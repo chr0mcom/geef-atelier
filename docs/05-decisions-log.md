@@ -1,6 +1,6 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 10. Mai 2026 (Schritt 3 abgeschlossen)*
+*Letzte Aktualisierung: 10. Mai 2026 (Schritt 4 abgeschlossen — EventSink + Postgres-Persistierung)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming. Format: Frage / Entscheidung / Begründung / ggf. Konsequenzen.
 
@@ -123,20 +123,14 @@ Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming. Format: Fr
 - **Provider-Sichtbarkeit:** `internal sealed` + `<InternalsVisibleTo Include="Geef.Atelier.Tests" />` in `Geef.Atelier.Infrastructure.csproj`.
 
 **Workflow-Bug entdeckt:**
-Der in D-011(A) beschlossene Workflow-Patch enthielt einen Fehler: Level 2 referenziert `claude --input-file`, das CLI-Flag existiert nicht (*"error: unknown option '--input-file'"*). Der eigentliche Fehler in Level 1 war kein Stdin-Redirect, sondern eine **Permissions-Wartung** — `claude -p` hat interaktiv um Erlaubnis gebeten und mit Exit 0 + bedeutungsloser Zeile beendet.
-
-Korrigierter Workflow-Patch (Empfehlung an Maintainer):
-- **Level 1:** Standard `claude -p` mit Heredoc.
-- **Level 2:** `claude -p --dangerously-skip-permissions` mit Heredoc — adressiert das tatsächliche Problem (Permissions-Wartung).
-- **Level 3:** Interaktive Subsession (wie bisher).
-
-In Schritt 2 wurde Atelier-Level-4-Fallback aktiviert: Executor hat `geef_architecture.md` selbst geschrieben mit Pflicht-Header, Diff gegen `docs/02-architecture.md`, dokumentierten Fehlermeldungen. R4 hat Existenz verifiziert — 0 CRITICAL.
+Der in D-011(A) beschlossene Workflow-Patch enthielt einen Fehler: Level 2 referenziert `claude --input-file`, das CLI-Flag existiert nicht. **Korrekt funktionierende Form aus Schritt 3:** `cat /tmp/prompt.txt | claude -p` (Pipe-Redirect, nicht Flag). Workflow-Patch sollte entsprechend korrigiert werden.
 
 **Beobachtung zur Reviewer-Effektivität:**
 Null aktionierbare Findings in Iteration 1 ist **kein** Zeichen unzureichender Prüfung — der Bericht erwähnt explizit: *"Die meisten Findings wurden während der Execution-Phase (Compilation-Fehler-Fixierung) abgefangen, bevor die Reviewer liefen."* Phase 2 fängt das Naheliegende, Phase 3 prüft das Subtile. Das System funktioniert wie geplant.
 
 **Pre-Mortem-Risiko für Schritt 3:**
 *"`AbortOnCritical = true` wird die Pipeline hart stoppen, sobald ein echter LLM-Reviewer Critical-Findings produziert."* Dieses Verhalten muss in Schritt 3 explizit getestet werden — nicht erst entdeckt werden, wenn die Pipeline in Production stoppt.
+
 ### D-013: Schritt 3 abgeschlossen — Anthropic-Client und echte Provider
 
 **Datum:** 10. Mai 2026
@@ -202,3 +196,94 @@ Null aktionierbare Findings in Iteration 1 ist **kein** Zeichen unzureichender P
 **R2 MAJOR-Findings (behoben vor Phase 4):**
 1. `AnthropicMessageFormat.DeserializeResponse`: `?? throw new JsonException(...)` statt `!`-Operator
 2. `LlmReviewer.ParseToolInput`: `TryGetProperty` statt `GetProperty` — gibt `ReviewDecision.Failed` bei malformiertem Tool-Input zurück
+
+**Offener Verifikationspunkt (für Schritt 5):**
+Der Integration-Test `AtelierPipelineRealAnthropicTests` wurde **nicht** mit echtem API-Key ausgeführt. Die echten Anthropic-API-Aufrufe sind damit aktuell ungetestet. Vor Schritt 5 (BackgroundService) sollte dieser Test mit echtem Key laufen — sonst baut Schritt 5 auf einer ungetesteten Annahme auf.
+
+### D-014: Production-Domain und Traefik-Routing für Schritt 10
+
+**Datum:** 10. Mai 2026
+**Status:** Vorbereitung für Schritt 10 (Production-Deploy).
+
+**Entscheidung:**
+- **Production-Domain:** `geef.stefan-bechtel.de`
+- **Server-IP:** `95.216.100.213`
+- **DNS:** A-Record bereits gesetzt, zeigt auf die IP.
+- **Reverse-Proxy:** Traefik, bereits auf dem Zielserver aktiv.
+- **TLS-Termination:** durch Traefik (Let's Encrypt o.ä. — bestehende Server-Konfiguration nutzen, nicht selbst verwalten).
+
+**Konsequenz:**
+- Der bestehende `docker-compose.yml` (Production-Skelett aus Schritt 1) enthält Placeholder `atelier.example.com` — wird in Schritt 10 durch `geef.stefan-bechtel.de` ersetzt.
+- Traefik-Labels im `docker-compose.yml` müssen mit der existierenden Server-Konvention konsistent sein (Network, EntryPoints, Cert-Resolver — vermutlich aus `/srv/CLAUDE.md` oder `/srv/docker/docs/docker-deployment.md` ableitbar).
+- Die App selbst lauscht intern unverändert auf Port 8080 — Traefik routet von 443 → interner Port.
+- Health-Check `/health` aus Schritt 1 wird von Traefik als Healthcheck-Endpoint nutzbar.
+
+**Nicht-Konsequenz für Schritte 4–9:**
+Diese Domain ist Schritt-10-Material. Schritte 4 (Persistierung), 5 (BackgroundService), 6 (IRunService), 7 (UI), 8 (Auth), 9 (MCP) sind davon unbetroffen — sie laufen lokal über `docker-compose.dev.yml`. Erst Schritt 10 koppelt Production-Compose und Domain.
+
+**Offener Punkt:** Wenn Auth in Schritt 8 Cookie-basiert ist und das Cookie auf `geef.stefan-bechtel.de` gesetzt wird, muss die Cookie-Konfiguration die Domain wissen. Aktuell kein Problem — kommt mit Schritt 8.
+
+---
+
+### D-015: Schritt 4 abgeschlossen — EventSink und Postgres-Persistierung
+
+**Datum:** 10. Mai 2026
+**Bericht:** [docs/reports/step-04-report.md](reports/step-04-report.md)
+**Reviewer-Iterationen:** 1; Findings: 1 MAJOR (behoben), Rest MINOR/INFO
+**Tests:** 15/15 grün (4 neue Persistence-Tests + 11 Regression aus Schritte 1–3)
+
+**Fixierte Realfakten aus Schritt 4 (verbindlich ab Schritt 5):**
+
+**(a) `IRunPersistenceService`-Vertrag:**
+- Interface in `Geef.Atelier.Core.Persistence`: `CreateRunAsync(briefingText, configJson, ct) → Task<Guid>`
+- Implementierung in `Geef.Atelier.Infrastructure.Persistence.RunPersistenceService`
+- Legt `RunEntity` mit `Status=Pending`, `CreatedAt=UtcNow` an; gibt die neue `RunId` zurück
+
+**(b) `PostgresEventSink`-Pattern und Verantwortungen:**
+- `internal sealed class PostgresEventSink(Guid atelierRunId, IServiceScopeFactory, ILogger)`
+- Pro `HandleEventAsync`-Aufruf: ein `CreateAsyncScope()` → ein frischer `AtelierDbContext`
+- Verarbeitete Events: `PipelineStartedEvent`, `ExecutionCompletedEvent`, `EvaluationApprovedEvent`, `EvaluationRejectedEvent`, `PipelineCompletedEvent`, `PipelineFailedEvent`
+- Alle Events → Raw-Log in `Events`-Tabelle (defensiv: Try-Catch um Serialisierung)
+- `PublishAsync` wrapped `HandleEventAsync` in Try-Catch — Sink killt niemals die Pipeline
+
+**(c) RunId-Propagation — Variante A (injizierte RunId):**
+- `PostgresEventSink` bekommt `RunId: Guid` direkt im Konstruktor
+- Tests und später `RunOrchestratorService` konstruieren Sink nach `CreateRunAsync`
+- `IGeefEvent.RunId` (als `string`) wird nicht für Routing verwendet
+
+**(d) Token-Tracking via typisiertem ContextKey:**
+- `AtelierContextKeys.TokenUsage = new ContextKey<AnthropicTokenUsage>("geef:atelier:token-usage")`
+- `LlmExecutionStep` schreibt nach jedem LLM-Call `AnthropicTokenUsage` in den Context
+- `PostgresEventSink` liest bei `ExecutionCompletedEvent` via `TryGet` und akkumuliert via `ExecuteUpdateAsync` (atomar, kein Read-Modify-Write-Race)
+
+**(e) Severity-Mapping-Tabelle:**
+- SDK `Critical` → Atelier `Critical`
+- SDK `Error` → Atelier `Major`
+- SDK `Warning` → Atelier `Minor`
+- SDK `Info` → Atelier `Info`
+- Implementiert als Extension-Method `ToAtelierSeverity()` in `FindingSeverityExtensions.cs` (Infrastructure, nicht Core)
+
+**(f) DbContext-per-Event-Pattern via `IServiceScopeFactory`:**
+- `await using var scope = scopeFactory.CreateAsyncScope()` pro Event-Verarbeitung
+- Token-Akkumulation via `ExecuteUpdateAsync(s => s.SetProperty(r => r.TokensTotal, r => r.TokensTotal + delta))` — DB-seitig atomar
+- Keine Connection-Pool-Probleme bei 15/15 Tests mit Testcontainers PostgreSQL 16
+
+**(g) `ConvergenceFailedException` → `Status=Aborted` (nicht `Failed`):**
+- Erkennung: `failed.Reason == ConvergenceDecision.AbortCriticalBlocker`
+- `Aborted`-Status, `ErrorMessage = "Aborted due to critical reviewer finding"`
+- `Failed`-Status für alle anderen `PipelineFailedEvent`-Gründe
+
+**(h) SDK-Realität: EvaluationRejectedEvent nicht für AbortCriticalBlocker:**
+- SDK feuert `EvaluationRejectedEvent` **nur** für `ConvergenceDecision.Continue`
+- Bei `AbortCriticalBlocker`: direkt `PipelineFailedEvent` ohne `EvaluationRejectedEvent`
+- Findings bei Critical-Abort: `PipelineFailedEvent.History.Records.LastOrDefault().EvaluationResult.AllFindings`
+- Verifiziert via SDK-Dekompilierung mit `ilspycmd`
+
+**(i) Architect-Konsultation:**
+- Level 2 (Pipe-basiert): erfolgreich, keine Eskalation nötig
+- `geef_architecture.md` durch Executor erstellt (Atelier-Level-4-Fallback nicht benötigt)
+
+**(j) AC7-Status (Real-Anthropic-Test):**
+- Skip: Im Session-Kontext nur OAuth-Token verfügbar, kein API-Bearer-Key
+- Skip-Pattern (`Skip.If`) verifiziert und korrekt implementiert
+- Real-Lauf vor Schritt 5 nachholen (via `Anthropic__ApiKey` Umgebungsvariable)

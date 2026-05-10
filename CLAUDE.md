@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Aktueller Zustand
 
-**Skeleton Schritt 3 abgeschlossen (10. Mai 2026).** Echte Anthropic-API-Aufrufe: `IAnthropicClient` + `HttpAnthropicClient` (HTTP gegen `/v1/messages`, Polly-Resilience), `LlmExecutionStep`, zwei `LlmReviewer` (Tool Use mit `submit_review`), `AtelierPipelineFactory` mit `BuildWithProviders`-Test-Hook. Namespace `Geef.Atelier.Infrastructure.Llm`. 11/11 Tests grün (Mock-Pipeline + Stub-Regression + Skip-If-No-Key-Integration). Nächster Schritt: [`docs/prompts/step-04-eventsink-persistence.md`](docs/prompts/step-04-eventsink-persistence.md) — EventSink und Persistierung in Postgres.
+**Skeleton Schritt 4 abgeschlossen (10. Mai 2026).** Postgres-Persistierung: `IRunPersistenceService` (Core-Interface) + `RunPersistenceService` (Infrastructure-Impl), `PostgresEventSink` (IServiceScopeFactory-Scope-per-Event, Variante A mit injizierter RunId), typisiertes Token-Tracking via `ContextKey<AnthropicTokenUsage>`, `FindingSeverityExtensions.ToAtelierSeverity()`, Critical-Abort → `Status=Aborted` (Findings aus `PipelineFailedEvent.History`). 15/15 Tests grün. Nächster Schritt: Schritt 5 — `RunOrchestratorService` (BackgroundService).
 
 ## Verbindlicher Workflow
 

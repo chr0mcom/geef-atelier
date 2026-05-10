@@ -1,6 +1,6 @@
 # Walking Skeleton — Bauplan
 
-*Letzte Aktualisierung: 10. Mai 2026 (Schritte 1–3 abgeschlossen)*
+*Letzte Aktualisierung: 10. Mai 2026 (Schritte 1–4 abgeschlossen)*
 
 Das Walking Skeleton ist die kleinste end-to-end-funktionale Version von Geef.Atelier: ein Auftrag wird über die UI oder via MCP gestellt, eine echte Geef-Pipeline läuft (mit echten LLM-Calls), Live-Status ist sichtbar, das Ergebnis wird angezeigt und persistiert. Quellen-Upload, Klassifikator, dynamische Crew, Advisor, Multi-Format-Export — alles weitere kommt später.
 
@@ -28,6 +28,8 @@ Jeder Schritt ist einzeln verifizierbar. Kein Schritt setzt voraus, dass alles d
 - `dotnet ef database update` läuft erfolgreich gegen Postgres
 - `docker compose up` startet App und DB; Health-Check antwortet 200 OK
 - Tests-Projekt enthält mindestens einen Smoke-Test (DbContext lädt, Migration läuft in Test-DB)
+
+**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, alle 5 Reviewer durch (1 CRITICAL + 4 MAJOR Findings, alle behoben). 9 Conventional-Commits. Bericht: [reports/step-01-report.md](reports/step-01-report.md). Details siehe Decisions-Log D-010.
 
 **Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, alle 5 Reviewer durch (1 CRITICAL + 4 MAJOR Findings, alle behoben). 9 Conventional-Commits. Bericht: [reports/step-01-report.md](reports/step-01-report.md). Details siehe Decisions-Log D-010.
 
@@ -71,7 +73,9 @@ Jeder Schritt ist einzeln verifizierbar. Kein Schritt setzt voraus, dass alles d
 - Token-Verbrauch wird erfasst und im Final-Output ausgewiesen
 - Strukturierter Reviewer-Output wird korrekt geparst
 
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, alle 5 Reviewer mit 2 aktionierbaren Findings durch (beide R2 MAJOR-Findings vor Phase 4 behoben: defensive JSON-Deserialisierung). 11/11 Tests grün (4 neue Mock-Tests + 7 Regression). Bericht: [reports/step-03-report.md](reports/step-03-report.md). Details siehe Decisions-Log D-013.
+**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, 2 MAJOR-Findings vor Phase 4 behoben (defensive JSON-Deserialisierung). 11/11 Tests grün (4 neue Mock-Tests + 7 Regression). Anthropic-Tool-Use mit `submit_review`, `Microsoft.Extensions.Http.Resilience` via `AddStandardResilienceHandler`, `ConvergenceFailedException` bei `AbortOnCritical=true` verifiziert. 14 Conventional-Commits. Bericht: [reports/step-03-report.md](reports/step-03-report.md). Details siehe Decisions-Log D-013.
+
+**Offen:** Integration-Test `AtelierPipelineRealAnthropicTests` wurde nicht mit echtem API-Key ausgeführt — vor Schritt 5 nachholen.
 
 ---
 
@@ -88,6 +92,8 @@ Jeder Schritt ist einzeln verifizierbar. Kein Schritt setzt voraus, dass alles d
 **Akzeptanzkriterien:**
 - Nach einem Pipeline-Run sind in der DB: ein Run, mehrere Iterations, Findings (für die Iterationen, in denen welche gefunden wurden), und ein vollständiger Event-Log
 - Kein doppeltes Event, keine verlorene Iteration
+
+**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, 1 MAJOR-Finding behoben (`volatile` auf `_lastExecutionContext`). 15/15 Tests grün (11 alt + 4 neue Persistence-Tests). `IRunPersistenceService` in Core, `PostgresEventSink` + `RunPersistenceService` in Infrastructure, typisiertes Token-Tracking via `ContextKey<AnthropicTokenUsage>`, Severity-Mapping als Extension-Method, SDK-Critical-Abort-Verhalten via Dekompilierung verifiziert. Bericht: [reports/step-04-report.md](reports/step-04-report.md). Details siehe Decisions-Log D-015.
 
 ---
 
