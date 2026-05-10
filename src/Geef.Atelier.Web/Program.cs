@@ -1,8 +1,13 @@
+using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Web.Components;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Anthropic LLM client — ApiKey is read lazily; set Anthropic__ApiKey env-var for real calls.
+builder.Services.AddAnthropicClient(builder.Configuration)
+    .AddStandardResilienceHandler();
 
 builder.Services.AddDbContext<AtelierDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
