@@ -1,0 +1,43 @@
+using Geef.Atelier.Infrastructure.Pipeline;
+using Geef.Sdk.Events;
+
+namespace Geef.Atelier.Tests.Pipeline;
+
+public sealed class StubPipelineEventTests
+{
+    private const string Briefing = "Schreib mir einen Test-Text über Walking-Skeleton-Pattern.";
+
+    [Fact]
+    public async Task StubPipelineEmitsExpectedEvents()
+    {
+        var sink   = new CountingEventSink();
+        var runner = StubPipelineFactory.Build(additionalSinks: [sink]);
+
+        await runner.RunAsync(Briefing, CancellationToken.None);
+
+        // Pipeline lifecycle
+        Assert.Equal(1, sink.Get<PipelineStartedEvent>());
+        Assert.Equal(1, sink.Get<PipelineCompletedEvent>());
+        Assert.Equal(0, sink.Get<PipelineFailedEvent>());
+
+        // Grounding — runs once
+        Assert.Equal(1, sink.Get<GroundingStartedEvent>());
+        Assert.Equal(1, sink.Get<GroundingCompletedEvent>());
+
+        // Execution — once per iteration (2 iterations)
+        Assert.Equal(2, sink.Get<ExecutionStartedEvent>());
+        Assert.Equal(2, sink.Get<ExecutionCompletedEvent>());
+
+        // Reviewers — 2 reviewers × 2 iterations
+        Assert.Equal(4, sink.Get<ReviewerStartedEvent>());
+        Assert.Equal(4, sink.Get<ReviewerCompletedEvent>());
+
+        // Evaluation — iter 1 rejected (findings), iter 2 approved (no findings)
+        Assert.Equal(1, sink.Get<EvaluationRejectedEvent>());
+        Assert.Equal(1, sink.Get<EvaluationApprovedEvent>());
+
+        // Finalize — runs once
+        Assert.Equal(1, sink.Get<FinalizeStartedEvent>());
+        Assert.Equal(1, sink.Get<FinalizeCompletedEvent>());
+    }
+}
