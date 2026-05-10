@@ -1,6 +1,8 @@
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Web.Components;
+using Geef.Atelier.Web.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +15,9 @@ builder.Services.AddDbContext<AtelierDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddAtelierPersistence();
+
+builder.Services.Configure<OrchestratorOptions>(builder.Configuration.GetSection("Orchestrator"));
+builder.Services.AddHostedService<RunOrchestratorService>();
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AtelierDbContext>();
