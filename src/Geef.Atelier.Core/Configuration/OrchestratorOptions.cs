@@ -8,4 +8,7 @@ public sealed class OrchestratorOptions
 
     /// <summary>Maximum number of pipeline runs that may execute concurrently.</summary>
     public int MaxConcurrentRuns { get; set; } = 5;
+
+    /// <summary>How often the per-run cancellation watcher polls the database for the CancellationRequested flag.</summary>
+    public TimeSpan CancellationPollingInterval { get; set; } = TimeSpan.FromSeconds(1);
 }

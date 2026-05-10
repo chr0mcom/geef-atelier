@@ -17,4 +17,7 @@ public sealed record RunEntity
     public string? ErrorMessage { get; init; }
     public int TokensTotal { get; init; }
     public decimal CostTotal { get; init; }
+
+    /// <summary>Set to true when a cancellation request has been submitted for this run.</summary>
+    public bool CancellationRequested { get; init; }
 }
