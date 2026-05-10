@@ -1,0 +1,37 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.nupkg
+*.snupkg
+
+## Test results
+TestResults/
+coverage/
+
+## Environment / secrets
+.env
+.env.local
+*.env
+
+## Docker build cache
+**/.dockerignore
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Rider / VS
+.idea/
+*.DotSettings.user
+
+## geef_workflow temporary files (cleaned up in Phase 4.3)
+geef_plan.md
+geef_architecture.md
+geef_review_*.md
+geef_advisor_*.md
+geef_advisor_log.md
+geef_eval_log.md
+geef_test_runner.sh

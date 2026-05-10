@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Geef.Atelier.Core/Geef.Atelier.Core.csproj" />
+    <Project Path="src/Geef.Atelier.Infrastructure/Geef.Atelier.Infrastructure.csproj" />
+    <Project Path="src/Geef.Atelier.Mcp/Geef.Atelier.Mcp.csproj" />
+    <Project Path="src/Geef.Atelier.Web/Geef.Atelier.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Geef.Atelier.Tests/Geef.Atelier.Tests.csproj" />
+  </Folder>
+</Solution>
