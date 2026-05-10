@@ -12,6 +12,8 @@ builder.Services.AddAnthropicClient(builder.Configuration)
 builder.Services.AddDbContext<AtelierDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddAtelierPersistence();
+
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AtelierDbContext>();
 
