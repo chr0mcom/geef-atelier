@@ -92,25 +92,33 @@ Jeder Schritt ist einzeln verifizierbar. Kein Schritt setzt voraus, dass alles d
 **Akzeptanzkriterien:**
 - Nach einem Pipeline-Run sind in der DB: ein Run, mehrere Iterations, Findings (für die Iterationen, in denen welche gefunden wurden), und ein vollständiger Event-Log
 - Kein doppeltes Event, keine verlorene Iteration
+**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, 1 MAJOR-Finding (volatile-Annotation für `_lastExecutionContext`) behoben. 15/15 Tests grün (4 neue Persistence-Tests + 11 Regression). PostgresEventSink mit Variante-A-RunId-Propagation, IRunPersistenceService in Core, typisiertes Token-Tracking via `ContextKey<AnthropicTokenUsage>`, Critical-Abort-Findings aus `PipelineFailedEvent.History` (SDK via Dekompilierung verifiziert). 13 Conventional-Commits. Bericht: [reports/step-04-report.md](reports/step-04-report.md). Details siehe Decisions-Log D-015.
 
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, 1 MAJOR-Finding behoben (`volatile` auf `_lastExecutionContext`). 15/15 Tests grün (11 alt + 4 neue Persistence-Tests). `IRunPersistenceService` in Core, `PostgresEventSink` + `RunPersistenceService` in Infrastructure, typisiertes Token-Tracking via `ContextKey<AnthropicTokenUsage>`, Severity-Mapping als Extension-Method, SDK-Critical-Abort-Verhalten via Dekompilierung verifiziert. Bericht: [reports/step-04-report.md](reports/step-04-report.md). Details siehe Decisions-Log D-015.
+**Offen (verschoben):** `AtelierPipelineRealAnthropicTests` mit echtem API-Bearer-Key — kein Key in Session-Umgebung verfügbar. Real-Lauf in Schritt 5 oder später, wenn Bearer-Key bereitgestellt wird.
 
 ---
 
 ### Schritt 5 — RunOrchestratorService
 
+✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, 6 Findings (alle behoben). Bericht: [docs/reports/step-05-report.md](reports/step-05-report.md). D-016.
+
 **Ziel:** Asynchrone Auftragsverarbeitung über einen `BackgroundService`. Aufträge werden mit Status `Pending` in die DB geschrieben; der Service nimmt sie auf, führt die Pipeline aus, schreibt das Ergebnis zurück.
 
 **Umfang:**
 - `RunOrchestratorService : BackgroundService`
-- Polling-Intervall (z.B. 2 Sekunden) für `Pending`-Runs
-- Status-Übergänge: `Pending` → `Running` → `Completed` / `Failed`
-- Crash-Recovery (naive Variante): Beim Service-Start alle `Running`-Runs auf `Failed` setzen mit Error "Service restarted"
-- Cancellation-Token-Verkettung: Run kann via DB-Flag (`CancellationRequested`) abgebrochen werden
+- Polling-Intervall (2 Sekunden Default) für `Pending`-Runs; atomarer `Pending→Running`-Claim
+- `SemaphoreSlim`-Concurrency-Gate + Task-Tracking (`_runTasks`) mit Drain beim Stop
+- Crash-Recovery beim Service-Start: alle `Running`-Runs → `Failed/"Service restarted"`
+- Cancellation-Strategie γ: nur `StoppingToken`; `OverrideToAbortedAsync` mit `CancellationToken.None`
+- `OrchestratorOptions` (PollingInterval, MaxConcurrentRuns) in `Core/Configuration/`
+- `GatedFakeAnthropicClient` für deterministische Concurrency-Tests
 
 **Akzeptanzkriterien:**
-- Mehrere Runs nacheinander automatisch verarbeitet
-- App-Restart bricht laufende Runs sauber ab und markiert sie als Failed
+- ✅ Mehrere Runs nacheinander automatisch verarbeitet (E2E Pending→Completed)
+- ✅ App-Restart markiert laufende Runs als Failed/"Service restarted"
+- ✅ Nie mehr als MaxConcurrentRuns=2 Runs gleichzeitig (5/5 deterministisch)
+- ✅ StopAsync mid-flight → Status=Aborted
+- ✅ 19/19 Tests grün; AC8 Skip (OAuth-only)
 
 ---
 

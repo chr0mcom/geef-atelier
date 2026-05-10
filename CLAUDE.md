@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Aktueller Zustand
 
-**Skeleton Schritt 4 abgeschlossen (10. Mai 2026).** Postgres-Persistierung: `IRunPersistenceService` (Core-Interface) + `RunPersistenceService` (Infrastructure-Impl), `PostgresEventSink` (IServiceScopeFactory-Scope-per-Event, Variante A mit injizierter RunId), typisiertes Token-Tracking via `ContextKey<AnthropicTokenUsage>`, `FindingSeverityExtensions.ToAtelierSeverity()`, Critical-Abort → `Status=Aborted` (Findings aus `PipelineFailedEvent.History`). 15/15 Tests grün. Nächster Schritt: Schritt 5 — `RunOrchestratorService` (BackgroundService).
+**Skeleton Schritt 5 abgeschlossen (10. Mai 2026).** BackgroundService-Orchestrierung: `RunOrchestratorService` (Web/Services) mit atomarem `Pending→Running`-Claim, `SemaphoreSlim`-Concurrency-Gate (`MaxConcurrentRuns=5`), `ConcurrentDictionary<Guid, Task>` Task-Tracking + `Task.WhenAll`-Drain nach Polling-Loop, Crash-Recovery beim Start, `OverrideToAbortedAsync` mit `CancellationToken.None`. `OrchestratorOptions` (Core/Configuration, `PollingInterval TimeSpan`, `MaxConcurrentRuns int`). `PostgresEventSink.PipelineStartedEvent`-Handler idempotent (nur `StartedAt`). `GatedFakeAnthropicClient` für deterministische Concurrency-Tests. 19/19 Tests grün. Nächster Schritt: Schritt 6 — `IRunService` (Application-Service-Layer).
 
 ## Verbindlicher Workflow
 
