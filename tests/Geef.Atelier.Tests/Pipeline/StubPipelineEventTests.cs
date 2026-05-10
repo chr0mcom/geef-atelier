@@ -11,7 +11,15 @@ public sealed class StubPipelineEventTests
     public async Task StubPipelineEmitsExpectedEvents()
     {
         var sink   = new CountingEventSink();
-        var runner = StubPipelineFactory.Build(additionalSinks: [sink]);
+        var runner = AtelierPipelineFactory.BuildWithProviders(
+            new BriefingGroundingStep(),
+            new StubExecutionStep(),
+            [
+                new StubReviewer("BriefingTreueStub",  Geef.Sdk.Results.FindingSeverity.Error,   "Stub finding: simulated briefing-coverage gap (will be cleared on next iteration)."),
+                new StubReviewer("KlarheitStub",        Geef.Sdk.Results.FindingSeverity.Warning, "Stub finding: simulated clarity nit (will be cleared on next iteration).")
+            ],
+            new MarkdownFinalizer(),
+            additionalSinks: [sink]);
 
         await runner.RunAsync(Briefing, CancellationToken.None);
 

@@ -12,7 +12,15 @@ public sealed class StubPipelineConvergenceTests(ITestOutputHelper output)
     public async Task StubPipelineRunsToConvergence()
     {
         var outputSink = new OutputEventSink(output);
-        var runner = StubPipelineFactory.Build(additionalSinks: [outputSink]);
+        var runner = AtelierPipelineFactory.BuildWithProviders(
+            new BriefingGroundingStep(),
+            new StubExecutionStep(),
+            [
+                new StubReviewer("BriefingTreueStub",  Geef.Sdk.Results.FindingSeverity.Error,   "Stub finding: simulated briefing-coverage gap (will be cleared on next iteration)."),
+                new StubReviewer("KlarheitStub",        Geef.Sdk.Results.FindingSeverity.Warning, "Stub finding: simulated clarity nit (will be cleared on next iteration).")
+            ],
+            new MarkdownFinalizer(),
+            additionalSinks: [outputSink]);
 
         var result = await runner.RunAsync(Briefing, CancellationToken.None);
 
