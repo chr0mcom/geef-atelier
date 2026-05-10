@@ -1,12 +1,30 @@
 # Walking Skeleton — Bauplan
 
-*Letzte Aktualisierung: 10. Mai 2026 (Schritte 1–4 abgeschlossen)*
+*Letzte Aktualisierung: 10. Mai 2026 (Schritte 1–6 abgeschlossen; Migration M1 auf feature/openai-compatible-providers)*
 
 Das Walking Skeleton ist die kleinste end-to-end-funktionale Version von Geef.Atelier: ein Auftrag wird über die UI oder via MCP gestellt, eine echte Geef-Pipeline läuft (mit echten LLM-Calls), Live-Status ist sichtbar, das Ergebnis wird angezeigt und persistiert. Quellen-Upload, Klassifikator, dynamische Crew, Advisor, Multi-Format-Export — alles weitere kommt später.
 
 ## Strategie
 
 Jeder Schritt ist einzeln verifizierbar. Kein Schritt setzt voraus, dass alles davor perfekt ist. Nach jedem Schritt sollte das System in einem testbaren Zustand sein. Schritte werden in Reihenfolge umgesetzt, weil jeder auf Vorgängern aufbaut — aber bei Bedarf darf gestoppt, refaktoriert oder neu gedacht werden, bevor der nächste startet.
+
+---
+
+## Parallele Migrations-Tracks
+
+Während die nummerierten Schritte sequenziell durchlaufen werden, gibt es parallele Migrations-Tracks für strukturelle Umbauten, die durch Ereignisse außerhalb des Walking-Skeleton-Plans ausgelöst wurden. Sie laufen auf eigenen Branches und werden nicht automatisch in main gemerged — der Brainstorming-Maintainer entscheidet den Merge-Zeitpunkt.
+
+### M1 — Provider-Migration auf OpenAI-konforme APIs
+
+**Branch:** `feature/openai-compatible-providers`
+**Status:** In Arbeit (parallel zu Schritt 6).
+**Auslöser:** D-017 — Anthropic-OAuth-Token wird von Messages-API nicht akzeptiert; Pay-as-you-go-Bearer-Key vermeidbar; Multi-Provider-Vorteil sofort nutzbar.
+**Scope:** Ersetzt anthropic-spezifischen LLM-Layer durch OpenAI-API-konformen Adapter (Default: OpenRouter). Pro-Akteur-Modell-Konfiguration. Tool-Use-Format wechselt auf OpenAI-`function`-Schema.
+**Nicht im Scope:** Pipeline-Struktur, EventSink, Persistierung, Orchestrator, Domain-Modell.
+**Empfohlener Merge-Zeitpunkt:** Vor Schritt 7 (UI), damit die UI direkt gegen die neuen Provider-Verträge gebaut wird.
+**Prompt:** [prompts/migration-01-openai-compatible-providers.md](prompts/migration-01-openai-compatible-providers.md)
+
+---
 
 ## Die zehn Schritte
 
@@ -77,6 +95,8 @@ Jeder Schritt ist einzeln verifizierbar. Kein Schritt setzt voraus, dass alles d
 
 **Offen:** Integration-Test `AtelierPipelineRealAnthropicTests` wurde nicht mit echtem API-Key ausgeführt — vor Schritt 5 nachholen.
 
+**Hinweis:** Die in Schritt 3 etablierte Anthropic-spezifische LLM-Schicht wird durch Migration M1 (siehe oben) durch eine OpenAI-API-konforme Provider-Schicht ersetzt. Die Pipeline-Struktur und Convergence-Logik aus Schritt 3 bleiben unverändert; nur der Client-Adapter und die Konfigurations-Records ändern sich. Details siehe D-017 im Decisions-Log.
+
 ---
 
 ### Schritt 4 — EventSink und Persistierung
@@ -120,6 +140,10 @@ Jeder Schritt ist einzeln verifizierbar. Kein Schritt setzt voraus, dass alles d
 - ✅ StopAsync mid-flight → Status=Aborted
 - ✅ 19/19 Tests grün; AC8 Skip (OAuth-only)
 
+**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration; 4 MAJOR R2 (Drain-Race, Test-Precondition-Guards) + 2 MAJOR R4 (Doku-Updates) — alle behoben. 19/19 Tests grün (4 neue Orchestrator-Tests + 15 Regression), Concurrency-Test 5/5 deterministisch via `GatedFakeAnthropicClient`. Atomarer Pending→Running-Claim, `SemaphoreSlim` + `ConcurrentDictionary<Guid, Task>` + `WhenAll`-Drain, Crash-Recovery beim Service-Start, Cancellation via Option γ (nur StoppingToken). 11 Conventional-Commits. Bericht: [reports/step-05-report.md](reports/step-05-report.md). Details siehe Decisions-Log D-016.
+
+**Offen (verschoben):** AC8 (Real-Anthropic-Test mit Bearer-Key) — 3. Mal Skip wegen OAuth-only Token in Session. `CancelRunAsync` als Stub-Implementierung folgt in Schritt 6 zusammen mit DB-Flag-Migration.
+
 ---
 
 ### Schritt 6 — IRunService als Application-Service-Layer
@@ -127,19 +151,29 @@ Jeder Schritt ist einzeln verifizierbar. Kein Schritt setzt voraus, dass alles d
 **Ziel:** Saubere Anwendungslogik-Schicht, die von beiden Frontends (Web-UI und MCP-Server) konsumiert wird.
 
 **Umfang:**
-- `IRunService`-Interface in Core
-- Implementierung in Web (oder eigenes Application-Projekt)
-- Methoden: `SubmitRunAsync`, `GetRunStatusAsync`, `GetRunResultAsync`, `ListRunsAsync`, `CancelRunAsync`
-- DI-Registrierung
-- Repository-Pattern für DB-Zugriff (ein einfaches `IRunRepository` reicht)
+- `IRunService`-Interface in neuem `Geef.Atelier.Application`-Projekt (Option B, User bestätigt)
+- Methoden: `SubmitRunAsync`, `GetRunAsync`, `ListRunsAsync`, `CancelRunAsync`
+- `IRunRepository` in Core, `RunRepository` in Infrastructure (Variante β — keine Infra-Dep in Application)
+- `RunEntity.CancellationRequested`-Flag + EF-Migration `Step06Cancellation`
+- Cancellation-Watcher im Orchestrator (Pattern A, pro-Run, pollt DB jede `CancellationPollingInterval`)
+- DI-Registrierung `AddAtelierApplication()` + `AddAtelierApplication()` in Program.cs
 
 **Akzeptanzkriterien:**
-- Service ist über DI in Tests aufrufbar
-- Tests für jeden Service-Methoden-Call (gegen Test-DB oder InMemory)
+- ✅ `SubmitRunAsync` + `GetRunAsync`: End-to-End Pending→Completed
+- ✅ `ListRunsAsync`: sortiert nach `CreatedAt desc`, filterbar nach Status
+- ✅ `CancelRunAsync` mid-flight: DB-Flag → Watcher → CTS → Pipeline-OCE → Aborted
+- ✅ `CancelRunAsync` für terminalen Run: false (idempotent)
+- ✅ Input-Validierung: leeres/null-Briefing, null-configJson, ungültiges JSON
+- ✅ `dotnet test`: 31/31 grün (5 neue Application-Tests + 26 Regression)
+- ✅ AC9: Skip — kein Live-API-Key in Session (Eskalations-Hinweis vor Schritt 9)
+
+**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 2 Reviewer-Iterationen (R1+R2+R4 parallel), 2 MAJOR-Findings behoben (ServiceProvider-Leak, Hardcoded-Delay). 31/31 Tests grün. Bericht: [reports/step-06-report.md](reports/step-06-report.md). Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt).
 
 ---
 
 ### Schritt 7 — Blazor-UI
+
+**Voraussetzung:** Migration M1 (Provider-Wechsel auf OpenAI-konform) sollte vor Schritt 7 in main gemerged sein. Andernfalls baut die UI gegen die später ersetzte Anthropic-spezifische LLM-Schicht und müsste nachträglich angepasst werden.
 
 **Ziel:** Drei UI-Seiten für den Workflow.
 

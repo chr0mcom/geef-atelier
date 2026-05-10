@@ -7,6 +7,7 @@ Text-Generations-Pipeline-Plattform auf Basis des [Geef SDK](https://github.com/
 **Schritt 3 ✅** Echte Anthropic-API-Aufrufe — `IAnthropicClient` mit HTTP-Implementierung, `LlmExecutionStep` und zwei `LlmReviewer` (Tool Use mit `submit_review`). 11/11 Tests grün (Mocks + Stub-Regression + Skip-If-No-Key-Integration). Polly-Resilience via `Microsoft.Extensions.Http.Resilience`.
 **Schritt 4 ✅** Postgres-Persistierung — `PostgresEventSink` schreibt jeden Pipeline-Run mit Iterationen, Findings, Token-Verbrauch und Event-Log in die DB. `IRunPersistenceService` für Run-Initialisierung. 15/15 Tests grün (4 neue Persistence-Tests mit Testcontainers).
 **Schritt 5 ✅** BackgroundService-Orchestrierung — `RunOrchestratorService` pollt für `Pending`-Runs, setzt atomaren Claim, führt die Geef-Pipeline concurrent aus (SemaphoreSlim), recovert crashed Runs beim Start, drainiert In-Flight-Tasks bei StopAsync. 19/19 Tests grün (4 neue Orchestrator-Tests mit deterministischem GatedFakeAnthropicClient).
+**Schritt 6 ✅** Application-Service-Layer — `IRunService` (Submit/Get/List/Cancel) in neuem `Geef.Atelier.Application`-Projekt. `IRunRepository`/`RunRepository` (Variante β). `RunEntity.CancellationRequested`-Flag + EF-Migration. Cancellation-Watcher pro Run pollt DB, signalisiert CTS → Pipeline-OCE → Aborted. 31/31 Tests grün (5 neue Application-Tests).
 
 Vollständiger Scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope.md)
 
@@ -46,9 +47,10 @@ dotnet test
 
 ```
 src/
-  Geef.Atelier.Core/           Domain-Entities, keine externen Abhängigkeiten
-  Geef.Atelier.Infrastructure/ EF Core, Npgsql, Geef.Sdk-Provider-Implementierungen
-  Geef.Atelier.Web/            Blazor Server, IRunService, Health-Check
+  Geef.Atelier.Core/           Domain-Entities, Interfaces (IRunRepository etc.), keine externen Deps
+  Geef.Atelier.Application/    IRunService-Vertrag + RunService-Implementierung (→ nur Core-Dep)
+  Geef.Atelier.Infrastructure/ EF Core, Npgsql, OpenAiCompatibleClient, Geef.Sdk-Provider-Impl.
+  Geef.Atelier.Web/            Blazor Server, RunOrchestratorService, Health-Check
   Geef.Atelier.Mcp/            MCP-Server-Stub (aktiv ab Schritt 9)
 tests/
   Geef.Atelier.Tests/          xUnit + Testcontainers

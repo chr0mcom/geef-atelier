@@ -1,6 +1,6 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 10. Mai 2026 (Provider-Strategie auf OpenAI-konform geändert; Migration M1 parallel zu Schritt 6)*
+*Letzte Aktualisierung: 10. Mai 2026 (Provider-Strategie auf OpenAI-konform geändert M1; Schritt 6 IRunService Application-Layer abgeschlossen)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -129,3 +129,34 @@ Wechsel der LLM-Schicht von Anthropic-spezifisch auf **OpenAI-API-konform**. Def
 - Keine `anthropic-version`-Header-Reste im neuen Client; Provider-agnostisch per Design.
 - Bestehende 15 Tests (Schritt 5) + 3 neue Unit-Tests (`OpenAiCompatibleClientTests`) — 18 Tests ohne Docker; Integration-Test (`AtelierPipelineRunsAgainstOpenRouter`) skipped ohne `Llm__ApiKey`.
 - `CountingEventSink.TotalEvents`-Property hinzugefügt (für Integration-Test-Assertion).
+
+### D-017b: Schritt 6 abgeschlossen — IRunService Application-Service-Layer
+
+**Datum:** 10. Mai 2026
+**Bericht:** [reports/step-06-report.md](reports/step-06-report.md)
+
+**Realfakten (Schritt 6):**
+
+**(a) Projekt-Layout:** Neues Projekt `Geef.Atelier.Application` (`src/Geef.Atelier.Application/`). Project-References: Application → Core; Web → Application + Core + Infrastructure; Tests → Application + Core + Infrastructure + Web. Application hat **keine** Infrastructure-Dep (Variante β bestätigt durch Architect-Konsultation / Plan-Phase-Integration).
+
+**(b) IRunService-Interface-Position:** `Geef.Atelier.Application.Runs.IRunService` — im Application-Projekt, nicht in Core. Abweichung von `02-architecture.md` Zeile 64 (Vorplanung), weil Core frei von Application-Konzepten bleiben soll. Architecture-Doc in diesem Schritt aktualisiert.
+
+**(c) Repository-Variante β (final):** `IRunRepository` in `Core/Persistence/` (`GetByIdAsync`, `ListAsync`, `RequestCancellationAsync`). `internal sealed RunRepository(AtelierDbContext db) : IRunRepository` in Infrastructure. Registriert in `AddAtelierPersistence()`.
+
+**(d) `RunEntity.CancellationRequested`:** `bool CancellationRequested { get; init; }` — Value-Type-Default `false`. EF-Mapping: `IsRequired().HasDefaultValue(false)`.
+
+**(e) EF-Migration `Step06Cancellation`:** `ALTER TABLE "Runs" ADD COLUMN "CancellationRequested" boolean NOT NULL DEFAULT false`. Timestamp-Präfix `20260510202104`.
+
+**(f) `OrchestratorOptions.CancellationPollingInterval`:** `TimeSpan`, Default `TimeSpan.FromSeconds(1)`. In Tests: `TimeSpan.FromMilliseconds(200)` (schnelleres Feedback).
+
+**(g) Cancellation-Watcher Pattern A:** `WatchCancellationAsync(Guid runId, CancellationTokenSource cts)` als privater Task in `RunOrchestratorService`. Pollt DB via eigenem Scope (`CreateAsyncScope`). Erkennt `CancellationRequested = true` → `cts.Cancel()` → `return`. Watcher-Join: `await watcherTask` in `finally` (try/catch), nach `cts.Cancel()` (idempotent). `cts.Dispose()` ebenfalls im `finally`. `_runTasks.TryRemove` bleibt letzte Aktion (Drain-Semantik aus D-016).
+
+**(h) Catch-Block-Erweiterung:** Zweiter Arm `catch (OperationCanceledException) when (cts.IsCancellationRequested)` → `OverrideToAbortedAsync(run.Id, "Cancelled by user")`. Reihenfolge: Service-Stop-Arm zuerst (gewinnt wenn beide CTS gleichzeitig gesetzt).
+
+**(i) `IRunService.CancelRunAsync`-Semantik:** `true` wenn Run Pending/Running war und `CancellationRequested` noch nicht gesetzt. `false` in allen anderen Fällen (terminal, nicht gefunden, bereits angefragt). Atomar via `ExecuteUpdateAsync` mit `WHERE Id=? AND Status IN(Pending,Running) AND !CancellationRequested`.
+
+**(j) `configJson` als `string`:** Nicht-null (ArgumentNullException). Leerstring erlaubt (Defaults). Nicht-leere Strings werden via `JsonDocument.Parse` auf Wohlgeformtheit geprüft (ArgumentException bei Fehler). Leerstring wird intern als `"{}"` normalisiert.
+
+**(k) Architect-Invocation:** Plan-Phase-Integration (5 Pflichtfragen inline im Plan beantwortet, `geef_architecture.md` als Output-Dokument). Kein Level-2-Subprozess nötig.
+
+**(l) AC9-Status (Schritt 6):** Skip — kein Live-API-Key in Session. Gilt auch für Schritt 5, 4, 3. **Eskalations-Hinweis:** Vor Schritt 9 (MCP) muss AC9 mindestens einmal grün laufen — sonst bauen wir MCP gegen möglicherweise defektes Backend. User entscheidet ob Bearer-Key für OpenRouter (`Llm__ApiKey`-Env-Var) bereitgestellt wird.

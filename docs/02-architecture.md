@@ -1,6 +1,6 @@
 # Architektur
 
-*Letzte Aktualisierung: 10. Mai 2026 (M1: LLM-Schicht auf OpenAI-kompatiblen Adapter umgestellt)*
+*Letzte Aktualisierung: 10. Mai 2026 (M1: LLM-Schicht auf OpenAI-kompatiblen Adapter umgestellt; S6: Geef.Atelier.Application-Projekt + Solution-Struktur aktualisiert)*
 
 ## Schichtenbild
 
@@ -60,12 +60,14 @@
 ```
 Geef.Atelier.sln
 ├── src/
-│   ├── Geef.Atelier.Core/           // Domain-Records, IRunService-Vertrag,
-│   │                                // Pipeline-Konfigurations-Records
-│   ├── Geef.Atelier.Infrastructure/ // EF Core, LLM-Clients, EventSink,
-│   │                                // Provider-Implementierungen, Repositories
+│   ├── Geef.Atelier.Core/           // Domain-Records, Interfaces (IRunRepository,
+│   │                                // IRunPersistenceService), Pipeline-Konfig-Records
+│   ├── Geef.Atelier.Application/    // IRunService-Vertrag + RunService-Implementierung,
+│   │                                // ApplicationServiceExtensions (AddAtelierApplication)
+│   ├── Geef.Atelier.Infrastructure/ // EF Core, LLM-Clients (OpenAiCompatibleClient),
+│   │                                // EventSink, Provider-Implementierungen, Repositories
 │   ├── Geef.Atelier.Web/            // Blazor Server: UI + BackgroundService
-│   │                                // + Application-Service-Implementierung
+│   │                                // (RunOrchestratorService), DI-Composition
 │   └── Geef.Atelier.Mcp/            // MCP-Server (eigener Host, ruft IRunService)
 └── tests/
     └── Geef.Atelier.Tests/          // xUnit
