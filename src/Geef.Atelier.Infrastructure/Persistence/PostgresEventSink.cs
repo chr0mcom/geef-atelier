@@ -46,12 +46,11 @@ internal sealed class PostgresEventSink(
 
         switch (geefEvent)
         {
-            case PipelineStartedEvent:
+            case PipelineStartedEvent started:
                 await db.Runs
                     .Where(r => r.Id == atelierRunId)
                     .ExecuteUpdateAsync(s => s
-                        .SetProperty(r => r.Status,    RunStatus.Running)
-                        .SetProperty(r => r.StartedAt, geefEvent.Timestamp), ct);
+                        .SetProperty(r => r.StartedAt, r => r.StartedAt ?? started.Timestamp), ct);
                 break;
 
             case ExecutionCompletedEvent exec:
