@@ -1,162 +1,172 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 10. Mai 2026 (Provider-Strategie auf OpenAI-konform geändert M1; Schritt 6 IRunService Application-Layer abgeschlossen)*
+*Letzte Aktualisierung: 10. Mai 2026 (Migration M1 abgeschlossen, Merge in main offen)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
 ## 10. Mai 2026 — Erstes Brainstorming
 
-### D-001: Erster Use-Case-Fokus
-**Entscheidung:** Generische Pipeline ohne Domänen-Fokus.
+### D-001 bis D-009 (kondensiert)
 
-### D-002: Mensch-im-Loop
-**Entscheidung:** Reiner Fire-and-Forget (Start → Ergebnis).
-
-### D-003: Frontend-Stack
-**Entscheidung:** Blazor Server.
-
-### D-004: Datenbank
-**Entscheidung:** Postgres.
-
-### D-005: MCP-Schnittstelle
-**Entscheidung:** Ja — als zweites Frontend.
-
-### D-006: Projekt-Name
-**Entscheidung:** Geef.Atelier.
-
-### D-007: Bau-Konventionen (initial)
-**Status:** Durch D-009 konkretisiert.
-
-### D-008: Reihenfolge der Schritte
-**Entscheidung:** Walking Skeleton zuerst.
-
-### D-009: Verbindlicher Workflow für Claude Code
-**Entscheidung:** Kanonische Workflow-Datei `geef_workflow.md` unter `/srv/docker/docs/` (projekt-agnostisch). Atelier-Spezifisches kommt in Step-Prompts oder `docs/`.
+Use-Case-Fokus generisch (D-001), Fire-and-Forget (D-002), Blazor Server (D-003), Postgres (D-004), MCP zweite Schnittstelle (D-005), Projekt-Name Geef.Atelier (D-006), Konventionen formalisiert via D-009, Walking Skeleton zuerst (D-008), kanonische `geef_workflow.md` (D-009).
 
 ### D-010: Schritt 1 abgeschlossen — Realitäts-Abgleich
-**Bericht:** [reports/step-01-report.md](reports/step-01-report.md)
-**Realfakten:** Geef.Sdk 1.0.0-ci.1, `.slnx`-Format, `Directory.Build.props` (`CS1591` suppressed), `docs/`-Struktur, `CLAUDE.md`, UI-Component-Library unter `src/Geef.Atelier.Web/Components/UI/`, Auto-Migration mit try-catch, Server-Pfad `/srv/docker/websites/geef_atelier`.
+
+Realfakten: Geef.Sdk 1.0.0-ci.1, `.slnx`-Format, `Directory.Build.props`, UI-Component-Library unter `src/Geef.Atelier.Web/Components/UI/`, Auto-Migration mit try-catch.
 
 ### D-011: Architect-Workflow-Update + Atelier-Fallback
-**(A)** Phase 1.4 mit Fallback-Sequence (Levels 1–3); Hard Rule: `geef_architecture.md` MUSS existieren; R4 prüft Existenz.
-**(B)** Atelier-Level-4: Executor schreibt selbst mit Pflicht-Header, Diff-Sektion, Bericht-Doku.
+
+(A) Generisches Workflow-Update: Phase 1.4 mit Fallback-Sequence, R4 prüft `geef_architecture.md`-Existenz. (B) Atelier-Level-4: Executor schreibt selbst.
 
 ### D-012: Schritt 2 abgeschlossen — SDK-Realfakten
-**Bericht:** [reports/step-02-report.md](reports/step-02-report.md)
-**Sechs Korrekturen:** FindingSeverity `{Info, Warning, Error, Critical}`; `DefaultConvergencePolicy`; `UseMiddleware<T>()` generisch; nur `EvaluationApprovedEvent`/`RejectedEvent`; `PreviousFindings` via `IterationHistory`; `using SdkGeef = Geef.Sdk.Geef;`. Workflow-Bug: `--input-file` existiert nicht, korrekt ist `cat file | claude -p`.
 
-### D-013: Schritt 3 abgeschlossen — Anthropic-Client (in M1 ersetzt)
-**Bericht:** [reports/step-03-report.md](reports/step-03-report.md)
-**Realfakten:** `IAnthropicClient` mit `ToolInputJson` als `string?`; Typed Client; API-Key per Request; `AddStandardResilienceHandler()`; `IOptions<AnthropicOptions>` mit `claude-opus-4-7`; Tool-Use mit `tool_choice: "tool:submit_review"`; `ConvergenceFailedException` mit `"AbortCriticalBlocker"`.
+Sechs Korrekturen: `FindingSeverity { Info, Warning, Error, Critical }`; `DefaultConvergencePolicy`; `UseMiddleware<T>()` generisch; nur `EvaluationApprovedEvent`/`RejectedEvent`; `PreviousFindings` via `IterationHistory`; `using SdkGeef = Geef.Sdk.Geef;`.
 
-**Status durch M1 (D-017):** Diese Anthropic-spezifischen Strukturen werden durch provider-agnostische Pendants ersetzt (siehe D-017). Inhaltliche Realfakten (Tool-Use-Konzept, Convergence-Verhalten, Resilience) bleiben gültig — nur die Schicht-Adapter ändern sich.
+### D-013: Schritt 3 abgeschlossen — Anthropic-Client (in M1 ersetzt durch ILlmClient)
+
+Realfakten zur ursprünglichen Anthropic-Schicht. **Status durch M1 (siehe D-018):** Komplett ersetzt durch provider-agnostische `ILlmClient`-Schicht. Inhaltliche Konzepte (Tool-Use-Pattern, defensive JSON-Deserialisierung, API-Key per Request statt DefaultHeaders, Resilience-Strategie) bleiben gültig — nur die Adapter-Implementierung ändert sich.
 
 ### D-014: Production-Domain und Traefik-Routing für Schritt 10
-**Domain:** `geef.stefan-bechtel.de`. **IP:** `95.216.100.213` (DNS gesetzt). **Reverse-Proxy:** Traefik (TLS dort).
+
+Domain `geef.stefan-bechtel.de`, IP `95.216.100.213`, Traefik mit TLS auf Server aktiv. Wird in Schritt 10 verkabelt.
 
 ### D-015: Schritt 4 abgeschlossen — EventSink und Persistierung
-**Bericht:** [reports/step-04-report.md](reports/step-04-report.md)
-**Realfakten:** `IRunPersistenceService` in `Core/Persistence/`. `PostgresEventSink` mit injizierter `Guid runId` (Variante A). Severity-Mapping via `ToAtelierSeverity()` Extension. Token-Tracking via typisierter `ContextKey<AnthropicTokenUsage>` (in M1 zu `ContextKey<LlmTokenUsage>` umbenannt — Inhalt identisch). Critical-Abort-Findings aus `PipelineFailedEvent.History.Records[^1].EvaluationResult.AllFindings` (SDK-Dekompilierung). `_lastExecutionContext` als `volatile`. `JsonSerializerOptions.ReferenceHandler = IgnoreCycles`. `IGeefEvent.RunId` ist `string`. `IServiceScopeFactory.CreateAsyncScope()` pro Event.
+
+Realfakten: `IRunPersistenceService` in Core, `PostgresEventSink` mit injizierter `Guid runId`, Severity-Mapping via `ToAtelierSeverity()`, Token-Tracking via typisierter `ContextKey<LlmTokenUsage>` (in M1 von `AnthropicTokenUsage` umbenannt — Inhalt identisch), Critical-Abort-Findings aus `PipelineFailedEvent.History.Records[^1].EvaluationResult.AllFindings` (SDK-Dekompilierung verifiziert), `_lastExecutionContext` als `volatile`, `JsonSerializerOptions.ReferenceHandler = IgnoreCycles`, `IServiceScopeFactory.CreateAsyncScope()` pro Event.
 
 ### D-016: Schritt 5 abgeschlossen — RunOrchestratorService
-**Bericht:** [reports/step-05-report.md](reports/step-05-report.md)
-**Realfakten:** Atomarer Pending→Running-Claim, `SemaphoreSlim` + `ConcurrentDictionary<Guid, Task>` + `WhenAll`-Drain, `OverrideToAbortedAsync` mit `CancellationToken.None`, `PipelineStartedEvent`-Handler nur idempotent `StartedAt`. Cancellation-Watcher-Vorbereitung via `_runCts`. `OrchestratorOptions` in `Core/Configuration/`. `GatedFakeAnthropicClient` (in M1 zu `GatedFakeLlmClient`). `OrchestratorTestHost`. Architect-Konsultation als Plan-Phase-Integration.
 
-### D-017: Provider-Strategie-Wechsel auf OpenAI-konforme APIs (Migration M1)
+Realfakten: Atomarer Pending→Running-Claim, `SemaphoreSlim` + `ConcurrentDictionary<Guid, Task>` + `WhenAll`-Drain, `OverrideToAbortedAsync` mit `CancellationToken.None`, `PipelineStartedEvent`-Handler nur idempotent `StartedAt`. `_runCts`-Dictionary für spätere Cancellation-Reaktion. `OrchestratorOptions` in Core. `GatedFakeLlmClient` für deterministische Concurrency-Tests. Cancellation-Strategie: nur StoppingToken (Option γ); `CancelRunAsync`-API-Implementierung verschoben auf Schritt 6.
 
-**Datum:** 10. Mai 2026
-**Status:** ✅ Abgeschlossen (Branch `feature/openai-compatible-providers` — nicht in main gemerged, wartet auf Maintainer-Entscheidung).
+### D-017: Provider-Strategie-Wechsel auf OpenAI-konforme APIs (Migration M1 — Auslöser)
+
+**Status:** ✅ Abgeschlossen (Branch `feature/openai-compatible-providers`, kein Merge in main bisher — wartet auf Maintainer-Entscheidung).
 
 **Auslöser:**
-- Der OAuth-Token (`sk-ant-oat01-*`), den Claude Code in seiner Session-Umgebung hat, wurde von Anthropic im Februar 2026 für die Messages-API deaktiviert (siehe Diskussion zwischen AC8/AC9-Skip in D-013, D-015, D-016).
-- Ein API-Bearer-Key (`sk-ant-api03-*`) erfordert separaten Pay-as-you-go-Account auf der Anthropic-Console — vermeidbar.
+- OAuth-Token (`sk-ant-oat01-*`) wurde von Anthropic im Februar 2026 für die Messages-API deaktiviert.
+- API-Bearer-Key (`sk-ant-api03-*`) erfordert separaten Pay-as-you-go-Account auf der Anthropic-Console — vermeidbar.
 - OpenAI-konforme APIs (insbesondere OpenRouter) bieten Anthropic Claude **plus** OpenAI GPT, Google Gemini, Meta Llama, Mistral, etc. über einen einzigen Bearer-Key.
 
-**Entscheidung:**
-Wechsel der LLM-Schicht von Anthropic-spezifisch auf **OpenAI-API-konform**. Default-Endpoint: **OpenRouter** (`https://openrouter.ai/api/v1`). Andere OpenAI-kompatible Endpoints (OpenAI direkt, lokales Ollama, Together AI, DeepInfra) sind durch denselben Adapter-Code ansprechbar.
+**Entscheidung:** Wechsel der LLM-Schicht von Anthropic-spezifisch auf OpenAI-API-konform. Default-Endpoint: OpenRouter. Pro-Akteur-Modell-Mapping. Modell-Pluralismus aus Vision sofort verfügbar (vorgezogen aus "nach Skeleton").
 
-**Vorgezogene Vision-Umsetzung:**
-- "Modell-Pluralismus" aus `01-vision-and-scope.md` (Leitstern: *"Reviewer mit anderem Modell als Executor"*) wird ab M1 sofort verfügbar — nicht "nach Skeleton" wie ursprünglich in D-013(i) geplant.
-- Pro Akteur (Executor, BriefingTreueReviewer, KlarheitReviewer) eigene Modell-Konfiguration. Beispiel: Executor `anthropic/claude-opus-4.7`, BriefingTreueReviewer `openai/gpt-5`, KlarheitReviewer `google/gemini-2.5-pro`.
-- Cross-Provider-Reviewer-Effekt (R2 mit gpt-5.4 fängt Pattern, die Claude-Modelle übersehen) ist damit auch in der Atelier-Pipeline aktiv, nicht nur in Claude Codes eigenem Reviewer-Pass.
+**Branch-Strategie:** Nicht in main automatisch mergen, nur pushen. Empfehlung: Merge vor Schritt 7.
 
-**Was sich ändert (LLM-Schicht):**
-- `IAnthropicClient` → `ILlmClient`
-- `AnthropicRequest`/`AnthropicResponse`/`AnthropicTool`/`AnthropicTokenUsage` → `LlmRequest`/`LlmResponse`/`LlmTool`/`LlmTokenUsage`
-- `HttpAnthropicClient` → `OpenAiCompatibleClient`
-- `AnthropicOptions` → `LlmOptions` mit Pro-Akteur-Modell-Mapping
-- Tool-Use-Format wechselt von Anthropic-Schema auf OpenAI-`function`-Schema
-- Token-Felder: `prompt_tokens`/`completion_tokens` (nur API-Wire-Format; `LlmTokenUsage` bekommt klare englische Properties)
-- Endpoint-Pfad: `/v1/messages` → `/v1/chat/completions`
-- `tool_choice`-Format: `"tool:submit_review"` → `{"type": "function", "function": {"name": "submit_review"}}`
+(Detail-Realfakten siehe D-018, der den M1-Abschluss dokumentiert.)
 
-**Was unverändert bleibt:**
-- Pipeline-Struktur, alle Geef-SDK-Verträge, Convergence-Logik (D-012-Realfakten gelten weiter)
-- `BriefingGroundingStep`, `MarkdownFinalizer`, `AtelierContextKeys` (außer Token-Key-Typ-Umbenennung)
-- `PostgresEventSink`, `IRunPersistenceService`, `RunOrchestratorService` (alles aus D-015/D-016)
-- Domain-Records (`RunEntity`, `IterationEntity`, `FindingEntity`, `EventEntity`, Atelier-`FindingSeverity`)
-- DB-Schema, Migrations
-- Tests oberhalb der LLM-Schicht (Persistence-Tests, Orchestrator-Tests bleiben grün; nur Fake-Client-Klasse wird umbenannt)
-- Resilience-Strategie (`AddStandardResilienceHandler()`)
-- Critical-Abort-Verhalten (`ConvergenceFailedException` mit `"AbortCriticalBlocker"`)
-
-**Branch-Strategie:**
-- Migration läuft auf eigenem Branch `feature/openai-compatible-providers`.
-- Parallel zu numerischen Schritten (Schritt 6 läuft in `main` weiter, M1 in seinem Branch).
-- M1-Branch wird **nicht** automatisch in main gemerged — nur gepusht. User entscheidet Merge-Zeitpunkt.
-- Empfehlung: Merge vor Schritt 7 (UI), damit die UI direkt gegen die neuen Provider-Verträge gebaut wird.
-- Konfliktbereiche bei Merge: `Program.cs` (M1 baut LLM-Layer um, Schritt 6 fügt `IRunService`-Registrierung hinzu) und `appsettings.json` (Sektions-Umbenennung). Beides handhabbar.
-
-**OpenRouter-spezifische Aspekte:**
-- Modell-Namen mit Provider-Präfix: `anthropic/claude-opus-4.7`, `openai/gpt-5`, `google/gemini-2.5-pro`.
-- Optionale Header für Analytics: `HTTP-Referer: https://geef.stefan-bechtel.de`, `X-Title: Geef.Atelier`.
-- Tool-Use unterstützt fast alle Modelle, Verhalten variiert minimal — Reviewer-Defensive-Parsing aus D-013(e) trägt diese Variabilität bereits.
-- Pro-Modell-Pricing transparent auf openrouter.ai/models — Cost-Tracking (Schritt 10 oder später) wird damit einfacher als mit Anthropic-Console-Accounting.
-
-**Konsequenzen für Step-Prompts ab Schritt 7:**
-- `IAnthropicClient`-Referenzen werden zu `ILlmClient`.
-- `AnthropicOptions`-Referenzen werden zu `LlmOptions`.
-- AC9 (Real-Anthropic-Test) wird zu AC9 (Real-OpenRouter-Test) — und ist dann ohne weiteres Auth-Manöver erreichbar, weil OpenRouter-Bearer-Keys problemlos per `Llm__ApiKey`-Env-Var bereitgestellt werden können.
-
-**Realfakten (M1-Abschluss):**
-- `ILlmClient` mit `CompleteAsync(LlmRequest, CancellationToken)` ist das neue Provider-Interface.
-- `OpenAiCompatibleClient` (internal sealed) implementiert `ILlmClient` via Typed HttpClient; baut Full-URL aus `LlmOptions.Endpoint`; API-Key per Request gesetzt (nicht in `DefaultRequestHeaders`).
-- `LlmRequest.ToolChoice`: Atelier-Konvention `"function:submit_review"` → Client serialisiert zu `{"type":"function","function":{"name":"submit_review"}}`.
-- `LlmResponse.ToolArgumentsJson`: Raw-JSON-String (analog zu `AnthropicResponse.ToolInputJson` aus D-013(a)) — kein `JsonElement`-Coupling im Interface.
-- `LlmOptions.Actors`-Dictionary: Key = Akteur-Name (String, z. B. `"Executor"`), nicht `LlmActor`-Enum — simpler, erweiterbar ohne Enum-Änderung.
-- `OpenAiMessageFormat` (internal static class neben `OpenAiCompatibleClient`) kapselt die komplette Serialisierung/Deserialisierung, analog zu `AnthropicMessageFormat`.
-- `LlmServiceExtensions.AddLlmClient()` registriert Options + Typed HttpClient; setzt `HTTP-Referer` und `X-Title` in `DefaultRequestHeaders` (Analytics-Headers für OpenRouter).
-- Keine `anthropic-version`-Header-Reste im neuen Client; Provider-agnostisch per Design.
-- Bestehende 15 Tests (Schritt 5) + 3 neue Unit-Tests (`OpenAiCompatibleClientTests`) — 18 Tests ohne Docker; Integration-Test (`AtelierPipelineRunsAgainstOpenRouter`) skipped ohne `Llm__ApiKey`.
-- `CountingEventSink.TotalEvents`-Property hinzugefügt (für Integration-Test-Assertion).
-
-### D-017b: Schritt 6 abgeschlossen — IRunService Application-Service-Layer
+### D-018: Migration M1 abgeschlossen — Realfakten und Workflow-Abweichung
 
 **Datum:** 10. Mai 2026
-**Bericht:** [reports/step-06-report.md](reports/step-06-report.md)
+**Bericht:** [reports/migration-01-report.md](reports/migration-01-report.md) (auf Branch `feature/openai-compatible-providers`)
+**Branch:** `feature/openai-compatible-providers` — gepusht, **nicht** in main gemerged.
+**Tests:** 31/31 grün (alle Tests, inklusive Postgres/Orchestrator-Testcontainer; davon 9 Unit-Tests ohne Docker).
+**Commits:** 4 Conventional-Commits + 1 nachgereichter `docs(reports)`-Commit für den Bericht selbst.
 
-**Realfakten (Schritt 6):**
+**Architect-Konsultation — Antworten auf die sechs Schwerpunkte aus dem M1-Prompt:**
 
-**(a) Projekt-Layout:** Neues Projekt `Geef.Atelier.Application` (`src/Geef.Atelier.Application/`). Project-References: Application → Core; Web → Application + Core + Infrastructure; Tests → Application + Core + Infrastructure + Web. Application hat **keine** Infrastructure-Dep (Variante β bestätigt durch Architect-Konsultation / Plan-Phase-Integration).
+**(F1) ToolChoice-Repräsentation:** String-Convention `"function:submit_review"` (intern in `OpenAiMessageFormat.BuildToolChoice()` zu OpenAI-Object serialisiert). Begründung: Nur eine genutzte Variante in der Pipeline; typsichere Discriminated Union wäre überdimensionierte Abstraktion für ein statisches Muster.
 
-**(b) IRunService-Interface-Position:** `Geef.Atelier.Application.Runs.IRunService` — im Application-Projekt, nicht in Core. Abweichung von `02-architecture.md` Zeile 64 (Vorplanung), weil Core frei von Application-Konzepten bleiben soll. Architecture-Doc in diesem Schritt aktualisiert.
+**(F2) Pro-Akteur-Lookup-Pattern:** `string actorName` als Dictionary-Key in `LlmOptions.Actors`, **nicht** als Enum. `LlmActor`-Enum existiert weiterhin als Typen-Dokumentation, wird aber nicht für den Lookup genutzt. Begründung: `IReviewer.Name` aus dem Geef-SDK ist bereits `string`; Enum als Key hätte zwei Quellen der Wahrheit erzeugt (`actor.ToString()` für `IReviewer.Name`-Getter). Lookup-Form: `options.Value.Actors.GetValueOrDefault(name)`.
 
-**(c) Repository-Variante β (final):** `IRunRepository` in `Core/Persistence/` (`GetByIdAsync`, `ListAsync`, `RequestCancellationAsync`). `internal sealed RunRepository(AtelierDbContext db) : IRunRepository` in Infrastructure. Registriert in `AddAtelierPersistence()`.
+**(F3) `OpenAiMessageFormat`-Position:** Internal static class neben `OpenAiCompatibleClient`, exakt analog zur Schritt-3-Konvention mit `AnthropicMessageFormat`. Saubere Kapselung pro Adapter — wenn später ein zweiter Adapter (z.B. `AnthropicNativeClient` mit Bearer-Key) ergänzt würde, hätte er eigene `AnthropicMessageFormat`-Klasse, keine Kollision.
 
-**(d) `RunEntity.CancellationRequested`:** `bool CancellationRequested { get; init; }` — Value-Type-Default `false`. EF-Mapping: `IsRequired().HasDefaultValue(false)`.
+**(F4) Endpoint-Override-Pfad:** `LlmOptions.Endpoint` als konfigurierbare String-Property mit Default `"https://openrouter.ai/api/v1"`. Override via `Llm__Endpoint`-Env-Var. **`HttpClient.BaseAddress` wird NICHT gesetzt** — `OpenAiCompatibleClient` baut Full-URL pro Request via `$"{options.Value.Endpoint.TrimEnd('/')}/chat/completions"`. Abweichung vom Schritt-3-Pattern, aber bewusst: Endpoint dynamisch aus Config kommt, nicht statisch.
 
-**(e) EF-Migration `Step06Cancellation`:** `ALTER TABLE "Runs" ADD COLUMN "CancellationRequested" boolean NOT NULL DEFAULT false`. Timestamp-Präfix `20260510202104`.
+**(F5) `02-architecture.md`-Update-Form:** Vollständige Ersetzung der "Multi-Provider-LLM-Abstraktion (geplant)"-Sektion durch eine "LLM-Provider-Schicht (umgesetzt in M1)"-Sektion. Begründung: Der ursprüngliche Abschnitt enthielt eine falsche `LlmRequest`-Signatur (mit `Provider`-Parameter); inkrementelles Update mit Verweis hätte Lesende verwirrt. D-017-Verweis ist im neuen Abschnitt für historischen Kontext enthalten.
 
-**(f) `OrchestratorOptions.CancellationPollingInterval`:** `TimeSpan`, Default `TimeSpan.FromSeconds(1)`. In Tests: `TimeSpan.FromMilliseconds(200)` (schnelleres Feedback).
+**(F6) `anthropic-version`-Header-Erbe:** Vollständig entfernt. Kein Provider-spezifisches Header-Framework. Begründung: OpenRouter setzt Provider-Header selbst beim Weiterleiten. Future-Proofing durch das `ILlmClient`-Interface ist ausreichend — ein späterer `AnthropicNativeClient` wäre ein neuer Implementer mit eigenen Headern.
 
-**(g) Cancellation-Watcher Pattern A:** `WatchCancellationAsync(Guid runId, CancellationTokenSource cts)` als privater Task in `RunOrchestratorService`. Pollt DB via eigenem Scope (`CreateAsyncScope`). Erkennt `CancellationRequested = true` → `cts.Cancel()` → `return`. Watcher-Join: `await watcherTask` in `finally` (try/catch), nach `cts.Cancel()` (idempotent). `cts.Dispose()` ebenfalls im `finally`. `_runTasks.TryRemove` bleibt letzte Aktion (Drain-Semantik aus D-016).
+**Fixierte Realfakten aus M1 (verbindlich ab Schritt 7, nach Merge):**
 
-**(h) Catch-Block-Erweiterung:** Zweiter Arm `catch (OperationCanceledException) when (cts.IsCancellationRequested)` → `OverrideToAbortedAsync(run.Id, "Cancelled by user")`. Reihenfolge: Service-Stop-Arm zuerst (gewinnt wenn beide CTS gleichzeitig gesetzt).
+**(a) `ILlmClient` als public interface in `Geef.Atelier.Infrastructure.Llm`:**
+- `Task<LlmResponse> CompleteAsync(LlmRequest, CancellationToken)`
+- Co-Located Records `LlmRequest`, `LlmResponse`, `LlmTokenUsage`, `LlmTool` in derselben Datei (analog zu Schritt-3-Konvention mit `IAnthropicClient`).
 
-**(i) `IRunService.CancelRunAsync`-Semantik:** `true` wenn Run Pending/Running war und `CancellationRequested` noch nicht gesetzt. `false` in allen anderen Fällen (terminal, nicht gefunden, bereits angefragt). Atomar via `ExecuteUpdateAsync` mit `WHERE Id=? AND Status IN(Pending,Running) AND !CancellationRequested`.
+**(b) `LlmResponse`-Form mit separatem `ToolName` und `ToolArgumentsJson`:**
+- `ToolName: string?` — Name des aufgerufenen Tools (z.B. `"submit_review"`), `null` bei Plain-Text-Response.
+- `ToolArgumentsJson: string?` — Raw-JSON-String der Tool-Arguments, kein `JsonElement`-Coupling im Interface (analog zu D-013(a)).
+- `FinishReason: string` — z.B. `"stop"`, `"tool_calls"`, `"length"`. Reviewer-Code prüft auf `"tool_calls"` (OpenAI-Standard, nicht Anthropic-`"tool_use"`).
+- Diese Property-Trennung ist eine **leichte Verbesserung** gegenüber dem M1-Prompt-Vorschlag, der nur eine kombinierte Tool-Repräsentation nannte.
 
-**(j) `configJson` als `string`:** Nicht-null (ArgumentNullException). Leerstring erlaubt (Defaults). Nicht-leere Strings werden via `JsonDocument.Parse` auf Wohlgeformtheit geprüft (ArgumentException bei Fehler). Leerstring wird intern als `"{}"` normalisiert.
+**(c) `OpenAiCompatibleClient` (internal sealed):**
+- Typed HttpClient via `AddHttpClient<ILlmClient, OpenAiCompatibleClient>()`.
+- API-Key per Request gesetzt (`Authorization: Bearer ...`), **nicht** in `DefaultRequestHeaders` — analog zu D-013(b), verhindert Key-Leak im HttpClient-Singleton.
+- Lazy-Validation des `ApiKey` beim ersten Aufruf: `InvalidOperationException` mit klarer Botschaft.
+- Kein `BaseAddress`; Full-URL aus `LlmOptions.Endpoint` pro Request gebaut.
+- Timeout 120 Sekunden (wie aus Schritt 3).
 
-**(k) Architect-Invocation:** Plan-Phase-Integration (5 Pflichtfragen inline im Plan beantwortet, `geef_architecture.md` als Output-Dokument). Kein Level-2-Subprozess nötig.
+**(d) `LlmOptions` mit Pro-Akteur-Mapping:**
+```csharp
+public sealed class LlmOptions {
+    public string Endpoint { get; set; } = "https://openrouter.ai/api/v1";
+    public string ApiKey { get; set; } = "";
+    public string DefaultModel { get; set; } = "anthropic/claude-opus-4.7";
+    public int DefaultMaxTokens { get; set; } = 4096;
+    public Dictionary<string, ActorConfig> Actors { get; set; } = new();
+    public sealed class ActorConfig {
+        public string Model { get; set; } = "";
+        public int? MaxTokens { get; set; }
+    }
+}
+```
+Sektion `"Llm"` in `appsettings.json` mit drei Default-Akteur-Einträgen (`Executor`, `BriefingTreueReviewer`, `KlarheitReviewer`) — alle initial auf `anthropic/claude-opus-4.7`.
 
-**(l) AC9-Status (Schritt 6):** Skip — kein Live-API-Key in Session. Gilt auch für Schritt 5, 4, 3. **Eskalations-Hinweis:** Vor Schritt 9 (MCP) muss AC9 mindestens einmal grün laufen — sonst bauen wir MCP gegen möglicherweise defektes Backend. User entscheidet ob Bearer-Key für OpenRouter (`Llm__ApiKey`-Env-Var) bereitgestellt wird.
+**(e) `LlmServiceExtensions.AddLlmClient(IConfiguration)`:**
+- Registriert `LlmOptions` aus `"Llm"`-Sektion.
+- Setzt Analytics-Header in `DefaultRequestHeaders`: `HTTP-Referer: https://geef.stefan-bechtel.de`, `X-Title: Geef.Atelier`.
+- Gibt `IHttpClientBuilder` für Resilience-Chaining zurück.
+- In `Program.cs`: `builder.Services.AddLlmClient(builder.Configuration).AddStandardResilienceHandler();`
+
+**(f) `OpenAiMessageFormat` (internal static):**
+- `BuildRequestBody(LlmRequest)` — serialisiert zu OpenAI-Chat-Completions-Request-Form.
+- `BuildToolChoice(string)` — wandelt Atelier-String `"function:submit_review"` zu OpenAI-Object `{"type":"function","function":{"name":"submit_review"}}`.
+- `DeserializeResponse(string)` — parst zu `LlmResponse` mit defensiver `?? throw new JsonException(...)`-Strategie (Pattern aus D-013).
+- Token-Mapping: OpenAI-Wire `prompt_tokens`/`completion_tokens` → `LlmTokenUsage.InputTokens`/`OutputTokens` (Property-Namen bleiben für minimale Disruption in `PostgresEventSink`).
+
+**(g) `LlmExecutionStep` und `LlmReviewer` umgestellt:**
+- Konstruktor-Typen: `ILlmClient`/`IOptions<LlmOptions>`.
+- Pro-Akteur-Modell-Lookup: `options.Value.Actors.GetValueOrDefault("Executor")` (oder Reviewer-Name); Fallback auf `DefaultModel`.
+- `LlmReviewer` ToolChoice-String: `"function:submit_review"` (statt Schritt-3 `"tool:submit_review"`).
+- Reviewer prüft `FinishReason == "tool_calls"` und `ToolName == "submit_review"`; defensiver Fallback bei fehlendem Tool-Call: `ReviewDecision.Failed` mit `SuggestedRetryHint` (Pattern aus D-013(e) bleibt).
+
+**(h) `LlmActor`-Enum existiert, aber nicht als Lookup-Key:**
+```csharp
+public enum LlmActor { Executor, BriefingTreueReviewer, KlarheitReviewer }
+```
+Dient als Typen-Dokumentation und Referenz. String-Keys für `LlmOptions.Actors`-Dictionary verwenden konventionell dieselben Namen (`"Executor"`, etc.).
+
+**(i) Test-Infrastruktur:**
+- `FakeLlmClient`, `CriticalFakeLlmClient`, `GatedFakeLlmClient` (mechanische Renames + LlmResponse-Anpassung).
+- Erkennungslogik aus D-013(g) bleibt: `request.Tools == null` → Executor-Call, sonst Reviewer-Call.
+- Neue `OpenAiCompatibleClientTests` (3 Unit-Tests): ToolCall-Response-Parsing, PlainText-Response, EmptyApiKey-Guard.
+- `AtelierPipelineRunsAgainstOpenRouterTests` ersetzt `AtelierPipelineRealAnthropicTests` — Skip via Early-Return bei fehlendem `Llm__ApiKey`.
+- `CountingEventSink.TotalEvents`-Property neu hinzugefügt für Integration-Test-Assertion.
+
+**(j) `RunOrchestratorService` minimal angepasst:**
+- Konstruktor-Parameter-Typen: `ILlmClient` statt `IAnthropicClient`, `IOptions<LlmOptions>` statt `IOptions<AnthropicOptions>`.
+- `AtelierPipelineFactory.Build`-Aufruf mit neuen Typen.
+- Keine logischen Änderungen — Orchestrator-Verhalten aus D-016 bleibt vollständig gültig.
+
+**Workflow-Abweichung — bewusst dokumentiert:**
+
+M1 wurde als **parallelisierter Subagent-Auftrag ohne formalen Geef-Workflow-Reviewer-Pass** ausgeführt. Der Bericht sagt explizit: *"Die Reviewer-Pässe wurden durch die Subagent-eigenen Self-Reviews und die Build-/Test-Verifikation ersetzt."*
+
+Konsequenzen:
+- **R1 (Functional Correctness)**: Durch Self-Review + 31/31 Tests indirekt abgedeckt — vertretbar.
+- **R2 (Code Quality via codex+gpt-5.4)**: **Nicht ausgeführt.** Diese Lücke ist relevant — R2 hat in den vergangenen Schritten konsistent subtile Threading-, Defensiv-Code- und Race-Condition-Issues gefunden, die R1 (Claude-basiert) übersehen hat. Cross-Provider-Reviewer-Effekt fehlt für M1.
+- **R3 (Test Execution)**: Durch `dotnet test` mit Docker (31/31 grün) abgedeckt — vertretbar.
+- **R4 (Architecture Compliance)**: `geef_architecture.md` existiert (AC7), aber kein dedicated Compliance-Review.
+- **R5 (Live UI Sanity Check via Playwright)**: Bei reinem LLM-Layer-Refactor ohne UI-Änderungen irrelevant — Skip begründet.
+
+**Empfohlene Nachholarbeit:** Nach dem Merge in main einen **R2-Pass auf den finalen post-Merge-Stand** ausführen. Dauert ~10 Minuten, fängt potenzielle Race-Conditions im neuen `OpenAiCompatibleClient` und defensive JSON-Deserialisierungs-Lücken im neuen `OpenAiMessageFormat` ab.
+
+**AC9-Status (Real-OpenRouter-Test):** ⏭ Skip — kein `Llm__ApiKey` in Ausführungsumgebung. Skip-Mechanismus korrekt implementiert (Early-Return). **Dringende Empfehlung:** Vor Schritt-7-Beginn einmal manuell mit echtem OpenRouter-Bearer-Key ausführen, um zu verifizieren:
+- `anthropic/claude-opus-4.7` ist der stabile Modellname auf OpenRouter (Alternative: `anthropic/claude-opus-4-5`).
+- `finish_reason: "tool_calls"` wird konsistent geliefert.
+- Tool-Use-Verhalten ist mit dem `submit_review`-Schema kompatibel.
+- Cold-Start-Latenz und Token-Verbrauch im realistischen Bereich.
+
+**Merge-Status:** Branch gepusht, Merge in main offen — wartet auf:
+1. Schritt-6-Abschluss in main, dann
+2. Rebase von M1 auf aktualisierten main (Konflikte: `Program.cs`, `appsettings.json`, `RunOrchestratorService.cs`).
+
+Detail-Plan siehe Merge-Coordination-Notiz [snippets/m1-merge-coordination.md](snippets/m1-merge-coordination.md).
