@@ -14,11 +14,11 @@ namespace Geef.Atelier.Infrastructure.Pipeline;
 internal static class AtelierPipelineFactory
 {
     /// <summary>
-    /// Builds the pipeline with real LLM providers. Requires a configured <see cref="IAnthropicClient"/>.
+    /// Builds the pipeline with real LLM providers. Requires a configured <see cref="ILlmClient"/>.
     /// </summary>
     public static GeefPipelineRunner<FinalizedDocument> Build(
-        IAnthropicClient client,
-        IOptions<AnthropicOptions> options,
+        ILlmClient client,
+        IOptions<LlmOptions> options,
         ILoggerFactory? loggerFactory = null,
         IEnumerable<IGeefEventSink>? additionalSinks = null)
     {

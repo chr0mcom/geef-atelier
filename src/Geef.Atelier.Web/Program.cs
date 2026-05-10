@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
@@ -7,14 +8,15 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Anthropic LLM client — ApiKey is read lazily; set Anthropic__ApiKey env-var for real calls.
-builder.Services.AddAnthropicClient(builder.Configuration)
+// OpenAI-compatible LLM client (default: OpenRouter) — set Llm__ApiKey env-var for real calls.
+builder.Services.AddLlmClient(builder.Configuration)
     .AddStandardResilienceHandler();
 
 builder.Services.AddDbContext<AtelierDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddAtelierPersistence();
+builder.Services.AddAtelierApplication();
 
 builder.Services.Configure<OrchestratorOptions>(builder.Configuration.GetSection("Orchestrator"));
 builder.Services.AddHostedService<RunOrchestratorService>();

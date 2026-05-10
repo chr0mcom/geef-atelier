@@ -8,8 +8,8 @@ using Microsoft.Extensions.Options;
 namespace Geef.Atelier.Infrastructure.Pipeline;
 
 internal sealed class LlmExecutionStep(
-    IAnthropicClient client,
-    IOptions<AnthropicOptions> options) : IExecutionStep
+    ILlmClient client,
+    IOptions<LlmOptions> options) : IExecutionStep
 {
     public async Task<ExecutionResult> RunAsync(IRunContext context, CancellationToken cancellationToken)
     {
@@ -40,12 +40,16 @@ internal sealed class LlmExecutionStep(
                 """;
         }
 
-        var response = await client.CompleteAsync(new AnthropicRequest
+        var actorCfg  = options.Value.Actors.GetValueOrDefault("Executor");
+        var model     = actorCfg?.Model is { Length: > 0 } m ? m : options.Value.DefaultModel;
+        var maxTokens = actorCfg?.MaxTokens ?? options.Value.DefaultMaxTokens;
+
+        var response = await client.CompleteAsync(new LlmRequest
         {
-            Model       = options.Value.ExecutorModel,
+            Model        = model,
             SystemPrompt = AtelierSystemPrompts.Executor,
-            UserPrompt  = userPrompt,
-            MaxTokens   = 4096
+            UserPrompt   = userPrompt,
+            MaxTokens    = maxTokens
         }, cancellationToken);
 
         var updated = context

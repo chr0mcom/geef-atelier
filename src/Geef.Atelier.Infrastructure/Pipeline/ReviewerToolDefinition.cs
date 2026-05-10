@@ -33,7 +33,7 @@ internal static class ReviewerToolDefinition
         }
         """;
 
-    public static readonly AnthropicTool SubmitReview = new()
+    public static readonly LlmTool SubmitReview = new()
     {
         Name = "submit_review",
         Description = "Submit structured review results. Set approved=true only when the findings array is empty.",

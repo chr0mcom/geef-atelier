@@ -13,8 +13,8 @@ namespace Geef.Atelier.Infrastructure.Pipeline;
 internal sealed class LlmReviewer(
     string name,
     string systemPrompt,
-    IAnthropicClient client,
-    IOptions<AnthropicOptions> options) : IReviewer
+    ILlmClient client,
+    IOptions<LlmOptions> options) : IReviewer
 {
     public string Name => name;
     public int Priority => 0;
@@ -34,34 +34,38 @@ internal sealed class LlmReviewer(
             Use the submit_review tool to submit your evaluation.
             """;
 
-        var response = await client.CompleteAsync(new AnthropicRequest
+        var actorCfg  = options.Value.Actors.GetValueOrDefault(name);
+        var model     = actorCfg?.Model is { Length: > 0 } m ? m : options.Value.DefaultModel;
+        var maxTokens = actorCfg?.MaxTokens ?? options.Value.DefaultMaxTokens;
+
+        var response = await client.CompleteAsync(new LlmRequest
         {
-            Model       = options.Value.ReviewerModel,
+            Model        = model,
             SystemPrompt = systemPrompt,
-            UserPrompt  = userPrompt,
-            MaxTokens   = 2048,
-            Tools       = [ReviewerToolDefinition.SubmitReview],
-            ToolChoice  = "tool:submit_review"
+            UserPrompt   = userPrompt,
+            MaxTokens    = maxTokens,
+            Tools        = [ReviewerToolDefinition.SubmitReview],
+            ToolChoice   = "function:submit_review"
         }, cancellationToken);
 
-        if (response.StopReason != "tool_use" || response.ToolInputJson is null)
+        if (response.FinishReason != "tool_calls" || response.ToolArgumentsJson is null)
         {
             return new ReviewResult
             {
-                ReviewerName     = name,
-                Decision         = ReviewDecision.Failed,
-                Findings         = [],
-                Duration         = TimeSpan.Zero,
-                SuggestedRetryHint = $"Reviewer did not call submit_review (stop_reason='{response.StopReason}')."
+                ReviewerName       = name,
+                Decision           = ReviewDecision.Failed,
+                Findings           = [],
+                Duration           = TimeSpan.Zero,
+                SuggestedRetryHint = $"Reviewer did not call submit_review (finish_reason='{response.FinishReason}')."
             };
         }
 
-        return ParseToolInput(response.ToolInputJson);
+        return ParseToolInput(response.ToolArgumentsJson);
     }
 
-    private ReviewResult ParseToolInput(string toolInputJson)
+    private ReviewResult ParseToolInput(string toolArgumentsJson)
     {
-        using var doc = JsonDocument.Parse(toolInputJson);
+        using var doc = JsonDocument.Parse(toolArgumentsJson);
         var root      = doc.RootElement;
 
         if (!root.TryGetProperty("approved", out var approvedEl) ||

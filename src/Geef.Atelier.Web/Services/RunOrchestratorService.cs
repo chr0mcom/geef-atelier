@@ -12,16 +12,16 @@ namespace Geef.Atelier.Web.Services;
 /// <summary>BackgroundService that polls for Pending runs and dispatches them to the Geef pipeline.</summary>
 internal sealed class RunOrchestratorService(
     IServiceScopeFactory            scopeFactory,
-    IAnthropicClient                anthropicClient,
+    ILlmClient                      llmClient,
     IOptions<OrchestratorOptions>   options,
-    IOptions<AnthropicOptions>      anthropicOptions,
+    IOptions<LlmOptions>            llmOptions,
     ILoggerFactory                  loggerFactory,
     ILogger<RunOrchestratorService> logger) : BackgroundService
 {
     private readonly OrchestratorOptions _opts = options.Value;
     private readonly SemaphoreSlim _slots = new(options.Value.MaxConcurrentRuns, options.Value.MaxConcurrentRuns);
-    private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _runCts  = new();
-    private readonly ConcurrentDictionary<Guid, Task>                    _runTasks = new();
+    private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _runCts   = new();
+    private readonly ConcurrentDictionary<Guid, Task>                    _runTasks  = new();
 
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -119,16 +119,21 @@ internal sealed class RunOrchestratorService(
 
     /// <summary>
     /// Executes the full Geef pipeline for a single claimed run. Releases the semaphore slot when done.
+    /// Also starts a cancellation watcher that polls the DB flag and cancels the run CTS if set.
     /// </summary>
     private async Task ProcessRunAsync(RunEntity run, CancellationToken stoppingToken)
     {
         var cts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         _runCts[run.Id] = cts;
+
+        // Watcher polls DB flag; signals cts if CancellationRequested=true.
+        var watcherTask = Task.Run(() => WatchCancellationAsync(run.Id, cts), CancellationToken.None);
+
         try
         {
             var sinkLogger = loggerFactory.CreateLogger($"PostgresEventSink[{run.Id}]");
             var sink       = new PostgresEventSink(run.Id, scopeFactory, sinkLogger);
-            var runner     = AtelierPipelineFactory.Build(anthropicClient, anthropicOptions, loggerFactory, additionalSinks: [sink]);
+            var runner     = AtelierPipelineFactory.Build(llmClient, llmOptions, loggerFactory, additionalSinks: [sink]);
             await runner.RunAsync(run.BriefingText, cts.Token);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -136,12 +141,22 @@ internal sealed class RunOrchestratorService(
             // Do not pass the already-cancelled stoppingToken — use None so the DB write completes.
             await OverrideToAbortedAsync(run.Id, "Service stopping");
         }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            // User-initiated cancellation: sink may have written Failed; override to Aborted.
+            await OverrideToAbortedAsync(run.Id, "Cancelled by user");
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Run {RunId} failed outside pipeline; sink already persisted state.", run.Id);
         }
         finally
         {
+            // Stop the watcher cleanly before releasing resources.
+            if (!cts.IsCancellationRequested)
+                cts.Cancel();
+            try { await watcherTask; } catch { /* watcher exits via OCE; swallow */ }
+
             _runCts.TryRemove(run.Id, out _);
             cts.Dispose();
             _slots.Release();
@@ -150,8 +165,52 @@ internal sealed class RunOrchestratorService(
     }
 
     /// <summary>
+    /// Polls the database for the <c>CancellationRequested</c> flag on the given run.
+    /// Cancels <paramref name="cts"/> as soon as the flag is found to be true.
+    /// </summary>
+    private async Task WatchCancellationAsync(Guid runId, CancellationTokenSource cts)
+    {
+        while (!cts.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_opts.CancellationPollingInterval, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            try
+            {
+                await using var scope = scopeFactory.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
+
+                var requested = await db.Runs
+                    .Where(r => r.Id == runId)
+                    .Select(r => r.CancellationRequested)
+                    .FirstOrDefaultAsync(cts.Token);
+
+                if (requested)
+                {
+                    cts.Cancel();
+                    return;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Cancellation watcher for run {RunId} encountered an error; will retry.", runId);
+            }
+        }
+    }
+
+    /// <summary>
     /// Forces a run that is still Running or Failed into Aborted state with a reason message.
-    /// Used when the service is stopping mid-execution.
+    /// Used when the service is stopping mid-execution or when the user cancels the run.
     /// </summary>
     private async Task OverrideToAbortedAsync(Guid runId, string reason, CancellationToken ct = default)
     {
