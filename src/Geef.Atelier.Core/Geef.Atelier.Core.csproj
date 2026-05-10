@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Geef.Atelier.Core</RootNamespace>
+    <AssemblyName>Geef.Atelier.Core</AssemblyName>
+  </PropertyGroup>
+
+  <!-- No external dependencies: Core is LLM-free and persistence-free -->
+
+</Project>
