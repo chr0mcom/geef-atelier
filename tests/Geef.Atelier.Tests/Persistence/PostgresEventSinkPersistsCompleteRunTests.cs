@@ -24,13 +24,12 @@ public sealed class PostgresEventSinkPersistsCompleteRunTests(PostgresFixture fi
         var             scopes  = fixture.NewScopeFactory();
         var             sink    = new PostgresEventSink(runId, scopes, NullLogger.Instance);
 
-        var options = Options.Create(new AnthropicOptions
+        var options = Options.Create(new LlmOptions
         {
-            ApiKey        = "fake-key",
-            ExecutorModel = "fake-model",
-            ReviewerModel = "fake-model"
+            ApiKey       = "fake-key",
+            DefaultModel = "fake-model"
         });
-        var fakeClient = new FakeAnthropicClient();
+        var fakeClient = new FakeLlmClient();
 
         var runner = AtelierPipelineFactory.BuildWithProviders(
             new BriefingGroundingStep(),
@@ -59,7 +58,7 @@ public sealed class PostgresEventSinkPersistsCompleteRunTests(PostgresFixture fi
         Assert.NotNull(run.StartedAt);
         Assert.True(run.TokensTotal > 0);
 
-        // Iterations: 2 expected (FakeAnthropicClient runs 2 iterations)
+        // Iterations: 2 expected (FakeLlmClient runs 2 iterations)
         var iterations = await verify.Iterations
             .Where(i => i.RunId == runId)
             .OrderBy(i => i.IterationNumber)

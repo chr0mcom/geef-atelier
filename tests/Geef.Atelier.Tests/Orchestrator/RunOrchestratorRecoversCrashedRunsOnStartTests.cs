@@ -35,7 +35,7 @@ public sealed class RunOrchestratorRecoversCrashedRunsOnStartTests(PostgresFixtu
         await ctx.SaveChangesAsync();
 
         // Act — start the service (RecoverCrashedRunsAsync runs before the polling loop)
-        await using var host = new OrchestratorTestHost(fixture, new FakeAnthropicClient(),
+        await using var host = new OrchestratorTestHost(fixture, new FakeLlmClient(),
             new Geef.Atelier.Core.Configuration.OrchestratorOptions
             {
                 PollingInterval   = TimeSpan.FromSeconds(60),

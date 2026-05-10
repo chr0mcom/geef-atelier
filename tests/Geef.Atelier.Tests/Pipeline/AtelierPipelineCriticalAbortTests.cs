@@ -14,13 +14,12 @@ public sealed class AtelierPipelineCriticalAbortTests
     [Fact]
     public async Task AtelierPipelineAbortsOnCriticalFinding()
     {
-        var options = Options.Create(new AnthropicOptions
+        var options = Options.Create(new LlmOptions
         {
-            ApiKey        = "fake-key-for-tests",
-            ExecutorModel = "fake-model",
-            ReviewerModel = "fake-model"
+            ApiKey       = "fake-key-for-tests",
+            DefaultModel = "fake-model"
         });
-        var criticalClient = new CriticalFakeAnthropicClient();
+        var criticalClient = new CriticalFakeLlmClient();
         var sink           = new CountingEventSink();
 
         var runner = AtelierPipelineFactory.BuildWithProviders(

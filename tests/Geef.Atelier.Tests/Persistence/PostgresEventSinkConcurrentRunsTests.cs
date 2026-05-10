@@ -28,14 +28,13 @@ public sealed class PostgresEventSinkConcurrentRunsTests(PostgresFixture fixture
         var sink1   = new PostgresEventSink(runId1, scopes, NullLogger.Instance);
         var sink2   = new PostgresEventSink(runId2, scopes, NullLogger.Instance);
 
-        var options = Options.Create(new AnthropicOptions
+        var options = Options.Create(new LlmOptions
         {
-            ApiKey        = "fake-key",
-            ExecutorModel = "fake-model",
-            ReviewerModel = "fake-model"
+            ApiKey       = "fake-key",
+            DefaultModel = "fake-model"
         });
 
-        var fakeClient1 = new FakeAnthropicClient();
+        var fakeClient1 = new FakeLlmClient();
         var runner1 = AtelierPipelineFactory.BuildWithProviders(
             new BriefingGroundingStep(),
             new LlmExecutionStep(fakeClient1, options),
@@ -46,7 +45,7 @@ public sealed class PostgresEventSinkConcurrentRunsTests(PostgresFixture fixture
             new MarkdownFinalizer(),
             additionalSinks: [sink1]);
 
-        var fakeClient2 = new FakeAnthropicClient();
+        var fakeClient2 = new FakeLlmClient();
         var runner2 = AtelierPipelineFactory.BuildWithProviders(
             new BriefingGroundingStep(),
             new LlmExecutionStep(fakeClient2, options),

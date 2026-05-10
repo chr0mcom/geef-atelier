@@ -28,7 +28,7 @@ public sealed class RunOrchestratorPicksUpPendingRunTests(PostgresFixture fixtur
         var runId = await svc.CreateRunAsync(Briefing, "{}", CancellationToken.None);
 
         // Act — start the orchestrator
-        await using var host = new OrchestratorTestHost(fixture, new FakeAnthropicClient());
+        await using var host = new OrchestratorTestHost(fixture, new FakeLlmClient());
         await host.StartAsync();
 
         // Wait until Status=Completed (max 25 seconds)

@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
@@ -12,7 +13,7 @@ namespace Geef.Atelier.Tests.Orchestrator;
 
 /// <summary>
 /// Builds and manages an <see cref="IHost"/> with <see cref="RunOrchestratorService"/> registered,
-/// using the provided <see cref="PostgresFixture"/> database and a custom <see cref="IAnthropicClient"/>.
+/// using the provided <see cref="PostgresFixture"/> database and a custom <see cref="ILlmClient"/>.
 /// </summary>
 internal sealed class OrchestratorTestHost : IAsyncDisposable
 {
@@ -22,14 +23,15 @@ internal sealed class OrchestratorTestHost : IAsyncDisposable
     /// Initializes a new <see cref="OrchestratorTestHost"/> with the given fixture, client, and optional options.
     /// </summary>
     public OrchestratorTestHost(
-        PostgresFixture     fixture,
-        IAnthropicClient    anthropicClient,
+        PostgresFixture      fixture,
+        ILlmClient           llmClient,
         OrchestratorOptions? options = null)
     {
         var opts = options ?? new OrchestratorOptions
         {
-            PollingInterval   = TimeSpan.FromMilliseconds(100),
-            MaxConcurrentRuns = 5
+            PollingInterval            = TimeSpan.FromMilliseconds(100),
+            MaxConcurrentRuns          = 5,
+            CancellationPollingInterval = TimeSpan.FromMilliseconds(200)
         };
 
         _host = Host.CreateDefaultBuilder()
@@ -38,21 +40,28 @@ internal sealed class OrchestratorTestHost : IAsyncDisposable
                 services.AddDbContext<AtelierDbContext>(opt =>
                     opt.UseNpgsql(fixture.ConnectionString));
                 services.AddAtelierPersistence();
+                services.AddAtelierApplication();
 
-                // Provide fake Anthropic client for tests (overrides any AddHttpClient registration)
-                services.AddSingleton(anthropicClient);
-                // AnthropicOptions uses init-only properties; wrap in IOptions directly
-                services.AddSingleton<IOptions<AnthropicOptions>>(
-                    Options.Create(new AnthropicOptions
+                // Provide fake LLM client for tests.
+                services.AddSingleton(llmClient);
+                // LlmOptions with test defaults.
+                services.AddSingleton<IOptions<LlmOptions>>(
+                    Options.Create(new LlmOptions
                     {
-                        ApiKey        = "test-key",
-                        ExecutorModel = "test-model",
-                        ReviewerModel = "test-model"
+                        ApiKey       = "test-key",
+                        DefaultModel = "test-model",
+                        Actors = new Dictionary<string, LlmOptions.ActorConfig>
+                        {
+                            ["Executor"]              = new() { Model = "test-model" },
+                            ["BriefingTreueReviewer"] = new() { Model = "test-model" },
+                            ["KlarheitReviewer"]      = new() { Model = "test-model" }
+                        }
                     }));
                 services.Configure<OrchestratorOptions>(o =>
                 {
-                    o.PollingInterval   = opts.PollingInterval;
-                    o.MaxConcurrentRuns = opts.MaxConcurrentRuns;
+                    o.PollingInterval            = opts.PollingInterval;
+                    o.MaxConcurrentRuns          = opts.MaxConcurrentRuns;
+                    o.CancellationPollingInterval = opts.CancellationPollingInterval;
                 });
                 services.AddHostedService<RunOrchestratorService>();
             })

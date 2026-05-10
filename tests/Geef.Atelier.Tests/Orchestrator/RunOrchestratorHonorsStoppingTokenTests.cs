@@ -26,7 +26,7 @@ public sealed class RunOrchestratorHonorsStoppingTokenTests(PostgresFixture fixt
         var runId = await svc.CreateRunAsync("Stopping test run", "{}", CancellationToken.None);
 
         var gate        = new SemaphoreSlim(0, int.MaxValue); // closed
-        var gatedClient = new GatedFakeAnthropicClient(gate);
+        var gatedClient = new GatedFakeLlmClient(gate);
 
         await using var host = new OrchestratorTestHost(fixture, gatedClient,
             new OrchestratorOptions

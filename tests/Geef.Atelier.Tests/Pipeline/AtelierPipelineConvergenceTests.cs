@@ -14,13 +14,12 @@ public sealed class AtelierPipelineConvergenceTests(ITestOutputHelper output)
     [Fact]
     public async Task AtelierPipelineConvergesWithMockClient()
     {
-        var options = Options.Create(new AnthropicOptions
+        var options = Options.Create(new LlmOptions
         {
-            ApiKey        = "fake-key-for-tests",
-            ExecutorModel = "fake-model",
-            ReviewerModel = "fake-model"
+            ApiKey       = "fake-key-for-tests",
+            DefaultModel = "fake-model"
         });
-        var fakeClient = new FakeAnthropicClient();
+        var fakeClient = new FakeLlmClient();
         var outputSink = new OutputEventSink(output);
 
         var runner = AtelierPipelineFactory.BuildWithProviders(

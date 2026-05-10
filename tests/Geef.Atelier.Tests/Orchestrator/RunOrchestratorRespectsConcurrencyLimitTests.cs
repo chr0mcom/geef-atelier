@@ -29,7 +29,7 @@ public sealed class RunOrchestratorRespectsConcurrencyLimitTests(PostgresFixture
 
         // Gate starts closed (0 permits) — all API calls block
         var gate = new SemaphoreSlim(0, int.MaxValue);
-        var gatedClient = new GatedFakeAnthropicClient(gate);
+        var gatedClient = new GatedFakeLlmClient(gate);
 
         await using var host = new OrchestratorTestHost(fixture, gatedClient,
             new OrchestratorOptions

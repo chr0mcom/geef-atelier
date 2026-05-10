@@ -25,13 +25,12 @@ public sealed class PostgresEventSinkHandlesCriticalAbortTests(PostgresFixture f
         var             scopes  = fixture.NewScopeFactory();
         var             sink    = new PostgresEventSink(runId, scopes, NullLogger.Instance);
 
-        var options = Options.Create(new AnthropicOptions
+        var options = Options.Create(new LlmOptions
         {
-            ApiKey        = "fake-key",
-            ExecutorModel = "fake-model",
-            ReviewerModel = "fake-model"
+            ApiKey       = "fake-key",
+            DefaultModel = "fake-model"
         });
-        var criticalClient = new CriticalFakeAnthropicClient();
+        var criticalClient = new CriticalFakeLlmClient();
 
         var runner = AtelierPipelineFactory.BuildWithProviders(
             new BriefingGroundingStep(),

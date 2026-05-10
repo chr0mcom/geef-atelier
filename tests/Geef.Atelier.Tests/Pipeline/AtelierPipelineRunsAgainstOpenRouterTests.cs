@@ -6,36 +6,38 @@ using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Tests.Pipeline;
 
-public sealed class AtelierPipelineRealAnthropicTests
+public sealed class AtelierPipelineRunsAgainstOpenRouterTests
 {
     private const string Briefing = "Schreibe einen kurzen Text (ca. 150 Wörter) über das Walking-Skeleton-Pattern in der Softwareentwicklung.";
 
     [Fact]
-    public async Task AtelierPipelineRunsAgainstRealAnthropic()
+    public async Task AtelierPipelineRunsAgainstOpenRouter()
     {
-        var apiKey = Environment.GetEnvironmentVariable("Anthropic__ApiKey");
+        var apiKey = Environment.GetEnvironmentVariable("Llm__ApiKey");
         if (string.IsNullOrWhiteSpace(apiKey))
         {
-            // No API key available. Set Anthropic__ApiKey env-var to run this integration test.
+            // No API key available. Set Llm__ApiKey env-var to run this integration test.
             return;
         }
 
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Anthropic:ApiKey"]        = apiKey,
-                ["Anthropic:ExecutorModel"] = "claude-opus-4-7",
-                ["Anthropic:ReviewerModel"] = "claude-opus-4-7"
+                ["Llm:ApiKey"]       = apiKey,
+                ["Llm:DefaultModel"] = "anthropic/claude-opus-4.7",
+                ["Llm:Actors:Executor:Model"]              = "anthropic/claude-opus-4.7",
+                ["Llm:Actors:BriefingTreueReviewer:Model"] = "anthropic/claude-opus-4.7",
+                ["Llm:Actors:KlarheitReviewer:Model"]      = "anthropic/claude-opus-4.7"
             })
             .Build();
 
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddAnthropicClient(configuration);
+        services.AddLlmClient(configuration).AddStandardResilienceHandler();
 
         await using var provider = services.BuildServiceProvider();
-        var client  = provider.GetRequiredService<IAnthropicClient>();
-        var options = provider.GetRequiredService<IOptions<AnthropicOptions>>();
+        var client  = provider.GetRequiredService<ILlmClient>();
+        var options = provider.GetRequiredService<IOptions<LlmOptions>>();
         var sink    = new CountingEventSink();
 
         var runner = AtelierPipelineFactory.Build(client, options, additionalSinks: [sink]);
@@ -48,5 +50,6 @@ public sealed class AtelierPipelineRealAnthropicTests
         Assert.NotEmpty(result.Output.Markdown);
         Assert.True(result.TotalIterations >= 1);
         Assert.True(result.Output.IterationCount >= 1);
+        Assert.True(sink.TotalEvents > 0);
     }
 }

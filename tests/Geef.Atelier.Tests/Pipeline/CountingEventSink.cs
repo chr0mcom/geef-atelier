@@ -15,4 +15,6 @@ internal sealed class CountingEventSink : IGeefEventSink
 
     public int Get<T>() where T : IGeefEvent =>
         Counts.TryGetValue(typeof(T), out var count) ? count : 0;
+
+    public int TotalEvents => Counts.Values.Sum();
 }

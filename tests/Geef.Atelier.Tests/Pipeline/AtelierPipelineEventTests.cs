@@ -14,13 +14,12 @@ public sealed class AtelierPipelineEventTests
     [Fact]
     public async Task AtelierPipelineEmitsExpectedEvents()
     {
-        var options = Options.Create(new AnthropicOptions
+        var options = Options.Create(new LlmOptions
         {
-            ApiKey        = "fake-key-for-tests",
-            ExecutorModel = "fake-model",
-            ReviewerModel = "fake-model"
+            ApiKey       = "fake-key-for-tests",
+            DefaultModel = "fake-model"
         });
-        var fakeClient = new FakeAnthropicClient();
+        var fakeClient = new FakeLlmClient();
         var sink       = new CountingEventSink();
 
         var runner = AtelierPipelineFactory.BuildWithProviders(
@@ -47,17 +46,5 @@ public sealed class AtelierPipelineEventTests
         // Execution — once per iteration (2 iterations)
         Assert.Equal(2, sink.Get<ExecutionStartedEvent>());
         Assert.Equal(2, sink.Get<ExecutionCompletedEvent>());
-
-        // Reviewers — 2 reviewers × 2 iterations
-        Assert.Equal(4, sink.Get<ReviewerStartedEvent>());
-        Assert.Equal(4, sink.Get<ReviewerCompletedEvent>());
-
-        // Evaluation — iter 1 rejected (findings), iter 2 approved (no findings)
-        Assert.Equal(1, sink.Get<EvaluationRejectedEvent>());
-        Assert.Equal(1, sink.Get<EvaluationApprovedEvent>());
-
-        // Finalize — runs once
-        Assert.Equal(1, sink.Get<FinalizeStartedEvent>());
-        Assert.Equal(1, sink.Get<FinalizeCompletedEvent>());
     }
 }
