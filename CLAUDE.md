@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Aktueller Zustand
 
-**Pre-Implementation.** Es existiert noch kein Code, nur Brainstorming-Dokumentation und Bau-Prompts. Phase: *Brainstorming abgeschlossen, Walking Skeleton in Vorbereitung.* Nächster konkreter Bauschritt: [`prompts/step-01-solution-setup.md`](prompts/step-01-solution-setup.md).
+**Skeleton Schritt 2 abgeschlossen (10. Mai 2026).** In-memory Geef-Pipeline mit Stub-Providern ist implementiert und grün getestet (7/7 xUnit-Tests). Pipeline-Namespace: `Geef.Atelier.Infrastructure.Pipeline` (`BriefingGroundingStep`, `StubExecutionStep`, `StubReviewer`, `MarkdownFinalizer`, `StubPipelineFactory`, `AtelierContextKeys`). Domain-Record: `Geef.Atelier.Core.Domain.FinalizedDocument`. Nächster Schritt: [`docs/prompts/step-03-anthropic-client.md`](docs/prompts/step-03-anthropic-client.md) — Stubs durch echte Anthropic-API-Aufrufe ersetzen.
 
 ## Verbindlicher Workflow
 
@@ -44,7 +44,7 @@ Zwei Frontends (Blazor Server UI + MCP-Server), beide rufen denselben `IRunServi
 
 - **Code, Kommentare, XML-Docs:** Englisch (Geef-SDK-Konvention)
 - **Doku, Berichte, Commits:** Deutsch (Projekt-Konvention)
-- **Reviewer-Modell:** außerhalb der Anthropic-Familie für echte Außenperspektive (z.B. gpt-5.4 via Codex). Reviewer dürfen Anthropic nutzen, aber dann mit *anderem Modell* als der Executor.
+- **Reviewer-Modell:** außerhalb der Anthropic-Familie für echte Außenperspektive (z.B. gpt-5.5 via Codex, aber hier wichtig immer das neuste zu nutzen!). Reviewer dürfen Anthropic nutzen, aber dann mit *anderem Modell* als der Executor.
 - **Persistente Berichte:** Abschlussberichte aus Bau-Schritten kommen nach `reports/` (überlebt das Phase-4.3-Cleanup, weil der Pfad nicht der `geef_*.md`-Naming-Konvention entspricht)
 
 ## Auth-Modell (Skeleton)

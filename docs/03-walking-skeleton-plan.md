@@ -1,6 +1,6 @@
 # Walking Skeleton — Bauplan
 
-*Letzte Aktualisierung: 10. Mai 2026*
+*Letzte Aktualisierung: 10. Mai 2026 — Schritt 2 abgeschlossen*
 
 Das Walking Skeleton ist die kleinste end-to-end-funktionale Version von Geef.Atelier: ein Auftrag wird über die UI oder via MCP gestellt, eine echte Geef-Pipeline läuft (mit echten LLM-Calls), Live-Status ist sichtbar, das Ergebnis wird angezeigt und persistiert. Quellen-Upload, Klassifikator, dynamische Crew, Advisor, Multi-Format-Export — alles weitere kommt später.
 
@@ -29,7 +29,7 @@ Jeder Schritt ist einzeln verifizierbar. Kein Schritt setzt voraus, dass alles d
 - `docker compose up` startet App und DB; Health-Check antwortet 200 OK
 - Tests-Projekt enthält mindestens einen Smoke-Test (DbContext lädt, Migration läuft in Test-DB)
 
-**Status:** Prompt vorbereitet (siehe [prompts/step-01-solution-setup.md](prompts/step-01-solution-setup.md))
+**Status:** ✅ Abgeschlossen am 10. Mai 2026. 1 Reviewer-Iteration, alle Findings behoben. Bericht: [docs/reports/step-01-report.md](reports/step-01-report.md).
 
 ---
 
@@ -49,6 +49,8 @@ Jeder Schritt ist einzeln verifizierbar. Kein Schritt setzt voraus, dass alles d
 - Pipeline läuft 2 Iterationen und konvergiert
 - Alle Geef-Events werden in der Konsole geloggt
 - Final-Output enthält den erwarteten Marker
+
+**Status:** ✅ Abgeschlossen am 10. Mai 2026. 1 Reviewer-Iteration, 0 aktionierbare Findings. 7/7 Tests grün. Bericht: [docs/reports/step-02-report.md](reports/step-02-report.md).
 
 ---
 
@@ -213,3 +215,25 @@ Damit der Scope klar bleibt:
 - **Export nach DOCX/PDF** (Skeleton liefert Markdown)
 - **Crew-Templates und Reviewer-Profile** als versionierte Daten (Skeleton hat zwei hartkodierte Reviewer)
 - **OAuth-2.0** für MCP (Skeleton nutzt Bearer-Token)
+
+## Wo
+
+Im File `docs/03-walking-skeleton-plan.md`, **im Abschnitt "Schritt 1 — Solution-Setup mit Postgres und EF Core"**, ganz am Ende des Schritt-1-Blocks (direkt vor dem `---`-Trenner zu Schritt 2).
+
+## Was ersetzen
+
+**Alte Zeile:**
+```markdown
+**Status:** Prompt vorbereitet (siehe [prompts/step-01-solution-setup.md](prompts/step-01-solution-setup.md))
+```
+
+**Neuer Block:**
+```markdown
+**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, alle 5 Reviewer durch (1 CRITICAL + 4 MAJOR Findings, alle behoben). 9 Conventional-Commits. Bericht: [reports/step-01-report.md](reports/step-01-report.md). Details siehe Decisions-Log D-010.
+```
+
+## Zusätzlich
+
+Im Header der Datei das Datum aktualisieren:
+```markdown
+*Letzte Aktualisierung: 10. Mai 2026 (Schritt 1 abgeschlossen)*

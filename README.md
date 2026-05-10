@@ -2,7 +2,8 @@
 
 Text-Generations-Pipeline-Plattform auf Basis des [Geef SDK](https://github.com/chr0mcom/geef).
 
-Schritt 1 des Walking Skeleton ist abgeschlossen: Solution-Struktur, Postgres-Persistence, Health-Check, Docker-Compose.
+**Schritt 1 ✅** Solution-Struktur, Postgres-Persistence, Health-Check, Docker-Compose.
+**Schritt 2 ✅** In-memory Geef-Pipeline mit Stub-Providern — kein LLM, kein DB-Zugriff. Convergence-Loop (2 Iterationen), EventSink, alle vier Provider-Verträge (Grounding/Execution/Reviewer/Finalizer) implementiert und mit xUnit-Tests abgedeckt.
 
 Vollständiger Scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope.md)
 
