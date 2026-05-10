@@ -1,0 +1,14 @@
+**/.git
+**/.gitignore
+**/.vs
+**/.vscode
+**/obj
+**/bin
+**/*.user
+**/TestResults
+docs/
+*.md
+.editorconfig
+geef_*.md
+docker-compose*.yml
+.env*
