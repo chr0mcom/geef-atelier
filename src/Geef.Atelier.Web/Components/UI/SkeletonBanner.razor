@@ -1,0 +1,8 @@
+@* Minimal UI component establishing the project's own component library convention.
+   All page-level UI in Geef.Atelier must use components from Components/UI/ — never raw HTML equivalents where a component exists. *@
+
+<h1 class="skeleton-banner">@Title</h1>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+}
