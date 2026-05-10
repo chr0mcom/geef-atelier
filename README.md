@@ -4,6 +4,7 @@ Text-Generations-Pipeline-Plattform auf Basis des [Geef SDK](https://github.com/
 
 **Schritt 1 ✅** Solution-Struktur, Postgres-Persistence, Health-Check, Docker-Compose.
 **Schritt 2 ✅** In-memory Geef-Pipeline mit Stub-Providern — kein LLM, kein DB-Zugriff. Convergence-Loop (2 Iterationen), EventSink, alle vier Provider-Verträge (Grounding/Execution/Reviewer/Finalizer) implementiert und mit xUnit-Tests abgedeckt.
+**Schritt 3 ✅** Echte Anthropic-API-Aufrufe — `IAnthropicClient` mit HTTP-Implementierung, `LlmExecutionStep` und zwei `LlmReviewer` (Tool Use mit `submit_review`). 11/11 Tests grün (Mocks + Stub-Regression + Skip-If-No-Key-Integration). Polly-Resilience via `Microsoft.Extensions.Http.Resilience`.
 
 Vollständiger Scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope.md)
 

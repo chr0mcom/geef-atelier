@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Aktueller Zustand
 
-**Skeleton Schritt 2 abgeschlossen (10. Mai 2026).** In-memory Geef-Pipeline mit Stub-Providern ist implementiert und grün getestet (7/7 xUnit-Tests). Pipeline-Namespace: `Geef.Atelier.Infrastructure.Pipeline` (`BriefingGroundingStep`, `StubExecutionStep`, `StubReviewer`, `MarkdownFinalizer`, `StubPipelineFactory`, `AtelierContextKeys`). Domain-Record: `Geef.Atelier.Core.Domain.FinalizedDocument`. Nächster Schritt: [`docs/prompts/step-03-anthropic-client.md`](docs/prompts/step-03-anthropic-client.md) — Stubs durch echte Anthropic-API-Aufrufe ersetzen.
+**Skeleton Schritt 3 abgeschlossen (10. Mai 2026).** Echte Anthropic-API-Aufrufe: `IAnthropicClient` + `HttpAnthropicClient` (HTTP gegen `/v1/messages`, Polly-Resilience), `LlmExecutionStep`, zwei `LlmReviewer` (Tool Use mit `submit_review`), `AtelierPipelineFactory` mit `BuildWithProviders`-Test-Hook. Namespace `Geef.Atelier.Infrastructure.Llm`. 11/11 Tests grün (Mock-Pipeline + Stub-Regression + Skip-If-No-Key-Integration). Nächster Schritt: [`docs/prompts/step-04-eventsink-persistence.md`](docs/prompts/step-04-eventsink-persistence.md) — EventSink und Persistierung in Postgres.
 
 ## Verbindlicher Workflow
 

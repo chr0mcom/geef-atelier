@@ -1,6 +1,6 @@
 # Walking Skeleton — Bauplan
 
-*Letzte Aktualisierung: 10. Mai 2026 (Schritte 1 + 2 abgeschlossen)*
+*Letzte Aktualisierung: 10. Mai 2026 (Schritte 1–3 abgeschlossen)*
 
 Das Walking Skeleton ist die kleinste end-to-end-funktionale Version von Geef.Atelier: ein Auftrag wird über die UI oder via MCP gestellt, eine echte Geef-Pipeline läuft (mit echten LLM-Calls), Live-Status ist sichtbar, das Ergebnis wird angezeigt und persistiert. Quellen-Upload, Klassifikator, dynamische Crew, Advisor, Multi-Format-Export — alles weitere kommt später.
 
@@ -70,6 +70,8 @@ Jeder Schritt ist einzeln verifizierbar. Kein Schritt setzt voraus, dass alles d
 - Pipeline läuft mit echtem Anthropic-Modell und konvergiert (mit einem trivialen Briefing)
 - Token-Verbrauch wird erfasst und im Final-Output ausgewiesen
 - Strukturierter Reviewer-Output wird korrekt geparst
+
+**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, alle 5 Reviewer mit 2 aktionierbaren Findings durch (beide R2 MAJOR-Findings vor Phase 4 behoben: defensive JSON-Deserialisierung). 11/11 Tests grün (4 neue Mock-Tests + 7 Regression). Bericht: [reports/step-03-report.md](reports/step-03-report.md). Details siehe Decisions-Log D-013.
 
 ---
 

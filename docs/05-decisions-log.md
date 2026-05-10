@@ -1,6 +1,6 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 10. Mai 2026*
+*Letzte Aktualisierung: 10. Mai 2026 (Schritt 3 abgeschlossen)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming. Format: Frage / Entscheidung / Begründung / ggf. Konsequenzen.
 
@@ -137,3 +137,68 @@ Null aktionierbare Findings in Iteration 1 ist **kein** Zeichen unzureichender P
 
 **Pre-Mortem-Risiko für Schritt 3:**
 *"`AbortOnCritical = true` wird die Pipeline hart stoppen, sobald ein echter LLM-Reviewer Critical-Findings produziert."* Dieses Verhalten muss in Schritt 3 explizit getestet werden — nicht erst entdeckt werden, wenn die Pipeline in Production stoppt.
+### D-013: Schritt 3 abgeschlossen — Anthropic-Client und echte Provider
+
+**Datum:** 10. Mai 2026
+**Bericht:** [docs/reports/step-03-report.md](reports/step-03-report.md)
+**Reviewer-Iterationen:** 1; Findings: 2 MAJOR (beide behoben), Rest MINOR/INFO
+**Tests:** 11/11 grün (4 neue Mock-Tests, 7 Regression aus Schritt 1+2)
+
+**Fixierte Realfakten aus Schritt 3 (verbindlich ab Schritt 4):**
+
+**(a) `IAnthropicClient`-Vertrag:**
+- Public interface in `Geef.Atelier.Infrastructure.Llm`; `CompleteAsync(AnthropicRequest, CancellationToken) → AnthropicResponse`
+- `AnthropicResponse.ToolInputJson` ist `string?` (raw JSON), nicht `IReadOnlyDictionary<string,object>` — vermeidet `JsonElement`-Coupling im Interface
+- `AnthropicTool.InputSchema` ist `JsonElement` — ermöglicht beliebige JSON-Schema-Strukturen
+
+**(b) HTTP-Implementierung (`HttpAnthropicClient`):**
+- Typed Client via `AddHttpClient<IAnthropicClient, HttpAnthropicClient>()` (nicht Named Client)
+- API-Key per Request gesetzt (`httpRequest.Headers.Add("x-api-key", apiKey)`), **nicht** in `DefaultRequestHeaders` (verhindert Key-Leak in Singleton)
+- `DefaultRequestHeaders.Add("anthropic-version", "2023-06-01")` — statisch, kein Pro-Request-Overhead
+- `client.Timeout = TimeSpan.FromSeconds(120)` — schützt vor hängenden LLM-Calls
+- Lazy-Validation beim ersten Call: `if (string.IsNullOrWhiteSpace(apiKey)) throw InvalidOperationException`
+
+**(c) `Microsoft.Extensions.Http.Resilience` als Resilience-Default:**
+- `AddStandardResilienceHandler()` wird in `Program.cs` an den `IHttpClientBuilder` gekettet (nicht in Infrastructure selbst)
+- Infrastructure gibt `IHttpClientBuilder` aus `AddAnthropicClient()` zurück — Web entscheidet über Resilience-Konfiguration
+
+**(d) `IOptions<AnthropicOptions>` für Konfig-Pattern:**
+- `AnthropicOptions { ApiKey, ExecutorModel = "claude-opus-4-7", ReviewerModel = "claude-opus-4-7" }`
+- Sektion `"Anthropic"` in `appsettings.json`
+- Environment-Variable-Override: `Anthropic__ApiKey` (Doppelunterstrich = Sections-Separator)
+
+**(e) Tool-Use-Pattern für Reviewer:**
+- `tool_choice: "tool:submit_review"` zwingt Anthropic zur Tool-Benutzung
+- Fallback bei fehlendem Tool-Call: `ReviewDecision.Failed` mit `SuggestedRetryHint`
+- `LlmReviewer.ParseToolInput` verwendet `TryGetProperty` (defensiv, nicht `GetProperty`)
+- Fingerprint-Strategie: SHA-256 der Finding-Message → Base64 → 12 Zeichen → `{name}:{hash}`
+
+**(f) `AtelierPipelineFactory.BuildWithProviders` als Test-Hook:**
+- Ersetzt `StubPipelineFactory`; `Build(IAnthropicClient, ...)` für Production, `BuildWithProviders(...)` für Tests mit beliebigen Provider-Kombinationen
+- `StubExecutionStep` und `StubReviewer` bleiben im Repo als Regression-Test-Artefakte
+
+**(g) `FakeAnthropicClient` Erkennungslogik:**
+- Unterscheidet Executor vs. Reviewer über `request.Tools == null` (Executor sendet keine Tools)
+- Zählt Executor-Calls intern: 1. Call = Iteration 1 (reject), 2+ = Iteration 2+ (approve)
+
+**(h) `ConvergenceFailedException` bei Critical-Abort:**
+- `AbortOnCritical = true` → SDK wirft `ConvergenceFailedException` (nicht `result.Success = false`)
+- Exception-Message enthält "AbortCriticalBlocker" — für Assertions nutzbar
+- `PipelineFailedEvent` feuert, `PipelineCompletedEvent` und `FinalizeStartedEvent` nicht
+
+**(i) Modell-Pluralismus postponed:**
+- Beide Provider (`LlmExecutionStep` + `LlmReviewer`) nutzen dasselbe `claude-opus-4-7`
+- Multi-Provider-Adapter (OpenAI/OpenRouter als Reviewer) kommt nach Skeleton-Abschluss
+
+**(j) PreviousFindings-Workaround bleibt:**
+- `GeefKeys.IterationHistory.Records[^1].EvaluationResult.AllFindings` — funktional korrekt
+- SDK-Bump auf `1.0.0` stable postponed bis nach Skeleton-Abschluss
+
+**Architect-Konsultation Schritt 3:**
+- Level 1 (`claude -p --dangerously-skip-permissions`) nicht versucht (aufgrund vorangegangenem Level-2-Muster aus D-012)
+- Level 2 (`cat file | claude -p`) für Architect-Konsultation verwendet: erfolgreich
+- `geef_architecture.md` durch Executor erstellt (Atelier-Level-4-Fallback nicht benötigt, da Level 2 erfolgreich)
+
+**R2 MAJOR-Findings (behoben vor Phase 4):**
+1. `AnthropicMessageFormat.DeserializeResponse`: `?? throw new JsonException(...)` statt `!`-Operator
+2. `LlmReviewer.ParseToolInput`: `TryGetProperty` statt `GetProperty` — gibt `ReviewDecision.Failed` bei malformiertem Tool-Input zurück
