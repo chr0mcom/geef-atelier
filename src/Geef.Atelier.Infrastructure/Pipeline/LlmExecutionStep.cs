@@ -48,7 +48,9 @@ internal sealed class LlmExecutionStep(
             MaxTokens   = 4096
         }, cancellationToken);
 
-        var updated = context.Set(AtelierContextKeys.CurrentDraft, response.Text);
+        var updated = context
+            .Set(AtelierContextKeys.CurrentDraft, response.Text)
+            .Set(AtelierContextKeys.TokenUsage, response.TokenUsage);
         return new ExecutionResult
         {
             UpdatedContext = updated,
