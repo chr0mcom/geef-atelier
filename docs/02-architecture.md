@@ -1,6 +1,6 @@
 # Architektur
 
-*Letzte Aktualisierung: 10. Mai 2026*
+*Letzte Aktualisierung: 10. Mai 2026 (M1: LLM-Schicht auf OpenAI-kompatiblen Adapter umgestellt)*
 
 ## Schichtenbild
 
@@ -139,34 +139,53 @@ Vier Tabellen reichen am Anfang. Spätere Erweiterungen (Sources, AdvisorConsult
 | GEEF-Phase | Provider-Implementierung | Skeleton-Verhalten |
 |---|---|---|
 | Grounding | `BriefingGroundingStep` | Schreibt das Briefing in den Context, keine externen Quellen |
-| Execution | `LlmExecutionStep` | Anthropic-Call mit Briefing + PreviousFindings, gibt neuen Text zurück |
-| Evaluation | `LlmReviewer` × 2 | Zwei Reviewer mit OpenAI-Modell, parallel ausgeführt |
+| Execution | `LlmExecutionStep` | OpenAI-kompatibler LLM-Call (via OpenRouter) mit Briefing + PreviousFindings, gibt neuen Text zurück |
+| Evaluation | `LlmReviewer` × 2 | Zwei Reviewer (konfigurierbar pro Akteur), parallel ausgeführt |
 | Finalize | `MarkdownFinalizer` | Wrappt finalen Text in `FinalizedDocument`-Record |
 
 **Convergence-Policy im Skeleton:** `MaxIterationsPolicy(3)` — drei Iterationen Maximum, danach abbrechen. Mehr ist im Skeleton Overkill.
 
 **Evaluation-Strategy im Skeleton:** `ParallelEvaluationStrategy` — beide Reviewer laufen gleichzeitig.
 
-## Multi-Provider-LLM-Abstraktion (geplant, nicht im Skeleton)
+## LLM-Provider-Schicht (umgesetzt in Migration M1, siehe D-017)
 
-Für späteren Multi-Provider-Support (Anthropic, OpenAI, OpenRouter) ist ein dünner Adapter geplant:
+Die LLM-Schicht ist **OpenAI-API-konform** implementiert. Default-Endpoint: **OpenRouter** (`https://openrouter.ai/api/v1`).
+
+### Abstraktion
 
 ```csharp
 public interface ILlmClient
 {
-    Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken ct);
+    Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken);
 }
-
-public sealed record LlmRequest(
-    string Provider,        // "anthropic" | "openai" | "openrouter"
-    string Model,
-    string SystemPrompt,
-    string UserPrompt,
-    JsonSchema? ResponseSchema,
-    LlmOptions Options);
 ```
 
-Im Skeleton existiert nur `AnthropicLlmClient`. OpenAI und OpenRouter werden in einem späteren Schritt ergänzt. Die Reviewer im Skeleton dürfen ausnahmsweise auch Anthropic nutzen, *müssen aber ein anderes Modell* als der Executor verwenden, damit die "fremder Blick"-Eigenschaft erhalten bleibt.
+`OpenAiCompatibleClient` ist die einzige Implementierung im Skeleton. Weitere OpenAI-kompatible Endpoints (OpenAI direkt, lokales Ollama, Together AI) sind durch Anpassen von `LlmOptions.Endpoint` ansprechbar — ohne Code-Änderung.
+
+### Pro-Akteur-Modell-Konfiguration
+
+Jeder Pipeline-Akteur (Executor, BriefingTreueReviewer, KlarheitReviewer) hat eine eigene Modell-Konfiguration in `appsettings.json`:
+
+```json
+{
+  "Llm": {
+    "Endpoint": "https://openrouter.ai/api/v1",
+    "ApiKey": "",
+    "DefaultModel": "anthropic/claude-opus-4.7",
+    "Actors": {
+      "Executor":              { "Model": "anthropic/claude-opus-4.7", "MaxTokens": 8192 },
+      "BriefingTreueReviewer": { "Model": "anthropic/claude-opus-4.7", "MaxTokens": 2048 },
+      "KlarheitReviewer":      { "Model": "anthropic/claude-opus-4.7", "MaxTokens": 2048 }
+    }
+  }
+}
+```
+
+Der Leitstern **Modell-Pluralismus** ist damit konfigurativ sofort verfügbar: Executor kann ein anderes Modell nutzen als die Reviewer. Beispiel: `anthropic/claude-opus-4.7` für den Executor, `openai/gpt-5` + `google/gemini-2.5-pro` für die Reviewer. API-Key-Override via Environment-Variable: `Llm__ApiKey`.
+
+### Token-Tracking
+
+`LlmTokenUsage` (`InputTokens`, `OutputTokens`) wird pro Iteration vom `LlmExecutionStep` in `AtelierContextKeys.TokenUsage` gesetzt und von `PostgresEventSink` in `Runs.TokensTotal` akkumuliert. Property-Namen identisch zu Schritt 3; nur der Wire-Name ändert sich (`prompt_tokens`/`completion_tokens` in der OpenAI-API).
 
 ## Frontend-Stack-Entscheidung
 

@@ -1,243 +1,131 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 10. Mai 2026 (Schritt 5 abgeschlossen)*
+*Letzte Aktualisierung: 10. Mai 2026 (Provider-Strategie auf OpenAI-konform geändert; Migration M1 parallel zu Schritt 6)*
 
-Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming. Format: Frage / Entscheidung / Begründung / ggf. Konsequenzen.
+Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
 ## 10. Mai 2026 — Erstes Brainstorming
 
 ### D-001: Erster Use-Case-Fokus
-
 **Entscheidung:** Generische Pipeline ohne Domänen-Fokus.
-**Begründung:** Verhindert, dass die Architektur einen Domänen-Bias einbacken bekommt. Spezialisierung kommt später als *Konfiguration* dazu — nicht als Code-Branch.
 
 ### D-002: Mensch-im-Loop
-
 **Entscheidung:** Reiner Fire-and-Forget (Start → Ergebnis).
-**Konsequenz:** Crash-Recovery bleibt eine System-Anforderung. Abbruch-Button in der UI als einziger User-Eingriff.
 
 ### D-003: Frontend-Stack
-
 **Entscheidung:** Blazor Server.
 
 ### D-004: Datenbank
-
 **Entscheidung:** Postgres.
 
 ### D-005: MCP-Schnittstelle
-
-**Entscheidung:** Ja — als zweites Frontend neben der Web-UI.
-**Konsequenz:** Application-Service-Layer (`IRunService`) wird zwingend. Eigenes Projekt `Geef.Atelier.Mcp`. Auth-Strategie zweispurig.
+**Entscheidung:** Ja — als zweites Frontend.
 
 ### D-006: Projekt-Name
-
 **Entscheidung:** Geef.Atelier.
 
 ### D-007: Bau-Konventionen (initial)
-
-**Status:** Durch D-009 konkretisiert und durch `geef_workflow.md` formalisiert.
+**Status:** Durch D-009 konkretisiert.
 
 ### D-008: Reihenfolge der Schritte
-
 **Entscheidung:** Walking Skeleton zuerst.
 
 ### D-009: Verbindlicher Workflow für Claude Code
-
-**Entscheidung:** Es gibt eine **kanonische Workflow-Datei `geef_workflow.md`** unter `/srv/docker/docs/geef-workflow.md` (projekt-agnostisch). Sie definiert vier Phasen, drei Rollen, fünf Reviewer, Pflicht-Advisors, Hard Rules.
-**Trennlinie:** Atelier-spezifisches kommt ausschließlich in Step-Prompts oder `docs/`.
+**Entscheidung:** Kanonische Workflow-Datei `geef_workflow.md` unter `/srv/docker/docs/` (projekt-agnostisch). Atelier-Spezifisches kommt in Step-Prompts oder `docs/`.
 
 ### D-010: Schritt 1 abgeschlossen — Realitäts-Abgleich
+**Bericht:** [reports/step-01-report.md](reports/step-01-report.md)
+**Realfakten:** Geef.Sdk 1.0.0-ci.1, `.slnx`-Format, `Directory.Build.props` (`CS1591` suppressed), `docs/`-Struktur, `CLAUDE.md`, UI-Component-Library unter `src/Geef.Atelier.Web/Components/UI/`, Auto-Migration mit try-catch, Server-Pfad `/srv/docker/websites/geef_atelier`.
 
-**Datum:** 10. Mai 2026
-**Bericht:** [docs/reports/step-01-report.md](reports/step-01-report.md)
+### D-011: Architect-Workflow-Update + Atelier-Fallback
+**(A)** Phase 1.4 mit Fallback-Sequence (Levels 1–3); Hard Rule: `geef_architecture.md` MUSS existieren; R4 prüft Existenz.
+**(B)** Atelier-Level-4: Executor schreibt selbst mit Pflicht-Header, Diff-Sektion, Bericht-Doku.
 
-**Realfakten aus Schritt 1 (verbindlich):**
-- `Geef.Sdk 1.0.0-ci.1` (prerelease) via `Directory.Packages.props` + `nuget.config`.
-- Solution-Format: `Geef.Atelier.slnx`.
-- `Directory.Build.props` zentralisiert Build-Properties; `CS1591` global suppressed.
-- Doku unter `docs/`, Berichte unter `docs/reports/`, Prompts unter `docs/prompts/`.
-- `CLAUDE.md` im Root verweist auf Workflow + Doku-Hierarchie + übergeordnete `/srv/docker/docs/` und `/srv/CLAUDE.md`.
-- UI-Component-Library: `src/Geef.Atelier.Web/Components/UI/` (erste Komponente: `SkeletonBanner.razor`). Direkte HTML-Elemente in Pages = CRITICAL.
-- Migration-Strategie: Auto-on-Startup mit try-catch.
-- Lokaler Server-Pfad: `/srv/docker/websites/geef_atelier`.
+### D-012: Schritt 2 abgeschlossen — SDK-Realfakten
+**Bericht:** [reports/step-02-report.md](reports/step-02-report.md)
+**Sechs Korrekturen:** FindingSeverity `{Info, Warning, Error, Critical}`; `DefaultConvergencePolicy`; `UseMiddleware<T>()` generisch; nur `EvaluationApprovedEvent`/`RejectedEvent`; `PreviousFindings` via `IterationHistory`; `using SdkGeef = Geef.Sdk.Geef;`. Workflow-Bug: `--input-file` existiert nicht, korrekt ist `cat file | claude -p`.
 
-### D-011: Architect-Konsultation (Phase 1.4) — Workflow-Update + Atelier-Konvention
+### D-013: Schritt 3 abgeschlossen — Anthropic-Client (in M1 ersetzt)
+**Bericht:** [reports/step-03-report.md](reports/step-03-report.md)
+**Realfakten:** `IAnthropicClient` mit `ToolInputJson` als `string?`; Typed Client; API-Key per Request; `AddStandardResilienceHandler()`; `IOptions<AnthropicOptions>` mit `claude-opus-4-7`; Tool-Use mit `tool_choice: "tool:submit_review"`; `ConvergenceFailedException` mit `"AbortCriticalBlocker"`.
 
-**(A) Generisches Workflow-Update:** Phase 1.4 mit Invocation-Fallback-Sequence (Levels 1–3). Hard Rules: `geef_architecture.md` MUSS vor Phase 2 existieren. R4 prüft Existenz.
-
-**(B) Atelier-Level-4-Fallback:** Executor schreibt `geef_architecture.md` selbst, mit Pflicht-Header, Diff-Sektion gegen `docs/02-architecture.md`, Bericht-Doku.
-
-### D-012: Schritt 2 abgeschlossen — SDK-Realfakten und Workflow-Bug
-
-**Datum:** 10. Mai 2026
-**Bericht:** [docs/reports/step-02-report.md](reports/step-02-report.md)
-
-**Sechs Geef-SDK-Realfakt-Korrekturen:**
-
-1. **`FindingSeverity`-Enum:** SDK definiert `{ Info, Warning, Error, Critical }`. **NICHT** Major/Minor.
-2. **Convergence-Policy:** `DefaultConvergencePolicy { MaxIterations, AbortOnCritical, DetectRegression, StagnationThreshold }`.
-3. **Middleware:** `UseMiddleware<TMiddleware>()` oder `UseMiddleware(IGeefMiddleware)` — generisch.
-4. **Evaluation-Events:** Nur `EvaluationApprovedEvent` und `EvaluationRejectedEvent` — keine PhaseStarted/Completed.
-5. **`PreviousFindings`-Access:** Über `GeefKeys.IterationHistory` mit `history.Records[^1].EvaluationResult.AllFindings`.
-6. **Namespace-Konflikt:** `using SdkGeef = Geef.Sdk.Geef;`.
-
-**Atelier-Konventionen:** `internal sealed` Provider, `<InternalsVisibleTo>`, `AtelierContextKeys` mit `geef:atelier:`-Präfix.
-
-**Workflow-Bug:** Level 2 referenzierte `claude --input-file`, das existiert nicht. **Korrekt funktionierende Form:** `cat /tmp/prompt.txt | claude -p` (Pipe).
-
-### D-013: Schritt 3 abgeschlossen — Anthropic-Client und echte Provider
-
-**Datum:** 10. Mai 2026
-**Bericht:** [docs/reports/step-03-report.md](reports/step-03-report.md)
-**Tests:** 11/11 grün
-
-**Fixierte Realfakten:**
-- (a) `IAnthropicClient` in `Geef.Atelier.Infrastructure.Llm`; `AnthropicResponse.ToolInputJson` als `string?` (raw JSON), `AnthropicTool.InputSchema` als `JsonElement`.
-- (b) Typed Client (`AddHttpClient<IAnthropicClient, HttpAnthropicClient>()`); API-Key per Request, nicht in `DefaultRequestHeaders`.
-- (c) `Microsoft.Extensions.Http.Resilience` via `AddStandardResilienceHandler()` in Program.cs.
-- (d) `IOptions<AnthropicOptions> { ApiKey, ExecutorModel="claude-opus-4-7", ReviewerModel="claude-opus-4-7" }`.
-- (e) Tool-Use mit `tool_choice: "tool:submit_review"`; defensives `TryGetProperty`-Parsing.
-- (f) `AtelierPipelineFactory.Build(...)` für Production, `BuildWithProviders(...)` für Tests.
-- (g) `FakeAnthropicClient` unterscheidet Executor vs. Reviewer über `request.Tools == null`.
-- (h) `ConvergenceFailedException` bei Critical-Abort — Message enthält `"AbortCriticalBlocker"`.
-- (i) Modell-Pluralismus postponed bis nach Skeleton.
-- (j) `PreviousFindings`-Workaround bleibt aktiv.
-
-**Offener Verifikationspunkt:** `AtelierPipelineRealAnthropicTests` mit echtem API-Key — kein Key in Claude-Code-Session verfügbar (siehe D-015).
+**Status durch M1 (D-017):** Diese Anthropic-spezifischen Strukturen werden durch provider-agnostische Pendants ersetzt (siehe D-017). Inhaltliche Realfakten (Tool-Use-Konzept, Convergence-Verhalten, Resilience) bleiben gültig — nur die Schicht-Adapter ändern sich.
 
 ### D-014: Production-Domain und Traefik-Routing für Schritt 10
-
-**Status:** Vorbereitung für Schritt 10.
-- **Production-Domain:** `geef.stefan-bechtel.de`
-- **Server-IP:** `95.216.100.213`
-- **DNS:** A-Record bereits gesetzt.
-- **Reverse-Proxy:** Traefik (auf Server bereits aktiv); TLS-Termination dort.
-
-**Konsequenz:** Placeholder `atelier.example.com` im Production-Compose wird in Schritt 10 ersetzt. Schritte 4–9 sind davon unbetroffen.
+**Domain:** `geef.stefan-bechtel.de`. **IP:** `95.216.100.213` (DNS gesetzt). **Reverse-Proxy:** Traefik (TLS dort).
 
 ### D-015: Schritt 4 abgeschlossen — EventSink und Persistierung
+**Bericht:** [reports/step-04-report.md](reports/step-04-report.md)
+**Realfakten:** `IRunPersistenceService` in `Core/Persistence/`. `PostgresEventSink` mit injizierter `Guid runId` (Variante A). Severity-Mapping via `ToAtelierSeverity()` Extension. Token-Tracking via typisierter `ContextKey<AnthropicTokenUsage>` (in M1 zu `ContextKey<LlmTokenUsage>` umbenannt — Inhalt identisch). Critical-Abort-Findings aus `PipelineFailedEvent.History.Records[^1].EvaluationResult.AllFindings` (SDK-Dekompilierung). `_lastExecutionContext` als `volatile`. `JsonSerializerOptions.ReferenceHandler = IgnoreCycles`. `IGeefEvent.RunId` ist `string`. `IServiceScopeFactory.CreateAsyncScope()` pro Event.
+
+### D-016: Schritt 5 abgeschlossen — RunOrchestratorService
+**Bericht:** [reports/step-05-report.md](reports/step-05-report.md)
+**Realfakten:** Atomarer Pending→Running-Claim, `SemaphoreSlim` + `ConcurrentDictionary<Guid, Task>` + `WhenAll`-Drain, `OverrideToAbortedAsync` mit `CancellationToken.None`, `PipelineStartedEvent`-Handler nur idempotent `StartedAt`. Cancellation-Watcher-Vorbereitung via `_runCts`. `OrchestratorOptions` in `Core/Configuration/`. `GatedFakeAnthropicClient` (in M1 zu `GatedFakeLlmClient`). `OrchestratorTestHost`. Architect-Konsultation als Plan-Phase-Integration.
+
+### D-017: Provider-Strategie-Wechsel auf OpenAI-konforme APIs (Migration M1)
 
 **Datum:** 10. Mai 2026
-**Bericht:** [docs/reports/step-04-report.md](reports/step-04-report.md)
-**Reviewer-Iterationen:** 1; Findings: 1 MAJOR (volatile-Annotation), behoben.
-**Tests:** 15/15 grün (4 neue Persistence-Tests + 11 Regression).
-**13 Conventional-Commits.**
+**Status:** ✅ Abgeschlossen (Branch `feature/openai-compatible-providers` — nicht in main gemerged, wartet auf Maintainer-Entscheidung).
 
-**Fixierte Realfakten aus Schritt 4 (verbindlich ab Schritt 5):**
+**Auslöser:**
+- Der OAuth-Token (`sk-ant-oat01-*`), den Claude Code in seiner Session-Umgebung hat, wurde von Anthropic im Februar 2026 für die Messages-API deaktiviert (siehe Diskussion zwischen AC8/AC9-Skip in D-013, D-015, D-016).
+- Ein API-Bearer-Key (`sk-ant-api03-*`) erfordert separaten Pay-as-you-go-Account auf der Anthropic-Console — vermeidbar.
+- OpenAI-konforme APIs (insbesondere OpenRouter) bieten Anthropic Claude **plus** OpenAI GPT, Google Gemini, Meta Llama, Mistral, etc. über einen einzigen Bearer-Key.
 
-**(a) `IRunPersistenceService` in `Geef.Atelier.Core.Persistence`:**
-- Interface in Core, Implementierung (`RunPersistenceService`) in Infrastructure.
-- Einzige Methode: `CreateRunAsync(briefingText, configJson, ct) → Task<Guid>`.
-- Erzeugt `RunEntity` mit `Status=Pending`, `CreatedAt=UtcNow`.
-- Core-Layer darf von Persistence-Interfaces wissen, aber nicht von EF/SDK.
+**Entscheidung:**
+Wechsel der LLM-Schicht von Anthropic-spezifisch auf **OpenAI-API-konform**. Default-Endpoint: **OpenRouter** (`https://openrouter.ai/api/v1`). Andere OpenAI-kompatible Endpoints (OpenAI direkt, lokales Ollama, Together AI, DeepInfra) sind durch denselben Adapter-Code ansprechbar.
 
-**(b) `PostgresEventSink` mit injizierter `RunId` (Variante A):**
-- Konstruktor: `PostgresEventSink(Guid runId, IServiceScopeFactory scopeFactory, ILogger logger)`.
-- `AsyncLocal` (Variante C) wurde verworfen wegen Risiko bei parallelen Runs.
-- Tests und BackgroundService konstruieren den Sink direkt — keine separate Factory-Klasse.
+**Vorgezogene Vision-Umsetzung:**
+- "Modell-Pluralismus" aus `01-vision-and-scope.md` (Leitstern: *"Reviewer mit anderem Modell als Executor"*) wird ab M1 sofort verfügbar — nicht "nach Skeleton" wie ursprünglich in D-013(i) geplant.
+- Pro Akteur (Executor, BriefingTreueReviewer, KlarheitReviewer) eigene Modell-Konfiguration. Beispiel: Executor `anthropic/claude-opus-4.7`, BriefingTreueReviewer `openai/gpt-5`, KlarheitReviewer `google/gemini-2.5-pro`.
+- Cross-Provider-Reviewer-Effekt (R2 mit gpt-5.4 fängt Pattern, die Claude-Modelle übersehen) ist damit auch in der Atelier-Pipeline aktiv, nicht nur in Claude Codes eigenem Reviewer-Pass.
 
-**(c) Severity-Mapping über `ToAtelierSeverity()`-Extension:**
-- Liegt in `Geef.Atelier.Infrastructure.Persistence.FindingSeverityExtensions`.
-- Mapping: SDK `Critical→Critical`, `Error→Major`, `Warning→Minor`, `Info→Info`.
-- Extension in Infrastructure (nicht Core), weil sie SDK-Typen referenziert.
+**Was sich ändert (LLM-Schicht):**
+- `IAnthropicClient` → `ILlmClient`
+- `AnthropicRequest`/`AnthropicResponse`/`AnthropicTool`/`AnthropicTokenUsage` → `LlmRequest`/`LlmResponse`/`LlmTool`/`LlmTokenUsage`
+- `HttpAnthropicClient` → `OpenAiCompatibleClient`
+- `AnthropicOptions` → `LlmOptions` mit Pro-Akteur-Modell-Mapping
+- Tool-Use-Format wechselt von Anthropic-Schema auf OpenAI-`function`-Schema
+- Token-Felder: `prompt_tokens`/`completion_tokens` (nur API-Wire-Format; `LlmTokenUsage` bekommt klare englische Properties)
+- Endpoint-Pfad: `/v1/messages` → `/v1/chat/completions`
+- `tool_choice`-Format: `"tool:submit_review"` → `{"type": "function", "function": {"name": "submit_review"}}`
 
-**(d) Token-Tracking via typisierter `ContextKey<AnthropicTokenUsage>`:**
-- Schlüssel: `AtelierContextKeys.TokenUsage` (`"geef:atelier:token-usage"`).
-- `LlmExecutionStep` schreibt zusätzlich zum Notes-String den typisierten Wert.
-- Sink liest aus `ExecutionCompletedEvent.Result.UpdatedContext`.
-- Token-Akkumulation atomar via `ExecuteUpdateAsync` auf `RunEntity.TokensTotal` — verhindert Read-Modify-Write-Race.
+**Was unverändert bleibt:**
+- Pipeline-Struktur, alle Geef-SDK-Verträge, Convergence-Logik (D-012-Realfakten gelten weiter)
+- `BriefingGroundingStep`, `MarkdownFinalizer`, `AtelierContextKeys` (außer Token-Key-Typ-Umbenennung)
+- `PostgresEventSink`, `IRunPersistenceService`, `RunOrchestratorService` (alles aus D-015/D-016)
+- Domain-Records (`RunEntity`, `IterationEntity`, `FindingEntity`, `EventEntity`, Atelier-`FindingSeverity`)
+- DB-Schema, Migrations
+- Tests oberhalb der LLM-Schicht (Persistence-Tests, Orchestrator-Tests bleiben grün; nur Fake-Client-Klasse wird umbenannt)
+- Resilience-Strategie (`AddStandardResilienceHandler()`)
+- Critical-Abort-Verhalten (`ConvergenceFailedException` mit `"AbortCriticalBlocker"`)
 
-**(e) Critical-Abort-Findings aus `PipelineFailedEvent.History` (SDK-Verhalten via Dekompilierung verifiziert):**
-- Bei `AbortCriticalBlocker` feuert das SDK **kein** `EvaluationRejectedEvent`, sondern springt direkt zu `PipelineFailedEvent`.
-- Findings sind in `failed.History.Records.LastOrDefault()?.EvaluationResult.AllFindings` zu lesen.
-- `IterationRecord.Iteration` (1-basiert) ermöglicht Zuordnung zur richtigen `IterationEntity` in der DB.
-- Run-Status bei Critical-Abort: `Aborted` (nicht `Failed`).
+**Branch-Strategie:**
+- Migration läuft auf eigenem Branch `feature/openai-compatible-providers`.
+- Parallel zu numerischen Schritten (Schritt 6 läuft in `main` weiter, M1 in seinem Branch).
+- M1-Branch wird **nicht** automatisch in main gemerged — nur gepusht. User entscheidet Merge-Zeitpunkt.
+- Empfehlung: Merge vor Schritt 7 (UI), damit die UI direkt gegen die neuen Provider-Verträge gebaut wird.
+- Konfliktbereiche bei Merge: `Program.cs` (M1 baut LLM-Layer um, Schritt 6 fügt `IRunService`-Registrierung hinzu) und `appsettings.json` (Sektions-Umbenennung). Beides handhabbar.
 
-**(f) `PipelineCompletedEvent.FinalText` ist nicht im Event:**
-- SDK liefert keinen `FinalizedDocument`-Property im Event.
-- Workaround: `FinalText` aus `_lastExecutionContext` (letzter `ExecutionCompletedEvent`-Context) extrahieren — semantisch äquivalent.
-- `_lastExecutionContext` ist `volatile` (R2-MAJOR-Fix für Threading).
+**OpenRouter-spezifische Aspekte:**
+- Modell-Namen mit Provider-Präfix: `anthropic/claude-opus-4.7`, `openai/gpt-5`, `google/gemini-2.5-pro`.
+- Optionale Header für Analytics: `HTTP-Referer: https://geef.stefan-bechtel.de`, `X-Title: Geef.Atelier`.
+- Tool-Use unterstützt fast alle Modelle, Verhalten variiert minimal — Reviewer-Defensive-Parsing aus D-013(e) trägt diese Variabilität bereits.
+- Pro-Modell-Pricing transparent auf openrouter.ai/models — Cost-Tracking (Schritt 10 oder später) wird damit einfacher als mit Anthropic-Console-Accounting.
 
-**(g) `IGeefEvent.RunId` ist `string`, nicht `Guid`:**
-- Nicht für Routing verwendet — Sink-pro-Run via injizierter `Guid` ist robuster.
+**Konsequenzen für Step-Prompts ab Schritt 7:**
+- `IAnthropicClient`-Referenzen werden zu `ILlmClient`.
+- `AnthropicOptions`-Referenzen werden zu `LlmOptions`.
+- AC9 (Real-Anthropic-Test) wird zu AC9 (Real-OpenRouter-Test) — und ist dann ohne weiteres Auth-Manöver erreichbar, weil OpenRouter-Bearer-Keys problemlos per `Llm__ApiKey`-Env-Var bereitgestellt werden können.
 
-**(h) `JsonSerializerOptions.ReferenceHandler = IgnoreCycles`:**
-- Notwendig für Event-Payload-Serialisierung — einige SDK-Event-Typen enthalten zirkuläre Referenzen (`IterationHistory → IterationRecord → IRunContext → ...`).
-
-**(i) `IServiceScopeFactory.CreateAsyncScope()` pro Event:**
-- Sink ist Singleton (pro Run), aber jeder Event-Empfang braucht frischen `AtelierDbContext`.
-- Connection-Pool von Npgsql-Default (100) reicht für Skeleton.
-
-**(j) `FakeAnthropicClient`-Instanz-Sharing zwischen Executor und Reviewer:**
-- Einer derselben Client-Instanz für beide, da `_executorCallCount` instanzgebunden ist.
-- Separate Instanzen führen zu Dauerablehnung und `ConvergenceFailedException`.
-
-**Architect-Konsultation Schritt 4:**
-- Level 2 (`cat file | claude -p`) erfolgreich.
-- Alle fünf Architect-Fragen beantwortet (RunId-Variante A, IRunPersistenceService-Position in Core/Infrastructure, Token-Tracking Option B, Severity-Mapping in Infrastructure, DbContext via CreateAsyncScope).
-
-**AC7-Status (Real-Anthropic-Test):**
-- ⏭️ Skip — kein API-Bearer-Key in Claude-Code-Session-Umgebung verfügbar (nur OAuth-Token `sk-ant-oat01-...`, der mit dem Messages-API nicht funktioniert).
-- Skip-Pattern verifiziert.
-- **Real-Lauf bleibt offen** für Schritt 5 oder später, wenn ein API-Bearer-Key (`sk-ant-api03-...`) als Environment-Variable `Anthropic__ApiKey` bereitgestellt wird.
-- Kein Blocker für Schritt 5: HTTP-Infrastruktur ist durch 15 Tests mit Fakes abgedeckt; Real-Test ist Confidence-Check, nicht Funktionalitätstest.
-
-**Empfehlungen für Schritt 5 (aus Bericht-Sektion 8):**
-- `RunOrchestratorService.SubmitRun`-Ablauf: `CreateRunAsync → runId → new PostgresEventSink(runId, scopeFactory, logger) → AtelierPipelineFactory.BuildWithProviders(..., additionalSinks: [sink]) → runner.RunAsync(briefing, ct)`.
-- Crash-Recovery: alle `Running`-Runs beim Service-Start auf `Failed` setzen mit `ErrorMessage="Service restarted"`.
-- `IRunPersistenceService` bleibt als internes Interface, in Schritt 6 wird `IRunService.SubmitRunAsync` darauf aufbauen.
-- Cancellation: `BackgroundService.StoppingToken` + optionales DB-Flag für UI-initiierte Abbrüche.
-- Concurrent Runs: `SemaphoreSlim` oder Task-Queue für `MaxConcurrentRuns` (Default ~5–10).
----
-
-## D-016: Schritt 5 abgeschlossen — RunOrchestratorService (10. Mai 2026)
-
-**(a) `RunOrchestratorService` Position und Konstruktor-Dependencies:**
-- Datei: `src/Geef.Atelier.Web/Services/RunOrchestratorService.cs` (BackgroundService gehört zur Hosting-Schicht)
-- Konstruktor-DI: `IServiceScopeFactory`, `IAnthropicClient`, `IOptions<OrchestratorOptions>`, `IOptions<AnthropicOptions>`, `ILoggerFactory`, `ILogger<RunOrchestratorService>` (alle Singletons)
-- `AtelierPipelineFactory.Build(client, options, loggerFactory, additionalSinks: [sink])` — korrigierte Signatur gegenüber Bau-Prompt
-
-**(b) `OrchestratorOptions` in `Core/Configuration/`:**
-- `PollingInterval TimeSpan` (Default 2s), `MaxConcurrentRuns int` (Default 5)
-- SDK-frei, kein `SectionName`-Constant, `set`-Accessors
-- Bindet aus appsettings.json-Sektion `"Orchestrator"` via `builder.Services.Configure<OrchestratorOptions>(...)`
-
-**(c) Cancellation-Strategie γ:**
-- Nur `StoppingToken` im Skeleton; kein DB-Flag, kein neuer Enum-Wert, keine Migration
-- UI-getriggerte Cancellation kommt mit Schritt 7
-
-**(d) Status=Running-Claim und Sink-Idempotenz:**
-- Orchestrator setzt atomar `Pending→Running` via `ExecuteUpdateAsync WHERE Status=Pending` beim Polling-Pickup
-- `affectedRows=0` → Run bereits gepickt, Skip
-- `PostgresEventSink.PipelineStartedEvent`-Handler: nur `StartedAt` gesetzt (`r.StartedAt ?? started.Timestamp`), kein Status-Update mehr
-- `OverrideToAbortedAsync` mit `CancellationToken.None` (nicht stoppingToken!) damit DB-Update nach Cancellation noch durchläuft
-
-**(e) `ConcurrentDictionary<Guid, CancellationTokenSource>` + `ConcurrentDictionary<Guid, Task>` für In-Flight-Verwaltung:**
-- `_runCts`: pro-Run-CTS verkettet mit stoppingToken, vorbereitet für Schritt-7-UI-Cancellation
-- `_runTasks`: trackt die Fire-and-Forget-Tasks; `ExecuteAsync` drainiert nach Polling-Loop via `Task.WhenAll(_runTasks.Values.ToArray())`
-- `_runTasks.TryRemove` ist letzter Schritt im `finally`-Block (nach `_slots.Release()`), damit Drain-Snapshot vollständig ist
-
-**(f) `SemaphoreSlim`-Slot-Position:**
-- Privates Feld `_slots` im Service (nicht injiziert), initialisiert mit `MaxConcurrentRuns`
-- WaitAsync im Polling-Loop, Release im `finally` von `ProcessRunAsync`
-
-**(g) `OperationCanceledException`-Override-Logik:**
-- `catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)` in `ProcessRunAsync`
-- Ruft `OverrideToAbortedAsync(runId, "Service stopping")` auf (kein CT → CancellationToken.None)
-- Überschreibt Sink-State (`Failed`) auf `Aborted` mit `ErrorMessage="Service stopping"` und `CompletedAt=UtcNow`
-
-**(h) `GatedFakeAnthropicClient`-Pattern für Concurrency-Tests:**
-- `tests/Geef.Atelier.Tests/Llm/GatedFakeAnthropicClient.cs`
-- `SemaphoreSlim(0, int.MaxValue)`: geschlossen → alle API-Calls blockieren; `gate.Release(int.MaxValue)` öffnet
-- Release-after-use-Semantik: Gate bleibt nach dem ersten Call balance; Test öffnet dauerhaft via `Release(int.MaxValue)`
-- Deterministisch, keine `Task.Delay`-Timing-Abhängigkeiten
-
-**(i) Architect-Konsultation:**
-- Level 2 (Plan-Phase): Alle 6 Fragen mit Empfehlungen vorab im Plan beantwortet und als verbindliche Realfakten fixiert
-- Kein separater `claude -p`-Aufruf nötig — Antworten decken sich mit tatsächlicher Implementierung
-
-**(j) AC8-Status (Real-Anthropic-Test):**
-- ⏭️ Skip — kein API-Bearer-Key (`sk-ant-api03-...`) in Session-Umgebung verfügbar
-- OAuth-Token (`sk-ant-oat01-...`) funktioniert nicht mit Messages-API
-- Kein Blocker: 19/19 Tests mit FakeAnthropicClient abgedeckt
-- Real-Lauf bleibt offen für Session mit gesetztem `Anthropic__ApiKey`
+**Realfakten (M1-Abschluss):**
+- `ILlmClient` mit `CompleteAsync(LlmRequest, CancellationToken)` ist das neue Provider-Interface.
+- `OpenAiCompatibleClient` (internal sealed) implementiert `ILlmClient` via Typed HttpClient; baut Full-URL aus `LlmOptions.Endpoint`; API-Key per Request gesetzt (nicht in `DefaultRequestHeaders`).
+- `LlmRequest.ToolChoice`: Atelier-Konvention `"function:submit_review"` → Client serialisiert zu `{"type":"function","function":{"name":"submit_review"}}`.
+- `LlmResponse.ToolArgumentsJson`: Raw-JSON-String (analog zu `AnthropicResponse.ToolInputJson` aus D-013(a)) — kein `JsonElement`-Coupling im Interface.
+- `LlmOptions.Actors`-Dictionary: Key = Akteur-Name (String, z. B. `"Executor"`), nicht `LlmActor`-Enum — simpler, erweiterbar ohne Enum-Änderung.
+- `OpenAiMessageFormat` (internal static class neben `OpenAiCompatibleClient`) kapselt die komplette Serialisierung/Deserialisierung, analog zu `AnthropicMessageFormat`.
+- `LlmServiceExtensions.AddLlmClient()` registriert Options + Typed HttpClient; setzt `HTTP-Referer` und `X-Title` in `DefaultRequestHeaders` (Analytics-Headers für OpenRouter).
+- Keine `anthropic-version`-Header-Reste im neuen Client; Provider-agnostisch per Design.
+- Bestehende 15 Tests (Schritt 5) + 3 neue Unit-Tests (`OpenAiCompatibleClientTests`) — 18 Tests ohne Docker; Integration-Test (`AtelierPipelineRunsAgainstOpenRouter`) skipped ohne `Llm__ApiKey`.
+- `CountingEventSink.TotalEvents`-Property hinzugefügt (für Integration-Test-Assertion).
