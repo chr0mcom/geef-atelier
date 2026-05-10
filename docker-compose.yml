@@ -1,0 +1,42 @@
+name: geef-atelier
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: src/Geef.Atelier.Web/Dockerfile
+    image: geef-atelier-web:latest
+    container_name: geef-atelier-web
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      # TODO: Set these in .env before production deployment (Schritt 10)
+      - ConnectionStrings__DefaultConnection=${ATELIER_DB_CONNECTION}
+    networks:
+      - geef-atelier-network
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      # TODO: Replace atelier.example.com with actual domain in Schritt 10
+      - "traefik.http.routers.geef-atelier-http.rule=Host(`atelier.example.com`)"
+      - "traefik.http.routers.geef-atelier-http.entrypoints=web"
+      - "traefik.http.routers.geef-atelier-http.middlewares=geef-atelier-redirect"
+      - "traefik.http.middlewares.geef-atelier-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.geef-atelier.rule=Host(`atelier.example.com`)"
+      - "traefik.http.routers.geef-atelier.entrypoints=websecure"
+      - "traefik.http.routers.geef-atelier.tls=true"
+      - "traefik.http.routers.geef-atelier.tls.certresolver=le"
+      - "traefik.http.services.geef-atelier.loadbalancer.server.port=8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  geef-atelier-network:
+    driver: bridge
+  proxy:
+    external: true

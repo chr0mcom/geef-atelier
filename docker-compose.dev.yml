@@ -1,0 +1,38 @@
+name: geef-atelier-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: geef-atelier-postgres-dev
+    environment:
+      POSTGRES_USER: geef_atelier
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-DevPassword123!}
+      POSTGRES_DB: geef_atelier
+    ports:
+      - "5439:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U geef_atelier -d geef_atelier"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  web:
+    build:
+      context: .
+      dockerfile: src/Geef.Atelier.Web/Dockerfile
+    image: geef-atelier-web:dev
+    container_name: geef-atelier-web-dev
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=geef_atelier;Username=geef_atelier;Password=${POSTGRES_PASSWORD:-DevPassword123!}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_dev_data:
