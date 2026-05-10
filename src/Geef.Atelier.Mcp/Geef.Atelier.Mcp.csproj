@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>Geef.Atelier.Mcp</RootNamespace>
+    <AssemblyName>Geef.Atelier.Mcp</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Geef.Atelier.Core\Geef.Atelier.Core.csproj" />
+  </ItemGroup>
+
+</Project>
