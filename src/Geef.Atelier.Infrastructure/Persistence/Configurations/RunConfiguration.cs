@@ -24,6 +24,10 @@ internal sealed class RunConfiguration : IEntityTypeConfiguration<RunEntity>
         builder.Property(r => r.CostTotal)
             .HasColumnType("numeric(10,4)");
 
+        builder.Property(r => r.CancellationRequested)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.HasIndex(r => r.Status);
     }
 }
