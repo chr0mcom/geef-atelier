@@ -15,4 +15,8 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Geef.Atelier.Tests" />
+  </ItemGroup>
+
 </Project>
