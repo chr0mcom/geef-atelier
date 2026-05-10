@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Geef.Atelier.Application/Geef.Atelier.Application.csproj" />
     <Project Path="src/Geef.Atelier.Core/Geef.Atelier.Core.csproj" />
     <Project Path="src/Geef.Atelier.Infrastructure/Geef.Atelier.Infrastructure.csproj" />
     <Project Path="src/Geef.Atelier.Mcp/Geef.Atelier.Mcp.csproj" />
