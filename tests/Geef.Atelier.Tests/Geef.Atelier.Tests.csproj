@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Geef.Atelier.Application\Geef.Atelier.Application.csproj" />
     <ProjectReference Include="..\..\src\Geef.Atelier.Core\Geef.Atelier.Core.csproj" />
     <ProjectReference Include="..\..\src\Geef.Atelier.Infrastructure\Geef.Atelier.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Geef.Atelier.Web\Geef.Atelier.Web.csproj" />
