@@ -4,11 +4,14 @@ using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
+using Geef.Atelier.Mcp;
+using Geef.Atelier.Web.Auth;
 using Geef.Atelier.Web.Components;
 using Geef.Atelier.Web.Endpoints;
 using Geef.Atelier.Web.Hubs;
 using Geef.Atelier.Web.Notifications;
 using Geef.Atelier.Web.Services;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +38,7 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<IRunNotifier, SignalRRunNotifier>();
 
 builder.Services.AddAtelierAuth(builder.Configuration);
+builder.Services.AddAtelierMcpAuth(builder.Configuration);
 
 builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -51,9 +55,20 @@ builder.Services
             : CookieSecurePolicy.Always;
         o.Cookie.SameSite = SameSiteMode.Strict;
         o.Cookie.Name     = "Atelier.Auth";
-    });
+    })
+    .AddScheme<AuthenticationSchemeOptions, BearerTokenHandler>(
+        McpAuthorizationConstants.BearerScheme, _ => { });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(o =>
+{
+    o.AddPolicy(McpAuthorizationConstants.McpPolicy, p =>
+    {
+        p.AuthenticationSchemes = new[] { McpAuthorizationConstants.BearerScheme };
+        p.RequireAuthenticatedUser();
+    });
+});
+
+builder.Services.AddAtelierMcp();
 builder.Services.AddCascadingAuthenticationState();
 
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
@@ -105,6 +120,8 @@ app.Use(async (ctx, next) =>
 app.MapHealthChecks("/health").AllowAnonymous();
 
 app.MapHub<RunHub>("/hubs/runs");
+
+app.MapMcp("/mcp").RequireAuthorization(McpAuthorizationConstants.McpPolicy);
 
 app.MapAuthEndpoints();
 

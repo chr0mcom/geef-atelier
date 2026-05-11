@@ -10,6 +10,7 @@
     <ProjectReference Include="..\Geef.Atelier.Application\Geef.Atelier.Application.csproj" />
     <ProjectReference Include="..\Geef.Atelier.Core\Geef.Atelier.Core.csproj" />
     <ProjectReference Include="..\Geef.Atelier.Infrastructure\Geef.Atelier.Infrastructure.csproj" />
+    <ProjectReference Include="..\Geef.Atelier.Mcp\Geef.Atelier.Mcp.csproj" />
   </ItemGroup>
 
   <ItemGroup>
