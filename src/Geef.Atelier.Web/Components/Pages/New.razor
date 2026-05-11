@@ -3,6 +3,7 @@
 @attribute [Authorize]
 @inject IRunService RunService
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthProvider
 
 <PageTitle>New Run — Geef.Atelier</PageTitle>
 
@@ -25,7 +26,9 @@
         _error = null;
         try
         {
-            var runId = await RunService.SubmitRunAsync(result.Briefing, result.ConfigJson);
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var createdByUser = auth.User.Identity?.Name;
+            var runId = await RunService.SubmitRunAsync(result.Briefing, result.ConfigJson, createdByUser: createdByUser);
             Nav.NavigateTo($"/runs/{runId}");
         }
         catch (ArgumentException ex)
