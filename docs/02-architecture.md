@@ -1,6 +1,6 @@
 # Architektur
 
-*Letzte Aktualisierung: 2026-05-11 (S9: Mcp-Projekt auf Class-Library umgestellt, Multi-Auth-Sektion ergänzt)*
+*Letzte Aktualisierung: 2026-05-11 (S10: Production-Deploy-Sektion ergänzt)*
 
 ## Schichtenbild
 
@@ -340,6 +340,46 @@ Geef.Atelier.Web/Auth/BearerTokenHandler.cs           → AuthenticationHandler<
 `ITokenValidator` lebt in Application (ohne Web-Dependency). `BearerTokenHandler` lebt in Web und ist der einzige Ort mit ASP.NET-Core-Auth-Primitiven im Bearer-Pfad. Token wird aus `ATELIER_MCP_TOKEN` gelesen; fehlt die Variable, schlägt jede Bearer-Anfrage fehl.
 
 OAuth-2.0-Flow ist im MCP-Standard vorgesehen — kommt nach dem Skeleton, wenn echter Multi-Client-Bedarf entsteht.
+
+## Production-Deployment
+
+### Traefik-Flow
+
+```
+Browser → HTTPS:443 → Traefik (TLS via Let's Encrypt, cert-resolver 'le') → HTTP:8080 → geef-atelier-web container → ASP.NET
+```
+
+Traefik terminiert TLS und leitet HTTP (Port 8080) an den Container weiter. Der Container selbst exponiert keinen Port nach außen (`ports:` entfällt im Production-Compose).
+
+### TLS und Traefik-Konfiguration
+
+| Parameter | Wert |
+|---|---|
+| Externes Netzwerk | `proxy` (Server-Konvention) |
+| Cert-Resolver | `le` (HTTP-Challenge via `web`-Entry-Point) |
+| Entry-Point (HTTPS) | `websecure` |
+| HTTP→HTTPS-Redirect | Global in `traefik.yml` (kein App-seitiger Redirect-Router) |
+| Middleware-Chain | `chain@file` (secure-headers + compression + rate-limit, Server-Konvention) |
+| `traefik.docker.network` | `proxy` (Pflicht wenn Container in mehreren Netzwerken) |
+
+### Cookie-SecurePolicy in Production
+
+`ASPNETCORE_ENVIRONMENT=Production` aktiviert `CookieSecurePolicy.Always`. Die `ForwardedHeaders`-Middleware (vor `UseAuthentication` gesetzt, siehe Auth-Strategie-Abschnitt) liest `X-Forwarded-Proto=https` von Traefik und stellt sicher, dass `Request.IsHttps == true` — ohne dies würde `SecurePolicy.Always` Cookies blockieren, weil der Container HTTP sieht, nicht HTTPS.
+
+### Multi-Auth über HTTPS
+
+Cookie-Auth für die Web-UI und Bearer-Auth für den MCP-Endpoint (`/mcp`) funktionieren identisch über HTTPS: TLS wird bei Traefik terminiert, der Container empfängt HTTP. Die Auth-Schicht der Anwendung sieht keinen Unterschied zum Dev-Betrieb — lediglich `SecurePolicy.Always` und `SameSite=Strict` sind in Production aktiv.
+
+### Postgres-Strategie (Server-Konvention)
+
+Jede Anwendung auf diesem Server betreibt einen eigenen Postgres-Container im selben Compose-File (`own-Postgres-per-App`-Pattern). Kein geteilter Datenbank-Host — Isolation und einfaches Backup pro App.
+
+### Deployment-Ablauf
+
+1. `.env`-File generieren via `openssl rand` + `tools/HashPassword` (gitignored, nie ins Repo).
+2. `docker build --no-cache -t geef-atelier .` im `build/`-Verzeichnis.
+3. `docker compose -f docker-compose.prod.yml up -d` startet App + Postgres; Auto-Migration on Startup (D-010) läuft beim ersten Start.
+4. Traefik erkennt den Container via Docker-Labels, stellt Let's-Encrypt-Zertifikat aus.
 
 ## Observability
 
