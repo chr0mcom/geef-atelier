@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Pipeline;
@@ -13,6 +14,7 @@ namespace Geef.Atelier.Web.Services;
 internal sealed class RunOrchestratorService(
     IServiceScopeFactory            scopeFactory,
     ILlmClient                      llmClient,
+    IRunNotifier                    runNotifier,
     IOptions<OrchestratorOptions>   options,
     IOptions<LlmOptions>            llmOptions,
     ILoggerFactory                  loggerFactory,
@@ -26,7 +28,18 @@ internal sealed class RunOrchestratorService(
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await RecoverCrashedRunsAsync(stoppingToken);
+        try
+        {
+            await RecoverCrashedRunsAsync(stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Crash recovery on startup failed; stale Running runs were not reset.");
+        }
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -132,7 +145,7 @@ internal sealed class RunOrchestratorService(
         try
         {
             var sinkLogger = loggerFactory.CreateLogger($"PostgresEventSink[{run.Id}]");
-            var sink       = new PostgresEventSink(run.Id, scopeFactory, sinkLogger);
+            var sink       = new PostgresEventSink(run.Id, scopeFactory, runNotifier, sinkLogger);
             var runner     = AtelierPipelineFactory.Build(llmClient, llmOptions, loggerFactory, additionalSinks: [sink]);
             await runner.RunAsync(run.BriefingText, cts.Token);
         }
@@ -140,11 +153,13 @@ internal sealed class RunOrchestratorService(
         {
             // Do not pass the already-cancelled stoppingToken — use None so the DB write completes.
             await OverrideToAbortedAsync(run.Id, "Service stopping");
+            try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
             // User-initiated cancellation: sink may have written Failed; override to Aborted.
             await OverrideToAbortedAsync(run.Id, "Cancelled by user");
+            try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
         }
         catch (Exception ex)
         {
