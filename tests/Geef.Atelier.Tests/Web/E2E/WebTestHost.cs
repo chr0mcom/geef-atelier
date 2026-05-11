@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
@@ -8,10 +9,14 @@ using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Persistence;
 using Geef.Atelier.Web.Components;
+using Geef.Atelier.Web.Endpoints;
 using Geef.Atelier.Web.Hubs;
 using Geef.Atelier.Web.Notifications;
 using Geef.Atelier.Web.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -43,11 +48,16 @@ internal sealed class WebTestHost : IAsyncDisposable
     /// </summary>
     /// <param name="fixture">Provides the Postgres connection string and migrations.</param>
     /// <param name="initialGateCount">Initial semaphore count. Use 0 to block pipeline; use a large value (e.g. 100) to run freely.</param>
+    /// <param name="authenticated">
+    /// When true (default), all requests are pre-authenticated via <see cref="TestAuthenticationHandler"/>.
+    /// When false, real Cookie auth is configured with a test user (username: "test-user", password: "test-password").
+    /// </param>
     /// <param name="ct">Cancellation token for startup.</param>
     public static async Task<WebTestHost> StartAsync(
-        PostgresFixture  fixture,
-        int              initialGateCount = 100,
-        CancellationToken ct = default)
+        PostgresFixture   fixture,
+        int               initialGateCount = 100,
+        bool              authenticated    = true,
+        CancellationToken ct               = default)
     {
         var port = FindFreePort();
         var url  = $"http://127.0.0.1:{port}";
@@ -95,6 +105,43 @@ internal sealed class WebTestHost : IAsyncDisposable
         builder.Services.AddSignalR();
         builder.Services.AddSingleton<IRunNotifier, SignalRRunNotifier>();
 
+        // Auth
+        if (authenticated)
+        {
+            builder.Services
+                .AddAuthentication(TestAuthenticationHandler.SchemeName)
+                .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
+                    TestAuthenticationHandler.SchemeName, _ => { });
+        }
+        else
+        {
+            // wf=4 for speed in tests
+            var testHash = BCrypt.Net.BCrypt.HashPassword("test-password", workFactor: 4);
+            builder.Services.Configure<AtelierUserOptions>(o =>
+            {
+                o.Username     = "test-user";
+                o.PasswordHash = testHash;
+            });
+            builder.Services.AddScoped<IUserAuthenticator, AtelierUserAuthenticator>();
+            builder.Services
+                .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+                .AddCookie(o =>
+                {
+                    o.LoginPath        = "/login";
+                    o.LogoutPath       = "/auth/logout";
+                    o.AccessDeniedPath = "/login";
+                    o.ExpireTimeSpan   = TimeSpan.FromDays(30);
+                    o.SlidingExpiration = true;
+                    o.Cookie.HttpOnly  = true;
+                    o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                    // Lax instead of Strict so that redirect-after-login carries the cookie in tests.
+                    o.Cookie.SameSite  = SameSiteMode.Lax;
+                    o.Cookie.Name      = "Atelier.Auth";
+                });
+        }
+        builder.Services.AddAuthorization();
+        builder.Services.AddCascadingAuthenticationState();
+
         // Blazor Server
         builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
@@ -103,8 +150,11 @@ internal sealed class WebTestHost : IAsyncDisposable
         await using (var scope = app.Services.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<AtelierDbContext>().Database.MigrateAsync(ct);
 
+        app.UseAuthentication();
+        app.UseAuthorization();
         app.UseAntiforgery();
         app.MapHub<RunHub>("/hubs/runs");
+        app.MapAuthEndpoints();
         app.MapStaticAssets();
         app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
