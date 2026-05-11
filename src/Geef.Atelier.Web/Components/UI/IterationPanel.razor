@@ -1,0 +1,28 @@
+@using Geef.Atelier.Core.Domain
+
+<details class="iteration-panel">
+    <summary class="iteration-summary">
+        <span class="iteration-label">Iteration @Iteration.IterationNumber</span>
+        <span class="iteration-meta">@Findings.Count finding(s)</span>
+    </summary>
+    <div class="iteration-body">
+        <pre class="artifact-text">@Iteration.ArtifactText</pre>
+        @if (Findings.Count > 0)
+        {
+            <div class="findings-list">
+                @foreach (var finding in Findings)
+                {
+                    <FindingItem Finding="finding" />
+                }
+            </div>
+        }
+    </div>
+</details>
+
+@code {
+    /// <summary>The iteration to display.</summary>
+    [Parameter, EditorRequired] public IterationEntity Iteration { get; set; } = null!;
+
+    /// <summary>The findings associated with this iteration.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<FindingEntity> Findings { get; set; } = [];
+}

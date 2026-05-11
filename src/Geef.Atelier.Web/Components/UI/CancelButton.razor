@@ -1,0 +1,29 @@
+@inject IRunService RunService
+
+<button class="btn-cancel" disabled="@_disabled" @onclick="HandleClickAsync">
+    @(_disabled ? "Cancelling…" : "Cancel Run")
+</button>
+
+@code {
+    /// <summary>The id of the run to cancel.</summary>
+    [Parameter, EditorRequired] public Guid RunId { get; set; }
+
+    /// <summary>Raised after cancellation has been requested.</summary>
+    [Parameter] public EventCallback OnCancelled { get; set; }
+
+    private bool _disabled;
+
+    private async Task HandleClickAsync()
+    {
+        _disabled = true;
+        try
+        {
+            await RunService.CancelRunAsync(RunId);
+            await OnCancelled.InvokeAsync();
+        }
+        catch
+        {
+            _disabled = false;
+        }
+    }
+}

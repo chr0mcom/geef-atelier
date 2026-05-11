@@ -1,0 +1,56 @@
+.run-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    transition: box-shadow 0.15s ease;
+}
+
+.run-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.run-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.run-card-time {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin-left: auto;
+}
+
+.run-card-briefing {
+    font-size: 0.9rem;
+    color: #334155;
+    margin: 0 0 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.run-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.run-card-tokens {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.run-card-link {
+    font-size: 0.85rem;
+    color: #6366f1;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.run-card-link:hover {
+    text-decoration: underline;
+}

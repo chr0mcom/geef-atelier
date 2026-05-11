@@ -1,0 +1,8 @@
+<div class="empty-state">
+    <p class="empty-message">@Message</p>
+</div>
+
+@code {
+    /// <summary>The message to display when no items are present.</summary>
+    [Parameter, EditorRequired] public string Message { get; set; } = string.Empty;
+}

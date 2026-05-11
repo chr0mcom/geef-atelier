@@ -1,0 +1,14 @@
+.severity {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.severity-critical { background: #991b1b; color: #fff; }
+.severity-major    { background: #b45309; color: #fff; }
+.severity-minor    { background: #0369a1; color: #fff; }
+.severity-info     { background: #6b7280; color: #fff; }

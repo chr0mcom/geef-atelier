@@ -1,0 +1,23 @@
+@using Geef.Atelier.Core.Domain
+
+<div class="run-card">
+    <div class="run-card-header">
+        <StatusBadge Status="Run.Status" />
+        <span class="run-card-time">@Run.CreatedAt.ToString("yyyy-MM-dd HH:mm")</span>
+    </div>
+    <p class="run-card-briefing">@Snippet</p>
+    <div class="run-card-footer">
+        <span class="run-card-tokens">@Run.TokensTotal tok</span>
+        <a href="/runs/@Run.Id" class="run-card-link">Open &rarr;</a>
+    </div>
+</div>
+
+@code {
+    /// <summary>The run entity to display as a card.</summary>
+    [Parameter, EditorRequired] public RunEntity Run { get; set; } = null!;
+
+    private string Snippet =>
+        Run.BriefingText.Length > 60
+            ? Run.BriefingText[..60] + "…"
+            : Run.BriefingText;
+}

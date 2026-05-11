@@ -1,0 +1,30 @@
+@using Geef.Atelier.Core.Domain
+
+<div class="run-header">
+    <div class="run-header-top">
+        <StatusBadge Status="Run.Status" />
+        <span class="run-header-id">@Run.Id.ToString()[..8]…</span>
+    </div>
+    <p class="run-header-briefing">@Run.BriefingText</p>
+    <div class="run-header-meta">
+        <span>Created: @Run.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</span>
+        @if (Run.StartedAt.HasValue)
+        {
+            <span>Started: @Run.StartedAt.Value.ToString("HH:mm:ss")</span>
+        }
+        @if (Run.CompletedAt.HasValue)
+        {
+            <span>Completed: @Run.CompletedAt.Value.ToString("HH:mm:ss")</span>
+        }
+        <span>Tokens: @Run.TokensTotal</span>
+    </div>
+    @if (!string.IsNullOrEmpty(Run.ErrorMessage))
+    {
+        <div class="run-header-error">@Run.ErrorMessage</div>
+    }
+</div>
+
+@code {
+    /// <summary>The run entity to display in the detail header.</summary>
+    [Parameter, EditorRequired] public RunEntity Run { get; set; } = null!;
+}

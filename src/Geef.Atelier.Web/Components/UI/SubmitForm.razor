@@ -1,0 +1,56 @@
+@using System.ComponentModel.DataAnnotations
+
+<EditForm class="submit-form" Model="_model" OnValidSubmit="HandleValidSubmitAsync">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="form-group">
+        <label for="briefing">Briefing</label>
+        <InputTextArea id="briefing" @bind-Value="_model.Briefing" class="form-control" rows="6"
+                       placeholder="Describe what you want the pipeline to generate…" />
+        <ValidationMessage For="() => _model.Briefing" />
+    </div>
+
+    <div class="form-group">
+        <label for="configJson">Config JSON <span class="optional">(optional)</span></label>
+        <InputTextArea id="configJson" @bind-Value="_model.ConfigJson" class="form-control" rows="3"
+                       placeholder="{}" />
+        <ValidationMessage For="() => _model.ConfigJson" />
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn-submit" disabled="@_submitting">
+            @(_submitting ? "Submitting…" : "Submit Run")
+        </button>
+    </div>
+</EditForm>
+
+@code {
+    /// <summary>Raised when the form is submitted with a valid briefing. The argument contains the briefing and config JSON.</summary>
+    [Parameter, EditorRequired] public EventCallback<SubmitFormResult> OnSubmitted { get; set; }
+
+    private readonly FormModel _model = new();
+    private bool _submitting;
+
+    private async Task HandleValidSubmitAsync()
+    {
+        _submitting = true;
+        try
+        {
+            await OnSubmitted.InvokeAsync(new SubmitFormResult(_model.Briefing, _model.ConfigJson ?? "{}"));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private sealed class FormModel
+    {
+        [Required(ErrorMessage = "Briefing is required.")]
+        [MinLength(5, ErrorMessage = "Briefing must be at least 5 characters.")]
+        public string Briefing { get; set; } = string.Empty;
+
+        public string? ConfigJson { get; set; }
+    }
+}

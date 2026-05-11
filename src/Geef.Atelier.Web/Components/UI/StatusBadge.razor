@@ -1,0 +1,18 @@
+@using Geef.Atelier.Core.Domain
+
+<span class="badge badge-@CssClass" data-status="@Status">@Status</span>
+
+@code {
+    /// <summary>The run status to display.</summary>
+    [Parameter, EditorRequired] public RunStatus Status { get; set; }
+
+    private string CssClass => Status switch
+    {
+        RunStatus.Pending   => "pending",
+        RunStatus.Running   => "running",
+        RunStatus.Completed => "completed",
+        RunStatus.Failed    => "failed",
+        RunStatus.Aborted   => "aborted",
+        _                   => "unknown"
+    };
+}

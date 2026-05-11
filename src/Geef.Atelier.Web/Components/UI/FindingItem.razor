@@ -1,0 +1,12 @@
+@using Geef.Atelier.Core.Domain
+
+<div class="finding-item">
+    <SeverityBadge Severity="Finding.Severity" />
+    <span class="finding-reviewer">@Finding.ReviewerName</span>
+    <p class="finding-message">@Finding.Message</p>
+</div>
+
+@code {
+    /// <summary>The finding to display.</summary>
+    [Parameter, EditorRequired] public FindingEntity Finding { get; set; } = null!;
+}
