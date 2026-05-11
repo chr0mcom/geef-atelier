@@ -21,6 +21,8 @@ internal sealed class RunConfiguration : IEntityTypeConfiguration<RunEntity>
             .HasColumnType("jsonb")
             .IsRequired();
 
+        builder.Property(r => r.CreatedByUser).HasColumnType("text").IsRequired(false);
+
         builder.Property(r => r.CostTotal)
             .HasColumnType("numeric(10,4)");
 

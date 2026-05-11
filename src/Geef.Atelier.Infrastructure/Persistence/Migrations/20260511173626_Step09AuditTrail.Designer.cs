@@ -3,6 +3,7 @@ using System;
 using Geef.Atelier.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Geef.Atelier.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AtelierDbContext))]
-    partial class AtelierDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260511173626_Step09AuditTrail")]
+    partial class Step09AuditTrail
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
