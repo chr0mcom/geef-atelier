@@ -11,6 +11,8 @@ public sealed record RunEntity
     /// <summary>JSON snapshot of model/crew/budget config at submission time.</summary>
     public required string ConfigJson { get; init; }
 
+    public string? CreatedByUser { get; init; }
+
     public DateTimeOffset? StartedAt { get; init; }
     public DateTimeOffset? CompletedAt { get; init; }
     public string? FinalText { get; init; }
