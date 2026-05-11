@@ -8,6 +8,7 @@ Text-Generations-Pipeline-Plattform auf Basis des [Geef SDK](https://github.com/
 **Schritt 4 ✅** Postgres-Persistierung — `PostgresEventSink` schreibt jeden Pipeline-Run mit Iterationen, Findings, Token-Verbrauch und Event-Log in die DB. `IRunPersistenceService` für Run-Initialisierung. 15/15 Tests grün (4 neue Persistence-Tests mit Testcontainers).
 **Schritt 5 ✅** BackgroundService-Orchestrierung — `RunOrchestratorService` pollt für `Pending`-Runs, setzt atomaren Claim, führt die Geef-Pipeline concurrent aus (SemaphoreSlim), recovert crashed Runs beim Start, drainiert In-Flight-Tasks bei StopAsync. 19/19 Tests grün (4 neue Orchestrator-Tests mit deterministischem GatedFakeAnthropicClient).
 **Schritt 6 ✅** Application-Service-Layer — `IRunService` (Submit/Get/List/Cancel) in neuem `Geef.Atelier.Application`-Projekt. `IRunRepository`/`RunRepository` (Variante β). `RunEntity.CancellationRequested`-Flag + EF-Migration. Cancellation-Watcher pro Run pollt DB, signalisiert CTS → Pipeline-OCE → Aborted. 31/31 Tests grün (5 neue Application-Tests).
+**Schritt 7 ✅** Blazor-UI — drei Pages (`/new`, `/runs`, `/runs/{id}`), SignalR-Hub (`RunHub`) mit zwei Groups, `IRunNotifier`/`SignalRRunNotifier` in Core/Web, 9 UI-Komponenten in `Components/UI/`. bUnit-Komponenten-Tests (4) + Playwright-E2E-Tests (4, mit `WebTestHost`). SignalR Live-Status ohne Page-Reload verifiziert. AC8 (OpenRouter-Real-Pipeline) grün. 55/55 Tests grün.
 
 Vollständiger Scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope.md)
 

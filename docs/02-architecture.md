@@ -1,6 +1,6 @@
 # Architektur
 
-*Letzte Aktualisierung: 10. Mai 2026 (M1: LLM-Schicht auf OpenAI-kompatiblen Adapter umgestellt; S6: Geef.Atelier.Application-Projekt + Solution-Struktur aktualisiert)*
+*Letzte Aktualisierung: 11. Mai 2026 (S7: UI-Architektur-Sektion ergänzt — drei Pages, RunHub, IRunNotifier)*
 
 ## Schichtenbild
 
@@ -188,6 +188,61 @@ Der Leitstern **Modell-Pluralismus** ist damit konfigurativ sofort verfügbar: E
 ### Token-Tracking
 
 `LlmTokenUsage` (`InputTokens`, `OutputTokens`) wird pro Iteration vom `LlmExecutionStep` in `AtelierContextKeys.TokenUsage` gesetzt und von `PostgresEventSink` in `Runs.TokensTotal` akkumuliert. Property-Namen identisch zu Schritt 3; nur der Wire-Name ändert sich (`prompt_tokens`/`completion_tokens` in der OpenAI-API).
+
+## UI-Architektur (Schritt 7)
+
+### Pages
+
+Drei Blazor Server Pages in `src/Geef.Atelier.Web/Components/Pages/`:
+
+| Route | Komponente | Funktion |
+|---|---|---|
+| `/new` | `New.razor` | Submit-Formular. `EditForm` + `DataAnnotationsValidator`. Redirect zu `/runs/{id}` nach Submit. |
+| `/runs` | `Runs.razor` | Run-Liste. Status-Filter via Query-Parameter. `HubConnection` auf `all-runs`-Group. Live-Update via `AnyRunUpdated`-Event. |
+| `/runs/{id}` | `RunDetail.razor` | Run-Detail. `HubConnection` auf `run-{id}`-Group. Live-Update via `RunUpdated`-Event. Cancel-Button für Pending/Running. |
+
+### SignalR-Hub (`RunHub`)
+
+`src/Geef.Atelier.Web/Hubs/RunHub.cs` — gemappt auf `/hubs/runs`.
+
+Zwei Groups:
+- `run-{runId}` — Detail-Page-Subscriber. Sendet `"RunUpdated"` nach jedem Persist-Event.
+- `all-runs` — Runs-Listen-Page-Subscriber. Sendet `"AnyRunUpdated"` nach jedem Persist-Event.
+
+Browser-Clients verwenden `HubConnectionBuilder.WithUrl("/hubs/runs").WithAutomaticReconnect()`. Reconnect-Handler re-joinst die Group. Pages implementieren `IAsyncDisposable` mit `Leave`-Aufruf + Hub-Dispose.
+
+### `IRunNotifier` / `SignalRRunNotifier`
+
+`IRunNotifier` lebt in Core (`Core/Notifications/`). `PostgresEventSink` (Infrastructure) konsumiert den Vertrag — ohne Web-Dependency. `SignalRRunNotifier` lebt in Web, injiziert `IHubContext<RunHub>`, Singleton-Lifetime. Notifier-Aufrufe sind best-effort (`try/catch`).
+
+**Sequenz User-Submit → Live-View:**
+
+```
+Browser /new  →  IRunService.SubmitRunAsync  →  RunEntity (Pending) in DB
+                                                ↓
+                                      RunOrchestratorService (BackgroundService)
+                                        pollt Pending, setzt Running-Claim
+                                                ↓
+                                      Geef-SDK-Pipeline (Grounding → Execution → Evaluation → Finalize)
+                                                ↓
+                                      PostgresEventSink
+                                        (a) schreibt Event in DB
+                                        (b) IRunNotifier.NotifyRunUpdatedAsync
+                                                ↓
+                                      SignalRRunNotifier → IHubContext<RunHub>
+                                        → run-{id}-Group: "RunUpdated"
+                                        → all-runs-Group: "AnyRunUpdated"
+                                                ↓
+                                      Browser HubConnection.On("RunUpdated")
+                                        → IRunService.GetRunAsync → StateHasChanged
+```
+
+### UI-Komponenten-Library (`Components/UI/`)
+
+9 Komponenten, alle mit scoped `.razor.css`:
+`StatusBadge`, `SeverityBadge`, `RunCard`, `IterationPanel`, `FindingItem`, `RunHeader`, `SubmitForm`, `EmptyState`, `CancelButton`.
+
+**Workflow-Regel:** Semantische UI-Elemente (Buttons, Forms, Badges, Listen) sind Komponenten. Layout-`div`-Tags in Pages erlaubt.
 
 ## Frontend-Stack-Entscheidung
 

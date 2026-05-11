@@ -1,6 +1,6 @@
 # Walking Skeleton — Bauplan
 
-*Letzte Aktualisierung: 10. Mai 2026 (Schritte 1–5 abgeschlossen; M1 abgeschlossen, Merge offen)*
+*Letzte Aktualisierung: 11. Mai 2026 (Schritte 1–7 abgeschlossen; M1 in main)*
 
 Das Walking Skeleton ist die kleinste end-to-end-funktionale Version von Geef.Atelier: ein Auftrag wird über die UI oder via MCP gestellt, eine echte Geef-Pipeline läuft (mit echten LLM-Calls), Live-Status ist sichtbar, das Ergebnis wird angezeigt und persistiert. Quellen-Upload, Klassifikator, dynamische Crew, Advisor, Multi-Format-Export — alles weitere kommt später.
 
@@ -18,7 +18,7 @@ Während die nummerierten Schritte sequenziell durchlaufen werden, gibt es paral
 
 **Branch:** `feature/openai-compatible-providers`
 **Status:** ✅ **Abgeschlossen am 10. Mai 2026.** Branch `feature/openai-compatible-providers` gepusht (4 Commits + 1 nachgereichter Bericht-Commit). 31/31 Tests grün (9 ohne Docker, 22 weitere via Postgres/Orchestrator-Testcontainer). Architect-Antworten zu allen sechs Schwerpunkten getroffen — markante Entscheidung: `LlmActor`-Enum existiert nur als Typen-Dokumentation, Lookup über String-Keys. Workflow-Abweichung: keine formalen R1–R5-Reviewer-Pässe (durch Subagent-Self-Reviews + Build/Test ersetzt) — R2-Nachholpass nach Merge empfohlen. Bericht: [reports/migration-01-report.md](reports/migration-01-report.md). Details siehe Decisions-Log D-018.
-**Merge-Status:** Offen. Wartet auf Schritt-6-Abschluss in main, dann Rebase + Merge. Konflikt-Coordination: [snippets/m1-merge-coordination.md](snippets/m1-merge-coordination.md). Empfohlener Merge vor Schritt 7.
+**Merge-Status:** Merge fertig (Schritt 6 wurde direkt auf dem M1-Branch gebaut, daher kein Rebase nötig — Fast-Forward-Merge möglich). main enthält nun Schritte 1–5 + M1 + Schritt 6 zusammen.md](snippets/m1-merge-coordination.md). 
 **Offen vor Schritt 7:** Real-OpenRouter-Integration-Test (`AtelierPipelineRunsAgainstOpenRouter`) einmal mit echtem Bearer-Key ausführen — verifiziert Modell-ID-Stabilität, Tool-Use-Verhalten, Latenz.
 **Auslöser:** D-017 — Anthropic-OAuth-Token wird von Messages-API nicht akzeptiert; Pay-as-you-go-Bearer-Key vermeidbar; Multi-Provider-Vorteil sofort nutzbar.
 **Scope:** Ersetzt anthropic-spezifischen LLM-Layer durch OpenAI-API-konformen Adapter (Default: OpenRouter). Pro-Akteur-Modell-Konfiguration. Tool-Use-Format wechselt auf OpenAI-`function`-Schema.
@@ -169,27 +169,14 @@ Während die nummerierten Schritte sequenziell durchlaufen werden, gibt es paral
 - ✅ `dotnet test`: 31/31 grün (5 neue Application-Tests + 26 Regression)
 - ✅ AC9: Skip — kein Live-API-Key in Session (Eskalations-Hinweis vor Schritt 9)
 
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 2 Reviewer-Iterationen (R1+R2+R4 parallel), 2 MAJOR-Findings behoben (ServiceProvider-Leak, Hardcoded-Delay). 31/31 Tests grün. Bericht: [reports/step-06-report.md](reports/step-06-report.md). Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt).
+**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 2 Reviewer-Iterationen, 2 R2-MAJOR-Findings (ServiceProvider-Disposal, Test-Race) behoben. 31/31 Tests grün (5 neue Application-Tests). Variante β (Application-Layer ohne Infrastructure-Dep, IRunRepository in Core), Cancellation-Watcher Pattern A (pro-Run-Task), DB-Flag `RunEntity.CancellationRequested` mit Migration `Step06Cancellation`. 6 Conventional-Commits. Bericht: [reports/step-06-report.md](reports/step-06-report.md). Details siehe Decisions-Log D-019.
+Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt)
 
 ---
 
 ### Schritt 7 — Blazor-UI
 
-**Voraussetzung:** Migration M1 (Provider-Wechsel auf OpenAI-konform) sollte vor Schritt 7 in main gemerged sein. Andernfalls baut die UI gegen die später ersetzte Anthropic-spezifische LLM-Schicht und müsste nachträglich angepasst werden.
-
-**Ziel:** Drei UI-Seiten für den Workflow.
-
-**Umfang:**
-- `/new` — Auftragsformular (Briefing-Textarea, Modell-Auswahl, Submit)
-- `/runs` — Run-Liste mit Status-Badge, Auto-Refresh via SignalR
-- `/runs/{id}` — Detail-Seite mit Briefing, Iterations-Akkordeon (jede Iteration zeigt Artefakt + Findings), Live-Event-Log, Final-Text bei Status=Completed, Abbruch-Button bei Status=Running
-- `IRunService` wird per DI in die Pages injiziert
-- SignalR-Hub für Live-Events; UI registriert sich pro Run-Detail-View
-
-**Akzeptanzkriterien:**
-- Auftrag stellen und live durchlaufen sehen, ohne Page-Reload
-- Liste aktualisiert sich live wenn neue Runs entstehen oder ihren Status wechseln
-- Abbruch-Button bricht Run sauber ab
+**Status:** ✅ **Abgeschlossen am 11. Mai 2026.** R1: 0 Findings. R2: 1 CRITICAL behoben (SignalRRunNotifier try/catch). R3: 5/5 Determinismus. R4: 0 CRITICAL/MAJOR. R5: 4 Flows verifiziert (Submit, List, LiveUpdate SignalR, Cancel via Auto-E2E). AC8 grün (OpenRouter, 5–12s, 174–523 Tokens). 55/55 Tests grün. Bericht: [reports/step-07-report.md](reports/step-07-report.md). Details: D-020.
 
 ---
 
