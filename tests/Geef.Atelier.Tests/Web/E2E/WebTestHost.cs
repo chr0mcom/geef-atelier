@@ -6,8 +6,10 @@ using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
+using Geef.Atelier.Mcp;
 using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Persistence;
+using Geef.Atelier.Web.Auth;
 using Geef.Atelier.Web.Components;
 using Geef.Atelier.Web.Endpoints;
 using Geef.Atelier.Web.Hubs;
@@ -35,6 +37,9 @@ internal sealed class WebTestHost : IAsyncDisposable
 
     /// <summary>The semaphore that gates LLM calls. Release to allow pipeline execution; initial count is passed via <see cref="StartAsync"/>.</summary>
     public SemaphoreSlim Gate { get; }
+
+    /// <summary>The bearer token accepted by the <c>/mcp</c> endpoint in this test host.</summary>
+    public string McpToken => "test-mcp-token";
 
     private WebTestHost(WebApplication app, string baseUrl, SemaphoreSlim gate)
     {
@@ -111,7 +116,9 @@ internal sealed class WebTestHost : IAsyncDisposable
             builder.Services
                 .AddAuthentication(TestAuthenticationHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
-                    TestAuthenticationHandler.SchemeName, _ => { });
+                    TestAuthenticationHandler.SchemeName, _ => { })
+                .AddScheme<AuthenticationSchemeOptions, BearerTokenHandler>(
+                    McpAuthorizationConstants.BearerScheme, _ => { });
         }
         else
         {
@@ -137,10 +144,24 @@ internal sealed class WebTestHost : IAsyncDisposable
                     // Lax instead of Strict so that redirect-after-login carries the cookie in tests.
                     o.Cookie.SameSite  = SameSiteMode.Lax;
                     o.Cookie.Name      = "Atelier.Auth";
-                });
+                })
+                .AddScheme<AuthenticationSchemeOptions, BearerTokenHandler>(
+                    McpAuthorizationConstants.BearerScheme, _ => { });
         }
-        builder.Services.AddAuthorization();
+        builder.Services.AddAuthorization(o =>
+        {
+            o.AddPolicy(McpAuthorizationConstants.McpPolicy, p =>
+            {
+                p.AuthenticationSchemes = new[] { McpAuthorizationConstants.BearerScheme };
+                p.RequireAuthenticatedUser();
+            });
+        });
         builder.Services.AddCascadingAuthenticationState();
+
+        // MCP: token auth + MCP server
+        builder.Services.AddAtelierMcpAuth(builder.Configuration);
+        builder.Services.PostConfigure<AtelierMcpOptions>(opts => opts.Token = "test-mcp-token");
+        builder.Services.AddAtelierMcp();
 
         // Blazor Server
         builder.Services.AddRazorComponents().AddInteractiveServerComponents();
@@ -154,6 +175,7 @@ internal sealed class WebTestHost : IAsyncDisposable
         app.UseAuthorization();
         app.UseAntiforgery();
         app.MapHub<RunHub>("/hubs/runs");
+        app.MapMcp("/mcp").RequireAuthorization(McpAuthorizationConstants.McpPolicy);
         app.MapAuthEndpoints();
         app.MapStaticAssets();
         app.MapRazorComponents<App>().AddInteractiveServerRenderMode();

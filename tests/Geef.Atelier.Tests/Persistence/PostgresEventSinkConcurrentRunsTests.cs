@@ -19,11 +19,11 @@ public sealed class PostgresEventSinkConcurrentRunsTests(PostgresFixture fixture
         // Arrange two independent runs
         await using var db1   = fixture.NewContext();
         var             svc1  = new RunPersistenceService(db1);
-        var             runId1 = await svc1.CreateRunAsync("Brief A", "{}", CancellationToken.None);
+        var             runId1 = await svc1.CreateRunAsync("Brief A", "{}", cancellationToken: CancellationToken.None);
 
         await using var db2   = fixture.NewContext();
         var             svc2  = new RunPersistenceService(db2);
-        var             runId2 = await svc2.CreateRunAsync("Brief B", "{}", CancellationToken.None);
+        var             runId2 = await svc2.CreateRunAsync("Brief B", "{}", cancellationToken: CancellationToken.None);
 
         var scopes  = fixture.NewScopeFactory();
         var sink1   = new PostgresEventSink(runId1, scopes, new NoOpRunNotifier(), NullLogger.Instance);

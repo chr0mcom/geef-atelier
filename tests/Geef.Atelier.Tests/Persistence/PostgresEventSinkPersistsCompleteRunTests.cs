@@ -21,7 +21,7 @@ public sealed class PostgresEventSinkPersistsCompleteRunTests(PostgresFixture fi
         // Arrange
         await using var db      = fixture.NewContext();
         var             svc     = new RunPersistenceService(db);
-        var             runId   = await svc.CreateRunAsync(Briefing, "{}", CancellationToken.None);
+        var             runId   = await svc.CreateRunAsync(Briefing, "{}", cancellationToken: CancellationToken.None);
         var             scopes  = fixture.NewScopeFactory();
         var             sink    = new PostgresEventSink(runId, scopes, new NoOpRunNotifier(), NullLogger.Instance);
 

@@ -15,7 +15,7 @@ public sealed class RunPersistenceServiceCreatesRunTests(PostgresFixture fixture
         const string    brief  = "Test briefing.";
         const string    config = "{}";
 
-        var runId = await svc.CreateRunAsync(brief, config, CancellationToken.None);
+        var runId = await svc.CreateRunAsync(brief, config, cancellationToken: CancellationToken.None);
 
         Assert.NotEqual(Guid.Empty, runId);
 
