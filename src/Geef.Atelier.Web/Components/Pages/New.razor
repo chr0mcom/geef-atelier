@@ -1,0 +1,39 @@
+@page "/new"
+@rendermode InteractiveServer
+@inject IRunService RunService
+@inject NavigationManager Nav
+
+<PageTitle>New Run — Geef.Atelier</PageTitle>
+
+<div class="new-run-container">
+    <h2>New Run</h2>
+
+    @if (_error is not null)
+    {
+        <div class="new-run-error">@_error</div>
+    }
+
+    <SubmitForm OnSubmitted="HandleSubmittedAsync" />
+</div>
+
+@code {
+    private string? _error;
+
+    private async Task HandleSubmittedAsync(SubmitFormResult result)
+    {
+        _error = null;
+        try
+        {
+            var runId = await RunService.SubmitRunAsync(result.Briefing, result.ConfigJson);
+            Nav.NavigateTo($"/runs/{runId}");
+        }
+        catch (ArgumentException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception)
+        {
+            _error = "Failed to submit run. Please try again.";
+        }
+    }
+}

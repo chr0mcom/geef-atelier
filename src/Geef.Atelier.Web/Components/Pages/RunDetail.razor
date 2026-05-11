@@ -1,0 +1,113 @@
+@page "/runs/{runId:guid}"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject IRunService RunService
+@inject NavigationManager Nav
+
+<PageTitle>Run @RunId.ToString()[..8] — Geef.Atelier</PageTitle>
+
+<div class="run-detail-container">
+    @if (_details is null && !_notFound)
+    {
+        <EmptyState Message="Loading…" />
+    }
+    else if (_notFound)
+    {
+        <EmptyState Message="Run not found." />
+    }
+    else if (_details is not null)
+    {
+        <div class="run-detail-actions">
+            <a href="/runs" class="back-link">← Back to Runs</a>
+            @if (_details.Run.Status is RunStatus.Pending or RunStatus.Running)
+            {
+                <CancelButton RunId="_details.Run.Id" OnCancelled="HandleCancelledAsync" />
+            }
+        </div>
+
+        <RunHeader Run="_details.Run" />
+
+        @if (_details.Iterations.Count == 0)
+        {
+            <EmptyState Message="No iterations yet — pipeline is starting…" />
+        }
+        else
+        {
+            <h3 class="iterations-heading">Iterations</h3>
+            @foreach (var iwf in _details.Iterations)
+            {
+                <IterationPanel Iteration="iwf.Iteration" Findings="iwf.Findings" />
+            }
+        }
+
+        @if (!string.IsNullOrEmpty(_details.Run.FinalText))
+        {
+            <div class="final-text-section">
+                <h3>Final Output</h3>
+                <pre class="final-text">@_details.Run.FinalText</pre>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public Guid RunId { get; set; }
+
+    private RunDetails? _details;
+    private bool _notFound;
+    private HubConnection? _hub;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDetailsAsync();
+        await InitHubAsync();
+    }
+
+    private async Task LoadDetailsAsync()
+    {
+        _details = await RunService.GetRunDetailsAsync(RunId);
+        _notFound = _details is null;
+    }
+
+    private async Task InitHubAsync()
+    {
+        _hub = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/hubs/runs"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hub.On<Guid>("RunUpdated", async _ =>
+        {
+            await LoadDetailsAsync();
+            await InvokeAsync(StateHasChanged);
+        });
+
+        _hub.Reconnected += async _ =>
+        {
+            await _hub.SendAsync("JoinRunGroupAsync", RunId);
+            await LoadDetailsAsync();
+            await InvokeAsync(StateHasChanged);
+        };
+
+        await _hub.StartAsync();
+        await _hub.SendAsync("JoinRunGroupAsync", RunId);
+        // Re-fetch after joining to catch any status changes that arrived while connecting.
+        await LoadDetailsAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleCancelledAsync()
+    {
+        await LoadDetailsAsync();
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hub is not null)
+        {
+            try { await _hub.SendAsync("LeaveRunGroupAsync", RunId); } catch { }
+            await _hub.DisposeAsync();
+        }
+    }
+}
