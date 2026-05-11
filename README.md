@@ -168,6 +168,59 @@ docker compose logs -f web      # Logs folgen
 
 ---
 
+## Backup & Restore
+
+Der `postgres-backup`-Container läuft im Stack und erstellt automatisch tägliche Backups.
+
+### Backup-Konfiguration
+
+- **Zeitplan:** täglich um 03:00 UTC
+- **Retention:** 7 Tages-Snapshots, 4 Wochen-Snapshots, 6 Monats-Snapshots
+- **Speicherort:** Docker-Volume `geef-atelier-backups`, gemountet auf `/backups` im Backup-Container
+- **Format:** `.sql.gz` (gzip-komprimiertes pg_dump SQL)
+
+### Backup manuell auslösen
+
+```bash
+docker compose exec postgres-backup /backup.sh
+```
+
+### Aktuelle Backups inspizieren
+
+```bash
+docker compose exec postgres-backup ls -lh /backups/last/
+docker compose exec postgres-backup ls -lh /backups/daily/
+```
+
+### Backup-Datei extrahieren
+
+```bash
+# Backup-Datei aus dem Container-Volume kopieren
+docker cp geef-atelier-postgres-backup:/backups/last/<dateiname>.sql.gz ./
+```
+
+### Restore
+
+```bash
+# 1. App stoppen (Backup-Container kann weiterlaufen)
+docker compose stop web
+
+# 2. Restore via Skript
+./scripts/restore-backup.sh <pfad-zur-backup-datei.sql.gz>
+
+# 3. Verifikation
+curl https://geef.stefan-bechtel.de/health
+```
+
+> **Hinweis:** `scripts/restore-backup.sh` überschreibt alle bestehenden Daten.
+> Vor dem Restore immer eine aktuelle Backup-Kopie sichern.
+
+### Off-Site-Backup
+
+Das Volume-Backup schützt gegen DB-Container-Crash und Logic-Errors, **nicht** gegen Server-Hardware-Ausfall oder versehentliches `docker volume rm`. Für robusteren Schutz empfiehlt sich ein regelmäßiges rsync der Backup-Dateien auf einen zweiten Host (z.B. Hetzner Storage Box).
+
+---
+
 ## Projektstruktur
 
 ```
