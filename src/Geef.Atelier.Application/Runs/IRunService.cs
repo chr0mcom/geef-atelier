@@ -6,7 +6,11 @@ namespace Geef.Atelier.Application.Runs;
 public interface IRunService
 {
     /// <summary>Validates and submits a new run, returning its ID.</summary>
-    Task<Guid> SubmitRunAsync(string briefingText, string configJson, CancellationToken cancellationToken = default);
+    Task<Guid> SubmitRunAsync(
+        string briefingText,
+        string configJson,
+        string? createdByUser = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>Returns the run with the given ID, or null if not found.</summary>
     Task<RunEntity?> GetRunAsync(Guid runId, CancellationToken cancellationToken = default);

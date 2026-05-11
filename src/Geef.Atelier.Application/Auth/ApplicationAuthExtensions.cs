@@ -23,4 +23,17 @@ public static class ApplicationAuthExtensions
         services.AddScoped<IUserAuthenticator, AtelierUserAuthenticator>();
         return services;
     }
+
+    /// <summary>Registers MCP token authentication services and binds <see cref="AtelierMcpOptions"/> from configuration.</summary>
+    public static IServiceCollection AddAtelierMcpAuth(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<AtelierMcpOptions>(opts =>
+        {
+            configuration.GetSection(AtelierMcpOptions.SectionName).Bind(opts);
+            if (string.IsNullOrEmpty(opts.Token))
+                opts.Token = Environment.GetEnvironmentVariable("ATELIER_MCP_TOKEN") ?? "";
+        });
+        services.AddScoped<ITokenValidator, StaticTokenValidator>();
+        return services;
+    }
 }

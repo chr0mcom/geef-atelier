@@ -9,7 +9,11 @@ internal sealed class RunService(
     IRunRepository         repository) : IRunService
 {
     /// <inheritdoc/>
-    public Task<Guid> SubmitRunAsync(string briefingText, string configJson, CancellationToken cancellationToken = default)
+    public Task<Guid> SubmitRunAsync(
+        string briefingText,
+        string configJson,
+        string? createdByUser = null,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(briefingText))
             throw new ArgumentException("Briefing text must not be empty.", nameof(briefingText));
@@ -24,7 +28,7 @@ internal sealed class RunService(
 
         // Normalize empty string to "{}" — the DB column is JSONB and requires valid JSON.
         var normalizedConfig = string.IsNullOrEmpty(configJson) ? "{}" : configJson;
-        return persistence.CreateRunAsync(briefingText, normalizedConfig, cancellationToken);
+        return persistence.CreateRunAsync(briefingText, normalizedConfig, createdByUser, cancellationToken);
     }
 
     /// <inheritdoc/>
