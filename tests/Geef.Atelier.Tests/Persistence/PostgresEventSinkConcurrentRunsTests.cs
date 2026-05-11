@@ -3,6 +3,7 @@ using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Tests.Llm;
+using Geef.Atelier.Tests.Web.Notifications;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -25,8 +26,8 @@ public sealed class PostgresEventSinkConcurrentRunsTests(PostgresFixture fixture
         var             runId2 = await svc2.CreateRunAsync("Brief B", "{}", CancellationToken.None);
 
         var scopes  = fixture.NewScopeFactory();
-        var sink1   = new PostgresEventSink(runId1, scopes, NullLogger.Instance);
-        var sink2   = new PostgresEventSink(runId2, scopes, NullLogger.Instance);
+        var sink1   = new PostgresEventSink(runId1, scopes, new NoOpRunNotifier(), NullLogger.Instance);
+        var sink2   = new PostgresEventSink(runId2, scopes, new NoOpRunNotifier(), NullLogger.Instance);
 
         var options = Options.Create(new LlmOptions
         {

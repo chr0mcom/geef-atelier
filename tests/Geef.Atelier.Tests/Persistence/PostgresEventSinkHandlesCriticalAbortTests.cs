@@ -3,6 +3,7 @@ using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Tests.Llm;
+using Geef.Atelier.Tests.Web.Notifications;
 using Geef.Sdk.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -23,7 +24,7 @@ public sealed class PostgresEventSinkHandlesCriticalAbortTests(PostgresFixture f
         var             svc     = new RunPersistenceService(db);
         var             runId   = await svc.CreateRunAsync(Briefing, "{}", CancellationToken.None);
         var             scopes  = fixture.NewScopeFactory();
-        var             sink    = new PostgresEventSink(runId, scopes, NullLogger.Instance);
+        var             sink    = new PostgresEventSink(runId, scopes, new NoOpRunNotifier(), NullLogger.Instance);
 
         var options = Options.Create(new LlmOptions
         {

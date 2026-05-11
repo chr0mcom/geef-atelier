@@ -1,8 +1,10 @@
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
+using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Tests.Persistence;
+using Geef.Atelier.Tests.Web.Notifications;
 using Geef.Atelier.Web.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -63,6 +65,7 @@ internal sealed class OrchestratorTestHost : IAsyncDisposable
                     o.MaxConcurrentRuns          = opts.MaxConcurrentRuns;
                     o.CancellationPollingInterval = opts.CancellationPollingInterval;
                 });
+                services.AddSingleton<IRunNotifier, NoOpRunNotifier>();
                 services.AddHostedService<RunOrchestratorService>();
             })
             .Build();
