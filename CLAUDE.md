@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Aktueller Zustand
 
-**Skeleton Schritt 10 abgeschlossen (11. Mai 2026).** Walking Skeleton komplett. App produktiv unter `https://geef.stefan-bechtel.de/` mit Traefik-Routing, Let's-Encrypt-TLS, Cookie-Auth (UI) + Bearer-Auth (MCP). `docker-compose.yml` mit Traefik-Labels (Network `proxy`, Cert-Resolver `le`, `chain@file`-Middleware). `.env` gitignored mit generierten Secrets. 85/85 Tests grün. Nächste Phase: Post-Skeleton-Erweiterungen (Backup-Cron, Cost-Tracking, RAG, Multi-User, Monitoring).
+**Post-Skeleton Schritt 1 abgeschlossen (11. Mai 2026): Postgres-Backup.** Walking Skeleton komplett + automatischer Backup-Service aktiv. App produktiv unter `https://geef.stefan-bechtel.de/`. Stack: drei Container (web, postgres, postgres-backup). Backup: täglich 03:00 UTC via `prodrigestivill/postgres-backup-local:16`, Retention 7/4/6, Volume `geef-atelier-backups`. Restore-Skript: `scripts/restore-backup.sh`. 85/85 Tests grün. Nächste Post-Skeleton-Schritte: LiveUpdateFlowTests-Stabilisierung, Cost-Tracking, RAG, Multi-User, Off-Site-Backup, Monitoring.
 
 ## Verbindlicher Workflow
 
