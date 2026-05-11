@@ -67,6 +67,49 @@ dotnet test
 
 ---
 
+## MCP-Server (Schritt 9)
+
+Der MCP-Server läuft unter `/mcp` und ist mit Bearer-Token-Auth gesichert.
+
+### Token generieren
+
+```bash
+openssl rand -hex 32
+```
+
+### Konfiguration
+
+```bash
+# In .env oder docker-compose.dev.yml override:
+ATELIER_MCP_TOKEN=<generated-token>
+```
+
+### Claude Desktop Konfiguration
+
+```json
+{
+  "mcpServers": {
+    "geef-atelier": {
+      "url": "http://95.216.100.213:8080/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-token>"
+      }
+    }
+  }
+}
+```
+
+### MCP-Tools
+
+- `submit_request` — Neuen Run einreichen
+- `get_run_status` — Status eines Runs abfragen
+- `get_run_result` — Ergebnis eines abgeschlossenen Runs abrufen
+- `list_runs` — Letzte Runs auflisten
+- `get_run_details` — Detailinformationen inkl. Iterationen abrufen
+- `cancel_run` — Laufenden Run abbrechen
+
+---
+
 ## Projektstruktur
 
 ```

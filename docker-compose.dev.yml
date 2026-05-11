@@ -32,6 +32,7 @@ services:
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=geef_atelier;Username=geef_atelier;Password=${POSTGRES_PASSWORD:-DevPassword123!}
       - ATELIER_USER=${ATELIER_USER:-admin}
       - ATELIER_PASSWORD_HASH=${ATELIER_PASSWORD_HASH:-$$2a$$11$$qwJWvC7D.y3SI3uIfCZTd.ZJNwv1b4SDEz50I9SRCeox9SB9jo6rq}
+      - ATELIER_MCP_TOKEN=${ATELIER_MCP_TOKEN:-dev-mcp-token-change-me}
     depends_on:
       postgres:
         condition: service_healthy
