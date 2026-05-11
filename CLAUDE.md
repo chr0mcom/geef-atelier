@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Aktueller Zustand
 
-**Skeleton Schritt 8 abgeschlossen (11. Mai 2026).** Cookie-Auth: Login-Page (Static SSR), Logout-Endpoint (`POST /auth/logout`), `[Authorize]` auf `/new`, `/runs`, `/runs/{id}`. `IUserAuthenticator` in Application, `AtelierUserOptions` in Core. BCrypt-Hash (wf=11) via `tools/HashPassword/`. `ATELIER_USER`/`ATELIER_PASSWORD_HASH` Env-Vars. `TestAuthenticationHandler` in Tests für E2E-Bypass. `UserMenu`-Komponente (AuthorizeView, Logout-Form). `ForwardedHeaders`-Middleware (Traefik-Vorbereitung). 71/71 Tests grün (55 bestehende + 4 Auth-Application + 6 bUnit + 3 Playwright-E2E + 3 weitere). Nächster Schritt: Schritt 9 — MCP-Server mit Bearer-Token-Auth.
+**Skeleton Schritt 9 abgeschlossen (11. Mai 2026).** MCP-Server unter `/mcp`: Bearer-Token-Auth (`ATELIER_MCP_TOKEN`), sechs Tools (`submit_request`, `get_run_status`, `get_run_result`, `list_runs`, `get_run_details`, `cancel_run`). `ModelContextProtocol.AspNetCore` 1.3.0 (offiziell). Multi-Auth: Cookie (UI) + Bearer (MCP), beide im selben Web-Host. `RunEntity.CreatedByUser` (Audit-Trail, nullable). 85/85 Tests grün (71 bestehende + 14 neue). Nächster Schritt: Schritt 10 — Production-Deploy mit Traefik + Domain `geef.stefan-bechtel.de`.
 
 ## Verbindlicher Workflow
 

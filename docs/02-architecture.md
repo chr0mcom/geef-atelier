@@ -1,6 +1,6 @@
 # Architektur
 
-*Letzte Aktualisierung: 11. Mai 2026 (S8: Auth-Sektion erweitert — Cookie-Konfig, Login Static SSR, TestAuthHandler, ForwardedHeaders, RunHub-Trade-off)*
+*Letzte Aktualisierung: 2026-05-11 (S9: Mcp-Projekt auf Class-Library umgestellt, Multi-Auth-Sektion ergänzt)*
 
 ## Schichtenbild
 
@@ -68,7 +68,8 @@ Geef.Atelier.sln
 │   │                                // EventSink, Provider-Implementierungen, Repositories
 │   ├── Geef.Atelier.Web/            // Blazor Server: UI + BackgroundService
 │   │                                // (RunOrchestratorService), DI-Composition
-│   └── Geef.Atelier.Mcp/            // MCP-Server (eigener Host, ruft IRunService)
+│   └── Geef.Atelier.Mcp/            // Class Library: MCP-Tool-Definitionen,
+   │                                // gehostet im Web-Projekt (shared DI, shared Container)
 └── tests/
     └── Geef.Atelier.Tests/          // xUnit
 ```
@@ -78,7 +79,7 @@ Geef.Atelier.sln
 - **Core** ist LLM-frei und persistenz-frei — enthält nur Records, Interfaces, Domain-Logik. Damit testbar ohne Infrastruktur.
 - **Infrastructure** kapselt alle externen Abhängigkeiten (Postgres, LLM-APIs, Geef SDK). Provider-Implementierungen leben hier, weil sie LLM-Clients und Repositories brauchen.
 - **Web** hostet die UI, den `BackgroundService` und die `IRunService`-Implementierung. Letztere könnte später in ein eigenes Projekt wandern, ist aber im Skeleton hier am praktischsten.
-- **Mcp** ist ein eigenes ASP.NET-Core-Projekt, das den MCP-Server hostet und denselben `IRunService` aufruft wie die UI. Kann separat deployed werden, im Skeleton läuft es als Teil derselben Anwendung.
+- **Mcp** ist eine **Class Library** (kein eigener Host). Sie enthält alle MCP-Tool-Definitionen. Der MCP-Endpoint lebt im `Web`-Projekt (Pfad `/mcp`), das `Geef.Atelier.Mcp` referenziert und die Tools im selben DI-Container registriert. Vorteile: kein zweiter Host-Prozess, `IRunService` und alle Singletons (SignalR, DbContext) werden direkt geteilt, kein HTTP-Hop zwischen MCP und Application Layer.
 
 ## Datenmodell (Skeleton-Stand)
 
@@ -314,9 +315,31 @@ Traefik terminiert TLS und leitet HTTP weiter. Ohne `UseForwardedHeaders` würde
 
 `TestAuthenticationHandler` (in `tests/Geef.Atelier.Tests/Web/E2E/`, `internal sealed`) markiert jeden Request als pre-authenticated mit `ClaimTypes.Name = "test-user"`. `WebTestHost.StartAsync(authenticated: true/false)` — `true` aktiviert den Test-Handler, `false` startet echte Cookie-Auth mit BCrypt-wf=4-Hash für LoginFlow/LogoutFlow-Tests. **Der Handler darf nie in `Program.cs` oder dem Web-Projekt referenziert werden.**
 
-### MCP-Server — Bearer-Token
+### MCP-Server — Bearer-Token / Multi-Auth (umgesetzt in Schritt 9, siehe D-022)
 
-Bearer-Token aus `ATELIER_MCP_TOKEN` (kommt in Schritt 9). OAuth-2.0-Flow ist im MCP-Standard vorgesehen, kommt nach Skeleton. Beide Auth-Schemes (Cookie + Bearer) können in Schritt 9 als Multi-Auth-Schema-Setup koexistieren.
+**Multi-Auth-Schema-Setup:** Die Anwendung nutzt zwei parallele Authentication Schemes.
+
+| Scheme | Name | Zweck |
+|---|---|---|
+| Cookie | `CookieAuthenticationDefaults.AuthenticationScheme` | Web-UI, Default-Scheme |
+| Bearer | `"Bearer"` | MCP-Endpoint `/mcp`, explizit via `McpPolicy` |
+
+**Default-Scheme:** Cookie (alle Blazor-Routen, `[Authorize]` ohne Argument).
+
+**MCP-Endpoint:** Ist explizit mit `RequireAuthorization("McpPolicy")` geschützt. Die `McpPolicy` setzt das Authentication-Scheme auf `"Bearer"`, sodass der MCP-Pfad nie Cookie-Auth versucht.
+
+**`ITokenValidator` / `BearerTokenHandler`:**
+
+```
+Geef.Atelier.Application/Auth/ITokenValidator.cs      → Interface (Application Layer)
+Geef.Atelier.Application/Auth/AtelierTokenValidator.cs → Implementierung: konstanter Zeitvergleich vs. ATELIER_MCP_TOKEN
+Geef.Atelier.Web/Auth/BearerTokenHandler.cs           → AuthenticationHandler<AuthenticationSchemeOptions>
+                                                         liest Authorization-Header, delegiert an ITokenValidator
+```
+
+`ITokenValidator` lebt in Application (ohne Web-Dependency). `BearerTokenHandler` lebt in Web und ist der einzige Ort mit ASP.NET-Core-Auth-Primitiven im Bearer-Pfad. Token wird aus `ATELIER_MCP_TOKEN` gelesen; fehlt die Variable, schlägt jede Bearer-Anfrage fehl.
+
+OAuth-2.0-Flow ist im MCP-Standard vorgesehen — kommt nach dem Skeleton, wenn echter Multi-Client-Bedarf entsteht.
 
 ## Observability
 

@@ -1,6 +1,6 @@
 # Walking Skeleton — Bauplan
 
-*Letzte Aktualisierung: 11. Mai 2026 (Schritt 8 abgeschlossen — Cookie-Auth; 71/71 Tests grün)*
+*Letzte Aktualisierung: 2026-05-11 (Schritt 9 abgeschlossen — MCP-Server, Bearer-Auth, 85/85 Tests grün)*
 
 Das Walking Skeleton ist die kleinste end-to-end-funktionale Version von Geef.Atelier: ein Auftrag wird über die UI oder via MCP gestellt, eine echte Geef-Pipeline läuft (mit echten LLM-Calls), Live-Status ist sichtbar, das Ergebnis wird angezeigt und persistiert. Quellen-Upload, Klassifikator, dynamische Crew, Advisor, Multi-Format-Export — alles weitere kommt später.
 
@@ -207,28 +207,35 @@ Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt)
 
 ---
 
-### Schritt 9 — MCP-Server
+### Schritt 9 — MCP-Server ✅
 
 **Ziel:** Zweiter Frontend-Adapter neben der Web-UI. Externe MCP-Clients (Claude Desktop, Claude Code, eigene Agenten) können Aufträge stellen, Status abfragen, Ergebnisse abholen.
 
+**Voraussetzung:** Schritte 1–8 + M1 in main. App auf `95.216.100.213:8080` mit Cookie-Auth bereits erreichbar. Schritt 9 fügt einen zweiten Auth-Pfad (Bearer-Token) und einen zweiten Frontend-Adapter (MCP) hinzu — bestehende Cookie-UI bleibt unverändert.
+
+**Architekturelle Implikation:** Mit Schritt 9 hat das System zum ersten Mal **zwei parallel laufende Frontends** über denselben Application-Service-Layer (`IRunService`). Das ist der eigentliche Lackmustest für die Schichten-Disziplin der bisherigen Schritte. Wenn `IRunService` und seine Verträge sauber genug sind, sollte MCP keine Pipeline-/Domain-/Orchestrator-Änderungen erfordern.
+
 **Umfang:**
-- `Geef.Atelier.Mcp` als ASP.NET-Core-Host
-- Verwendung des offiziellen [modelcontextprotocol/csharp-sdk](https://github.com/modelcontextprotocol/csharp-sdk)
-- Transport: Streamable HTTP (Standard für moderne MCP-Server)
+- `Geef.Atelier.Mcp` als **Class Library** (Tool-Definitionen), gehostet im Web-Projekt
+- Verwendung von `ModelContextProtocol.AspNetCore` v1.3.0 (offizielles Anthropic+Microsoft SDK)
+- Transport: Streamable HTTP (Stateless=true), Endpunkt `/mcp`
 - Tools:
-  - `submit_request(briefing, options?)` → returns `run_id`
-  - `get_run_status(run_id)` → returns `{status, current_phase, iteration, tokens_used, cost}`
-  - `get_run_result(run_id)` → returns `{final_text}` (nur bei Status=Completed)
-  - `list_runs(limit?, status_filter?)` → returns `[run_summaries]`
-  - `get_run_details(run_id)` → returns `{iterations, findings, events}`
-  - `cancel_run(run_id)` → returns `{success}`
-- Auth über Bearer-Token (siehe Schritt 8)
+  - `submit_request(briefing, options?)` → gibt neue Run-ID zurück
+  - `get_run_status(run_id)` → aktueller Status mit Phase, Iteration, Tokens, Kosten
+  - `get_run_result(run_id)` → finaler Text (nur bei Status=Completed)
+  - `list_runs(limit?, status_filter?)` → Liste der letzten Runs
+  - `get_run_details(run_id)` → vollständige Details mit Iterationen und Findings
+  - `cancel_run(run_id)` → gibt `bool` zurück
+- Multi-Auth: Cookie (UI, Default-Scheme) + Bearer (MCP, via `McpPolicy`)
+- `ITokenValidator` in Application, `BearerTokenHandler` in Web
 - Alle Tools rufen `IRunService` (kein direkter DB-Zugriff)
 
 **Akzeptanzkriterien:**
 - MCP-Inspector kann sich verbinden und alle Tools auflisten
 - Auftrag via MCP stellen, parallel in der Web-UI live mitverfolgen
 - Ergebnis via MCP abholen entspricht dem in der UI
+
+**Status:** ✅ **Abgeschlossen am 2026-05-11.** N Reviewer-Iterationen, 0 Findings (alle behoben). Bericht: docs/reports/step-09-report.md. D-022.
 
 ---
 
@@ -248,6 +255,8 @@ Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt)
 - Container baut und startet ohne manuelle Eingriffe
 - App verbindet sich mit der bestehenden Postgres-Instanz
 - Health-Check und Auth funktionieren hinter Reverse-Proxy
+
+**Hinweis aus Schritt-8-Bericht:** Die App läuft bereits auf `95.216.100.213:8080` (ohne Traefik-Routing) und wurde dort von R5 für die Auth-Flows verifiziert. Schritt 10 wird damit kein klassischer "ersten-Deploy" mehr, sondern ein **Routing-und-Domain-Setup**: Traefik-Labels für `geef.stefan-bechtel.de`, TLS-Termination, ggf. Production-Hardening (z.B. Migration-Strategie revisiten). Der Aufwand reduziert sich erheblich, weil das Container-Image bereits funktional ist.
 
 ---
 

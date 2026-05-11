@@ -1,6 +1,6 @@
 # MCP-Integration
 
-*Letzte Aktualisierung: 10. Mai 2026*
+*Letzte Aktualisierung: 2026-05-11 (Schritt 9 abgeschlossen: SDK-Version, Transport, Auth, Tool-Signaturen verifiziert)*
 
 ## Warum MCP
 
@@ -109,21 +109,27 @@ Liefert den vollständigen Trail eines Runs.
 
 ### `cancel_run`
 
-Bricht einen laufenden Run ab.
+Bricht einen laufenden Run ab. Gibt `true` zurück, wenn der Abbruch ausgelöst wurde; `false`, wenn der Run bereits terminal war (Completed, Failed, Aborted) oder nicht existiert.
 
 **Input:** `{ "run_id": "uuid" }`
 
-**Output:** `{ "success": true | false, "message": "..." }`
+**Output:** `bool` (`true` | `false`)
+
+## SDK
+
+**`ModelContextProtocol.AspNetCore` v1.3.0** — das offizielle Anthropic+Microsoft C# SDK ([modelcontextprotocol/csharp-sdk](https://github.com/modelcontextprotocol/csharp-sdk)). Die Tools werden als `[McpServerTool]`-annotierte Methoden in `Geef.Atelier.Mcp` (Class Library) definiert und über `AddMcpServer().WithToolsFromAssembly()` im Web-Host registriert.
 
 ## Transport
 
-**Streamable HTTP** ist der moderne MCP-Transport-Standard und wird vom offiziellen [modelcontextprotocol/csharp-sdk](https://github.com/modelcontextprotocol/csharp-sdk) unterstützt. Vorteil gegenüber dem älteren SSE-Transport: bidirektional über eine einzige Verbindung, leichter durch Reverse-Proxies zu führen, einfacheres Auth-Handling.
+**Streamable HTTP** (stateless, `Stateless=true`) ist der aktiv genutzte Transport. Vorteil gegenüber dem älteren SSE-Transport: bidirektional über eine einzige Verbindung, leichter durch Reverse-Proxies zu führen, einfacheres Auth-Handling.
 
-Endpunkt: `POST https://atelier.example.com/mcp/v1` (genauer Pfad wird im SDK festgelegt; üblich ist `/mcp`).
+Endpunkt: `POST https://atelier.example.com/mcp` (Pfad `/mcp` ist fest im `MapMcp()`-Aufruf des Web-Hosts).
 
 ## Auth
 
-Im Skeleton: **Bearer-Token** im `Authorization`-Header. Token wird aus Environment-Variable `ATELIER_MCP_TOKEN` gelesen. Kein Token-Refresh, kein Token-Rotation, ein Token reicht für den Single-User-Betrieb.
+**Bearer-Token** im `Authorization`-Header. Token wird aus Environment-Variable `ATELIER_MCP_TOKEN` gelesen. Kein Token-Refresh, kein Token-Rotation — ein Token reicht für den Single-User-Betrieb.
+
+Umsetzung: `BearerTokenHandler` (Web-Layer) delegiert Validierung an `ITokenValidator` (Application-Layer). Der `/mcp`-Endpoint ist über `RequireAuthorization("McpPolicy")` geschützt, das Bearer-Scheme explizit gesetzt. Damit koexistiert Bearer-Auth sauber mit der Cookie-Auth der Web-UI (Multi-Auth-Schema-Setup, siehe `02-architecture.md`).
 
 Später: OAuth-2.0-Flow nach MCP-Spec — der MCP-Standard definiert das, der C# SDK unterstützt es. Aktivierung erfolgt erst, wenn echter Bedarf entsteht (z.B. wenn mehrere Clients mit unterschiedlichen Berechtigungen anbinden).
 
