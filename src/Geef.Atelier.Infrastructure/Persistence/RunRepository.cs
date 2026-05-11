@@ -29,4 +29,32 @@ internal sealed class RunRepository(AtelierDbContext db) : IRunRepository
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.CancellationRequested, true), cancellationToken);
         return affected > 0;
     }
+
+    /// <inheritdoc/>
+    public async Task<RunDetails?> GetDetailsAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        var run = await db.Runs.AsNoTracking().FirstOrDefaultAsync(r => r.Id == runId, cancellationToken);
+        if (run is null) return null;
+
+        var iterations = await db.Iterations
+            .AsNoTracking()
+            .Where(i => i.RunId == runId)
+            .OrderBy(i => i.IterationNumber)
+            .ToListAsync(cancellationToken);
+
+        var iterationIds = iterations.Select(i => i.Id).ToList();
+        var findings = await db.Findings
+            .AsNoTracking()
+            .Where(f => iterationIds.Contains(f.IterationId))
+            .OrderBy(f => f.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        var iterationsWithFindings = iterations
+            .Select(i => new IterationWithFindings(
+                i,
+                findings.Where(f => f.IterationId == i.Id).ToList()))
+            .ToList();
+
+        return new RunDetails(run, iterationsWithFindings);
+    }
 }

@@ -19,4 +19,7 @@ public interface IRunService
     /// false if the run is already in a terminal state or was already cancelled.
     /// </summary>
     Task<bool> CancelRunAsync(Guid runId, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the run with all its iterations and findings, or null if not found.</summary>
+    Task<RunDetails?> GetRunDetailsAsync(Guid runId, CancellationToken cancellationToken = default);
 }

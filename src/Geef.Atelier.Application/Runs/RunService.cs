@@ -41,4 +41,8 @@ internal sealed class RunService(
     /// <inheritdoc/>
     public Task<bool> CancelRunAsync(Guid runId, CancellationToken cancellationToken = default)
         => repository.RequestCancellationAsync(runId, cancellationToken);
+
+    /// <inheritdoc/>
+    public Task<RunDetails?> GetRunDetailsAsync(Guid runId, CancellationToken cancellationToken = default)
+        => repository.GetDetailsAsync(runId, cancellationToken);
 }

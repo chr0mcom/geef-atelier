@@ -16,4 +16,7 @@ public interface IRunRepository
     /// Returns true if the flag was set, false if the run was already terminal or already cancelled.
     /// </summary>
     Task<bool> RequestCancellationAsync(Guid runId, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the run with all its iterations and findings, or null if the run does not exist.</summary>
+    Task<RunDetails?> GetDetailsAsync(Guid runId, CancellationToken cancellationToken = default);
 }
