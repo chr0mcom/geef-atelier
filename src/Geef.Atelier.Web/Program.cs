@@ -1,12 +1,16 @@
+using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Web.Components;
+using Geef.Atelier.Web.Endpoints;
 using Geef.Atelier.Web.Hubs;
 using Geef.Atelier.Web.Notifications;
 using Geef.Atelier.Web.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,6 +34,35 @@ builder.Services.AddHealthChecks()
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IRunNotifier, SignalRRunNotifier>();
 
+builder.Services.AddAtelierAuth(builder.Configuration);
+
+builder.Services
+    .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(o =>
+    {
+        o.LoginPath        = "/login";
+        o.LogoutPath       = "/auth/logout";
+        o.AccessDeniedPath = "/login";
+        o.ExpireTimeSpan   = TimeSpan.FromDays(30);
+        o.SlidingExpiration = true;
+        o.Cookie.HttpOnly  = true;
+        o.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+            ? CookieSecurePolicy.SameAsRequest
+            : CookieSecurePolicy.Always;
+        o.Cookie.SameSite = SameSiteMode.Strict;
+        o.Cookie.Name     = "Atelier.Auth";
+    });
+
+builder.Services.AddAuthorization();
+builder.Services.AddCascadingAuthenticationState();
+
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    o.KnownIPNetworks.Clear();
+    o.KnownProxies.Clear();
+});
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -52,14 +85,28 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+app.UseForwardedHeaders();
+
 if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
 
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
-app.MapHealthChecks("/health");
+// Prevent caching of authenticated responses.
+app.Use(async (ctx, next) =>
+{
+    if (ctx.User.Identity?.IsAuthenticated == true)
+        ctx.Response.Headers.CacheControl = "no-store, no-cache";
+    await next();
+});
+
+app.MapHealthChecks("/health").AllowAnonymous();
 
 app.MapHub<RunHub>("/hubs/runs");
+
+app.MapAuthEndpoints();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
