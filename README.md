@@ -110,6 +110,64 @@ ATELIER_MCP_TOKEN=<generated-token>
 
 ---
 
+## Production-Deployment
+
+Voraussetzungen: Traefik läuft auf dem Server, DNS für `geef.stefan-bechtel.de` zeigt auf den Server.
+
+### Erste Einrichtung
+
+**1. Production-Secrets generieren:**
+
+```bash
+cd /srv/docker/websites/geef_atelier
+
+# BCrypt-Hash für das UI-Passwort (workFactor 11)
+dotnet run --project tools/HashPassword -- "DeinPasswort"
+
+# Zufälligen MCP-Token generieren (64 Hex-Zeichen)
+openssl rand -hex 32
+
+# Zufälliges Postgres-Passwort
+openssl rand -base64 24
+```
+
+**2. `.env`-Datei anlegen** (niemals in Git committen — ist gitignored):
+
+```env
+POSTGRES_DB=geef_atelier
+POSTGRES_USER=geef_atelier
+POSTGRES_PASSWORD=<generiertes-passwort>
+ATELIER_USER=admin
+ATELIER_PASSWORD_HASH=<bcrypt-hash>
+ATELIER_MCP_TOKEN=<hex-token>
+LLM_API_KEY=<openrouter-api-key>
+```
+
+**3. Stack starten:**
+
+```bash
+docker compose up -d --build
+```
+
+Migrations laufen automatisch beim Start. Health-Check: `https://geef.stefan-bechtel.de/health`.
+
+### Neustart / Update
+
+```bash
+docker compose up -d --build   # baut neu und startet Container
+docker compose logs -f web      # Logs folgen
+```
+
+### Wichtige URLs
+
+| URL | Beschreibung |
+|-----|--------------|
+| `https://geef.stefan-bechtel.de/` | Web-UI (Cookie-Auth) |
+| `https://geef.stefan-bechtel.de/health` | Health-Check |
+| `https://geef.stefan-bechtel.de/mcp` | MCP-Endpoint (Bearer-Auth) |
+
+---
+
 ## Projektstruktur
 
 ```
