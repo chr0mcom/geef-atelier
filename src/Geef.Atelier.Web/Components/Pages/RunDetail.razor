@@ -1,5 +1,6 @@
 @page "/runs/{runId:guid}"
 @rendermode InteractiveServer
+@attribute [Authorize]
 @implements IAsyncDisposable
 @inject IRunService RunService
 @inject NavigationManager Nav
