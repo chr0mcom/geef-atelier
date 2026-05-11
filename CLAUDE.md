@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Aktueller Zustand
 
-**Skeleton Schritt 9 abgeschlossen (11. Mai 2026).** MCP-Server unter `/mcp`: Bearer-Token-Auth (`ATELIER_MCP_TOKEN`), sechs Tools (`submit_request`, `get_run_status`, `get_run_result`, `list_runs`, `get_run_details`, `cancel_run`). `ModelContextProtocol.AspNetCore` 1.3.0 (offiziell). Multi-Auth: Cookie (UI) + Bearer (MCP), beide im selben Web-Host. `RunEntity.CreatedByUser` (Audit-Trail, nullable). 85/85 Tests grün (71 bestehende + 14 neue). Nächster Schritt: Schritt 10 — Production-Deploy mit Traefik + Domain `geef.stefan-bechtel.de`.
+**Skeleton Schritt 10 abgeschlossen (11. Mai 2026).** Walking Skeleton komplett. App produktiv unter `https://geef.stefan-bechtel.de/` mit Traefik-Routing, Let's-Encrypt-TLS, Cookie-Auth (UI) + Bearer-Auth (MCP). `docker-compose.yml` mit Traefik-Labels (Network `proxy`, Cert-Resolver `le`, `chain@file`-Middleware). `.env` gitignored mit generierten Secrets. 85/85 Tests grün. Nächste Phase: Post-Skeleton-Erweiterungen (Backup-Cron, Cost-Tracking, RAG, Multi-User, Monitoring).
 
 ## Verbindlicher Workflow
 
