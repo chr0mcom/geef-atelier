@@ -1,8 +1,11 @@
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
+using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Web.Components;
+using Geef.Atelier.Web.Hubs;
+using Geef.Atelier.Web.Notifications;
 using Geef.Atelier.Web.Services;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,6 +26,9 @@ builder.Services.AddHostedService<RunOrchestratorService>();
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AtelierDbContext>();
+
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<IRunNotifier, SignalRRunNotifier>();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
@@ -52,6 +58,8 @@ if (!app.Environment.IsDevelopment())
 app.UseAntiforgery();
 
 app.MapHealthChecks("/health");
+
+app.MapHub<RunHub>("/hubs/runs");
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

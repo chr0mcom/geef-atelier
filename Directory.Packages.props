@@ -12,11 +12,15 @@
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
     <!-- Health Checks -->
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="10.0.0" />
+    <!-- SignalR Client (for HubConnectionBuilder in Blazor Server components) -->
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.0" />
     <!-- HTTP Client abstractions + Resilience (Polly) -->
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="9.4.0" />
     <!-- Testing -->
+    <PackageVersion Include="bunit" Version="1.38.5" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
+    <PackageVersion Include="Microsoft.Playwright" Version="1.52.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.4.0" />
