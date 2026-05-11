@@ -1,6 +1,6 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 2026-05-11 (Schritt 9 abgeschlossen — MCP-Server, 85/85 Tests grün)*
+*Letzte Aktualisierung: 2026-05-11 (Schritt 10 abgeschlossen — Walking Skeleton komplett, D-023 ergänzt)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -241,3 +241,26 @@ Seit Commit `28daafb` wird `appsettings.Development.json` nicht mehr getrackt. B
 - (o) Stdio-Transport als Future Work dokumentiert (nach Skeleton).
 
 **Ergebnis:** 85/85 Tests grün. R1 PASS, R2 APPROVED, R3 PASS, R4 COMPLIANT, R5 curl-verifiziert.
+
+---
+
+## D-023 — Schritt 10: Production-Deploy mit Traefik (2026-05-11)
+
+**Kontext:** Letzter Walking-Skeleton-Schritt. App-Code unverändert; nur Deployment-Konfiguration.
+
+**Entscheidungen:**
+- (a) Externes Traefik-Netzwerk: `proxy` (Server-Konvention, verifiziert).
+- (b) Cert-Resolver-Name: `le` (HTTP-Challenge via `web`-Entry-Point); nicht `letsencrypt`.
+- (c) Entry-Point für HTTPS-Router: `websecure`; HTTP→HTTPS-Redirect global in traefik.yml.
+- (d) Kein App-seitiger HTTP-Redirect-Router — Traefik macht das global.
+- (e) `chain@file`-Middleware: secure-headers + compression + rate-limit (Server-Konvention).
+- (f) Postgres im selben Compose-File (Server-Konvention: own-Postgres-per-App).
+- (g) `.env`-File gitignored, automatisch generiert via `openssl rand` + `tools/HashPassword`.
+- (h) `pull_policy: never` + `com.centurylinklabs.watchtower.enable=false` für lokalen Build.
+- (i) Auto-Migration on Startup bleibt (D-010); `Step09AuditTrail` ist additiv (nullable Spalte).
+- (j) `Cookie.Domain` unset — Auto-Detect robuster für Subdomains.
+- (k) Direkt-Port-Exposure (8080) entfernt; kein `ports:` im Production-Compose.
+- (l) `tools/HashPassword` für BCrypt-Hash mit workFactor 11.
+- (m) `traefik.docker.network=proxy` Label erforderlich wenn Container in mehreren Netzwerken.
+
+**Ergebnis:** Walking Skeleton komplett. `geef.stefan-bechtel.de` produktiv erreichbar.

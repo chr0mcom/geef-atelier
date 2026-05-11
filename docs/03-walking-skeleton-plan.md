@@ -1,6 +1,6 @@
 # Walking Skeleton — Bauplan
 
-*Letzte Aktualisierung: 2026-05-11 (Schritt 9 abgeschlossen — MCP-Server, Bearer-Auth, 85/85 Tests grün)*
+*Letzte Aktualisierung: 2026-05-11 (Schritt 10 abgeschlossen — Walking Skeleton komplett)*
 
 Das Walking Skeleton ist die kleinste end-to-end-funktionale Version von Geef.Atelier: ein Auftrag wird über die UI oder via MCP gestellt, eine echte Geef-Pipeline läuft (mit echten LLM-Calls), Live-Status ist sichtbar, das Ergebnis wird angezeigt und persistiert. Quellen-Upload, Klassifikator, dynamische Crew, Advisor, Multi-Format-Export — alles weitere kommt später.
 
@@ -235,13 +235,24 @@ Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt)
 - Auftrag via MCP stellen, parallel in der Web-UI live mitverfolgen
 - Ergebnis via MCP abholen entspricht dem in der UI
 
-**Status:** ✅ **Abgeschlossen am 2026-05-11.** N Reviewer-Iterationen, 0 Findings (alle behoben). Bericht: docs/reports/step-09-report.md. D-022.
+**Status:** ✅ **Abgeschlossen am 11. Mai 2026.** 1 Reviewer-Iteration, 0 Critical/Important Findings (1 R2-Minor zu Dummy-FixedTimeEquals behoben). 85/85 Tests grün (14 neue: 3 StaticTokenValidator + 4 BearerHandler + 5 MCP-Unit + 2 MCP-E2E). MCP-Library: `ModelContextProtocol.AspNetCore 1.3.0` (offiziell Microsoft+Anthropic). `Geef.Atelier.Mcp` als Class Library (kein zweiter Web-Host). Multi-Auth: Cookie default + Bearer via `McpPolicy`, kein Cross-Interferenz. Endpoint `/mcp` im Web-Host, `RunEntity.CreatedByUser` als Audit-Trail-Vorbereitung. 14 Conventional-Commits. Bericht: [reports/step-09-report.md](reports/step-09-report.md). Details siehe Decisions-Log D-022 (vom Executor selbst geschrieben).
 
+**Lackmustest bestanden:** Zwei parallel laufende Frontends (UI über Cookie, MCP über Bearer) nutzen denselben `IRunService` ohne jegliche Eingriffe in Pipeline-/Domain-/Orchestrator-Code. Die Onion-Architektur trägt.
+
+**Bekannte Tech-Debt für Post-Skeleton:** `LiveUpdateFlowTests` (E2E) zeigt gelegentliche Timeouts unter Voll-Test-Lauf bei Ressourcenknappheit. Im Einzellauf stabil. Kein Blocker für Schritt 10.
 ---
 
 ### Schritt 10 — Dockerfile und Compose-Setup für Production
 
+**Status:** ✅ Abgeschlossen am 2026-05-11. 1 Reviewer-Iteration, 0 Findings. Bericht: docs/reports/step-10-report.md. D-023.
+
 **Ziel:** Deploybar auf dem Zielserver.
+
+**Voraussetzung:** Alle 9 Schritte + M1 in main. App-Container läuft bereits auf `95.216.100.213:8080` (Direkt-Port aus Schritt-8-R5). 85/85 Tests grün, alle Frontends (UI + MCP) funktional verifiziert.
+
+**Scope-Reduktion gegenüber ursprünglicher Plan-Form:** Schritt 10 ist kein klassischer "Initial-Deploy" — der Container ist bereits funktional auf dem Zielserver. Schritt 10 ist **Routing-und-TLS-Setup**: Traefik-Labels für `geef.stefan-bechtel.de`, Let's-Encrypt-Zertifikat, Direkt-Port-Exposure abschalten, Cookie-`SecurePolicy.Always` aktivieren. Aufwand: deutlich geringer als initial geplant.
+
+**Aus Schritt-9-Bericht Empfehlungen-Sektion bereits vorbereitet:** Vollständige Env-Var-Liste, Traefik-Label-Vorlage, Migration-Strategie (Auto-on-Startup bleibt), SignalR-WebSocket-Routing-Hinweis. Architect prüft in Phase 1.4 vor allem die Übereinstimmung mit der existierenden Traefik-Server-Konvention auf `/srv/CLAUDE.md` oder `/srv/docker/docs/`.
 
 **Umfang:**
 - Multi-Stage `Dockerfile` (.NET 10 SDK build → ASP.NET Core 10 runtime)
