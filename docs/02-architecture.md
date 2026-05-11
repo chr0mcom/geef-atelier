@@ -1,6 +1,6 @@
 # Architektur
 
-*Letzte Aktualisierung: 2026-05-11 (S10: Production-Deploy-Sektion ergänzt)*
+*Letzte Aktualisierung: 2026-05-11 (PS1: Backup-Strategie ergänzt)*
 
 ## Schichtenbild
 
@@ -373,6 +373,18 @@ Cookie-Auth für die Web-UI und Bearer-Auth für den MCP-Endpoint (`/mcp`) funkt
 ### Postgres-Strategie (Server-Konvention)
 
 Jede Anwendung auf diesem Server betreibt einen eigenen Postgres-Container im selben Compose-File (`own-Postgres-per-App`-Pattern). Kein geteilter Datenbank-Host — Isolation und einfaches Backup pro App.
+
+### Backup-Strategie (Post-Skeleton Schritt 1)
+
+Der `postgres-backup`-Service (`prodrigestivill/postgres-backup-local:16`) läuft als dritter Container im Production-Stack:
+
+- **Schedule:** täglich 03:00 UTC (`0 3 * * *`)
+- **Retention:** 7 Tages-, 4 Wochen-, 6 Monats-Snapshots
+- **Volume:** `geef-atelier-backups` (Named Volume, unabhängig vom DB-Volume)
+- **Format:** `.sql.gz` (gzip-komprimiertes pg_dump SQL, Compression Level 6)
+- **Restore:** `scripts/restore-backup.sh <datei.sql.gz>` (stoppt `web`, restored, startet `web` neu)
+
+Kein App-Code-Eingriff — reiner Compose-Service. Backup-Container braucht nur das interne `geef-atelier-network` (kein `proxy`).
 
 ### Deployment-Ablauf
 
