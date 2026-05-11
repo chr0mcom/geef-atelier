@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Sdk.Context;
 using Geef.Sdk.Events;
@@ -14,6 +15,7 @@ namespace Geef.Atelier.Infrastructure.Persistence;
 internal sealed class PostgresEventSink(
     Guid                 atelierRunId,
     IServiceScopeFactory scopeFactory,
+    IRunNotifier         notifier,
     ILogger              logger) : IGeefEventSink
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
@@ -46,6 +48,7 @@ internal sealed class PostgresEventSink(
 
         switch (geefEvent)
         {
+
             case PipelineStartedEvent started:
                 await db.Runs
                     .Where(r => r.Id == atelierRunId)
@@ -117,6 +120,15 @@ internal sealed class PostgresEventSink(
                         await PersistFindingsAsync(db, lastRecord.EvaluationResult.AllFindings, lastRecord.Iteration, ct);
                 }
                 break;
+        }
+
+        try
+        {
+            await notifier.NotifyRunUpdatedAsync(atelierRunId, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "IRunNotifier failed for run {RunId}; UI update skipped", atelierRunId);
         }
     }
 
