@@ -1,0 +1,9 @@
+<AuthorizeView>
+    <Authorized>
+        <span class="user-name">@context.User.Identity?.Name</span>
+        <form method="post" action="/auth/logout" class="logout-form">
+            <AntiforgeryToken />
+            <button type="submit" class="btn-logout">Logout</button>
+        </form>
+    </Authorized>
+</AuthorizeView>
