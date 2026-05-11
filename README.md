@@ -9,6 +9,7 @@ Text-Generations-Pipeline-Plattform auf Basis des [Geef SDK](https://github.com/
 **Schritt 5 ✅** BackgroundService-Orchestrierung — `RunOrchestratorService` pollt für `Pending`-Runs, setzt atomaren Claim, führt die Geef-Pipeline concurrent aus (SemaphoreSlim), recovert crashed Runs beim Start, drainiert In-Flight-Tasks bei StopAsync. 19/19 Tests grün (4 neue Orchestrator-Tests mit deterministischem GatedFakeAnthropicClient).
 **Schritt 6 ✅** Application-Service-Layer — `IRunService` (Submit/Get/List/Cancel) in neuem `Geef.Atelier.Application`-Projekt. `IRunRepository`/`RunRepository` (Variante β). `RunEntity.CancellationRequested`-Flag + EF-Migration. Cancellation-Watcher pro Run pollt DB, signalisiert CTS → Pipeline-OCE → Aborted. 31/31 Tests grün (5 neue Application-Tests).
 **Schritt 7 ✅** Blazor-UI — drei Pages (`/new`, `/runs`, `/runs/{id}`), SignalR-Hub (`RunHub`) mit zwei Groups, `IRunNotifier`/`SignalRRunNotifier` in Core/Web, 9 UI-Komponenten in `Components/UI/`. bUnit-Komponenten-Tests (4) + Playwright-E2E-Tests (4, mit `WebTestHost`). SignalR Live-Status ohne Page-Reload verifiziert. AC8 (OpenRouter-Real-Pipeline) grün. 55/55 Tests grün.
+**Schritt 8 ✅** Cookie-Auth — Single-User-Login (`ATELIER_USER`/`ATELIER_PASSWORD_HASH`), `[Authorize]` auf Pages, Login/Logout-Flow, `TestAuthenticationHandler` für E2E-Tests. 71/71 Tests grün.
 
 Vollständiger Scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope.md)
 
@@ -26,6 +27,28 @@ curl http://localhost:8080/health   # → Healthy
 # Stack stoppen
 docker compose -f docker-compose.dev.yml down
 ```
+
+## Auth-Setup
+
+Die App erfordert einen einzigen User, der über Umgebungsvariablen konfiguriert wird:
+
+```bash
+# BCrypt-Hash für ein Passwort generieren (work factor 11)
+dotnet run --project tools/HashPassword -- "DeinPasswort"
+# Ausgabe: $2a$11$...
+
+# Umgebungsvariablen setzen (docker-compose.dev.yml überschreibbar)
+ATELIER_USER=admin
+ATELIER_PASSWORD_HASH=$2a$11$...
+```
+
+**Dev-Defaults** (nur für lokale Entwicklung, in `docker-compose.dev.yml`):
+- Username: `admin`
+- Passwort: `DevPassword!`
+
+**Production**: `ATELIER_USER` und `ATELIER_PASSWORD_HASH` als Container-Umgebungsvariablen setzen. Der Hash wird mit `tools/HashPassword` erzeugt. Alternativ: ASP.NET Core-Konvention `AtelierUser__Username` / `AtelierUser__PasswordHash`.
+
+---
 
 ## Migration manuell ausführen
 
@@ -55,6 +78,8 @@ src/
   Geef.Atelier.Mcp/            MCP-Server-Stub (aktiv ab Schritt 9)
 tests/
   Geef.Atelier.Tests/          xUnit + Testcontainers
+tools/
+  HashPassword/                BCrypt-Hash-Generator CLI
 docs/
   reports/                     Abschlussberichte je Bau-Schritt
 ```

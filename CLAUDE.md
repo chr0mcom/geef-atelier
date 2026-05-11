@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Aktueller Zustand
 
-**Skeleton Schritt 7 abgeschlossen (11. Mai 2026).** Blazor-UI: drei Pages (`/new`, `/runs`, `/runs/{id}`). `IRunNotifier` in Core, `SignalRRunNotifier` in Web (Singleton). `RunHub` mit zwei Groups (`run-{id}`, `all-runs`), vier Methoden. `PostgresEventSink`-Konstruktor jetzt vierstellig (+ `IRunNotifier`). 9 UI-Komponenten in `Components/UI/` (StatusBadge, SeverityBadge, RunCard, IterationPanel, FindingItem, RunHeader, SubmitForm, EmptyState, CancelButton), alle mit scoped `.razor.css`. 4 bUnit-Tests + 4 Playwright-E2E-Tests (WebTestHost mit echtem Kestrel). 55/55 Tests grün. AC8 (OpenRouter-Real-Pipeline) grün. Nächster Schritt: Schritt 8 — Cookie-Auth (`ATELIER_USER`/`ATELIER_PASSWORD_HASH`) + `[Authorize]` auf Hub und Pages.
+**Skeleton Schritt 8 abgeschlossen (11. Mai 2026).** Cookie-Auth: Login-Page (Static SSR), Logout-Endpoint (`POST /auth/logout`), `[Authorize]` auf `/new`, `/runs`, `/runs/{id}`. `IUserAuthenticator` in Application, `AtelierUserOptions` in Core. BCrypt-Hash (wf=11) via `tools/HashPassword/`. `ATELIER_USER`/`ATELIER_PASSWORD_HASH` Env-Vars. `TestAuthenticationHandler` in Tests für E2E-Bypass. `UserMenu`-Komponente (AuthorizeView, Logout-Form). `ForwardedHeaders`-Middleware (Traefik-Vorbereitung). 71/71 Tests grün (55 bestehende + 4 Auth-Application + 6 bUnit + 3 Playwright-E2E + 3 weitere). Nächster Schritt: Schritt 9 — MCP-Server mit Bearer-Token-Auth.
 
 ## Verbindlicher Workflow
 

@@ -1,6 +1,6 @@
 # Walking Skeleton — Bauplan
 
-*Letzte Aktualisierung: 11. Mai 2026 (Schritte 1–7 abgeschlossen; M1 in main)*
+*Letzte Aktualisierung: 11. Mai 2026 (Schritt 8 abgeschlossen — Cookie-Auth; 71/71 Tests grün)*
 
 Das Walking Skeleton ist die kleinste end-to-end-funktionale Version von Geef.Atelier: ein Auftrag wird über die UI oder via MCP gestellt, eine echte Geef-Pipeline läuft (mit echten LLM-Calls), Live-Status ist sichtbar, das Ergebnis wird angezeigt und persistiert. Quellen-Upload, Klassifikator, dynamische Crew, Advisor, Multi-Format-Export — alles weitere kommt später.
 
@@ -18,7 +18,7 @@ Während die nummerierten Schritte sequenziell durchlaufen werden, gibt es paral
 
 **Branch:** `feature/openai-compatible-providers`
 **Status:** ✅ **Abgeschlossen am 10. Mai 2026.** Branch `feature/openai-compatible-providers` gepusht (4 Commits + 1 nachgereichter Bericht-Commit). 31/31 Tests grün (9 ohne Docker, 22 weitere via Postgres/Orchestrator-Testcontainer). Architect-Antworten zu allen sechs Schwerpunkten getroffen — markante Entscheidung: `LlmActor`-Enum existiert nur als Typen-Dokumentation, Lookup über String-Keys. Workflow-Abweichung: keine formalen R1–R5-Reviewer-Pässe (durch Subagent-Self-Reviews + Build/Test ersetzt) — R2-Nachholpass nach Merge empfohlen. Bericht: [reports/migration-01-report.md](reports/migration-01-report.md). Details siehe Decisions-Log D-018.
-**Merge-Status:** Merge fertig (Schritt 6 wurde direkt auf dem M1-Branch gebaut, daher kein Rebase nötig — Fast-Forward-Merge möglich). main enthält nun Schritte 1–5 + M1 + Schritt 6 zusammen.md](snippets/m1-merge-coordination.md). 
+**Merge-Status:** ✅ **Abgeschlossen** (Push-Range `28daafb..ad90f65`). main enthält jetzt Schritte 1–7 + M1 zusammen. Branch `feature/openai-compatible-providers` kann gelöscht werden.
 **Offen vor Schritt 7:** Real-OpenRouter-Integration-Test (`AtelierPipelineRunsAgainstOpenRouter`) einmal mit echtem Bearer-Key ausführen — verifiziert Modell-ID-Stabilität, Tool-Use-Verhalten, Latenz.
 **Auslöser:** D-017 — Anthropic-OAuth-Token wird von Messages-API nicht akzeptiert; Pay-as-you-go-Bearer-Key vermeidbar; Multi-Provider-Vorteil sofort nutzbar.
 **Scope:** Ersetzt anthropic-spezifischen LLM-Layer durch OpenAI-API-konformen Adapter (Default: OpenRouter). Pro-Akteur-Modell-Konfiguration. Tool-Use-Format wechselt auf OpenAI-`function`-Schema.
@@ -176,7 +176,9 @@ Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt)
 
 ### Schritt 7 — Blazor-UI
 
-**Status:** ✅ **Abgeschlossen am 11. Mai 2026.** R1: 0 Findings. R2: 1 CRITICAL behoben (SignalRRunNotifier try/catch). R3: 5/5 Determinismus. R4: 0 CRITICAL/MAJOR. R5: 4 Flows verifiziert (Submit, List, LiveUpdate SignalR, Cancel via Auto-E2E). AC8 grün (OpenRouter, 5–12s, 174–523 Tokens). 55/55 Tests grün. Bericht: [reports/step-07-report.md](reports/step-07-report.md). Details: D-020.
+**Status:** ✅ **Abgeschlossen am 11. Mai 2026.** 2 Reviewer-Iterationen, 1 R2-CRITICAL (fehlendes try/catch in `SignalRRunNotifier`) behoben — doppelter Fail-Safe-Pattern etabliert. 55/55 Tests grün (4 neue bUnit + 4 neue Playwright E2E + bestehende Persistence/Orchestrator/Application). Drei Pages (`/new`, `/runs`, `/runs/{id}`), 9 UI-Komponenten in `Components/UI/` mit scoped CSS, SignalR-Hub `RunHub` mit zwei Groups (`run-{id}` + `all-runs`), `IRunNotifier` in Core und `SignalRRunNotifier` in Web als Singleton. **AC8 endlich grün:** OpenRouter-Real-Pipeline mit 5–12s Latenz und 174–523 Tokens pro Run verifiziert. 12 Conventional-Commits in `main`. Bericht: [reports/step-07-report.md](reports/step-07-report.md). Details siehe Decisions-Log D-020.
+
+**Workflow-Festlegung dieser Stufe:** Plan-Phase-Integration etabliert sich als Architect-Form (seit Schritt 5 verwendet); `geef_architecture.md` als Pflicht-Artefakt wird in der Praxis durch Plan-Dokumente äquivalent ersetzt — R4 prüft Architektur-Compliance gegen den Plan. Atelier-Auslegung der "keine HTML in Pages"-Regel: triviale Page-Steuerelemente (einfache `<button>`/`<div>` ohne State) dürfen in Pages bleiben, nur wiederverwendbare UI-**Logik** muss in `Components/UI/`.
 
 ---
 
@@ -184,16 +186,24 @@ Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt)
 
 **Ziel:** Anwendung ist nicht mehr ungeschützt im Internet erreichbar.
 
+**Voraussetzung:** Schritte 1–7 + M1 in main. AC8 (Real-OpenRouter-Test) grün. Schritt 8 baut auf der etablierten UI-Schicht (drei Pages + SignalR-Hub) auf und ergänzt Auth-Middleware + Login-Page. Single-User-Setup mit Cookie-basierter Auth.
+
 **Umfang:**
 - Cookie-Auth für die Web-UI; ein User aus Environment-Variablen
-- Login-Page, Logout-Endpoint
+- Login-Page (Static SSR), Logout-Endpoint (`POST /auth/logout`)
 - Bearer-Token-Auth-Schema vorbereitet für MCP-Server (im nächsten Schritt aktiviert)
 - Gesundheitscheck bleibt unauthentifiziert
 
 **Akzeptanzkriterien:**
-- Ohne Login: Redirect auf Login-Page
-- Mit Login: alle UI-Routen erreichbar
-- Falsche Credentials: Login schlägt fehl, kein Cookie
+- ✅ Ohne Login: Redirect auf Login-Page (`/login?ReturnUrl=…`)
+- ✅ Mit Login (admin/DevPassword! als Dev-Default): alle UI-Routen erreichbar, Logout-Button sichtbar
+- ✅ Falsche Credentials: Login schlägt fehl, "Ungültige Anmeldedaten"-Banner, kein Cookie
+- ✅ Logout → Cookie gelöscht, folgende Auth-Routen redirigierten wieder zu /login
+- ✅ `/health` weiterhin anonym (AllowAnonymous)
+- ✅ `tools/HashPassword` CLI für BCrypt-Hash-Generierung
+- ✅ 71/71 Tests grün (55 bestehende + 16 neue)
+
+**Status:** ✅ **Abgeschlossen am 11. Mai 2026.** 4 Reviewer-Iterationen (R1–R5 alle 0 Findings). 71/71 Tests grün (55 Regression + 4 Application-Auth + 6 bUnit + 6 Playwright-E2E). Cookie-Auth: BCrypt wf=11, 30d SlidingExpiration, HttpOnly, SameSite=Strict, SecurePolicy Dev/Prod-Switch. Login als Static SSR (`@formname`-Pflicht). Logout via `POST /auth/logout` mit AntiforgeryToken. `TestAuthenticationHandler` in Tests für Bypass. Arch-Trade-off: RunHub ohne `[Authorize]` (Blazor Server server-side HubConnection kann Browser-Cookies nicht forwarden — SSR-Pre-render würde 401 erhalten). `ForwardedHeaders`-Middleware vor `UseAuthentication` (Traefik-TLS-Vorbereitung). 13 Conventional-Commits. Bericht: [reports/step-08-report.md](reports/step-08-report.md). Details siehe Decisions-Log D-021.
 
 ---
 

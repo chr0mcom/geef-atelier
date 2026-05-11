@@ -1,6 +1,6 @@
 # Architektur
 
-*Letzte Aktualisierung: 11. Mai 2026 (S7: UI-Architektur-Sektion ergänzt — drei Pages, RunHub, IRunNotifier)*
+*Letzte Aktualisierung: 11. Mai 2026 (S8: Auth-Sektion erweitert — Cookie-Konfig, Login Static SSR, TestAuthHandler, ForwardedHeaders, RunHub-Trade-off)*
 
 ## Schichtenbild
 
@@ -248,10 +248,75 @@ Browser /new  →  IRunService.SubmitRunAsync  →  RunEntity (Pending) in DB
 
 **Blazor Server.** Begründung: derselbe .NET-Stack wie Geef SDK, kein Kontextwechsel; SignalR ist eingebaut und beliefert den Live-Status quasi gratis; Single-User heißt keine Skalierungs-Sorgen; lokale UI-Latenz ist dank Server-Hosting und Reverse-Proxy unkritisch. Falls später ein Wechsel zu Blazor WebAssembly oder React+API nötig wird, bleibt das Backend (`IRunService`, MCP-Server, Pipeline) unverändert.
 
-## Auth-Strategie
+## Auth-Strategie (umgesetzt in Schritt 8, siehe D-021)
 
-- **Web-UI:** Cookie-Auth mit einem festen User aus Environment-Variablen (`ATELIER_USER`, `ATELIER_PASSWORD_HASH`). Hash via ASP.NET Core Identity-Hasher oder bcrypt.
-- **MCP-Server:** Bearer-Token in Header. Im Skeleton ein einzelnes Long-Lived-Token aus Environment-Variable (`ATELIER_MCP_TOKEN`). OAuth-2.0-Flow ist im MCP-Standard vorgesehen, kommt aber nach Skeleton.
+### Web-UI — Cookie-Auth
+
+Ein fester User aus Environment-Variablen. BCrypt-Hash (work factor 11) via `tools/HashPassword/`.
+
+**Cookie-Konfiguration:**
+
+| Option | Wert |
+|---|---|
+| Cookie-Name | `Atelier.Auth` |
+| `HttpOnly` | `true` |
+| `SameSite` | `Strict` (Produktion) / `Lax` (Test-Env) |
+| `SecurePolicy` | `SameAsRequest` (Dev) / `Always` (Prod) |
+| `ExpireTimeSpan` | 30 Tage |
+| `SlidingExpiration` | `true` |
+| `LoginPath` | `/login` |
+
+**Login-Flow (Static SSR):**
+
+```
+Anonymer Browser → /runs → [Authorize] → RedirectToLogin
+  → NavigationManager.NavigateTo("/login?ReturnUrl=%2Fruns")
+  → Login.razor (Static SSR, kein @rendermode)
+  → POST /login (Blazor Static SSR Form-Handler, @formname="login-form")
+  → IUserAuthenticator.ValidateCredentialsAsync (BCrypt.Verify)
+  → HttpContext.SignInAsync → Cookie gesetzt → Redirect zu /runs
+```
+
+**Wichtig: Login-Page muss Static SSR bleiben.** `@rendermode InteractiveServer` würde die Form-POST im WebSocket-Kontext abwickeln ohne `HttpContext` → `SignInAsync` wäre nicht aufrufbar. Das `@formname="login-form"`-Attribut auf dem `<form>`-Element ist Pflicht für Blazor Static SSR Form-Routing.
+
+**Logout:** `POST /auth/logout` (Minimal API) mit `<AntiforgeryToken />` in der `UserMenu`-Komponente. GET-Logout wäre ein CSRF-Angriffspunkt.
+
+**`IUserAuthenticator`-Schicht:**
+
+```
+Geef.Atelier.Core/Configuration/AtelierUserOptions.cs   → POCO für Username/PasswordHash
+Geef.Atelier.Application/Auth/IUserAuthenticator.cs     → Interface (Application, nicht Infrastructure)
+Geef.Atelier.Application/Auth/AtelierUserAuthenticator.cs → BCrypt.Verify + CryptographicOperations.FixedTimeEquals
+Geef.Atelier.Application/Auth/ApplicationAuthExtensions.cs → AddAtelierAuth(IServiceCollection, IConfiguration)
+```
+
+`AtelierUserAuthenticator` ist `internal sealed`. Env-Var-Fallback (`ATELIER_USER`/`ATELIER_PASSWORD_HASH`) wird in `ApplicationAuthExtensions` aufgelöst — docker-compose-User müssen nicht die ASP.NET-Core-Doppelunderstrich-Konvention kennen.
+
+**Timing-Schutz:** `FixedTimeEquals` für Username-Vergleich, `BCrypt.Verify` aufgerufen auch bei falschem Username (konstante Timing-Eigenschaft). Kein Username/Password-Hash wird in Logs geschrieben — nur `"Login attempt rejected"` (ohne PII).
+
+**Lazy-Fail bei fehlender Konfiguration:** Service startet auch ohne Env-Vars, Login gibt `false` zurück. Health-Check bleibt anonym (`.AllowAnonymous()` auf `MapHealthChecks`). Init-Warning-Log beim ersten fehlkonfigurierten Login-Versuch.
+
+**`ForwardedHeaders` vor `UseAuthentication`:**
+
+```csharp
+app.UseForwardedHeaders();   // ZUERST — damit Request.IsHttps korrekt ist
+app.UseAuthentication();
+app.UseAuthorization();
+```
+
+Traefik terminiert TLS und leitet HTTP weiter. Ohne `UseForwardedHeaders` würde `SecurePolicy.Always` in Produktion Cookies blockieren. `KnownIPNetworks.Clear()` öffnet für alle Proxy-IPs (Docker-Netzwerk-invariant).
+
+**RunHub ohne `[Authorize]` (architektonischer Trade-off):**
+
+`RunHub` hat kein `[Authorize]`-Attribut. Begründung: Blazor Server's `HubConnectionBuilder` erzeugt server-seitige SignalR-Verbindungen, die Browser-Cookies nicht weiterleiten. Mit `[Authorize]` auf dem Hub würde das SSR-Pre-Render-Phase 401 erhalten und Blazor Circuit-Initialisierung schlägt fehl. Mitigation: Alle subscribenden Pages (`/new`, `/runs`, `/runs/{id}`) tragen `@attribute [Authorize]` — unauthentifizierte User können die Pages nicht laden, also auch keine Hub-Verbindung aufbauen.
+
+### Test-Auth-Bypass
+
+`TestAuthenticationHandler` (in `tests/Geef.Atelier.Tests/Web/E2E/`, `internal sealed`) markiert jeden Request als pre-authenticated mit `ClaimTypes.Name = "test-user"`. `WebTestHost.StartAsync(authenticated: true/false)` — `true` aktiviert den Test-Handler, `false` startet echte Cookie-Auth mit BCrypt-wf=4-Hash für LoginFlow/LogoutFlow-Tests. **Der Handler darf nie in `Program.cs` oder dem Web-Projekt referenziert werden.**
+
+### MCP-Server — Bearer-Token
+
+Bearer-Token aus `ATELIER_MCP_TOKEN` (kommt in Schritt 9). OAuth-2.0-Flow ist im MCP-Standard vorgesehen, kommt nach Skeleton. Beide Auth-Schemes (Cookie + Bearer) können in Schritt 9 als Multi-Auth-Schema-Setup koexistieren.
 
 ## Observability
 
