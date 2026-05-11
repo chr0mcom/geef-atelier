@@ -1,0 +1,42 @@
+@page "/login"
+@layout Layout.EmptyLayout
+@inject IUserAuthenticator Authenticator
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+
+<PageTitle>Login — Geef.Atelier</PageTitle>
+
+<LoginForm Error="@_error" ReturnUrl="@ReturnUrl" />
+
+@code {
+    [SupplyParameterFromQuery] public string? ReturnUrl   { get; set; }
+    [SupplyParameterFromForm]  public LoginFormModel? Model { get; set; }
+    [CascadingParameter]       public HttpContext? HttpContext { get; set; }
+
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext is null || HttpContext.Request.Method != "POST" || Model is null)
+            return;
+
+        var ok = await Authenticator.ValidateCredentialsAsync(
+            Model.Username ?? "", Model.Password ?? "");
+
+        if (!ok)
+        {
+            _error = "Ungültige Anmeldedaten";
+            return;
+        }
+
+        var claims   = new[] { new Claim(ClaimTypes.Name, Model.Username!) };
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            new ClaimsPrincipal(identity));
+
+        var target = string.IsNullOrEmpty(ReturnUrl) ? "/runs" : ReturnUrl;
+        HttpContext.Response.Redirect(target);
+    }
+}
