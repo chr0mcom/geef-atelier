@@ -28,7 +28,7 @@ public sealed class SubmitFlowTests(PlaywrightFixture pw, PostgresFixture pg) : 
 
             // Fill and submit the form
             await page.FillAsync("textarea#briefing", "E2E test briefing for SubmitFlow");
-            await page.ClickAsync("button[type='submit']");
+            await page.ClickAsync("button.btn-submit");
 
             // Should redirect to /runs/{guid}
             await page.WaitForURLAsync(new Regex(@"/runs/[0-9a-f\-]{36}$"),

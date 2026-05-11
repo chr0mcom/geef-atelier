@@ -27,7 +27,7 @@ public sealed class ListFlowTests(PlaywrightFixture pw, PostgresFixture pg) : IA
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
             await page.FillAsync("textarea#briefing", "List flow test briefing");
-            await page.ClickAsync("button[type='submit']");
+            await page.ClickAsync("button.btn-submit");
 
             // Wait for redirect to detail page
             await page.WaitForURLAsync("**/runs/**", new PageWaitForURLOptions { Timeout = 10_000 });

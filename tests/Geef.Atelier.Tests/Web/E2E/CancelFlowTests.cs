@@ -28,7 +28,7 @@ public sealed class CancelFlowTests(PlaywrightFixture pw, PostgresFixture pg) : 
             await page.GotoAsync($"{_host!.BaseUrl}/new");
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             await page.FillAsync("textarea#briefing", "Cancel flow test — this pipeline will be cancelled.");
-            await page.ClickAsync("button[type='submit']");
+            await page.ClickAsync("button.btn-submit");
 
             // Wait for redirect to detail page
             await page.WaitForURLAsync(new Regex(@"/runs/[0-9a-f\-]{36}$"),
