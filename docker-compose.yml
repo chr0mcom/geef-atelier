@@ -6,28 +6,33 @@ services:
       context: .
       dockerfile: src/Geef.Atelier.Web/Dockerfile
     image: geef-atelier-web:latest
+    pull_policy: never
     container_name: geef-atelier-web
     restart: unless-stopped
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
-      # TODO: Set these in .env before production deployment (Schritt 10)
-      - ConnectionStrings__DefaultConnection=${ATELIER_DB_CONNECTION}
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - AtelierUser__Username=${ATELIER_USER}
+      - AtelierUser__PasswordHash=${ATELIER_PASSWORD_HASH}
+      - AtelierMcp__Token=${ATELIER_MCP_TOKEN}
+      - Llm__ApiKey=${LLM_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - geef-atelier-network
       - proxy
     labels:
       - "traefik.enable=true"
-      # TODO: Replace atelier.example.com with actual domain in Schritt 10
-      - "traefik.http.routers.geef-atelier-http.rule=Host(`atelier.example.com`)"
-      - "traefik.http.routers.geef-atelier-http.entrypoints=web"
-      - "traefik.http.routers.geef-atelier-http.middlewares=geef-atelier-redirect"
-      - "traefik.http.middlewares.geef-atelier-redirect.redirectscheme.scheme=https"
-      - "traefik.http.routers.geef-atelier.rule=Host(`atelier.example.com`)"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.geef-atelier.rule=Host(`geef.stefan-bechtel.de`)"
       - "traefik.http.routers.geef-atelier.entrypoints=websecure"
       - "traefik.http.routers.geef-atelier.tls=true"
       - "traefik.http.routers.geef-atelier.tls.certresolver=le"
+      - "traefik.http.routers.geef-atelier.middlewares=chain@file"
       - "traefik.http.services.geef-atelier.loadbalancer.server.port=8080"
+      - "com.centurylinklabs.watchtower.enable=false"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -35,8 +40,30 @@ services:
       retries: 3
       start_period: 60s
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: geef-atelier-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - geef_atelier_postgres_data:/var/lib/postgresql/data
+    networks:
+      - geef-atelier-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
 networks:
   geef-atelier-network:
     driver: bridge
   proxy:
     external: true
+
+volumes:
+  geef_atelier_postgres_data:
