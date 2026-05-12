@@ -1,10 +1,106 @@
 @page "/"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IRunService RunService
+@inject NavigationManager Nav
 
-<PageTitle>Geef.Atelier</PageTitle>
+<PageTitle>Atelier — Geef.Atelier</PageTitle>
 
-<SkeletonBanner Title="Geef.Atelier — Text Generation Pipeline" />
+<div class="welcome">
+    <div class="welcome-hero">
+        <h1>
+            A briefing well-given<br />
+            is half the <em>manuscript</em>.
+        </h1>
+        <div class="meta">
+            <div class="greeting">@_greeting · Atelier open</div>
+        </div>
+    </div>
 
-<div class="index-links">
-    <a href="/new" class="index-link-btn">+ New Run</a>
-    <a href="/runs" class="index-link-btn index-link-btn-outline">View Runs</a>
+    <div class="welcome-cta">
+        <a class="cta-card" href="/new">
+            <div class="glyph-stamp" aria-hidden="true">¶</div>
+            <div class="t-eyebrow eyebrow">Begin</div>
+            <h2>Hand the crew a new briefing</h2>
+            <p>
+                Describe what should be written and to whom. The crew will draft, review,
+                revise — and return when it converges or after three iterations.
+            </p>
+            <div class="arrow">⟶ Open the form</div>
+        </a>
+        <div class="welcome-side">
+            <div class="stat-tile coming-soon" title="Statistics coming soon">
+                <div class="label">This month</div>
+                <div class="value">—</div>
+                <div class="delta">runs</div>
+            </div>
+            <div class="stat-tile coming-soon" title="Statistics coming soon">
+                <div class="label">Convergence rate</div>
+                <div class="value">—</div>
+                <div class="delta">within ≤ 2 iterations</div>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <div class="t-eyebrow eyebrow" style="margin-bottom:6px">The workbench</div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
+            <h2 style="font-family:var(--font-display);font-weight:300;font-size:28px;letter-spacing:-0.012em;margin:0">
+                Recent work
+            </h2>
+            <a href="/runs" style="font-family:var(--font-mono);font-size:11px;color:var(--ink-3);letter-spacing:.06em">
+                ALL RUNS ⟶
+            </a>
+        </div>
+        @if (_recentRuns is null)
+        {
+            <div class="recent-list">
+                <EmptyState Message="Loading…" />
+            </div>
+        }
+        else if (_recentRuns.Count == 0)
+        {
+            <div class="recent-list">
+                <EmptyState Message="No runs yet — hand the crew your first briefing." />
+            </div>
+        }
+        else
+        {
+            <div class="recent-list">
+                @foreach (var run in _recentRuns)
+                {
+                    <div class="recent-row" @onclick="@(() => Nav.NavigateTo("/runs/" + run.Id))" role="button" tabindex="0">
+                        <div class="when">@TimeAgo(run.CreatedAt)</div>
+                        <div class="briefing-snip">@Truncate(run.BriefingText, 70)</div>
+                        <div class="meta t-mono">@(run.TokensTotal > 0 ? run.TokensTotal.ToString("N0") + " tok" : "—")</div>
+                        <StatusBadge Status="run.Status" />
+                    </div>
+                }
+            </div>
+        }
+    </div>
 </div>
+
+@code {
+    IReadOnlyList<RunEntity>? _recentRuns;
+
+    string _greeting = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _recentRuns = await RunService.ListRunsAsync(5);
+        _greeting   = DateTime.Now.ToString("dddd · HH:mm");
+    }
+
+    static string TimeAgo(DateTimeOffset dt)
+    {
+        var diff = DateTimeOffset.UtcNow - dt;
+        if (diff.TotalMinutes < 1) return "just now";
+        if (diff.TotalHours < 1)   return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalDays < 1)    return $"{(int)diff.TotalHours}h ago";
+        return $"{(int)diff.TotalDays}d ago";
+    }
+
+    static string Truncate(string s, int max) =>
+        s.Length > max ? s[..max] + "…" : s;
+}

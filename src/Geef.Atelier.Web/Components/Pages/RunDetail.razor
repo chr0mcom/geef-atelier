@@ -4,10 +4,12 @@
 @implements IAsyncDisposable
 @inject IRunService RunService
 @inject NavigationManager Nav
+@using Microsoft.AspNetCore.SignalR.Client
+@using Geef.Atelier.Web.Display
 
-<PageTitle>Run @RunId.ToString()[..8] — Geef.Atelier</PageTitle>
+<PageTitle>Run @_shortId — Geef.Atelier</PageTitle>
 
-<div class="run-detail-container">
+<div class="detail">
     @if (_details is null && !_notFound)
     {
         <EmptyState Message="Loading…" />
@@ -18,35 +20,61 @@
     }
     else if (_details is not null)
     {
-        <div class="run-detail-actions">
-            <a href="/runs" class="back-link">← Back to Runs</a>
-            @if (_details.Run.Status is RunStatus.Pending or RunStatus.Running)
+        <div class="crumb">
+            <a href="/runs">All runs</a>
+            <span class="sep" aria-hidden="true">/</span>
+            <span class="id t-mono">@_shortId</span>
+        </div>
+
+        <div class="run-header">
+            <div>
+                <div class="status-line">
+                    <StatusBadge Status="_details.Run.Status" Large="true" />
+                    <span class="t-eyebrow eyebrow">
+                        Iteration @_details.Iterations.Count of 3
+                    </span>
+                </div>
+                <h1>@Truncate(_details.Run.BriefingText, 100)</h1>
+                <div class="briefing-block">@_details.Run.BriefingText</div>
+                @if (_details.Run.ErrorMessage is not null)
+                {
+                    <div class="error-banner" style="margin-top:18px;max-width:600px" role="alert">
+                        @_details.Run.ErrorMessage
+                    </div>
+                }
+            </div>
+            <div class="run-meta">
+                <div class="row"><span class="label">Submitted</span><span class="val">@_details.Run.CreatedAt.LocalDateTime.ToString("HH:mm")</span></div>
+                <div class="row"><span class="label">Tokens</span><span class="val">@(_details.Run.TokensTotal > 0 ? _details.Run.TokensTotal.ToString("N0") : "—")</span></div>
+                <div class="row"><span class="label">Cost</span><span class="val coming-soon" title="Cost tracking coming soon">$ —</span></div>
+                @if (_details.Run.Status is RunStatus.Pending or RunStatus.Running)
+                {
+                    <div class="actions">
+                        <CancelButton RunId="_details.Run.Id" OnCancelled="HandleCancelledAsync" />
+                    </div>
+                }
+            </div>
+        </div>
+
+        <Press Status="_details.Run.Status" />
+
+        <div class="iters">
+            @{
+                var resolvedMap = FindingResolutionInferrer.MarkResolved(_details.Iterations);
+            }
+            @foreach (var (iwf, idx) in _details.Iterations.Select((x, i) => (x, i)))
             {
-                <CancelButton RunId="_details.Run.Id" OnCancelled="HandleCancelledAsync" />
+                <IterationPanel
+                    Iteration="iwf.Iteration"
+                    Findings="iwf.Findings"
+                    IsLast="@(idx == _details.Iterations.Count - 1)"
+                    ResolvedMap="resolvedMap" />
             }
         </div>
 
-        <RunHeader Run="_details.Run" />
-
-        @if (_details.Iterations.Count == 0)
+        @if (_details.Run.Status == RunStatus.Completed && !string.IsNullOrEmpty(_details.Run.FinalText))
         {
-            <EmptyState Message="No iterations yet — pipeline is starting…" />
-        }
-        else
-        {
-            <h3 class="iterations-heading">Iterations</h3>
-            @foreach (var iwf in _details.Iterations)
-            {
-                <IterationPanel Iteration="iwf.Iteration" Findings="iwf.Findings" />
-            }
-        }
-
-        @if (!string.IsNullOrEmpty(_details.Run.FinalText))
-        {
-            <div class="final-text-section">
-                <h3>Final Output</h3>
-                <pre class="final-text">@_details.Run.FinalText</pre>
-            </div>
+            <Manuscript Run="_details.Run" IterationCount="@_details.Iterations.Count" />
         }
     }
 </div>
@@ -54,23 +82,25 @@
 @code {
     [Parameter] public Guid RunId { get; set; }
 
-    private RunDetails? _details;
-    private bool _notFound;
-    private HubConnection? _hub;
+    RunDetails? _details;
+    bool        _notFound;
+    HubConnection? _hub;
+
+    string _shortId => RunId.ToString("N")[..8].ToUpperInvariant();
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadDetailsAsync();
+        await LoadAsync();
         await InitHubAsync();
     }
 
-    private async Task LoadDetailsAsync()
+    async Task LoadAsync()
     {
-        _details = await RunService.GetRunDetailsAsync(RunId);
+        _details  = await RunService.GetRunDetailsAsync(RunId);
         _notFound = _details is null;
     }
 
-    private async Task InitHubAsync()
+    async Task InitHubAsync()
     {
         _hub = new HubConnectionBuilder()
             .WithUrl(Nav.ToAbsoluteUri("/hubs/runs"))
@@ -79,29 +109,31 @@
 
         _hub.On<Guid>("RunUpdated", async _ =>
         {
-            await LoadDetailsAsync();
+            await LoadAsync();
             await InvokeAsync(StateHasChanged);
         });
 
         _hub.Reconnected += async _ =>
         {
             await _hub.SendAsync("JoinRunGroupAsync", RunId);
-            await LoadDetailsAsync();
+            await LoadAsync();
             await InvokeAsync(StateHasChanged);
         };
 
         await _hub.StartAsync();
         await _hub.SendAsync("JoinRunGroupAsync", RunId);
-        // Re-fetch after joining to catch any status changes that arrived while connecting.
-        await LoadDetailsAsync();
+        await LoadAsync();
         await InvokeAsync(StateHasChanged);
     }
 
-    private async Task HandleCancelledAsync()
+    async Task HandleCancelledAsync()
     {
-        await LoadDetailsAsync();
+        await LoadAsync();
         StateHasChanged();
     }
+
+    static string Truncate(string s, int max) =>
+        s.Length > max ? s[..max] + "…" : s;
 
     public async ValueTask DisposeAsync()
     {

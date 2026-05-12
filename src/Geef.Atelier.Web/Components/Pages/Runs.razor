@@ -4,23 +4,27 @@
 @implements IAsyncDisposable
 @inject IRunService RunService
 @inject NavigationManager Nav
+@using Microsoft.AspNetCore.SignalR.Client
 
 <PageTitle>Runs — Geef.Atelier</PageTitle>
 
-<div class="runs-container">
-    <div class="runs-header">
-        <h2>Runs</h2>
-        <a href="/new" class="btn-new-run">+ New Run</a>
-    </div>
-
-    <div class="runs-filter">
-        @foreach (var status in _filterOptions)
-        {
-            <button class="filter-btn @(StatusFilter == status ? "active" : "")"
-                    @onclick="() => ApplyFilterAsync(status)">
-                @(status?.ToString() ?? "All")
-            </button>
-        }
+<div class="runs">
+    <div class="runs-head">
+        <div>
+            <div class="t-eyebrow eyebrow">The workbench</div>
+            <h1>All runs</h1>
+            <div class="sub">Every commission, every revision — newest first.</div>
+        </div>
+        <div class="filters">
+            @foreach (var f in _filters)
+            {
+                var count  = f.Status is null ? _runs?.Count : _runs?.Count(r => r.Status == f.Status);
+                <FilterPill Label="@f.Label"
+                            Count="@count"
+                            Active="@(StatusFilter == f.Status)"
+                            OnClick="@(() => ApplyFilterAsync(f.Status))" />
+            }
+        </div>
     </div>
 
     @if (_runs is null)
@@ -29,26 +33,45 @@
     }
     else if (_runs.Count == 0)
     {
-        <EmptyState Message="No runs yet. Submit your first run!" />
+        <div class="empty-state">
+            <h3>An empty workbench</h3>
+            <p>No runs match this filter — but the door is open. Begin your next briefing.</p>
+            <a class="btn primary" href="/new">New briefing</a>
+        </div>
     }
     else
     {
-        @foreach (var run in _runs)
-        {
-            <RunCard Run="run" />
-        }
+        <div class="runs-grid">
+            @foreach (var run in _runs)
+            {
+                <RunRow Run="run" OnOpen="@(() => Nav.NavigateTo($"/runs/{run.Id}"))" />
+            }
+        </div>
     }
+
+    <a class="floating-new btn primary" href="/new" aria-label="New briefing">
+        <IconAdd Size="14" />
+        New briefing
+    </a>
 </div>
 
 @code {
     [SupplyParameterFromQuery] public string? Status { get; set; }
 
-    private RunStatus? StatusFilter => Enum.TryParse<RunStatus>(Status, out var s) ? s : null;
+    RunStatus? StatusFilter => Enum.TryParse<RunStatus>(Status, out var s) ? s : null;
 
-    private static readonly RunStatus?[] _filterOptions = [null, RunStatus.Pending, RunStatus.Running, RunStatus.Completed, RunStatus.Failed, RunStatus.Aborted];
+    static readonly (RunStatus? Status, string Label)[] _filters =
+    [
+        (null,                   "All"),
+        (RunStatus.Pending,      "Pending"),
+        (RunStatus.Running,      "Running"),
+        (RunStatus.Completed,    "Completed"),
+        (RunStatus.Failed,       "Failed"),
+        (RunStatus.Aborted,      "Aborted"),
+    ];
 
-    private IReadOnlyList<RunEntity>? _runs;
-    private HubConnection? _hub;
+    IReadOnlyList<RunEntity>? _runs;
+    HubConnection?            _hub;
 
     protected override async Task OnInitializedAsync()
     {
@@ -56,7 +79,7 @@
         await InitHubAsync();
     }
 
-    private async Task InitHubAsync()
+    async Task InitHubAsync()
     {
         _hub = new HubConnectionBuilder()
             .WithUrl(Nav.ToAbsoluteUri("/hubs/runs"))
@@ -80,7 +103,7 @@
         await _hub.SendAsync("JoinAllRunsGroupAsync");
     }
 
-    private async Task ApplyFilterAsync(RunStatus? status)
+    async Task ApplyFilterAsync(RunStatus? status)
     {
         var query = status.HasValue ? $"?Status={status.Value}" : string.Empty;
         Nav.NavigateTo("/runs" + query, forceLoad: false);

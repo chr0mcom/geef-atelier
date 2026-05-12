@@ -4,40 +4,96 @@
 @inject IRunService RunService
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthProvider
+@inject IJSRuntime JS
 
-<PageTitle>New Run — Geef.Atelier</PageTitle>
+<PageTitle>New briefing — Geef.Atelier</PageTitle>
 
-<div class="new-run-container">
-    <h2>New Run</h2>
+<div class="newrun">
+    <div class="head">
+        <div class="t-eyebrow eyebrow">New briefing</div>
+        <h1>What should we make?</h1>
+        <div class="helper">
+            A briefing is a commission. Describe the addressee, the tone, the length, the sources.
+            The more you say, the less the crew must guess.
+        </div>
+    </div>
 
     @if (_error is not null)
     {
-        <div class="new-run-error">@_error</div>
+        <div class="error-banner" role="alert">@_error</div>
     }
 
-    <SubmitForm OnSubmitted="HandleSubmittedAsync" />
+    <div class="briefing-wrap @(_briefing.Length > 0 ? "has-content" : "")">
+        <textarea id="briefing" @bind="_briefing" @bind:event="oninput"
+                  placeholder="Describe what should be written.
+
+— Who is the addressee?
+— What register or tone?
+— What length, in words or paragraphs?
+— What sources, citations, or constraints?
+
+Be specific. Generic briefings produce generic texts."
+                  autofocus></textarea>
+        <div class="briefing-corner">
+            <span class="ready-pip" aria-hidden="true"></span>
+            <span>@_briefing.Length chars · @WordCount words</span>
+            <span>@(_briefing.Length > 0 ? "ready to hand" : "awaiting your hand")</span>
+        </div>
+    </div>
+
+    <div class="@("config-toggle" + (_openConfig ? " open" : ""))" @onclick="() => _openConfig = !_openConfig" role="button" tabindex="0">
+        <span class="caret" aria-hidden="true">▸</span>
+        <span>Advanced — pipeline configuration (JSON)</span>
+    </div>
+    @if (_openConfig)
+    {
+        <div class="config-area">
+            <textarea @bind="_configJson" @bind:event="oninput" spellcheck="false"></textarea>
+        </div>
+    }
+
+    <div class="newrun-actions">
+        <div class="left-hint">⌘ + Enter to hand to the crew · esc to discard</div>
+        <div style="display:flex;gap:10px">
+            <a class="btn ghost" href="/runs">Cancel</a>
+            <button class="btn primary btn-submit" disabled="@(!CanSubmit)" @onclick="SubmitAsync">
+                @(_submitting ? "Handing over…" : "Hand to the crew")
+            </button>
+        </div>
+    </div>
+
+    <div class="press-row">
+        <span>The crew on duty —</span>
+        <div class="crew"><span class="mark">E</span> Executor</div>
+        <div class="crew"><span class="mark">B</span> Briefing-fidelity reviewer</div>
+        <div class="crew"><span class="mark">C</span> Clarity reviewer</div>
+    </div>
 </div>
 
 @code {
-    private string? _error;
+    string _briefing  = string.Empty;
+    string _configJson = "{}";
+    bool   _openConfig;
+    bool   _submitting;
+    string? _error;
 
-    private async Task HandleSubmittedAsync(SubmitFormResult result)
+    int  WordCount  => _briefing.Trim().Length > 0 ? _briefing.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).Length : 0;
+    bool CanSubmit  => _briefing.Trim().Length > 0 && !_submitting;
+
+    async Task SubmitAsync()
     {
+        if (!CanSubmit) return;
+        _submitting = true;
         _error = null;
         try
         {
             var auth = await AuthProvider.GetAuthenticationStateAsync();
-            var createdByUser = auth.User.Identity?.Name;
-            var runId = await RunService.SubmitRunAsync(result.Briefing, result.ConfigJson, createdByUser: createdByUser);
-            Nav.NavigateTo($"/runs/{runId}");
+            var user = auth.User.Identity?.Name;
+            var id   = await RunService.SubmitRunAsync(_briefing, _configJson, createdByUser: user);
+            Nav.NavigateTo($"/runs/{id}");
         }
-        catch (ArgumentException ex)
-        {
-            _error = ex.Message;
-        }
-        catch (Exception)
-        {
-            _error = "Failed to submit run. Please try again.";
-        }
+        catch (ArgumentException ex) { _error = ex.Message; }
+        catch                        { _error = "Failed to submit run. Please try again."; }
+        finally { _submitting = false; }
     }
 }
