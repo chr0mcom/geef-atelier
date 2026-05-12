@@ -1,12 +1,15 @@
 @using Geef.Atelier.Core.Domain
 
-<span class="badge badge-@CssClass" data-status="@Status">@Status</span>
+<span class="status @CssClass" data-status="@Status">
+    <span class="glyph" aria-hidden="true"></span>
+    @Label
+</span>
 
 @code {
-    /// <summary>The run status to display.</summary>
     [Parameter, EditorRequired] public RunStatus Status { get; set; }
+    [Parameter] public bool Large { get; set; }
 
-    private string CssClass => Status switch
+    string CssClass => (Status switch
     {
         RunStatus.Pending   => "pending",
         RunStatus.Running   => "running",
@@ -14,5 +17,15 @@
         RunStatus.Failed    => "failed",
         RunStatus.Aborted   => "aborted",
         _                   => "unknown"
+    }) + (Large ? " status-lg" : "");
+
+    string Label => Status switch
+    {
+        RunStatus.Pending   => "Pending",
+        RunStatus.Running   => "Running",
+        RunStatus.Completed => "Completed",
+        RunStatus.Failed    => "Failed",
+        RunStatus.Aborted   => "Aborted",
+        _                   => "Unknown"
     };
 }

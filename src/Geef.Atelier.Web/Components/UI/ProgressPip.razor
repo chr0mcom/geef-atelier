@@ -1,0 +1,15 @@
+@using Geef.Atelier.Web.Display
+
+<span class="pip @CssClass" aria-hidden="true"></span>
+
+@code {
+    [Parameter, EditorRequired] public ProgressPipState State { get; set; }
+
+    string CssClass => State switch
+    {
+        ProgressPipState.Done    => "done",
+        ProgressPipState.Active  => "active",
+        ProgressPipState.Pending => "",
+        _                        => ""
+    };
+}

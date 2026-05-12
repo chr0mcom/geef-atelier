@@ -1,12 +1,23 @@
 @using Geef.Atelier.Core.Domain
 
-<span class="severity severity-@CssClass">@Severity</span>
+<span class="severity @CssClass">
+    <span class="mark" aria-hidden="true"></span>
+    @Label
+</span>
 
 @code {
-    /// <summary>The finding severity to display.</summary>
     [Parameter, EditorRequired] public FindingSeverity Severity { get; set; }
 
-    private string CssClass => Severity switch
+    string CssClass => Severity switch
+    {
+        FindingSeverity.Critical => "critical",
+        FindingSeverity.Major    => "major",
+        FindingSeverity.Minor    => "minor",
+        FindingSeverity.Info     => "info",
+        _                        => "info"
+    };
+
+    string Label => Severity switch
     {
         FindingSeverity.Critical => "critical",
         FindingSeverity.Major    => "major",

@@ -1,0 +1,59 @@
+@using Geef.Atelier.Core.Domain
+
+<div class="run-row" @onclick="OnOpen" role="button" tabindex="0">
+    <div class="run-stamp @StatusCss">
+        <span class="inner" aria-hidden="true"></span>
+    </div>
+    <div class="when">
+        @TimeAgo
+        <span class="full">@Run.CreatedAt.LocalDateTime.ToString("dd MMM yyyy · HH:mm")</span>
+    </div>
+    <div class="body">
+        <div class="title">@Title</div>
+        <div class="tags">
+            <span>@RunId</span>
+            <span>@(Run.TokensTotal > 0 ? Run.TokensTotal.ToString("N0") + " tok" : "—")</span>
+        </div>
+    </div>
+    <div class="progress" aria-label="@ProgressLabel">
+        <ProgressPip State="ProgressPipState.Done" />
+        <ProgressPip State="ProgressPipState.Done" />
+        <ProgressPip State="ProgressPipState.Pending" />
+    </div>
+    <div class="open-link" aria-hidden="true">OPEN ⟶</div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RunEntity Run { get; set; } = default!;
+    [Parameter, EditorRequired] public EventCallback OnOpen { get; set; }
+
+    string StatusCss => Run.Status switch
+    {
+        RunStatus.Pending   => "pending",
+        RunStatus.Running   => "running",
+        RunStatus.Completed => "completed",
+        RunStatus.Failed    => "failed",
+        RunStatus.Aborted   => "aborted",
+        _                   => "unknown"
+    };
+
+    string RunId => Run.Id.ToString("N")[..8].ToUpperInvariant();
+
+    string Title => Run.BriefingText.Length > 80
+        ? Run.BriefingText[..80] + "…"
+        : Run.BriefingText;
+
+    string ProgressLabel => $"Status: {Run.Status}";
+
+    string TimeAgo
+    {
+        get
+        {
+            var diff = DateTimeOffset.UtcNow - Run.CreatedAt;
+            if (diff.TotalMinutes < 1) return "just now";
+            if (diff.TotalHours < 1) return $"{(int)diff.TotalMinutes}m ago";
+            if (diff.TotalDays < 1) return $"{(int)diff.TotalHours}h ago";
+            return $"{(int)diff.TotalDays}d ago";
+        }
+    }
+}

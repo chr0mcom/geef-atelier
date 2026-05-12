@@ -1,0 +1,16 @@
+<button class="filter-pill @(Active ? "active" : "")"
+        @onclick="OnClick"
+        aria-pressed="@Active">
+    @Label
+    @if (Count.HasValue)
+    {
+        <span class="count" aria-label="@Count runs">@Count</span>
+    }
+</button>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter] public int? Count { get; set; }
+    [Parameter] public bool Active { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+}
