@@ -1,22 +1,21 @@
 using System.Text;
-using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Infrastructure.Llm;
 
 internal sealed class OpenAiCompatibleClient(
     HttpClient httpClient,
-    IOptions<LlmOptions> options) : ILlmClient
+    string endpoint,
+    string apiKey) : ILlmClient
 {
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken)
     {
-        var apiKey = options.Value.ApiKey;
         if (string.IsNullOrWhiteSpace(apiKey))
             throw new InvalidOperationException(
-                "LLM API key is not configured. Set the environment variable 'Llm__ApiKey'.");
+                "LLM API key is not configured. Set the environment variable for the provider's ApiKey.");
 
-        var endpoint = options.Value.Endpoint.TrimEnd('/');
+        var baseEndpoint = endpoint.TrimEnd('/');
         var body = OpenAiMessageFormat.SerializeRequest(request);
-        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{endpoint}/chat/completions");
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseEndpoint}/chat/completions");
 
         // Set key per-request to avoid leaking it into shared HttpClient headers.
         httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");

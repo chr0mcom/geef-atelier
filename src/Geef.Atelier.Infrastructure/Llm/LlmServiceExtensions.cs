@@ -3,13 +3,11 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Geef.Atelier.Infrastructure.Llm;
 
-/// <summary>
-/// DI registration for the OpenAI-compatible LLM client (default: OpenRouter).
-/// </summary>
+/// <summary>DI registration for the multi-provider LLM infrastructure.</summary>
 public static class LlmServiceExtensions
 {
     /// <summary>
-    /// Registers <see cref="ILlmClient"/> with its named HttpClient.
+    /// Registers <see cref="ILlmClientResolver"/> and a shared named HttpClient "llm".
     /// Returns <see cref="IHttpClientBuilder"/> so callers can chain resilience handlers.
     /// </summary>
     public static IHttpClientBuilder AddLlmClient(
@@ -17,7 +15,9 @@ public static class LlmServiceExtensions
         IConfiguration configuration)
     {
         services.Configure<LlmOptions>(configuration.GetSection("Llm"));
-        return services.AddHttpClient<ILlmClient, OpenAiCompatibleClient>(client =>
+        services.AddSingleton<ILlmClientResolver, LlmClientResolver>();
+
+        return services.AddHttpClient("llm", client =>
         {
             client.DefaultRequestHeaders.Add("HTTP-Referer", "https://geef.stefan-bechtel.de");
             client.DefaultRequestHeaders.Add("X-Title", "Geef.Atelier");
