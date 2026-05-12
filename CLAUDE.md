@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Aktueller Zustand
 
-**Post-Skeleton Schritt 3 abgeschlossen (12. Mai 2026): Design-Translation.** PS-1 (Postgres-Backup) ✅. PS-2 (Reviewer-Kalibrierung) ✅. Mockup → Blazor: drei Themes (Vellum/Noir/Petrol), self-hosted Fonts, 16 Icons, Bootstrap entfernt, alle fünf Screens nach Mockup. 106 Tests (105 grün, 1 Skip). App produktiv unter `https://geef.stefan-bechtel.de/`. Nächste Post-Skeleton-Schritte: PS-4 (CLI-Provider-Adapter), Cost-Tracking, RAG, Multi-User, Off-Site-Backup, Monitoring.
+**Post-Skeleton Schritt 4 abgeschlossen (13. Mai 2026): CLI-Provider-Adapter.** PS-1 ✅ PS-2 ✅ PS-3 ✅. Multi-Provider-Architektur: `ILlmClientResolver` mit `Providers`-Dict + `Actors`-Dict; CLI-Proxy-Side-Container (Python/FastAPI) für `claude` + `codex` CLIs. 113 C#-Tests grün, 21 Python-Tests grün. App produktiv unter `https://geef.stefan-bechtel.de/`. Nächste Post-Skeleton-Schritte: Cost-Tracking, RAG, Multi-User, Off-Site-Backup, Monitoring.
+
+**Wichtig für Production-Deploy nach PS-4:** `.env`-Variable umbenannt: `LLM_API_KEY` → `LLM_OPENROUTER_API_KEY`. CLI-Auth nach erstem Deploy einmalig via `docker exec -it geef-atelier-cli-proxy claude auth login`.
 
 ## Verbindlicher Workflow
 

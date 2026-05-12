@@ -1,6 +1,6 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 2026-05-12 (PS-3: D-026 ergänzt)*
+*Letzte Aktualisierung: 2026-05-13 (PS-4: D-027 ergänzt)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -328,3 +328,31 @@ Seit Commit `28daafb` wird `appsettings.Development.json` nicht mehr getrackt. B
 - (n) WebTestHost in Tests: `AddHttpContextAccessor()` ergänzt, `[Collection("Postgres")]` für Theme-Cookie-Tests.
 
 **Ergebnis:** 106 Tests gesamt (105 passed, 1 skipped ThemeSwitcher-E2E). `dotnet build` 0/0. Fünf Screens visuell überarbeitet, drei Themes funktional, self-hosted Fonts, 16 Icon-Komponenten, Bootstrap entfernt.
+
+---
+
+## D-027 — Post-Skeleton Schritt 4: CLI-Provider-Adapter (2026-05-13)
+
+**Kontext:** Alle drei Provider-Aufrufe liefen bisher über OpenRouter (Pay-as-you-go). Auf dem Atelier-Server (Hetzner, `95.216.100.213`) sind `claude` (Claude Code CLI, Subscription) und `codex` (OpenAI Codex CLI, Subscription) installiert — Subscription-Kapazität ohne Token-Abrechnung. Ziel: zweiter Provider-Pfad via neuem Side-Container, der diese CLIs als OpenAI-kompatibles HTTP exposed.
+
+**Entscheidungen:**
+
+- **(a) Tech-Stack CLI-Proxy:** Python 3.12 + FastAPI. Begründung: kompakter Code für HTTP-Subprocess-Wrapper, Pydantic für Schema-Validierung, pytest für Tests. Dockerfile installiert Node.js + CLI-Packages (`@anthropic-ai/claude-code`, `@openai/codex`) on top.
+- **(b) Schnittstelle CLI-Proxy:** OpenAI-kompatibel (`POST /v1/chat/completions`, `GET /v1/models`, `GET /health`). `OpenAiCompatibleClient` bleibt unverändert — nutzt einfach alternativen Endpoint. Kein neuer `CliLlmClient` nötig.
+- **(c) `LlmOptions`-Umbau (Multi-Provider):** Altes flaches Schema (`ApiKey`, `DefaultModel`, `Actors{Model}`) ersetzt durch `Providers`-Dict (name → Endpoint + ApiKey) und `Actors`-Dict (name → Provider + Model + MaxTokens). Harter Cut, kein Backward-Kompat (Single-Maintainer-Projekt). Env-Var: `Llm__Providers__openrouter__ApiKey`.
+- **(d) `ILlmClientResolver`-Interface:** `(ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName)` in `Geef.Atelier.Infrastructure.Llm`. Resolver cached `OpenAiCompatibleClient`-Instances pro Provider in `ConcurrentDictionary` (eine `HttpClient`-Instanz pro Provider, nicht pro Akteur).
+- **(e) `OpenAiCompatibleClient`-Multi-Instance:** Konstruktor übernimmt jetzt `(HttpClient, string endpoint, string apiKey)` direkt — keine `IOptions<LlmOptions>` mehr. Einziger named `HttpClient` ("llm") wird für alle Provider wiederverwendet (`IHttpClientFactory`); Endpoint und ApiKey werden per Call via `Authorization`-Header injiziert.
+- **(f) Model-Routing im CLI-Proxy:** `claude-*` / `anthropic/claude-*` → claude CLI; `gpt-*` / `o*` / `openai/*` → codex CLI. Unbekannte → claude (Fallback). Provider-Prefix wird vor CLI-Aufruf gestripped.
+- **(g) Tool-Use-Mapping:** Schema-Embedding als System-Prompt-Addendum → CLI liefert Plaintext → `tool_use_parser.extract_json()` extrahiert JSON (inkl. Markdown-Fence-Stripping, Balanced-Brace-Scan) → `tool_calls`-Response. Bei JSON-Parse-Failure: Plaintext als `finish_reason="stop"` zurück (downstream `LlmReviewer` kann damit umgehen via D-013(e)).
+- **(h) Auth-Strategie CLI-Proxy:** Named Volume `geef-atelier-cli-auth:/auth`, unterteilt in `/auth/claude` und `/auth/codex`. Einmaliger manueller Login via `docker exec -it geef-atelier-cli-proxy claude auth login`. Tokens persistieren über Container-Restarts. Secrets niemals in Source-Control, Logs oder Berichten.
+- **(i) Concurrency:** `asyncio.Semaphore` pro CLI, Default 2 (`CLAUDE_MAX_CONCURRENT=2`, `CODEX_MAX_CONCURRENT=2`). Warteschlange bei Überschreitung, kein Fehler.
+- **(j) Side-Container-Netzwerk:** `geef-atelier-network` (intern), kein `proxy` (kein Traefik). Hostname innerhalb Compose-Stack: `cli-proxy`. Erreichbar von `web` via `http://cli-proxy:8090/v1`.
+- **(k) Umbenannte Env-Var:** `LLM_API_KEY` → `LLM_OPENROUTER_API_KEY` in `.env` + docker-compose. Klarere Semantik im Multi-Provider-Kontext.
+- **(l) Default-Konfiguration:** Alle drei Akteure bleiben auf `openrouter` (Backward-Sanity). `cli`-Provider in `appsettings.json` vorkonfiguriert, aber kein Akteur darauf geroutet. Umschalten per Env-Override ohne Code-Änderung.
+- **(m) `web`-depends-on `cli-proxy`:** Health-Check-abhängig (service_healthy). Verhindert Start vor CLI-Proxy-Bereitschaft.
+
+**Tests:**
+- Python: 21 pytest-Tests (openai_format, tool_use_parser, claude_adapter_mock, codex_adapter_mock, concurrency) — alle grün.
+- C#: LlmOptionsMultiProviderTests, LlmClientResolverTests, OpenAiCompatibleClientTests (angepasst), TestLlmClientResolver (neu). `dotnet test` 113 passed, 1 skipped — alle grün.
+
+**Ergebnis:** `dotnet build` 0/0. 113 C#-Tests grün. 21 Python-Tests grün. CLI-Proxy-Image bauffähig. Backward-Sanity (pure OpenRouter) unverändert.
