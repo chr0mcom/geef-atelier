@@ -1,9 +1,50 @@
+@rendermode InteractiveServer
+@inject IJSRuntime JS
+@inject IHttpContextAccessor Http
+
 <AuthorizeView>
     <Authorized>
-        <span class="user-name">@context.User.Identity?.Name</span>
-        <form method="post" action="/auth/logout" class="logout-form">
-            <AntiforgeryToken />
-            <button type="submit" class="btn-logout">Logout</button>
-        </form>
+        <div class="user-menu">
+            <button class="user-chip" @onclick="ToggleMenu" aria-expanded="@_open" aria-haspopup="true">
+                <div class="av" aria-hidden="true">@Initial</div>
+                <span class="user-name">@context.User.Identity?.Name</span>
+            </button>
+
+            @if (_open)
+            {
+                <div class="user-menu-dd" role="menu">
+                    <div class="item coming-soon" title="Coming soon" role="menuitem" aria-disabled="true">
+                        <IconUser Size="14" />
+                        Profile
+                    </div>
+
+                    <div class="sep" role="separator"></div>
+
+                    <div class="item theme-section" role="group" aria-label="Theme">
+                        <ThemeSwitcher />
+                    </div>
+
+                    <div class="sep" role="separator"></div>
+
+                    <form method="post" action="/auth/logout" role="menuitem">
+                        <AntiforgeryToken />
+                        <button type="submit" class="item btn-logout">
+                            <IconLogout Size="14" />
+                            Sign out
+                        </button>
+                    </form>
+                </div>
+            }
+        </div>
     </Authorized>
 </AuthorizeView>
+
+@code {
+    bool _open;
+
+    string Initial => Http.HttpContext?.User.Identity?.Name is { Length: > 0 } name
+        ? char.ToUpperInvariant(name[0]).ToString()
+        : "?";
+
+    void ToggleMenu() => _open = !_open;
+}

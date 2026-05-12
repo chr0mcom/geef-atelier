@@ -1,0 +1,41 @@
+@inject IJSRuntime JS
+@inject IHttpContextAccessor Http
+
+<div class="theme-switcher" role="group" aria-label="Color theme">
+    @foreach (var theme in Themes)
+    {
+        <button class="theme-option @(ActiveTheme == theme.Key ? "active" : "")"
+                data-testid="theme-switcher-@theme.Key"
+                title="@theme.Label"
+                @onclick="() => SetTheme(theme.Key)">
+            <span class="theme-dot palette-@theme.Key" aria-hidden="true"></span>
+            @theme.Label
+        </button>
+    }
+</div>
+
+@code {
+    static readonly (string Key, string Label)[] Themes =
+    [
+        ("vellum", "Vellum"),
+        ("noir",   "Noir"),
+        ("petrol", "Petrol"),
+    ];
+
+    string _activeTheme = "vellum";
+
+    string ActiveTheme
+    {
+        get
+        {
+            var cookie = Http.HttpContext?.Request.Cookies["Atelier.Theme"];
+            return cookie is "vellum" or "noir" or "petrol" ? cookie : _activeTheme;
+        }
+    }
+
+    async Task SetTheme(string name)
+    {
+        _activeTheme = name;
+        await JS.InvokeVoidAsync("atelier.setTheme", name);
+    }
+}
