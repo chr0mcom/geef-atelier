@@ -1,5 +1,4 @@
 using Geef.Atelier.Infrastructure.Configuration;
-using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Tests.Llm;
 using Geef.Sdk.Events;
@@ -12,12 +11,6 @@ public sealed class OvereagerCriticalAbortTests
 {
     private const string Briefing = "Schreibe einen kurzen Text über Kalibrierung.";
 
-    private static readonly IOptions<LlmOptions> FakeOptions = Options.Create(new LlmOptions
-    {
-        ApiKey       = "fake-key-for-tests",
-        DefaultModel = "fake-model"
-    });
-
     [Fact]
     public async Task Pipeline_WithAbortOnCriticalFalse_DoesNotAbortOnCriticalFindings()
     {
@@ -25,15 +18,16 @@ public sealed class OvereagerCriticalAbortTests
         // With AbortOnCritical=false the pipeline must NOT throw with the AbortCriticalBlocker reason
         // (which signals an immediate early abort). It should instead run until MaxIterations and
         // then throw with StopMaxAttemptsReached — because it never converged, not because of early abort.
-        var client = new CriticalFakeLlmClient();
-        var sink   = new CountingEventSink();
+        var client   = new CriticalFakeLlmClient();
+        var resolver = new TestLlmClientResolver(client);
+        var sink     = new CountingEventSink();
 
         var runner = AtelierPipelineFactory.BuildWithProviders(
             new BriefingGroundingStep(),
-            new LlmExecutionStep(client, FakeOptions),
+            new LlmExecutionStep(resolver),
             [
-                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, client, FakeOptions),
-                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      client, FakeOptions)
+                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, resolver),
+                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      resolver)
             ],
             new MarkdownFinalizer(),
             Options.Create(new ConvergenceOptions { AbortOnCritical = false, MaxIterations = 3 }),
@@ -56,15 +50,16 @@ public sealed class OvereagerCriticalAbortTests
     [Fact]
     public async Task Pipeline_WithAbortOnCriticalTrue_AbortsImmediately()
     {
-        var client = new CriticalFakeLlmClient();
-        var sink   = new CountingEventSink();
+        var client   = new CriticalFakeLlmClient();
+        var resolver = new TestLlmClientResolver(client);
+        var sink     = new CountingEventSink();
 
         var runnerWithSink = AtelierPipelineFactory.BuildWithProviders(
             new BriefingGroundingStep(),
-            new LlmExecutionStep(client, FakeOptions),
+            new LlmExecutionStep(resolver),
             [
-                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, client, FakeOptions),
-                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      client, FakeOptions)
+                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, resolver),
+                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      resolver)
             ],
             new MarkdownFinalizer(),
             Options.Create(new ConvergenceOptions { AbortOnCritical = true }),

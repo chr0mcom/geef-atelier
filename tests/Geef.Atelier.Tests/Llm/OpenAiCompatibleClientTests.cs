@@ -2,20 +2,11 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Geef.Atelier.Infrastructure.Llm;
-using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Tests.Llm;
 
 public sealed class OpenAiCompatibleClientTests
 {
-    private static IOptions<LlmOptions> CreateOptions(string apiKey = "test-key") =>
-        Options.Create(new LlmOptions
-        {
-            Endpoint     = "https://openrouter.ai/api/v1",
-            ApiKey       = apiKey,
-            DefaultModel = "anthropic/claude-opus-4.7"
-        });
-
     private static HttpClient CreateMockClient(string responseJson, HttpStatusCode status = HttpStatusCode.OK)
     {
         var handler = new MockHttpMessageHandler(responseJson, status);
@@ -50,7 +41,7 @@ public sealed class OpenAiCompatibleClientTests
             }
             """;
 
-        var client = new OpenAiCompatibleClient(CreateMockClient(responseJson), CreateOptions());
+        var client = new OpenAiCompatibleClient(CreateMockClient(responseJson), "https://openrouter.ai/api/v1", "test-key");
         var response = await client.CompleteAsync(new LlmRequest
         {
             Model        = "anthropic/claude-opus-4.7",
@@ -88,7 +79,7 @@ public sealed class OpenAiCompatibleClientTests
             }
             """;
 
-        var client = new OpenAiCompatibleClient(CreateMockClient(responseJson), CreateOptions());
+        var client = new OpenAiCompatibleClient(CreateMockClient(responseJson), "https://openrouter.ai/api/v1", "test-key");
         var response = await client.CompleteAsync(new LlmRequest
         {
             Model        = "anthropic/claude-opus-4.7",
@@ -108,7 +99,7 @@ public sealed class OpenAiCompatibleClientTests
     public async Task ThrowsOnEmptyApiKey()
     {
         var responseJson = "{}"; // irrelevant — should not be called
-        var client = new OpenAiCompatibleClient(CreateMockClient(responseJson), CreateOptions(apiKey: ""));
+        var client = new OpenAiCompatibleClient(CreateMockClient(responseJson), "https://openrouter.ai/api/v1", apiKey: "");
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             client.CompleteAsync(new LlmRequest

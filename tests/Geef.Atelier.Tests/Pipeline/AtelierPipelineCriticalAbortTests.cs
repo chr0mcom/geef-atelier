@@ -1,5 +1,4 @@
 using Geef.Atelier.Infrastructure.Configuration;
-using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Tests.Llm;
 using Geef.Sdk.Events;
@@ -15,20 +14,16 @@ public sealed class AtelierPipelineCriticalAbortTests
     [Fact]
     public async Task AtelierPipelineAbortsOnCriticalFinding()
     {
-        var options = Options.Create(new LlmOptions
-        {
-            ApiKey       = "fake-key-for-tests",
-            DefaultModel = "fake-model"
-        });
         var criticalClient = new CriticalFakeLlmClient();
+        var resolver       = new TestLlmClientResolver(criticalClient);
         var sink           = new CountingEventSink();
 
         var runner = AtelierPipelineFactory.BuildWithProviders(
             new BriefingGroundingStep(),
-            new LlmExecutionStep(criticalClient, options),
+            new LlmExecutionStep(resolver),
             [
-                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, criticalClient, options),
-                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      criticalClient, options)
+                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, resolver),
+                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      resolver)
             ],
             new MarkdownFinalizer(),
             Options.Create(new ConvergenceOptions { AbortOnCritical = true }),

@@ -4,6 +4,7 @@ using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
+using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Persistence;
 using Geef.Atelier.Tests.Web.Notifications;
 using Geef.Atelier.Web.Services;
@@ -23,7 +24,7 @@ internal sealed class OrchestratorTestHost : IAsyncDisposable
     private readonly IHost _host;
 
     /// <summary>
-    /// Initializes a new <see cref="OrchestratorTestHost"/> with the given fixture, client, and optional options.
+    /// Initializes a new <see cref="OrchestratorTestHost"/> with the given fixture, LLM client, and optional options.
     /// </summary>
     public OrchestratorTestHost(
         PostgresFixture      fixture,
@@ -45,21 +46,7 @@ internal sealed class OrchestratorTestHost : IAsyncDisposable
                 services.AddAtelierPersistence();
                 services.AddAtelierApplication();
 
-                // Provide fake LLM client for tests.
-                services.AddSingleton(llmClient);
-                // LlmOptions with test defaults.
-                services.AddSingleton<IOptions<LlmOptions>>(
-                    Options.Create(new LlmOptions
-                    {
-                        ApiKey       = "test-key",
-                        DefaultModel = "test-model",
-                        Actors = new Dictionary<string, LlmOptions.ActorConfig>
-                        {
-                            ["Executor"]              = new() { Model = "test-model" },
-                            ["BriefingTreueReviewer"] = new() { Model = "test-model" },
-                            ["KlarheitReviewer"]      = new() { Model = "test-model" }
-                        }
-                    }));
+                services.AddSingleton<ILlmClientResolver>(new TestLlmClientResolver(llmClient));
                 services.Configure<OrchestratorOptions>(o =>
                 {
                     o.PollingInterval            = opts.PollingInterval;

@@ -1,6 +1,5 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Infrastructure.Configuration;
-using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Tests.Llm;
@@ -26,19 +25,15 @@ public sealed class PostgresEventSinkPersistsCompleteRunTests(PostgresFixture fi
         var             scopes  = fixture.NewScopeFactory();
         var             sink    = new PostgresEventSink(runId, scopes, new NoOpRunNotifier(), NullLogger.Instance);
 
-        var options = Options.Create(new LlmOptions
-        {
-            ApiKey       = "fake-key",
-            DefaultModel = "fake-model"
-        });
         var fakeClient = new FakeLlmClient();
+        var resolver   = new TestLlmClientResolver(fakeClient);
 
         var runner = AtelierPipelineFactory.BuildWithProviders(
             new BriefingGroundingStep(),
-            new LlmExecutionStep(fakeClient, options),
+            new LlmExecutionStep(resolver),
             [
-                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, fakeClient, options),
-                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      fakeClient, options)
+                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, resolver),
+                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      resolver)
             ],
             new MarkdownFinalizer(),
             Options.Create(new ConvergenceOptions()),

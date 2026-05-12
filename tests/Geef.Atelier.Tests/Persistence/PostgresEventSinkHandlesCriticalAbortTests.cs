@@ -1,6 +1,5 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Infrastructure.Configuration;
-using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Tests.Llm;
@@ -27,19 +26,15 @@ public sealed class PostgresEventSinkHandlesCriticalAbortTests(PostgresFixture f
         var             scopes  = fixture.NewScopeFactory();
         var             sink    = new PostgresEventSink(runId, scopes, new NoOpRunNotifier(), NullLogger.Instance);
 
-        var options = Options.Create(new LlmOptions
-        {
-            ApiKey       = "fake-key",
-            DefaultModel = "fake-model"
-        });
         var criticalClient = new CriticalFakeLlmClient();
+        var resolver       = new TestLlmClientResolver(criticalClient);
 
         var runner = AtelierPipelineFactory.BuildWithProviders(
             new BriefingGroundingStep(),
-            new LlmExecutionStep(criticalClient, options),
+            new LlmExecutionStep(resolver),
             [
-                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, criticalClient, options),
-                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      criticalClient, options)
+                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, resolver),
+                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      resolver)
             ],
             new MarkdownFinalizer(),
             Options.Create(new ConvergenceOptions { AbortOnCritical = true }),

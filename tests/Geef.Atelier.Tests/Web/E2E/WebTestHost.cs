@@ -76,19 +76,8 @@ internal sealed class WebTestHost : IAsyncDisposable
             ApplicationName = "Geef.Atelier.Web"
         });
 
-        // LLM: gated fake client (no real HTTP calls)
-        builder.Services.AddSingleton<ILlmClient>(llmClient);
-        builder.Services.AddSingleton<IOptions<LlmOptions>>(Options.Create(new LlmOptions
-        {
-            ApiKey       = "test-key",
-            DefaultModel = "test-model",
-            Actors       = new Dictionary<string, LlmOptions.ActorConfig>
-            {
-                ["Executor"]              = new() { Model = "test-model" },
-                ["BriefingTreueReviewer"] = new() { Model = "test-model" },
-                ["KlarheitReviewer"]      = new() { Model = "test-model" }
-            }
-        }));
+        // LLM: gated fake client via resolver (no real HTTP calls)
+        builder.Services.AddSingleton<ILlmClientResolver>(new TestLlmClientResolver(llmClient));
 
         // DB: fixture Postgres (already migrated by PostgresFixture)
         builder.Services.AddDbContext<AtelierDbContext>(opts =>

@@ -1,19 +1,13 @@
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Pipeline;
+using Geef.Atelier.Tests.Llm;
 using Geef.Sdk.Context;
 using Geef.Sdk.Results;
-using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Tests.Pipeline;
 
 public sealed class SeverityClassificationTests
 {
-    private static readonly IOptions<LlmOptions> FakeOptions = Options.Create(new LlmOptions
-    {
-        ApiKey       = "fake",
-        DefaultModel = "fake-model"
-    });
-
     [Theory]
     [InlineData("critical", FindingSeverity.Critical)]
     [InlineData("major",    FindingSeverity.Error)]
@@ -24,7 +18,8 @@ public sealed class SeverityClassificationTests
     public async Task LlmReviewer_MapsSeverityCorrectly(string severityString, FindingSeverity expectedSdkSeverity)
     {
         var client   = new FixedSeverityLlmClient(severityString);
-        var reviewer = new LlmReviewer("TestReviewer", "You are a reviewer.", client, FakeOptions);
+        var resolver = new TestLlmClientResolver(client);
+        var reviewer = new LlmReviewer("TestReviewer", "You are a reviewer.", resolver);
         var context  = BuildContext("Some briefing.", "Some draft.");
 
         var result = await reviewer.ReviewAsync(context, CancellationToken.None);
@@ -37,7 +32,8 @@ public sealed class SeverityClassificationTests
     public async Task LlmReviewer_UnknownSeverity_DefaultsToWarning()
     {
         var client   = new FixedSeverityLlmClient("unknown-value");
-        var reviewer = new LlmReviewer("TestReviewer", "You are a reviewer.", client, FakeOptions);
+        var resolver = new TestLlmClientResolver(client);
+        var reviewer = new LlmReviewer("TestReviewer", "You are a reviewer.", resolver);
         var context  = BuildContext("Some briefing.", "Some draft.");
 
         var result = await reviewer.ReviewAsync(context, CancellationToken.None);

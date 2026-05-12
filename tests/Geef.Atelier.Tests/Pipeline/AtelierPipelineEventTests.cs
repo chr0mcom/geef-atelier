@@ -1,6 +1,5 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Infrastructure.Configuration;
-using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Tests.Llm;
 using Geef.Sdk.Events;
@@ -15,20 +14,16 @@ public sealed class AtelierPipelineEventTests
     [Fact]
     public async Task AtelierPipelineEmitsExpectedEvents()
     {
-        var options = Options.Create(new LlmOptions
-        {
-            ApiKey       = "fake-key-for-tests",
-            DefaultModel = "fake-model"
-        });
         var fakeClient = new FakeLlmClient();
+        var resolver   = new TestLlmClientResolver(fakeClient);
         var sink       = new CountingEventSink();
 
         var runner = AtelierPipelineFactory.BuildWithProviders(
             new BriefingGroundingStep(),
-            new LlmExecutionStep(fakeClient, options),
+            new LlmExecutionStep(resolver),
             [
-                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, fakeClient, options),
-                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      fakeClient, options)
+                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, resolver),
+                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      resolver)
             ],
             new MarkdownFinalizer(),
             Options.Create(new ConvergenceOptions()),

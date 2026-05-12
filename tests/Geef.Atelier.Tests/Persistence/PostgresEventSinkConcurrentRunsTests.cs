@@ -1,6 +1,5 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Infrastructure.Configuration;
-using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Tests.Llm;
@@ -30,31 +29,27 @@ public sealed class PostgresEventSinkConcurrentRunsTests(PostgresFixture fixture
         var sink1   = new PostgresEventSink(runId1, scopes, new NoOpRunNotifier(), NullLogger.Instance);
         var sink2   = new PostgresEventSink(runId2, scopes, new NoOpRunNotifier(), NullLogger.Instance);
 
-        var options = Options.Create(new LlmOptions
-        {
-            ApiKey       = "fake-key",
-            DefaultModel = "fake-model"
-        });
-
         var fakeClient1 = new FakeLlmClient();
+        var resolver1   = new TestLlmClientResolver(fakeClient1);
         var runner1 = AtelierPipelineFactory.BuildWithProviders(
             new BriefingGroundingStep(),
-            new LlmExecutionStep(fakeClient1, options),
+            new LlmExecutionStep(resolver1),
             [
-                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, fakeClient1, options),
-                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      fakeClient1, options)
+                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, resolver1),
+                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      resolver1)
             ],
             new MarkdownFinalizer(),
             Options.Create(new ConvergenceOptions()),
             additionalSinks: [sink1]);
 
         var fakeClient2 = new FakeLlmClient();
+        var resolver2   = new TestLlmClientResolver(fakeClient2);
         var runner2 = AtelierPipelineFactory.BuildWithProviders(
             new BriefingGroundingStep(),
-            new LlmExecutionStep(fakeClient2, options),
+            new LlmExecutionStep(resolver2),
             [
-                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, fakeClient2, options),
-                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      fakeClient2, options)
+                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, resolver2),
+                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      resolver2)
             ],
             new MarkdownFinalizer(),
             Options.Create(new ConvergenceOptions()),
