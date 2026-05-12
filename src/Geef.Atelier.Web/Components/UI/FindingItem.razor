@@ -1,12 +1,31 @@
 @using Geef.Atelier.Core.Domain
+@using Geef.Atelier.Web.Display
 
-<div class="finding-item">
-    <SeverityBadge Severity="Finding.Severity" />
-    <span class="finding-reviewer">@Finding.ReviewerName</span>
-    <p class="finding-message">@Finding.Message</p>
+<div class="finding @SeverityCss">
+    <div class="top">
+        <SeverityBadge Severity="Finding.Severity" />
+        <span class="reviewer">@ReviewerDisplay.ToDisplay(Finding.ReviewerName)</span>
+    </div>
+    <div class="msg">@Finding.Message</div>
+    @if (Resolved)
+    {
+        <div class="resolved">
+            <IconCheck Size="11" />
+            Resolved in next iteration
+        </div>
+    }
 </div>
 
 @code {
-    /// <summary>The finding to display.</summary>
     [Parameter, EditorRequired] public FindingEntity Finding { get; set; } = null!;
+    [Parameter] public bool Resolved { get; set; }
+
+    string SeverityCss => Finding.Severity switch
+    {
+        FindingSeverity.Critical => "critical",
+        FindingSeverity.Major    => "major",
+        FindingSeverity.Minor    => "minor",
+        FindingSeverity.Info     => "info",
+        _                        => "info"
+    };
 }

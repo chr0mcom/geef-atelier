@@ -1,0 +1,41 @@
+@using Geef.Atelier.Core.Domain
+@using Geef.Atelier.Web.Display
+
+<div class="press" aria-label="Pipeline stages">
+    <div class="ribbon r1" style="--ink: @(PressStageMapper.InkPercent1(Status))%"></div>
+    <div class="ribbon r2" style="--ink: @(PressStageMapper.InkPercent2(Status))%"></div>
+
+    @foreach (var (stage, i) in _stages.Select((s, i) => (s, i)))
+    {
+        <div class="stage @StageCss(i)" aria-label="@stage.Role">
+            <div class="seal">@_numerals[i]</div>
+            <div class="role">@stage.Role</div>
+            <div class="desc">@stage.Desc</div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RunStatus Status { get; set; }
+
+    static readonly (string Role, string Desc)[] _stages =
+    [
+        ("Executor",  "First draft"),
+        ("Reviewers", "Briefing fidelity + clarity"),
+        ("Executor",  "Revision"),
+    ];
+
+    static readonly string[] _numerals = ["I", "II", "III"];
+
+    string StageCss(int i)
+    {
+        var active = PressStageMapper.ActiveStage(Status);
+        return Status is RunStatus.Completed or RunStatus.Failed or RunStatus.Aborted
+            ? "done"
+            : active == i
+                ? "active"
+                : active > i
+                    ? "done"
+                    : "";
+    }
+}

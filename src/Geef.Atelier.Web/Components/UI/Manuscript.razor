@@ -1,0 +1,65 @@
+@using Geef.Atelier.Core.Domain
+@inject IJSRuntime JS
+
+<div class="manuscript-wrap">
+    <div class="head">
+        <div>
+            <div class="t-eyebrow eyebrow">Final manuscript</div>
+            <h2>@Title</h2>
+            <div class="sub">After @IterationCount iteration@(IterationCount != 1 ? "s" : "") · @WordCount words · serif body, Newsreader</div>
+        </div>
+        <div class="actions">
+            <button class="btn small" @onclick="CopyText">
+                <IconCopy Size="13" />
+                @(_copied ? "Copied" : "Copy text")
+            </button>
+            <button class="btn small ghost coming-soon" disabled title="Export coming soon">
+                <IconDownload Size="13" />
+                Export
+            </button>
+        </div>
+    </div>
+    <div class="manuscript">
+        <div class="colophon">
+            <span>Geef.Atelier — Manuscript @RunId</span>
+            <span>Iteration @IterationCount · @(RunStatus == RunStatus.Completed ? "Approved" : RunStatus.ToString())</span>
+        </div>
+        <div class="body-text">@FinalText</div>
+        <div class="signature">
+            <span>Executor · Atelier Prose</span>
+            <span>Reviewed · BriefingFidelity, Clarity</span>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public RunEntity Run { get; set; } = null!;
+    [Parameter] public int IterationCount { get; set; }
+
+    bool _copied;
+
+    RunStatus RunStatus => Run.Status;
+    string RunId       => Run.Id.ToString("N")[..8].ToUpperInvariant();
+    string FinalText   => Run.FinalText ?? string.Empty;
+    int    WordCount   => FinalText.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+
+    string Title
+    {
+        get
+        {
+            var text = FinalText;
+            if (string.IsNullOrWhiteSpace(text)) return "Untitled";
+            var first = text.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? text;
+            return first.TrimStart('#', ' ').Length > 60 ? first[..60] + "…" : first.TrimStart('#', ' ');
+        }
+    }
+
+    async Task CopyText()
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", FinalText);
+        _copied = true;
+        await Task.Delay(1400);
+        _copied = false;
+        StateHasChanged();
+    }
+}

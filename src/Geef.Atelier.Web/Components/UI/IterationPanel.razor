@@ -1,28 +1,51 @@
 @using Geef.Atelier.Core.Domain
+@using Geef.Atelier.Web.Display
 
-<details class="iteration-panel">
-    <summary class="iteration-summary">
-        <span class="iteration-label">Iteration @Iteration.IterationNumber</span>
-        <span class="iteration-meta">@Findings.Count finding(s)</span>
-    </summary>
-    <div class="iteration-body">
-        <pre class="artifact-text">@Iteration.ArtifactText</pre>
-        @if (Findings.Count > 0)
-        {
-            <div class="findings-list">
-                @foreach (var finding in Findings)
-                {
-                    <FindingItem Finding="finding" />
-                }
-            </div>
-        }
+<div class="iter @(_open ? "open" : "") @(IsLast ? "active" : "")">
+    <div class="iter-head" @onclick="Toggle" role="button" tabindex="0" aria-expanded="@_open">
+        <div class="num">i.<span class="label">Iteration</span> @Iteration.IterationNumber</div>
+        <div class="summary">@Iteration.ArtifactText[..Math.Min(120, Iteration.ArtifactText.Length)]…</div>
+        <div class="findings-count">
+            @if (_critCount > 0) { <span class="pill crit">@_critCount crit</span> }
+            @if (_majCount > 0)  { <span class="pill maj">@_majCount maj</span> }
+            @if (_minCount > 0)  { <span class="pill min">@_minCount min</span> }
+            @if (_infCount > 0)  { <span class="pill inf">@_infCount info</span> }
+        </div>
+        <span class="caret"><IconChevron Size="14" /></span>
     </div>
-</details>
+    <div class="iter-body">
+        <div class="artifact">
+            <pre>@Iteration.ArtifactText</pre>
+        </div>
+        <div class="findings">
+            @foreach (var finding in Findings)
+            {
+                <FindingItem Finding="finding" Resolved="@(ResolvedMap?.GetValueOrDefault(finding.Id) ?? false)" />
+            }
+        </div>
+    </div>
+    @if (!IsLast)
+    {
+        var nonInfo = Findings.Count(f => f.Severity != FindingSeverity.Info);
+        <div class="evolution">
+            ↓ <strong>Carried into iteration @(Iteration.IterationNumber + 1):</strong>
+            @nonInfo finding@(nonInfo != 1 ? "s" : "") requiring revision.
+        </div>
+    }
+</div>
 
 @code {
-    /// <summary>The iteration to display.</summary>
     [Parameter, EditorRequired] public IterationEntity Iteration { get; set; } = null!;
-
-    /// <summary>The findings associated with this iteration.</summary>
     [Parameter, EditorRequired] public IReadOnlyList<FindingEntity> Findings { get; set; } = [];
+    [Parameter] public bool IsLast { get; set; }
+    [Parameter] public IReadOnlyDictionary<Guid, bool>? ResolvedMap { get; set; }
+
+    bool _open;
+
+    int _critCount => Findings.Count(f => f.Severity == FindingSeverity.Critical);
+    int _majCount  => Findings.Count(f => f.Severity == FindingSeverity.Major);
+    int _minCount  => Findings.Count(f => f.Severity == FindingSeverity.Minor);
+    int _infCount  => Findings.Count(f => f.Severity == FindingSeverity.Info);
+
+    void Toggle() => _open = !_open;
 }
