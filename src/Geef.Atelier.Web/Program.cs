@@ -80,6 +80,8 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
     o.KnownProxies.Clear();
 });
 
+builder.Services.AddHttpContextAccessor();
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -126,6 +128,7 @@ app.MapHub<RunHub>("/hubs/runs");
 app.MapMcp("/mcp").RequireAuthorization(McpAuthorizationConstants.McpPolicy);
 
 app.MapAuthEndpoints();
+app.MapSettingsEndpoints();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
