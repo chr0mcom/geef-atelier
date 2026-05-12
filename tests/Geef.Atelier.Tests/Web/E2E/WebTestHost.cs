@@ -163,6 +163,9 @@ internal sealed class WebTestHost : IAsyncDisposable
         builder.Services.PostConfigure<AtelierMcpOptions>(opts => opts.Token = "test-mcp-token");
         builder.Services.AddAtelierMcp();
 
+        // HttpContextAccessor required by App.razor (theme cookie)
+        builder.Services.AddHttpContextAccessor();
+
         // Blazor Server
         builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 

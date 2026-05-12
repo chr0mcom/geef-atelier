@@ -33,6 +33,7 @@ public sealed class CancelFlowTests(PlaywrightFixture pw, PostgresFixture pg) : 
             // Wait for redirect to detail page
             await page.WaitForURLAsync(new Regex(@"/runs/[0-9a-f\-]{36}$"),
                 new PageWaitForURLOptions { Timeout = 15_000 });
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
             // Wait for either Pending or Running status (pipeline stalled at gate)
             await page.WaitForSelectorAsync("[data-status='Pending'], [data-status='Running']",

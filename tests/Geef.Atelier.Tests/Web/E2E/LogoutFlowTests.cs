@@ -35,6 +35,11 @@ public sealed class LogoutFlowTests(PlaywrightFixture pw, PostgresFixture pg) : 
             await LoginAsync(page);
             Assert.Contains("/runs", page.Url);
 
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            // Open user-menu dropdown, then click logout
+            await page.WaitForSelectorAsync("button.user-chip", new PageWaitForSelectorOptions { Timeout = 10_000 });
+            await page.ClickAsync("button.user-chip");
+            await page.WaitForSelectorAsync("button.btn-logout", new PageWaitForSelectorOptions { Timeout = 10_000 });
             await page.ClickAsync("button.btn-logout");
             await page.WaitForURLAsync("**/login**", new PageWaitForURLOptions { Timeout = 15_000 });
 
@@ -55,6 +60,11 @@ public sealed class LogoutFlowTests(PlaywrightFixture pw, PostgresFixture pg) : 
             await LoginAsync(page);
             Assert.Contains("/runs", page.Url);
 
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            // Open user-menu dropdown, then click logout
+            await page.WaitForSelectorAsync("button.user-chip", new PageWaitForSelectorOptions { Timeout = 10_000 });
+            await page.ClickAsync("button.user-chip");
+            await page.WaitForSelectorAsync("button.btn-logout", new PageWaitForSelectorOptions { Timeout = 10_000 });
             await page.ClickAsync("button.btn-logout");
             await page.WaitForURLAsync("**/login**", new PageWaitForURLOptions { Timeout = 15_000 });
 

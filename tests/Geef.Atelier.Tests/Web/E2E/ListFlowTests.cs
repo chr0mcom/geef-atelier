@@ -36,16 +36,10 @@ public sealed class ListFlowTests(PlaywrightFixture pw, PostgresFixture pg) : IA
             await page.GotoAsync($"{_host.BaseUrl}/runs");
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-            // At least one RunCard should appear
-            await page.WaitForSelectorAsync(".run-card", new PageWaitForSelectorOptions { Timeout = 10_000 });
-            var cards = await page.QuerySelectorAllAsync(".run-card");
-            Assert.True(cards.Count >= 1, $"Expected at least 1 run card, found {cards.Count}");
-
-            // "Open →" link should point to /runs/{guid}
-            var link = await cards[0].QuerySelectorAsync("a.run-card-link");
-            Assert.NotNull(link);
-            var href = await link!.GetAttributeAsync("href");
-            Assert.Contains("/runs/", href);
+            // At least one RunRow should appear
+            await page.WaitForSelectorAsync(".run-row", new PageWaitForSelectorOptions { Timeout = 10_000 });
+            var rows = await page.QuerySelectorAllAsync(".run-row");
+            Assert.True(rows.Count >= 1, $"Expected at least 1 run row, found {rows.Count}");
         }
         finally
         {

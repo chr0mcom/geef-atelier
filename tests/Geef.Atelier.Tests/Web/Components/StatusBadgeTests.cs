@@ -8,11 +8,11 @@ namespace Geef.Atelier.Tests.Web.Components;
 public sealed class StatusBadgeTests : TestContext
 {
     [Theory]
-    [InlineData(RunStatus.Pending,   "badge-pending")]
-    [InlineData(RunStatus.Running,   "badge-running")]
-    [InlineData(RunStatus.Completed, "badge-completed")]
-    [InlineData(RunStatus.Failed,    "badge-failed")]
-    [InlineData(RunStatus.Aborted,   "badge-aborted")]
+    [InlineData(RunStatus.Pending,   "pending")]
+    [InlineData(RunStatus.Running,   "running")]
+    [InlineData(RunStatus.Completed, "completed")]
+    [InlineData(RunStatus.Failed,    "failed")]
+    [InlineData(RunStatus.Aborted,   "aborted")]
     public void RendersExpectedCssClass(RunStatus status, string expectedClass)
     {
         var cut = RenderComponent<StatusBadge>(p => p.Add(c => c.Status, status));

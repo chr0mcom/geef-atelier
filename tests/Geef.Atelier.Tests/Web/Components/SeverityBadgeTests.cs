@@ -7,10 +7,10 @@ namespace Geef.Atelier.Tests.Web.Components;
 public sealed class SeverityBadgeTests : TestContext
 {
     [Theory]
-    [InlineData(FindingSeverity.Critical, "severity-critical")]
-    [InlineData(FindingSeverity.Major,    "severity-major")]
-    [InlineData(FindingSeverity.Minor,    "severity-minor")]
-    [InlineData(FindingSeverity.Info,     "severity-info")]
+    [InlineData(FindingSeverity.Critical, "critical")]
+    [InlineData(FindingSeverity.Major,    "major")]
+    [InlineData(FindingSeverity.Minor,    "minor")]
+    [InlineData(FindingSeverity.Info,     "info")]
     public void RendersExpectedCssClass(FindingSeverity severity, string expectedClass)
     {
         var cut = RenderComponent<SeverityBadge>(p => p.Add(c => c.Severity, severity));
