@@ -86,7 +86,7 @@ internal sealed class LlmReviewer(
 
         foreach (var f in findingsEl.EnumerateArray())
         {
-            var severityStr = f.TryGetProperty("severity", out var sevEl) ? sevEl.GetString() ?? "warning" : "warning";
+            var severityStr = f.TryGetProperty("severity", out var sevEl) ? sevEl.GetString() ?? "minor" : "minor";
             var message     = f.TryGetProperty("message",  out var msgEl) ? msgEl.GetString() ?? ""        : "";
             if (string.IsNullOrEmpty(message)) continue;
 
@@ -119,10 +119,12 @@ internal sealed class LlmReviewer(
 
     private static SdkSeverity MapSeverity(string s) => s.ToLowerInvariant() switch
     {
-        "info"     => SdkSeverity.Info,
-        "warning"  => SdkSeverity.Warning,
-        "error"    => SdkSeverity.Error,
         "critical" => SdkSeverity.Critical,
+        "major"    => SdkSeverity.Error,
+        "minor"    => SdkSeverity.Warning,
+        "info"     => SdkSeverity.Info,
+        "error"    => SdkSeverity.Error,    // backwards-compat
+        "warning"  => SdkSeverity.Warning,  // backwards-compat
         _          => SdkSeverity.Warning
     };
 }

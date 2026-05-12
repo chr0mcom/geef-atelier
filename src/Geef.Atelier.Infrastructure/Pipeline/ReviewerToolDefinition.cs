@@ -19,7 +19,7 @@ internal static class ReviewerToolDefinition
                         "properties": {
                             "severity": {
                                 "type": "string",
-                                "enum": ["info", "warning", "error", "critical"]
+                                "enum": ["critical", "major", "minor", "info"]
                             },
                             "message": {
                                 "type": "string"
@@ -36,7 +36,7 @@ internal static class ReviewerToolDefinition
     public static readonly LlmTool SubmitReview = new()
     {
         Name = "submit_review",
-        Description = "Submit structured review results. Set approved=true only when the findings array is empty.",
+        Description = "Submit structured review results. severity must be one of: critical (factual error), major (important omission), minor (style/precision), info (observation). Set approved=true only when findings is empty.",
         InputSchema = JsonSerializer.Deserialize<JsonElement>(SchemaJson)
     };
 }
