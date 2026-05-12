@@ -1,6 +1,6 @@
 # Architektur
 
-*Letzte Aktualisierung: 2026-05-11 (PS1: Backup-Strategie ergänzt)*
+*Letzte Aktualisierung: 2026-05-12 (PS2: Reviewer-Kalibrierung ergänzt)*
 
 ## Schichtenbild
 
@@ -385,6 +385,10 @@ Der `postgres-backup`-Service (`prodrigestivill/postgres-backup-local:16`) läuf
 - **Restore:** `scripts/restore-backup.sh <datei.sql.gz>` (stoppt `web`, restored, startet `web` neu)
 
 Kein App-Code-Eingriff — reiner Compose-Service. Backup-Container braucht nur das interne `geef-atelier-network` (kein `proxy`).
+
+### Reviewer-Kalibrierung
+
+Severity-Taxonomie, Anti-Pattern-Regel und Convergence-Policy-Strategie sind in [`docs/06-reviewer-calibration.md`](06-reviewer-calibration.md) beschrieben. Neue Reviewer-Rollen müssen den dort definierten Standard übernehmen.
 
 ### Deployment-Ablauf
 

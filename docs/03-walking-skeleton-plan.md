@@ -1,6 +1,6 @@
 # Walking Skeleton — Bauplan
 
-*Letzte Aktualisierung: 2026-05-11 (Schritt 10 abgeschlossen — Walking Skeleton komplett)*
+*Letzte Aktualisierung: 2026-05-12 (PS2: Reviewer-Kalibrierung ergänzt)*
 
 Das Walking Skeleton ist die kleinste end-to-end-funktionale Version von Geef.Atelier: ein Auftrag wird über die UI oder via MCP gestellt, eine echte Geef-Pipeline läuft (mit echten LLM-Calls), Live-Status ist sichtbar, das Ergebnis wird angezeigt und persistiert. Quellen-Upload, Klassifikator, dynamische Crew, Advisor, Multi-Format-Export — alles weitere kommt später.
 
@@ -284,6 +284,14 @@ Damit der Scope klar bleibt:
 - **Export nach DOCX/PDF** (Skeleton liefert Markdown)
 - **Crew-Templates und Reviewer-Profile** als versionierte Daten (Skeleton hat zwei hartkodierte Reviewer)
 - **OAuth-2.0** für MCP (Skeleton nutzt Bearer-Token)
+
+## Post-Skeleton-Schritte
+
+### PS-1: Postgres-Backup ✅ (2026-05-11)
+Automatischer täglicher Backup-Service (`prodrigestivill/postgres-backup-local:16`), Retention 7/4/6, Volume `geef-atelier-backups`, Restore-Skript `scripts/restore-backup.sh`. D-024. Bericht: `docs/reports/post-skeleton-01-postgres-backup-report.md`.
+
+### PS-2: Reviewer-Kalibrierung ✅ (2026-05-12)
+4-stufige Severity-Taxonomie (critical/major/minor/info) mit Anti-Pattern-Regel + Hadwiger-Nelson-Negativbeispiel in Reviewer-Prompts. `ConvergenceOptions` (`AbortOnCritical=false` Default). Tool-Schema-Update. Executor-Iteration-2+-Schärfung. 11 neue Tests. D-025. Bericht: `docs/reports/post-skeleton-02-reviewer-calibration-report.md`.
 
 ## Wo
 
