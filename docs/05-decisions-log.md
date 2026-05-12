@@ -1,6 +1,6 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 2026-05-12 (PS2: D-025 ergänzt)*
+*Letzte Aktualisierung: 2026-05-12 (PS-3: D-026 ergänzt)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -304,3 +304,27 @@ Seit Commit `28daafb` wird `appsettings.Development.json` nicht mehr getrackt. B
 - (j) Hadwiger-Nelson-Replay als `[Fact]`-Test mit Skip-If-No-ApiKey in `AtelierPipelineRunsAgainstOpenRouterTests` — langfristige Regression-Absicherung.
 
 **Ergebnis:** 96 Tests (vorher: 85). 3 neue Test-Klassen (SeverityClassification, ConvergencePolicyConfig, OvereagerCriticalAbort). `dotnet build` 0/0. Reviewer-Kalibrierung auf Atelier-Standard angehoben.
+
+---
+
+## D-026 — Post-Skeleton Schritt 3: Design-Translation (2026-05-12)
+
+**Kontext:** Walking Skeleton + PS-1 (Backup) + PS-2 (Reviewer-Kalibrierung) sind durch. Ein professioneller HTML/CSS/JSX-Prototyp (`docs/design/atelier-mockups/`) mit drei Paletten (Vellum/Noir/Petrol), eigener Typografie (Newsreader/Geist/JetBrains Mono), 14+ Hairline-Icons und fünf Screens lag vor. Ziel: visuelle und strukturelle Sprache ins Blazor-UI übertragen ohne neue Backend-Features.
+
+**Entscheidungen:**
+- (a) Drei Themes via `html.palette-{vellum|noir|petrol}` (CSS-Klasse). Default Vellum (Prompt-Anforderung) — Mockup-Default war Noir; explizite Divergenz.
+- (b) Theme-Cookie `Atelier.Theme`, 1 Jahr, `HttpOnly=false` (JS-Interop muss lesen/setzen), SameSite=Strict, Logout löscht NICHT.
+- (c) Theme-Wechsel-Mechanik: JS-Interop primär (`window.atelier.setTheme`), Server-Endpoint `/settings/theme` als Fallback und Playwright-Test-Hook. Beide parallel implementiert.
+- (d) `<html>`-Klasse Razor-server-side via `IHttpContextAccessor` — kein Flash-of-Wrong-Theme.
+- (e) Bootstrap-Stylesheet vollständig entfernt; `wwwroot/atelier.css` als globales Stylesheet (1:1 portiert aus Mockup + @font-face).
+- (f) Self-hosted Fonts (Newsreader, Geist, JetBrains Mono) in `wwwroot/fonts/` — DSGVO-konform, kein externer Network-Request.
+- (g) ReviewerDisplay-Helper-Mapping (β-Variante): Code-Klassen `BriefingTreueReviewer`/`KlarheitReviewer` unverändert; UI zeigt `BriefingFidelity`/`Clarity`. Keine Persistenz-Breaking-Changes.
+- (h) PressStageMapper: konservative Heuristik — alle Running-Runs zeigen Stage 0 (Draft) active; komplexere Event-basierte Stage-Erkennung als optionale Verfeinerung.
+- (i) FindingResolutionInferrer: heuristisches Cross-Iteration-Diff via `Severity|ReviewerName|Message[..60]`-Signatur. Bug-Fix in PS-3: `IndexOutOfRangeException` bei leerer Iterations-Liste behoben.
+- (j) Mock-Stubs konsistent via `.coming-soon`-Klasse: Cost-Anzeige, Export-Button, Profile-MenuItem, Welcome-Stats.
+- (k) E2E-Selektoren bewusst stabil: `input#username`, `button.btn-login`, `.user-name`, `.btn-logout`, `textarea#briefing`, `button.btn-submit`, `[data-status]`. Neue Komponenten mit `data-testid`.
+- (l) Tweaks-Panel und Style-Guide aus Mockup nicht in Production übernommen.
+- (m) StatusBadge: `data-status`-Attribut wiederhergestellt (E2E-Tests erwarten es); CSS-Klassen-Umbau (`badge-*` → `status pending`) erforderte Test-Anpassung.
+- (n) WebTestHost in Tests: `AddHttpContextAccessor()` ergänzt, `[Collection("Postgres")]` für Theme-Cookie-Tests.
+
+**Ergebnis:** 106 Tests gesamt (105 passed, 1 skipped ThemeSwitcher-E2E). `dotnet build` 0/0. Fünf Screens visuell überarbeitet, drei Themes funktional, self-hosted Fonts, 16 Icon-Komponenten, Bootstrap entfernt.

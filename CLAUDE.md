@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Aktueller Zustand
 
-**Post-Skeleton Schritt 2 abgeschlossen (12. Mai 2026): Reviewer-Kalibrierung.** Post-Skeleton Schritt 1 (Postgres-Backup) ✅. Reviewer-Severity-Taxonomie (critical/major/minor/info) + `ConvergenceOptions` (`AbortOnCritical=false` Default) + Tool-Schema-Update + Executor-Iteration-2+-Schärfung. 96/96 Tests grün. App produktiv unter `https://geef.stefan-bechtel.de/`. Nächste Post-Skeleton-Schritte: LiveUpdateFlowTests-Stabilisierung, Cost-Tracking, RAG, Multi-User, Off-Site-Backup, Monitoring.
+**Post-Skeleton Schritt 3 abgeschlossen (12. Mai 2026): Design-Translation.** PS-1 (Postgres-Backup) ✅. PS-2 (Reviewer-Kalibrierung) ✅. Mockup → Blazor: drei Themes (Vellum/Noir/Petrol), self-hosted Fonts, 16 Icons, Bootstrap entfernt, alle fünf Screens nach Mockup. 106 Tests (105 grün, 1 Skip). App produktiv unter `https://geef.stefan-bechtel.de/`. Nächste Post-Skeleton-Schritte: PS-4 (CLI-Provider-Adapter), Cost-Tracking, RAG, Multi-User, Off-Site-Backup, Monitoring.
 
 ## Verbindlicher Workflow
 
