@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Aktueller Zustand
 
-**Post-Skeleton Schritt 1 abgeschlossen (11. Mai 2026): Postgres-Backup.** Walking Skeleton komplett + automatischer Backup-Service aktiv. App produktiv unter `https://geef.stefan-bechtel.de/`. Stack: drei Container (web, postgres, postgres-backup). Backup: täglich 03:00 UTC via `prodrigestivill/postgres-backup-local:16`, Retention 7/4/6, Volume `geef-atelier-backups`. Restore-Skript: `scripts/restore-backup.sh`. 85/85 Tests grün. Nächste Post-Skeleton-Schritte: LiveUpdateFlowTests-Stabilisierung, Cost-Tracking, RAG, Multi-User, Off-Site-Backup, Monitoring.
+**Post-Skeleton Schritt 2 abgeschlossen (12. Mai 2026): Reviewer-Kalibrierung.** Post-Skeleton Schritt 1 (Postgres-Backup) ✅. Reviewer-Severity-Taxonomie (critical/major/minor/info) + `ConvergenceOptions` (`AbortOnCritical=false` Default) + Tool-Schema-Update + Executor-Iteration-2+-Schärfung. 96/96 Tests grün. App produktiv unter `https://geef.stefan-bechtel.de/`. Nächste Post-Skeleton-Schritte: LiveUpdateFlowTests-Stabilisierung, Cost-Tracking, RAG, Multi-User, Off-Site-Backup, Monitoring.
 
 ## Verbindlicher Workflow
 
