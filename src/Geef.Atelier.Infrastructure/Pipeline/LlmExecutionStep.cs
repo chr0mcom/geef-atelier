@@ -25,7 +25,12 @@ internal sealed class LlmExecutionStep(
         {
             var prevDraft = context.GetRequired(AtelierContextKeys.CurrentDraft);
             var findings  = ExtractPreviousFindings(context);
-            var findingList = string.Join("\n", findings.Select(f => $"- [{f.ReviewerName}] {f.Message}"));
+            var findingLines = findings
+                .Select((f, i) => $"{i + 1}. [{f.Severity.ToString().ToUpperInvariant()}] [{f.ReviewerName}] {f.Message}")
+                .ToList();
+            var findingList = findingLines.Count > 0
+                ? string.Join("\n", findingLines)
+                : "(no findings — improve general quality)";
             userPrompt = $"""
                 Briefing:
                 {brief}
@@ -33,10 +38,10 @@ internal sealed class LlmExecutionStep(
                 Your previous draft:
                 {prevDraft}
 
-                Reviewer findings to address:
+                Reviewer findings — address each one with a concrete, visible change:
                 {findingList}
 
-                Rewrite the text, addressing all findings.
+                Rewrite the text. For every finding above, make a specific change that resolves it.
                 """;
         }
 
