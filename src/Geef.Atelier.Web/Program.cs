@@ -2,6 +2,7 @@ using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
+using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Mcp;
@@ -29,6 +30,7 @@ builder.Services.AddAtelierPersistence();
 builder.Services.AddAtelierApplication();
 
 builder.Services.Configure<OrchestratorOptions>(builder.Configuration.GetSection("Orchestrator"));
+builder.Services.Configure<ConvergenceOptions>(builder.Configuration.GetSection("Convergence"));
 builder.Services.AddHostedService<RunOrchestratorService>();
 
 builder.Services.AddHealthChecks()

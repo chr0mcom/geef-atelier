@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Notifications;
+using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Pipeline;
@@ -12,13 +13,14 @@ namespace Geef.Atelier.Web.Services;
 
 /// <summary>BackgroundService that polls for Pending runs and dispatches them to the Geef pipeline.</summary>
 internal sealed class RunOrchestratorService(
-    IServiceScopeFactory            scopeFactory,
-    ILlmClient                      llmClient,
-    IRunNotifier                    runNotifier,
-    IOptions<OrchestratorOptions>   options,
-    IOptions<LlmOptions>            llmOptions,
-    ILoggerFactory                  loggerFactory,
-    ILogger<RunOrchestratorService> logger) : BackgroundService
+    IServiceScopeFactory                scopeFactory,
+    ILlmClient                          llmClient,
+    IRunNotifier                        runNotifier,
+    IOptions<OrchestratorOptions>       options,
+    IOptions<LlmOptions>                llmOptions,
+    IOptions<ConvergenceOptions>        convergenceOptions,
+    ILoggerFactory                      loggerFactory,
+    ILogger<RunOrchestratorService>     logger) : BackgroundService
 {
     private readonly OrchestratorOptions _opts = options.Value;
     private readonly SemaphoreSlim _slots = new(options.Value.MaxConcurrentRuns, options.Value.MaxConcurrentRuns);
@@ -146,7 +148,7 @@ internal sealed class RunOrchestratorService(
         {
             var sinkLogger = loggerFactory.CreateLogger($"PostgresEventSink[{run.Id}]");
             var sink       = new PostgresEventSink(run.Id, scopeFactory, runNotifier, sinkLogger);
-            var runner     = AtelierPipelineFactory.Build(llmClient, llmOptions, loggerFactory, additionalSinks: [sink]);
+            var runner     = AtelierPipelineFactory.Build(llmClient, llmOptions, convergenceOptions, loggerFactory, additionalSinks: [sink]);
             await runner.RunAsync(run.BriefingText, cts.Token);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

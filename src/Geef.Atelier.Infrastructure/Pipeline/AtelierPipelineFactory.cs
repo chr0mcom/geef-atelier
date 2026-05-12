@@ -1,4 +1,5 @@
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk;
 using Geef.Sdk.Events;
@@ -19,6 +20,7 @@ internal static class AtelierPipelineFactory
     public static GeefPipelineRunner<FinalizedDocument> Build(
         ILlmClient client,
         IOptions<LlmOptions> options,
+        IOptions<ConvergenceOptions> convergenceOptions,
         ILoggerFactory? loggerFactory = null,
         IEnumerable<IGeefEventSink>? additionalSinks = null)
     {
@@ -30,7 +32,7 @@ internal static class AtelierPipelineFactory
             new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      client, options)
         };
         var finalizer = new MarkdownFinalizer();
-        return BuildWithProviders(grounding, execution, reviewers, finalizer, loggerFactory, additionalSinks);
+        return BuildWithProviders(grounding, execution, reviewers, finalizer, convergenceOptions, loggerFactory, additionalSinks);
     }
 
     /// <summary>
@@ -41,6 +43,7 @@ internal static class AtelierPipelineFactory
         IExecutionStep execution,
         IEnumerable<IReviewer> reviewers,
         IFinalizer<FinalizedDocument> finalizer,
+        IOptions<ConvergenceOptions> convergenceOptions,
         ILoggerFactory? loggerFactory = null,
         IEnumerable<IGeefEventSink>? additionalSinks = null)
     {
@@ -55,10 +58,10 @@ internal static class AtelierPipelineFactory
             .UseFinalizer(finalizer)
             .UseConvergencePolicy(new DefaultConvergencePolicy
             {
-                MaxIterations       = 3,
-                AbortOnCritical     = true,
-                DetectRegression    = true,
-                StagnationThreshold = 3
+                MaxIterations       = convergenceOptions.Value.MaxIterations,
+                AbortOnCritical     = convergenceOptions.Value.AbortOnCritical,
+                DetectRegression    = convergenceOptions.Value.DetectRegression,
+                StagnationThreshold = convergenceOptions.Value.StagnationThreshold
             })
             .UseEvaluationStrategy(new ParallelEvaluationStrategy())
             .UseMiddleware(new ExceptionHandlingMiddleware())
