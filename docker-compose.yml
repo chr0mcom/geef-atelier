@@ -16,9 +16,11 @@ services:
       - AtelierUser__Username=${ATELIER_USER}
       - AtelierUser__PasswordHash=${ATELIER_PASSWORD_HASH}
       - AtelierMcp__Token=${ATELIER_MCP_TOKEN}
-      - Llm__ApiKey=${LLM_API_KEY}
+      - Llm__Providers__openrouter__ApiKey=${LLM_OPENROUTER_API_KEY}
     depends_on:
       postgres:
+        condition: service_healthy
+      cli-proxy:
         condition: service_healthy
     networks:
       - geef-atelier-network
@@ -35,6 +37,33 @@ services:
       - "com.centurylinklabs.watchtower.enable=false"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  cli-proxy:
+    build:
+      context: ./cli-proxy
+      dockerfile: Dockerfile
+    image: geef-atelier-cli-proxy:latest
+    pull_policy: never
+    container_name: geef-atelier-cli-proxy
+    restart: unless-stopped
+    environment:
+      - CLAUDE_MAX_CONCURRENT=2
+      - CODEX_MAX_CONCURRENT=2
+      - CLAUDE_HOME=/auth/claude
+      - CODEX_HOME=/auth/codex
+    volumes:
+      - geef-atelier-cli-auth:/auth
+    networks:
+      - geef-atelier-network
+    labels:
+      - "traefik.enable=false"
+      - "com.centurylinklabs.watchtower.enable=false"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -93,3 +122,4 @@ networks:
 volumes:
   geef_atelier_postgres_data:
   geef-atelier-backups:
+  geef-atelier-cli-auth:
