@@ -14,10 +14,9 @@ namespace Geef.Atelier.Web.Services;
 /// <summary>BackgroundService that polls for Pending runs and dispatches them to the Geef pipeline.</summary>
 internal sealed class RunOrchestratorService(
     IServiceScopeFactory                scopeFactory,
-    ILlmClient                          llmClient,
+    ILlmClientResolver                  llmClientResolver,
     IRunNotifier                        runNotifier,
     IOptions<OrchestratorOptions>       options,
-    IOptions<LlmOptions>                llmOptions,
     IOptions<ConvergenceOptions>        convergenceOptions,
     ILoggerFactory                      loggerFactory,
     ILogger<RunOrchestratorService>     logger) : BackgroundService
@@ -148,7 +147,7 @@ internal sealed class RunOrchestratorService(
         {
             var sinkLogger = loggerFactory.CreateLogger($"PostgresEventSink[{run.Id}]");
             var sink       = new PostgresEventSink(run.Id, scopeFactory, runNotifier, sinkLogger);
-            var runner     = AtelierPipelineFactory.Build(llmClient, llmOptions, convergenceOptions, loggerFactory, additionalSinks: [sink]);
+            var runner     = AtelierPipelineFactory.Build(llmClientResolver, convergenceOptions, loggerFactory, additionalSinks: [sink]);
             await runner.RunAsync(run.BriefingText, cts.Token);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

@@ -3,13 +3,10 @@ using Geef.Sdk;
 using Geef.Sdk.Context;
 using Geef.Sdk.Providers;
 using Geef.Sdk.Results;
-using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Infrastructure.Pipeline;
 
-internal sealed class LlmExecutionStep(
-    ILlmClient client,
-    IOptions<LlmOptions> options) : IExecutionStep
+internal sealed class LlmExecutionStep(ILlmClientResolver resolver) : IExecutionStep
 {
     public async Task<ExecutionResult> RunAsync(IRunContext context, CancellationToken cancellationToken)
     {
@@ -45,9 +42,7 @@ internal sealed class LlmExecutionStep(
                 """;
         }
 
-        var actorCfg  = options.Value.Actors.GetValueOrDefault("Executor");
-        var model     = actorCfg?.Model is { Length: > 0 } m ? m : options.Value.DefaultModel;
-        var maxTokens = actorCfg?.MaxTokens ?? options.Value.DefaultMaxTokens;
+        var (client, model, maxTokens) = resolver.ForActor("Executor");
 
         var response = await client.CompleteAsync(new LlmRequest
         {

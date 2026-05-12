@@ -5,7 +5,6 @@ using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk.Context;
 using Geef.Sdk.Providers;
 using Geef.Sdk.Results;
-using Microsoft.Extensions.Options;
 using SdkSeverity = Geef.Sdk.Results.FindingSeverity;
 
 namespace Geef.Atelier.Infrastructure.Pipeline;
@@ -13,8 +12,7 @@ namespace Geef.Atelier.Infrastructure.Pipeline;
 internal sealed class LlmReviewer(
     string name,
     string systemPrompt,
-    ILlmClient client,
-    IOptions<LlmOptions> options) : IReviewer
+    ILlmClientResolver resolver) : IReviewer
 {
     public string Name => name;
     public int Priority => 0;
@@ -34,9 +32,7 @@ internal sealed class LlmReviewer(
             Use the submit_review tool to submit your evaluation.
             """;
 
-        var actorCfg  = options.Value.Actors.GetValueOrDefault(name);
-        var model     = actorCfg?.Model is { Length: > 0 } m ? m : options.Value.DefaultModel;
-        var maxTokens = actorCfg?.MaxTokens ?? options.Value.DefaultMaxTokens;
+        var (client, model, maxTokens) = resolver.ForActor(name);
 
         var response = await client.CompleteAsync(new LlmRequest
         {

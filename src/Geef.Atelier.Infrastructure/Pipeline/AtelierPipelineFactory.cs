@@ -15,21 +15,20 @@ namespace Geef.Atelier.Infrastructure.Pipeline;
 internal static class AtelierPipelineFactory
 {
     /// <summary>
-    /// Builds the pipeline with real LLM providers. Requires a configured <see cref="ILlmClient"/>.
+    /// Builds the pipeline with real LLM providers via the resolver.
     /// </summary>
     public static GeefPipelineRunner<FinalizedDocument> Build(
-        ILlmClient client,
-        IOptions<LlmOptions> options,
+        ILlmClientResolver resolver,
         IOptions<ConvergenceOptions> convergenceOptions,
         ILoggerFactory? loggerFactory = null,
         IEnumerable<IGeefEventSink>? additionalSinks = null)
     {
         var grounding  = new BriefingGroundingStep();
-        var execution  = new LlmExecutionStep(client, options);
+        var execution  = new LlmExecutionStep(resolver);
         var reviewers  = new IReviewer[]
         {
-            new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, client, options),
-            new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      client, options)
+            new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, resolver),
+            new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      resolver)
         };
         var finalizer = new MarkdownFinalizer();
         return BuildWithProviders(grounding, execution, reviewers, finalizer, convergenceOptions, loggerFactory, additionalSinks);
