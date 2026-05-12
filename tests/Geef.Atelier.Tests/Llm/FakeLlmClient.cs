@@ -40,7 +40,7 @@ internal sealed class FakeLlmClient : ILlmClient
         Text              = "",
         FinishReason      = "tool_calls",
         ToolName          = "submit_review",
-        ToolArgumentsJson = $$$"""{"approved":false,"findings":[{"severity":"warning","message":"{{{findingMessage}}}"}]}""",
+        ToolArgumentsJson = $$$"""{"approved":false,"findings":[{"severity":"minor","message":"{{{findingMessage}}}"}]}""",
         TokenUsage        = new LlmTokenUsage { InputTokens = 8, OutputTokens = 15 }
     };
 

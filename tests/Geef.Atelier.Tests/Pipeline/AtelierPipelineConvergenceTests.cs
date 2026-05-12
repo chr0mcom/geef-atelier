@@ -1,4 +1,5 @@
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Tests.Llm;
@@ -30,6 +31,7 @@ public sealed class AtelierPipelineConvergenceTests(ITestOutputHelper output)
                 new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      fakeClient, options)
             ],
             new MarkdownFinalizer(),
+            Options.Create(new ConvergenceOptions()),
             additionalSinks: [outputSink]);
 
         var result = await runner.RunAsync(Briefing, CancellationToken.None);

@@ -1,5 +1,7 @@
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Pipeline;
+using Microsoft.Extensions.Options;
 using Xunit.Abstractions;
 
 namespace Geef.Atelier.Tests.Pipeline;
@@ -20,6 +22,7 @@ public sealed class StubPipelineConvergenceTests(ITestOutputHelper output)
                 new StubReviewer("KlarheitStub",        Geef.Sdk.Results.FindingSeverity.Warning, "Stub finding: simulated clarity nit (will be cleared on next iteration).")
             ],
             new MarkdownFinalizer(),
+            Options.Create(new ConvergenceOptions()),
             additionalSinks: [outputSink]);
 
         var result = await runner.RunAsync(Briefing, CancellationToken.None);

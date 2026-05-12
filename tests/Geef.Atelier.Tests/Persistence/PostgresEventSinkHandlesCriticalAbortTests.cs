@@ -1,4 +1,5 @@
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Pipeline;
@@ -41,6 +42,7 @@ public sealed class PostgresEventSinkHandlesCriticalAbortTests(PostgresFixture f
                 new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      criticalClient, options)
             ],
             new MarkdownFinalizer(),
+            Options.Create(new ConvergenceOptions { AbortOnCritical = true }),
             additionalSinks: [sink]);
 
         // Act — expect ConvergenceFailedException

@@ -1,4 +1,5 @@
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Pipeline;
@@ -44,6 +45,7 @@ public sealed class PostgresEventSinkConcurrentRunsTests(PostgresFixture fixture
                 new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      fakeClient1, options)
             ],
             new MarkdownFinalizer(),
+            Options.Create(new ConvergenceOptions()),
             additionalSinks: [sink1]);
 
         var fakeClient2 = new FakeLlmClient();
@@ -55,6 +57,7 @@ public sealed class PostgresEventSinkConcurrentRunsTests(PostgresFixture fixture
                 new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      fakeClient2, options)
             ],
             new MarkdownFinalizer(),
+            Options.Create(new ConvergenceOptions()),
             additionalSinks: [sink2]);
 
         // Act — run both pipelines in parallel

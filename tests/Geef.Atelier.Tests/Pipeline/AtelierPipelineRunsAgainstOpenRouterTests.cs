@@ -1,5 +1,7 @@
+using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Pipeline;
+using Geef.Sdk.Exceptions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -40,7 +42,7 @@ public sealed class AtelierPipelineRunsAgainstOpenRouterTests
         var options = provider.GetRequiredService<IOptions<LlmOptions>>();
         var sink    = new CountingEventSink();
 
-        var runner = AtelierPipelineFactory.Build(client, options, additionalSinks: [sink]);
+        var runner = AtelierPipelineFactory.Build(client, options, Options.Create(new ConvergenceOptions()), additionalSinks: [sink]);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(300));
         var result    = await runner.RunAsync(Briefing, cts.Token);
@@ -51,5 +53,62 @@ public sealed class AtelierPipelineRunsAgainstOpenRouterTests
         Assert.True(result.TotalIterations >= 1);
         Assert.True(result.Output.IterationCount >= 1);
         Assert.True(sink.TotalEvents > 0);
+    }
+
+    [Fact]
+    public async Task HadwigerNelson_DoesNotAbortWithCriticalBlocker()
+    {
+        var apiKey = Environment.GetEnvironmentVariable("Llm__ApiKey");
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return; // No API key available
+
+        const string hadwigerNelsonBriefing = """
+            Beantworte folgende Frage präzise und strukturiert (ca. 200-250 Wörter):
+            Wie viele Farben sind mindestens notwendig, um die gesamte Ebene so einzufärben,
+            dass je zwei Punkte mit Abstand 1 unterschiedlich gefärbt sind?
+            Erkläre die bekannten Schranken und den aktuellen Stand der Forschung.
+            """;
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Llm:ApiKey"]       = apiKey,
+                ["Llm:DefaultModel"] = "anthropic/claude-opus-4.7",
+                ["Llm:Actors:Executor:Model"]              = "anthropic/claude-opus-4.7",
+                ["Llm:Actors:BriefingTreueReviewer:Model"] = "anthropic/claude-opus-4.7",
+                ["Llm:Actors:KlarheitReviewer:Model"]      = "anthropic/claude-opus-4.7"
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddLlmClient(configuration).AddStandardResilienceHandler();
+
+        await using var provider = services.BuildServiceProvider();
+        var client  = provider.GetRequiredService<ILlmClient>();
+        var options = provider.GetRequiredService<IOptions<LlmOptions>>();
+        var sink    = new CountingEventSink();
+
+        var runner = AtelierPipelineFactory.Build(
+            client,
+            options,
+            Options.Create(new ConvergenceOptions { AbortOnCritical = false }),
+            additionalSinks: [sink]);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(300));
+        try
+        {
+            var result = await runner.RunAsync(hadwigerNelsonBriefing, cts.Token);
+            // Full convergence: best-case outcome.
+            Assert.True(result.TotalIterations <= 3, $"Pipeline took {result.TotalIterations} iterations — expected <= 3.");
+            Assert.NotNull(result.Output);
+            Assert.NotEmpty(result.Output.Markdown);
+        }
+        catch (ConvergenceFailedException ex)
+        {
+            // AbortCriticalBlocker = the pre-PS2 bug (overzealous critical abort after 1 iteration).
+            // StopMaxAttemptsReached = reviewers still strict, but no early abort — acceptable.
+            Assert.DoesNotContain("AbortCriticalBlocker", ex.Message);
+        }
     }
 }

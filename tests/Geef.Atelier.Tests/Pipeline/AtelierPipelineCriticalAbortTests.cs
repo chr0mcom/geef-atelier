@@ -1,3 +1,4 @@
+using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Tests.Llm;
@@ -30,6 +31,7 @@ public sealed class AtelierPipelineCriticalAbortTests
                 new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      criticalClient, options)
             ],
             new MarkdownFinalizer(),
+            Options.Create(new ConvergenceOptions { AbortOnCritical = true }),
             additionalSinks: [sink]);
 
         // AbortOnCritical=true causes the SDK to throw ConvergenceFailedException, not return Success=false.
