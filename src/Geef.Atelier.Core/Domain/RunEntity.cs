@@ -22,4 +22,16 @@ public sealed record RunEntity
 
     /// <summary>Set to true when a cancellation request has been submitted for this run.</summary>
     public bool CancellationRequested { get; init; }
+
+    /// <summary>
+    /// Name of the crew template the run was submitted with, or null when an inline custom crew was used.
+    /// Historical runs (pre-PS-5) are migrated to <c>"klassik"</c>.
+    /// </summary>
+    public string? CrewTemplateName { get; init; }
+
+    /// <summary>
+    /// JSONB-serialised <see cref="Crew.CrewSnapshot"/> capturing the fully-dereferenced crew
+    /// configuration used for this run. Persisted to keep runs reproducible after profiles change.
+    /// </summary>
+    public string? CrewSnapshot { get; init; }
 }

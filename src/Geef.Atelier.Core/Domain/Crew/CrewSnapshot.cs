@@ -1,0 +1,34 @@
+using Geef.Atelier.Core.Domain.Crew.Profiles;
+
+namespace Geef.Atelier.Core.Domain.Crew;
+
+/// <summary>
+/// Frozen, fully-dereferenced snapshot of the crew configuration used for a single run.
+/// Persisted as JSONB on <c>RunEntity.CrewSnapshot</c> so that runs remain reproducible even
+/// after referenced profiles are renamed or deleted.
+/// </summary>
+/// <param name="SchemaVersion">
+/// Format version. Increment when the snapshot schema changes; deserialisation throws on
+/// unknown versions to surface format drift early.
+/// </param>
+/// <param name="TemplateName">
+/// Name of the template the snapshot was built from, or null when the run was submitted with
+/// an inline <see cref="CrewSpec"/>.
+/// </param>
+/// <param name="Executor">Embedded executor profile (full content, not just a reference).</param>
+/// <param name="Reviewers">Embedded reviewer profiles in the order required by the evaluation strategy.</param>
+/// <param name="EvaluationStrategy">Strategy used for reviewer orchestration.</param>
+/// <param name="ConvergenceOverride">Convergence-policy overrides applied for this run, if any.</param>
+/// <param name="Advisors">Embedded advisor profiles. Empty in PS-5.</param>
+public sealed record CrewSnapshot(
+    int SchemaVersion,
+    string? TemplateName,
+    ExecutorProfile Executor,
+    IReadOnlyList<ReviewerProfile> Reviewers,
+    EvaluationStrategy EvaluationStrategy,
+    ConvergencePolicyOverride? ConvergenceOverride,
+    IReadOnlyList<Advisors.AdvisorProfile> Advisors)
+{
+    /// <summary>Current snapshot schema version. Bump when the format changes incompatibly.</summary>
+    public const int CurrentSchemaVersion = 1;
+}
