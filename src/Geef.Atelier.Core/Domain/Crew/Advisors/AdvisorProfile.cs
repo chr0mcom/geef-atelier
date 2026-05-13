@@ -13,6 +13,7 @@ namespace Geef.Atelier.Core.Domain.Crew.Advisors;
 /// <param name="Model">Bare model identifier passed to the provider.</param>
 /// <param name="MaxTokens">Optional per-profile token cap; falls back to <c>LlmOptions.DefaultMaxTokens</c> when null.</param>
 /// <param name="Mode">Behavioural archetype that determines how the response is integrated.</param>
+/// <param name="Trigger">When during the pipeline run the advisor is consulted.</param>
 /// <param name="IsSystem">True for profiles defined as code constants; false for user-created profiles.</param>
 public sealed record AdvisorProfile(
     string Name,
@@ -23,4 +24,5 @@ public sealed record AdvisorProfile(
     string Model,
     int? MaxTokens,
     AdvisorMode Mode,
+    AdvisorTrigger Trigger,
     bool IsSystem);
