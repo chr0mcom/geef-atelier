@@ -48,6 +48,15 @@ internal sealed class CrewTemplateConfiguration : IEntityTypeConfiguration<CrewT
             .IsRequired()
             .HasDefaultValueSql("'[]'::jsonb");
 
+        builder.Property(t => t.GroundingProviderNames)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, JsonOpts),
+                v => (IReadOnlyList<string>)JsonSerializer.Deserialize<List<string>>(v, JsonOpts)!,
+                StringListComparer)
+            .IsRequired()
+            .HasDefaultValueSql("'[]'::jsonb");
+
         builder.Property(t => t.ConvergenceOverride)
             .HasColumnType("jsonb")
             .HasConversion(

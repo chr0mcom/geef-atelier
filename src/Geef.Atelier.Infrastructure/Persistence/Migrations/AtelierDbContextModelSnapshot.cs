@@ -140,6 +140,12 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("GroundingProviderNames")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
                     b.Property<bool>("IsSystem")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -154,6 +160,86 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
                     b.HasKey("Name");
 
                     b.ToTable("CrewTemplates", (string)null);
+                });
+
+            modelBuilder.Entity("Geef.Atelier.Core.Domain.Crew.Grounding.GroundingConsultation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Citations")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
+                    b.Property<decimal?>("CostEur")
+                        .HasColumnType("numeric(10,4)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("GroundingProviderName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Query")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TokensOrCreditsUsed")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RunId")
+                        .HasDatabaseName("IX_GroundingConsultations_RunId");
+
+                    b.ToTable("GroundingConsultations", (string)null);
+                });
+
+            modelBuilder.Entity("Geef.Atelier.Core.Domain.Crew.Grounding.GroundingProviderProfile", b =>
+                {
+                    b.Property<string>("Name")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("IsSystem")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<int?>("MaxQueriesPerRun")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ProviderSettings")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'{}'::jsonb");
+
+                    b.Property<string>("ProviderType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Name");
+
+                    b.ToTable("GroundingProviderProfiles", (string)null);
                 });
 
             modelBuilder.Entity("Geef.Atelier.Core.Domain.Crew.Profiles.ExecutorProfile", b =>

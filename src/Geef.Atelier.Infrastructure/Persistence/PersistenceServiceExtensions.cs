@@ -16,6 +16,8 @@ public static class PersistenceServiceExtensions
         services.AddScoped<ICrewTemplateRepository, CrewTemplateRepository>();
         services.AddScoped<IAdvisorProfileRepository, AdvisorProfileRepository>();
         services.AddScoped<IAdvisorConsultationRepository, AdvisorConsultationRepository>();
+        services.AddScoped<IGroundingProviderProfileRepository, GroundingProviderProfileRepository>();
+        services.AddScoped<IGroundingConsultationRepository, GroundingConsultationRepository>();
         return services;
     }
 }
