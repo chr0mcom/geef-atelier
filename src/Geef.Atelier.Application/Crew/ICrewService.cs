@@ -1,4 +1,5 @@
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 
 namespace Geef.Atelier.Application.Crew;
@@ -36,6 +37,20 @@ public interface ICrewService
 
     /// <summary>Deletes a custom executor profile by name. Throws <see cref="InvalidOperationException"/> for system profiles.</summary>
     Task DeleteCustomExecutorProfileAsync(string name, CancellationToken cancellationToken = default);
+
+    // --- Advisor profiles ---
+
+    Task<IReadOnlyList<AdvisorProfile>> ListAdvisorProfilesAsync(bool includeSystem = true, CancellationToken cancellationToken = default);
+    Task<AdvisorProfile?> GetAdvisorProfileAsync(string name, CancellationToken cancellationToken = default);
+
+    /// <summary>Creates a custom advisor profile. The name is auto-prefixed with <c>"custom-"</c> if not already present.</summary>
+    Task<AdvisorProfile> CreateCustomAdvisorProfileAsync(AdvisorProfile profile, CancellationToken cancellationToken = default);
+
+    /// <summary>Updates a custom advisor profile. Throws <see cref="InvalidOperationException"/> for system profiles.</summary>
+    Task<AdvisorProfile> UpdateCustomAdvisorProfileAsync(AdvisorProfile profile, CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes a custom advisor profile by name. Throws <see cref="InvalidOperationException"/> for system profiles.</summary>
+    Task DeleteCustomAdvisorProfileAsync(string name, CancellationToken cancellationToken = default);
 
     // --- Crew templates ---
 

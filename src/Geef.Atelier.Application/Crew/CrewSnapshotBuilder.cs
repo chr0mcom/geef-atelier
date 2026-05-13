@@ -15,6 +15,7 @@ public static class CrewSnapshotBuilder
         CrewTemplate template,
         Func<string, CancellationToken, Task<ExecutorProfile?>> executorLookup,
         Func<string, CancellationToken, Task<ReviewerProfile?>> reviewerLookup,
+        Func<string, CancellationToken, Task<AdvisorProfile?>> advisorLookup,
         CancellationToken cancellationToken = default)
     {
         var executor = await executorLookup(template.ExecutorProfileName, cancellationToken)
@@ -22,6 +23,7 @@ public static class CrewSnapshotBuilder
                 $"Executor profile '{template.ExecutorProfileName}' referenced by template '{template.Name}' not found.");
 
         var reviewers = await ResolveReviewersAsync(template.ReviewerProfileNames, reviewerLookup, cancellationToken);
+        var advisors = await ResolveAdvisorsAsync(template.AdvisorProfileNames, advisorLookup, cancellationToken);
 
         return new CrewSnapshot(
             SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
@@ -30,7 +32,7 @@ public static class CrewSnapshotBuilder
             Reviewers: reviewers,
             EvaluationStrategy: template.EvaluationStrategy,
             ConvergenceOverride: template.ConvergenceOverride,
-            Advisors: Array.Empty<AdvisorProfile>());
+            Advisors: advisors);
     }
 
     /// <summary>Builds a snapshot from an inline crew spec (no template name), resolving all referenced profiles.</summary>
@@ -38,6 +40,7 @@ public static class CrewSnapshotBuilder
         CrewSpec spec,
         Func<string, CancellationToken, Task<ExecutorProfile?>> executorLookup,
         Func<string, CancellationToken, Task<ReviewerProfile?>> reviewerLookup,
+        Func<string, CancellationToken, Task<AdvisorProfile?>> advisorLookup,
         CancellationToken cancellationToken = default)
     {
         var executor = await executorLookup(spec.ExecutorProfileName, cancellationToken)
@@ -45,6 +48,7 @@ public static class CrewSnapshotBuilder
                 $"Executor profile '{spec.ExecutorProfileName}' referenced by inline crew spec not found.");
 
         var reviewers = await ResolveReviewersAsync(spec.ReviewerProfileNames, reviewerLookup, cancellationToken);
+        var advisors = await ResolveAdvisorsAsync(spec.AdvisorProfileNames, advisorLookup, cancellationToken);
 
         return new CrewSnapshot(
             SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
@@ -53,7 +57,7 @@ public static class CrewSnapshotBuilder
             Reviewers: reviewers,
             EvaluationStrategy: spec.EvaluationStrategy,
             ConvergenceOverride: spec.ConvergenceOverride,
-            Advisors: Array.Empty<AdvisorProfile>());
+            Advisors: advisors);
     }
 
     private static async Task<IReadOnlyList<ReviewerProfile>> ResolveReviewersAsync(
@@ -69,5 +73,20 @@ public static class CrewSnapshotBuilder
             reviewers.Add(reviewer);
         }
         return reviewers;
+    }
+
+    private static async Task<IReadOnlyList<AdvisorProfile>> ResolveAdvisorsAsync(
+        IReadOnlyList<string> names,
+        Func<string, CancellationToken, Task<AdvisorProfile?>> advisorLookup,
+        CancellationToken cancellationToken)
+    {
+        var result = new List<AdvisorProfile>(names.Count);
+        foreach (var name in names)
+        {
+            var profile = await advisorLookup(name, cancellationToken);
+            if (profile is not null) result.Add(profile);
+            // Silently skip missing advisors (profile deleted after template creation)
+        }
+        return result;
     }
 }

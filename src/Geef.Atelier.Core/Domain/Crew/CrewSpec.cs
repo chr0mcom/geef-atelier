@@ -9,8 +9,17 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// <param name="ReviewerProfileNames">Names of the <c>ReviewerProfile</c>s to use, in order.</param>
 /// <param name="EvaluationStrategy">Strategy for reviewer orchestration.</param>
 /// <param name="ConvergenceOverride">Optional convergence-policy overrides for this run.</param>
+/// <param name="AdvisorProfileNames">
+/// Names of advisor profiles to consult during grounding/finalisation.
+/// Defaults to an empty list when the field is absent from the JSON payload.
+/// </param>
 public sealed record CrewSpec(
     string ExecutorProfileName,
     IReadOnlyList<string> ReviewerProfileNames,
     EvaluationStrategy EvaluationStrategy,
-    ConvergencePolicyOverride? ConvergenceOverride);
+    ConvergencePolicyOverride? ConvergenceOverride,
+    IReadOnlyList<string>? AdvisorProfileNames = null)
+{
+    /// <summary>Resolved advisor profile names; never null after construction.</summary>
+    public IReadOnlyList<string> AdvisorProfileNames { get; init; } = AdvisorProfileNames ?? Array.Empty<string>();
+}

@@ -1,4 +1,5 @@
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Persistence.Crew;
 
@@ -7,9 +8,11 @@ namespace Geef.Atelier.Application.Crew;
 internal sealed class CrewService(
     IReviewerProfileRepository reviewerRepo,
     IExecutorProfileRepository executorRepo,
+    IAdvisorProfileRepository advisorRepo,
     ICrewTemplateRepository templateRepo) : ICrewService
 {
     private const string ReadOnlyMessage = "System profile is read-only — copy it as a custom variant.";
+    private const string ReadOnlyAdvisorMessage = "System advisor profile is read-only — copy it as a custom variant.";
     private const string ReadOnlyTemplateMessage = "System template is read-only — copy it as a custom variant.";
 
     // --- Reviewer profiles ---
@@ -72,6 +75,38 @@ internal sealed class CrewService(
         return executorRepo.DeleteAsync(name, cancellationToken);
     }
 
+    // --- Advisor profiles ---
+
+    public Task<IReadOnlyList<AdvisorProfile>> ListAdvisorProfilesAsync(bool includeSystem = true, CancellationToken cancellationToken = default)
+        => advisorRepo.ListAsync(includeSystem, cancellationToken);
+
+    public Task<AdvisorProfile?> GetAdvisorProfileAsync(string name, CancellationToken cancellationToken = default)
+        => advisorRepo.GetByNameAsync(name, cancellationToken);
+
+    public async Task<AdvisorProfile> CreateCustomAdvisorProfileAsync(AdvisorProfile profile, CancellationToken cancellationToken = default)
+    {
+        if (SystemCrew.IsSystemAdvisorName(profile.Name))
+            throw new InvalidOperationException(ReadOnlyAdvisorMessage);
+        var normalized = profile with { Name = SystemCrew.EnsureCustomPrefix(profile.Name), IsSystem = false };
+        await advisorRepo.CreateAsync(normalized, cancellationToken);
+        return normalized;
+    }
+
+    public async Task<AdvisorProfile> UpdateCustomAdvisorProfileAsync(AdvisorProfile profile, CancellationToken cancellationToken = default)
+    {
+        if (SystemCrew.IsSystemAdvisorName(profile.Name))
+            throw new InvalidOperationException(ReadOnlyAdvisorMessage);
+        await advisorRepo.UpdateAsync(profile, cancellationToken);
+        return profile;
+    }
+
+    public Task DeleteCustomAdvisorProfileAsync(string name, CancellationToken cancellationToken = default)
+    {
+        if (SystemCrew.IsSystemAdvisorName(name))
+            throw new InvalidOperationException(ReadOnlyAdvisorMessage);
+        return advisorRepo.DeleteAsync(name, cancellationToken);
+    }
+
     // --- Crew templates ---
 
     public Task<IReadOnlyList<CrewTemplate>> ListCrewTemplatesAsync(bool includeSystem = true, CancellationToken cancellationToken = default)
@@ -112,6 +147,7 @@ internal sealed class CrewService(
                 customCrew,
                 (name, ct) => executorRepo.GetByNameAsync(name, ct),
                 (name, ct) => reviewerRepo.GetByNameAsync(name, ct),
+                (name, ct) => advisorRepo.GetByNameAsync(name, ct),
                 cancellationToken);
 
         var templateName = crewTemplateName ?? SystemCrew.KlassikTemplateName;
@@ -122,6 +158,7 @@ internal sealed class CrewService(
             template,
             (name, ct) => executorRepo.GetByNameAsync(name, ct),
             (name, ct) => reviewerRepo.GetByNameAsync(name, ct),
+            (name, ct) => advisorRepo.GetByNameAsync(name, ct),
             cancellationToken);
     }
 }
