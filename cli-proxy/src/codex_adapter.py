@@ -11,6 +11,20 @@ _semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 # Home directory for codex auth — mounted as a volume in the container.
 CODEX_HOME = os.getenv("CODEX_HOME", "/auth/codex")
 
+# Static model list — the codex CLI has no model-listing command.
+# Update this list when new Codex/OpenAI models become available.
+STATIC_MODELS = [
+    "o4-mini",
+    "gpt-4o",
+    "gpt-4o-mini",
+    "o3",
+]
+
+
+def list_models() -> list[str]:
+    """Returns the static list of supported Codex/OpenAI models."""
+    return list(STATIC_MODELS)
+
 
 async def complete(prompt: str, model: str | None, max_tokens: int | None) -> str:
     """
