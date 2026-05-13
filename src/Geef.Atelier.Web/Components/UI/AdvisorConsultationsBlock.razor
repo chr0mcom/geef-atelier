@@ -1,0 +1,35 @@
+@* Collapsible block showing advisor consultations for a single iteration *@
+@using Geef.Atelier.Core.Domain.Crew.Advisors
+
+<div class="advisor-consultations-block" data-testid="advisor-consultations">
+    <button class="collapsible-header" @onclick="Toggle" type="button"
+            aria-expanded="@_expanded">
+        <span>@(IsRecovery ? "Recovery advisors: " : "Advisors consulted: ")@Consultations.Count advisor@(Consultations.Count != 1 ? "s" : "")</span>
+        <span class="chevron @(_expanded ? "up" : "down")">▾</span>
+    </button>
+
+    @if (_expanded)
+    {
+        <div class="collapsible-body">
+            @foreach (var c in Consultations)
+            {
+                <div class="advisor-consultation" data-testid="advisor-consultation-@c.AdvisorProfileName">
+                    <div class="advisor-consultation-header">
+                        <strong>@c.AdvisorProfileName</strong>
+                        <span class="advisor-consultation-time">@c.CreatedAt.LocalDateTime.ToString("HH:mm")</span>
+                    </div>
+                    <div class="advisor-consultation-output">@c.Output</div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<AdvisorConsultation> Consultations { get; set; } = [];
+    [Parameter] public bool IsRecovery { get; set; }
+
+    private bool _expanded;
+
+    private void Toggle() => _expanded = !_expanded;
+}

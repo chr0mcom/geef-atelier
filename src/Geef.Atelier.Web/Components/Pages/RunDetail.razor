@@ -4,8 +4,11 @@
 @implements IAsyncDisposable
 @inject IRunService RunService
 @inject NavigationManager Nav
+@inject Geef.Atelier.Core.Persistence.Crew.IAdvisorConsultationRepository _advisorConsultationRepo
 @using Microsoft.AspNetCore.SignalR.Client
 @using Geef.Atelier.Core.Domain.Crew
+@using Geef.Atelier.Core.Domain.Crew.Advisors
+@using Geef.Atelier.Core.Persistence.Crew
 @using Geef.Atelier.Web.Display
 
 <PageTitle>Run @_shortId — Geef.Atelier</PageTitle>
@@ -67,6 +70,11 @@
             }
             @foreach (var (iwf, idx) in _details.Iterations.Select((x, i) => (x, i)))
             {
+                var iterConsultations = _consultationsByIteration[iwf.Iteration.IterationNumber].ToList();
+                @if (iterConsultations.Count > 0)
+                {
+                    <AdvisorConsultationsBlock Consultations="iterConsultations" />
+                }
                 <IterationPanel
                     Iteration="iwf.Iteration"
                     Findings="iwf.Findings"
@@ -74,6 +82,14 @@
                     ResolvedMap="resolvedMap" />
             }
         </div>
+
+        @if (_consultationsByIteration[-1].Any())
+        {
+            <div class="advisor-recovery-section">
+                <h4>Convergence Failure Recovery</h4>
+                <AdvisorConsultationsBlock Consultations="_consultationsByIteration[-1].ToList()" IsRecovery="true" />
+            </div>
+        }
 
         @if (_details.Run.Status == RunStatus.Completed && !string.IsNullOrEmpty(_details.Run.FinalText))
         {
@@ -89,6 +105,8 @@
     bool           _notFound;
     HubConnection? _hub;
     CrewSnapshot?  _snapshot;
+    ILookup<int, AdvisorConsultation> _consultationsByIteration =
+        Enumerable.Empty<AdvisorConsultation>().ToLookup(c => c.IterationNumber);
 
     string _shortId => RunId.ToString("N")[..8].ToUpperInvariant();
 
@@ -103,6 +121,9 @@
         _details  = await RunService.GetRunDetailsAsync(RunId);
         _notFound = _details is null;
         _snapshot = _details is not null ? CrewSnapshot.Deserialize(_details.Run.CrewSnapshot) : null;
+
+        var consultations = await _advisorConsultationRepo.GetByRunIdAsync(RunId, CancellationToken.None);
+        _consultationsByIteration = consultations.ToLookup(c => c.IterationNumber);
     }
 
     async Task InitHubAsync()
