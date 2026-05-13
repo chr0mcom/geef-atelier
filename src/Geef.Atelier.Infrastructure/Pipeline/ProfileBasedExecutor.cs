@@ -47,6 +47,10 @@ internal sealed class ProfileBasedExecutor(
 
         var (client, model, maxTokens) = resolver.ForProfile(profile.Provider, profile.Model, profile.MaxTokens);
 
+        // Prepend advisor consultation outputs to the user prompt when present.
+        if (context.TryGet(AtelierContextKeys.AdvisorBlock, out var advisorBlock) && advisorBlock is not null)
+            userPrompt = $"{advisorBlock}\n\n{userPrompt}";
+
         var response = await client.CompleteAsync(new LlmRequest
         {
             Model        = model,

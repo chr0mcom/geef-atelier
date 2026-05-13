@@ -1,8 +1,11 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk;
+using Geef.Sdk.Context;
 using Geef.Sdk.Events;
 using Geef.Sdk.Middleware;
 using Geef.Sdk.Providers;
@@ -16,16 +19,74 @@ internal static class AtelierPipelineFactory
 {
     /// <summary>
     /// Builds the pipeline dynamically from a fully-dereferenced <see cref="CrewSnapshot"/>.
+    /// When the snapshot contains pre-execution advisors (<see cref="AdvisorTrigger.BeforeFirstExecution"/>
+    /// or <see cref="AdvisorTrigger.BeforeEveryExecution"/>), the executor is wrapped with an
+    /// <see cref="AdvisorAwareExecutor"/> decorator that consults them before each iteration.
     /// </summary>
     public static GeefPipelineRunner<FinalizedDocument> Build(
         CrewSnapshot snapshot,
         ILlmClientResolver resolver,
         IOptions<ConvergenceOptions> convergenceOptions,
+        IAdvisorConsultationRepository? consultationRepository = null,
+        Guid runId = default,
         ILoggerFactory? loggerFactory = null,
         IEnumerable<IGeefEventSink>? additionalSinks = null)
     {
         var grounding = new BriefingGroundingStep();
-        var execution = new ProfileBasedExecutor(snapshot.Executor, resolver);
+        IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver);
+
+        var preExecutionAdvisors = snapshot.Advisors
+            .Where(a => a.Trigger != AdvisorTrigger.OnConvergenceFailure)
+            .ToList();
+
+        if (preExecutionAdvisors.Count > 0 && consultationRepository is not null)
+        {
+            var advisorInstances = preExecutionAdvisors
+                .Select(a => new ProfileBasedAdvisor(a, resolver, consultationRepository))
+                .ToList();
+            execution = new AdvisorAwareExecutor(execution, advisorInstances, runId);
+        }
+
+        var reviewers = snapshot.Reviewers
+            .Select(r => (IReviewer)new ProfileBasedReviewer(r, resolver));
+        var finalizer = new MarkdownFinalizer();
+
+        return BuildWithProviders(grounding, execution, reviewers, finalizer,
+            convergenceOptions, snapshot.ConvergenceOverride,
+            snapshot.EvaluationStrategy, loggerFactory, additionalSinks);
+    }
+
+    /// <summary>
+    /// Builds the pipeline like <see cref="Build"/>, but also injects a pre-formed advisor context
+    /// block directly into the initial run context. Used by the orchestrator for convergence-failure
+    /// recovery passes where <see cref="AdvisorTrigger.OnConvergenceFailure"/> advisors have already
+    /// been consulted and their outputs assembled into <paramref name="advisorContextBlock"/>.
+    /// </summary>
+    public static GeefPipelineRunner<FinalizedDocument> BuildWithAdvisorContext(
+        CrewSnapshot snapshot,
+        ILlmClientResolver resolver,
+        IOptions<ConvergenceOptions> convergenceOptions,
+        string advisorContextBlock,
+        IAdvisorConsultationRepository? consultationRepository = null,
+        Guid runId = default,
+        ILoggerFactory? loggerFactory = null,
+        IEnumerable<IGeefEventSink>? additionalSinks = null)
+    {
+        var grounding = new AdvisorContextGroundingStep(advisorContextBlock);
+        IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver);
+
+        var preExecutionAdvisors = snapshot.Advisors
+            .Where(a => a.Trigger != AdvisorTrigger.OnConvergenceFailure)
+            .ToList();
+
+        if (preExecutionAdvisors.Count > 0 && consultationRepository is not null)
+        {
+            var advisorInstances = preExecutionAdvisors
+                .Select(a => new ProfileBasedAdvisor(a, resolver, consultationRepository))
+                .ToList();
+            execution = new AdvisorAwareExecutor(execution, advisorInstances, runId);
+        }
+
         var reviewers = snapshot.Reviewers
             .Select(r => (IReviewer)new ProfileBasedReviewer(r, resolver));
         var finalizer = new MarkdownFinalizer();
