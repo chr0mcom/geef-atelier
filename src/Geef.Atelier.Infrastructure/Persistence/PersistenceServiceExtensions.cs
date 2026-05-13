@@ -1,4 +1,6 @@
 using Geef.Atelier.Core.Persistence;
+using Geef.Atelier.Core.Persistence.Crew;
+using Geef.Atelier.Infrastructure.Persistence.Crew;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Geef.Atelier.Infrastructure.Persistence;
@@ -9,6 +11,9 @@ public static class PersistenceServiceExtensions
     {
         services.AddScoped<IRunPersistenceService, RunPersistenceService>();
         services.AddScoped<IRunRepository, RunRepository>();
+        services.AddScoped<IReviewerProfileRepository, ReviewerProfileRepository>();
+        services.AddScoped<IExecutorProfileRepository, ExecutorProfileRepository>();
+        services.AddScoped<ICrewTemplateRepository, CrewTemplateRepository>();
         return services;
     }
 }

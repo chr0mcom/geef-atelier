@@ -30,6 +30,14 @@ internal sealed class RunConfiguration : IEntityTypeConfiguration<RunEntity>
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.Property(r => r.CrewTemplateName)
+            .HasMaxLength(100)
+            .IsRequired(false);
+
+        builder.Property(r => r.CrewSnapshot)
+            .HasColumnType("jsonb")
+            .IsRequired(false);
+
         builder.HasIndex(r => r.Status);
     }
 }

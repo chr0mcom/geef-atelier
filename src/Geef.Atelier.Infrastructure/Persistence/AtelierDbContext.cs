@@ -1,4 +1,6 @@
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Microsoft.EntityFrameworkCore;
 
 namespace Geef.Atelier.Infrastructure.Persistence;
@@ -10,6 +12,10 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     public DbSet<IterationEntity> Iterations => Set<IterationEntity>();
     public DbSet<FindingEntity> Findings => Set<FindingEntity>();
     public DbSet<EventEntity> Events => Set<EventEntity>();
+
+    public DbSet<ReviewerProfile> ReviewerProfiles => Set<ReviewerProfile>();
+    public DbSet<ExecutorProfile> ExecutorProfiles => Set<ExecutorProfile>();
+    public DbSet<CrewTemplate> CrewTemplates => Set<CrewTemplate>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
         => modelBuilder.ApplyConfigurationsFromAssembly(typeof(AtelierDbContext).Assembly);
