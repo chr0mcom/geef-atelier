@@ -1,6 +1,9 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
@@ -21,6 +24,9 @@ internal sealed class RunOrchestratorService(
     ILoggerFactory                      loggerFactory,
     ILogger<RunOrchestratorService>     logger) : BackgroundService
 {
+    private static readonly JsonSerializerOptions SnapshotJsonOpts =
+        new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
     private readonly OrchestratorOptions _opts = options.Value;
     private readonly SemaphoreSlim _slots = new(options.Value.MaxConcurrentRuns, options.Value.MaxConcurrentRuns);
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _runCts   = new();
@@ -147,7 +153,8 @@ internal sealed class RunOrchestratorService(
         {
             var sinkLogger = loggerFactory.CreateLogger($"PostgresEventSink[{run.Id}]");
             var sink       = new PostgresEventSink(run.Id, scopeFactory, runNotifier, sinkLogger);
-            var runner     = AtelierPipelineFactory.Build(llmClientResolver, convergenceOptions, loggerFactory, additionalSinks: [sink]);
+            var snapshot   = ResolveSnapshot(run);
+            var runner     = AtelierPipelineFactory.Build(snapshot, llmClientResolver, convergenceOptions, loggerFactory, additionalSinks: [sink]);
             await runner.RunAsync(run.BriefingText, cts.Token);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -222,6 +229,26 @@ internal sealed class RunOrchestratorService(
                 logger.LogWarning(ex, "Cancellation watcher for run {RunId} encountered an error; will retry.", runId);
             }
         }
+    }
+
+    private static CrewSnapshot ResolveSnapshot(RunEntity run)
+    {
+        if (run.CrewSnapshot is { Length: > 0 } json)
+        {
+            var deserialized = JsonSerializer.Deserialize<CrewSnapshot>(json, SnapshotJsonOpts);
+            if (deserialized is not null)
+                return deserialized;
+        }
+
+        // Defensive fallback: pre-PS-5 runs have no snapshot; reconstruct from code constants.
+        return new CrewSnapshot(
+            SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
+            TemplateName: SystemCrew.KlassikTemplateName,
+            Executor: SystemCrew.DefaultExecutorProfile,
+            Reviewers: [SystemCrew.BriefingFidelityProfile, SystemCrew.ClarityProfile],
+            EvaluationStrategy: EvaluationStrategy.Parallel,
+            ConvergenceOverride: null,
+            Advisors: Array.Empty<AdvisorProfile>());
     }
 
     /// <summary>
