@@ -1,5 +1,6 @@
 @using Geef.Atelier.Core.Domain.Crew
 @using Geef.Atelier.Core.Domain.Crew.Advisors
+@using Geef.Atelier.Core.Domain.Crew.Grounding
 @using Geef.Atelier.Web.Display
 
 <div class="crew-summary" data-testid="crew-summary">
@@ -34,6 +35,14 @@
                     <strong>Advisors:</strong>
                     @string.Join(" · ", Snapshot.Advisors.Select(a =>
                         $"{a.DisplayName} ({ReviewerDisplay.GetAdvisorModeDisplay(a.Mode)}, {ReviewerDisplay.GetAdvisorTriggerDisplay(a.Trigger)})"))
+                </div>
+            }
+            @if (Snapshot.GroundingProviders?.Count > 0)
+            {
+                <div class="crew-summary-grounding" data-testid="crew-summary-grounding">
+                    <strong>Grounding:</strong>
+                    @string.Join(" · ", Snapshot.GroundingProviders.Select(g =>
+                        $"{g.DisplayName} ({ReviewerDisplay.GetGroundingProviderTypeDisplay(g.ProviderType)})"))
                 </div>
             }
             @if (Snapshot.ConvergenceOverride != null)

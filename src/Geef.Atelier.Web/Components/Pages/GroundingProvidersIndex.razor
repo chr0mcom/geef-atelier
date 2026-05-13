@@ -1,0 +1,126 @@
+@page "/crew/profiles/grounding"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Core.Domain.Crew.Grounding
+@using Geef.Atelier.Web.Display
+@inject ICrewService CrewService
+
+<PageTitle>Grounding Providers — Atelier</PageTitle>
+
+<div class="crew-profiles-index">
+    <div class="page-header">
+        <h1>Grounding Providers</h1>
+        <a href="/crew/profiles/grounding/new" class="btn primary">+ New Profile</a>
+    </div>
+
+    @if (_profiles.Count == 0)
+    {
+        <p class="text-muted">No grounding provider profiles yet.</p>
+    }
+    else
+    {
+        <table class="crew-table" data-testid="grounding-provider-list">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Max Queries/Run</th>
+                    <th>Description</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in _profiles)
+                {
+                    <tr data-testid="grounding-provider-row-@p.Name">
+                        <td>
+                            @p.DisplayName
+                            @if (p.IsSystem) { <span class="crew-badge">System</span> }
+                        </td>
+                        <td>@ReviewerDisplay.GetGroundingProviderTypeDisplay(p.ProviderType)</td>
+                        <td>@(p.MaxQueriesPerRun?.ToString() ?? "—")</td>
+                        <td>
+                            @if (!string.IsNullOrEmpty(p.Description))
+                            {
+                                <span title="@p.Description">
+                                    @(p.Description.Length > 60 ? p.Description[..60] + "…" : p.Description)
+                                </span>
+                            }
+                        </td>
+                        <td class="crew-table-actions">
+                            @if (p.IsSystem)
+                            {
+                                <button class="btn small disabled-action" disabled title="System profile — duplicate to customize">Edit</button>
+                                <button class="btn small primary" @onclick="() => DuplicateProfile(p)">Duplicate as custom</button>
+                                <button class="btn small disabled-action" disabled title="System profile — cannot delete">Delete</button>
+                            }
+                            else
+                            {
+                                <a href="/crew/profiles/grounding/@p.Name" class="btn small">Edit</a>
+                                <button class="btn small danger" @onclick="() => _profileToDelete = p">Delete</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="error-banner">@_error</div>
+    }
+</div>
+
+<DeleteConfirmationModal
+    Show="_profileToDelete != null"
+    ItemName="@(_profileToDelete?.Name ?? "")"
+    ItemKind="Profile"
+    OnConfirm="ExecuteIndexDeleteAsync"
+    OnCancel="() => _profileToDelete = null" />
+
+@code {
+    private IReadOnlyList<GroundingProviderProfile> _profiles = [];
+    private GroundingProviderProfile? _profileToDelete;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _profiles = await CrewService.ListGroundingProviderProfilesAsync(includeSystem: true);
+    }
+
+    private async Task DuplicateProfile(GroundingProviderProfile original)
+    {
+        _error = null;
+        try
+        {
+            var copy = original with
+            {
+                Name = original.Name + "-copy",
+                DisplayName = original.DisplayName + " (Copy)",
+                IsSystem = false
+            };
+            await CrewService.CreateCustomGroundingProviderProfileAsync(copy);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task ExecuteIndexDeleteAsync()
+    {
+        if (_profileToDelete == null) return;
+        var name = _profileToDelete.Name;
+        _profileToDelete = null;
+        try { await CrewService.DeleteCustomGroundingProviderProfileAsync(name); await LoadAsync(); }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+}

@@ -78,4 +78,22 @@ public static class ReviewerDisplay
             AdvisorTrigger.OnConvergenceFailure => "On Convergence Failure (Recovery)",
             _                                   => trigger.ToString()
         };
+
+    /// <summary>Returns a human-readable label for a grounding provider type string.</summary>
+    public static string GetGroundingProviderTypeDisplay(string providerType) =>
+        providerType switch
+        {
+            "tavily" => "Tavily Web Search",
+            _        => providerType
+        };
+
+    /// <summary>
+    /// Returns the display name for a grounding provider profile.
+    /// Looks up <see cref="SystemCrew.GroundingProviderProfiles"/> first; falls back to
+    /// <paramref name="fallbackDisplayName"/> or <paramref name="profileName"/>.
+    /// </summary>
+    public static string GetGroundingProviderDisplay(string profileName, string? fallbackDisplayName = null) =>
+        SystemCrew.GroundingProviderProfiles.TryGetValue(profileName, out var profile)
+            ? profile.DisplayName
+            : fallbackDisplayName ?? profileName;
 }
