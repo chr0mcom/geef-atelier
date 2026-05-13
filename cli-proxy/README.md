@@ -5,26 +5,35 @@ Ein leichtgewichtiger HTTP-Wrapper, der die `claude` (Claude Code CLI) und `code
 ## Architektur
 
 ```
-Geef.Atelier Web ──► POST /v1/chat/completions ──► CLI-Proxy
-                                                      ├─ claude-* → claude CLI
-                                                      └─ gpt-*/o*  → codex CLI
+Geef.Atelier Web ──► POST /v1/claude/chat/completions ──► CLI-Proxy ──► claude CLI
+                 ──► POST /v1/codex/chat/completions  ──► CLI-Proxy ──► codex CLI
 ```
 
-Der Proxy ist intern im Docker-Netzwerk erreichbar (`http://cli-proxy:8090/v1`) und hat kein Traefik-Routing nach außen.
+Der Proxy ist intern im Docker-Netzwerk erreichbar (`http://cli-proxy:8090`) und hat kein Traefik-Routing nach außen.
 
 ## Endpoints
 
 | Methode | Pfad | Beschreibung |
 |---------|------|--------------|
-| `POST` | `/v1/chat/completions` | OpenAI-konformes Chat Completions |
-| `GET` | `/v1/models` | Liste unterstützter Modelle |
-| `GET` | `/health` | Health-Check mit CLI-Status |
+| `POST` | `/v1/claude/chat/completions` | Direkt zur claude CLI — kein Model-Name-Routing |
+| `POST` | `/v1/codex/chat/completions`  | Direkt zur codex CLI — kein Model-Name-Routing |
+| `POST` | `/v1/chat/completions` | **DEPRECATED** Legacy-Endpoint mit Model-Name-Routing. Loggt WARNING. |
+| `GET`  | `/v1/models` | Liste unterstützter Modelle |
+| `GET`  | `/health` | Health-Check mit CLI-Status |
 
-## Model-Routing
+### Explizite Endpoints (empfohlen)
 
-- `claude-*`, `anthropic/claude-*` → `claude` CLI
-- `gpt-*`, `o1-*`, `o3-*`, `o4-*`, `openai/*` → `codex` CLI
-- Unbekannte Modelle → `claude` CLI (Fallback)
+Die neuen Endpunkte `/v1/claude/chat/completions` und `/v1/codex/chat/completions` routen deterministisch anhand des Pfades — unabhängig vom `model`-Feld im Request. Dies ist die empfohlene Variante für alle neuen Profile.
+
+### Legacy-Endpoint (veraltet)
+
+`/v1/chat/completions` bleibt für Backward-Kompatibilität erhalten und nutzt weiterhin Model-Name-Routing:
+
+- `claude-*`, `anthropic/claude-*` → claude CLI
+- `gpt-*`, `o1-*`, `o3-*`, `o4-*`, `openai/*` → codex CLI
+- Unbekannte Modelle → claude CLI (Fallback)
+
+Jeder Aufruf dieses Endpunkts loggt ein DEPRECATED-Warning. Geplante Entfernung nach 2 Atelier-Versionen.
 
 ## Tool-Use
 
@@ -83,13 +92,17 @@ In `appsettings.json` / Umgebungsvariablen:
 {
   "Llm": {
     "Providers": {
-      "cli": {
-        "Endpoint": "http://cli-proxy:8090/v1",
+      "claude-cli": {
+        "Endpoint": "http://cli-proxy:8090/v1/claude",
+        "ApiKey": ""
+      },
+      "codex-cli": {
+        "Endpoint": "http://cli-proxy:8090/v1/codex",
         "ApiKey": ""
       }
     },
     "Actors": {
-      "Executor": { "Provider": "cli", "Model": "claude-opus-4-5" }
+      "Executor": { "Provider": "claude-cli", "Model": "claude-opus-4-5" }
     }
   }
 }
@@ -112,6 +125,6 @@ CLI-Auth-Tokens (in `/auth/`) sind niemals in Source-Control, Logs oder Berichte
 
 ```bash
 cd cli-proxy
-python -m venv .venv && .venv/bin/pip install ".[dev]"
-.venv/bin/python -m pytest tests/ -v
+pip3 install ".[dev]" --break-system-packages
+python3 -m pytest tests/ -v
 ```

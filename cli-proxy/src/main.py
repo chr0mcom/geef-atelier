@@ -114,11 +114,58 @@ def _build_response(req: ChatCompletionRequest, raw_text: str) -> ChatCompletion
 
 
 # ---------------------------------------------------------------------------
+# Request processing helpers (adapter-level, no routing logic)
+# ---------------------------------------------------------------------------
+
+async def _call_claude(req: ChatCompletionRequest) -> ChatCompletionResponse:
+    prompt = _build_prompt(req)
+    log.info("Dispatching to claude | model=%s | tool=%s", req.model, _extract_tool_name(req))
+    raw = await claude_adapter.complete(prompt, req.model, req.max_tokens)
+    return _build_response(req, raw)
+
+
+async def _call_codex(req: ChatCompletionRequest) -> ChatCompletionResponse:
+    prompt = _build_prompt(req)
+    log.info("Dispatching to codex | model=%s | tool=%s", req.model, _extract_tool_name(req))
+    raw = await codex_adapter.complete(prompt, req.model, req.max_tokens)
+    return _build_response(req, raw)
+
+
+# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
+@app.post("/v1/claude/chat/completions", response_model=ChatCompletionResponse)
+async def claude_completions(req: ChatCompletionRequest) -> ChatCompletionResponse:
+    """Routes directly to the claude CLI — no model-name heuristic."""
+    if req.stream:
+        raise HTTPException(status_code=400, detail="Streaming is not supported by the CLI proxy.")
+    try:
+        return await _call_claude(req)
+    except RuntimeError as exc:
+        log.error("claude CLI call failed: %s", exc)
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.post("/v1/codex/chat/completions", response_model=ChatCompletionResponse)
+async def codex_completions(req: ChatCompletionRequest) -> ChatCompletionResponse:
+    """Routes directly to the codex CLI — no model-name heuristic."""
+    if req.stream:
+        raise HTTPException(status_code=400, detail="Streaming is not supported by the CLI proxy.")
+    try:
+        return await _call_codex(req)
+    except RuntimeError as exc:
+        log.error("codex CLI call failed: %s", exc)
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
 async def chat_completions(req: ChatCompletionRequest) -> ChatCompletionResponse:
+    """Legacy endpoint with model-name routing. Use /v1/claude/... or /v1/codex/... instead."""
+    log.warning(
+        "DEPRECATED: /v1/chat/completions endpoint with model-name routing. "
+        "Use /v1/claude/chat/completions or /v1/codex/chat/completions instead."
+    )
     if req.stream:
         raise HTTPException(status_code=400, detail="Streaming is not supported by the CLI proxy.")
     try:
