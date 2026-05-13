@@ -75,5 +75,6 @@ public sealed class SubmitRequestWithCrewTests
         public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<RunEntity>>([]);
         public Task<bool> CancelRunAsync(Guid runId, CancellationToken ct = default) => Task.FromResult(false);
         public Task<RunDetails?> GetRunDetailsAsync(Guid runId, CancellationToken ct = default) => Task.FromResult<RunDetails?>(null);
+        public Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, CancellationToken ct = default) => Task.FromResult<RunWithGroundingViewModel?>(null);
     }
 }

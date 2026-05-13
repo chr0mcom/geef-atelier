@@ -51,5 +51,8 @@ public sealed class SubmitRequestToolCallsRunServiceTests
 
         public Task<RunDetails?> GetRunDetailsAsync(Guid runId, CancellationToken cancellationToken = default)
             => Task.FromResult<RunDetails?>(null);
+
+        public Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, CancellationToken cancellationToken = default)
+            => Task.FromResult<RunWithGroundingViewModel?>(null);
     }
 }
