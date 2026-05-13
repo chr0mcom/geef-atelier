@@ -5,6 +5,7 @@
 @using System.ComponentModel.DataAnnotations
 @using Geef.Atelier.Application.Crew
 @using Geef.Atelier.Core.Domain.Crew
+@using Geef.Atelier.Core.Domain.Crew.Advisors
 @using Geef.Atelier.Core.Domain.Crew.Profiles
 @inject ICrewService CrewService
 @inject NavigationManager Nav
@@ -59,6 +60,13 @@
                         <option value="@e.Name">@e.DisplayName @(e.IsSystem ? "(System)" : "")</option>
                     }
                 </InputSelect>
+            </div>
+
+            <div class="field">
+                <label>Advisors</label>
+                <AdvisorPicker AllProfiles="_advisorProfiles"
+                               Selected="_form.AdvisorProfileNames"
+                               SelectedChanged="names => _form.AdvisorProfileNames = names" />
             </div>
 
             <div class="field">
@@ -152,6 +160,7 @@
 
     private IReadOnlyList<ReviewerProfile> _reviewers = [];
     private IReadOnlyList<ExecutorProfile> _executors = [];
+    private IReadOnlyList<AdvisorProfile> _advisorProfiles = [];
 
     private TemplateFormModel _form = new();
 
@@ -159,6 +168,7 @@
     {
         _reviewers = await CrewService.ListReviewerProfilesAsync(includeSystem: true);
         _executors = await CrewService.ListExecutorProfilesAsync(includeSystem: true);
+        _advisorProfiles = await CrewService.ListAdvisorProfilesAsync(includeSystem: true);
 
         if (!IsNew)
         {
@@ -245,6 +255,8 @@
         [Required]
         public string ExecutorProfileName { get; set; } = "";
 
+        public List<string> AdvisorProfileNames { get; set; } = [];
+
         public List<string> ReviewerProfileNames { get; set; } = [];
 
         public EvaluationStrategy EvaluationStrategy { get; set; } = EvaluationStrategy.Parallel;
@@ -260,6 +272,7 @@
             DisplayName = t.DisplayName,
             Description = t.Description,
             ExecutorProfileName = t.ExecutorProfileName,
+            AdvisorProfileNames = t.AdvisorProfileNames.ToList(),
             ReviewerProfileNames = t.ReviewerProfileNames.ToList(),
             EvaluationStrategy = t.EvaluationStrategy,
             MaxIterations = t.ConvergenceOverride?.MaxIterations,
@@ -282,7 +295,7 @@
                 ReviewerProfileNames: ReviewerProfileNames,
                 EvaluationStrategy: EvaluationStrategy,
                 ConvergenceOverride: overr,
-                AdvisorProfileNames: [],
+                AdvisorProfileNames: AdvisorProfileNames,
                 IsSystem: false);
         }
     }

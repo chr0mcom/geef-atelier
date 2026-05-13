@@ -1,4 +1,5 @@
 @using Geef.Atelier.Core.Domain.Crew
+@using Geef.Atelier.Core.Domain.Crew.Advisors
 @using Geef.Atelier.Web.Display
 
 <div class="crew-summary" data-testid="crew-summary">
@@ -27,6 +28,14 @@
                 <strong>Strategy:</strong>
                 @ReviewerDisplay.GetEvaluationStrategyDisplay(Snapshot.EvaluationStrategy)
             </div>
+            @if (Snapshot.Advisors?.Count > 0)
+            {
+                <div class="crew-summary-advisors" data-testid="crew-summary-advisors">
+                    <strong>Advisors:</strong>
+                    @string.Join(" · ", Snapshot.Advisors.Select(a =>
+                        $"{a.DisplayName} ({ReviewerDisplay.GetAdvisorModeDisplay(a.Mode)}, {ReviewerDisplay.GetAdvisorTriggerDisplay(a.Trigger)})"))
+                </div>
+            }
             @if (Snapshot.ConvergenceOverride != null)
             {
                 <div class="crew-summary-override">

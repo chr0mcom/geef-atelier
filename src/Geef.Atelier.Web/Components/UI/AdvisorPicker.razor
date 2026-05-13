@@ -1,0 +1,92 @@
+@using Geef.Atelier.Core.Domain.Crew.Advisors
+@using Geef.Atelier.Web.Display
+
+<div class="advisor-picker" data-testid="advisor-picker">
+    <div class="advisor-picker-columns">
+        <div class="advisor-picker-available">
+            <h4>Available</h4>
+            @foreach (var profile in AvailableNotSelected)
+            {
+                <button type="button" class="advisor-picker-item"
+                        data-testid="advisor-picker-available-@profile.Name"
+                        @onclick="() => Add(profile.Name)">
+                    @profile.DisplayName — @ReviewerDisplay.GetAdvisorModeDisplay(profile.Mode) (@ReviewerDisplay.GetAdvisorTriggerDisplay(profile.Trigger))
+                    @if (profile.IsSystem) { <span class="crew-badge">System</span> }
+                </button>
+            }
+        </div>
+        <div class="advisor-picker-selected">
+            <h4>Selected</h4>
+            @for (int i = 0; i < Selected.Count; i++)
+            {
+                var idx = i;
+                var name = Selected[idx];
+                var profile = FindProfile(name);
+                <div class="advisor-picker-selected-item" data-testid="advisor-picker-selected-@name">
+                    <span>@(profile != null ? $"{profile.DisplayName} — {ReviewerDisplay.GetAdvisorModeDisplay(profile.Mode)} ({ReviewerDisplay.GetAdvisorTriggerDisplay(profile.Trigger)})" : name)</span>
+                    <div class="advisor-picker-actions">
+                        <button type="button" class="btn small ghost" disabled="@(idx == 0)"
+                                data-testid="advisor-picker-up-@name"
+                                @onclick="() => MoveUp(idx)">↑</button>
+                        <button type="button" class="btn small ghost" disabled="@(idx == Selected.Count - 1)"
+                                data-testid="advisor-picker-down-@name"
+                                @onclick="() => MoveDown(idx)">↓</button>
+                        <button type="button" class="btn small danger"
+                                @onclick="() => Remove(idx)">×</button>
+                    </div>
+                </div>
+            }
+            @if (Selected.Count == 0)
+            {
+                <p class="text-muted">No advisors selected.</p>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<AdvisorProfile> AllProfiles { get; set; } = [];
+    [Parameter, EditorRequired] public List<string> Selected { get; set; } = [];
+    [Parameter] public EventCallback<List<string>> SelectedChanged { get; set; }
+
+    private IEnumerable<AdvisorProfile> AvailableNotSelected =>
+        AllProfiles.Where(p => !Selected.Contains(p.Name));
+
+    private AdvisorProfile? FindProfile(string name) =>
+        AllProfiles.FirstOrDefault(p => p.Name == name);
+
+    private async Task Add(string name)
+    {
+        if (!Selected.Contains(name))
+        {
+            Selected = [.. Selected, name];
+            await SelectedChanged.InvokeAsync(Selected);
+        }
+    }
+
+    private async Task Remove(int idx)
+    {
+        var newList = Selected.ToList();
+        newList.RemoveAt(idx);
+        Selected = newList;
+        await SelectedChanged.InvokeAsync(Selected);
+    }
+
+    private async Task MoveUp(int idx)
+    {
+        if (idx <= 0) return;
+        var newList = Selected.ToList();
+        (newList[idx - 1], newList[idx]) = (newList[idx], newList[idx - 1]);
+        Selected = newList;
+        await SelectedChanged.InvokeAsync(Selected);
+    }
+
+    private async Task MoveDown(int idx)
+    {
+        if (idx >= Selected.Count - 1) return;
+        var newList = Selected.ToList();
+        (newList[idx + 1], newList[idx]) = (newList[idx], newList[idx + 1]);
+        Selected = newList;
+        await SelectedChanged.InvokeAsync(Selected);
+    }
+}
