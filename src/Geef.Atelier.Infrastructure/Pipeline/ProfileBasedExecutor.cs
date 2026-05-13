@@ -47,6 +47,10 @@ internal sealed class ProfileBasedExecutor(
 
         var (client, model, maxTokens) = resolver.ForProfile(profile.Provider, profile.Model, profile.MaxTokens);
 
+        // Prepend grounding context (web research) before advisor block and user prompt.
+        if (context.TryGet(AtelierContextKeys.GroundingContext, out var groundingCtx) && groundingCtx is not null)
+            userPrompt = $"{groundingCtx}\n\n{userPrompt}";
+
         // Prepend advisor consultation outputs to the user prompt when present.
         if (context.TryGet(AtelierContextKeys.AdvisorBlock, out var advisorBlock) && advisorBlock is not null)
             userPrompt = $"{advisorBlock}\n\n{userPrompt}";

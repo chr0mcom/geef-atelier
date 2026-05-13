@@ -17,6 +17,7 @@ services:
       - AtelierUser__PasswordHash=${ATELIER_PASSWORD_HASH}
       - AtelierMcp__Token=${ATELIER_MCP_TOKEN}
       - Llm__Providers__openrouter__ApiKey=${LLM_OPENROUTER_API_KEY}
+      - Tavily__ApiKey=${TAVILY_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy

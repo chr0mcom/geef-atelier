@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
@@ -30,9 +31,18 @@ internal static class AtelierPipelineFactory
         IAdvisorConsultationRepository? consultationRepository = null,
         Guid runId = default,
         ILoggerFactory? loggerFactory = null,
-        IEnumerable<IGeefEventSink>? additionalSinks = null)
+        IEnumerable<IGeefEventSink>? additionalSinks = null,
+        IGroundingProviderFactory? groundingProviderFactory = null)
     {
-        var grounding = new BriefingGroundingStep();
+        IGroundingStep grounding = new BriefingGroundingStep();
+        if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
+        {
+            grounding = new MultiProviderGroundingStep(
+                grounding, snapshot.GroundingProviders, groundingProviderFactory, runId,
+                loggerFactory?.CreateLogger<MultiProviderGroundingStep>()
+                    ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance);
+        }
+
         IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver);
 
         var preExecutionAdvisors = snapshot.Advisors
@@ -70,9 +80,18 @@ internal static class AtelierPipelineFactory
         IAdvisorConsultationRepository? consultationRepository = null,
         Guid runId = default,
         ILoggerFactory? loggerFactory = null,
-        IEnumerable<IGeefEventSink>? additionalSinks = null)
+        IEnumerable<IGeefEventSink>? additionalSinks = null,
+        IGroundingProviderFactory? groundingProviderFactory = null)
     {
-        var grounding = new AdvisorContextGroundingStep(advisorContextBlock);
+        IGroundingStep grounding = new AdvisorContextGroundingStep(advisorContextBlock);
+        if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
+        {
+            grounding = new MultiProviderGroundingStep(
+                grounding, snapshot.GroundingProviders, groundingProviderFactory, runId,
+                loggerFactory?.CreateLogger<MultiProviderGroundingStep>()
+                    ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance);
+        }
+
         IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver);
 
         var preExecutionAdvisors = snapshot.Advisors

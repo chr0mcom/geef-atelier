@@ -1,4 +1,5 @@
 using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 
 namespace Geef.Atelier.Core.Domain.Crew;
@@ -67,6 +68,22 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
+        GroundingProviderNames: Array.Empty<string>(),
+        IsSystem: true);
+
+    /// <summary>System grounding-provider profile for Tavily Basic web-search (1 credit/search, ~5 sources).</summary>
+    public static readonly GroundingProviderProfile TavilyBasicProfile = new(
+        Name: "tavily-basic",
+        DisplayName: "Tavily Basic Web Search",
+        Description: "Web research via the Tavily API (Basic tier, 1 credit per search). Returns ~5 web sources with title, URL and snippet.",
+        ProviderType: "tavily",
+        ProviderSettings: new Dictionary<string, string>
+        {
+            ["Tier"] = "basic",
+            ["MaxResults"] = "5",
+            ["IncludeAnswer"] = "true",
+        },
+        MaxQueriesPerRun: 1,
         IsSystem: true);
 
     /// <summary>All system reviewer profiles, indexed by name.</summary>
@@ -118,6 +135,13 @@ public static class SystemCrew
             [DevilsAdvocateProfile.Name] = DevilsAdvocateProfile,
         };
 
+    /// <summary>All system grounding-provider profiles, indexed by name.</summary>
+    public static readonly IReadOnlyDictionary<string, GroundingProviderProfile> GroundingProviderProfiles =
+        new Dictionary<string, GroundingProviderProfile>
+        {
+            [TavilyBasicProfile.Name] = TavilyBasicProfile,
+        };
+
     /// <summary>All system crew templates, indexed by name.</summary>
     public static readonly IReadOnlyDictionary<string, CrewTemplate> CrewTemplates =
         new Dictionary<string, CrewTemplate>
@@ -134,6 +158,10 @@ public static class SystemCrew
     /// <summary>True when the supplied name matches a system advisor profile.</summary>
     public static bool IsSystemAdvisorName(string name) =>
         AdvisorProfiles.ContainsKey(name);
+
+    /// <summary>True when the supplied name matches a system grounding-provider profile.</summary>
+    public static bool IsSystemGroundingProviderName(string name) =>
+        GroundingProviderProfiles.ContainsKey(name);
 
     /// <summary>Ensures the supplied name carries the <c>"custom-"</c> prefix; idempotent.</summary>
     public static string EnsureCustomPrefix(string name) =>

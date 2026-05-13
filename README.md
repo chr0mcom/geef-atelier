@@ -169,7 +169,10 @@ POSTGRES_PASSWORD=<generiertes-passwort>
 ATELIER_USER=admin
 ATELIER_PASSWORD_HASH=<bcrypt-hash>
 ATELIER_MCP_TOKEN=<hex-token>
-LLM_API_KEY=<openrouter-api-key>
+LLM_OPENROUTER_API_KEY=<openrouter-api-key>
+
+# Tavily Web Search (https://tavily.com) — optional, only needed for Tavily grounding profiles
+TAVILY_API_KEY=
 ```
 
 **3. Stack starten:**

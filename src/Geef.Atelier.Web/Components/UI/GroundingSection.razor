@@ -1,4 +1,6 @@
 @using Geef.Atelier.Core.Domain.Crew.Advisors
+@using Geef.Atelier.Core.Domain.Crew.Grounding
+@using Geef.Atelier.Web.Display
 
 <div class="grounding-section" data-testid="grounding-section">
     <h2 class="grounding-header">Grounding</h2>
@@ -7,6 +9,64 @@
         <div class="sub-section-label">Briefing</div>
         <pre class="briefing-text">@Briefing</pre>
     </div>
+
+    @if (GroundingConsultations?.Count > 0)
+    {
+        <div class="sub-section" data-testid="grounding-web-research">
+            <button class="sub-section-toggle collapsible-header" type="button"
+                    @onclick="() => _webResearchExpanded = !_webResearchExpanded"
+                    aria-expanded="@_webResearchExpanded">
+                <span class="chevron @(_webResearchExpanded ? "up" : "down")">▾</span>
+                <span>Web Research (@GroundingConsultations.Count @(GroundingConsultations.Count == 1 ? "search" : "searches"))</span>
+            </button>
+            @if (_webResearchExpanded)
+            {
+                <div class="collapsible-body">
+                    @foreach (var consultation in GroundingConsultations)
+                    {
+                        <div class="grounding-consultation" data-testid="grounding-consultation-@consultation.Id">
+                            <div class="grounding-consultation-meta">
+                                <span class="grounding-provider-label">@ReviewerDisplay.GetGroundingProviderDisplay(consultation.GroundingProviderName, consultation.GroundingProviderName)</span>
+                                @if (consultation.CostEur.HasValue)
+                                {
+                                    <span class="grounding-cost">~€@consultation.CostEur.Value.ToString("F4")</span>
+                                }
+                            </div>
+                            <div class="grounding-query">
+                                <strong>Query:</strong> <em>@Truncate(consultation.Query, 200)</em>
+                            </div>
+                            @if (consultation.Citations.Count > 0)
+                            {
+                                <ol class="grounding-citations">
+                                    @foreach (var citation in consultation.Citations)
+                                    {
+                                        <li class="grounding-citation">
+                                            @if (!string.IsNullOrEmpty(citation.Url))
+                                            {
+                                                <a href="@citation.Url" target="_blank" rel="noopener noreferrer" class="citation-title">@citation.Title</a>
+                                            }
+                                            else
+                                            {
+                                                <span class="citation-title">@citation.Title</span>
+                                            }
+                                            @if (citation.RelevanceScore.HasValue)
+                                            {
+                                                <span class="citation-score">@citation.RelevanceScore.Value.ToString("F2")</span>
+                                            }
+                                            @if (!string.IsNullOrEmpty(citation.Snippet))
+                                            {
+                                                <div class="citation-snippet">@Truncate(citation.Snippet, 300)</div>
+                                            }
+                                        </li>
+                                    }
+                                </ol>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
 
     @if (BeforeFirstAdvisors.Count > 0)
     {
@@ -37,7 +97,10 @@
         {
             <div class="collapsible-body">
                 <pre class="briefing-text">@GroundedBrief</pre>
-                <p class="grounded-brief-hint"><em>Currently identical to the original briefing — RAG will enrich this in a future step.</em></p>
+                @if (GroundingConsultations == null || GroundingConsultations.Count == 0)
+                {
+                    <p class="grounded-brief-hint"><em>Currently identical to the original briefing — RAG will enrich this in a future step.</em></p>
+                }
             </div>
         }
     </div>
@@ -47,7 +110,12 @@
     [Parameter, EditorRequired] public string Briefing { get; set; } = "";
     [Parameter, EditorRequired] public string GroundedBrief { get; set; } = "";
     [Parameter] public IReadOnlyList<AdvisorConsultation> BeforeFirstAdvisors { get; set; } = [];
+    [Parameter] public IReadOnlyList<GroundingConsultation>? GroundingConsultations { get; set; }
 
+    private bool _webResearchExpanded = true;
     private bool _advisorsExpanded = false;
     private bool _groundedExpanded = false;
+
+    private static string Truncate(string s, int max) =>
+        s.Length > max ? s[..max] + "…" : s;
 }

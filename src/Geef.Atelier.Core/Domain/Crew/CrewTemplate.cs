@@ -23,6 +23,10 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// Names of advisor profiles to consult during grounding/finalisation. Empty in PS-5 (advisor pass
 /// implementation is deferred to PS-7).
 /// </param>
+/// <param name="GroundingProviderNames">
+/// Names of grounding-provider profiles to run before the executor begins. Empty list means no web-research
+/// pre-processing. Grounding runs once per run (not per iteration).
+/// </param>
 /// <param name="IsSystem">
 /// True for templates defined as code constants in <see cref="SystemCrew"/>; false for user-created
 /// templates persisted in the database. System templates are read-only at runtime.
@@ -36,4 +40,5 @@ public sealed record CrewTemplate(
     EvaluationStrategy EvaluationStrategy,
     ConvergencePolicyOverride? ConvergenceOverride,
     IReadOnlyList<string> AdvisorProfileNames,
+    IReadOnlyList<string> GroundingProviderNames,
     bool IsSystem);

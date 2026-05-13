@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
@@ -23,7 +24,8 @@ internal sealed class RunOrchestratorService(
     IOptions<OrchestratorOptions>       options,
     IOptions<ConvergenceOptions>        convergenceOptions,
     ILoggerFactory                      loggerFactory,
-    ILogger<RunOrchestratorService>     logger) : BackgroundService
+    ILogger<RunOrchestratorService>     logger,
+    IGroundingProviderFactory?          groundingProviderFactory = null) : BackgroundService
 {
     private readonly OrchestratorOptions _opts = options.Value;
     private readonly SemaphoreSlim _slots = new(options.Value.MaxConcurrentRuns, options.Value.MaxConcurrentRuns);
@@ -161,7 +163,8 @@ internal sealed class RunOrchestratorService(
                 consultationRepository: consultations,
                 runId: run.Id,
                 loggerFactory: loggerFactory,
-                additionalSinks: [sink]);
+                additionalSinks: [sink],
+                groundingProviderFactory: groundingProviderFactory);
 
             try
             {
@@ -354,7 +357,8 @@ internal sealed class RunOrchestratorService(
             consultationRepository: retryConsultations,
             runId: run.Id,
             loggerFactory: loggerFactory,
-            additionalSinks: [retrySink]);
+            additionalSinks: [retrySink],
+            groundingProviderFactory: groundingProviderFactory);
 
         // The retry pipeline writes its own status via PostgresEventSink just like the main run.
         // ConvergenceFailedException from the retry is intentionally not caught here — it propagates

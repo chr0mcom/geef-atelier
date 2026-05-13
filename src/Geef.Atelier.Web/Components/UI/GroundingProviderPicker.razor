@@ -1,0 +1,92 @@
+@using Geef.Atelier.Core.Domain.Crew.Grounding
+@using Geef.Atelier.Web.Display
+
+<div class="grounding-provider-picker" data-testid="grounding-provider-picker">
+    <div class="grounding-provider-picker-columns">
+        <div class="grounding-provider-picker-available">
+            <h4>Available</h4>
+            @foreach (var profile in AvailableNotSelected)
+            {
+                <button type="button" class="grounding-provider-picker-item"
+                        data-testid="grounding-provider-picker-available-@profile.Name"
+                        @onclick="() => Add(profile.Name)">
+                    @profile.DisplayName — @ReviewerDisplay.GetGroundingProviderTypeDisplay(profile.ProviderType)
+                    @if (profile.IsSystem) { <span class="crew-badge">System</span> }
+                </button>
+            }
+        </div>
+        <div class="grounding-provider-picker-selected">
+            <h4>Selected</h4>
+            @for (int i = 0; i < Selected.Count; i++)
+            {
+                var idx = i;
+                var name = Selected[idx];
+                var profile = FindProfile(name);
+                <div class="grounding-provider-picker-selected-item" data-testid="grounding-provider-picker-selected-@name">
+                    <span>@(profile != null ? $"{profile.DisplayName} — {ReviewerDisplay.GetGroundingProviderTypeDisplay(profile.ProviderType)}" : name)</span>
+                    <div class="grounding-provider-picker-actions">
+                        <button type="button" class="btn small ghost" disabled="@(idx == 0)"
+                                data-testid="grounding-provider-picker-up-@name"
+                                @onclick="() => MoveUp(idx)">↑</button>
+                        <button type="button" class="btn small ghost" disabled="@(idx == Selected.Count - 1)"
+                                data-testid="grounding-provider-picker-down-@name"
+                                @onclick="() => MoveDown(idx)">↓</button>
+                        <button type="button" class="btn small danger"
+                                @onclick="() => Remove(idx)">×</button>
+                    </div>
+                </div>
+            }
+            @if (Selected.Count == 0)
+            {
+                <p class="text-muted">No grounding providers selected.</p>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<GroundingProviderProfile> AllProfiles { get; set; } = [];
+    [Parameter, EditorRequired] public List<string> Selected { get; set; } = [];
+    [Parameter] public EventCallback<List<string>> SelectedChanged { get; set; }
+
+    private IEnumerable<GroundingProviderProfile> AvailableNotSelected =>
+        AllProfiles.Where(p => !Selected.Contains(p.Name));
+
+    private GroundingProviderProfile? FindProfile(string name) =>
+        AllProfiles.FirstOrDefault(p => p.Name == name);
+
+    private async Task Add(string name)
+    {
+        if (!Selected.Contains(name))
+        {
+            Selected = [.. Selected, name];
+            await SelectedChanged.InvokeAsync(Selected);
+        }
+    }
+
+    private async Task Remove(int idx)
+    {
+        var newList = Selected.ToList();
+        newList.RemoveAt(idx);
+        Selected = newList;
+        await SelectedChanged.InvokeAsync(Selected);
+    }
+
+    private async Task MoveUp(int idx)
+    {
+        if (idx <= 0) return;
+        var newList = Selected.ToList();
+        (newList[idx - 1], newList[idx]) = (newList[idx], newList[idx - 1]);
+        Selected = newList;
+        await SelectedChanged.InvokeAsync(Selected);
+    }
+
+    private async Task MoveDown(int idx)
+    {
+        if (idx >= Selected.Count - 1) return;
+        var newList = Selected.ToList();
+        (newList[idx + 1], newList[idx]) = (newList[idx], newList[idx + 1]);
+        Selected = newList;
+        await SelectedChanged.InvokeAsync(Selected);
+    }
+}

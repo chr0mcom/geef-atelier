@@ -1,6 +1,7 @@
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Persistence.Crew;
 
@@ -81,14 +82,16 @@ public sealed class CrewServiceAutoPrexfixTests
     // --- Helpers ---
 
     private static ICrewService BuildService(
-        InMemoryReviewerProfileRepository? reviewerRepo = null,
-        InMemoryExecutorProfileRepository? executorRepo = null,
-        InMemoryAdvisorProfileRepository?  advisorRepo  = null,
-        InMemoryCrewTemplateRepository?    templateRepo = null)
+        InMemoryReviewerProfileRepository?          reviewerRepo  = null,
+        InMemoryExecutorProfileRepository?          executorRepo  = null,
+        InMemoryAdvisorProfileRepository?           advisorRepo   = null,
+        InMemoryGroundingProviderProfileRepository? groundingRepo = null,
+        InMemoryCrewTemplateRepository?             templateRepo  = null)
         => new CrewService(
             reviewerRepo  ?? new InMemoryReviewerProfileRepository(),
             executorRepo  ?? new InMemoryExecutorProfileRepository(),
             advisorRepo   ?? new InMemoryAdvisorProfileRepository(),
+            groundingRepo ?? new InMemoryGroundingProviderProfileRepository(),
             templateRepo  ?? new InMemoryCrewTemplateRepository());
 
     private static ReviewerProfile BuildReviewerProfile(string name) => new(
@@ -186,5 +189,20 @@ public sealed class CrewServiceAutoPrexfixTests
         public Task CreateAsync(AdvisorProfile profile, CancellationToken ct = default) { _store.Add(profile); return Task.CompletedTask; }
         public Task UpdateAsync(AdvisorProfile profile, CancellationToken ct = default) { var i = _store.FindIndex(a => a.Name == profile.Name); if (i >= 0) _store[i] = profile; return Task.CompletedTask; }
         public Task DeleteAsync(string name, CancellationToken ct = default) { _store.RemoveAll(a => a.Name == name); return Task.CompletedTask; }
+    }
+
+    private sealed class InMemoryGroundingProviderProfileRepository : IGroundingProviderProfileRepository
+    {
+        private readonly List<GroundingProviderProfile> _store = [];
+
+        public Task<IReadOnlyList<GroundingProviderProfile>> ListAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<GroundingProviderProfile>>(_store);
+
+        public Task<GroundingProviderProfile?> GetByNameAsync(string name, CancellationToken ct = default)
+            => Task.FromResult(_store.FirstOrDefault(g => g.Name == name));
+
+        public Task<GroundingProviderProfile> CreateAsync(GroundingProviderProfile profile, CancellationToken ct = default) { _store.Add(profile); return Task.FromResult(profile); }
+        public Task<GroundingProviderProfile> UpdateAsync(GroundingProviderProfile profile, CancellationToken ct = default) { var i = _store.FindIndex(g => g.Name == profile.Name); if (i >= 0) _store[i] = profile; return Task.FromResult(profile); }
+        public Task DeleteAsync(string name, CancellationToken ct = default) { _store.RemoveAll(g => g.Name == name); return Task.CompletedTask; }
     }
 }

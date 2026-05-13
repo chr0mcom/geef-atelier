@@ -1,0 +1,237 @@
+@page "/crew/profiles/grounding/new"
+@page "/crew/profiles/grounding/{name}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Core.Domain.Crew
+@using Geef.Atelier.Core.Domain.Crew.Grounding
+@using Geef.Atelier.Web.Display
+@inject ICrewService CrewService
+@inject NavigationManager Nav
+
+<PageTitle>@(IsNew ? "New Grounding Provider" : "Edit Grounding Provider") — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="grounding-provider-editor">
+    <div class="page-header">
+        <h1>@(IsNew ? "New Grounding Provider" : _isSystem ? _displayName : $"Edit: {_displayName}")</h1>
+        <a href="/crew/profiles/grounding" class="btn ghost">← Back</a>
+    </div>
+
+    @if (_loading)
+    {
+        <p>Loading…</p>
+    }
+    else if (_isSystem)
+    {
+        <div class="info-banner">System profiles are read-only. Use <strong>Duplicate as custom</strong> from the list page to create a customizable copy.</div>
+    }
+    else
+    {
+        <EditForm Model="_form" OnValidSubmit="SaveAsync" class="crew-form">
+            <DataAnnotationsValidator />
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="error-banner" data-testid="editor-error">@_error</div>
+            }
+
+            <div class="form-row">
+                <label>Name (slug)</label>
+                <InputText @bind-Value="_form.Name" disabled="@(!IsNew)" class="form-input" placeholder="custom-…" data-testid="input-name" />
+                <ValidationMessage For="() => _form.Name" />
+            </div>
+
+            <div class="form-row">
+                <label>Display Name</label>
+                <InputText @bind-Value="_form.DisplayName" class="form-input" placeholder="Tavily Basic" data-testid="input-display-name" />
+                <ValidationMessage For="() => _form.DisplayName" />
+            </div>
+
+            <div class="form-row">
+                <label>Description</label>
+                <InputTextArea @bind-Value="_form.Description" class="form-input" rows="2" data-testid="input-description" />
+            </div>
+
+            <div class="form-row">
+                <label>Provider Type</label>
+                <InputSelect @bind-Value="_form.ProviderType" class="form-input" data-testid="input-provider-type">
+                    <option value="tavily">Tavily Web Search</option>
+                </InputSelect>
+            </div>
+
+            @if (_form.ProviderType == "tavily")
+            {
+                <div class="form-row">
+                    <label>Search Tier</label>
+                    <InputSelect @bind-Value="_form.Tier" class="form-input" data-testid="input-tier">
+                        <option value="basic">Basic (~$0.001/search)</option>
+                        <option value="advanced">Advanced (~$0.002/search)</option>
+                    </InputSelect>
+                </div>
+
+                <div class="form-row">
+                    <label>Max Results</label>
+                    <InputNumber @bind-Value="_form.MaxResults" class="form-input" min="1" max="20" data-testid="input-max-results" />
+                </div>
+
+                <div class="form-row">
+                    <label>
+                        <InputCheckbox @bind-Value="_form.IncludeAnswer" data-testid="input-include-answer" />
+                        Include synthesized answer
+                    </label>
+                </div>
+            }
+
+            <div class="form-row">
+                <label>Max Queries per Run</label>
+                <InputNumber @bind-Value="_form.MaxQueriesPerRun" class="form-input" data-testid="input-max-queries" />
+                <small class="form-hint">Leave empty for no limit.</small>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn primary" disabled="@_saving" data-testid="btn-save">
+                    @(_saving ? "Saving…" : IsNew ? "Create" : "Save")
+                </button>
+                <button type="button" class="btn ghost" @onclick="NavigateBack">Cancel</button>
+            </div>
+        </EditForm>
+
+        @if (!IsNew)
+        {
+            <div style="margin-top: 1rem;">
+                <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true">Delete</button>
+            </div>
+        }
+    }
+</div>
+
+<DeleteConfirmationModal
+    Show="_showDeleteModal"
+    ItemName="@(Name ?? "")"
+    ItemKind="Profile"
+    OnConfirm="ExecuteDeleteAsync"
+    OnCancel="() => _showDeleteModal = false" />
+
+@code {
+    [Parameter] public string? Name { get; set; }
+
+    private bool IsNew => Name == null;
+    private bool _isSystem;
+    private bool _loading = true;
+    private bool _saving;
+    private bool _showDeleteModal;
+    private string? _error;
+    private string _displayName = "";
+
+    private GroundingFormModel _form = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!IsNew)
+        {
+            var profile = await CrewService.GetGroundingProviderProfileAsync(Name!);
+            if (profile == null) { Nav.NavigateTo("/crew/profiles/grounding"); return; }
+            _isSystem = profile.IsSystem;
+            _displayName = profile.DisplayName;
+            _form = GroundingFormModel.From(profile);
+        }
+
+        _loading = false;
+    }
+
+    private void NavigateBack() => Nav.NavigateTo("/crew/profiles/grounding");
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            var profile = _form.ToProfile();
+            if (IsNew)
+                await CrewService.CreateCustomGroundingProviderProfileAsync(profile);
+            else
+                await CrewService.UpdateCustomGroundingProviderProfileAsync(profile);
+            Nav.NavigateTo("/crew/profiles/grounding");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ExecuteDeleteAsync()
+    {
+        _showDeleteModal = false;
+        _error = null;
+        try
+        {
+            await CrewService.DeleteCustomGroundingProviderProfileAsync(Name!);
+            Nav.NavigateTo("/crew/profiles/grounding");
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private sealed class GroundingFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Only lowercase letters, numbers, and hyphens")]
+        [System.ComponentModel.DataAnnotations.MaxLength(64)]
+        public string Name { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.MaxLength(200)]
+        public string DisplayName { get; set; } = "";
+
+        public string Description { get; set; } = "";
+
+        public string ProviderType { get; set; } = "tavily";
+
+        public string Tier { get; set; } = "basic";
+
+        public int MaxResults { get; set; } = 5;
+
+        public bool IncludeAnswer { get; set; } = true;
+
+        public int? MaxQueriesPerRun { get; set; }
+
+        public static GroundingFormModel From(GroundingProviderProfile p)
+        {
+            p.ProviderSettings.TryGetValue("Tier", out var tier);
+            p.ProviderSettings.TryGetValue("MaxResults", out var maxResultsStr);
+            p.ProviderSettings.TryGetValue("IncludeAnswer", out var includeAnswerStr);
+            return new GroundingFormModel
+            {
+                Name = p.Name,
+                DisplayName = p.DisplayName,
+                Description = p.Description,
+                ProviderType = p.ProviderType,
+                Tier = tier ?? "basic",
+                MaxResults = int.TryParse(maxResultsStr, out var mr) ? mr : 5,
+                IncludeAnswer = !string.Equals(includeAnswerStr, "false", StringComparison.OrdinalIgnoreCase),
+                MaxQueriesPerRun = p.MaxQueriesPerRun
+            };
+        }
+
+        public GroundingProviderProfile ToProfile()
+        {
+            var settings = new Dictionary<string, string>
+            {
+                ["Tier"] = Tier,
+                ["MaxResults"] = MaxResults.ToString(),
+                ["IncludeAnswer"] = IncludeAnswer ? "true" : "false"
+            };
+            return new GroundingProviderProfile(
+                Name: SystemCrew.EnsureCustomPrefix(Name),
+                DisplayName: DisplayName,
+                Description: Description,
+                ProviderType: ProviderType,
+                ProviderSettings: settings,
+                MaxQueriesPerRun: MaxQueriesPerRun,
+                IsSystem: false);
+        }
+    }
+}

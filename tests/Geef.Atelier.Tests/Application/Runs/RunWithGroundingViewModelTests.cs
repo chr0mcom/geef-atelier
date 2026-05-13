@@ -107,7 +107,8 @@ public sealed class RunWithGroundingViewModelTests
             details.Run.BriefingText,
             groundingAdvisors,
             recoveryAdvisors,
-            advisorsByIteration);
+            advisorsByIteration,
+            []);
     }
 
     // ─── tests ─────────────────────────────────────────────────────────────────

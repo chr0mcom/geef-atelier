@@ -1,6 +1,7 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,6 +20,9 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     public DbSet<CrewTemplate> CrewTemplates => Set<CrewTemplate>();
     public DbSet<AdvisorProfile> AdvisorProfiles => Set<AdvisorProfile>();
     public DbSet<AdvisorConsultation> AdvisorConsultations => Set<AdvisorConsultation>();
+
+    public DbSet<GroundingProviderProfile> GroundingProviderProfiles => Set<GroundingProviderProfile>();
+    public DbSet<GroundingConsultation> GroundingConsultations => Set<GroundingConsultation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
         => modelBuilder.ApplyConfigurationsFromAssembly(typeof(AtelierDbContext).Assembly);
