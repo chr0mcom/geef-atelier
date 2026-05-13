@@ -1,0 +1,53 @@
+@using Geef.Atelier.Core.Domain.Crew.Advisors
+
+<div class="grounding-section" data-testid="grounding-section">
+    <h2 class="grounding-header">Grounding</h2>
+
+    <div class="sub-section">
+        <div class="sub-section-label">Briefing</div>
+        <pre class="briefing-text">@Briefing</pre>
+    </div>
+
+    @if (BeforeFirstAdvisors.Count > 0)
+    {
+        <div class="sub-section" data-testid="grounding-advisors">
+            <button class="sub-section-toggle collapsible-header" type="button"
+                    @onclick="() => _advisorsExpanded = !_advisorsExpanded"
+                    aria-expanded="@_advisorsExpanded">
+                <span class="chevron @(_advisorsExpanded ? "up" : "down")">▾</span>
+                <span>Advisor consultations (@BeforeFirstAdvisors.Count)</span>
+            </button>
+            @if (_advisorsExpanded)
+            {
+                <div class="collapsible-body">
+                    <AdvisorConsultationsBlock Consultations="BeforeFirstAdvisors" />
+                </div>
+            }
+        </div>
+    }
+
+    <div class="sub-section" data-testid="grounding-brief">
+        <button class="sub-section-toggle collapsible-header" type="button"
+                @onclick="() => _groundedExpanded = !_groundedExpanded"
+                aria-expanded="@_groundedExpanded">
+            <span class="chevron @(_groundedExpanded ? "up" : "down")">▾</span>
+            <span>Grounded Brief</span>
+        </button>
+        @if (_groundedExpanded)
+        {
+            <div class="collapsible-body">
+                <pre class="briefing-text">@GroundedBrief</pre>
+                <p class="grounded-brief-hint"><em>Currently identical to the original briefing — RAG will enrich this in a future step.</em></p>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Briefing { get; set; } = "";
+    [Parameter, EditorRequired] public string GroundedBrief { get; set; } = "";
+    [Parameter] public IReadOnlyList<AdvisorConsultation> BeforeFirstAdvisors { get; set; } = [];
+
+    private bool _advisorsExpanded = false;
+    private bool _groundedExpanded = false;
+}
