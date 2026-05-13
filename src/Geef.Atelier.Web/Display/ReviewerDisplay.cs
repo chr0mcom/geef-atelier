@@ -1,4 +1,5 @@
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Advisors;
 
 namespace Geef.Atelier.Web.Display;
 
@@ -45,5 +46,36 @@ public static class ReviewerDisplay
             EvaluationStrategy.FailFast   => "FailFast",
             EvaluationStrategy.Priority   => "Priority",
             _                             => strategy.ToString()
+        };
+
+    /// <summary>
+    /// Returns the display name for an advisor profile.
+    /// Looks up <see cref="SystemCrew.AdvisorProfiles"/> first; falls back to
+    /// <paramref name="fallbackDisplayName"/> or <paramref name="profileName"/>.
+    /// </summary>
+    public static string GetAdvisorDisplay(string profileName, string? fallbackDisplayName = null) =>
+        SystemCrew.AdvisorProfiles.TryGetValue(profileName, out var profile)
+            ? profile.DisplayName
+            : fallbackDisplayName ?? profileName;
+
+    /// <summary>Returns a human-readable label for an <see cref="AdvisorMode"/> value.</summary>
+    public static string GetAdvisorModeDisplay(AdvisorMode mode) =>
+        mode switch
+        {
+            AdvisorMode.Strategic      => "Strategic",
+            AdvisorMode.Critical       => "Critical",
+            AdvisorMode.DevilsAdvocate => "Devil's Advocate",
+            AdvisorMode.DomainExpert   => "Domain Expert",
+            _                          => mode.ToString()
+        };
+
+    /// <summary>Returns a human-readable label for an <see cref="AdvisorTrigger"/> value.</summary>
+    public static string GetAdvisorTriggerDisplay(AdvisorTrigger trigger) =>
+        trigger switch
+        {
+            AdvisorTrigger.BeforeFirstExecution => "Before First Execution",
+            AdvisorTrigger.BeforeEveryExecution => "Before Every Execution",
+            AdvisorTrigger.OnConvergenceFailure => "On Convergence Failure",
+            _                                   => trigger.ToString()
         };
 }

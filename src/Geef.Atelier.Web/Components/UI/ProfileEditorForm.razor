@@ -1,5 +1,6 @@
 @using System.ComponentModel.DataAnnotations
 @using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Core.Domain.Crew.Advisors
 @inject IProviderCatalog ProviderCatalog
 
 <div class="profile-editor-form" data-testid="profile-editor">
@@ -64,6 +65,47 @@
             <InputNumber @bind-Value="_form.MaxTokens" disabled="@IsSystem" />
         </div>
 
+        @if (ShowAdvisorFields)
+        {
+            <div class="field">
+                <label>Mode</label>
+                <div class="radio-group" data-testid="advisor-mode-group">
+                    @foreach (var mode in Enum.GetValues<AdvisorMode>())
+                    {
+                        <label class="radio-option">
+                            <input type="radio"
+                                   name="advisor-mode"
+                                   value="@mode"
+                                   checked="@(SelectedMode == mode)"
+                                   disabled="@IsSystem"
+                                   @onchange="() => SelectedModeChanged.InvokeAsync(mode)" />
+                            <strong>@mode.ToString()</strong>
+                            <span class="radio-description">@GetAdvisorModeDescription(mode)</span>
+                        </label>
+                    }
+                </div>
+            </div>
+
+            <div class="field">
+                <label>Trigger</label>
+                <div class="radio-group" data-testid="advisor-trigger-group">
+                    @foreach (var trigger in Enum.GetValues<AdvisorTrigger>())
+                    {
+                        <label class="radio-option">
+                            <input type="radio"
+                                   name="advisor-trigger"
+                                   value="@trigger"
+                                   checked="@(SelectedTrigger == trigger)"
+                                   disabled="@IsSystem"
+                                   @onchange="() => SelectedTriggerChanged.InvokeAsync(trigger)" />
+                            <strong>@trigger.ToString()</strong>
+                            <span class="radio-description">@GetAdvisorTriggerDescription(trigger)</span>
+                        </label>
+                    }
+                </div>
+            </div>
+        }
+
         <div class="editor-actions">
             @if (!IsSystem)
             {
@@ -93,6 +135,11 @@
     [Parameter] public bool IsSystem { get; set; }
     [Parameter] public bool IsSaving { get; set; }
     [Parameter] public string? Error { get; set; }
+    [Parameter] public bool ShowAdvisorFields { get; set; }
+    [Parameter] public AdvisorMode? SelectedMode { get; set; }
+    [Parameter] public EventCallback<AdvisorMode?> SelectedModeChanged { get; set; }
+    [Parameter] public AdvisorTrigger? SelectedTrigger { get; set; }
+    [Parameter] public EventCallback<AdvisorTrigger?> SelectedTriggerChanged { get; set; }
     [Parameter] public EventCallback<ProfileFormValues> OnSave { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
     [Parameter] public EventCallback OnDuplicate { get; set; }
@@ -125,8 +172,27 @@
             _form.SystemPrompt ?? "",
             _form.Provider,
             _form.Model ?? "",
-            _form.MaxTokens));
+            _form.MaxTokens,
+            SelectedMode,
+            SelectedTrigger));
     }
+
+    private static string GetAdvisorModeDescription(AdvisorMode m) => m switch
+    {
+        AdvisorMode.Strategic      => "Provides strategic consultation before the executor begins",
+        AdvisorMode.Critical       => "Critical analysis of the artifact's assumptions",
+        AdvisorMode.DevilsAdvocate => "Challenges the strongest claims to surface weak assumptions",
+        AdvisorMode.DomainExpert   => "Brings domain-specific knowledge to the consultation",
+        _                          => m.ToString()
+    };
+
+    private static string GetAdvisorTriggerDescription(AdvisorTrigger t) => t switch
+    {
+        AdvisorTrigger.BeforeFirstExecution => "Consulted only before the first iteration",
+        AdvisorTrigger.BeforeEveryExecution => "Consulted before every iteration",
+        AdvisorTrigger.OnConvergenceFailure => "Consulted when convergence fails (retry mode)",
+        _                                   => t.ToString()
+    };
 
     private sealed class ProfileFormModel
     {
@@ -159,5 +225,7 @@
         string SystemPrompt,
         string Provider,
         string Model,
-        int? MaxTokens);
+        int? MaxTokens,
+        AdvisorMode? Mode = null,
+        AdvisorTrigger? Trigger = null);
 }
