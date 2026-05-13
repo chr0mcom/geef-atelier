@@ -73,9 +73,9 @@ public static class ReviewerDisplay
     public static string GetAdvisorTriggerDisplay(AdvisorTrigger trigger) =>
         trigger switch
         {
-            AdvisorTrigger.BeforeFirstExecution => "Before First Execution",
-            AdvisorTrigger.BeforeEveryExecution => "Before Every Execution",
-            AdvisorTrigger.OnConvergenceFailure => "On Convergence Failure",
+            AdvisorTrigger.BeforeFirstExecution => "Pre-Run (Grounding)",
+            AdvisorTrigger.BeforeEveryExecution => "Per-Iteration",
+            AdvisorTrigger.OnConvergenceFailure => "On Convergence Failure (Recovery)",
             _                                   => trigger.ToString()
         };
 }
