@@ -1,6 +1,6 @@
 # Architektur
 
-*Letzte Aktualisierung: 2026-05-13 (PS-6: Crew-Verwaltungs-Pages ergänzt)*
+*Letzte Aktualisierung: 2026-05-13 (PS-7: Advisor-Pipeline-Schicht ergänzt)*
 
 ## Schichtenbild
 
@@ -83,7 +83,7 @@ Geef.Atelier.sln
 
 ## Datenmodell (Skeleton-Stand)
 
-Sieben Tabellen (Stand PS-5). Spätere Erweiterungen (Sources, AdvisorConsultations) kommen mit den entsprechenden Features.
+Neun Tabellen (Stand PS-7). `AdvisorConsultations` und `AdvisorProfiles` wurden mit Migration Step11AdvisorSystem eingeführt.
 
 ### Runs
 
@@ -103,6 +103,7 @@ Sieben Tabellen (Stand PS-5). Spätere Erweiterungen (Sources, AdvisorConsultati
 | CancellationRequested | bool | true wenn User den Run abbrechen möchte |
 | CrewTemplateName | varchar(100) | nullable; Name des Templates (z.B. `"klassik"`). Null = Custom-Crew-Submit. |
 | CrewSnapshot | jsonb | nullable; vollständig eingebetteter CrewSnapshot zum Zeitpunkt des Submits. |
+| AdvisorRetryAttempted | bool | nullable; true wenn OnConvergenceFailure-Retry bereits durchgeführt wurde (Single-Retry-Cap). |
 
 ### Iterations
 
@@ -144,13 +145,15 @@ Sieben Tabellen (Stand PS-5). Spätere Erweiterungen (Sources, AdvisorConsultati
 
 Jeder Run verwendet eine **Crew** aus Executor + Reviewers. Profile sind wiederverwendbare Konfigurationsbausteine.
 
-### Neue Tabellen (Migration Step10)
+### Neue Tabellen (Migration Step10 + Step11)
 
-| Tabelle | Inhalt |
-|---|---|
-| `ReviewerProfiles` | Custom Reviewer-Profile (System-Profile leben als Code-Konstanten in `SystemCrew`). |
-| `ExecutorProfiles` | Custom Executor-Profile. |
-| `CrewTemplates` | Custom Crew-Templates. |
+| Tabelle | Migration | Inhalt |
+|---|---|---|
+| `ReviewerProfiles` | Step10 | Custom Reviewer-Profile (System-Profile leben als Code-Konstanten in `SystemCrew`). |
+| `ExecutorProfiles` | Step10 | Custom Executor-Profile. |
+| `CrewTemplates` | Step10 | Custom Crew-Templates. |
+| `AdvisorProfiles` | Step11 | Custom Advisor-Profile. |
+| `AdvisorConsultations` | Step11 | Persistierte Advisor-Outputs pro Iteration. |
 
 ### ProfileBasedReviewer / ProfileBasedExecutor
 
@@ -162,14 +165,66 @@ Alle vier Strategien via Geef-SDK: `Parallel`, `Sequential`, `FailFast`, `Priori
 
 Weitere Details: [`08-crew-system.md`](08-crew-system.md).
 
-## Mapping auf GEEF-Provider (PS-5-Stand)
+## Advisor-Pipeline-Schicht (PS-7)
+
+Advisors werden als Decorator um `IExecutionStep` realisiert. Der `AdvisorAwareExecutor` schiebt sich transparent vor jeden Executor-Aufruf, ohne das Geef-SDK zu modifizieren (D-031(a)).
+
+### Decorator-Kette
+
+```
+AtelierPipelineFactory
+  └── AdvisorAwareExecutor (IExecutionStep-Decorator)
+        1. Filtert Advisors nach Trigger (BeforeFirst / BeforeEvery)
+        2. ProfileBasedAdvisor: LLM-Call (plain text), persistiert AdvisorConsultation
+        3. Schreibt Output → context[AtelierContextKeys.AdvisorBlock]
+        4. Delegiert an ProfileBasedExecutor (echter Execution-Step)
+```
+
+### AtelierContextKeys.AdvisorBlock
+
+Der Advisor-Output landet als einzelner Text-Block im `IRunContext`. Format:
+
+```
+[ADVISOR: briefing-clarifier]
+<Advisor-Output-Text>
+
+[ADVISOR: devils-advocate]
+<Advisor-Output-Text>
+```
+
+Executor-System-Prompt kann diesen Block explizit referenzieren. Mehrere Advisors akkumulieren sequenziell (D-031(d)).
+
+### Convergence-Failure-Retry
+
+```
+ConvergenceFailedException
+  → RunOrchestratorService.TryConvergenceFailureRetryAsync
+      ├── RunEntity.AdvisorRetryAttempted == true → Status = Failed (kein zweiter Retry)
+      └── AdvisorRetryAttempted = true → OnConvergenceFailure-Advisors aktiviert → Pipeline-Retry
+```
+
+`RunEntity.AdvisorRetryAttempted` (Migration Step11) ist der Single-Retry-Cap (D-031(e)).
+
+### DB-Erweiterungen (Migration Step11AdvisorSystem)
+
+| Neu | Inhalt |
+|---|---|
+| `AdvisorProfiles` | Custom Advisor-Profile |
+| `AdvisorConsultations` | Persistierter Advisor-Output pro Iteration (RunId, IterationNumber, AdvisorName, OutputText) |
+| `Runs.AdvisorRetryAttempted` | bool nullable — Retry-Cap-Flag |
+
+Weitere Details: [`08-crew-system.md`](08-crew-system.md) → Sektion "Advisor-Pässe (PS-7)".
+
+## Mapping auf GEEF-Provider (PS-7-Stand)
 
 | GEEF-Phase | Provider-Implementierung | Verhalten |
 |---|---|---|
 | Grounding | `BriefingGroundingStep` | Schreibt das Briefing in den Context, keine externen Quellen |
-| Execution | `ProfileBasedExecutor` | LLM-Call mit Profil-SystemPrompt + PreviousFindings; Modell aus `ExecutorProfile` |
+| Pre-Execution | `AdvisorAwareExecutor` (Decorator) | Konsultiert BeforeFirst/BeforeEvery-Advisors; schreibt AdvisorBlock in Context |
+| Execution | `ProfileBasedExecutor` | LLM-Call mit Profil-SystemPrompt + PreviousFindings + AdvisorBlock; Modell aus `ExecutorProfile` |
 | Evaluation | `ProfileBasedReviewer` × N | N Reviewer aus `CrewSnapshot.Reviewers`; Strategie konfigurierbar |
 | Finalize | `MarkdownFinalizer` | Wrappt finalen Text in `FinalizedDocument`-Record |
+| Convergence-Failure | `TryConvergenceFailureRetryAsync` | Aktiviert OnConvergenceFailure-Advisors, Single-Retry (AdvisorRetryAttempted-Cap) |
 
 **Convergence-Policy:** `DefaultConvergencePolicy` aus `ConvergenceOptions`, überschreibbar per `ConvergencePolicyOverride` im CrewTemplate.
 

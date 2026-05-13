@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Aktueller Zustand
 
-**Post-Skeleton Schritt 6 abgeschlossen (13. Mai 2026): Crew-UI.** PS-1 ✅ PS-2 ✅ PS-3 ✅ PS-4 ✅ PS-5 ✅ PS-6 ✅. Crew-System: `ReviewerProfile`/`ExecutorProfile` als Records, `SystemCrew` als Code-Konstanten, `CrewSnapshot` (JSONB) pro Run, alle vier EvaluationStrategies, `ILlmClientResolver.ForProfile`. Crew-UI: 10 neue Pages unter `/crew`, 7 neue UI-Komponenten. 189 C#-Tests grün, 21 Python-Tests grün. App produktiv unter `https://geef.stefan-bechtel.de/`. Nächste Post-Skeleton-Schritte: PS-7 (Advisor-Pässe).
+**Post-Skeleton Schritte 6 + 7 abgeschlossen (13. Mai 2026).** PS-1 ✅ PS-2 ✅ PS-3 ✅ PS-4 ✅ PS-5 ✅ PS-6 ✅ PS-7 ✅. Crew-System (PS-5/6): `ReviewerProfile`/`ExecutorProfile` als Records, `SystemCrew` als Code-Konstanten, `CrewSnapshot` (JSONB) pro Run, alle vier EvaluationStrategies, `ILlmClientResolver.ForProfile`. Crew-UI: 10 neue Pages unter `/crew`, 7 neue UI-Komponenten. Advisor-Pässe (PS-7): `AdvisorTrigger`-Enum (BeforeFirstExecution, BeforeEveryExecution, OnConvergenceFailure), System-Advisors `briefing-clarifier` (Strategic/BeforeFirst, gemini-2.5-flash) + `devils-advocate` (DevilsAdvocate/BeforeEvery, gpt-4o-mini), `AdvisorAwareExecutor`-Decorator, Convergence-Failure-Retry via `TryConvergenceFailureRetryAsync` + `RunEntity.AdvisorRetryAttempted`-Cap, MCP-Tool `list_advisor_profiles`, vollständige UI (AdvisorPicker, AdvisorConsultationsBlock, AdvisorProfilesIndex/Editor). Architektur-Knackpunkte in D-031. 239 C#-Tests grün, 21 Python-Tests grün. App produktiv unter `https://geef.stefan-bechtel.de/`. Nächste Post-Skeleton-Schritte: PS-8 (Cookie-Auth-Erweiterung) oder Bug-Fix-Sprint; OnConvergenceFailure-Multi-Retry als ausstehender Punkt (aktuell Single-Retry-Cap).
 
-**Wichtig für Production-Deploy nach PS-6:** DB-Migration Step10CrewSystem läuft beim Container-Start automatisch. Backup vor Deploy prüfen.
+**Wichtig für Production-Deploy nach PS-7:** DB-Migration Step11AdvisorSystem (Tabellen `AdvisorProfiles`, `AdvisorConsultations`, Spalte `RunEntity.AdvisorRetryAttempted`) läuft beim Container-Start automatisch. Backup vor Deploy prüfen.
 
 ## Verbindlicher Workflow
 

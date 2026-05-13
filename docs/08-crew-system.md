@@ -1,6 +1,6 @@
 # 08 — Crew-System (PS-5)
 
-Letzte Aktualisierung: 2026-05-13 (PS-6: UI-Sektion ergänzt)
+Letzte Aktualisierung: 2026-05-13 (PS-7: Advisor-Pässe-Sektion ergänzt)
 
 ## Überblick
 
@@ -12,9 +12,9 @@ Das Crew-System ersetzt die in PS-2 hartkodierte Dreier-Crew (Executor + Briefin
 |---|---|
 | **ExecutorProfile** | LLM-Akteur der den Draft erstellt. Trägt System-Prompt, Provider, Modell, MaxTokens. |
 | **ReviewerProfile** | LLM-Akteur der den Draft bewertet. Gleiche Felder. `Priority` für sequenzielle Strategien via `IReviewer.Priority`. |
-| **CrewTemplate** | Komponiert Executor + Reviewers + EvaluationStrategy + optionalen ConvergenceOverride. |
+| **CrewTemplate** | Komponiert Executor + Reviewers + EvaluationStrategy + optionalen ConvergenceOverride + Advisor-Profile. |
 | **CrewSnapshot** | Vollständig eingebettete Kopie des CrewTemplates (inkl. aller Profil-Daten) zum Zeitpunkt der Run-Einreichung. Persistiert als JSONB auf `Runs.CrewSnapshot`. |
-| **AdvisorProfile** | Schema-Stub für PS-7. Definiert, aber noch nicht funktional in PS-5. |
+| **AdvisorProfile** | LLM-Akteur für konsultative Pässe vor oder nach der Execution. Trägt `AdvisorMode` + `AdvisorTrigger`. Funktional ab PS-7. |
 
 ## EvaluationStrategies
 
@@ -73,20 +73,93 @@ Das einzige System-Template ist `"klassik"`: reproduziert exakt das PS-2-Verhalt
 
 Serialisiert mit `JsonNamingPolicy.CamelCase`. Gespeichert auf `Runs.CrewSnapshot` (JSONB).
 
-## AdvisorProfile (PS-7-Stub)
+## Advisor-Pässe (PS-7)
 
-Vollständiges Schema bereits definiert, aber noch nicht funktional in PS-5:
+Advisors sind konsultative LLM-Akteure, die zu definierten Zeitpunkten in der Pipeline ausgeführt werden. Ihr Output fließt als gekennzeichneter Kontext-Block in den Run — der Executor und nachfolgende Reviewer sehen ihn, ohne dass das Geef-SDK-Kern modifiziert werden muss.
+
+### AdvisorProfile-Schema
 
 ```csharp
 public sealed record AdvisorProfile(
     string Name, string DisplayName, string Description,
     string SystemPrompt, string Provider, string Model, int? MaxTokens,
-    AdvisorMode Mode, bool IsSystem);
+    AdvisorMode Mode, AdvisorTrigger Trigger, bool IsSystem);
 
-public enum AdvisorMode { Strategic, Critical, DevilsAdvocate, DomainExpert }
+public enum AdvisorMode    { Strategic, Critical, DevilsAdvocate, DomainExpert }
+public enum AdvisorTrigger { BeforeFirstExecution, BeforeEveryExecution, OnConvergenceFailure }
 ```
 
-In PS-7 wird `Advisors[]` im CrewSnapshot befüllt und vor dem Executor-Pass ausgeführt.
+### Trigger-Typen
+
+| Trigger | Bedeutung |
+|---|---|
+| `BeforeFirstExecution` | Advisor wird einmalig vor Iteration 1 konsultiert. Geeignet für strategische Briefing-Analyse. |
+| `BeforeEveryExecution` | Advisor wird vor jeder Iteration konsultiert. Geeignet für kritische Gegenstimmen. |
+| `OnConvergenceFailure` | Advisor wird nur bei Convergence-Failure konsultiert; danach folgt ein einmaliger Retry-Durchlauf. |
+
+### System-Advisors
+
+| Name | Mode | Trigger | Modell | Zweck |
+|---|---|---|---|---|
+| `briefing-clarifier` | Strategic | BeforeFirstExecution | `google/gemini-2.5-flash` | Analysiert das Briefing vor dem ersten Executor-Pass und liefert strukturierte Klärungshinweise. |
+| `devils-advocate` | DevilsAdvocate | BeforeEveryExecution | `openai/gpt-4o-mini` | Hinterfragt vor jeder Iteration die geplante Executor-Richtung kritisch, um Schreibfehler durch blinden Fortschritt zu vermeiden. |
+
+### Pipeline-Integration via Decorator
+
+Der `AdvisorAwareExecutor` (in `Infrastructure/Pipeline/`) dekoriert `IExecutionStep` und schiebt sich transparent vor jeden Executor-Aufruf:
+
+```
+AdvisorAwareExecutor.ExecuteAsync(context)
+  1. Filtert Advisors nach aktivem Trigger (BeforeFirst nur bei Iteration 1, BeforeEvery immer)
+  2. Ruft ProfileBasedAdvisor für jeden passenden Advisor sequenziell auf
+  3. Schreibt Output als "[ADVISOR: <name>]\n<text>" in context[AtelierContextKeys.AdvisorBlock]
+  4. Persistiert AdvisorConsultation-Record (Tabelle AdvisorConsultations)
+  5. Delegiert an den echten IExecutionStep
+```
+
+`AtelierPipelineFactory.BuildWithAdvisorContext(snapshot, context)` wired den Decorator und stellt sicher, dass der Advisor-Block im `IRunContext` propagiert wird.
+
+### Advisor-Failure-Verhalten
+
+Advisor-LLM-Calls sind nicht best-effort. Eine Exception in `ProfileBasedAdvisor` bubbled durch `AdvisorAwareExecutor` und bricht den Run mit `Status=Failed` ab (D-031(c)). Stiller Weiterlauf würde einen möglicherweise korrumpierten Kontext maskieren.
+
+### Convergence-Failure-Retry-Mechanismus
+
+```
+Pipeline → ConvergenceFailedException
+  → RunOrchestratorService.TryConvergenceFailureRetryAsync
+      1. Prüft RunEntity.AdvisorRetryAttempted — true → eskaliert zu Failed (kein zweiter Retry)
+      2. Setzt AdvisorRetryAttempted = true in DB
+      3. Aktiviert OnConvergenceFailure-Advisors im nächsten Run-Kontext
+      4. Startet Pipeline-Durchlauf erneut (einmalig)
+      5. Zweites ConvergenceFailedException → Failed (kein weiterer Retry)
+```
+
+**Single-Retry-Cap:** `RunEntity.AdvisorRetryAttempted` (Migration Step11) verhindert Endlos-Schleifen. Multi-Retry mit konfigurierbarer Wiederholungsanzahl ist als Future Work dokumentiert.
+
+### DB-Tabellen (Migration Step11AdvisorSystem)
+
+| Tabelle | Inhalt |
+|---|---|
+| `AdvisorProfiles` | Custom Advisor-Profile (System-Advisors leben als Code-Konstanten in `SystemCrew`). |
+| `AdvisorConsultations` | Persistierte Advisor-Outputs pro Iteration und Advisor (RunId, IterationNumber, AdvisorName, OutputText, CreatedAt). |
+
+Spalte `RunEntity.AdvisorRetryAttempted` (bool, nullable) auf `Runs`-Tabelle.
+
+### UI-Komponenten (PS-7)
+
+| Komponente | Zweck |
+|---|---|
+| `AdvisorPicker` | Available/Selected-Liste analog `ReviewerPicker`, mit Trigger-Anzeige |
+| `AdvisorConsultationsBlock` | Klappsection auf RunDetail-Page: zeigt alle Consultations pro Iteration |
+| `AdvisorProfilesIndex` | Liste aller Advisor-Profile (System + Custom) unter `/crew/profiles/advisors` |
+| `AdvisorProfileEditor` | CRUD-Editor für Custom Advisor-Profile |
+
+`ProfileEditorForm` wurde um `ShowAdvisorFields` + Mode/Trigger Radio-Groups erweitert (wiederverwendbar für Reviewer, Executor und Advisor).
+
+### MCP-Tool
+
+`list_advisor_profiles` — listet alle Advisor-Profile (System + Custom).
 
 ## API-Pfade
 
