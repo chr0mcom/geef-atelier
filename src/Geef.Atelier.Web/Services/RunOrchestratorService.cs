@@ -167,7 +167,9 @@ internal sealed class RunOrchestratorService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Run {RunId} failed outside pipeline; sink already persisted state.", run.Id);
+            logger.LogError(ex, "Run {RunId} pipeline threw unhandled exception.", run.Id);
+            await MarkRunFailedAsync(run.Id, SanitizeErrorMessage(ex));
+            try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
         }
         finally
         {
@@ -242,6 +244,66 @@ internal sealed class RunOrchestratorService(
             EvaluationStrategy: EvaluationStrategy.Parallel,
             ConvergenceOverride: null,
             Advisors: Array.Empty<AdvisorProfile>());
+    }
+
+    /// <summary>
+    /// Marks a run that is still in Running state as Failed with the given error message.
+    /// Called when the Geef pipeline throws an unhandled exception that the SDK did not convert
+    /// to a <c>PipelineFailedEvent</c> (e.g. <see cref="HttpRequestException"/> from the LLM provider).
+    /// </summary>
+    private async Task MarkRunFailedAsync(Guid runId, string message, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
+
+            await db.Runs
+                .Where(r => r.Id == runId && r.Status == RunStatus.Running)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.Status,       RunStatus.Failed)
+                    .SetProperty(r => r.ErrorMessage, message)
+                    .SetProperty(r => r.CompletedAt,  DateTimeOffset.UtcNow),
+                    ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to mark run {RunId} as Failed.", runId);
+        }
+    }
+
+    /// <summary>
+    /// Produces a sanitized, user-visible error message from a pipeline exception.
+    /// Walks the full inner-exception chain so that exceptions wrapped by the Geef SDK
+    /// are handled by the most-specific matching rule.
+    /// Sensitive details (API keys, full stack traces, provider URLs) are never included.
+    /// </summary>
+    internal static string SanitizeErrorMessage(Exception ex)
+    {
+        var current = ex;
+        while (current is not null)
+        {
+            if (current is HttpRequestException { StatusCode: { } code })
+                return (int)code switch
+                {
+                    400 => "LLM provider returned an invalid response (HTTP 400). Check model name and configuration.",
+                    401 => "LLM provider authentication failed.",
+                    403 => "LLM provider access denied.",
+                    429 => "LLM provider rate limit exceeded. Retry later.",
+                    >= 500 => "LLM provider temporarily unavailable. Retry later.",
+                    _ => $"LLM provider returned an error (HTTP {(int)code})."
+                };
+
+            if (current is HttpRequestException)
+                return "LLM provider request failed. Check connectivity and configuration.";
+
+            if (current is TaskCanceledException)
+                return "LLM provider request timed out.";
+
+            current = current.InnerException;
+        }
+
+        return $"Pipeline execution failed: {ex.Message.Split('\n')[0].Trim()}";
     }
 
     /// <summary>
