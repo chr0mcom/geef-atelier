@@ -169,13 +169,16 @@
     protected override void OnInitialized()
     {
         _providers = ProviderCatalog.ListProviders();
+        // For new profiles, fall back to the first available provider so ModelSelector loads immediately.
+        var effectiveProvider = !string.IsNullOrEmpty(Provider) ? Provider
+            : _providers.Count > 0 ? _providers[0].Name : "";
         _form = new ProfileFormModel
         {
             Name = ProfileName ?? "",
             DisplayName = DisplayName,
             Description = Description,
             SystemPrompt = SystemPrompt,
-            Provider = Provider,
+            Provider = effectiveProvider,
             Model = Model,
             MaxTokens = MaxTokens,
         };

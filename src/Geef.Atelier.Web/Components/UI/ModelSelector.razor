@@ -87,7 +87,8 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (Provider != _loadedForProvider)
+        // Guard: don't attempt to load with an empty provider — caller hasn't selected one yet.
+        if (!string.IsNullOrEmpty(Provider) && Provider != _loadedForProvider)
             await LoadModelsAsync();
     }
 
