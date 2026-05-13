@@ -415,6 +415,9 @@ FodyWeavers.xsd
 .env.*
 !.env.example
 
+# Git worktrees
+.worktrees/
+
 # VS Code files for those working on multiple tools
 .vscode/*
 !.vscode/settings.json
