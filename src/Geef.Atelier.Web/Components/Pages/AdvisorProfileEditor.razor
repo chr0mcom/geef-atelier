@@ -1,0 +1,170 @@
+@page "/crew/profiles/advisors/new"
+@page "/crew/profiles/advisors/{name}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Core.Domain.Crew
+@using Geef.Atelier.Core.Domain.Crew.Advisors
+@inject ICrewService CrewService
+@inject NavigationManager Nav
+
+<PageTitle>@(IsNew ? "New Advisor Profile" : "Edit Advisor Profile") — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="advisor-profile-editor">
+    <div class="page-header">
+        <h1>@(IsNew ? "New Advisor Profile" : _isSystem ? _displayName : $"Edit: {_displayName}")</h1>
+        <a href="/crew/profiles/advisors" class="btn ghost">← Back</a>
+    </div>
+
+    @if (_loading)
+    {
+        <p>Loading…</p>
+    }
+    else
+    {
+        <ProfileEditorForm ProfileName="@(IsNew ? null : Name)"
+                           DisplayName="@_profileDisplayName"
+                           Description="@_profileDescription"
+                           SystemPrompt="@_profileSystemPrompt"
+                           Provider="@_profileProvider"
+                           Model="@_profileModel"
+                           MaxTokens="@_profile?.MaxTokens"
+                           IsSystem="@_isSystem"
+                           IsSaving="@_saving"
+                           Error="@_error"
+                           ShowAdvisorFields="true"
+                           SelectedMode="@_advisorMode"
+                           SelectedModeChanged="mode => _advisorMode = mode"
+                           SelectedTrigger="@_advisorTrigger"
+                           SelectedTriggerChanged="trigger => _advisorTrigger = trigger"
+                           OnSave="SaveAsync"
+                           OnCancel="NavigateBack"
+                           OnDuplicate="DuplicateAsCustom" />
+
+        @if (!IsNew && !_isSystem)
+        {
+            <div style="margin-top: 1rem;">
+                <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true">Delete</button>
+            </div>
+        }
+    }
+</div>
+
+<DeleteConfirmationModal
+    Show="_showDeleteModal"
+    ItemName="@(Name ?? "")"
+    ItemKind="Profile"
+    ExtraWarning="Removing this advisor profile cannot be undone. Any crew templates referencing it may be affected."
+    OnConfirm="ExecuteDeleteAsync"
+    OnCancel="() => _showDeleteModal = false" />
+
+@code {
+    [Parameter] public string? Name { get; set; }
+
+    private bool IsNew => Name == null;
+    private bool _isSystem;
+    private bool _loading = true;
+    private bool _saving;
+    private bool _showDeleteModal;
+    private string? _error;
+    private string _displayName = "";
+    private AdvisorProfile? _profile;
+    private AdvisorMode? _advisorMode;
+    private AdvisorTrigger? _advisorTrigger;
+
+    // Computed properties to avoid null-coalescing in Razor component attributes
+    private string _profileDisplayName => _profile?.DisplayName ?? "";
+    private string _profileDescription => _profile?.Description ?? "";
+    private string _profileSystemPrompt => _profile?.SystemPrompt ?? "";
+    private string _profileProvider => _profile?.Provider ?? "";
+    private string _profileModel => _profile?.Model ?? "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!IsNew)
+        {
+            _profile = await CrewService.GetAdvisorProfileAsync(Name!);
+            if (_profile == null) { Nav.NavigateTo("/crew/profiles/advisors"); return; }
+            _isSystem = _profile.IsSystem;
+            _displayName = _profile.DisplayName;
+            _advisorMode = _profile.Mode;
+            _advisorTrigger = _profile.Trigger;
+        }
+
+        _loading = false;
+    }
+
+    private void NavigateBack() => Nav.NavigateTo("/crew/profiles/advisors");
+
+    private async Task SaveAsync(ProfileEditorForm.ProfileFormValues values)
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            var mode = values.Mode ?? AdvisorMode.Strategic;
+            var trigger = values.Trigger ?? AdvisorTrigger.BeforeFirstExecution;
+
+            var profile = new AdvisorProfile(
+                Name: SystemCrew.EnsureCustomPrefix(values.Name),
+                DisplayName: values.DisplayName,
+                Description: values.Description,
+                SystemPrompt: values.SystemPrompt,
+                Provider: values.Provider,
+                Model: values.Model,
+                MaxTokens: values.MaxTokens,
+                Mode: mode,
+                Trigger: trigger,
+                IsSystem: false);
+
+            if (IsNew)
+                await CrewService.CreateCustomAdvisorProfileAsync(profile);
+            else
+                await CrewService.UpdateCustomAdvisorProfileAsync(profile);
+
+            Nav.NavigateTo("/crew/profiles/advisors");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DuplicateAsCustom()
+    {
+        _error = null;
+        try
+        {
+            var original = await CrewService.GetAdvisorProfileAsync(Name!);
+            if (original == null) return;
+            var copy = original with
+            {
+                Name = original.Name + "-copy",
+                DisplayName = original.DisplayName + " (Copy)",
+                IsSystem = false
+            };
+            await CrewService.CreateCustomAdvisorProfileAsync(copy);
+            Nav.NavigateTo("/crew/profiles/advisors");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task ExecuteDeleteAsync()
+    {
+        _showDeleteModal = false;
+        _error = null;
+        try
+        {
+            await CrewService.DeleteCustomAdvisorProfileAsync(Name!);
+            Nav.NavigateTo("/crew/profiles/advisors");
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+}

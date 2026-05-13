@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @using Geef.Atelier.Application.Crew
 @using Geef.Atelier.Core.Domain.Crew
+@using Geef.Atelier.Core.Domain.Crew.Advisors
 @using Geef.Atelier.Core.Domain.Crew.Profiles
 @inject ICrewService CrewService
 
@@ -82,17 +83,43 @@
         }
         <a href="/crew/profiles/executors" class="view-all-link">View all executor profiles →</a>
     </section>
+
+    <section class="crew-section">
+        <div class="crew-section-header">
+            <h2>Advisor Profiles</h2>
+            <a href="/crew/profiles/advisors/new" class="btn small">+ New</a>
+        </div>
+        @if (_advisors.Count == 0)
+        {
+            <p class="text-muted">No advisor profiles yet.</p>
+        }
+        else
+        {
+            <ul class="crew-item-list">
+                @foreach (var a in _advisors.Take(5))
+                {
+                    <li>
+                        <a href="/crew/profiles/advisors/@a.Name">@a.DisplayName</a>
+                        @if (a.IsSystem) { <span class="crew-badge">System</span> }
+                    </li>
+                }
+            </ul>
+        }
+        <a href="/crew/profiles/advisors" class="view-all-link">View all advisor profiles →</a>
+    </section>
 </div>
 
 @code {
     private IReadOnlyList<CrewTemplate> _templates = [];
     private IReadOnlyList<ReviewerProfile> _reviewers = [];
     private IReadOnlyList<ExecutorProfile> _executors = [];
+    private IReadOnlyList<AdvisorProfile> _advisors = [];
 
     protected override async Task OnInitializedAsync()
     {
         _templates = await CrewService.ListCrewTemplatesAsync(includeSystem: true);
         _reviewers = await CrewService.ListReviewerProfilesAsync(includeSystem: true);
         _executors = await CrewService.ListExecutorProfilesAsync(includeSystem: true);
+        _advisors = await CrewService.ListAdvisorProfilesAsync(includeSystem: true);
     }
 }

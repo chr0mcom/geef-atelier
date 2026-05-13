@@ -1,0 +1,130 @@
+@page "/crew/profiles/advisors"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Core.Domain.Crew.Advisors
+@using Geef.Atelier.Web.Display
+@inject ICrewService CrewService
+
+<PageTitle>Advisor Profiles — Atelier</PageTitle>
+
+<div class="crew-profiles-index">
+    <div class="page-header">
+        <h1>Advisor Profiles</h1>
+        <a href="/crew/profiles/advisors/new" class="btn primary">+ New Profile</a>
+    </div>
+
+    @if (_profiles.Count == 0)
+    {
+        <p class="text-muted">No advisor profiles yet.</p>
+    }
+    else
+    {
+        <table class="crew-table" data-testid="advisor-profile-list">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Mode</th>
+                    <th>Trigger</th>
+                    <th>Provider</th>
+                    <th>Model</th>
+                    <th>Description</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in _profiles)
+                {
+                    <tr data-testid="profile-row-@p.Name">
+                        <td>
+                            @p.DisplayName
+                            @if (p.IsSystem) { <span class="crew-badge">System</span> }
+                        </td>
+                        <td>@ReviewerDisplay.GetAdvisorModeDisplay(p.Mode)</td>
+                        <td>@ReviewerDisplay.GetAdvisorTriggerDisplay(p.Trigger)</td>
+                        <td>@p.Provider</td>
+                        <td>@p.Model</td>
+                        <td>
+                            @if (!string.IsNullOrEmpty(p.Description))
+                            {
+                                <span title="@p.Description">
+                                    @(p.Description.Length > 60 ? p.Description[..60] + "…" : p.Description)
+                                </span>
+                            }
+                        </td>
+                        <td class="crew-table-actions">
+                            @if (p.IsSystem)
+                            {
+                                <button class="btn small disabled-action" disabled title="System profile — duplicate to customize">Edit</button>
+                                <button class="btn small primary" @onclick="() => DuplicateProfile(p)">Duplicate as custom</button>
+                                <button class="btn small disabled-action" disabled title="System profile — cannot delete">Delete</button>
+                            }
+                            else
+                            {
+                                <a href="/crew/profiles/advisors/@p.Name" class="btn small">Edit</a>
+                                <button class="btn small danger" @onclick="() => _profileToDelete = p">Delete</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="error-banner">@_error</div>
+    }
+</div>
+
+<DeleteConfirmationModal
+    Show="_profileToDelete != null"
+    ItemName="@(_profileToDelete?.Name ?? "")"
+    ItemKind="Profile"
+    OnConfirm="ExecuteIndexDeleteAsync"
+    OnCancel="() => _profileToDelete = null" />
+
+@code {
+    private IReadOnlyList<AdvisorProfile> _profiles = [];
+    private AdvisorProfile? _profileToDelete;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _profiles = await CrewService.ListAdvisorProfilesAsync(includeSystem: true);
+    }
+
+    private async Task DuplicateProfile(AdvisorProfile original)
+    {
+        _error = null;
+        try
+        {
+            var copy = original with
+            {
+                Name = original.Name + "-copy",
+                DisplayName = original.DisplayName + " (Copy)",
+                IsSystem = false
+            };
+            await CrewService.CreateCustomAdvisorProfileAsync(copy);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task ExecuteIndexDeleteAsync()
+    {
+        if (_profileToDelete == null) return;
+        var name = _profileToDelete.Name;
+        _profileToDelete = null;
+        try { await CrewService.DeleteCustomAdvisorProfileAsync(name); await LoadAsync(); }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+}
