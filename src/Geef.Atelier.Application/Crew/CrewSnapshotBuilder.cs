@@ -1,5 +1,6 @@
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 
 namespace Geef.Atelier.Application.Crew;
@@ -16,6 +17,7 @@ public static class CrewSnapshotBuilder
         Func<string, CancellationToken, Task<ExecutorProfile?>> executorLookup,
         Func<string, CancellationToken, Task<ReviewerProfile?>> reviewerLookup,
         Func<string, CancellationToken, Task<AdvisorProfile?>> advisorLookup,
+        Func<string, CancellationToken, Task<GroundingProviderProfile?>> groundingLookup,
         CancellationToken cancellationToken = default)
     {
         var executor = await executorLookup(template.ExecutorProfileName, cancellationToken)
@@ -24,6 +26,7 @@ public static class CrewSnapshotBuilder
 
         var reviewers = await ResolveReviewersAsync(template.ReviewerProfileNames, reviewerLookup, cancellationToken);
         var advisors = await ResolveAdvisorsAsync(template.AdvisorProfileNames, advisorLookup, cancellationToken);
+        var groundingProviders = await ResolveGroundingProvidersAsync(template.GroundingProviderNames, groundingLookup, cancellationToken);
 
         return new CrewSnapshot(
             SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
@@ -32,7 +35,8 @@ public static class CrewSnapshotBuilder
             Reviewers: reviewers,
             EvaluationStrategy: template.EvaluationStrategy,
             ConvergenceOverride: template.ConvergenceOverride,
-            Advisors: advisors);
+            Advisors: advisors,
+            GroundingProviders: groundingProviders);
     }
 
     /// <summary>Builds a snapshot from an inline crew spec (no template name), resolving all referenced profiles.</summary>
@@ -41,6 +45,7 @@ public static class CrewSnapshotBuilder
         Func<string, CancellationToken, Task<ExecutorProfile?>> executorLookup,
         Func<string, CancellationToken, Task<ReviewerProfile?>> reviewerLookup,
         Func<string, CancellationToken, Task<AdvisorProfile?>> advisorLookup,
+        Func<string, CancellationToken, Task<GroundingProviderProfile?>> groundingLookup,
         CancellationToken cancellationToken = default)
     {
         var executor = await executorLookup(spec.ExecutorProfileName, cancellationToken)
@@ -49,6 +54,7 @@ public static class CrewSnapshotBuilder
 
         var reviewers = await ResolveReviewersAsync(spec.ReviewerProfileNames, reviewerLookup, cancellationToken);
         var advisors = await ResolveAdvisorsAsync(spec.AdvisorProfileNames, advisorLookup, cancellationToken);
+        var groundingProviders = await ResolveGroundingProvidersAsync(spec.GroundingProviderNames, groundingLookup, cancellationToken);
 
         return new CrewSnapshot(
             SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
@@ -57,7 +63,8 @@ public static class CrewSnapshotBuilder
             Reviewers: reviewers,
             EvaluationStrategy: spec.EvaluationStrategy,
             ConvergenceOverride: spec.ConvergenceOverride,
-            Advisors: advisors);
+            Advisors: advisors,
+            GroundingProviders: groundingProviders);
     }
 
     private static async Task<IReadOnlyList<ReviewerProfile>> ResolveReviewersAsync(
@@ -86,6 +93,21 @@ public static class CrewSnapshotBuilder
             var profile = await advisorLookup(name, cancellationToken);
             if (profile is not null) result.Add(profile);
             // Silently skip missing advisors (profile deleted after template creation)
+        }
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<GroundingProviderProfile>> ResolveGroundingProvidersAsync(
+        IReadOnlyList<string> names,
+        Func<string, CancellationToken, Task<GroundingProviderProfile?>> groundingLookup,
+        CancellationToken cancellationToken)
+    {
+        var result = new List<GroundingProviderProfile>(names.Count);
+        foreach (var name in names)
+        {
+            var profile = await groundingLookup(name, cancellationToken);
+            if (profile is not null) result.Add(profile);
+            // Silently skip missing providers (profile deleted after template creation)
         }
         return result;
     }

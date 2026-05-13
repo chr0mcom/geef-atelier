@@ -1,5 +1,6 @@
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 
 namespace Geef.Atelier.Application.Crew;
@@ -51,6 +52,20 @@ public interface ICrewService
 
     /// <summary>Deletes a custom advisor profile by name. Throws <see cref="InvalidOperationException"/> for system profiles.</summary>
     Task DeleteCustomAdvisorProfileAsync(string name, CancellationToken cancellationToken = default);
+
+    // --- Grounding-provider profiles ---
+
+    Task<IReadOnlyList<GroundingProviderProfile>> ListGroundingProviderProfilesAsync(bool includeSystem = true, CancellationToken cancellationToken = default);
+    Task<GroundingProviderProfile?> GetGroundingProviderProfileAsync(string name, CancellationToken cancellationToken = default);
+
+    /// <summary>Creates a custom grounding-provider profile. The name is auto-prefixed with <c>"custom-"</c> if not already present.</summary>
+    Task<GroundingProviderProfile> CreateCustomGroundingProviderProfileAsync(GroundingProviderProfile profile, CancellationToken cancellationToken = default);
+
+    /// <summary>Updates a custom grounding-provider profile. Throws <see cref="InvalidOperationException"/> for system profiles.</summary>
+    Task<GroundingProviderProfile> UpdateCustomGroundingProviderProfileAsync(GroundingProviderProfile profile, CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes a custom grounding-provider profile by name. Throws <see cref="InvalidOperationException"/> for system profiles.</summary>
+    Task DeleteCustomGroundingProviderProfileAsync(string name, CancellationToken cancellationToken = default);
 
     // --- Crew templates ---
 

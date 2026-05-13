@@ -3,16 +3,18 @@ using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
 
 namespace Geef.Atelier.Application.Runs;
 
 internal sealed class RunService(
-    IRunPersistenceService         persistence,
-    IRunRepository                 repository,
-    ICrewService                   crewService,
-    IAdvisorConsultationRepository consultationRepository) : IRunService
+    IRunPersistenceService                persistence,
+    IRunRepository                        repository,
+    ICrewService                          crewService,
+    IAdvisorConsultationRepository        consultationRepository,
+    IGroundingConsultationRepository?     groundingConsultationRepository = null) : IRunService
 {
     private static readonly JsonSerializerOptions SnapshotJsonOpts =
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
@@ -104,12 +106,17 @@ internal sealed class RunService(
             .Where(c => !iterationSet.Contains(c.Id))
             .ToLookup(c => c.IterationNumber);
 
+        IReadOnlyList<GroundingConsultation> groundingConsultations = groundingConsultationRepository is not null
+            ? await groundingConsultationRepository.GetByRunIdAsync(runId, cancellationToken)
+            : [];
+
         return new RunWithGroundingViewModel(
             details,
             snapshot,
             groundedBrief,
             groundingAdvisors,
             recoveryAdvisors,
-            advisorsByIteration);
+            advisorsByIteration,
+            groundingConsultations);
     }
 }
