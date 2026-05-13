@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 
 namespace Geef.Atelier.Core.Domain.Crew;
@@ -20,7 +21,11 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// <param name="Reviewers">Embedded reviewer profiles in the order required by the evaluation strategy.</param>
 /// <param name="EvaluationStrategy">Strategy used for reviewer orchestration.</param>
 /// <param name="ConvergenceOverride">Convergence-policy overrides applied for this run, if any.</param>
-/// <param name="Advisors">Embedded advisor profiles. Empty in PS-5.</param>
+/// <param name="Advisors">Embedded advisor profiles. Empty when no advisors are configured.</param>
+/// <param name="GroundingProviders">
+/// Fully-dereferenced grounding-provider profiles. Empty for templates without web-research.
+/// Grounding runs once at the start of a run (not per iteration).
+/// </param>
 public sealed record CrewSnapshot(
     int SchemaVersion,
     string? TemplateName,
@@ -28,7 +33,8 @@ public sealed record CrewSnapshot(
     IReadOnlyList<ReviewerProfile> Reviewers,
     EvaluationStrategy EvaluationStrategy,
     ConvergencePolicyOverride? ConvergenceOverride,
-    IReadOnlyList<Advisors.AdvisorProfile> Advisors)
+    IReadOnlyList<Advisors.AdvisorProfile> Advisors,
+    IReadOnlyList<GroundingProviderProfile>? GroundingProviders = null)
 {
     /// <summary>Current snapshot schema version. Bump when the format changes incompatibly.</summary>
     public const int CurrentSchemaVersion = 1;
