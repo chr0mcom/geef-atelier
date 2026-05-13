@@ -17,12 +17,13 @@ public sealed class LlmClientResolverTests
             Providers       = providers ?? new()
             {
                 ["openrouter"] = new() { Endpoint = "https://openrouter.ai/api/v1", ApiKey = "key1" },
-                ["cli"]        = new() { Endpoint = "http://cli-proxy:8090/v1",     ApiKey = "" }
+                ["claude-cli"] = new() { Endpoint = "http://cli-proxy:8090/v1/claude", ApiKey = "" },
+                ["codex-cli"]  = new() { Endpoint = "http://cli-proxy:8090/v1/codex",  ApiKey = "" }
             },
             Actors = actors ?? new()
             {
-                ["Executor"]              = new() { Provider = "openrouter", Model = "claude-opus-4.7", MaxTokens = 8192 },
-                ["BriefingTreueReviewer"] = new() { Provider = "cli",        Model = "claude-sonnet-4-5" },
+                ["Executor"]              = new() { Provider = "openrouter",  Model = "claude-opus-4.7", MaxTokens = 8192 },
+                ["BriefingTreueReviewer"] = new() { Provider = "claude-cli",  Model = "claude-sonnet-4-5" },
             }
         });
 
@@ -102,6 +103,30 @@ public sealed class LlmClientResolverTests
         var (client, model, _) = resolver.ForActor("Executor");
         Assert.NotNull(client);
         Assert.Equal("some-model", model);
+    }
+
+    [Fact]
+    public void ForProfile_ResolvesClaudeCliProvider()
+    {
+        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions());
+
+        var (client, model, maxTokens) = resolver.ForProfile("claude-cli", "claude-opus-4.7", 4096);
+
+        Assert.NotNull(client);
+        Assert.Equal("claude-opus-4.7", model);
+        Assert.Equal(4096, maxTokens);
+    }
+
+    [Fact]
+    public void ForProfile_ResolvesCodexCliProvider()
+    {
+        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions());
+
+        var (client, model, maxTokens) = resolver.ForProfile("codex-cli", "gpt-4o", 2048);
+
+        Assert.NotNull(client);
+        Assert.Equal("gpt-4o", model);
+        Assert.Equal(2048, maxTokens);
     }
 
     // --- helpers ---
