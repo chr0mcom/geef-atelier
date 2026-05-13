@@ -34,4 +34,18 @@ internal sealed class LlmClientResolver(
         var maxTokens = actorCfg.MaxTokens ?? opts.DefaultMaxTokens;
         return (client, model, maxTokens);
     }
+
+    public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
+    {
+        var opts = options.Value;
+
+        if (!opts.Providers.TryGetValue(provider, out var providerCfg))
+            throw new InvalidOperationException(
+                $"Provider '{provider}' (requested by profile) is not configured in Llm:Providers.");
+
+        var client = _clients.GetOrAdd(provider, _ =>
+            new OpenAiCompatibleClient(factory.CreateClient("llm"), providerCfg.Endpoint, providerCfg.ApiKey));
+
+        return (client, model, maxTokens ?? opts.DefaultMaxTokens);
+    }
 }

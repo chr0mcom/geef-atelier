@@ -1,6 +1,6 @@
 namespace Geef.Atelier.Infrastructure.Llm;
 
-/// <summary>Resolves the correct <see cref="ILlmClient"/>, model, and token limit for a named pipeline actor.</summary>
+/// <summary>Resolves the correct <see cref="ILlmClient"/>, model, and token limit for pipeline actors and profiles.</summary>
 public interface ILlmClientResolver
 {
     /// <summary>
@@ -8,4 +8,11 @@ public interface ILlmClientResolver
     /// Throws <see cref="InvalidOperationException"/> when the actor or its provider is not configured.
     /// </summary>
     (ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName);
+
+    /// <summary>
+    /// Returns the client, model, and effective max-tokens for a profile-defined provider/model pair.
+    /// Falls back to <c>LlmOptions.DefaultMaxTokens</c> when <paramref name="maxTokens"/> is null.
+    /// Throws <see cref="InvalidOperationException"/> when the provider is not configured.
+    /// </summary>
+    (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens);
 }
