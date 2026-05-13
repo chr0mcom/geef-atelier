@@ -1,6 +1,6 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 2026-05-13 (Feature Model-Catalog-Dropdown: D-033 ergänzt)*
+*Letzte Aktualisierung: 2026-05-13 (Feature Grounding-Visualization: D-034 ergänzt)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -477,3 +477,17 @@ Datum: 2026-05-13
 | (f) Custom-Model-Escape-Hatch | Besteht als "Custom model name…" Option im Dropdown. Beim Speichern mit nicht-katalogisiertem Modell: Bestätigungs-Modal ("Save anyway?"). Verhindert Tippfehler, erlaubt aber bewusste Custom-Nutzung. |
 
 **Tests:** 256 C#-Tests (8 neu `ModelCatalogTests`), 43 Python-Tests (13 neu `test_models_endpoints.py`), 1 E2E-Skip, 0 Failures.
+
+---
+
+## D-034 — Feature: Grounding-Visualization (2026-05-13)
+
+**Kontext:** Die GEEF-Grounding-Phase existiert vollständig im Code (`BriefingGroundingStep`, `AdvisorContextGroundingStep`), ist aber in der UI unsichtbar. RunDetail springt direkt von Briefing zur ersten Iteration. Zusätzlich werden Pre-Execution-Advisors (Trigger `BeforeFirstExecution`) als Iteration-1-Beitrag gerendert — konzeptionell gehören sie zur Grounding-Phase, da sie einmalig pro Run laufen.
+
+| Knackpunkt | Entscheidung |
+|---|---|
+| (a) Trigger-Lookup-Strategie: DB-Spalte vs. Snapshot-Deserialisierung | **Snapshot-Deserialisierung.** `AdvisorConsultation`-Entity hat kein `Trigger`-Feld. Der Trigger wird zur Render-Zeit aus `CrewSnapshot.Advisors` per `AdvisorProfileName`-Match nachgeschlagen. Keine DB-Migration nötig. Fallback bei Lookup-Miss (z.B. historische Runs ohne passendes Advisor-Profil im Snapshot): Consultation bleibt im Iteration-Bucket, kein Datenverlust. |
+| (b) Press-Visualization-Layout: Vier gleichberechtigte Stages vs. zweiteilige Anzeige | **Zweiteilig** (Grounding | Iteration-Loop). Grounding als eigenständige Spalte links des Iteration-Blocks, getrennt durch CSS-Divider. Macht semantisch klar, dass Grounding einmalig läuft und die Iteration-Stages ein Loop sind. Vier gleichberechtigte Stages würden den Unterschied verschleiern. |
+| (c) Grouping-Logik-Location: Page-intern vs. Application-Layer ViewModel | **Application-Layer ViewModel** (`RunWithGroundingViewModel`). `IRunService.GetRunWithGroundingAsync` kapselt die Grouping-Logik vollständig: testbar ohne Blazor-Stack, wiederverwendbar (ggf. für zukünftiges MCP-Tool), saubere Layer-Trennung. `RunDetail.razor` ist damit rein deklarativ ohne Grouping-Logik. |
+
+**Tests:** 273 C#-Tests (19 neu: `RunWithGroundingViewModelTests`, `GroundingSectionTests`, `PressVisualizationWithGroundingTests`), 1 E2E-Skip, 0 Failures. Python-Tests unverändert (43 grün).
