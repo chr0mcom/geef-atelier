@@ -13,4 +13,7 @@ internal sealed class TestLlmClientResolver(
 {
     public (ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName) =>
         (client, model, maxTokens);
+
+    public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string profileModel, int? profileMaxTokens) =>
+        (client, profileModel, profileMaxTokens ?? maxTokens);
 }

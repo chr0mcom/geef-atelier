@@ -1,6 +1,8 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Persistence;
+using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Web.Notifications;
@@ -30,10 +32,10 @@ public sealed class PostgresEventSinkPersistsCompleteRunTests(PostgresFixture fi
 
         var runner = AtelierPipelineFactory.BuildWithProviders(
             new BriefingGroundingStep(),
-            new LlmExecutionStep(resolver),
+            new ProfileBasedExecutor(SystemCrew.DefaultExecutorProfile, resolver),
             [
-                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, resolver),
-                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      resolver)
+                new ProfileBasedReviewer(SystemCrew.BriefingFidelityProfile, resolver),
+                new ProfileBasedReviewer(SystemCrew.ClarityProfile, resolver)
             ],
             new MarkdownFinalizer(),
             Options.Create(new ConvergenceOptions()),

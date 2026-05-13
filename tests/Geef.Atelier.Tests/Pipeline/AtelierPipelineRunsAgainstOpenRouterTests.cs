@@ -1,3 +1,5 @@
+using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Pipeline;
@@ -11,6 +13,15 @@ namespace Geef.Atelier.Tests.Pipeline;
 public sealed class AtelierPipelineRunsAgainstOpenRouterTests
 {
     private const string Briefing = "Schreibe einen kurzen Text (ca. 150 Wörter) über das Walking-Skeleton-Pattern in der Softwareentwicklung.";
+
+    private static CrewSnapshot KlassikSnapshot() => new(
+        SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
+        TemplateName: SystemCrew.KlassikTemplateName,
+        Executor: SystemCrew.DefaultExecutorProfile,
+        Reviewers: [SystemCrew.BriefingFidelityProfile, SystemCrew.ClarityProfile],
+        EvaluationStrategy: EvaluationStrategy.Parallel,
+        ConvergenceOverride: null,
+        Advisors: Array.Empty<AdvisorProfile>());
 
     [Fact]
     public async Task AtelierPipelineRunsAgainstOpenRouter()
@@ -28,12 +39,6 @@ public sealed class AtelierPipelineRunsAgainstOpenRouterTests
                 ["Llm:DefaultProvider"]                            = "openrouter",
                 ["Llm:Providers:openrouter:Endpoint"]              = "https://openrouter.ai/api/v1",
                 ["Llm:Providers:openrouter:ApiKey"]                = apiKey,
-                ["Llm:Actors:Executor:Provider"]                   = "openrouter",
-                ["Llm:Actors:Executor:Model"]                      = "anthropic/claude-opus-4.7",
-                ["Llm:Actors:BriefingTreueReviewer:Provider"]      = "openrouter",
-                ["Llm:Actors:BriefingTreueReviewer:Model"]         = "anthropic/claude-opus-4.7",
-                ["Llm:Actors:KlarheitReviewer:Provider"]           = "openrouter",
-                ["Llm:Actors:KlarheitReviewer:Model"]              = "anthropic/claude-opus-4.7"
             })
             .Build();
 
@@ -45,7 +50,10 @@ public sealed class AtelierPipelineRunsAgainstOpenRouterTests
         var resolver = provider.GetRequiredService<ILlmClientResolver>();
         var sink     = new CountingEventSink();
 
-        var runner = AtelierPipelineFactory.Build(resolver, Options.Create(new ConvergenceOptions()), additionalSinks: [sink]);
+        var runner = AtelierPipelineFactory.Build(
+            KlassikSnapshot(), resolver,
+            Options.Create(new ConvergenceOptions()),
+            additionalSinks: [sink]);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(300));
         var result    = await runner.RunAsync(Briefing, cts.Token);
@@ -78,12 +86,6 @@ public sealed class AtelierPipelineRunsAgainstOpenRouterTests
                 ["Llm:DefaultProvider"]                            = "openrouter",
                 ["Llm:Providers:openrouter:Endpoint"]              = "https://openrouter.ai/api/v1",
                 ["Llm:Providers:openrouter:ApiKey"]                = apiKey,
-                ["Llm:Actors:Executor:Provider"]                   = "openrouter",
-                ["Llm:Actors:Executor:Model"]                      = "anthropic/claude-opus-4.7",
-                ["Llm:Actors:BriefingTreueReviewer:Provider"]      = "openrouter",
-                ["Llm:Actors:BriefingTreueReviewer:Model"]         = "anthropic/claude-opus-4.7",
-                ["Llm:Actors:KlarheitReviewer:Provider"]           = "openrouter",
-                ["Llm:Actors:KlarheitReviewer:Model"]              = "anthropic/claude-opus-4.7"
             })
             .Build();
 
@@ -96,7 +98,7 @@ public sealed class AtelierPipelineRunsAgainstOpenRouterTests
         var sink     = new CountingEventSink();
 
         var runner = AtelierPipelineFactory.Build(
-            resolver,
+            KlassikSnapshot(), resolver,
             Options.Create(new ConvergenceOptions { AbortOnCritical = false }),
             additionalSinks: [sink]);
 

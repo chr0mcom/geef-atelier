@@ -1,3 +1,4 @@
+using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Tests.Llm;
@@ -8,6 +9,16 @@ namespace Geef.Atelier.Tests.Pipeline;
 
 public sealed class SeverityClassificationTests
 {
+    private static ReviewerProfile TestProfile(string systemPrompt) => new(
+        Name: "test-reviewer",
+        DisplayName: "Test",
+        Description: "Test reviewer",
+        SystemPrompt: systemPrompt,
+        Provider: "test",
+        Model: "test-model",
+        MaxTokens: null,
+        IsSystem: false);
+
     [Theory]
     [InlineData("critical", FindingSeverity.Critical)]
     [InlineData("major",    FindingSeverity.Error)]
@@ -15,11 +26,11 @@ public sealed class SeverityClassificationTests
     [InlineData("info",     FindingSeverity.Info)]
     [InlineData("error",    FindingSeverity.Error)]    // backwards-compat
     [InlineData("warning",  FindingSeverity.Warning)]  // backwards-compat
-    public async Task LlmReviewer_MapsSeverityCorrectly(string severityString, FindingSeverity expectedSdkSeverity)
+    public async Task ProfileBasedReviewer_MapsSeverityCorrectly(string severityString, FindingSeverity expectedSdkSeverity)
     {
         var client   = new FixedSeverityLlmClient(severityString);
         var resolver = new TestLlmClientResolver(client);
-        var reviewer = new LlmReviewer("TestReviewer", "You are a reviewer.", resolver);
+        var reviewer = new ProfileBasedReviewer(TestProfile("You are a reviewer."), resolver);
         var context  = BuildContext("Some briefing.", "Some draft.");
 
         var result = await reviewer.ReviewAsync(context, CancellationToken.None);
@@ -29,11 +40,11 @@ public sealed class SeverityClassificationTests
     }
 
     [Fact]
-    public async Task LlmReviewer_UnknownSeverity_DefaultsToWarning()
+    public async Task ProfileBasedReviewer_UnknownSeverity_DefaultsToWarning()
     {
         var client   = new FixedSeverityLlmClient("unknown-value");
         var resolver = new TestLlmClientResolver(client);
-        var reviewer = new LlmReviewer("TestReviewer", "You are a reviewer.", resolver);
+        var reviewer = new ProfileBasedReviewer(TestProfile("You are a reviewer."), resolver);
         var context  = BuildContext("Some briefing.", "Some draft.");
 
         var result = await reviewer.ReviewAsync(context, CancellationToken.None);

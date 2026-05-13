@@ -1,5 +1,6 @@
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Mcp.Tools;
 
 namespace Geef.Atelier.Tests.Mcp;
@@ -30,6 +31,8 @@ public sealed class SubmitRequestToolCallsRunServiceTests
             string briefingText,
             string configJson,
             string? createdByUser = null,
+            string? crewTemplateName = null,
+            CrewSpec? customCrew = null,
             CancellationToken cancellationToken = default)
         {
             LastCreatedByUser = createdByUser;

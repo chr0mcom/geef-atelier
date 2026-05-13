@@ -1,6 +1,8 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Persistence;
+using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Web.Notifications;
@@ -33,10 +35,10 @@ public sealed class PostgresEventSinkConcurrentRunsTests(PostgresFixture fixture
         var resolver1   = new TestLlmClientResolver(fakeClient1);
         var runner1 = AtelierPipelineFactory.BuildWithProviders(
             new BriefingGroundingStep(),
-            new LlmExecutionStep(resolver1),
+            new ProfileBasedExecutor(SystemCrew.DefaultExecutorProfile, resolver1),
             [
-                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, resolver1),
-                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      resolver1)
+                new ProfileBasedReviewer(SystemCrew.BriefingFidelityProfile, resolver1),
+                new ProfileBasedReviewer(SystemCrew.ClarityProfile, resolver1)
             ],
             new MarkdownFinalizer(),
             Options.Create(new ConvergenceOptions()),
@@ -46,10 +48,10 @@ public sealed class PostgresEventSinkConcurrentRunsTests(PostgresFixture fixture
         var resolver2   = new TestLlmClientResolver(fakeClient2);
         var runner2 = AtelierPipelineFactory.BuildWithProviders(
             new BriefingGroundingStep(),
-            new LlmExecutionStep(resolver2),
+            new ProfileBasedExecutor(SystemCrew.DefaultExecutorProfile, resolver2),
             [
-                new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, resolver2),
-                new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      resolver2)
+                new ProfileBasedReviewer(SystemCrew.BriefingFidelityProfile, resolver2),
+                new ProfileBasedReviewer(SystemCrew.ClarityProfile, resolver2)
             ],
             new MarkdownFinalizer(),
             Options.Create(new ConvergenceOptions()),
