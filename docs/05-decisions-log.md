@@ -1,6 +1,6 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 2026-05-13 (PS-7 Advisor-Pässe: D-031 ergänzt)*
+*Letzte Aktualisierung: 2026-05-13 (CLI-Provider-Split Refactor: D-032 ergänzt)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -444,3 +444,19 @@ Datum: 2026-05-13
 | (c) Advisor-Failure → Run schlägt fehl (Exception bubbling) | Advisor-LLM-Calls sind nicht best-effort. Eine Exception im `ProfileBasedAdvisor` bubbled durch den `AdvisorAwareExecutor` hoch und bricht den Run mit Status `Failed` ab. Begründung: ein fehlgeschlagener Advisor hat möglicherweise den Executor-Context korrumpiert — stiller Weiterlauf wäre gefährlicher als transparenter Abbruch. |
 | (d) Advisor-Reihenfolge signifikant (analog Reviewer) | Mehrere Advisors eines Triggers werden in Listen-Reihenfolge sequenziell ausgeführt. Jeder spätere Advisor sieht den bereits akkumulierten `AdvisorBlock` der Vorgänger. Analog zur `Sequential`-EvaluationStrategy bei Reviewern: Reihenfolge im CrewTemplate ist semantisch. |
 | (e) OnConvergenceFailure-Trigger via Single-Retry-Cap | `RunOrchestratorService.TryConvergenceFailureRetryAsync` fängt `ConvergenceFailedException` und startet einen einmaligen Wiederholungsdurchlauf mit `OnConvergenceFailure`-Advisors im Kontext. `RunEntity.AdvisorRetryAttempted`-Flag (Migration Step11) verhindert Endlos-Schleifen: ein zweites `ConvergenceFailedException` nach dem Retry eskaliert direkt zu `Failed`. Multi-Retry mit konfigurierter Wiederholungsanzahl ist als Future Work dokumentiert (PS-8 oder eigener Schritt). |
+
+---
+
+## D-032 — Refactor: CLI-Provider-Split (2026-05-13)
+
+**Kontext:** PS-4 hat einen einzelnen `cli`-Provider mit internem Model-Name-Routing angelegt (claude-Präfix → claude CLI, gpt-/o*-Präfix → codex CLI). Im PS-6 Crew-UI wurde sichtbar, dass dieser versteckte Routing-Mechanismus eine UX-Schwäche ist: der User sieht im Provider-Dropdown nur "cli" und muss anhand des Modell-Namens raten, welche CLI tatsächlich genutzt wird. Ein falsch geschriebener Modell-Name kann silently in die falsche CLI routen.
+
+| Knackpunkt | Entscheidung |
+|---|---|
+| (a) Legacy-Endpoint im cli-proxy: Entfernen oder Behalten | **Behalten mit Deprecation-Warning.** Der Legacy-Endpoint `/v1/chat/completions` bleibt erhalten und loggt bei jedem Aufruf ein WARNING-Level-Log. Begründung: minimales Risiko bei Migration-Edge-Cases (falls ein Profil nach DB-Migration noch `cli` als Provider hätte, würde es weiter funktionieren statt komplett zu scheitern). Geplante Entfernung nach 2-3 Atelier-Versionen. |
+| (b) Zwei explizite Endpoints: `/v1/claude/chat/completions` + `/v1/codex/chat/completions` | Deterministisches Routing ohne Model-Name-Heuristik. Provider-Name allein entscheidet die CLI-Wahl. Atelier-Konfiguration trennt die zwei Provider in `appsettings.json` mit unterschiedlichen Endpoint-Pfaden. |
+| (c) `IProviderCatalog`-API-Erweiterung um `ProviderInfo` | Die alte Methode `ListProviderNames() → IReadOnlyList<string>` wird ersetzt durch `ListProviders() → IReadOnlyList<ProviderInfo>`. `ProviderInfo` ist ein sealed record mit `Name` (DB-Key) und `DisplayName` (UI-Label). Kein Backward-Kompat (Single-Maintainer-Projekt, einziger Caller ist `ProfileEditorForm`). |
+| (d) `ProviderCatalog`-Implementierung: Hardcodierte DisplayNames statt DB-Daten | DisplayNames für die drei bekannten Provider (`openrouter`, `claude-cli`, `codex-cli`) sind als Dictionary-Konstante im Code hinterlegt. Unbekannte Provider-Namen (zukünftige Erweiterungen) fallen auf `Name == DisplayName` zurück. |
+| (e) CrewSnapshot-Migrations-Strategie: Two-Pass SQL | DB-Migration `Step12CliProviderSplit` migriert Profile-Tabellen (ReviewerProfiles, ExecutorProfiles, AdvisorProfiles) via direktem `CASE`-`UPDATE` auf der `"Model"`-Spalte — immer korrekt. Für `Runs.CrewSnapshot`-JSONB: Two-Pass SQL-String-Replace (Codex-Pattern zuerst, dann claude-cli-Fallback). Limitation: Mixed-CLI-Snapshots (ein Executor claude, ein Reviewer codex im selben Run) werden nicht korrekt migriert — in der Praxis existieren solche Snapshots nicht, da alle System-Akteure `openrouter` nutzen und custom CLI-Profile im Projekt neu sind. |
+
+**Tests:** `dotnet build` 0/0. 246 C#-Tests grün (7 neue), 1 E2E-Skip. Python pytest 30/30 grün (9 neue).

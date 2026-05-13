@@ -230,9 +230,17 @@ Weitere Details: [`08-crew-system.md`](08-crew-system.md) → Sektion "Advisor-P
 
 **Evaluation-Strategy:** `Parallel` (Standard). Alle vier Strategien wählbar per Template.
 
-## LLM-Provider-Schicht (umgesetzt in Migration M1, siehe D-017)
+## LLM-Provider-Schicht (umgesetzt in Migration M1 und CLI-Provider-Split, D-017/D-032)
 
-Die LLM-Schicht ist **OpenAI-API-konform** implementiert. Default-Endpoint: **OpenRouter** (`https://openrouter.ai/api/v1`).
+Die LLM-Schicht ist **OpenAI-API-konform** implementiert. Drei konfigurierte Provider (Stand CLI-Provider-Split):
+
+| Provider-Name | Endpoint | Abrechnung |
+|---|---|---|
+| `openrouter` | `https://openrouter.ai/api/v1` | Pay-per-Token |
+| `claude-cli` | `http://cli-proxy:8090/v1/claude` | Claude Subscription |
+| `codex-cli`  | `http://cli-proxy:8090/v1/codex`  | Codex Subscription |
+
+Der `cli-proxy`-Side-Container (FastAPI, Python) stellt zwei explizite Endpunkte bereit, die direkt an die jeweilige CLI routen — ohne Model-Name-Heuristik. Ein Legacy-Endpunkt `/v1/chat/completions` bleibt für Backward-Kompatibilität erhalten und loggt eine Deprecation-Warning.
 
 ### Abstraktion
 
