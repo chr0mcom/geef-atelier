@@ -1,3 +1,4 @@
+using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 
 namespace Geef.Atelier.Core.Domain.Crew;
@@ -83,6 +84,40 @@ public static class SystemCrew
             [DefaultExecutorProfile.Name] = DefaultExecutorProfile,
         };
 
+    /// <summary>Strategic advisor consulted once before the executor begins: surfaces unclear constraints and missing context.</summary>
+    public static readonly AdvisorProfile BriefingClarifierProfile = new(
+        Name: "briefing-clarifier",
+        DisplayName: "Briefing Clarifier",
+        Description: "Strategic consultant. Analyzes briefings for unclear constraints, missing context, or unrealistic scope before the Executor begins.",
+        SystemPrompt: "You are a strategic consultant reviewing a text briefing before an AI executor processes it. Identify up to 5 key strategic observations: unclear constraints, missing context, unrealistic scope, or conflicting requirements. Be concise (2-3 sentences per point). Do NOT write the text yourself — advise the executor.",
+        Provider: "openrouter",
+        Model: "google/gemini-2.5-flash-preview",
+        MaxTokens: null,
+        Mode: AdvisorMode.Strategic,
+        Trigger: AdvisorTrigger.BeforeFirstExecution,
+        IsSystem: true);
+
+    /// <summary>Adversarial advisor consulted before every iteration: challenges weak assumptions in the current draft.</summary>
+    public static readonly AdvisorProfile DevilsAdvocateProfile = new(
+        Name: "devils-advocate",
+        DisplayName: "Devil's Advocate",
+        Description: "Adversarial perspective. After each iteration, challenges the strongest claims of the artifact to surface weak assumptions.",
+        SystemPrompt: "You are a critical reviewer tasked with challenging an AI-generated text artifact. In 2-4 sentences, identify the weakest assumptions or most contestable claims. Be constructive — aim to strengthen the final text, not tear it down. Do NOT rewrite the text.",
+        Provider: "openrouter",
+        Model: "openai/gpt-4o-mini",
+        MaxTokens: null,
+        Mode: AdvisorMode.DevilsAdvocate,
+        Trigger: AdvisorTrigger.BeforeEveryExecution,
+        IsSystem: true);
+
+    /// <summary>All system advisor profiles, indexed by name.</summary>
+    public static readonly IReadOnlyDictionary<string, AdvisorProfile> AdvisorProfiles =
+        new Dictionary<string, AdvisorProfile>
+        {
+            [BriefingClarifierProfile.Name] = BriefingClarifierProfile,
+            [DevilsAdvocateProfile.Name] = DevilsAdvocateProfile,
+        };
+
     /// <summary>All system crew templates, indexed by name.</summary>
     public static readonly IReadOnlyDictionary<string, CrewTemplate> CrewTemplates =
         new Dictionary<string, CrewTemplate>
@@ -95,6 +130,10 @@ public static class SystemCrew
         ReviewerProfiles.ContainsKey(name)
         || ExecutorProfiles.ContainsKey(name)
         || CrewTemplates.ContainsKey(name);
+
+    /// <summary>True when the supplied name matches a system advisor profile.</summary>
+    public static bool IsSystemAdvisorName(string name) =>
+        AdvisorProfiles.ContainsKey(name);
 
     /// <summary>Ensures the supplied name carries the <c>"custom-"</c> prefix; idempotent.</summary>
     public static string EnsureCustomPrefix(string name) =>
