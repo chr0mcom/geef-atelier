@@ -1,8 +1,11 @@
 namespace Geef.Atelier.Application.Crew;
 
-/// <summary>Read-only catalogue of configured LLM provider names.</summary>
+/// <summary>A named LLM provider with a human-readable display name for the UI.</summary>
+public sealed record ProviderInfo(string Name, string DisplayName);
+
+/// <summary>Read-only catalogue of available LLM providers.</summary>
 public interface IProviderCatalog
 {
-    /// <summary>Returns the names of all configured LLM providers, sorted alphabetically.</summary>
-    IReadOnlyList<string> ListProviderNames();
+    /// <summary>Returns all available LLM providers with their display names.</summary>
+    IReadOnlyList<ProviderInfo> ListProviders();
 }
