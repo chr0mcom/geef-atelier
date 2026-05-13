@@ -1,0 +1,50 @@
+@using Geef.Atelier.Web.Components.UI
+
+<Modal Show="Show" OnClose="OnCancel" CloseOnBackdropClick="true" DataTestId="delete-confirm">
+    <Title>
+        <span>Delete @ItemKind</span>
+    </Title>
+    <ChildContent>
+        <p>This action cannot be undone. @ExtraWarning</p>
+        <p>To confirm, type <strong>@ItemName</strong> below:</p>
+        <input type="text" class="delete-confirm-input"
+               data-testid="delete-confirm-input"
+               @bind="_typedName"
+               @bind:event="oninput"
+               placeholder="@ItemName" />
+    </ChildContent>
+    <Actions>
+        <button type="button" class="btn danger"
+                data-testid="delete-confirm-button"
+                disabled="@(_typedName != ItemName)"
+                @onclick="HandleConfirm">
+            Delete
+        </button>
+        <button type="button" class="btn ghost"
+                @onclick="() => OnCancel.InvokeAsync()">
+            Cancel
+        </button>
+    </Actions>
+</Modal>
+
+@code {
+    [Parameter] public bool Show { get; set; }
+    [Parameter, EditorRequired] public string ItemName { get; set; } = "";
+    [Parameter] public string ItemKind { get; set; } = "Item";
+    [Parameter] public string? ExtraWarning { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private string _typedName = "";
+
+    protected override void OnParametersSet()
+    {
+        if (!Show) _typedName = "";
+    }
+
+    private async Task HandleConfirm()
+    {
+        if (_typedName == ItemName)
+            await OnConfirm.InvokeAsync();
+    }
+}

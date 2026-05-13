@@ -1,0 +1,163 @@
+@using System.ComponentModel.DataAnnotations
+@using Geef.Atelier.Application.Crew
+@inject IProviderCatalog ProviderCatalog
+
+<div class="profile-editor-form" data-testid="profile-editor">
+    @if (!string.IsNullOrEmpty(Error))
+    {
+        <div class="error-banner">@Error</div>
+    }
+
+    <EditForm Model="_form" OnValidSubmit="HandleSave">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="field">
+            <label>Name</label>
+            <InputText @bind-Value="_form.Name" disabled="@(!IsNew || IsSystem)" placeholder="my-profile" />
+            @if (IsNew && !string.IsNullOrEmpty(_form.Name))
+            {
+                <small>Will be saved as: custom-@_form.Name.TrimStart("custom-".ToCharArray())</small>
+            }
+        </div>
+
+        <div class="field">
+            <label>Display Name</label>
+            <InputText @bind-Value="_form.DisplayName" disabled="@IsSystem" />
+            <ValidationMessage For="() => _form.DisplayName" />
+        </div>
+
+        <div class="field">
+            <label>Description</label>
+            <InputTextArea @bind-Value="_form.Description" rows="3" disabled="@IsSystem" />
+            <ValidationMessage For="() => _form.Description" />
+        </div>
+
+        <div class="field">
+            <label>System Prompt (@(_form.SystemPrompt?.Length ?? 0)/8000)</label>
+            <InputTextArea @bind-Value="_form.SystemPrompt" rows="15"
+                           style="font-family: var(--font-mono, monospace)"
+                           disabled="@IsSystem" data-testid="profile-systemprompt" />
+            <ValidationMessage For="() => _form.SystemPrompt" />
+        </div>
+
+        <div class="field">
+            <label>Provider</label>
+            <InputSelect @bind-Value="_form.Provider" disabled="@IsSystem">
+                @foreach (var p in _providers)
+                {
+                    <option value="@p">@p</option>
+                }
+            </InputSelect>
+            <ValidationMessage For="() => _form.Provider" />
+        </div>
+
+        <div class="field">
+            <label>Model</label>
+            <InputText @bind-Value="_form.Model" disabled="@IsSystem"
+                       placeholder="e.g., anthropic/claude-opus-4-7" />
+            <ValidationMessage For="() => _form.Model" />
+        </div>
+
+        <div class="field">
+            <label>Max Tokens (optional)</label>
+            <InputNumber @bind-Value="_form.MaxTokens" disabled="@IsSystem" />
+        </div>
+
+        <div class="editor-actions">
+            @if (!IsSystem)
+            {
+                <button type="submit" class="btn primary" data-testid="save-profile" disabled="@IsSaving">
+                    @(IsSaving ? "Saving…" : "Save")
+                </button>
+            }
+            else
+            {
+                <button type="button" class="btn primary" @onclick="() => OnDuplicate.InvokeAsync()">
+                    Duplicate as custom
+                </button>
+            }
+            <button type="button" class="btn ghost" @onclick="() => OnCancel.InvokeAsync()">Cancel</button>
+        </div>
+    </EditForm>
+</div>
+
+@code {
+    [Parameter] public string? ProfileName { get; set; }
+    [Parameter] public string DisplayName { get; set; } = "";
+    [Parameter] public string Description { get; set; } = "";
+    [Parameter] public string SystemPrompt { get; set; } = "";
+    [Parameter] public string Provider { get; set; } = "";
+    [Parameter] public string Model { get; set; } = "";
+    [Parameter] public int? MaxTokens { get; set; }
+    [Parameter] public bool IsSystem { get; set; }
+    [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public EventCallback<ProfileFormValues> OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback OnDuplicate { get; set; }
+
+    private bool IsNew => ProfileName == null;
+    private IReadOnlyList<string> _providers = [];
+    private ProfileFormModel _form = new();
+
+    protected override void OnInitialized()
+    {
+        _providers = ProviderCatalog.ListProviderNames();
+        _form = new ProfileFormModel
+        {
+            Name = ProfileName ?? "",
+            DisplayName = DisplayName,
+            Description = Description,
+            SystemPrompt = SystemPrompt,
+            Provider = Provider,
+            Model = Model,
+            MaxTokens = MaxTokens,
+        };
+    }
+
+    private async Task HandleSave()
+    {
+        await OnSave.InvokeAsync(new ProfileFormValues(
+            _form.Name,
+            _form.DisplayName,
+            _form.Description,
+            _form.SystemPrompt ?? "",
+            _form.Provider,
+            _form.Model ?? "",
+            _form.MaxTokens));
+    }
+
+    private sealed class ProfileFormModel
+    {
+        [Required, RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Only lowercase letters, numbers, hyphens")]
+        [MaxLength(64)]
+        public string Name { get; set; } = "";
+
+        [Required, MaxLength(200)]
+        public string DisplayName { get; set; } = "";
+
+        [MaxLength(1000)]
+        public string Description { get; set; } = "";
+
+        [Required, MaxLength(8000)]
+        public string? SystemPrompt { get; set; } = "";
+
+        [Required]
+        public string Provider { get; set; } = "";
+
+        [Required]
+        public string? Model { get; set; } = "";
+
+        public int? MaxTokens { get; set; }
+    }
+
+    public sealed record ProfileFormValues(
+        string Name,
+        string DisplayName,
+        string Description,
+        string SystemPrompt,
+        string Provider,
+        string Model,
+        int? MaxTokens);
+}
