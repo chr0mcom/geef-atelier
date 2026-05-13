@@ -14,6 +14,8 @@ public static class PersistenceServiceExtensions
         services.AddScoped<IReviewerProfileRepository, ReviewerProfileRepository>();
         services.AddScoped<IExecutorProfileRepository, ExecutorProfileRepository>();
         services.AddScoped<ICrewTemplateRepository, CrewTemplateRepository>();
+        services.AddScoped<IAdvisorProfileRepository, AdvisorProfileRepository>();
+        services.AddScoped<IAdvisorConsultationRepository, AdvisorConsultationRepository>();
         return services;
     }
 }

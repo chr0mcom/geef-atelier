@@ -34,4 +34,10 @@ public sealed record RunEntity
     /// configuration used for this run. Persisted to keep runs reproducible after profiles change.
     /// </summary>
     public string? CrewSnapshot { get; init; }
+
+    /// <summary>
+    /// Set to true when an advisor-driven convergence-failure recovery pass has been attempted for this run.
+    /// Prevents infinite retry loops: only one advisor retry is permitted per run.
+    /// </summary>
+    public bool AdvisorRetryAttempted { get; init; }
 }

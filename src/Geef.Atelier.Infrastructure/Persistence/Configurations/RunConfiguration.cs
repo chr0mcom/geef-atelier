@@ -38,6 +38,10 @@ internal sealed class RunConfiguration : IEntityTypeConfiguration<RunEntity>
             .HasColumnType("jsonb")
             .IsRequired(false);
 
+        builder.Property(r => r.AdvisorRetryAttempted)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.HasIndex(r => r.Status);
     }
 }
