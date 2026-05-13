@@ -32,4 +32,10 @@ public interface IRunService
 
     /// <summary>Returns the run with all its iterations and findings, or null if not found.</summary>
     Task<RunDetails?> GetRunDetailsAsync(Guid runId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns a <see cref="RunWithGroundingViewModel"/> that groups advisor consultations by trigger type,
+    /// or null if the run does not exist.
+    /// </summary>
+    Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, CancellationToken cancellationToken = default);
 }

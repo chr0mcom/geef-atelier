@@ -2,14 +2,17 @@ using System.Text.Json;
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Persistence;
+using Geef.Atelier.Core.Persistence.Crew;
 
 namespace Geef.Atelier.Application.Runs;
 
 internal sealed class RunService(
-    IRunPersistenceService persistence,
-    IRunRepository         repository,
-    ICrewService           crewService) : IRunService
+    IRunPersistenceService         persistence,
+    IRunRepository                 repository,
+    ICrewService                   crewService,
+    IAdvisorConsultationRepository consultationRepository) : IRunService
 {
     private static readonly JsonSerializerOptions SnapshotJsonOpts =
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
@@ -64,4 +67,49 @@ internal sealed class RunService(
     /// <inheritdoc/>
     public Task<RunDetails?> GetRunDetailsAsync(Guid runId, CancellationToken cancellationToken = default)
         => repository.GetDetailsAsync(runId, cancellationToken);
+
+    /// <inheritdoc/>
+    public async Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        var details = await repository.GetDetailsAsync(runId, cancellationToken);
+        if (details is null)
+            return null;
+
+        var snapshot = details.Run.CrewSnapshot is { } s ? CrewSnapshot.Deserialize(s) : null;
+        var groundedBrief = details.Run.BriefingText;
+
+        var consultations = await consultationRepository.GetByRunIdAsync(runId, cancellationToken);
+
+        // Build a name→trigger lookup from the snapshot's advisor profiles (null-safe).
+        var triggerDict = snapshot is not null
+            ? snapshot.Advisors.ToDictionary(a => a.Name, a => a.Trigger, StringComparer.OrdinalIgnoreCase)
+            : new Dictionary<string, AdvisorTrigger>(StringComparer.OrdinalIgnoreCase);
+
+        var recoveryAdvisors = consultations
+            .Where(c => c.IterationNumber == -1)
+            .ToList();
+
+        var nonRecovery = consultations
+            .Where(c => c.IterationNumber != -1)
+            .ToList();
+
+        var groundingAdvisors = nonRecovery
+            .Where(c => triggerDict.TryGetValue(c.AdvisorProfileName, out var t)
+                        && t == AdvisorTrigger.BeforeFirstExecution)
+            .ToList();
+
+        // This covers BeforeEveryExecution as well as fallback for profiles not found in the snapshot.
+        var iterationSet = new HashSet<Guid>(groundingAdvisors.Select(c => c.Id));
+        var advisorsByIteration = nonRecovery
+            .Where(c => !iterationSet.Contains(c.Id))
+            .ToLookup(c => c.IterationNumber);
+
+        return new RunWithGroundingViewModel(
+            details,
+            snapshot,
+            groundedBrief,
+            groundingAdvisors,
+            recoveryAdvisors,
+            advisorsByIteration);
+    }
 }
