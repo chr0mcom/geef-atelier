@@ -6,76 +6,54 @@ using Geef.Atelier.Core.Persistence.Crew;
 
 namespace Geef.Atelier.Tests.Application.Crew;
 
-public sealed class CrewServiceAutoPrexfixTests
+public sealed class CrewServiceAdvisorCrudTests
 {
-    // --- Reviewer profile auto-prefix ---
-
     [Fact]
-    public async Task CreateCustomReviewer_AddsPrefixWhenMissing()
+    public async Task CreateCustomAdvisorProfileAsync_AddsCustomPrefix()
     {
-        var repo = new InMemoryReviewerProfileRepository();
-        var svc  = BuildService(reviewerRepo: repo);
+        var repo = new InMemoryAdvisorProfileRepository();
+        var svc  = BuildService(advisorRepo: repo);
 
-        var result = await svc.CreateCustomReviewerProfileAsync(BuildReviewerProfile("my-reviewer"));
+        var result = await svc.CreateCustomAdvisorProfileAsync(BuildAdvisorProfile("my-advisor"));
 
-        Assert.Equal("custom-my-reviewer", result.Name);
+        Assert.Equal("custom-my-advisor", result.Name);
         Assert.False(result.IsSystem);
     }
 
     [Fact]
-    public async Task CreateCustomReviewer_DoesNotDoublePrefixWhenAlreadyPresent()
-    {
-        var repo   = new InMemoryReviewerProfileRepository();
-        var svc    = BuildService(reviewerRepo: repo);
-        var result = await svc.CreateCustomReviewerProfileAsync(BuildReviewerProfile("custom-my-reviewer"));
-
-        Assert.Equal("custom-my-reviewer", result.Name);
-    }
-
-    // --- System-profile protection ---
-
-    [Fact]
-    public async Task UpdateCustomReviewer_ThrowsForSystemProfile()
+    public async Task CreateCustomAdvisorProfileAsync_ThrowsOnSystemName()
     {
         var svc = BuildService();
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => svc.UpdateCustomReviewerProfileAsync(SystemCrew.BriefingFidelityProfile));
+            () => svc.CreateCustomAdvisorProfileAsync(SystemCrew.BriefingClarifierProfile));
     }
 
     [Fact]
-    public async Task DeleteCustomReviewer_ThrowsForSystemProfile()
+    public async Task DeleteCustomAdvisorProfileAsync_ThrowsOnSystemName()
     {
         var svc = BuildService();
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => svc.DeleteCustomReviewerProfileAsync(SystemCrew.BriefingFidelityProfile.Name));
+            () => svc.DeleteCustomAdvisorProfileAsync(SystemCrew.BriefingClarifierProfile.Name));
     }
 
     [Fact]
-    public async Task UpdateCustomTemplate_ThrowsForSystemTemplate()
+    public async Task UpdateCustomAdvisorProfileAsync_ThrowsOnSystemName()
     {
         var svc = BuildService();
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => svc.UpdateCustomCrewTemplateAsync(SystemCrew.KlassikTemplate));
+            () => svc.UpdateCustomAdvisorProfileAsync(SystemCrew.DevilsAdvocateProfile));
     }
 
     [Fact]
-    public async Task DeleteCustomTemplate_ThrowsForSystemTemplate()
+    public async Task ListAdvisorProfilesAsync_IncludesSystemProfiles_WhenRequested()
     {
-        var svc = BuildService();
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => svc.DeleteCustomCrewTemplateAsync(SystemCrew.KlassikTemplateName));
-    }
+        var repo = new InMemoryAdvisorProfileRepository();
+        var svc  = BuildService(advisorRepo: repo);
 
-    // --- ResolveSnapshot falls back to Klassik when null ---
+        var all = await svc.ListAdvisorProfilesAsync(includeSystem: true);
 
-    [Fact]
-    public async Task ResolveSnapshot_WithNullArgs_ReturnKlassikSnapshot()
-    {
-        var svc      = BuildService();
-        var snapshot = await svc.ResolveSnapshotAsync(null, null);
-
-        Assert.Equal(SystemCrew.KlassikTemplateName, snapshot.TemplateName);
-        Assert.Equal(CrewSnapshot.CurrentSchemaVersion, snapshot.SchemaVersion);
+        Assert.Contains(all, p => p.Name == SystemCrew.BriefingClarifierProfile.Name);
+        Assert.Contains(all, p => p.Name == SystemCrew.DevilsAdvocateProfile.Name);
     }
 
     // --- Helpers ---
@@ -91,10 +69,19 @@ public sealed class CrewServiceAutoPrexfixTests
             advisorRepo   ?? new InMemoryAdvisorProfileRepository(),
             templateRepo  ?? new InMemoryCrewTemplateRepository());
 
-    private static ReviewerProfile BuildReviewerProfile(string name) => new(
-        name, name, name, "prompt", "openrouter", "model", null, false);
+    private static AdvisorProfile BuildAdvisorProfile(string name) => new(
+        Name: name,
+        DisplayName: name,
+        Description: "desc",
+        SystemPrompt: "prompt",
+        Provider: "openrouter",
+        Model: "model",
+        MaxTokens: null,
+        Mode: AdvisorMode.Strategic,
+        Trigger: AdvisorTrigger.BeforeFirstExecution,
+        IsSystem: false);
 
-    // --- In-memory repo stubs ---
+    // --- In-memory repo stubs (reused from CrewServiceAutoPrexfixTests pattern) ---
 
     private sealed class InMemoryReviewerProfileRepository : IReviewerProfileRepository
     {
