@@ -1306,12 +1306,36 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
 
 /* --- THE PRESS — pipeline visualization --- */
 .press {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  align-items: center;
+  display: flex;
+  align-items: stretch;
   gap: 0;
   padding: 28px 8px 22px;
   border-bottom: 1px solid var(--hairline-soft);
+  position: relative;
+}
+
+/* Press: two-part layout with Grounding + Iteration stages */
+.press-grounding {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  flex-shrink: 0;
+}
+
+.press-divider {
+  width: 1px;
+  background: var(--hairline-soft);
+  align-self: stretch;
+  margin: 8px 12px;
+  flex-shrink: 0;
+}
+
+.press-iteration {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: center;
+  flex: 1;
   position: relative;
 }
 .press::before {

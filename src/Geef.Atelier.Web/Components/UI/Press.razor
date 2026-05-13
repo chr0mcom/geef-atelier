@@ -2,17 +2,27 @@
 @using Geef.Atelier.Web.Display
 
 <div class="press" aria-label="Pipeline stages">
-    <div class="ribbon r1" style="--ink: @(PressStageMapper.InkPercent1(Status))%"></div>
-    <div class="ribbon r2" style="--ink: @(PressStageMapper.InkPercent2(Status))%"></div>
-
-    @foreach (var (stage, i) in _stages.Select((s, i) => (s, i)))
-    {
-        <div class="stage @StageCss(i)" aria-label="@stage.Role">
-            <div class="seal">@_numerals[i]</div>
-            <div class="role">@stage.Role</div>
-            <div class="desc">@stage.Desc</div>
+    <div class="press-grounding" data-testid="press-grounding">
+        <div class="stage @(IsGroundingDone(Status) ? "done" : "active")" aria-label="Grounding">
+            <div class="seal">G</div>
+            <div class="role">Grounding</div>
+            <div class="desc">Setup &amp; briefing</div>
         </div>
-    }
+    </div>
+    <div class="press-divider" aria-hidden="true"></div>
+    <div class="press-iteration">
+        <div class="ribbon r1" style="--ink: @(PressStageMapper.InkPercent1(Status))%"></div>
+        <div class="ribbon r2" style="--ink: @(PressStageMapper.InkPercent2(Status))%"></div>
+
+        @foreach (var (stage, i) in _stages.Select((s, i) => (s, i)))
+        {
+            <div class="stage @StageCss(i)" aria-label="@stage.Role">
+                <div class="seal">@_numerals[i]</div>
+                <div class="role">@stage.Role</div>
+                <div class="desc">@stage.Desc</div>
+            </div>
+        }
+    </div>
 </div>
 
 @code {
@@ -38,4 +48,7 @@
                     ? "done"
                     : "";
     }
+
+    private static bool IsGroundingDone(RunStatus status) =>
+        status is not RunStatus.Pending;
 }
