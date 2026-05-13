@@ -92,6 +92,10 @@
   --font-mono:      "JetBrains Mono", ui-monospace, Menlo, monospace;
 
   --grain-opacity:  0.18;
+
+  /* Brand marks */
+  --brand-mark:     url('/img/brand/mark-light.png');
+  --hero-mark:      url('/img/brand/mark-light.png');
 }
 
 /* ---------- Palette: Vellum (light warm parchment) ---------- */
@@ -134,6 +138,10 @@ html.palette-vellum {
   --paper-rule:     oklch(0.78 0.022 70);
 
   --grain-opacity:  0.10;
+
+  /* Brand marks */
+  --brand-mark:     url('/img/brand/mark-dark.png');
+  --hero-mark:      url('/img/brand/mark-dark.png');
 }
 
 /* ---------- Palette: Petrol (cool deep teal) ---------- */
@@ -176,6 +184,10 @@ html.palette-petrol {
   --paper-rule:     oklch(0.74 0.030 210);
 
   --grain-opacity:  0.15;
+
+  /* Brand marks */
+  --brand-mark:     url('/img/brand/mark-sand.png');
+  --hero-mark:      url('/img/brand/mark-sand.png');
 }
 
 /* ---------- Reset + base ---------- */
@@ -267,19 +279,13 @@ body::before {
   font-style: italic;
   color: var(--ink-2);
 }
-.nav-brand .crest {
+.nav-brand .brand-mark {
   width: 28px;
   height: 28px;
-  border: 1px solid var(--hairline-strong);
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: var(--hero);
-  font-family: var(--font-display);
-  font-size: 14px;
-  background:
-    radial-gradient(circle at 35% 30%, color-mix(in oklch, var(--hero) 20%, transparent), transparent 60%),
-    var(--surface);
+  background-image: var(--brand-mark);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
 }
 .nav-links { display: flex; gap: 4px; }
 .nav-link {
@@ -549,7 +555,7 @@ body::before {
   overflow: hidden;
   border-right: 1px solid var(--hairline-soft);
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto auto 1fr auto;
   padding: 36px 44px;
   background:
     radial-gradient(ellipse at 20% 80%, color-mix(in oklch, var(--hero) 10%, transparent), transparent 60%),
@@ -557,6 +563,16 @@ body::before {
 }
 .login-left .brand-row {
   display: flex; align-items: center; gap: 12px;
+  z-index: 2;
+}
+.login-hero-mark {
+  width: 240px;
+  height: 240px;
+  background-image: var(--hero-mark);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  margin-bottom: 32px;
   z-index: 2;
 }
 .login-left .quote {
@@ -1833,3 +1849,47 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
 .scroll-x-hide::-webkit-scrollbar { width: 8px; height: 8px; }
 .scroll-x-hide::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 999px; }
 .scroll-x-hide::-webkit-scrollbar-track { background: transparent; }
+
+/* ── z-index layers ─────────────────────────────────────── */
+:root {
+    --z-modal: 1000;
+}
+
+/* ── crew-badge ─────────────────────────────────────────── */
+.crew-badge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: var(--surface-2);
+    color: var(--ink-2);
+    border: 1px solid var(--hairline);
+    white-space: nowrap;
+}
+
+/* ── disabled-action (for read-only system profile buttons) */
+.disabled-action {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* ── collapsible sections ───────────────────────────────── */
+.collapsible-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+    color: var(--ink-2);
+    font-size: 0.875rem;
+}
+
+.collapsible-header:hover {
+    color: var(--ink);
+}
+
+.collapsible-body {
+    margin-top: 0.75rem;
+}
