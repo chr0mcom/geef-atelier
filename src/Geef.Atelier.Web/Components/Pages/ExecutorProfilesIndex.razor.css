@@ -1,0 +1,37 @@
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+
+.page-header h1 {
+    margin: 0;
+}
+
+.crew-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.crew-table th,
+.crew-table td {
+    padding: 0.625rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--hairline);
+}
+
+.crew-table th {
+    font-weight: 600;
+    color: var(--ink-2);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.crew-table-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}

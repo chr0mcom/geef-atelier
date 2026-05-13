@@ -123,6 +123,18 @@ Jeder Run verwendet eine konfigurierbare Crew aus Executor (schreibt den Draft) 
 
 Jeder Run speichert einen vollständig eingebetteten **CrewSnapshot** in der DB — damit bleibt der Run reproduzierbar, auch wenn Profile später geändert werden.
 
+### Crew-Verwaltung in der UI
+
+| Seite | URL |
+|---|---|
+| Crew-Übersicht | `/crew` |
+| Template-Liste | `/crew/templates` |
+| Template anlegen/bearbeiten | `/crew/templates/new`, `/crew/templates/{name}` |
+| Reviewer-Profile | `/crew/profiles/reviewers` |
+| Executor-Profile | `/crew/profiles/executors` |
+
+Auf der **NewRun-Page** (`/new`) wählt der User das Template über ein Dropdown. Auf der **RunDetail-Page** zeigt die **CrewSummary**-Komponente die verwendete Crew (click-to-expand). In der **Runs-Liste** zeigt **CrewBadge** den Template-Namen.
+
 Details: [`docs/08-crew-system.md`](docs/08-crew-system.md)
 
 ---

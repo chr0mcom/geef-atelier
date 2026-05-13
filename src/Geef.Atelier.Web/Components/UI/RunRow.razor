@@ -13,6 +13,7 @@
         <div class="tags">
             <span>@RunId</span>
             <span>@(Run.TokensTotal > 0 ? Run.TokensTotal.ToString("N0") + " tok" : "—")</span>
+            <CrewBadge TemplateName="@Run.CrewTemplateName" />
         </div>
     </div>
     <div class="progress" aria-label="@ProgressLabel">

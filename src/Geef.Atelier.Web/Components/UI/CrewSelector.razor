@@ -1,0 +1,36 @@
+@using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Core.Domain.Crew
+@inject ICrewService CrewService
+
+<div class="crew-selector-row">
+    <label class="field">
+        <span class="field-label">Crew</span>
+        <select data-testid="crew-selector" @bind="Value" @bind:event="onchange">
+            @foreach (var t in _templates)
+            {
+                <option value="@t.Name">
+                    @t.DisplayName@(t.IsSystem ? " (System)" : "")@(t.Description.Length > 0 ? " — " + Truncate(t.Description, 80) : "")
+                </option>
+            }
+        </select>
+    </label>
+    <a href="/crew/templates" class="manage-crews-link">Manage crews →</a>
+</div>
+
+@code {
+    [Parameter] public string? Value { get; set; } = "klassik";
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    private IReadOnlyList<CrewTemplate> _templates = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _templates = await CrewService.ListCrewTemplatesAsync(includeSystem: true);
+        if (Value == null && _templates.Count > 0)
+            Value = _templates.FirstOrDefault(t => t.Name == SystemCrew.KlassikTemplateName)?.Name
+                    ?? _templates[0].Name;
+    }
+
+    private static string Truncate(string s, int max) =>
+        s.Length <= max ? s : s[..max] + "…";
+}

@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Text.Json;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
@@ -24,9 +23,6 @@ internal sealed class RunOrchestratorService(
     ILoggerFactory                      loggerFactory,
     ILogger<RunOrchestratorService>     logger) : BackgroundService
 {
-    private static readonly JsonSerializerOptions SnapshotJsonOpts =
-        new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-
     private readonly OrchestratorOptions _opts = options.Value;
     private readonly SemaphoreSlim _slots = new(options.Value.MaxConcurrentRuns, options.Value.MaxConcurrentRuns);
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _runCts   = new();
@@ -233,12 +229,9 @@ internal sealed class RunOrchestratorService(
 
     private static CrewSnapshot ResolveSnapshot(RunEntity run)
     {
-        if (run.CrewSnapshot is { Length: > 0 } json)
-        {
-            var deserialized = JsonSerializer.Deserialize<CrewSnapshot>(json, SnapshotJsonOpts);
-            if (deserialized is not null)
-                return deserialized;
-        }
+        var deserialized = CrewSnapshot.Deserialize(run.CrewSnapshot);
+        if (deserialized is not null)
+            return deserialized;
 
         // Defensive fallback: pre-PS-5 runs have no snapshot; reconstruct from code constants.
         return new CrewSnapshot(

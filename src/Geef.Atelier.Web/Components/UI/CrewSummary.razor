@@ -1,0 +1,62 @@
+@using Geef.Atelier.Core.Domain.Crew
+@using Geef.Atelier.Web.Display
+
+<div class="crew-summary" data-testid="crew-summary">
+    <button class="collapsible-header" @onclick="Toggle" data-testid="crew-summary-toggle" type="button">
+        <span>Crew: @_headerLabel</span>
+        <span class="chevron @(_expanded ? "up" : "down")">▾</span>
+    </button>
+
+    @if (_expanded && Snapshot != null)
+    {
+        <div class="crew-summary-body" data-testid="crew-summary-body">
+            <div class="crew-summary-executor">
+                <strong>Executor:</strong>
+                @Snapshot.Executor.DisplayName · @Snapshot.Executor.Provider/@Snapshot.Executor.Model
+            </div>
+            <div class="crew-summary-reviewers">
+                <strong>Reviewers:</strong>
+                <ul>
+                    @foreach (var r in Snapshot.Reviewers)
+                    {
+                        <li>@r.DisplayName · @r.Provider/@r.Model</li>
+                    }
+                </ul>
+            </div>
+            <div class="crew-summary-strategy">
+                <strong>Strategy:</strong>
+                @ReviewerDisplay.GetEvaluationStrategyDisplay(Snapshot.EvaluationStrategy)
+            </div>
+            @if (Snapshot.ConvergenceOverride != null)
+            {
+                <div class="crew-summary-override">
+                    <strong>Override:</strong>
+                    @FormatOverride(Snapshot.ConvergenceOverride)
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public CrewSnapshot? Snapshot { get; set; }
+    [Parameter] public string? FallbackTemplateName { get; set; }
+
+    private bool _expanded;
+
+    private string _headerLabel => Snapshot != null
+        ? $"{ReviewerDisplay.GetTemplateDisplay(Snapshot.TemplateName ?? FallbackTemplateName ?? "custom")} · 1 Executor + {Snapshot.Reviewers.Count} Reviewer{(Snapshot.Reviewers.Count != 1 ? "s" : "")}"
+        : $"{FallbackTemplateName ?? "Klassik"} (system default)";
+
+    private void Toggle() => _expanded = !_expanded;
+
+    private static string FormatOverride(ConvergencePolicyOverride o)
+    {
+        var parts = new List<string>();
+        if (o.MaxIterations.HasValue) parts.Add($"MaxIterations={o.MaxIterations}");
+        if (o.AbortOnCritical.HasValue) parts.Add($"AbortOnCritical={o.AbortOnCritical}");
+        if (o.DetectRegression.HasValue) parts.Add($"DetectRegression={o.DetectRegression}");
+        if (o.StagnationThreshold.HasValue) parts.Add($"StagnationThreshold={o.StagnationThreshold}");
+        return string.Join(", ", parts);
+    }
+}

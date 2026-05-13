@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Aktueller Zustand
 
-**Post-Skeleton Schritt 5 abgeschlossen (13. Mai 2026): Crew-Foundation.** PS-1 ✅ PS-2 ✅ PS-3 ✅ PS-4 ✅. Crew-System: `ReviewerProfile`/`ExecutorProfile` als Records, `SystemCrew` als Code-Konstanten, `CrewSnapshot` (JSONB) pro Run, alle vier EvaluationStrategies, `ILlmClientResolver.ForProfile`. 154 C#-Tests grün, 21 Python-Tests grün. App produktiv unter `https://geef.stefan-bechtel.de/`. Nächste Post-Skeleton-Schritte: PS-6 (UI-Crew-Auswahl), PS-7 (Advisor-Pässe).
+**Post-Skeleton Schritt 6 abgeschlossen (13. Mai 2026): Crew-UI.** PS-1 ✅ PS-2 ✅ PS-3 ✅ PS-4 ✅ PS-5 ✅ PS-6 ✅. Crew-System: `ReviewerProfile`/`ExecutorProfile` als Records, `SystemCrew` als Code-Konstanten, `CrewSnapshot` (JSONB) pro Run, alle vier EvaluationStrategies, `ILlmClientResolver.ForProfile`. Crew-UI: 10 neue Pages unter `/crew`, 7 neue UI-Komponenten. 189 C#-Tests grün, 21 Python-Tests grün. App produktiv unter `https://geef.stefan-bechtel.de/`. Nächste Post-Skeleton-Schritte: PS-7 (Advisor-Pässe).
 
-**Wichtig für Production-Deploy nach PS-5:** DB-Migration Step10CrewSystem läuft beim Container-Start automatisch. Backup vor Deploy prüfen.
+**Wichtig für Production-Deploy nach PS-6:** DB-Migration Step10CrewSystem läuft beim Container-Start automatisch. Backup vor Deploy prüfen.
 
 ## Verbindlicher Workflow
 
