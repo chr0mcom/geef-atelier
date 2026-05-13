@@ -1,0 +1,289 @@
+@page "/crew/templates/new"
+@page "/crew/templates/{name}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Core.Domain.Crew
+@using Geef.Atelier.Core.Domain.Crew.Profiles
+@inject ICrewService CrewService
+@inject NavigationManager Nav
+
+<PageTitle>@(IsNew ? "New Template" : "Edit Template") — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="template-editor">
+    <div class="page-header">
+        <h1>@(IsNew ? "New Template" : _isSystem ? _displayName : $"Edit: {_displayName}")</h1>
+        <a href="/crew/templates" class="btn ghost">← Back</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="error-banner">@_error</div>
+    }
+
+    @if (_loading)
+    {
+        <p>Loading…</p>
+    }
+    else
+    {
+        <EditForm Model="_form" OnValidSubmit="SaveAsync" data-testid="template-editor-form">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="field">
+                <label>Name</label>
+                <InputText @bind-Value="_form.Name" disabled="@(!IsNew)" placeholder="my-template" />
+                @if (IsNew && !string.IsNullOrEmpty(_form.Name))
+                {
+                    <small>Will be saved as: custom-@_form.Name.TrimStart("custom-".ToCharArray())</small>
+                }
+            </div>
+
+            <div class="field">
+                <label>Display Name</label>
+                <InputText @bind-Value="_form.DisplayName" />
+            </div>
+
+            <div class="field">
+                <label>Description</label>
+                <InputTextArea @bind-Value="_form.Description" rows="3" />
+            </div>
+
+            <div class="field">
+                <label>Executor Profile</label>
+                <InputSelect @bind-Value="_form.ExecutorProfileName" disabled="@_isSystem">
+                    @foreach (var e in _executors)
+                    {
+                        <option value="@e.Name">@e.DisplayName @(e.IsSystem ? "(System)" : "")</option>
+                    }
+                </InputSelect>
+            </div>
+
+            <div class="field">
+                <label>Reviewers</label>
+                <ReviewerPicker AllProfiles="_reviewers"
+                                Selected="_form.ReviewerProfileNames"
+                                SelectedChanged="names => _form.ReviewerProfileNames = names" />
+            </div>
+
+            <div class="field">
+                <label>Evaluation Strategy</label>
+                <div class="radio-group">
+                    @foreach (var strategy in Enum.GetValues<EvaluationStrategy>())
+                    {
+                        <label class="radio-option">
+                            <input type="radio" name="strategy"
+                                   value="@strategy"
+                                   checked="@(_form.EvaluationStrategy == strategy)"
+                                   @onchange="() => _form.EvaluationStrategy = strategy"
+                                   disabled="@_isSystem" />
+                            @strategy.ToString()
+                        </label>
+                    }
+                </div>
+            </div>
+
+            <details class="collapsible-section">
+                <summary class="collapsible-header">Advanced (Convergence Override)</summary>
+                <div class="collapsible-body">
+                    <div class="field">
+                        <label>Max Iterations</label>
+                        <InputNumber @bind-Value="_form.MaxIterations" />
+                    </div>
+                    <div class="field">
+                        <label>Abort on Critical</label>
+                        <InputCheckbox @bind-Value="_form.AbortOnCritical" />
+                    </div>
+                    <div class="field">
+                        <label>Detect Regression</label>
+                        <InputCheckbox @bind-Value="_form.DetectRegression" />
+                    </div>
+                    <div class="field">
+                        <label>Stagnation Threshold</label>
+                        <InputNumber @bind-Value="_form.StagnationThreshold" />
+                    </div>
+                </div>
+            </details>
+
+            @if (!_isSystem)
+            {
+                <div class="editor-actions">
+                    <button type="submit" class="btn primary" data-testid="save-template" disabled="@_saving">
+                        @(_saving ? "Saving…" : "Save")
+                    </button>
+                    <a href="/crew/templates" class="btn ghost">Cancel</a>
+                    @if (!IsNew)
+                    {
+                        <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true">Delete</button>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="editor-actions">
+                    <button type="button" class="btn primary" @onclick="DuplicateAsCustom">Duplicate as custom</button>
+                    <a href="/crew/templates" class="btn ghost">Cancel</a>
+                </div>
+            }
+        </EditForm>
+    }
+</div>
+
+<DeleteConfirmationModal
+    Show="_showDeleteModal"
+    ItemName="@(Name ?? "")"
+    ItemKind="Template"
+    ExtraWarning="Templates are preserved in historical runs as a snapshot — this delete only affects future submits."
+    OnConfirm="ExecuteDeleteAsync"
+    OnCancel="() => _showDeleteModal = false" />
+
+@code {
+    [Parameter] public string? Name { get; set; }
+
+    private bool IsNew => Name == null;
+    private bool _isSystem;
+    private bool _loading = true;
+    private bool _saving;
+    private bool _showDeleteModal;
+    private string? _error;
+    private string _displayName = "";
+
+    private IReadOnlyList<ReviewerProfile> _reviewers = [];
+    private IReadOnlyList<ExecutorProfile> _executors = [];
+
+    private TemplateFormModel _form = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _reviewers = await CrewService.ListReviewerProfilesAsync(includeSystem: true);
+        _executors = await CrewService.ListExecutorProfilesAsync(includeSystem: true);
+
+        if (!IsNew)
+        {
+            var template = await CrewService.GetCrewTemplateAsync(Name!);
+            if (template == null) { Nav.NavigateTo("/crew/templates"); return; }
+            _isSystem = template.IsSystem;
+            _displayName = template.DisplayName;
+            _form = TemplateFormModel.FromTemplate(template);
+        }
+        else
+        {
+            _form.ExecutorProfileName = _executors.FirstOrDefault()?.Name ?? "";
+        }
+
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            var template = _form.ToTemplate();
+            if (IsNew)
+                await CrewService.CreateCustomCrewTemplateAsync(template);
+            else
+                await CrewService.UpdateCustomCrewTemplateAsync(template);
+            Nav.NavigateTo("/crew/templates");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DuplicateAsCustom()
+    {
+        _error = null;
+        try
+        {
+            var original = await CrewService.GetCrewTemplateAsync(Name!);
+            if (original == null) return;
+            var copy = original with
+            {
+                Name = original.Name + "-copy",
+                DisplayName = original.DisplayName + " (Copy)",
+                IsSystem = false
+            };
+            await CrewService.CreateCustomCrewTemplateAsync(copy);
+            Nav.NavigateTo("/crew/templates");
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private async Task ExecuteDeleteAsync()
+    {
+        _showDeleteModal = false;
+        _error = null;
+        try
+        {
+            await CrewService.DeleteCustomCrewTemplateAsync(Name!);
+            Nav.NavigateTo("/crew/templates");
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private sealed class TemplateFormModel
+    {
+        [Required, RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Only lowercase letters, numbers, and hyphens")]
+        [MaxLength(64)]
+        public string Name { get; set; } = "";
+
+        [Required, MaxLength(200)]
+        public string DisplayName { get; set; } = "";
+
+        [MaxLength(1000)]
+        public string Description { get; set; } = "";
+
+        [Required]
+        public string ExecutorProfileName { get; set; } = "";
+
+        public List<string> ReviewerProfileNames { get; set; } = [];
+
+        public EvaluationStrategy EvaluationStrategy { get; set; } = EvaluationStrategy.Parallel;
+
+        public int? MaxIterations { get; set; }
+        public bool AbortOnCritical { get; set; }
+        public bool DetectRegression { get; set; }
+        public int? StagnationThreshold { get; set; }
+
+        public static TemplateFormModel FromTemplate(CrewTemplate t) => new()
+        {
+            Name = t.Name,
+            DisplayName = t.DisplayName,
+            Description = t.Description,
+            ExecutorProfileName = t.ExecutorProfileName,
+            ReviewerProfileNames = t.ReviewerProfileNames.ToList(),
+            EvaluationStrategy = t.EvaluationStrategy,
+            MaxIterations = t.ConvergenceOverride?.MaxIterations,
+            AbortOnCritical = t.ConvergenceOverride?.AbortOnCritical ?? false,
+            DetectRegression = t.ConvergenceOverride?.DetectRegression ?? false,
+            StagnationThreshold = t.ConvergenceOverride?.StagnationThreshold,
+        };
+
+        public CrewTemplate ToTemplate()
+        {
+            ConvergencePolicyOverride? overr = null;
+            if (MaxIterations.HasValue || AbortOnCritical || DetectRegression || StagnationThreshold.HasValue)
+                overr = new ConvergencePolicyOverride(MaxIterations, AbortOnCritical, DetectRegression, StagnationThreshold);
+
+            return new CrewTemplate(
+                Name: SystemCrew.EnsureCustomPrefix(Name),
+                DisplayName: DisplayName,
+                Description: Description,
+                ExecutorProfileName: ExecutorProfileName,
+                ReviewerProfileNames: ReviewerProfileNames,
+                EvaluationStrategy: EvaluationStrategy,
+                ConvergenceOverride: overr,
+                AdvisorProfileNames: [],
+                IsSystem: false);
+        }
+    }
+}

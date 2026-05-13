@@ -1,0 +1,117 @@
+@page "/crew/templates"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Core.Domain.Crew
+@inject ICrewService CrewService
+
+<PageTitle>Crew Templates — Atelier</PageTitle>
+
+<div class="crew-templates-index">
+    <div class="page-header">
+        <h1>Crew Templates</h1>
+        <a href="/crew/templates/new" class="btn primary">+ New Template</a>
+    </div>
+
+    @if (_templates.Count == 0)
+    {
+        <p class="text-muted">No templates yet.</p>
+    }
+    else
+    {
+        <table class="crew-table" data-testid="template-list">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Executor</th>
+                    <th>Reviewers</th>
+                    <th>Strategy</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in _templates)
+                {
+                    <tr data-testid="template-row-@t.Name">
+                        <td>
+                            @t.DisplayName
+                            @if (t.IsSystem) { <span class="crew-badge">System</span> }
+                        </td>
+                        <td>@t.ExecutorProfileName</td>
+                        <td>@t.ReviewerProfileNames.Count</td>
+                        <td>@t.EvaluationStrategy</td>
+                        <td class="crew-table-actions">
+                            @if (t.IsSystem)
+                            {
+                                <button class="btn small disabled-action" disabled title="System profile — duplicate to customize">Edit</button>
+                                <button class="btn small primary" @onclick="() => DuplicateTemplate(t)">Duplicate as custom</button>
+                            }
+                            else
+                            {
+                                <a href="/crew/templates/@t.Name" class="btn small">Edit</a>
+                                <button class="btn small danger" @onclick="() => _templateToDelete = t">Delete</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="error-banner">@_error</div>
+    }
+</div>
+
+<DeleteConfirmationModal
+    Show="_templateToDelete != null"
+    ItemName="@(_templateToDelete?.Name ?? "")"
+    ItemKind="Template"
+    ExtraWarning="Templates are preserved in historical runs — this only affects future submits."
+    OnConfirm="ExecuteIndexDeleteAsync"
+    OnCancel="() => _templateToDelete = null" />
+
+@code {
+    private IReadOnlyList<CrewTemplate> _templates = [];
+    private CrewTemplate? _templateToDelete;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _templates = await CrewService.ListCrewTemplatesAsync(includeSystem: true);
+    }
+
+    private async Task DuplicateTemplate(CrewTemplate original)
+    {
+        try
+        {
+            var copy = original with
+            {
+                Name = original.Name + "-copy",
+                DisplayName = original.DisplayName + " (Copy)",
+                IsSystem = false
+            };
+            await CrewService.CreateCustomCrewTemplateAsync(copy);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task ExecuteIndexDeleteAsync()
+    {
+        if (_templateToDelete == null) return;
+        var name = _templateToDelete.Name;
+        _templateToDelete = null;
+        try { await CrewService.DeleteCustomCrewTemplateAsync(name); await LoadAsync(); }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+}
