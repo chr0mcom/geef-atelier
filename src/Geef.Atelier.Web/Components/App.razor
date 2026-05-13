@@ -11,7 +11,18 @@
     <link rel="stylesheet" href="@Assets["atelier.css"]" />
     <link rel="stylesheet" href="@Assets["Geef.Atelier.Web.styles.css"]" />
     <ImportMap />
-    <link rel="icon" type="image/png" href="favicon.png" />
+    <!-- Modern PNG favicons -->
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="favicon-512.png" />
+    <!-- Dark mode hint -->
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-noir-16.png" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-noir-32.png" media="(prefers-color-scheme: dark)" />
+    <!-- Apple Touch -->
+    <link rel="apple-touch-icon" sizes="192x192" href="apple-touch-icon.png" />
+    <!-- Web Manifest for PWA / Android home screen -->
+    <link rel="manifest" href="site.webmanifest" />
     <HeadOutlet />
     <script defer src="@Assets["js/theme.js"]"></script>
 </head>
