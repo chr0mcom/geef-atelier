@@ -11,6 +11,19 @@ _semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 # Home directory for claude auth — mounted as a volume in the container.
 CLAUDE_HOME = os.getenv("CLAUDE_HOME", "/auth/claude")
 
+# Static model list — the claude CLI has no model-listing command.
+# Update this list when new Claude models become available.
+STATIC_MODELS = [
+    "claude-opus-4-7",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5",
+]
+
+
+def list_models() -> list[str]:
+    """Returns the static list of supported Claude models."""
+    return list(STATIC_MODELS)
+
 
 async def complete(prompt: str, model: str | None, max_tokens: int | None) -> str:
     """

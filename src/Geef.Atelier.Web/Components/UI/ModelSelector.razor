@@ -1,0 +1,183 @@
+@using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Core.Domain.Crew
+@inject IModelCatalog ModelCatalog
+
+<div class="model-selector" data-testid="@DataTestId">
+    @if (_loading)
+    {
+        <div class="model-selector-loading">Loading models…</div>
+    }
+    else
+    {
+        @if (_usingFallback)
+        {
+            <div class="model-selector-fallback-banner">
+                Showing fallback list — provider unreachable.
+                <button type="button" class="model-selector-refresh-inline" @onclick="HandleRefresh">Refresh</button>
+            </div>
+        }
+
+        @if (_showCustomInput)
+        {
+            <div class="model-selector-custom-row">
+                <input type="text"
+                       class="model-selector-custom-input"
+                       value="@Value"
+                       @oninput="OnCustomInput"
+                       placeholder="Enter custom model ID…"
+                       data-testid="model-selector-custom-input" />
+                <button type="button" class="model-selector-back" @onclick="SwitchToDropdown"
+                        title="Back to list">↩</button>
+            </div>
+        }
+        else
+        {
+            <div class="model-selector-row">
+                <select class="model-selector-select"
+                        value="@_selectValue"
+                        @onchange="OnSelectChange"
+                        data-testid="model-selector-select"
+                        disabled="@Disabled">
+                    @if (_recommended.Count > 0)
+                    {
+                        <optgroup label="Recommended">
+                            @foreach (var m in _recommended)
+                            {
+                                <option value="@m.Id">@m.Label</option>
+                            }
+                        </optgroup>
+                    }
+                    @if (_others.Count > 0)
+                    {
+                        <optgroup label="Other available">
+                            @foreach (var m in _others)
+                            {
+                                <option value="@m.Id">@m.Label</option>
+                            }
+                        </optgroup>
+                    }
+                    <optgroup label="Advanced">
+                        <option value="__custom__">Custom model name…</option>
+                    </optgroup>
+                </select>
+                <button type="button" class="model-selector-refresh" @onclick="HandleRefresh"
+                        title="Refresh model list" disabled="@_refreshing">⟳</button>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public string Provider { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string DataTestId { get; set; } = "model-selector";
+
+    private string _loadedForProvider = "";
+    private List<ModelInfo> _recommended = [];
+    private List<ModelInfo> _others      = [];
+    private bool _loading      = false;
+    private bool _refreshing   = false;
+    private bool _usingFallback = false;
+    private bool _showCustomInput = false;
+
+    // The value shown in the <select>. "__custom__" when the current value isn't in the list.
+    private string _selectValue = "";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Guard: don't attempt to load with an empty provider — caller hasn't selected one yet.
+        if (!string.IsNullOrEmpty(Provider) && Provider != _loadedForProvider)
+            await LoadModelsAsync();
+    }
+
+    private async Task LoadModelsAsync(bool forceRefresh = false)
+    {
+        _loading = true;
+        StateHasChanged();
+
+        try
+        {
+            var models = forceRefresh
+                ? await ModelCatalog.RefreshAsync(Provider)
+                : await ModelCatalog.ListModelsAsync(Provider);
+
+            _recommended = models.Where(m => m.IsRecommended).ToList();
+            _others      = models.Where(m => !m.IsRecommended).ToList();
+            _usingFallback = ModelCatalog.IsUsingFallback(Provider);
+            _loadedForProvider = Provider;
+
+            // If current Value exists in the fetched list, select it in the dropdown.
+            // If not, and there's a non-empty current value, switch to custom input.
+            // If no value yet, pre-select the first recommended model.
+            var allIds = models.Select(m => m.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrEmpty(Value) && !allIds.Contains(Value))
+            {
+                _showCustomInput = true;
+                _selectValue = "__custom__";
+            }
+            else
+            {
+                _showCustomInput = false;
+                if (string.IsNullOrEmpty(Value) && _recommended.Count > 0)
+                {
+                    await SetValue(_recommended[0].Id);
+                }
+                _selectValue = Value;
+            }
+        }
+        finally
+        {
+            _loading = false;
+            _refreshing = false;
+        }
+    }
+
+    private async Task OnSelectChange(ChangeEventArgs e)
+    {
+        var selected = e.Value?.ToString() ?? "";
+        if (selected == "__custom__")
+        {
+            _showCustomInput = true;
+            _selectValue = "__custom__";
+            await SetValue("");
+        }
+        else
+        {
+            _selectValue = selected;
+            await SetValue(selected);
+        }
+    }
+
+    private async Task OnCustomInput(ChangeEventArgs e)
+    {
+        await SetValue(e.Value?.ToString() ?? "");
+    }
+
+    private void SwitchToDropdown()
+    {
+        _showCustomInput = false;
+        _selectValue = _recommended.Count > 0 ? _recommended[0].Id : "";
+        _ = SetValue(_selectValue);
+    }
+
+    private async Task HandleRefresh()
+    {
+        _refreshing = true;
+        await LoadModelsAsync(forceRefresh: true);
+    }
+
+    private async Task SetValue(string value)
+    {
+        Value = value;
+        await ValueChanged.InvokeAsync(value);
+    }
+
+    /// <summary>Returns true when the current <see cref="Value"/> is not in the fetched model list.</summary>
+    public bool IsCustomModel()
+    {
+        var allIds = _recommended.Concat(_others).Select(m => m.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return !string.IsNullOrEmpty(Value) && !allIds.Contains(Value);
+    }
+}

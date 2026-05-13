@@ -56,8 +56,11 @@
 
         <div class="field">
             <label>Model</label>
-            <InputText @bind-Value="_form.Model" disabled="@IsSystem"
-                       placeholder="e.g., anthropic/claude-opus-4-7" />
+            <ModelSelector @ref="_modelSelector"
+                           Provider="@_form.Provider"
+                           @bind-Value="_form.Model"
+                           Disabled="@IsSystem"
+                           data-testid="model-selector" />
             <ValidationMessage For="() => _form.Model" />
         </div>
 
@@ -125,6 +128,18 @@
     </EditForm>
 </div>
 
+<Modal Show="_showCustomModelWarning" OnClose="CancelCustomModelSave" DataTestId="custom-model-warning-modal">
+    <Title>Unknown model</Title>
+    <ChildContent>
+        <p>Model <strong>@_form.Model</strong> is not in the catalog for this provider.</p>
+        <p>Are you sure you want to save this profile with a custom model name?</p>
+    </ChildContent>
+    <Actions>
+        <button type="button" class="btn primary" @onclick="ConfirmCustomModelSave" data-testid="custom-model-confirm">Save anyway</button>
+        <button type="button" class="btn ghost"   @onclick="CancelCustomModelSave">Cancel</button>
+    </Actions>
+</Modal>
+
 @code {
     [Parameter] public string? ProfileName { get; set; }
     [Parameter] public string DisplayName { get; set; } = "";
@@ -148,23 +163,46 @@
     private bool IsNew => ProfileName == null;
     private IReadOnlyList<ProviderInfo> _providers = [];
     private ProfileFormModel _form = new();
+    private ModelSelector? _modelSelector;
+    private bool _showCustomModelWarning = false;
 
     protected override void OnInitialized()
     {
         _providers = ProviderCatalog.ListProviders();
+        // For new profiles, fall back to the first available provider so ModelSelector loads immediately.
+        var effectiveProvider = !string.IsNullOrEmpty(Provider) ? Provider
+            : _providers.Count > 0 ? _providers[0].Name : "";
         _form = new ProfileFormModel
         {
             Name = ProfileName ?? "",
             DisplayName = DisplayName,
             Description = Description,
             SystemPrompt = SystemPrompt,
-            Provider = Provider,
+            Provider = effectiveProvider,
             Model = Model,
             MaxTokens = MaxTokens,
         };
     }
 
     private async Task HandleSave()
+    {
+        if (_modelSelector?.IsCustomModel() == true)
+        {
+            _showCustomModelWarning = true;
+            return;
+        }
+        await CommitSaveAsync();
+    }
+
+    private async Task ConfirmCustomModelSave()
+    {
+        _showCustomModelWarning = false;
+        await CommitSaveAsync();
+    }
+
+    private void CancelCustomModelSave() => _showCustomModelWarning = false;
+
+    private async Task CommitSaveAsync()
     {
         await OnSave.InvokeAsync(new ProfileFormValues(
             _form.Name,

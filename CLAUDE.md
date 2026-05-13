@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Aktueller Zustand
 
-**CLI-Provider-Split abgeschlossen (13. Mai 2026).** PS-1 ✅ PS-2 ✅ PS-3 ✅ PS-4 ✅ PS-5 ✅ PS-6 ✅ PS-7 ✅ + CLI-Split ✅. Refactor D-032: `cli`-Provider aufgeteilt in `claude-cli` (Endpoint `/v1/claude`) + `codex-cli` (Endpoint `/v1/codex`). cli-proxy hat zwei explizite Endpoints ohne Model-Name-Heuristik. `IProviderCatalog` liefert jetzt `ProviderInfo(Name, DisplayName)`-Records statt rohen Strings. Provider-Dropdown zeigt Display-Namen. DB-Migration `Step12CliProviderSplit` migriert Custom-Profile. 246 C#-Tests grün, 30 Python-Tests grün.
+**Model-Catalog-Dropdown implementiert (13. Mai 2026).** PS-1 ✅ PS-2 ✅ PS-3 ✅ PS-4 ✅ PS-5 ✅ PS-6 ✅ PS-7 ✅ + CLI-Split ✅ + Model-Catalog ✅. D-033: `IModelCatalog` mit 24h-Cache, statischer Fallback-Liste und `ModelSelector`-Komponente im Profile-Editor. cli-proxy hat neue Endpoints `/v1/claude/models` und `/v1/codex/models`. 256 C#-Tests grün, 43 Python-Tests grün.
 
 Crew-System (PS-5/6): `ReviewerProfile`/`ExecutorProfile` als Records, `SystemCrew` als Code-Konstanten, `CrewSnapshot` (JSONB) pro Run, alle vier EvaluationStrategies, `ILlmClientResolver.ForProfile`. Crew-UI: 10 neue Pages unter `/crew`, 7 neue UI-Komponenten. Advisor-Pässe (PS-7): `AdvisorTrigger`-Enum (BeforeFirstExecution, BeforeEveryExecution, OnConvergenceFailure), System-Advisors `briefing-clarifier` (Strategic/BeforeFirst, gemini-2.5-flash) + `devils-advocate` (DevilsAdvocate/BeforeEvery, gpt-4o-mini), `AdvisorAwareExecutor`-Decorator, Convergence-Failure-Retry via `TryConvergenceFailureRetryAsync` + `RunEntity.AdvisorRetryAttempted`-Cap.
 

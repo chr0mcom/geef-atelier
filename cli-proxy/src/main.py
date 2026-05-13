@@ -176,15 +176,26 @@ async def chat_completions(req: ChatCompletionRequest) -> ChatCompletionResponse
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
+@app.get("/v1/claude/models")
+async def claude_models() -> JSONResponse:
+    """Lists available Claude CLI models (static list — CLI has no model-listing command)."""
+    data = [{"id": m, "object": "model", "owned_by": "anthropic"} for m in claude_adapter.list_models()]
+    return JSONResponse({"object": "list", "data": data})
+
+
+@app.get("/v1/codex/models")
+async def codex_models() -> JSONResponse:
+    """Lists available Codex/OpenAI CLI models (static list — CLI has no model-listing command)."""
+    data = [{"id": m, "object": "model", "owned_by": "openai"} for m in codex_adapter.list_models()]
+    return JSONResponse({"object": "list", "data": data})
+
+
 @app.get("/v1/models")
 async def list_models() -> JSONResponse:
-    models = [
-        {"id": "claude-opus-4-5", "object": "model", "owned_by": "anthropic"},
-        {"id": "claude-sonnet-4-5", "object": "model", "owned_by": "anthropic"},
-        {"id": "gpt-4o", "object": "model", "owned_by": "openai"},
-        {"id": "o4-mini", "object": "model", "owned_by": "openai"},
-    ]
-    return JSONResponse({"object": "list", "data": models})
+    """Legacy combined model list. Use /v1/claude/models or /v1/codex/models instead."""
+    claude_data = [{"id": m, "object": "model", "owned_by": "anthropic"} for m in claude_adapter.list_models()]
+    codex_data  = [{"id": m, "object": "model", "owned_by": "openai"}    for m in codex_adapter.list_models()]
+    return JSONResponse({"object": "list", "data": claude_data + codex_data})
 
 
 @app.get("/health")

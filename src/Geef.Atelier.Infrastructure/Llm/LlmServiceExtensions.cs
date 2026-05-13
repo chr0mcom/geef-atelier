@@ -1,4 +1,5 @@
 using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Infrastructure.Crew;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -8,7 +9,8 @@ namespace Geef.Atelier.Infrastructure.Llm;
 public static class LlmServiceExtensions
 {
     /// <summary>
-    /// Registers <see cref="ILlmClientResolver"/> and a shared named HttpClient "llm".
+    /// Registers <see cref="ILlmClientResolver"/>, <see cref="IProviderCatalog"/>,
+    /// <see cref="IModelCatalog"/>, and a shared named HttpClient "llm".
     /// Returns <see cref="IHttpClientBuilder"/> so callers can chain resilience handlers.
     /// </summary>
     public static IHttpClientBuilder AddLlmClient(
@@ -18,6 +20,8 @@ public static class LlmServiceExtensions
         services.Configure<LlmOptions>(configuration.GetSection("Llm"));
         services.AddSingleton<ILlmClientResolver, LlmClientResolver>();
         services.AddSingleton<IProviderCatalog, ProviderCatalog>();
+        services.AddMemoryCache();
+        services.AddSingleton<IModelCatalog, ModelCatalog>();
 
         return services.AddHttpClient("llm", client =>
         {

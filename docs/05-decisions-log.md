@@ -1,6 +1,6 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 2026-05-13 (CLI-Provider-Split Refactor: D-032 ergänzt)*
+*Letzte Aktualisierung: 2026-05-13 (Feature Model-Catalog-Dropdown: D-033 ergänzt)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -460,3 +460,20 @@ Datum: 2026-05-13
 | (e) CrewSnapshot-Migrations-Strategie: Two-Pass SQL | DB-Migration `Step12CliProviderSplit` migriert Profile-Tabellen (ReviewerProfiles, ExecutorProfiles, AdvisorProfiles) via direktem `CASE`-`UPDATE` auf der `"Model"`-Spalte — immer korrekt. Für `Runs.CrewSnapshot`-JSONB: Two-Pass SQL-String-Replace (Codex-Pattern zuerst, dann claude-cli-Fallback). Limitation: Mixed-CLI-Snapshots (ein Executor claude, ein Reviewer codex im selben Run) werden nicht korrekt migriert — in der Praxis existieren solche Snapshots nicht, da alle System-Akteure `openrouter` nutzen und custom CLI-Profile im Projekt neu sind. |
 
 **Tests:** `dotnet build` 0/0. 246 C#-Tests grün (7 neue), 1 E2E-Skip. Python pytest 30/30 grün (9 neue).
+
+---
+
+## D-033 — Feature: Model-Catalog-Dropdown (2026-05-13)
+
+**Kontext:** Der Profile-Editor (PS-6) nutzte ein Free-Text-Input für das Modell-Feld. Das führte zu einem Bug mit nicht-existentem Modell (`openai/gpt-5.5-mini`), der jetzt korrekt als `Failed` landet (D-030), aber besser durch Prävention gelöst wird: ein Dropdown mit validen Modell-IDs verhindert Tippfehler.
+
+| Knackpunkt | Entscheidung |
+|---|---|
+| (a) CLI-Listing-Befehl | Weder `claude` noch `codex` CLI hat einen `--list-models`-Befehl. Nur Option (b) — statische Listen in den Adaptern. Kein "Hybrid"-Versuch nötig. |
+| (b) Recommended-Listen | Hardcoded in `StaticModelFallback.cs` (Core-Layer). Recommendation ist eine Atelier-Meinung, keine Provider-Eigenschaft. Maintainer-Pflicht bei jedem Modell-Release. |
+| (c) Cache-Sharing | Single-Instanz-Setup: `IMemoryCache` mit 24h-TTL ausreichend. Kein Redis oder distributed cache nötig. |
+| (d) CLI-Provider-Modellquellen | `claude-cli`-Backend: statische Liste in `claude_adapter.STATIC_MODELS`. `codex-cli`-Backend: statische Liste in `codex_adapter.STATIC_MODELS`. Beide werden über die neuen `/v1/claude/models` und `/v1/codex/models` Endpoints im cli-proxy exponiert. OpenRouter: live API-Aufruf gegen `https://openrouter.ai/api/v1/models`. |
+| (e) Fallback-Strategie | API-Aufruf schlägt fehl → `StaticModelFallback.For(providerName)`. `IsUsingFallback()`-Flag wird exponiert; UI zeigt Warning-Banner wenn Fallback aktiv. |
+| (f) Custom-Model-Escape-Hatch | Besteht als "Custom model name…" Option im Dropdown. Beim Speichern mit nicht-katalogisiertem Modell: Bestätigungs-Modal ("Save anyway?"). Verhindert Tippfehler, erlaubt aber bewusste Custom-Nutzung. |
+
+**Tests:** 256 C#-Tests (8 neu `ModelCatalogTests`), 43 Python-Tests (13 neu `test_models_endpoints.py`), 1 E2E-Skip, 0 Failures.
