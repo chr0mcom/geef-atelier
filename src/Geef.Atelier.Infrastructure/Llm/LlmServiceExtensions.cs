@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Crew;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,6 +17,7 @@ public static class LlmServiceExtensions
     {
         services.Configure<LlmOptions>(configuration.GetSection("Llm"));
         services.AddSingleton<ILlmClientResolver, LlmClientResolver>();
+        services.AddSingleton<IProviderCatalog, ProviderCatalog>();
 
         return services.AddHttpClient("llm", client =>
         {

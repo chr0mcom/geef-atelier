@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Geef.Atelier.Core\Geef.Atelier.Core.csproj" />
+    <ProjectReference Include="..\Geef.Atelier.Application\Geef.Atelier.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

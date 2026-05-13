@@ -52,7 +52,7 @@ public static class SystemCrew
         Description: "Audits clarity, argumentation, structure, and style. Outside-model perspective; complements the briefing-fidelity reviewer with a different model family.",
         SystemPrompt: SystemPrompts.Clarity,
         Provider: "openrouter",
-        Model: "openai/gpt-5.5-mini",
+        Model: "openai/gpt-4o-mini",
         MaxTokens: null,
         IsSystem: true);
 

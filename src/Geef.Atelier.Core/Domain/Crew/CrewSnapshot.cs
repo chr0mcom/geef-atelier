@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 
 namespace Geef.Atelier.Core.Domain.Crew;
@@ -31,4 +32,25 @@ public sealed record CrewSnapshot(
 {
     /// <summary>Current snapshot schema version. Bump when the format changes incompatibly.</summary>
     public const int CurrentSchemaVersion = 1;
+
+    private static readonly JsonSerializerOptions DeserializeOpts =
+        new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+    /// <summary>
+    /// Attempts to deserialize a <see cref="CrewSnapshot"/> from a JSON string.
+    /// Returns <c>null</c> if <paramref name="json"/> is null, empty, or cannot be parsed.
+    /// </summary>
+    public static CrewSnapshot? Deserialize(string? json)
+    {
+        if (string.IsNullOrEmpty(json))
+            return null;
+        try
+        {
+            return JsonSerializer.Deserialize<CrewSnapshot>(json, DeserializeOpts);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }
