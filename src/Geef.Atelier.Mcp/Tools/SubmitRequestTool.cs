@@ -19,7 +19,7 @@ public static class SubmitRequestTool
         [Description("The briefing text describing the task for the AI orchestrator.")] string briefingText,
         [Description("Optional JSON configuration object. Defaults to '{}'.")] string? configJson = null,
         [Description("Name of the crew template to use (e.g. 'klassik'). Defaults to the system default when omitted.")] string? crewTemplate = null,
-        [Description("Optional custom crew specification as a JSON object (CrewSpec). When supplied, crewTemplate is ignored.")] string? customCrew = null,
+        [Description("Optional custom crew specification as a JSON object (CrewSpec). When supplied, crewTemplate is ignored. Supported fields: executorProfileName, reviewerProfileNames, advisorProfileNames, groundingProviderProfileNames, evaluationStrategy.")] string? customCrew = null,
         CancellationToken cancellationToken = default)
     {
         CrewSpec? crewSpec = null;
