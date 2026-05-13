@@ -101,12 +101,29 @@ ATELIER_MCP_TOKEN=<generated-token>
 
 ### MCP-Tools
 
-- `submit_request` — Neuen Run einreichen
+**Run-Management:**
+- `submit_request` — Neuen Run einreichen (optional: `crew_template`, `custom_crew`)
 - `get_run_status` — Status eines Runs abfragen
 - `get_run_result` — Ergebnis eines abgeschlossenen Runs abrufen
 - `list_runs` — Letzte Runs auflisten
 - `get_run_details` — Detailinformationen inkl. Iterationen abrufen
 - `cancel_run` — Laufenden Run abbrechen
+
+**Crew-System:**
+- `list_crew_templates` — Verfügbare Crew-Templates (System + Custom)
+- `list_reviewer_profiles` — Verfügbare Reviewer-Profile (System + Custom)
+
+## Crew-System
+
+Jeder Run verwendet eine konfigurierbare Crew aus Executor (schreibt den Draft) und Reviewern (bewerten den Draft). Das Standard-Template `"klassik"` reproduziert das ursprüngliche Verhalten mit zwei Reviewern in paralleler Ausführung.
+
+**Verfügbare Evaluation-Strategien:** `Parallel` (Standard), `Sequential`, `FailFast`, `Priority`.
+
+**System-Profile** sind im Code versioniert und read-only. **Custom-Profile** können per `ICrewService` oder MCP erstellt und in der DB gespeichert werden (erhalten automatisch den Prefix `"custom-"`).
+
+Jeder Run speichert einen vollständig eingebetteten **CrewSnapshot** in der DB — damit bleibt der Run reproduzierbar, auch wenn Profile später geändert werden.
+
+Details: [`docs/08-crew-system.md`](docs/08-crew-system.md)
 
 ---
 

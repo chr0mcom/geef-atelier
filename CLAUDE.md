@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Aktueller Zustand
 
-**Post-Skeleton Schritt 4 abgeschlossen (13. Mai 2026): CLI-Provider-Adapter.** PS-1 ✅ PS-2 ✅ PS-3 ✅. Multi-Provider-Architektur: `ILlmClientResolver` mit `Providers`-Dict + `Actors`-Dict; CLI-Proxy-Side-Container (Python/FastAPI) für `claude` + `codex` CLIs. 113 C#-Tests grün, 21 Python-Tests grün. App produktiv unter `https://geef.stefan-bechtel.de/`. Nächste Post-Skeleton-Schritte: Cost-Tracking, RAG, Multi-User, Off-Site-Backup, Monitoring.
+**Post-Skeleton Schritt 5 abgeschlossen (13. Mai 2026): Crew-Foundation.** PS-1 ✅ PS-2 ✅ PS-3 ✅ PS-4 ✅. Crew-System: `ReviewerProfile`/`ExecutorProfile` als Records, `SystemCrew` als Code-Konstanten, `CrewSnapshot` (JSONB) pro Run, alle vier EvaluationStrategies, `ILlmClientResolver.ForProfile`. 154 C#-Tests grün, 21 Python-Tests grün. App produktiv unter `https://geef.stefan-bechtel.de/`. Nächste Post-Skeleton-Schritte: PS-6 (UI-Crew-Auswahl), PS-7 (Advisor-Pässe).
 
-**Wichtig für Production-Deploy nach PS-4:** `.env`-Variable umbenannt: `LLM_API_KEY` → `LLM_OPENROUTER_API_KEY`. CLI-Auth nach erstem Deploy einmalig via `docker exec -it geef-atelier-cli-proxy claude auth login`.
+**Wichtig für Production-Deploy nach PS-5:** DB-Migration Step10CrewSystem läuft beim Container-Start automatisch. Backup vor Deploy prüfen.
 
 ## Verbindlicher Workflow
 

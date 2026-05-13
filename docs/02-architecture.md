@@ -83,7 +83,7 @@ Geef.Atelier.sln
 
 ## Datenmodell (Skeleton-Stand)
 
-Vier Tabellen reichen am Anfang. Spätere Erweiterungen (Sources, AdvisorConsultations, AdvisorProvenance, ReviewerProfiles, CrewTemplates) kommen mit den entsprechenden Features.
+Sieben Tabellen (Stand PS-5). Spätere Erweiterungen (Sources, AdvisorConsultations) kommen mit den entsprechenden Features.
 
 ### Runs
 
@@ -93,13 +93,16 @@ Vier Tabellen reichen am Anfang. Spätere Erweiterungen (Sources, AdvisorConsult
 | CreatedAt | timestamptz | |
 | StartedAt | timestamptz | nullable |
 | CompletedAt | timestamptz | nullable |
-| Status | enum | Pending / Running / Completed / Failed / Aborted |
+| Status | varchar(50) | Pending / Running / Completed / Failed / Aborted |
 | BriefingText | text | |
-| ConfigJson | jsonb | Modell-Auswahl, Crew, Budget — als Snapshot bei Erstellung |
+| ConfigJson | jsonb | Modell-Auswahl, Budget — als Snapshot bei Erstellung |
 | FinalText | text | nullable, gesetzt wenn Status=Completed |
 | ErrorMessage | text | nullable, gesetzt wenn Status=Failed |
 | TokensTotal | int | accumuliert über alle LLM-Calls |
 | CostTotal | numeric(10,4) | accumuliert |
+| CancellationRequested | bool | true wenn User den Run abbrechen möchte |
+| CrewTemplateName | varchar(100) | nullable; Name des Templates (z.B. `"klassik"`). Null = Custom-Crew-Submit. |
+| CrewSnapshot | jsonb | nullable; vollständig eingebetteter CrewSnapshot zum Zeitpunkt des Submits. |
 
 ### Iterations
 
@@ -137,18 +140,40 @@ Vier Tabellen reichen am Anfang. Spätere Erweiterungen (Sources, AdvisorConsult
 - `Events.RunId` (für Detail-View)
 - `Iterations.RunId` (für Detail-View)
 
-## Mapping auf GEEF-Provider (Skeleton)
+## Crew-System (PS-5)
 
-| GEEF-Phase | Provider-Implementierung | Skeleton-Verhalten |
+Jeder Run verwendet eine **Crew** aus Executor + Reviewers. Profile sind wiederverwendbare Konfigurationsbausteine.
+
+### Neue Tabellen (Migration Step10)
+
+| Tabelle | Inhalt |
+|---|---|
+| `ReviewerProfiles` | Custom Reviewer-Profile (System-Profile leben als Code-Konstanten in `SystemCrew`). |
+| `ExecutorProfiles` | Custom Executor-Profile. |
+| `CrewTemplates` | Custom Crew-Templates. |
+
+### ProfileBasedReviewer / ProfileBasedExecutor
+
+Ersetzen die alten `LlmReviewer` / `LlmExecutionStep`. Verwenden `ILlmClientResolver.ForProfile(provider, model, maxTokens?)` statt Actor-basierter Auflösung.
+
+### EvaluationStrategies
+
+Alle vier Strategien via Geef-SDK: `Parallel`, `Sequential`, `FailFast`, `PriorityOrdered`.
+
+Weitere Details: [`08-crew-system.md`](08-crew-system.md).
+
+## Mapping auf GEEF-Provider (PS-5-Stand)
+
+| GEEF-Phase | Provider-Implementierung | Verhalten |
 |---|---|---|
 | Grounding | `BriefingGroundingStep` | Schreibt das Briefing in den Context, keine externen Quellen |
-| Execution | `LlmExecutionStep` | OpenAI-kompatibler LLM-Call (via OpenRouter) mit Briefing + PreviousFindings, gibt neuen Text zurück |
-| Evaluation | `LlmReviewer` × 2 | Zwei Reviewer (konfigurierbar pro Akteur), parallel ausgeführt |
+| Execution | `ProfileBasedExecutor` | LLM-Call mit Profil-SystemPrompt + PreviousFindings; Modell aus `ExecutorProfile` |
+| Evaluation | `ProfileBasedReviewer` × N | N Reviewer aus `CrewSnapshot.Reviewers`; Strategie konfigurierbar |
 | Finalize | `MarkdownFinalizer` | Wrappt finalen Text in `FinalizedDocument`-Record |
 
-**Convergence-Policy im Skeleton:** `MaxIterationsPolicy(3)` — drei Iterationen Maximum, danach abbrechen. Mehr ist im Skeleton Overkill.
+**Convergence-Policy:** `DefaultConvergencePolicy` aus `ConvergenceOptions`, überschreibbar per `ConvergencePolicyOverride` im CrewTemplate.
 
-**Evaluation-Strategy im Skeleton:** `ParallelEvaluationStrategy` — beide Reviewer laufen gleichzeitig.
+**Evaluation-Strategy:** `Parallel` (Standard). Alle vier Strategien wählbar per Template.
 
 ## LLM-Provider-Schicht (umgesetzt in Migration M1, siehe D-017)
 
