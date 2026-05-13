@@ -1,18 +1,26 @@
 using System.Text.Json;
+using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Persistence;
 
 namespace Geef.Atelier.Application.Runs;
 
 internal sealed class RunService(
     IRunPersistenceService persistence,
-    IRunRepository         repository) : IRunService
+    IRunRepository         repository,
+    ICrewService           crewService) : IRunService
 {
+    private static readonly JsonSerializerOptions SnapshotJsonOpts =
+        new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
     /// <inheritdoc/>
-    public Task<Guid> SubmitRunAsync(
+    public async Task<Guid> SubmitRunAsync(
         string briefingText,
         string configJson,
         string? createdByUser = null,
+        string? crewTemplateName = null,
+        CrewSpec? customCrew = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(briefingText))
@@ -26,9 +34,16 @@ internal sealed class RunService(
             { throw new ArgumentException("configJson must be valid JSON.", nameof(configJson), ex); }
         }
 
-        // Normalize empty string to "{}" — the DB column is JSONB and requires valid JSON.
         var normalizedConfig = string.IsNullOrEmpty(configJson) ? "{}" : configJson;
-        return persistence.CreateRunAsync(briefingText, normalizedConfig, createdByUser, cancellationToken);
+
+        var snapshot = await crewService.ResolveSnapshotAsync(crewTemplateName, customCrew, cancellationToken);
+        var snapshotJson = JsonSerializer.Serialize(snapshot, SnapshotJsonOpts);
+        // CrewTemplateName is the template name from snapshot (null for inline spec)
+        var resolvedTemplateName = snapshot.TemplateName;
+
+        return await persistence.CreateRunAsync(
+            briefingText, normalizedConfig, createdByUser,
+            resolvedTemplateName, snapshotJson, cancellationToken);
     }
 
     /// <inheritdoc/>

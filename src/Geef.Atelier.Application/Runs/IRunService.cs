@@ -1,15 +1,21 @@
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Crew;
 
 namespace Geef.Atelier.Application.Runs;
 
 /// <summary>Application-service contract for submitting, querying, listing, and cancelling pipeline runs.</summary>
 public interface IRunService
 {
-    /// <summary>Validates and submits a new run, returning its ID.</summary>
+    /// <summary>
+    /// Validates and submits a new run, returning its ID. When both <paramref name="crewTemplateName"/>
+    /// and <paramref name="customCrew"/> are null, the <c>"klassik"</c> system template is used.
+    /// </summary>
     Task<Guid> SubmitRunAsync(
         string briefingText,
         string configJson,
         string? createdByUser = null,
+        string? crewTemplateName = null,
+        CrewSpec? customCrew = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>Returns the run with the given ID, or null if not found.</summary>

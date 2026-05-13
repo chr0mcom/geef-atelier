@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Crew;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Geef.Atelier.Application.Runs;
@@ -9,6 +10,7 @@ public static class ApplicationServiceExtensions
     public static IServiceCollection AddAtelierApplication(this IServiceCollection services)
     {
         services.AddScoped<IRunService, RunService>();
+        services.AddScoped<ICrewService, CrewService>();
         return services;
     }
 }
