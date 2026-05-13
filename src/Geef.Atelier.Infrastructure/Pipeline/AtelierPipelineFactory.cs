@@ -1,10 +1,10 @@
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk;
 using Geef.Sdk.Events;
 using Geef.Sdk.Middleware;
-using Geef.Sdk.Policies;
 using Geef.Sdk.Providers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,23 +15,24 @@ namespace Geef.Atelier.Infrastructure.Pipeline;
 internal static class AtelierPipelineFactory
 {
     /// <summary>
-    /// Builds the pipeline with real LLM providers via the resolver.
+    /// Builds the pipeline dynamically from a fully-dereferenced <see cref="CrewSnapshot"/>.
     /// </summary>
     public static GeefPipelineRunner<FinalizedDocument> Build(
+        CrewSnapshot snapshot,
         ILlmClientResolver resolver,
         IOptions<ConvergenceOptions> convergenceOptions,
         ILoggerFactory? loggerFactory = null,
         IEnumerable<IGeefEventSink>? additionalSinks = null)
     {
-        var grounding  = new BriefingGroundingStep();
-        var execution  = new LlmExecutionStep(resolver);
-        var reviewers  = new IReviewer[]
-        {
-            new LlmReviewer("BriefingTreueReviewer", AtelierSystemPrompts.BriefingTreue, resolver),
-            new LlmReviewer("KlarheitReviewer",       AtelierSystemPrompts.Klarheit,      resolver)
-        };
+        var grounding = new BriefingGroundingStep();
+        var execution = new ProfileBasedExecutor(snapshot.Executor, resolver);
+        var reviewers = snapshot.Reviewers
+            .Select(r => (IReviewer)new ProfileBasedReviewer(r, resolver));
         var finalizer = new MarkdownFinalizer();
-        return BuildWithProviders(grounding, execution, reviewers, finalizer, convergenceOptions, loggerFactory, additionalSinks);
+
+        return BuildWithProviders(grounding, execution, reviewers, finalizer,
+            convergenceOptions, snapshot.ConvergenceOverride,
+            snapshot.EvaluationStrategy, loggerFactory, additionalSinks);
     }
 
     /// <summary>
@@ -43,6 +44,8 @@ internal static class AtelierPipelineFactory
         IEnumerable<IReviewer> reviewers,
         IFinalizer<FinalizedDocument> finalizer,
         IOptions<ConvergenceOptions> convergenceOptions,
+        ConvergencePolicyOverride? convergenceOverride = null,
+        EvaluationStrategy evaluationStrategy = EvaluationStrategy.Parallel,
         ILoggerFactory? loggerFactory = null,
         IEnumerable<IGeefEventSink>? additionalSinks = null)
     {
@@ -55,14 +58,8 @@ internal static class AtelierPipelineFactory
 
         builder = builder
             .UseFinalizer(finalizer)
-            .UseConvergencePolicy(new DefaultConvergencePolicy
-            {
-                MaxIterations       = convergenceOptions.Value.MaxIterations,
-                AbortOnCritical     = convergenceOptions.Value.AbortOnCritical,
-                DetectRegression    = convergenceOptions.Value.DetectRegression,
-                StagnationThreshold = convergenceOptions.Value.StagnationThreshold
-            })
-            .UseEvaluationStrategy(new ParallelEvaluationStrategy())
+            .UseConvergencePolicy(ConvergencePolicyBuilder.Build(convergenceOptions.Value, convergenceOverride))
+            .UseEvaluationStrategy(EvaluationStrategyMapper.Map(evaluationStrategy))
             .UseMiddleware(new ExceptionHandlingMiddleware())
             .UseMiddleware(new TracingMiddleware());
 

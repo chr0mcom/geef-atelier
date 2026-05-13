@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk.Context;
 using Geef.Sdk.Providers;
@@ -9,12 +10,11 @@ using SdkSeverity = Geef.Sdk.Results.FindingSeverity;
 
 namespace Geef.Atelier.Infrastructure.Pipeline;
 
-internal sealed class LlmReviewer(
-    string name,
-    string systemPrompt,
+internal sealed class ProfileBasedReviewer(
+    ReviewerProfile profile,
     ILlmClientResolver resolver) : IReviewer
 {
-    public string Name => name;
+    public string Name => profile.Name;
     public int Priority => 0;
 
     public async Task<ReviewResult> ReviewAsync(IRunContext context, CancellationToken cancellationToken)
@@ -32,12 +32,12 @@ internal sealed class LlmReviewer(
             Use the submit_review tool to submit your evaluation.
             """;
 
-        var (client, model, maxTokens) = resolver.ForActor(name);
+        var (client, model, maxTokens) = resolver.ForProfile(profile.Provider, profile.Model, profile.MaxTokens);
 
         var response = await client.CompleteAsync(new LlmRequest
         {
             Model        = model,
-            SystemPrompt = systemPrompt,
+            SystemPrompt = profile.SystemPrompt,
             UserPrompt   = userPrompt,
             MaxTokens    = maxTokens,
             Tools        = [ReviewerToolDefinition.SubmitReview],
@@ -48,7 +48,7 @@ internal sealed class LlmReviewer(
         {
             return new ReviewResult
             {
-                ReviewerName       = name,
+                ReviewerName       = profile.Name,
                 Decision           = ReviewDecision.Failed,
                 Findings           = [],
                 Duration           = TimeSpan.Zero,
@@ -69,7 +69,7 @@ internal sealed class LlmReviewer(
         {
             return new ReviewResult
             {
-                ReviewerName       = name,
+                ReviewerName       = profile.Name,
                 Decision           = ReviewDecision.Failed,
                 Findings           = [],
                 Duration           = TimeSpan.Zero,
@@ -83,12 +83,12 @@ internal sealed class LlmReviewer(
         foreach (var f in findingsEl.EnumerateArray())
         {
             var severityStr = f.TryGetProperty("severity", out var sevEl) ? sevEl.GetString() ?? "minor" : "minor";
-            var message     = f.TryGetProperty("message",  out var msgEl) ? msgEl.GetString() ?? ""        : "";
+            var message     = f.TryGetProperty("message",  out var msgEl) ? msgEl.GetString() ?? ""       : "";
             if (string.IsNullOrEmpty(message)) continue;
 
             findings.Add(new Finding
             {
-                ReviewerName      = name,
+                ReviewerName      = profile.Name,
                 Fingerprint       = ComputeFingerprint(message),
                 Message           = message,
                 Severity          = MapSeverity(severityStr),
@@ -100,7 +100,7 @@ internal sealed class LlmReviewer(
 
         return new ReviewResult
         {
-            ReviewerName = name,
+            ReviewerName = profile.Name,
             Decision     = approved ? ReviewDecision.Approved : ReviewDecision.Rejected,
             Findings     = findings,
             Duration     = TimeSpan.Zero
@@ -110,7 +110,7 @@ internal sealed class LlmReviewer(
     private string ComputeFingerprint(string message)
     {
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(message));
-        return $"{name}:{Convert.ToBase64String(hash)[..12]}";
+        return $"{profile.Name}:{Convert.ToBase64String(hash)[..12]}";
     }
 
     private static SdkSeverity MapSeverity(string s) => s.ToLowerInvariant() switch

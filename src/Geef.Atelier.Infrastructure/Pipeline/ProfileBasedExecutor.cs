@@ -1,3 +1,4 @@
+using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk;
 using Geef.Sdk.Context;
@@ -6,7 +7,9 @@ using Geef.Sdk.Results;
 
 namespace Geef.Atelier.Infrastructure.Pipeline;
 
-internal sealed class LlmExecutionStep(ILlmClientResolver resolver) : IExecutionStep
+internal sealed class ProfileBasedExecutor(
+    ExecutorProfile profile,
+    ILlmClientResolver resolver) : IExecutionStep
 {
     public async Task<ExecutionResult> RunAsync(IRunContext context, CancellationToken cancellationToken)
     {
@@ -42,12 +45,12 @@ internal sealed class LlmExecutionStep(ILlmClientResolver resolver) : IExecution
                 """;
         }
 
-        var (client, model, maxTokens) = resolver.ForActor("Executor");
+        var (client, model, maxTokens) = resolver.ForProfile(profile.Provider, profile.Model, profile.MaxTokens);
 
         var response = await client.CompleteAsync(new LlmRequest
         {
             Model        = model,
-            SystemPrompt = AtelierSystemPrompts.Executor,
+            SystemPrompt = profile.SystemPrompt,
             UserPrompt   = userPrompt,
             MaxTokens    = maxTokens
         }, cancellationToken);
