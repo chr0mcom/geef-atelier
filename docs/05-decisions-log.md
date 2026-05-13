@@ -1,6 +1,6 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 2026-05-13 (Feature Grounding-Visualization: D-034 ergänzt)*
+*Letzte Aktualisierung: 2026-05-13 (Grounding-Provider-Foundation + Tavily: D-035 ergänzt)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -491,3 +491,26 @@ Datum: 2026-05-13
 | (c) Grouping-Logik-Location: Page-intern vs. Application-Layer ViewModel | **Application-Layer ViewModel** (`RunWithGroundingViewModel`). `IRunService.GetRunWithGroundingAsync` kapselt die Grouping-Logik vollständig: testbar ohne Blazor-Stack, wiederverwendbar (ggf. für zukünftiges MCP-Tool), saubere Layer-Trennung. `RunDetail.razor` ist damit rein deklarativ ohne Grouping-Logik. |
 
 **Tests:** 273 C#-Tests (19 neu: `RunWithGroundingViewModelTests`, `GroundingSectionTests`, `PressVisualizationWithGroundingTests`), 1 E2E-Skip, 0 Failures. Python-Tests unverändert (43 grün).
+
+---
+
+## D-035 — Grounding-Provider-Foundation + Tavily Web-Search (2026-05-13)
+
+**Kontext:** Erster echter Web-Search-Provider auf Basis der Advisor-Pässe-Architektur (PS-7 gespiegelt). Ziel: generische `IGroundingProvider`-Abstraktion, die auch für einen zukünftigen `VectorStoreGroundingProvider` ohne Refactor gilt.
+
+### Architect-Entscheidungen (vier Knackpunkte):
+
+| Frage | Entscheidung | Begründung |
+|---|---|---|
+| (a) ProviderType-Discriminator: Enum vs. String | **String** (`"tavily"`, `"vector-store"`, …). Offenes System via `IGroundingProviderFactory`-DI-Lookup. Enum würde einen Core-Change pro neuem Provider erfordern. | Provider-agnostisch — AC17-Voraussetzung. |
+| (b) Cost-Tracking: Sync in Pipeline vs. Lazy | **Sync in `TavilyGroundingProvider.EnrichAsync`**. `IServiceScopeFactory`-Scope-Pattern (identisch zu PS-7 `AdvisorAwareExecutor`). Kein separater Post-Run-Job nötig, keine verlorenen Kosten bei Absturz. | Captive-Dependency-Fix: Singleton Provider, Scoped Repository. |
+| (c) QueryExtraction: Briefing-Prefix vs. eigenständige Query-Extraktion | **Briefing-Text direkt als Query**. Query-Extraktion (eigener LLM-Call vor Tavily) ist PS-8-Scope. Für Phase 1 ausreichend, da Tavily-Synthesized-Answer auch bei langen Briefings sinnvolle Ergebnisse liefert. | Scope-Grenze klar gehalten; Foundation-First. |
+| (d) Grounding-Context-Position: Vor vs. Nach Advisor-Block | **Vor Advisor-Block** in `ProfileBasedExecutor`. Web-Fakten sollen für Advisors bereits sichtbar sein, wenn deren Output entsteht (z.B. `briefing-clarifier` kann web-recherchierte Fakten in seine Fragen einbeziehen). GroundingContext → AdvisorBlock → UserPrompt. |  Advisor-before-Executor-Ordering aus PS-7 bleibt konsistent. |
+
+**Foundation-Check (AC17):** `VectorStoreGroundingProvider` kann durch `IGroundingProvider`-Implementation + DI-Registrierung andocken, ohne eine Zeile bestehenden Codes zu ändern. `ProviderSettings: Dictionary<string,string>` trägt beliebige Provider-Konfiguration. `GroundingProviderProfile.ProviderType` ist string. `IGroundingProviderFactory.Create(type)` resolved per Discriminator.
+
+**Tests:** 304 C#-Tests (31 neu: SystemCrewGroundingConstantsTests, CrewServiceGroundingProviderCrudTests, TavilyGroundingProviderTests, MultiProviderGroundingStepTests, KlassikTemplateGroundingRegressionTests), 1 E2E-Skip, 0 Failures. Python-Tests unverändert (43 grün).
+
+**Migration:** `Step13GroundingProviders` — drei Tabellen/Spalten: `GroundingProviderProfiles`, `GroundingConsultations` (mit Cascade-Delete FK auf Runs), `GroundingProviderNames`-JSONB-Spalte auf `CrewTemplates`.
+
+**Deployment-Note:** `TAVILY_API_KEY` muss in `.env` gesetzt werden (optional — leerer Key registriert Provider, wirft aber zur Laufzeit `InvalidOperationException` mit klarer Message, kein App-Crash beim Start). Kein Key in Logs.
