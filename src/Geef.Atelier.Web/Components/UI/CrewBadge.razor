@@ -1,0 +1,7 @@
+<span class="crew-badge" data-testid="crew-badge">@_label</span>
+
+@code {
+    [Parameter] public string? TemplateName { get; set; }
+
+    private string _label => TemplateName ?? "custom";
+}

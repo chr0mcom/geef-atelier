@@ -5,6 +5,7 @@
 @inject IRunService RunService
 @inject NavigationManager Nav
 @using Microsoft.AspNetCore.SignalR.Client
+@using Geef.Atelier.Core.Domain.Crew
 @using Geef.Atelier.Web.Display
 
 <PageTitle>Run @_shortId — Geef.Atelier</PageTitle>
@@ -56,6 +57,8 @@
             </div>
         </div>
 
+        <CrewSummary Snapshot="_snapshot" FallbackTemplateName="@_details.Run.CrewTemplateName" />
+
         <Press Status="_details.Run.Status" />
 
         <div class="iters">
@@ -82,9 +85,10 @@
 @code {
     [Parameter] public Guid RunId { get; set; }
 
-    RunDetails? _details;
-    bool        _notFound;
+    RunDetails?    _details;
+    bool           _notFound;
     HubConnection? _hub;
+    CrewSnapshot?  _snapshot;
 
     string _shortId => RunId.ToString("N")[..8].ToUpperInvariant();
 
@@ -98,6 +102,7 @@
     {
         _details  = await RunService.GetRunDetailsAsync(RunId);
         _notFound = _details is null;
+        _snapshot = _details is not null ? CrewSnapshot.Deserialize(_details.Run.CrewSnapshot) : null;
     }
 
     async Task InitHubAsync()

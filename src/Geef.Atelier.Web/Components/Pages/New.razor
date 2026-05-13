@@ -1,6 +1,7 @@
 @page "/new"
 @rendermode InteractiveServer
 @attribute [Authorize]
+@using Geef.Atelier.Core.Domain.Crew
 @inject IRunService RunService
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthProvider
@@ -52,6 +53,8 @@ Be specific. Generic briefings produce generic texts."
         </div>
     }
 
+    <CrewSelector @bind-Value="_crewTemplateName" />
+
     <div class="newrun-actions">
         <div class="left-hint">⌘ + Enter to hand to the crew · esc to discard</div>
         <div style="display:flex;gap:10px">
@@ -73,6 +76,7 @@ Be specific. Generic briefings produce generic texts."
 @code {
     string _briefing  = string.Empty;
     string _configJson = "{}";
+    string? _crewTemplateName = SystemCrew.KlassikTemplateName;
     bool   _openConfig;
     bool   _submitting;
     string? _error;
@@ -89,7 +93,7 @@ Be specific. Generic briefings produce generic texts."
         {
             var auth = await AuthProvider.GetAuthenticationStateAsync();
             var user = auth.User.Identity?.Name;
-            var id   = await RunService.SubmitRunAsync(_briefing, _configJson, createdByUser: user);
+            var id   = await RunService.SubmitRunAsync(_briefing, _configJson, createdByUser: user, crewTemplateName: _crewTemplateName);
             Nav.NavigateTo($"/runs/{id}");
         }
         catch (ArgumentException ex) { _error = ex.Message; }

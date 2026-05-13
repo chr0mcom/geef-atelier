@@ -1,0 +1,19 @@
+.crew-selector-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.manage-crews-link {
+    font-size: 0.8125rem;
+    color: var(--ink-2);
+    text-decoration: none;
+    white-space: nowrap;
+    padding-bottom: 0.375rem;
+}
+
+.manage-crews-link:hover {
+    color: var(--ink);
+    text-decoration: underline;
+}
