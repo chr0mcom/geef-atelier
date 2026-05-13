@@ -1,6 +1,6 @@
 # Architektur
 
-*Letzte Aktualisierung: 2026-05-12 (PS2: Reviewer-Kalibrierung ergänzt)*
+*Letzte Aktualisierung: 2026-05-13 (PS-6: Crew-Verwaltungs-Pages ergänzt)*
 
 ## Schichtenbild
 
@@ -269,6 +269,23 @@ Browser /new  →  IRunService.SubmitRunAsync  →  RunEntity (Pending) in DB
 `StatusBadge`, `SeverityBadge`, `RunCard`, `IterationPanel`, `FindingItem`, `RunHeader`, `SubmitForm`, `EmptyState`, `CancelButton`.
 
 **Workflow-Regel:** Semantische UI-Elemente (Buttons, Forms, Badges, Listen) sind Komponenten. Layout-`div`-Tags in Pages erlaubt.
+
+### PS-6 Crew-Verwaltungs-Pages
+
+| URL | Komponente | Beschreibung |
+|---|---|---|
+| `/crew` | `CrewIndex` | Landing-Page mit Überblick über Templates + Profile |
+| `/crew/templates` | `CrewTemplatesIndex` | Liste aller Templates (System + Custom) |
+| `/crew/templates/new` | `CrewTemplateEditor` | Neues Template anlegen |
+| `/crew/templates/{name}` | `CrewTemplateEditor` | Template bearbeiten / System-Template duplizieren |
+| `/crew/profiles/reviewers` | `ReviewerProfilesIndex` | Liste aller Reviewer-Profile |
+| `/crew/profiles/reviewers/new` | `ReviewerProfileEditor` | Neues Reviewer-Profil anlegen |
+| `/crew/profiles/reviewers/{name}` | `ReviewerProfileEditor` | Reviewer-Profil bearbeiten |
+| `/crew/profiles/executors` | `ExecutorProfilesIndex` | Liste aller Executor-Profile |
+| `/crew/profiles/executors/new` | `ExecutorProfileEditor` | Neues Executor-Profil anlegen |
+| `/crew/profiles/executors/{name}` | `ExecutorProfileEditor` | Executor-Profil bearbeiten |
+
+Neue UI-Komponenten (PS-6): `CrewBadge`, `CrewSelector`, `CrewSummary`, `ReviewerPicker`, `ProfileEditorForm`, `Modal`, `DeleteConfirmationModal`.
 
 ## Frontend-Stack-Entscheidung
 

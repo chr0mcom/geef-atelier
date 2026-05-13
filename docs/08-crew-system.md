@@ -1,6 +1,6 @@
 # 08 — Crew-System (PS-5)
 
-Letzte Aktualisierung: 2026-05-13
+Letzte Aktualisierung: 2026-05-13 (PS-6: UI-Sektion ergänzt)
 
 ## Überblick
 
@@ -132,3 +132,36 @@ Migration Step10 benennt historische `Findings.ReviewerName`-Werte um. `Reviewer
 - `Core/Domain/Crew/SystemPrompts.cs` — System-Prompt-Texte (lang, gehören semantisch zu System-Profilen).
 - `Infrastructure/Pipeline/ProfileBasedReviewer.cs` / `ProfileBasedExecutor.cs` — Geef-SDK-Adapter.
 - `Application/Crew/CrewService.cs` + `CrewSnapshotBuilder.cs` — orchestriert Repo-Lookups + Snapshot-Konstruktion.
+
+## PS-6 — UI-Pfade und Konventionen
+
+### Routing-Map
+
+| URL | Komponente | Beschreibung |
+|---|---|---|
+| `/crew` | `CrewIndex` | Landing-Page mit Überblick über Templates + Profile |
+| `/crew/templates` | `CrewTemplatesIndex` | Liste aller Templates (System + Custom) |
+| `/crew/templates/new` | `CrewTemplateEditor` | Neues Template anlegen |
+| `/crew/templates/{name}` | `CrewTemplateEditor` | Template bearbeiten / System-Template duplizieren |
+| `/crew/profiles/reviewers` | `ReviewerProfilesIndex` | Liste aller Reviewer-Profile |
+| `/crew/profiles/reviewers/new` | `ReviewerProfileEditor` | Neues Reviewer-Profil anlegen |
+| `/crew/profiles/reviewers/{name}` | `ReviewerProfileEditor` | Reviewer-Profil bearbeiten |
+| `/crew/profiles/executors` | `ExecutorProfilesIndex` | Liste aller Executor-Profile |
+| `/crew/profiles/executors/new` | `ExecutorProfileEditor` | Neues Executor-Profil anlegen |
+| `/crew/profiles/executors/{name}` | `ExecutorProfileEditor` | Executor-Profil bearbeiten |
+
+### UI-Komponenten
+
+| Komponente | Ort | Zweck |
+|---|---|---|
+| `CrewBadge` | `Components/UI/` | Dezenter Text-Badge mit Template-Namen in RunRow |
+| `CrewSelector` | `Components/UI/` | Dropdown zur Template-Auswahl auf der NewRun-Page |
+| `CrewSummary` | `Components/UI/` | Click-to-Expand Crew-Übersicht auf RunDetail-Page |
+| `ReviewerPicker` | `Components/UI/` | Available/Selected-Liste mit Up/Down-Reordering |
+| `ProfileEditorForm` | `Components/UI/` | Generisches Form für Reviewer- und Executor-Profile |
+| `Modal` | `Components/UI/` | Generische Modal-Komponente mit Backdrop |
+| `DeleteConfirmationModal` | `Components/UI/` | Bestätigungs-Modal: User muss Namen tippen |
+
+### Name-Constraints
+
+Pattern `^[a-z0-9\-]+$`, max 64 Zeichen — gilt für alle Profile- und Template-Namen (Custom-Prefix exkl.). Form-Validierung via `DataAnnotations.RegularExpression`. Service-Layer ist idempotent bzgl. `custom-`-Prefix.
