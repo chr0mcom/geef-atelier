@@ -4,11 +4,10 @@
 @implements IAsyncDisposable
 @inject IRunService RunService
 @inject NavigationManager Nav
-@inject Geef.Atelier.Core.Persistence.Crew.IAdvisorConsultationRepository _advisorConsultationRepo
 @using Microsoft.AspNetCore.SignalR.Client
+@using Geef.Atelier.Application.Runs
 @using Geef.Atelier.Core.Domain.Crew
 @using Geef.Atelier.Core.Domain.Crew.Advisors
-@using Geef.Atelier.Core.Persistence.Crew
 @using Geef.Atelier.Web.Display
 
 <PageTitle>Run @_shortId — Geef.Atelier</PageTitle>
@@ -64,13 +63,21 @@
 
         <Press Status="_details.Run.Status" />
 
+        @if (_details is not null && _viewModel is not null)
+        {
+            <GroundingSection
+                Briefing="@_details.Run.BriefingText"
+                GroundedBrief="@_viewModel.GroundedBrief"
+                BeforeFirstAdvisors="@_viewModel.GroundingAdvisors" />
+        }
+
         <div class="iters">
             @{
-                var resolvedMap = FindingResolutionInferrer.MarkResolved(_details.Iterations);
+                var resolvedMap = FindingResolutionInferrer.MarkResolved(_details!.Iterations);
             }
             @foreach (var (iwf, idx) in _details.Iterations.Select((x, i) => (x, i)))
             {
-                var iterConsultations = _consultationsByIteration[iwf.Iteration.IterationNumber].ToList();
+                var iterConsultations = _viewModel?.AdvisorsByIteration[iwf.Iteration.IterationNumber]?.ToList() ?? [];
                 @if (iterConsultations.Count > 0)
                 {
                     <AdvisorConsultationsBlock Consultations="iterConsultations" />
@@ -83,11 +90,11 @@
             }
         </div>
 
-        @if (_consultationsByIteration[-1].Any())
+        @if (_viewModel?.RecoveryAdvisors.Count > 0)
         {
             <div class="advisor-recovery-section">
                 <h4>Convergence Failure Recovery</h4>
-                <AdvisorConsultationsBlock Consultations="_consultationsByIteration[-1].ToList()" IsRecovery="true" />
+                <AdvisorConsultationsBlock Consultations="@_viewModel.RecoveryAdvisors" IsRecovery="true" />
             </div>
         }
 
@@ -101,12 +108,11 @@
 @code {
     [Parameter] public Guid RunId { get; set; }
 
+    RunWithGroundingViewModel? _viewModel;
     RunDetails?    _details;
     bool           _notFound;
     HubConnection? _hub;
     CrewSnapshot?  _snapshot;
-    ILookup<int, AdvisorConsultation> _consultationsByIteration =
-        Enumerable.Empty<AdvisorConsultation>().ToLookup(c => c.IterationNumber);
 
     string _shortId => RunId.ToString("N")[..8].ToUpperInvariant();
 
@@ -118,12 +124,10 @@
 
     async Task LoadAsync()
     {
-        _details  = await RunService.GetRunDetailsAsync(RunId);
-        _notFound = _details is null;
-        _snapshot = _details is not null ? CrewSnapshot.Deserialize(_details.Run.CrewSnapshot) : null;
-
-        var consultations = await _advisorConsultationRepo.GetByRunIdAsync(RunId, CancellationToken.None);
-        _consultationsByIteration = consultations.ToLookup(c => c.IterationNumber);
+        _viewModel = await RunService.GetRunWithGroundingAsync(RunId, CancellationToken.None);
+        _details   = _viewModel?.Details;
+        _snapshot  = _viewModel?.Snapshot;
+        _notFound  = _viewModel is null;
     }
 
     async Task InitHubAsync()
