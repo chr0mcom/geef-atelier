@@ -47,9 +47,10 @@
             <InputSelect @bind-Value="_form.Provider" disabled="@IsSystem">
                 @foreach (var p in _providers)
                 {
-                    <option value="@p">@p</option>
+                    <option value="@p.Name">@p.DisplayName</option>
                 }
             </InputSelect>
+            <small class="field-hint">OpenRouter is billed per token. Claude-CLI and Codex-CLI use a local subscription.</small>
             <ValidationMessage For="() => _form.Provider" />
         </div>
 
@@ -145,12 +146,12 @@
     [Parameter] public EventCallback OnDuplicate { get; set; }
 
     private bool IsNew => ProfileName == null;
-    private IReadOnlyList<string> _providers = [];
+    private IReadOnlyList<ProviderInfo> _providers = [];
     private ProfileFormModel _form = new();
 
     protected override void OnInitialized()
     {
-        _providers = ProviderCatalog.ListProviderNames();
+        _providers = ProviderCatalog.ListProviders();
         _form = new ProfileFormModel
         {
             Name = ProfileName ?? "",
