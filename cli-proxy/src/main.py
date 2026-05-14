@@ -185,8 +185,9 @@ async def claude_models() -> JSONResponse:
 
 @app.get("/v1/codex/models")
 async def codex_models() -> JSONResponse:
-    """Lists available Codex/OpenAI CLI models (static list — CLI has no model-listing command)."""
-    data = [{"id": m, "object": "model", "owned_by": "openai"} for m in codex_adapter.list_models()]
+    """Lists the 10 newest OpenAI models, fetched live from OpenRouter (24 h cache)."""
+    models = await codex_adapter.list_models_async()
+    data = [{"id": m, "object": "model", "owned_by": "openai"} for m in models]
     return JSONResponse({"object": "list", "data": data})
 
 
@@ -194,7 +195,8 @@ async def codex_models() -> JSONResponse:
 async def list_models() -> JSONResponse:
     """Legacy combined model list. Use /v1/claude/models or /v1/codex/models instead."""
     claude_data = [{"id": m, "object": "model", "owned_by": "anthropic"} for m in claude_adapter.list_models()]
-    codex_data  = [{"id": m, "object": "model", "owned_by": "openai"}    for m in codex_adapter.list_models()]
+    codex_models = await codex_adapter.list_models_async()
+    codex_data   = [{"id": m, "object": "model", "owned_by": "openai"} for m in codex_models]
     return JSONResponse({"object": "list", "data": claude_data + codex_data})
 
 

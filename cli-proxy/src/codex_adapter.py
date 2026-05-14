@@ -2,8 +2,15 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import tempfile
+import time
+from typing import Any
+
+import httpx
+
+log = logging.getLogger(__name__)
 
 MAX_CONCURRENT = int(os.getenv("CODEX_MAX_CONCURRENT", "2"))
 _semaphore = asyncio.Semaphore(MAX_CONCURRENT)
@@ -11,9 +18,17 @@ _semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 # Home directory for codex auth — mounted as a volume in the container.
 CODEX_HOME = os.getenv("CODEX_HOME", "/auth/codex")
 
-# Static model list — the codex CLI has no model-listing command.
-# Update this list when new Codex/OpenAI models become available.
-STATIC_MODELS = [
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+_OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
+_SKIP_KEYWORDS = ("image", "audio", "vision", "dall-e", "whisper", "tts", "chat-latest")
+_CACHE_TTL = 86400  # 24 hours
+
+# In-memory cache: (model_ids, fetched_at)
+_model_cache: tuple[list[str], float] | None = None
+_cache_lock = asyncio.Lock()
+
+# Fallback if OpenRouter is unreachable and cache is empty
+_FALLBACK_MODELS = [
     "gpt-5.5-pro",
     "gpt-5.5",
     "gpt-5.4-nano",
@@ -21,9 +36,50 @@ STATIC_MODELS = [
 ]
 
 
+async def _fetch_from_openrouter(top_n: int = 10) -> list[str]:
+    """Fetches the top_n newest OpenAI models from OpenRouter, excluding image/audio/alias variants."""
+    if not OPENROUTER_API_KEY:
+        log.warning("OPENROUTER_API_KEY not set — using fallback model list for codex")
+        return _FALLBACK_MODELS
+
+    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}"}
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(_OPENROUTER_MODELS_URL, headers=headers)
+        resp.raise_for_status()
+        data: list[dict[str, Any]] = resp.json().get("data", [])
+
+    openai_models = [
+        m for m in data
+        if m.get("id", "").startswith("openai/")
+        and not any(kw in m["id"].lower() for kw in _SKIP_KEYWORDS)
+    ]
+    openai_models.sort(key=lambda m: m.get("created", 0), reverse=True)
+    return [m["id"].replace("openai/", "") for m in openai_models[:top_n]]
+
+
+async def _get_cached_models() -> list[str]:
+    global _model_cache
+    async with _cache_lock:
+        if _model_cache is not None and time.time() - _model_cache[1] < _CACHE_TTL:
+            return _model_cache[0]
+        try:
+            models = await _fetch_from_openrouter()
+            _model_cache = (models, time.time())
+            log.info("Codex model list refreshed: %s", models)
+            return models
+        except Exception as exc:
+            log.warning("Failed to fetch codex models from OpenRouter: %s — using cached/fallback", exc)
+            return _model_cache[0] if _model_cache else _FALLBACK_MODELS
+
+
 def list_models() -> list[str]:
-    """Returns the static list of supported Codex/OpenAI models."""
-    return list(STATIC_MODELS)
+    """Synchronous shim used at startup; returns fallback until async cache is warm."""
+    return _model_cache[0] if _model_cache else _FALLBACK_MODELS
+
+
+async def list_models_async() -> list[str]:
+    """Returns live model list, refreshed from OpenRouter every 24 hours."""
+    return await _get_cached_models()
 
 
 async def complete(prompt: str, model: str | None, max_tokens: int | None) -> str:

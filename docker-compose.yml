@@ -56,6 +56,7 @@ services:
       - CODEX_MAX_CONCURRENT=2
       - CLAUDE_HOME=/auth/claude
       - CODEX_HOME=/auth/codex
+      - OPENROUTER_API_KEY=${LLM_OPENROUTER_API_KEY}
     volumes:
       - geef-atelier-cli-auth:/auth
     networks:
