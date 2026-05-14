@@ -58,18 +58,14 @@ public sealed class AtelierPipelineFactoryWithVectorStoreTests
     [Fact]
     public async Task EnrichAsync_WithVectorStoreProvider_CitationsHaveExpectedCount()
     {
-        GroundingResult? captured = null;
         var consultationRepo = new CapturingGroundingConsultationRepository();
 
-        var (groundingStep, _) = BuildGroundingStep(TwoResults, consultationRepo: consultationRepo);
-
-        // Run the grounding step directly to inspect the result
+        // Run the provider directly to inspect the result
         var directProvider = BuildProviderDirectly(TwoResults, consultationRepo);
         var profile = BuildProfile([]);
         var result = await directProvider.EnrichAsync("Test briefing.", profile, Guid.NewGuid(), CancellationToken.None);
-        captured = result;
 
-        Assert.Equal(2, captured.Citations.Count);
+        Assert.Equal(2, result.Citations.Count);
     }
 
     [Fact]
