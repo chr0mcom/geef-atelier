@@ -51,7 +51,7 @@ internal sealed class VectorStoreGroundingProvider(
             .Select(r => new SourceCitation(
                 Title: r.DocumentTitle,
                 Url: null,
-                Snippet: Truncate(r.Chunk.Content, 500),
+                Snippet: Truncate(r.Chunk.Content, 300),
                 DocumentReference: $"{r.Chunk.DocumentId}/chunk-{r.Chunk.ChunkIndex}",
                 RelevanceScore: r.Similarity))
             .ToList();
