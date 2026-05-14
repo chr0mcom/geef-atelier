@@ -56,6 +56,7 @@
                 <label>Provider Type</label>
                 <InputSelect @bind-Value="_form.ProviderType" class="form-input" data-testid="input-provider-type">
                     <option value="tavily">Tavily Web Search</option>
+                    <option value="vector-store">Vector Store (Knowledge Base)</option>
                 </InputSelect>
             </div>
 
@@ -79,6 +80,26 @@
                         <InputCheckbox @bind-Value="_form.IncludeAnswer" data-testid="input-include-answer" />
                         Include synthesized answer
                     </label>
+                </div>
+            }
+
+            @if (_form.ProviderType == "vector-store")
+            {
+                <div class="form-row">
+                    <label>Top K Results</label>
+                    <InputNumber @bind-Value="_form.TopK" class="form-input" min="1" max="20" data-testid="input-top-k" />
+                    <small class="form-hint">Number of chunks to retrieve per query (1–20).</small>
+                </div>
+
+                <div class="form-row">
+                    <label>Tag Filter (optional, comma-separated)</label>
+                    <InputText @bind-Value="_form.TagFilter" class="form-input" placeholder="policy, hr" data-testid="input-tag-filter" />
+                    <small class="form-hint">Leave empty to search all documents.</small>
+                </div>
+
+                <div class="form-row">
+                    <label>Embedding Model</label>
+                    <p class="form-hint" data-testid="embedding-model-info">openai/text-embedding-3-small (1536 dimensions)</p>
                 </div>
             }
 
@@ -196,6 +217,10 @@
 
         public bool IncludeAnswer { get; set; } = true;
 
+        public int TopK { get; set; } = 5;
+
+        public string TagFilter { get; set; } = "";
+
         public int? MaxQueriesPerRun { get; set; }
 
         public static GroundingFormModel From(GroundingProviderProfile p)
@@ -203,6 +228,8 @@
             p.ProviderSettings.TryGetValue("Tier", out var tier);
             p.ProviderSettings.TryGetValue("MaxResults", out var maxResultsStr);
             p.ProviderSettings.TryGetValue("IncludeAnswer", out var includeAnswerStr);
+            p.ProviderSettings.TryGetValue("TopK", out var topKStr);
+            p.ProviderSettings.TryGetValue("TagFilter", out var tagFilter);
             return new GroundingFormModel
             {
                 Name = p.Name,
@@ -212,18 +239,32 @@
                 Tier = tier ?? "basic",
                 MaxResults = int.TryParse(maxResultsStr, out var mr) ? mr : 5,
                 IncludeAnswer = !string.Equals(includeAnswerStr, "false", StringComparison.OrdinalIgnoreCase),
+                TopK = int.TryParse(topKStr, out var tk) ? tk : 5,
+                TagFilter = tagFilter ?? "",
                 MaxQueriesPerRun = p.MaxQueriesPerRun
             };
         }
 
         public GroundingProviderProfile ToProfile()
         {
-            var settings = new Dictionary<string, string>
+            Dictionary<string, string> settings;
+            if (ProviderType == "vector-store")
             {
-                ["Tier"] = Tier,
-                ["MaxResults"] = MaxResults.ToString(),
-                ["IncludeAnswer"] = IncludeAnswer ? "true" : "false"
-            };
+                settings = new Dictionary<string, string>
+                {
+                    ["TopK"] = TopK.ToString(),
+                    ["TagFilter"] = TagFilter
+                };
+            }
+            else
+            {
+                settings = new Dictionary<string, string>
+                {
+                    ["Tier"] = Tier,
+                    ["MaxResults"] = MaxResults.ToString(),
+                    ["IncludeAnswer"] = IncludeAnswer ? "true" : "false"
+                };
+            }
             return new GroundingProviderProfile(
                 Name: SystemCrew.EnsureCustomPrefix(Name),
                 DisplayName: DisplayName,

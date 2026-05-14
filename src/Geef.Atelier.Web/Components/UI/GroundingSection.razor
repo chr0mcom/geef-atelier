@@ -45,11 +45,21 @@
                                             {
                                                 <a href="@citation.Url" target="_blank" rel="noopener noreferrer" class="citation-title">@citation.Title</a>
                                             }
+                                            else if (!string.IsNullOrEmpty(citation.DocumentReference))
+                                            {
+                                                var docId = ParseDocId(citation.DocumentReference);
+                                                <a href="/crew/knowledge/@docId" class="citation-title">@citation.Title</a>
+                                                <span class="citation-source"> — From your knowledge base</span>
+                                                @if (citation.RelevanceScore.HasValue)
+                                                {
+                                                    <span class="citation-score">(relevance: @citation.RelevanceScore.Value.ToString("F2"))</span>
+                                                }
+                                            }
                                             else
                                             {
                                                 <span class="citation-title">@citation.Title</span>
                                             }
-                                            @if (citation.RelevanceScore.HasValue)
+                                            @if (citation.Url != null && citation.RelevanceScore.HasValue)
                                             {
                                                 <span class="citation-score">@citation.RelevanceScore.Value.ToString("F2")</span>
                                             }
@@ -118,4 +128,13 @@
 
     private static string Truncate(string s, int max) =>
         s.Length > max ? s[..max] + "…" : s;
+
+    /// <summary>
+    /// Parses the document ID from a vector-store document reference in the format "{docId}/chunk-{N}".
+    /// </summary>
+    private static string ParseDocId(string documentReference)
+    {
+        var slashIndex = documentReference.IndexOf('/');
+        return slashIndex > 0 ? documentReference[..slashIndex] : documentReference;
+    }
 }

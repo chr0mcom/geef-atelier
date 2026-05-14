@@ -1,0 +1,192 @@
+@page "/crew/knowledge/{DocumentId:guid}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Application.Crew.Knowledge
+@using Geef.Atelier.Core.Domain.Crew.Knowledge
+@inject IKnowledgeService KnowledgeService
+@inject NavigationManager Nav
+
+<PageTitle>@(_document?.Title ?? "Document") — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="knowledge-document-detail">
+    <div class="page-header">
+        <h1>@(_document?.Title ?? "Document")</h1>
+        <a href="/crew/knowledge" class="btn ghost" data-testid="btn-back">← Back</a>
+    </div>
+
+    @if (_loading)
+    {
+        <p>Loading…</p>
+    }
+    else if (_notFound)
+    {
+        <div class="alert alert-danger" data-testid="not-found">Document not found.</div>
+    }
+    else if (_document != null)
+    {
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger" data-testid="error-banner">@_error</div>
+        }
+
+        @if (_reindexSuccess)
+        {
+            <div class="alert alert-success" data-testid="reindex-success">Document has been re-indexed successfully.</div>
+        }
+
+        <dl class="knowledge-detail" data-testid="knowledge-detail">
+            <dt>Title</dt>
+            <dd data-testid="detail-title">@_document.Title</dd>
+
+            <dt>Description</dt>
+            <dd data-testid="detail-description">@(string.IsNullOrEmpty(_document.Description) ? "—" : _document.Description)</dd>
+
+            <dt>Tags</dt>
+            <dd data-testid="detail-tags">
+                @if (_document.Tags.Count > 0)
+                {
+                    @foreach (var tag in _document.Tags)
+                    {
+                        <span class="crew-badge">@tag</span>
+                    }
+                }
+                else
+                {
+                    <span class="text-muted">—</span>
+                }
+            </dd>
+
+            <dt>File</dt>
+            <dd data-testid="detail-filename">@_document.OriginalFilename</dd>
+
+            <dt>Size</dt>
+            <dd data-testid="detail-size">@FormatBytes(_document.FileSizeBytes)</dd>
+
+            <dt>Chunks</dt>
+            <dd data-testid="detail-chunks">
+                <IndexingStatusBadge ChunkCount="_document.ChunkCount" />
+            </dd>
+
+            <dt>Embedding Model</dt>
+            <dd data-testid="detail-embedding-model">@_document.EmbeddingModel</dd>
+
+            @if (_document.IndexingCostEur.HasValue)
+            {
+                <dt>Indexing Cost</dt>
+                <dd data-testid="detail-cost">~€@_document.IndexingCostEur.Value.ToString("F4")</dd>
+            }
+
+            <dt>Created</dt>
+            <dd data-testid="detail-created">@_document.CreatedAt.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+
+            <dt>Updated</dt>
+            <dd data-testid="detail-updated">@_document.UpdatedAt.ToString("yyyy-MM-dd HH:mm") UTC</dd>
+        </dl>
+
+        <div class="form-actions" style="margin-top: 1.5rem;">
+            <button class="btn primary" @onclick="ReindexAsync" disabled="@_reindexing" data-testid="btn-reindex">
+                @(_reindexing ? "Re-indexing…" : "Re-Index")
+            </button>
+            <button class="btn danger" @onclick="() => _showDeleteConfirm = true" data-testid="btn-delete">Delete</button>
+        </div>
+    }
+</div>
+
+@if (_showDeleteConfirm)
+{
+    <div class="modal-backdrop" data-testid="delete-confirm">
+        <div class="modal">
+            <p>Are you sure you want to delete <strong>@_document?.Title</strong>? This cannot be undone.</p>
+            <div class="form-actions">
+                <button class="btn danger" @onclick="DeleteAsync" disabled="@_deleting" data-testid="btn-confirm-delete">
+                    @(_deleting ? "Deleting…" : "Delete")
+                </button>
+                <button class="btn ghost" @onclick="() => _showDeleteConfirm = false">Cancel</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid DocumentId { get; set; }
+
+    private KnowledgeDocument? _document;
+    private bool _loading = true;
+    private bool _notFound;
+    private bool _reindexing;
+    private bool _reindexSuccess;
+    private bool _deleting;
+    private bool _showDeleteConfirm;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        _notFound = false;
+        try
+        {
+            _document = await KnowledgeService.GetAsync(DocumentId, CancellationToken.None);
+            if (_document == null)
+                _notFound = true;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ReindexAsync()
+    {
+        _reindexing = true;
+        _reindexSuccess = false;
+        _error = null;
+        try
+        {
+            await KnowledgeService.ReindexAsync(DocumentId, CancellationToken.None);
+            _reindexSuccess = true;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _reindexing = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        _deleting = true;
+        _error = null;
+        try
+        {
+            await KnowledgeService.DeleteAsync(DocumentId, CancellationToken.None);
+            Nav.NavigateTo("/crew/knowledge");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            _deleting = false;
+            _showDeleteConfirm = false;
+        }
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024):F1} MB";
+    }
+}

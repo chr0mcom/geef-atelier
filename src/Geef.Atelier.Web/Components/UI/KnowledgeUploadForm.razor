@@ -1,0 +1,101 @@
+@using Microsoft.AspNetCore.Components.Forms
+
+<EditForm Model="_model" OnValidSubmit="SubmitAsync" class="crew-form" data-testid="knowledge-upload-form">
+    <DataAnnotationsValidator />
+
+    @if (!string.IsNullOrEmpty(_validationError))
+    {
+        <div class="alert alert-danger" data-testid="upload-error">@_validationError</div>
+    }
+
+    <div class="form-row">
+        <label>Title</label>
+        <InputText @bind-Value="_model.Title" class="form-input" placeholder="Document title" data-testid="input-title" />
+        <ValidationMessage For="() => _model.Title" />
+    </div>
+
+    <div class="form-row">
+        <label>Description</label>
+        <InputTextArea @bind-Value="_model.Description" class="form-input" rows="3" placeholder="Short description of the document" data-testid="input-description" />
+    </div>
+
+    <div class="form-row">
+        <label>Tags (comma-separated)</label>
+        <TagInput @bind-Value="_model.TagsRaw" Placeholder="policy, procedures, hr" />
+    </div>
+
+    <div class="form-row">
+        <label>File (.md or .txt, max 5 MB)</label>
+        <InputFile OnChange="OnFileChange" accept=".md,.txt" data-testid="input-file" />
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn primary" disabled="@_submitting" data-testid="btn-upload">
+            @(_submitting ? "Uploading…" : "Upload")
+        </button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter] public EventCallback<(string Title, string Description, IReadOnlyList<string> Tags, IBrowserFile? File)> OnSubmit { get; set; }
+
+    private readonly UploadFormModel _model = new();
+    private IBrowserFile? _selectedFile;
+    private string? _validationError;
+    private bool _submitting;
+
+    private void OnFileChange(InputFileChangeEventArgs e)
+    {
+        _selectedFile = e.File;
+        _validationError = null;
+
+        if (_selectedFile != null && _selectedFile.Size > 5 * 1024 * 1024)
+        {
+            _validationError = "File exceeds the 5 MB limit. Please choose a smaller file.";
+            _selectedFile = null;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        _validationError = null;
+
+        if (_selectedFile == null)
+        {
+            _validationError = "Please select a file to upload.";
+            return;
+        }
+
+        if (_selectedFile.Size > 5 * 1024 * 1024)
+        {
+            _validationError = "File exceeds the 5 MB limit. Please choose a smaller file.";
+            return;
+        }
+
+        var tags = _model.TagsRaw
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(t => !string.IsNullOrEmpty(t))
+            .ToList();
+
+        _submitting = true;
+        try
+        {
+            await OnSubmit.InvokeAsync((_model.Title, _model.Description, tags, _selectedFile));
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private sealed class UploadFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.MaxLength(200)]
+        public string Title { get; set; } = "";
+
+        public string Description { get; set; } = "";
+
+        public string TagsRaw { get; set; } = "";
+    }
+}

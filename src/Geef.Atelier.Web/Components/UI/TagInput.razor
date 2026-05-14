@@ -1,0 +1,15 @@
+<input type="text" class="form-input" value="@Value"
+       placeholder="@Placeholder"
+       @oninput="OnInput" />
+
+@code {
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "tag1, tag2, tag3";
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString() ?? "";
+        await ValueChanged.InvokeAsync(Value);
+    }
+}

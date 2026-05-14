@@ -1,0 +1,12 @@
+@if (ChunkCount > 0)
+{
+    <span class="crew-badge indexed-badge" data-testid="indexing-badge-indexed">Indexed (@ChunkCount chunk@(ChunkCount == 1 ? "" : "s"))</span>
+}
+else
+{
+    <span class="crew-badge not-indexed-badge" data-testid="indexing-badge-not-indexed">Not indexed</span>
+}
+
+@code {
+    [Parameter, EditorRequired] public int ChunkCount { get; set; }
+}
