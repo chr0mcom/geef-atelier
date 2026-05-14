@@ -672,3 +672,33 @@ CREATE INDEX "IX_TemplateStudioAnalyses_CreatedAt" ON "TemplateStudioAnalyses"("
 ### Bewusst NICHT in diesem Step:
 
 MCP-Tool-Erweiterung für Studio, Auto-Run nach Materialization, Studio-Iterationen ("Lass nochmal nachdenken"), Lerneffekte aus Audit-Trail, Custom-Executor-Vorschlag, Cost-Budgets, Bulk-Import von Templates.
+
+---
+
+## D-039: Studio-Extensions (14. Mai 2026)
+
+**Feature:** MCP-API für Template Studio + Analysis-History-Komponente + Welcome-Stats-Erweiterung.
+
+### Entscheidungen:
+
+**1. MCP-Tool-Design:** Zwei separate Tools statt einem kombiniertem — `analyze_template_proposal` (Analyse + Persistierung) und `materialize_template_proposal` (Materialisierung nach User-Review). Trennung ermöglicht asynchronen Workflow: Analyse → Review → Materialisierung mit optionalen Edits dazwischen. Die `AnalysisId` aus Schritt 1 verknüpft beide Aufrufe.
+
+**2. `TemplateStudioHistoryItem` als Core-Record:** Leichtgewichtige Projektion für History-Queries im `Core.Persistence`-Namespace, um die Schicht `Infrastructure → Application` zu vermeiden. Der `ReasoningSummary` wird aus dem `AnalysisResultJson`-JSONB deserialisiert (kein eigenes DB-Feld) — vertretbar für max. 10 Einträge per Page.
+
+**3. `StudioAnalysesPage` und `StudioAnalysisHistoryEntry` im Application-Layer:** Analog zum HasMore-Pagination-Pattern aller anderen List-Endpunkte. Die UI-Komponente injiziert `ITemplateStudioService` direkt — kein separates Controller-Layer.
+
+**4. Studio-Kosten separat von Run-Kosten:** `WelcomeStats` bekommt `StudioAnalysesThisMonth` und `StudioCostThisMonth` als eigene Felder, nicht in `TotalCostThisMonth` aggregiert. Studio-Analysen sind Konfigurationskosten, keine Ausführungskosten — User soll beide Dimensionen separat sehen.
+
+**5. `StudioAnalysisHistoryList`-Komponente ohne StateContainer:** Lokaler State in der Komponente selbst (`_analyses`, `_currentPage`, `_expandedId`). Re-Analyze-Callback via `EventCallback<string>` — Parent (`TemplateStudio.razor`) setzt `_taskDescription` und springt damit zurück in Eingabe-Mode.
+
+### Kein Schema-Change:
+
+Alle Tabellen (insbesondere `TemplateStudioAnalyses`) existieren seit Step17 — kein neuer Migration-Step. `TemplateStudioHistoryItem` ist nur eine Code-Abstraktion, keine DB-Entität.
+
+### Tests:
+
+625 bestehende C#-Tests unverändert grün + 40 neue Tests. Neue Test-Klassen: `AnalyzeTemplateProposalToolTests` (9), `MaterializeTemplateProposalToolTests` (9), `TemplateStudioServiceListRecentAnalysesTests` (7), `StudioAnalysisHistoryListTests` (13), `WelcomeStatsTests` (4). Orchestrator-Timing-Tests (2 Stück) waren bereits pre-existing flaky — bestehen isoliert, schlagen unter Full-Suite durch Thread-Timing-Sensitivität fehl (kein neues Problem).
+
+### Bewusst NICHT in diesem Step:
+
+Auto-Run nach Materialization, Studio-Iterationen, Cost-Budget-Alerts, Bulk-Export von Analyse-Historien, E-Mail-Notification nach abgeschlossener Analyse.
