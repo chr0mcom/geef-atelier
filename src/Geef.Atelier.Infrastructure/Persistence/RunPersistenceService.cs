@@ -1,5 +1,6 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Geef.Atelier.Infrastructure.Persistence;
 
@@ -30,5 +31,13 @@ internal sealed class RunPersistenceService(AtelierDbContext db) : IRunPersisten
         db.Runs.Add(run);
         await db.SaveChangesAsync(cancellationToken);
         return run.Id;
+    }
+
+    /// <inheritdoc/>
+    public async Task UpdateSnapshotAsync(Guid runId, string snapshotJson, CancellationToken cancellationToken = default)
+    {
+        await db.Runs
+            .Where(r => r.Id == runId)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.CrewSnapshot, snapshotJson), cancellationToken);
     }
 }

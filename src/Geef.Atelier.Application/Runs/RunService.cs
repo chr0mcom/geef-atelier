@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Application.Crew.Knowledge;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
@@ -14,6 +15,7 @@ internal sealed class RunService(
     IRunRepository                        repository,
     ICrewService                          crewService,
     IAdvisorConsultationRepository        consultationRepository,
+    IKnowledgeService?                    knowledgeService = null,
     IGroundingConsultationRepository?     groundingConsultationRepository = null) : IRunService
 {
     private static readonly JsonSerializerOptions SnapshotJsonOpts =
@@ -42,9 +44,35 @@ internal sealed class RunService(
         // CrewTemplateName is the template name from snapshot (null for inline spec)
         var resolvedTemplateName = snapshot.TemplateName;
 
-        return await persistence.CreateRunAsync(
+        var runId = await persistence.CreateRunAsync(
             request.BriefingText, normalizedConfig, request.CreatedByUser,
             resolvedTemplateName, snapshotJson, cancellationToken);
+
+        // Upload run-local attachments and extend the snapshot with RunAttachmentsProfile.
+        if (request.Attachments is { Count: > 0 } attachments && knowledgeService is not null)
+        {
+            foreach (var attachment in attachments)
+            {
+                await knowledgeService.UploadRunAttachmentAsync(
+                    runId,
+                    attachment.Filename,
+                    new MemoryStream(attachment.Content),
+                    attachment.Filename,
+                    attachment.ContentType,
+                    cancellationToken);
+            }
+
+            var extendedProviders = new List<GroundingProviderProfile>
+                { SystemCrew.RunAttachmentsProfile };
+            if (snapshot.GroundingProviders is { Count: > 0 } existing)
+                extendedProviders.AddRange(existing);
+
+            var extendedSnapshot = snapshot with { GroundingProviders = extendedProviders };
+            var extendedSnapshotJson = JsonSerializer.Serialize(extendedSnapshot, SnapshotJsonOpts);
+            await persistence.UpdateSnapshotAsync(runId, extendedSnapshotJson, cancellationToken);
+        }
+
+        return runId;
     }
 
     /// <inheritdoc/>
