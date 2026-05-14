@@ -14,10 +14,10 @@ CODEX_HOME = os.getenv("CODEX_HOME", "/auth/codex")
 # Static model list — the codex CLI has no model-listing command.
 # Update this list when new Codex/OpenAI models become available.
 STATIC_MODELS = [
-    "o4-mini",
-    "gpt-4o",
-    "gpt-4o-mini",
-    "o3",
+    "gpt-5.3-codex",
+    "gpt-5.2-codex",
+    "gpt-5.1-codex-max",
+    "gpt-5.1-codex",
 ]
 
 
