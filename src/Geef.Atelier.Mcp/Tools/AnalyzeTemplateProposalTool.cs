@@ -50,8 +50,6 @@ public static class AnalyzeTemplateProposalTool
         p.GroundingProviderType, p.GroundingProviderSettings);
 }
 
-// --- Output DTOs ---
-
 public sealed record AnalyzeTemplateProposalOutput(
     Guid AnalysisId,
     string TaskDescription,

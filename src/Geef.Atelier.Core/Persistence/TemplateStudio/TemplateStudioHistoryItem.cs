@@ -1,6 +1,6 @@
 namespace Geef.Atelier.Core.Persistence.TemplateStudio;
 
-/// <summary>Lightweight projection of a studio analysis used for history list queries.</summary>
+/// <summary>Lightweight projection of a TemplateStudioAnalysis for history list queries.</summary>
 public sealed record TemplateStudioHistoryItem(
     Guid Id,
     string TaskDescription,
