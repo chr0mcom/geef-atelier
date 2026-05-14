@@ -1,7 +1,7 @@
 namespace Geef.Atelier.Core.Domain;
 
 /// <summary>Represents a single text-generation run submitted to the Geef pipeline.</summary>
-public sealed record RunEntity
+public sealed class RunEntity
 {
     public required Guid Id { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
@@ -40,4 +40,9 @@ public sealed record RunEntity
     /// Prevents infinite retry loops: only one advisor retry is permitted per run.
     /// </summary>
     public bool AdvisorRetryAttempted { get; init; }
+
+    // Cost tracking — null for runs before Step16 migration or when CostTracking:Enabled=false.
+    public decimal? TotalCostEur { get; set; }
+    public decimal? LlmCostEur { get; set; }
+    public decimal? GroundingCostEur { get; set; }
 }

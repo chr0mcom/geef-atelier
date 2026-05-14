@@ -1,3 +1,5 @@
+using Geef.Atelier.Application.Pricing;
+using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk;
@@ -9,7 +11,9 @@ namespace Geef.Atelier.Infrastructure.Pipeline;
 
 internal sealed class ProfileBasedExecutor(
     ExecutorProfile profile,
-    ILlmClientResolver resolver) : IExecutionStep
+    ILlmClientResolver resolver,
+    IPricingCatalog? pricingCatalog = null,
+    ICostAccumulator? costAccumulator = null) : IExecutionStep
 {
     public async Task<ExecutionResult> RunAsync(IRunContext context, CancellationToken cancellationToken)
     {
@@ -62,6 +66,15 @@ internal sealed class ProfileBasedExecutor(
             UserPrompt   = userPrompt,
             MaxTokens    = maxTokens
         }, cancellationToken);
+
+        if (costAccumulator is not null)
+        {
+            var costEur = pricingCatalog?.CalculateCostEur(
+                model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens);
+            costAccumulator.RecordActorCost(
+                iter, ActorType.Executor, profile.Name, model,
+                response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur);
+        }
 
         var updated = context
             .Set(AtelierContextKeys.CurrentDraft, response.Text)

@@ -1,3 +1,5 @@
+using Geef.Atelier.Application.Pricing;
+using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Infrastructure.Llm;
@@ -11,7 +13,9 @@ namespace Geef.Atelier.Infrastructure.Pipeline;
 internal sealed class ProfileBasedAdvisor(
     AdvisorProfile profile,
     ILlmClientResolver resolver,
-    IAdvisorConsultationRepository consultations)
+    IAdvisorConsultationRepository consultations,
+    IPricingCatalog? pricingCatalog = null,
+    ICostAccumulator? costAccumulator = null)
 {
     /// <summary>The profile that drives this advisor instance.</summary>
     public AdvisorProfile Profile => profile;
@@ -42,6 +46,15 @@ internal sealed class ProfileBasedAdvisor(
             UserPrompt   = briefingText,
             MaxTokens    = maxTokens
         }, ct);
+
+        if (costAccumulator is not null && iterationNumber >= 0)
+        {
+            var costEur = pricingCatalog?.CalculateCostEur(
+                model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens);
+            costAccumulator.RecordActorCost(
+                iterationNumber, ActorType.Advisor, profile.Name, model,
+                response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur);
+        }
 
         var consultation = new AdvisorConsultation(
             Id:                 Guid.NewGuid(),

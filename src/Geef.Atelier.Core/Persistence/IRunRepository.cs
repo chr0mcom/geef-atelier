@@ -19,4 +19,7 @@ public interface IRunRepository
 
     /// <summary>Returns the run with all its iterations and findings, or null if the run does not exist.</summary>
     Task<RunDetails?> GetDetailsAsync(Guid runId, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns aggregated statistics for the current calendar month.</summary>
+    Task<WelcomeStats> GetWelcomeStatsAsync(CancellationToken cancellationToken = default);
 }

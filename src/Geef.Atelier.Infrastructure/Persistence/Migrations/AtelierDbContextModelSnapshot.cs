@@ -388,11 +388,54 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
                     b.ToTable("Findings");
                 });
 
+            modelBuilder.Entity("Geef.Atelier.Core.Domain.IterationActorCostEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ActorType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("CostEur")
+                        .HasColumnType("numeric(10,6)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("InputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("IterationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ModelName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("OutputTokens")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IterationId")
+                        .HasDatabaseName("IX_IterationActorCosts_IterationId");
+
+                    b.ToTable("IterationActorCosts", (string)null);
+                });
+
             modelBuilder.Entity("Geef.Atelier.Core.Domain.IterationEntity", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<decimal?>("AdvisorsTotalCostEur")
+                        .HasColumnType("numeric(10,6)");
 
                     b.Property<string>("ArtifactText")
                         .IsRequired()
@@ -401,8 +444,20 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal?>("ExecutorCostEur")
+                        .HasColumnType("numeric(10,6)");
+
+                    b.Property<int?>("ExecutorInputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ExecutorOutputTokens")
+                        .HasColumnType("integer");
+
                     b.Property<int>("IterationNumber")
                         .HasColumnType("integer");
+
+                    b.Property<decimal?>("ReviewersTotalCostEur")
+                        .HasColumnType("numeric(10,6)");
 
                     b.Property<Guid>("RunId")
                         .HasColumnType("uuid");
@@ -463,6 +518,12 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
                     b.Property<string>("FinalText")
                         .HasColumnType("text");
 
+                    b.Property<decimal?>("GroundingCostEur")
+                        .HasColumnType("numeric(10,6)");
+
+                    b.Property<decimal?>("LlmCostEur")
+                        .HasColumnType("numeric(10,6)");
+
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -473,6 +534,9 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("TokensTotal")
                         .HasColumnType("integer");
+
+                    b.Property<decimal?>("TotalCostEur")
+                        .HasColumnType("numeric(10,6)");
 
                     b.HasKey("Id");
 
@@ -583,6 +647,22 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("IX_KnowledgeDocumentChunks_DocumentId");
 
                     b.ToTable("KnowledgeDocumentChunks", (string)null);
+                });
+
+            modelBuilder.Entity("Geef.Atelier.Core.Domain.IterationActorCostEntity", b =>
+                {
+                    b.HasOne("Geef.Atelier.Core.Domain.IterationEntity", "Iteration")
+                        .WithMany("ActorCosts")
+                        .HasForeignKey("IterationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Iteration");
+                });
+
+            modelBuilder.Entity("Geef.Atelier.Core.Domain.IterationEntity", b =>
+                {
+                    b.Navigation("ActorCosts");
                 });
 
             modelBuilder.Entity("Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge.KnowledgeDocumentChunkEntity", b =>

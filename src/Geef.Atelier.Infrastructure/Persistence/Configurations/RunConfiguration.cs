@@ -42,6 +42,18 @@ internal sealed class RunConfiguration : IEntityTypeConfiguration<RunEntity>
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.Property(r => r.TotalCostEur)
+            .HasColumnType("numeric(10,6)")
+            .IsRequired(false);
+
+        builder.Property(r => r.LlmCostEur)
+            .HasColumnType("numeric(10,6)")
+            .IsRequired(false);
+
+        builder.Property(r => r.GroundingCostEur)
+            .HasColumnType("numeric(10,6)")
+            .IsRequired(false);
+
         builder.HasIndex(r => r.Status);
     }
 }

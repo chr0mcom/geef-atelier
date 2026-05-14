@@ -1,10 +1,12 @@
 using Geef.Atelier.Application.Auth;
+using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Embeddings;
 using Geef.Atelier.Infrastructure.Grounding;
+using Geef.Atelier.Infrastructure.Pricing;
 using Geef.Atelier.Infrastructure.Knowledge;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
@@ -37,6 +39,10 @@ builder.Services.AddKnowledge(builder.Configuration);
 
 // Grounding providers — ApiKey intentionally not logged; missing key fails at run time, not at startup.
 builder.Services.AddGroundingProviders(builder.Configuration);
+
+builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection("Pricing"));
+builder.Services.Configure<CostTrackingOptions>(builder.Configuration.GetSection("CostTracking"));
+builder.Services.AddSingleton<IPricingCatalog, PricingCatalog>();
 
 builder.Services.Configure<OrchestratorOptions>(builder.Configuration.GetSection("Orchestrator"));
 builder.Services.Configure<ConvergenceOptions>(builder.Configuration.GetSection("Convergence"));

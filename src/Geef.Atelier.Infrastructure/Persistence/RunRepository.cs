@@ -57,4 +57,33 @@ internal sealed class RunRepository(AtelierDbContext db) : IRunRepository
 
         return new RunDetails(run, iterationsWithFindings);
     }
+
+    /// <inheritdoc/>
+    public async Task<WelcomeStats> GetWelcomeStatsAsync(CancellationToken cancellationToken = default)
+    {
+        var startOfMonth = new DateTimeOffset(
+            DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var runsThisMonth = await db.Runs
+            .Where(r => r.CreatedAt >= startOfMonth)
+            .CountAsync(cancellationToken);
+
+        var completedThisMonth = await db.Runs
+            .Where(r => r.CreatedAt >= startOfMonth && r.Status == RunStatus.Completed)
+            .CountAsync(cancellationToken);
+
+        var convergenceRate = runsThisMonth > 0 ? (double)completedThisMonth / runsThisMonth : 0.0;
+
+        var totalIterationsThisMonth = await db.Iterations
+            .Where(i => db.Runs.Any(r => r.Id == i.RunId && r.CreatedAt >= startOfMonth))
+            .CountAsync(cancellationToken);
+
+        var avgIterations = runsThisMonth > 0 ? (double)totalIterationsThisMonth / runsThisMonth : 0.0;
+
+        var totalCostThisMonth = await db.Runs
+            .Where(r => r.CreatedAt >= startOfMonth && r.TotalCostEur != null)
+            .SumAsync(r => r.TotalCostEur!.Value, cancellationToken);
+
+        return new WelcomeStats(runsThisMonth, convergenceRate, avgIterations, totalCostThisMonth);
+    }
 }
