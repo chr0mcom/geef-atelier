@@ -14,7 +14,7 @@ internal sealed class KnowledgeDocumentChunkConfiguration : IEntityTypeConfigura
     /// NpgsqlParameter&lt;Pgvector.Vector&gt; directly, bypassing EF for those queries.
     /// </summary>
     private static readonly ValueConverter<float[], string> EmbeddingConverter = new(
-        v => "[" + string.Join(",", v) + "]",
+        v => "[" + string.Join(",", v.Select(f => f.ToString(System.Globalization.CultureInfo.InvariantCulture))) + "]",
         v => ParseVector(v));
 
     private static float[] ParseVector(string s)
@@ -24,7 +24,7 @@ internal sealed class KnowledgeDocumentChunkConfiguration : IEntityTypeConfigura
         var parts = inner.Split(',');
         var result = new float[parts.Length];
         for (var i = 0; i < parts.Length; i++)
-            result[i] = float.Parse(parts[i]);
+            result[i] = float.Parse(parts[i], System.Globalization.CultureInfo.InvariantCulture);
         return result;
     }
 
