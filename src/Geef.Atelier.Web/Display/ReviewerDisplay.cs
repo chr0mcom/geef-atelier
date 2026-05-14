@@ -83,8 +83,9 @@ public static class ReviewerDisplay
     public static string GetGroundingProviderTypeDisplay(string providerType) =>
         providerType switch
         {
-            "tavily" => "Tavily Web Search",
-            _        => providerType
+            "tavily"       => "Tavily Web Search",
+            "vector-store" => "Vector Store",
+            _              => providerType
         };
 
     /// <summary>

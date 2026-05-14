@@ -217,6 +217,7 @@
 
         public bool IncludeAnswer { get; set; } = true;
 
+        [System.ComponentModel.DataAnnotations.Range(1, 20)]
         public int TopK { get; set; } = 5;
 
         public string TagFilter { get; set; } = "";

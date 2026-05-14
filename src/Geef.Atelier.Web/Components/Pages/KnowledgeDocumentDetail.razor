@@ -129,6 +129,7 @@
         _loading = true;
         _error = null;
         _notFound = false;
+        _reindexSuccess = false;
         try
         {
             _document = await KnowledgeService.GetAsync(DocumentId, CancellationToken.None);

@@ -66,12 +66,6 @@
             return;
         }
 
-        if (_selectedFile.Size > 5 * 1024 * 1024)
-        {
-            _validationError = "File exceeds the 5 MB limit. Please choose a smaller file.";
-            return;
-        }
-
         var tags = _model.TagsRaw
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(t => !string.IsNullOrEmpty(t))
