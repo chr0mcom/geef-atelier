@@ -15,7 +15,7 @@ public sealed class RecursiveCharacterTextSplitterTests
     [Fact]
     public void Split_ShortText_ReturnsSingleChunk()
     {
-        var splitter = new RecursiveCharacterTextSplitter(maxTokens: 100);
+        var splitter = new RecursiveCharacterTextSplitter(maxTokens: 100, overlapTokens: 10);
         var result = splitter.Split("Hello world");
 
         Assert.Single(result);
@@ -26,7 +26,7 @@ public sealed class RecursiveCharacterTextSplitterTests
     [Fact]
     public void Split_ShortText_EstimatedTokensIsCorrect()
     {
-        var splitter = new RecursiveCharacterTextSplitter(maxTokens: 100);
+        var splitter = new RecursiveCharacterTextSplitter(maxTokens: 100, overlapTokens: 10);
         // "Hello world" = 11 chars → (11 + 3) / 4 = 3
         var result = splitter.Split("Hello world");
         Assert.Equal(3, result[0].EstimatedTokens);
@@ -37,7 +37,7 @@ public sealed class RecursiveCharacterTextSplitterTests
     {
         // 400 chars → (400 + 3) / 4 = 100 tokens — exactly at the limit of 100.
         var text = new string('a', 400);
-        var splitter = new RecursiveCharacterTextSplitter(maxTokens: 100);
+        var splitter = new RecursiveCharacterTextSplitter(maxTokens: 100, overlapTokens: 10);
         var result = splitter.Split(text);
         Assert.Single(result);
     }
@@ -154,6 +154,31 @@ public sealed class RecursiveCharacterTextSplitterTests
         var result = splitter.Split(text);
 
         Assert.True(result.Count > 1);
+    }
+
+    [Fact]
+    public void Constructor_ZeroMaxTokens_ThrowsArgumentOutOfRangeException()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RecursiveCharacterTextSplitter(maxTokens: 0));
+    }
+
+    [Fact]
+    public void Constructor_NegativeMaxTokens_ThrowsArgumentOutOfRangeException()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RecursiveCharacterTextSplitter(maxTokens: -1));
+    }
+
+    [Fact]
+    public void Constructor_NegativeOverlapTokens_ThrowsArgumentOutOfRangeException()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RecursiveCharacterTextSplitter(maxTokens: 100, overlapTokens: -1));
+    }
+
+    [Fact]
+    public void Constructor_OverlapGreaterThanOrEqualToMaxTokens_ThrowsArgumentException()
+    {
+        Assert.Throws<ArgumentException>(() => new RecursiveCharacterTextSplitter(maxTokens: 100, overlapTokens: 100));
+        Assert.Throws<ArgumentException>(() => new RecursiveCharacterTextSplitter(maxTokens: 100, overlapTokens: 150));
     }
 
     [Fact]

@@ -40,17 +40,25 @@ public sealed class KnowledgeDocumentChunkTests
     }
 
     [Fact]
-    public void RecordEquality_SameValues_AreEqual()
+    public void RecordEquality_SameArrayInstance_AreEqual()
     {
+        var now = DateTimeOffset.UtcNow;
+        var embedding = new float[] { 0.1f, 0.2f, 0.3f };
+        var chunkA = new KnowledgeDocumentChunk(Guid.NewGuid(), Guid.NewGuid(), 0, "content", embedding, 5, now);
+        var chunkB = chunkA with { };  // same values, same array reference
+        Assert.Equal(chunkA, chunkB);
+    }
+
+    [Fact]
+    public void RecordEquality_DifferentArrayInstances_AreNotEqual()
+    {
+        // float[] uses reference equality in C# records — two separate arrays with same contents are NOT equal
         var id = Guid.NewGuid();
         var docId = Guid.NewGuid();
-        var ts = DateTimeOffset.UtcNow;
-        var embedding = new float[] { 1f, 2f };
-
-        var chunkA = new KnowledgeDocumentChunk(id, docId, 0, "text", embedding, 1, ts);
-        var chunkB = new KnowledgeDocumentChunk(id, docId, 0, "text", embedding, 1, ts);
-
-        Assert.Equal(chunkA, chunkB);
+        var now = DateTimeOffset.UtcNow;
+        var chunkA = new KnowledgeDocumentChunk(id, docId, 0, "content", new float[] { 0.1f, 0.2f }, 5, now);
+        var chunkB = new KnowledgeDocumentChunk(id, docId, 0, "content", new float[] { 0.1f, 0.2f }, 5, now);
+        Assert.NotEqual(chunkA, chunkB); // different array instances, even with same values
     }
 
     [Fact]

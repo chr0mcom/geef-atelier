@@ -16,6 +16,10 @@ public sealed class RecursiveCharacterTextSplitter
     /// <param name="overlapTokens">Tokens from the end of the previous chunk prepended to the next (default 100).</param>
     public RecursiveCharacterTextSplitter(int maxTokens = 1000, int overlapTokens = 100)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxTokens, nameof(maxTokens));
+        ArgumentOutOfRangeException.ThrowIfNegative(overlapTokens, nameof(overlapTokens));
+        if (overlapTokens >= maxTokens)
+            throw new ArgumentException($"overlapTokens ({overlapTokens}) must be less than maxTokens ({maxTokens}).", nameof(overlapTokens));
         _maxTokens = maxTokens;
         _overlapTokens = overlapTokens;
     }
