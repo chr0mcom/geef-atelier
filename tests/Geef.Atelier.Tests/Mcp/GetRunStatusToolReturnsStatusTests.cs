@@ -1,6 +1,5 @@
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
-using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Mcp.Tools;
 
 namespace Geef.Atelier.Tests.Mcp;
@@ -36,7 +35,7 @@ public sealed class GetRunStatusToolReturnsStatusTests
 
     private sealed class FakeRunServiceWithRun(Guid knownId, RunStatus status) : IRunService
     {
-        public Task<Guid> SubmitRunAsync(string briefingText, string configJson, string? createdByUser = null, string? crewTemplateName = null, CrewSpec? customCrew = null, CancellationToken cancellationToken = default)
+        public Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default)
             => Task.FromResult(Guid.NewGuid());
 
         public Task<RunEntity?> GetRunAsync(Guid runId, CancellationToken cancellationToken = default)

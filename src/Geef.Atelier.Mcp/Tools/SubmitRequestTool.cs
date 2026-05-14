@@ -36,12 +36,13 @@ public static class SubmitRequestTool
         }
 
         var runId = await runService.SubmitRunAsync(
-            briefingText,
-            configJson ?? "{}",
-            createdByUser: "mcp-client",
-            crewTemplateName: crewSpec is null ? crewTemplate : null,
-            customCrew: crewSpec,
-            cancellationToken: cancellationToken);
+            new SubmitRunRequest(
+                BriefingText: briefingText,
+                ConfigJson: configJson ?? "{}",
+                CreatedByUser: "mcp-client",
+                CrewTemplateName: crewSpec is null ? crewTemplate : null,
+                CustomCrew: crewSpec),
+            cancellationToken);
 
         return new RunStatusDto(runId.ToString(), "Pending", null);
     }

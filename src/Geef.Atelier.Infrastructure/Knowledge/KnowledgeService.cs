@@ -62,7 +62,9 @@ internal sealed class KnowledgeService(
             ChunkCount: 0,
             IndexingCostEur: null,
             CreatedAt: now,
-            UpdatedAt: now);
+            UpdatedAt: now,
+            Scope: KnowledgeScope.Global,
+            RunId: null);
 
         var created = await documentRepo.CreateAsync(doc, ct);
 
@@ -151,4 +153,27 @@ internal sealed class KnowledgeService(
         foreach (var doc in documents)
             await ReindexAsync(doc.Id, ct);
     }
+
+    /// <inheritdoc/>
+    public Task<KnowledgeDocument> UploadRunAttachmentAsync(
+        Guid runId,
+        string title,
+        Stream content,
+        string filename,
+        string contentType,
+        CancellationToken ct)
+        => throw new NotImplementedException("Run-attachment upload is implemented in Phase 2.");
+
+    /// <inheritdoc/>
+    public Task<IReadOnlyList<KnowledgeDocument>> ListRunAttachmentsAsync(Guid runId, CancellationToken ct)
+        => throw new NotImplementedException("Run-attachment listing is implemented in Phase 2.");
+
+    /// <inheritdoc/>
+    public Task PromoteToGlobalAsync(
+        Guid documentId,
+        string? newTitle,
+        string? newDescription,
+        IReadOnlyList<string>? additionalTags,
+        CancellationToken ct)
+        => throw new NotImplementedException("Run-attachment promotion is implemented in Phase 2.");
 }

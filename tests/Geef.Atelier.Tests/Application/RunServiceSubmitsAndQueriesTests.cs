@@ -20,7 +20,7 @@ public sealed class RunServiceSubmitsAndQueriesTests(PostgresFixture fixture)
         await using (var scope = host.ScopeFactory.CreateAsyncScope())
         {
             var svc = scope.ServiceProvider.GetRequiredService<IRunService>();
-            runId = await svc.SubmitRunAsync("Test briefing for E2E run", "{}");
+            runId = await svc.SubmitRunAsync(new SubmitRunRequest("Test briefing for E2E run", "{}"));
         }
 
         // Verify run was persisted with correct briefing text (may already be Running due to fast polling).

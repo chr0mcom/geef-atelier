@@ -44,4 +44,24 @@ public interface IKnowledgeService
 
     /// <summary>Re-chunks and re-embeds every document in the knowledge base.</summary>
     Task ReindexAllAsync(CancellationToken ct);
+
+    /// <summary>Uploads a document as a run-local attachment (scope = RunLocal).</summary>
+    Task<KnowledgeDocument> UploadRunAttachmentAsync(
+        Guid runId,
+        string title,
+        Stream content,
+        string filename,
+        string contentType,
+        CancellationToken ct);
+
+    /// <summary>Lists all run-local attachment documents for a given run.</summary>
+    Task<IReadOnlyList<KnowledgeDocument>> ListRunAttachmentsAsync(Guid runId, CancellationToken ct);
+
+    /// <summary>Promotes a run-local document to global scope (Scope = Global, RunId = null).</summary>
+    Task PromoteToGlobalAsync(
+        Guid documentId,
+        string? newTitle,
+        string? newDescription,
+        IReadOnlyList<string>? additionalTags,
+        CancellationToken ct);
 }

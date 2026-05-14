@@ -93,7 +93,7 @@ Be specific. Generic briefings produce generic texts."
         {
             var auth = await AuthProvider.GetAuthenticationStateAsync();
             var user = auth.User.Identity?.Name;
-            var id   = await RunService.SubmitRunAsync(_briefing, _configJson, createdByUser: user, crewTemplateName: _crewTemplateName);
+            var id   = await RunService.SubmitRunAsync(new Geef.Atelier.Application.Runs.SubmitRunRequest(_briefing, _configJson, CreatedByUser: user, CrewTemplateName: _crewTemplateName));
             Nav.NavigateTo($"/runs/{id}");
         }
         catch (ArgumentException ex) { _error = ex.Message; }

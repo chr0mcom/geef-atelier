@@ -20,7 +20,7 @@ public sealed class RunServiceCancelReturnsFalseForTerminalRunTests(PostgresFixt
         await using (var scope = host.ScopeFactory.CreateAsyncScope())
         {
             var svc = scope.ServiceProvider.GetRequiredService<IRunService>();
-            runId = await svc.SubmitRunAsync("Briefing for terminal cancel test", "{}");
+            runId = await svc.SubmitRunAsync(new SubmitRunRequest("Briefing for terminal cancel test", "{}"));
         }
 
         // Wait for Completed

@@ -20,34 +20,30 @@ internal sealed class RunService(
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     /// <inheritdoc/>
-    public async Task<Guid> SubmitRunAsync(
-        string briefingText,
-        string configJson,
-        string? createdByUser = null,
-        string? crewTemplateName = null,
-        CrewSpec? customCrew = null,
-        CancellationToken cancellationToken = default)
+    public async Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(briefingText))
-            throw new ArgumentException("Briefing text must not be empty.", nameof(briefingText));
-        ArgumentNullException.ThrowIfNull(configJson);
+        ArgumentNullException.ThrowIfNull(request);
 
-        if (!string.IsNullOrEmpty(configJson))
+        if (string.IsNullOrWhiteSpace(request.BriefingText))
+            throw new ArgumentException("Briefing text must not be empty.", nameof(request));
+        ArgumentNullException.ThrowIfNull(request.ConfigJson);
+
+        if (!string.IsNullOrEmpty(request.ConfigJson))
         {
-            try { using var _ = JsonDocument.Parse(configJson); }
+            try { using var _ = JsonDocument.Parse(request.ConfigJson); }
             catch (JsonException ex)
-            { throw new ArgumentException("configJson must be valid JSON.", nameof(configJson), ex); }
+            { throw new ArgumentException("configJson must be valid JSON.", nameof(request), ex); }
         }
 
-        var normalizedConfig = string.IsNullOrEmpty(configJson) ? "{}" : configJson;
+        var normalizedConfig = string.IsNullOrEmpty(request.ConfigJson) ? "{}" : request.ConfigJson;
 
-        var snapshot = await crewService.ResolveSnapshotAsync(crewTemplateName, customCrew, cancellationToken);
+        var snapshot = await crewService.ResolveSnapshotAsync(request.CrewTemplateName, request.CustomCrew, cancellationToken);
         var snapshotJson = JsonSerializer.Serialize(snapshot, SnapshotJsonOpts);
         // CrewTemplateName is the template name from snapshot (null for inline spec)
         var resolvedTemplateName = snapshot.TemplateName;
 
         return await persistence.CreateRunAsync(
-            briefingText, normalizedConfig, createdByUser,
+            request.BriefingText, normalizedConfig, request.CreatedByUser,
             resolvedTemplateName, snapshotJson, cancellationToken);
     }
 

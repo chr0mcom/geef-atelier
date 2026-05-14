@@ -23,7 +23,7 @@ public sealed class RunServiceListsRecentRunsTests(PostgresFixture fixture)
             await Task.Delay(10); // ensure distinct CreatedAt ordering
             await using var scope = host.ScopeFactory.CreateAsyncScope();
             var svc = scope.ServiceProvider.GetRequiredService<IRunService>();
-            ids.Add(await svc.SubmitRunAsync($"Briefing {i}", "{}"));
+            ids.Add(await svc.SubmitRunAsync(new SubmitRunRequest($"Briefing {i}", "{}")));
         }
 
         // Wait until all 3 runs are terminal

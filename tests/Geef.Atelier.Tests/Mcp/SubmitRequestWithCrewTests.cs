@@ -61,13 +61,10 @@ public sealed class SubmitRequestWithCrewTests
         public string? LastCrewTemplateName { get; private set; }
         public CrewSpec? LastCustomCrew { get; private set; }
 
-        public Task<Guid> SubmitRunAsync(
-            string briefingText, string configJson, string? createdByUser = null,
-            string? crewTemplateName = null, CrewSpec? customCrew = null,
-            CancellationToken cancellationToken = default)
+        public Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default)
         {
-            LastCrewTemplateName = crewTemplateName;
-            LastCustomCrew       = customCrew;
+            LastCrewTemplateName = request.CrewTemplateName;
+            LastCustomCrew       = request.CustomCrew;
             return Task.FromResult(Guid.NewGuid());
         }
 

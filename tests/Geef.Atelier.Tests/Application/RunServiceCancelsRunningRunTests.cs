@@ -28,7 +28,7 @@ public sealed class RunServiceCancelsRunningRunTests(PostgresFixture fixture)
         await using (var scope = host.ScopeFactory.CreateAsyncScope())
         {
             var svc = scope.ServiceProvider.GetRequiredService<IRunService>();
-            runId = await svc.SubmitRunAsync("Cancel test briefing", "{}");
+            runId = await svc.SubmitRunAsync(new SubmitRunRequest("Cancel test briefing", "{}"));
         }
 
         // Wait until Running (precondition guard)
