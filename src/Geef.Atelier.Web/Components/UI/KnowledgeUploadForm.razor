@@ -25,8 +25,8 @@
     </div>
 
     <div class="form-row">
-        <label>File (.md or .txt, max 5 MB)</label>
-        <InputFile OnChange="OnFileChange" accept=".md,.txt" data-testid="input-file" />
+        <label>File (.md, .txt or .pdf — max 5 MB for text, 25 MB for PDF)</label>
+        <InputFile OnChange="OnFileChange" accept=".md,.txt,.pdf" data-testid="input-file" />
     </div>
 
     <div class="form-actions">
@@ -49,10 +49,15 @@
         _selectedFile = e.File;
         _validationError = null;
 
-        if (_selectedFile != null && _selectedFile.Size > 5 * 1024 * 1024)
+        if (_selectedFile != null)
         {
-            _validationError = "File exceeds the 5 MB limit. Please choose a smaller file.";
-            _selectedFile = null;
+            var isPdf = Path.GetExtension(_selectedFile.Name).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
+            var limitBytes = isPdf ? 25L * 1024 * 1024 : 5L * 1024 * 1024;
+            if (_selectedFile.Size > limitBytes)
+            {
+                _validationError = $"File exceeds the {limitBytes / 1024 / 1024} MB limit. Please choose a smaller file.";
+                _selectedFile = null;
+            }
         }
     }
 
