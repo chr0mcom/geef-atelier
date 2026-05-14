@@ -1,6 +1,6 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 2026-05-14 (Vector-Store-Grounding-Provider Phase 2 RAG: D-036 ergänzt)*
+*Letzte Aktualisierung: 2026-05-14 (Run-Attachments: D-037 ergänzt)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -563,3 +563,55 @@ CREATE EXTENSION IF NOT EXISTS vector;
 ### Bewusst NICHT in diesem Step:
 
 PDF-Support, Background-Job für Indexing, Multi-Modal-Embeddings, OR-Tag-Filter (UI), Hybrid-Search, Re-Ranking, Embedding-Modell-Wechsel-UI mit Auto-Re-Index, Document-Versionierung, OpenAI-direkt-Integration.
+
+---
+
+## D-037 — Feature: Run-Attachments — Direkter Document-Upload beim Briefing (2026-05-14)
+
+**Kontext:** D-036 (Vector-Store-Grounding) ist ideal für **persistente** Domain-Quellen (Brand-Guidelines, Style-Guides). Für Ad-hoc-Verwendung ("Fasse diesen Bericht zusammen") ist der Upload→Template→Select→Brief-Workflow zu schwergewichtig. Run-Attachments implementiert das ChatGPT/Claude-Standard-Pattern: Dateien direkt beim Briefing anhängen, run-lokal indexiert, automatisch als Grounding-Provider aktiv.
+
+### Architect-Entscheidungen (drei Knackpunkte):
+
+| Frage | Entscheidung | Begründung |
+|---|---|---|
+| (a) Schema-Strategie: Erweiterung `KnowledgeDocuments` vs. separate Tabelle | **Erweiterung.** `Scope integer NOT NULL DEFAULT 0` + `RunId uuid NULL` + FK auf `Runs.Id`. | Eine Such-Logik, kein JOIN, FK direkt auf Runs, Scope-Filter transparent für `VectorSearchRepository`. Separate Tabelle hätte UI/Such-Logik dupliziert. |
+| (b) Run-Persist + Attachment-Upload Sequenz | **Two-Phase: Status=Pending → Attachments → Snapshot-Patch → Queue.** `RunPersistenceService` erhält `UpdateSnapshotAsync` + `MarkRunFailedAsync`. | FK greift nach Run-Create, Pipeline startet erst nach Attachment-Upload. Failure → `MarkRunFailedAsync` = kein orphaned Pending-Run. Strukturell analog zu D-030 `MarkRunFailedAsync` im Orchestrator. |
+| (c) Multi-Provider-Vorrang | **`RunAttachmentsProfile` wird per `Prepend` vor alle anderen Provider gehängt (specific > general).** `MultiProviderGroundingStep` respektiert Snapshot-Reihenfolge — keine Änderung nötig. | Custom-Template mit `knowledge-base-default` + Attachments: run-lokale Quellen zuerst, dann globale KB. Analog zu D-031 Advisor-Reihenfolge. |
+
+### Implementierungs-Highlights:
+
+- **`KnowledgeScope`-Enum** (`Global=0`, `RunLocal=1`) — typsicher, default 0 = Backward-Compat für bestehende Docs
+- **`SubmitRunRequest`-Record** — `IRunService.SubmitRunAsync` von positional Args auf Record umgestellt (bricht Aufrufer-Signatur sauber statt Parameter-Chaos)
+- **`RunAttachmentInput`-Record** mit `byte[]` statt `Stream` — Lifetime-Safe über async Boundaries
+- **`VectorSearchRepository`** Raw-SQL: `WHERE (@scopeFilter IS NULL OR d."Scope" = @scopeFilter) AND (@runIdFilter IS NULL OR d."RunId" = @runIdFilter)` — typed `NpgsqlParameter` mit explizitem `NpgsqlDbType` für nullable Parameter
+- **Blazor Server + Drag-and-Drop:** `DragEventArgs` serialisiert keine `Files`-Referenz über SignalR — Drag-and-Drop entfernt, UI auf "Click to browse" umgestellt
+- **`to_regclass` vs. `::regclass` in Migration:** Ersteres gibt NULL für nicht-existente Tabellen, Letzteres wirft Exception — wichtig für idempotente FK-Guards
+- **Tag-Dedup in `PromoteToGlobalAsync`:** `.Union()` statt Spread-Syntax (Spread produziert Duplikate)
+- **`ListAsync`-Scope-Filter:** `KnowledgeDocuments` in globaler KB-Ansicht + MCP-Tool passieren explizit `KnowledgeScope.Global` — Run-lokale Attachments bluten nicht durch
+
+### Migration `Step15RunAttachments`:
+
+```sql
+ALTER TABLE "KnowledgeDocuments" ADD COLUMN "Scope" integer NOT NULL DEFAULT 0;
+ALTER TABLE "KnowledgeDocuments" ADD COLUMN "RunId" uuid NULL;
+-- FK via PL/pgSQL-Block (to_regclass-Guard, PostgreSQL 16 kein ADD CONSTRAINT IF NOT EXISTS)
+FK REFERENCES "Runs"("Id") ON DELETE CASCADE;
+CREATE INDEX "IX_KnowledgeDocuments_RunId" ON "KnowledgeDocuments"("RunId") WHERE "RunId" IS NOT NULL;
+CREATE INDEX "IX_KnowledgeDocuments_Scope" ON "KnowledgeDocuments"("Scope");
+INSERT INTO "GroundingProviderProfiles" ... ('run-attachments', 'vector-store', ...) ON CONFLICT DO NOTHING;
+```
+
+### Tests:
+
+494 C#-Tests (94 neu), 1 E2E-Skip, 0 Failures. Neue Test-Klassen: `KnowledgeDocumentScopeTests`, `SystemCrewRunAttachmentsProfileTests`, `SubmitRunRequestTests`, `Step15RunAttachmentsMigrationTests`, `KnowledgeDocumentRepositoryScopeTests`, `VectorSearchRepositoryScopeTests`, `RunDeleteCascadesAttachmentsTests`, `KnowledgeServiceUploadRunAttachmentTests`, `RunServiceAttachmentTests`, `SubmitRequestToolAttachmentTests`, `AtelierPipelineFactoryWithRunAttachmentsTests`, `KlassikWithAttachmentsTests`, `MultiProviderOrderingTests`, `FileDropZoneTests`, `RunAttachmentsListTests`, `PromoteAttachmentModalTests`.
+
+### Deployment:
+
+- Backup: `backup/before-run-attachments-migration-20260514-165517.dump` (39K, 60 TOC-Entries)
+- Web-Container mit `--no-cache` neu gebaut
+- PR #7 gemerged (SHA: `f6832f9`), Branch `feat/run-attachments` gelöscht
+- Produktiv unter `https://geef.stefan-bechtel.de/new` (FileDropZone sichtbar)
+
+### Bewusst NICHT in diesem Step:
+
+PDF-Support, Background-Job für Attachment-Indexing, Image-Attachments, Auto-Cleanup-Retention-Policy, Attachment-Editierung (Upload-only), Hybrid-Search (pure Vector wie D-036).
