@@ -1,15 +1,12 @@
 @using Microsoft.AspNetCore.Components.Forms
 
-<div class="file-drop-zone" data-testid="file-drop-zone"
-     @ondragover:preventDefault="true"
-     @ondrop:preventDefault="true"
-     @ondrop="HandleDrop">
+<div class="file-drop-zone" data-testid="file-drop-zone">
     <InputFile id="@_inputId" OnChange="HandleFileInput"
                multiple accept="@string.Join(",", AllowedExtensions)"
                style="display:none" />
     <label for="@_inputId" class="file-drop-label">
         <span class="file-drop-icon" aria-hidden="true">+</span>
-        <span>Drop files here or click to browse</span>
+        <span>Click to browse</span>
         <span class="file-drop-hint">Supported: @string.Join(", ", AllowedExtensions)</span>
     </label>
 </div>
@@ -51,8 +48,6 @@
     private readonly List<IBrowserFile> _files = [];
     private readonly List<string> _errors = [];
     private readonly string _inputId = $"file-drop-input-{Guid.NewGuid():N}"[..26];
-
-    private Task HandleDrop(DragEventArgs _) => Task.CompletedTask;
 
     private async Task HandleFileInput(InputFileChangeEventArgs e)
     {

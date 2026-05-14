@@ -12,7 +12,7 @@ public sealed class FileDropZoneTests : TestContext
         var cut = RenderComponent<FileDropZone>();
 
         cut.Find("[data-testid='file-drop-zone']");
-        Assert.Contains("Drop files here or click to browse", cut.Markup);
+        Assert.Contains("Click to browse", cut.Markup);
     }
 
     [Fact]

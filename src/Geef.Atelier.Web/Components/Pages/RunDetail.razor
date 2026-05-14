@@ -5,6 +5,7 @@
 @inject IRunService RunService
 @inject IKnowledgeService KnowledgeService
 @inject NavigationManager Nav
+@inject ILogger<RunDetail> Logger
 @using Microsoft.AspNetCore.SignalR.Client
 @using Geef.Atelier.Application.Runs
 @using Geef.Atelier.Application.Crew.Knowledge
@@ -67,6 +68,11 @@
 
         <Press Status="_details.Run.Status" />
 
+        @if (_promoteError is not null)
+        {
+            <div class="error-banner" role="alert">@_promoteError</div>
+        }
+
         @if (_runAttachments.Count > 0)
         {
             <RunAttachmentsList Attachments="_runAttachments"
@@ -84,7 +90,7 @@
                 GroundedBrief="@_viewModel.GroundedBrief"
                 BeforeFirstAdvisors="@_viewModel.GroundingAdvisors"
                 GroundingConsultations="@_viewModel.GroundingConsultations"
-                RunAttachmentDocumentIds="_runAttachments.Select(a => a.Id).ToList()" />
+                RunAttachmentDocumentIds="_runAttachmentDocumentIds" />
         }
 
         <div class="iters">
@@ -130,8 +136,10 @@
     HubConnection? _hub;
     CrewSnapshot?  _snapshot;
     List<KnowledgeDocument> _runAttachments = [];
+    IReadOnlyList<Guid>     _runAttachmentDocumentIds = [];
     bool _showPromoteModal;
     KnowledgeDocument? _promoteCandidate;
+    string? _promoteError;
 
     string _shortId => RunId.ToString("N")[..8].ToUpperInvariant();
 
@@ -147,7 +155,16 @@
         _details   = _viewModel?.Details;
         _snapshot  = _viewModel?.Snapshot;
         _notFound  = _viewModel is null;
-        _runAttachments = (await KnowledgeService.ListRunAttachmentsAsync(RunId, CancellationToken.None)).ToList();
+        try
+        {
+            _runAttachments = (await KnowledgeService.ListRunAttachmentsAsync(RunId, CancellationToken.None)).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load run attachments for run {RunId}", RunId);
+            _runAttachments = [];
+        }
+        _runAttachmentDocumentIds = _runAttachments.Select(a => a.Id).ToArray();
     }
 
     void OpenPromoteModal(KnowledgeDocument doc)
@@ -158,10 +175,21 @@
 
     async Task HandlePromoteAsync(PromoteAttachmentModal.PromoteRequest req)
     {
-        await KnowledgeService.PromoteToGlobalAsync(
-            req.DocumentId, req.NewTitle, req.NewDescription, req.AdditionalTags, CancellationToken.None);
-        _showPromoteModal = false;
-        _runAttachments = (await KnowledgeService.ListRunAttachmentsAsync(RunId, CancellationToken.None)).ToList();
+        _promoteError = null;
+        try
+        {
+            await KnowledgeService.PromoteToGlobalAsync(
+                req.DocumentId, req.NewTitle, req.NewDescription, req.AdditionalTags, CancellationToken.None);
+            _showPromoteModal = false;
+            _runAttachments = (await KnowledgeService.ListRunAttachmentsAsync(RunId, CancellationToken.None)).ToList();
+            _runAttachmentDocumentIds = _runAttachments.Select(a => a.Id).ToArray();
+            _promoteCandidate = null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to promote attachment {DocumentId}", req.DocumentId);
+            _promoteError = "Failed to save to knowledge base. Please try again.";
+        }
     }
 
     async Task InitHubAsync()

@@ -60,8 +60,7 @@ Be specific. Generic briefings produce generic texts."
         <FileDropZone @bind-Files="_attachmentFiles"
                       AllowedExtensions="@(new[] { ".md", ".txt" })"
                       MaxFiles="@_maxFiles"
-                      MaxFileSizeBytes="@_maxFileSizeBytes"
-                      data-testid="run-attachment-dropzone" />
+                      MaxFileSizeBytes="@_maxFileSizeBytes" />
     </div>
 
     <CrewSelector @bind-Value="_crewTemplateName" />
