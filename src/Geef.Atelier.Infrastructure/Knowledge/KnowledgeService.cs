@@ -153,25 +153,104 @@ internal sealed class KnowledgeService(
     }
 
     /// <inheritdoc/>
-    public Task<KnowledgeDocument> UploadRunAttachmentAsync(
+    public async Task<KnowledgeDocument> UploadRunAttachmentAsync(
         Guid runId,
         string title,
         Stream content,
         string filename,
         string contentType,
         CancellationToken ct)
-        => throw new NotImplementedException("Run-attachment upload is implemented in Phase 2.");
+    {
+        var opts = options.Value;
+
+        if (!opts.AllowedContentTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                $"Content type '{contentType}' is not allowed. Allowed types: {string.Join(", ", opts.AllowedContentTypes)}.");
+
+        using var ms = new MemoryStream();
+        await content.CopyToAsync(ms, ct);
+
+        if (ms.Length > opts.MaxDocumentSizeBytes)
+            throw new InvalidOperationException(
+                $"Document size {ms.Length} bytes exceeds the maximum allowed size of {opts.MaxDocumentSizeBytes} bytes.");
+
+        ms.Position = 0;
+        using var reader = new StreamReader(ms);
+        var rawContent = await reader.ReadToEndAsync(ct);
+
+        var now = DateTimeOffset.UtcNow;
+        var doc = new KnowledgeDocument(
+            Id: Guid.NewGuid(),
+            Title: title,
+            Description: string.Empty,
+            OriginalFilename: filename,
+            ContentType: contentType,
+            FileSizeBytes: ms.Length,
+            RawContent: rawContent,
+            Tags: [],
+            EmbeddingModel: embeddingProvider.ModelName,
+            EmbeddingDimensions: embeddingProvider.Dimensions,
+            ChunkCount: 0,
+            IndexingCostEur: null,
+            CreatedAt: now,
+            UpdatedAt: now,
+            Scope: KnowledgeScope.RunLocal,
+            RunId: runId);
+
+        var created = await documentRepo.CreateAsync(doc, ct);
+
+        logger.LogInformation(
+            "Created run-local attachment {DocumentId} for run {RunId} ({Filename})",
+            created.Id, runId, filename);
+
+        var (chunkCount, totalCost) = await indexingService.IndexAsync(created.Id, rawContent, ct);
+
+        var updated = created with
+        {
+            ChunkCount = chunkCount,
+            IndexingCostEur = totalCost,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+
+        await documentRepo.UpdateAsync(updated, ct);
+
+        return updated;
+    }
 
     /// <inheritdoc/>
     public Task<IReadOnlyList<KnowledgeDocument>> ListRunAttachmentsAsync(Guid runId, CancellationToken ct)
-        => throw new NotImplementedException("Run-attachment listing is implemented in Phase 2.");
+        => documentRepo.ListByRunAsync(runId, ct);
 
     /// <inheritdoc/>
-    public Task PromoteToGlobalAsync(
+    public async Task PromoteToGlobalAsync(
         Guid documentId,
         string? newTitle,
         string? newDescription,
         IReadOnlyList<string>? additionalTags,
         CancellationToken ct)
-        => throw new NotImplementedException("Run-attachment promotion is implemented in Phase 2.");
+    {
+        var doc = await documentRepo.GetAsync(documentId, ct)
+            ?? throw new InvalidOperationException($"Knowledge document '{documentId}' not found.");
+
+        if (doc.Scope != KnowledgeScope.RunLocal)
+            throw new InvalidOperationException(
+                $"Document '{documentId}' is already global and cannot be promoted.");
+
+        var promoted = doc with
+        {
+            Scope = KnowledgeScope.Global,
+            RunId = null,
+            Title = newTitle ?? doc.Title,
+            Description = newDescription ?? doc.Description,
+            Tags = additionalTags is { Count: > 0 }
+                ? [.. doc.Tags, .. additionalTags]
+                : doc.Tags,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+
+        await documentRepo.UpdateAsync(promoted, ct);
+
+        logger.LogInformation(
+            "Promoted run-local document {DocumentId} to global scope", documentId);
+    }
 }

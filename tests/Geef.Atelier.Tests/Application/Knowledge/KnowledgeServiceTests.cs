@@ -164,6 +164,14 @@ public sealed class KnowledgeServiceTests
             IReadOnlyList<string> tags = [.. _store.Values.SelectMany(d => d.Tags).Distinct()];
             return Task.FromResult(tags);
         }
+
+        public Task<IReadOnlyList<KnowledgeDocument>> ListByRunAsync(Guid runId, CancellationToken ct)
+        {
+            IReadOnlyList<KnowledgeDocument> list = [.. _store.Values
+                .Where(d => d.RunId == runId)
+                .OrderBy(d => d.CreatedAt)];
+            return Task.FromResult(list);
+        }
     }
 
     private sealed class InMemoryVectorSearchRepository : IVectorSearchRepository
@@ -183,7 +191,8 @@ public sealed class KnowledgeServiceTests
         }
 
         public Task<IReadOnlyList<VectorSearchResult>> SearchAsync(
-            float[] queryEmbedding, int topK, IReadOnlyList<string>? tagFilter, CancellationToken ct)
+            float[] queryEmbedding, int topK, IReadOnlyList<string>? tagFilter,
+            KnowledgeScope? scopeFilter, Guid? runIdFilter, CancellationToken ct)
             => Task.FromResult<IReadOnlyList<VectorSearchResult>>([]);
     }
 }

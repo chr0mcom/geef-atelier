@@ -28,7 +28,8 @@ internal sealed class KnowledgeDocumentRepository(AtelierDbContext context) : IK
             IndexingCostEur = document.IndexingCostEur,
             CreatedAt = document.CreatedAt,
             UpdatedAt = document.UpdatedAt,
-            // TODO Phase 2: persist Scope and RunId from domain record once columns exist
+            Scope = (int)document.Scope,
+            RunId = document.RunId,
         };
 
         context.KnowledgeDocuments.Add(entity);
@@ -78,6 +79,8 @@ internal sealed class KnowledgeDocumentRepository(AtelierDbContext context) : IK
         entity.ChunkCount = document.ChunkCount;
         entity.IndexingCostEur = document.IndexingCostEur;
         entity.UpdatedAt = document.UpdatedAt;
+        entity.Scope = (int)document.Scope;
+        entity.RunId = document.RunId;
 
         await context.SaveChangesAsync(ct);
     }
@@ -105,6 +108,17 @@ internal sealed class KnowledgeDocumentRepository(AtelierDbContext context) : IK
         return tags;
     }
 
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<KnowledgeDocument>> ListByRunAsync(Guid runId, CancellationToken ct)
+    {
+        var entities = await context.KnowledgeDocuments
+            .AsNoTracking()
+            .Where(d => d.RunId == runId)
+            .OrderBy(d => d.CreatedAt)
+            .ToListAsync(ct);
+        return entities.Select(ToModel).ToList();
+    }
+
     private static KnowledgeDocument ToModel(KnowledgeDocumentEntity e) => new(
         Id: e.Id,
         Title: e.Title,
@@ -120,7 +134,6 @@ internal sealed class KnowledgeDocumentRepository(AtelierDbContext context) : IK
         IndexingCostEur: e.IndexingCostEur,
         CreatedAt: e.CreatedAt,
         UpdatedAt: e.UpdatedAt,
-        // TODO Phase 2: map entity.Scope and entity.RunId once Step15RunAttachments migration adds the columns
-        Scope: KnowledgeScope.Global,
-        RunId: null);
+        Scope: (KnowledgeScope)e.Scope,
+        RunId: e.RunId);
 }

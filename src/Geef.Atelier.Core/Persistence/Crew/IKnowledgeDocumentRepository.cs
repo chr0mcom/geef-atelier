@@ -26,4 +26,7 @@ public interface IKnowledgeDocumentRepository
 
     /// <summary>Returns the distinct union of all tags across all documents.</summary>
     Task<IReadOnlyList<string>> GetAllTagsAsync(CancellationToken ct);
+
+    /// <summary>Returns all documents whose <c>RunId</c> matches <paramref name="runId"/>, ordered by creation time.</summary>
+    Task<IReadOnlyList<KnowledgeDocument>> ListByRunAsync(Guid runId, CancellationToken ct);
 }
