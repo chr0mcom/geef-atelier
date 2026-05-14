@@ -86,6 +86,16 @@ public static class SystemCrew
         MaxQueriesPerRun: 1,
         IsSystem: true);
 
+    /// <summary>System grounding-provider profile for the full knowledge base (vector-store, Top-5 results, no tag filter).</summary>
+    public static readonly GroundingProviderProfile KnowledgeBaseDefaultProfile = new(
+        Name: "knowledge-base-default",
+        DisplayName: "Knowledge Base (All Documents)",
+        Description: "Searches the full knowledge base for briefing-relevant passages using semantic similarity. Returns the top 5 most similar chunks.",
+        ProviderType: "vector-store",
+        ProviderSettings: new Dictionary<string, string> { ["TopK"] = "5" },
+        MaxQueriesPerRun: 1,
+        IsSystem: true);
+
     /// <summary>All system reviewer profiles, indexed by name.</summary>
     public static readonly IReadOnlyDictionary<string, ReviewerProfile> ReviewerProfiles =
         new Dictionary<string, ReviewerProfile>
@@ -140,6 +150,7 @@ public static class SystemCrew
         new Dictionary<string, GroundingProviderProfile>
         {
             [TavilyBasicProfile.Name] = TavilyBasicProfile,
+            [KnowledgeBaseDefaultProfile.Name] = KnowledgeBaseDefaultProfile,
         };
 
     /// <summary>All system crew templates, indexed by name.</summary>
