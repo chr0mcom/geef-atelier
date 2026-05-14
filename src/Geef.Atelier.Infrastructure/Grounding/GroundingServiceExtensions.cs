@@ -18,6 +18,7 @@ public static class GroundingServiceExtensions
             client.BaseAddress = new Uri(endpoint));
 
         services.AddSingleton<IGroundingProvider, TavilyGroundingProvider>();
+        services.AddSingleton<IGroundingProvider, VectorStoreGroundingProvider>();
         services.AddSingleton<IGroundingProviderFactory, GroundingProviderFactory>();
 
         return services;

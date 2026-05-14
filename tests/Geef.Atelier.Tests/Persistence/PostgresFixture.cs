@@ -8,7 +8,7 @@ namespace Geef.Atelier.Tests.Persistence;
 public sealed class PostgresFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+        .WithImage("pgvector/pgvector:pg16")
         .Build();
 
     public string ConnectionString => _container.GetConnectionString();

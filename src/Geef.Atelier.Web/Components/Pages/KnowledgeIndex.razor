@@ -1,0 +1,102 @@
+@page "/crew/knowledge"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Application.Crew.Knowledge
+@using Geef.Atelier.Core.Domain.Crew.Knowledge
+@inject IKnowledgeService KnowledgeService
+@inject NavigationManager Nav
+
+<PageTitle>Knowledge Base — Atelier</PageTitle>
+
+<div class="crew-profiles-index" data-testid="knowledge-index">
+    <div class="page-header">
+        <h1>Knowledge Base</h1>
+        <a href="/crew/knowledge/upload" class="btn primary" data-testid="btn-upload">+ Upload Document</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger" data-testid="error-banner">@_error</div>
+    }
+
+    @if (_loading)
+    {
+        <p>Loading…</p>
+    }
+    else if (_documents.Count == 0)
+    {
+        <p class="text-muted" data-testid="empty-state">No documents yet. Upload one to get started.</p>
+    }
+    else
+    {
+        <div class="knowledge-doc-list" data-testid="knowledge-doc-list">
+            @foreach (var doc in _documents)
+            {
+                <KnowledgeDocumentCard Document="doc" />
+            }
+        </div>
+    }
+
+    <div class="form-actions" style="margin-top: 1.5rem;">
+        <button class="btn ghost" @onclick="ReindexAllAsync" disabled="@_reindexing" data-testid="btn-reindex-all">
+            @(_reindexing ? "Re-indexing…" : "Re-Index All")
+        </button>
+    </div>
+
+    @if (_reindexSuccess)
+    {
+        <p class="text-muted" data-testid="reindex-success">All documents have been re-indexed.</p>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<KnowledgeDocument> _documents = [];
+    private bool _loading = true;
+    private bool _reindexing;
+    private bool _reindexSuccess;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _documents = await KnowledgeService.ListAsync(null, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ReindexAllAsync()
+    {
+        _reindexing = true;
+        _reindexSuccess = false;
+        _error = null;
+        try
+        {
+            await KnowledgeService.ReindexAllAsync(CancellationToken.None);
+            _reindexSuccess = true;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _reindexing = false;
+        }
+    }
+}

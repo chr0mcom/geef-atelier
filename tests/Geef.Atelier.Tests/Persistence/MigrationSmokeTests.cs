@@ -8,7 +8,7 @@ namespace Geef.Atelier.Tests.Persistence;
 public sealed class MigrationSmokeTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+        .WithImage("pgvector/pgvector:pg16")
         .Build();
 
     public Task InitializeAsync() => _postgres.StartAsync();

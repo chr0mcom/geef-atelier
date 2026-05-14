@@ -42,7 +42,9 @@
                 <div class="crew-summary-grounding" data-testid="crew-summary-grounding">
                     <strong>Grounding:</strong>
                     @string.Join(" · ", Snapshot.GroundingProviders.Select(g =>
-                        $"{g.DisplayName} ({ReviewerDisplay.GetGroundingProviderTypeDisplay(g.ProviderType)})"))
+                        g.ProviderType == "vector-store"
+                            ? FormatVectorStoreProvider(g)
+                            : $"{g.DisplayName} ({ReviewerDisplay.GetGroundingProviderTypeDisplay(g.ProviderType)})"))
                 </div>
             }
             @if (Snapshot.ConvergenceOverride != null)
@@ -76,5 +78,14 @@
         if (o.DetectRegression.HasValue) parts.Add($"DetectRegression={o.DetectRegression}");
         if (o.StagnationThreshold.HasValue) parts.Add($"StagnationThreshold={o.StagnationThreshold}");
         return string.Join(", ", parts);
+    }
+
+    private static string FormatVectorStoreProvider(Geef.Atelier.Core.Domain.Crew.Grounding.GroundingProviderProfile g)
+    {
+        g.ProviderSettings.TryGetValue("TopK", out var topKStr);
+        g.ProviderSettings.TryGetValue("TagFilter", out var tagFilter);
+        var topK = int.TryParse(topKStr, out var k) ? k : 5;
+        var tags = string.IsNullOrWhiteSpace(tagFilter) ? "all" : tagFilter;
+        return $"{g.DisplayName} (Knowledge Base, TopK={topK}, Tags: {tags})";
     }
 }

@@ -1,0 +1,56 @@
+@page "/crew/knowledge/upload"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Application.Crew.Knowledge
+@using Microsoft.AspNetCore.Components.Forms
+@inject IKnowledgeService KnowledgeService
+@inject NavigationManager Nav
+
+<PageTitle>Upload Document — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="knowledge-upload">
+    <div class="page-header">
+        <h1>Upload Document</h1>
+        <a href="/crew/knowledge" class="btn ghost">← Back</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger" data-testid="upload-error">@_error</div>
+    }
+
+    <KnowledgeUploadForm OnSubmit="HandleUploadAsync" />
+</div>
+
+@code {
+    private string? _error;
+
+    private async Task HandleUploadAsync((string Title, string Description, IReadOnlyList<string> Tags, IBrowserFile? File) args)
+    {
+        _error = null;
+        if (args.File == null)
+        {
+            _error = "Please select a file.";
+            return;
+        }
+
+        try
+        {
+            var contentType = args.File.ContentType is { Length: > 0 } ct ? ct : "text/plain";
+            await using var stream = args.File.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            var doc = await KnowledgeService.UploadAsync(
+                args.Title,
+                args.Description,
+                args.Tags,
+                stream,
+                args.File.Name,
+                contentType,
+                CancellationToken.None);
+            Nav.NavigateTo($"/crew/knowledge/{doc.Id}");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}

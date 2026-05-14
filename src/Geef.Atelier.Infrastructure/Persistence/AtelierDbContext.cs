@@ -3,6 +3,7 @@ using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge;
 using Microsoft.EntityFrameworkCore;
 
 namespace Geef.Atelier.Infrastructure.Persistence;
@@ -23,6 +24,9 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
 
     public DbSet<GroundingProviderProfile> GroundingProviderProfiles => Set<GroundingProviderProfile>();
     public DbSet<GroundingConsultation> GroundingConsultations => Set<GroundingConsultation>();
+
+    internal DbSet<KnowledgeDocumentEntity> KnowledgeDocuments => Set<KnowledgeDocumentEntity>();
+    internal DbSet<KnowledgeDocumentChunkEntity> KnowledgeDocumentChunks => Set<KnowledgeDocumentChunkEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
         => modelBuilder.ApplyConfigurationsFromAssembly(typeof(AtelierDbContext).Assembly);
