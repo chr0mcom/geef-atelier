@@ -140,6 +140,8 @@ public sealed class KnowledgeDocumentRepositoryTests(PostgresFixture fixture) : 
             ChunkCount: 0,
             IndexingCostEur: null,
             CreatedAt: now,
-            UpdatedAt: now);
+            UpdatedAt: now,
+            Scope: KnowledgeScope.Global,
+            RunId: null);
     }
 }

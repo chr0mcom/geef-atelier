@@ -158,7 +158,9 @@ public sealed class VectorSearchRepositoryTests(PostgresFixture fixture) : IClas
             ChunkCount: 0,
             IndexingCostEur: null,
             CreatedAt: now,
-            UpdatedAt: now);
+            UpdatedAt: now,
+            Scope: KnowledgeScope.Global,
+            RunId: null);
     }
 
     private static KnowledgeDocumentChunk BuildChunk(Guid documentId, int index, float[] embedding) => new(

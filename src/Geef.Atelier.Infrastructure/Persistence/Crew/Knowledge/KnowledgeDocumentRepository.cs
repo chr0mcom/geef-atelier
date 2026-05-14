@@ -118,5 +118,7 @@ internal sealed class KnowledgeDocumentRepository(AtelierDbContext context) : IK
         ChunkCount: e.ChunkCount,
         IndexingCostEur: e.IndexingCostEur,
         CreatedAt: e.CreatedAt,
-        UpdatedAt: e.UpdatedAt);
+        UpdatedAt: e.UpdatedAt,
+        Scope: KnowledgeScope.Global,
+        RunId: null);
 }

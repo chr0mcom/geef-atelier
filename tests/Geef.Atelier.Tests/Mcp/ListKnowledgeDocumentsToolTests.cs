@@ -21,7 +21,9 @@ public sealed class ListKnowledgeDocumentsToolTests
             ChunkCount:          chunkCount,
             IndexingCostEur:     0.0001m,
             CreatedAt:           new DateTimeOffset(2026, 5, 1, 0, 0, 0, TimeSpan.Zero),
-            UpdatedAt:           new DateTimeOffset(2026, 5, 14, 0, 0, 0, TimeSpan.Zero));
+            UpdatedAt:           new DateTimeOffset(2026, 5, 14, 0, 0, 0, TimeSpan.Zero),
+            Scope:               KnowledgeScope.Global,
+            RunId:               null);
 
     [Fact]
     public async Task EmptyKnowledgeBase_ReturnsEmptyList()
@@ -109,5 +111,14 @@ public sealed class ListKnowledgeDocumentsToolTests
         public Task DeleteAsync(Guid documentId, CancellationToken ct) => Task.CompletedTask;
         public Task ReindexAsync(Guid documentId, CancellationToken ct) => Task.CompletedTask;
         public Task ReindexAllAsync(CancellationToken ct) => Task.CompletedTask;
+
+        public Task<KnowledgeDocument> UploadRunAttachmentAsync(Guid runId, string title, Stream content, string filename, string contentType, CancellationToken ct)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<KnowledgeDocument>> ListRunAttachmentsAsync(Guid runId, CancellationToken ct)
+            => Task.FromResult<IReadOnlyList<KnowledgeDocument>>([]);
+
+        public Task PromoteToGlobalAsync(Guid documentId, string? newTitle, string? newDescription, IReadOnlyList<string>? additionalTags, CancellationToken ct)
+            => Task.CompletedTask;
     }
 }

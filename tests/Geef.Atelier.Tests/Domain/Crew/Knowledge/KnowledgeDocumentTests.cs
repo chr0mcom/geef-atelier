@@ -18,7 +18,9 @@ public sealed class KnowledgeDocumentTests
         int chunkCount = 2,
         decimal? indexingCostEur = 0.001m,
         DateTimeOffset? createdAt = null,
-        DateTimeOffset? updatedAt = null) => new(
+        DateTimeOffset? updatedAt = null,
+        KnowledgeScope scope = KnowledgeScope.Global,
+        Guid? runId = null) => new(
         id ?? Guid.NewGuid(),
         title,
         description,
@@ -32,7 +34,9 @@ public sealed class KnowledgeDocumentTests
         chunkCount,
         indexingCostEur,
         createdAt ?? DateTimeOffset.UtcNow,
-        updatedAt ?? DateTimeOffset.UtcNow);
+        updatedAt ?? DateTimeOffset.UtcNow,
+        scope,
+        runId);
 
     [Fact]
     public void FieldAccess_AllPropertiesReadable()
@@ -64,8 +68,8 @@ public sealed class KnowledgeDocumentTests
         var ts = DateTimeOffset.UtcNow;
         var tags = new List<string> { "a" };
 
-        var docA = new KnowledgeDocument(id, "T", "D", "f.md", "text/plain", 100, "c", tags, "m", 512, 1, null, ts, ts);
-        var docB = new KnowledgeDocument(id, "T", "D", "f.md", "text/plain", 100, "c", tags, "m", 512, 1, null, ts, ts);
+        var docA = new KnowledgeDocument(id, "T", "D", "f.md", "text/plain", 100, "c", tags, "m", 512, 1, null, ts, ts, KnowledgeScope.Global, null);
+        var docB = new KnowledgeDocument(id, "T", "D", "f.md", "text/plain", 100, "c", tags, "m", 512, 1, null, ts, ts, KnowledgeScope.Global, null);
 
         Assert.Equal(docA, docB);
     }
@@ -76,8 +80,8 @@ public sealed class KnowledgeDocumentTests
         var ts = DateTimeOffset.UtcNow;
         var tags = new List<string>();
 
-        var docA = new KnowledgeDocument(Guid.NewGuid(), "T", "D", "f.md", "text/plain", 0, "", tags, "m", 0, 0, null, ts, ts);
-        var docB = new KnowledgeDocument(Guid.NewGuid(), "T", "D", "f.md", "text/plain", 0, "", tags, "m", 0, 0, null, ts, ts);
+        var docA = new KnowledgeDocument(Guid.NewGuid(), "T", "D", "f.md", "text/plain", 0, "", tags, "m", 0, 0, null, ts, ts, KnowledgeScope.Global, null);
+        var docB = new KnowledgeDocument(Guid.NewGuid(), "T", "D", "f.md", "text/plain", 0, "", tags, "m", 0, 0, null, ts, ts, KnowledgeScope.Global, null);
 
         Assert.NotEqual(docA, docB);
     }

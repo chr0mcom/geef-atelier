@@ -72,7 +72,7 @@ public sealed class KnowledgeServiceTests
         var now = DateTimeOffset.UtcNow;
         var doc = new KnowledgeDocument(
             Guid.NewGuid(), "Title", "Desc", "f.md", "text/markdown",
-            10, "content", [], "model", 1536, 0, null, now, now);
+            10, "content", [], "model", 1536, 0, null, now, now, KnowledgeScope.Global, null);
         await repos.DocumentRepo.CreateAsync(doc, CancellationToken.None);
 
         await service.DeleteAsync(doc.Id, CancellationToken.None);

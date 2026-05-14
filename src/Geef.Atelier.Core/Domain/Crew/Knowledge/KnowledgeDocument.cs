@@ -17,6 +17,8 @@ namespace Geef.Atelier.Core.Domain.Crew.Knowledge;
 /// <param name="IndexingCostEur">Estimated cost of indexing this document in EUR, or <c>null</c> if unavailable.</param>
 /// <param name="CreatedAt">UTC timestamp when the document was first uploaded.</param>
 /// <param name="UpdatedAt">UTC timestamp of the most recent metadata or content update.</param>
+/// <param name="Scope">Whether the document is globally shared or attached to a single run.</param>
+/// <param name="RunId">Set only when <paramref name="Scope"/> is <see cref="KnowledgeScope.RunLocal"/>; otherwise null.</param>
 public sealed record KnowledgeDocument(
     Guid Id,
     string Title,
@@ -31,4 +33,6 @@ public sealed record KnowledgeDocument(
     int ChunkCount,
     decimal? IndexingCostEur,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    KnowledgeScope Scope,
+    Guid? RunId);
