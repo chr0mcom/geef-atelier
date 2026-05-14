@@ -1,0 +1,95 @@
+@using Microsoft.AspNetCore.Components.Forms
+
+<div class="file-drop-zone" data-testid="file-drop-zone"
+     @ondragover:preventDefault="true"
+     @ondrop:preventDefault="true"
+     @ondrop="HandleDrop">
+    <InputFile id="@_inputId" OnChange="HandleFileInput"
+               multiple accept="@string.Join(",", AllowedExtensions)"
+               style="display:none" />
+    <label for="@_inputId" class="file-drop-label">
+        <span class="file-drop-icon" aria-hidden="true">+</span>
+        <span>Drop files here or click to browse</span>
+        <span class="file-drop-hint">Supported: @string.Join(", ", AllowedExtensions)</span>
+    </label>
+</div>
+
+@if (_files.Count > 0)
+{
+    <ul class="file-drop-list" data-testid="file-drop-list">
+        @foreach (var file in _files)
+        {
+            var f = file;
+            <li class="file-drop-item" data-testid="file-drop-item">
+                <span class="file-drop-name">@f.Name</span>
+                <span class="file-drop-size">@FormatSize(f.Size)</span>
+                <button type="button" class="file-drop-remove btn small ghost"
+                        aria-label="Remove @f.Name"
+                        @onclick="() => RemoveFile(f)">×</button>
+            </li>
+        }
+    </ul>
+}
+
+@if (_errors.Count > 0)
+{
+    <ul class="file-drop-errors" data-testid="file-drop-errors">
+        @foreach (var err in _errors)
+        {
+            <li class="file-drop-error">@err</li>
+        }
+    </ul>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<IBrowserFile> Files { get; set; } = [];
+    [Parameter] public EventCallback<IReadOnlyList<IBrowserFile>> FilesChanged { get; set; }
+    [Parameter] public string[] AllowedExtensions { get; set; } = [".md", ".txt"];
+    [Parameter] public int MaxFiles { get; set; } = 5;
+    [Parameter] public long MaxFileSizeBytes { get; set; } = 5 * 1024 * 1024;
+
+    private readonly List<IBrowserFile> _files = [];
+    private readonly List<string> _errors = [];
+    private readonly string _inputId = $"file-drop-input-{Guid.NewGuid():N}"[..26];
+
+    private Task HandleDrop(DragEventArgs _) => Task.CompletedTask;
+
+    private async Task HandleFileInput(InputFileChangeEventArgs e)
+    {
+        _errors.Clear();
+        foreach (var file in e.GetMultipleFiles(MaxFiles + _files.Count + 10))
+        {
+            if (_files.Count >= MaxFiles)
+            {
+                _errors.Add($"Maximum {MaxFiles} files allowed.");
+                break;
+            }
+            var ext = Path.GetExtension(file.Name).ToLowerInvariant();
+            if (!AllowedExtensions.Contains(ext))
+            {
+                _errors.Add($"{file.Name}: unsupported type. Only {string.Join(", ", AllowedExtensions)}.");
+                continue;
+            }
+            if (file.Size > MaxFileSizeBytes)
+            {
+                _errors.Add($"{file.Name}: exceeds {MaxFileSizeBytes / 1024 / 1024} MB limit.");
+                continue;
+            }
+            _files.Add(file);
+        }
+        await FilesChanged.InvokeAsync(_files.AsReadOnly());
+    }
+
+    private async Task RemoveFile(IBrowserFile file)
+    {
+        _files.Remove(file);
+        await FilesChanged.InvokeAsync(_files.AsReadOnly());
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024} KB";
+        return $"{bytes / 1024.0 / 1024.0:F1} MB";
+    }
+}
