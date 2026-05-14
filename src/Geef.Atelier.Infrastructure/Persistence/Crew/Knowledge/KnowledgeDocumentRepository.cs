@@ -28,6 +28,7 @@ internal sealed class KnowledgeDocumentRepository(AtelierDbContext context) : IK
             IndexingCostEur = document.IndexingCostEur,
             CreatedAt = document.CreatedAt,
             UpdatedAt = document.UpdatedAt,
+            // TODO Phase 2: persist Scope and RunId from domain record once columns exist
         };
 
         context.KnowledgeDocuments.Add(entity);
@@ -119,6 +120,7 @@ internal sealed class KnowledgeDocumentRepository(AtelierDbContext context) : IK
         IndexingCostEur: e.IndexingCostEur,
         CreatedAt: e.CreatedAt,
         UpdatedAt: e.UpdatedAt,
+        // TODO Phase 2: map entity.Scope and entity.RunId once Step15RunAttachments migration adds the columns
         Scope: KnowledgeScope.Global,
         RunId: null);
 }

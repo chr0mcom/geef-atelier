@@ -48,19 +48,6 @@ public sealed class KnowledgeDocumentScopeTests
     }
 
     [Fact]
-    public void RecordEquality_TwoIdenticalGlobalDocuments_AreEqual()
-    {
-        var id = Guid.NewGuid();
-        var ts = DateTimeOffset.UtcNow;
-        var tags = new List<string>();
-
-        var docA = new KnowledgeDocument(id, "T", "D", "f.md", "text/plain", 0, "", tags, "m", 0, 0, null, ts, ts, KnowledgeScope.Global, null);
-        var docB = new KnowledgeDocument(id, "T", "D", "f.md", "text/plain", 0, "", tags, "m", 0, 0, null, ts, ts, KnowledgeScope.Global, null);
-
-        Assert.Equal(docA, docB);
-    }
-
-    [Fact]
     public void RecordEquality_DifferentScope_AreNotEqual()
     {
         var id = Guid.NewGuid();

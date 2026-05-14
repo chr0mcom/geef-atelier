@@ -30,12 +30,10 @@ internal sealed class KnowledgeService(
     {
         var opts = options.Value;
 
-        // Validate content type
         if (!opts.AllowedContentTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase))
             throw new InvalidOperationException(
                 $"Content type '{contentType}' is not allowed. Allowed types: {string.Join(", ", opts.AllowedContentTypes)}.");
 
-        // Read stream and enforce size limit
         using var ms = new MemoryStream();
         await content.CopyToAsync(ms, ct);
 

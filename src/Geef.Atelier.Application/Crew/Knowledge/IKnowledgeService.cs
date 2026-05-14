@@ -45,7 +45,11 @@ public interface IKnowledgeService
     /// <summary>Re-chunks and re-embeds every document in the knowledge base.</summary>
     Task ReindexAllAsync(CancellationToken ct);
 
-    /// <summary>Uploads a document as a run-local attachment (scope = RunLocal).</summary>
+    /// <summary>
+    /// Uploads a document as a run-local attachment (Scope = RunLocal, RunId set to the run).
+    /// Description defaults to empty string; no tags are applied (run-local documents are
+    /// ephemeral and not tag-searchable in the global knowledge base).
+    /// </summary>
     Task<KnowledgeDocument> UploadRunAttachmentAsync(
         Guid runId,
         string title,

@@ -171,7 +171,11 @@ public static class SystemCrew
             [KlassikTemplate.Name] = KlassikTemplate,
         };
 
-    /// <summary>True when the supplied name matches a system profile or template (any kind).</summary>
+    /// <summary>
+    /// Returns true if the name belongs to a built-in reviewer, executor, or crew template.
+    /// Advisor profiles are covered by <see cref="IsSystemAdvisorName"/>.
+    /// For grounding providers, use <see cref="IsSystemGroundingProviderName"/> instead.
+    /// </summary>
     public static bool IsSystemName(string name) =>
         ReviewerProfiles.ContainsKey(name)
         || ExecutorProfiles.ContainsKey(name)

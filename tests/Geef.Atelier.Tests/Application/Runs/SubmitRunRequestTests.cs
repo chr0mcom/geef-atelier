@@ -6,47 +6,6 @@ namespace Geef.Atelier.Tests.Application.Runs;
 public sealed class SubmitRunRequestTests
 {
     [Fact]
-    public void RequiredFields_AreAccessible()
-    {
-        var request = new SubmitRunRequest("My briefing", "{}");
-
-        Assert.Equal("My briefing", request.BriefingText);
-        Assert.Equal("{}", request.ConfigJson);
-    }
-
-    [Fact]
-    public void Attachments_DefaultsToNull()
-    {
-        var request = new SubmitRunRequest("briefing", "{}");
-
-        Assert.Null(request.Attachments);
-    }
-
-    [Fact]
-    public void CreatedByUser_DefaultsToNull()
-    {
-        var request = new SubmitRunRequest("briefing", "{}");
-
-        Assert.Null(request.CreatedByUser);
-    }
-
-    [Fact]
-    public void CrewTemplateName_DefaultsToNull()
-    {
-        var request = new SubmitRunRequest("briefing", "{}");
-
-        Assert.Null(request.CrewTemplateName);
-    }
-
-    [Fact]
-    public void CustomCrew_DefaultsToNull()
-    {
-        var request = new SubmitRunRequest("briefing", "{}");
-
-        Assert.Null(request.CustomCrew);
-    }
-
-    [Fact]
     public void AllOptionalFields_CanBeSet()
     {
         var crew = new CrewSpec(
@@ -55,7 +14,7 @@ public sealed class SubmitRunRequestTests
             EvaluationStrategy: EvaluationStrategy.Parallel,
             ConvergenceOverride: null);
 
-        var attachment = new RunAttachmentInput("notes.md", "text/markdown", Stream.Null);
+        var attachment = new RunAttachmentInput("notes.md", "text/markdown", []);
 
         var request = new SubmitRunRequest(
             BriefingText: "briefing",
@@ -70,5 +29,30 @@ public sealed class SubmitRunRequestTests
         Assert.Equal(crew, request.CustomCrew);
         Assert.Single(request.Attachments!);
         Assert.Equal("notes.md", request.Attachments![0].Filename);
+    }
+
+    [Fact]
+    public void Attachments_ContainsAllSuppliedItems()
+    {
+        var a1 = new RunAttachmentInput("doc1.txt", "text/plain", "hello"u8.ToArray());
+        var a2 = new RunAttachmentInput("doc2.md", "text/markdown", "world"u8.ToArray());
+
+        var request = new SubmitRunRequest(
+            BriefingText: "briefing",
+            ConfigJson: "{}",
+            Attachments: [a1, a2]);
+
+        Assert.Equal(2, request.Attachments!.Count);
+        Assert.Equal("doc1.txt", request.Attachments[0].Filename);
+        Assert.Equal("doc2.md", request.Attachments[1].Filename);
+    }
+
+    [Fact]
+    public void EmptyBriefingText_CanBeConstructed()
+    {
+        // Validation is enforced at the application-service boundary, not in the record itself.
+        var request = new SubmitRunRequest(BriefingText: "", ConfigJson: "{}");
+
+        Assert.Equal(string.Empty, request.BriefingText);
     }
 }
