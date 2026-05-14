@@ -1,0 +1,13 @@
+@using Geef.Atelier.Web.Display
+@if (_domain is not null)
+{
+    <span class="domain-badge domain-badge--@_domain.ToLowerInvariant()" data-testid="domain-badge">
+        @_domain
+    </span>
+}
+
+@code {
+    [Parameter] public string? TemplateName { get; set; }
+
+    private string? _domain => ReviewerDisplay.GetTemplateDomain(TemplateName);
+}

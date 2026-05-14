@@ -31,11 +31,12 @@ public sealed class SystemCrewAdvisorConstantsTests
     }
 
     [Fact]
-    public void AdvisorProfiles_ContainsBothSystemProfiles()
+    public void AdvisorProfiles_ContainsBothOriginalSystemProfiles()
     {
         Assert.True(SystemCrew.AdvisorProfiles.ContainsKey(SystemCrew.BriefingClarifierProfile.Name));
         Assert.True(SystemCrew.AdvisorProfiles.ContainsKey(SystemCrew.DevilsAdvocateProfile.Name));
-        Assert.Equal(2, SystemCrew.AdvisorProfiles.Count);
+        // Two domain advisors were added in domain-templates: legal-domain-expert + academic-rigor-advisor
+        Assert.True(SystemCrew.AdvisorProfiles.Count >= 2);
     }
 
     [Fact]

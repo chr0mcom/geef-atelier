@@ -1,0 +1,127 @@
+@using Geef.Atelier.Application.Crew.TemplateStudio
+@using Microsoft.AspNetCore.Components.Web
+@inject ITemplateStudioService StudioService
+
+<div class="analysis-history" data-testid="analysis-history">
+    <h3>Recent Analyses</h3>
+
+    @if (_loading)
+    {
+        <p class="loading-text">Loading…</p>
+    }
+    else if (_analyses is { Count: > 0 })
+    {
+        <ul class="history-list">
+            @foreach (var entry in _analyses)
+            {
+                var entryId = entry.Id;
+                <li class="history-entry @(_expandedId == entry.Id ? "expanded" : "")"
+                    data-testid="history-entry">
+                    <div class="entry-summary" @onclick="() => ToggleExpand(entryId)" role="button" tabindex="0"
+                         @onkeydown="e => HandleKeyDown(e, entryId)">
+                        <span class="timestamp t-mono">@entry.CreatedAt.ToLocalTime().ToString("g")</span>
+                        <span class="task-preview">@TruncatePreview(entry.TaskDescription, 80)</span>
+                        @if (entry.MaterializedTemplateName is not null)
+                        {
+                            <span class="badge badge-materialized" data-testid="badge-materialized">→ @entry.MaterializedTemplateName</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-pending">Not materialized</span>
+                        }
+                        <span class="cost t-mono">@FormatCost(entry.CostEur)</span>
+                    </div>
+
+                    @if (_expandedId == entry.Id)
+                    {
+                        <div class="entry-details" data-testid="entry-details">
+                            <h4>Task</h4>
+                            <pre class="task-full">@entry.TaskDescription</pre>
+                            <h4>Reasoning</h4>
+                            <p>@entry.ReasoningSummary</p>
+                            <div class="entry-actions">
+                                <button type="button" class="btn secondary btn-sm"
+                                        @onclick="() => OnReAnalyze.InvokeAsync(entry.TaskDescription)"
+                                        data-testid="re-analyze-button">
+                                    Re-analyze with edits
+                                </button>
+                                @if (entry.MaterializedTemplateName is not null)
+                                {
+                                    <a href="/crew/templates/@entry.MaterializedTemplateName"
+                                       class="btn secondary btn-sm"
+                                       data-testid="view-template-link">
+                                        View materialized template →
+                                    </a>
+                                }
+                            </div>
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+
+        @if (_hasMore)
+        {
+            <button type="button" class="btn ghost btn-sm show-more"
+                    @onclick="LoadMoreAsync"
+                    data-testid="show-more-button">
+                Show more
+            </button>
+        }
+    }
+    else
+    {
+        <p class="empty-state" data-testid="empty-state">No analyses yet. Try the Studio with a task description above.</p>
+    }
+</div>
+
+@code {
+    [Parameter] public EventCallback<string> OnReAnalyze { get; set; }
+
+    private List<StudioAnalysisHistoryEntry>? _analyses;
+    private Guid? _expandedId;
+    private bool _loading = true;
+    private bool _hasMore;
+    private int _currentPage;
+    private const int PageSize = 10;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAnalysesAsync();
+    }
+
+    private async Task LoadAnalysesAsync()
+    {
+        var page = await StudioService.ListRecentAnalysesAsync(_currentPage, PageSize, CancellationToken.None);
+        _analyses = (_analyses ?? []).Concat(page.Items).ToList();
+        _hasMore = page.HasMore;
+        _loading = false;
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        _currentPage++;
+        await LoadAnalysesAsync();
+    }
+
+    private void ToggleExpand(Guid id)
+    {
+        _expandedId = _expandedId == id ? null : id;
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e, Guid id)
+    {
+        if (e.Key is "Enter" or " ")
+            ToggleExpand(id);
+    }
+
+    private static string TruncatePreview(string s, int max) =>
+        s.Length > max ? s[..max] + "…" : s;
+
+    private static string FormatCost(decimal? eur)
+    {
+        if (!eur.HasValue || eur.Value == 0m) return "—";
+        if (eur.Value < 0.01m) return $"~€{eur.Value:F4}";
+        return $"€{eur.Value:F2}";
+    }
+}

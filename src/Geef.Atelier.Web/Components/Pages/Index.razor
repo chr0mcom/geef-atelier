@@ -47,6 +47,11 @@
                 <div class="value">@FormatCost(_stats?.TotalCostThisMonth)</div>
                 <div class="delta">LLM + research</div>
             </div>
+            <div class="stat-tile" data-testid="stat-studio-analyses">
+                <div class="label">Studio analyses</div>
+                <div class="value">@(_stats?.StudioAnalysesThisMonth.ToString() ?? "—")</div>
+                <div class="delta">this month</div>
+            </div>
         </div>
     </div>
 

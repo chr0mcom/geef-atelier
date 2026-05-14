@@ -67,6 +67,17 @@ internal sealed class TemplateStudioService(
         return analysis;
     }
 
+    public async Task<StudioAnalysesPage> ListRecentAnalysesAsync(int page, int pageSize, CancellationToken ct = default)
+    {
+        var (items, hasMore) = await analysisRepository.ListHistoryAsync(page, pageSize, ct);
+        var entries = items
+            .Select(i => new StudioAnalysisHistoryEntry(
+                i.Id, i.TaskDescription, i.ReasoningSummary,
+                i.MaterializedTemplateName, i.CostEur, i.CreatedAt))
+            .ToList();
+        return new StudioAnalysesPage(entries, hasMore);
+    }
+
     public async Task<MaterializationResult> MaterializeAsync(
         Guid analysisId, MaterializationRequest request, CancellationToken ct = default)
     {

@@ -105,6 +105,18 @@ public sealed class TemplateStudioServiceAnalyzeTests
         public Task<IReadOnlyList<TemplateStudioAnalysis>> ListRecentAsync(int limit = 10, CancellationToken ct = default)
             => Task.FromResult((IReadOnlyList<TemplateStudioAnalysis>)_store.OrderByDescending(a => a.CreatedAt).Take(limit).ToList());
 
+        public Task<(IReadOnlyList<TemplateStudioHistoryItem> Items, bool HasMore)> ListHistoryAsync(int page, int pageSize, CancellationToken ct = default)
+        {
+            var skip = page * pageSize;
+            var take = pageSize + 1;
+            var slice = _store.OrderByDescending(a => a.CreatedAt).Skip(skip).Take(take).ToList();
+            var hasMore = slice.Count > pageSize;
+            var items = slice.Take(pageSize)
+                .Select(a => new TemplateStudioHistoryItem(a.Id, a.TaskDescription, a.ReasoningSummary, null, a.CostEur, a.CreatedAt))
+                .ToList();
+            return Task.FromResult(((IReadOnlyList<TemplateStudioHistoryItem>)items, hasMore));
+        }
+
         public bool WasCreated(Guid id) => _store.Any(a => a.Id == id);
     }
 

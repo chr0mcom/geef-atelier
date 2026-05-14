@@ -5,4 +5,6 @@ public sealed record WelcomeStats(
     int RunsThisMonth,
     double ConvergenceRate,
     double AverageIterations,
-    decimal TotalCostThisMonth);
+    decimal TotalCostThisMonth,
+    int StudioAnalysesThisMonth,
+    decimal StudioCostThisMonth);
