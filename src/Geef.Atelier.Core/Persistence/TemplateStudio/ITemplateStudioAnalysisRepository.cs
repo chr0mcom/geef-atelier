@@ -9,4 +9,5 @@ public interface ITemplateStudioAnalysisRepository
     Task<TemplateStudioAnalysis?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task MarkMaterializedAsync(Guid analysisId, string templateName, CancellationToken ct = default);
     Task<IReadOnlyList<TemplateStudioAnalysis>> ListRecentAsync(int limit = 10, CancellationToken ct = default);
+    Task<(IReadOnlyList<TemplateStudioHistoryItem> Items, bool HasMore)> ListHistoryAsync(int page, int pageSize, CancellationToken ct = default);
 }
