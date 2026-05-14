@@ -148,15 +148,21 @@ public sealed class VectorStoreGroundingProviderTests
     {
         public int LastTopK { get; private set; }
         public IReadOnlyList<string>? LastTagFilter { get; private set; }
+        public KnowledgeScope? LastScopeFilter { get; private set; }
+        public Guid? LastRunIdFilter { get; private set; }
 
         public Task<IReadOnlyList<VectorSearchResult>> SearchAsync(
             float[] queryEmbedding,
             int topK,
             IReadOnlyList<string>? tagFilter,
+            KnowledgeScope? scopeFilter,
+            Guid? runIdFilter,
             CancellationToken ct)
         {
             LastTopK = topK;
             LastTagFilter = tagFilter;
+            LastScopeFilter = scopeFilter;
+            LastRunIdFilter = runIdFilter;
             return Task.FromResult(results);
         }
 

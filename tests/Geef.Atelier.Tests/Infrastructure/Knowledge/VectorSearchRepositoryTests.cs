@@ -32,7 +32,7 @@ public sealed class VectorSearchRepositoryTests(PostgresFixture fixture) : IClas
         await chunkRepo.CreateChunkAsync(chunk2, CancellationToken.None);
 
         // Query with unit vector in dim[0] — chunk0 should rank first
-        var results = await chunkRepo.SearchAsync(MakeUnitVector(0, positive: true), topK: 3, tagFilter: null, CancellationToken.None);
+        var results = await chunkRepo.SearchAsync(MakeUnitVector(0, positive: true), topK: 3, tagFilter: null, scopeFilter: null, runIdFilter: null, CancellationToken.None);
 
         Assert.Equal(3, results.Count);
         Assert.Equal(chunk0.Id, results[0].Chunk.Id);
@@ -57,7 +57,8 @@ public sealed class VectorSearchRepositoryTests(PostgresFixture fixture) : IClas
         await chunkRepo.CreateChunkAsync(chunkB, CancellationToken.None);
 
         var results = await chunkRepo.SearchAsync(
-            MakeUnitVector(0, positive: true), topK: 10, tagFilter: ["tag-alpha"], CancellationToken.None);
+            MakeUnitVector(0, positive: true), topK: 10, tagFilter: ["tag-alpha"],
+            scopeFilter: null, runIdFilter: null, CancellationToken.None);
 
         Assert.All(results, r => Assert.Equal(docA.Id, r.Chunk.DocumentId));
         Assert.DoesNotContain(results, r => r.Chunk.DocumentId == docB.Id);
@@ -78,14 +79,16 @@ public sealed class VectorSearchRepositoryTests(PostgresFixture fixture) : IClas
         // Filtering by ["overlap-only-tag", "other-tag"] — doc has "overlap-only-tag" → overlap → should be returned
         var resultsOverlap = await chunkRepo.SearchAsync(
             MakeUnitVector(0, positive: true), topK: 10,
-            tagFilter: ["overlap-only-tag", "other-tag"], CancellationToken.None);
+            tagFilter: ["overlap-only-tag", "other-tag"],
+            scopeFilter: null, runIdFilter: null, CancellationToken.None);
 
         Assert.Contains(resultsOverlap, r => r.Chunk.DocumentId == doc.Id);
 
         // Filtering by ["no-match-tag-1", "no-match-tag-2"] — doc has neither → no overlap → should NOT be returned
         var resultsNoOverlap = await chunkRepo.SearchAsync(
             MakeUnitVector(0, positive: true), topK: 10,
-            tagFilter: ["no-match-tag-1", "no-match-tag-2"], CancellationToken.None);
+            tagFilter: ["no-match-tag-1", "no-match-tag-2"],
+            scopeFilter: null, runIdFilter: null, CancellationToken.None);
 
         Assert.DoesNotContain(resultsNoOverlap, r => r.Chunk.DocumentId == doc.Id);
     }
@@ -98,7 +101,8 @@ public sealed class VectorSearchRepositoryTests(PostgresFixture fixture) : IClas
 
         // Use a unique tag that guarantees no results
         var results = await chunkRepo.SearchAsync(
-            MakeUnitVector(0, positive: true), topK: 10, tagFilter: ["tag-that-does-not-exist-xyz"], CancellationToken.None);
+            MakeUnitVector(0, positive: true), topK: 10, tagFilter: ["tag-that-does-not-exist-xyz"],
+            scopeFilter: null, runIdFilter: null, CancellationToken.None);
 
         Assert.NotNull(results);
         Assert.Empty(results);
@@ -125,7 +129,8 @@ public sealed class VectorSearchRepositoryTests(PostgresFixture fixture) : IClas
 
         // docB's chunk should still be searchable
         var results = await chunkRepo.SearchAsync(
-            MakeUnitVector(4, positive: true), topK: 10, tagFilter: ["keep-tag"], CancellationToken.None);
+            MakeUnitVector(4, positive: true), topK: 10, tagFilter: ["keep-tag"],
+            scopeFilter: null, runIdFilter: null, CancellationToken.None);
 
         Assert.Contains(results, r => r.Chunk.Id == chunkB.Id);
         Assert.DoesNotContain(results, r => r.Chunk.DocumentId == docA.Id);
@@ -158,7 +163,9 @@ public sealed class VectorSearchRepositoryTests(PostgresFixture fixture) : IClas
             ChunkCount: 0,
             IndexingCostEur: null,
             CreatedAt: now,
-            UpdatedAt: now);
+            UpdatedAt: now,
+            Scope: KnowledgeScope.Global,
+            RunId: null);
     }
 
     private static KnowledgeDocumentChunk BuildChunk(Guid documentId, int index, float[] embedding) => new(

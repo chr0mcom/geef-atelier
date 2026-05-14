@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Geef.Atelier.Application.Crew.Knowledge;
+using Geef.Atelier.Core.Domain.Crew.Knowledge;
 using Geef.Atelier.Mcp.Dtos;
 using ModelContextProtocol.Server;
 
@@ -14,7 +15,7 @@ public static class ListKnowledgeDocumentsTool
         [Description("Optional tag to filter documents by. Returns only documents that have this tag.")] string? tag_filter = null,
         CancellationToken cancellationToken = default)
     {
-        var documents = await knowledgeService.ListAsync(tag_filter, cancellationToken);
+        var documents = await knowledgeService.ListAsync(tag_filter, cancellationToken, KnowledgeScope.Global);
         return documents
             .Select(d => new KnowledgeDocumentDto(
                 d.Id,

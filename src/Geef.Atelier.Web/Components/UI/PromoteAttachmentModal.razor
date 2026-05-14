@@ -1,0 +1,95 @@
+@using Geef.Atelier.Core.Domain.Crew.Knowledge
+
+<Modal Show="Show" OnClose="HandleCancel" CloseOnBackdropClick="true" DataTestId="promote-modal">
+    <Title>
+        <span>Promote to Knowledge Base</span>
+    </Title>
+    <ChildContent>
+        @if (Document is not null)
+        {
+            <div class="form-row">
+                <label>Title</label>
+                <input type="text" class="form-input"
+                       placeholder="@Document.Title"
+                       @bind="_title"
+                       data-testid="promote-title-input" />
+                <span class="form-hint">Leave blank to keep the original title.</span>
+            </div>
+
+            <div class="form-row">
+                <label>Description</label>
+                <textarea class="form-input" rows="3"
+                          placeholder="Short description (optional)"
+                          @bind="_description"
+                          data-testid="promote-description-input"></textarea>
+            </div>
+
+            <div class="form-row">
+                <label>Additional tags (comma-separated)</label>
+                <TagInput @bind-Value="_tagsRaw" Placeholder="policy, procedures, hr" />
+            </div>
+        }
+    </ChildContent>
+    <Actions>
+        <button type="button" class="btn primary"
+                data-testid="promote-confirm-button"
+                @onclick="HandleConfirm">
+            Promote
+        </button>
+        <button type="button" class="btn ghost"
+                @onclick="HandleCancel">
+            Cancel
+        </button>
+    </Actions>
+</Modal>
+
+@code {
+    [Parameter] public bool Show { get; set; }
+    [Parameter] public EventCallback<bool> ShowChanged { get; set; }
+    [Parameter] public KnowledgeDocument? Document { get; set; }
+    [Parameter] public EventCallback<PromoteRequest> OnConfirm { get; set; }
+
+    private string _title = "";
+    private string _description = "";
+    private string _tagsRaw = "";
+
+    protected override void OnParametersSet()
+    {
+        if (!Show)
+        {
+            _title = "";
+            _description = "";
+            _tagsRaw = "";
+        }
+    }
+
+    private async Task HandleConfirm()
+    {
+        if (Document is null) return;
+
+        var additionalTags = _tagsRaw
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(t => !string.IsNullOrEmpty(t))
+            .ToList();
+
+        var req = new PromoteRequest(
+            DocumentId: Document.Id,
+            NewTitle: string.IsNullOrWhiteSpace(_title) ? null : _title.Trim(),
+            NewDescription: string.IsNullOrWhiteSpace(_description) ? null : _description.Trim(),
+            AdditionalTags: additionalTags);
+
+        await OnConfirm.InvokeAsync(req);
+        await ShowChanged.InvokeAsync(false);
+    }
+
+    private async Task HandleCancel()
+    {
+        await ShowChanged.InvokeAsync(false);
+    }
+
+    public sealed record PromoteRequest(
+        Guid DocumentId,
+        string? NewTitle,
+        string? NewDescription,
+        IReadOnlyList<string> AdditionalTags);
+}

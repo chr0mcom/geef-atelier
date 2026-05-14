@@ -1,6 +1,5 @@
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
-using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Mcp.Tools;
 
 namespace Geef.Atelier.Tests.Mcp;
@@ -27,16 +26,10 @@ public sealed class SubmitRequestToolCallsRunServiceTests
         public string? LastCreatedByUser { get; private set; }
         public string? LastBriefingText { get; private set; }
 
-        public Task<Guid> SubmitRunAsync(
-            string briefingText,
-            string configJson,
-            string? createdByUser = null,
-            string? crewTemplateName = null,
-            CrewSpec? customCrew = null,
-            CancellationToken cancellationToken = default)
+        public Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default)
         {
-            LastCreatedByUser = createdByUser;
-            LastBriefingText = briefingText;
+            LastCreatedByUser = request.CreatedByUser;
+            LastBriefingText = request.BriefingText;
             return Task.FromResult(Guid.NewGuid());
         }
 

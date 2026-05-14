@@ -16,6 +16,8 @@ internal sealed class KnowledgeDocumentEntity
     public decimal? IndexingCostEur { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+    public int Scope { get; set; }         // maps to KnowledgeScope enum (0 = Global, 1 = RunLocal)
+    public Guid? RunId { get; set; }       // nullable FK to Runs
 
     // Navigation
     public ICollection<KnowledgeDocumentChunkEntity> Chunks { get; set; } = [];

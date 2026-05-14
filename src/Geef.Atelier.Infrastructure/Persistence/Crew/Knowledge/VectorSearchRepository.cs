@@ -18,28 +18,24 @@ internal sealed class VectorSearchRepository(AtelierDbContext context) : IVector
         float[] queryEmbedding,
         int topK,
         IReadOnlyList<string>? tagFilter,
+        KnowledgeScope? scopeFilter,
+        Guid? runIdFilter,
         CancellationToken ct)
     {
         // Format query vector as postgres vector literal: [f1,f2,...]
         var vectorLiteral = "[" + string.Join(",",
             queryEmbedding.Select(f => f.ToString(System.Globalization.CultureInfo.InvariantCulture))) + "]";
 
-        var sql = tagFilter is { Count: > 0 }
-            ? @"SELECT c.""Id"", c.""DocumentId"", c.""ChunkIndex"", c.""Content"",
+        var sql = @"SELECT c.""Id"", c.""DocumentId"", c.""ChunkIndex"", c.""Content"",
                        c.""Embedding""::text AS ""EmbeddingText"", c.""TokenCount"", c.""CreatedAt"",
                        d.""Title"" AS ""DocumentTitle"",
                        1.0 - (c.""Embedding"" <=> @vec::vector) AS ""Similarity""
                 FROM ""KnowledgeDocumentChunks"" c
                 JOIN ""KnowledgeDocuments"" d ON c.""DocumentId"" = d.""Id""
-                WHERE d.""Tags"" && @tags::text[]
-                ORDER BY c.""Embedding"" <=> @vec::vector
-                LIMIT @topk"
-            : @"SELECT c.""Id"", c.""DocumentId"", c.""ChunkIndex"", c.""Content"",
-                       c.""Embedding""::text AS ""EmbeddingText"", c.""TokenCount"", c.""CreatedAt"",
-                       d.""Title"" AS ""DocumentTitle"",
-                       1.0 - (c.""Embedding"" <=> @vec::vector) AS ""Similarity""
-                FROM ""KnowledgeDocumentChunks"" c
-                JOIN ""KnowledgeDocuments"" d ON c.""DocumentId"" = d.""Id""
+                WHERE 1=1
+                  AND (@scopeFilter IS NULL OR d.""Scope"" = @scopeFilter)
+                  AND (@runIdFilter IS NULL OR d.""RunId"" = @runIdFilter)
+                  AND (@tags IS NULL OR d.""Tags"" && @tags::text[])
                 ORDER BY c.""Embedding"" <=> @vec::vector
                 LIMIT @topk";
 
@@ -48,8 +44,19 @@ internal sealed class VectorSearchRepository(AtelierDbContext context) : IVector
         await using var cmd = new Npgsql.NpgsqlCommand(sql, connection);
         cmd.Parameters.AddWithValue("@vec", vectorLiteral);
         cmd.Parameters.AddWithValue("@topk", topK);
-        if (tagFilter is { Count: > 0 })
-            cmd.Parameters.AddWithValue("@tags", tagFilter.ToArray());
+
+        // Typed null parameters are required — Npgsql cannot infer the type of DBNull.Value
+        var scopeParam = new Npgsql.NpgsqlParameter("@scopeFilter", NpgsqlTypes.NpgsqlDbType.Integer);
+        scopeParam.Value = scopeFilter.HasValue ? (object)(int)scopeFilter.Value : DBNull.Value;
+        cmd.Parameters.Add(scopeParam);
+
+        var runIdParam = new Npgsql.NpgsqlParameter("@runIdFilter", NpgsqlTypes.NpgsqlDbType.Uuid);
+        runIdParam.Value = runIdFilter.HasValue ? (object)runIdFilter.Value : DBNull.Value;
+        cmd.Parameters.Add(runIdParam);
+
+        var tagsParam = new Npgsql.NpgsqlParameter("@tags", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.Text);
+        tagsParam.Value = tagFilter is { Count: > 0 } ? (object)tagFilter.ToArray() : DBNull.Value;
+        cmd.Parameters.Add(tagsParam);
 
         var results = new List<VectorSearchResult>();
         await using var reader = await cmd.ExecuteReaderAsync(ct);

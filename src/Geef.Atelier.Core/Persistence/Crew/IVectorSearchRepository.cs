@@ -10,12 +10,15 @@ public interface IVectorSearchRepository
     /// <summary>
     /// Returns the top <paramref name="topK"/> chunks whose embeddings are most similar to
     /// <paramref name="queryEmbedding"/>, optionally filtered to chunks whose parent document
-    /// contains at least one tag from <paramref name="tagFilter"/>.
+    /// contains at least one tag from <paramref name="tagFilter"/>, belongs to
+    /// <paramref name="scopeFilter"/>, or is attached to run <paramref name="runIdFilter"/>.
     /// </summary>
     Task<IReadOnlyList<VectorSearchResult>> SearchAsync(
         float[] queryEmbedding,
         int topK,
         IReadOnlyList<string>? tagFilter,
+        KnowledgeScope? scopeFilter,
+        Guid? runIdFilter,
         CancellationToken ct);
 
     /// <summary>Persists a new chunk and returns it.</summary>

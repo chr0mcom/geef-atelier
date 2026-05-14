@@ -1,6 +1,7 @@
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Crew.Knowledge;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
+using Geef.Atelier.Core.Domain.Crew.Knowledge;
 using Geef.Atelier.Core.Persistence.Crew;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -36,16 +37,32 @@ internal sealed class VectorStoreGroundingProvider(
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         }
 
+        KnowledgeScope? scopeFilter = null;
+        if (profile.ProviderSettings.TryGetValue("Scope", out var scopeStr)
+            && !string.IsNullOrWhiteSpace(scopeStr))
+        {
+            scopeFilter = scopeStr.Trim().ToLowerInvariant() switch
+            {
+                "run-local" => KnowledgeScope.RunLocal,
+                "global"    => KnowledgeScope.Global,
+                _           => null
+            };
+        }
+
+        Guid? runIdFilter = scopeFilter == KnowledgeScope.RunLocal ? runId : null;
+
         logger.LogInformation(
-            "Vector-store grounding: run={RunId} provider={Profile} topK={TopK} tagFilter={Tags}",
-            runId, profile.Name, topK, tagFilter is null ? "(none)" : string.Join(",", tagFilter));
+            "Vector-store grounding: run={RunId} provider={Profile} topK={TopK} tagFilter={Tags} scope={Scope}",
+            runId, profile.Name, topK,
+            tagFilter is null ? "(none)" : string.Join(",", tagFilter),
+            scopeFilter?.ToString() ?? "(none)");
 
         var embedding = await embeddingProvider.CreateAsync(briefingText, ct);
 
         await using var scope = scopeFactory.CreateAsyncScope();
         var searchRepo = scope.ServiceProvider.GetRequiredService<IVectorSearchRepository>();
 
-        var searchResults = await searchRepo.SearchAsync(embedding.Vector, topK, tagFilter, ct);
+        var searchResults = await searchRepo.SearchAsync(embedding.Vector, topK, tagFilter, scopeFilter, runIdFilter, ct);
 
         var citations = searchResults
             .Select(r => new SourceCitation(

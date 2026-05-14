@@ -28,6 +28,8 @@ internal sealed class KnowledgeDocumentRepository(AtelierDbContext context) : IK
             IndexingCostEur = document.IndexingCostEur,
             CreatedAt = document.CreatedAt,
             UpdatedAt = document.UpdatedAt,
+            Scope = (int)document.Scope,
+            RunId = document.RunId,
         };
 
         context.KnowledgeDocuments.Add(entity);
@@ -47,12 +49,15 @@ internal sealed class KnowledgeDocumentRepository(AtelierDbContext context) : IK
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct)
+    public async Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct, KnowledgeScope? scope = null)
     {
         var query = context.KnowledgeDocuments.AsNoTracking();
 
         if (tagFilter is not null)
             query = query.Where(d => d.Tags.Contains(tagFilter));
+
+        if (scope is not null)
+            query = query.Where(d => d.Scope == (int)scope.Value);
 
         var entities = await query.ToListAsync(ct);
         return entities.Select(ToModel).ToList();
@@ -77,6 +82,8 @@ internal sealed class KnowledgeDocumentRepository(AtelierDbContext context) : IK
         entity.ChunkCount = document.ChunkCount;
         entity.IndexingCostEur = document.IndexingCostEur;
         entity.UpdatedAt = document.UpdatedAt;
+        entity.Scope = (int)document.Scope;
+        entity.RunId = document.RunId;
 
         await context.SaveChangesAsync(ct);
     }
@@ -104,6 +111,17 @@ internal sealed class KnowledgeDocumentRepository(AtelierDbContext context) : IK
         return tags;
     }
 
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<KnowledgeDocument>> ListByRunAsync(Guid runId, CancellationToken ct)
+    {
+        var entities = await context.KnowledgeDocuments
+            .AsNoTracking()
+            .Where(d => d.RunId == runId)
+            .OrderBy(d => d.CreatedAt)
+            .ToListAsync(ct);
+        return entities.Select(ToModel).ToList();
+    }
+
     private static KnowledgeDocument ToModel(KnowledgeDocumentEntity e) => new(
         Id: e.Id,
         Title: e.Title,
@@ -118,5 +136,7 @@ internal sealed class KnowledgeDocumentRepository(AtelierDbContext context) : IK
         ChunkCount: e.ChunkCount,
         IndexingCostEur: e.IndexingCostEur,
         CreatedAt: e.CreatedAt,
-        UpdatedAt: e.UpdatedAt);
+        UpdatedAt: e.UpdatedAt,
+        Scope: (KnowledgeScope)e.Scope,
+        RunId: e.RunId);
 }

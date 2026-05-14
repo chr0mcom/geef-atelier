@@ -92,7 +92,17 @@ public static class SystemCrew
         DisplayName: "Knowledge Base (All Documents)",
         Description: "Searches the full knowledge base for briefing-relevant passages using semantic similarity. Returns the top 5 most similar chunks.",
         ProviderType: "vector-store",
-        ProviderSettings: new Dictionary<string, string> { ["TopK"] = "5" },
+        ProviderSettings: new Dictionary<string, string> { ["TopK"] = "5", ["Scope"] = "global" },
+        MaxQueriesPerRun: 1,
+        IsSystem: true);
+
+    /// <summary>System grounding-provider profile for run-local attachments uploaded with the briefing.</summary>
+    public static readonly GroundingProviderProfile RunAttachmentsProfile = new(
+        Name: "run-attachments",
+        DisplayName: "Run Attachments",
+        Description: "Uses documents uploaded with the briefing as a grounding source. Activated automatically when attachments are present.",
+        ProviderType: "vector-store",
+        ProviderSettings: new Dictionary<string, string> { ["TopK"] = "5", ["Scope"] = "run-local" },
         MaxQueriesPerRun: 1,
         IsSystem: true);
 
@@ -151,6 +161,7 @@ public static class SystemCrew
         {
             [TavilyBasicProfile.Name] = TavilyBasicProfile,
             [KnowledgeBaseDefaultProfile.Name] = KnowledgeBaseDefaultProfile,
+            [RunAttachmentsProfile.Name] = RunAttachmentsProfile,
         };
 
     /// <summary>All system crew templates, indexed by name.</summary>
@@ -160,7 +171,11 @@ public static class SystemCrew
             [KlassikTemplate.Name] = KlassikTemplate,
         };
 
-    /// <summary>True when the supplied name matches a system profile or template (any kind).</summary>
+    /// <summary>
+    /// Returns true if the name belongs to a built-in reviewer, executor, or crew template.
+    /// Advisor profiles are covered by <see cref="IsSystemAdvisorName"/>.
+    /// For grounding providers, use <see cref="IsSystemGroundingProviderName"/> instead.
+    /// </summary>
     public static bool IsSystemName(string name) =>
         ReviewerProfiles.ContainsKey(name)
         || ExecutorProfiles.ContainsKey(name)

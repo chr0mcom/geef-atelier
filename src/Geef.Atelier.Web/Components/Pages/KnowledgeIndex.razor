@@ -67,7 +67,7 @@
         _error = null;
         try
         {
-            _documents = await KnowledgeService.ListAsync(null, CancellationToken.None);
+            _documents = await KnowledgeService.ListAsync(null, CancellationToken.None, KnowledgeScope.Global);
         }
         catch (Exception ex)
         {

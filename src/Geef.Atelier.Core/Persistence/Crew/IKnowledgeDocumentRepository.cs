@@ -14,9 +14,11 @@ public interface IKnowledgeDocumentRepository
     Task<KnowledgeDocument?> GetAsync(Guid id, CancellationToken ct);
 
     /// <summary>
-    /// Returns all documents, optionally filtered to those that contain <paramref name="tagFilter"/> in their tag list.
+    /// Returns documents, optionally filtered to those that contain <paramref name="tagFilter"/> in their
+    /// tag list and/or match the given <paramref name="scope"/>. Pass <c>null</c> for either parameter to
+    /// skip that filter.
     /// </summary>
-    Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct);
+    Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct, KnowledgeScope? scope = null);
 
     /// <summary>Replaces the stored document with the supplied record (matched by <see cref="KnowledgeDocument.Id"/>).</summary>
     Task UpdateAsync(KnowledgeDocument document, CancellationToken ct);
@@ -26,4 +28,7 @@ public interface IKnowledgeDocumentRepository
 
     /// <summary>Returns the distinct union of all tags across all documents.</summary>
     Task<IReadOnlyList<string>> GetAllTagsAsync(CancellationToken ct);
+
+    /// <summary>Returns all documents whose <c>RunId</c> matches <paramref name="runId"/>, ordered by creation time.</summary>
+    Task<IReadOnlyList<KnowledgeDocument>> ListByRunAsync(Guid runId, CancellationToken ct);
 }

@@ -145,6 +145,56 @@ public sealed class KlassikRegressionTests
         Assert.Empty(SystemCrew.KlassikTemplate.GroundingProviderNames);
     }
 
+    /// <summary>
+    /// Explicit "without-attachments" regression: a Klassik snapshot with GroundingProviders=null
+    /// must not trigger the embedding provider even when the factory is registered.
+    /// Mirrors the naming used in the run-attachments feature spec (Test 3c).
+    /// </summary>
+    [Fact]
+    public async Task KlassikTemplate_WithoutAttachments_EmbeddingProviderNotCalled()
+    {
+        var embeddingProvider = new CountingEmbeddingProviderStub();
+        var factory = BuildFactory(embeddingProvider);
+        var fakeClient = new FakeLlmClient();
+        var resolver = new TestLlmClientResolver(fakeClient);
+
+        // KlassikSnapshot has GroundingProviders == null — no grounding profile registered.
+        var runner = AtelierPipelineFactory.Build(
+            KlassikSnapshot(),
+            resolver,
+            Options.Create(new ConvergenceOptions()),
+            groundingProviderFactory: factory);
+
+        await runner.RunAsync(Briefing, CancellationToken.None);
+
+        Assert.Equal(0, embeddingProvider.CallCount);
+    }
+
+    /// <summary>
+    /// Explicit "without-attachments" regression: a Klassik snapshot with GroundingProviders=null
+    /// must not produce any grounding consultations.
+    /// Mirrors the naming used in the run-attachments feature spec (Test 3d).
+    /// </summary>
+    [Fact]
+    public async Task KlassikTemplate_WithoutAttachments_NoGroundingConsultations()
+    {
+        var embeddingProvider = new CountingEmbeddingProviderStub();
+        var consultationRepo = new CapturingGroundingConsultationRepository();
+        var factory = BuildFactory(embeddingProvider, consultationRepo);
+        var fakeClient = new FakeLlmClient();
+        var resolver = new TestLlmClientResolver(fakeClient);
+
+        var runner = AtelierPipelineFactory.Build(
+            KlassikSnapshot(),
+            resolver,
+            Options.Create(new ConvergenceOptions()),
+            groundingProviderFactory: factory);
+
+        await runner.RunAsync(Briefing, CancellationToken.None);
+
+        Assert.Empty(consultationRepo.All);
+    }
+
     // --- factory helpers ---
 
     /// <summary>
@@ -207,6 +257,8 @@ public sealed class KlassikRegressionTests
             float[] queryEmbedding,
             int topK,
             IReadOnlyList<string>? tagFilter,
+            KnowledgeScope? scopeFilter,
+            Guid? runIdFilter,
             CancellationToken ct)
             => Task.FromResult<IReadOnlyList<VectorSearchResult>>([]);
 

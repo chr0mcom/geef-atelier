@@ -1,5 +1,7 @@
+using Geef.Atelier.Application.Crew.Knowledge;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Infrastructure.Persistence;
+using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Tests.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +17,8 @@ public sealed class RunServiceValidatesInputsTests(PostgresFixture fixture)
         services.AddDbContext<AtelierDbContext>(opt => opt.UseNpgsql(fixture.ConnectionString));
         services.AddAtelierPersistence();
         services.AddAtelierApplication();
+        services.AddScoped<IKnowledgeService, NoOpKnowledgeService>();
+        services.AddLogging();
         return services.BuildServiceProvider();
     }
 
@@ -24,7 +28,7 @@ public sealed class RunServiceValidatesInputsTests(PostgresFixture fixture)
         await using var provider = BuildProvider();
         await using var scope = provider.CreateAsyncScope();
         var svc = scope.ServiceProvider.GetRequiredService<IRunService>();
-        await Assert.ThrowsAsync<ArgumentException>(() => svc.SubmitRunAsync("", "{}"));
+        await Assert.ThrowsAsync<ArgumentException>(() => svc.SubmitRunAsync(new SubmitRunRequest("", "{}")));
     }
 
     [Fact]
@@ -33,7 +37,7 @@ public sealed class RunServiceValidatesInputsTests(PostgresFixture fixture)
         await using var provider = BuildProvider();
         await using var scope = provider.CreateAsyncScope();
         var svc = scope.ServiceProvider.GetRequiredService<IRunService>();
-        await Assert.ThrowsAsync<ArgumentException>(() => svc.SubmitRunAsync("   ", "{}"));
+        await Assert.ThrowsAsync<ArgumentException>(() => svc.SubmitRunAsync(new SubmitRunRequest("   ", "{}")));
     }
 
     [Fact]
@@ -42,7 +46,7 @@ public sealed class RunServiceValidatesInputsTests(PostgresFixture fixture)
         await using var provider = BuildProvider();
         await using var scope = provider.CreateAsyncScope();
         var svc = scope.ServiceProvider.GetRequiredService<IRunService>();
-        await Assert.ThrowsAsync<ArgumentNullException>(() => svc.SubmitRunAsync("valid briefing", null!));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => svc.SubmitRunAsync(new SubmitRunRequest("valid briefing", null!)));
     }
 
     [Fact]
@@ -51,7 +55,7 @@ public sealed class RunServiceValidatesInputsTests(PostgresFixture fixture)
         await using var provider = BuildProvider();
         await using var scope = provider.CreateAsyncScope();
         var svc = scope.ServiceProvider.GetRequiredService<IRunService>();
-        await Assert.ThrowsAsync<ArgumentException>(() => svc.SubmitRunAsync("valid briefing", "not-json"));
+        await Assert.ThrowsAsync<ArgumentException>(() => svc.SubmitRunAsync(new SubmitRunRequest("valid briefing", "not-json")));
     }
 
     [Fact]
@@ -60,7 +64,7 @@ public sealed class RunServiceValidatesInputsTests(PostgresFixture fixture)
         await using var provider = BuildProvider();
         await using var scope = provider.CreateAsyncScope();
         var svc = scope.ServiceProvider.GetRequiredService<IRunService>();
-        var id = await svc.SubmitRunAsync("valid briefing", "");
+        var id = await svc.SubmitRunAsync(new SubmitRunRequest("valid briefing", ""));
         Assert.NotEqual(Guid.Empty, id);
     }
 }
