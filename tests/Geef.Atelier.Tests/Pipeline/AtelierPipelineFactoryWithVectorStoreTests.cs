@@ -208,6 +208,8 @@ public sealed class AtelierPipelineFactoryWithVectorStoreTests
             float[] queryEmbedding,
             int topK,
             IReadOnlyList<string>? tagFilter,
+            KnowledgeScope? scopeFilter,
+            Guid? runIdFilter,
             CancellationToken ct)
             => Task.FromResult(results);
 

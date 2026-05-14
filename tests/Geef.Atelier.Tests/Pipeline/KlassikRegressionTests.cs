@@ -207,6 +207,8 @@ public sealed class KlassikRegressionTests
             float[] queryEmbedding,
             int topK,
             IReadOnlyList<string>? tagFilter,
+            KnowledgeScope? scopeFilter,
+            Guid? runIdFilter,
             CancellationToken ct)
             => Task.FromResult<IReadOnlyList<VectorSearchResult>>([]);
 
