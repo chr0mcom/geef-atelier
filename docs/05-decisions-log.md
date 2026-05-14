@@ -1,6 +1,6 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 2026-05-13 (Grounding-Provider-Foundation + Tavily: D-035 ergänzt)*
+*Letzte Aktualisierung: 2026-05-14 (Vector-Store-Grounding-Provider Phase 2 RAG: D-036 ergänzt)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -514,3 +514,52 @@ Datum: 2026-05-13
 **Migration:** `Step13GroundingProviders` — drei Tabellen/Spalten: `GroundingProviderProfiles`, `GroundingConsultations` (mit Cascade-Delete FK auf Runs), `GroundingProviderNames`-JSONB-Spalte auf `CrewTemplates`.
 
 **Deployment-Note:** `TAVILY_API_KEY` muss in `.env` gesetzt werden (optional — leerer Key registriert Provider, wirft aber zur Laufzeit `InvalidOperationException` mit klarer Message, kein App-Crash beim Start). Kein Key in Logs.
+
+---
+
+## D-036 — Feature: Vector-Store-Grounding-Provider (Phase 2 RAG) (2026-05-14)
+
+**Kontext:** Tavily-Step (D-035) hat die `IGroundingProvider`-Foundation mit reservierten `SourceCitation`-Feldern `DocumentReference` und `RelevanceScore` angelegt. Dieser Step aktiviert den zweiten Provider: semantische Suche über hochgeladene Dokumente (Markdown, Text) statt Web-Search. Vollständiges RAG-Setup (Phase 2).
+
+### Architect-Entscheidungen (fünf Knackpunkte):
+
+| Frage | Entscheidung | Begründung |
+|---|---|---|
+| (a) Postgres-Image: `pgvector/pgvector:pg16` | **Akzeptiert.** `gen_random_uuid()` ist PG16-Core, Encoding/Locale identisch zu `postgres:16-alpine`. Volume bleibt beim Image-Wechsel erhalten. | Offizielles pgvector-Image, kein Vendor-Lock. |
+| (b) Embedding-Modell-Default | **`openai/text-embedding-3-small` (1536 dim, ~$0.02/1M Tokens via OpenRouter).** Günstigstes leistungsfähiges OpenAI-Embedding-Modell, via OpenRouter ohne separaten API-Key. `allow_fallbacks: true` für Verfügbarkeit. | Keine neuen Keys nötig (LLM_OPENROUTER_API_KEY wiederverwendet). |
+| (c) Chunking-Strategie | **Selbstgebauter `RecursiveCharacterTextSplitter`** (LangChain-kompatibel). Separatoren: `"\n\n"`, `"\n"`, `". "`, `" "`, `""`. ~4 chars/token. Keine externe Library. | `TreatWarningsAsErrors=true` + LangChain.NET ist instabil. Eigene Impl. vollständig testbar. |
+| (d) `Pgvector.EntityFrameworkCore 0.3.0` Kompatibilität | **INKOMPATIBEL mit EF Core 10.** Targets net8.0, requires Npgsql.EF ≥9.0.1. LINQ-Distance-Operatoren funktionieren nicht. **Fallback: Raw Npgsql ADO.NET für alle Vector-Operationen.** `float[]` ValueConverter (culture-invariant) für EF-Column-Mapping. | Gleiches Interface `IVectorSearchRepository`, andere Impl. Keine API-Änderung nach außen. |
+| (e) HttpClient-Sharing für Embeddings | **Eigener `HttpClient<OpenRouterEmbeddingProvider>`** via `EmbeddingsServiceExtensions`. Selber `LLM_OPENROUTER_API_KEY` aus `LlmOptions`. | Cleaner Scope, keine zirkulären Abhängigkeiten. |
+
+### Implementierungs-Highlights:
+
+- **VectorSearchRepository:** Raw NpgsqlCommand mit `@vec::vector`-Cast (named `@param`-Syntax statt positional `$N`, um Npgsql auto-prepare-Cache-Konflikte zu vermeiden), `<=>` Cosine-Distance-Operator, `&&` Array-Overlap für Tag-Filter (OR-Semantik: mindestens ein Tag muss matchen)
+- **float[] ValueConverter:** `string.Join(",", floats)` → `[f1,...fn]` (InvariantCulture beide Richtungen) — pgvector-Literal-Format
+- **HNSW-Index:** `CREATE INDEX USING hnsw ("Embedding" vector_cosine_ops)` — ANN für Cosine-Similarity
+- **Tag-Filter:** `&&` (Array-Overlap, OR) statt `@>` (Array-Contains-All, AND) — korrekte "mindestens einer"-Semantik
+- **Foundation-Check (AC15):** `IGroundingProvider`-Vertrag aus D-035 ohne Refactor wiederverwendet — `VectorStoreGroundingProvider` ist drop-in neben `TavilyGroundingProvider`
+
+### Neue Tabellen (Migration `Step14VectorStore`):
+
+```sql
+"KnowledgeDocuments"     -- Dokument-Metadaten + Tags (text[]) + GIN-Index
+"KnowledgeDocumentChunks" -- Chunks + "Embedding" vector(1536) + HNSW-Index
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+### Tests:
+
+400 C#-Tests (40 neu: Domain/Application, Embeddings, Repositories, Services, Provider, UI/bUnit, Pipeline/Regression), 1 E2E-Skip, 0 Failures.
+
+### Deployment:
+
+- Backup: `backup/before-pgvector-migration-20260514-120931.dump` (34K, 48 TOC-Entries, PG16)
+- Postgres-Image gewechselt auf `pgvector/pgvector:pg16` (PG 16.13, Debian)
+- `vector`-Extension 0.8.2 installiert
+- Web-Container mit `--no-cache` neu gebaut
+- PR #6 gemerged (SHA: `b659912`), Branch `feat/vector-store-grounding` gelöscht
+- Produktiv unter `https://geef.stefan-bechtel.de/crew/knowledge`
+
+### Bewusst NICHT in diesem Step:
+
+PDF-Support, Background-Job für Indexing, Multi-Modal-Embeddings, OR-Tag-Filter (UI), Hybrid-Search, Re-Ranking, Embedding-Modell-Wechsel-UI mit Auto-Re-Index, Document-Versionierung, OpenAI-direkt-Integration.
