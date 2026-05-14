@@ -3,12 +3,16 @@
 @attribute [Authorize]
 @implements IAsyncDisposable
 @inject IRunService RunService
+@inject IKnowledgeService KnowledgeService
 @inject NavigationManager Nav
 @using Microsoft.AspNetCore.SignalR.Client
 @using Geef.Atelier.Application.Runs
+@using Geef.Atelier.Application.Crew.Knowledge
 @using Geef.Atelier.Core.Domain.Crew
 @using Geef.Atelier.Core.Domain.Crew.Advisors
+@using Geef.Atelier.Core.Domain.Crew.Knowledge
 @using Geef.Atelier.Web.Display
+@using Geef.Atelier.Web.Components.UI
 
 <PageTitle>Run @_shortId — Geef.Atelier</PageTitle>
 
@@ -63,13 +67,24 @@
 
         <Press Status="_details.Run.Status" />
 
+        @if (_runAttachments.Count > 0)
+        {
+            <RunAttachmentsList Attachments="_runAttachments"
+                               OnPromoteClick="OpenPromoteModal" />
+        }
+
+        <PromoteAttachmentModal @bind-Show="_showPromoteModal"
+                               Document="_promoteCandidate"
+                               OnConfirm="HandlePromoteAsync" />
+
         @if (_details is not null && _viewModel is not null)
         {
             <GroundingSection
                 Briefing="@_details.Run.BriefingText"
                 GroundedBrief="@_viewModel.GroundedBrief"
                 BeforeFirstAdvisors="@_viewModel.GroundingAdvisors"
-                GroundingConsultations="@_viewModel.GroundingConsultations" />
+                GroundingConsultations="@_viewModel.GroundingConsultations"
+                RunAttachmentDocumentIds="_runAttachments.Select(a => a.Id).ToList()" />
         }
 
         <div class="iters">
@@ -114,6 +129,9 @@
     bool           _notFound;
     HubConnection? _hub;
     CrewSnapshot?  _snapshot;
+    List<KnowledgeDocument> _runAttachments = [];
+    bool _showPromoteModal;
+    KnowledgeDocument? _promoteCandidate;
 
     string _shortId => RunId.ToString("N")[..8].ToUpperInvariant();
 
@@ -129,6 +147,21 @@
         _details   = _viewModel?.Details;
         _snapshot  = _viewModel?.Snapshot;
         _notFound  = _viewModel is null;
+        _runAttachments = (await KnowledgeService.ListRunAttachmentsAsync(RunId, CancellationToken.None)).ToList();
+    }
+
+    void OpenPromoteModal(KnowledgeDocument doc)
+    {
+        _promoteCandidate = doc;
+        _showPromoteModal = true;
+    }
+
+    async Task HandlePromoteAsync(PromoteAttachmentModal.PromoteRequest req)
+    {
+        await KnowledgeService.PromoteToGlobalAsync(
+            req.DocumentId, req.NewTitle, req.NewDescription, req.AdditionalTags, CancellationToken.None);
+        _showPromoteModal = false;
+        _runAttachments = (await KnowledgeService.ListRunAttachmentsAsync(RunId, CancellationToken.None)).ToList();
     }
 
     async Task InitHubAsync()
