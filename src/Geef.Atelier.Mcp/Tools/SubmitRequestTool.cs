@@ -13,12 +13,13 @@ public static class SubmitRequestTool
     private static readonly JsonSerializerOptions JsonOpts =
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-    /// <summary>Supported MIME types for run-attachment uploads. Only text/markdown and text/plain are supported.</summary>
+    /// <summary>Supported MIME types for run-attachment uploads.</summary>
     private static readonly IReadOnlySet<string> SupportedAttachmentContentTypes =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "text/markdown",
             "text/plain",
+            "application/pdf",
         };
 
     [McpServerTool, Description("Submits a new run request with a briefing text and optional JSON configuration.")]
@@ -28,7 +29,7 @@ public static class SubmitRequestTool
         [Description("Optional JSON configuration object. Defaults to '{}'.")] string? configJson = null,
         [Description("Name of the crew template to use (e.g. 'klassik'). Defaults to the system default when omitted.")] string? crewTemplate = null,
         [Description("Optional custom crew specification as a JSON object (CrewSpec). When supplied, crewTemplate is ignored. Supported fields: executorProfileName, reviewerProfileNames, advisorProfileNames, groundingProviderProfileNames, evaluationStrategy.")] string? customCrew = null,
-        [Description("Optional attachments as a JSON array: [{\"filename\":\"report.md\",\"contentType\":\"text/plain\",\"contentBase64\":\"...\"}]. Only text/markdown and text/plain are supported content types.")] string? attachments = null,
+        [Description("Optional attachments as a JSON array: [{\"filename\":\"report.md\",\"contentType\":\"text/plain\",\"contentBase64\":\"...\"}]. Supported content types: text/markdown, text/plain, application/pdf.")] string? attachments = null,
         CancellationToken cancellationToken = default)
     {
         CrewSpec? crewSpec = null;
