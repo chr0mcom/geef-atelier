@@ -20,8 +20,7 @@
             <StudioTaskInputStep
                 TaskDescription="@_taskDescription"
                 TaskDescriptionChanged="@(v => _taskDescription = v)"
-                OnAnalyze="StartAnalysisAsync"
-                data-testid="studio-task-input" />
+                OnAnalyze="StartAnalysisAsync" />
             break;
 
         case StudioStep.Analyzing:
@@ -33,8 +32,7 @@
                 Analysis="@(_analysis!)"
                 OnUseExistingTemplate="UseExistingTemplateAsync"
                 OnProceedToEdit="GoToEdit"
-                OnRestart="Restart"
-                data-testid="studio-review" />
+                OnRestart="Restart" />
             break;
 
         case StudioStep.Edit:
@@ -44,15 +42,13 @@
                 EditedTemplateChanged="@(v => _editedTemplate = v)"
                 EditedProfiles="@_editedProfiles"
                 OnSave="MaterializeAsync"
-                OnBack="BackToReview"
-                data-testid="studio-edit" />
+                OnBack="BackToReview" />
             break;
 
         case StudioStep.Confirmation:
             <StudioConfirmationStep
                 Result="@(_materializationResult!)"
-                OnStartRun="StartRunWithTemplate"
-                data-testid="studio-confirmation" />
+                OnStartRun="StartRunWithTemplate" />
             break;
     }
 
