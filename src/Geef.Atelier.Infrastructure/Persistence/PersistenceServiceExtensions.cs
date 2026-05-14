@@ -1,6 +1,8 @@
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
+using Geef.Atelier.Core.Persistence.TemplateStudio;
 using Geef.Atelier.Infrastructure.Persistence.Crew;
+using Geef.Atelier.Infrastructure.Persistence.TemplateStudio;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Geef.Atelier.Infrastructure.Persistence;
@@ -18,6 +20,7 @@ public static class PersistenceServiceExtensions
         services.AddScoped<IAdvisorConsultationRepository, AdvisorConsultationRepository>();
         services.AddScoped<IGroundingProviderProfileRepository, GroundingProviderProfileRepository>();
         services.AddScoped<IGroundingConsultationRepository, GroundingConsultationRepository>();
+        services.AddScoped<ITemplateStudioAnalysisRepository, TemplateStudioAnalysisRepository>();
         return services;
     }
 }

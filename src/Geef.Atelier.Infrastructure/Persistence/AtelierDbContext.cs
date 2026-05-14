@@ -4,6 +4,7 @@ using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge;
+using Geef.Atelier.Infrastructure.Persistence.TemplateStudio;
 using Microsoft.EntityFrameworkCore;
 
 namespace Geef.Atelier.Infrastructure.Persistence;
@@ -29,6 +30,8 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
 
     internal DbSet<KnowledgeDocumentEntity> KnowledgeDocuments => Set<KnowledgeDocumentEntity>();
     internal DbSet<KnowledgeDocumentChunkEntity> KnowledgeDocumentChunks => Set<KnowledgeDocumentChunkEntity>();
+
+    internal DbSet<TemplateStudioAnalysisEntity> TemplateStudioAnalyses => Set<TemplateStudioAnalysisEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
         => modelBuilder.ApplyConfigurationsFromAssembly(typeof(AtelierDbContext).Assembly);
