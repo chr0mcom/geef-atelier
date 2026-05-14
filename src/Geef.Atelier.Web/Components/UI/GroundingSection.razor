@@ -40,6 +40,13 @@
                                 <ol class="grounding-citations">
                                     @foreach (var citation in consultation.Citations)
                                     {
+                                        var isRunLocal = false;
+                                        if (citation.DocumentReference is { } docRef
+                                            && docRef.Contains('/')
+                                            && Guid.TryParse(docRef.Split('/')[0], out var docGuid))
+                                        {
+                                            isRunLocal = RunAttachmentDocumentIds.Contains(docGuid);
+                                        }
                                         <li class="grounding-citation">
                                             @if (!string.IsNullOrEmpty(citation.Url))
                                             {
@@ -48,8 +55,16 @@
                                             else if (!string.IsNullOrEmpty(citation.DocumentReference))
                                             {
                                                 var docId = ParseDocId(citation.DocumentReference);
-                                                <a href="/crew/knowledge/@docId" class="citation-title">@citation.Title</a>
-                                                <span class="citation-source"> — From your knowledge base</span>
+                                                @if (isRunLocal)
+                                                {
+                                                    <span class="citation-title">@citation.Title</span>
+                                                    <span class="badge badge-attachment">From this run's attachments</span>
+                                                }
+                                                else
+                                                {
+                                                    <a href="/crew/knowledge/@docId" class="citation-title">@citation.Title</a>
+                                                    <span class="badge badge-knowledge-base">From your knowledge base</span>
+                                                }
                                                 @if (citation.RelevanceScore.HasValue)
                                                 {
                                                     <span class="citation-score">(relevance: @citation.RelevanceScore.Value.ToString("F2"))</span>
@@ -121,6 +136,7 @@
     [Parameter, EditorRequired] public string GroundedBrief { get; set; } = "";
     [Parameter] public IReadOnlyList<AdvisorConsultation> BeforeFirstAdvisors { get; set; } = [];
     [Parameter] public IReadOnlyList<GroundingConsultation>? GroundingConsultations { get; set; }
+    [Parameter] public IReadOnlyList<Guid> RunAttachmentDocumentIds { get; set; } = [];
 
     private bool _webResearchExpanded = true;
     private bool _advisorsExpanded = false;
