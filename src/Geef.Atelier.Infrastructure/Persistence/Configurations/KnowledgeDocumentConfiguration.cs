@@ -1,3 +1,4 @@
+using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -25,6 +26,23 @@ internal sealed class KnowledgeDocumentConfiguration : IEntityTypeConfiguration<
         builder.Property(d => d.IndexingCostEur).HasColumnType("numeric(10,4)").IsRequired(false);
         builder.Property(d => d.CreatedAt).IsRequired();
         builder.Property(d => d.UpdatedAt).IsRequired();
+
+        builder.Property(d => d.Scope)
+            .HasDefaultValue(0);    // 0 = KnowledgeScope.Global
+
+        builder.Property(d => d.RunId)
+            .HasColumnType("uuid")
+            .IsRequired(false);
+
+        builder.HasOne<RunEntity>()
+            .WithMany()
+            .HasForeignKey(d => d.RunId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(d => d.RunId)
+            .HasFilter("\"RunId\" IS NOT NULL");
+
+        builder.HasIndex(d => d.Scope);
 
         builder.HasMany(d => d.Chunks)
             .WithOne(c => c.Document)

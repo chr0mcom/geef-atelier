@@ -521,6 +521,14 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("RunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Scope")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<string[]>("Tags")
                         .IsRequired()
                         .HasColumnType("text[]");
@@ -533,6 +541,11 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RunId")
+                        .HasFilter("\"RunId\" IS NOT NULL");
+
+                    b.HasIndex("Scope");
 
                     b.ToTable("KnowledgeDocuments", (string)null);
                 });
@@ -585,6 +598,11 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge.KnowledgeDocumentEntity", b =>
                 {
+                    b.HasOne("Geef.Atelier.Core.Domain.RunEntity", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.Navigation("Chunks");
                 });
 
