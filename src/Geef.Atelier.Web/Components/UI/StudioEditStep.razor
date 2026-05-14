@@ -1,0 +1,113 @@
+@using Geef.Atelier.Core.Domain.Crew.TemplateStudio
+
+<div class="studio-edit" data-testid="studio-edit-step">
+    <h2>Review and edit</h2>
+    <p class="edit-hint">Edit the proposed configuration before saving. All fields are optional to change.</p>
+
+    @if (EditedTemplate is not null)
+    {
+        <div class="edit-section">
+            <h3>Template</h3>
+            <div class="field">
+                <label>Display Name</label>
+                <input type="text" value="@EditedTemplate.DisplayName"
+                       @oninput="OnDisplayNameInput"
+                       data-testid="template-display-name" />
+            </div>
+            <div class="field">
+                <label>Description</label>
+                <textarea rows="2" value="@EditedTemplate.Description"
+                          @oninput="OnDescriptionInput"
+                          data-testid="template-description"></textarea>
+            </div>
+            <div class="field">
+                <label>Evaluation Strategy</label>
+                <select value="@EditedTemplate.EvaluationStrategy"
+                        @onchange="OnStrategyChange"
+                        data-testid="template-strategy">
+                    <option value="Sequential">Sequential</option>
+                    <option value="Parallel">Parallel</option>
+                    <option value="FailFast">Fail Fast</option>
+                    <option value="Priority">Priority</option>
+                </select>
+            </div>
+        </div>
+
+        @if (EditedProfiles.Count > 0)
+        {
+            <div class="edit-section">
+                <h3>New profiles to create</h3>
+                @foreach (var profile in EditedProfiles)
+                {
+                    var capturedProfile = profile;
+                    <div class="proposed-profile-edit" data-testid="profile-edit-@profile.Name">
+                        <div class="profile-edit-header">
+                            <strong>@profile.DisplayName</strong>
+                            <span class="profile-type-badge">@profile.ProfileType</span>
+                        </div>
+                        <div class="field">
+                            <label>System Prompt</label>
+                            <textarea rows="4" value="@profile.SystemPrompt"
+                                      @oninput="e => OnProfilePromptInput(capturedProfile, e)"
+                                      data-testid="profile-prompt-@profile.Name"
+                                      style="font-family: var(--font-mono, monospace)"></textarea>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+
+    <div class="edit-actions">
+        <button type="button" class="btn primary"
+                @onclick="OnSave"
+                data-testid="save-button">
+            Save and create
+        </button>
+        <button type="button" class="btn ghost"
+                @onclick="OnBack"
+                data-testid="back-button">
+            ← Back
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TemplateStudioAnalysis Analysis { get; set; } = null!;
+    [Parameter, EditorRequired] public ProposedTemplate EditedTemplate { get; set; } = null!;
+    [Parameter] public EventCallback<ProposedTemplate> EditedTemplateChanged { get; set; }
+    [Parameter, EditorRequired] public List<ProposedProfile> EditedProfiles { get; set; } = [];
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback OnBack { get; set; }
+
+    private async Task UpdateTemplate(ProposedTemplate updated)
+    {
+        await EditedTemplateChanged.InvokeAsync(updated);
+    }
+
+    private void UpdateProfile(ProposedProfile original, ProposedProfile updated)
+    {
+        var idx = EditedProfiles.IndexOf(original);
+        if (idx >= 0) EditedProfiles[idx] = updated;
+    }
+
+    private async Task OnDisplayNameInput(ChangeEventArgs e)
+    {
+        await UpdateTemplate(EditedTemplate with { DisplayName = e.Value?.ToString() ?? string.Empty });
+    }
+
+    private async Task OnDescriptionInput(ChangeEventArgs e)
+    {
+        await UpdateTemplate(EditedTemplate with { Description = e.Value?.ToString() ?? string.Empty });
+    }
+
+    private async Task OnStrategyChange(ChangeEventArgs e)
+    {
+        await UpdateTemplate(EditedTemplate with { EvaluationStrategy = e.Value?.ToString() ?? "Sequential" });
+    }
+
+    private void OnProfilePromptInput(ProposedProfile original, ChangeEventArgs e)
+    {
+        UpdateProfile(original, original with { SystemPrompt = e.Value?.ToString() ?? string.Empty });
+    }
+}

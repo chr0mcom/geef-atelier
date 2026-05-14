@@ -1,6 +1,6 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 2026-05-14 (Run-Attachments: D-037 ergänzt)*
+*Letzte Aktualisierung: 2026-05-14 (Template-Studio: D-038 ergänzt)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -615,3 +615,60 @@ INSERT INTO "GroundingProviderProfiles" ... ('run-attachments', 'vector-store', 
 ### Bewusst NICHT in diesem Step:
 
 PDF-Support, Background-Job für Attachment-Indexing, Image-Attachments, Auto-Cleanup-Retention-Policy, Attachment-Editierung (Upload-only), Hybrid-Search (pure Vector wie D-036).
+
+---
+
+## D-038 — Template Studio: Meta-KI für Template-Erstellung (2026-05-14)
+
+Neue Seite `/crew/studio`: User beschreibt eine Aufgabe in natürlicher Sprache, eine Meta-KI (Claude Sonnet 4.5 via OpenRouter) analysiert die Aufgabe mit Tool-Use (`submit_template_proposal`), vergleicht sie mit existierenden Templates und Profilen, und schlägt entweder ein bestehendes Template vor oder erstellt ein neues mit passenden Custom-Profilen. User reviewt und editiert im 5-Schritt-Wizard (Input → Analyzing → Review → Edit → Confirmation) **bevor** gespeichert wird. Alle erstellten Records sind danach durch die existierenden Editoren (`/crew/templates/{name}`, `/crew/profiles/.../{name}`) normal bearbeitbar.
+
+### Architektur-Entscheidungen:
+
+| Bereich | Entscheidung |
+|---|---|
+| **Meta-LLM** | `anthropic/claude-sonnet-4-5` via OpenRouter; konfigurierbar über `appsettings.json:TemplateStudio:Model` |
+| **Strukturiertes Output** | OpenAI Tool-Use (`submit_template_proposal`-Tool mit vollständigem JSON-Schema); kein Freitext-Parsing |
+| **Edit-vor-Save-Pflicht** | Wizard erlaubt keinen Skip von Review → Confirmation; Halluzinationsschutz durch Pflicht-Review |
+| **Nachträgliche Bearbeitbarkeit** | Studio erstellt nur `custom-`-Records via `ICrewService.CreateCustom…`; System-Profile werden nur referenziert, niemals modifiziert |
+| **Profile-Similarity-Check** | On-the-fly Embedding-Cosine-Similarity via `IEmbeddingProvider`; Schwellwert 0.85 → vorgeschlagenes Profil als Duplikat markiert und nicht angelegt |
+| **System-Profile-Schutz** | Guard in `TemplateStudioService.ValidateNotSystemProfiles` + bestehender `CrewService.Update`-Check |
+| **Modell-Verfügbarkeits-Validation** | `IModelCatalog.ListModelsAsync` pro Provider; fehlende Modelle → Warning, kein Failure |
+| **Provider-Verfügbarkeits-Check** | `IProviderCatalog.ListProviders`; fehlende API-Keys → Warning im `MaterializationResult.Warnings` |
+| **Audit-Trail** | Neue Tabelle `TemplateStudioAnalyses` (Step17-Migration); JSONB-Spalte `AnalysisResultJson` enthält kompletten `TemplateStudioAnalysis`-Record |
+| **Cost-Tracking** | `IPricingCatalog.CalculateCostEur` berechnet Kosten des Meta-LLM-Calls; persistiert in `TemplateStudioAnalyses.CostEur` |
+| **Multi-Step-Wizard** | Blazor-State-Machine client-side im `TemplateStudio.razor`; kein Backend-State nötig |
+| **Few-Shot-Examples** | 3 Beispiele im System-Prompt: (1) Klassik-Template-Match > 0.85, (2) Neues Template mit existing Profilen, (3) Neues Template mit neuem domänenspezifischen Reviewer |
+| **Custom-Profile-Naming** | `custom-`-Prefix automatisch via `ICrewService.CreateCustom…`; Konflikte über EF-DB-Unique-Constraint gefangen |
+| **String-Format-Schutz** | `template.Replace("{0}", context)` statt `string.Format` (Prompt enthält `{klassik: 0.95}`-Literals die `FormatException` auslösen) |
+
+### Implementierung:
+
+- **Core:** `Domain/Crew/TemplateStudio/` — 6 neue Records/Enums (TemplateStudioAnalysis, ProposedTemplate, ProposedProfile, TemplateMatch, StudioRecommendation, ProposedProfileType)
+- **Persistence:** `Core/Persistence/TemplateStudio/ITemplateStudioAnalysisRepository`, Infrastructure-Entity/-Configuration/-Repository; Migration `Step17TemplateStudio` (manuell als raw SQL, da `dotnet ef` wegen pgvector-ValueComparer-Bug abstürzt)
+- **Application:** `ITemplateStudioService`, `MaterializationRequest/Result`, `TemplateStudioOptions`
+- **Infrastructure:** `TemplateProposalTool` (JSON-Schema), `TemplateStudioPrompts` (Meta-Prompt + 3 Few-Shot-Examples), `ProfileSimilarityService` (Cosine), `TemplateStudioService` (vollständige Implementation), `TemplateStudioServiceExtensions` (DI)
+- **Web:** `TemplateStudio.razor` (`/crew/studio`), `StudioTaskInputStep`, `StudioAnalyzingStep`, `StudioReviewStep`, `StudioEditStep`, `StudioConfirmationStep`, NavMenu-Eintrag "Crew Studio", `New.razor` mit `[SupplyParameterFromQuery]`
+
+### Migration `Step17TemplateStudio`:
+
+```sql
+CREATE TABLE "TemplateStudioAnalyses" (
+    "Id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "TaskDescription" text NOT NULL,
+    "AnalysisResultJson" jsonb NOT NULL DEFAULT '{}'::jsonb,
+    "InputTokens" integer NOT NULL,
+    "OutputTokens" integer NOT NULL,
+    "CostEur" numeric(10,6) NULL,
+    "MaterializedTemplateName" text NULL,
+    "CreatedAt" timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX "IX_TemplateStudioAnalyses_CreatedAt" ON "TemplateStudioAnalyses"("CreatedAt" DESC);
+```
+
+### Tests:
+
+562 bestehende C#-Tests unverändert grün + 43 neue Tests. Neue Test-Klassen: `TemplateStudioAnalysisTests`, `TemplateProposalToolTests`, `ProfileSimilarityServiceTests`, `TemplateStudioServiceAnalyzeTests`, `TemplateStudioServiceMaterializeTests`, `TemplateStudioAnalysisRepositoryTests`, `Step17TemplateStudioMigrationTests`, `StudioTaskInputStepTests`, `StudioReviewStepTests`, `StudioEditStepTests`, `StudioConfirmationStepTests`.
+
+### Bewusst NICHT in diesem Step:
+
+MCP-Tool-Erweiterung für Studio, Auto-Run nach Materialization, Studio-Iterationen ("Lass nochmal nachdenken"), Lerneffekte aus Audit-Trail, Custom-Executor-Vorschlag, Cost-Budgets, Bulk-Import von Templates.
