@@ -1,0 +1,45 @@
+@using Geef.Atelier.Core.Domain
+
+@if (Iteration is not null && HasCostData)
+{
+    <div class="iteration-cost-block" data-testid="iteration-cost-block">
+        <div class="cost-row executor-cost">
+            <span class="cost-label">Executor</span>
+            <span class="cost-tokens">@(Iteration.ExecutorInputTokens?.ToString("N0") ?? "—")in / @(Iteration.ExecutorOutputTokens?.ToString("N0") ?? "—")out tok</span>
+            <span class="cost-eur">@FormatNullableCost(Iteration.ExecutorCostEur)</span>
+        </div>
+        @if (Iteration.ReviewersTotalCostEur.HasValue)
+        {
+            <div class="cost-row reviewer-cost">
+                <span class="cost-label">Reviewers</span>
+                <span class="cost-eur">@FormatCost(Iteration.ReviewersTotalCostEur.Value)</span>
+            </div>
+        }
+        @if (Iteration.AdvisorsTotalCostEur.HasValue)
+        {
+            <div class="cost-row advisor-cost">
+                <span class="cost-label">Advisors</span>
+                <span class="cost-eur">@FormatCost(Iteration.AdvisorsTotalCostEur.Value)</span>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public IterationEntity? Iteration { get; set; }
+
+    bool HasCostData =>
+        Iteration is not null &&
+        (Iteration.ExecutorInputTokens.HasValue ||
+         Iteration.ReviewersTotalCostEur.HasValue ||
+         Iteration.AdvisorsTotalCostEur.HasValue);
+
+    static string FormatNullableCost(decimal? eur) =>
+        eur.HasValue ? FormatCost(eur.Value) : "—";
+
+    static string FormatCost(decimal eur)
+    {
+        if (eur < 0.01m) return $"~€{eur:F4}";
+        return $"€{eur:F2}";
+    }
+}
