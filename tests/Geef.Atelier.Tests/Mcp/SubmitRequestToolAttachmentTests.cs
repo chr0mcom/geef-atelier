@@ -77,14 +77,14 @@ public sealed class SubmitRequestToolAttachmentTests
     public async Task SubmitRequest_WithUnsupportedContentType_ThrowsArgumentException()
     {
         var svc = new CapturingRunService();
-        var b64 = Convert.ToBase64String("%PDF-1.4"u8.ToArray());
+        var b64 = Convert.ToBase64String("binary"u8.ToArray());
 
-        var json = $$"""[{"filename":"doc.pdf","contentType":"application/pdf","contentBase64":"{{b64}}"}]""";
+        var json = $$"""[{"filename":"doc.docx","contentType":"application/msword","contentBase64":"{{b64}}"}]""";
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(
             () => SubmitRequestTool.SubmitRequest(svc, "briefing", attachments: json));
 
-        Assert.Contains("application/pdf", ex.Message);
+        Assert.Contains("application/msword", ex.Message);
     }
 
     [Fact]

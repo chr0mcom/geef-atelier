@@ -56,7 +56,8 @@ public sealed class SeverityClassificationTests
     private static IRunContext BuildContext(string briefing, string draft) =>
         new RunContext()
             .Set(AtelierContextKeys.GroundedBrief, briefing)
-            .Set(AtelierContextKeys.CurrentDraft,  draft);
+            .Set(AtelierContextKeys.CurrentDraft,  draft)
+            .Set(GeefKeys.CurrentIteration,        1);
 }
 
 internal sealed class FixedSeverityLlmClient(string severity) : ILlmClient
