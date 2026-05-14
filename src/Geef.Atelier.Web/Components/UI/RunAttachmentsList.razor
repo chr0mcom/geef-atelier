@@ -1,0 +1,47 @@
+@using Geef.Atelier.Core.Domain.Crew.Knowledge
+
+<div class="run-attachments" data-testid="run-attachments">
+    <button class="sub-section-toggle collapsible-header" type="button"
+            @onclick="() => _expanded = !_expanded"
+            aria-expanded="@_expanded">
+        <span class="chevron @(_expanded ? "up" : "down")" aria-hidden="true">▾</span>
+        <span>Run Attachments (@Attachments.Count)</span>
+    </button>
+
+    @if (_expanded)
+    {
+        <div class="collapsible-body">
+            <ul class="run-attachments-list">
+                @foreach (var doc in Attachments)
+                {
+                    var d = doc;
+                    <li class="run-attachment-item" data-testid="run-attachment-item">
+                        <div class="run-attachment-info">
+                            <span class="run-attachment-title">@d.Title</span>
+                            <span class="run-attachment-meta">@FormatSize(d.FileSizeBytes) · @d.ChunkCount chunk@(d.ChunkCount == 1 ? "" : "s")</span>
+                        </div>
+                        <button type="button" class="btn small ghost"
+                                data-testid="promote-button"
+                                @onclick="() => OnPromoteClick.InvokeAsync(d)">
+                            Promote to Knowledge Base
+                        </button>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<KnowledgeDocument> Attachments { get; set; } = [];
+    [Parameter] public EventCallback<KnowledgeDocument> OnPromoteClick { get; set; }
+
+    private bool _expanded = true;
+
+    private static string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024} KB";
+        return $"{bytes / 1024.0 / 1024.0:F1} MB";
+    }
+}
