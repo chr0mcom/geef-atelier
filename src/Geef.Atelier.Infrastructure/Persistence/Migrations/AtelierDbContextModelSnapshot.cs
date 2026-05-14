@@ -686,6 +686,48 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
                     b.Navigation("Chunks");
                 });
 
+            modelBuilder.Entity("Geef.Atelier.Infrastructure.Persistence.TemplateStudio.TemplateStudioAnalysisEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("AnalysisResultJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'{}'::jsonb");
+
+                    b.Property<decimal?>("CostEur")
+                        .HasColumnType("decimal(10,6)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("InputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("MaterializedTemplateName")
+                        .HasColumnType("text");
+
+                    b.Property<int>("OutputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TaskDescription")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt")
+                        .IsDescending(true)
+                        .HasDatabaseName("IX_TemplateStudioAnalyses_CreatedAt");
+
+                    b.ToTable("TemplateStudioAnalyses", (string)null);
+                });
+
 #pragma warning restore 612, 618
         }
     }

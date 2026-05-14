@@ -27,7 +27,7 @@ internal sealed class TemplateStudioService(
     {
         var opts = options.Value;
         var context = await BuildContextAsync(ct);
-        var systemPrompt = string.Format(TemplateStudioPrompts.MetaSystemPromptTemplate, context);
+        var systemPrompt = TemplateStudioPrompts.MetaSystemPromptTemplate.Replace("{0}", context);
 
         var (client, model, maxTokens) = resolver.ForProfile("openrouter", opts.Model, opts.MaxTokens);
 
