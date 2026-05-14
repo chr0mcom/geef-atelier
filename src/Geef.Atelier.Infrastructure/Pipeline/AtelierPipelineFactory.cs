@@ -1,4 +1,5 @@
 using Geef.Atelier.Application.Crew.Grounding;
+using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
@@ -32,7 +33,9 @@ internal static class AtelierPipelineFactory
         Guid runId = default,
         ILoggerFactory? loggerFactory = null,
         IEnumerable<IGeefEventSink>? additionalSinks = null,
-        IGroundingProviderFactory? groundingProviderFactory = null)
+        IGroundingProviderFactory? groundingProviderFactory = null,
+        IPricingCatalog? pricingCatalog = null,
+        ICostAccumulator? costAccumulator = null)
     {
         IGroundingStep grounding = new BriefingGroundingStep();
         if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
@@ -43,7 +46,7 @@ internal static class AtelierPipelineFactory
                     ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance);
         }
 
-        IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver);
+        IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);
 
         var preExecutionAdvisors = snapshot.Advisors
             .Where(a => a.Trigger != AdvisorTrigger.OnConvergenceFailure)
@@ -52,13 +55,13 @@ internal static class AtelierPipelineFactory
         if (preExecutionAdvisors.Count > 0 && consultationRepository is not null)
         {
             var advisorInstances = preExecutionAdvisors
-                .Select(a => new ProfileBasedAdvisor(a, resolver, consultationRepository))
+                .Select(a => new ProfileBasedAdvisor(a, resolver, consultationRepository, pricingCatalog, costAccumulator))
                 .ToList();
             execution = new AdvisorAwareExecutor(execution, advisorInstances, runId);
         }
 
         var reviewers = snapshot.Reviewers
-            .Select(r => (IReviewer)new ProfileBasedReviewer(r, resolver));
+            .Select(r => (IReviewer)new ProfileBasedReviewer(r, resolver, pricingCatalog, costAccumulator));
         var finalizer = new MarkdownFinalizer();
 
         return BuildWithProviders(grounding, execution, reviewers, finalizer,
@@ -81,7 +84,9 @@ internal static class AtelierPipelineFactory
         Guid runId = default,
         ILoggerFactory? loggerFactory = null,
         IEnumerable<IGeefEventSink>? additionalSinks = null,
-        IGroundingProviderFactory? groundingProviderFactory = null)
+        IGroundingProviderFactory? groundingProviderFactory = null,
+        IPricingCatalog? pricingCatalog = null,
+        ICostAccumulator? costAccumulator = null)
     {
         IGroundingStep grounding = new AdvisorContextGroundingStep(advisorContextBlock);
         if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
@@ -92,7 +97,7 @@ internal static class AtelierPipelineFactory
                     ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance);
         }
 
-        IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver);
+        IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);
 
         var preExecutionAdvisors = snapshot.Advisors
             .Where(a => a.Trigger != AdvisorTrigger.OnConvergenceFailure)
@@ -101,13 +106,13 @@ internal static class AtelierPipelineFactory
         if (preExecutionAdvisors.Count > 0 && consultationRepository is not null)
         {
             var advisorInstances = preExecutionAdvisors
-                .Select(a => new ProfileBasedAdvisor(a, resolver, consultationRepository))
+                .Select(a => new ProfileBasedAdvisor(a, resolver, consultationRepository, pricingCatalog, costAccumulator))
                 .ToList();
             execution = new AdvisorAwareExecutor(execution, advisorInstances, runId);
         }
 
         var reviewers = snapshot.Reviewers
-            .Select(r => (IReviewer)new ProfileBasedReviewer(r, resolver));
+            .Select(r => (IReviewer)new ProfileBasedReviewer(r, resolver, pricingCatalog, costAccumulator));
         var finalizer = new MarkdownFinalizer();
 
         return BuildWithProviders(grounding, execution, reviewers, finalizer,

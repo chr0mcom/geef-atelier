@@ -2,7 +2,10 @@
 @rendermode InteractiveServer
 @attribute [Authorize]
 @inject IRunService RunService
+@inject IRunRepository RunRepository
 @inject NavigationManager Nav
+@using Geef.Atelier.Core.Domain
+@using Geef.Atelier.Core.Persistence
 
 <PageTitle>Atelier — Geef.Atelier</PageTitle>
 
@@ -29,15 +32,20 @@
             <div class="arrow">⟶ Open the form</div>
         </a>
         <div class="welcome-side">
-            <div class="stat-tile coming-soon" title="Statistics coming soon">
+            <div class="stat-tile" data-testid="stat-runs-this-month">
                 <div class="label">This month</div>
-                <div class="value">—</div>
+                <div class="value">@(_stats?.RunsThisMonth.ToString() ?? "—")</div>
                 <div class="delta">runs</div>
             </div>
-            <div class="stat-tile coming-soon" title="Statistics coming soon">
+            <div class="stat-tile" data-testid="stat-convergence-rate">
                 <div class="label">Convergence rate</div>
-                <div class="value">—</div>
-                <div class="delta">within ≤ 2 iterations</div>
+                <div class="value">@FormatRate(_stats?.ConvergenceRate)</div>
+                <div class="delta">completed runs</div>
+            </div>
+            <div class="stat-tile" data-testid="stat-cost-this-month">
+                <div class="label">Cost this month</div>
+                <div class="value">@FormatCost(_stats?.TotalCostThisMonth)</div>
+                <div class="delta">LLM + research</div>
             </div>
         </div>
     </div>
@@ -83,12 +91,13 @@
 
 @code {
     IReadOnlyList<RunEntity>? _recentRuns;
-
+    WelcomeStats? _stats;
     string _greeting = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         _recentRuns = await RunService.ListRunsAsync(5);
+        _stats      = await RunRepository.GetWelcomeStatsAsync(CancellationToken.None);
         _greeting   = DateTime.Now.ToString("dddd · HH:mm");
     }
 
@@ -103,4 +112,14 @@
 
     static string Truncate(string s, int max) =>
         s.Length > max ? s[..max] + "…" : s;
+
+    static string FormatRate(double? rate) =>
+        rate.HasValue ? $"{rate.Value:P0}" : "—";
+
+    static string FormatCost(decimal? eur)
+    {
+        if (!eur.HasValue || eur.Value == 0m) return "—";
+        if (eur.Value < 0.01m) return $"~€{eur.Value:F4}";
+        return $"€{eur.Value:F2}";
+    }
 }

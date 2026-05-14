@@ -25,6 +25,8 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     public DbSet<GroundingProviderProfile> GroundingProviderProfiles => Set<GroundingProviderProfile>();
     public DbSet<GroundingConsultation> GroundingConsultations => Set<GroundingConsultation>();
 
+    public DbSet<IterationActorCostEntity> IterationActorCosts => Set<IterationActorCostEntity>();
+
     internal DbSet<KnowledgeDocumentEntity> KnowledgeDocuments => Set<KnowledgeDocumentEntity>();
     internal DbSet<KnowledgeDocumentChunkEntity> KnowledgeDocumentChunks => Set<KnowledgeDocumentChunkEntity>();
 

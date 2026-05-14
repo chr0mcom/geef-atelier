@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Geef.Atelier.Application.Crew.Grounding;
+using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
@@ -10,6 +11,7 @@ using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Pipeline;
+using Geef.Atelier.Infrastructure.Pricing;
 using Geef.Sdk.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -25,7 +27,9 @@ internal sealed class RunOrchestratorService(
     IOptions<ConvergenceOptions>        convergenceOptions,
     ILoggerFactory                      loggerFactory,
     ILogger<RunOrchestratorService>     logger,
-    IGroundingProviderFactory?          groundingProviderFactory = null) : BackgroundService
+    IGroundingProviderFactory?          groundingProviderFactory = null,
+    IPricingCatalog?                    pricingCatalog = null,
+    IOptions<CostTrackingOptions>?      costTrackingOptions = null) : BackgroundService
 {
     private readonly OrchestratorOptions _opts = options.Value;
     private readonly SemaphoreSlim _slots = new(options.Value.MaxConcurrentRuns, options.Value.MaxConcurrentRuns);
@@ -155,6 +159,9 @@ internal sealed class RunOrchestratorService(
             var sink       = new PostgresEventSink(run.Id, scopeFactory, runNotifier, sinkLogger);
             var snapshot   = ResolveSnapshot(run);
 
+            var costTrackingEnabled = costTrackingOptions?.Value.Enabled ?? false;
+            var accumulator = costTrackingEnabled ? new RunCostAccumulator() : null;
+
             await using var scope = scopeFactory.CreateAsyncScope();
             var consultations = scope.ServiceProvider.GetRequiredService<IAdvisorConsultationRepository>();
 
@@ -164,11 +171,15 @@ internal sealed class RunOrchestratorService(
                 runId: run.Id,
                 loggerFactory: loggerFactory,
                 additionalSinks: [sink],
-                groundingProviderFactory: groundingProviderFactory);
+                groundingProviderFactory: groundingProviderFactory,
+                pricingCatalog: pricingCatalog,
+                costAccumulator: accumulator);
 
             try
             {
                 await runner.RunAsync(run.BriefingText, cts.Token);
+                if (accumulator is not null)
+                    await FinalizeRunCostsAsync(run.Id, accumulator, cts.Token);
             }
             catch (ConvergenceFailedException convergenceEx)
             {
@@ -349,6 +360,9 @@ internal sealed class RunOrchestratorService(
         var retryConsultations = retryScope.ServiceProvider
             .GetRequiredService<IAdvisorConsultationRepository>();
 
+        var costTrackingEnabled = costTrackingOptions?.Value.Enabled ?? false;
+        var retryAccumulator = costTrackingEnabled ? new RunCostAccumulator() : null;
+
         var retryRunner = AtelierPipelineFactory.BuildWithAdvisorContext(
             snapshot,
             llmClientResolver,
@@ -358,12 +372,16 @@ internal sealed class RunOrchestratorService(
             runId: run.Id,
             loggerFactory: loggerFactory,
             additionalSinks: [retrySink],
-            groundingProviderFactory: groundingProviderFactory);
+            groundingProviderFactory: groundingProviderFactory,
+            pricingCatalog: pricingCatalog,
+            costAccumulator: retryAccumulator);
 
         // The retry pipeline writes its own status via PostgresEventSink just like the main run.
         // ConvergenceFailedException from the retry is intentionally not caught here — it propagates
         // to the outer ProcessRunAsync handler which will mark the run as Failed.
         await retryRunner.RunAsync(run.BriefingText, ct);
+        if (retryAccumulator is not null)
+            await FinalizeRunCostsAsync(run.Id, retryAccumulator, ct);
 
         return true;
     }
@@ -467,6 +485,101 @@ internal sealed class RunOrchestratorService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to mark run {RunId} as Aborted during shutdown.", runId);
+        }
+    }
+
+    /// <summary>
+    /// Persists per-actor cost records, aggregates them at iteration level, and updates the run totals.
+    /// Called after a successful pipeline run when cost tracking is enabled.
+    /// </summary>
+    private async Task FinalizeRunCostsAsync(Guid runId, ICostAccumulator accumulator, CancellationToken ct)
+    {
+        try
+        {
+            var pending = accumulator.Flush();
+            if (pending.Count == 0) return;
+
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
+
+            // Load iterations to map IterationNumber → IterationId
+            var iterations = await db.Iterations
+                .Where(i => i.RunId == runId)
+                .OrderBy(i => i.IterationNumber)
+                .ToListAsync(ct);
+
+            var iterByNumber = iterations.ToDictionary(i => i.IterationNumber, i => i);
+
+            // Persist individual actor cost records
+            var costEntities = new List<IterationActorCostEntity>();
+            foreach (var cost in pending)
+            {
+                if (!iterByNumber.TryGetValue(cost.IterationNumber, out var iter))
+                    continue;
+
+                costEntities.Add(new IterationActorCostEntity
+                {
+                    Id           = Guid.NewGuid(),
+                    IterationId  = iter.Id,
+                    ActorType    = cost.ActorType,
+                    ActorName    = cost.ActorName,
+                    ModelName    = cost.ModelName,
+                    InputTokens  = cost.InputTokens,
+                    OutputTokens = cost.OutputTokens,
+                    CostEur      = cost.CostEur,
+                    CreatedAt    = DateTimeOffset.UtcNow
+                });
+            }
+
+            db.IterationActorCosts.AddRange(costEntities);
+            await db.SaveChangesAsync(ct);
+
+            // Aggregate costs per iteration and update iteration rows
+            foreach (var iter in iterations)
+            {
+                var iterCosts = costEntities.Where(c => c.IterationId == iter.Id).ToList();
+                if (iterCosts.Count == 0) continue;
+
+                var execCosts     = iterCosts.Where(c => c.ActorType == ActorType.Executor).ToList();
+                var reviewerCosts = iterCosts.Where(c => c.ActorType == ActorType.Reviewer).ToList();
+                var advisorCosts  = iterCosts.Where(c => c.ActorType == ActorType.Advisor).ToList();
+
+                await db.Iterations
+                    .Where(i => i.Id == iter.Id)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(i => i.ExecutorInputTokens,    execCosts.Sum(c => c.InputTokens))
+                        .SetProperty(i => i.ExecutorOutputTokens,   execCosts.Sum(c => c.OutputTokens))
+                        .SetProperty(i => i.ExecutorCostEur,        execCosts.Any(c => c.CostEur.HasValue) ? execCosts.Sum(c => c.CostEur ?? 0m) : (decimal?)null)
+                        .SetProperty(i => i.ReviewersTotalCostEur,  reviewerCosts.Any(c => c.CostEur.HasValue) ? reviewerCosts.Sum(c => c.CostEur ?? 0m) : (decimal?)null)
+                        .SetProperty(i => i.AdvisorsTotalCostEur,   advisorCosts.Any(c => c.CostEur.HasValue) ? advisorCosts.Sum(c => c.CostEur ?? 0m) : (decimal?)null),
+                        ct);
+            }
+
+            // Aggregate on run level
+            var llmCostEur = costEntities.Any(c => c.CostEur.HasValue)
+                ? costEntities.Sum(c => c.CostEur ?? 0m)
+                : (decimal?)null;
+
+            // Sum grounding costs from GroundingConsultations
+            var groundingCostEur = await db.GroundingConsultations
+                .Where(g => g.RunId == runId && g.CostEur.HasValue)
+                .SumAsync(g => g.CostEur!.Value, ct);
+            var groundingCostNullable = groundingCostEur > 0 ? groundingCostEur : (decimal?)null;
+
+            var totalCostEur = (llmCostEur ?? 0m) + (groundingCostNullable ?? 0m);
+            var totalNullable = totalCostEur > 0 ? totalCostEur : (decimal?)null;
+
+            await db.Runs
+                .Where(r => r.Id == runId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.LlmCostEur,      llmCostEur)
+                    .SetProperty(r => r.GroundingCostEur, groundingCostNullable)
+                    .SetProperty(r => r.TotalCostEur,     totalNullable),
+                    ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to finalize cost tracking for run {RunId}.", runId);
         }
     }
 }

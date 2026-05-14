@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Geef.Atelier.Application.Pricing;
+using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk.Context;
@@ -12,7 +14,9 @@ namespace Geef.Atelier.Infrastructure.Pipeline;
 
 internal sealed class ProfileBasedReviewer(
     ReviewerProfile profile,
-    ILlmClientResolver resolver) : IReviewer
+    ILlmClientResolver resolver,
+    IPricingCatalog? pricingCatalog = null,
+    ICostAccumulator? costAccumulator = null) : IReviewer
 {
     public string Name => profile.Name;
     public int Priority => 0;
@@ -21,6 +25,7 @@ internal sealed class ProfileBasedReviewer(
     {
         var brief = context.GetRequired(AtelierContextKeys.GroundedBrief);
         var draft = context.GetRequired(AtelierContextKeys.CurrentDraft);
+        var iter  = context.GetRequired(GeefKeys.CurrentIteration);
 
         var userPrompt = $"""
             Briefing:
@@ -43,6 +48,15 @@ internal sealed class ProfileBasedReviewer(
             Tools        = [ReviewerToolDefinition.SubmitReview],
             ToolChoice   = "function:submit_review"
         }, cancellationToken);
+
+        if (costAccumulator is not null)
+        {
+            var costEur = pricingCatalog?.CalculateCostEur(
+                model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens);
+            costAccumulator.RecordActorCost(
+                iter, ActorType.Reviewer, profile.Name, model,
+                response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur);
+        }
 
         if (response.FinishReason != "tool_calls" || response.ToolArgumentsJson is null)
         {
