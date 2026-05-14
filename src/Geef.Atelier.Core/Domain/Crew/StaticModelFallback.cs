@@ -30,10 +30,10 @@ public static class StaticModelFallback
 
     public static readonly IReadOnlyList<ModelInfo> ForCodexCli = new ModelInfo[]
     {
-        new("gpt-5.3-codex",     "GPT-5.3 Codex",     "Newest Codex model, best coding quality",    true),
-        new("gpt-5.2-codex",     "GPT-5.2 Codex",     "Previous Codex generation, fast and capable", true),
-        new("gpt-5.1-codex-max", "GPT-5.1 Codex Max", "High-power Codex variant",                   true),
-        new("gpt-5.1-codex",     "GPT-5.1 Codex",     "Standard Codex model",                       false),
+        new("gpt-5.5-pro",  "GPT-5.5 Pro",  "Most capable, 1M context",     true),
+        new("gpt-5.5",      "GPT-5.5",      "Latest generation, 1M context", true),
+        new("gpt-5.4-nano", "GPT-5.4 Nano", "Fast and cheap, 400k context",  true),
+        new("gpt-5.4-mini", "GPT-5.4 Mini", "Balanced, 400k context",        false),
     };
 
     /// <summary>Returns the fallback list for <paramref name="providerName"/>, or an empty list if unknown.</summary>
