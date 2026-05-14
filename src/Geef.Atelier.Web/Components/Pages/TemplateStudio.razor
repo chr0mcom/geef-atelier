@@ -21,6 +21,8 @@
                 TaskDescription="@_taskDescription"
                 TaskDescriptionChanged="@(v => _taskDescription = v)"
                 OnAnalyze="StartAnalysisAsync" />
+            <hr class="section-divider" style="margin: 2rem 0;" />
+            <StudioAnalysisHistoryList OnReAnalyze="HandleReAnalyze" />
             break;
 
         case StudioStep.Analyzing:
@@ -134,5 +136,12 @@
     private void StartRunWithTemplate()
     {
         Nav.NavigateTo($"/new?template={Uri.EscapeDataString(_materializationResult!.CreatedTemplateName)}");
+    }
+
+    private void HandleReAnalyze(string taskDescription)
+    {
+        _taskDescription = taskDescription;
+        _error = null;
+        StateHasChanged();
     }
 }
