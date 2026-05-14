@@ -2,6 +2,8 @@
 @rendermode InteractiveServer
 @attribute [Authorize]
 @using Geef.Atelier.Core.Domain.Crew
+@using Geef.Atelier.Application.Runs
+@using Microsoft.AspNetCore.Components.Forms
 @inject IRunService RunService
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthProvider
@@ -53,6 +55,15 @@ Be specific. Generic briefings produce generic texts."
         </div>
     }
 
+    <div class="attachment-section">
+        <label>Attachments <span class="form-hint">(optional, MD/TXT, max @_maxFiles files x @(_maxFileSizeBytes / 1024 / 1024) MB)</span></label>
+        <FileDropZone @bind-Files="_attachmentFiles"
+                      AllowedExtensions="@(new[] { ".md", ".txt" })"
+                      MaxFiles="@_maxFiles"
+                      MaxFileSizeBytes="@_maxFileSizeBytes"
+                      data-testid="run-attachment-dropzone" />
+    </div>
+
     <CrewSelector @bind-Value="_crewTemplateName" />
 
     <div class="newrun-actions">
@@ -60,7 +71,18 @@ Be specific. Generic briefings produce generic texts."
         <div style="display:flex;gap:10px">
             <a class="btn ghost" href="/runs">Cancel</a>
             <button class="btn primary btn-submit" disabled="@(!CanSubmit)" @onclick="SubmitAsync">
-                @(_submitting ? "Handing over…" : "Hand to the crew")
+                @if (_submitting && _attachmentFiles.Count > 0)
+                {
+                    <text>Processing @_attachmentFiles.Count attachment(s) and starting run...</text>
+                }
+                else if (_submitting)
+                {
+                    <text>Handing over...</text>
+                }
+                else
+                {
+                    <text>Hand to the crew</text>
+                }
             </button>
         </div>
     </div>
@@ -80,6 +102,9 @@ Be specific. Generic briefings produce generic texts."
     bool   _openConfig;
     bool   _submitting;
     string? _error;
+    IReadOnlyList<IBrowserFile> _attachmentFiles = [];
+    const int _maxFiles = 5;
+    const long _maxFileSizeBytes = 5 * 1024 * 1024;
 
     int  WordCount  => _briefing.Trim().Length > 0 ? _briefing.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).Length : 0;
     bool CanSubmit  => _briefing.Trim().Length > 0 && !_submitting;
@@ -93,7 +118,27 @@ Be specific. Generic briefings produce generic texts."
         {
             var auth = await AuthProvider.GetAuthenticationStateAsync();
             var user = auth.User.Identity?.Name;
-            var id   = await RunService.SubmitRunAsync(new Geef.Atelier.Application.Runs.SubmitRunRequest(_briefing, _configJson, CreatedByUser: user, CrewTemplateName: _crewTemplateName));
+
+            IReadOnlyList<RunAttachmentInput>? attachments = null;
+            if (_attachmentFiles.Count > 0)
+            {
+                var list = new List<RunAttachmentInput>();
+                foreach (var file in _attachmentFiles)
+                {
+                    using var stream = file.OpenReadStream(maxAllowedSize: _maxFileSizeBytes);
+                    using var ms = new MemoryStream();
+                    await stream.CopyToAsync(ms);
+                    list.Add(new RunAttachmentInput(file.Name, file.ContentType, ms.ToArray()));
+                }
+                attachments = list;
+            }
+
+            var id = await RunService.SubmitRunAsync(new SubmitRunRequest(
+                BriefingText: _briefing,
+                ConfigJson: _configJson,
+                CreatedByUser: user,
+                CrewTemplateName: _crewTemplateName,
+                Attachments: attachments));
             Nav.NavigateTo($"/runs/{id}");
         }
         catch (ArgumentException ex) { _error = ex.Message; }
