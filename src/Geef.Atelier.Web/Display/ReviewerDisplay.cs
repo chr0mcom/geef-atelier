@@ -97,4 +97,17 @@ public static class ReviewerDisplay
         SystemCrew.GroundingProviderProfiles.TryGetValue(profileName, out var profile)
             ? profile.DisplayName
             : fallbackDisplayName ?? profileName;
+
+    /// <summary>
+    /// Returns a short domain label for a crew template name, or <c>null</c> for generic templates.
+    /// Used by <c>DomainBadge</c> to show a visual domain indicator on template cards.
+    /// </summary>
+    public static string? GetTemplateDomain(string? templateName) =>
+        templateName switch
+        {
+            "juristisch" => "Legal",
+            "akademisch" => "Academic",
+            "marketing"  => "Marketing",
+            _            => null
+        };
 }

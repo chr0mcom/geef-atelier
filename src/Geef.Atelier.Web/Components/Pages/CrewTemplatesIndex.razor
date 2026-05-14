@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @using Geef.Atelier.Application.Crew
 @using Geef.Atelier.Core.Domain.Crew
+@using Geef.Atelier.Web.Display
 @inject ICrewService CrewService
 
 <PageTitle>Crew Templates — Atelier</PageTitle>
@@ -36,6 +37,7 @@
                         <td>
                             @t.DisplayName
                             @if (t.IsSystem) { <span class="crew-badge">System</span> }
+                            <DomainBadge TemplateName="@t.Name" />
                         </td>
                         <td>@t.ExecutorProfileName</td>
                         <td>@t.ReviewerProfileNames.Count</td>
