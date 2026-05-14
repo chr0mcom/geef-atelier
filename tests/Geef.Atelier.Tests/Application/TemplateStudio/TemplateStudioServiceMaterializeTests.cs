@@ -102,7 +102,16 @@ public sealed class TemplateStudioServiceMaterializeTests
             => Task.FromResult((IReadOnlyList<TemplateStudioAnalysis>)_store.Take(limit).ToList());
 
         public Task<(IReadOnlyList<TemplateStudioHistoryItem> Items, bool HasMore)> ListHistoryAsync(int page, int pageSize, CancellationToken ct = default)
-            => Task.FromResult<(IReadOnlyList<TemplateStudioHistoryItem>, bool)>(([], false));
+        {
+            var skip = page * pageSize;
+            var take = pageSize + 1;
+            var slice = _store.Skip(skip).Take(take).ToList();
+            var hasMore = slice.Count > pageSize;
+            var items = slice.Take(pageSize)
+                .Select(a => new TemplateStudioHistoryItem(a.Id, a.TaskDescription, a.ReasoningSummary, null, a.CostEur, a.CreatedAt))
+                .ToList();
+            return Task.FromResult(((IReadOnlyList<TemplateStudioHistoryItem>)items, hasMore));
+        }
     }
 
     private sealed class EmptyProviderCatalog : IProviderCatalog

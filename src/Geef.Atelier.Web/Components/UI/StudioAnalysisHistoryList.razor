@@ -1,4 +1,5 @@
 @using Geef.Atelier.Application.Crew.TemplateStudio
+@using Microsoft.AspNetCore.Components.Web
 @inject ITemplateStudioService StudioService
 
 <div class="analysis-history" data-testid="analysis-history">
@@ -31,7 +32,7 @@
                         <span class="cost t-mono">@FormatCost(entry.CostEur)</span>
                     </div>
 
-                    @if (_expandedId == entryId)
+                    @if (_expandedId == entry.Id)
                     {
                         <div class="entry-details" data-testid="entry-details">
                             <h4>Task</h4>
@@ -108,7 +109,7 @@
         _expandedId = _expandedId == id ? null : id;
     }
 
-    private void HandleKeyDown(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, Guid id)
+    private void HandleKeyDown(KeyboardEventArgs e, Guid id)
     {
         if (e.Key is "Enter" or " ")
             ToggleExpand(id);

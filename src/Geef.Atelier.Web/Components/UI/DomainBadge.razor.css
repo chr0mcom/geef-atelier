@@ -1,0 +1,28 @@
+.domain-badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid currentColor;
+    opacity: 0.7;
+}
+
+.domain-badge--legal,
+.domain-badge--juristisch {
+    color: oklch(0.45 0.08 250);
+    background: oklch(0.96 0.02 250);
+}
+
+.domain-badge--academic,
+.domain-badge--akademisch {
+    color: oklch(0.42 0.09 160);
+    background: oklch(0.96 0.02 160);
+}
+
+.domain-badge--marketing {
+    color: oklch(0.45 0.10 30);
+    background: oklch(0.97 0.02 30);
+}

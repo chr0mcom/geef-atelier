@@ -58,6 +58,74 @@ public static class SystemCrew
         MaxTokens: null,
         IsSystem: true);
 
+    // ── Domain reviewer profiles ────────────────────────────────────────────────────
+
+    /// <summary>Legal jargon precision reviewer — checks German legal texts for terminological exactness.</summary>
+    public static readonly ReviewerProfile LegalJargonPrecisionProfile = new(
+        Name: "legal-jargon-precision",
+        DisplayName: "Legal Jargon Precision",
+        Description: "Checks German legal texts for precise use of legal terminology. Identifies colloquial substitutes where statutory terms are required (e.g., Anfechtung vs. Widerruf, Kündigung vs. Rücktritt).",
+        SystemPrompt: SystemPrompts.LegalJargonPrecision,
+        Provider: "openrouter",
+        Model: "openai/gpt-4o-mini",
+        MaxTokens: null,
+        IsSystem: true);
+
+    /// <summary>Legal clause risk reviewer — identifies problematic or unenforceable contract clauses.</summary>
+    public static readonly ReviewerProfile LegalClauseRiskProfile = new(
+        Name: "legal-clause-risk",
+        DisplayName: "Legal Clause Risk",
+        Description: "Identifies problematic or void contract clauses. Checks AGB conformity (§307 BGB), consumer protection compliance (§§312ff./474ff. BGB), and penalty clause proportionality.",
+        SystemPrompt: SystemPrompts.LegalClauseRisk,
+        Provider: "openrouter",
+        Model: "anthropic/claude-sonnet-4-5",
+        MaxTokens: null,
+        IsSystem: true);
+
+    /// <summary>Academic citation readiness reviewer — marks uncited claims that require sources.</summary>
+    public static readonly ReviewerProfile AcademicCitationReadinessProfile = new(
+        Name: "academic-citation-readiness",
+        DisplayName: "Academic Citation Readiness",
+        Description: "Checks scholarly texts for citation adequacy. Distinguishes common knowledge from claims requiring attribution; marks uncited empirical findings and contested theoretical positions.",
+        SystemPrompt: SystemPrompts.AcademicCitationReadiness,
+        Provider: "openrouter",
+        Model: "openai/gpt-4o-mini",
+        MaxTokens: null,
+        IsSystem: true);
+
+    /// <summary>Academic argumentation rigor reviewer — checks logical structure and identifies fallacies.</summary>
+    public static readonly ReviewerProfile AcademicArgumentationRigorProfile = new(
+        Name: "academic-argumentation-rigor",
+        DisplayName: "Academic Argumentation Rigor",
+        Description: "Checks academic argumentation for logical soundness. Maps Claim→Premise→Warrant→Conclusion and identifies non sequiturs, false dichotomies, hasty generalisations, and other formal fallacies.",
+        SystemPrompt: SystemPrompts.AcademicArgumentationRigor,
+        Provider: "openrouter",
+        Model: "anthropic/claude-sonnet-4-5",
+        MaxTokens: null,
+        IsSystem: true);
+
+    /// <summary>Marketing audience clarity reviewer — checks if copy matches the defined target audience.</summary>
+    public static readonly ReviewerProfile MarketingAudienceClarityProfile = new(
+        Name: "marketing-audience-clarity",
+        DisplayName: "Marketing Audience Clarity",
+        Description: "Checks marketing texts for target-audience alignment. Evaluates reading level, tone, jargon-accessibility balance, and cultural resonance against the stated audience persona.",
+        SystemPrompt: SystemPrompts.MarketingAudienceClarity,
+        Provider: "openrouter",
+        Model: "google/gemini-2.5-flash",
+        MaxTokens: null,
+        IsSystem: true);
+
+    /// <summary>Marketing conversion strength reviewer — checks CTAs, value propositions, and urgency signals.</summary>
+    public static readonly ReviewerProfile MarketingConversionStrengthProfile = new(
+        Name: "marketing-conversion-strength",
+        DisplayName: "Marketing Conversion Strength",
+        Description: "Checks marketing copy for conversion effectiveness. Verifies CTA clarity (action verb + outcome), USP visibility, urgency signals, and social proof integration.",
+        SystemPrompt: SystemPrompts.MarketingConversionStrength,
+        Provider: "openrouter",
+        Model: "openai/gpt-4o-mini",
+        MaxTokens: null,
+        IsSystem: true);
+
     /// <summary>The only system template in PS-5: the Klassik crew that reproduces the PS-2 hardcoded behaviour.</summary>
     public static readonly CrewTemplate KlassikTemplate = new(
         Name: KlassikTemplateName,
@@ -65,6 +133,47 @@ public static class SystemCrew
         Description: "The default Atelier crew: one drafting executor plus briefing-fidelity and clarity reviewers running in parallel. Reproduces the pre-PS-5 hardcoded pipeline.",
         ExecutorProfileName: DefaultExecutorProfile.Name,
         ReviewerProfileNames: new[] { BriefingFidelityProfile.Name, ClarityProfile.Name },
+        EvaluationStrategy: EvaluationStrategy.Parallel,
+        ConvergenceOverride: null,
+        AdvisorProfileNames: Array.Empty<string>(),
+        GroundingProviderNames: Array.Empty<string>(),
+        IsSystem: true);
+
+    // ── Domain templates ────────────────────────────────────────────────────────────
+
+    /// <summary>Juristisch template — for German legal texts: contract drafting, clause analysis, legal opinions.</summary>
+    public static readonly CrewTemplate JuristischTemplate = new(
+        Name: "juristisch",
+        DisplayName: "Juristisch",
+        Description: "Für juristische Texte: Vertragsentwürfe, Klausel-Analysen, rechtliche Stellungnahmen. Mit Fachterminologie-Review und Klausel-Risiko-Check. Reviewers laufen sequenziell, da Klausel-Risk auf dem Jargon-Output aufbaut.",
+        ExecutorProfileName: DefaultExecutorProfile.Name,
+        ReviewerProfileNames: new[] { BriefingFidelityProfile.Name, LegalJargonPrecisionProfile.Name, LegalClauseRiskProfile.Name },
+        EvaluationStrategy: EvaluationStrategy.Sequential,
+        ConvergenceOverride: null,
+        AdvisorProfileNames: new[] { "legal-domain-expert" },
+        GroundingProviderNames: Array.Empty<string>(),
+        IsSystem: true);
+
+    /// <summary>Akademisch template — for scientific texts: papers, argumentation essays, research texts.</summary>
+    public static readonly CrewTemplate AkademischTemplate = new(
+        Name: "akademisch",
+        DisplayName: "Akademisch",
+        Description: "Für wissenschaftliche Texte: Papers, Argumentations-Aufsätze, Forschungstexte. Mit Zitierfähigkeits-Check und Argumentations-Stringenz-Review. Reviewers laufen sequenziell.",
+        ExecutorProfileName: DefaultExecutorProfile.Name,
+        ReviewerProfileNames: new[] { BriefingFidelityProfile.Name, AcademicCitationReadinessProfile.Name, AcademicArgumentationRigorProfile.Name },
+        EvaluationStrategy: EvaluationStrategy.Sequential,
+        ConvergenceOverride: null,
+        AdvisorProfileNames: new[] { "academic-rigor-advisor" },
+        GroundingProviderNames: Array.Empty<string>(),
+        IsSystem: true);
+
+    /// <summary>Marketing template — for marketing copy: landing pages, emails, ad copy.</summary>
+    public static readonly CrewTemplate MarketingTemplate = new(
+        Name: "marketing",
+        DisplayName: "Marketing",
+        Description: "Für Marketing-Texte: Landing-Pages, Mails, Werbe-Copy. Mit Audience-Klarheits-Check und Conversion-Stärke-Review. Reviewers laufen parallel (unabhängige Perspektiven).",
+        ExecutorProfileName: DefaultExecutorProfile.Name,
+        ReviewerProfileNames: new[] { BriefingFidelityProfile.Name, MarketingAudienceClarityProfile.Name, MarketingConversionStrengthProfile.Name },
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
@@ -110,8 +219,14 @@ public static class SystemCrew
     public static readonly IReadOnlyDictionary<string, ReviewerProfile> ReviewerProfiles =
         new Dictionary<string, ReviewerProfile>
         {
-            [BriefingFidelityProfile.Name] = BriefingFidelityProfile,
-            [ClarityProfile.Name] = ClarityProfile,
+            [BriefingFidelityProfile.Name]              = BriefingFidelityProfile,
+            [ClarityProfile.Name]                       = ClarityProfile,
+            [LegalJargonPrecisionProfile.Name]          = LegalJargonPrecisionProfile,
+            [LegalClauseRiskProfile.Name]               = LegalClauseRiskProfile,
+            [AcademicCitationReadinessProfile.Name]     = AcademicCitationReadinessProfile,
+            [AcademicArgumentationRigorProfile.Name]    = AcademicArgumentationRigorProfile,
+            [MarketingAudienceClarityProfile.Name]      = MarketingAudienceClarityProfile,
+            [MarketingConversionStrengthProfile.Name]   = MarketingConversionStrengthProfile,
         };
 
     /// <summary>All system executor profiles, indexed by name.</summary>
@@ -120,6 +235,34 @@ public static class SystemCrew
         {
             [DefaultExecutorProfile.Name] = DefaultExecutorProfile,
         };
+
+    // ── Domain advisor profiles ─────────────────────────────────────────────────────
+
+    /// <summary>Legal domain expert advisor — pre-checks briefings for legal practicability (BeforeFirstExecution).</summary>
+    public static readonly AdvisorProfile LegalDomainExpertProfile = new(
+        Name: "legal-domain-expert",
+        DisplayName: "Legal Domain Expert",
+        Description: "Pre-checks briefings for legal practicability before drafting begins. Identifies constraints, terminological traps, regulatory context, missing information, and risk areas where qualifications are needed.",
+        SystemPrompt: SystemPrompts.LegalDomainExpert,
+        Provider: "openrouter",
+        Model: "anthropic/claude-sonnet-4-5",
+        MaxTokens: null,
+        Mode: AdvisorMode.DomainExpert,
+        Trigger: AdvisorTrigger.BeforeFirstExecution,
+        IsSystem: true);
+
+    /// <summary>Academic rigor advisor — challenges weakest assumptions in the draft before every iteration.</summary>
+    public static readonly AdvisorProfile AcademicRigorAdvisorProfile = new(
+        Name: "academic-rigor-advisor",
+        DisplayName: "Academic Rigor Advisor",
+        Description: "Challenges the weakest assumptions, contested claims, and methodological gaps in the current draft before each iteration. Rotates focus to prevent repetitive critique.",
+        SystemPrompt: SystemPrompts.AcademicRigorAdvisor,
+        Provider: "openrouter",
+        Model: "openai/gpt-4o-mini",
+        MaxTokens: null,
+        Mode: AdvisorMode.Critical,
+        Trigger: AdvisorTrigger.BeforeEveryExecution,
+        IsSystem: true);
 
     /// <summary>Strategic advisor consulted once before the executor begins: surfaces unclear constraints and missing context.</summary>
     public static readonly AdvisorProfile BriefingClarifierProfile = new(
@@ -151,8 +294,10 @@ public static class SystemCrew
     public static readonly IReadOnlyDictionary<string, AdvisorProfile> AdvisorProfiles =
         new Dictionary<string, AdvisorProfile>
         {
-            [BriefingClarifierProfile.Name] = BriefingClarifierProfile,
-            [DevilsAdvocateProfile.Name] = DevilsAdvocateProfile,
+            [LegalDomainExpertProfile.Name]      = LegalDomainExpertProfile,
+            [AcademicRigorAdvisorProfile.Name]   = AcademicRigorAdvisorProfile,
+            [BriefingClarifierProfile.Name]       = BriefingClarifierProfile,
+            [DevilsAdvocateProfile.Name]          = DevilsAdvocateProfile,
         };
 
     /// <summary>All system grounding-provider profiles, indexed by name.</summary>
@@ -168,7 +313,10 @@ public static class SystemCrew
     public static readonly IReadOnlyDictionary<string, CrewTemplate> CrewTemplates =
         new Dictionary<string, CrewTemplate>
         {
-            [KlassikTemplate.Name] = KlassikTemplate,
+            [KlassikTemplate.Name]    = KlassikTemplate,
+            [JuristischTemplate.Name] = JuristischTemplate,
+            [AkademischTemplate.Name] = AkademischTemplate,
+            [MarketingTemplate.Name]  = MarketingTemplate,
         };
 
     /// <summary>
