@@ -18,6 +18,7 @@ public static class KnowledgeServiceExtensions
         services.Configure<KnowledgeOptions>(configuration.GetSection("Knowledge"));
 
         services.AddSingleton<RecursiveCharacterTextSplitter>();
+        services.AddSingleton<PdfTextExtractor>();
         services.AddScoped<DocumentIndexingService>();
         services.AddScoped<IKnowledgeService, KnowledgeService>();
         services.AddScoped<IKnowledgeDocumentRepository, KnowledgeDocumentRepository>();

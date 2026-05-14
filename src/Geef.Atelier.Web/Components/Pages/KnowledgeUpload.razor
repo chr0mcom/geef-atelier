@@ -37,7 +37,7 @@
         try
         {
             var contentType = args.File.ContentType is { Length: > 0 } ct ? ct : "text/plain";
-            await using var stream = args.File.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            await using var stream = args.File.OpenReadStream(maxAllowedSize: 26 * 1024 * 1024);
             var doc = await KnowledgeService.UploadAsync(
                 args.Title,
                 args.Description,

@@ -31,7 +31,7 @@ public sealed class KnowledgeServiceTests
         var content = new MemoryStream("hello"u8.ToArray());
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.UploadAsync("title", "desc", [], content, "doc.pdf", "application/pdf", CancellationToken.None));
+            () => service.UploadAsync("title", "desc", [], content, "doc.docx", "application/msword", CancellationToken.None));
     }
 
     [Fact]
@@ -114,11 +114,11 @@ public sealed class KnowledgeServiceTests
     {
         var (service, _) = BuildService();
         var runId = Guid.NewGuid();
-        var content = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 }); // PDF magic bytes
+        var content = new MemoryStream("binary"u8.ToArray());
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.UploadRunAttachmentAsync(
-                runId, "PDF Attachment", content, "doc.pdf", "application/pdf", CancellationToken.None));
+                runId, "Word Attachment", content, "doc.docx", "application/msword", CancellationToken.None));
     }
 
     [Fact]
@@ -241,11 +241,13 @@ public sealed class KnowledgeServiceTests
             splitter, embeddingProvider, chunkRepo, NullLogger<DocumentIndexingService>.Instance);
 
         var knowledgeOpts = opts ?? new KnowledgeOptions();
+        var pdfExtractor = new PdfTextExtractor(NullLogger<PdfTextExtractor>.Instance);
         var service = new KnowledgeService(
             docRepo,
             chunkRepo,
             indexingService,
             embeddingProvider,
+            pdfExtractor,
             Options.Create(knowledgeOpts),
             NullLogger<KnowledgeService>.Instance);
 

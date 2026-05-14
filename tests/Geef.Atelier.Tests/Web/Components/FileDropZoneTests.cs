@@ -110,6 +110,57 @@ public sealed class FileDropZoneTests : TestContext
         Assert.Single(captured!);
     }
 
+    [Fact]
+    public void PdfFile_WithinPdfSizeLimit_IsAccepted()
+    {
+        IReadOnlyList<IBrowserFile>? captured = null;
+        var cut = RenderComponent<FileDropZone>(p =>
+        {
+            p.Add(c => c.AllowedExtensions, new[] { ".pdf" });
+            p.Add(c => c.MaxFileSizeBytes, 5 * 1024 * 1024L);
+            p.Add(c => c.MaxPdfSizeBytes, 25 * 1024 * 1024L);
+            p.Add(c => c.FilesChanged,
+                Microsoft.AspNetCore.Components.EventCallback.Factory.Create<IReadOnlyList<IBrowserFile>>(
+                    this, files => captured = files));
+        });
+
+        var pdfFile = new FakeBrowserFile("report.pdf", 20 * 1024 * 1024);
+        var input = cut.FindComponent<InputFile>();
+        input.InvokeAsync(() =>
+            input.Instance.OnChange.InvokeAsync(new InputFileChangeEventArgs([pdfFile])));
+
+        cut.WaitForState(() => captured is { Count: > 0 });
+
+        Assert.NotNull(captured);
+        Assert.Single(captured!);
+        Assert.Throws<Bunit.ElementNotFoundException>(() => cut.Find("[data-testid='file-drop-errors']"));
+    }
+
+    [Fact]
+    public void PdfFile_ExceedingPdfSizeLimit_ShowsErrorAndIsExcluded()
+    {
+        IReadOnlyList<IBrowserFile>? captured = null;
+        var cut = RenderComponent<FileDropZone>(p =>
+        {
+            p.Add(c => c.AllowedExtensions, new[] { ".pdf" });
+            p.Add(c => c.MaxFileSizeBytes, 5 * 1024 * 1024L);
+            p.Add(c => c.MaxPdfSizeBytes, 25 * 1024 * 1024L);
+            p.Add(c => c.FilesChanged,
+                Microsoft.AspNetCore.Components.EventCallback.Factory.Create<IReadOnlyList<IBrowserFile>>(
+                    this, files => captured = files));
+        });
+
+        var bigPdf = new FakeBrowserFile("huge.pdf", 30 * 1024 * 1024);
+        var input = cut.FindComponent<InputFile>();
+        input.InvokeAsync(() =>
+            input.Instance.OnChange.InvokeAsync(new InputFileChangeEventArgs([bigPdf])));
+
+        cut.WaitForState(() => cut.FindAll("[data-testid='file-drop-errors']").Count > 0);
+
+        Assert.Contains("exceeds", cut.Markup);
+        Assert.True(captured is null || captured.Count == 0);
+    }
+
     /// <summary>
     /// Minimal <see cref="IBrowserFile"/> stub for unit tests.
     /// </summary>

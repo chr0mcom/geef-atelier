@@ -41,9 +41,10 @@
 @code {
     [Parameter] public IReadOnlyList<IBrowserFile> Files { get; set; } = [];
     [Parameter] public EventCallback<IReadOnlyList<IBrowserFile>> FilesChanged { get; set; }
-    [Parameter] public string[] AllowedExtensions { get; set; } = [".md", ".txt"];
+    [Parameter] public string[] AllowedExtensions { get; set; } = [".md", ".txt", ".pdf"];
     [Parameter] public int MaxFiles { get; set; } = 5;
     [Parameter] public long MaxFileSizeBytes { get; set; } = 5 * 1024 * 1024;
+    [Parameter] public long MaxPdfSizeBytes { get; set; } = 25 * 1024 * 1024;
 
     private readonly List<IBrowserFile> _files = [];
     private readonly List<string> _errors = [];
@@ -65,9 +66,10 @@
                 _errors.Add($"{file.Name}: unsupported type. Only {string.Join(", ", AllowedExtensions)}.");
                 continue;
             }
-            if (file.Size > MaxFileSizeBytes)
+            var limitBytes = ext == ".pdf" ? MaxPdfSizeBytes : MaxFileSizeBytes;
+            if (file.Size > limitBytes)
             {
-                _errors.Add($"{file.Name}: exceeds {MaxFileSizeBytes / 1024 / 1024} MB limit.");
+                _errors.Add($"{file.Name}: exceeds {limitBytes / 1024 / 1024} MB limit.");
                 continue;
             }
             _files.Add(file);
