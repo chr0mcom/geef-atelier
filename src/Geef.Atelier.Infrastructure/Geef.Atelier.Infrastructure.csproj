@@ -17,6 +17,7 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="Pgvector" />
     <PackageReference Include="Pgvector.EntityFrameworkCore" />
+    <PackageReference Include="PdfPig" />
   </ItemGroup>
 
   <ItemGroup>
