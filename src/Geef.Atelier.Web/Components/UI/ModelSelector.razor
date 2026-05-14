@@ -118,6 +118,12 @@
         {
             _isOpen = false;
             _searchQuery = "";
+            _showCustomInput = false;
+            // When switching providers (not the initial load), clear the stale model ID
+            // so LoadModelsAsync selects the first recommended model of the new provider
+            // instead of treating the previous provider's ID as a custom entry.
+            if (!string.IsNullOrEmpty(_loadedForProvider))
+                await SetValue("");
             await LoadModelsAsync();
         }
     }
