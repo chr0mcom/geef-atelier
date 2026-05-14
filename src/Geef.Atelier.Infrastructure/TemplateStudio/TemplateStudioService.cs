@@ -17,6 +17,7 @@ internal sealed class TemplateStudioService(
     ILlmClientResolver resolver,
     ICrewService crewService,
     IProviderCatalog providerCatalog,
+    IModelCatalog modelCatalog,
     IPricingCatalog pricingCatalog,
     ITemplateStudioAnalysisRepository analysisRepository,
     ProfileSimilarityService similarityService,
@@ -72,6 +73,7 @@ internal sealed class TemplateStudioService(
         ValidateNotSystemProfiles(request);
 
         var warnings = new List<string>();
+        await ValidateAvailabilityAsync(request.FinalNewProfiles, warnings, ct);
         var createdProfileNames = new List<string>();
 
         foreach (var profile in request.FinalNewProfiles)
@@ -281,6 +283,27 @@ internal sealed class TemplateStudioService(
             IsSystem:              false), ct);
 
         return created.Name;
+    }
+
+    private async Task ValidateAvailabilityAsync(
+        IReadOnlyList<ProposedProfile> profiles, List<string> warnings, CancellationToken ct)
+    {
+        foreach (var profile in profiles)
+        {
+            try
+            {
+                var models = await modelCatalog.ListModelsAsync(profile.Provider, ct);
+                var isAvailable = models.Any(m =>
+                    string.Equals(m.Id, profile.Model, StringComparison.OrdinalIgnoreCase));
+                if (!isAvailable)
+                    warnings.Add(
+                        $"Model '{profile.Model}' is not currently available from provider '{profile.Provider}'. Please verify before saving.");
+            }
+            catch
+            {
+                // Network or provider issue — skip availability check for this profile gracefully.
+            }
+        }
     }
 
     private static IReadOnlyList<string> GetStringArray(JsonElement el, string propertyName)
