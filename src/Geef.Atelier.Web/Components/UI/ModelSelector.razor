@@ -115,7 +115,11 @@
     protected override async Task OnParametersSetAsync()
     {
         if (!string.IsNullOrEmpty(Provider) && Provider != _loadedForProvider)
+        {
+            _isOpen = false;
+            _searchQuery = "";
             await LoadModelsAsync();
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
