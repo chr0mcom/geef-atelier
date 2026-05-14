@@ -3,7 +3,9 @@ using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Configuration;
+using Geef.Atelier.Infrastructure.Embeddings;
 using Geef.Atelier.Infrastructure.Grounding;
+using Geef.Atelier.Infrastructure.Knowledge;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Mcp;
@@ -29,6 +31,9 @@ builder.Services.AddDbContext<AtelierDbContext>(options =>
 
 builder.Services.AddAtelierPersistence();
 builder.Services.AddAtelierApplication();
+
+builder.Services.AddEmbeddings(builder.Configuration);
+builder.Services.AddKnowledge(builder.Configuration);
 
 // Grounding providers — ApiKey intentionally not logged; missing key fails at run time, not at startup.
 builder.Services.AddGroundingProviders(builder.Configuration);
