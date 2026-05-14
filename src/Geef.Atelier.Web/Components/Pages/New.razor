@@ -96,6 +96,9 @@ Be specific. Generic briefings produce generic texts."
 </div>
 
 @code {
+    [SupplyParameterFromQuery(Name = "template")]
+    public string? Template { get; set; }
+
     string _briefing  = string.Empty;
     string _configJson = "{}";
     string? _crewTemplateName = SystemCrew.KlassikTemplateName;
@@ -109,6 +112,12 @@ Be specific. Generic briefings produce generic texts."
 
     int  WordCount  => _briefing.Trim().Length > 0 ? _briefing.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries).Length : 0;
     bool CanSubmit  => _briefing.Trim().Length > 0 && !_submitting;
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrEmpty(Template))
+            _crewTemplateName = Template;
+    }
 
     async Task SubmitAsync()
     {

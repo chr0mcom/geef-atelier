@@ -1,0 +1,27 @@
+<div class="studio-task-input" data-testid="studio-task-input-step">
+    <div class="field">
+        <label for="task-description">Task description</label>
+        <textarea id="task-description"
+                  rows="6"
+                  placeholder="Describe what you want to do regularly. The more specific, the better the Studio can suggest matching crew components."
+                  @bind="TaskDescription"
+                  @bind:event="oninput"
+                  data-testid="task-description-input"
+                  class="task-textarea"></textarea>
+        <small class="cost-hint">~€0.02–0.05 per analysis</small>
+    </div>
+    <div class="studio-actions">
+        <button type="button" class="btn primary"
+                disabled="@(string.IsNullOrWhiteSpace(TaskDescription))"
+                @onclick="OnAnalyze"
+                data-testid="analyze-button">
+            Analyze
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string TaskDescription { get; set; } = "";
+    [Parameter] public EventCallback<string> TaskDescriptionChanged { get; set; }
+    [Parameter] public EventCallback OnAnalyze { get; set; }
+}

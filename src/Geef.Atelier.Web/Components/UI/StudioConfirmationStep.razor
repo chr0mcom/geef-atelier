@@ -1,0 +1,57 @@
+@using Geef.Atelier.Application.Crew.TemplateStudio
+
+<div class="studio-confirmation" data-testid="studio-confirmation-step">
+    <div class="confirmation-header">
+        <h2>Template created successfully</h2>
+        <p>Template <strong>@Result.CreatedTemplateName</strong> is ready.</p>
+    </div>
+
+    @if (Result.CreatedProfileNames.Count > 0)
+    {
+        <div class="created-profiles">
+            <h3>New profiles created</h3>
+            <ul>
+                @foreach (var name in Result.CreatedProfileNames)
+                {
+                    <li>
+                        <a href="/crew/profiles/reviewers/@name" data-testid="profile-link-@name">@name</a>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+    @if (Result.Warnings.Count > 0)
+    {
+        <div class="warnings-banner" data-testid="warnings-banner">
+            <strong>Warnings:</strong>
+            <ul>
+                @foreach (var warning in Result.Warnings)
+                {
+                    <li>@warning</li>
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="confirmation-actions">
+        <button type="button" class="btn primary"
+                @onclick="OnStartRun"
+                data-testid="start-run-button">
+            Start a run with this template
+        </button>
+        <a href="/crew/templates/@Result.CreatedTemplateName" class="btn secondary"
+           data-testid="edit-template-link">
+            Edit template further
+        </a>
+        <a href="/crew/studio" class="btn ghost"
+           data-testid="new-analysis-link">
+            New analysis
+        </a>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public MaterializationResult Result { get; set; } = null!;
+    [Parameter] public EventCallback OnStartRun { get; set; }
+}

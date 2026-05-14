@@ -1,0 +1,142 @@
+@page "/crew/studio"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using Geef.Atelier.Application.Crew.TemplateStudio
+@using Geef.Atelier.Core.Domain.Crew.TemplateStudio
+@inject ITemplateStudioService StudioService
+@inject NavigationManager Nav
+
+<PageTitle>Crew Studio — Atelier</PageTitle>
+
+<div class="studio-page" data-testid="studio-page">
+    <div class="page-header">
+        <h1>Crew Studio</h1>
+        <p class="studio-subtitle">Describe a task and let the AI propose a crew configuration.</p>
+    </div>
+
+    @switch (_step)
+    {
+        case StudioStep.TaskInput:
+            <StudioTaskInputStep
+                TaskDescription="@_taskDescription"
+                TaskDescriptionChanged="@(v => _taskDescription = v)"
+                OnAnalyze="StartAnalysisAsync"
+                data-testid="studio-task-input" />
+            break;
+
+        case StudioStep.Analyzing:
+            <StudioAnalyzingStep />
+            break;
+
+        case StudioStep.Review:
+            <StudioReviewStep
+                Analysis="@(_analysis!)"
+                OnUseExistingTemplate="UseExistingTemplateAsync"
+                OnProceedToEdit="GoToEdit"
+                OnRestart="Restart"
+                data-testid="studio-review" />
+            break;
+
+        case StudioStep.Edit:
+            <StudioEditStep
+                Analysis="@(_analysis!)"
+                EditedTemplate="@(_editedTemplate!)"
+                EditedTemplateChanged="@(v => _editedTemplate = v)"
+                EditedProfiles="@_editedProfiles"
+                OnSave="MaterializeAsync"
+                OnBack="BackToReview"
+                data-testid="studio-edit" />
+            break;
+
+        case StudioStep.Confirmation:
+            <StudioConfirmationStep
+                Result="@(_materializationResult!)"
+                OnStartRun="StartRunWithTemplate"
+                data-testid="studio-confirmation" />
+            break;
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="error-banner" role="alert" data-testid="studio-error">@_error</div>
+    }
+</div>
+
+@code {
+    private enum StudioStep { TaskInput, Analyzing, Review, Edit, Confirmation }
+
+    private StudioStep _step = StudioStep.TaskInput;
+    private string _taskDescription = "";
+    private TemplateStudioAnalysis? _analysis;
+    private ProposedTemplate? _editedTemplate;
+    private List<ProposedProfile> _editedProfiles = new();
+    private MaterializationResult? _materializationResult;
+    private string? _error;
+
+    private async Task StartAnalysisAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_taskDescription)) return;
+        _error = null;
+        _step = StudioStep.Analyzing;
+        StateHasChanged();
+        try
+        {
+            _analysis = await StudioService.AnalyzeAsync(_taskDescription);
+            _editedTemplate = _analysis.ProposedTemplate;
+            _editedProfiles = _analysis.ProposedNewProfiles.ToList();
+            _step = StudioStep.Review;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Analysis failed: {ex.Message}";
+            _step = StudioStep.TaskInput;
+        }
+    }
+
+    private void GoToEdit()
+    {
+        _step = StudioStep.Edit;
+    }
+
+    private void BackToReview()
+    {
+        _step = StudioStep.Review;
+    }
+
+    private void Restart()
+    {
+        _taskDescription = "";
+        _analysis = null;
+        _editedTemplate = null;
+        _editedProfiles = new();
+        _materializationResult = null;
+        _error = null;
+        _step = StudioStep.TaskInput;
+    }
+
+    private void UseExistingTemplateAsync(string templateName)
+    {
+        Nav.NavigateTo($"/new?template={Uri.EscapeDataString(templateName)}");
+    }
+
+    private async Task MaterializeAsync()
+    {
+        if (_editedTemplate is null) return;
+        _error = null;
+        try
+        {
+            var request = new MaterializationRequest(_editedTemplate, _editedProfiles);
+            _materializationResult = await StudioService.MaterializeAsync(_analysis!.Id, request);
+            _step = StudioStep.Confirmation;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Save failed: {ex.Message}";
+        }
+    }
+
+    private void StartRunWithTemplate()
+    {
+        Nav.NavigateTo($"/new?template={Uri.EscapeDataString(_materializationResult!.CreatedTemplateName)}");
+    }
+}

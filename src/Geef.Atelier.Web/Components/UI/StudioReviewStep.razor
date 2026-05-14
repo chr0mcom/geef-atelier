@@ -1,0 +1,96 @@
+@using Geef.Atelier.Core.Domain.Crew.TemplateStudio
+
+<div class="studio-review" data-testid="studio-review-step">
+    <div class="review-summary">
+        <h2>Analysis complete</h2>
+        <p class="reasoning-summary" data-testid="reasoning-summary">@Analysis.ReasoningSummary</p>
+        @if (Analysis.CostEur.HasValue)
+        {
+            <small class="cost-display">Analysis cost: €@Analysis.CostEur.Value.ToString("F4")</small>
+        }
+    </div>
+
+    @if (Analysis.MatchedExistingTemplates.Count > 0)
+    {
+        <div class="matched-templates" data-testid="matched-templates">
+            <h3>Existing templates</h3>
+            @foreach (var match in Analysis.MatchedExistingTemplates.OrderByDescending(m => m.Confidence))
+            {
+                <div class="template-match" data-testid="template-match-@match.TemplateName">
+                    <div class="match-header">
+                        <strong>@match.TemplateName</strong>
+                        <span class="confidence-badge">@((match.Confidence * 100).ToString("F0"))% match</span>
+                    </div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" style="width: @((match.Confidence * 100).ToString("F0"))%"></div>
+                    </div>
+                    <p class="match-reasoning">@match.Reasoning</p>
+                    @if (match.Confidence >= 0.85)
+                    {
+                        <button type="button" class="btn secondary"
+                                data-testid="use-template-@match.TemplateName"
+                                @onclick="() => OnUseExistingTemplate.InvokeAsync(match.TemplateName)">
+                            Use this template
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @if (Analysis.ProposedTemplate is not null)
+    {
+        <div class="proposed-template" data-testid="proposed-template">
+            <h3>Proposed new template: <strong>@Analysis.ProposedTemplate.DisplayName</strong></h3>
+            <p>@Analysis.ProposedTemplate.Description</p>
+            <div class="profile-summary">
+                <div><strong>Executor:</strong> @Analysis.ProposedTemplate.ExecutorProfileName</div>
+                @if (Analysis.ProposedTemplate.ReviewerProfileNames.Count > 0)
+                {
+                    <div><strong>Reviewers:</strong> @string.Join(", ", Analysis.ProposedTemplate.ReviewerProfileNames)</div>
+                }
+                @if (Analysis.ProposedTemplate.AdvisorProfileNames.Count > 0)
+                {
+                    <div><strong>Advisors:</strong> @string.Join(", ", Analysis.ProposedTemplate.AdvisorProfileNames)</div>
+                }
+            </div>
+            @if (Analysis.ProposedNewProfiles.Count > 0)
+            {
+                <div class="new-profiles-list">
+                    <h4>New profiles to create:</h4>
+                    @foreach (var profile in Analysis.ProposedNewProfiles)
+                    {
+                        <div class="proposed-profile-card" data-testid="proposed-profile-@profile.Name">
+                            <strong>@profile.DisplayName</strong>
+                            <span class="profile-type-badge">@profile.ProfileType</span>
+                            <p>@profile.Description</p>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    <div class="review-actions">
+        @if (Analysis.ProposedTemplate is not null)
+        {
+            <button type="button" class="btn primary"
+                    @onclick="OnProceedToEdit"
+                    data-testid="proceed-to-edit-button">
+                Edit and create
+            </button>
+        }
+        <button type="button" class="btn ghost"
+                @onclick="OnRestart"
+                data-testid="restart-button">
+            Start over
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TemplateStudioAnalysis Analysis { get; set; } = null!;
+    [Parameter] public EventCallback OnProceedToEdit { get; set; }
+    [Parameter] public EventCallback<string> OnUseExistingTemplate { get; set; }
+    [Parameter] public EventCallback OnRestart { get; set; }
+}
