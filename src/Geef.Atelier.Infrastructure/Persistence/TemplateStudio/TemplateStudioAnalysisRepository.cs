@@ -39,6 +39,35 @@ internal sealed class TemplateStudioAnalysisRepository(AtelierDbContext db) : IT
         return entities.Select(ToDomain).ToList();
     }
 
+    public async Task<(IReadOnlyList<TemplateStudioHistoryItem> Items, bool HasMore)> ListHistoryAsync(
+        int page, int pageSize, CancellationToken ct = default)
+    {
+        var take = pageSize + 1;
+        var entities = await db.TemplateStudioAnalyses.AsNoTracking()
+            .OrderByDescending(e => e.CreatedAt)
+            .Skip(page * pageSize)
+            .Take(take)
+            .ToListAsync(ct);
+
+        var hasMore = entities.Count > pageSize;
+        var items = entities
+            .Take(pageSize)
+            .Select(e =>
+            {
+                var analysis = JsonSerializer.Deserialize<TemplateStudioAnalysis>(e.AnalysisResultJson, JsonOpts)!;
+                return new TemplateStudioHistoryItem(
+                    e.Id,
+                    e.TaskDescription,
+                    analysis.ReasoningSummary,
+                    e.MaterializedTemplateName,
+                    e.CostEur,
+                    e.CreatedAt);
+            })
+            .ToList();
+
+        return (items, hasMore);
+    }
+
     private static TemplateStudioAnalysisEntity ToEntity(TemplateStudioAnalysis analysis) => new()
     {
         Id = analysis.Id,

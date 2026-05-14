@@ -100,6 +100,9 @@ public sealed class TemplateStudioServiceMaterializeTests
 
         public Task<IReadOnlyList<TemplateStudioAnalysis>> ListRecentAsync(int limit = 10, CancellationToken ct = default)
             => Task.FromResult((IReadOnlyList<TemplateStudioAnalysis>)_store.Take(limit).ToList());
+
+        public Task<(IReadOnlyList<TemplateStudioHistoryItem> Items, bool HasMore)> ListHistoryAsync(int page, int pageSize, CancellationToken ct = default)
+            => Task.FromResult<(IReadOnlyList<TemplateStudioHistoryItem>, bool)>(([], false));
     }
 
     private sealed class EmptyProviderCatalog : IProviderCatalog

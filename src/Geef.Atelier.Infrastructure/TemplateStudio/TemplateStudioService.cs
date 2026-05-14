@@ -88,6 +88,17 @@ internal sealed class TemplateStudioService(
         return new MaterializationResult(templateName, createdProfileNames, warnings);
     }
 
+    public async Task<StudioAnalysesPage> ListRecentAnalysesAsync(int page, int pageSize, CancellationToken ct = default)
+    {
+        var (items, hasMore) = await analysisRepository.ListHistoryAsync(page, pageSize, ct);
+        var entries = items
+            .Select(i => new StudioAnalysisHistoryEntry(
+                i.Id, i.TaskDescription, i.ReasoningSummary,
+                i.MaterializedTemplateName, i.CostEur, i.CreatedAt))
+            .ToList();
+        return new StudioAnalysesPage(entries, hasMore);
+    }
+
     // --- Private helpers ---
 
     private async Task<string> BuildContextAsync(CancellationToken ct)
