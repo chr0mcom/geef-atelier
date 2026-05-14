@@ -15,6 +15,7 @@ internal sealed class KnowledgeService(
     IVectorSearchRepository chunkRepo,
     DocumentIndexingService indexingService,
     IEmbeddingProvider embeddingProvider,
+    PdfTextExtractor pdfExtractor,
     IOptions<KnowledgeOptions> options,
     ILogger<KnowledgeService> logger) : IKnowledgeService
 {
@@ -34,16 +35,7 @@ internal sealed class KnowledgeService(
             throw new InvalidOperationException(
                 $"Content type '{contentType}' is not allowed. Allowed types: {string.Join(", ", opts.AllowedContentTypes)}.");
 
-        using var ms = new MemoryStream();
-        await content.CopyToAsync(ms, ct);
-
-        if (ms.Length > opts.MaxDocumentSizeBytes)
-            throw new InvalidOperationException(
-                $"Document size {ms.Length} bytes exceeds the maximum allowed size of {opts.MaxDocumentSizeBytes} bytes.");
-
-        ms.Position = 0;
-        using var reader = new StreamReader(ms);
-        var rawContent = await reader.ReadToEndAsync(ct);
+        var rawContent = await ReadRawContentAsync(content, contentType, opts, ct);
 
         var now = DateTimeOffset.UtcNow;
         var doc = new KnowledgeDocument(
@@ -52,7 +44,7 @@ internal sealed class KnowledgeService(
             Description: description,
             OriginalFilename: filename,
             ContentType: contentType,
-            FileSizeBytes: ms.Length,
+            FileSizeBytes: 0,
             RawContent: rawContent,
             Tags: tags,
             EmbeddingModel: embeddingProvider.ModelName,
@@ -167,16 +159,7 @@ internal sealed class KnowledgeService(
             throw new InvalidOperationException(
                 $"Content type '{contentType}' is not allowed. Allowed types: {string.Join(", ", opts.AllowedContentTypes)}.");
 
-        using var ms = new MemoryStream();
-        await content.CopyToAsync(ms, ct);
-
-        if (ms.Length > opts.MaxDocumentSizeBytes)
-            throw new InvalidOperationException(
-                $"Document size {ms.Length} bytes exceeds the maximum allowed size of {opts.MaxDocumentSizeBytes} bytes.");
-
-        ms.Position = 0;
-        using var reader = new StreamReader(ms);
-        var rawContent = await reader.ReadToEndAsync(ct);
+        var rawContent = await ReadRawContentAsync(content, contentType, opts, ct);
 
         var now = DateTimeOffset.UtcNow;
         var doc = new KnowledgeDocument(
@@ -185,7 +168,7 @@ internal sealed class KnowledgeService(
             Description: string.Empty,
             OriginalFilename: filename,
             ContentType: contentType,
-            FileSizeBytes: ms.Length,
+            FileSizeBytes: 0,
             RawContent: rawContent,
             Tags: [],
             EmbeddingModel: embeddingProvider.ModelName,
@@ -252,5 +235,33 @@ internal sealed class KnowledgeService(
 
         logger.LogInformation(
             "Promoted run-local document {DocumentId} to global scope", documentId);
+    }
+
+    private async Task<string> ReadRawContentAsync(
+        Stream content, string contentType, KnowledgeOptions opts, CancellationToken ct)
+    {
+        using var ms = new MemoryStream();
+        await content.CopyToAsync(ms, ct);
+
+        var maxSize = contentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase)
+            ? opts.MaxPdfSizeBytes
+            : opts.MaxDocumentSizeBytes;
+
+        if (ms.Length > maxSize)
+            throw new InvalidOperationException(
+                $"File too large. Maximum size for {contentType}: {maxSize / (1024 * 1024)} MB.");
+
+        if (contentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            var bytes = ms.ToArray();
+            var result = pdfExtractor.ExtractText(bytes);
+            if (!result.IsSuccess)
+                throw new InvalidOperationException(result.ErrorMessage);
+            return result.Text!;
+        }
+
+        ms.Position = 0;
+        using var reader = new StreamReader(ms);
+        return await reader.ReadToEndAsync(ct);
     }
 }
