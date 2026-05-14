@@ -22,7 +22,7 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
                     IF NOT EXISTS (
                         SELECT 1 FROM pg_constraint
                         WHERE conname = 'FK_KnowledgeDocuments_Runs_RunId'
-                          AND conrelid = '""KnowledgeDocuments""'::regclass
+                          AND conrelid = to_regclass('""KnowledgeDocuments""')
                     ) THEN
                         ALTER TABLE ""KnowledgeDocuments""
                             ADD CONSTRAINT ""FK_KnowledgeDocuments_Runs_RunId""

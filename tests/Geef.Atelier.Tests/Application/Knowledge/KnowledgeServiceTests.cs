@@ -81,6 +81,153 @@ public sealed class KnowledgeServiceTests
         Assert.Null(fromRepo);
     }
 
+    // --- UploadRunAttachmentAsync tests ---
+
+    [Fact]
+    public async Task UploadRunAttachmentAsync_SetsScopeToRunLocal()
+    {
+        var (service, repos) = BuildService();
+        var runId = Guid.NewGuid();
+        var content = new MemoryStream("attachment content"u8.ToArray());
+
+        var result = await service.UploadRunAttachmentAsync(
+            runId, "Attachment", content, "attach.md", "text/markdown", CancellationToken.None);
+
+        Assert.Equal(KnowledgeScope.RunLocal, result.Scope);
+    }
+
+    [Fact]
+    public async Task UploadRunAttachmentAsync_SetsRunIdToProvidedRunId()
+    {
+        var (service, repos) = BuildService();
+        var runId = Guid.NewGuid();
+        var content = new MemoryStream("hello"u8.ToArray());
+
+        var result = await service.UploadRunAttachmentAsync(
+            runId, "My Attachment", content, "file.txt", "text/plain", CancellationToken.None);
+
+        Assert.Equal(runId, result.RunId);
+    }
+
+    [Fact]
+    public async Task UploadRunAttachmentAsync_RejectsUnsupportedContentType()
+    {
+        var (service, _) = BuildService();
+        var runId = Guid.NewGuid();
+        var content = new MemoryStream(new byte[] { 0x25, 0x50, 0x44, 0x46 }); // PDF magic bytes
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.UploadRunAttachmentAsync(
+                runId, "PDF Attachment", content, "doc.pdf", "application/pdf", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task UploadRunAttachmentAsync_SuccessPath_DocumentIsPersistedWithCorrectFields()
+    {
+        var (service, repos) = BuildService();
+        var runId = Guid.NewGuid();
+        var content = new MemoryStream("run attachment text"u8.ToArray());
+
+        var result = await service.UploadRunAttachmentAsync(
+            runId, "Title", content, "file.md", "text/markdown", CancellationToken.None);
+
+        Assert.NotEqual(Guid.Empty, result.Id);
+        Assert.Equal(KnowledgeScope.RunLocal, result.Scope);
+        Assert.Equal(runId, result.RunId);
+
+        var fromRepo = await repos.DocumentRepo.GetAsync(result.Id, CancellationToken.None);
+        Assert.NotNull(fromRepo);
+        Assert.Equal(KnowledgeScope.RunLocal, fromRepo!.Scope);
+        Assert.Equal(runId, fromRepo.RunId);
+    }
+
+    // --- PromoteToGlobalAsync tests ---
+
+    [Fact]
+    public async Task PromoteToGlobalAsync_SetsScopeToGlobal()
+    {
+        var (service, repos) = BuildService();
+        var runId = Guid.NewGuid();
+        var doc = SeedRunLocalDocument(repos.DocumentRepo, runId);
+
+        await service.PromoteToGlobalAsync(doc.Id, null, null, null, CancellationToken.None);
+
+        var promoted = await repos.DocumentRepo.GetAsync(doc.Id, CancellationToken.None);
+        Assert.Equal(KnowledgeScope.Global, promoted!.Scope);
+    }
+
+    [Fact]
+    public async Task PromoteToGlobalAsync_SetsRunIdToNull()
+    {
+        var (service, repos) = BuildService();
+        var runId = Guid.NewGuid();
+        var doc = SeedRunLocalDocument(repos.DocumentRepo, runId);
+
+        await service.PromoteToGlobalAsync(doc.Id, null, null, null, CancellationToken.None);
+
+        var promoted = await repos.DocumentRepo.GetAsync(doc.Id, CancellationToken.None);
+        Assert.Null(promoted!.RunId);
+    }
+
+    [Fact]
+    public async Task PromoteToGlobalAsync_MergesAdditionalTagsWithoutDuplicates()
+    {
+        var (service, repos) = BuildService();
+        var runId = Guid.NewGuid();
+        // Seed with tag "existing"
+        var doc = SeedRunLocalDocument(repos.DocumentRepo, runId, tags: ["existing", "shared"]);
+
+        // Promote with tags that overlap
+        await service.PromoteToGlobalAsync(doc.Id, null, null, ["shared", "new"], CancellationToken.None);
+
+        var promoted = await repos.DocumentRepo.GetAsync(doc.Id, CancellationToken.None);
+        Assert.NotNull(promoted);
+        // "existing", "shared", "new" — "shared" must appear only once
+        Assert.Equal(3, promoted!.Tags.Count);
+        Assert.Contains("existing", promoted.Tags);
+        Assert.Contains("shared", promoted.Tags);
+        Assert.Contains("new", promoted.Tags);
+    }
+
+    [Fact]
+    public async Task PromoteToGlobalAsync_ThrowsWhenDocumentNotFound()
+    {
+        var (service, _) = BuildService();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.PromoteToGlobalAsync(Guid.NewGuid(), null, null, null, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task PromoteToGlobalAsync_ThrowsWhenDocumentAlreadyGlobal()
+    {
+        var (service, repos) = BuildService();
+        var now = DateTimeOffset.UtcNow;
+        var globalDoc = new KnowledgeDocument(
+            Guid.NewGuid(), "Global", "desc", "f.md", "text/markdown",
+            10, "content", ["tag"], "model", 1536, 0, null, now, now, KnowledgeScope.Global, null);
+        await repos.DocumentRepo.CreateAsync(globalDoc, CancellationToken.None);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.PromoteToGlobalAsync(globalDoc.Id, null, null, null, CancellationToken.None));
+    }
+
+    // --- helpers ---
+
+    private static KnowledgeDocument SeedRunLocalDocument(
+        InMemoryKnowledgeDocumentRepository repo,
+        Guid runId,
+        IReadOnlyList<string>? tags = null)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var doc = new KnowledgeDocument(
+            Guid.NewGuid(), "RunLocal Doc", "desc", "f.md", "text/markdown",
+            10, "content", tags ?? [], "model", 1536, 0, null, now, now,
+            KnowledgeScope.RunLocal, runId);
+        repo.CreateAsync(doc, CancellationToken.None).GetAwaiter().GetResult();
+        return doc;
+    }
+
     // --- helpers ---
 
     private static (KnowledgeService Service, (InMemoryKnowledgeDocumentRepository DocumentRepo, InMemoryVectorSearchRepository ChunkRepo) Repos)
@@ -139,11 +286,14 @@ public sealed class KnowledgeServiceTests
         public Task<KnowledgeDocument?> GetAsync(Guid id, CancellationToken ct)
             => Task.FromResult(_store.GetValueOrDefault(id));
 
-        public Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct)
+        public Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct, KnowledgeScope? scope = null)
         {
-            IReadOnlyList<KnowledgeDocument> list = tagFilter is null
-                ? [.. _store.Values]
-                : [.. _store.Values.Where(d => d.Tags.Contains(tagFilter))];
+            var values = _store.Values.AsEnumerable();
+            if (tagFilter is not null)
+                values = values.Where(d => d.Tags.Contains(tagFilter));
+            if (scope is not null)
+                values = values.Where(d => d.Scope == scope.Value);
+            IReadOnlyList<KnowledgeDocument> list = [.. values];
             return Task.FromResult(list);
         }
 

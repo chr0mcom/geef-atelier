@@ -87,8 +87,8 @@ internal sealed class KnowledgeService(
         => documentRepo.GetAsync(documentId, ct);
 
     /// <inheritdoc/>
-    public Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct)
-        => documentRepo.ListAsync(tagFilter, ct);
+    public Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct, KnowledgeScope? scope = null)
+        => documentRepo.ListAsync(tagFilter, ct, scope);
 
     /// <inheritdoc/>
     public async Task UpdateMetadataAsync(
@@ -243,7 +243,7 @@ internal sealed class KnowledgeService(
             Title = newTitle ?? doc.Title,
             Description = newDescription ?? doc.Description,
             Tags = additionalTags is { Count: > 0 }
-                ? [.. doc.Tags, .. additionalTags]
+                ? doc.Tags.Union(additionalTags).ToArray()
                 : doc.Tags,
             UpdatedAt = DateTimeOffset.UtcNow,
         };

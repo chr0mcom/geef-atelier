@@ -24,9 +24,13 @@ public interface IKnowledgeService
     Task<KnowledgeDocument?> GetAsync(Guid documentId, CancellationToken ct);
 
     /// <summary>
-    /// Returns all documents, optionally filtered by <paramref name="tagFilter"/>.
+    /// Returns documents, optionally filtered by <paramref name="tagFilter"/> and/or <paramref name="scope"/>.
+    /// When <paramref name="scope"/> is <c>null</c> all scopes are returned; pass
+    /// <see cref="KnowledgeScope.Global"/> to restrict the result to global documents only
+    /// (the Knowledge Management UI should always use that overload so run-local attachments
+    /// are not shown in the global list).
     /// </summary>
-    Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct);
+    Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct, KnowledgeScope? scope = null);
 
     /// <summary>Updates the title, description, and tags of an existing document without re-indexing its content.</summary>
     Task UpdateMetadataAsync(

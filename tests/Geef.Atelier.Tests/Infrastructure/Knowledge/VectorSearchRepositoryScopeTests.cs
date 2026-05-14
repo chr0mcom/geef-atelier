@@ -9,7 +9,7 @@ namespace Geef.Atelier.Tests.Infrastructure.Knowledge;
 /// Verifies that VectorSearchRepository.SearchAsync correctly filters by Scope and RunId.
 /// </summary>
 [Collection("Postgres")]
-public sealed class VectorSearchRepositoryScopeTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class VectorSearchRepositoryScopeTests(PostgresFixture fixture)
 {
     private KnowledgeDocumentRepository DocRepo() => new(fixture.NewContext());
     private VectorSearchRepository SearchRepo() => new(fixture.NewContext());

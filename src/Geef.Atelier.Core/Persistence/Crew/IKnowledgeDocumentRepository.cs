@@ -14,9 +14,11 @@ public interface IKnowledgeDocumentRepository
     Task<KnowledgeDocument?> GetAsync(Guid id, CancellationToken ct);
 
     /// <summary>
-    /// Returns all documents, optionally filtered to those that contain <paramref name="tagFilter"/> in their tag list.
+    /// Returns documents, optionally filtered to those that contain <paramref name="tagFilter"/> in their
+    /// tag list and/or match the given <paramref name="scope"/>. Pass <c>null</c> for either parameter to
+    /// skip that filter.
     /// </summary>
-    Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct);
+    Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct, KnowledgeScope? scope = null);
 
     /// <summary>Replaces the stored document with the supplied record (matched by <see cref="KnowledgeDocument.Id"/>).</summary>
     Task UpdateAsync(KnowledgeDocument document, CancellationToken ct);

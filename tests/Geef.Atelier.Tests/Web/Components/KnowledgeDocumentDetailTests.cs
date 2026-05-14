@@ -114,7 +114,7 @@ public sealed class KnowledgeDocumentDetailTests : TestContext
         public Task<KnowledgeDocument?> GetAsync(Guid documentId, CancellationToken ct) =>
             Task.FromResult(document);
 
-        public Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct) =>
+        public Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct, KnowledgeScope? scope = null) =>
             Task.FromResult<IReadOnlyList<KnowledgeDocument>>([]);
 
         public Task<KnowledgeDocument> UploadAsync(string title, string description,

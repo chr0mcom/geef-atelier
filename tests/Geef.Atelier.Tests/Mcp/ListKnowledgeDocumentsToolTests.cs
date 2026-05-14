@@ -92,7 +92,7 @@ public sealed class ListKnowledgeDocumentsToolTests
     {
         public string? LastTagFilter { get; private set; } = "UNSET";
 
-        public Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct)
+        public Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct, KnowledgeScope? scope = null)
         {
             LastTagFilter = tagFilter;
             return Task.FromResult(documents);

@@ -49,12 +49,15 @@ internal sealed class KnowledgeDocumentRepository(AtelierDbContext context) : IK
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct)
+    public async Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct, KnowledgeScope? scope = null)
     {
         var query = context.KnowledgeDocuments.AsNoTracking();
 
         if (tagFilter is not null)
             query = query.Where(d => d.Tags.Contains(tagFilter));
+
+        if (scope is not null)
+            query = query.Where(d => d.Scope == (int)scope.Value);
 
         var entities = await query.ToListAsync(ct);
         return entities.Select(ToModel).ToList();

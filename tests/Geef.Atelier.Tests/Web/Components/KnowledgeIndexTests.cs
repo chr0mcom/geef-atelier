@@ -92,7 +92,7 @@ public sealed class KnowledgeIndexTests : TestContext
         IReadOnlyList<KnowledgeDocument>? documents,
         bool throwOnList = false) : IKnowledgeService
     {
-        public Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct)
+        public Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct, KnowledgeScope? scope = null)
         {
             if (throwOnList) throw new InvalidOperationException("Service error");
             return Task.FromResult(documents ?? (IReadOnlyList<KnowledgeDocument>)[]);

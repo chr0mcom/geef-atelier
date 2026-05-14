@@ -10,7 +10,7 @@ namespace Geef.Atelier.Tests.Infrastructure.Knowledge;
 /// Scope and RunId fields added in Step15RunAttachments.
 /// </summary>
 [Collection("Postgres")]
-public sealed class KnowledgeDocumentRepositoryScopeTests(PostgresFixture fixture) : IClassFixture<PostgresFixture>
+public sealed class KnowledgeDocumentRepositoryScopeTests(PostgresFixture fixture)
 {
     private KnowledgeDocumentRepository Repo() => new(fixture.NewContext());
 
