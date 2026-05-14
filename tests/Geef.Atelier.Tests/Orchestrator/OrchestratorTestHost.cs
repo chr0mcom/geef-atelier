@@ -1,9 +1,11 @@
+using Geef.Atelier.Application.Crew.Knowledge;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
+using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Persistence;
 using Geef.Atelier.Tests.Web.Notifications;
@@ -45,6 +47,7 @@ internal sealed class OrchestratorTestHost : IAsyncDisposable
                     opt.UseNpgsql(fixture.ConnectionString));
                 services.AddAtelierPersistence();
                 services.AddAtelierApplication();
+                services.AddScoped<IKnowledgeService, NoOpKnowledgeService>();
 
                 services.AddSingleton<ILlmClientResolver>(new TestLlmClientResolver(llmClient));
                 services.Configure<OrchestratorOptions>(o =>

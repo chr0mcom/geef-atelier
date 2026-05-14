@@ -9,6 +9,8 @@ using Geef.Atelier.Core.Domain.Crew.Knowledge;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
+using Geef.Atelier.Tests.Fakes;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Geef.Atelier.Tests.Application.Runs;
 
@@ -133,17 +135,33 @@ public sealed class RunServiceAttachmentTests
         Assert.Null(persistence.LastUpdatedSnapshotJson);
     }
 
+    [Fact]
+    public async Task SubmitRunAsync_AttachmentUploadFails_RunMarkedAsFailed()
+    {
+        var persistence = new CapturingPersistenceService();
+        var knowledge   = new FailingKnowledgeService();
+        var svc         = BuildService(persistence: persistence, knowledge: knowledge);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.SubmitRunAsync(new SubmitRunRequest("briefing", "{}",
+                Attachments: [new RunAttachmentInput("doc.md", "text/markdown", "content"u8.ToArray())])));
+
+        Assert.NotNull(persistence.LastFailureMessage);
+        Assert.Contains("Attachment upload failed", persistence.LastFailureMessage);
+    }
+
     // --- Builder ---
 
     private static RunService BuildService(
         CapturingPersistenceService? persistence = null,
-        CapturingKnowledgeService?   knowledge   = null)
+        IKnowledgeService?           knowledge   = null)
         => new RunService(
             persistence ?? new CapturingPersistenceService(),
             new StubRunRepository(),
             new StubCrewService(),
             new StubAdvisorConsultationRepository(),
-            knowledge);
+            knowledge ?? new NoOpKnowledgeService(),
+            NullLogger<RunService>.Instance);
 
     // --- Fakes ---
 
@@ -151,6 +169,7 @@ public sealed class RunServiceAttachmentTests
     {
         private Guid _lastRunId = Guid.NewGuid();
         public string? LastUpdatedSnapshotJson { get; private set; }
+        public string? LastFailureMessage { get; private set; }
 
         public Task<Guid> CreateRunAsync(
             string briefingText, string configJson,
@@ -164,6 +183,12 @@ public sealed class RunServiceAttachmentTests
         public Task UpdateSnapshotAsync(Guid runId, string snapshotJson, CancellationToken cancellationToken = default)
         {
             LastUpdatedSnapshotJson = snapshotJson;
+            return Task.CompletedTask;
+        }
+
+        public Task MarkRunFailedAsync(Guid runId, string errorMessage, CancellationToken cancellationToken = default)
+        {
+            LastFailureMessage = errorMessage;
             return Task.CompletedTask;
         }
     }
@@ -263,6 +288,26 @@ public sealed class RunServiceAttachmentTests
         public Task<CrewTemplate> CreateCustomCrewTemplateAsync(CrewTemplate template, CancellationToken cancellationToken = default) => Task.FromResult(template);
         public Task<CrewTemplate> UpdateCustomCrewTemplateAsync(CrewTemplate template, CancellationToken cancellationToken = default) => Task.FromResult(template);
         public Task DeleteCustomCrewTemplateAsync(string name, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    /// <summary>Always throws <see cref="InvalidOperationException"/> to simulate an upload failure.</summary>
+    private sealed class FailingKnowledgeService : IKnowledgeService
+    {
+        public Task<KnowledgeDocument> UploadRunAttachmentAsync(
+            Guid runId, string title, Stream content, string filename,
+            string contentType, CancellationToken ct)
+            => throw new InvalidOperationException("Simulated upload failure");
+
+        public Task<KnowledgeDocument> UploadAsync(string title, string description, IReadOnlyList<string> tags, Stream content, string filename, string contentType, CancellationToken ct)
+            => throw new NotImplementedException();
+        public Task<KnowledgeDocument?> GetAsync(Guid documentId, CancellationToken ct) => Task.FromResult<KnowledgeDocument?>(null);
+        public Task<IReadOnlyList<KnowledgeDocument>> ListAsync(string? tagFilter, CancellationToken ct, KnowledgeScope? scope = null) => Task.FromResult<IReadOnlyList<KnowledgeDocument>>([]);
+        public Task UpdateMetadataAsync(Guid documentId, string title, string description, IReadOnlyList<string> tags, CancellationToken ct) => Task.CompletedTask;
+        public Task DeleteAsync(Guid documentId, CancellationToken ct) => Task.CompletedTask;
+        public Task ReindexAsync(Guid documentId, CancellationToken ct) => Task.CompletedTask;
+        public Task ReindexAllAsync(CancellationToken ct) => Task.CompletedTask;
+        public Task<IReadOnlyList<KnowledgeDocument>> ListRunAttachmentsAsync(Guid runId, CancellationToken ct) => Task.FromResult<IReadOnlyList<KnowledgeDocument>>([]);
+        public Task PromoteToGlobalAsync(Guid documentId, string? newTitle, string? newDescription, IReadOnlyList<string>? additionalTags, CancellationToken ct) => Task.CompletedTask;
     }
 
     private sealed class StubAdvisorConsultationRepository : IAdvisorConsultationRepository

@@ -7,6 +7,7 @@ using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
+using Microsoft.Extensions.Logging;
 
 namespace Geef.Atelier.Application.Runs;
 
@@ -15,7 +16,8 @@ internal sealed class RunService(
     IRunRepository                        repository,
     ICrewService                          crewService,
     IAdvisorConsultationRepository        consultationRepository,
-    IKnowledgeService?                    knowledgeService = null,
+    IKnowledgeService                     knowledgeService,
+    ILogger<RunService>                   logger,
     IGroundingConsultationRepository?     groundingConsultationRepository = null) : IRunService
 {
     private static readonly JsonSerializerOptions SnapshotJsonOpts =
@@ -30,14 +32,13 @@ internal sealed class RunService(
             throw new ArgumentException("Briefing text must not be empty.", nameof(request));
         ArgumentNullException.ThrowIfNull(request.ConfigJson);
 
-        if (!string.IsNullOrEmpty(request.ConfigJson))
+        var normalizedConfig = string.IsNullOrEmpty(request.ConfigJson) ? "{}" : request.ConfigJson;
+        if (normalizedConfig != "{}")
         {
-            try { using var _ = JsonDocument.Parse(request.ConfigJson); }
+            try { using var _ = JsonDocument.Parse(normalizedConfig); }
             catch (JsonException ex)
             { throw new ArgumentException("configJson must be valid JSON.", nameof(request), ex); }
         }
-
-        var normalizedConfig = string.IsNullOrEmpty(request.ConfigJson) ? "{}" : request.ConfigJson;
 
         var snapshot = await crewService.ResolveSnapshotAsync(request.CrewTemplateName, request.CustomCrew, cancellationToken);
         var snapshotJson = JsonSerializer.Serialize(snapshot, SnapshotJsonOpts);
@@ -49,27 +50,36 @@ internal sealed class RunService(
             resolvedTemplateName, snapshotJson, cancellationToken);
 
         // Upload run-local attachments and extend the snapshot with RunAttachmentsProfile.
-        if (request.Attachments is { Count: > 0 } attachments && knowledgeService is not null)
+        if (request.Attachments is { Count: > 0 } attachments)
         {
-            foreach (var attachment in attachments)
+            try
             {
-                await knowledgeService.UploadRunAttachmentAsync(
-                    runId,
-                    attachment.Filename,
-                    new MemoryStream(attachment.Content),
-                    attachment.Filename,
-                    attachment.ContentType,
-                    cancellationToken);
+                foreach (var attachment in attachments)
+                {
+                    await knowledgeService.UploadRunAttachmentAsync(
+                        runId,
+                        attachment.Filename,
+                        new MemoryStream(attachment.Content),
+                        attachment.Filename,
+                        attachment.ContentType,
+                        cancellationToken);
+                }
+
+                var extendedProviders = new List<GroundingProviderProfile>
+                    { SystemCrew.RunAttachmentsProfile };
+                if (snapshot.GroundingProviders is { Count: > 0 } existing)
+                    extendedProviders.AddRange(existing);
+
+                var extendedSnapshot = snapshot with { GroundingProviders = extendedProviders };
+                var extendedSnapshotJson = JsonSerializer.Serialize(extendedSnapshot, SnapshotJsonOpts);
+                await persistence.UpdateSnapshotAsync(runId, extendedSnapshotJson, cancellationToken);
             }
-
-            var extendedProviders = new List<GroundingProviderProfile>
-                { SystemCrew.RunAttachmentsProfile };
-            if (snapshot.GroundingProviders is { Count: > 0 } existing)
-                extendedProviders.AddRange(existing);
-
-            var extendedSnapshot = snapshot with { GroundingProviders = extendedProviders };
-            var extendedSnapshotJson = JsonSerializer.Serialize(extendedSnapshot, SnapshotJsonOpts);
-            await persistence.UpdateSnapshotAsync(runId, extendedSnapshotJson, cancellationToken);
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Attachment upload failed for run {RunId}; marking run as Failed", runId);
+                await persistence.MarkRunFailedAsync(runId, $"Attachment upload failed: {ex.Message}", cancellationToken);
+                throw;
+            }
         }
 
         return runId;

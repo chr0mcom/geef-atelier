@@ -13,13 +13,12 @@ public static class SubmitRequestTool
     private static readonly JsonSerializerOptions JsonOpts =
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-    /// <summary>Supported MIME types for run-attachment uploads.</summary>
+    /// <summary>Supported MIME types for run-attachment uploads. Only text/markdown and text/plain are supported.</summary>
     private static readonly IReadOnlySet<string> SupportedAttachmentContentTypes =
         new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "text/markdown",
             "text/plain",
-            "application/octet-stream",
         };
 
     [McpServerTool, Description("Submits a new run request with a briefing text and optional JSON configuration.")]
@@ -29,7 +28,7 @@ public static class SubmitRequestTool
         [Description("Optional JSON configuration object. Defaults to '{}'.")] string? configJson = null,
         [Description("Name of the crew template to use (e.g. 'klassik'). Defaults to the system default when omitted.")] string? crewTemplate = null,
         [Description("Optional custom crew specification as a JSON object (CrewSpec). When supplied, crewTemplate is ignored. Supported fields: executorProfileName, reviewerProfileNames, advisorProfileNames, groundingProviderProfileNames, evaluationStrategy.")] string? customCrew = null,
-        [Description("Optional attachments as a JSON array: [{\"filename\":\"report.md\",\"contentType\":\"text/plain\",\"contentBase64\":\"...\"}]")] string? attachments = null,
+        [Description("Optional attachments as a JSON array: [{\"filename\":\"report.md\",\"contentType\":\"text/plain\",\"contentBase64\":\"...\"}]. Only text/markdown and text/plain are supported content types.")] string? attachments = null,
         CancellationToken cancellationToken = default)
     {
         CrewSpec? crewSpec = null;
@@ -100,5 +99,8 @@ public static class SubmitRequestTool
     }
 
     /// <summary>DTO for deserializing a single attachment entry from the <c>attachments</c> JSON parameter.</summary>
-    internal sealed record AttachmentDto(string Filename, string ContentType, string ContentBase64);
+    internal sealed record AttachmentDto(
+        [property: System.Text.Json.Serialization.JsonRequired] string Filename,
+        [property: System.Text.Json.Serialization.JsonRequired] string ContentType,
+        [property: System.Text.Json.Serialization.JsonRequired] string ContentBase64);
 }

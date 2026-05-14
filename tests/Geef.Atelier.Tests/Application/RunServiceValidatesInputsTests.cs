@@ -1,5 +1,7 @@
+using Geef.Atelier.Application.Crew.Knowledge;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Infrastructure.Persistence;
+using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Tests.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,6 +17,8 @@ public sealed class RunServiceValidatesInputsTests(PostgresFixture fixture)
         services.AddDbContext<AtelierDbContext>(opt => opt.UseNpgsql(fixture.ConnectionString));
         services.AddAtelierPersistence();
         services.AddAtelierApplication();
+        services.AddScoped<IKnowledgeService, NoOpKnowledgeService>();
+        services.AddLogging();
         return services.BuildServiceProvider();
     }
 

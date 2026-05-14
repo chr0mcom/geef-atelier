@@ -88,17 +88,17 @@ public sealed class SubmitRequestToolAttachmentTests
     }
 
     [Fact]
-    public async Task SubmitRequest_WithSupportedOctetStream_Succeeds()
+    public async Task SubmitRequest_OctetStreamContentType_ThrowsArgumentException()
     {
         var svc = new CapturingRunService();
         var b64 = Convert.ToBase64String("binary data"u8.ToArray());
 
         var json = $$"""[{"filename":"data.bin","contentType":"application/octet-stream","contentBase64":"{{b64}}"}]""";
 
-        await SubmitRequestTool.SubmitRequest(svc, "briefing", attachments: json);
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => SubmitRequestTool.SubmitRequest(svc, "briefing", attachments: json));
 
-        Assert.Single(svc.LastAttachments!);
-        Assert.Equal("application/octet-stream", svc.LastAttachments![0].ContentType);
+        Assert.Contains("application/octet-stream", ex.Message);
     }
 
     [Fact]

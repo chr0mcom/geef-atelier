@@ -6,6 +6,8 @@ namespace Geef.Atelier.Infrastructure.Persistence;
 
 internal sealed class RunPersistenceService(AtelierDbContext db) : IRunPersistenceService
 {
+    private static readonly RunStatus[] TerminalStatuses =
+        [RunStatus.Completed, RunStatus.Failed, RunStatus.Aborted];
     public async Task<Guid> CreateRunAsync(
         string briefingText,
         string configJson,
@@ -36,8 +38,22 @@ internal sealed class RunPersistenceService(AtelierDbContext db) : IRunPersisten
     /// <inheritdoc/>
     public async Task UpdateSnapshotAsync(Guid runId, string snapshotJson, CancellationToken cancellationToken = default)
     {
-        await db.Runs
+        var affected = await db.Runs
             .Where(r => r.Id == runId)
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.CrewSnapshot, snapshotJson), cancellationToken);
+        if (affected == 0)
+            throw new InvalidOperationException($"Run {runId} not found for snapshot update.");
+    }
+
+    /// <inheritdoc/>
+    public async Task MarkRunFailedAsync(Guid runId, string errorMessage, CancellationToken cancellationToken = default)
+    {
+        await db.Runs
+            .Where(r => r.Id == runId && !TerminalStatuses.Contains(r.Status))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.Status,       RunStatus.Failed)
+                .SetProperty(r => r.ErrorMessage, errorMessage)
+                .SetProperty(r => r.CompletedAt,  DateTimeOffset.UtcNow),
+                cancellationToken);
     }
 }

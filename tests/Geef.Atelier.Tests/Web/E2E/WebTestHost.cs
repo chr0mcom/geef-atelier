@@ -1,12 +1,14 @@
 using System.Net;
 using System.Net.Sockets;
 using Geef.Atelier.Application.Auth;
+using Geef.Atelier.Application.Crew.Knowledge;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Mcp;
+using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Persistence;
 using Geef.Atelier.Web.Auth;
@@ -85,6 +87,7 @@ internal sealed class WebTestHost : IAsyncDisposable
 
         builder.Services.AddAtelierPersistence();
         builder.Services.AddAtelierApplication();
+        builder.Services.AddScoped<IKnowledgeService, NoOpKnowledgeService>();
 
         // Orchestrator: fast polling for tests
         builder.Services.Configure<OrchestratorOptions>(o =>
