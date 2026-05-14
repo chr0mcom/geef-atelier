@@ -31,7 +31,7 @@ internal sealed class VectorSearchRepository(AtelierDbContext context) : IVector
                        1.0 - (c.""Embedding"" <=> @vec::vector) AS ""Similarity""
                 FROM ""KnowledgeDocumentChunks"" c
                 JOIN ""KnowledgeDocuments"" d ON c.""DocumentId"" = d.""Id""
-                WHERE d.""Tags"" @> @tags::text[]
+                WHERE d.""Tags"" && @tags::text[]
                 ORDER BY c.""Embedding"" <=> @vec::vector
                 LIMIT @topk"
             : @"SELECT c.""Id"", c.""DocumentId"", c.""ChunkIndex"", c.""Content"",

@@ -91,8 +91,12 @@ internal sealed class OpenRouterEmbeddingProvider(
 
         logger.LogDebug("OpenRouter embedding request: model={Model} count={Count}", opts.Model, texts.Count);
 
-        var response = await httpClient.SendAsync(request, cts.Token);
-        response.EnsureSuccessStatusCode();
+        using var response = await httpClient.SendAsync(request, cts.Token);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cts.Token);
+            throw new HttpRequestException($"OpenRouter embeddings returned {(int)response.StatusCode}: {body}");
+        }
 
         var result = await response.Content.ReadFromJsonAsync<EmbeddingResponse>(JsonOpts, cts.Token)
             ?? throw new InvalidOperationException("OpenRouter embeddings returned an empty response body.");

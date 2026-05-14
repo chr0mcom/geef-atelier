@@ -44,7 +44,8 @@ internal sealed class KnowledgeService(
                 $"Document size {ms.Length} bytes exceeds the maximum allowed size of {opts.MaxDocumentSizeBytes} bytes.");
 
         ms.Position = 0;
-        var rawContent = new System.IO.StreamReader(ms).ReadToEnd();
+        using var reader = new StreamReader(ms);
+        var rawContent = await reader.ReadToEndAsync(ct);
 
         var now = DateTimeOffset.UtcNow;
         var doc = new KnowledgeDocument(

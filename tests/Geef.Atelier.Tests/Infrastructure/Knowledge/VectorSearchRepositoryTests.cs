@@ -64,6 +64,33 @@ public sealed class VectorSearchRepositoryTests(PostgresFixture fixture) : IClas
     }
 
     [Fact]
+    public async Task SearchAsync_TagFilter_UsesOverlapSemantics()
+    {
+        var docRepo = DocRepo();
+        var chunkRepo = ChunkRepo();
+
+        // Document tagged only with "overlap-only-tag" — unique to this test
+        var doc = await docRepo.CreateAsync(
+            BuildDocument("Overlap Doc", ["overlap-only-tag"]), CancellationToken.None);
+        var chunk = BuildChunk(doc.Id, 0, MakeUnitVector(0, positive: true));
+        await chunkRepo.CreateChunkAsync(chunk, CancellationToken.None);
+
+        // Filtering by ["overlap-only-tag", "other-tag"] — doc has "overlap-only-tag" → overlap → should be returned
+        var resultsOverlap = await chunkRepo.SearchAsync(
+            MakeUnitVector(0, positive: true), topK: 10,
+            tagFilter: ["overlap-only-tag", "other-tag"], CancellationToken.None);
+
+        Assert.Contains(resultsOverlap, r => r.Chunk.DocumentId == doc.Id);
+
+        // Filtering by ["no-match-tag-1", "no-match-tag-2"] — doc has neither → no overlap → should NOT be returned
+        var resultsNoOverlap = await chunkRepo.SearchAsync(
+            MakeUnitVector(0, positive: true), topK: 10,
+            tagFilter: ["no-match-tag-1", "no-match-tag-2"], CancellationToken.None);
+
+        Assert.DoesNotContain(resultsNoOverlap, r => r.Chunk.DocumentId == doc.Id);
+    }
+
+    [Fact]
     public async Task SearchAsync_DoesNotThrow_WhenNoChunksMatchQuery()
     {
         var docRepo = DocRepo();
