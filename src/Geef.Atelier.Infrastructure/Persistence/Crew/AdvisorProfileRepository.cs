@@ -39,7 +39,9 @@ internal sealed class AdvisorProfileRepository(AtelierDbContext db) : IAdvisorPr
     {
         if (SystemCrew.IsSystemAdvisorName(profile.Name))
             throw new InvalidOperationException($"Advisor profile '{profile.Name}' is a system profile and cannot be modified.");
-        db.AdvisorProfiles.Update(profile);
+        var existing = await db.AdvisorProfiles.FirstOrDefaultAsync(a => a.Name == profile.Name, cancellationToken)
+            ?? throw new InvalidOperationException($"Advisor profile '{profile.Name}' not found in the database.");
+        db.Entry(existing).CurrentValues.SetValues(profile);
         await db.SaveChangesAsync(cancellationToken);
     }
 

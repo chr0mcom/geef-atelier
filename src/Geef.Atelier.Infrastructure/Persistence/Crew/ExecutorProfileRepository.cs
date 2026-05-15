@@ -35,7 +35,9 @@ internal sealed class ExecutorProfileRepository(AtelierDbContext db) : IExecutor
     /// <inheritdoc/>
     public async Task UpdateAsync(ExecutorProfile profile, CancellationToken cancellationToken = default)
     {
-        db.ExecutorProfiles.Update(profile);
+        var existing = await db.ExecutorProfiles.FirstOrDefaultAsync(e => e.Name == profile.Name, cancellationToken)
+            ?? throw new InvalidOperationException($"Executor profile '{profile.Name}' not found in the database.");
+        db.Entry(existing).CurrentValues.SetValues(profile);
         await db.SaveChangesAsync(cancellationToken);
     }
 

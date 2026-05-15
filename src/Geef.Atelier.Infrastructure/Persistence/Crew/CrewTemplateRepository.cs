@@ -34,7 +34,9 @@ internal sealed class CrewTemplateRepository(AtelierDbContext db) : ICrewTemplat
     /// <inheritdoc/>
     public async Task UpdateAsync(CrewTemplate template, CancellationToken cancellationToken = default)
     {
-        db.CrewTemplates.Update(template);
+        var existing = await db.CrewTemplates.FirstOrDefaultAsync(t => t.Name == template.Name, cancellationToken)
+            ?? throw new InvalidOperationException($"Crew template '{template.Name}' not found in the database.");
+        db.Entry(existing).CurrentValues.SetValues(template);
         await db.SaveChangesAsync(cancellationToken);
     }
 

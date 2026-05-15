@@ -35,7 +35,9 @@ internal sealed class ReviewerProfileRepository(AtelierDbContext db) : IReviewer
     /// <inheritdoc/>
     public async Task UpdateAsync(ReviewerProfile profile, CancellationToken cancellationToken = default)
     {
-        db.ReviewerProfiles.Update(profile);
+        var existing = await db.ReviewerProfiles.FirstOrDefaultAsync(r => r.Name == profile.Name, cancellationToken)
+            ?? throw new InvalidOperationException($"Reviewer profile '{profile.Name}' not found in the database.");
+        db.Entry(existing).CurrentValues.SetValues(profile);
         await db.SaveChangesAsync(cancellationToken);
     }
 
