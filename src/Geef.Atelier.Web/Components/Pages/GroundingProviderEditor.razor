@@ -116,7 +116,7 @@
         @if (!IsNew)
         {
             <div style="margin-top: 1rem;">
-                <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true">Delete</button>
+                <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true" data-testid="btn-delete">Delete</button>
             </div>
         }
     }

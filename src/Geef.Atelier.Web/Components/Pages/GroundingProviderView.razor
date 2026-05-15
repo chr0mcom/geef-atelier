@@ -45,7 +45,7 @@
             @foreach (var setting in _profile.ProviderSettings)
             {
                 <dt>@setting.Key</dt>
-                <dd>@setting.Value</dd>
+                <dd data-testid="detail-setting-@setting.Key.ToLowerInvariant()">@setting.Value</dd>
             }
 
             <dt>Max Queries per Run</dt>
@@ -62,9 +62,9 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _profile = await CrewService.GetGroundingProviderProfileAsync(Name!);
-        if (_profile == null)
-            Nav.NavigateTo("/crew/profiles/grounding-providers");
+        if (Name is null) { Nav.NavigateTo("/crew/profiles/grounding-providers"); return; }
+        _profile = await CrewService.GetGroundingProviderProfileAsync(Name);
+        if (_profile == null) { Nav.NavigateTo("/crew/profiles/grounding-providers"); return; }
         _loading = false;
     }
 }
