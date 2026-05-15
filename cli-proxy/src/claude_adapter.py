@@ -39,12 +39,11 @@ async def _run_claude(prompt: str, model: str | None, max_tokens: int | None) ->
     args = ["claude", "-p", "--output-format", "json"]
 
     if model:
-        # Strip provider prefix (e.g. "anthropic/claude-opus-4-5" → "claude-opus-4-5").
+        # Strip provider prefix and normalize dots to dashes
+        # (e.g. "anthropic/claude-opus-4.7" → "claude-opus-4-7").
         bare_model = model.split("/")[-1] if "/" in model else model
+        bare_model = bare_model.replace(".", "-")
         args += ["--model", bare_model]
-
-    if max_tokens:
-        args += ["--max-tokens", str(max_tokens)]
 
     args.append(prompt)
 
@@ -56,13 +55,25 @@ async def _run_claude(prompt: str, model: str | None, max_tokens: int | None) ->
         stderr=asyncio.subprocess.PIPE,
         env=env,
     )
-    stdout, stderr = await proc.communicate()
-
-    if proc.returncode != 0:
-        err = stderr.decode(errors="replace").strip()
-        raise RuntimeError(f"claude CLI exited with code {proc.returncode}: {err}")
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=270)
+    except asyncio.TimeoutError:
+        proc.kill()
+        raise RuntimeError("claude CLI timed out after 4.5 minutes")
 
     raw = stdout.decode(errors="replace").strip()
+
+    if proc.returncode != 0:
+        # Errors may appear in stdout JSON (is_error: true) rather than stderr.
+        stderr_msg = stderr.decode(errors="replace").strip()
+        try:
+            data = json.loads(raw)
+            if isinstance(data, dict) and data.get("is_error"):
+                raise RuntimeError(f"claude CLI error: {data.get('result', stderr_msg)}")
+        except (json.JSONDecodeError, ValueError):
+            pass
+        raise RuntimeError(f"claude CLI exited with code {proc.returncode}: {stderr_msg or raw[:200]}")
+
     return _extract_result(raw)
 
 

@@ -98,7 +98,9 @@ async def _run_codex(prompt: str, model: str | None, max_tokens: int | None) -> 
         output_file = tmp.name
 
     try:
-        args = ["codex", "exec"]
+        # --skip-git-repo-check: the proxy container is not a git repo, and codex
+        # exec otherwise refuses to run ("Not inside a trusted directory").
+        args = ["codex", "exec", "--skip-git-repo-check"]
 
         if model:
             bare_model = model.split("/")[-1] if "/" in model else model
@@ -114,7 +116,11 @@ async def _run_codex(prompt: str, model: str | None, max_tokens: int | None) -> 
             stderr=asyncio.subprocess.PIPE,
             env=env,
         )
-        _, stderr = await proc.communicate()
+        try:
+            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=270)
+        except asyncio.TimeoutError:
+            proc.kill()
+            raise RuntimeError("codex CLI timed out after 4.5 minutes")
 
         if proc.returncode != 0:
             err = stderr.decode(errors="replace").strip()
