@@ -27,7 +27,7 @@ public static class LlmServiceExtensions
         {
             client.DefaultRequestHeaders.Add("HTTP-Referer", "https://github.com/chr0mcom/geef-atelier");
             client.DefaultRequestHeaders.Add("X-Title", "Geef.Atelier");
-            client.Timeout = TimeSpan.FromSeconds(120);
+            client.Timeout = TimeSpan.FromMinutes(5);
         });
     }
 }

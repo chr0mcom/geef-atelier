@@ -161,7 +161,7 @@ public sealed class OpenRouterEmbeddingProviderTests
             },
         };
         var provider = new OpenRouterEmbeddingProvider(
-            httpClient,
+            new FakeHttpClientFactory(httpClient),
             Options.Create(embOpts),
             Options.Create(llmOptions),
             NullLogger<OpenRouterEmbeddingProvider>.Instance);

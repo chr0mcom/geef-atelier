@@ -15,7 +15,8 @@ public static class EmbeddingsServiceExtensions
         services.Configure<EmbeddingsOptions>(configuration.GetSection("Embeddings"));
 
         var endpoint = configuration["Embeddings:Endpoint"] ?? "https://openrouter.ai/api/v1";
-        services.AddHttpClient<OpenRouterEmbeddingProvider>(client =>
+        if (!endpoint.EndsWith('/')) endpoint += '/';
+        services.AddHttpClient("embeddings", client =>
             client.BaseAddress = new Uri(endpoint));
 
         services.AddSingleton<IEmbeddingProvider, OpenRouterEmbeddingProvider>();

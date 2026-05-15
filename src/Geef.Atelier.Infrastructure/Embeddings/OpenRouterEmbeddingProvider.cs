@@ -15,7 +15,7 @@ namespace Geef.Atelier.Infrastructure.Embeddings;
 /// Uses the openrouter API key from <see cref="LlmOptions.Providers"/>.
 /// </summary>
 internal sealed class OpenRouterEmbeddingProvider(
-    HttpClient httpClient,
+    IHttpClientFactory httpClientFactory,
     IOptions<EmbeddingsOptions> options,
     IOptions<LlmOptions> llmOptions,
     ILogger<OpenRouterEmbeddingProvider> logger) : IEmbeddingProvider
@@ -85,7 +85,9 @@ internal sealed class OpenRouterEmbeddingProvider(
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(TimeSpan.FromSeconds(opts.RequestTimeoutSeconds));
 
-        var request = new HttpRequestMessage(HttpMethod.Post, "/embeddings");
+        // Not disposed: IHttpClientFactory owns the lifetime of clients it hands out.
+        var httpClient = httpClientFactory.CreateClient("embeddings");
+        var request = new HttpRequestMessage(HttpMethod.Post, "embeddings");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         request.Content = JsonContent.Create(requestBody, options: JsonOpts);
 
