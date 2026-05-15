@@ -29,7 +29,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.geef-atelier.rule=Host(`geef.stefan-bechtel.de`)"
+      - "traefik.http.routers.geef-atelier.rule=Host(`${ATELIER_DOMAIN}`)"
       - "traefik.http.routers.geef-atelier.entrypoints=websecure"
       - "traefik.http.routers.geef-atelier.tls=true"
       - "traefik.http.routers.geef-atelier.tls.certresolver=le"

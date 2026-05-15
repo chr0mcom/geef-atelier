@@ -25,7 +25,7 @@ public static class LlmServiceExtensions
 
         return services.AddHttpClient("llm", client =>
         {
-            client.DefaultRequestHeaders.Add("HTTP-Referer", "https://geef.stefan-bechtel.de");
+            client.DefaultRequestHeaders.Add("HTTP-Referer", "https://github.com/chr0mcom/geef-atelier");
             client.DefaultRequestHeaders.Add("X-Title", "Geef.Atelier");
             client.Timeout = TimeSpan.FromSeconds(120);
         });

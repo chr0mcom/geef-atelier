@@ -415,6 +415,13 @@ FodyWeavers.xsd
 .env.*
 !.env.example
 
+# Internal build docs (prompts, deployment reports)
+docs/prompts/
+docs/reports/
+
+# AI assistant config
+CLAUDE.md
+
 # Git worktrees
 .worktrees/
 

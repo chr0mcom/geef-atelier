@@ -67,7 +67,7 @@ dotnet test
 
 ---
 
-## MCP-Server (Schritt 9)
+## MCP-Server
 
 Der MCP-Server läuft unter `/mcp` und ist mit Bearer-Token-Auth gesichert.
 
@@ -90,7 +90,7 @@ ATELIER_MCP_TOKEN=<generated-token>
 {
   "mcpServers": {
     "geef-atelier": {
-      "url": "http://95.216.100.213:8080/mcp",
+      "url": "http://localhost:8080/mcp",
       "headers": {
         "Authorization": "Bearer <your-token>"
       }
@@ -98,6 +98,8 @@ ATELIER_MCP_TOKEN=<generated-token>
   }
 }
 ```
+
+Für eine öffentlich erreichbare Instanz entsprechend `http://localhost:8080` durch die eigene Domain ersetzen.
 
 ### MCP-Tools
 
@@ -132,6 +134,7 @@ Jeder Run speichert einen vollständig eingebetteten **CrewSnapshot** in der DB 
 | Template anlegen/bearbeiten | `/crew/templates/new`, `/crew/templates/{name}` |
 | Reviewer-Profile | `/crew/profiles/reviewers` |
 | Executor-Profile | `/crew/profiles/executors` |
+| Grounding-Provider | `/crew/profiles/grounding-providers` |
 
 Auf der **NewRun-Page** (`/new`) wählt der User das Template über ein Dropdown. Auf der **RunDetail-Page** zeigt die **CrewSummary**-Komponente die verwendete Crew (click-to-expand). In der **Runs-Liste** zeigt **CrewBadge** den Template-Namen.
 
@@ -141,15 +144,13 @@ Details: [`docs/08-crew-system.md`](docs/08-crew-system.md)
 
 ## Production-Deployment
 
-Voraussetzungen: Traefik läuft auf dem Server, DNS für `geef.stefan-bechtel.de` zeigt auf den Server.
+Voraussetzungen: Traefik läuft auf dem Server, DNS der eigenen Domain zeigt auf den Server.
 
 ### Erste Einrichtung
 
 **1. Production-Secrets generieren:**
 
 ```bash
-cd /srv/docker/websites/geef_atelier
-
 # BCrypt-Hash für das UI-Passwort (workFactor 11)
 dotnet run --project tools/HashPassword -- "DeinPasswort"
 
@@ -169,6 +170,7 @@ POSTGRES_PASSWORD=<generiertes-passwort>
 ATELIER_USER=admin
 ATELIER_PASSWORD_HASH=<bcrypt-hash>
 ATELIER_MCP_TOKEN=<hex-token>
+ATELIER_DOMAIN=<your-domain>
 LLM_OPENROUTER_API_KEY=<openrouter-api-key>
 
 # Tavily Web Search (https://tavily.com) — optional, only needed for Tavily grounding profiles
@@ -181,7 +183,7 @@ TAVILY_API_KEY=
 docker compose up -d --build
 ```
 
-Migrations laufen automatisch beim Start. Health-Check: `https://geef.stefan-bechtel.de/health`.
+Migrations laufen automatisch beim Start. Health-Check: `https://<your-domain>/health`.
 
 ### Neustart / Update
 
@@ -194,9 +196,9 @@ docker compose logs -f web      # Logs folgen
 
 | URL | Beschreibung |
 |-----|--------------|
-| `https://geef.stefan-bechtel.de/` | Web-UI (Cookie-Auth) |
-| `https://geef.stefan-bechtel.de/health` | Health-Check |
-| `https://geef.stefan-bechtel.de/mcp` | MCP-Endpoint (Bearer-Auth) |
+| `https://<your-domain>/` | Web-UI (Cookie-Auth) |
+| `https://<your-domain>/health` | Health-Check |
+| `https://<your-domain>/mcp` | MCP-Endpoint (Bearer-Auth) |
 
 ---
 
@@ -241,7 +243,7 @@ docker compose stop web
 ./scripts/restore-backup.sh <pfad-zur-backup-datei.sql.gz>
 
 # 3. Verifikation
-curl https://geef.stefan-bechtel.de/health
+curl https://<your-domain>/health
 ```
 
 > **Hinweis:** `scripts/restore-backup.sh` überschreibt alle bestehenden Daten.
@@ -249,7 +251,7 @@ curl https://geef.stefan-bechtel.de/health
 
 ### Off-Site-Backup
 
-Das Volume-Backup schützt gegen DB-Container-Crash und Logic-Errors, **nicht** gegen Server-Hardware-Ausfall oder versehentliches `docker volume rm`. Für robusteren Schutz empfiehlt sich ein regelmäßiges rsync der Backup-Dateien auf einen zweiten Host (z.B. Hetzner Storage Box).
+Das Volume-Backup schützt gegen DB-Container-Crash und Logic-Errors, **nicht** gegen Server-Hardware-Ausfall oder versehentliches `docker volume rm`. Für robusteren Schutz empfiehlt sich ein regelmäßiges rsync der Backup-Dateien auf einen zweiten Host.
 
 ---
 

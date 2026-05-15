@@ -1742,6 +1742,7 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
 }
 
 /* --- Reconnect modal --- */
+#blazor-error-ui { display: none; }
 .reconnect {
   position: fixed;
   bottom: 28px; left: 50%;
@@ -1921,10 +1922,17 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
 /* ── Crew UI — shared page layout ───────────────────────── */
 .crew-index,
 .crew-templates-index,
-.crew-profiles-index {
+.crew-profiles-index,
+.studio-page {
     max-width: 1180px;
     margin: 0 auto;
     padding: 40px 32px 80px;
+}
+
+.studio-subtitle {
+    color: var(--ink-2);
+    font-size: 0.9375rem;
+    margin: 0;
 }
 
 .crew-editor {
