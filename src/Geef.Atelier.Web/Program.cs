@@ -27,7 +27,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 // OpenAI-compatible LLM client (default: OpenRouter) — set Llm__ApiKey env-var for real calls.
 builder.Services.AddLlmClient(builder.Configuration)
-    .AddStandardResilienceHandler();
+    .AddStandardResilienceHandler(options =>
+    {
+        options.TotalRequestTimeout.Timeout        = TimeSpan.FromMinutes(5);
+        options.AttemptTimeout.Timeout             = TimeSpan.FromMinutes(4);
+        options.CircuitBreaker.SamplingDuration    = TimeSpan.FromMinutes(10);
+        options.Retry.MaxRetryAttempts             = 2;
+    });
 
 builder.Services.AddDbContext<AtelierDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
