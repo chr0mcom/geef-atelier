@@ -1,5 +1,5 @@
-@page "/crew/profiles/grounding/new"
-@page "/crew/profiles/grounding/{name}"
+@page "/crew/profiles/grounding-providers/create"
+@page "/crew/profiles/grounding-providers/edit/{name}"
 @attribute [Authorize]
 @rendermode InteractiveServer
 @using Geef.Atelier.Application.Crew
@@ -13,17 +13,13 @@
 
 <div class="crew-editor" data-testid="grounding-provider-editor">
     <div class="page-header">
-        <h1>@(IsNew ? "New Grounding Provider" : _isSystem ? _displayName : $"Edit: {_displayName}")</h1>
-        <a href="/crew/profiles/grounding" class="btn ghost">← Back</a>
+        <h1>@(IsNew ? "New Grounding Provider" : $"Edit: {_displayName}")</h1>
+        <a href="/crew/profiles/grounding-providers" class="btn ghost">← Back</a>
     </div>
 
     @if (_loading)
     {
         <p>Loading…</p>
-    }
-    else if (_isSystem)
-    {
-        <div class="info-banner">System profiles are read-only. Use <strong>Duplicate as custom</strong> from the list page to create a customizable copy.</div>
     }
     else
     {
@@ -137,7 +133,6 @@
     [Parameter] public string? Name { get; set; }
 
     private bool IsNew => Name == null;
-    private bool _isSystem;
     private bool _loading = true;
     private bool _saving;
     private bool _showDeleteModal;
@@ -151,8 +146,8 @@
         if (!IsNew)
         {
             var profile = await CrewService.GetGroundingProviderProfileAsync(Name!);
-            if (profile == null) { Nav.NavigateTo("/crew/profiles/grounding"); return; }
-            _isSystem = profile.IsSystem;
+            if (profile == null) { Nav.NavigateTo("/crew/profiles/grounding-providers"); return; }
+            if (profile.IsSystem) { Nav.NavigateTo("/crew/profiles/grounding-providers/view/" + Name!); return; }
             _displayName = profile.DisplayName;
             _form = GroundingFormModel.From(profile);
         }
@@ -160,7 +155,7 @@
         _loading = false;
     }
 
-    private void NavigateBack() => Nav.NavigateTo("/crew/profiles/grounding");
+    private void NavigateBack() => Nav.NavigateTo("/crew/profiles/grounding-providers");
 
     private async Task SaveAsync()
     {
@@ -173,7 +168,7 @@
                 await CrewService.CreateCustomGroundingProviderProfileAsync(profile);
             else
                 await CrewService.UpdateCustomGroundingProviderProfileAsync(profile);
-            Nav.NavigateTo("/crew/profiles/grounding");
+            Nav.NavigateTo("/crew/profiles/grounding-providers");
         }
         catch (Exception ex)
         {
@@ -192,7 +187,7 @@
         try
         {
             await CrewService.DeleteCustomGroundingProviderProfileAsync(Name!);
-            Nav.NavigateTo("/crew/profiles/grounding");
+            Nav.NavigateTo("/crew/profiles/grounding-providers");
         }
         catch (Exception ex) { _error = ex.Message; }
     }
