@@ -4,6 +4,7 @@
 @using Geef.Atelier.Application.Crew
 @using Geef.Atelier.Core.Domain.Crew
 @using Geef.Atelier.Core.Domain.Crew.Advisors
+@using Geef.Atelier.Core.Domain.Crew.Grounding
 @using Geef.Atelier.Core.Domain.Crew.Profiles
 @inject ICrewService CrewService
 
@@ -108,6 +109,30 @@
         <a href="/crew/profiles/advisors" class="view-all-link">View all advisor profiles →</a>
     </section>
 
+    <section class="crew-section" data-testid="grounding-providers-section">
+        <div class="crew-section-header">
+            <h2>Grounding Providers</h2>
+            <a href="/crew/profiles/grounding-providers/create" class="btn small">+ New</a>
+        </div>
+        @if (_groundingProviders.Count == 0)
+        {
+            <p class="text-muted">No grounding provider profiles yet.</p>
+        }
+        else
+        {
+            <ul class="crew-item-list">
+                @foreach (var g in _groundingProviders.Take(5))
+                {
+                    <li>
+                        <a href="/crew/profiles/grounding-providers/view/@g.Name">@g.DisplayName</a>
+                        @if (g.IsSystem) { <span class="crew-badge">System</span> }
+                    </li>
+                }
+            </ul>
+        }
+        <a href="/crew/profiles/grounding-providers" class="view-all-link">View all grounding providers →</a>
+    </section>
+
     <section class="crew-section" data-testid="knowledge-base-section">
         <div class="crew-section-header">
             <h2>Knowledge Base</h2>
@@ -123,6 +148,7 @@
     private IReadOnlyList<ReviewerProfile> _reviewers = [];
     private IReadOnlyList<ExecutorProfile> _executors = [];
     private IReadOnlyList<AdvisorProfile> _advisors = [];
+    private IReadOnlyList<GroundingProviderProfile> _groundingProviders = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -130,5 +156,6 @@
         _reviewers = await CrewService.ListReviewerProfilesAsync(includeSystem: true);
         _executors = await CrewService.ListExecutorProfilesAsync(includeSystem: true);
         _advisors = await CrewService.ListAdvisorProfilesAsync(includeSystem: true);
+        _groundingProviders = await CrewService.ListGroundingProviderProfilesAsync(includeSystem: true);
     }
 }
