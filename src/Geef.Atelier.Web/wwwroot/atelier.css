@@ -1505,7 +1505,6 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
 .iter.open .iter-body { max-height: 2000px; }
 
 .artifact {
-  padding: 26px 32px 30px 32px;
   border-right: 1px solid var(--hairline-soft);
   font-family: var(--font-display);
   font-size: 15px;
@@ -1513,52 +1512,118 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
   color: var(--ink);
   max-height: 640px;
   overflow-y: auto;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
 }
-.artifact h3 {
+.artifact-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 22px;
+  background: color-mix(in oklch, var(--surface) 92%, transparent);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--hairline-soft);
+}
+.artifact .md.prose {
+  padding: 22px 32px 30px 32px;
+  min-width: 0;
+}
+
+/* --- Rendered Markdown typography --- */
+.md {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 {
   font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 19px;
-  margin: 22px 0 6px;
-  letter-spacing: -0.005em;
+  font-weight: 500;
+  letter-spacing: -0.008em;
+  line-height: 1.25;
+  margin: 26px 0 8px;
 }
-.artifact h3:first-child { margin-top: 0; }
-.artifact p { margin: 0 0 10px; }
-.artifact .math {
+.md h1 { font-size: 26px; font-weight: 400; }
+.md h2 { font-size: 21px; }
+.md h3 { font-size: 18px; }
+.md h4, .md h5, .md h6 { font-size: 15px; }
+.md p { margin: 0 0 12px; }
+.md ul, .md ol { margin: 0 0 12px; padding-left: 24px; }
+.md li { margin-bottom: 5px; line-height: 1.6; }
+.md li > ul, .md li > ol { margin: 5px 0 0; }
+.md a { color: var(--hero-deep); text-decoration: underline; text-underline-offset: 2px; }
+.md em { font-style: italic; }
+.md strong { font-weight: 600; }
+.md hr { border: 0; border-top: 1px solid var(--hairline-soft); margin: 22px 0; }
+.md blockquote {
+  margin: 12px 0;
+  padding: 4px 16px;
+  border-left: 3px solid var(--hero);
+  color: var(--ink-2);
+  font-style: italic;
+}
+.md code {
   font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--surface-2);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.md pre {
+  background: var(--bg-deep);
+  border: 1px solid var(--hairline-soft);
+  border-radius: 4px;
+  padding: 14px 16px;
+  margin: 0 0 14px;
+  overflow-x: auto;
+  white-space: pre;
+}
+.md pre code {
+  background: none;
+  padding: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.md table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 14px;
   font-size: 13.5px;
-  color: var(--hero-deep);
-  background: color-mix(in oklch, var(--hero) 5%, transparent);
-  border-left: 2px solid var(--hero);
-  padding: 8px 12px;
-  margin: 8px 0 12px;
   display: block;
+  overflow-x: auto;
 }
-.artifact em { color: var(--hero); font-style: italic; }
-.artifact strong { color: var(--ink); font-weight: 500; }
-.artifact .change-mark {
-  background: color-mix(in oklch, var(--hero) 15%, transparent);
-  padding: 0 3px;
-  border-radius: 2px;
+.md th, .md td {
+  border: 1px solid var(--hairline-soft);
+  padding: 6px 10px;
+  text-align: left;
 }
+.md th { background: var(--surface-2); font-weight: 600; }
+.md img { max-width: 100%; height: auto; border-radius: 4px; }
+.md.prose em { color: var(--hero); }
 
 /* Findings — margin / annotation style */
 .findings {
   padding: 22px 22px 22px 22px;
   background: var(--bg-deep);
   position: relative;
+  max-height: 640px;
+  overflow-y: auto;
+  min-width: 0;
+  min-height: 0;
 }
 .findings::before {
   content: "MARGIN NOTES";
-  position: absolute;
-  top: -1px;
-  left: 22px;
-  background: var(--bg-deep);
+  display: block;
+  margin-bottom: 16px;
   font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.2em;
   color: var(--ink-3);
-  padding: 0 6px;
-  transform: translateY(-50%);
 }
 .finding {
   position: relative;
@@ -1719,6 +1784,34 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
 .manuscript strong { font-weight: 600; }
 .manuscript ul, .manuscript ol { padding-left: 22px; margin: 8px 0 14px; max-width: 64ch; }
 .manuscript li { margin-bottom: 6px; line-height: 1.6; font-size: 15px; }
+.manuscript .body-text { color: var(--paper-ink); }
+.manuscript .body-text h1 {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 40px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0 0 26px;
+  color: var(--paper-ink);
+}
+.manuscript .body-text h2 { color: var(--paper-ink); }
+.manuscript .body-text h3 { font-size: 17px; margin: 22px 0 8px; }
+.manuscript .body-text a { color: var(--hero-deep); }
+.manuscript .body-text code {
+  background: var(--paper-2);
+  color: var(--paper-ink);
+}
+.manuscript .body-text pre {
+  background: var(--paper-2);
+  border-color: var(--paper-rule);
+}
+.manuscript .body-text pre code { color: var(--paper-ink); }
+.manuscript .body-text blockquote {
+  border-left-color: var(--hero-deep);
+  color: var(--paper-ink-2);
+}
+.manuscript .body-text th { background: var(--paper-2); }
+.manuscript .body-text th, .manuscript .body-text td { border-color: var(--paper-rule); }
 .manuscript .drop {
   float: left;
   font-family: var(--font-display);

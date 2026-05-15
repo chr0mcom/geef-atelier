@@ -24,7 +24,7 @@
             <span>Geef.Atelier — Manuscript @RunId</span>
             <span>Iteration @IterationCount · @(RunStatus == RunStatus.Completed ? "Approved" : RunStatus.ToString())</span>
         </div>
-        <div class="body-text">@FinalText</div>
+        <MarkdownView Markdown="@FinalText" Class="body-text" />
         <div class="signature">
             <span>Executor · Atelier Prose</span>
             <span>Reviewed · BriefingFidelity, Clarity</span>

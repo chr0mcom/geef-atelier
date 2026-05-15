@@ -1,5 +1,6 @@
 @using Geef.Atelier.Core.Domain
 @using Geef.Atelier.Web.Display
+@inject IJSRuntime JS
 
 <div class="iter @(_open ? "open" : "") @(IsLast ? "active" : "")">
     <div class="iter-head" @onclick="Toggle" role="button" tabindex="0" aria-expanded="@_open">
@@ -15,7 +16,14 @@
     </div>
     <div class="iter-body">
         <div class="artifact">
-            <pre>@Iteration.ArtifactText</pre>
+            <div class="artifact-head">
+                <span class="t-eyebrow eyebrow">Working draft</span>
+                <button type="button" class="btn small ghost" @onclick="CopyArtifact" @onclick:stopPropagation="true">
+                    <IconCopy Size="13" />
+                    @(_copied ? "Copied" : "Copy Markdown")
+                </button>
+            </div>
+            <MarkdownView Markdown="@Iteration.ArtifactText" Class="prose" />
         </div>
         <div class="findings">
             @foreach (var finding in Findings)
@@ -41,6 +49,16 @@
     [Parameter] public IReadOnlyDictionary<Guid, bool>? ResolvedMap { get; set; }
 
     bool _open;
+    bool _copied;
+
+    async Task CopyArtifact()
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", Iteration.ArtifactText);
+        _copied = true;
+        await Task.Delay(1400);
+        _copied = false;
+        StateHasChanged();
+    }
 
     int _critCount => Findings.Count(f => f.Severity == FindingSeverity.Critical);
     int _majCount  => Findings.Count(f => f.Severity == FindingSeverity.Major);

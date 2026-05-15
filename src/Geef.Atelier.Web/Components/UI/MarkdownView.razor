@@ -1,0 +1,20 @@
+@using Markdig
+
+<div class="md @Class">@_rendered</div>
+
+@code {
+    [Parameter, EditorRequired] public string? Markdown { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    static readonly MarkdownPipeline Pipeline =
+        new MarkdownPipelineBuilder()
+            .UseAdvancedExtensions()
+            .UseSoftlineBreakAsHardlineBreak()
+            .DisableHtml()
+            .Build();
+
+    MarkupString _rendered;
+
+    protected override void OnParametersSet() =>
+        _rendered = (MarkupString)Markdig.Markdown.ToHtml(Markdown ?? string.Empty, Pipeline);
+}
