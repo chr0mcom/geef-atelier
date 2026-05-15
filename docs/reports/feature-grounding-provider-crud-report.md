@@ -1,8 +1,9 @@
 # Feature-Abschlussbericht: Grounding-Provider-Profile CRUD-UI (D-040)
 
 **Datum:** 15. Mai 2026  
-**Branch:** `feat/grounding-provider-crud` → PR → `main`  
-**Deploy-Timestamp:** (nach Deploy ausfüllen)
+**Branch:** `feat/grounding-provider-crud` → PR #13 → `main`  
+**Merge-SHA:** 52f7a4c  
+**Deploy-Timestamp:** 2026-05-15 11:06 UTC
 
 ---
 
@@ -94,8 +95,8 @@ PR gemerged, Branch gelöscht  ✅
 | 16 | Real-Test Vector-Store + Tag-Filter | (nach Deploy) |
 | 17 | Real-Test Edit + Delete | (nach Deploy) |
 | 18 | Decisions-Log-Eintrag D-040 | ✅ |
-| 19 | Merge auf `main` | (nach Deploy) |
-| 20 | Production-Deploy verifiziert | (nach Deploy) |
+| 19 | Merge auf `main` | ✅ PR #13 gemerged, Branch gelöscht |
+| 20 | Production-Deploy verifiziert | ✅ HTTP 302 auf /crew/profiles/grounding-providers |
 
 ---
 
