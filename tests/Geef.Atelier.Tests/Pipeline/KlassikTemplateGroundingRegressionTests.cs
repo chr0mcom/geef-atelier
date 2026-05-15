@@ -3,15 +3,16 @@ using Geef.Atelier.Core.Domain.Crew;
 namespace Geef.Atelier.Tests.Pipeline;
 
 /// <summary>
-/// Verifies that the Klassik system template ships with no grounding providers, preserving the
-/// pre-grounding baseline. A Klassik run must never trigger Tavily or any other grounding provider.
+/// Verifies that the Klassik system template ships with tavily-basic as its only grounding provider.
+/// All system templates have internet access enabled by default.
 /// </summary>
 public sealed class KlassikTemplateGroundingRegressionTests
 {
     [Fact]
-    public void KlassikTemplate_HasNoGroundingProviders()
+    public void KlassikTemplate_HasTavilyBasicGroundingProvider()
     {
-        Assert.Empty(SystemCrew.KlassikTemplate.GroundingProviderNames);
+        Assert.Single(SystemCrew.KlassikTemplate.GroundingProviderNames);
+        Assert.Contains("tavily-basic", SystemCrew.KlassikTemplate.GroundingProviderNames);
     }
 
     [Fact]
@@ -21,12 +22,10 @@ public sealed class KlassikTemplateGroundingRegressionTests
     }
 
     [Fact]
-    public void KlassikSnapshot_WouldProduceNoGroundingProviders_InSnapshot()
+    public void KlassikSnapshot_ContainsTavilyBasic_InGroundingProviderNames()
     {
-        // When CrewSnapshotBuilder resolves Klassik, GroundingProviders should always be empty
-        // because GroundingProviderNames is []. This test verifies the template-level constraint
-        // without needing a full DB round-trip.
+        // When CrewSnapshotBuilder resolves Klassik, GroundingProviders should contain tavily-basic.
         var template = SystemCrew.KlassikTemplate;
-        Assert.Empty(template.GroundingProviderNames);
+        Assert.Contains("tavily-basic", template.GroundingProviderNames);
     }
 }

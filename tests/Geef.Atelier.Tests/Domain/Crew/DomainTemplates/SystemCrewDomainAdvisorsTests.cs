@@ -19,10 +19,11 @@ public sealed class SystemCrewDomainAdvisorsTests
     }
 
     [Fact]
-    public void LegalDomainExpert_IsSystem_UsesSonnet()
+    public void LegalDomainExpert_IsSystem_UsesClaudioCli_Opus47()
     {
         Assert.True(SystemCrew.LegalDomainExpertProfile.IsSystem);
-        Assert.Equal("anthropic/claude-sonnet-4-5", SystemCrew.LegalDomainExpertProfile.Model);
+        Assert.Equal("claude-cli", SystemCrew.LegalDomainExpertProfile.Provider);
+        Assert.Equal("anthropic/claude-opus-4.7", SystemCrew.LegalDomainExpertProfile.Model);
     }
 
     [Fact]
@@ -39,10 +40,11 @@ public sealed class SystemCrewDomainAdvisorsTests
     }
 
     [Fact]
-    public void AcademicRigorAdvisor_IsSystem_UsesGpt4oMini()
+    public void AcademicRigorAdvisor_IsSystem_UsesClaudioCli_Opus47()
     {
         Assert.True(SystemCrew.AcademicRigorAdvisorProfile.IsSystem);
-        Assert.Equal("openai/gpt-4o-mini", SystemCrew.AcademicRigorAdvisorProfile.Model);
+        Assert.Equal("claude-cli", SystemCrew.AcademicRigorAdvisorProfile.Provider);
+        Assert.Equal("anthropic/claude-opus-4.7", SystemCrew.AcademicRigorAdvisorProfile.Model);
     }
 
     [Fact]

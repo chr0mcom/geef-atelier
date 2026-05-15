@@ -138,11 +138,10 @@ public sealed class KlassikRegressionTests
     }
 
     [Fact]
-    public void KlassikTemplate_HasNoGroundingProviderNames_ConfirmingNoVectorStoreActivation()
+    public void KlassikTemplate_HasTavilyBasicGroundingProvider_ConfirmingDefaultInternetAccess()
     {
-        // Confirm at the template level that Klassik ships with no grounding — the snapshot
-        // produced from it will therefore never include a vector-store provider.
-        Assert.Empty(SystemCrew.KlassikTemplate.GroundingProviderNames);
+        // All system templates ship with tavily-basic enabled by default.
+        Assert.Contains("tavily-basic", SystemCrew.KlassikTemplate.GroundingProviderNames);
     }
 
     /// <summary>

@@ -42,9 +42,10 @@ public sealed class KlassikUnchangedRegressionTests
     }
 
     [Fact]
-    public void KlassikTemplate_HasNoGroundingProviders()
+    public void KlassikTemplate_HasTavilyBasicGroundingProvider()
     {
-        Assert.Empty(SystemCrew.KlassikTemplate.GroundingProviderNames);
+        Assert.Single(SystemCrew.KlassikTemplate.GroundingProviderNames);
+        Assert.Contains("tavily-basic", SystemCrew.KlassikTemplate.GroundingProviderNames);
     }
 
     [Fact]
@@ -54,21 +55,23 @@ public sealed class KlassikUnchangedRegressionTests
     }
 
     [Fact]
-    public void BriefingFidelityProfile_ModelUnchanged()
+    public void BriefingFidelityProfile_UsesCodexCli_Gpt55()
     {
-        // Klassik relies on this model — any change here would affect the Klassik pipeline
-        Assert.Equal("google/gemini-2.5-flash", SystemCrew.BriefingFidelityProfile.Model);
+        Assert.Equal("codex-cli", SystemCrew.BriefingFidelityProfile.Provider);
+        Assert.Equal("gpt-5.5", SystemCrew.BriefingFidelityProfile.Model);
     }
 
     [Fact]
-    public void ClarityProfile_ModelUnchanged()
+    public void ClarityProfile_UsesCodexCli_Gpt55()
     {
-        Assert.Equal("openai/gpt-4o-mini", SystemCrew.ClarityProfile.Model);
+        Assert.Equal("codex-cli", SystemCrew.ClarityProfile.Provider);
+        Assert.Equal("gpt-5.5", SystemCrew.ClarityProfile.Model);
     }
 
     [Fact]
-    public void DefaultExecutorProfile_ModelUnchanged()
+    public void DefaultExecutorProfile_UsesClaudioCli_Opus47()
     {
+        Assert.Equal("claude-cli", SystemCrew.DefaultExecutorProfile.Provider);
         Assert.Equal("anthropic/claude-opus-4.7", SystemCrew.DefaultExecutorProfile.Model);
     }
 

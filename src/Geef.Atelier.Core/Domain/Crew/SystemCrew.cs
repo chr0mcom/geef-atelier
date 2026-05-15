@@ -31,7 +31,7 @@ public static class SystemCrew
         DisplayName: "Default Executor",
         Description: "Standard Atelier drafting executor: clear, concise, briefing-bound prose; revises iterations against reviewer findings.",
         SystemPrompt: SystemPrompts.Executor,
-        Provider: "openrouter",
+        Provider: "claude-cli",
         Model: "anthropic/claude-opus-4.7",
         MaxTokens: null,
         IsSystem: true);
@@ -42,8 +42,8 @@ public static class SystemCrew
         DisplayName: "Briefing Fidelity",
         Description: "Verifies that the draft fully addresses every briefing requirement. Outside-model perspective for genuine independence from the executor.",
         SystemPrompt: SystemPrompts.BriefingFidelity,
-        Provider: "openrouter",
-        Model: "google/gemini-2.5-flash",
+        Provider: "codex-cli",
+        Model: "gpt-5.5",
         MaxTokens: null,
         IsSystem: true);
 
@@ -53,8 +53,8 @@ public static class SystemCrew
         DisplayName: "Clarity",
         Description: "Audits clarity, argumentation, structure, and style. Outside-model perspective; complements the briefing-fidelity reviewer with a different model family.",
         SystemPrompt: SystemPrompts.Clarity,
-        Provider: "openrouter",
-        Model: "openai/gpt-4o-mini",
+        Provider: "codex-cli",
+        Model: "gpt-5.5",
         MaxTokens: null,
         IsSystem: true);
 
@@ -66,8 +66,8 @@ public static class SystemCrew
         DisplayName: "Legal Jargon Precision",
         Description: "Checks German legal texts for precise use of legal terminology. Identifies colloquial substitutes where statutory terms are required (e.g., Anfechtung vs. Widerruf, Kündigung vs. Rücktritt).",
         SystemPrompt: SystemPrompts.LegalJargonPrecision,
-        Provider: "openrouter",
-        Model: "openai/gpt-4o-mini",
+        Provider: "codex-cli",
+        Model: "gpt-5.5",
         MaxTokens: null,
         IsSystem: true);
 
@@ -77,8 +77,8 @@ public static class SystemCrew
         DisplayName: "Legal Clause Risk",
         Description: "Identifies problematic or void contract clauses. Checks AGB conformity (§307 BGB), consumer protection compliance (§§312ff./474ff. BGB), and penalty clause proportionality.",
         SystemPrompt: SystemPrompts.LegalClauseRisk,
-        Provider: "openrouter",
-        Model: "anthropic/claude-sonnet-4-5",
+        Provider: "codex-cli",
+        Model: "gpt-5.5",
         MaxTokens: null,
         IsSystem: true);
 
@@ -88,8 +88,8 @@ public static class SystemCrew
         DisplayName: "Academic Citation Readiness",
         Description: "Checks scholarly texts for citation adequacy. Distinguishes common knowledge from claims requiring attribution; marks uncited empirical findings and contested theoretical positions.",
         SystemPrompt: SystemPrompts.AcademicCitationReadiness,
-        Provider: "openrouter",
-        Model: "openai/gpt-4o-mini",
+        Provider: "codex-cli",
+        Model: "gpt-5.5",
         MaxTokens: null,
         IsSystem: true);
 
@@ -99,8 +99,8 @@ public static class SystemCrew
         DisplayName: "Academic Argumentation Rigor",
         Description: "Checks academic argumentation for logical soundness. Maps Claim→Premise→Warrant→Conclusion and identifies non sequiturs, false dichotomies, hasty generalisations, and other formal fallacies.",
         SystemPrompt: SystemPrompts.AcademicArgumentationRigor,
-        Provider: "openrouter",
-        Model: "anthropic/claude-sonnet-4-5",
+        Provider: "claude-cli",
+        Model: "anthropic/claude-opus-4.7",
         MaxTokens: null,
         IsSystem: true);
 
@@ -110,8 +110,8 @@ public static class SystemCrew
         DisplayName: "Marketing Audience Clarity",
         Description: "Checks marketing texts for target-audience alignment. Evaluates reading level, tone, jargon-accessibility balance, and cultural resonance against the stated audience persona.",
         SystemPrompt: SystemPrompts.MarketingAudienceClarity,
-        Provider: "openrouter",
-        Model: "google/gemini-2.5-flash",
+        Provider: "codex-cli",
+        Model: "gpt-5.5",
         MaxTokens: null,
         IsSystem: true);
 
@@ -121,8 +121,8 @@ public static class SystemCrew
         DisplayName: "Marketing Conversion Strength",
         Description: "Checks marketing copy for conversion effectiveness. Verifies CTA clarity (action verb + outcome), USP visibility, urgency signals, and social proof integration.",
         SystemPrompt: SystemPrompts.MarketingConversionStrength,
-        Provider: "openrouter",
-        Model: "openai/gpt-4o-mini",
+        Provider: "codex-cli",
+        Model: "gpt-5.5",
         MaxTokens: null,
         IsSystem: true);
 
@@ -136,7 +136,7 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
-        GroundingProviderNames: Array.Empty<string>(),
+        GroundingProviderNames: new[] { "tavily-basic" },
         IsSystem: true);
 
     // ── Domain templates ────────────────────────────────────────────────────────────
@@ -151,7 +151,7 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Sequential,
         ConvergenceOverride: null,
         AdvisorProfileNames: new[] { "legal-domain-expert" },
-        GroundingProviderNames: Array.Empty<string>(),
+        GroundingProviderNames: new[] { "tavily-basic" },
         IsSystem: true);
 
     /// <summary>Akademisch template — for scientific texts: papers, argumentation essays, research texts.</summary>
@@ -164,7 +164,7 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Sequential,
         ConvergenceOverride: null,
         AdvisorProfileNames: new[] { "academic-rigor-advisor" },
-        GroundingProviderNames: Array.Empty<string>(),
+        GroundingProviderNames: new[] { "tavily-basic" },
         IsSystem: true);
 
     /// <summary>Marketing template — for marketing copy: landing pages, emails, ad copy.</summary>
@@ -177,7 +177,7 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
-        GroundingProviderNames: Array.Empty<string>(),
+        GroundingProviderNames: new[] { "tavily-basic" },
         IsSystem: true);
 
     /// <summary>System grounding-provider profile for Tavily Basic web-search (1 credit/search, ~5 sources).</summary>
@@ -244,8 +244,8 @@ public static class SystemCrew
         DisplayName: "Legal Domain Expert",
         Description: "Pre-checks briefings for legal practicability before drafting begins. Identifies constraints, terminological traps, regulatory context, missing information, and risk areas where qualifications are needed.",
         SystemPrompt: SystemPrompts.LegalDomainExpert,
-        Provider: "openrouter",
-        Model: "anthropic/claude-sonnet-4-5",
+        Provider: "claude-cli",
+        Model: "anthropic/claude-opus-4.7",
         MaxTokens: null,
         Mode: AdvisorMode.DomainExpert,
         Trigger: AdvisorTrigger.BeforeFirstExecution,
@@ -257,8 +257,8 @@ public static class SystemCrew
         DisplayName: "Academic Rigor Advisor",
         Description: "Challenges the weakest assumptions, contested claims, and methodological gaps in the current draft before each iteration. Rotates focus to prevent repetitive critique.",
         SystemPrompt: SystemPrompts.AcademicRigorAdvisor,
-        Provider: "openrouter",
-        Model: "openai/gpt-4o-mini",
+        Provider: "claude-cli",
+        Model: "anthropic/claude-opus-4.7",
         MaxTokens: null,
         Mode: AdvisorMode.Critical,
         Trigger: AdvisorTrigger.BeforeEveryExecution,
@@ -270,8 +270,8 @@ public static class SystemCrew
         DisplayName: "Briefing Clarifier",
         Description: "Strategic consultant. Analyzes briefings for unclear constraints, missing context, or unrealistic scope before the Executor begins.",
         SystemPrompt: "You are a strategic consultant reviewing a text briefing before an AI executor processes it. Identify up to 5 key strategic observations: unclear constraints, missing context, unrealistic scope, or conflicting requirements. Be concise (2-3 sentences per point). Do NOT write the text yourself — advise the executor.",
-        Provider: "openrouter",
-        Model: "google/gemini-2.5-flash-preview",
+        Provider: "claude-cli",
+        Model: "anthropic/claude-opus-4.7",
         MaxTokens: null,
         Mode: AdvisorMode.Strategic,
         Trigger: AdvisorTrigger.BeforeFirstExecution,
@@ -283,8 +283,8 @@ public static class SystemCrew
         DisplayName: "Devil's Advocate",
         Description: "Adversarial perspective. After each iteration, challenges the strongest claims of the artifact to surface weak assumptions.",
         SystemPrompt: "You are a critical reviewer tasked with challenging an AI-generated text artifact. In 2-4 sentences, identify the weakest assumptions or most contestable claims. Be constructive — aim to strengthen the final text, not tear it down. Do NOT rewrite the text.",
-        Provider: "openrouter",
-        Model: "openai/gpt-4o-mini",
+        Provider: "claude-cli",
+        Model: "anthropic/claude-opus-4.7",
         MaxTokens: null,
         Mode: AdvisorMode.DevilsAdvocate,
         Trigger: AdvisorTrigger.BeforeEveryExecution,

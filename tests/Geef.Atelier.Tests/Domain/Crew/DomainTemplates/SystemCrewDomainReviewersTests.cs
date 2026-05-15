@@ -13,10 +13,11 @@ public sealed class SystemCrewDomainReviewersTests
     }
 
     [Fact]
-    public void LegalJargonPrecision_IsSystem_UsesGpt4oMini()
+    public void LegalJargonPrecision_IsSystem_UsesCodexCli_Gpt55()
     {
         Assert.True(SystemCrew.LegalJargonPrecisionProfile.IsSystem);
-        Assert.Equal("openai/gpt-4o-mini", SystemCrew.LegalJargonPrecisionProfile.Model);
+        Assert.Equal("codex-cli", SystemCrew.LegalJargonPrecisionProfile.Provider);
+        Assert.Equal("gpt-5.5", SystemCrew.LegalJargonPrecisionProfile.Model);
     }
 
     [Fact]
@@ -26,10 +27,11 @@ public sealed class SystemCrewDomainReviewersTests
     }
 
     [Fact]
-    public void LegalClauseRisk_IsSystem_UsesSonnet()
+    public void LegalClauseRisk_IsSystem_UsesCodexCli_Gpt55()
     {
         Assert.True(SystemCrew.LegalClauseRiskProfile.IsSystem);
-        Assert.Equal("anthropic/claude-sonnet-4-5", SystemCrew.LegalClauseRiskProfile.Model);
+        Assert.Equal("codex-cli", SystemCrew.LegalClauseRiskProfile.Provider);
+        Assert.Equal("gpt-5.5", SystemCrew.LegalClauseRiskProfile.Model);
     }
 
     // ── Academic reviewers ───────────────────────────────────────────────────────
@@ -41,10 +43,11 @@ public sealed class SystemCrewDomainReviewersTests
     }
 
     [Fact]
-    public void AcademicCitationReadiness_IsSystem_UsesGpt4oMini()
+    public void AcademicCitationReadiness_IsSystem_UsesCodexCli_Gpt55()
     {
         Assert.True(SystemCrew.AcademicCitationReadinessProfile.IsSystem);
-        Assert.Equal("openai/gpt-4o-mini", SystemCrew.AcademicCitationReadinessProfile.Model);
+        Assert.Equal("codex-cli", SystemCrew.AcademicCitationReadinessProfile.Provider);
+        Assert.Equal("gpt-5.5", SystemCrew.AcademicCitationReadinessProfile.Model);
     }
 
     [Fact]
@@ -54,10 +57,11 @@ public sealed class SystemCrewDomainReviewersTests
     }
 
     [Fact]
-    public void AcademicArgumentationRigor_IsSystem_UsesSonnet()
+    public void AcademicArgumentationRigor_IsSystem_UsesClaudioCli_Opus47()
     {
         Assert.True(SystemCrew.AcademicArgumentationRigorProfile.IsSystem);
-        Assert.Equal("anthropic/claude-sonnet-4-5", SystemCrew.AcademicArgumentationRigorProfile.Model);
+        Assert.Equal("claude-cli", SystemCrew.AcademicArgumentationRigorProfile.Provider);
+        Assert.Equal("anthropic/claude-opus-4.7", SystemCrew.AcademicArgumentationRigorProfile.Model);
     }
 
     // ── Marketing reviewers ──────────────────────────────────────────────────────
@@ -69,10 +73,11 @@ public sealed class SystemCrewDomainReviewersTests
     }
 
     [Fact]
-    public void MarketingAudienceClarity_IsSystem_UsesGeminiFlash()
+    public void MarketingAudienceClarity_IsSystem_UsesCodexCli_Gpt55()
     {
         Assert.True(SystemCrew.MarketingAudienceClarityProfile.IsSystem);
-        Assert.Equal("google/gemini-2.5-flash", SystemCrew.MarketingAudienceClarityProfile.Model);
+        Assert.Equal("codex-cli", SystemCrew.MarketingAudienceClarityProfile.Provider);
+        Assert.Equal("gpt-5.5", SystemCrew.MarketingAudienceClarityProfile.Model);
     }
 
     [Fact]
@@ -82,10 +87,11 @@ public sealed class SystemCrewDomainReviewersTests
     }
 
     [Fact]
-    public void MarketingConversionStrength_IsSystem_UsesGpt4oMini()
+    public void MarketingConversionStrength_IsSystem_UsesCodexCli_Gpt55()
     {
         Assert.True(SystemCrew.MarketingConversionStrengthProfile.IsSystem);
-        Assert.Equal("openai/gpt-4o-mini", SystemCrew.MarketingConversionStrengthProfile.Model);
+        Assert.Equal("codex-cli", SystemCrew.MarketingConversionStrengthProfile.Provider);
+        Assert.Equal("gpt-5.5", SystemCrew.MarketingConversionStrengthProfile.Model);
     }
 
     // ── Dictionary completeness ──────────────────────────────────────────────────
