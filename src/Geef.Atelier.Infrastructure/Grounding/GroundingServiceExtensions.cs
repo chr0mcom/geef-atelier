@@ -14,9 +14,11 @@ public static class GroundingServiceExtensions
         services.Configure<TavilyOptions>(configuration.GetSection("Tavily"));
 
         var endpoint = configuration["Tavily:Endpoint"] ?? "https://api.tavily.com";
-        services.AddHttpClient<TavilyGroundingProvider>(client =>
+        if (!endpoint.EndsWith('/')) endpoint += '/';
+        services.AddHttpClient("tavily", client =>
             client.BaseAddress = new Uri(endpoint));
 
+        services.AddSingleton<IGroundingQueryExtractor, LlmGroundingQueryExtractor>();
         services.AddSingleton<IGroundingProvider, TavilyGroundingProvider>();
         services.AddSingleton<IGroundingProvider, VectorStoreGroundingProvider>();
         services.AddSingleton<IGroundingProviderFactory, GroundingProviderFactory>();

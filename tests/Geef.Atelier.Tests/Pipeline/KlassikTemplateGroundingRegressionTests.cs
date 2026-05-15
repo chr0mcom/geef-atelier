@@ -11,8 +11,9 @@ public sealed class KlassikTemplateGroundingRegressionTests
     [Fact]
     public void KlassikTemplate_HasTavilyBasicGroundingProvider()
     {
-        Assert.Single(SystemCrew.KlassikTemplate.GroundingProviderNames);
+        Assert.Equal(2, SystemCrew.KlassikTemplate.GroundingProviderNames.Count);
         Assert.Contains("tavily-basic", SystemCrew.KlassikTemplate.GroundingProviderNames);
+        Assert.Contains("run-attachments", SystemCrew.KlassikTemplate.GroundingProviderNames);
     }
 
     [Fact]

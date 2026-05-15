@@ -14,6 +14,14 @@ public sealed class TavilyOptions
     public int RequestTimeoutSeconds { get; set; } = 30;
 
     /// <summary>
+    /// Default minimum Tavily relevance score (0.0–1.0) a result must reach to be used.
+    /// Results below this are discarded; if none qualify the synthesised answer is dropped
+    /// too and no web context is injected. Overridable per profile via the
+    /// <c>MinRelevanceScore</c> provider setting.
+    /// </summary>
+    public double DefaultMinRelevanceScore { get; set; } = 0.4;
+
+    /// <summary>
     /// Bound from <c>TAVILY_API_KEY</c> env var. When empty the provider is registered
     /// but throws <see cref="InvalidOperationException"/> on use — the app does not crash at startup.
     /// </summary>

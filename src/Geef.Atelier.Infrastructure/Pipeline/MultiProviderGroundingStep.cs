@@ -28,7 +28,8 @@ internal sealed class MultiProviderGroundingStep(
                 runId, profile.Name);
             var provider = factory.Create(profile.ProviderType);
             var result = await provider.EnrichAsync(input, profile, runId, cancellationToken);
-            enrichedBlocks.Add(result.EnrichedContext);
+            if (!string.IsNullOrWhiteSpace(result.EnrichedContext))
+                enrichedBlocks.Add(result.EnrichedContext);
         }
 
         if (enrichedBlocks.Count == 0)

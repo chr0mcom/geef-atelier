@@ -45,8 +45,9 @@ public sealed class SystemCrewDomainTemplatesTests
     [Fact]
     public void JuristischTemplate_HasTavilyBasicGroundingProvider()
     {
-        Assert.Single(SystemCrew.JuristischTemplate.GroundingProviderNames);
+        Assert.Equal(2, SystemCrew.JuristischTemplate.GroundingProviderNames.Count);
         Assert.Contains("tavily-basic", SystemCrew.JuristischTemplate.GroundingProviderNames);
+        Assert.Contains("run-attachments", SystemCrew.JuristischTemplate.GroundingProviderNames);
     }
 
     // ── Akademisch template ──────────────────────────────────────────────────────
@@ -90,8 +91,9 @@ public sealed class SystemCrewDomainTemplatesTests
     [Fact]
     public void AkademischTemplate_HasTavilyBasicGroundingProvider()
     {
-        Assert.Single(SystemCrew.AkademischTemplate.GroundingProviderNames);
+        Assert.Equal(2, SystemCrew.AkademischTemplate.GroundingProviderNames.Count);
         Assert.Contains("tavily-basic", SystemCrew.AkademischTemplate.GroundingProviderNames);
+        Assert.Contains("run-attachments", SystemCrew.AkademischTemplate.GroundingProviderNames);
     }
 
     // ── Marketing template ───────────────────────────────────────────────────────
@@ -135,8 +137,9 @@ public sealed class SystemCrewDomainTemplatesTests
     [Fact]
     public void MarketingTemplate_HasTavilyBasicGroundingProvider()
     {
-        Assert.Single(SystemCrew.MarketingTemplate.GroundingProviderNames);
+        Assert.Equal(2, SystemCrew.MarketingTemplate.GroundingProviderNames.Count);
         Assert.Contains("tavily-basic", SystemCrew.MarketingTemplate.GroundingProviderNames);
+        Assert.Contains("run-attachments", SystemCrew.MarketingTemplate.GroundingProviderNames);
     }
 
     // ── Dictionary completeness ──────────────────────────────────────────────────

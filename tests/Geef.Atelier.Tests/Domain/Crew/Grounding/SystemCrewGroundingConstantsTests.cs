@@ -23,6 +23,8 @@ public sealed class SystemCrewGroundingConstantsTests
         Assert.Equal("basic", settings["Tier"]);
         Assert.Equal("5", settings["MaxResults"]);
         Assert.Equal("true", settings["IncludeAnswer"]);
+        Assert.Equal("0.4", settings["MinRelevanceScore"]);
+        Assert.Equal("true", settings["ExtractQuery"]);
     }
 
     [Fact]

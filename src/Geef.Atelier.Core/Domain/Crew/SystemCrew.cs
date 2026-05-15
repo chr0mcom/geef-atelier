@@ -136,7 +136,7 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
-        GroundingProviderNames: new[] { "tavily-basic" },
+        GroundingProviderNames: new[] { "tavily-basic", "run-attachments" },
         IsSystem: true);
 
     // ── Domain templates ────────────────────────────────────────────────────────────
@@ -151,7 +151,7 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Sequential,
         ConvergenceOverride: null,
         AdvisorProfileNames: new[] { "legal-domain-expert" },
-        GroundingProviderNames: new[] { "tavily-basic" },
+        GroundingProviderNames: new[] { "tavily-basic", "run-attachments" },
         IsSystem: true);
 
     /// <summary>Akademisch template — for scientific texts: papers, argumentation essays, research texts.</summary>
@@ -164,7 +164,7 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Sequential,
         ConvergenceOverride: null,
         AdvisorProfileNames: new[] { "academic-rigor-advisor" },
-        GroundingProviderNames: new[] { "tavily-basic" },
+        GroundingProviderNames: new[] { "tavily-basic", "run-attachments" },
         IsSystem: true);
 
     /// <summary>Marketing template — for marketing copy: landing pages, emails, ad copy.</summary>
@@ -177,7 +177,7 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
-        GroundingProviderNames: new[] { "tavily-basic" },
+        GroundingProviderNames: new[] { "tavily-basic", "run-attachments" },
         IsSystem: true);
 
     /// <summary>System grounding-provider profile for Tavily Basic web-search (1 credit/search, ~5 sources).</summary>
@@ -191,6 +191,8 @@ public static class SystemCrew
             ["Tier"] = "basic",
             ["MaxResults"] = "5",
             ["IncludeAnswer"] = "true",
+            ["MinRelevanceScore"] = "0.4",
+            ["ExtractQuery"] = "true",
         },
         MaxQueriesPerRun: 1,
         IsSystem: true);

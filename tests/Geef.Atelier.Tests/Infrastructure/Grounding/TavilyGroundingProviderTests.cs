@@ -1,4 +1,5 @@
 using System.Net;
+using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Persistence.Crew;
@@ -98,7 +99,7 @@ public sealed class TavilyGroundingProviderTests
         var services = new ServiceCollection();
         services.AddScoped<IGroundingConsultationRepository>(_ => consultationRepo);
         var provider = new TavilyGroundingProvider(
-            httpClient,
+            new FakeHttpClientFactory(httpClient),
             Options.Create(opts),
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
             NullLogger<TavilyGroundingProvider>.Instance);
@@ -114,11 +115,99 @@ public sealed class TavilyGroundingProviderTests
         Assert.Equal("tavily", provider.ProviderType);
     }
 
+    // --- relevance-score filtering ---
+
+    private const string LowRelevanceResponse = """
+        {
+          "answer": "Misleading synthesized answer derived from off-topic sources.",
+          "results": [
+            { "title": "Vierfarbensatz", "url": "https://x/1", "content": "map coloring", "score": 0.124 },
+            { "title": "Travel catalog", "url": "https://x/2", "content": "vacations", "score": 0.0006 }
+          ]
+        }
+        """;
+
+    private const string MixedRelevanceResponse = """
+        {
+          "answer": "Partially relevant answer.",
+          "results": [
+            { "title": "Relevant hit", "url": "https://x/1", "content": "on topic", "score": 0.88 },
+            { "title": "Noise", "url": "https://x/2", "content": "off topic", "score": 0.10 }
+          ]
+        }
+        """;
+
+    [Fact]
+    public async Task EnrichAsync_DropsAllResultsBelowThreshold_AndDiscardsSynthesizedAnswer()
+    {
+        var (provider, repo) = BuildProvider(FakeHttpHandler.Ok(LowRelevanceResponse));
+        var runId = Guid.NewGuid();
+
+        var result = await provider.EnrichAsync("briefing", SystemCrew.TavilyBasicProfile, runId, CancellationToken.None);
+
+        Assert.Empty(result.Citations);
+        Assert.Equal(string.Empty, result.EnrichedContext);
+        Assert.DoesNotContain("Misleading", result.EnrichedContext);
+        var stored = await repo.GetByRunIdAsync(runId, CancellationToken.None);
+        Assert.Single(stored);
+        Assert.Empty(stored[0].Citations);
+    }
+
+    [Fact]
+    public async Task EnrichAsync_KeepsOnlyResultsAtOrAboveThreshold()
+    {
+        var (provider, _) = BuildProvider(FakeHttpHandler.Ok(MixedRelevanceResponse));
+
+        var result = await provider.EnrichAsync("briefing", SystemCrew.TavilyBasicProfile, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.Single(result.Citations);
+        Assert.Equal("Relevant hit", result.Citations[0].Title);
+        Assert.Contains("Partially relevant answer.", result.EnrichedContext);
+    }
+
+    // --- LLM query extraction ---
+
+    [Fact]
+    public async Task EnrichAsync_SkipsWebSearch_WhenExtractorReturnsNoSearch()
+    {
+        var handler = FakeHttpHandler.Ok(ValidTavilyResponse);
+        var extractor = new FakeQueryExtractor(new GroundingQuery(ShouldSearch: false, Query: string.Empty));
+        var (provider, repo) = BuildProvider(handler, queryExtractor: extractor);
+        var runId = Guid.NewGuid();
+
+        var result = await provider.EnrichAsync("a pure math puzzle", SystemCrew.TavilyBasicProfile, runId, CancellationToken.None);
+
+        Assert.Equal(0, handler.CallCount);
+        Assert.Empty(result.Citations);
+        Assert.Equal(string.Empty, result.EnrichedContext);
+        Assert.Null(result.CostEur);
+        var stored = await repo.GetByRunIdAsync(runId, CancellationToken.None);
+        Assert.Single(stored);
+        Assert.Empty(stored[0].Citations);
+        Assert.Equal("a pure math puzzle", stored[0].Query);
+    }
+
+    [Fact]
+    public async Task EnrichAsync_UsesRefinedQuery_FromExtractor()
+    {
+        var extractor = new FakeQueryExtractor(new GroundingQuery(ShouldSearch: true, Query: "refined focused query"));
+        var (provider, repo) = BuildProvider(FakeHttpHandler.Ok(ValidTavilyResponse), queryExtractor: extractor);
+        var runId = Guid.NewGuid();
+
+        var result = await provider.EnrichAsync("verbose briefing with tone instructions", SystemCrew.TavilyBasicProfile, runId, CancellationToken.None);
+
+        Assert.Equal(2, result.Citations.Count);
+        var stored = await repo.GetByRunIdAsync(runId, CancellationToken.None);
+        Assert.Equal("refined focused query", stored[0].Query);
+        Assert.Equal("verbose briefing with tone instructions", extractor.LastBriefing);
+    }
+
     // --- helpers ---
 
     private static (TavilyGroundingProvider, InMemoryGroundingConsultationRepository) BuildProvider(
         FakeHttpHandler handler,
-        InMemoryGroundingConsultationRepository? repo = null)
+        InMemoryGroundingConsultationRepository? repo = null,
+        IGroundingQueryExtractor? queryExtractor = null)
     {
         repo ??= new InMemoryGroundingConsultationRepository();
         var opts = new TavilyOptions
@@ -128,16 +217,29 @@ public sealed class TavilyGroundingProviderTests
             AdvancedSearchCostUsd = 0.002,
             UsdToEurRate = 0.92,
             RequestTimeoutSeconds = 30,
+            DefaultMinRelevanceScore = 0.4,
         };
         var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.tavily.com") };
         var services = new ServiceCollection();
         services.AddScoped<IGroundingConsultationRepository>(_ => repo);
         var provider = new TavilyGroundingProvider(
-            httpClient,
+            new FakeHttpClientFactory(httpClient),
             Options.Create(opts),
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
-            NullLogger<TavilyGroundingProvider>.Instance);
+            NullLogger<TavilyGroundingProvider>.Instance,
+            queryExtractor);
         return (provider, repo);
+    }
+
+    private sealed class FakeQueryExtractor(GroundingQuery result) : IGroundingQueryExtractor
+    {
+        public string? LastBriefing { get; private set; }
+
+        public Task<GroundingQuery> ExtractAsync(string briefingText, CancellationToken ct)
+        {
+            LastBriefing = briefingText;
+            return Task.FromResult(result);
+        }
     }
 
     private sealed class InMemoryGroundingConsultationRepository : IGroundingConsultationRepository
