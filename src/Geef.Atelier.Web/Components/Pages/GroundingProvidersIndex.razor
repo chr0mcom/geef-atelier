@@ -1,4 +1,4 @@
-@page "/crew/profiles/grounding"
+@page "/crew/profiles/grounding-providers"
 @attribute [Authorize]
 @rendermode InteractiveServer
 @using Geef.Atelier.Application.Crew
@@ -11,7 +11,7 @@
 <div class="crew-profiles-index">
     <div class="page-header">
         <h1>Grounding Providers</h1>
-        <a href="/crew/profiles/grounding/new" class="btn primary">+ New Profile</a>
+        <a href="/crew/profiles/grounding-providers/create" class="btn primary">+ New Profile</a>
     </div>
 
     @if (_profiles.Count == 0)
@@ -51,13 +51,13 @@
                         <td class="crew-table-actions">
                             @if (p.IsSystem)
                             {
-                                <button class="btn small disabled-action" disabled title="System profile — duplicate to customize">Edit</button>
+                                <a href="/crew/profiles/grounding-providers/view/@p.Name" class="btn small">View</a>
                                 <button class="btn small primary" @onclick="() => DuplicateProfile(p)">Duplicate as custom</button>
                                 <button class="btn small disabled-action" disabled title="System profile — cannot delete">Delete</button>
                             }
                             else
                             {
-                                <a href="/crew/profiles/grounding/@p.Name" class="btn small">Edit</a>
+                                <a href="/crew/profiles/grounding-providers/edit/@p.Name" class="btn small">Edit</a>
                                 <button class="btn small danger" @onclick="() => _profileToDelete = p">Delete</button>
                             }
                         </td>

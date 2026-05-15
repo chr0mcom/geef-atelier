@@ -1,0 +1,70 @@
+@page "/crew/profiles/grounding-providers/view/{name}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Core.Domain.Crew.Grounding
+@using Geef.Atelier.Web.Display
+@inject ICrewService CrewService
+@inject NavigationManager Nav
+
+<PageTitle>@(_profile?.DisplayName ?? "Grounding Provider") — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="grounding-provider-view">
+    <div class="page-header">
+        <h1>@(_profile?.DisplayName ?? "")</h1>
+        <a href="/crew/profiles/grounding-providers" class="btn ghost">← Back</a>
+    </div>
+
+    @if (_loading)
+    {
+        <p>Loading…</p>
+    }
+    else if (_profile == null)
+    {
+        <p>Profile not found.</p>
+    }
+    else
+    {
+        <div class="info-banner">
+            This is a system profile and cannot be edited. To customize, use <strong>Duplicate as custom</strong> from the list.
+        </div>
+
+        <dl class="profile-detail" data-testid="profile-detail">
+            <dt>Name</dt>
+            <dd data-testid="detail-name">@_profile.Name</dd>
+
+            <dt>Display Name</dt>
+            <dd data-testid="detail-display-name">@_profile.DisplayName</dd>
+
+            <dt>Description</dt>
+            <dd data-testid="detail-description">@(string.IsNullOrEmpty(_profile.Description) ? "—" : _profile.Description)</dd>
+
+            <dt>Provider Type</dt>
+            <dd data-testid="detail-provider-type">@ReviewerDisplay.GetGroundingProviderTypeDisplay(_profile.ProviderType)</dd>
+
+            @foreach (var setting in _profile.ProviderSettings)
+            {
+                <dt>@setting.Key</dt>
+                <dd data-testid="detail-setting-@setting.Key.ToLowerInvariant()">@setting.Value</dd>
+            }
+
+            <dt>Max Queries per Run</dt>
+            <dd data-testid="detail-max-queries">@(_profile.MaxQueriesPerRun?.ToString() ?? "—")</dd>
+        </dl>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Name { get; set; }
+
+    private GroundingProviderProfile? _profile;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Name is null) { Nav.NavigateTo("/crew/profiles/grounding-providers"); return; }
+        _profile = await CrewService.GetGroundingProviderProfileAsync(Name);
+        if (_profile == null) { Nav.NavigateTo("/crew/profiles/grounding-providers"); return; }
+        _loading = false;
+    }
+}

@@ -1,29 +1,28 @@
-@page "/crew/profiles/grounding/new"
-@page "/crew/profiles/grounding/{name}"
+@page "/crew/profiles/grounding-providers/create"
+@page "/crew/profiles/grounding-providers/edit/{name}"
 @attribute [Authorize]
 @rendermode InteractiveServer
 @using Geef.Atelier.Application.Crew
 @using Geef.Atelier.Core.Domain.Crew
 @using Geef.Atelier.Core.Domain.Crew.Grounding
 @using Geef.Atelier.Web.Display
+@using Geef.Atelier.Infrastructure.Grounding
+@using Microsoft.Extensions.Options
 @inject ICrewService CrewService
 @inject NavigationManager Nav
+@inject IOptions<TavilyOptions> TavilyOpts
 
 <PageTitle>@(IsNew ? "New Grounding Provider" : "Edit Grounding Provider") — Atelier</PageTitle>
 
 <div class="crew-editor" data-testid="grounding-provider-editor">
     <div class="page-header">
-        <h1>@(IsNew ? "New Grounding Provider" : _isSystem ? _displayName : $"Edit: {_displayName}")</h1>
-        <a href="/crew/profiles/grounding" class="btn ghost">← Back</a>
+        <h1>@(IsNew ? "New Grounding Provider" : $"Edit: {_displayName}")</h1>
+        <a href="/crew/profiles/grounding-providers" class="btn ghost">← Back</a>
     </div>
 
     @if (_loading)
     {
         <p>Loading…</p>
-    }
-    else if (_isSystem)
-    {
-        <div class="info-banner">System profiles are read-only. Use <strong>Duplicate as custom</strong> from the list page to create a customizable copy.</div>
     }
     else
     {
@@ -37,8 +36,9 @@
 
             <div class="form-row">
                 <label>Name (slug)</label>
-                <InputText @bind-Value="_form.Name" disabled="@(!IsNew)" class="form-input" placeholder="custom-…" data-testid="input-name" />
+                <InputText @bind-Value="_form.Name" disabled="@(!IsNew)" class="form-input" placeholder="legal-docs-search" data-testid="input-name" />
                 <ValidationMessage For="() => _form.Name" />
+                <small class="form-hint">Saved as <code>custom-…</code>. Lowercase letters, numbers, and hyphens only.</small>
             </div>
 
             <div class="form-row">
@@ -54,7 +54,7 @@
 
             <div class="form-row">
                 <label>Provider Type</label>
-                <InputSelect @bind-Value="_form.ProviderType" class="form-input" data-testid="input-provider-type">
+                <InputSelect @bind-Value="_form.ProviderType" disabled="@(!IsNew)" class="form-input" data-testid="input-provider-type">
                     <option value="tavily">Tavily Web Search</option>
                     <option value="vector-store">Vector Store (Knowledge Base)</option>
                 </InputSelect>
@@ -62,6 +62,13 @@
 
             @if (_form.ProviderType == "tavily")
             {
+                @if (string.IsNullOrWhiteSpace(TavilyOpts.Value.ApiKey))
+                {
+                    <div class="warning-banner" data-testid="tavily-key-warning">
+                        ⚠ TAVILY_API_KEY is not configured in .env. Profile can be created but won't function until the key is added.
+                    </div>
+                }
+
                 <div class="form-row">
                     <label>Search Tier</label>
                     <InputSelect @bind-Value="_form.Tier" class="form-input" data-testid="input-tier">
@@ -98,6 +105,18 @@
                 </div>
 
                 <div class="form-row">
+                    <label>Scope</label>
+                    <InputSelect @bind-Value="_form.Scope" class="form-input" data-testid="input-scope">
+                        <option value="global">Global knowledge base only</option>
+                        <option value="run-local">Run-attached documents only</option>
+                        <option value="both">Both global and run-attached</option>
+                    </InputSelect>
+                    <small class="form-hint">
+                        <strong>Global:</strong> Persistent knowledge base. <strong>Run-local:</strong> Documents attached to this run only. <strong>Both:</strong> Combined search (no scope filter).
+                    </small>
+                </div>
+
+                <div class="form-row">
                     <label>Embedding Model</label>
                     <p class="form-hint" data-testid="embedding-model-info">openai/text-embedding-3-small (1536 dimensions)</p>
                 </div>
@@ -106,7 +125,7 @@
             <div class="form-row">
                 <label>Max Queries per Run</label>
                 <InputNumber @bind-Value="_form.MaxQueriesPerRun" class="form-input" data-testid="input-max-queries" />
-                <small class="form-hint">Leave empty for no limit.</small>
+                <small class="form-hint">1–5, default 1. Leave empty for no limit.</small>
             </div>
 
             <div class="form-actions">
@@ -120,7 +139,7 @@
         @if (!IsNew)
         {
             <div style="margin-top: 1rem;">
-                <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true">Delete</button>
+                <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true" data-testid="btn-delete">Delete</button>
             </div>
         }
     }
@@ -137,7 +156,6 @@
     [Parameter] public string? Name { get; set; }
 
     private bool IsNew => Name == null;
-    private bool _isSystem;
     private bool _loading = true;
     private bool _saving;
     private bool _showDeleteModal;
@@ -151,8 +169,8 @@
         if (!IsNew)
         {
             var profile = await CrewService.GetGroundingProviderProfileAsync(Name!);
-            if (profile == null) { Nav.NavigateTo("/crew/profiles/grounding"); return; }
-            _isSystem = profile.IsSystem;
+            if (profile == null) { Nav.NavigateTo("/crew/profiles/grounding-providers"); return; }
+            if (profile.IsSystem) { Nav.NavigateTo("/crew/profiles/grounding-providers/view/" + Name!); return; }
             _displayName = profile.DisplayName;
             _form = GroundingFormModel.From(profile);
         }
@@ -160,7 +178,7 @@
         _loading = false;
     }
 
-    private void NavigateBack() => Nav.NavigateTo("/crew/profiles/grounding");
+    private void NavigateBack() => Nav.NavigateTo("/crew/profiles/grounding-providers");
 
     private async Task SaveAsync()
     {
@@ -173,7 +191,7 @@
                 await CrewService.CreateCustomGroundingProviderProfileAsync(profile);
             else
                 await CrewService.UpdateCustomGroundingProviderProfileAsync(profile);
-            Nav.NavigateTo("/crew/profiles/grounding");
+            Nav.NavigateTo("/crew/profiles/grounding-providers");
         }
         catch (Exception ex)
         {
@@ -192,7 +210,7 @@
         try
         {
             await CrewService.DeleteCustomGroundingProviderProfileAsync(Name!);
-            Nav.NavigateTo("/crew/profiles/grounding");
+            Nav.NavigateTo("/crew/profiles/grounding-providers");
         }
         catch (Exception ex) { _error = ex.Message; }
     }
@@ -222,7 +240,10 @@
 
         public string TagFilter { get; set; } = "";
 
-        public int? MaxQueriesPerRun { get; set; }
+        public string Scope { get; set; } = "global";
+
+        [System.ComponentModel.DataAnnotations.Range(1, 5, ErrorMessage = "Must be between 1 and 5")]
+        public int? MaxQueriesPerRun { get; set; } = 1;
 
         public static GroundingFormModel From(GroundingProviderProfile p)
         {
@@ -231,6 +252,7 @@
             p.ProviderSettings.TryGetValue("IncludeAnswer", out var includeAnswerStr);
             p.ProviderSettings.TryGetValue("TopK", out var topKStr);
             p.ProviderSettings.TryGetValue("TagFilter", out var tagFilter);
+            p.ProviderSettings.TryGetValue("Scope", out var scope);
             return new GroundingFormModel
             {
                 Name = p.Name,
@@ -242,6 +264,7 @@
                 IncludeAnswer = !string.Equals(includeAnswerStr, "false", StringComparison.OrdinalIgnoreCase),
                 TopK = int.TryParse(topKStr, out var tk) ? tk : 5,
                 TagFilter = tagFilter ?? "",
+                Scope = scope ?? "both",
                 MaxQueriesPerRun = p.MaxQueriesPerRun
             };
         }
@@ -254,7 +277,8 @@
                 settings = new Dictionary<string, string>
                 {
                     ["TopK"] = TopK.ToString(),
-                    ["TagFilter"] = TagFilter
+                    ["TagFilter"] = TagFilter,
+                    ["Scope"] = Scope
                 };
             }
             else

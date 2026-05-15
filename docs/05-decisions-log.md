@@ -702,3 +702,25 @@ Alle Tabellen (insbesondere `TemplateStudioAnalyses`) existieren seit Step17 —
 ### Bewusst NICHT in diesem Step:
 
 Auto-Run nach Materialization, Studio-Iterationen, Cost-Budget-Alerts, Bulk-Export von Analyse-Historien, E-Mail-Notification nach abgeschlossener Analyse.
+
+---
+
+## D-040: Grounding-Provider-Profile CRUD-UI Catch-Up (2026-05-15)
+
+**Kontext:** Die Spec für diesen Catch-Up-Step ging davon aus, die Grounding-Provider-CRUD-UI „fehlt komplett". Nach Code-Exploration stellte sich heraus, dass `GroundingProvidersIndex.razor` und `GroundingProviderEditor.razor` bereits vollständig implementiert waren — inkl. System/Custom-Split, Tavily- und Vector-Store-Felder, DataAnnotations-Validierung, Delete-Modal und allen 5 `ICrewService`-Grounding-Methoden. Die Seiten folgten bereits exakt dem Reviewer/Executor/Advisor-Muster. Die eigentliche Lücke lag nicht in der CRUD-Implementierung, sondern in: (a) einem abweichenden Routen-Schema (Spec wollte `/grounding-providers`, `/create`, `/edit/{name}`, `/view/{name}`), (b) fehlenden Gap-Features und (c) fehlendem Dashboard-Eintrag und Tests.
+
+**Entscheidungen:**
+
+**D-040/1 — Routen-Schema:** Spec-Routen übernommen (`/crew/profiles/grounding-providers`, `/create`, `/edit/{name}`, `/view/{name}`). Die bestehenden Routen (`/crew/profiles/grounding`, `/new`, `/{name}`) matchten zwar das echte Reviewer/Executor/Advisor-Muster — aber die User-Entscheidung favorisierte Spec-Konformität. Asymmetrie zu den Geschwister-Seiten (die `/new` und `/{name}` verwenden) wird in einem Folge-Step durch Angleichung der anderen drei Profile-Typen adressiert (Empfehlung: Reviewer/Executor/Advisor auf konsistentes Schema vereinheitlichen).
+
+**D-040/2 — Separate View-Page für System-Profile:** Neues `GroundingProviderView.razor` mit `@page "/crew/profiles/grounding-providers/view/{name}"` statt inline read-only Banner im Editor. Ermöglicht klare System-Präsentation ohne editierbares Formular. Reviewer/Executor/Advisor behalten das Inline-Banner-Pattern — mögliche Aufgabe für Folge-Step-Harmonisierung.
+
+**D-040/3 — Vector-Store Scope-Selector:** `Scope`-Feld (global/run-local/both) im Editor exponiert. Bestehende Custom-Vector-Store-Profile (vor diesem Step erstellt) hatten keinen `Scope`-Schlüssel in `ProviderSettings` — `From()` defaultet auf `"both"` zur Wahrung des bisherigen ungefilterten Verhaltens. Neue Profile: Default `"global"`. Backend-Mapping: `"both"` → `null`-Filter → keine Einschränkung (funktioniert ohne Backend-Änderung, bestätigt durch `VectorStoreGroundingProvider.cs:44-49`).
+
+**D-040/4 — ProviderType immutable bei Edit:** `InputSelect` für ProviderType bekommt `disabled="@(!IsNew)"`. Typ-spezifische Settings (Tavily vs. Vector-Store) sind nicht zwischen Types migrierbar — User muss altes Profil löschen und neues anlegen.
+
+**D-040/5 — Delete-Cascade-Verhalten (verifiziert):** Kein Cascade-Delete aus `CrewTemplates` bei Profil-Löschung. `CrewTemplate.GroundingProviderNames` ist JSONB-String-Array ohne FK-Beziehung zu `GroundingProviderProfiles`. Gelöschte Profile hinterlassen Dangling-Namen in Templates; zur Laufzeit löst `GetGroundingProviderProfileAsync` → `null` auf. Identisch zum Verhalten bei Reviewer/Advisor-Profil-Löschung. `DeleteConfirmationModal` fordert exakte Namens-Eingabe als Sicherheitsschicht. Folge-Step-Empfehlung: Template-Referenz-Listing im Delete-Modal.
+
+**D-040/6 — NavMenu-Eintrag:** Einziger Grounding-Providers-NavLink im NavMenu. Reviewer/Executor/Advisor haben keine NavMenu-Einträge (nur via `/crew`-Dashboard erreichbar). Diese Asymmetrie ist bewusst (Spec-AC #12 explizit). Empfehlung Folge-Step: Crew-Profile-Sektion im NavMenu oder alle vier Typen gleich behandeln.
+
+**Lehre (Ursprung der Lücke):** Die Grounding-Provider-CRUD-Pages wurden beim Tavily-Step (D-035) korrekt mitimplementiert — aber ohne CrewIndex-Dashboard-Eintrag, ohne bUnit-UI-Tests und ohne Routen-Schema-Alignment auf die Spec. Kein Page-Code wurde vergessen; die organisatorische Lücke lag in fehlenden Routen-Konventionen und Test-Coverage.
