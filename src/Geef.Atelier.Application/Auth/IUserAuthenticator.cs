@@ -1,11 +1,13 @@
+using Geef.Atelier.Core.Domain;
+
 namespace Geef.Atelier.Application.Auth;
 
-/// <summary>Validates user credentials against the configured single-user account.</summary>
+/// <summary>Validates user credentials against the user store.</summary>
 public interface IUserAuthenticator
 {
     /// <summary>
-    /// Returns <see langword="true"/> if <paramref name="username"/> and <paramref name="password"/>
-    /// match the configured credentials; otherwise <see langword="false"/>.
+    /// Returns the authenticated <see cref="AtelierUser"/> if credentials are valid and the account is active;
+    /// otherwise <see langword="null"/>.
     /// </summary>
-    Task<bool> ValidateCredentialsAsync(string username, string password, CancellationToken cancellationToken = default);
+    Task<AtelierUser?> ValidateCredentialsAsync(string username, string password, CancellationToken cancellationToken = default);
 }
