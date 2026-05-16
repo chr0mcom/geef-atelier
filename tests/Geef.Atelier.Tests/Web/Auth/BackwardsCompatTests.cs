@@ -86,8 +86,10 @@ public sealed class BackwardsCompatTests
         var loggerFactory             = LoggerFactory.Create(_ => { });
 
         var staticOpts = Options.Create(new AtelierMcpOptions { Token = "the-real-token" });
+        var userOpts   = Options.Create(new AtelierUserOptions { Username = "admin" });
         var staticValidator = new StaticTokenValidator(
             staticOpts,
+            userOpts,
             loggerFactory.CreateLogger<StaticTokenValidator>());
 
         var oauthValidator  = new OAuthAccessTokenValidator(oauthSvc);

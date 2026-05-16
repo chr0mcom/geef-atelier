@@ -28,13 +28,20 @@ internal sealed class BearerTokenHandler(
         if (!outcome.IsValid)
             return AuthenticateResult.Fail("Invalid bearer token");
 
+        var username = outcome.Subject ?? "mcp-client";
+        var isStaticBearer = outcome.Kind == "static-bearer";
+
         var claims = new List<Claim>
         {
-            new(ClaimTypes.Name, outcome.Subject ?? "mcp-client"),
-            new(ClaimTypes.Role, outcome.Kind),
+            new(ClaimTypes.Name, username),
+            new(ClaimTypes.NameIdentifier, outcome.ClientId ?? username),
         };
-        if (outcome.ClientId is not null)
-            claims.Add(new Claim(ClaimTypes.NameIdentifier, outcome.ClientId));
+
+        // Static bearer tokens carry full admin access; OAuth tokens keep their declared kind as role.
+        claims.Add(isStaticBearer
+            ? new Claim(ClaimTypes.Role, "admin")
+            : new Claim(ClaimTypes.Role, outcome.Kind));
+
         if (outcome.Scope is not null)
             claims.Add(new Claim("scope", outcome.Scope));
 
