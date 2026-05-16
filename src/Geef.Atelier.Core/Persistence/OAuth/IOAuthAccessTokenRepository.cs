@@ -6,6 +6,7 @@ public interface IOAuthAccessTokenRepository
 {
     Task AddAsync(OAuthAccessToken token, CancellationToken ct);
     Task<OAuthAccessToken?> FindByHashAsync(string tokenHash, CancellationToken ct);
+    Task RevokeByHashAsync(string tokenHash, CancellationToken ct);
     Task RevokeByUserIdAsync(string userId, CancellationToken ct);
     Task RevokeByClientIdAndUserIdAsync(string clientId, string userId, CancellationToken ct);
     Task DeleteExpiredAsync(CancellationToken ct);

@@ -162,13 +162,17 @@ internal sealed class OAuthService(
 
     public async Task RevokeTokenAsync(string token, string clientId, CancellationToken ct)
     {
-        var tokenHash     = OAuthCrypto.HashToken(token);
-        var accessToken   = await accessTokenRepo.FindByHashAsync(tokenHash, ct);
+        var tokenHash   = OAuthCrypto.HashToken(token);
+        var accessToken = await accessTokenRepo.FindByHashAsync(tokenHash, ct);
 
         if (accessToken is not null)
         {
+            // RFC 7009 §2.1: if client_id does not match, silently return 200 — do not reveal validity
+            if (!string.Equals(accessToken.ClientId, clientId, StringComparison.Ordinal))
+                return;
+
             var now = DateTimeOffset.UtcNow;
-            await accessTokenRepo.RevokeByClientIdAndUserIdAsync(accessToken.ClientId, accessToken.UserId, ct);
+            await accessTokenRepo.RevokeByHashAsync(tokenHash, ct);
             await auditLogRepo.AddAsync(new OAuthAuditLogEntry(
                 Id: Guid.NewGuid(),
                 EventType: "TokenRevoked",
@@ -184,8 +188,12 @@ internal sealed class OAuthService(
         var refreshToken = await refreshTokenRepo.FindByHashAsync(tokenHash, ct);
         if (refreshToken is not null)
         {
+            // RFC 7009 §2.1: if client_id does not match, silently return 200 — do not reveal validity
+            if (!string.Equals(refreshToken.ClientId, clientId, StringComparison.Ordinal))
+                return;
+
             var now = DateTimeOffset.UtcNow;
-            await refreshTokenRepo.RevokeByUserIdAsync(refreshToken.UserId, ct);
+            await refreshTokenRepo.RevokeByHashAsync(tokenHash, ct);
             await auditLogRepo.AddAsync(new OAuthAuditLogEntry(
                 Id: Guid.NewGuid(),
                 EventType: "TokenRevoked",

@@ -9,6 +9,7 @@ public interface IOAuthRefreshTokenRepository
     Task<OAuthRefreshToken?> ConsumeAsync(string tokenHash, CancellationToken ct);
     /// <summary>Finds a refresh token by hash without consuming it (used for reuse detection).</summary>
     Task<OAuthRefreshToken?> FindByHashAsync(string tokenHash, CancellationToken ct);
+    Task RevokeByHashAsync(string tokenHash, CancellationToken ct);
     Task RevokeByUserIdAsync(string userId, CancellationToken ct);
     Task RevokeByClientIdAndUserIdAsync(string clientId, string userId, CancellationToken ct);
     Task DeleteExpiredAsync(CancellationToken ct);

@@ -24,6 +24,13 @@ public sealed class InMemoryOAuthRefreshTokenRepository : IOAuthRefreshTokenRepo
     public Task<OAuthRefreshToken?> FindByHashAsync(string tokenHash, CancellationToken ct)
         => Task.FromResult(_store.GetValueOrDefault(tokenHash));
 
+    public Task RevokeByHashAsync(string tokenHash, CancellationToken ct)
+    {
+        if (_store.TryGetValue(tokenHash, out var t) && !t.RevokedAt.HasValue)
+            _store[tokenHash] = t with { RevokedAt = DateTimeOffset.UtcNow };
+        return Task.CompletedTask;
+    }
+
     public Task RevokeByUserIdAsync(string userId, CancellationToken ct)
     {
         var keys = _store.Where(kv => kv.Value.UserId == userId).Select(kv => kv.Key).ToList();

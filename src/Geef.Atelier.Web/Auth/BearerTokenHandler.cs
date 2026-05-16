@@ -34,7 +34,7 @@ internal sealed class BearerTokenHandler(
             new(ClaimTypes.Role, outcome.Kind),
         };
         if (outcome.ClientId is not null)
-            claims.Add(new Claim("client_id", outcome.ClientId));
+            claims.Add(new Claim(ClaimTypes.NameIdentifier, outcome.ClientId));
         if (outcome.Scope is not null)
             claims.Add(new Claim("scope", outcome.Scope));
 

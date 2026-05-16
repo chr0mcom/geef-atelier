@@ -27,6 +27,14 @@ internal sealed class OAuthRefreshTokenRepository(AtelierDbContext db) : IOAuthR
     public async Task<OAuthRefreshToken?> FindByHashAsync(string tokenHash, CancellationToken ct)
         => await db.OAuthRefreshTokens.AsNoTracking().FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
 
+    public async Task RevokeByHashAsync(string tokenHash, CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow;
+        await db.OAuthRefreshTokens
+            .Where(t => t.TokenHash == tokenHash && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), ct);
+    }
+
     public async Task RevokeByUserIdAsync(string userId, CancellationToken ct)
     {
         var now = DateTimeOffset.UtcNow;
