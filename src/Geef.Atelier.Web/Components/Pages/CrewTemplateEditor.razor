@@ -8,7 +8,10 @@
 @using Geef.Atelier.Core.Domain.Crew.Advisors
 @using Geef.Atelier.Core.Domain.Crew.Grounding
 @using Geef.Atelier.Core.Domain.Crew.Profiles
+@using Geef.Atelier.Infrastructure.Configuration
+@using Microsoft.Extensions.Options
 @inject ICrewService CrewService
+@inject IOptions<ConvergenceOptions> ConvergenceOpts
 @inject NavigationManager Nav
 
 <PageTitle>@(IsNew ? "New Template" : "Edit Template") — Atelier</PageTitle>
@@ -104,21 +107,22 @@
             <details class="collapsible-section">
                 <summary class="collapsible-header">Advanced (Convergence Override)</summary>
                 <div class="collapsible-body">
+                    <p class="field-hint">Pre-filled with the global defaults. A value is only stored as a per-template override when you change it away from the default.</p>
                     <div class="field">
                         <label>Max Iterations</label>
-                        <InputNumber @bind-Value="_form.MaxIterations" />
+                        <InputNumber @bind-Value="_form.MaxIterations" data-testid="advanced-max-iterations" />
                     </div>
                     <div class="field">
                         <label>Abort on Critical</label>
-                        <InputCheckbox @bind-Value="_form.AbortOnCritical" />
+                        <InputCheckbox @bind-Value="_form.AbortOnCritical" data-testid="advanced-abort-on-critical" />
                     </div>
                     <div class="field">
                         <label>Detect Regression</label>
-                        <InputCheckbox @bind-Value="_form.DetectRegression" />
+                        <InputCheckbox @bind-Value="_form.DetectRegression" data-testid="advanced-detect-regression" />
                     </div>
                     <div class="field">
                         <label>Stagnation Threshold</label>
-                        <InputNumber @bind-Value="_form.StagnationThreshold" />
+                        <InputNumber @bind-Value="_form.StagnationThreshold" data-testid="advanced-stagnation-threshold" />
                     </div>
                 </div>
             </details>
@@ -180,17 +184,19 @@
         _advisorProfiles = await CrewService.ListAdvisorProfilesAsync(includeSystem: true);
         _groundingProviderProfiles = await CrewService.ListGroundingProviderProfilesAsync(includeSystem: true);
 
+        var defaults = ConvergenceOpts.Value;
         if (!IsNew)
         {
             var template = await CrewService.GetCrewTemplateAsync(Name!);
             if (template == null) { Nav.NavigateTo("/crew/templates"); return; }
             _isSystem = template.IsSystem;
             _displayName = template.DisplayName;
-            _form = TemplateFormModel.FromTemplate(template);
+            _form = TemplateFormModel.FromTemplate(template, defaults);
         }
         else
         {
             _form.ExecutorProfileName = _executors.FirstOrDefault()?.Name ?? "";
+            _form.ApplyConvergenceDefaults(defaults);
         }
 
         _loading = false;
@@ -202,7 +208,7 @@
         _error = null;
         try
         {
-            var template = _form.ToTemplate();
+            var template = _form.ToTemplate(ConvergenceOpts.Value);
             if (IsNew)
                 await CrewService.CreateCustomCrewTemplateAsync(template);
             else
@@ -278,7 +284,7 @@
         public bool DetectRegression { get; set; }
         public int? StagnationThreshold { get; set; }
 
-        public static TemplateFormModel FromTemplate(CrewTemplate t) => new()
+        public static TemplateFormModel FromTemplate(CrewTemplate t, ConvergenceOptions d) => new()
         {
             Name = t.Name,
             DisplayName = t.DisplayName,
@@ -288,17 +294,34 @@
             ReviewerProfileNames = t.ReviewerProfileNames.ToList(),
             GroundingProviderNames = t.GroundingProviderNames.ToList(),
             EvaluationStrategy = t.EvaluationStrategy,
-            MaxIterations = t.ConvergenceOverride?.MaxIterations,
-            AbortOnCritical = t.ConvergenceOverride?.AbortOnCritical ?? false,
-            DetectRegression = t.ConvergenceOverride?.DetectRegression ?? false,
-            StagnationThreshold = t.ConvergenceOverride?.StagnationThreshold,
+            MaxIterations = t.ConvergenceOverride?.MaxIterations ?? d.MaxIterations,
+            AbortOnCritical = t.ConvergenceOverride?.AbortOnCritical ?? d.AbortOnCritical,
+            DetectRegression = t.ConvergenceOverride?.DetectRegression ?? d.DetectRegression,
+            StagnationThreshold = t.ConvergenceOverride?.StagnationThreshold ?? d.StagnationThreshold,
         };
 
-        public CrewTemplate ToTemplate()
+        public void ApplyConvergenceDefaults(ConvergenceOptions d)
         {
-            ConvergencePolicyOverride? overr = null;
-            if (MaxIterations.HasValue || AbortOnCritical || DetectRegression || StagnationThreshold.HasValue)
-                overr = new ConvergencePolicyOverride(MaxIterations, AbortOnCritical, DetectRegression, StagnationThreshold);
+            MaxIterations = d.MaxIterations;
+            AbortOnCritical = d.AbortOnCritical;
+            DetectRegression = d.DetectRegression;
+            StagnationThreshold = d.StagnationThreshold;
+        }
+
+        public CrewTemplate ToTemplate(ConvergenceOptions d)
+        {
+            // Persist a per-field override only when it differs from the global default,
+            // so untouched templates keep ConvergenceOverride = null and continue to
+            // inherit future changes to the global convergence policy.
+            int? mi = MaxIterations == d.MaxIterations ? null : MaxIterations;
+            bool? ac = AbortOnCritical == d.AbortOnCritical ? null : AbortOnCritical;
+            bool? dr = DetectRegression == d.DetectRegression ? null : DetectRegression;
+            int? st = StagnationThreshold == d.StagnationThreshold ? null : StagnationThreshold;
+
+            ConvergencePolicyOverride? overr =
+                mi is null && ac is null && dr is null && st is null
+                    ? null
+                    : new ConvergencePolicyOverride(mi, ac, dr, st);
 
             return new CrewTemplate(
                 Name: SystemCrew.EnsureCustomPrefix(Name),

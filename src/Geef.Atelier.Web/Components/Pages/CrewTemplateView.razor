@@ -6,8 +6,11 @@
 @using Geef.Atelier.Core.Domain.Crew.Advisors
 @using Geef.Atelier.Core.Domain.Crew.Grounding
 @using Geef.Atelier.Core.Domain.Crew.Profiles
+@using Geef.Atelier.Infrastructure.Configuration
 @using Geef.Atelier.Web.Display
+@using Microsoft.Extensions.Options
 @inject ICrewService CrewService
+@inject IOptions<ConvergenceOptions> ConvergenceOpts
 @inject NavigationManager Nav
 
 <PageTitle>@(_template?.DisplayName ?? "Crew Template") — Atelier</PageTitle>
@@ -108,29 +111,34 @@
                 }
             </dd>
 
-            @if (_template.ConvergenceOverride is { } co)
-            {
-                @if (co.MaxIterations.HasValue)
-                {
-                    <dt>Max Iterations</dt>
-                    <dd data-testid="detail-max-iterations">@co.MaxIterations</dd>
-                }
-                @if (co.AbortOnCritical.HasValue)
-                {
-                    <dt>Abort on Critical</dt>
-                    <dd data-testid="detail-abort-on-critical">@(co.AbortOnCritical.Value ? "Yes" : "No")</dd>
-                }
-                @if (co.DetectRegression.HasValue)
-                {
-                    <dt>Detect Regression</dt>
-                    <dd data-testid="detail-detect-regression">@(co.DetectRegression.Value ? "Yes" : "No")</dd>
-                }
-                @if (co.StagnationThreshold.HasValue)
-                {
-                    <dt>Stagnation Threshold</dt>
-                    <dd data-testid="detail-stagnation">@co.StagnationThreshold</dd>
-                }
+            @{
+                var co = _template.ConvergenceOverride;
+                var d = ConvergenceOpts.Value;
             }
+
+            <dt>Max Iterations</dt>
+            <dd data-testid="detail-max-iterations">
+                @(co?.MaxIterations ?? d.MaxIterations)
+                @if (co?.MaxIterations is null) { <span class="text-muted">(default)</span> }
+            </dd>
+
+            <dt>Abort on Critical</dt>
+            <dd data-testid="detail-abort-on-critical">
+                @((co?.AbortOnCritical ?? d.AbortOnCritical) ? "Yes" : "No")
+                @if (co?.AbortOnCritical is null) { <span class="text-muted">(default)</span> }
+            </dd>
+
+            <dt>Detect Regression</dt>
+            <dd data-testid="detail-detect-regression">
+                @((co?.DetectRegression ?? d.DetectRegression) ? "Yes" : "No")
+                @if (co?.DetectRegression is null) { <span class="text-muted">(default)</span> }
+            </dd>
+
+            <dt>Stagnation Threshold</dt>
+            <dd data-testid="detail-stagnation">
+                @(co?.StagnationThreshold ?? d.StagnationThreshold)
+                @if (co?.StagnationThreshold is null) { <span class="text-muted">(default)</span> }
+            </dd>
         </dl>
 
         <div class="editor-actions">
