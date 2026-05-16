@@ -93,7 +93,7 @@
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        _userId = authState.User.FindFirst(ClaimTypes.Name)?.Value ?? "stefan";
+        _userId = authState.User.FindFirst(ClaimTypes.Name)?.Value ?? "";
         await LoadAsync();
     }
 
