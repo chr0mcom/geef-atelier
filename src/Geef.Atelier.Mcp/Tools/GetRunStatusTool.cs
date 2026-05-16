@@ -15,7 +15,7 @@ public static class GetRunStatusTool
         CancellationToken cancellationToken = default)
     {
         if (!Guid.TryParse(runId, out var guid)) return null;
-        var run = await runService.GetRunAsync(guid, cancellationToken);
+        var run = await runService.GetRunAsync(guid, requestingUsername: null, cancellationToken);
         return run is null ? null : new RunStatusDto(run.Id.ToString(), run.Status.ToString(), run.ErrorMessage);
     }
 }

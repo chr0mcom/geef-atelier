@@ -68,10 +68,11 @@ public sealed class SubmitRequestWithCrewTests
             return Task.FromResult(Guid.NewGuid());
         }
 
-        public Task<RunEntity?> GetRunAsync(Guid runId, CancellationToken ct = default) => Task.FromResult<RunEntity?>(null);
-        public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<RunEntity>>([]);
-        public Task<bool> CancelRunAsync(Guid runId, CancellationToken ct = default) => Task.FromResult(false);
-        public Task<RunDetails?> GetRunDetailsAsync(Guid runId, CancellationToken ct = default) => Task.FromResult<RunDetails?>(null);
-        public Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, CancellationToken ct = default) => Task.FromResult<RunWithGroundingViewModel?>(null);
+        public Task<RunEntity?> GetRunAsync(Guid runId, string? requestingUsername, CancellationToken ct = default) => Task.FromResult<RunEntity?>(null);
+        public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null, string? requestingUsername = null, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<RunEntity>>([]);
+        public Task<bool> CancelRunAsync(Guid runId, string? requestingUsername, CancellationToken ct = default) => Task.FromResult(false);
+        public Task<RunDetails?> GetRunDetailsAsync(Guid runId, string? requestingUsername, CancellationToken ct = default) => Task.FromResult<RunDetails?>(null);
+        public Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, string? requestingUsername, CancellationToken ct = default) => Task.FromResult<RunWithGroundingViewModel?>(null);
+        public Task<WelcomeStats> GetWelcomeStatsAsync(string? requestingUsername, CancellationToken ct = default) => Task.FromResult(new WelcomeStats(0, 0, 0, 0, 0, 0));
     }
 }

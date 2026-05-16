@@ -2,10 +2,8 @@
 @rendermode InteractiveServer
 @attribute [Authorize]
 @inject IRunService RunService
-@inject IRunRepository RunRepository
 @inject NavigationManager Nav
 @using Geef.Atelier.Core.Domain
-@using Geef.Atelier.Core.Persistence
 
 <PageTitle>Atelier — Geef.Atelier</PageTitle>
 
@@ -101,8 +99,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _recentRuns = await RunService.ListRunsAsync(5);
-        _stats      = await RunRepository.GetWelcomeStatsAsync(null, CancellationToken.None);
+        _recentRuns = await RunService.ListRunsAsync(5, requestingUsername: null);
+        _stats      = await RunService.GetWelcomeStatsAsync(requestingUsername: null, CancellationToken.None);
         _greeting   = DateTime.Now.ToString("dddd · HH:mm");
     }
 

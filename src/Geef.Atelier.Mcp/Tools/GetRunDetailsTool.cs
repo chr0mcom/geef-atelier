@@ -15,7 +15,7 @@ public static class GetRunDetailsTool
         CancellationToken cancellationToken = default)
     {
         if (!Guid.TryParse(runId, out var guid)) return null;
-        var details = await runService.GetRunDetailsAsync(guid, cancellationToken);
+        var details = await runService.GetRunDetailsAsync(guid, requestingUsername: null, cancellationToken);
         if (details is null) return null;
         var iterations = details.Iterations
             .Select(i => new IterationDto(

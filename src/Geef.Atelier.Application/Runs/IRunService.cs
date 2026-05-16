@@ -8,24 +8,64 @@ public interface IRunService
     /// <summary>Submits a new run request for processing.</summary>
     Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default);
 
-    /// <summary>Returns the run with the given ID, or null if not found.</summary>
-    Task<RunEntity?> GetRunAsync(Guid runId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Returns the run with the given ID, or null if not found.
+    /// When <paramref name="requestingUsername"/> is non-null, returns null if the run belongs to a different user.
+    /// Pass null to bypass the ownership check (admin mode).
+    /// </summary>
+    Task<RunEntity?> GetRunAsync(
+        Guid runId,
+        string? requestingUsername,
+        CancellationToken cancellationToken = default);
 
-    /// <summary>Returns the most recent runs, optionally filtered by status, ordered by creation time descending.</summary>
-    Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Returns the most recent runs, optionally filtered by status, ordered by creation time descending.
+    /// When <paramref name="requestingUsername"/> is non-null, only runs owned by that user are returned.
+    /// Pass null to return runs for all users (admin mode).
+    /// </summary>
+    Task<IReadOnlyList<RunEntity>> ListRunsAsync(
+        int limit = 20,
+        RunStatus? statusFilter = null,
+        string? requestingUsername = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Requests cancellation of the run. Returns true if the cancellation flag was set,
-    /// false if the run is already in a terminal state or was already cancelled.
+    /// false if the run is already in a terminal state, was already cancelled, or does not belong to
+    /// <paramref name="requestingUsername"/> (when non-null).
+    /// Pass null to bypass the ownership check (admin mode).
     /// </summary>
-    Task<bool> CancelRunAsync(Guid runId, CancellationToken cancellationToken = default);
+    Task<bool> CancelRunAsync(
+        Guid runId,
+        string? requestingUsername,
+        CancellationToken cancellationToken = default);
 
-    /// <summary>Returns the run with all its iterations and findings, or null if not found.</summary>
-    Task<RunDetails?> GetRunDetailsAsync(Guid runId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Returns the run with all its iterations and findings, or null if not found.
+    /// When <paramref name="requestingUsername"/> is non-null, returns null if the run belongs to a different user.
+    /// Pass null to bypass the ownership check (admin mode).
+    /// </summary>
+    Task<RunDetails?> GetRunDetailsAsync(
+        Guid runId,
+        string? requestingUsername,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns a <see cref="RunWithGroundingViewModel"/> that groups advisor consultations by trigger type,
-    /// or null if the run does not exist.
+    /// or null if the run does not exist or belongs to a different user (when <paramref name="requestingUsername"/> is non-null).
+    /// Pass null to bypass the ownership check (admin mode).
     /// </summary>
-    Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, CancellationToken cancellationToken = default);
+    Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(
+        Guid runId,
+        string? requestingUsername,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns aggregated welcome-page statistics.
+    /// When <paramref name="requestingUsername"/> is non-null, stats are scoped to that user's runs.
+    /// Pass null for system-wide stats (admin mode).
+    /// </summary>
+    Task<WelcomeStats> GetWelcomeStatsAsync(
+        string? requestingUsername,
+        CancellationToken cancellationToken = default);
 }

@@ -14,6 +14,6 @@ public static class CancelRunTool
         CancellationToken cancellationToken = default)
     {
         if (!Guid.TryParse(runId, out var guid)) return false;
-        return await runService.CancelRunAsync(guid, cancellationToken);
+        return await runService.CancelRunAsync(guid, requestingUsername: null, cancellationToken);
     }
 }

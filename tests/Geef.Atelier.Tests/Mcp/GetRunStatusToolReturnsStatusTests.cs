@@ -38,7 +38,7 @@ public sealed class GetRunStatusToolReturnsStatusTests
         public Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default)
             => Task.FromResult(Guid.NewGuid());
 
-        public Task<RunEntity?> GetRunAsync(Guid runId, CancellationToken cancellationToken = default)
+        public Task<RunEntity?> GetRunAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
         {
             if (runId != knownId) return Task.FromResult<RunEntity?>(null);
             var entity = new RunEntity
@@ -52,16 +52,19 @@ public sealed class GetRunStatusToolReturnsStatusTests
             return Task.FromResult<RunEntity?>(entity);
         }
 
-        public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null, CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null, string? requestingUsername = null, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<RunEntity>>(Array.Empty<RunEntity>());
 
-        public Task<bool> CancelRunAsync(Guid runId, CancellationToken cancellationToken = default)
+        public Task<bool> CancelRunAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
             => Task.FromResult(false);
 
-        public Task<RunDetails?> GetRunDetailsAsync(Guid runId, CancellationToken cancellationToken = default)
+        public Task<RunDetails?> GetRunDetailsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
             => Task.FromResult<RunDetails?>(null);
 
-        public Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, CancellationToken cancellationToken = default)
+        public Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
             => Task.FromResult<RunWithGroundingViewModel?>(null);
+
+        public Task<WelcomeStats> GetWelcomeStatsAsync(string? requestingUsername, CancellationToken cancellationToken = default)
+            => Task.FromResult(new WelcomeStats(0, 0, 0, 0, 0, 0));
     }
 }

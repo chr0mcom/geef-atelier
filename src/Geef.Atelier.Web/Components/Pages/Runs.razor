@@ -75,7 +75,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _runs = await RunService.ListRunsAsync(20, StatusFilter);
+        _runs = await RunService.ListRunsAsync(20, StatusFilter, requestingUsername: null);
         await InitHubAsync();
     }
 
@@ -88,14 +88,14 @@
 
         _hub.On<Guid>("AnyRunUpdated", async _ =>
         {
-            _runs = await RunService.ListRunsAsync(20, StatusFilter);
+            _runs = await RunService.ListRunsAsync(20, StatusFilter, requestingUsername: null);
             await InvokeAsync(StateHasChanged);
         });
 
         _hub.Reconnected += async _ =>
         {
             await _hub.SendAsync("JoinAllRunsGroupAsync");
-            _runs = await RunService.ListRunsAsync(20, StatusFilter);
+            _runs = await RunService.ListRunsAsync(20, StatusFilter, requestingUsername: null);
             await InvokeAsync(StateHasChanged);
         };
 
@@ -107,7 +107,7 @@
     {
         var query = status.HasValue ? $"?Status={status.Value}" : string.Empty;
         Nav.NavigateTo("/runs" + query, forceLoad: false);
-        _runs = await RunService.ListRunsAsync(20, status);
+        _runs = await RunService.ListRunsAsync(20, status, requestingUsername: null);
         StateHasChanged();
     }
 

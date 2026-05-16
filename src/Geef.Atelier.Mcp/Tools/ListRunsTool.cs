@@ -17,7 +17,7 @@ public static class ListRunsTool
         CancellationToken cancellationToken = default)
     {
         RunStatus? parsedStatus = statusFilter is not null && Enum.TryParse<RunStatus>(statusFilter, ignoreCase: true, out var s) ? s : null;
-        var runs = await runService.ListRunsAsync(limit, parsedStatus, cancellationToken);
+        var runs = await runService.ListRunsAsync(limit, parsedStatus, requestingUsername: null, cancellationToken);
         return runs.Select(r => new RunSummaryDto(
             r.Id.ToString(),
             r.Status.ToString(),

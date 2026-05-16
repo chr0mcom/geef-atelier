@@ -153,7 +153,7 @@
 
     async Task LoadAsync()
     {
-        _viewModel = await RunService.GetRunWithGroundingAsync(RunId, CancellationToken.None);
+        _viewModel = await RunService.GetRunWithGroundingAsync(RunId, requestingUsername: null, CancellationToken.None);
         _details   = _viewModel?.Details;
         _snapshot  = _viewModel?.Snapshot;
         _notFound  = _viewModel is null;
