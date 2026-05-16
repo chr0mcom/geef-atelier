@@ -1,0 +1,260 @@
+@page "/admin/oauth-clients"
+@attribute [Authorize(Policy = "AdminPolicy")]
+@rendermode InteractiveServer
+@using Geef.Atelier.Application.OAuth
+@using Geef.Atelier.Core.Domain.OAuth
+@inject IOAuthService OAuthService
+@inject IConfiguration Configuration
+
+<PageTitle>OAuth-Clients — Geef.Atelier</PageTitle>
+
+<div class="user-management" data-testid="oauth-clients-page">
+    <div class="page-header">
+        <h1>OAuth-Clients</h1>
+        <a href="/runs" class="btn ghost" data-testid="btn-back">← Zurück</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger" data-testid="error-banner">@_error</div>
+    }
+
+    @if (!string.IsNullOrEmpty(_success))
+    {
+        <div class="alert alert-success" data-testid="success-banner">@_success</div>
+    }
+
+    @if (_loading)
+    {
+        <p>Laden…</p>
+    }
+    else
+    {
+        <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <h2 style="margin:0;">Registrierte Clients</h2>
+            @if (!_showCreateForm)
+            {
+                <button class="btn primary" @onclick="ShowCreateForm" data-testid="btn-new-client">
+                    + Neuer Client
+                </button>
+            }
+        </div>
+
+        @if (_showCreateForm)
+        {
+            <div class="user-form" data-testid="create-client-form">
+                <h3>Neuen Client registrieren</h3>
+
+                @if (!string.IsNullOrEmpty(_formError))
+                {
+                    <div class="alert alert-danger" data-testid="create-form-error">@_formError</div>
+                }
+
+                <div class="form-group">
+                    <label for="fc-name">Name *</label>
+                    <input id="fc-name" type="text" class="form-control"
+                           @bind="_formClientName"
+                           data-testid="input-client-name"
+                           placeholder="z.B. Claude.ai" />
+                </div>
+
+                <div class="form-group">
+                    <label for="fc-id">Client-ID (leer = automatisch generiert)</label>
+                    <input id="fc-id" type="text" class="form-control"
+                           @bind="_formClientId"
+                           data-testid="input-client-id"
+                           placeholder="z.B. claude-ai" />
+                </div>
+
+                <div class="form-group">
+                    <label for="fc-uris">Redirect-URIs * <small>(eine pro Zeile)</small></label>
+                    <textarea id="fc-uris" class="form-control" rows="3"
+                              @bind="_formRedirectUris"
+                              data-testid="input-redirect-uris"
+                              placeholder="https://claude.ai/api/mcp/auth_callback"></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn primary" @onclick="CreateClientAsync"
+                            disabled="@_saving" data-testid="btn-create-client">
+                        @(_saving ? "Registrieren…" : "Registrieren")
+                    </button>
+                    <button type="button" class="btn ghost" @onclick="CancelCreate"
+                            disabled="@_saving" data-testid="btn-cancel-create">
+                        Abbrechen
+                    </button>
+                </div>
+            </div>
+        }
+
+        @if (_newClientResult is not null)
+        {
+            <div class="alert alert-success" style="font-family:monospace;" data-testid="new-client-result">
+                <strong>Client registriert:</strong><br/>
+                Client-ID: <strong>@_newClientResult.ClientId</strong>
+            </div>
+        }
+
+        <div class="users-list" data-testid="clients-list">
+            @if (_clients.Count == 0)
+            {
+                <div class="empty-state" data-testid="empty-state">Keine Clients registriert.</div>
+            }
+            else
+            {
+                @foreach (var client in _clients)
+                {
+                    <div class="user-row" data-testid="client-row-@client.ClientId">
+                        <div class="user-info">
+                            <span class="user-name" data-testid="client-name-@client.ClientId">@client.ClientName</span>
+                            <span class="user-meta" style="font-family:monospace;" data-testid="client-id-@client.ClientId">ID: @client.ClientId</span>
+                            @foreach (var uri in client.RedirectUris)
+                            {
+                                <span class="user-meta">↪ @uri</span>
+                            }
+                            <span class="user-meta">Erstellt: @client.CreatedAt.ToString("yyyy-MM-dd HH:mm") UTC</span>
+                        </div>
+                        <div class="user-actions">
+                            @if (_confirmDeleteClientId == client.ClientId)
+                            {
+                                <span class="delete-confirm-text">Wirklich löschen?</span>
+                                <button class="btn danger small" @onclick="() => DeleteClientAsync(client.ClientId)"
+                                        data-testid="btn-confirm-delete-@client.ClientId">
+                                    Ja
+                                </button>
+                                <button class="btn ghost small" @onclick="() => _confirmDeleteClientId = null"
+                                        data-testid="btn-cancel-delete-@client.ClientId">
+                                    Nein
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn danger small" @onclick="() => _confirmDeleteClientId = client.ClientId"
+                                        data-testid="btn-delete-@client.ClientId">
+                                    Löschen
+                                </button>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<OAuthClient> _clients = [];
+    private bool    _loading             = true;
+    private bool    _saving;
+    private bool    _showCreateForm;
+    private string? _error;
+    private string? _success;
+    private string? _formError;
+    private string? _confirmDeleteClientId;
+    private ClientRegistrationResult? _newClientResult;
+
+    private string  _formClientName   = "";
+    private string  _formClientId     = "";
+    private string  _formRedirectUris = "";
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error   = null;
+        try
+        {
+            _clients = await OAuthService.GetAllClientsAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ShowCreateForm()
+    {
+        _showCreateForm   = true;
+        _formClientName   = "";
+        _formClientId     = "";
+        _formRedirectUris = "";
+        _formError        = null;
+        _newClientResult  = null;
+        _success          = null;
+    }
+
+    private void CancelCreate()
+    {
+        _showCreateForm  = false;
+        _newClientResult = null;
+        _formError       = null;
+    }
+
+    private async Task CreateClientAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_formClientName))
+        {
+            _formError = "Name ist erforderlich.";
+            return;
+        }
+
+        var uris = _formRedirectUris
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(u => !string.IsNullOrEmpty(u))
+            .ToList();
+
+        if (uris.Count == 0)
+        {
+            _formError = "Mindestens eine Redirect-URI ist erforderlich.";
+            return;
+        }
+
+        _saving    = true;
+        _formError = null;
+        try
+        {
+            var request = new ClientRegistrationRequest(
+                ClientName:   _formClientName.Trim(),
+                RedirectUris: uris,
+                LogoUri:      null,
+                ClientUri:    null,
+                ClientId:     string.IsNullOrWhiteSpace(_formClientId) ? null : _formClientId.Trim());
+
+            _newClientResult = await OAuthService.RegisterClientAsync(request, CancellationToken.None);
+            _showCreateForm  = false;
+            _success         = $"Client \"{_formClientName.Trim()}\" wurde registriert.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _formError = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DeleteClientAsync(string clientId)
+    {
+        _confirmDeleteClientId = null;
+        _error = null;
+        try
+        {
+            await OAuthService.DeleteClientAsync(clientId, CancellationToken.None);
+            _success = "Client wurde gelöscht.";
+            if (_newClientResult?.ClientId == clientId)
+                _newClientResult = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}

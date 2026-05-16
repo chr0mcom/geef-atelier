@@ -255,6 +255,12 @@ internal sealed class OAuthService(
         return result;
     }
 
+    public Task<IReadOnlyList<OAuthClient>> GetAllClientsAsync(CancellationToken ct)
+        => clientRepo.GetAllAsync(ct);
+
+    public Task DeleteClientAsync(string clientId, CancellationToken ct)
+        => clientRepo.DeleteAsync(clientId, ct);
+
     private static bool ClientOwns(string storedClientId, string requestedClientId)
         => string.Equals(storedClientId, requestedClientId, StringComparison.Ordinal);
 

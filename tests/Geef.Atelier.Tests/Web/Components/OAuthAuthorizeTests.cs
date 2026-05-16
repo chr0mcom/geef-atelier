@@ -27,6 +27,8 @@ public sealed class OAuthAuthorizeTests : TestContext
         public Task LogEventAsync(OAuthAuditLogEntry entry, CancellationToken ct) => throw new NotImplementedException();
         public Task<IReadOnlyList<OAuthAccessToken>> GetActiveTokensForUserAsync(string userId, CancellationToken ct) => throw new NotImplementedException();
         public Task<IReadOnlyList<ConnectedClientInfo>> GetConnectedClientsAsync(string userId, CancellationToken ct) => throw new NotImplementedException();
+        public Task<IReadOnlyList<OAuthClient>> GetAllClientsAsync(CancellationToken ct) => throw new NotImplementedException();
+        public Task DeleteClientAsync(string clientId, CancellationToken ct) => throw new NotImplementedException();
     }
 
     private static HttpContext GetContext(string method = "GET", string userName = "stefan")

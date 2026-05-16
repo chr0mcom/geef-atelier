@@ -16,4 +16,6 @@ public interface IOAuthService
     Task LogEventAsync(OAuthAuditLogEntry entry, CancellationToken ct);
     Task<IReadOnlyList<OAuthAccessToken>> GetActiveTokensForUserAsync(string userId, CancellationToken ct);
     Task<IReadOnlyList<ConnectedClientInfo>> GetConnectedClientsAsync(string userId, CancellationToken ct);
+    Task<IReadOnlyList<OAuthClient>> GetAllClientsAsync(CancellationToken ct);
+    Task DeleteClientAsync(string clientId, CancellationToken ct);
 }

@@ -52,6 +52,8 @@ public sealed class ConnectedClientsTests : TestContext
         public Task RevokeTokenAsync(string token, string clientId, CancellationToken ct) => throw new NotImplementedException();
         public Task LogEventAsync(OAuthAuditLogEntry entry, CancellationToken ct) => throw new NotImplementedException();
         public Task<IReadOnlyList<OAuthAccessToken>> GetActiveTokensForUserAsync(string userId, CancellationToken ct) => throw new NotImplementedException();
+        public Task<IReadOnlyList<OAuthClient>> GetAllClientsAsync(CancellationToken ct) => throw new NotImplementedException();
+        public Task DeleteClientAsync(string clientId, CancellationToken ct) => throw new NotImplementedException();
     }
 
     private static ConnectedClientInfo MakeClient(string clientId = "client-1", string name = "Test App") =>
