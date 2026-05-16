@@ -1,6 +1,6 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 2026-05-16 (MCP-OAuth: D-041 ergänzt)*
+*Letzte Aktualisierung: 2026-05-17 (Run-User-Isolation: D-042 ergänzt)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -763,3 +763,25 @@ Auto-Run nach Materialization, Studio-Iterationen, Cost-Budget-Alerts, Bulk-Expo
 - `token_type_hint` in Revocation: SHOULD laut RFC 7009, nicht implementiert (akzeptiert)
 - `scopes_supported` im Metadata-Endpoint: String statt Array (akzeptiert, da nur ein Scope)
 - TOCTOU-Fenster zwischen `FindByXxxAsync` und `ConsumeAsync`: kein exploitbares Sicherheitsproblem (atomare `ConsumeAsync`-Implementierung via `UPDATE WHERE UsedAt IS NULL`; akzeptiert)
+
+---
+
+## D-042 — Run-Sichtbarkeits-Isolation (User Run Isolation)
+
+*Datum: 17. Mai 2026 | Bericht: [reports/feature-run-user-isolation-report.md](reports/feature-run-user-isolation-report.md)*
+
+Run-Sichtbarkeit auf eigenen Account eingeschränkt. Admin-Override via explizite Toggles ("Alle Benutzer anzeigen", "System-weite Statistiken anzeigen"). Grundlage: OAuth (Step19) + Multi-User (Step20).
+
+**D-042/1 — Username als Isolation-Schlüssel:** `Runs.CreatedByUser` (String) als User-Identifier beibehalten. Kein Wechsel auf UserId-FK — Username ist seit Step20 stabil, Migration wäre rein kosmetisch ohne Sicherheitsgewinn.
+
+**D-042/2 — null-Semantik für Admin-Bypass:** `requestingUsername = null` bedeutet systemweit in allen Service- und Repository-Methoden. Caller entscheidet (nicht der Service) anhand der User-Claims ob Admin-Mode. Vermeidet Code-Duplikation zwischen Web und MCP.
+
+**D-042/3 — 403 für Web-UI, generische Meldung für MCP:** RunDetail zeigt explizite 403-Seite ("Kein Zugriff — dieser Run gehört einem anderen Benutzer") — klare UX. MCP-Tools geben `null` zurück (= "Run not found or access denied") — verhindert Run-Existenz-Leak via API.
+
+**D-042/4 — Static-Bearer-Token → Admin-Mapping:** Runs via `ATELIER_MCP_TOKEN` (Claude Code CLI) werden dem konfigurierten Admin-User zugeordnet (neu: `ATELIER_MCP__STATIC_TOKEN_USER`, Default: `ATELIER_USER`). Kein Backfill bestehender "mcp-client"-Runs. Sicherheits-Fix: Timing-Leak (Length-Pre-Check vor `FixedTimeEquals`) entfernt.
+
+**D-042/5 — Welcome-Stats-Default für Admin: eigene Stats:** Admin sieht standardmäßig eigene Stats; system-weite via Toggle. Verhindert unbeabsichtigte Privacy-Implikationen bei Multi-User-Setup.
+
+**D-042/6 — Kein Cascade-Delete bei User-Löschung:** Runs bleiben in der DB erhalten wenn User gelöscht wird. Admin sieht verwaiste Runs. Runs sind historische Wertdaten — destruktiver Auto-Delete inakzeptabel.
+
+**D-042/7 — Index `IX_Runs_CreatedByUser`:** Migration Step21 fügt Index auf `Runs.CreatedByUser` hinzu. Filter-Performance bei wachsender Run-Zahl.
