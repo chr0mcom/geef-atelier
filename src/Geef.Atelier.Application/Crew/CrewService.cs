@@ -28,7 +28,9 @@ internal sealed class CrewService(
 
     public async Task<ReviewerProfile> CreateCustomReviewerProfileAsync(ReviewerProfile profile, CancellationToken cancellationToken = default)
     {
-        var normalized = profile with { Name = SystemCrew.EnsureCustomPrefix(profile.Name), IsSystem = false };
+        var baseName = SystemCrew.EnsureCustomPrefix(profile.Name);
+        var uniqueName = await UniqueNameAsync(baseName, n => reviewerRepo.GetByNameAsync(n, cancellationToken));
+        var normalized = profile with { Name = uniqueName, IsSystem = false };
         await reviewerRepo.CreateAsync(normalized, cancellationToken);
         return normalized;
     }
@@ -58,7 +60,9 @@ internal sealed class CrewService(
 
     public async Task<ExecutorProfile> CreateCustomExecutorProfileAsync(ExecutorProfile profile, CancellationToken cancellationToken = default)
     {
-        var normalized = profile with { Name = SystemCrew.EnsureCustomPrefix(profile.Name), IsSystem = false };
+        var baseName = SystemCrew.EnsureCustomPrefix(profile.Name);
+        var uniqueName = await UniqueNameAsync(baseName, n => executorRepo.GetByNameAsync(n, cancellationToken));
+        var normalized = profile with { Name = uniqueName, IsSystem = false };
         await executorRepo.CreateAsync(normalized, cancellationToken);
         return normalized;
     }
@@ -90,7 +94,9 @@ internal sealed class CrewService(
     {
         if (SystemCrew.IsSystemAdvisorName(profile.Name))
             throw new InvalidOperationException(ReadOnlyAdvisorMessage);
-        var normalized = profile with { Name = SystemCrew.EnsureCustomPrefix(profile.Name), IsSystem = false };
+        var baseName = SystemCrew.EnsureCustomPrefix(profile.Name);
+        var uniqueName = await UniqueNameAsync(baseName, n => advisorRepo.GetByNameAsync(n, cancellationToken));
+        var normalized = profile with { Name = uniqueName, IsSystem = false };
         await advisorRepo.CreateAsync(normalized, cancellationToken);
         return normalized;
     }
@@ -135,7 +141,9 @@ internal sealed class CrewService(
     {
         if (SystemCrew.IsSystemGroundingProviderName(profile.Name))
             throw new InvalidOperationException(ReadOnlyGroundingMessage);
-        var normalized = profile with { Name = SystemCrew.EnsureCustomPrefix(profile.Name), IsSystem = false };
+        var baseName = SystemCrew.EnsureCustomPrefix(profile.Name);
+        var uniqueName = await UniqueNameAsync(baseName, n => groundingRepo.GetByNameAsync(n, cancellationToken));
+        var normalized = profile with { Name = uniqueName, IsSystem = false };
         await groundingRepo.CreateAsync(normalized, cancellationToken);
         return normalized;
     }
@@ -166,7 +174,9 @@ internal sealed class CrewService(
 
     public async Task<CrewTemplate> CreateCustomCrewTemplateAsync(CrewTemplate template, CancellationToken cancellationToken = default)
     {
-        var normalized = template with { Name = SystemCrew.EnsureCustomPrefix(template.Name), IsSystem = false };
+        var baseName = SystemCrew.EnsureCustomPrefix(template.Name);
+        var uniqueName = await UniqueNameAsync(baseName, n => templateRepo.GetByNameAsync(n, cancellationToken));
+        var normalized = template with { Name = uniqueName, IsSystem = false };
         await templateRepo.CreateAsync(normalized, cancellationToken);
         return normalized;
     }
@@ -184,6 +194,20 @@ internal sealed class CrewService(
         if (SystemCrew.IsSystemName(name))
             throw new InvalidOperationException(ReadOnlyTemplateMessage);
         return templateRepo.DeleteAsync(name, cancellationToken);
+    }
+
+    // --- Helpers ---
+
+    private static async Task<string> UniqueNameAsync<T>(string baseName, Func<string, Task<T?>> existsCheck) where T : class
+    {
+        if (await existsCheck(baseName) is null)
+            return baseName;
+        for (var i = 2; ; i++)
+        {
+            var candidate = $"{baseName}-{i}";
+            if (await existsCheck(candidate) is null)
+                return candidate;
+        }
     }
 
     // --- Snapshot ---

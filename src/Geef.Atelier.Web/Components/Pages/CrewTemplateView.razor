@@ -1,0 +1,203 @@
+@page "/crew/templates/view/{name}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Core.Domain.Crew
+@using Geef.Atelier.Core.Domain.Crew.Advisors
+@using Geef.Atelier.Core.Domain.Crew.Grounding
+@using Geef.Atelier.Core.Domain.Crew.Profiles
+@using Geef.Atelier.Web.Display
+@inject ICrewService CrewService
+@inject NavigationManager Nav
+
+<PageTitle>@(_template?.DisplayName ?? "Crew Template") — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="crew-template-view">
+    <div class="page-header">
+        <h1>@(_template?.DisplayName ?? "")</h1>
+        <a href="/crew/templates" class="btn ghost">← Back</a>
+    </div>
+
+    @if (_loading)
+    {
+        <p>Loading…</p>
+    }
+    else if (_template == null)
+    {
+        <p>Template not found.</p>
+    }
+    else
+    {
+        <div class="info-banner">
+            System-Template — schreibgeschützt. Über <strong>Duplicate as custom</strong> eine bearbeitbare Kopie erstellen.
+        </div>
+
+        <dl class="profile-detail" data-testid="template-detail">
+            <dt>Name</dt>
+            <dd data-testid="detail-name">@_template.Name</dd>
+
+            <dt>Display Name</dt>
+            <dd data-testid="detail-display-name">@_template.DisplayName</dd>
+
+            <dt>Description</dt>
+            <dd data-testid="detail-description">@(string.IsNullOrEmpty(_template.Description) ? "—" : _template.Description)</dd>
+
+            <dt>Executor</dt>
+            <dd data-testid="detail-executor">
+                @(_executors.TryGetValue(_template.ExecutorProfileName, out var ex) ? ex.DisplayName : _template.ExecutorProfileName)
+                <span class="profile-chip" style="margin-left:.5rem;">@_template.ExecutorProfileName</span>
+            </dd>
+
+            <dt>Strategy</dt>
+            <dd data-testid="detail-strategy">@ReviewerDisplay.GetEvaluationStrategyDisplay(_template.EvaluationStrategy)</dd>
+
+            <dt>Reviewers</dt>
+            <dd data-testid="detail-reviewers">
+                @if (_template.ReviewerProfileNames.Count == 0)
+                {
+                    <span class="text-muted">—</span>
+                }
+                else
+                {
+                    <ul class="profile-chips">
+                        @foreach (var rName in _template.ReviewerProfileNames)
+                        {
+                            <li class="profile-chip">
+                                @(_reviewers.TryGetValue(rName, out var r) ? r.DisplayName : rName)
+                            </li>
+                        }
+                    </ul>
+                }
+            </dd>
+
+            <dt>Advisors</dt>
+            <dd data-testid="detail-advisors">
+                @if (_template.AdvisorProfileNames.Count == 0)
+                {
+                    <span class="text-muted">—</span>
+                }
+                else
+                {
+                    <ul class="profile-chips">
+                        @foreach (var aName in _template.AdvisorProfileNames)
+                        {
+                            <li class="profile-chip">
+                                @(_advisors.TryGetValue(aName, out var a) ? a.DisplayName : aName)
+                            </li>
+                        }
+                    </ul>
+                }
+            </dd>
+
+            <dt>Grounding</dt>
+            <dd data-testid="detail-grounding">
+                @if (_template.GroundingProviderNames.Count == 0)
+                {
+                    <span class="text-muted">—</span>
+                }
+                else
+                {
+                    <ul class="profile-chips">
+                        @foreach (var gName in _template.GroundingProviderNames)
+                        {
+                            <li class="profile-chip">
+                                @(_groundingProviders.TryGetValue(gName, out var g) ? g.DisplayName : gName)
+                            </li>
+                        }
+                    </ul>
+                }
+            </dd>
+
+            @if (_template.ConvergenceOverride is { } co)
+            {
+                @if (co.MaxIterations.HasValue)
+                {
+                    <dt>Max Iterations</dt>
+                    <dd data-testid="detail-max-iterations">@co.MaxIterations</dd>
+                }
+                @if (co.AbortOnCritical.HasValue)
+                {
+                    <dt>Abort on Critical</dt>
+                    <dd data-testid="detail-abort-on-critical">@(co.AbortOnCritical.Value ? "Yes" : "No")</dd>
+                }
+                @if (co.DetectRegression.HasValue)
+                {
+                    <dt>Detect Regression</dt>
+                    <dd data-testid="detail-detect-regression">@(co.DetectRegression.Value ? "Yes" : "No")</dd>
+                }
+                @if (co.StagnationThreshold.HasValue)
+                {
+                    <dt>Stagnation Threshold</dt>
+                    <dd data-testid="detail-stagnation">@co.StagnationThreshold</dd>
+                }
+            }
+        </dl>
+
+        <div class="editor-actions">
+            <button type="button" class="btn primary" @onclick="DuplicateAsCustom" disabled="@_duplicating">
+                @(_duplicating ? "Creating…" : "Duplicate as custom")
+            </button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="error-banner" style="margin-top:1rem;">@_error</div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public string? Name { get; set; }
+
+    private CrewTemplate? _template;
+    private Dictionary<string, ReviewerProfile> _reviewers = [];
+    private Dictionary<string, ExecutorProfile> _executors = [];
+    private Dictionary<string, AdvisorProfile> _advisors = [];
+    private Dictionary<string, GroundingProviderProfile> _groundingProviders = [];
+    private bool _loading = true;
+    private bool _duplicating;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Name is null) { Nav.NavigateTo("/crew/templates"); return; }
+        _template = await CrewService.GetCrewTemplateAsync(Name);
+        if (_template is null) { Nav.NavigateTo("/crew/templates"); return; }
+        if (!_template.IsSystem) { Nav.NavigateTo($"/crew/templates/{Uri.EscapeDataString(Name)}"); return; }
+
+        var reviewerList = await CrewService.ListReviewerProfilesAsync(includeSystem: true);
+        var executorList = await CrewService.ListExecutorProfilesAsync(includeSystem: true);
+        var advisorList  = await CrewService.ListAdvisorProfilesAsync(includeSystem: true);
+        var groundingList = await CrewService.ListGroundingProviderProfilesAsync(includeSystem: true);
+
+        _reviewers         = reviewerList.ToDictionary(r => r.Name);
+        _executors         = executorList.ToDictionary(e => e.Name);
+        _advisors          = advisorList.ToDictionary(a => a.Name);
+        _groundingProviders = groundingList.ToDictionary(g => g.Name);
+
+        _loading = false;
+    }
+
+    private async Task DuplicateAsCustom()
+    {
+        if (_template is null) return;
+        _duplicating = true;
+        _error = null;
+        try
+        {
+            var copy = _template with
+            {
+                Name = _template.Name + "-copy",
+                DisplayName = _template.DisplayName + " (Copy)",
+                IsSystem = false
+            };
+            var created = await CrewService.CreateCustomCrewTemplateAsync(copy);
+            Nav.NavigateTo($"/crew/templates/{Uri.EscapeDataString(created.Name)}");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            _duplicating = false;
+        }
+    }
+}

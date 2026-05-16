@@ -4,6 +4,7 @@
 @using Geef.Atelier.Application.Crew
 @using Geef.Atelier.Core.Domain.Crew.Profiles
 @inject ICrewService CrewService
+@inject NavigationManager Nav
 
 <PageTitle>Reviewer Profiles — Atelier</PageTitle>
 
@@ -41,7 +42,7 @@
                         <td class="crew-table-actions">
                             @if (p.IsSystem)
                             {
-                                <button class="btn small disabled-action" disabled title="System profile — duplicate to customize">Edit</button>
+                                <a href="/crew/profiles/reviewers/view/@Uri.EscapeDataString(p.Name)" class="btn small">View</a>
                                 <button class="btn small primary" @onclick="() => DuplicateProfile(p)">Duplicate as custom</button>
                             }
                             else
@@ -95,8 +96,8 @@
                 DisplayName = original.DisplayName + " (Copy)",
                 IsSystem = false
             };
-            await CrewService.CreateCustomReviewerProfileAsync(copy);
-            await LoadAsync();
+            var created = await CrewService.CreateCustomReviewerProfileAsync(copy);
+            Nav.NavigateTo($"/crew/profiles/reviewers/{Uri.EscapeDataString(created.Name)}");
         }
         catch (Exception ex)
         {

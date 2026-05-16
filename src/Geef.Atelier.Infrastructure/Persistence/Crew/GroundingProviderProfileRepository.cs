@@ -16,6 +16,7 @@ internal sealed class GroundingProviderProfileRepository(AtelierDbContext db) : 
     {
         db.GroundingProviderProfiles.Add(profile);
         await db.SaveChangesAsync(ct);
+        db.Entry(profile).State = EntityState.Detached;
         return profile;
     }
 

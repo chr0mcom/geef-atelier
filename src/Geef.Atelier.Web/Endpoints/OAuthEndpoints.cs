@@ -146,9 +146,9 @@ public static class OAuthEndpoints
             }
         }).AllowAnonymous().DisableAntiforgery();
 
-        // Authorization endpoint — GET handled by OAuthAuthorize.razor Blazor page
-        // POST here processes the Approve/Deny form
-        app.MapPost("/oauth/authorize", async (
+        // Authorization consent endpoint — GET handled by OAuthAuthorize.razor Blazor page
+        // Separate POST path avoids Blazor SSR route ambiguity (Blazor maps @page for all HTTP methods)
+        app.MapPost("/oauth/consent", async (
             HttpContext ctx,
             IOAuthService oauthService,
             CancellationToken ct) =>

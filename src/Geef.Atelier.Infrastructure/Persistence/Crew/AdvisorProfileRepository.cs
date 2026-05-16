@@ -32,6 +32,7 @@ internal sealed class AdvisorProfileRepository(AtelierDbContext db) : IAdvisorPr
             throw new InvalidOperationException($"Advisor profile '{profile.Name}' is a system profile and cannot be persisted to the database.");
         db.AdvisorProfiles.Add(profile);
         await db.SaveChangesAsync(cancellationToken);
+        db.Entry(profile).State = EntityState.Detached;
     }
 
     /// <inheritdoc/>

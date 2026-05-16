@@ -5,6 +5,7 @@
 @using Geef.Atelier.Core.Domain.Crew.Advisors
 @using Geef.Atelier.Web.Display
 @inject ICrewService CrewService
+@inject NavigationManager Nav
 
 <PageTitle>Advisor Profiles — Atelier</PageTitle>
 
@@ -55,9 +56,8 @@
                         <td class="crew-table-actions">
                             @if (p.IsSystem)
                             {
-                                <button class="btn small disabled-action" disabled title="System profile — duplicate to customize">Edit</button>
+                                <a href="/crew/profiles/advisors/view/@Uri.EscapeDataString(p.Name)" class="btn small">View</a>
                                 <button class="btn small primary" @onclick="() => DuplicateProfile(p)">Duplicate as custom</button>
-                                <button class="btn small disabled-action" disabled title="System profile — cannot delete">Delete</button>
                             }
                             else
                             {
@@ -110,8 +110,8 @@
                 DisplayName = original.DisplayName + " (Copy)",
                 IsSystem = false
             };
-            await CrewService.CreateCustomAdvisorProfileAsync(copy);
-            await LoadAsync();
+            var created = await CrewService.CreateCustomAdvisorProfileAsync(copy);
+            Nav.NavigateTo($"/crew/profiles/advisors/{Uri.EscapeDataString(created.Name)}");
         }
         catch (Exception ex)
         {

@@ -5,6 +5,7 @@
 @using Geef.Atelier.Core.Domain.Crew
 @using Geef.Atelier.Web.Display
 @inject ICrewService CrewService
+@inject NavigationManager Nav
 
 <PageTitle>Crew Templates — Atelier</PageTitle>
 
@@ -45,7 +46,7 @@
                         <td class="crew-table-actions">
                             @if (t.IsSystem)
                             {
-                                <button class="btn small disabled-action" disabled title="System profile — duplicate to customize">Edit</button>
+                                <a href="/crew/templates/view/@Uri.EscapeDataString(t.Name)" class="btn small">View</a>
                                 <button class="btn small primary" @onclick="() => DuplicateTemplate(t)">Duplicate as custom</button>
                             }
                             else
@@ -99,8 +100,8 @@
                 DisplayName = original.DisplayName + " (Copy)",
                 IsSystem = false
             };
-            await CrewService.CreateCustomCrewTemplateAsync(copy);
-            await LoadAsync();
+            var created = await CrewService.CreateCustomCrewTemplateAsync(copy);
+            Nav.NavigateTo($"/crew/templates/{Uri.EscapeDataString(created.Name)}");
         }
         catch (Exception ex)
         {

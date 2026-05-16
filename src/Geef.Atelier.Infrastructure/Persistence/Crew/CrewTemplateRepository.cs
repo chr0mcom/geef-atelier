@@ -29,6 +29,7 @@ internal sealed class CrewTemplateRepository(AtelierDbContext db) : ICrewTemplat
     {
         db.CrewTemplates.Add(template);
         await db.SaveChangesAsync(cancellationToken);
+        db.Entry(template).State = EntityState.Detached;
     }
 
     /// <inheritdoc/>

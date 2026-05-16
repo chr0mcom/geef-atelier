@@ -30,6 +30,7 @@ internal sealed class ReviewerProfileRepository(AtelierDbContext db) : IReviewer
     {
         db.ReviewerProfiles.Add(profile);
         await db.SaveChangesAsync(cancellationToken);
+        db.Entry(profile).State = EntityState.Detached;
     }
 
     /// <inheritdoc/>

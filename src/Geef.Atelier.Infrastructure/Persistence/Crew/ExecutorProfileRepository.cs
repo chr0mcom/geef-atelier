@@ -30,6 +30,7 @@ internal sealed class ExecutorProfileRepository(AtelierDbContext db) : IExecutor
     {
         db.ExecutorProfiles.Add(profile);
         await db.SaveChangesAsync(cancellationToken);
+        db.Entry(profile).State = EntityState.Detached;
     }
 
     /// <inheritdoc/>

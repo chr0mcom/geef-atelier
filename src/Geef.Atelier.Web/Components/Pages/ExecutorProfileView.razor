@@ -1,0 +1,111 @@
+@page "/crew/profiles/executors/view/{name}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Core.Domain.Crew.Profiles
+@inject ICrewService CrewService
+@inject NavigationManager Nav
+
+<PageTitle>@(_profile?.DisplayName ?? "Executor Profile") — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="executor-profile-view">
+    <div class="page-header">
+        <h1>@(_profile?.DisplayName ?? "")</h1>
+        <a href="/crew/profiles/executors" class="btn ghost">← Back</a>
+    </div>
+
+    @if (_loading)
+    {
+        <p>Loading…</p>
+    }
+    else if (_profile == null)
+    {
+        <p>Profile not found.</p>
+    }
+    else
+    {
+        <div class="info-banner">
+            System-Profil — schreibgeschützt. Über <strong>Duplicate as custom</strong> eine bearbeitbare Kopie erstellen.
+        </div>
+
+        <dl class="profile-detail" data-testid="profile-detail">
+            <dt>Name</dt>
+            <dd data-testid="detail-name">@_profile.Name</dd>
+
+            <dt>Display Name</dt>
+            <dd data-testid="detail-display-name">@_profile.DisplayName</dd>
+
+            <dt>Description</dt>
+            <dd data-testid="detail-description">@(string.IsNullOrEmpty(_profile.Description) ? "—" : _profile.Description)</dd>
+
+            <dt>Provider</dt>
+            <dd data-testid="detail-provider">@_profile.Provider</dd>
+
+            <dt>Model</dt>
+            <dd data-testid="detail-model">@_profile.Model</dd>
+
+            @if (_profile.MaxTokens.HasValue)
+            {
+                <dt>Max Tokens</dt>
+                <dd data-testid="detail-max-tokens">@_profile.MaxTokens</dd>
+            }
+
+            <dt>System Prompt</dt>
+            <dd data-testid="detail-system-prompt">
+                <pre class="system-prompt-view">@_profile.SystemPrompt</pre>
+            </dd>
+        </dl>
+
+        <div class="editor-actions">
+            <button type="button" class="btn primary" @onclick="DuplicateAsCustom" disabled="@_duplicating">
+                @(_duplicating ? "Creating…" : "Duplicate as custom")
+            </button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="error-banner" style="margin-top:1rem;">@_error</div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public string? Name { get; set; }
+
+    private ExecutorProfile? _profile;
+    private bool _loading = true;
+    private bool _duplicating;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Name is null) { Nav.NavigateTo("/crew/profiles/executors"); return; }
+        _profile = await CrewService.GetExecutorProfileAsync(Name);
+        if (_profile is null) { Nav.NavigateTo("/crew/profiles/executors"); return; }
+        if (!_profile.IsSystem) { Nav.NavigateTo($"/crew/profiles/executors/{Uri.EscapeDataString(Name)}"); return; }
+        _loading = false;
+    }
+
+    private async Task DuplicateAsCustom()
+    {
+        if (_profile is null) return;
+        _duplicating = true;
+        _error = null;
+        try
+        {
+            var copy = _profile with
+            {
+                Name = _profile.Name + "-copy",
+                DisplayName = _profile.DisplayName + " (Copy)",
+                IsSystem = false
+            };
+            var created = await CrewService.CreateCustomExecutorProfileAsync(copy);
+            Nav.NavigateTo($"/crew/profiles/executors/{Uri.EscapeDataString(created.Name)}");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            _duplicating = false;
+        }
+    }
+}
