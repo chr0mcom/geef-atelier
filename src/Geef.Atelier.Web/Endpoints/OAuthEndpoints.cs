@@ -185,8 +185,9 @@ public static class OAuthEndpoints
             try
             {
                 var userId = ctx.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value
-                             ?? ctx.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                             ?? "stefan";
+                             ?? ctx.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                    return Results.Redirect($"{redirectUri}?error=server_error");
 
                 var code = await oauthService.CreateAuthorizationCodeAsync(
                     clientId, userId, redirectUri, scope,
