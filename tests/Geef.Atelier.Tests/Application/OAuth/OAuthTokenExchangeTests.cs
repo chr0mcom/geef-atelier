@@ -102,6 +102,22 @@ public sealed class OAuthTokenExchangeTests
     }
 
     [Fact]
+    public async Task WrongClientId_DoesNotBurnCode_LegitimateClientCanStillExchange()
+    {
+        var (svc, clientId, code) = await PrepareFullFlowAsync();
+
+        // Wrong-client attempt must not consume the code
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.ExchangeAuthorizationCodeAsync(
+                code, "wrong-client-id", "https://example.com/callback", Verifier, CancellationToken.None));
+
+        // Legitimate owner can still exchange the same code
+        var response = await svc.ExchangeAuthorizationCodeAsync(
+            code, clientId, "https://example.com/callback", Verifier, CancellationToken.None);
+        Assert.NotNull(response.AccessToken);
+    }
+
+    [Fact]
     public async Task WrongRedirectUri_ThrowsInvalidOperationException()
     {
         var (svc, clientId, code) = await PrepareFullFlowAsync();

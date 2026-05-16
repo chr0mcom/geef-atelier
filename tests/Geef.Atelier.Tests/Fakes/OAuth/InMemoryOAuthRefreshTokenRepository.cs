@@ -33,7 +33,8 @@ public sealed class InMemoryOAuthRefreshTokenRepository : IOAuthRefreshTokenRepo
 
     public Task RevokeByUserIdAsync(string userId, CancellationToken ct)
     {
-        var keys = _store.Where(kv => kv.Value.UserId == userId).Select(kv => kv.Key).ToList();
+        var keys = _store.Where(kv => kv.Value.UserId == userId && !kv.Value.RevokedAt.HasValue)
+            .Select(kv => kv.Key).ToList();
         foreach (var k in keys)
             _store[k] = _store[k] with { RevokedAt = DateTimeOffset.UtcNow };
         return Task.CompletedTask;

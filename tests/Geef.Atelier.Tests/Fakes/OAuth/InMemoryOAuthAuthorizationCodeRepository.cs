@@ -13,6 +13,9 @@ public sealed class InMemoryOAuthAuthorizationCodeRepository : IOAuthAuthorizati
         return Task.CompletedTask;
     }
 
+    public Task<OAuthAuthorizationCode?> FindByCodeHashAsync(string codeHash, CancellationToken ct)
+        => Task.FromResult(_store.GetValueOrDefault(codeHash));
+
     public Task<OAuthAuthorizationCode?> ConsumeAsync(string codeHash, CancellationToken ct)
     {
         if (!_store.TryGetValue(codeHash, out var code)) return Task.FromResult<OAuthAuthorizationCode?>(null);

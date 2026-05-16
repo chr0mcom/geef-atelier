@@ -12,6 +12,9 @@ internal sealed class OAuthAuthorizationCodeRepository(AtelierDbContext db) : IO
         await db.SaveChangesAsync(ct);
     }
 
+    public async Task<OAuthAuthorizationCode?> FindByCodeHashAsync(string codeHash, CancellationToken ct)
+        => await db.OAuthAuthorizationCodes.AsNoTracking().FirstOrDefaultAsync(c => c.CodeHash == codeHash, ct);
+
     public async Task<OAuthAuthorizationCode?> ConsumeAsync(string codeHash, CancellationToken ct)
     {
         var now = DateTimeOffset.UtcNow;

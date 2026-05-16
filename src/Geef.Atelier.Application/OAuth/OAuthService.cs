@@ -95,6 +95,13 @@ internal sealed class OAuthService(
         CancellationToken ct)
     {
         var codeHash = OAuthCrypto.HashToken(code);
+
+        // Validate client_id ownership BEFORE consuming — mirrors the RefreshTokenAsync pattern
+        // to prevent a wrong-client request from irreversibly burning a valid authorization code.
+        var lookup = await codeRepo.FindByCodeHashAsync(codeHash, ct);
+        if (lookup is not null && !ClientOwns(lookup.ClientId, clientId))
+            throw new InvalidOperationException("client_id mismatch");
+
         var consumed = await codeRepo.ConsumeAsync(codeHash, ct);
 
         if (consumed is null)
@@ -102,9 +109,6 @@ internal sealed class OAuthService(
 
         if (consumed.ExpiresAt < DateTimeOffset.UtcNow)
             throw new InvalidOperationException("Authorization code expired");
-
-        if (!string.Equals(consumed.ClientId, clientId, StringComparison.Ordinal))
-            throw new InvalidOperationException("client_id mismatch");
 
         if (!string.Equals(consumed.RedirectUri, redirectUri, StringComparison.Ordinal))
             throw new InvalidOperationException("redirect_uri mismatch");
@@ -206,9 +210,6 @@ internal sealed class OAuthService(
         }
     }
 
-    private static bool ClientOwns(string storedClientId, string requestedClientId)
-        => string.Equals(storedClientId, requestedClientId, StringComparison.Ordinal);
-
     public async Task RevokeAllUserTokensAsync(string userId, CancellationToken ct)
     {
         await accessTokenRepo.RevokeByUserIdAsync(userId, ct);
@@ -251,6 +252,9 @@ internal sealed class OAuthService(
         }
         return result;
     }
+
+    private static bool ClientOwns(string storedClientId, string requestedClientId)
+        => string.Equals(storedClientId, requestedClientId, StringComparison.Ordinal);
 
     private async Task<TokenResponse> IssueTokenPairAsync(string clientId, string userId, string scope, CancellationToken ct)
     {
