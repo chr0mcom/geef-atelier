@@ -15,6 +15,6 @@ public sealed class StaticTokenValidatorRejectsWrongTokenTests
 
         var result = await sut.ValidateTokenAsync("wrong-token");
 
-        Assert.False(result);
+        Assert.False(result.IsValid);
     }
 }

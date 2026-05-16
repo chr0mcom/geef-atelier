@@ -15,6 +15,6 @@ public sealed class StaticTokenValidatorAcceptsConfiguredTokenTests
 
         var result = await sut.ValidateTokenAsync("valid-token");
 
-        Assert.True(result);
+        Assert.True(result.IsValid);
     }
 }

@@ -1,0 +1,117 @@
+@page "/oauth/authorize"
+@layout Layout.EmptyLayout
+@attribute [Authorize]
+@using System.Security.Claims
+@using Geef.Atelier.Application.OAuth
+@using Geef.Atelier.Core.Domain.OAuth
+@inject IOAuthService OAuthService
+
+<PageTitle>Zugriff gewähren — Geef.Atelier</PageTitle>
+
+<div class="auth-card">
+    <div class="auth-card-brand">
+        <span class="auth-brand-wordmark">Geef<span class="auth-brand-dot">.</span><em>Atelier</em></span>
+    </div>
+
+    @if (_error is not null)
+    {
+        <div class="alert alert-danger" data-testid="oauth-error">@_error</div>
+    }
+
+    @if (_valid && _client is not null)
+    {
+        <h1 class="auth-card-heading">Zugriff gewähren</h1>
+
+        <p class="auth-card-body">
+            <strong>@_client.ClientName</strong> möchte auf Ihr Geef.Atelier zugreifen.
+        </p>
+
+        @if (_client.ClientUri is not null)
+        {
+            <p class="auth-card-meta">
+                <a href="@_client.ClientUri" target="_blank" rel="noopener noreferrer" data-testid="client-uri">
+                    @_client.ClientUri
+                </a>
+            </p>
+        }
+
+        <p class="auth-card-meta">
+            Berechtigung: <strong>MCP (Vollzugriff)</strong>
+        </p>
+
+        <p class="auth-card-meta auth-signed-in">
+            Sie sind angemeldet als <strong>@HttpContext!.User.Identity?.Name</strong>.
+        </p>
+
+        <form method="post" action="/oauth/authorize" class="auth-consent-form">
+            <input type="hidden" name="client_id"              value="@ClientId" />
+            <input type="hidden" name="redirect_uri"           value="@RedirectUri" />
+            <input type="hidden" name="scope"                  value="@Scope" />
+            <input type="hidden" name="state"                  value="@State" />
+            <input type="hidden" name="code_challenge"         value="@CodeChallenge" />
+            <input type="hidden" name="code_challenge_method"  value="@CodeChallengeMethod" />
+
+            <div class="auth-consent-actions">
+                <button name="action" value="approve" type="submit"
+                        class="btn hero" data-testid="btn-approve">
+                    Zugriff gewähren
+                </button>
+                <button name="action" value="deny" type="submit"
+                        class="btn ghost" data-testid="btn-deny">
+                    Ablehnen
+                </button>
+            </div>
+        </form>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "response_type")]      public string? ResponseType         { get; set; }
+    [SupplyParameterFromQuery(Name = "client_id")]          public string? ClientId             { get; set; }
+    [SupplyParameterFromQuery(Name = "redirect_uri")]       public string? RedirectUri          { get; set; }
+    [SupplyParameterFromQuery(Name = "scope")]              public string? Scope                { get; set; }
+    [SupplyParameterFromQuery(Name = "state")]              public string? State                { get; set; }
+    [SupplyParameterFromQuery(Name = "code_challenge")]     public string? CodeChallenge        { get; set; }
+    [SupplyParameterFromQuery(Name = "code_challenge_method")] public string? CodeChallengeMethod { get; set; }
+
+    [CascadingParameter] public HttpContext? HttpContext { get; set; }
+
+    private string?     _error;
+    private OAuthClient? _client;
+    private bool        _valid;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext?.Request.Method != "GET")
+            return;
+
+        if (string.IsNullOrEmpty(ClientId)
+            || string.IsNullOrEmpty(RedirectUri)
+            || string.IsNullOrEmpty(CodeChallenge)
+            || string.IsNullOrEmpty(CodeChallengeMethod))
+        {
+            _error = "Ungültige Anfrage: Pflichtparameter fehlen.";
+            return;
+        }
+
+        var request = new AuthorizationRequest(
+            ResponseType:        ResponseType ?? "",
+            ClientId:            ClientId,
+            RedirectUri:         RedirectUri,
+            Scope:               Scope,
+            State:               State,
+            CodeChallenge:       CodeChallenge,
+            CodeChallengeMethod: CodeChallengeMethod);
+
+        var result = await OAuthService.ValidateAuthorizationRequestAsync(request, CancellationToken.None);
+
+        if (!result.IsValid)
+        {
+            _error = result.ErrorDescription ?? result.ErrorCode ?? "Ungültige Anfrage.";
+            return;
+        }
+
+        _client = result.Client;
+        _valid  = true;
+    }
+}

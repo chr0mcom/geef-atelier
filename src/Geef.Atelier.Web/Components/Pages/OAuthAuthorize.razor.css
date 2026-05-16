@@ -1,0 +1,113 @@
+.auth-card {
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto;
+    background: var(--surface);
+    border: 1px solid var(--hairline-soft);
+    border-radius: 8px;
+    padding: 36px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.auth-card-brand {
+    text-align: center;
+    margin-bottom: 8px;
+}
+
+.auth-brand-wordmark {
+    font-family: var(--font-display);
+    font-size: 20px;
+    letter-spacing: -0.01em;
+}
+
+.auth-brand-wordmark .auth-brand-dot {
+    color: var(--hero);
+    font-family: var(--font-mono);
+    font-weight: 500;
+}
+
+.auth-brand-wordmark em {
+    font-style: italic;
+    color: var(--ink-2);
+}
+
+.auth-card-heading {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    margin: 0;
+    color: var(--ink);
+}
+
+.auth-card-body {
+    color: var(--ink);
+    font-size: 14px;
+    margin: 0;
+    line-height: 1.6;
+}
+
+.auth-card-meta {
+    color: var(--ink-3);
+    font-size: 12px;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.auth-card-meta a {
+    color: var(--hero);
+    text-decoration: none;
+}
+
+.auth-card-meta a:hover {
+    text-decoration: underline;
+}
+
+.auth-signed-in {
+    padding: 8px 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline-soft);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--ink-2);
+}
+
+.auth-consent-form {
+    margin-top: 8px;
+}
+
+.auth-consent-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.auth-consent-actions .btn {
+    flex: 1;
+    justify-content: center;
+}
+
+.alert {
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin: 0;
+}
+
+.alert-danger {
+    background: color-mix(in oklch, var(--st-failed) 12%, transparent);
+    border: 1px solid color-mix(in oklch, var(--st-failed) 40%, transparent);
+    color: var(--st-failed);
+}
+
+.btn.hero {
+    background: var(--hero);
+    color: var(--on-hero);
+    border-color: color-mix(in oklch, var(--hero) 60%, black);
+}
+
+.btn.hero:hover {
+    background: color-mix(in oklch, var(--hero) 92%, white);
+}

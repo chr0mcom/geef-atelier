@@ -1,5 +1,6 @@
 using Geef.Atelier.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
 
@@ -26,6 +27,7 @@ public sealed class PostgresFixture : IAsyncLifetime
     {
         var options = new DbContextOptionsBuilder<AtelierDbContext>()
             .UseNpgsql(ConnectionString)
+            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
         return new AtelierDbContext(options);
     }
@@ -34,7 +36,8 @@ public sealed class PostgresFixture : IAsyncLifetime
     {
         var services = new ServiceCollection();
         services.AddDbContext<AtelierDbContext>(opt =>
-            opt.UseNpgsql(ConnectionString));
+            opt.UseNpgsql(ConnectionString)
+               .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
         var provider = services.BuildServiceProvider();
         return provider.GetRequiredService<IServiceScopeFactory>();
     }

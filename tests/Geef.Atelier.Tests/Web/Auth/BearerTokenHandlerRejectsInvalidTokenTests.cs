@@ -52,7 +52,7 @@ public sealed class BearerTokenHandlerRejectsInvalidTokenTests
 
     private sealed class AlwaysInvalidTokenValidator : ITokenValidator
     {
-        public Task<bool> ValidateTokenAsync(string token, CancellationToken cancellationToken = default)
-            => Task.FromResult(false);
+        public Task<TokenValidationOutcome> ValidateTokenAsync(string token, CancellationToken cancellationToken = default)
+            => Task.FromResult(TokenValidationOutcome.Invalid);
     }
 }

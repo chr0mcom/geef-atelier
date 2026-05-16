@@ -19,9 +19,11 @@ using Geef.Atelier.Web.Hubs;
 using Geef.Atelier.Web.Notifications;
 using Geef.Atelier.Web.Services;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,7 +38,10 @@ builder.Services.AddLlmClient(builder.Configuration)
     });
 
 builder.Services.AddDbContext<AtelierDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+           // Raw-SQL migrations (Step19McpOAuth+) deliberately bypass EF schema tracking;
+           // the tables exist in the DB but not in the model snapshot.
+           .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
 
 builder.Services.AddAtelierPersistence();
 builder.Services.AddAtelierApplication();
@@ -55,6 +60,7 @@ builder.Services.AddTemplateStudio(builder.Configuration);
 builder.Services.Configure<OrchestratorOptions>(builder.Configuration.GetSection("Orchestrator"));
 builder.Services.Configure<ConvergenceOptions>(builder.Configuration.GetSection("Convergence"));
 builder.Services.AddHostedService<RunOrchestratorService>();
+builder.Services.AddHostedService<OAuthCleanupBackgroundService>();
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AtelierDbContext>();
@@ -64,6 +70,7 @@ builder.Services.AddSingleton<IRunNotifier, SignalRRunNotifier>();
 
 builder.Services.AddAtelierAuth(builder.Configuration);
 builder.Services.AddAtelierMcpAuth(builder.Configuration);
+builder.Services.AddAtelierOAuth(builder.Configuration);
 
 builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -132,6 +139,24 @@ app.UseForwardedHeaders();
 if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
 
+// Register OnStarting BEFORE auth middleware so it fires even when auth short-circuits.
+app.Use(async (ctx, next) =>
+{
+    ctx.Response.OnStarting(() =>
+    {
+        if (ctx.Request.Path.StartsWithSegments("/mcp") &&
+            ctx.Response.StatusCode == 401 &&
+            !ctx.Response.Headers.ContainsKey("WWW-Authenticate"))
+        {
+            var issuer = ctx.RequestServices.GetRequiredService<IOptions<OAuthOptions>>().Value.Issuer;
+            ctx.Response.Headers.WWWAuthenticate =
+                $"Bearer resource_metadata={issuer}/.well-known/oauth-protected-resource";
+        }
+        return Task.CompletedTask;
+    });
+    await next();
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
@@ -151,6 +176,8 @@ app.MapHub<RunHub>("/hubs/runs");
 app.MapMcp("/mcp").RequireAuthorization(McpAuthorizationConstants.McpPolicy);
 
 app.MapAuthEndpoints();
+app.MapWellKnownEndpoints();
+app.MapOAuthEndpoints();
 app.MapSettingsEndpoints();
 
 app.MapStaticAssets();

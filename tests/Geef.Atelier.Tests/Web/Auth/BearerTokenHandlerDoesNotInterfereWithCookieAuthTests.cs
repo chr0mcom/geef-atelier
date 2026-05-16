@@ -69,7 +69,7 @@ public sealed class BearerTokenHandlerDoesNotInterfereWithCookieAuthTests
 
     private sealed class AlwaysValidTokenValidator : ITokenValidator
     {
-        public Task<bool> ValidateTokenAsync(string token, CancellationToken cancellationToken = default)
-            => Task.FromResult(true);
+        public Task<TokenValidationOutcome> ValidateTokenAsync(string token, CancellationToken cancellationToken = default)
+            => Task.FromResult(new TokenValidationOutcome(true, "static-bearer", "static-client", null, null));
     }
 }

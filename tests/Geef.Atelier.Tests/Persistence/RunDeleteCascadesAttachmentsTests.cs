@@ -2,6 +2,7 @@ using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew.Knowledge;
 using Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Testcontainers.PostgreSql;
 
 namespace Geef.Atelier.Tests.Persistence;
@@ -24,6 +25,7 @@ public sealed class RunDeleteCascadesAttachmentsTests : IAsyncLifetime
     {
         var options = new DbContextOptionsBuilder<Geef.Atelier.Infrastructure.Persistence.AtelierDbContext>()
             .UseNpgsql(_postgres.GetConnectionString())
+            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
         return new Geef.Atelier.Infrastructure.Persistence.AtelierDbContext(options);
     }

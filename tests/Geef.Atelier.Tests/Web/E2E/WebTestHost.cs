@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Crew.Knowledge;
+using Geef.Atelier.Application.OAuth;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
@@ -22,6 +23,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -83,7 +85,8 @@ internal sealed class WebTestHost : IAsyncDisposable
 
         // DB: fixture Postgres (already migrated by PostgresFixture)
         builder.Services.AddDbContext<AtelierDbContext>(opts =>
-            opts.UseNpgsql(fixture.ConnectionString));
+            opts.UseNpgsql(fixture.ConnectionString)
+            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
 
         builder.Services.AddAtelierPersistence();
         builder.Services.AddAtelierApplication();
@@ -150,9 +153,11 @@ internal sealed class WebTestHost : IAsyncDisposable
         });
         builder.Services.AddCascadingAuthenticationState();
 
-        // MCP: token auth + MCP server
+        // MCP: token auth + OAuth services + MCP server
         builder.Services.AddAtelierMcpAuth(builder.Configuration);
         builder.Services.PostConfigure<AtelierMcpOptions>(opts => opts.Token = "test-mcp-token");
+        builder.Services.AddAtelierOAuth(builder.Configuration);
+        builder.Services.PostConfigure<OAuthOptions>(opts => opts.Issuer = "http://localhost");
         builder.Services.AddAtelierMcp();
 
         // HttpContextAccessor required by App.razor (theme cookie)

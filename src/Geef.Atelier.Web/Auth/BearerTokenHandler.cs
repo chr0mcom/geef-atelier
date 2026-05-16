@@ -22,18 +22,24 @@ internal sealed class BearerTokenHandler(
         if (!raw.StartsWith("Bearer ", StringComparison.Ordinal))
             return AuthenticateResult.NoResult();
 
-        var token = raw["Bearer ".Length..].Trim();
-        var ok = await validator.ValidateTokenAsync(token, Context.RequestAborted);
+        var token   = raw["Bearer ".Length..].Trim();
+        var outcome = await validator.ValidateTokenAsync(token, Context.RequestAborted);
 
-        if (!ok)
+        if (!outcome.IsValid)
             return AuthenticateResult.Fail("Invalid bearer token");
 
-        var claims   = new[] { new Claim(ClaimTypes.Name, "mcp-client") };
-        var identity = new ClaimsIdentity(claims, McpAuthorizationConstants.BearerScheme);
-        var ticket   = new AuthenticationTicket(
-            new ClaimsPrincipal(identity),
-            McpAuthorizationConstants.BearerScheme);
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.Name, outcome.Subject ?? "mcp-client"),
+            new(ClaimTypes.Role, outcome.Kind),
+        };
+        if (outcome.ClientId is not null)
+            claims.Add(new Claim("client_id", outcome.ClientId));
+        if (outcome.Scope is not null)
+            claims.Add(new Claim("scope", outcome.Scope));
 
+        var identity = new ClaimsIdentity(claims, McpAuthorizationConstants.BearerScheme);
+        var ticket   = new AuthenticationTicket(new ClaimsPrincipal(identity), McpAuthorizationConstants.BearerScheme);
         return AuthenticateResult.Success(ticket);
     }
 }
