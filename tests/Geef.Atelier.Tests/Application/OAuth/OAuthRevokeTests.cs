@@ -83,4 +83,49 @@ public sealed class OAuthRevokeTests
 
         Assert.Contains(auditLog.Entries, e => e.EventType == "TokenRevoked");
     }
+
+    [Fact]
+    public async Task RevokeAccessToken_WrongClientId_DoesNotRevokeToken()
+    {
+        var (svc, clientId, accessToken, _) = await IssueTokensAsync();
+
+        // A different client attempts to revoke the token — must silently no-op (RFC 7009 §2.1)
+        await svc.RevokeTokenAsync(accessToken, "wrong-client-id", CancellationToken.None);
+
+        var result = await svc.ValidateAccessTokenAsync(accessToken, CancellationToken.None);
+        Assert.True(result.IsValid, "Token must remain valid when revoked by a non-owning client");
+    }
+
+    [Fact]
+    public async Task RevokeAccessToken_WrongClientId_ProducesNoAuditEvent()
+    {
+        var (svc, _, _, _, _, auditLog) = OAuthServiceFactory.Create();
+        var reg = await svc.RegisterClientAsync(
+            new Geef.Atelier.Application.OAuth.ClientRegistrationRequest(
+                "App", ["https://example.com/callback"], null, null),
+            CancellationToken.None);
+        var code = await svc.CreateAuthorizationCodeAsync(
+            reg.ClientId, "user-1", "https://example.com/callback",
+            "mcp:full", Challenge, "S256", CancellationToken.None);
+        var tokens = await svc.ExchangeAuthorizationCodeAsync(
+            code, reg.ClientId, "https://example.com/callback", Verifier, CancellationToken.None);
+
+        var countBefore = auditLog.Entries.Count;
+        await svc.RevokeTokenAsync(tokens.AccessToken, "wrong-client-id", CancellationToken.None);
+
+        Assert.Equal(countBefore, auditLog.Entries.Count);
+    }
+
+    [Fact]
+    public async Task RevokeRefreshToken_WrongClientId_DoesNotRevokeToken()
+    {
+        var (svc, clientId, _, refreshToken) = await IssueTokensAsync();
+
+        // A different client attempts to revoke the refresh token — must silently no-op (RFC 7009 §2.1)
+        await svc.RevokeTokenAsync(refreshToken, "wrong-client-id", CancellationToken.None);
+
+        // Re-issuing a token via the refresh token proves it was not revoked
+        var result = await svc.RefreshTokenAsync(refreshToken, clientId, CancellationToken.None);
+        Assert.NotNull(result.AccessToken);
+    }
 }

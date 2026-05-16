@@ -118,21 +118,25 @@ internal sealed class OAuthService(
     public async Task<TokenResponse> RefreshTokenAsync(string refreshToken, string clientId, CancellationToken ct)
     {
         var tokenHash = OAuthCrypto.HashToken(refreshToken);
-        var consumed  = await refreshTokenRepo.ConsumeAsync(tokenHash, ct);
+
+        // Validate client_id ownership BEFORE consuming so a wrong-client request cannot
+        // burn a valid token and trigger false reuse-detection for the legitimate owner.
+        var lookup = await refreshTokenRepo.FindByHashAsync(tokenHash, ct);
+        if (lookup is not null && !ClientOwns(lookup.ClientId, clientId))
+            throw new InvalidOperationException("client_id mismatch");
+
+        var consumed = await refreshTokenRepo.ConsumeAsync(tokenHash, ct);
 
         if (consumed is null)
         {
-            var existing = await refreshTokenRepo.FindByHashAsync(tokenHash, ct);
-            if (existing is not null)
-                await RevokeAllUserTokensAsync(existing.UserId, ct);
+            var reused = await refreshTokenRepo.FindByHashAsync(tokenHash, ct);
+            if (reused is not null)
+                await RevokeAllUserTokensAsync(reused.UserId, ct);
             throw new InvalidOperationException("Invalid refresh token");
         }
 
         if (consumed.ExpiresAt < DateTimeOffset.UtcNow)
             throw new InvalidOperationException("Refresh token expired");
-
-        if (!string.Equals(consumed.ClientId, clientId, StringComparison.Ordinal))
-            throw new InvalidOperationException("client_id mismatch");
 
         var response = await IssueTokenPairAsync(consumed.ClientId, consumed.UserId, consumed.Scope, ct);
 
@@ -167,9 +171,7 @@ internal sealed class OAuthService(
 
         if (accessToken is not null)
         {
-            // RFC 7009 §2.1: if client_id does not match, silently return 200 — do not reveal validity
-            if (!string.Equals(accessToken.ClientId, clientId, StringComparison.Ordinal))
-                return;
+            if (!ClientOwns(accessToken.ClientId, clientId)) return; // RFC 7009 §2.1: silent no-op on mismatch
 
             var now = DateTimeOffset.UtcNow;
             await accessTokenRepo.RevokeByHashAsync(tokenHash, ct);
@@ -188,9 +190,7 @@ internal sealed class OAuthService(
         var refreshToken = await refreshTokenRepo.FindByHashAsync(tokenHash, ct);
         if (refreshToken is not null)
         {
-            // RFC 7009 §2.1: if client_id does not match, silently return 200 — do not reveal validity
-            if (!string.Equals(refreshToken.ClientId, clientId, StringComparison.Ordinal))
-                return;
+            if (!ClientOwns(refreshToken.ClientId, clientId)) return; // RFC 7009 §2.1: silent no-op on mismatch
 
             var now = DateTimeOffset.UtcNow;
             await refreshTokenRepo.RevokeByHashAsync(tokenHash, ct);
@@ -205,6 +205,9 @@ internal sealed class OAuthService(
                 CreatedAt: now), ct);
         }
     }
+
+    private static bool ClientOwns(string storedClientId, string requestedClientId)
+        => string.Equals(storedClientId, requestedClientId, StringComparison.Ordinal);
 
     public async Task RevokeAllUserTokensAsync(string userId, CancellationToken ct)
     {

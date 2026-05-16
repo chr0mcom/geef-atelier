@@ -1,4 +1,5 @@
 using Geef.Atelier.Application.Auth;
+using Geef.Atelier.Application.OAuth;
 using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
@@ -150,7 +151,7 @@ app.Use(async (ctx, next) =>
         {
             var issuer = ctx.RequestServices.GetRequiredService<IOptions<OAuthOptions>>().Value.Issuer;
             ctx.Response.Headers.WWWAuthenticate =
-                $"Bearer resource_metadata={issuer}/.well-known/oauth-protected-resource";
+                $"Bearer resource_metadata=\"{issuer}/.well-known/oauth-protected-resource\"";
         }
         return Task.CompletedTask;
     });

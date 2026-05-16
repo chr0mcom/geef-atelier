@@ -5,7 +5,6 @@
 @using Geef.Atelier.Application.OAuth
 @inject IOAuthService OAuthService
 @inject AuthenticationStateProvider AuthStateProvider
-@inject NavigationManager Nav
 
 <PageTitle>Verbundene Clients — Geef.Atelier</PageTitle>
 
@@ -126,37 +125,29 @@
 
     private async Task RevokeClientAsync(string clientId)
     {
-        _error = null;
+        _confirmRevokeClientId = null;
         try
         {
             await OAuthService.RevokeClientAsync(_userId, clientId, CancellationToken.None);
+            await LoadAsync();
         }
         catch (Exception ex)
         {
             _error = ex.Message;
         }
-        finally
-        {
-            _confirmRevokeClientId = null;
-        }
-        await LoadAsync();
     }
 
     private async Task RevokeAllAsync()
     {
-        _error = null;
+        _confirmRevokeAll = false;
         try
         {
             await OAuthService.RevokeAllUserTokensAsync(_userId, CancellationToken.None);
+            await LoadAsync();
         }
         catch (Exception ex)
         {
             _error = ex.Message;
         }
-        finally
-        {
-            _confirmRevokeAll = false;
-        }
-        await LoadAsync();
     }
 }

@@ -48,7 +48,7 @@ public sealed class McpWwwAuthenticateHeaderTests
                             if (ctx.Request.Path.StartsWithSegments("/mcp") && ctx.Response.StatusCode == 401
                                 && !ctx.Response.Headers.ContainsKey("WWW-Authenticate"))
                                 ctx.Response.Headers.WWWAuthenticate =
-                                    $"Bearer resource_metadata={issuer}/.well-known/oauth-protected-resource";
+                                    $"Bearer resource_metadata=\"{issuer}/.well-known/oauth-protected-resource\"";
                             return Task.CompletedTask;
                         });
                         await next();

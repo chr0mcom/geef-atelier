@@ -179,4 +179,30 @@ public sealed class ConnectedClientsTests : TestContext
         cut.Find("[data-testid='btn-revoke-all']");
         cut.Find("[data-testid='connected-clients-list']");
     }
+
+    [Fact]
+    public async Task ConnectedClients_RevokeClientThrows_ShowsErrorBanner()
+    {
+        SetupServices(new StubOAuthService([MakeClient("c1")], revokeClientThrows: true));
+
+        var cut = RenderComponent<ConnectedClients>();
+
+        cut.Find("[data-testid='btn-revoke-c1']").Click();
+        await cut.Find("[data-testid='btn-confirm-revoke-c1']").ClickAsync(new());
+
+        cut.Find("[data-testid='error-banner']");
+    }
+
+    [Fact]
+    public async Task ConnectedClients_RevokeAllThrows_ShowsErrorBanner()
+    {
+        SetupServices(new StubOAuthService([MakeClient("c1")], revokeAllThrows: true));
+
+        var cut = RenderComponent<ConnectedClients>();
+
+        cut.Find("[data-testid='btn-revoke-all']").Click();
+        await cut.Find("[data-testid='btn-confirm-revoke-all']").ClickAsync(new());
+
+        cut.Find("[data-testid='error-banner']");
+    }
 }

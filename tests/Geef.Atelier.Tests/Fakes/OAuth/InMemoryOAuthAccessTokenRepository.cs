@@ -25,7 +25,8 @@ public sealed class InMemoryOAuthAccessTokenRepository : IOAuthAccessTokenReposi
 
     public Task RevokeByUserIdAsync(string userId, CancellationToken ct)
     {
-        var keys = _store.Where(kv => kv.Value.UserId == userId).Select(kv => kv.Key).ToList();
+        var keys = _store.Where(kv => kv.Value.UserId == userId && kv.Value.RevokedAt is null)
+            .Select(kv => kv.Key).ToList();
         foreach (var k in keys)
             _store[k] = _store[k] with { RevokedAt = DateTimeOffset.UtcNow };
         return Task.CompletedTask;
@@ -34,7 +35,7 @@ public sealed class InMemoryOAuthAccessTokenRepository : IOAuthAccessTokenReposi
     public Task RevokeByClientIdAndUserIdAsync(string clientId, string userId, CancellationToken ct)
     {
         var keys = _store
-            .Where(kv => kv.Value.ClientId == clientId && kv.Value.UserId == userId)
+            .Where(kv => kv.Value.ClientId == clientId && kv.Value.UserId == userId && kv.Value.RevokedAt is null)
             .Select(kv => kv.Key).ToList();
         foreach (var k in keys)
             _store[k] = _store[k] with { RevokedAt = DateTimeOffset.UtcNow };

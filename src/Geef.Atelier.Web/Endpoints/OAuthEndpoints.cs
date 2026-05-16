@@ -63,6 +63,8 @@ public static class OAuthEndpoints
             IOAuthService oauthService,
             CancellationToken ct) =>
         {
+            ctx.Response.Headers.Append("Cache-Control", "no-store"); // RFC 6749 §5.1 MUST
+
             var form      = await ctx.Request.ReadFormAsync(ct);
             var grantType = form["grant_type"].ToString();
 
