@@ -1,6 +1,6 @@
 # MCP-Integration
 
-*Letzte Aktualisierung: 2026-05-11 (Schritt 9 abgeschlossen: SDK-Version, Transport, Auth, Tool-Signaturen verifiziert)*
+*Letzte Aktualisierung: 2026-05-16 (PS-9-Erweiterung: OAuth 2.1 Authorization Server ergänzt, D-041)*
 
 ## Warum MCP
 
@@ -127,11 +127,58 @@ Endpunkt: `POST https://atelier.example.com/mcp` (Pfad `/mcp` ist fest im `MapMc
 
 ## Auth
 
-**Bearer-Token** im `Authorization`-Header. Token wird aus Environment-Variable `ATELIER_MCP_TOKEN` gelesen. Kein Token-Refresh, kein Token-Rotation — ein Token reicht für den Single-User-Betrieb.
+Zwei parallele Auth-Pfade — beide aktiv, kein Config-Schalter nötig:
 
-Umsetzung: `BearerTokenHandler` (Web-Layer) delegiert Validierung an `ITokenValidator` (Application-Layer). Der `/mcp`-Endpoint ist über `RequireAuthorization("McpPolicy")` geschützt, das Bearer-Scheme explizit gesetzt. Damit koexistiert Bearer-Auth sauber mit der Cookie-Auth der Web-UI (Multi-Auth-Schema-Setup, siehe `02-architecture.md`).
+### Pfad A: Statisches Bearer-Token (Claude Code CLI)
 
-Später: OAuth-2.0-Flow nach MCP-Spec — der MCP-Standard definiert das, der C# SDK unterstützt es. Aktivierung erfolgt erst, wenn echter Bedarf entsteht (z.B. wenn mehrere Clients mit unterschiedlichen Berechtigungen anbinden).
+**Bearer-Token** im `Authorization`-Header. Token aus Umgebungsvariable `ATELIER_MCP_TOKEN`. Keine Rotation, kein Refresh. Ausreichend für Single-User-CLI-Betrieb.
+
+```
+Authorization: Bearer <ATELIER_MCP_TOKEN>
+```
+
+### Pfad B: OAuth 2.1 (Claude Desktop / Claude.ai Custom Connectors)
+
+Self-hosted OAuth-2.1-Authorization-Server, direkt in Geef.Atelier implementiert. Unterstützt den vollständigen Authorization-Code-Flow mit Pflicht-PKCE/S256.
+
+**Relevante Spezifikationen:** RFC 8414 (Metadata), RFC 7591 (Dynamic Client Registration), RFC 7636 (PKCE), RFC 7009 (Revocation), RFC 8252 (Loopback).
+
+**Endpunkte:**
+
+| Endpunkt | Methode | Zweck |
+|----------|---------|-------|
+| `/.well-known/oauth-authorization-server` | GET | RFC 8414 Server Metadata |
+| `/.well-known/oauth-protected-resource` | GET | MCP Resource Metadata |
+| `/oauth/register` | POST | RFC 7591 Dynamic Client Registration |
+| `/oauth/authorize` | GET/POST | Authorization-Code-Flow + Consent |
+| `/oauth/token` | POST | Token-Endpoint (authorization_code + refresh_token) |
+| `/oauth/revoke` | POST | RFC 7009 Token-Revocation |
+| `/account/connected-clients` | GET | Verwaltung verbundener Clients (UI) |
+
+**Flow:**
+
+```
+1. Client → GET /.well-known/oauth-authorization-server  (Discovery)
+2. Client → POST /oauth/register                         (Dynamic Client Registration)
+3. Client → GET /oauth/authorize?...&code_challenge=...  (→ Browser-Login + Consent)
+4. Nutzer genehmigt → Browser-Redirect zurück mit ?code=...
+5. Client → POST /oauth/token (code + code_verifier)     (Token-Exchange)
+6. Client → MCP-Request mit Bearer <access_token>
+7. Client → POST /oauth/token (refresh_token)            (Refresh-Rotation, optional)
+8. Client → POST /oauth/revoke                           (Revocation, optional)
+```
+
+**Token-Design:** Opaque Tokens (32-Byte-Zufallsstring, Base64Url). Nur SHA-256-Hash in DB. Access-Token: 1 Stunde. Refresh-Token: 30 Tage, Rotation bei jedem Refresh.
+
+**Sicherheit:**
+- Alle geheimen Vergleiche via `CryptographicOperations.FixedTimeEquals`
+- Token-Generierung ausschließlich `RandomNumberGenerator.GetBytes(32)`
+- PKCE S256 erzwungen — `plain` abgelehnt
+- Refresh-Reuse-Detection: verbrauchtes Refresh-Token → sofortige Revocation aller User-Tokens
+
+### Kompatibilität
+
+`CompositeTokenValidator` prüft beide Pfade — statisches Token zuerst. Claude Code CLI-Requests mit `ATELIER_MCP_TOKEN` erreichen den OAuth-Pfad nie. Beide Pfade koexistieren ohne Konfigurationsänderung.
 
 ## Beziehung zu Web-UI
 
@@ -150,28 +197,30 @@ Im Skeleton läuft der MCP-Server **als Teil derselben ASP.NET-Anwendung** wie d
 
 ## Discovery und Konfiguration
 
-MCP-Clients (Claude Desktop etc.) erfahren von Geef.Atelier durch lokale Konfigurations-Datei. Beispiel-Eintrag für Claude Desktop:
+### Claude Code CLI (statisches Token)
 
 ```json
 {
   "mcpServers": {
     "geef-atelier": {
-      "url": "https://atelier.example.com/mcp",
+      "url": "https://geef.stefan-bechtel.de/mcp",
       "transport": "streamable-http",
       "auth": {
         "type": "bearer",
-        "token": "your-token-here"
+        "token": "<ATELIER_MCP_TOKEN>"
       }
     }
   }
 }
 ```
 
-Die genaue Syntax hängt vom MCP-Client ab — Claude Desktop, Claude Code und Custom-Clients haben jeweils eigene Konfigurationsformate, aber das Prinzip ist überall gleich.
+### Claude Desktop / Claude.ai Custom Connector (OAuth)
 
-## Nicht im Skeleton
+URL `https://geef.stefan-bechtel.de/mcp` eingeben — der Client erkennt `WWW-Authenticate: Bearer resource_metadata=".../.well-known/oauth-protected-resource"` und startet den OAuth-Flow automatisch (Dynamic Client Registration → Browser-Login → Consent → Token-Exchange).
 
-- OAuth-2.0-Auth (Bearer-Token reicht erstmal)
+## Nicht im Scope
+
 - Rate-Limiting (Single-User, kein Bedarf)
-- Mehrere Token mit unterschiedlichen Berechtigungen
-- Audit-Log MCP-spezifischer Aufrufe (alles läuft eh in den Events der Runs auf, das reicht)
+- Mehrere Scopes / feingranulare Berechtigungen (nur `mcp:full`)
+- JWTs / OpenID Connect (Opaque Tokens + DB-Lookup ist ausreichend)
+- Multi-Tenant

@@ -1,6 +1,6 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 2026-05-14 (Template-Studio: D-038 ergänzt)*
+*Letzte Aktualisierung: 2026-05-16 (MCP-OAuth: D-041 ergänzt)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -724,3 +724,42 @@ Auto-Run nach Materialization, Studio-Iterationen, Cost-Budget-Alerts, Bulk-Expo
 **D-040/6 — NavMenu-Eintrag:** Einziger Grounding-Providers-NavLink im NavMenu. Reviewer/Executor/Advisor haben keine NavMenu-Einträge (nur via `/crew`-Dashboard erreichbar). Diese Asymmetrie ist bewusst (Spec-AC #12 explizit). Empfehlung Folge-Step: Crew-Profile-Sektion im NavMenu oder alle vier Typen gleich behandeln.
 
 **Lehre (Ursprung der Lücke):** Die Grounding-Provider-CRUD-Pages wurden beim Tavily-Step (D-035) korrekt mitimplementiert — aber ohne CrewIndex-Dashboard-Eintrag, ohne bUnit-UI-Tests und ohne Routen-Schema-Alignment auf die Spec. Kein Page-Code wurde vergessen; die organisatorische Lücke lag in fehlenden Routen-Konventionen und Test-Coverage.
+
+---
+
+## 16. Mai 2026 — MCP OAuth 2.1 Authorization Server (PS-9-Erweiterung)
+
+### D-041: Self-hosted OAuth 2.1 AS für Claude Desktop / Claude.ai Custom Connectors
+
+**Datum:** 16. Mai 2026
+**Bericht:** [reports/feature-mcp-oauth-report.md](reports/feature-mcp-oauth-report.md)
+**Branch:** `feat/mcp-oauth` → PR gegen `main`
+**Reviewer-Iterationen:** 9 (Iteration 9: alle fünf R1–R5 mit 0 Findings)
+**Tests:** 803 grün (+ 1 bekannter E2E-Flake-Skip), 92 neue OAuth-Tests. **14 Conventional-Commits.**
+
+**Kontext:** Claude Code CLI funktioniert mit statischem Bearer-Token (`ATELIER_MCP_TOKEN`). Claude Desktop Custom Connectors und Claude.ai Web Custom Connectors sprechen ausschließlich OAuth — statisches Bearer-Token reicht dort nicht. Ziel: self-hosted minimaler OAuth-2.1-Authorization-Server, der neben dem statischen Auth weiterläuft.
+
+**Kernentscheidungen:**
+
+**D-041/1 — Self-hosted AS statt externem IdP:** OAuth-2.1-AS direkt in Geef.Atelier implementiert (kein Keycloak, Auth0 etc.). Begründung: Single-User-Kontext, kein Deployment-Overhead, volle Kontrolle über Token-Lebenszyklus. Scope ausschließlich `mcp:full` (kein Multi-Scope-Design).
+
+**D-041/2 — Opaque Tokens + SHA-256 statt JWT:** Tokens sind kryptografisch zufällige 32-Byte-Strings (Base64Url), in der DB ausschließlich als SHA-256-Hash gespeichert (`RandomNumberGenerator.GetBytes(32)`). Vorteil: kein JWKS-Endpoint, keine asymmetrische Kryptographie-Infrastruktur, Token-Revocation einfach (Hash in DB markieren), keine Tokengröße im HTTP-Header.
+
+**D-041/3 — PKCE strikt S256, kein `plain`:** `code_challenge_method=plain` wird abgelehnt. Authorization-Server erzwingt S256 per `string.Equals(..., StringComparison.Ordinal)`-Check. Public Clients (keine Client-Secrets) — `token_endpoint_auth_method=none`.
+
+**D-041/4 — Loopback-Sonderregel (RFC 8252):** Redirect-URIs werden exakt verglichen. Ausnahme: `http://127.0.0.1`-URIs erlauben beliebigen Port (RFC 8252 §7.3). Nie auf andere Hosts angewandt. `localhost` wird nicht als Loopback behandelt (nur `127.0.0.1`).
+
+**D-041/5 — Refresh-Token-Rotation + Reuse-Detection:** Jeder Token-Refresh gibt ein neues Paar (Access + Refresh) aus und invalidiert den alten Refresh-Token atomisch via SQL `UPDATE WHERE UsedAt IS NULL`. Erneuter Einsatz eines bereits verbrauchten Refresh-Tokens (Diebstahl-Indikator per RFC 6819) löst sofortige Revocation aller aktiven Tokens des Users aus (`RevokeAllUserTokensAsync`).
+
+**D-041/6 — Endpoint-Mapping Minimal-API + Razor-Consent:** Maschinelle OAuth-Endpoints als Minimal-API-Extensions (`OAuthEndpoints.cs`, `WellKnownEndpoints.cs`) — kein MVC-Stack. `GET /oauth/authorize` als Razor-Page (`OAuthAuthorize.razor`, `@attribute [Authorize]`, Static SSR) — nutzt bestehende Cookie-Auth + Return-URL-Mechanismus von `Login.razor` ohne zusätzliches Plumbing.
+
+**D-041/7 — `ITokenValidator` evolviert zu `TokenValidationOutcome`:** Interface-Result erweitert von `bool` auf `TokenValidationOutcome { IsValid, Kind, Subject, ClientId, Scope }`. `StaticTokenValidator` → `Kind="static-bearer"` (Verhalten identisch). `OAuthAccessTokenValidator` neu. `CompositeTokenValidator` als neue `ITokenValidator`-Registrierung: erst statisch, dann OAuth. `BearerTokenHandler` baut Claims aus Outcome. Backwards-Compat: statischer Pfad bit-identisch zu vorher.
+
+**D-041/8 — Backwards-Compat Claude Code CLI:** `ATELIER_MCP_TOKEN` weiterhin voll funktional. `CompositeTokenValidator` prüft statisches Token zuerst — Claude Code CLI-Requests passieren den OAuth-Pfad nie. Beide Auth-Pfade koexistieren ohne Konfigurationsänderung.
+
+**D-041/9 — Audit-Log + Cleanup-BackgroundService:** Alle relevanten OAuth-Operationen schreiben `OAuthAuditLogEntry` (5 Tabellen, Migration `Step19McpOAuth`). `OAuthCleanupBackgroundService` löscht abgelaufene Auth-Codes und Access-/Refresh-Tokens; Audit-Log bleibt permanent (Forensik).
+
+**Akzeptierte Abweichungen vom Blueprint (dokumentiert in `geef_architecture.md`):**
+- `token_type_hint` in Revocation: SHOULD laut RFC 7009, nicht implementiert (akzeptiert)
+- `scopes_supported` im Metadata-Endpoint: String statt Array (akzeptiert, da nur ein Scope)
+- TOCTOU-Fenster zwischen `FindByXxxAsync` und `ConsumeAsync`: kein exploitbares Sicherheitsproblem (atomare `ConsumeAsync`-Implementierung via `UPDATE WHERE UsedAt IS NULL`; akzeptiert)
