@@ -41,7 +41,7 @@ public static class OAuthEndpoints
             if (string.IsNullOrWhiteSpace(body.ClientName))
                 return Results.Json(new { error = "invalid_client_metadata", error_description = "client_name is required" }, statusCode: 400);
 
-            var request = new ClientRegistrationRequest(body.ClientName, body.RedirectUris, body.LogoUri, body.ClientUri);
+            var request = new ClientRegistrationRequest(body.ClientName, body.RedirectUris, body.LogoUri, body.ClientUri, body.ClientId);
             var result  = await oauthService.RegisterClientAsync(request, ct);
 
             ctx.Response.Headers.Location = $"/oauth/register/{result.ClientId}";
@@ -214,6 +214,7 @@ public static class OAuthEndpoints
         [property: JsonPropertyName("client_name")]    string? ClientName,
         [property: JsonPropertyName("redirect_uris")]  IReadOnlyList<string>? RedirectUris,
         [property: JsonPropertyName("logo_uri")]       string? LogoUri,
-        [property: JsonPropertyName("client_uri")]     string? ClientUri
+        [property: JsonPropertyName("client_uri")]     string? ClientUri,
+        [property: JsonPropertyName("client_id")]      string? ClientId
     );
 }

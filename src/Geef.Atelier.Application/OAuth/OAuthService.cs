@@ -18,7 +18,9 @@ internal sealed class OAuthService(
     public async Task<ClientRegistrationResult> RegisterClientAsync(ClientRegistrationRequest request, CancellationToken ct)
     {
         var now      = DateTimeOffset.UtcNow;
-        var clientId = OAuthCrypto.GenerateToken();
+        var clientId = string.IsNullOrWhiteSpace(request.ClientId)
+            ? OAuthCrypto.GenerateToken()
+            : request.ClientId.Trim();
         var client   = new OAuthClient(
             ClientId: clientId,
             ClientName: request.ClientName,

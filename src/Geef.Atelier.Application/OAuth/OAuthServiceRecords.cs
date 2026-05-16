@@ -6,7 +6,8 @@ public sealed record ClientRegistrationRequest(
     string ClientName,
     IReadOnlyList<string> RedirectUris,
     string? LogoUri,
-    string? ClientUri
+    string? ClientUri,
+    string? ClientId = null
 );
 
 public sealed record ClientRegistrationResult(
