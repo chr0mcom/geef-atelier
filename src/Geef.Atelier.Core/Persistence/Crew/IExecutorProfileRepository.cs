@@ -20,6 +20,13 @@ public interface IExecutorProfileRepository
     /// <summary>Updates an existing custom executor profile identified by <see cref="ExecutorProfile.Name"/>.</summary>
     Task UpdateAsync(ExecutorProfile profile, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Renames a custom executor profile from <paramref name="oldName"/> to <paramref name="newName"/>,
+    /// cascading the change into the <c>ExecutorProfileName</c> of every custom crew template that
+    /// references it. Atomic. Throws if the profile does not exist in the database.
+    /// </summary>
+    Task RenameAsync(string oldName, string newName, CancellationToken cancellationToken = default);
+
     /// <summary>Deletes the custom executor profile with the given name. Throws if the profile does not exist in the database.</summary>
     Task DeleteAsync(string name, CancellationToken cancellationToken = default);
 }

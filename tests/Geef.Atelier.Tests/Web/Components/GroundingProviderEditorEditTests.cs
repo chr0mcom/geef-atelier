@@ -23,7 +23,7 @@ public sealed class GroundingProviderEditorEditTests : TestContext
             MaxQueriesPerRun: 2, IsSystem: isSystem);
 
     [Fact]
-    public void EditMode_NameInputIsDisabled()
+    public void EditMode_NameInputIsEditable()
     {
         var profile = MakeGrounding("custom-tavily-adv", isSystem: false);
         Services.AddSingleton<ICrewService>(new StubCrewService(profile));
@@ -33,7 +33,7 @@ public sealed class GroundingProviderEditorEditTests : TestContext
         var cut = RenderComponent<GroundingProviderEditor>(p => p.Add(c => c.Name, "custom-tavily-adv"));
 
         var nameInput = cut.Find("[data-testid='input-name']");
-        Assert.NotNull(nameInput.GetAttribute("disabled"));
+        Assert.Null(nameInput.GetAttribute("disabled"));
     }
 
     [Fact]
@@ -138,6 +138,11 @@ public sealed class GroundingProviderEditorEditTests : TestContext
         public Task<CrewTemplate> CreateCustomCrewTemplateAsync(CrewTemplate t, CancellationToken ct = default) => Task.FromResult(t);
         public Task<CrewTemplate> UpdateCustomCrewTemplateAsync(CrewTemplate t, CancellationToken ct = default) => Task.FromResult(t);
         public Task DeleteCustomCrewTemplateAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<string> RenameCustomReviewerProfileAsync(string oldName, string newName, CancellationToken ct = default) => Task.FromResult(newName);
+        public Task<string> RenameCustomExecutorProfileAsync(string oldName, string newName, CancellationToken ct = default) => Task.FromResult(newName);
+        public Task<string> RenameCustomAdvisorProfileAsync(string oldName, string newName, CancellationToken ct = default) => Task.FromResult(newName);
+        public Task<string> RenameCustomGroundingProviderProfileAsync(string oldName, string newName, CancellationToken ct = default) => Task.FromResult(newName);
+        public Task<string> RenameCustomCrewTemplateAsync(string oldName, string newName, CancellationToken ct = default) => Task.FromResult(newName);
         public Task<CrewSnapshot> ResolveSnapshotAsync(string? name, CrewSpec? spec, CancellationToken ct = default)
             => Task.FromResult(new CrewSnapshot(1, "klassik", SystemCrew.DefaultExecutorProfile, [], EvaluationStrategy.Parallel, null, []));
     }

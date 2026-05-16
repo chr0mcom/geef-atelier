@@ -47,6 +47,22 @@ internal sealed class AdvisorProfileRepository(AtelierDbContext db) : IAdvisorPr
     }
 
     /// <inheritdoc/>
+    public async Task RenameAsync(string oldName, string newName, CancellationToken cancellationToken = default)
+    {
+        if (SystemCrew.IsSystemAdvisorName(oldName) || SystemCrew.IsSystemAdvisorName(newName))
+            throw new InvalidOperationException("System advisor profiles cannot be renamed.");
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+        var affected = await db.AdvisorProfiles
+            .Where(a => a.Name == oldName)
+            .ExecuteUpdateAsync(s => s.SetProperty(a => a.Name, newName), cancellationToken);
+        if (affected == 0)
+            throw new InvalidOperationException($"Advisor profile '{oldName}' not found in the database.");
+        await CrewTemplateCascade.RenameListRefAsync(
+            db, CrewTemplateCascade.ListRef.Advisor, oldName, newName, cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+    }
+
+    /// <inheritdoc/>
     public async Task DeleteAsync(string name, CancellationToken cancellationToken = default)
     {
         if (SystemCrew.IsSystemAdvisorName(name))

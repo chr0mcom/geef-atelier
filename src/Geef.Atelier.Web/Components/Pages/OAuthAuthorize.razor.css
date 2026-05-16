@@ -1,7 +1,7 @@
 .auth-card {
     width: 100%;
     max-width: 420px;
-    margin: 0 auto;
+    margin: auto;
     background: var(--surface);
     border: 1px solid var(--hairline-soft);
     border-radius: 8px;

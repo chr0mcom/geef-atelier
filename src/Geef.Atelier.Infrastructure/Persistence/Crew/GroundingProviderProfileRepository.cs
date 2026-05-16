@@ -29,6 +29,19 @@ internal sealed class GroundingProviderProfileRepository(AtelierDbContext db) : 
         return profile;
     }
 
+    public async Task RenameAsync(string oldName, string newName, CancellationToken ct)
+    {
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var affected = await db.GroundingProviderProfiles
+            .Where(p => p.Name == oldName)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Name, newName), ct);
+        if (affected == 0)
+            throw new InvalidOperationException($"Grounding-provider profile '{oldName}' not found.");
+        await CrewTemplateCascade.RenameListRefAsync(
+            db, CrewTemplateCascade.ListRef.Grounding, oldName, newName, ct);
+        await tx.CommitAsync(ct);
+    }
+
     public async Task DeleteAsync(string name, CancellationToken ct)
     {
         var existing = await db.GroundingProviderProfiles.FirstOrDefaultAsync(p => p.Name == name, ct)

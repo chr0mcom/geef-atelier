@@ -39,8 +39,8 @@
 
             <div class="field">
                 <label>Name</label>
-                <InputText @bind-Value="_form.Name" disabled="@(!IsNew)" placeholder="my-template" />
-                @if (IsNew && !string.IsNullOrEmpty(_form.Name))
+                <InputText @bind-Value="_form.Name" disabled="@_isSystem" placeholder="my-template" />
+                @if (!_isSystem && !string.IsNullOrEmpty(_form.Name))
                 {
                     <small>Will be saved as: custom-@_form.Name.TrimStart("custom-".ToCharArray())</small>
                 }
@@ -210,9 +210,15 @@
         {
             var template = _form.ToTemplate(ConvergenceOpts.Value);
             if (IsNew)
+            {
                 await CrewService.CreateCustomCrewTemplateAsync(template);
+            }
             else
+            {
+                if (template.Name != Name)
+                    await CrewService.RenameCustomCrewTemplateAsync(Name!, template.Name);
                 await CrewService.UpdateCustomCrewTemplateAsync(template);
+            }
             Nav.NavigateTo("/crew/templates");
         }
         catch (Exception ex)

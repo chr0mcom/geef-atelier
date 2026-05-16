@@ -43,6 +43,20 @@ internal sealed class ReviewerProfileRepository(AtelierDbContext db) : IReviewer
     }
 
     /// <inheritdoc/>
+    public async Task RenameAsync(string oldName, string newName, CancellationToken cancellationToken = default)
+    {
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+        var affected = await db.ReviewerProfiles
+            .Where(r => r.Name == oldName)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Name, newName), cancellationToken);
+        if (affected == 0)
+            throw new InvalidOperationException($"Reviewer profile '{oldName}' not found in the database.");
+        await CrewTemplateCascade.RenameListRefAsync(
+            db, CrewTemplateCascade.ListRef.Reviewer, oldName, newName, cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+    }
+
+    /// <inheritdoc/>
     public async Task DeleteAsync(string name, CancellationToken cancellationToken = default)
     {
         var affected = await db.ReviewerProfiles

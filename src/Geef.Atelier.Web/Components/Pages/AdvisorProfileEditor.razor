@@ -118,9 +118,15 @@
                 IsSystem: false);
 
             if (IsNew)
+            {
                 await CrewService.CreateCustomAdvisorProfileAsync(profile);
+            }
             else
+            {
+                if (profile.Name != Name)
+                    await CrewService.RenameCustomAdvisorProfileAsync(Name!, profile.Name);
                 await CrewService.UpdateCustomAdvisorProfileAsync(profile);
+            }
 
             Nav.NavigateTo("/crew/profiles/advisors");
         }

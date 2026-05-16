@@ -20,6 +20,13 @@ public interface IAdvisorProfileRepository
     /// <summary>Updates an existing custom advisor profile identified by <see cref="AdvisorProfile.Name"/>.</summary>
     Task UpdateAsync(AdvisorProfile profile, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Renames a custom advisor profile from <paramref name="oldName"/> to <paramref name="newName"/>,
+    /// cascading the change into the <c>AdvisorProfileNames</c> list of every custom crew template
+    /// that references it. Atomic. Throws if the profile does not exist in the database.
+    /// </summary>
+    Task RenameAsync(string oldName, string newName, CancellationToken cancellationToken = default);
+
     /// <summary>Deletes the custom advisor profile with the given name. Throws if the profile does not exist in the database.</summary>
     Task DeleteAsync(string name, CancellationToken cancellationToken = default);
 }

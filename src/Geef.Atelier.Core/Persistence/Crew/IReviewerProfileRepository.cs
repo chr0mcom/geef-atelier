@@ -20,6 +20,13 @@ public interface IReviewerProfileRepository
     /// <summary>Updates an existing custom reviewer profile identified by <see cref="ReviewerProfile.Name"/>.</summary>
     Task UpdateAsync(ReviewerProfile profile, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Renames a custom reviewer profile from <paramref name="oldName"/> to <paramref name="newName"/>,
+    /// cascading the change into the <c>ReviewerProfileNames</c> list of every custom crew template
+    /// that references it. Atomic. Throws if the profile does not exist in the database.
+    /// </summary>
+    Task RenameAsync(string oldName, string newName, CancellationToken cancellationToken = default);
+
     /// <summary>Deletes the custom reviewer profile with the given name. Throws if the profile does not exist in the database.</summary>
     Task DeleteAsync(string name, CancellationToken cancellationToken = default);
 }

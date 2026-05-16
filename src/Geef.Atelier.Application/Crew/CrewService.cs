@@ -50,6 +50,13 @@ internal sealed class CrewService(
         return reviewerRepo.DeleteAsync(name, cancellationToken);
     }
 
+    public Task<string> RenameCustomReviewerProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default)
+        => RenameAsync(
+            oldName, newName, ReadOnlyMessage,
+            SystemCrew.IsSystemName,
+            n => reviewerRepo.GetByNameAsync(n, cancellationToken),
+            (o, n) => reviewerRepo.RenameAsync(o, n, cancellationToken));
+
     // --- Executor profiles ---
 
     public Task<IReadOnlyList<ExecutorProfile>> ListExecutorProfilesAsync(bool includeSystem = true, CancellationToken cancellationToken = default)
@@ -81,6 +88,13 @@ internal sealed class CrewService(
             throw new InvalidOperationException(ReadOnlyMessage);
         return executorRepo.DeleteAsync(name, cancellationToken);
     }
+
+    public Task<string> RenameCustomExecutorProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default)
+        => RenameAsync(
+            oldName, newName, ReadOnlyMessage,
+            SystemCrew.IsSystemName,
+            n => executorRepo.GetByNameAsync(n, cancellationToken),
+            (o, n) => executorRepo.RenameAsync(o, n, cancellationToken));
 
     // --- Advisor profiles ---
 
@@ -115,6 +129,13 @@ internal sealed class CrewService(
             throw new InvalidOperationException(ReadOnlyAdvisorMessage);
         return advisorRepo.DeleteAsync(name, cancellationToken);
     }
+
+    public Task<string> RenameCustomAdvisorProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default)
+        => RenameAsync(
+            oldName, newName, ReadOnlyAdvisorMessage,
+            SystemCrew.IsSystemAdvisorName,
+            n => advisorRepo.GetByNameAsync(n, cancellationToken),
+            (o, n) => advisorRepo.RenameAsync(o, n, cancellationToken));
 
     // --- Grounding-provider profiles ---
 
@@ -164,6 +185,13 @@ internal sealed class CrewService(
         return groundingRepo.DeleteAsync(name, cancellationToken);
     }
 
+    public Task<string> RenameCustomGroundingProviderProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default)
+        => RenameAsync(
+            oldName, newName, ReadOnlyGroundingMessage,
+            SystemCrew.IsSystemGroundingProviderName,
+            n => GetGroundingProviderProfileAsync(n, cancellationToken),
+            (o, n) => groundingRepo.RenameAsync(o, n, cancellationToken));
+
     // --- Crew templates ---
 
     public Task<IReadOnlyList<CrewTemplate>> ListCrewTemplatesAsync(bool includeSystem = true, CancellationToken cancellationToken = default)
@@ -196,6 +224,13 @@ internal sealed class CrewService(
         return templateRepo.DeleteAsync(name, cancellationToken);
     }
 
+    public Task<string> RenameCustomCrewTemplateAsync(string oldName, string newName, CancellationToken cancellationToken = default)
+        => RenameAsync(
+            oldName, newName, ReadOnlyTemplateMessage,
+            SystemCrew.IsSystemName,
+            n => templateRepo.GetByNameAsync(n, cancellationToken),
+            (o, n) => templateRepo.RenameAsync(o, n, cancellationToken));
+
     // --- Helpers ---
 
     private static async Task<string> UniqueNameAsync<T>(string baseName, Func<string, Task<T?>> existsCheck) where T : class
@@ -208,6 +243,34 @@ internal sealed class CrewService(
             if (await existsCheck(candidate) is null)
                 return candidate;
         }
+    }
+
+    /// <summary>
+    /// Shared rename pipeline: rejects system entries, enforces the <c>custom-</c> prefix on the
+    /// target, fails on an already-used name (an explicit rename should not silently de-duplicate),
+    /// then delegates the atomic rename-and-cascade to the repository. Returns the final name.
+    /// </summary>
+    private static async Task<string> RenameAsync<T>(
+        string oldName,
+        string newName,
+        string readOnlyMessage,
+        Func<string, bool> isSystem,
+        Func<string, Task<T?>> lookup,
+        Func<string, string, Task> repoRename) where T : class
+    {
+        if (isSystem(oldName))
+            throw new InvalidOperationException(readOnlyMessage);
+        if (string.IsNullOrWhiteSpace(newName))
+            throw new InvalidOperationException("A name is required.");
+
+        var finalName = SystemCrew.EnsureCustomPrefix(newName.Trim());
+        if (finalName == oldName)
+            return oldName;
+        if (await lookup(finalName) is not null)
+            throw new InvalidOperationException($"The name '{finalName}' is already in use.");
+
+        await repoRename(oldName, finalName);
+        return finalName;
     }
 
     // --- Snapshot ---

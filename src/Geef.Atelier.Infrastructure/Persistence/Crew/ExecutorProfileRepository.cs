@@ -43,6 +43,19 @@ internal sealed class ExecutorProfileRepository(AtelierDbContext db) : IExecutor
     }
 
     /// <inheritdoc/>
+    public async Task RenameAsync(string oldName, string newName, CancellationToken cancellationToken = default)
+    {
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+        var affected = await db.ExecutorProfiles
+            .Where(e => e.Name == oldName)
+            .ExecuteUpdateAsync(s => s.SetProperty(e => e.Name, newName), cancellationToken);
+        if (affected == 0)
+            throw new InvalidOperationException($"Executor profile '{oldName}' not found in the database.");
+        await CrewTemplateCascade.RenameExecutorRefAsync(db, oldName, newName, cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+    }
+
+    /// <inheritdoc/>
     public async Task DeleteAsync(string name, CancellationToken cancellationToken = default)
     {
         var affected = await db.ExecutorProfiles

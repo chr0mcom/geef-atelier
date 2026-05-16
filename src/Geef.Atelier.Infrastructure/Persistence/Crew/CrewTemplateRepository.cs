@@ -42,6 +42,19 @@ internal sealed class CrewTemplateRepository(AtelierDbContext db) : ICrewTemplat
     }
 
     /// <inheritdoc/>
+    public async Task RenameAsync(string oldName, string newName, CancellationToken cancellationToken = default)
+    {
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
+        var affected = await db.CrewTemplates
+            .Where(t => t.Name == oldName)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.Name, newName), cancellationToken);
+        if (affected == 0)
+            throw new InvalidOperationException($"Crew template '{oldName}' not found in the database.");
+        await CrewTemplateCascade.RenameRunTemplateRefAsync(db, oldName, newName, cancellationToken);
+        await tx.CommitAsync(cancellationToken);
+    }
+
+    /// <inheritdoc/>
     public async Task DeleteAsync(string name, CancellationToken cancellationToken = default)
     {
         var affected = await db.CrewTemplates

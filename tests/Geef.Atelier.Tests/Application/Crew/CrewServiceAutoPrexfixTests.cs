@@ -120,6 +120,7 @@ public sealed class CrewServiceAutoPrexfixTests
         public Task CreateAsync(ReviewerProfile profile, CancellationToken ct = default) { _store.Add(profile); return Task.CompletedTask; }
         public Task UpdateAsync(ReviewerProfile profile, CancellationToken ct = default) { var i = _store.FindIndex(r => r.Name == profile.Name); if (i >= 0) _store[i] = profile; return Task.CompletedTask; }
         public Task DeleteAsync(string name, CancellationToken ct = default) { _store.RemoveAll(r => r.Name == name); return Task.CompletedTask; }
+        public Task RenameAsync(string oldName, string newName, CancellationToken ct = default) { var i = _store.FindIndex(x => x.Name == oldName); if (i >= 0) _store[i] = _store[i] with { Name = newName }; return Task.CompletedTask; }
     }
 
     private sealed class InMemoryExecutorProfileRepository : IExecutorProfileRepository
@@ -143,6 +144,7 @@ public sealed class CrewServiceAutoPrexfixTests
         public Task CreateAsync(ExecutorProfile profile, CancellationToken ct = default) { _store.Add(profile); return Task.CompletedTask; }
         public Task UpdateAsync(ExecutorProfile profile, CancellationToken ct = default) { var i = _store.FindIndex(r => r.Name == profile.Name); if (i >= 0) _store[i] = profile; return Task.CompletedTask; }
         public Task DeleteAsync(string name, CancellationToken ct = default) { _store.RemoveAll(r => r.Name == name); return Task.CompletedTask; }
+        public Task RenameAsync(string oldName, string newName, CancellationToken ct = default) { var i = _store.FindIndex(x => x.Name == oldName); if (i >= 0) _store[i] = _store[i] with { Name = newName }; return Task.CompletedTask; }
     }
 
     private sealed class InMemoryCrewTemplateRepository : ICrewTemplateRepository
@@ -166,6 +168,7 @@ public sealed class CrewServiceAutoPrexfixTests
         public Task CreateAsync(CrewTemplate template, CancellationToken ct = default) { _store.Add(template); return Task.CompletedTask; }
         public Task UpdateAsync(CrewTemplate template, CancellationToken ct = default) { var i = _store.FindIndex(t => t.Name == template.Name); if (i >= 0) _store[i] = template; return Task.CompletedTask; }
         public Task DeleteAsync(string name, CancellationToken ct = default) { _store.RemoveAll(t => t.Name == name); return Task.CompletedTask; }
+        public Task RenameAsync(string oldName, string newName, CancellationToken ct = default) { var i = _store.FindIndex(x => x.Name == oldName); if (i >= 0) _store[i] = _store[i] with { Name = newName }; return Task.CompletedTask; }
     }
 
     private sealed class InMemoryAdvisorProfileRepository : IAdvisorProfileRepository
@@ -189,6 +192,7 @@ public sealed class CrewServiceAutoPrexfixTests
         public Task CreateAsync(AdvisorProfile profile, CancellationToken ct = default) { _store.Add(profile); return Task.CompletedTask; }
         public Task UpdateAsync(AdvisorProfile profile, CancellationToken ct = default) { var i = _store.FindIndex(a => a.Name == profile.Name); if (i >= 0) _store[i] = profile; return Task.CompletedTask; }
         public Task DeleteAsync(string name, CancellationToken ct = default) { _store.RemoveAll(a => a.Name == name); return Task.CompletedTask; }
+        public Task RenameAsync(string oldName, string newName, CancellationToken ct = default) { var i = _store.FindIndex(x => x.Name == oldName); if (i >= 0) _store[i] = _store[i] with { Name = newName }; return Task.CompletedTask; }
     }
 
     private sealed class InMemoryGroundingProviderProfileRepository : IGroundingProviderProfileRepository
@@ -204,5 +208,6 @@ public sealed class CrewServiceAutoPrexfixTests
         public Task<GroundingProviderProfile> CreateAsync(GroundingProviderProfile profile, CancellationToken ct = default) { _store.Add(profile); return Task.FromResult(profile); }
         public Task<GroundingProviderProfile> UpdateAsync(GroundingProviderProfile profile, CancellationToken ct = default) { var i = _store.FindIndex(g => g.Name == profile.Name); if (i >= 0) _store[i] = profile; return Task.FromResult(profile); }
         public Task DeleteAsync(string name, CancellationToken ct = default) { _store.RemoveAll(g => g.Name == name); return Task.CompletedTask; }
+        public Task RenameAsync(string oldName, string newName, CancellationToken ct = default) { var i = _store.FindIndex(x => x.Name == oldName); if (i >= 0) _store[i] = _store[i] with { Name = newName }; return Task.CompletedTask; }
     }
 }

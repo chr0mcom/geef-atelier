@@ -36,7 +36,7 @@
 
             <div class="form-row">
                 <label>Name (slug)</label>
-                <InputText @bind-Value="_form.Name" disabled="@(!IsNew)" class="form-input" placeholder="legal-docs-search" data-testid="input-name" />
+                <InputText @bind-Value="_form.Name" class="form-input" placeholder="legal-docs-search" data-testid="input-name" />
                 <ValidationMessage For="() => _form.Name" />
                 <small class="form-hint">Saved as <code>custom-…</code>. Lowercase letters, numbers, and hyphens only.</small>
             </div>
@@ -188,9 +188,15 @@
         {
             var profile = _form.ToProfile();
             if (IsNew)
+            {
                 await CrewService.CreateCustomGroundingProviderProfileAsync(profile);
+            }
             else
+            {
+                if (profile.Name != Name)
+                    await CrewService.RenameCustomGroundingProviderProfileAsync(Name!, profile.Name);
                 await CrewService.UpdateCustomGroundingProviderProfileAsync(profile);
+            }
             Nav.NavigateTo("/crew/profiles/grounding-providers");
         }
         catch (Exception ex)

@@ -34,8 +34,8 @@
             @if (_isAdmin)
             {
                 <label class="admin-toggle">
-                    <input type="checkbox" @bind="_showSystemStats" @bind:after="LoadStatsAsync" />
-                    System-weite Statistiken anzeigen
+                    <input type="checkbox" @bind="_showAll" @bind:after="LoadAdminViewAsync" />
+                    Alle Benutzer / system-weit anzeigen
                 </label>
             }
             <div class="stat-tile" data-testid="stat-runs-this-month">
@@ -106,7 +106,7 @@
     string _greeting = string.Empty;
     bool _isAdmin;
     string? _currentUsername;
-    bool _showSystemStats;
+    bool _showAll;
 
     protected override async Task OnInitializedAsync()
     {
@@ -114,16 +114,17 @@
         _isAdmin         = auth.User.IsInRole("admin");
         _currentUsername = auth.User.Identity?.Name;
 
-        var username = _isAdmin ? null : _currentUsername;
-        _recentRuns = await RunService.ListRunsAsync(5, requestingUsername: username);
-        await LoadStatsAsync();
+        await LoadAdminViewAsync();
         _greeting   = DateTime.Now.ToString("dddd · HH:mm");
     }
 
-    async Task LoadStatsAsync()
+    // Admin defaults to their own view; the toggle opts into the system-wide /
+    // all-users view for both the recent-runs list and the stats tiles at once.
+    async Task LoadAdminViewAsync()
     {
-        var username = (_showSystemStats && _isAdmin) ? null : _currentUsername;
-        _stats = await RunService.GetWelcomeStatsAsync(requestingUsername: username, CancellationToken.None);
+        var username = (_showAll && _isAdmin) ? null : _currentUsername;
+        _recentRuns = await RunService.ListRunsAsync(5, requestingUsername: username);
+        _stats      = await RunService.GetWelcomeStatsAsync(requestingUsername: username, CancellationToken.None);
     }
 
     static string TimeAgo(DateTimeOffset dt)

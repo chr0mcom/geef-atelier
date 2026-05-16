@@ -20,6 +20,14 @@ public interface ICrewTemplateRepository
     /// <summary>Updates an existing custom crew template identified by <see cref="CrewTemplate.Name"/>.</summary>
     Task UpdateAsync(CrewTemplate template, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Renames a custom crew template from <paramref name="oldName"/> to <paramref name="newName"/>,
+    /// cascading the change to <c>RunEntity.CrewTemplateName</c> for past runs. Historical
+    /// <c>CrewSnapshot</c> JSON is left untouched so runs stay reproducible. Atomic.
+    /// Throws if the template does not exist in the database.
+    /// </summary>
+    Task RenameAsync(string oldName, string newName, CancellationToken cancellationToken = default);
+
     /// <summary>Deletes the custom crew template with the given name. Throws if the template does not exist in the database.</summary>
     Task DeleteAsync(string name, CancellationToken cancellationToken = default);
 }

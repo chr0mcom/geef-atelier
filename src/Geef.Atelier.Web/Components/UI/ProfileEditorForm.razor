@@ -15,8 +15,8 @@
 
         <div class="field">
             <label>Name</label>
-            <InputText @bind-Value="_form.Name" disabled="@(!IsNew || IsSystem)" placeholder="my-profile" />
-            @if (IsNew && !string.IsNullOrEmpty(_form.Name))
+            <InputText @bind-Value="_form.Name" disabled="@IsSystem" placeholder="my-profile" />
+            @if (!IsSystem && !string.IsNullOrEmpty(_form.Name))
             {
                 <small>Will be saved as: custom-@_form.Name.TrimStart("custom-".ToCharArray())</small>
             }

@@ -103,9 +103,15 @@
                 IsSystem: false);
 
             if (IsNew)
+            {
                 await CrewService.CreateCustomReviewerProfileAsync(profile);
+            }
             else
+            {
+                if (profile.Name != Name)
+                    await CrewService.RenameCustomReviewerProfileAsync(Name!, profile.Name);
                 await CrewService.UpdateCustomReviewerProfileAsync(profile);
+            }
 
             Nav.NavigateTo("/crew/profiles/reviewers");
         }

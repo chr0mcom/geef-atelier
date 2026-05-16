@@ -25,6 +25,13 @@ public interface ICrewService
     /// <summary>Deletes a custom reviewer profile by name. Throws <see cref="InvalidOperationException"/> for system profiles.</summary>
     Task DeleteCustomReviewerProfileAsync(string name, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Renames a custom reviewer profile, cascading the new name into every custom crew template
+    /// that references it. Returns the final (custom-prefixed) name. Throws for system profiles
+    /// or when the target name is already taken.
+    /// </summary>
+    Task<string> RenameCustomReviewerProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default);
+
     // --- Executor profiles ---
 
     Task<IReadOnlyList<ExecutorProfile>> ListExecutorProfilesAsync(bool includeSystem = true, CancellationToken cancellationToken = default);
@@ -38,6 +45,13 @@ public interface ICrewService
 
     /// <summary>Deletes a custom executor profile by name. Throws <see cref="InvalidOperationException"/> for system profiles.</summary>
     Task DeleteCustomExecutorProfileAsync(string name, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Renames a custom executor profile, cascading the new name into every custom crew template
+    /// that references it. Returns the final (custom-prefixed) name. Throws for system profiles
+    /// or when the target name is already taken.
+    /// </summary>
+    Task<string> RenameCustomExecutorProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default);
 
     // --- Advisor profiles ---
 
@@ -53,6 +67,13 @@ public interface ICrewService
     /// <summary>Deletes a custom advisor profile by name. Throws <see cref="InvalidOperationException"/> for system profiles.</summary>
     Task DeleteCustomAdvisorProfileAsync(string name, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Renames a custom advisor profile, cascading the new name into every custom crew template
+    /// that references it. Returns the final (custom-prefixed) name. Throws for system profiles
+    /// or when the target name is already taken.
+    /// </summary>
+    Task<string> RenameCustomAdvisorProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default);
+
     // --- Grounding-provider profiles ---
 
     Task<IReadOnlyList<GroundingProviderProfile>> ListGroundingProviderProfilesAsync(bool includeSystem = true, CancellationToken cancellationToken = default);
@@ -67,6 +88,13 @@ public interface ICrewService
     /// <summary>Deletes a custom grounding-provider profile by name. Throws <see cref="InvalidOperationException"/> for system profiles.</summary>
     Task DeleteCustomGroundingProviderProfileAsync(string name, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Renames a custom grounding-provider profile, cascading the new name into every custom crew
+    /// template that references it. Returns the final (custom-prefixed) name. Throws for system
+    /// profiles or when the target name is already taken.
+    /// </summary>
+    Task<string> RenameCustomGroundingProviderProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default);
+
     // --- Crew templates ---
 
     Task<IReadOnlyList<CrewTemplate>> ListCrewTemplatesAsync(bool includeSystem = true, CancellationToken cancellationToken = default);
@@ -80,6 +108,13 @@ public interface ICrewService
 
     /// <summary>Deletes a custom crew template by name. Throws <see cref="InvalidOperationException"/> for system templates.</summary>
     Task DeleteCustomCrewTemplateAsync(string name, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Renames a custom crew template, cascading the new name into <c>CrewTemplateName</c> of past
+    /// runs (frozen snapshots stay untouched). Returns the final (custom-prefixed) name. Throws for
+    /// system templates or when the target name is already taken.
+    /// </summary>
+    Task<string> RenameCustomCrewTemplateAsync(string oldName, string newName, CancellationToken cancellationToken = default);
 
     // --- Snapshot ---
 
