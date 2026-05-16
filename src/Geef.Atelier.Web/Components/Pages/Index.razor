@@ -3,6 +3,7 @@
 @attribute [Authorize]
 @inject IRunService RunService
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthProvider
 @using Geef.Atelier.Core.Domain
 
 <PageTitle>Atelier — Geef.Atelier</PageTitle>
@@ -30,6 +31,13 @@
             <div class="arrow">⟶ Open the form</div>
         </a>
         <div class="welcome-side">
+            @if (_isAdmin)
+            {
+                <label class="admin-toggle">
+                    <input type="checkbox" @bind="_showSystemStats" @bind:after="LoadStatsAsync" />
+                    System-weite Statistiken anzeigen
+                </label>
+            }
             <div class="stat-tile" data-testid="stat-runs-this-month">
                 <div class="label">This month</div>
                 <div class="value">@(_stats?.RunsThisMonth.ToString() ?? "—")</div>
@@ -96,12 +104,26 @@
     IReadOnlyList<RunEntity>? _recentRuns;
     WelcomeStats? _stats;
     string _greeting = string.Empty;
+    bool _isAdmin;
+    string? _currentUsername;
+    bool _showSystemStats;
 
     protected override async Task OnInitializedAsync()
     {
-        _recentRuns = await RunService.ListRunsAsync(5, requestingUsername: null);
-        _stats      = await RunService.GetWelcomeStatsAsync(requestingUsername: null, CancellationToken.None);
+        var auth     = await AuthProvider.GetAuthenticationStateAsync();
+        _isAdmin         = auth.User.IsInRole("admin");
+        _currentUsername = auth.User.Identity?.Name;
+
+        var username = _isAdmin ? null : _currentUsername;
+        _recentRuns = await RunService.ListRunsAsync(5, requestingUsername: username);
+        await LoadStatsAsync();
         _greeting   = DateTime.Now.ToString("dddd · HH:mm");
+    }
+
+    async Task LoadStatsAsync()
+    {
+        var username = (_showSystemStats && _isAdmin) ? null : _currentUsername;
+        _stats = await RunService.GetWelcomeStatsAsync(requestingUsername: username, CancellationToken.None);
     }
 
     static string TimeAgo(DateTimeOffset dt)

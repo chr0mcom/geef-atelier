@@ -6,6 +6,7 @@
 @inject IKnowledgeService KnowledgeService
 @inject NavigationManager Nav
 @inject ILogger<RunDetail> Logger
+@inject AuthenticationStateProvider AuthProvider
 @using Microsoft.AspNetCore.SignalR.Client
 @using Geef.Atelier.Application.Runs
 @using Geef.Atelier.Application.Crew.Knowledge
@@ -19,9 +20,17 @@
 <PageTitle>Run @_shortId — Geef.Atelier</PageTitle>
 
 <div class="detail">
-    @if (_details is null && !_notFound)
+    @if (_details is null && !_notFound && !_forbidden)
     {
         <EmptyState Message="Loading…" />
+    }
+    else if (_forbidden)
+    {
+        <div class="forbidden-banner">
+            <h2>Kein Zugriff</h2>
+            <p>Dieser Run gehört einem anderen Benutzer.</p>
+            <a href="/runs" class="btn ghost">← Zurück zur Übersicht</a>
+        </div>
     }
     else if (_notFound)
     {
@@ -135,6 +144,7 @@
     RunWithGroundingViewModel? _viewModel;
     RunDetails?    _details;
     bool           _notFound;
+    bool           _forbidden;
     HubConnection? _hub;
     CrewSnapshot?  _snapshot;
     List<KnowledgeDocument> _runAttachments = [];
@@ -142,21 +152,46 @@
     bool _showPromoteModal;
     KnowledgeDocument? _promoteCandidate;
     string? _promoteError;
+    string? _requestingUser;
 
     string _shortId => RunId.ToString("N")[..8].ToUpperInvariant();
 
     protected override async Task OnInitializedAsync()
     {
+        var auth     = await AuthProvider.GetAuthenticationStateAsync();
+        var isAdmin  = auth.User.IsInRole("admin");
+        var username = auth.User.Identity?.Name;
+        _requestingUser = isAdmin ? null : username;
+
         await LoadAsync();
         await InitHubAsync();
     }
 
     async Task LoadAsync()
     {
-        _viewModel = await RunService.GetRunWithGroundingAsync(RunId, requestingUsername: null, CancellationToken.None);
+        _viewModel = await RunService.GetRunWithGroundingAsync(RunId, requestingUsername: _requestingUser, CancellationToken.None);
         _details   = _viewModel?.Details;
         _snapshot  = _viewModel?.Snapshot;
-        _notFound  = _viewModel is null;
+
+        if (_viewModel is null)
+        {
+            // Distinguish 403 (run exists but belongs to another user) from 404
+            if (_requestingUser is not null)
+            {
+                var adminView = await RunService.GetRunDetailsAsync(RunId, requestingUsername: null, CancellationToken.None);
+                _forbidden = adminView is not null;
+                _notFound  = !_forbidden;
+            }
+            else
+            {
+                _notFound = true;
+            }
+        }
+        else
+        {
+            _forbidden = false;
+            _notFound  = false;
+        }
         try
         {
             _runAttachments = (await KnowledgeService.ListRunAttachmentsAsync(RunId, CancellationToken.None)).ToList();
