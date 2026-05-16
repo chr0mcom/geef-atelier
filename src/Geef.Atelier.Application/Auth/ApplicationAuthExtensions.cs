@@ -13,8 +13,6 @@ public static class ApplicationAuthExtensions
         services.Configure<AtelierUserOptions>(opts =>
         {
             configuration.GetSection(AtelierUserOptions.SectionName).Bind(opts);
-            // Also accept short env var names (ATELIER_USER / ATELIER_PASSWORD_HASH) as fallback
-            // so docker-compose users don't need the double-underscore ASP.NET Core convention.
             if (string.IsNullOrEmpty(opts.Username))
                 opts.Username = Environment.GetEnvironmentVariable("ATELIER_USER") ?? "";
             if (string.IsNullOrEmpty(opts.PasswordHash))
@@ -33,7 +31,7 @@ public static class ApplicationAuthExtensions
             if (string.IsNullOrEmpty(opts.Token))
                 opts.Token = Environment.GetEnvironmentVariable("ATELIER_MCP_TOKEN") ?? "";
         });
-        services.AddScoped<ITokenValidator, StaticTokenValidator>();
+        services.AddScoped<StaticTokenValidator>();
         return services;
     }
 }

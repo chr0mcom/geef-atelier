@@ -1,5 +1,6 @@
 using Geef.Atelier.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Testcontainers.PostgreSql;
 
 namespace Geef.Atelier.Tests.Persistence;
@@ -19,6 +20,7 @@ public sealed class DbContextSmokeTests : IAsyncLifetime
     {
         var options = new DbContextOptionsBuilder<AtelierDbContext>()
             .UseNpgsql(_postgres.GetConnectionString())
+            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
 
         await using var context = new AtelierDbContext(options);

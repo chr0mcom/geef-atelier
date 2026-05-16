@@ -1,6 +1,7 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Testcontainers.PostgreSql;
 
 namespace Geef.Atelier.Tests.Persistence;
@@ -24,6 +25,7 @@ public sealed class Step10CrewSystemMigrationTests : IAsyncLifetime
     {
         var options = new DbContextOptionsBuilder<AtelierDbContext>()
             .UseNpgsql(_postgres.GetConnectionString())
+            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
 
         await using var context = new AtelierDbContext(options);
@@ -104,6 +106,7 @@ public sealed class Step10CrewSystemMigrationTests : IAsyncLifetime
     {
         var options = new DbContextOptionsBuilder<AtelierDbContext>()
             .UseNpgsql(_postgres.GetConnectionString())
+            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
 
         await using var context = new AtelierDbContext(options);

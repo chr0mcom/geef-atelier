@@ -1,0 +1,153 @@
+@page "/account/connected-clients"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using Geef.Atelier.Application.OAuth
+@inject IOAuthService OAuthService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Verbundene Clients — Geef.Atelier</PageTitle>
+
+<div class="connected-clients" data-testid="connected-clients-page">
+    <div class="page-header">
+        <h1>Verbundene Clients</h1>
+        <a href="/" class="btn ghost" data-testid="btn-back">← Zurück</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger" data-testid="error-banner">@_error</div>
+    }
+
+    @if (_loading)
+    {
+        <p>Laden…</p>
+    }
+    else if (_clients.Count == 0)
+    {
+        <div class="empty-state" data-testid="empty-state">
+            Keine verbundenen Clients.
+        </div>
+    }
+    else
+    {
+        <div class="clients-list" data-testid="connected-clients-list">
+            @foreach (var client in _clients)
+            {
+                <div class="client-row" data-testid="client-row-@client.ClientId">
+                    <div class="client-info">
+                        <span class="client-name">@client.ClientName</span>
+                        <span class="client-meta">Verbunden seit @client.IssuedAt.ToString("yyyy-MM-dd HH:mm") UTC</span>
+                        <span class="client-scope">Berechtigung: @client.Scope</span>
+                    </div>
+                    <div class="client-actions">
+                        @if (_confirmRevokeClientId == client.ClientId)
+                        {
+                            <span class="revoke-confirm-text">Wirklich widerrufen?</span>
+                            <button class="btn danger small" @onclick="() => RevokeClientAsync(client.ClientId)"
+                                    data-testid="btn-confirm-revoke-@client.ClientId">
+                                Ja
+                            </button>
+                            <button class="btn ghost small" @onclick="CancelRevoke"
+                                    data-testid="btn-cancel-revoke-@client.ClientId">
+                                Nein
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="btn ghost small" @onclick="() => ConfirmRevoke(client.ClientId)"
+                                    data-testid="btn-revoke-@client.ClientId">
+                                Widerrufen
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="clients-footer">
+            @if (_confirmRevokeAll)
+            {
+                <span class="revoke-confirm-text">Wirklich alle widerrufen?</span>
+                <button class="btn danger" @onclick="RevokeAllAsync" data-testid="btn-confirm-revoke-all">Ja</button>
+                <button class="btn ghost" @onclick="() => _confirmRevokeAll = false" data-testid="btn-cancel-revoke-all">Nein</button>
+            }
+            else
+            {
+                <button class="btn danger" @onclick="() => _confirmRevokeAll = true" data-testid="btn-revoke-all">
+                    Alle widerrufen
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<ConnectedClientInfo> _clients = [];
+    private bool    _loading            = true;
+    private string? _error;
+    private string? _confirmRevokeClientId;
+    private bool    _confirmRevokeAll;
+    private string  _userId             = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        _userId = authState.User.FindFirst(ClaimTypes.Name)?.Value ?? "";
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error   = null;
+        try
+        {
+            _clients = await OAuthService.GetConnectedClientsAsync(_userId, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ConfirmRevoke(string clientId)
+    {
+        _confirmRevokeClientId = clientId;
+        _confirmRevokeAll      = false;
+    }
+
+    private void CancelRevoke() => _confirmRevokeClientId = null;
+
+    private async Task RevokeClientAsync(string clientId)
+    {
+        _confirmRevokeClientId = null;
+        try
+        {
+            await OAuthService.RevokeClientAsync(_userId, clientId, CancellationToken.None);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task RevokeAllAsync()
+    {
+        _confirmRevokeAll = false;
+        try
+        {
+            await OAuthService.RevokeAllUserTokensAsync(_userId, CancellationToken.None);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}

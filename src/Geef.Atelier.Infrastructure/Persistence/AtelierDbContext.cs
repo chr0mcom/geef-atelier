@@ -3,6 +3,7 @@ using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Core.Domain.OAuth;
 using Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge;
 using Geef.Atelier.Infrastructure.Persistence.TemplateStudio;
 using Microsoft.EntityFrameworkCore;
@@ -32,6 +33,12 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     internal DbSet<KnowledgeDocumentChunkEntity> KnowledgeDocumentChunks => Set<KnowledgeDocumentChunkEntity>();
 
     internal DbSet<TemplateStudioAnalysisEntity> TemplateStudioAnalyses => Set<TemplateStudioAnalysisEntity>();
+
+    internal DbSet<OAuthClient> OAuthClients => Set<OAuthClient>();
+    internal DbSet<OAuthAuthorizationCode> OAuthAuthorizationCodes => Set<OAuthAuthorizationCode>();
+    internal DbSet<OAuthAccessToken> OAuthAccessTokens => Set<OAuthAccessToken>();
+    internal DbSet<OAuthRefreshToken> OAuthRefreshTokens => Set<OAuthRefreshToken>();
+    internal DbSet<OAuthAuditLogEntry> OAuthAuditLog => Set<OAuthAuditLogEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
         => modelBuilder.ApplyConfigurationsFromAssembly(typeof(AtelierDbContext).Assembly);

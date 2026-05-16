@@ -10,20 +10,20 @@ internal sealed class StaticTokenValidator(
     IOptions<AtelierMcpOptions> options,
     ILogger<StaticTokenValidator> logger) : ITokenValidator
 {
-    public Task<bool> ValidateTokenAsync(string token, CancellationToken cancellationToken = default)
+    public Task<TokenValidationOutcome> ValidateTokenAsync(string token, CancellationToken cancellationToken = default)
     {
         var opts = options.Value;
 
         if (string.IsNullOrEmpty(opts.Token))
         {
             logger.LogWarning("MCP token validation rejected: AtelierMcp.Token is not configured");
-            return Task.FromResult(false);
+            return Task.FromResult(TokenValidationOutcome.Invalid);
         }
 
         if (string.IsNullOrEmpty(token))
         {
             logger.LogWarning("MCP token validation rejected");
-            return Task.FromResult(false);
+            return Task.FromResult(TokenValidationOutcome.Invalid);
         }
 
         var expectedBytes = Encoding.UTF8.GetBytes(opts.Token);
@@ -33,10 +33,10 @@ internal sealed class StaticTokenValidator(
             !CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes))
         {
             logger.LogWarning("MCP token validation rejected");
-            return Task.FromResult(false);
+            return Task.FromResult(TokenValidationOutcome.Invalid);
         }
 
         logger.LogInformation("MCP token validation accepted");
-        return Task.FromResult(true);
+        return Task.FromResult(new TokenValidationOutcome(true, "static-bearer", "static-client", null, null));
     }
 }

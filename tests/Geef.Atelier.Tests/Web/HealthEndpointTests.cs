@@ -1,6 +1,7 @@
 using Geef.Atelier.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
 
@@ -60,7 +61,8 @@ public sealed class HealthEndpointTests : IAsyncLifetime
                     if (descriptor is not null) services.Remove(descriptor);
 
                     services.AddDbContext<AtelierDbContext>(options =>
-                        options.UseNpgsql(badConnectionString));
+                        options.UseNpgsql(badConnectionString)
+            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
                 }));
 
         using var client = factory.CreateClient();

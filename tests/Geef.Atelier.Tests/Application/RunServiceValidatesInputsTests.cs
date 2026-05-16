@@ -4,6 +4,7 @@ using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Tests.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Geef.Atelier.Tests.Application;
@@ -14,7 +15,8 @@ public sealed class RunServiceValidatesInputsTests(PostgresFixture fixture)
     private ServiceProvider BuildProvider()
     {
         var services = new ServiceCollection();
-        services.AddDbContext<AtelierDbContext>(opt => opt.UseNpgsql(fixture.ConnectionString));
+        services.AddDbContext<AtelierDbContext>(opt => opt.UseNpgsql(fixture.ConnectionString)
+               .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
         services.AddAtelierPersistence();
         services.AddAtelierApplication();
         services.AddScoped<IKnowledgeService, NoOpKnowledgeService>();
