@@ -21,16 +21,23 @@
         if (HttpContext is null || HttpContext.Request.Method != "POST" || Model is null)
             return;
 
-        var ok = await Authenticator.ValidateCredentialsAsync(
+        var user = await Authenticator.ValidateCredentialsAsync(
             Model.Username ?? "", Model.Password ?? "");
 
-        if (!ok)
+        if (user is null)
         {
             _error = "Ungültige Anmeldedaten";
             return;
         }
 
-        var claims   = new[] { new Claim(ClaimTypes.Name, Model.Username!) };
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.Name, user.Username),
+            new(ClaimTypes.NameIdentifier, user.UserId),
+        };
+        if (user.IsAdmin)
+            claims.Add(new Claim(ClaimTypes.Role, "admin"));
+
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         await HttpContext.SignInAsync(
             CookieAuthenticationDefaults.AuthenticationScheme,

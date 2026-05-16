@@ -31,6 +31,16 @@
                         Verbundene Clients
                     </a>
 
+                    <AuthorizeView Policy="AdminPolicy">
+                        <Authorized Context="adminCtx">
+                            <div class="sep" role="separator"></div>
+                            <a href="/admin/users" class="item" role="menuitem" data-testid="menu-admin-users">
+                                <IconUser Size="14" />
+                                Benutzerverwaltung
+                            </a>
+                        </Authorized>
+                    </AuthorizeView>
+
                     <div class="sep" role="separator"></div>
 
                     <form method="post" action="/auth/logout" role="menuitem">

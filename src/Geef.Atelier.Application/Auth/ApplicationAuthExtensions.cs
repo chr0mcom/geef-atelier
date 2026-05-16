@@ -19,6 +19,7 @@ public static class ApplicationAuthExtensions
                 opts.PasswordHash = Environment.GetEnvironmentVariable("ATELIER_PASSWORD_HASH") ?? "";
         });
         services.AddScoped<IUserAuthenticator, AtelierUserAuthenticator>();
+        services.AddScoped<IUserAdminService, UserAdminService>();
         return services;
     }
 

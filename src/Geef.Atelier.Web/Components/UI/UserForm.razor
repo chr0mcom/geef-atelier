@@ -1,0 +1,75 @@
+@using Microsoft.AspNetCore.Components.Web
+
+<div class="user-form" data-testid="user-form">
+    <h3>@Title</h3>
+
+    @if (!string.IsNullOrEmpty(FormError))
+    {
+        <div class="alert alert-danger" data-testid="user-form-error">@FormError</div>
+    }
+
+    <div class="form-group">
+        <label for="uf-username">Benutzername *</label>
+        <input id="uf-username" type="text" class="form-control"
+               value="@Username"
+               @oninput="e => OnUsernameChanged.InvokeAsync(e.Value?.ToString())"
+               data-testid="input-username"
+               placeholder="Benutzername" />
+    </div>
+
+    <div class="form-group">
+        <label for="uf-password">@_passwordLabel</label>
+        <input id="uf-password" type="password" class="form-control"
+               @oninput="e => OnPasswordChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)"
+               data-testid="input-password"
+               placeholder="@_passwordPlaceholder" />
+    </div>
+
+    <div class="form-group">
+        <label for="uf-email">E-Mail (optional)</label>
+        <input id="uf-email" type="email" class="form-control"
+               value="@Email"
+               @oninput="e => OnEmailChanged.InvokeAsync(e.Value?.ToString())"
+               data-testid="input-email"
+               placeholder="E-Mail-Adresse" />
+    </div>
+
+    <div class="form-group form-check">
+        <input id="uf-active" type="checkbox"
+               checked="@IsActive"
+               @onchange="e => OnIsActiveChanged.InvokeAsync((bool)(e.Value ?? true))"
+               data-testid="input-is-active" />
+        <label for="uf-active">Aktiv</label>
+    </div>
+
+    <div class="form-actions">
+        <button type="button" class="btn primary" @onclick="OnSave" disabled="@IsSaving"
+                data-testid="btn-save">
+            @(IsSaving ? "Speichern…" : "Speichern")
+        </button>
+        <button type="button" class="btn ghost" @onclick="OnCancel" disabled="@IsSaving"
+                data-testid="btn-cancel">
+            Abbrechen
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title            { get; set; } = "";
+    [Parameter]                 public string Username         { get; set; } = "";
+    [Parameter]                 public string? Email           { get; set; }
+    [Parameter]                 public bool   IsActive         { get; set; } = true;
+    [Parameter]                 public bool   PasswordRequired { get; set; }
+    [Parameter]                 public bool   IsSaving         { get; set; }
+    [Parameter]                 public string? FormError        { get; set; }
+
+    [Parameter] public EventCallback         OnSave            { get; set; }
+    [Parameter] public EventCallback         OnCancel          { get; set; }
+    [Parameter] public EventCallback<string> OnUsernameChanged { get; set; }
+    [Parameter] public EventCallback<string> OnPasswordChanged { get; set; }
+    [Parameter] public EventCallback<string?> OnEmailChanged   { get; set; }
+    [Parameter] public EventCallback<bool>   OnIsActiveChanged { get; set; }
+
+    private string _passwordLabel       => PasswordRequired ? "Passwort *" : "Passwort (leer lassen = unverändert)";
+    private string _passwordPlaceholder => PasswordRequired ? "Passwort" : "Neues Passwort (optional)";
+}

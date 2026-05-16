@@ -1,0 +1,300 @@
+@page "/admin/users"
+@attribute [Authorize(Policy = "AdminPolicy")]
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using Geef.Atelier.Application.Auth
+@using Geef.Atelier.Core.Domain
+@inject IUserAdminService UserAdmin
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Benutzerverwaltung — Geef.Atelier</PageTitle>
+
+<div class="user-management" data-testid="user-management-page">
+    <div class="page-header">
+        <h1>Benutzerverwaltung</h1>
+        <a href="/runs" class="btn ghost" data-testid="btn-back">← Zurück</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger" data-testid="error-banner">@_error</div>
+    }
+
+    @if (!string.IsNullOrEmpty(_success))
+    {
+        <div class="alert alert-success" data-testid="success-banner">@_success</div>
+    }
+
+    @if (_loading)
+    {
+        <p>Laden…</p>
+    }
+    else
+    {
+        <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <h2 style="margin:0;">Benutzer</h2>
+            @if (_editingUser is null && !_showCreateForm)
+            {
+                <button class="btn primary" @onclick="ShowCreateForm" data-testid="btn-new-user">
+                    + Neuer Benutzer
+                </button>
+            }
+        </div>
+
+        @if (_showCreateForm)
+        {
+            <UserForm Title="Neuer Benutzer"
+                      Username="@_formUsername"
+                      Email="@_formEmail"
+                      PasswordRequired="true"
+                      IsSaving="@_saving"
+                      FormError="@_formError"
+                      OnSave="CreateUserAsync"
+                      OnCancel="CancelEdit"
+                      OnUsernameChanged="v => _formUsername = v"
+                      OnPasswordChanged="v => _formPassword = v"
+                      OnEmailChanged="v => _formEmail = v"
+                      OnIsActiveChanged="v => _formIsActive = v"
+                      IsActive="@_formIsActive" />
+        }
+
+        <div class="users-list" data-testid="users-list">
+            @foreach (var user in _users)
+            {
+                <div class="user-row @(user.UserId == _editingUser?.UserId ? "editing" : "")"
+                     data-testid="user-row-@user.UserId">
+
+                    @if (_editingUser?.UserId == user.UserId)
+                    {
+                        <UserForm Title="Benutzer bearbeiten"
+                                  Username="@_formUsername"
+                                  Email="@_formEmail"
+                                  PasswordRequired="false"
+                                  IsSaving="@_saving"
+                                  FormError="@_formError"
+                                  OnSave="SaveEditAsync"
+                                  OnCancel="CancelEdit"
+                                  OnUsernameChanged="v => _formUsername = v"
+                                  OnPasswordChanged="v => _formPassword = v"
+                                  OnEmailChanged="v => _formEmail = v"
+                                  OnIsActiveChanged="v => _formIsActive = v"
+                                  IsActive="@_formIsActive" />
+                    }
+                    else
+                    {
+                        <div class="user-info">
+                            <span class="user-name" data-testid="username-@user.UserId">@user.Username</span>
+                            @if (user.IsAdmin)
+                            {
+                                <span class="badge badge-admin" data-testid="badge-admin-@user.UserId">Admin</span>
+                            }
+                            @if (!user.IsActive)
+                            {
+                                <span class="badge badge-inactive" data-testid="badge-inactive-@user.UserId">Inaktiv</span>
+                            }
+                            @if (!string.IsNullOrEmpty(user.Email))
+                            {
+                                <span class="user-meta" data-testid="email-@user.UserId">@user.Email</span>
+                            }
+                            <span class="user-meta">Erstellt: @user.CreatedAt.ToString("yyyy-MM-dd")</span>
+                        </div>
+                        <div class="user-actions">
+                            @if (!user.IsAdmin || user.UserId != _currentAdminId)
+                            {
+                                <button class="btn ghost small" @onclick="() => StartEdit(user)"
+                                        data-testid="btn-edit-@user.UserId">
+                                    Bearbeiten
+                                </button>
+                                @if (_confirmDeleteUserId == user.UserId)
+                                {
+                                    <span class="delete-confirm-text">Wirklich löschen?</span>
+                                    <button class="btn danger small" @onclick="() => DeleteUserAsync(user.UserId)"
+                                            data-testid="btn-confirm-delete-@user.UserId">
+                                        Ja
+                                    </button>
+                                    <button class="btn ghost small" @onclick="CancelDelete"
+                                            data-testid="btn-cancel-delete-@user.UserId">
+                                        Nein
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="btn danger small" @onclick="() => _confirmDeleteUserId = user.UserId"
+                                            data-testid="btn-delete-@user.UserId">
+                                        Löschen
+                                    </button>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<AtelierUser> _users = [];
+    private bool    _loading            = true;
+    private bool    _saving;
+    private bool    _showCreateForm;
+    private string? _error;
+    private string? _success;
+    private string? _formError;
+    private string? _confirmDeleteUserId;
+    private string  _currentAdminId     = "";
+    private AtelierUser? _editingUser;
+
+    private string  _formUsername       = "";
+    private string  _formPassword       = "";
+    private string? _formEmail;
+    private bool    _formIsActive       = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        _currentAdminId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "";
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error   = null;
+        try
+        {
+            _users = await UserAdmin.GetAllUsersAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ShowCreateForm()
+    {
+        _editingUser     = null;
+        _showCreateForm  = true;
+        _formUsername    = "";
+        _formPassword    = "";
+        _formEmail       = null;
+        _formIsActive    = true;
+        _formError       = null;
+        _success         = null;
+    }
+
+    private void StartEdit(AtelierUser user)
+    {
+        _showCreateForm  = false;
+        _editingUser     = user;
+        _formUsername    = user.Username;
+        _formPassword    = "";
+        _formEmail       = user.Email;
+        _formIsActive    = user.IsActive;
+        _formError       = null;
+        _success         = null;
+        _confirmDeleteUserId = null;
+    }
+
+    private void CancelEdit()
+    {
+        _showCreateForm = false;
+        _editingUser    = null;
+        _formError      = null;
+    }
+
+    private void CancelDelete() => _confirmDeleteUserId = null;
+
+    private async Task CreateUserAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_formUsername))
+        {
+            _formError = "Benutzername ist erforderlich.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_formPassword))
+        {
+            _formError = "Passwort ist erforderlich.";
+            return;
+        }
+
+        _saving    = true;
+        _formError = null;
+        try
+        {
+            await UserAdmin.CreateUserAsync(_formUsername.Trim(), _formPassword, _formEmail?.Trim(), CancellationToken.None);
+            _showCreateForm = false;
+            _success = $"Benutzer \"{_formUsername.Trim()}\" wurde angelegt.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _formError = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task SaveEditAsync()
+    {
+        if (_editingUser is null) return;
+
+        if (string.IsNullOrWhiteSpace(_formUsername))
+        {
+            _formError = "Benutzername ist erforderlich.";
+            return;
+        }
+
+        _saving    = true;
+        _formError = null;
+        try
+        {
+            var newPassword = string.IsNullOrWhiteSpace(_formPassword) ? null : _formPassword;
+            await UserAdmin.UpdateUserAsync(
+                _editingUser.UserId,
+                _formUsername.Trim(),
+                newPassword,
+                _formEmail?.Trim(),
+                _formIsActive,
+                CancellationToken.None);
+            _editingUser = null;
+            _success = $"Benutzer \"{_formUsername.Trim()}\" wurde aktualisiert.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _formError = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task DeleteUserAsync(string userId)
+    {
+        _confirmDeleteUserId = null;
+        _saving = true;
+        _error  = null;
+        try
+        {
+            await UserAdmin.DeleteUserAsync(userId, CancellationToken.None);
+            _success = "Benutzer wurde gelöscht.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

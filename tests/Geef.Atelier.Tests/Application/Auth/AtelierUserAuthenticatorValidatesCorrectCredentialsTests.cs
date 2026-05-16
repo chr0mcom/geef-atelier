@@ -1,24 +1,21 @@
 using Geef.Atelier.Application.Auth;
-using Geef.Atelier.Core.Configuration;
+using Geef.Atelier.Tests.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Tests.Application.Auth;
 
 public sealed class AtelierUserAuthenticatorValidatesCorrectCredentialsTests
 {
     [Fact]
-    public async Task ValidateCredentialsAsync_CorrectCredentials_ReturnsTrue()
+    public async Task ValidateCredentialsAsync_CorrectCredentials_ReturnsUser()
     {
-        var opts = Options.Create(new AtelierUserOptions
-        {
-            Username     = "testuser",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("correct-password", workFactor: 4),
-        });
-        var sut = new AtelierUserAuthenticator(opts, NullLogger<AtelierUserAuthenticator>.Instance);
+        var repo = new InMemoryAtelierUserRepository();
+        repo.Seed("testuser", "correct-password");
+        var sut = new AtelierUserAuthenticator(repo, NullLogger<AtelierUserAuthenticator>.Instance);
 
         var result = await sut.ValidateCredentialsAsync("testuser", "correct-password");
 
-        Assert.True(result);
+        Assert.NotNull(result);
+        Assert.Equal("testuser", result.Username);
     }
 }

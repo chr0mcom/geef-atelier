@@ -34,6 +34,8 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
 
     internal DbSet<TemplateStudioAnalysisEntity> TemplateStudioAnalyses => Set<TemplateStudioAnalysisEntity>();
 
+    internal DbSet<AtelierUser> Users => Set<AtelierUser>();
+
     internal DbSet<OAuthClient> OAuthClients => Set<OAuthClient>();
     internal DbSet<OAuthAuthorizationCode> OAuthAuthorizationCodes => Set<OAuthAuthorizationCode>();
     internal DbSet<OAuthAccessToken> OAuthAccessTokens => Set<OAuthAccessToken>();
