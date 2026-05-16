@@ -93,7 +93,7 @@ internal sealed class RunService(
     public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null, CancellationToken cancellationToken = default)
     {
         if (limit <= 0) throw new ArgumentOutOfRangeException(nameof(limit), "Limit must be positive.");
-        return repository.ListAsync(limit, statusFilter, cancellationToken);
+        return repository.ListAsync(limit, statusFilter, null, cancellationToken);
     }
 
     /// <inheritdoc/>

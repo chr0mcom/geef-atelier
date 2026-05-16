@@ -102,7 +102,7 @@
     protected override async Task OnInitializedAsync()
     {
         _recentRuns = await RunService.ListRunsAsync(5);
-        _stats      = await RunRepository.GetWelcomeStatsAsync(CancellationToken.None);
+        _stats      = await RunRepository.GetWelcomeStatsAsync(null, CancellationToken.None);
         _greeting   = DateTime.Now.ToString("dddd · HH:mm");
     }
 

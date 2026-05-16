@@ -230,10 +230,10 @@ public sealed class RunServiceAttachmentTests
     private sealed class StubRunRepository : IRunRepository
     {
         public Task<RunEntity?> GetByIdAsync(Guid runId, CancellationToken cancellationToken = default) => Task.FromResult<RunEntity?>(null);
-        public Task<IReadOnlyList<RunEntity>> ListAsync(int limit, RunStatus? statusFilter, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<RunEntity>>([]);
+        public Task<IReadOnlyList<RunEntity>> ListAsync(int limit, RunStatus? statusFilter, string? username, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<RunEntity>>([]);
         public Task<bool> RequestCancellationAsync(Guid runId, CancellationToken cancellationToken = default) => Task.FromResult(false);
         public Task<RunDetails?> GetDetailsAsync(Guid runId, CancellationToken cancellationToken = default) => Task.FromResult<RunDetails?>(null);
-        public Task<WelcomeStats> GetWelcomeStatsAsync(CancellationToken cancellationToken = default) => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m, 0, 0m));
+        public Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default) => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m, 0, 0m));
     }
 
     private sealed class StubCrewService : ICrewService

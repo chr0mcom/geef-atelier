@@ -8,8 +8,11 @@ public interface IRunRepository
     /// <summary>Returns the Run with the given ID, or null if not found.</summary>
     Task<RunEntity?> GetByIdAsync(Guid runId, CancellationToken cancellationToken = default);
 
-    /// <summary>Returns the most recent runs, optionally filtered by status, ordered by CreatedAt descending.</summary>
-    Task<IReadOnlyList<RunEntity>> ListAsync(int limit, RunStatus? statusFilter, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Returns the most recent runs, optionally filtered by status and username, ordered by CreatedAt descending.
+    /// Pass <c>null</c> for <paramref name="username"/> to return runs for all users (Admin-mode).
+    /// </summary>
+    Task<IReadOnlyList<RunEntity>> ListAsync(int limit, RunStatus? statusFilter, string? username, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Atomically sets CancellationRequested=true if the run is Pending or Running and not yet cancelled.
@@ -20,6 +23,11 @@ public interface IRunRepository
     /// <summary>Returns the run with all its iterations and findings, or null if the run does not exist.</summary>
     Task<RunDetails?> GetDetailsAsync(Guid runId, CancellationToken cancellationToken = default);
 
-    /// <summary>Returns aggregated statistics for the current calendar month.</summary>
-    Task<WelcomeStats> GetWelcomeStatsAsync(CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Returns aggregated statistics for the current calendar month.
+    /// Pass <c>null</c> for <paramref name="username"/> for system-wide stats (Admin-mode);
+    /// pass a username to scope run-level statistics to that user only.
+    /// Studio-analysis stats are never user-scoped.
+    /// </summary>
+    Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default);
 }
