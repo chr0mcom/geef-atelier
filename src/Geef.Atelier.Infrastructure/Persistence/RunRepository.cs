@@ -11,11 +11,13 @@ internal sealed class RunRepository(AtelierDbContext db) : IRunRepository
         => await db.Runs.AsNoTracking().FirstOrDefaultAsync(r => r.Id == runId, cancellationToken);
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<RunEntity>> ListAsync(int limit, RunStatus? statusFilter, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<RunEntity>> ListAsync(int limit, RunStatus? statusFilter, string? username, CancellationToken cancellationToken = default)
     {
         var q = db.Runs.AsNoTracking();
         if (statusFilter is { } s)
             q = q.Where(r => r.Status == s);
+        if (username is not null)
+            q = q.Where(r => r.CreatedByUser == username);
         return await q.OrderByDescending(r => r.CreatedAt).Take(limit).ToListAsync(cancellationToken);
     }
 
@@ -59,31 +61,35 @@ internal sealed class RunRepository(AtelierDbContext db) : IRunRepository
     }
 
     /// <inheritdoc/>
-    public async Task<WelcomeStats> GetWelcomeStatsAsync(CancellationToken cancellationToken = default)
+    public async Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default)
     {
         var startOfMonth = new DateTimeOffset(
             DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
 
-        var runsThisMonth = await db.Runs
-            .Where(r => r.CreatedAt >= startOfMonth)
-            .CountAsync(cancellationToken);
+        IQueryable<RunEntity> baseQ = db.Runs.Where(r => r.CreatedAt >= startOfMonth);
+        if (username is not null)
+            baseQ = baseQ.Where(r => r.CreatedByUser == username);
 
-        var completedThisMonth = await db.Runs
-            .Where(r => r.CreatedAt >= startOfMonth && r.Status == RunStatus.Completed)
+        var runsThisMonth = await baseQ.CountAsync(cancellationToken);
+
+        var completedThisMonth = await baseQ
+            .Where(r => r.Status == RunStatus.Completed)
             .CountAsync(cancellationToken);
 
         var convergenceRate = runsThisMonth > 0 ? (double)completedThisMonth / runsThisMonth : 0.0;
 
+        var runIds = baseQ.Select(r => r.Id);
         var totalIterationsThisMonth = await db.Iterations
-            .Where(i => db.Runs.Any(r => r.Id == i.RunId && r.CreatedAt >= startOfMonth))
+            .Where(i => runIds.Contains(i.RunId))
             .CountAsync(cancellationToken);
 
         var avgIterations = runsThisMonth > 0 ? (double)totalIterationsThisMonth / runsThisMonth : 0.0;
 
-        var totalCostThisMonth = await db.Runs
-            .Where(r => r.CreatedAt >= startOfMonth && r.TotalCostEur != null)
+        var totalCostThisMonth = await baseQ
+            .Where(r => r.TotalCostEur != null)
             .SumAsync(r => r.TotalCostEur!.Value, cancellationToken);
 
+        // Studio-analysis stats are shared and never scoped by user.
         var studioAnalysesThisMonth = await db.TemplateStudioAnalyses
             .Where(a => a.CreatedAt >= startOfMonth)
             .CountAsync(cancellationToken);

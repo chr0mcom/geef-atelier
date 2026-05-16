@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Runs;
 using ModelContextProtocol.Server;
 
@@ -10,10 +11,12 @@ public static class CancelRunTool
     [McpServerTool, Description("Cancels a running or pending run.")]
     public static async Task<bool> CancelRun(
         IRunService runService,
+        ICurrentUserService currentUser,
         [Description("The run ID (GUID).")] string runId,
         CancellationToken cancellationToken = default)
     {
         if (!Guid.TryParse(runId, out var guid)) return false;
-        return await runService.CancelRunAsync(guid, cancellationToken);
+        var requestingUsername = currentUser.IsAdmin ? null : currentUser.Username;
+        return await runService.CancelRunAsync(guid, requestingUsername, cancellationToken);
     }
 }

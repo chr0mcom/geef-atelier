@@ -10,8 +10,9 @@ public sealed class StaticTokenValidatorRejectsWrongTokenTests
     [Fact]
     public async Task ValidateTokenAsync_WrongToken_ReturnsFalse()
     {
-        var opts = Options.Create(new AtelierMcpOptions { Token = "valid-token" });
-        var sut = new StaticTokenValidator(opts, NullLogger<StaticTokenValidator>.Instance);
+        var opts     = Options.Create(new AtelierMcpOptions { Token = "valid-token" });
+        var userOpts = Options.Create(new AtelierUserOptions { Username = "admin" });
+        var sut = new StaticTokenValidator(opts, userOpts, NullLogger<StaticTokenValidator>.Instance);
 
         var result = await sut.ValidateTokenAsync("wrong-token");
 

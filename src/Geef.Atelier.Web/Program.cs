@@ -119,6 +119,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
 });
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserService, HttpContextCurrentUserService>();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

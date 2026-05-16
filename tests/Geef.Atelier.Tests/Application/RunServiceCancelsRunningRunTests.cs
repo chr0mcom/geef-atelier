@@ -53,7 +53,7 @@ public sealed class RunServiceCancelsRunningRunTests(PostgresFixture fixture)
         await using (var scope = host.ScopeFactory.CreateAsyncScope())
         {
             var svc = scope.ServiceProvider.GetRequiredService<IRunService>();
-            cancelResult = await svc.CancelRunAsync(runId);
+            cancelResult = await svc.CancelRunAsync(runId, requestingUsername: null);
         }
         Assert.True(cancelResult, "CancelRunAsync should return true for a Running run");
 

@@ -28,13 +28,22 @@ internal sealed class BearerTokenHandler(
         if (!outcome.IsValid)
             return AuthenticateResult.Fail("Invalid bearer token");
 
+        if (outcome.Subject is null)
+            return AuthenticateResult.Fail("Token validator returned IsValid=true with null Subject");
+
+        var username = outcome.Subject;
+        var isStaticBearer = outcome.Kind == "static-bearer";
+
         var claims = new List<Claim>
         {
-            new(ClaimTypes.Name, outcome.Subject ?? "mcp-client"),
-            new(ClaimTypes.Role, outcome.Kind),
+            new(ClaimTypes.Name, username),
+            new(ClaimTypes.NameIdentifier, outcome.ClientId ?? username),
         };
-        if (outcome.ClientId is not null)
-            claims.Add(new Claim(ClaimTypes.NameIdentifier, outcome.ClientId));
+
+        claims.Add(isStaticBearer
+            ? new Claim(ClaimTypes.Role, "admin")
+            : new Claim(ClaimTypes.Role, outcome.Kind));
+
         if (outcome.Scope is not null)
             claims.Add(new Claim("scope", outcome.Scope));
 

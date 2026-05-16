@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Mcp.Models;
@@ -25,6 +26,7 @@ public static class SubmitRequestTool
     [McpServerTool, Description("Submits a new run request with a briefing text and optional JSON configuration.")]
     public static async Task<RunStatusDto> SubmitRequest(
         IRunService runService,
+        ICurrentUserService currentUser,
         [Description("The briefing text describing the task for the AI orchestrator.")] string briefingText,
         [Description("Optional JSON configuration object. Defaults to '{}'.")] string? configJson = null,
         [Description("Name of the crew template to use (e.g. 'klassik'). Defaults to the system default when omitted.")] string? crewTemplate = null,
@@ -90,7 +92,7 @@ public static class SubmitRequestTool
             new SubmitRunRequest(
                 BriefingText: briefingText,
                 ConfigJson: configJson ?? "{}",
-                CreatedByUser: "mcp-client",
+                CreatedByUser: currentUser.Username,
                 CrewTemplateName: crewSpec is null ? crewTemplate : null,
                 CustomCrew: crewSpec,
                 Attachments: attachmentInputs),

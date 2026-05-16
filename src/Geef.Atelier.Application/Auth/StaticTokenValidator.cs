@@ -8,6 +8,7 @@ namespace Geef.Atelier.Application.Auth;
 
 internal sealed class StaticTokenValidator(
     IOptions<AtelierMcpOptions> options,
+    IOptions<AtelierUserOptions> userOptions,
     ILogger<StaticTokenValidator> logger) : ITokenValidator
 {
     public Task<TokenValidationOutcome> ValidateTokenAsync(string token, CancellationToken cancellationToken = default)
@@ -29,14 +30,17 @@ internal sealed class StaticTokenValidator(
         var expectedBytes = Encoding.UTF8.GetBytes(opts.Token);
         var actualBytes   = Encoding.UTF8.GetBytes(token);
 
-        if (expectedBytes.Length != actualBytes.Length ||
-            !CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes))
+        if (!CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes))
         {
             logger.LogWarning("MCP token validation rejected");
             return Task.FromResult(TokenValidationOutcome.Invalid);
         }
 
-        logger.LogInformation("MCP token validation accepted");
-        return Task.FromResult(new TokenValidationOutcome(true, "static-bearer", "static-client", null, null));
+        var username = !string.IsNullOrEmpty(opts.StaticTokenUser)
+            ? opts.StaticTokenUser
+            : userOptions.Value.Username;
+
+        logger.LogInformation("MCP token validation accepted for user {Username}", username);
+        return Task.FromResult(new TokenValidationOutcome(true, "static-bearer", username, null, null));
     }
 }

@@ -86,29 +86,52 @@ internal sealed class RunService(
     }
 
     /// <inheritdoc/>
-    public Task<RunEntity?> GetRunAsync(Guid runId, CancellationToken cancellationToken = default)
-        => repository.GetByIdAsync(runId, cancellationToken);
-
-    /// <inheritdoc/>
-    public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null, CancellationToken cancellationToken = default)
+    public async Task<RunEntity?> GetRunAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
     {
-        if (limit <= 0) throw new ArgumentOutOfRangeException(nameof(limit), "Limit must be positive.");
-        return repository.ListAsync(limit, statusFilter, cancellationToken);
+        var run = await repository.GetByIdAsync(runId, cancellationToken);
+        if (run is null) return null;
+        if (requestingUsername is not null && run.CreatedByUser != requestingUsername) return null;
+        return run;
     }
 
     /// <inheritdoc/>
-    public Task<bool> CancelRunAsync(Guid runId, CancellationToken cancellationToken = default)
-        => repository.RequestCancellationAsync(runId, cancellationToken);
+    public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null, string? requestingUsername = null, CancellationToken cancellationToken = default)
+    {
+        if (limit <= 0) throw new ArgumentOutOfRangeException(nameof(limit), "Limit must be positive.");
+        return repository.ListAsync(limit, statusFilter, requestingUsername, cancellationToken);
+    }
 
     /// <inheritdoc/>
-    public Task<RunDetails?> GetRunDetailsAsync(Guid runId, CancellationToken cancellationToken = default)
-        => repository.GetDetailsAsync(runId, cancellationToken);
+    public async Task<bool> CancelRunAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
+    {
+        if (requestingUsername is not null)
+        {
+            var run = await repository.GetByIdAsync(runId, cancellationToken);
+            if (run is null || run.CreatedByUser != requestingUsername) return false;
+        }
+        return await repository.RequestCancellationAsync(runId, cancellationToken);
+    }
 
     /// <inheritdoc/>
-    public async Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, CancellationToken cancellationToken = default)
+    public async Task<RunDetails?> GetRunDetailsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
+    {
+        var details = await repository.GetDetailsAsync(runId, cancellationToken);
+        if (details is null) return null;
+        if (requestingUsername is not null && details.Run.CreatedByUser != requestingUsername) return null;
+        return details;
+    }
+
+    /// <inheritdoc/>
+    public Task<WelcomeStats> GetWelcomeStatsAsync(string? requestingUsername, CancellationToken cancellationToken = default)
+        => repository.GetWelcomeStatsAsync(requestingUsername, cancellationToken);
+
+    /// <inheritdoc/>
+    public async Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
     {
         var details = await repository.GetDetailsAsync(runId, cancellationToken);
         if (details is null)
+            return null;
+        if (requestingUsername is not null && details.Run.CreatedByUser != requestingUsername)
             return null;
 
         var snapshot = details.Run.CrewSnapshot is { } s ? CrewSnapshot.Deserialize(s) : null;

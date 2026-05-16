@@ -50,7 +50,7 @@ public sealed class RunServiceSubmitsAndQueriesTests(PostgresFixture fixture)
         await using (var scope = host.ScopeFactory.CreateAsyncScope())
         {
             var svc = scope.ServiceProvider.GetRequiredService<IRunService>();
-            var result = await svc.GetRunAsync(runId);
+            var result = await svc.GetRunAsync(runId, requestingUsername: null);
             Assert.NotNull(result);
             Assert.Equal(RunStatus.Completed, result.Status);
             Assert.NotNull(result.FinalText);

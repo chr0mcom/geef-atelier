@@ -4,6 +4,7 @@
 @implements IAsyncDisposable
 @inject IRunService RunService
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthProvider
 @using Microsoft.AspNetCore.SignalR.Client
 
 <PageTitle>Runs — Geef.Atelier</PageTitle>
@@ -25,6 +26,13 @@
                             OnClick="@(() => ApplyFilterAsync(f.Status))" />
             }
         </div>
+        @if (_isAdmin)
+        {
+            <label class="admin-toggle">
+                <input type="checkbox" @bind="_showAllUsers" @bind:after="LoadRunsAsync" />
+                Alle Benutzer anzeigen
+            </label>
+        }
     </div>
 
     @if (_runs is null)
@@ -44,7 +52,13 @@
         <div class="runs-grid">
             @foreach (var run in _runs)
             {
-                <RunRow Run="run" OnOpen="@(() => Nav.NavigateTo($"/runs/{run.Id}"))" />
+                <div class="run-row-wrapper">
+                    @if (_showAllUsers && _isAdmin && run.CreatedByUser is not null)
+                    {
+                        <div class="run-user-badge">@run.CreatedByUser</div>
+                    }
+                    <RunRow Run="run" OnOpen="@(() => Nav.NavigateTo($"/runs/{run.Id}"))" />
+                </div>
             }
         </div>
     }
@@ -72,11 +86,24 @@
 
     IReadOnlyList<RunEntity>? _runs;
     HubConnection?            _hub;
+    bool                      _isAdmin;
+    string?                   _currentUsername;
+    bool                      _showAllUsers;
 
     protected override async Task OnInitializedAsync()
     {
-        _runs = await RunService.ListRunsAsync(20, StatusFilter);
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        _isAdmin         = auth.User.IsInRole("admin");
+        _currentUsername = auth.User.Identity?.Name;
+
+        await LoadRunsAsync();
         await InitHubAsync();
+    }
+
+    async Task LoadRunsAsync()
+    {
+        var username = (_showAllUsers && _isAdmin) ? null : _currentUsername;
+        _runs = await RunService.ListRunsAsync(20, StatusFilter, requestingUsername: username);
     }
 
     async Task InitHubAsync()
@@ -88,14 +115,14 @@
 
         _hub.On<Guid>("AnyRunUpdated", async _ =>
         {
-            _runs = await RunService.ListRunsAsync(20, StatusFilter);
+            await LoadRunsAsync();
             await InvokeAsync(StateHasChanged);
         });
 
         _hub.Reconnected += async _ =>
         {
             await _hub.SendAsync("JoinAllRunsGroupAsync");
-            _runs = await RunService.ListRunsAsync(20, StatusFilter);
+            await LoadRunsAsync();
             await InvokeAsync(StateHasChanged);
         };
 
@@ -107,7 +134,8 @@
     {
         var query = status.HasValue ? $"?Status={status.Value}" : string.Empty;
         Nav.NavigateTo("/runs" + query, forceLoad: false);
-        _runs = await RunService.ListRunsAsync(20, status);
+        var username = (_showAllUsers && _isAdmin) ? null : _currentUsername;
+        _runs = await RunService.ListRunsAsync(20, status, requestingUsername: username);
         StateHasChanged();
     }
 

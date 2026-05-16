@@ -18,7 +18,7 @@
         _disabled = true;
         try
         {
-            await RunService.CancelRunAsync(RunId);
+            await RunService.CancelRunAsync(RunId, requestingUsername: null);
             await OnCancelled.InvokeAsync();
         }
         catch

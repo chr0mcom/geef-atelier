@@ -10,8 +10,9 @@ public sealed class StaticTokenValidatorRejectsWhenNotConfiguredTests
     [Fact]
     public async Task ValidateTokenAsync_EmptyConfig_ReturnsFalse()
     {
-        var opts = Options.Create(new AtelierMcpOptions { Token = "" });
-        var sut = new StaticTokenValidator(opts, NullLogger<StaticTokenValidator>.Instance);
+        var opts     = Options.Create(new AtelierMcpOptions { Token = "" });
+        var userOpts = Options.Create(new AtelierUserOptions { Username = "admin" });
+        var sut = new StaticTokenValidator(opts, userOpts, NullLogger<StaticTokenValidator>.Instance);
 
         var result = await sut.ValidateTokenAsync("any-token");
 

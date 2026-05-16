@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
@@ -10,6 +11,8 @@ namespace Geef.Atelier.Tests.Mcp;
 /// </summary>
 public sealed class SubmitRequestToolAttachmentTests
 {
+    private static readonly ICurrentUserService AdminUser = new FakeAdminUser();
+
     [Fact]
     public async Task SubmitRequest_WithAttachments_DecodesBase64AndPassesToRunService()
     {
@@ -21,7 +24,7 @@ public sealed class SubmitRequestToolAttachmentTests
             [{"filename":"doc.md","contentType":"text/markdown","contentBase64":"{{b64}}"}]
             """;
 
-        await SubmitRequestTool.SubmitRequest(svc, "briefing", attachments: json);
+        await SubmitRequestTool.SubmitRequest(svc, AdminUser, "briefing", attachments: json);
 
         Assert.NotNull(svc.LastAttachments);
         Assert.Single(svc.LastAttachments!);
@@ -44,7 +47,7 @@ public sealed class SubmitRequestToolAttachmentTests
             ]
             """;
 
-        await SubmitRequestTool.SubmitRequest(svc, "briefing", attachments: json);
+        await SubmitRequestTool.SubmitRequest(svc, AdminUser, "briefing", attachments: json);
 
         Assert.Equal(2, svc.LastAttachments!.Count);
         Assert.Equal("a.txt", svc.LastAttachments![0].Filename);
@@ -57,7 +60,7 @@ public sealed class SubmitRequestToolAttachmentTests
         var svc = new CapturingRunService();
 
         await Assert.ThrowsAsync<ArgumentException>(
-            () => SubmitRequestTool.SubmitRequest(svc, "briefing", attachments: "not valid json{{"));
+            () => SubmitRequestTool.SubmitRequest(svc, AdminUser, "briefing", attachments: "not valid json{{"));
     }
 
     [Fact]
@@ -68,7 +71,7 @@ public sealed class SubmitRequestToolAttachmentTests
         var json = """[{"filename":"doc.md","contentType":"text/plain","contentBase64":"!!!not-base64!!!"}]""";
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(
-            () => SubmitRequestTool.SubmitRequest(svc, "briefing", attachments: json));
+            () => SubmitRequestTool.SubmitRequest(svc, AdminUser, "briefing", attachments: json));
 
         Assert.Contains("doc.md", ex.Message);
     }
@@ -82,7 +85,7 @@ public sealed class SubmitRequestToolAttachmentTests
         var json = $$"""[{"filename":"doc.docx","contentType":"application/msword","contentBase64":"{{b64}}"}]""";
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(
-            () => SubmitRequestTool.SubmitRequest(svc, "briefing", attachments: json));
+            () => SubmitRequestTool.SubmitRequest(svc, AdminUser, "briefing", attachments: json));
 
         Assert.Contains("application/msword", ex.Message);
     }
@@ -96,7 +99,7 @@ public sealed class SubmitRequestToolAttachmentTests
         var json = $$"""[{"filename":"data.bin","contentType":"application/octet-stream","contentBase64":"{{b64}}"}]""";
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(
-            () => SubmitRequestTool.SubmitRequest(svc, "briefing", attachments: json));
+            () => SubmitRequestTool.SubmitRequest(svc, AdminUser, "briefing", attachments: json));
 
         Assert.Contains("application/octet-stream", ex.Message);
     }
@@ -106,7 +109,7 @@ public sealed class SubmitRequestToolAttachmentTests
     {
         var svc = new CapturingRunService();
 
-        await SubmitRequestTool.SubmitRequest(svc, "briefing");
+        await SubmitRequestTool.SubmitRequest(svc, AdminUser, "briefing");
 
         Assert.Null(svc.LastAttachments);
     }
@@ -116,12 +119,19 @@ public sealed class SubmitRequestToolAttachmentTests
     {
         var svc = new CapturingRunService();
 
-        await SubmitRequestTool.SubmitRequest(svc, "briefing", attachments: "[]");
+        await SubmitRequestTool.SubmitRequest(svc, AdminUser, "briefing", attachments: "[]");
 
         Assert.Null(svc.LastAttachments);
     }
 
-    // --- Fake ---
+    // --- Fakes ---
+
+    private sealed class FakeAdminUser : ICurrentUserService
+    {
+        public string? Username => "admin";
+        public bool IsAuthenticated => true;
+        public bool IsAdmin => true;
+    }
 
     private sealed class CapturingRunService : IRunService
     {
@@ -133,10 +143,11 @@ public sealed class SubmitRequestToolAttachmentTests
             return Task.FromResult(Guid.NewGuid());
         }
 
-        public Task<RunEntity?> GetRunAsync(Guid runId, CancellationToken ct = default) => Task.FromResult<RunEntity?>(null);
-        public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<RunEntity>>([]);
-        public Task<bool> CancelRunAsync(Guid runId, CancellationToken ct = default) => Task.FromResult(false);
-        public Task<RunDetails?> GetRunDetailsAsync(Guid runId, CancellationToken ct = default) => Task.FromResult<RunDetails?>(null);
-        public Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, CancellationToken ct = default) => Task.FromResult<RunWithGroundingViewModel?>(null);
+        public Task<RunEntity?> GetRunAsync(Guid runId, string? requestingUsername, CancellationToken ct = default) => Task.FromResult<RunEntity?>(null);
+        public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null, string? requestingUsername = null, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<RunEntity>>([]);
+        public Task<bool> CancelRunAsync(Guid runId, string? requestingUsername, CancellationToken ct = default) => Task.FromResult(false);
+        public Task<RunDetails?> GetRunDetailsAsync(Guid runId, string? requestingUsername, CancellationToken ct = default) => Task.FromResult<RunDetails?>(null);
+        public Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, string? requestingUsername, CancellationToken ct = default) => Task.FromResult<RunWithGroundingViewModel?>(null);
+        public Task<WelcomeStats> GetWelcomeStatsAsync(string? requestingUsername, CancellationToken ct = default) => Task.FromResult(new WelcomeStats(0, 0, 0, 0, 0, 0));
     }
 }
