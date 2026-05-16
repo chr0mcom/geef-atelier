@@ -16,6 +16,28 @@
     @if (_error is not null)
     {
         <div class="alert alert-danger" data-testid="oauth-error">@_error</div>
+
+        @if (!string.IsNullOrEmpty(ClientId) || !string.IsNullOrEmpty(RedirectUri))
+        {
+            <div class="auth-card-meta" style="margin-top:1rem;font-size:.85em;" data-testid="oauth-error-details">
+                <p style="margin:.25rem 0;"><strong>Angaben aus der Anfrage:</strong></p>
+                @if (!string.IsNullOrEmpty(ClientId))
+                {
+                    <p style="margin:.25rem 0;">
+                        Client-ID: <code style="user-select:all;">@ClientId</code>
+                    </p>
+                }
+                @if (!string.IsNullOrEmpty(RedirectUri))
+                {
+                    <p style="margin:.25rem 0;">
+                        Redirect-URI: <code style="user-select:all;">@RedirectUri</code>
+                    </p>
+                }
+                <p style="margin:.75rem 0 0;">
+                    <a href="/admin/oauth-clients" class="btn ghost" style="font-size:.9em;">→ OAuth-Client anlegen</a>
+                </p>
+            </div>
+        }
     }
 
     @if (_valid && _client is not null)
