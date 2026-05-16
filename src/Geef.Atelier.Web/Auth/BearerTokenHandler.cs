@@ -37,7 +37,6 @@ internal sealed class BearerTokenHandler(
             new(ClaimTypes.NameIdentifier, outcome.ClientId ?? username),
         };
 
-        // Static bearer tokens carry full admin access; OAuth tokens keep their declared kind as role.
         claims.Add(isStaticBearer
             ? new Claim(ClaimTypes.Role, "admin")
             : new Claim(ClaimTypes.Role, outcome.Kind));

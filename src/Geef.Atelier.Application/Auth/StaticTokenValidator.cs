@@ -30,8 +30,7 @@ internal sealed class StaticTokenValidator(
         var expectedBytes = Encoding.UTF8.GetBytes(opts.Token);
         var actualBytes   = Encoding.UTF8.GetBytes(token);
 
-        if (expectedBytes.Length != actualBytes.Length ||
-            !CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes))
+        if (!CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes))
         {
             logger.LogWarning("MCP token validation rejected");
             return Task.FromResult(TokenValidationOutcome.Invalid);
