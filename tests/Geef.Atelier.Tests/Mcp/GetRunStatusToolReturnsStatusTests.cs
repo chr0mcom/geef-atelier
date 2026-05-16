@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Mcp.Tools;
@@ -6,6 +7,8 @@ namespace Geef.Atelier.Tests.Mcp;
 
 public sealed class GetRunStatusToolReturnsStatusTests
 {
+    private static readonly ICurrentUserService AdminUser = new FakeAdminUser();
+
     [Fact]
     public async Task GetRunStatus_WithValidRunId_ReturnsStatus()
     {
@@ -13,6 +16,7 @@ public sealed class GetRunStatusToolReturnsStatusTests
         var fakeService = new FakeRunServiceWithRun(runId, RunStatus.Running);
         var result = await GetRunStatusTool.GetRunStatus(
             fakeService,
+            AdminUser,
             runId: runId.ToString(),
             cancellationToken: default);
 
@@ -27,10 +31,18 @@ public sealed class GetRunStatusToolReturnsStatusTests
         var fakeService = new FakeRunServiceWithRun(Guid.NewGuid(), RunStatus.Pending);
         var result = await GetRunStatusTool.GetRunStatus(
             fakeService,
+            AdminUser,
             runId: "not-a-guid",
             cancellationToken: default);
 
         Assert.Null(result);
+    }
+
+    private sealed class FakeAdminUser : ICurrentUserService
+    {
+        public string? Username => "admin";
+        public bool IsAuthenticated => true;
+        public bool IsAdmin => true;
     }
 
     private sealed class FakeRunServiceWithRun(Guid knownId, RunStatus status) : IRunService

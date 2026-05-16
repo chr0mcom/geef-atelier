@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
@@ -7,11 +8,13 @@ namespace Geef.Atelier.Tests.Mcp;
 
 public sealed class SubmitRequestWithCrewTests
 {
+    private static readonly ICurrentUserService AdminUser = new FakeAdminUser();
+
     [Fact]
     public async Task SubmitRequest_WithCrewTemplate_PassesTemplateNameToService()
     {
         var svc = new CapturingRunService();
-        await SubmitRequestTool.SubmitRequest(svc, "briefing", crewTemplate: "klassik");
+        await SubmitRequestTool.SubmitRequest(svc, AdminUser, "briefing", crewTemplate: "klassik");
 
         Assert.Equal("klassik", svc.LastCrewTemplateName);
         Assert.Null(svc.LastCustomCrew);
@@ -30,7 +33,7 @@ public sealed class SubmitRequestWithCrewTests
             }
             """;
 
-        await SubmitRequestTool.SubmitRequest(svc, "briefing", customCrew: json);
+        await SubmitRequestTool.SubmitRequest(svc, AdminUser, "briefing", customCrew: json);
 
         Assert.NotNull(svc.LastCustomCrew);
         Assert.Null(svc.LastCrewTemplateName);  // custom crew overrides template
@@ -40,7 +43,7 @@ public sealed class SubmitRequestWithCrewTests
     public async Task SubmitRequest_WithInvalidCustomCrewJson_FallsBackToTemplate()
     {
         var svc = new CapturingRunService();
-        await SubmitRequestTool.SubmitRequest(svc, "briefing", crewTemplate: "klassik", customCrew: "not-json{{");
+        await SubmitRequestTool.SubmitRequest(svc, AdminUser, "briefing", crewTemplate: "klassik", customCrew: "not-json{{");
 
         Assert.Null(svc.LastCustomCrew);
         Assert.Equal("klassik", svc.LastCrewTemplateName);
@@ -50,10 +53,17 @@ public sealed class SubmitRequestWithCrewTests
     public async Task SubmitRequest_WithNoCrewArgs_PassesNullsToService()
     {
         var svc = new CapturingRunService();
-        await SubmitRequestTool.SubmitRequest(svc, "briefing");
+        await SubmitRequestTool.SubmitRequest(svc, AdminUser, "briefing");
 
         Assert.Null(svc.LastCrewTemplateName);
         Assert.Null(svc.LastCustomCrew);
+    }
+
+    private sealed class FakeAdminUser : ICurrentUserService
+    {
+        public string? Username => "admin";
+        public bool IsAuthenticated => true;
+        public bool IsAdmin => true;
     }
 
     private sealed class CapturingRunService : IRunService

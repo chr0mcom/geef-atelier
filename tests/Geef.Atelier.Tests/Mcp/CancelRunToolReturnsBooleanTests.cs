@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Mcp.Tools;
@@ -6,6 +7,8 @@ namespace Geef.Atelier.Tests.Mcp;
 
 public sealed class CancelRunToolReturnsBooleanTests
 {
+    private static readonly ICurrentUserService AdminUser = new FakeAdminUser();
+
     [Fact]
     public async Task CancelRun_WithValidRunId_ReturnsTrue()
     {
@@ -13,6 +16,7 @@ public sealed class CancelRunToolReturnsBooleanTests
         var fakeService = new FakeRunServiceCancellable(runId);
         var result = await CancelRunTool.CancelRun(
             fakeService,
+            AdminUser,
             runId: runId.ToString(),
             cancellationToken: default);
 
@@ -25,10 +29,18 @@ public sealed class CancelRunToolReturnsBooleanTests
         var fakeService = new FakeRunServiceCancellable(Guid.NewGuid());
         var result = await CancelRunTool.CancelRun(
             fakeService,
+            AdminUser,
             runId: "not-a-guid",
             cancellationToken: default);
 
         Assert.False(result);
+    }
+
+    private sealed class FakeAdminUser : ICurrentUserService
+    {
+        public string? Username => "admin";
+        public bool IsAuthenticated => true;
+        public bool IsAdmin => true;
     }
 
     private sealed class FakeRunServiceCancellable(Guid cancellableId) : IRunService
