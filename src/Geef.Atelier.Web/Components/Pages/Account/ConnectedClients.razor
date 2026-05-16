@@ -14,6 +14,11 @@
         <a href="/" class="btn ghost" data-testid="btn-back">← Zurück</a>
     </div>
 
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger" data-testid="error-banner">@_error</div>
+    }
+
     @if (_loading)
     {
         <p>Laden…</p>
@@ -26,11 +31,6 @@
     }
     else
     {
-        @if (!string.IsNullOrEmpty(_error))
-        {
-            <div class="alert alert-danger" data-testid="error-banner">@_error</div>
-        }
-
         <div class="clients-list" data-testid="connected-clients-list">
             @foreach (var client in _clients)
             {

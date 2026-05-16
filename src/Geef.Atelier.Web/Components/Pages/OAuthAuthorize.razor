@@ -44,6 +44,7 @@
         </p>
 
         <form method="post" action="/oauth/authorize" class="auth-consent-form">
+            <input type="hidden" name="response_type"          value="@ResponseType" />
             <input type="hidden" name="client_id"              value="@ClientId" />
             <input type="hidden" name="redirect_uri"           value="@RedirectUri" />
             <input type="hidden" name="scope"                  value="@Scope" />

@@ -20,8 +20,9 @@ public sealed class InMemoryOAuthAuthorizationCodeRepository : IOAuthAuthorizati
     {
         if (!_store.TryGetValue(codeHash, out var code)) return Task.FromResult<OAuthAuthorizationCode?>(null);
         if (code.UsedAt.HasValue) return Task.FromResult<OAuthAuthorizationCode?>(null);
-        _store[codeHash] = code with { UsedAt = DateTimeOffset.UtcNow };
-        return Task.FromResult<OAuthAuthorizationCode?>(code);
+        var consumed = code with { UsedAt = DateTimeOffset.UtcNow };
+        _store[codeHash] = consumed;
+        return Task.FromResult<OAuthAuthorizationCode?>(consumed);
     }
 
     public Task DeleteExpiredAsync(CancellationToken ct)
