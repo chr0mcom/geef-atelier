@@ -1,57 +1,59 @@
-# Reviewer-Kalibrierung
+# Reviewer calibration
 
-*Letzte Aktualisierung: 2026-05-17 (Code-Referenzen auf Crew-Profil-System aktualisiert; Severity-Taxonomie inhaltlich unverändert)*
+*[Deutsch](06-reviewer-calibration_de.md) · **English***
 
-Dieses Dokument beschreibt den **Atelier-Standard für Reviewer-Severity** und die **Convergence-Policy-Strategie**. Es ist normatives Referenzdokument für alle, die Reviewer-Prompts anpassen oder neue Reviewer hinzufügen.
+*Last updated: 2026-05-17 (code references updated to the crew-profile system; severity taxonomy unchanged in substance)*
 
-## Severity-Taxonomie (Atelier-Standard)
+This document describes the **Atelier standard for reviewer severity** and the **convergence-policy strategy**. It is the normative reference for anyone adjusting reviewer prompts or adding new reviewers.
 
-Die Atelier-Pipeline nutzt vier Severity-Stufen für Reviewer-Findings. Die Definitionen sind verbindlich — abweichende Interpretationen in Reviewer-Prompts sind ein Bug.
+## Severity taxonomy (Atelier standard)
 
-| Severity | Bedeutung | Beispiele |
+The Atelier pipeline uses four severity levels for reviewer findings. The definitions are binding — diverging interpretations in reviewer prompts are a bug.
+
+| Severity | Meaning | Examples |
 |---|---|---|
-| **critical** | Substanzieller Fakten- oder Logikfehler. Ein Leser, der dem Text vertraut, wird aktiv fehlinformiert. | Falscher Name einer Person; falsche Jahreszahl; falsches Theorem; Widerspruch zwischen zwei Abschnitten desselben Textes. |
-| **major** | Wichtige Auslassung oder klare Ungenauigkeit, die den Nutzen erheblich schmälert, aber nicht direkt fehlinformiert. | Zentrales Gegenargument fehlt; wichtige Einschränkung nicht erwähnt; zentrale Quelle fehlt. |
-| **minor** | Stil-Verbesserung, Präzisierungswunsch oder Klarheits-Erhöhung. Text ist substanziell korrekt. | Zwei Sätze wären zusammengefasst klarer; Begriff sollte präziser definiert werden; Formulierung ist umständlich. |
-| **info** | Optionaler Hinweis ohne Handlungsdruck. Der Reviewer beobachtet etwas, ohne eine Änderung zu verlangen. | Hinweis auf weiterführende Quellen; Beobachtung über Tonalität ohne Kritik. |
+| **critical** | Substantial factual or logical error. A reader who trusts the text is actively misinformed. | Wrong name of a person; wrong year; wrong theorem; contradiction between two sections of the same text. |
+| **major** | Important omission or clear inaccuracy that significantly reduces usefulness but does not directly misinform. | Central counter-argument missing; important caveat not mentioned; central source missing. |
+| **minor** | Style improvement, request for precision, or clarity increase. The text is substantially correct. | Two sentences would be clearer combined; a term should be defined more precisely; phrasing is clumsy. |
+| **info** | Optional note with no need to act. The reviewer observes something without demanding a change. | Pointer to further sources; observation about tone without criticism. |
 
-### Anti-Pattern: "stimmt zwar" ≠ Critical
+### Anti-pattern: "technically correct" ≠ critical
 
-Die häufigste Fehlklassifikation: Ein Reviewer findet, dass etwas technisch korrekt ist, aber "hätte präziser formuliert werden können" — und stuft es als **critical** ein.
+The most common misclassification: a reviewer finds that something is technically correct but "could have been phrased more precisely" — and rates it **critical**.
 
-**Regel:** Wenn die Reviewer-Begründung Formulierungen enthält wie:
-- "ist zwar korrekt, aber..."
-- "stimmt zwar"
-- "zufällig richtig"
-- "ist im Prinzip okay, jedoch..."
-- "die Zahl ist korrekt, allerdings..."
+**Rule:** if the reviewer's reasoning contains phrasings such as:
+- "is correct, but..."
+- "technically true"
+- "accidentally right"
+- "is fine in principle, however..."
+- "the number is correct, although..."
 
-...dann ist das Finding **per Definition kein Critical**. Höchstens **minor**.
+...then the finding is **by definition not critical**. At most **minor**.
 
-**Critical bedeutet: der Text ist falsch.** Nicht: "könnte präziser sein."
+**Critical means: the text is wrong.** Not: "could be more precise."
 
-### Negativ-Beispiel (Hadwiger-Nelson)
+### Negative example (Hadwiger–Nelson)
 
-Das Hadwiger-Nelson-Problem hat diese Fehlklassifikation ausgelöst:
+The Hadwiger–Nelson problem triggered this misclassification:
 
-> *"Die Beschreibung der Moser-Spindel ist faktisch falsch: Die Moser-Spindel besteht aus 7 Knoten und 11 Kanten, nicht aus 'sieben Punkten' allgemein — das ist zwar zufällig korrekt, aber die Aussage ist unpräzise."*
+> *"The description of the Moser spindle is factually wrong: the Moser spindle consists of 7 vertices and 11 edges, not 'seven points' in general — this is accidentally correct, but the statement is imprecise."*
 
-**Analyse:** Der Reviewer schreibt selbst "zufällig korrekt". Die Zahl 7 stimmt. Die Kritik ist eine Präzisierungs-Anfrage (graph-theoretische Terminologie "Knoten/Kanten" vs. "Punkte"). Das ist **minor**, nicht critical.
+**Analysis:** the reviewer themselves writes "accidentally correct". The number 7 is right. The criticism is a request for precision (graph-theoretical terminology "vertices/edges" vs. "points"). That is **minor**, not critical.
 
-Die Hadwiger-Nelson-Taxonomie ist als `[InlineData]` in `SeverityClassificationTests` verankert.
+The Hadwiger–Nelson taxonomy is anchored as `[InlineData]` in `SeverityClassificationTests`.
 
-## Tool-Schema
+## Tool schema
 
-Das `submit_review`-Tool akzeptiert:
+The `submit_review` tool accepts:
 ```json
 "severity": { "enum": ["critical", "major", "minor", "info"] }
 ```
 
-**Backwards-Kompat:** `ProfileBasedReviewer.MapSeverity()` (in `src/Geef.Atelier.Infrastructure/Pipeline/ProfileBasedReviewer.cs`) akzeptiert weiterhin `"error"` (→ `SdkSeverity.Error`) und `"warning"` (→ `SdkSeverity.Warning`) als Fallback für den Fall, dass das LLM vom Schema abweicht.
+**Backwards compatibility:** `ProfileBasedReviewer.MapSeverity()` (in `src/Geef.Atelier.Infrastructure/Pipeline/ProfileBasedReviewer.cs`) still accepts `"error"` (→ `SdkSeverity.Error`) and `"warning"` (→ `SdkSeverity.Warning`) as a fallback in case the LLM deviates from the schema.
 
-## Convergence-Policy
+## Convergence policy
 
-Die Policy wird via `ConvergenceOptions` (`src/Geef.Atelier.Infrastructure/Configuration/`) konfiguriert und aus `appsettings.json` gelesen:
+The policy is configured via `ConvergenceOptions` (`src/Geef.Atelier.Infrastructure/Configuration/`) and read from `appsettings.json`:
 
 ```json
 {
@@ -64,29 +66,28 @@ Die Policy wird via `ConvergenceOptions` (`src/Geef.Atelier.Infrastructure/Confi
 }
 ```
 
-### Begründung: AbortOnCritical=false als Default
+### Rationale: AbortOnCritical=false as default
 
-Mit `AbortOnCritical=true` (alter Default aus D-012) bricht ein einziger überzogener Critical-Finding die gesamte Pipeline ab. Das macht das System fragil gegen Reviewer-Kalibrierungsfehler.
+With `AbortOnCritical=true` (the old default from D-012) a single over-eager critical finding aborts the entire pipeline. That makes the system fragile against reviewer calibration errors.
 
-Mit `AbortOnCritical=false`:
-- Die Pipeline iteriert bis zu `MaxIterations=3` Mal.
-- Jede Iteration sieht die Findings der vorherigen und kann sie adressieren.
-- Erst bei Stagnation (identische Findings über `StagnationThreshold=3` Iterationen) bricht die Pipeline ab — was dann ein legitimer Abort wäre.
+With `AbortOnCritical=false`:
+- The pipeline iterates up to `MaxIterations=3` times.
+- Each iteration sees the previous one's findings and can address them.
+- Only on stagnation (identical findings across `StagnationThreshold=3` iterations) does the pipeline abort — which then is a legitimate abort.
 
-### Wann AbortOnCritical=true sinnvoll ist
+### When AbortOnCritical=true makes sense
 
-Wenn ein Deployment absolute Qualitätssicherheit erfordert und Reviewer-Kalibrierung als verlässlich gilt — z.B. domänen-spezialisierte Reviewer mit geprüften Prompts (Roadmap-Schritt 8: Domänen-Spezialisierung).
+When a deployment requires absolute quality assurance and reviewer calibration is considered reliable — e.g. domain-specialized reviewers with vetted prompts (roadmap step 8: domain specialization).
 
-## Neue Reviewer hinzufügen
+## Adding new reviewers
 
-Seit dem Crew-System (D-028) sind Reviewer **datengetriebene Profile**, keine Code-Klassen
-mehr (`LlmReviewer`/`AtelierSystemPrompts` wurden entfernt). Ein neuer System-Reviewer:
+Since the crew system (D-028) reviewers are **data-driven profiles**, no longer code classes (`LlmReviewer`/`AtelierSystemPrompts` were removed). A new system reviewer:
 
-1. System-Prompt als `public const string` in `src/Geef.Atelier.Core/Domain/Crew/SystemPrompts.cs` anlegen.
-2. Den **vollständigen Severity-Taxonomie-Block** aus einem bestehenden System-Reviewer (z.B. `briefing-fidelity` oder `clarity`) übernehmen — kein eigenes Schema erfinden.
-3. Den Anti-Pattern-Abschnitt und das Hadwiger-Nelson-Beispiel mitkopieren.
-4. Den Reviewer als `ReviewerProfile`-Konstante in `SystemCrew` (`src/Geef.Atelier.Core/Domain/Crew/SystemCrew.cs`) registrieren — mit Provider/Modell gemäß Modell-Pluralismus-Konvention (Fremd-Modell relativ zum Executor).
-5. Bei Bedarf einem System-`CrewTemplate` in `SystemCrew` zur Reviewer-Liste hinzufügen. Custom-Reviewer entstehen stattdessen über `ICrewService` / die `/crew/profiles/reviewers`-UI — kein Code nötig.
-6. `SeverityClassificationTests` um den neuen Reviewer-Namen erweitern (falls reviewer-spezifisch getestet).
+1. Add the system prompt as a `public const string` in `src/Geef.Atelier.Core/Domain/Crew/SystemPrompts.cs`.
+2. Reuse the **complete severity-taxonomy block** from an existing system reviewer (e.g. `briefing-fidelity` or `clarity`) — do not invent a separate schema.
+3. Copy the anti-pattern section and the Hadwiger–Nelson example along with it.
+4. Register the reviewer as a `ReviewerProfile` constant in `SystemCrew` (`src/Geef.Atelier.Core/Domain/Crew/SystemCrew.cs`) — with provider/model per the model-pluralism convention (foreign model relative to the executor).
+5. If needed, add it to the reviewer list of a system `CrewTemplate` in `SystemCrew`. Custom reviewers are instead created via `ICrewService` / the `/crew/profiles/reviewers` UI — no code needed.
+6. Extend `SeverityClassificationTests` with the new reviewer name (if tested reviewer-specifically).
 
-D-025 dokumentiert die Entscheidungspunkte hinter dieser Kalibrierung.
+D-025 documents the decision points behind this calibration.

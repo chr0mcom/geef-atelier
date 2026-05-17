@@ -1,600 +1,602 @@
 # Decisions Log
 
-*Letzte Aktualisierung: 2026-05-17 (Run-User-Isolation: D-042 ergänzt)*
+*[Deutsch](05-decisions-log_de.md) · **English***
 
-Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
+*Last updated: 2026-05-17 (run-user isolation: D-042 added)*
 
-## 10. Mai 2026 — Erstes Brainstorming
+Chronological log of all decisions from the brainstorming.
 
-### D-001 bis D-009 (kondensiert)
-Use-Case generisch, Fire-and-Forget, Blazor Server, Postgres, MCP zweite Schnittstelle, Geef.Atelier, Walking Skeleton, kanonische `geef_workflow.md`.
+## 10 May 2026 — first brainstorming
 
-### D-010: Schritt 1 — Solution-Setup
-Geef.Sdk 1.0.0-ci.1, `.slnx`, UI-Component-Library, Auto-Migration mit try-catch.
+### D-001 to D-009 (condensed)
+Generic use case, fire-and-forget, Blazor Server, Postgres, MCP as a second interface, Geef.Atelier, walking skeleton, canonical `geef_workflow.md`.
 
-### D-011: Architect-Workflow + Atelier-Fallback
-(A) Phase 1.4 mit Fallback-Sequence. (B) Atelier-Level-4: Executor schreibt selbst.
+### D-010: Step 1 — solution setup
+Geef.Sdk 1.0.0-ci.1, `.slnx`, UI component library, auto-migration with try-catch.
 
-### D-012: Schritt 2 — SDK-Realfakten
-Sechs Korrekturen: SDK-`FindingSeverity { Info, Warning, Error, Critical }`; `DefaultConvergencePolicy`; `UseMiddleware<T>()`; nur `EvaluationApprovedEvent`/`RejectedEvent`; `IterationHistory`-Workaround; `using SdkGeef = Geef.Sdk.Geef;`.
+### D-011: architect workflow + Atelier fallback
+(A) Phase 1.4 with a fallback sequence. (B) Atelier level 4: the executor writes it itself.
 
-### D-013: Schritt 3 — Anthropic-Client (durch M1 ersetzt)
-Realfakten zur ursprünglichen Anthropic-Schicht. Konzepte (Tool-Use, defensive JSON, API-Key per Request, Resilience) bleiben in M1 gültig.
+### D-012: Step 2 — SDK reality facts
+Six corrections: SDK `FindingSeverity { Info, Warning, Error, Critical }`; `DefaultConvergencePolicy`; `UseMiddleware<T>()`; only `EvaluationApprovedEvent`/`RejectedEvent`; `IterationHistory` workaround; `using SdkGeef = Geef.Sdk.Geef;`.
 
-### D-014: Production-Domain für Schritt 10
-`geef.stefan-bechtel.de`, IP `95.216.100.213`, Traefik mit TLS.
+### D-013: Step 3 — Anthropic client (replaced by M1)
+Reality facts about the original Anthropic layer. The concepts (tool use, defensive JSON, API key per request, resilience) remain valid in M1.
 
-### D-015: Schritt 4 — EventSink und Persistierung
-`IRunPersistenceService`, `PostgresEventSink` mit injizierter `Guid runId`, Severity-Mapping via `ToAtelierSeverity()`, Token-Tracking via Context-Key, Critical-Abort aus `PipelineFailedEvent.History` (SDK-Dekompilierung), `_lastExecutionContext` als `volatile`, `IServiceScopeFactory.CreateAsyncScope()` pro Event.
+### D-014: production domain for step 10
+`geef.stefan-bechtel.de`, IP `95.216.100.213`, Traefik with TLS.
 
-### D-016: Schritt 5 — RunOrchestratorService
-Atomarer Pending→Running-Claim, `SemaphoreSlim` + `ConcurrentDictionary<Guid, Task>` + `WhenAll`-Drain, `OverrideToAbortedAsync` mit `CancellationToken.None`, `_runCts`-Dictionary für Cancellation-Reaktion. `OrchestratorOptions` in Core.
+### D-015: Step 4 — event sink and persistence
+`IRunPersistenceService`, `PostgresEventSink` with an injected `Guid runId`, severity mapping via `ToAtelierSeverity()`, token tracking via a context key, critical-abort from `PipelineFailedEvent.History` (SDK decompilation), `_lastExecutionContext` as `volatile`, `IServiceScopeFactory.CreateAsyncScope()` per event.
 
-### D-017: Provider-Strategie-Wechsel (M1 Auslöser)
-Wechsel von Anthropic-spezifisch auf OpenAI-API-konform via OpenRouter. Pro-Akteur-Modell-Mapping.
+### D-016: Step 5 — RunOrchestratorService
+Atomic Pending→Running claim, `SemaphoreSlim` + `ConcurrentDictionary<Guid, Task>` + `WhenAll` drain, `OverrideToAbortedAsync` with `CancellationToken.None`, `_runCts` dictionary for cancellation reaction. `OrchestratorOptions` in Core.
 
-### D-018: Migration M1 abgeschlossen
-Branch `feature/openai-compatible-providers`. `ILlmClient`, `OpenAiCompatibleClient`, `LlmOptions` mit Pro-Akteur-Mapping. ToolChoice als String-Convention, String-Keys für Actor-Lookup, kein `BaseAddress` am HttpClient, `anthropic-version`-Header entfernt. Workflow-Abweichung: keine formalen R1–R5-Pässe.
+### D-017: provider-strategy switch (M1 trigger)
+Switch from Anthropic-specific to OpenAI-API-compatible via OpenRouter. Per-actor model mapping.
 
-### D-019: Schritt 6 — IRunService Application-Layer + Cancellation
-Variante β (eigenes Application-Projekt ohne Infrastructure-Dep, IRunRepository in Core). Cancellation-Watcher Pattern A (pro-Run-Task), DB-Flag `RunEntity.CancellationRequested` mit Migration `Step06Cancellation`. OCE-Catch-Filter-Reihenfolge: erst Service-Stop, dann User-Cancel. R2-Fixes: ServiceProvider-Disposal, Polling-Loop statt Task.Delay.
+### D-018: migration M1 completed
+Branch `feature/openai-compatible-providers`. `ILlmClient`, `OpenAiCompatibleClient`, `LlmOptions` with per-actor mapping. ToolChoice as a string convention, string keys for actor lookup, no `BaseAddress` on the HttpClient, `anthropic-version` header removed. Workflow deviation: no formal R1–R5 passes.
 
-### D-020: Schritt 7 abgeschlossen — Blazor-UI, SignalR, AC8 grün
+### D-019: Step 6 — IRunService application layer + cancellation
+Variant β (own Application project without an Infrastructure dep, IRunRepository in Core). Cancellation watcher pattern A (per-run task), DB flag `RunEntity.CancellationRequested` with migration `Step06Cancellation`. OCE catch-filter order: first service stop, then user cancel. R2 fixes: ServiceProvider disposal, polling loop instead of Task.Delay.
 
-**Datum:** 11. Mai 2026
-**Bericht:** [reports/step-07-report.md](reports/step-07-report.md)
-**Branch:** `main` — M1+Schritt-6+Schritt-7 alle in main (Push-Range `28daafb..ad90f65`).
-**Reviewer-Iterationen:** 2 (Iteration 1 mit 1 R2-CRITICAL, Iteration 2 grün).
-**Tests:** 55/55 grün. **12 Conventional-Commits.**
+### D-020: Step 7 completed — Blazor UI, SignalR, AC8 green
 
-**Architect-Konsultation:** Form: **Plan-Phase-Integration** (keine separate Architect-Invocation, alle Entscheidungen im Plan-Dokument fixiert). Etabliert sich als Standard-Form für Schritte 5–7. Antworten auf die sechs Schwerpunkte aus dem Step-7-Prompt:
+**Date:** 11 May 2026
+**Report:** [reports/step-07-report.md](reports/step-07-report.md)
+**Branch:** `main` — M1 + step 6 + step 7 all in main (push range `28daafb..ad90f65`).
+**Reviewer iterations:** 2 (iteration 1 with 1 R2-CRITICAL, iteration 2 green).
+**Tests:** 55/55 green. **12 conventional commits.**
 
-| Schwerpunkt | Entscheidung |
+**Architect consultation:** form: **plan-phase integration** (no separate architect invocation, all decisions fixed in the plan document). Establishes itself as the standard form for steps 5–7. Answers to the six focal points from the step-7 prompt:
+
+| Focal point | Decision |
 |---|---|
-| (F1) SignalR-Mechanik | Variante α (Browser-HubConnection) — MCP-konsistent, Playwright-testbar |
-| (F2) Hub-Event-Granularität | Nur `RunId` ohne Payload — UI re-fetcht via `IRunService` |
-| (F3) CSS-Strategie | Scoped `.razor.css` pro Komponente — konsistent mit `MainLayout.razor.css` und `ReconnectModal.razor.css` |
-| (F4) Form-Validierung | `EditForm` + `DataAnnotationsValidator` (Standard-Blazor) |
-| (F5) Test-Host-Setup | Hybrid: `WebApplicationFactory<Program>` + Kestrel auf Port 0 (für Playwright braucht echten HTTP-Listener) |
-| (F6) Notifier-Schicht | `IRunNotifier` in Core, `SignalRRunNotifier` in Web als Singleton (Sink-Tests via `NoOpRunNotifier`, keine SignalR-Mocks) |
+| (F1) SignalR mechanics | Variant α (browser HubConnection) — MCP-consistent, Playwright-testable |
+| (F2) Hub event granularity | Only `RunId` without a payload — the UI re-fetches via `IRunService` |
+| (F3) CSS strategy | Scoped `.razor.css` per component — consistent with `MainLayout.razor.css` and `ReconnectModal.razor.css` |
+| (F4) Form validation | `EditForm` + `DataAnnotationsValidator` (standard Blazor) |
+| (F5) Test host setup | Hybrid: `WebApplicationFactory<Program>` + Kestrel on port 0 (Playwright needs a real HTTP listener) |
+| (F6) Notifier layer | `IRunNotifier` in Core, `SignalRRunNotifier` in Web as a singleton (sink tests via `NoOpRunNotifier`, no SignalR mocks) |
 
-**Fixierte Realfakten aus Schritt 7 (verbindlich ab Schritt 8):**
+**Fixed reality facts from step 7 (binding from step 8):**
 
 **(a) `IRunNotifier` in `Geef.Atelier.Core/Notifications/`:**
-- Frontend-agnostischer Vertrag. Infrastructure-Sink konsumiert ohne Web-Dep.
-- Methode: `NotifyRunUpdatedAsync(Guid runId, CancellationToken ct)`.
+- Frontend-agnostic contract. The Infrastructure sink consumes it without a Web dep.
+- Method: `NotifyRunUpdatedAsync(Guid runId, CancellationToken ct)`.
 
 **(b) `RunHub` in `Geef.Atelier.Web/Hubs/`:**
-- Zwei Groups: `run-{runId}` (für Detail-Page) und `all-runs` (für Listen-Page).
-- Konstante `AllRunsGroup` für typsichere Referenz.
-- Vier Methoden: `JoinRunGroupAsync`, `LeaveRunGroupAsync`, `JoinAllRunsGroupAsync`, `LeaveAllRunsGroupAsync`.
+- Two groups: `run-{runId}` (for the detail page) and `all-runs` (for the list page).
+- Constant `AllRunsGroup` for a type-safe reference.
+- Four methods: `JoinRunGroupAsync`, `LeaveRunGroupAsync`, `JoinAllRunsGroupAsync`, `LeaveAllRunsGroupAsync`.
 - Endpoint: `app.MapHub<RunHub>("/hubs/runs")`.
 
 **(c) `SignalRRunNotifier` in `Geef.Atelier.Web/Notifications/`:**
-- `internal sealed`, Singleton-Lifetime.
-- Injiziert `IHubContext<RunHub>`.
-- Sendet `"RunUpdated"` an `run-{runId}`-Group **und** `"AnyRunUpdated"` an `all-runs`-Group.
-- **Best-effort:** Beide `SendAsync`-Aufrufe individuell in `try { } catch { }` gewrappt (R2-CRITICAL-Fix). Doppelter Fail-Safe zusammen mit Sink-Wrapper.
+- `internal sealed`, singleton lifetime.
+- Injects `IHubContext<RunHub>`.
+- Sends `"RunUpdated"` to the `run-{runId}` group **and** `"AnyRunUpdated"` to the `all-runs` group.
+- **Best-effort:** both `SendAsync` calls individually wrapped in `try { } catch { }` (R2-CRITICAL fix). Double fail-safe together with the sink wrapper.
 
-**(d) `PostgresEventSink`-Konstruktor-Erweiterung:**
-- Neuer Parameter `IRunNotifier notifier` als dritter Parameter (nach `scopeFactory`, vor `logger`).
-- Nach erfolgreichem Persist: `await notifier.NotifyRunUpdatedAsync(atelierRunId, ct)` in eigenem `try/catch` mit Warning-Log.
-- Sink-Tests verwenden `NoOpRunNotifier` (kein SignalR-Mock notwendig).
+**(d) `PostgresEventSink` constructor extension:**
+- New parameter `IRunNotifier notifier` as the third parameter (after `scopeFactory`, before `logger`).
+- After a successful persist: `await notifier.NotifyRunUpdatedAsync(atelierRunId, ct)` in its own `try/catch` with a warning log.
+- Sink tests use `NoOpRunNotifier` (no SignalR mock needed).
 
-**(e) Pages mit Hub-Lifecycle (`IAsyncDisposable`):**
-- `/new` (`New.razor`): `EditForm` mit `DataAnnotationsValidator`, Submit → `IRunService.SubmitRunAsync` → Redirect zu `/runs/{id}`.
-- `/runs` (`Runs.razor`): Listet 20 Runs, Status-Filter-Buttons, `JoinAllRunsGroupAsync` für Live-Updates der Liste.
-- `/runs/{RunId:guid}` (`RunDetail.razor`): Vollständige Details, `JoinRunGroupAsync(runId)` für Live-Detail-Updates.
-- Alle Pages: `WithAutomaticReconnect()` + `Reconnected`-Handler re-joinst die Group und re-fetcht den State.
+**(e) Pages with hub lifecycle (`IAsyncDisposable`):**
+- `/new` (`New.razor`): `EditForm` with `DataAnnotationsValidator`, submit → `IRunService.SubmitRunAsync` → redirect to `/runs/{id}`.
+- `/runs` (`Runs.razor`): lists 20 runs, status-filter buttons, `JoinAllRunsGroupAsync` for live updates of the list.
+- `/runs/{RunId:guid}` (`RunDetail.razor`): full details, `JoinRunGroupAsync(runId)` for live detail updates.
+- All pages: `WithAutomaticReconnect()` + a `Reconnected` handler re-joins the group and re-fetches the state.
 
-**(f) Neun UI-Komponenten in `Components/UI/`:**
+**(f) Nine UI components in `Components/UI/`:**
 - `StatusBadge`, `SeverityBadge`, `RunCard`, `IterationPanel`, `FindingItem`, `RunHeader`, `SubmitForm`, `EmptyState`, `CancelButton`.
-- Alle mit `.razor.css`-Datei (scoped CSS).
-- Wiederverwendbar: `StatusBadge` und `SeverityBadge` werden in `RunCard`, `RunHeader`, `FindingItem` mehrfach genutzt.
+- All with a `.razor.css` file (scoped CSS).
+- Reusable: `StatusBadge` and `SeverityBadge` are used multiple times in `RunCard`, `RunHeader`, `FindingItem`.
 
-**(g) Atelier-Auslegung der "keine HTML in Pages"-Regel (R4-MINOR-Präzedenzfall):**
-- Workflow-Hard-Rule fordert UI-Logik in `Components/UI/`. Aber: triviale Page-Steuerelemente (einfache `<button>` mit `onclick`-Handler, `<div>`-Container) bleiben in Pages erlaubt.
-- Beispiel aus Schritt 7: 6 Inline-Filter-Buttons in `Runs.razor` wurden nicht in eine `FilterBar`-Komponente extrahiert. Begründung: Extraktion bringt mehr Komplexität als Nutzen bei dieser Trivialität. R4 markierte als MINOR, blieb bewusst unbehoben.
-- **Atelier-Interpretation:** "UI-Komponente" meint wiederverwendbare UI-**Logik**, nicht jedes HTML-Element. Wenn ein Element nur an einer Stelle vorkommt, keinen eigenen State hat und keine 3+ Lines of HTML-Logik enthält, darf es in der Page bleiben.
+**(g) Atelier interpretation of the "no HTML in pages" rule (R4-MINOR precedent):**
+- The workflow hard rule requires UI logic in `Components/UI/`. But: trivial page controls (a simple `<button>` with an `onclick` handler, a `<div>` container) remain allowed in pages.
+- Example from step 7: 6 inline filter buttons in `Runs.razor` were not extracted into a `FilterBar` component. Rationale: extraction adds more complexity than benefit at this triviality. R4 flagged it as MINOR, deliberately left unfixed.
+- **Atelier interpretation:** "UI component" means reusable UI **logic**, not every HTML element. If an element occurs in only one place, has no own state and contains no 3+ lines of HTML logic, it may stay in the page.
 
-**(h) Test-Infrastruktur:**
-- **bUnit** (`Microsoft.AspNetCore.Components.Testing`) für Komponenten-Unit-Tests: 4 neue Tests (`StatusBadgeTests`, `SeverityBadgeTests`, `RunCardTests`, `SubmitFormTests`).
-- **Playwright** (`Microsoft.Playwright`) für E2E-Tests: 4 Flow-Tests (`SubmitFlowTests`, `ListFlowTests`, `LiveUpdateFlowTests`, `CancelFlowTests`).
-- `PlaywrightCollection` + `PlaywrightFixture`: `[Collection("Playwright")]` mit shared Chromium-Browser, Docker-Flags `--no-sandbox`, `--disable-setuid-sandbox`, `--disable-dev-shm-usage`, `--shm-size=2gb`.
-- `WebTestHost`: `WebApplicationFactory<Program>` + `UseKestrel()` + Port 0; `BaseUrl` aus `IServerAddressesFeature`; überschreibt `ILlmClient → GatedFakeLlmClient`, Connection-String → `PostgresFixture`, `MaxConcurrentRuns = 10`.
+**(h) Test infrastructure:**
+- **bUnit** (`Microsoft.AspNetCore.Components.Testing`) for component unit tests: 4 new tests (`StatusBadgeTests`, `SeverityBadgeTests`, `RunCardTests`, `SubmitFormTests`).
+- **Playwright** (`Microsoft.Playwright`) for E2E tests: 4 flow tests (`SubmitFlowTests`, `ListFlowTests`, `LiveUpdateFlowTests`, `CancelFlowTests`).
+- `PlaywrightCollection` + `PlaywrightFixture`: `[Collection("Playwright")]` with a shared Chromium browser, Docker flags `--no-sandbox`, `--disable-setuid-sandbox`, `--disable-dev-shm-usage`, `--shm-size=2gb`.
+- `WebTestHost`: `WebApplicationFactory<Program>` + `UseKestrel()` + port 0; `BaseUrl` from `IServerAddressesFeature`; overrides `ILlmClient → GatedFakeLlmClient`, connection string → `PostgresFixture`, `MaxConcurrentRuns = 10`.
 
-**(i) Cancel-Race-Lösung (Schritt-7-Erkenntnis):**
-- Bei `CancelFlowTests` ist Gate-Release nach Cancel-Click **kontraproduktiv** — würde `FakeLlmClient` (synchrones `Task.FromResult`) in < 200ms zur Completed-State rasen lassen, bevor Watcher CTS canceln kann.
-- `OverrideToAbortedAsync`-Filter `Status IN (Running, Failed)` schließt `Completed` aus — Race verloren.
-- **Lösung:** Gate geschlossen lassen. `SemaphoreSlim.WaitAsync(cancelledToken)` wirft `OperationCanceledException` sofort, auch ohne Permit.
-- Erkenntnis für künftige Schritte: Cancellation-Tests mit Mock-LLMs müssen die Pipeline künstlich verlangsamen, sonst gewinnt der Race.
+**(i) Cancel-race solution (step-7 insight):**
+- In `CancelFlowTests`, releasing the gate after a cancel click is **counterproductive** — it would let `FakeLlmClient` (synchronous `Task.FromResult`) race to the Completed state in < 200ms before the watcher CTS can cancel.
+- The `OverrideToAbortedAsync` filter `Status IN (Running, Failed)` excludes `Completed` — race lost.
+- **Solution:** keep the gate closed. `SemaphoreSlim.WaitAsync(cancelledToken)` throws `OperationCanceledException` immediately, even without a permit.
+- Insight for future steps: cancellation tests with mock LLMs must artificially slow the pipeline, otherwise the race is lost.
 
-**(j) `Program.cs` und `appsettings.json`:**
+**(j) `Program.cs` and `appsettings.json`:**
 - `builder.Services.AddSignalR();`
 - `builder.Services.AddSingleton<IRunNotifier, SignalRRunNotifier>();`
 - `app.MapHub<RunHub>("/hubs/runs");`
-- Keine neuen `appsettings.json`-Sektionen für UI/SignalR.
+- No new `appsettings.json` sections for UI/SignalR.
 
-**Workflow-Auslegung: AC9 (`geef_architecture.md`-Existenz) als "N/A":**
-Bericht stuft AC9 als "N/A" ein mit Begründung "Architektur-Entscheidungen im Plan dokumentiert; R4: 0 CRITICAL/MAJOR". Der `geef_workflow.md` selbst fordert `geef_architecture.md` als Pflicht-Artefakt (Hard Rule aus D-011(A)). **Praktisch etabliert sich Plan-Phase-Integration** als äquivalente Erfüllung — der Plan enthält die architektonischen Festlegungen, R4 prüft Compliance gegen sie. Workflow-Aktualisierung wäre konsequent, ist aber Maintainer-Sache.
+**Workflow interpretation: AC9 (`geef_architecture.md` existence) as "N/A":**
+The report rates AC9 as "N/A" with the rationale "architecture decisions documented in the plan; R4: 0 CRITICAL/MAJOR". `geef_workflow.md` itself requires `geef_architecture.md` as a mandatory artifact (hard rule from D-011(A)). **In practice, plan-phase integration establishes itself** as an equivalent fulfillment — the plan contains the architectural decisions, R4 checks compliance against it. A workflow update would be consistent but is the maintainer's call.
 
-**AC8 ENDLICH grün (Real-OpenRouter-Test):**
-- **Latenz:** 5–12 Sekunden für vollständige Pipeline (1 Iteration, Executor + 2 Reviewer).
-- **Token-Verbrauch (R5-Live-Runs):** 349 Tokens (Run 1), 174 Tokens (Run 2), 523 Tokens (separater Test-Run im Bericht erwähnt).
-- **Kosten-Implikation:** Bei Claude Opus 4.7 via OpenRouter grob 1–2 Cent pro Skeleton-Run. Cost-Tracking in Schritt 10 weniger dramatisch als initial befürchtet.
-- **Docker-Setup:** `Llm__ApiKey` als Env-Var via `-e`-Flag injiziert; `appsettings.Development.json` (gitignored seit Commit `28daafb`) lokal verwendet.
+**AC8 FINALLY green (real-OpenRouter test):**
+- **Latency:** 5–12 seconds for the full pipeline (1 iteration, executor + 2 reviewers).
+- **Token usage (R5 live runs):** 349 tokens (run 1), 174 tokens (run 2), 523 tokens (a separate test run mentioned in the report).
+- **Cost implication:** with Claude Opus 4.7 via OpenRouter roughly 1–2 cents per skeleton run. Cost tracking in step 10 less dramatic than initially feared.
+- **Docker setup:** `Llm__ApiKey` injected as an env var via the `-e` flag; `appsettings.Development.json` (gitignored since commit `28daafb`) used locally.
 
-**Workflow-Beobachtung — `appsettings.Development.json` gitignored:**
-Seit Commit `28daafb` wird `appsettings.Development.json` nicht mehr getrackt. Begründung: enthält OpenRouter-Bearer-Key. Sicheres Pattern für lokale Entwicklung. Production-Setup nutzt Env-Vars (`Llm__ApiKey`). Falls späterer Maintainer fragt warum die Datei fehlt: das ist Sicherheitsdisziplin, nicht Vergesslichkeit.
+**Workflow observation — `appsettings.Development.json` gitignored:**
+Since commit `28daafb`, `appsettings.Development.json` is no longer tracked. Rationale: it contains the OpenRouter bearer key. A safe pattern for local development. The production setup uses env vars (`Llm__ApiKey`). If a later maintainer asks why the file is missing: that is security discipline, not forgetfulness.
 
-**Empfehlungen für Schritt 8 (Cookie-Auth — aus Bericht-Sektion 8):**
-1. Login-Page `Components/Pages/Login.razor` mit `HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, ...)`.
-2. User-Credentials via `ATELIER_USER` + `ATELIER_PASSWORD_HASH` Environment-Variablen. BCrypt-Hash empfohlen.
-3. `AddAuthentication(...).AddCookie(...)` mit 30-Tage-Cookie-Lifetime.
-4. `[Authorize]` auf `RunHub` und Pages.
-5. `<AuthorizeView>` für conditional UI, `CascadingAuthenticationState` in `App.razor`.
-6. E2E-Tests: `WebTestHost` kann Auth-Middleware deaktivieren oder mocken — neue Auth-Flow-Tests separat.
+**Recommendations for step 8 (cookie auth — from report section 8):**
+1. Login page `Components/Pages/Login.razor` with `HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, ...)`.
+2. User credentials via `ATELIER_USER` + `ATELIER_PASSWORD_HASH` environment variables. BCrypt hash recommended.
+3. `AddAuthentication(...).AddCookie(...)` with a 30-day cookie lifetime.
+4. `[Authorize]` on `RunHub` and pages.
+5. `<AuthorizeView>` for conditional UI, `CascadingAuthenticationState` in `App.razor`.
+6. E2E tests: `WebTestHost` can disable or mock the auth middleware — new auth-flow tests separately.
 
 ---
 
-### D-021: Schritt 8 abgeschlossen — Cookie-Auth, Login/Logout, 71/71 Tests grün
+### D-021: Step 8 completed — cookie auth, login/logout, 71/71 tests green
 
-**Datum:** 11. Mai 2026
-**Bericht:** [reports/step-08-report.md](reports/step-08-report.md)
-**Branch:** `main` direkt
-**Reviewer-Iterationen:** 4 (R1–R5 alle mit 0 Findings abgeschlossen)
-**Tests:** 71/71 grün. **13 Conventional-Commits.**
+**Date:** 11 May 2026
+**Report:** [reports/step-08-report.md](reports/step-08-report.md)
+**Branch:** `main` directly
+**Reviewer iterations:** 4 (R1–R5 all completed with 0 findings)
+**Tests:** 71/71 green. **13 conventional commits.**
 
-**Architect-Konsultation:** Form: **Plan-Phase-Integration** (sechs Schwerpunkte im Plan-Dokument fixiert; kein separater Architect-Subagent).
+**Architect consultation:** form: **plan-phase integration** (six focal points fixed in the plan document; no separate architect subagent).
 
-**Fixierte Realfakten aus Schritt 8 (verbindlich ab Schritt 9):**
+**Fixed reality facts from step 8 (binding from step 9):**
 
-**(a) Cookie-Auth-Konfiguration:**
-- Cookie-Name: `Atelier.Auth`; `HttpOnly=true`; `SameSite=Strict` (Prod), `Lax` (Test-Env); `SecurePolicy`: `SameAsRequest` (Dev), `Always` (Prod); `ExpireTimeSpan=30d`, `SlidingExpiration=true`; `LoginPath="/login"`.
+**(a) Cookie-auth configuration:**
+- Cookie name: `Atelier.Auth`; `HttpOnly=true`; `SameSite=Strict` (prod), `Lax` (test env); `SecurePolicy`: `SameAsRequest` (dev), `Always` (prod); `ExpireTimeSpan=30d`, `SlidingExpiration=true`; `LoginPath="/login"`.
 
-**(b) Schicht-Platzierung:**
-- `IUserAuthenticator`-Interface in `Geef.Atelier.Application/Auth/` (nicht Infrastructure — Auth ist Anwendungslogik).
-- `AtelierUserOptions` in `Geef.Atelier.Core/Configuration/` (POCO ohne Deps).
+**(b) Layer placement:**
+- `IUserAuthenticator` interface in `Geef.Atelier.Application/Auth/` (not Infrastructure — auth is application logic).
+- `AtelierUserOptions` in `Geef.Atelier.Core/Configuration/` (POCO without deps).
 - `AtelierUserAuthenticator` (`internal sealed`) in Application.
-- `ApplicationAuthExtensions.AddAtelierAuth()` bindet Options + registriert Scoped `IUserAuthenticator`.
+- `ApplicationAuthExtensions.AddAtelierAuth()` binds options + registers a scoped `IUserAuthenticator`.
 
-**(c) Login-Page als Static SSR:**
-- `Login.razor` ohne `@rendermode` (Static SSR Pflicht — `HttpContext.SignInAsync` braucht HTTP-Request-Kontext, nicht WebSocket).
-- `@formname="login-form"` auf `<form method="post">` — Pflicht für Blazor Static SSR Form-Routing (ohne führt zu HTTP 400 "POST does not specify which form").
-- `OnInitializedAsync` prüft `HttpContext.Request.Method == "POST"`.
+**(c) Login page as static SSR:**
+- `Login.razor` without `@rendermode` (static SSR mandatory — `HttpContext.SignInAsync` needs an HTTP request context, not a WebSocket).
+- `@formname="login-form"` on `<form method="post">` — mandatory for Blazor static SSR form routing (without it leads to HTTP 400 "POST does not specify which form").
+- `OnInitializedAsync` checks `HttpContext.Request.Method == "POST"`.
 
 **(d) Logout via `POST /auth/logout`:**
-- Minimal-API-Endpoint in `AuthEndpoints.cs`; `.RequireAuthorization()`.
-- `UserMenu`-Komponente (`AuthorizeView`, `<form method="post" action="/auth/logout">` + `<AntiforgeryToken />`).
-- `SignOutAsync` in `try/catch` (Test-Env hat keinen Cookie-Auth-Handler in der authenticated=true-Variante → `InvalidOperationException` ignorieren).
+- Minimal-API endpoint in `AuthEndpoints.cs`; `.RequireAuthorization()`.
+- `UserMenu` component (`AuthorizeView`, `<form method="post" action="/auth/logout">` + `<AntiforgeryToken />`).
+- `SignOutAsync` in a `try/catch` (the test env has no cookie-auth handler in the authenticated=true variant → ignore `InvalidOperationException`).
 
-**(e) `[Authorize]` auf Pages — Index bleibt anonym:**
-- `@attribute [Authorize]` auf: `New.razor`, `Runs.razor`, `RunDetail.razor`.
-- `Index.razor` bleibt anonym — Welcome-Page mit Quick-Links zu geschützten Pages; `AuthorizeRouteView` redirected bei Auth-Bedarf.
+**(e) `[Authorize]` on pages — Index stays anonymous:**
+- `@attribute [Authorize]` on: `New.razor`, `Runs.razor`, `RunDetail.razor`.
+- `Index.razor` stays anonymous — a welcome page with quick links to protected pages; `AuthorizeRouteView` redirects when auth is needed.
 
-**(f) RunHub OHNE `[Authorize]` — architektonischer Trade-off (Abweichung von D-020-Empfehlung #4):**
-- Blazor Server's `HubConnectionBuilder` erzeugt server-seitige SignalR-Verbindungen. Browser-Auth-Cookies werden **nicht** weitergeleitet.
-- Mit `[Authorize]` auf `RunHub`: SSR-Pre-Render-Phase erhält 401, Blazor Circuit-Initialisierung schlägt fehl.
-- Mitigation: Alle subscribenden Pages tragen `@attribute [Authorize]` → unauthentifizierte User können Pages (und damit den Hub) nicht erreichen.
-- R2 und R4 akzeptierten diesen Trade-off explizit.
+**(f) RunHub WITHOUT `[Authorize]` — an architectural trade-off (deviation from D-020 recommendation #4):**
+- Blazor Server's `HubConnectionBuilder` creates server-side SignalR connections. Browser auth cookies are **not** forwarded.
+- With `[Authorize]` on `RunHub`: the SSR pre-render phase receives 401, Blazor circuit initialization fails.
+- Mitigation: all subscribing pages carry `@attribute [Authorize]` → unauthenticated users cannot reach the pages (and thus the hub).
+- R2 and R4 accepted this trade-off explicitly.
 
-**(g) `TestAuthenticationHandler` und `WebTestHost`-Erweiterung:**
+**(g) `TestAuthenticationHandler` and `WebTestHost` extension:**
 - `TestAuthenticationHandler` in `tests/Geef.Atelier.Tests/Web/E2E/`, `internal sealed`.
-- `WebTestHost.StartAsync(bool authenticated = true)` — `true`: Test-Handler (alle Requests pre-authenticated), `false`: echte Cookie-Auth mit BCrypt-wf=4-Hash.
-- **Sicherheitsregel:** Handler darf nie in `Program.cs` oder `Geef.Atelier.Web.csproj` referenziert werden.
+- `WebTestHost.StartAsync(bool authenticated = true)` — `true`: test handler (all requests pre-authenticated), `false`: real cookie auth with a BCrypt-wf=4 hash.
+- **Security rule:** the handler must never be referenced in `Program.cs` or `Geef.Atelier.Web.csproj`.
 
-**(h) `tools/HashPassword/` Mini-CLI:**
+**(h) `tools/HashPassword/` mini CLI:**
 - `BCrypt.Net.BCrypt.HashPassword(args[0], workFactor: 11)`.
-- Eingebunden als Solution-Projekt in `Geef.Atelier.slnx`.
-- Dev-Default-Hash in `docker-compose.dev.yml`: entspricht `"DevPassword!"` (nur für lokale Entwicklung).
+- Included as a solution project in `Geef.Atelier.slnx`.
+- Dev default hash in `docker-compose.dev.yml`: corresponds to `"DevPassword!"` (local development only).
 
-**(i) `UseForwardedHeaders` vor `UseAuthentication`:**
-- Pflicht für Traefik-TLS-Termination in Produktion. `KnownIPNetworks.Clear()` für Docker-Netzwerk-Invarianz.
+**(i) `UseForwardedHeaders` before `UseAuthentication`:**
+- Mandatory for Traefik TLS termination in production. `KnownIPNetworks.Clear()` for Docker-network invariance.
 
-**(j) `/health` mit `AllowAnonymous()`:**
-- Health-Probe bleibt unauthentifiziert. Reverse-Proxy-Routing und Container-Lifecycle-Management erfordern anonymen Zugriff.
+**(j) `/health` with `AllowAnonymous()`:**
+- The health probe stays unauthenticated. Reverse-proxy routing and container-lifecycle management require anonymous access.
 
 **(k) BCrypt work factor 11:**
-- Produktion: wf=11 (~80ms, Single-User → akzeptable Latenz). Tests: wf=4 (schnell, deterministisch).
+- Production: wf=11 (~80ms, single-user → acceptable latency). Tests: wf=4 (fast, deterministic).
 
-**(l) Lazy-Fail bei fehlender Konfiguration:**
-- Service startet ohne `ATELIER_USER`/`ATELIER_PASSWORD_HASH`. Login gibt `false` zurück ohne Crash. Health-Check bleibt grün. Init-Warning ohne PII geloggt.
+**(l) Lazy-fail on missing configuration:**
+- The service starts without `ATELIER_USER`/`ATELIER_PASSWORD_HASH`. Login returns `false` without a crash. The health check stays green. An init warning without PII is logged.
 
-**(m) UI-Komponenten-Library erweitert:**
-- Neu in `Components/UI/`: `LoginForm.razor`, `UserMenu.razor`, `RedirectToLogin.razor` — alle mit scoped `.razor.css`.
-- `EmptyLayout.razor` neu in `Components/Layout/` — minimaler Wrapper ohne NavMenu für Login-Page.
+**(m) UI component library extended:**
+- New in `Components/UI/`: `LoginForm.razor`, `UserMenu.razor`, `RedirectToLogin.razor` — all with scoped `.razor.css`.
+- `EmptyLayout.razor` new in `Components/Layout/` — a minimal wrapper without NavMenu for the login page.
 
-**(n) `no-store` Cache-Control-Middleware:**
-- `ctx.Response.Headers.CacheControl = "no-store, no-cache"` für authentifizierte Responses — verhindert Browser-Back-Button-Cache-Leck.
+**(n) `no-store` cache-control middleware:**
+- `ctx.Response.Headers.CacheControl = "no-store, no-cache"` for authenticated responses — prevents a browser-back-button cache leak.
 
-**(o) `AddCascadingAuthenticationState()` statt `<CascadingAuthenticationState>` in Routes.razor:**
-- `.NET 8+` Service-Registration ersetzt den Component-Wrapper. Beide zusammen führen zu doppelter Registrierung und `IComponentRenderMode`-Konflikt.
+**(o) `AddCascadingAuthenticationState()` instead of `<CascadingAuthenticationState>` in Routes.razor:**
+- `.NET 8+` service registration replaces the component wrapper. Both together lead to double registration and an `IComponentRenderMode` conflict.
 
-**Empfehlungen für Schritt 9 (MCP-Server):**
-1. Multi-Auth-Schema: `AddAuthentication().AddCookie().AddScheme<BearerTokenHandler>(...)` — Cookie für UI, Bearer für MCP koexistieren.
-2. `ITokenValidator`-Interface in `Geef.Atelier.Application/Auth/` (symmetrisch zu `IUserAuthenticator`).
-3. `ATELIER_MCP_TOKEN` als Env-Var, `MCP-TOKEN`-Header in Requests.
-4. MCP-Server-Projekt braucht `[Authorize(AuthenticationSchemes = "Bearer")]` auf seinen Endpoints.
-5. Kein Bearer-Token-Zugriff auf UI-Blazor-Routen nötig — klare Separation.
+**Recommendations for step 9 (MCP server):**
+1. Multi-auth scheme: `AddAuthentication().AddCookie().AddScheme<BearerTokenHandler>(...)` — cookie for the UI, bearer for MCP coexist.
+2. `ITokenValidator` interface in `Geef.Atelier.Application/Auth/` (symmetric to `IUserAuthenticator`).
+3. `ATELIER_MCP_TOKEN` as an env var, `MCP-TOKEN` header in requests.
+4. The MCP server project needs `[Authorize(AuthenticationSchemes = "Bearer")]` on its endpoints.
+5. No bearer-token access to UI Blazor routes needed — clear separation.
 
 ---
 
-## D-022 — Schritt 9: MCP-Server mit Bearer-Token-Auth (2026-05-11)
+## D-022 — Step 9: MCP server with bearer-token auth (2026-05-11)
 
-**Kontext:** Zweites Frontend für externe KI-Agenten (Claude Desktop, Claude Code) über Model Context Protocol.
+**Context:** a second frontend for external AI agents (Claude Desktop, Claude Code) over the Model Context Protocol.
 
-**Entscheidungen:**
-- (a) MCP-Library: `ModelContextProtocol.AspNetCore` 1.3.0 (offiziell Anthropic+Microsoft, GA, 9M Downloads). Eigenbau verworfen.
-- (b) Transport: Streamable HTTP (Stateless=true), kein SSE-Legacy, kein WebSocket. Stdio als Future Work.
-- (c) Endpoint-Position: Im Web-Host unter `/mcp` (Mcp = Class Library, gehostet im Web-Prozess).
+**Decisions:**
+- (a) MCP library: `ModelContextProtocol.AspNetCore` 1.3.0 (officially Anthropic+Microsoft, GA, 9M downloads). A custom build was rejected.
+- (b) Transport: Streamable HTTP (Stateless=true), no SSE legacy, no WebSocket. Stdio as future work.
+- (c) Endpoint position: in the web host under `/mcp` (Mcp = class library, hosted in the web process).
 - (d) `ITokenValidator` in `Geef.Atelier.Application/Auth/`, `AtelierMcpOptions` in `Core/Configuration/`.
-- (e) Multi-Auth: Default-Scheme=Cookie, explizite `McpPolicy` mit `AuthenticationSchemes=["Bearer"]`.
-- (f) `BearerTokenHandler` in `Geef.Atelier.Web/Auth/` (internal sealed), gibt `NoResult()` bei fehlendem Header.
-- (g) `RunEntity.CreatedByUser` nullable, Migration `Step09AuditTrail` (ADD COLUMN text nullable).
-- (h) `IRunService.SubmitRunAsync(briefing, configJson, createdByUser=null, ct)` — optionaler Default-null-Parameter (Backward-Compat).
-- (i) UI setzt `createdByUser=Identity.Name`, MCP setzt `"mcp-client"` (statischer Bezeichner).
-- (j) `GetRunDetailsAsync` (aus D-019) für `get_run_details`-Tool wiederverwendet — keine neue Methode.
-- (k) Constant-Time-Token-Compare: `CryptographicOperations.FixedTimeEquals` mit Längen-Kurzschluss vor dem Vergleich.
-- (l) MCP-SDK-Version gepinnt auf `[1.3.0,2.0.0)` in `Directory.Packages.props`.
-- (m) Mcp-Projekt-SDK-Wechsel: `Microsoft.NET.Sdk.Web` → `Microsoft.NET.Sdk` (Class Library); Program.cs + appsettings* gelöscht.
-- (n) MCP-Endpoint-Setup im `WebTestHost` immer aktiv (kein Konflikt mit Cookie-Tests).
-- (o) Stdio-Transport als Future Work dokumentiert (nach Skeleton).
+- (e) Multi-auth: default scheme=cookie, an explicit `McpPolicy` with `AuthenticationSchemes=["Bearer"]`.
+- (f) `BearerTokenHandler` in `Geef.Atelier.Web/Auth/` (internal sealed), returns `NoResult()` on a missing header.
+- (g) `RunEntity.CreatedByUser` nullable, migration `Step09AuditTrail` (ADD COLUMN text nullable).
+- (h) `IRunService.SubmitRunAsync(briefing, configJson, createdByUser=null, ct)` — optional default-null parameter (backward compat).
+- (i) The UI sets `createdByUser=Identity.Name`, MCP sets `"mcp-client"` (a static identifier).
+- (j) `GetRunDetailsAsync` (from D-019) reused for the `get_run_details` tool — no new method.
+- (k) Constant-time token compare: `CryptographicOperations.FixedTimeEquals` with a length short-circuit before the comparison.
+- (l) MCP-SDK version pinned to `[1.3.0,2.0.0)` in `Directory.Packages.props`.
+- (m) Mcp project SDK switch: `Microsoft.NET.Sdk.Web` → `Microsoft.NET.Sdk` (class library); Program.cs + appsettings* deleted.
+- (n) MCP endpoint setup always active in `WebTestHost` (no conflict with cookie tests).
+- (o) Stdio transport documented as future work (after the skeleton).
 
-**Ergebnis:** 85/85 Tests grün. R1 PASS, R2 APPROVED, R3 PASS, R4 COMPLIANT, R5 curl-verifiziert.
-
----
-
-## D-023 — Schritt 10: Production-Deploy mit Traefik (2026-05-11)
-
-**Kontext:** Letzter Walking-Skeleton-Schritt. App-Code unverändert; nur Deployment-Konfiguration.
-
-**Entscheidungen:**
-- (a) Externes Traefik-Netzwerk: `proxy` (Server-Konvention, verifiziert).
-- (b) Cert-Resolver-Name: `le` (HTTP-Challenge via `web`-Entry-Point); nicht `letsencrypt`.
-- (c) Entry-Point für HTTPS-Router: `websecure`; HTTP→HTTPS-Redirect global in traefik.yml.
-- (d) Kein App-seitiger HTTP-Redirect-Router — Traefik macht das global.
-- (e) `chain@file`-Middleware: secure-headers + compression + rate-limit (Server-Konvention).
-- (f) Postgres im selben Compose-File (Server-Konvention: own-Postgres-per-App).
-- (g) `.env`-File gitignored, automatisch generiert via `openssl rand` + `tools/HashPassword`.
-- (h) `pull_policy: never` + `com.centurylinklabs.watchtower.enable=false` für lokalen Build.
-- (i) Auto-Migration on Startup bleibt (D-010); `Step09AuditTrail` ist additiv (nullable Spalte).
-- (j) `Cookie.Domain` unset — Auto-Detect robuster für Subdomains.
-- (k) Direkt-Port-Exposure (8080) entfernt; kein `ports:` im Production-Compose.
-- (l) `tools/HashPassword` für BCrypt-Hash mit workFactor 11.
-- (m) `traefik.docker.network=proxy` Label erforderlich wenn Container in mehreren Netzwerken.
-
-**Ergebnis:** Walking Skeleton komplett. `geef.stefan-bechtel.de` produktiv erreichbar.
+**Result:** 85/85 tests green. R1 PASS, R2 APPROVED, R3 PASS, R4 COMPLIANT, R5 curl-verified.
 
 ---
 
-## D-024 — Post-Skeleton Schritt 1: Postgres-Backup-Strategie (2026-05-11)
+## D-023 — Step 10: production deploy with Traefik (2026-05-11)
 
-**Kontext:** Nach Walking-Skeleton-Abschluss: erster Post-Skeleton-Feature-Schritt zur Datensicherung. Kein Code-Eingriff — reiner Compose-Erweiterungsschritt.
+**Context:** the last walking-skeleton step. App code unchanged; only deployment configuration.
 
-**Entscheidungen:**
-- (a) Backup-Image: `prodrigestivill/postgres-backup-local:16` (Community-Standard, Healthcheck + Retention-Policy out-of-the-box, PG16-kompatibel).
-- (b) Netzwerk: nur `geef-atelier-network` (kein `proxy` — Backup braucht keinen externen Zugang).
-- (c) Watchtower-Disable: `com.centurylinklabs.watchtower.enable=false` (Server-Konvention aus D-023).
-- (d) Retention: 7 Tages-, 4 Wochen-, 6 Monats-Snapshots — angemessen für Single-User mit < 100 MB DB.
-- (e) Schedule: `0 3 * * *` (03:00 UTC, minimale Server-Auslastung).
-- (f) Backup-Volume: `geef-atelier-backups` (Named Volume, isoliert von `geef_atelier_postgres_data`).
-- (g) Restore-Skript: `scripts/restore-backup.sh` — stoppt `web`, restored via psql, startet `web` neu.
-- (h) Kein Off-Site-Backup in diesem Schritt — Volume-Backup schützt gegen Container-Crash, nicht gegen Server-Ausfall. Off-Site als nächster Post-Skeleton-Schritt dokumentiert.
-- (i) Keine neuen `.env`-Variablen — Backup nutzt bestehende `POSTGRES_*`-Credentials.
-- (j) Server-Präzedenz: kein anderer App-Stack auf diesem Server nutzt einen Backup-Service — Geef.Atelier setzt den Pattern.
+**Decisions:**
+- (a) External Traefik network: `proxy` (server convention, verified).
+- (b) Cert-resolver name: `le` (HTTP challenge via the `web` entry point); not `letsencrypt`.
+- (c) Entry point for the HTTPS router: `websecure`; HTTP→HTTPS redirect global in traefik.yml.
+- (d) No app-side HTTP redirect router — Traefik does it globally.
+- (e) `chain@file` middleware: secure-headers + compression + rate-limit (server convention).
+- (f) Postgres in the same compose file (server convention: own-Postgres-per-app).
+- (g) `.env` file gitignored, automatically generated via `openssl rand` + `tools/HashPassword`.
+- (h) `pull_policy: never` + `com.centurylinklabs.watchtower.enable=false` for the local build.
+- (i) Auto-migration on startup stays (D-010); `Step09AuditTrail` is additive (a nullable column).
+- (j) `Cookie.Domain` unset — auto-detect more robust for subdomains.
+- (k) Direct port exposure (8080) removed; no `ports:` in the production compose.
+- (l) `tools/HashPassword` for the BCrypt hash with workFactor 11.
+- (m) `traefik.docker.network=proxy` label required when the container is in multiple networks.
 
-**Ergebnis:** Drei Container healthy (web, postgres, postgres-backup). Erster manueller Backup-Trigger und Test-Restore erfolgreich verifiziert. 85/85 Tests weiter grün.
-
----
-
-## D-025 — Post-Skeleton Schritt 2: Reviewer-Kalibrierung (2026-05-12)
-
-**Kontext:** Erstes Real-World-Briefing (Hadwiger-Nelson-Problem) deckte fehlerhafte Severity-Klassifikation auf: Der `KlarheitReviewer` produzierte Critical-Findings für faktisch korrekte Inhalte ("stimmt zwar, aber...") → Pipeline brach ab (AbortOnCritical=true aus D-012). Drei Ziele: (A) Reviewer-Prompts schärfen, (B) Convergence-Policy robuster machen, (C) Executor-Iteration-2+-Verhalten verbessern.
-
-**Entscheidungen:**
-- (a) Severity-Taxonomie 4-stufig: Critical/Major/Minor/Info als Atelier-Standard; `docs/06-reviewer-calibration.md` ist normatives Referenzdokument.
-- (b) Tool-Schema-Werte umgestellt: `["critical", "major", "minor", "info"]` statt `["info", "warning", "error", "critical"]`. Backwards-Kompat in `LlmReviewer.MapSeverity()` für `"error"` und `"warning"`.
-- (c) Anti-Pattern-Regel "stimmt zwar" ≠ Critical explizit in beide Reviewer-Prompts aufgenommen.
-- (d) Hadwiger-Nelson-Problem als Negativbeispiel in beiden Reviewer-Prompts — konkreter LLM-Anker gegen Fehlklassifikation.
-- (e) `ConvergenceOptions` als neue Config-Klasse in `Geef.Atelier.Infrastructure.Configuration`; Default `AbortOnCritical=false` — Pipeline iteriert 3 Mal statt nach erstem Critical abzubrechen.
-- (f) Executor-Prompt schärft Iteration-2+-Verhalten: nummerierte Findings mit Severity-Tag, explizite Anforderung "concrete, visible change per finding".
-- (g) Reviewer-Prompts gewachsen von ~4 auf ~65 Zeilen — Token-Cost-Anstieg ~5-10% pro Reviewer-Call akzeptiert (bei <5 Cent/Run irrelevant).
-- (h) Stagnation-Threshold bleibt 3 (kein Eingriff) — Pipeline bricht bei persistierenden Findings nach 3 Iterationen ab.
-- (i) Cross-Reviewer-Voting (B2) verworfen — zu komplex für diesen Schritt; B1+B4 (konfigurierbar) reicht.
-- (j) Hadwiger-Nelson-Replay als `[Fact]`-Test mit Skip-If-No-ApiKey in `AtelierPipelineRunsAgainstOpenRouterTests` — langfristige Regression-Absicherung.
-
-**Ergebnis:** 96 Tests (vorher: 85). 3 neue Test-Klassen (SeverityClassification, ConvergencePolicyConfig, OvereagerCriticalAbort). `dotnet build` 0/0. Reviewer-Kalibrierung auf Atelier-Standard angehoben.
+**Result:** walking skeleton complete. `geef.stefan-bechtel.de` reachable in production.
 
 ---
 
-## D-026 — Post-Skeleton Schritt 3: Design-Translation (2026-05-12)
+## D-024 — post-skeleton step 1: Postgres backup strategy (2026-05-11)
 
-**Kontext:** Walking Skeleton + PS-1 (Backup) + PS-2 (Reviewer-Kalibrierung) sind durch. Ein professioneller HTML/CSS/JSX-Prototyp (`docs/design/atelier-mockups/`) mit drei Paletten (Vellum/Noir/Petrol), eigener Typografie (Newsreader/Geist/JetBrains Mono), 14+ Hairline-Icons und fünf Screens lag vor. Ziel: visuelle und strukturelle Sprache ins Blazor-UI übertragen ohne neue Backend-Features.
+**Context:** after walking-skeleton completion: the first post-skeleton feature step for data protection. No code intervention — a pure compose-extension step.
 
-**Entscheidungen:**
-- (a) Drei Themes via `html.palette-{vellum|noir|petrol}` (CSS-Klasse). Default Vellum (Prompt-Anforderung) — Mockup-Default war Noir; explizite Divergenz.
-- (b) Theme-Cookie `Atelier.Theme`, 1 Jahr, `HttpOnly=false` (JS-Interop muss lesen/setzen), SameSite=Strict, Logout löscht NICHT.
-- (c) Theme-Wechsel-Mechanik: JS-Interop primär (`window.atelier.setTheme`), Server-Endpoint `/settings/theme` als Fallback und Playwright-Test-Hook. Beide parallel implementiert.
-- (d) `<html>`-Klasse Razor-server-side via `IHttpContextAccessor` — kein Flash-of-Wrong-Theme.
-- (e) Bootstrap-Stylesheet vollständig entfernt; `wwwroot/atelier.css` als globales Stylesheet (1:1 portiert aus Mockup + @font-face).
-- (f) Self-hosted Fonts (Newsreader, Geist, JetBrains Mono) in `wwwroot/fonts/` — DSGVO-konform, kein externer Network-Request.
-- (g) ReviewerDisplay-Helper-Mapping (β-Variante): Code-Klassen `BriefingTreueReviewer`/`KlarheitReviewer` unverändert; UI zeigt `BriefingFidelity`/`Clarity`. Keine Persistenz-Breaking-Changes.
-- (h) PressStageMapper: konservative Heuristik — alle Running-Runs zeigen Stage 0 (Draft) active; komplexere Event-basierte Stage-Erkennung als optionale Verfeinerung.
-- (i) FindingResolutionInferrer: heuristisches Cross-Iteration-Diff via `Severity|ReviewerName|Message[..60]`-Signatur. Bug-Fix in PS-3: `IndexOutOfRangeException` bei leerer Iterations-Liste behoben.
-- (j) Mock-Stubs konsistent via `.coming-soon`-Klasse: Cost-Anzeige, Export-Button, Profile-MenuItem, Welcome-Stats.
-- (k) E2E-Selektoren bewusst stabil: `input#username`, `button.btn-login`, `.user-name`, `.btn-logout`, `textarea#briefing`, `button.btn-submit`, `[data-status]`. Neue Komponenten mit `data-testid`.
-- (l) Tweaks-Panel und Style-Guide aus Mockup nicht in Production übernommen.
-- (m) StatusBadge: `data-status`-Attribut wiederhergestellt (E2E-Tests erwarten es); CSS-Klassen-Umbau (`badge-*` → `status pending`) erforderte Test-Anpassung.
-- (n) WebTestHost in Tests: `AddHttpContextAccessor()` ergänzt, `[Collection("Postgres")]` für Theme-Cookie-Tests.
+**Decisions:**
+- (a) Backup image: `prodrigestivill/postgres-backup-local:16` (community standard, healthcheck + retention policy out of the box, PG16-compatible).
+- (b) Network: only `geef-atelier-network` (no `proxy` — the backup needs no external access).
+- (c) Watchtower disable: `com.centurylinklabs.watchtower.enable=false` (server convention from D-023).
+- (d) Retention: 7 daily, 4 weekly, 6 monthly snapshots — appropriate for single-user with a < 100 MB DB.
+- (e) Schedule: `0 3 * * *` (03:00 UTC, minimal server load).
+- (f) Backup volume: `geef-atelier-backups` (named volume, isolated from `geef_atelier_postgres_data`).
+- (g) Restore script: `scripts/restore-backup.sh` — stops `web`, restores via psql, restarts `web`.
+- (h) No off-site backup in this step — a volume backup protects against a container crash, not a server failure. Off-site documented as the next post-skeleton step.
+- (i) No new `.env` variables — the backup uses the existing `POSTGRES_*` credentials.
+- (j) Server precedent: no other app stack on this server uses a backup service — Geef.Atelier sets the pattern.
 
-**Ergebnis:** 106 Tests gesamt (105 passed, 1 skipped ThemeSwitcher-E2E). `dotnet build` 0/0. Fünf Screens visuell überarbeitet, drei Themes funktional, self-hosted Fonts, 16 Icon-Komponenten, Bootstrap entfernt.
+**Result:** three containers healthy (web, postgres, postgres-backup). The first manual backup trigger and test restore verified successfully. 85/85 tests still green.
 
 ---
 
-## D-027 — Post-Skeleton Schritt 4: CLI-Provider-Adapter (2026-05-13)
+## D-025 — post-skeleton step 2: reviewer calibration (2026-05-12)
 
-**Kontext:** Alle drei Provider-Aufrufe liefen bisher über OpenRouter (Pay-as-you-go). Auf dem Atelier-Server (Hetzner, `95.216.100.213`) sind `claude` (Claude Code CLI, Subscription) und `codex` (OpenAI Codex CLI, Subscription) installiert — Subscription-Kapazität ohne Token-Abrechnung. Ziel: zweiter Provider-Pfad via neuem Side-Container, der diese CLIs als OpenAI-kompatibles HTTP exposed.
+**Context:** the first real-world briefing (the Hadwiger–Nelson problem) exposed a faulty severity classification: the `KlarheitReviewer` produced critical findings for factually correct content ("correct, but...") → the pipeline aborted (AbortOnCritical=true from D-012). Three goals: (A) sharpen the reviewer prompts, (B) make the convergence policy more robust, (C) improve the executor's iteration-2+ behaviour.
 
-**Entscheidungen:**
+**Decisions:**
+- (a) 4-level severity taxonomy: Critical/Major/Minor/Info as the Atelier standard; `docs/06-reviewer-calibration.md` is the normative reference document.
+- (b) Tool-schema values changed: `["critical", "major", "minor", "info"]` instead of `["info", "warning", "error", "critical"]`. Backward compatibility in `LlmReviewer.MapSeverity()` for `"error"` and `"warning"`.
+- (c) The anti-pattern rule "correct, but" ≠ critical added explicitly to both reviewer prompts.
+- (d) The Hadwiger–Nelson problem as a negative example in both reviewer prompts — a concrete LLM anchor against misclassification.
+- (e) `ConvergenceOptions` as a new config class in `Geef.Atelier.Infrastructure.Configuration`; default `AbortOnCritical=false` — the pipeline iterates 3 times instead of aborting after the first critical.
+- (f) The executor prompt sharpens iteration-2+ behaviour: numbered findings with a severity tag, an explicit requirement "concrete, visible change per finding".
+- (g) Reviewer prompts grew from ~4 to ~65 lines — a token-cost increase of ~5–10% per reviewer call accepted (irrelevant at <5 cents/run).
+- (h) Stagnation threshold stays 3 (no intervention) — the pipeline aborts on persisting findings after 3 iterations.
+- (i) Cross-reviewer voting (B2) rejected — too complex for this step; B1+B4 (configurable) is enough.
+- (j) Hadwiger–Nelson replay as a `[Fact]` test with skip-if-no-ApiKey in `AtelierPipelineRunsAgainstOpenRouterTests` — long-term regression safeguard.
 
-- **(a) Tech-Stack CLI-Proxy:** Python 3.12 + FastAPI. Begründung: kompakter Code für HTTP-Subprocess-Wrapper, Pydantic für Schema-Validierung, pytest für Tests. Dockerfile installiert Node.js + CLI-Packages (`@anthropic-ai/claude-code`, `@openai/codex`) on top.
-- **(b) Schnittstelle CLI-Proxy:** OpenAI-kompatibel (`POST /v1/chat/completions`, `GET /v1/models`, `GET /health`). `OpenAiCompatibleClient` bleibt unverändert — nutzt einfach alternativen Endpoint. Kein neuer `CliLlmClient` nötig.
-- **(c) `LlmOptions`-Umbau (Multi-Provider):** Altes flaches Schema (`ApiKey`, `DefaultModel`, `Actors{Model}`) ersetzt durch `Providers`-Dict (name → Endpoint + ApiKey) und `Actors`-Dict (name → Provider + Model + MaxTokens). Harter Cut, kein Backward-Kompat (Single-Maintainer-Projekt). Env-Var: `Llm__Providers__openrouter__ApiKey`.
-- **(d) `ILlmClientResolver`-Interface:** `(ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName)` in `Geef.Atelier.Infrastructure.Llm`. Resolver cached `OpenAiCompatibleClient`-Instances pro Provider in `ConcurrentDictionary` (eine `HttpClient`-Instanz pro Provider, nicht pro Akteur).
-- **(e) `OpenAiCompatibleClient`-Multi-Instance:** Konstruktor übernimmt jetzt `(HttpClient, string endpoint, string apiKey)` direkt — keine `IOptions<LlmOptions>` mehr. Einziger named `HttpClient` ("llm") wird für alle Provider wiederverwendet (`IHttpClientFactory`); Endpoint und ApiKey werden per Call via `Authorization`-Header injiziert.
-- **(f) Model-Routing im CLI-Proxy:** `claude-*` / `anthropic/claude-*` → claude CLI; `gpt-*` / `o*` / `openai/*` → codex CLI. Unbekannte → claude (Fallback). Provider-Prefix wird vor CLI-Aufruf gestripped.
-- **(g) Tool-Use-Mapping:** Schema-Embedding als System-Prompt-Addendum → CLI liefert Plaintext → `tool_use_parser.extract_json()` extrahiert JSON (inkl. Markdown-Fence-Stripping, Balanced-Brace-Scan) → `tool_calls`-Response. Bei JSON-Parse-Failure: Plaintext als `finish_reason="stop"` zurück (downstream `LlmReviewer` kann damit umgehen via D-013(e)).
-- **(h) Auth-Strategie CLI-Proxy:** Named Volume `geef-atelier-cli-auth:/auth`, unterteilt in `/auth/claude` und `/auth/codex`. Einmaliger manueller Login via `docker exec -it geef-atelier-cli-proxy claude auth login`. Tokens persistieren über Container-Restarts. Secrets niemals in Source-Control, Logs oder Berichten.
-- **(i) Concurrency:** `asyncio.Semaphore` pro CLI, Default 2 (`CLAUDE_MAX_CONCURRENT=2`, `CODEX_MAX_CONCURRENT=2`). Warteschlange bei Überschreitung, kein Fehler.
-- **(j) Side-Container-Netzwerk:** `geef-atelier-network` (intern), kein `proxy` (kein Traefik). Hostname innerhalb Compose-Stack: `cli-proxy`. Erreichbar von `web` via `http://cli-proxy:8090/v1`.
-- **(k) Umbenannte Env-Var:** `LLM_API_KEY` → `LLM_OPENROUTER_API_KEY` in `.env` + docker-compose. Klarere Semantik im Multi-Provider-Kontext.
-- **(l) Default-Konfiguration:** Alle drei Akteure bleiben auf `openrouter` (Backward-Sanity). `cli`-Provider in `appsettings.json` vorkonfiguriert, aber kein Akteur darauf geroutet. Umschalten per Env-Override ohne Code-Änderung.
-- **(m) `web`-depends-on `cli-proxy`:** Health-Check-abhängig (service_healthy). Verhindert Start vor CLI-Proxy-Bereitschaft.
+**Result:** 96 tests (before: 85). 3 new test classes (SeverityClassification, ConvergencePolicyConfig, OvereagerCriticalAbort). `dotnet build` 0/0. Reviewer calibration raised to the Atelier standard.
+
+---
+
+## D-026 — post-skeleton step 3: design translation (2026-05-12)
+
+**Context:** the walking skeleton + PS-1 (backup) + PS-2 (reviewer calibration) are done. A professional HTML/CSS/JSX prototype (`docs/design/atelier-mockups/`) with three palettes (Vellum/Noir/Petrol), its own typography (Newsreader/Geist/JetBrains Mono), 14+ hairline icons and five screens existed. Goal: port the visual and structural language into the Blazor UI without new backend features.
+
+**Decisions:**
+- (a) Three themes via `html.palette-{vellum|noir|petrol}` (CSS class). Default Vellum (prompt requirement) — the mockup default was Noir; an explicit divergence.
+- (b) Theme cookie `Atelier.Theme`, 1 year, `HttpOnly=false` (JS interop must read/set it), SameSite=Strict, logout does NOT delete.
+- (c) Theme-switch mechanics: JS interop primary (`window.atelier.setTheme`), the server endpoint `/settings/theme` as a fallback and Playwright test hook. Both implemented in parallel.
+- (d) `<html>` class Razor-server-side via `IHttpContextAccessor` — no flash of wrong theme.
+- (e) The Bootstrap stylesheet fully removed; `wwwroot/atelier.css` as the global stylesheet (ported 1:1 from the mockup + @font-face).
+- (f) Self-hosted fonts (Newsreader, Geist, JetBrains Mono) in `wwwroot/fonts/` — GDPR-compliant, no external network request.
+- (g) ReviewerDisplay helper mapping (β variant): code classes `BriefingTreueReviewer`/`KlarheitReviewer` unchanged; the UI shows `BriefingFidelity`/`Clarity`. No persistence breaking changes.
+- (h) PressStageMapper: a conservative heuristic — all running runs show stage 0 (draft) active; more complex event-based stage detection as an optional refinement.
+- (i) FindingResolutionInferrer: heuristic cross-iteration diff via a `Severity|ReviewerName|Message[..60]` signature. Bug fix in PS-3: `IndexOutOfRangeException` on an empty iteration list fixed.
+- (j) Mock stubs consistent via the `.coming-soon` class: cost display, export button, profile menu item, welcome stats.
+- (k) E2E selectors deliberately stable: `input#username`, `button.btn-login`, `.user-name`, `.btn-logout`, `textarea#briefing`, `button.btn-submit`, `[data-status]`. New components with `data-testid`.
+- (l) The tweaks panel and the style guide from the mockup not adopted into production.
+- (m) StatusBadge: `data-status` attribute restored (E2E tests expect it); the CSS-class rework (`badge-*` → `status pending`) required a test adjustment.
+- (n) WebTestHost in tests: `AddHttpContextAccessor()` added, `[Collection("Postgres")]` for theme-cookie tests.
+
+**Result:** 106 tests total (105 passed, 1 skipped ThemeSwitcher E2E). `dotnet build` 0/0. Five screens visually reworked, three themes functional, self-hosted fonts, 16 icon components, Bootstrap removed.
+
+---
+
+## D-027 — post-skeleton step 4: CLI provider adapter (2026-05-13)
+
+**Context:** all three provider calls ran via OpenRouter (pay-as-you-go) so far. On the Atelier server (Hetzner, `95.216.100.213`), `claude` (Claude Code CLI, subscription) and `codex` (OpenAI Codex CLI, subscription) are installed — subscription capacity without token billing. Goal: a second provider path via a new side container that exposes these CLIs as OpenAI-compatible HTTP.
+
+**Decisions:**
+
+- **(a) Tech stack CLI proxy:** Python 3.12 + FastAPI. Rationale: compact code for an HTTP subprocess wrapper, Pydantic for schema validation, pytest for tests. The Dockerfile installs Node.js + CLI packages (`@anthropic-ai/claude-code`, `@openai/codex`) on top.
+- **(b) CLI proxy interface:** OpenAI-compatible (`POST /v1/chat/completions`, `GET /v1/models`, `GET /health`). `OpenAiCompatibleClient` stays unchanged — it simply uses an alternative endpoint. No new `CliLlmClient` needed.
+- **(c) `LlmOptions` rebuild (multi-provider):** the old flat schema (`ApiKey`, `DefaultModel`, `Actors{Model}`) replaced by a `Providers` dict (name → endpoint + ApiKey) and an `Actors` dict (name → provider + model + MaxTokens). Hard cut, no backward compat (single-maintainer project). Env var: `Llm__Providers__openrouter__ApiKey`.
+- **(d) `ILlmClientResolver` interface:** `(ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName)` in `Geef.Atelier.Infrastructure.Llm`. The resolver caches `OpenAiCompatibleClient` instances per provider in a `ConcurrentDictionary` (one `HttpClient` instance per provider, not per actor).
+- **(e) `OpenAiCompatibleClient` multi-instance:** the constructor now takes `(HttpClient, string endpoint, string apiKey)` directly — no more `IOptions<LlmOptions>`. A single named `HttpClient` ("llm") is reused for all providers (`IHttpClientFactory`); endpoint and ApiKey are injected per call via the `Authorization` header.
+- **(f) Model routing in the CLI proxy:** `claude-*` / `anthropic/claude-*` → claude CLI; `gpt-*` / `o*` / `openai/*` → codex CLI. Unknown → claude (fallback). The provider prefix is stripped before the CLI call.
+- **(g) Tool-use mapping:** schema embedding as a system-prompt addendum → the CLI returns plaintext → `tool_use_parser.extract_json()` extracts JSON (incl. Markdown-fence stripping, balanced-brace scan) → a `tool_calls` response. On a JSON parse failure: plaintext back as `finish_reason="stop"` (the downstream `LlmReviewer` can handle this via D-013(e)).
+- **(h) Auth strategy CLI proxy:** named volume `geef-atelier-cli-auth:/auth`, split into `/auth/claude` and `/auth/codex`. A one-time manual login via `docker exec -it geef-atelier-cli-proxy claude auth login`. Tokens persist across container restarts. Secrets never in source control, logs or reports.
+- **(i) Concurrency:** `asyncio.Semaphore` per CLI, default 2 (`CLAUDE_MAX_CONCURRENT=2`, `CODEX_MAX_CONCURRENT=2`). A queue on overrun, no error.
+- **(j) Side-container network:** `geef-atelier-network` (internal), no `proxy` (no Traefik). Hostname within the compose stack: `cli-proxy`. Reachable from `web` via `http://cli-proxy:8090/v1`.
+- **(k) Renamed env var:** `LLM_API_KEY` → `LLM_OPENROUTER_API_KEY` in `.env` + docker-compose. Clearer semantics in the multi-provider context.
+- **(l) Default configuration:** all three actors stay on `openrouter` (backward sanity). The `cli` provider is pre-configured in `appsettings.json` but no actor routed to it. Switch via env override without a code change.
+- **(m) `web` depends-on `cli-proxy`:** health-check dependent (service_healthy). Prevents starting before the CLI proxy is ready.
 
 **Tests:**
-- Python: 21 pytest-Tests (openai_format, tool_use_parser, claude_adapter_mock, codex_adapter_mock, concurrency) — alle grün.
-- C#: LlmOptionsMultiProviderTests, LlmClientResolverTests, OpenAiCompatibleClientTests (angepasst), TestLlmClientResolver (neu). `dotnet test` 113 passed, 1 skipped — alle grün.
+- Python: 21 pytest tests (openai_format, tool_use_parser, claude_adapter_mock, codex_adapter_mock, concurrency) — all green.
+- C#: LlmOptionsMultiProviderTests, LlmClientResolverTests, OpenAiCompatibleClientTests (adjusted), TestLlmClientResolver (new). `dotnet test` 113 passed, 1 skipped — all green.
 
-**Ergebnis:** `dotnet build` 0/0. 113 C#-Tests grün. 21 Python-Tests grün. CLI-Proxy-Image bauffähig. Backward-Sanity (pure OpenRouter) unverändert.
-
----
-
-## D-028 — Crew-Foundation: Profile, Templates, Snapshots (2026-05-13)
-
-**Kontext:** Die Pipeline lief mit einer fest hartkodierte Dreier-Crew (`LlmExecutionStep` + `LlmReviewer(BriefingTreue)` + `LlmReviewer(Klarheit)`). Das blockierte das Vision-Ziel "Text-Manufaktur mit verschiedenen Crews" und alle nachfolgenden Schritte (PS-6: UI-Crew-Auswahl, PS-7: Advisor-Pässe).
-
-**Entscheidungen:**
-
-- **(a) Profile als Records:** `ReviewerProfile` und `ExecutorProfile` sind sealed positional records in `Core/Domain/Crew/Profiles/`. Gleiche Struktur (Name, DisplayName, Description, SystemPrompt, Provider, Model, MaxTokens, IsSystem). EF Core mappt sie als Entities mit Name als PK.
-
-- **(b) System-Profile als Code-Konstanten:** Definiert in `SystemCrew.cs` (read-only). Nicht in DB. Custom-Profile in DB mit Auto-Prefix `"custom-"`. Update/Delete von System-Profilen wirft `InvalidOperationException`. Modell-Pluralismus: DefaultExecutor auf `anthropic/claude-opus-4.7` (Kontinuität), Reviewer auf Außen-Modelle (`google/gemini-2.5-flash`, `openai/gpt-5.5-mini`) gemäß Vision-Leitstern 3 + CLAUDE.md-Konvention.
-
-- **(c) CrewTemplate:** Komponiert Executor + Reviewers + EvaluationStrategy + optionalen ConvergenceOverride + leere AdvisorProfileNames (PS-7-Vorbereitung). System-Template `"klassik"` als Code-Konstante, reproduziert PS-2-Verhalten exakt.
-
-- **(d) CrewSnapshot vollständig eingebettet:** Reproduzierbarkeit garantiert. JSONB-Spalte auf `Runs`. SchemaVersion=1. Serialisiert mit `JsonNamingPolicy.CamelCase`. Defensive Deserialisierung im OrchestratorService mit Fallback auf Klassik-Konstanten.
-
-- **(e) EvaluationStrategies:** Alle vier Strategien (`Parallel`, `Sequential`, `FailFast`, `Priority`) als SDK-Klassen in `Geef.Sdk.Policies` vorhanden — kein Atelier-eigener Code nötig. `EvaluationStrategyMapper` mappt Domain-Enum auf SDK-Klassen.
-
-- **(f) `ILlmClientResolver.ForProfile`:** Zweite Methode ergänzt; nutzt denselben Provider-Cache wie `ForActor`. `ForActor` bleibt für Backward-Kompatibilität.
-
-- **(g) `IRunService.SubmitRunAsync` erweitert:** Neue Parameter `crewTemplateName` + `customCrew`. Null/leer → Default `"klassik"`. `customCrew` überschreibt `crewTemplateName`. Snapshot wird beim Submit gebaut und persistiert.
-
-- **(h) MCP-Tools:** `list_crew_templates` + `list_reviewer_profiles` neu. `submit_request` erweitert um `crew_template` + `custom_crew` (JSON-String, bei ParseFehler ignoriert).
-
-- **(i) Migration Step10CrewSystem:** Lücke nach Step09AuditTrail geschlossen. Neue Tabellen `ReviewerProfiles`, `ExecutorProfiles`, `CrewTemplates`. `Runs` um `CrewTemplateName` + `CrewSnapshot` erweitert. UPDATE historische Runs zu `"klassik"`. UPDATE `Findings.ReviewerName` (`BriefingTreueReviewer` → `briefing-fidelity`, `KlarheitReviewer` → `clarity`).
-
-- **(j) Reviewer-Slugs:** `"briefing-fidelity"` und `"clarity"` ersetzen alte Klassennamen in `FindingEntity.ReviewerName`. `ReviewerDisplay.ToDisplay()` enthält beide Varianten als Fallback.
-
-- **(k) `LlmReviewer`, `LlmExecutionStep`, `AtelierSystemPrompts` gelöscht:** Ersetzt durch `ProfileBasedReviewer`/`ProfileBasedExecutor` + `Core/Domain/Crew/SystemPrompts.cs`.
-
-- **(l) AdvisorProfile-Stub:** Vollständig definiert mit `AdvisorMode`-Enum (Strategic, Critical, DevilsAdvocate, DomainExpert). Keine DB-Tabelle in PS-5. PS-7 nutzt Schema ohne Breaking-Change.
-
-- **(m) SystemPrompts in Core:** Die langen System-Prompt-Strings gehören semantisch zu den System-Profilen → liegen jetzt in `Core/Domain/Crew/SystemPrompts.cs` (Domain-Layer, keine Infrastruktur-Abhängigkeit).
-
-**Tests:** `dotnet build` 0/0 Warnings. 154 C#-Tests grün (41 neue), 1 E2E-Skip unverändert.
-
-**Ergebnis:** Pipeline baut sich pro Run dynamisch aus dem persistierten CrewSnapshot. System-Defaults im Code versioniert, User-Custom in DB. Reviewer-Name-Migration sauber. MCP-Tools funktional. PS-6 (UI-Crew-Auswahl) und PS-7 (Advisor-Pässe) können ohne Schema-Brüche folgen.
+**Result:** `dotnet build` 0/0. 113 C# tests green. 21 Python tests green. CLI-proxy image buildable. Backward sanity (pure OpenRouter) unchanged.
 
 ---
 
-## D-029 — PS-6 Crew-UI: Architektur-Entscheidungen
+## D-028 — crew foundation: profiles, templates, snapshots (2026-05-13)
 
-Datum: 2026-05-13
+**Context:** the pipeline ran with a hard-coded three-member crew (`LlmExecutionStep` + `LlmReviewer(BriefingTreue)` + `LlmReviewer(Klarheit)`). This blocked the vision goal "text manufactory with different crews" and all subsequent steps (PS-6: UI crew selection, PS-7: advisor passes).
 
-| Entscheidung | Ergebnis |
+**Decisions:**
+
+- **(a) Profiles as records:** `ReviewerProfile` and `ExecutorProfile` are sealed positional records in `Core/Domain/Crew/Profiles/`. Same structure (Name, DisplayName, Description, SystemPrompt, Provider, Model, MaxTokens, IsSystem). EF Core maps them as entities with Name as the PK.
+
+- **(b) System profiles as code constants:** defined in `SystemCrew.cs` (read-only). Not in the DB. Custom profiles in the DB with the auto-prefix `"custom-"`. Update/delete of system profiles throws `InvalidOperationException`. Model pluralism: DefaultExecutor on `anthropic/claude-opus-4.7` (continuity), reviewers on foreign models (`google/gemini-2.5-flash`, `openai/gpt-5.5-mini`) per vision principle 3 + the CLAUDE.md convention.
+
+- **(c) CrewTemplate:** composes executor + reviewers + EvaluationStrategy + an optional ConvergenceOverride + empty AdvisorProfileNames (PS-7 preparation). System template `"klassik"` as a code constant, reproduces PS-2 behaviour exactly.
+
+- **(d) CrewSnapshot fully embedded:** reproducibility guaranteed. JSONB column on `Runs`. SchemaVersion=1. Serialized with `JsonNamingPolicy.CamelCase`. Defensive deserialization in the OrchestratorService with a fallback to the klassik constants.
+
+- **(e) EvaluationStrategies:** all four strategies (`Parallel`, `Sequential`, `FailFast`, `Priority`) exist as SDK classes in `Geef.Sdk.Policies` — no Atelier-own code needed. `EvaluationStrategyMapper` maps the domain enum to the SDK classes.
+
+- **(f) `ILlmClientResolver.ForProfile`:** a second method added; uses the same provider cache as `ForActor`. `ForActor` stays for backward compatibility.
+
+- **(g) `IRunService.SubmitRunAsync` extended:** new parameters `crewTemplateName` + `customCrew`. Null/empty → default `"klassik"`. `customCrew` overrides `crewTemplateName`. The snapshot is built and persisted on submit.
+
+- **(h) MCP tools:** `list_crew_templates` + `list_reviewer_profiles` new. `submit_request` extended with `crew_template` + `custom_crew` (JSON string, ignored on a parse error).
+
+- **(i) Migration Step10CrewSystem:** the gap after Step09AuditTrail closed. New tables `ReviewerProfiles`, `ExecutorProfiles`, `CrewTemplates`. `Runs` extended with `CrewTemplateName` + `CrewSnapshot`. UPDATE historical runs to `"klassik"`. UPDATE `Findings.ReviewerName` (`BriefingTreueReviewer` → `briefing-fidelity`, `KlarheitReviewer` → `clarity`).
+
+- **(j) Reviewer slugs:** `"briefing-fidelity"` and `"clarity"` replace the old class names in `FindingEntity.ReviewerName`. `ReviewerDisplay.ToDisplay()` contains both variants as a fallback.
+
+- **(k) `LlmReviewer`, `LlmExecutionStep`, `AtelierSystemPrompts` deleted:** replaced by `ProfileBasedReviewer`/`ProfileBasedExecutor` + `Core/Domain/Crew/SystemPrompts.cs`.
+
+- **(l) AdvisorProfile stub:** fully defined with the `AdvisorMode` enum (Strategic, Critical, DevilsAdvocate, DomainExpert). No DB table in PS-5. PS-7 uses the schema without a breaking change.
+
+- **(m) SystemPrompts in Core:** the long system-prompt strings semantically belong to the system profiles → they now live in `Core/Domain/Crew/SystemPrompts.cs` (domain layer, no infrastructure dependency).
+
+**Tests:** `dotnet build` 0/0 warnings. 154 C# tests green (41 new), 1 E2E skip unchanged.
+
+**Result:** the pipeline builds itself dynamically per run from the persisted CrewSnapshot. System defaults versioned in code, user-custom in the DB. Reviewer-name migration clean. MCP tools functional. PS-6 (UI crew selection) and PS-7 (advisor passes) can follow without schema breaks.
+
+---
+
+## D-029 — PS-6 crew UI: architecture decisions
+
+Date: 2026-05-13
+
+| Decision | Result |
 |---|---|
-| (a) `CrewSnapshot.Deserialize` als statischer Domain-Helper | Konsolidiert die bisher inline in `RunOrchestratorService` duplizierte Deserialisierungs-Logik. UI-Komponenten und Service konsumieren denselben Helper. |
-| (b) `IProviderCatalog`-Service in Application-Schicht | Statt direktem `IOptions<LlmOptions>`-Inject in Razor (Layer-Verletzung): schmale Interface in Application, Implementierung in Infrastructure wraps `IOptions<LlmOptions>`. |
-| (c) Routing-Constraint `[a-z0-9\-]+` max 64 Zeichen | Blazor-Route-Parameter für Profile-/Template-Namen. DataAnnotations-`RegularExpression` in Form-Validierung erzwingt dasselbe Pattern. |
-| (d) Interactive-Server-Render-Mode für alle CRUD-Editor-Pages | Up/Down-Buttons im ReviewerPicker, State-Verwaltung im Delete-Modal brauchen Server-Interaktivität ohne Page-Reload. |
-| (e) Top-Level-NavMenu-Link „Crew" als vierter Eintrag | NavMenu hatte nur 3 Items, kein Style-Guide-Link vorhanden. Top-Level ist die natürliche Wahl. |
-| (f) Generische `ProfileEditorForm` für Reviewer + Executor | Beide Records haben identisches Schema — Code-Reuse via einem parametrisierten Form-Komponenten. |
-| (g) Generische `Modal`-Komponente + `DeleteConfirmationModal` als Wrapper | Kein Browser-`confirm`. Modal ist wiederverwendbar für andere Bestätigungs-Flows. |
-| (h) Up/Down-Pfeil-Buttons statt Drag-Drop im ReviewerPicker | Kein JS-Interop nötig, ausreichend für 2-5 Reviewer. |
-| (i) System-Profile/Template-Schutz: UI + Service | UI rendert disabled-Buttons + Duplicate-Action; Service wirft zusätzlich `InvalidOperationException` (Defense in Depth). |
-| (j) Custom-Auto-Prefix Live-Preview im Editor | UI zeigt „Wird gespeichert als: custom-XXX" vor dem Speichern. Service-Layer ist idempotent. |
-| (k) `CrewSummary` Click-to-Expand statt separatem Modal | Platzsparend, kein zusätzlicher Klick für Schließen nötig. |
-| (l) `CrewBadge` als dezenter Text-Badge ohne Icon | Kleine visuelle Hierarchie unterhalb StatusBadge — Icon wäre Überfrachtung. |
-| (m) AdvisorProfile-Felder aus PS-6 ausgespart | PS-7 bringt Advisor-UI. Schema steht, aber in PS-6 noch nicht funktional. |
+| (a) `CrewSnapshot.Deserialize` as a static domain helper | Consolidates the deserialization logic previously duplicated inline in `RunOrchestratorService`. UI components and the service consume the same helper. |
+| (b) `IProviderCatalog` service in the application layer | Instead of injecting `IOptions<LlmOptions>` directly into Razor (a layer violation): a narrow interface in Application, the implementation in Infrastructure wraps `IOptions<LlmOptions>`. |
+| (c) Routing constraint `[a-z0-9\-]+` max 64 characters | Blazor route parameter for profile/template names. DataAnnotations `RegularExpression` in form validation enforces the same pattern. |
+| (d) Interactive-server render mode for all CRUD editor pages | Up/down buttons in the ReviewerPicker, state management in the delete modal need server interactivity without a page reload. |
+| (e) Top-level NavMenu link "Crew" as the fourth entry | NavMenu had only 3 items, no style-guide link present. Top-level is the natural choice. |
+| (f) Generic `ProfileEditorForm` for reviewer + executor | Both records have an identical schema — code reuse via one parameterized form component. |
+| (g) Generic `Modal` component + `DeleteConfirmationModal` as a wrapper | No browser `confirm`. The modal is reusable for other confirmation flows. |
+| (h) Up/down arrow buttons instead of drag-drop in the ReviewerPicker | No JS interop needed, sufficient for 2–5 reviewers. |
+| (i) System profile/template protection: UI + service | The UI renders disabled buttons + a duplicate action; the service additionally throws `InvalidOperationException` (defense in depth). |
+| (j) Custom auto-prefix live preview in the editor | The UI shows "Will be saved as: custom-XXX" before saving. The service layer is idempotent. |
+| (k) `CrewSummary` click-to-expand instead of a separate modal | Space-saving, no extra click for closing needed. |
+| (l) `CrewBadge` as a subtle text badge without an icon | A small visual hierarchy below StatusBadge — an icon would be overload. |
+| (m) AdvisorProfile fields omitted in PS-6 | PS-7 brings the advisor UI. The schema is there but not yet functional in PS-6. |
 
 
-## D-030 — Bugfix: Run-Status bei LLM-Provider-Fehler
+## D-030 — bugfix: run status on an LLM-provider error
 
-Datum: 2026-05-13
+Date: 2026-05-13
 
-| Entscheidung | Ergebnis |
+| Decision | Result |
 |---|---|
-| (a) Outer-Catch im `RunOrchestratorService`, nicht im SDK-Layer | `ProcessRunAsync` ist der einzige Ort, der den Run-Kontext kennt und Schreibrechte auf `RunEntity` hat. SDK-Layer für Error-Handling anzupassen wäre Schicht-Verletzung. |
-| (b) `MarkRunFailedAsync` als separater Helper analog zu `OverrideToAbortedAsync` | Konsistentes Muster: jede Terminal-State-Transition hat ihren eigenen Helper. Kein generischer Helper, um Verwechslungen zu vermeiden. |
-| (c) `SanitizeErrorMessage` walked die `InnerException`-Kette | Das Geef SDK wraps `HttpRequestException` in seiner eigenen Exception — direktes Pattern-Matching auf dem äußersten Exception-Typ reicht nicht. |
-| (d) Keine Exception-Typen explizit in der `catch`-Signatur | Der `catch (Exception ex)` bleibt generisch, da das SDK beliebige Wrapper-Typen verwenden könnte. Die Sanitize-Logik kapselt die Typ-Differenzierung. |
-| (e) `TaskCanceledException` im Sanitizer = "timed out" | `cts.IsCancellationRequested`-basierte Cancellation wird durch frühere `catch`-Blöcke abgefangen. Eine `TaskCanceledException`, die den generischen Block erreicht, ist ausschließlich ein Provider-Timeout. |
-| (f) Kein Auto-Retry | Transient-Error-Retry (HTTP 429/503) bleibt separater Step mit `Polly`. Dieser Bugfix nur Error-State korrekt persistieren. |
+| (a) Outer catch in `RunOrchestratorService`, not in the SDK layer | `ProcessRunAsync` is the only place that knows the run context and has write rights on `RunEntity`. Adjusting the SDK layer for error handling would be a layer violation. |
+| (b) `MarkRunFailedAsync` as a separate helper analogous to `OverrideToAbortedAsync` | A consistent pattern: every terminal-state transition has its own helper. No generic helper, to avoid confusion. |
+| (c) `SanitizeErrorMessage` walks the `InnerException` chain | The Geef SDK wraps `HttpRequestException` in its own exception — direct pattern matching on the outermost exception type is not enough. |
+| (d) No exception types explicitly in the `catch` signature | The `catch (Exception ex)` stays generic since the SDK could use arbitrary wrapper types. The sanitize logic encapsulates the type differentiation. |
+| (e) `TaskCanceledException` in the sanitizer = "timed out" | `cts.IsCancellationRequested`-based cancellation is caught by earlier `catch` blocks. A `TaskCanceledException` that reaches the generic block is exclusively a provider timeout. |
+| (f) No auto-retry | Transient-error retry (HTTP 429/503) stays a separate step with `Polly`. This bugfix only persists the error state correctly. |
 
 ---
 
-## D-031 — PS-7: Advisor-Pässe (2026-05-13)
+## D-031 — PS-7: advisor passes (2026-05-13)
 
-**Kontext:** Advisor-Pässe ermöglichen es, vor dem Executor-Pass (BeforeFirstExecution, BeforeEveryExecution) oder nach einem Convergence-Failure (OnConvergenceFailure) LLM-Akteure konsultativ einzuschalten. Ihr Output wird als gekennzeichneter Kontext-Block in den Run-Kontext injiziert, ohne den Geef-SDK-Kern zu modifizieren.
+**Context:** advisor passes make it possible to consultatively bring in LLM actors before the executor pass (BeforeFirstExecution, BeforeEveryExecution) or after a convergence failure (OnConvergenceFailure). Their output is injected as a marked context block into the run context without modifying the Geef SDK core.
 
-| Knackpunkt | Entscheidung |
+| Crux | Decision |
 |---|---|
-| (a) Decorator-Pattern statt SDK-Hook | Das Geef-SDK exportiert zwar `Geef.Sdk.Advisors.IAdvisor`, aber aus Layer-Trennung-Gründen wird ein eigener `AdvisorAwareExecutor`-Decorator um `IExecutionStep` gelegt. Der Decorator ist im Infrastructure-Layer angesiedelt und braucht kein SDK-Intern-Wissen. Änderungen am SDK-Interface würden Atelier nicht brechen. |
-| (b) Advisor-Output als `AtelierContextKeys.AdvisorBlock` | Der Advisor-Output wird als einzelner, klar bezeichneter Text-Block (`[ADVISOR: <name>]\n<text>`) in `IRunContext` via `AtelierContextKeys.AdvisorBlock` geschrieben. Executor- und Reviewer-System-Prompts können diesen Block referenzieren. Keine strukturierten Findings — Advisors liefern fließenden Rat, keine Severity-klassifizierten Befunde. |
-| (c) Advisor-Failure → Run schlägt fehl (Exception bubbling) | Advisor-LLM-Calls sind nicht best-effort. Eine Exception im `ProfileBasedAdvisor` bubbled durch den `AdvisorAwareExecutor` hoch und bricht den Run mit Status `Failed` ab. Begründung: ein fehlgeschlagener Advisor hat möglicherweise den Executor-Context korrumpiert — stiller Weiterlauf wäre gefährlicher als transparenter Abbruch. |
-| (d) Advisor-Reihenfolge signifikant (analog Reviewer) | Mehrere Advisors eines Triggers werden in Listen-Reihenfolge sequenziell ausgeführt. Jeder spätere Advisor sieht den bereits akkumulierten `AdvisorBlock` der Vorgänger. Analog zur `Sequential`-EvaluationStrategy bei Reviewern: Reihenfolge im CrewTemplate ist semantisch. |
-| (e) OnConvergenceFailure-Trigger via Single-Retry-Cap | `RunOrchestratorService.TryConvergenceFailureRetryAsync` fängt `ConvergenceFailedException` und startet einen einmaligen Wiederholungsdurchlauf mit `OnConvergenceFailure`-Advisors im Kontext. `RunEntity.AdvisorRetryAttempted`-Flag (Migration Step11) verhindert Endlos-Schleifen: ein zweites `ConvergenceFailedException` nach dem Retry eskaliert direkt zu `Failed`. Multi-Retry mit konfigurierter Wiederholungsanzahl ist als Future Work dokumentiert (PS-8 oder eigener Schritt). |
+| (a) Decorator pattern instead of an SDK hook | The Geef SDK does export `Geef.Sdk.Advisors.IAdvisor`, but for layer-separation reasons an own `AdvisorAwareExecutor` decorator is placed around `IExecutionStep`. The decorator sits in the Infrastructure layer and needs no SDK-internal knowledge. Changes to the SDK interface would not break Atelier. |
+| (b) Advisor output as `AtelierContextKeys.AdvisorBlock` | The advisor output is written as a single, clearly named text block (`[ADVISOR: <name>]\n<text>`) into `IRunContext` via `AtelierContextKeys.AdvisorBlock`. Executor and reviewer system prompts can reference this block. No structured findings — advisors deliver flowing advice, not severity-classified findings. |
+| (c) Advisor failure → the run fails (exception bubbling) | Advisor LLM calls are not best-effort. An exception in `ProfileBasedAdvisor` bubbles up through `AdvisorAwareExecutor` and aborts the run with status `Failed`. Rationale: a failed advisor may have corrupted the executor context — silently continuing would be more dangerous than a transparent abort. |
+| (d) Advisor order significant (analogous to reviewers) | Multiple advisors of one trigger run sequentially in list order. Each later advisor sees the already accumulated `AdvisorBlock` of the predecessors. Analogous to the `Sequential` EvaluationStrategy for reviewers: the order in the CrewTemplate is semantic. |
+| (e) OnConvergenceFailure trigger via single-retry cap | `RunOrchestratorService.TryConvergenceFailureRetryAsync` catches `ConvergenceFailedException` and starts a single repeat run with `OnConvergenceFailure` advisors in the context. The `RunEntity.AdvisorRetryAttempted` flag (migration Step11) prevents infinite loops: a second `ConvergenceFailedException` after the retry escalates directly to `Failed`. Multi-retry with a configured retry count is documented as future work (PS-8 or an own step). |
 
 ---
 
-## D-032 — Refactor: CLI-Provider-Split (2026-05-13)
+## D-032 — refactor: CLI provider split (2026-05-13)
 
-**Kontext:** PS-4 hat einen einzelnen `cli`-Provider mit internem Model-Name-Routing angelegt (claude-Präfix → claude CLI, gpt-/o*-Präfix → codex CLI). Im PS-6 Crew-UI wurde sichtbar, dass dieser versteckte Routing-Mechanismus eine UX-Schwäche ist: der User sieht im Provider-Dropdown nur "cli" und muss anhand des Modell-Namens raten, welche CLI tatsächlich genutzt wird. Ein falsch geschriebener Modell-Name kann silently in die falsche CLI routen.
+**Context:** PS-4 created a single `cli` provider with internal model-name routing (claude prefix → claude CLI, gpt-/o* prefix → codex CLI). In the PS-6 crew UI it became visible that this hidden routing mechanism is a UX weakness: the user sees only "cli" in the provider dropdown and must guess from the model name which CLI is actually used. A misspelled model name can silently route to the wrong CLI.
 
-| Knackpunkt | Entscheidung |
+| Crux | Decision |
 |---|---|
-| (a) Legacy-Endpoint im cli-proxy: Entfernen oder Behalten | **Behalten mit Deprecation-Warning.** Der Legacy-Endpoint `/v1/chat/completions` bleibt erhalten und loggt bei jedem Aufruf ein WARNING-Level-Log. Begründung: minimales Risiko bei Migration-Edge-Cases (falls ein Profil nach DB-Migration noch `cli` als Provider hätte, würde es weiter funktionieren statt komplett zu scheitern). Geplante Entfernung nach 2-3 Atelier-Versionen. |
-| (b) Zwei explizite Endpoints: `/v1/claude/chat/completions` + `/v1/codex/chat/completions` | Deterministisches Routing ohne Model-Name-Heuristik. Provider-Name allein entscheidet die CLI-Wahl. Atelier-Konfiguration trennt die zwei Provider in `appsettings.json` mit unterschiedlichen Endpoint-Pfaden. |
-| (c) `IProviderCatalog`-API-Erweiterung um `ProviderInfo` | Die alte Methode `ListProviderNames() → IReadOnlyList<string>` wird ersetzt durch `ListProviders() → IReadOnlyList<ProviderInfo>`. `ProviderInfo` ist ein sealed record mit `Name` (DB-Key) und `DisplayName` (UI-Label). Kein Backward-Kompat (Single-Maintainer-Projekt, einziger Caller ist `ProfileEditorForm`). |
-| (d) `ProviderCatalog`-Implementierung: Hardcodierte DisplayNames statt DB-Daten | DisplayNames für die drei bekannten Provider (`openrouter`, `claude-cli`, `codex-cli`) sind als Dictionary-Konstante im Code hinterlegt. Unbekannte Provider-Namen (zukünftige Erweiterungen) fallen auf `Name == DisplayName` zurück. |
-| (e) CrewSnapshot-Migrations-Strategie: Two-Pass SQL | DB-Migration `Step12CliProviderSplit` migriert Profile-Tabellen (ReviewerProfiles, ExecutorProfiles, AdvisorProfiles) via direktem `CASE`-`UPDATE` auf der `"Model"`-Spalte — immer korrekt. Für `Runs.CrewSnapshot`-JSONB: Two-Pass SQL-String-Replace (Codex-Pattern zuerst, dann claude-cli-Fallback). Limitation: Mixed-CLI-Snapshots (ein Executor claude, ein Reviewer codex im selben Run) werden nicht korrekt migriert — in der Praxis existieren solche Snapshots nicht, da alle System-Akteure `openrouter` nutzen und custom CLI-Profile im Projekt neu sind. |
+| (a) Legacy endpoint in the cli-proxy: remove or keep | **Keep with a deprecation warning.** The legacy endpoint `/v1/chat/completions` is retained and logs a WARNING-level log on every call. Rationale: minimal risk for migration edge cases (if a profile still had `cli` as provider after the DB migration, it would keep working instead of failing completely). Planned removal after 2–3 Atelier versions. |
+| (b) Two explicit endpoints: `/v1/claude/chat/completions` + `/v1/codex/chat/completions` | Deterministic routing without a model-name heuristic. The provider name alone decides the CLI choice. The Atelier configuration separates the two providers in `appsettings.json` with different endpoint paths. |
+| (c) `IProviderCatalog` API extension with `ProviderInfo` | The old method `ListProviderNames() → IReadOnlyList<string>` is replaced by `ListProviders() → IReadOnlyList<ProviderInfo>`. `ProviderInfo` is a sealed record with `Name` (DB key) and `DisplayName` (UI label). No backward compat (single-maintainer project, the only caller is `ProfileEditorForm`). |
+| (d) `ProviderCatalog` implementation: hard-coded DisplayNames instead of DB data | DisplayNames for the three known providers (`openrouter`, `claude-cli`, `codex-cli`) are stored as a dictionary constant in the code. Unknown provider names (future extensions) fall back to `Name == DisplayName`. |
+| (e) CrewSnapshot migration strategy: two-pass SQL | The DB migration `Step12CliProviderSplit` migrates the profile tables (ReviewerProfiles, ExecutorProfiles, AdvisorProfiles) via a direct `CASE`-`UPDATE` on the `"Model"` column — always correct. For `Runs.CrewSnapshot` JSONB: two-pass SQL string replace (codex pattern first, then claude-cli fallback). Limitation: mixed-CLI snapshots (one executor claude, one reviewer codex in the same run) are not migrated correctly — in practice such snapshots do not exist since all system actors use `openrouter` and custom CLI profiles are new in the project. |
 
-**Tests:** `dotnet build` 0/0. 246 C#-Tests grün (7 neue), 1 E2E-Skip. Python pytest 30/30 grün (9 neue).
+**Tests:** `dotnet build` 0/0. 246 C# tests green (7 new), 1 E2E skip. Python pytest 30/30 green (9 new).
 
 ---
 
-## D-033 — Feature: Model-Catalog-Dropdown (2026-05-13)
+## D-033 — feature: model-catalog dropdown (2026-05-13)
 
-**Kontext:** Der Profile-Editor (PS-6) nutzte ein Free-Text-Input für das Modell-Feld. Das führte zu einem Bug mit nicht-existentem Modell (`openai/gpt-5.5-mini`), der jetzt korrekt als `Failed` landet (D-030), aber besser durch Prävention gelöst wird: ein Dropdown mit validen Modell-IDs verhindert Tippfehler.
+**Context:** the profile editor (PS-6) used a free-text input for the model field. This led to a bug with a non-existent model (`openai/gpt-5.5-mini`), which now correctly lands as `Failed` (D-030) but is better solved by prevention: a dropdown with valid model IDs prevents typos.
 
-| Knackpunkt | Entscheidung |
+| Crux | Decision |
 |---|---|
-| (a) CLI-Listing-Befehl | Weder `claude` noch `codex` CLI hat einen `--list-models`-Befehl. Nur Option (b) — statische Listen in den Adaptern. Kein "Hybrid"-Versuch nötig. |
-| (b) Recommended-Listen | Hardcoded in `StaticModelFallback.cs` (Core-Layer). Recommendation ist eine Atelier-Meinung, keine Provider-Eigenschaft. Maintainer-Pflicht bei jedem Modell-Release. |
-| (c) Cache-Sharing | Single-Instanz-Setup: `IMemoryCache` mit 24h-TTL ausreichend. Kein Redis oder distributed cache nötig. |
-| (d) CLI-Provider-Modellquellen | `claude-cli`-Backend: statische Liste in `claude_adapter.STATIC_MODELS`. `codex-cli`-Backend: statische Liste in `codex_adapter.STATIC_MODELS`. Beide werden über die neuen `/v1/claude/models` und `/v1/codex/models` Endpoints im cli-proxy exponiert. OpenRouter: live API-Aufruf gegen `https://openrouter.ai/api/v1/models`. |
-| (e) Fallback-Strategie | API-Aufruf schlägt fehl → `StaticModelFallback.For(providerName)`. `IsUsingFallback()`-Flag wird exponiert; UI zeigt Warning-Banner wenn Fallback aktiv. |
-| (f) Custom-Model-Escape-Hatch | Besteht als "Custom model name…" Option im Dropdown. Beim Speichern mit nicht-katalogisiertem Modell: Bestätigungs-Modal ("Save anyway?"). Verhindert Tippfehler, erlaubt aber bewusste Custom-Nutzung. |
+| (a) CLI listing command | Neither the `claude` nor the `codex` CLI has a `--list-models` command. Only option (b) — static lists in the adapters. No "hybrid" attempt needed. |
+| (b) Recommended lists | Hard-coded in `StaticModelFallback.cs` (Core layer). A recommendation is an Atelier opinion, not a provider property. A maintainer duty on every model release. |
+| (c) Cache sharing | Single-instance setup: `IMemoryCache` with a 24h TTL is sufficient. No Redis or distributed cache needed. |
+| (d) CLI-provider model sources | `claude-cli` backend: static list in `claude_adapter.STATIC_MODELS`. `codex-cli` backend: static list in `codex_adapter.STATIC_MODELS`. Both are exposed via the new `/v1/claude/models` and `/v1/codex/models` endpoints in the cli-proxy. OpenRouter: a live API call against `https://openrouter.ai/api/v1/models`. |
+| (e) Fallback strategy | API call fails → `StaticModelFallback.For(providerName)`. An `IsUsingFallback()` flag is exposed; the UI shows a warning banner when the fallback is active. |
+| (f) Custom-model escape hatch | Exists as a "Custom model name…" option in the dropdown. When saving with a non-catalogued model: a confirmation modal ("Save anyway?"). Prevents typos but allows deliberate custom use. |
 
-**Tests:** 256 C#-Tests (8 neu `ModelCatalogTests`), 43 Python-Tests (13 neu `test_models_endpoints.py`), 1 E2E-Skip, 0 Failures.
+**Tests:** 256 C# tests (8 new `ModelCatalogTests`), 43 Python tests (13 new `test_models_endpoints.py`), 1 E2E skip, 0 failures.
 
 ---
 
-## D-034 — Feature: Grounding-Visualization (2026-05-13)
+## D-034 — feature: grounding visualization (2026-05-13)
 
-**Kontext:** Die GEEF-Grounding-Phase existiert vollständig im Code (`BriefingGroundingStep`, `AdvisorContextGroundingStep`), ist aber in der UI unsichtbar. RunDetail springt direkt von Briefing zur ersten Iteration. Zusätzlich werden Pre-Execution-Advisors (Trigger `BeforeFirstExecution`) als Iteration-1-Beitrag gerendert — konzeptionell gehören sie zur Grounding-Phase, da sie einmalig pro Run laufen.
+**Context:** the GEEF grounding phase exists fully in code (`BriefingGroundingStep`, `AdvisorContextGroundingStep`) but is invisible in the UI. RunDetail jumps directly from the briefing to the first iteration. Additionally, pre-execution advisors (trigger `BeforeFirstExecution`) are rendered as an iteration-1 contribution — conceptually they belong to the grounding phase since they run once per run.
 
-| Knackpunkt | Entscheidung |
+| Crux | Decision |
 |---|---|
-| (a) Trigger-Lookup-Strategie: DB-Spalte vs. Snapshot-Deserialisierung | **Snapshot-Deserialisierung.** `AdvisorConsultation`-Entity hat kein `Trigger`-Feld. Der Trigger wird zur Render-Zeit aus `CrewSnapshot.Advisors` per `AdvisorProfileName`-Match nachgeschlagen. Keine DB-Migration nötig. Fallback bei Lookup-Miss (z.B. historische Runs ohne passendes Advisor-Profil im Snapshot): Consultation bleibt im Iteration-Bucket, kein Datenverlust. |
-| (b) Press-Visualization-Layout: Vier gleichberechtigte Stages vs. zweiteilige Anzeige | **Zweiteilig** (Grounding | Iteration-Loop). Grounding als eigenständige Spalte links des Iteration-Blocks, getrennt durch CSS-Divider. Macht semantisch klar, dass Grounding einmalig läuft und die Iteration-Stages ein Loop sind. Vier gleichberechtigte Stages würden den Unterschied verschleiern. |
-| (c) Grouping-Logik-Location: Page-intern vs. Application-Layer ViewModel | **Application-Layer ViewModel** (`RunWithGroundingViewModel`). `IRunService.GetRunWithGroundingAsync` kapselt die Grouping-Logik vollständig: testbar ohne Blazor-Stack, wiederverwendbar (ggf. für zukünftiges MCP-Tool), saubere Layer-Trennung. `RunDetail.razor` ist damit rein deklarativ ohne Grouping-Logik. |
+| (a) Trigger lookup strategy: DB column vs. snapshot deserialization | **Snapshot deserialization.** The `AdvisorConsultation` entity has no `Trigger` field. The trigger is looked up at render time from `CrewSnapshot.Advisors` via an `AdvisorProfileName` match. No DB migration needed. Fallback on a lookup miss (e.g. historical runs without a matching advisor profile in the snapshot): the consultation stays in the iteration bucket, no data loss. |
+| (b) Press-visualization layout: four equal stages vs. a two-part display | **Two-part** (grounding | iteration loop). Grounding as a standalone column left of the iteration block, separated by a CSS divider. Makes it semantically clear that grounding runs once and the iteration stages are a loop. Four equal stages would obscure the difference. |
+| (c) Grouping logic location: page-internal vs. an application-layer ViewModel | **Application-layer ViewModel** (`RunWithGroundingViewModel`). `IRunService.GetRunWithGroundingAsync` encapsulates the grouping logic fully: testable without the Blazor stack, reusable (possibly for a future MCP tool), clean layer separation. `RunDetail.razor` is thereby purely declarative without grouping logic. |
 
-**Tests:** 273 C#-Tests (19 neu: `RunWithGroundingViewModelTests`, `GroundingSectionTests`, `PressVisualizationWithGroundingTests`), 1 E2E-Skip, 0 Failures. Python-Tests unverändert (43 grün).
+**Tests:** 273 C# tests (19 new: `RunWithGroundingViewModelTests`, `GroundingSectionTests`, `PressVisualizationWithGroundingTests`), 1 E2E skip, 0 failures. Python tests unchanged (43 green).
 
 ---
 
-## D-035 — Grounding-Provider-Foundation + Tavily Web-Search (2026-05-13)
+## D-035 — grounding-provider foundation + Tavily web search (2026-05-13)
 
-**Kontext:** Erster echter Web-Search-Provider auf Basis der Advisor-Pässe-Architektur (PS-7 gespiegelt). Ziel: generische `IGroundingProvider`-Abstraktion, die auch für einen zukünftigen `VectorStoreGroundingProvider` ohne Refactor gilt.
+**Context:** the first real web-search provider based on the advisor-passes architecture (PS-7 mirrored). Goal: a generic `IGroundingProvider` abstraction that also holds for a future `VectorStoreGroundingProvider` without a refactor.
 
-### Architect-Entscheidungen (vier Knackpunkte):
+### Architect decisions (four cruxes):
 
-| Frage | Entscheidung | Begründung |
+| Question | Decision | Rationale |
 |---|---|---|
-| (a) ProviderType-Discriminator: Enum vs. String | **String** (`"tavily"`, `"vector-store"`, …). Offenes System via `IGroundingProviderFactory`-DI-Lookup. Enum würde einen Core-Change pro neuem Provider erfordern. | Provider-agnostisch — AC17-Voraussetzung. |
-| (b) Cost-Tracking: Sync in Pipeline vs. Lazy | **Sync in `TavilyGroundingProvider.EnrichAsync`**. `IServiceScopeFactory`-Scope-Pattern (identisch zu PS-7 `AdvisorAwareExecutor`). Kein separater Post-Run-Job nötig, keine verlorenen Kosten bei Absturz. | Captive-Dependency-Fix: Singleton Provider, Scoped Repository. |
-| (c) QueryExtraction: Briefing-Prefix vs. eigenständige Query-Extraktion | **Briefing-Text direkt als Query**. Query-Extraktion (eigener LLM-Call vor Tavily) ist PS-8-Scope. Für Phase 1 ausreichend, da Tavily-Synthesized-Answer auch bei langen Briefings sinnvolle Ergebnisse liefert. | Scope-Grenze klar gehalten; Foundation-First. |
-| (d) Grounding-Context-Position: Vor vs. Nach Advisor-Block | **Vor Advisor-Block** in `ProfileBasedExecutor`. Web-Fakten sollen für Advisors bereits sichtbar sein, wenn deren Output entsteht (z.B. `briefing-clarifier` kann web-recherchierte Fakten in seine Fragen einbeziehen). GroundingContext → AdvisorBlock → UserPrompt. |  Advisor-before-Executor-Ordering aus PS-7 bleibt konsistent. |
+| (a) ProviderType discriminator: enum vs. string | **String** (`"tavily"`, `"vector-store"`, …). An open system via an `IGroundingProviderFactory` DI lookup. An enum would require a Core change per new provider. | Provider-agnostic — an AC17 prerequisite. |
+| (b) Cost tracking: sync in the pipeline vs. lazy | **Sync in `TavilyGroundingProvider.EnrichAsync`**. An `IServiceScopeFactory` scope pattern (identical to PS-7 `AdvisorAwareExecutor`). No separate post-run job needed, no lost costs on a crash. | Captive-dependency fix: singleton provider, scoped repository. |
+| (c) QueryExtraction: briefing prefix vs. standalone query extraction | **Briefing text directly as the query**. Query extraction (an own LLM call before Tavily) is PS-8 scope. Sufficient for phase 1 since the Tavily synthesized answer also yields sensible results for long briefings. | Scope boundary kept clear; foundation-first. |
+| (d) Grounding-context position: before vs. after the advisor block | **Before the advisor block** in `ProfileBasedExecutor`. Web facts should already be visible to advisors when their output is produced (e.g. `briefing-clarifier` can include web-researched facts in its questions). GroundingContext → AdvisorBlock → UserPrompt. | The advisor-before-executor ordering from PS-7 stays consistent. |
 
-**Foundation-Check (AC17):** `VectorStoreGroundingProvider` kann durch `IGroundingProvider`-Implementation + DI-Registrierung andocken, ohne eine Zeile bestehenden Codes zu ändern. `ProviderSettings: Dictionary<string,string>` trägt beliebige Provider-Konfiguration. `GroundingProviderProfile.ProviderType` ist string. `IGroundingProviderFactory.Create(type)` resolved per Discriminator.
+**Foundation check (AC17):** `VectorStoreGroundingProvider` can dock on via an `IGroundingProvider` implementation + DI registration, without changing a line of existing code. `ProviderSettings: Dictionary<string,string>` carries arbitrary provider configuration. `GroundingProviderProfile.ProviderType` is a string. `IGroundingProviderFactory.Create(type)` resolves by discriminator.
 
-**Tests:** 304 C#-Tests (31 neu: SystemCrewGroundingConstantsTests, CrewServiceGroundingProviderCrudTests, TavilyGroundingProviderTests, MultiProviderGroundingStepTests, KlassikTemplateGroundingRegressionTests), 1 E2E-Skip, 0 Failures. Python-Tests unverändert (43 grün).
+**Tests:** 304 C# tests (31 new: SystemCrewGroundingConstantsTests, CrewServiceGroundingProviderCrudTests, TavilyGroundingProviderTests, MultiProviderGroundingStepTests, KlassikTemplateGroundingRegressionTests), 1 E2E skip, 0 failures. Python tests unchanged (43 green).
 
-**Migration:** `Step13GroundingProviders` — drei Tabellen/Spalten: `GroundingProviderProfiles`, `GroundingConsultations` (mit Cascade-Delete FK auf Runs), `GroundingProviderNames`-JSONB-Spalte auf `CrewTemplates`.
+**Migration:** `Step13GroundingProviders` — three tables/columns: `GroundingProviderProfiles`, `GroundingConsultations` (with a cascade-delete FK on Runs), a `GroundingProviderNames` JSONB column on `CrewTemplates`.
 
-**Deployment-Note:** `TAVILY_API_KEY` muss in `.env` gesetzt werden (optional — leerer Key registriert Provider, wirft aber zur Laufzeit `InvalidOperationException` mit klarer Message, kein App-Crash beim Start). Kein Key in Logs.
+**Deployment note:** `TAVILY_API_KEY` must be set in `.env` (optional — an empty key registers the provider but throws `InvalidOperationException` at runtime with a clear message, no app crash at startup). No key in logs.
 
 ---
 
-## D-036 — Feature: Vector-Store-Grounding-Provider (Phase 2 RAG) (2026-05-14)
+## D-036 — feature: vector-store grounding provider (phase 2 RAG) (2026-05-14)
 
-**Kontext:** Tavily-Step (D-035) hat die `IGroundingProvider`-Foundation mit reservierten `SourceCitation`-Feldern `DocumentReference` und `RelevanceScore` angelegt. Dieser Step aktiviert den zweiten Provider: semantische Suche über hochgeladene Dokumente (Markdown, Text) statt Web-Search. Vollständiges RAG-Setup (Phase 2).
+**Context:** the Tavily step (D-035) created the `IGroundingProvider` foundation with reserved `SourceCitation` fields `DocumentReference` and `RelevanceScore`. This step activates the second provider: semantic search over uploaded documents (Markdown, text) instead of web search. A full RAG setup (phase 2).
 
-### Architect-Entscheidungen (fünf Knackpunkte):
+### Architect decisions (five cruxes):
 
-| Frage | Entscheidung | Begründung |
+| Question | Decision | Rationale |
 |---|---|---|
-| (a) Postgres-Image: `pgvector/pgvector:pg16` | **Akzeptiert.** `gen_random_uuid()` ist PG16-Core, Encoding/Locale identisch zu `postgres:16-alpine`. Volume bleibt beim Image-Wechsel erhalten. | Offizielles pgvector-Image, kein Vendor-Lock. |
-| (b) Embedding-Modell-Default | **`openai/text-embedding-3-small` (1536 dim, ~$0.02/1M Tokens via OpenRouter).** Günstigstes leistungsfähiges OpenAI-Embedding-Modell, via OpenRouter ohne separaten API-Key. `allow_fallbacks: true` für Verfügbarkeit. | Keine neuen Keys nötig (LLM_OPENROUTER_API_KEY wiederverwendet). |
-| (c) Chunking-Strategie | **Selbstgebauter `RecursiveCharacterTextSplitter`** (LangChain-kompatibel). Separatoren: `"\n\n"`, `"\n"`, `". "`, `" "`, `""`. ~4 chars/token. Keine externe Library. | `TreatWarningsAsErrors=true` + LangChain.NET ist instabil. Eigene Impl. vollständig testbar. |
-| (d) `Pgvector.EntityFrameworkCore 0.3.0` Kompatibilität | **INKOMPATIBEL mit EF Core 10.** Targets net8.0, requires Npgsql.EF ≥9.0.1. LINQ-Distance-Operatoren funktionieren nicht. **Fallback: Raw Npgsql ADO.NET für alle Vector-Operationen.** `float[]` ValueConverter (culture-invariant) für EF-Column-Mapping. | Gleiches Interface `IVectorSearchRepository`, andere Impl. Keine API-Änderung nach außen. |
-| (e) HttpClient-Sharing für Embeddings | **Eigener `HttpClient<OpenRouterEmbeddingProvider>`** via `EmbeddingsServiceExtensions`. Selber `LLM_OPENROUTER_API_KEY` aus `LlmOptions`. | Cleaner Scope, keine zirkulären Abhängigkeiten. |
+| (a) Postgres image: `pgvector/pgvector:pg16` | **Accepted.** `gen_random_uuid()` is PG16 core, encoding/locale identical to `postgres:16-alpine`. The volume is retained on the image switch. | Official pgvector image, no vendor lock. |
+| (b) Embedding-model default | **`openai/text-embedding-3-small` (1536 dim, ~$0.02/1M tokens via OpenRouter).** The cheapest capable OpenAI embedding model, via OpenRouter without a separate API key. `allow_fallbacks: true` for availability. | No new keys needed (LLM_OPENROUTER_API_KEY reused). |
+| (c) Chunking strategy | **Self-built `RecursiveCharacterTextSplitter`** (LangChain-compatible). Separators: `"\n\n"`, `"\n"`, `". "`, `" "`, `""`. ~4 chars/token. No external library. | `TreatWarningsAsErrors=true` + LangChain.NET is unstable. The own impl. is fully testable. |
+| (d) `Pgvector.EntityFrameworkCore 0.3.0` compatibility | **INCOMPATIBLE with EF Core 10.** Targets net8.0, requires Npgsql.EF ≥9.0.1. LINQ distance operators do not work. **Fallback: raw Npgsql ADO.NET for all vector operations.** A `float[]` ValueConverter (culture-invariant) for EF column mapping. | Same interface `IVectorSearchRepository`, different impl. No external API change. |
+| (e) HttpClient sharing for embeddings | **An own `HttpClient<OpenRouterEmbeddingProvider>`** via `EmbeddingsServiceExtensions`. The same `LLM_OPENROUTER_API_KEY` from `LlmOptions`. | Cleaner scope, no circular dependencies. |
 
-### Implementierungs-Highlights:
+### Implementation highlights:
 
-- **VectorSearchRepository:** Raw NpgsqlCommand mit `@vec::vector`-Cast (named `@param`-Syntax statt positional `$N`, um Npgsql auto-prepare-Cache-Konflikte zu vermeiden), `<=>` Cosine-Distance-Operator, `&&` Array-Overlap für Tag-Filter (OR-Semantik: mindestens ein Tag muss matchen)
-- **float[] ValueConverter:** `string.Join(",", floats)` → `[f1,...fn]` (InvariantCulture beide Richtungen) — pgvector-Literal-Format
-- **HNSW-Index:** `CREATE INDEX USING hnsw ("Embedding" vector_cosine_ops)` — ANN für Cosine-Similarity
-- **Tag-Filter:** `&&` (Array-Overlap, OR) statt `@>` (Array-Contains-All, AND) — korrekte "mindestens einer"-Semantik
-- **Foundation-Check (AC15):** `IGroundingProvider`-Vertrag aus D-035 ohne Refactor wiederverwendet — `VectorStoreGroundingProvider` ist drop-in neben `TavilyGroundingProvider`
+- **VectorSearchRepository:** a raw NpgsqlCommand with a `@vec::vector` cast (named `@param` syntax instead of positional `$N`, to avoid Npgsql auto-prepare cache conflicts), the `<=>` cosine-distance operator, `&&` array overlap for the tag filter (OR semantics: at least one tag must match)
+- **float[] ValueConverter:** `string.Join(",", floats)` → `[f1,...fn]` (InvariantCulture both directions) — the pgvector literal format
+- **HNSW index:** `CREATE INDEX USING hnsw ("Embedding" vector_cosine_ops)` — ANN for cosine similarity
+- **Tag filter:** `&&` (array overlap, OR) instead of `@>` (array contains all, AND) — correct "at least one" semantics
+- **Foundation check (AC15):** the `IGroundingProvider` contract from D-035 reused without a refactor — `VectorStoreGroundingProvider` is drop-in next to `TavilyGroundingProvider`
 
-### Neue Tabellen (Migration `Step14VectorStore`):
+### New tables (migration `Step14VectorStore`):
 
 ```sql
-"KnowledgeDocuments"     -- Dokument-Metadaten + Tags (text[]) + GIN-Index
-"KnowledgeDocumentChunks" -- Chunks + "Embedding" vector(1536) + HNSW-Index
+"KnowledgeDocuments"     -- document metadata + tags (text[]) + GIN index
+"KnowledgeDocumentChunks" -- chunks + "Embedding" vector(1536) + HNSW index
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
 ### Tests:
 
-400 C#-Tests (40 neu: Domain/Application, Embeddings, Repositories, Services, Provider, UI/bUnit, Pipeline/Regression), 1 E2E-Skip, 0 Failures.
+400 C# tests (40 new: Domain/Application, Embeddings, Repositories, Services, Provider, UI/bUnit, Pipeline/Regression), 1 E2E skip, 0 failures.
 
 ### Deployment:
 
-- Backup: `backup/before-pgvector-migration-20260514-120931.dump` (34K, 48 TOC-Entries, PG16)
-- Postgres-Image gewechselt auf `pgvector/pgvector:pg16` (PG 16.13, Debian)
-- `vector`-Extension 0.8.2 installiert
-- Web-Container mit `--no-cache` neu gebaut
-- PR #6 gemerged (SHA: `b659912`), Branch `feat/vector-store-grounding` gelöscht
-- Produktiv unter `https://geef.stefan-bechtel.de/crew/knowledge`
+- Backup: `backup/before-pgvector-migration-20260514-120931.dump` (34K, 48 TOC entries, PG16)
+- Postgres image switched to `pgvector/pgvector:pg16` (PG 16.13, Debian)
+- `vector` extension 0.8.2 installed
+- Web container rebuilt with `--no-cache`
+- PR #6 merged (SHA: `b659912`), branch `feat/vector-store-grounding` deleted
+- In production at `https://geef.stefan-bechtel.de/crew/knowledge`
 
-### Bewusst NICHT in diesem Step:
+### Deliberately NOT in this step:
 
-PDF-Support, Background-Job für Indexing, Multi-Modal-Embeddings, OR-Tag-Filter (UI), Hybrid-Search, Re-Ranking, Embedding-Modell-Wechsel-UI mit Auto-Re-Index, Document-Versionierung, OpenAI-direkt-Integration.
+PDF support, a background job for indexing, multi-modal embeddings, OR tag filter (UI), hybrid search, re-ranking, an embedding-model-switch UI with auto-re-index, document versioning, OpenAI-direct integration.
 
 ---
 
-## D-037 — Feature: Run-Attachments — Direkter Document-Upload beim Briefing (2026-05-14)
+## D-037 — feature: run attachments — direct document upload at the briefing (2026-05-14)
 
-**Kontext:** D-036 (Vector-Store-Grounding) ist ideal für **persistente** Domain-Quellen (Brand-Guidelines, Style-Guides). Für Ad-hoc-Verwendung ("Fasse diesen Bericht zusammen") ist der Upload→Template→Select→Brief-Workflow zu schwergewichtig. Run-Attachments implementiert das ChatGPT/Claude-Standard-Pattern: Dateien direkt beim Briefing anhängen, run-lokal indexiert, automatisch als Grounding-Provider aktiv.
+**Context:** D-036 (vector-store grounding) is ideal for **persistent** domain sources (brand guidelines, style guides). For ad-hoc use ("summarize this report") the upload→template→select→brief workflow is too heavyweight. Run attachments implement the ChatGPT/Claude standard pattern: attach files directly at the briefing, indexed run-locally, automatically active as a grounding provider.
 
-### Architect-Entscheidungen (drei Knackpunkte):
+### Architect decisions (three cruxes):
 
-| Frage | Entscheidung | Begründung |
+| Question | Decision | Rationale |
 |---|---|---|
-| (a) Schema-Strategie: Erweiterung `KnowledgeDocuments` vs. separate Tabelle | **Erweiterung.** `Scope integer NOT NULL DEFAULT 0` + `RunId uuid NULL` + FK auf `Runs.Id`. | Eine Such-Logik, kein JOIN, FK direkt auf Runs, Scope-Filter transparent für `VectorSearchRepository`. Separate Tabelle hätte UI/Such-Logik dupliziert. |
-| (b) Run-Persist + Attachment-Upload Sequenz | **Two-Phase: Status=Pending → Attachments → Snapshot-Patch → Queue.** `RunPersistenceService` erhält `UpdateSnapshotAsync` + `MarkRunFailedAsync`. | FK greift nach Run-Create, Pipeline startet erst nach Attachment-Upload. Failure → `MarkRunFailedAsync` = kein orphaned Pending-Run. Strukturell analog zu D-030 `MarkRunFailedAsync` im Orchestrator. |
-| (c) Multi-Provider-Vorrang | **`RunAttachmentsProfile` wird per `Prepend` vor alle anderen Provider gehängt (specific > general).** `MultiProviderGroundingStep` respektiert Snapshot-Reihenfolge — keine Änderung nötig. | Custom-Template mit `knowledge-base-default` + Attachments: run-lokale Quellen zuerst, dann globale KB. Analog zu D-031 Advisor-Reihenfolge. |
+| (a) Schema strategy: extend `KnowledgeDocuments` vs. a separate table | **Extension.** `Scope integer NOT NULL DEFAULT 0` + `RunId uuid NULL` + FK on `Runs.Id`. | One search logic, no JOIN, FK directly on Runs, the scope filter transparent for `VectorSearchRepository`. A separate table would have duplicated the UI/search logic. |
+| (b) Run-persist + attachment-upload sequence | **Two-phase: Status=Pending → attachments → snapshot patch → queue.** `RunPersistenceService` gets `UpdateSnapshotAsync` + `MarkRunFailedAsync`. | The FK takes hold after run-create, the pipeline starts only after attachment upload. Failure → `MarkRunFailedAsync` = no orphaned Pending run. Structurally analogous to D-030 `MarkRunFailedAsync` in the orchestrator. |
+| (c) Multi-provider precedence | **`RunAttachmentsProfile` is `Prepend`ed before all other providers (specific > general).** `MultiProviderGroundingStep` respects the snapshot order — no change needed. | Custom template with `knowledge-base-default` + attachments: run-local sources first, then the global KB. Analogous to D-031 advisor order. |
 
-### Implementierungs-Highlights:
+### Implementation highlights:
 
-- **`KnowledgeScope`-Enum** (`Global=0`, `RunLocal=1`) — typsicher, default 0 = Backward-Compat für bestehende Docs
-- **`SubmitRunRequest`-Record** — `IRunService.SubmitRunAsync` von positional Args auf Record umgestellt (bricht Aufrufer-Signatur sauber statt Parameter-Chaos)
-- **`RunAttachmentInput`-Record** mit `byte[]` statt `Stream` — Lifetime-Safe über async Boundaries
-- **`VectorSearchRepository`** Raw-SQL: `WHERE (@scopeFilter IS NULL OR d."Scope" = @scopeFilter) AND (@runIdFilter IS NULL OR d."RunId" = @runIdFilter)` — typed `NpgsqlParameter` mit explizitem `NpgsqlDbType` für nullable Parameter
-- **Blazor Server + Drag-and-Drop:** `DragEventArgs` serialisiert keine `Files`-Referenz über SignalR — Drag-and-Drop entfernt, UI auf "Click to browse" umgestellt
-- **`to_regclass` vs. `::regclass` in Migration:** Ersteres gibt NULL für nicht-existente Tabellen, Letzteres wirft Exception — wichtig für idempotente FK-Guards
-- **Tag-Dedup in `PromoteToGlobalAsync`:** `.Union()` statt Spread-Syntax (Spread produziert Duplikate)
-- **`ListAsync`-Scope-Filter:** `KnowledgeDocuments` in globaler KB-Ansicht + MCP-Tool passieren explizit `KnowledgeScope.Global` — Run-lokale Attachments bluten nicht durch
+- **`KnowledgeScope` enum** (`Global=0`, `RunLocal=1`) — type-safe, default 0 = backward compat for existing docs
+- **`SubmitRunRequest` record** — `IRunService.SubmitRunAsync` switched from positional args to a record (breaks the caller signature cleanly instead of parameter chaos)
+- **`RunAttachmentInput` record** with `byte[]` instead of `Stream` — lifetime-safe across async boundaries
+- **`VectorSearchRepository`** raw SQL: `WHERE (@scopeFilter IS NULL OR d."Scope" = @scopeFilter) AND (@runIdFilter IS NULL OR d."RunId" = @runIdFilter)` — typed `NpgsqlParameter` with an explicit `NpgsqlDbType` for nullable parameters
+- **Blazor Server + drag-and-drop:** `DragEventArgs` does not serialize a `Files` reference over SignalR — drag-and-drop removed, the UI switched to "click to browse"
+- **`to_regclass` vs. `::regclass` in the migration:** the former returns NULL for non-existent tables, the latter throws an exception — important for idempotent FK guards
+- **Tag dedup in `PromoteToGlobalAsync`:** `.Union()` instead of spread syntax (the spread produces duplicates)
+- **`ListAsync` scope filter:** `KnowledgeDocuments` in the global KB view + the MCP tool explicitly pass `KnowledgeScope.Global` — run-local attachments do not bleed through
 
 ### Migration `Step15RunAttachments`:
 
 ```sql
 ALTER TABLE "KnowledgeDocuments" ADD COLUMN "Scope" integer NOT NULL DEFAULT 0;
 ALTER TABLE "KnowledgeDocuments" ADD COLUMN "RunId" uuid NULL;
--- FK via PL/pgSQL-Block (to_regclass-Guard, PostgreSQL 16 kein ADD CONSTRAINT IF NOT EXISTS)
+-- FK via a PL/pgSQL block (to_regclass guard, PostgreSQL 16 has no ADD CONSTRAINT IF NOT EXISTS)
 FK REFERENCES "Runs"("Id") ON DELETE CASCADE;
 CREATE INDEX "IX_KnowledgeDocuments_RunId" ON "KnowledgeDocuments"("RunId") WHERE "RunId" IS NOT NULL;
 CREATE INDEX "IX_KnowledgeDocuments_Scope" ON "KnowledgeDocuments"("Scope");
@@ -603,51 +605,51 @@ INSERT INTO "GroundingProviderProfiles" ... ('run-attachments', 'vector-store', 
 
 ### Tests:
 
-494 C#-Tests (94 neu), 1 E2E-Skip, 0 Failures. Neue Test-Klassen: `KnowledgeDocumentScopeTests`, `SystemCrewRunAttachmentsProfileTests`, `SubmitRunRequestTests`, `Step15RunAttachmentsMigrationTests`, `KnowledgeDocumentRepositoryScopeTests`, `VectorSearchRepositoryScopeTests`, `RunDeleteCascadesAttachmentsTests`, `KnowledgeServiceUploadRunAttachmentTests`, `RunServiceAttachmentTests`, `SubmitRequestToolAttachmentTests`, `AtelierPipelineFactoryWithRunAttachmentsTests`, `KlassikWithAttachmentsTests`, `MultiProviderOrderingTests`, `FileDropZoneTests`, `RunAttachmentsListTests`, `PromoteAttachmentModalTests`.
+494 C# tests (94 new), 1 E2E skip, 0 failures. New test classes: `KnowledgeDocumentScopeTests`, `SystemCrewRunAttachmentsProfileTests`, `SubmitRunRequestTests`, `Step15RunAttachmentsMigrationTests`, `KnowledgeDocumentRepositoryScopeTests`, `VectorSearchRepositoryScopeTests`, `RunDeleteCascadesAttachmentsTests`, `KnowledgeServiceUploadRunAttachmentTests`, `RunServiceAttachmentTests`, `SubmitRequestToolAttachmentTests`, `AtelierPipelineFactoryWithRunAttachmentsTests`, `KlassikWithAttachmentsTests`, `MultiProviderOrderingTests`, `FileDropZoneTests`, `RunAttachmentsListTests`, `PromoteAttachmentModalTests`.
 
 ### Deployment:
 
-- Backup: `backup/before-run-attachments-migration-20260514-165517.dump` (39K, 60 TOC-Entries)
-- Web-Container mit `--no-cache` neu gebaut
-- PR #7 gemerged (SHA: `f6832f9`), Branch `feat/run-attachments` gelöscht
-- Produktiv unter `https://geef.stefan-bechtel.de/new` (FileDropZone sichtbar)
+- Backup: `backup/before-run-attachments-migration-20260514-165517.dump` (39K, 60 TOC entries)
+- Web container rebuilt with `--no-cache`
+- PR #7 merged (SHA: `f6832f9`), branch `feat/run-attachments` deleted
+- In production at `https://geef.stefan-bechtel.de/new` (FileDropZone visible)
 
-### Bewusst NICHT in diesem Step:
+### Deliberately NOT in this step:
 
-PDF-Support, Background-Job für Attachment-Indexing, Image-Attachments, Auto-Cleanup-Retention-Policy, Attachment-Editierung (Upload-only), Hybrid-Search (pure Vector wie D-036).
+PDF support, a background job for attachment indexing, image attachments, an auto-cleanup retention policy, attachment editing (upload-only), hybrid search (pure vector as in D-036).
 
 ---
 
-## D-038 — Template Studio: Meta-KI für Template-Erstellung (2026-05-14)
+## D-038 — Template Studio: meta-AI for template creation (2026-05-14)
 
-Neue Seite `/crew/studio`: User beschreibt eine Aufgabe in natürlicher Sprache, eine Meta-KI (Claude Sonnet 4.5 via OpenRouter) analysiert die Aufgabe mit Tool-Use (`submit_template_proposal`), vergleicht sie mit existierenden Templates und Profilen, und schlägt entweder ein bestehendes Template vor oder erstellt ein neues mit passenden Custom-Profilen. User reviewt und editiert im 5-Schritt-Wizard (Input → Analyzing → Review → Edit → Confirmation) **bevor** gespeichert wird. Alle erstellten Records sind danach durch die existierenden Editoren (`/crew/templates/{name}`, `/crew/profiles/.../{name}`) normal bearbeitbar.
+A new page `/crew/studio`: the user describes a task in natural language, a meta-AI (Claude Sonnet 4.5 via OpenRouter) analyzes the task with tool use (`submit_template_proposal`), compares it with existing templates and profiles, and either proposes an existing template or creates a new one with matching custom profiles. The user reviews and edits in a 5-step wizard (Input → Analyzing → Review → Edit → Confirmation) **before** anything is saved. All created records are afterwards normally editable via the existing editors (`/crew/templates/{name}`, `/crew/profiles/.../{name}`).
 
-### Architektur-Entscheidungen:
+### Architecture decisions:
 
-| Bereich | Entscheidung |
+| Area | Decision |
 |---|---|
-| **Meta-LLM** | `anthropic/claude-sonnet-4-5` via OpenRouter; konfigurierbar über `appsettings.json:TemplateStudio:Model` |
-| **Strukturiertes Output** | OpenAI Tool-Use (`submit_template_proposal`-Tool mit vollständigem JSON-Schema); kein Freitext-Parsing |
-| **Edit-vor-Save-Pflicht** | Wizard erlaubt keinen Skip von Review → Confirmation; Halluzinationsschutz durch Pflicht-Review |
-| **Nachträgliche Bearbeitbarkeit** | Studio erstellt nur `custom-`-Records via `ICrewService.CreateCustom…`; System-Profile werden nur referenziert, niemals modifiziert |
-| **Profile-Similarity-Check** | On-the-fly Embedding-Cosine-Similarity via `IEmbeddingProvider`; Schwellwert 0.85 → vorgeschlagenes Profil als Duplikat markiert und nicht angelegt |
-| **System-Profile-Schutz** | Guard in `TemplateStudioService.ValidateNotSystemProfiles` + bestehender `CrewService.Update`-Check |
-| **Modell-Verfügbarkeits-Validation** | `IModelCatalog.ListModelsAsync` pro Provider; fehlende Modelle → Warning, kein Failure |
-| **Provider-Verfügbarkeits-Check** | `IProviderCatalog.ListProviders`; fehlende API-Keys → Warning im `MaterializationResult.Warnings` |
-| **Audit-Trail** | Neue Tabelle `TemplateStudioAnalyses` (Step17-Migration); JSONB-Spalte `AnalysisResultJson` enthält kompletten `TemplateStudioAnalysis`-Record |
-| **Cost-Tracking** | `IPricingCatalog.CalculateCostEur` berechnet Kosten des Meta-LLM-Calls; persistiert in `TemplateStudioAnalyses.CostEur` |
-| **Multi-Step-Wizard** | Blazor-State-Machine client-side im `TemplateStudio.razor`; kein Backend-State nötig |
-| **Few-Shot-Examples** | 3 Beispiele im System-Prompt: (1) Klassik-Template-Match > 0.85, (2) Neues Template mit existing Profilen, (3) Neues Template mit neuem domänenspezifischen Reviewer |
-| **Custom-Profile-Naming** | `custom-`-Prefix automatisch via `ICrewService.CreateCustom…`; Konflikte über EF-DB-Unique-Constraint gefangen |
-| **String-Format-Schutz** | `template.Replace("{0}", context)` statt `string.Format` (Prompt enthält `{klassik: 0.95}`-Literals die `FormatException` auslösen) |
+| **Meta-LLM** | `anthropic/claude-sonnet-4-5` via OpenRouter; configurable via `appsettings.json:TemplateStudio:Model` |
+| **Structured output** | OpenAI tool use (`submit_template_proposal` tool with a full JSON schema); no free-text parsing |
+| **Edit-before-save mandatory** | The wizard allows no skip from Review → Confirmation; hallucination protection via mandatory review |
+| **Subsequent editability** | Studio creates only `custom-` records via `ICrewService.CreateCustom…`; system profiles are only referenced, never modified |
+| **Profile similarity check** | On-the-fly embedding cosine similarity via `IEmbeddingProvider`; threshold 0.85 → a proposed profile marked as a duplicate and not created |
+| **System-profile protection** | Guard in `TemplateStudioService.ValidateNotSystemProfiles` + the existing `CrewService.Update` check |
+| **Model-availability validation** | `IModelCatalog.ListModelsAsync` per provider; missing models → warning, no failure |
+| **Provider-availability check** | `IProviderCatalog.ListProviders`; missing API keys → warning in `MaterializationResult.Warnings` |
+| **Audit trail** | New table `TemplateStudioAnalyses` (Step17 migration); the JSONB column `AnalysisResultJson` contains the complete `TemplateStudioAnalysis` record |
+| **Cost tracking** | `IPricingCatalog.CalculateCostEur` computes the cost of the meta-LLM call; persisted in `TemplateStudioAnalyses.CostEur` |
+| **Multi-step wizard** | A Blazor state machine client-side in `TemplateStudio.razor`; no backend state needed |
+| **Few-shot examples** | 3 examples in the system prompt: (1) klassik template match > 0.85, (2) a new template with existing profiles, (3) a new template with a new domain-specific reviewer |
+| **Custom-profile naming** | `custom-` prefix automatic via `ICrewService.CreateCustom…`; conflicts caught via the EF DB unique constraint |
+| **String-format protection** | `template.Replace("{0}", context)` instead of `string.Format` (the prompt contains `{klassik: 0.95}` literals that trigger `FormatException`) |
 
-### Implementierung:
+### Implementation:
 
-- **Core:** `Domain/Crew/TemplateStudio/` — 6 neue Records/Enums (TemplateStudioAnalysis, ProposedTemplate, ProposedProfile, TemplateMatch, StudioRecommendation, ProposedProfileType)
-- **Persistence:** `Core/Persistence/TemplateStudio/ITemplateStudioAnalysisRepository`, Infrastructure-Entity/-Configuration/-Repository; Migration `Step17TemplateStudio` (manuell als raw SQL, da `dotnet ef` wegen pgvector-ValueComparer-Bug abstürzt)
+- **Core:** `Domain/Crew/TemplateStudio/` — 6 new records/enums (TemplateStudioAnalysis, ProposedTemplate, ProposedProfile, TemplateMatch, StudioRecommendation, ProposedProfileType)
+- **Persistence:** `Core/Persistence/TemplateStudio/ITemplateStudioAnalysisRepository`, Infrastructure entity/configuration/repository; migration `Step17TemplateStudio` (manual as raw SQL, since `dotnet ef` crashes due to a pgvector ValueComparer bug)
 - **Application:** `ITemplateStudioService`, `MaterializationRequest/Result`, `TemplateStudioOptions`
-- **Infrastructure:** `TemplateProposalTool` (JSON-Schema), `TemplateStudioPrompts` (Meta-Prompt + 3 Few-Shot-Examples), `ProfileSimilarityService` (Cosine), `TemplateStudioService` (vollständige Implementation), `TemplateStudioServiceExtensions` (DI)
-- **Web:** `TemplateStudio.razor` (`/crew/studio`), `StudioTaskInputStep`, `StudioAnalyzingStep`, `StudioReviewStep`, `StudioEditStep`, `StudioConfirmationStep`, NavMenu-Eintrag "Crew Studio", `New.razor` mit `[SupplyParameterFromQuery]`
+- **Infrastructure:** `TemplateProposalTool` (JSON schema), `TemplateStudioPrompts` (meta prompt + 3 few-shot examples), `ProfileSimilarityService` (cosine), `TemplateStudioService` (full implementation), `TemplateStudioServiceExtensions` (DI)
+- **Web:** `TemplateStudio.razor` (`/crew/studio`), `StudioTaskInputStep`, `StudioAnalyzingStep`, `StudioReviewStep`, `StudioEditStep`, `StudioConfirmationStep`, NavMenu entry "Crew Studio", `New.razor` with `[SupplyParameterFromQuery]`
 
 ### Migration `Step17TemplateStudio`:
 
@@ -667,121 +669,121 @@ CREATE INDEX "IX_TemplateStudioAnalyses_CreatedAt" ON "TemplateStudioAnalyses"("
 
 ### Tests:
 
-562 bestehende C#-Tests unverändert grün + 43 neue Tests. Neue Test-Klassen: `TemplateStudioAnalysisTests`, `TemplateProposalToolTests`, `ProfileSimilarityServiceTests`, `TemplateStudioServiceAnalyzeTests`, `TemplateStudioServiceMaterializeTests`, `TemplateStudioAnalysisRepositoryTests`, `Step17TemplateStudioMigrationTests`, `StudioTaskInputStepTests`, `StudioReviewStepTests`, `StudioEditStepTests`, `StudioConfirmationStepTests`.
+562 existing C# tests unchanged green + 43 new tests. New test classes: `TemplateStudioAnalysisTests`, `TemplateProposalToolTests`, `ProfileSimilarityServiceTests`, `TemplateStudioServiceAnalyzeTests`, `TemplateStudioServiceMaterializeTests`, `TemplateStudioAnalysisRepositoryTests`, `Step17TemplateStudioMigrationTests`, `StudioTaskInputStepTests`, `StudioReviewStepTests`, `StudioEditStepTests`, `StudioConfirmationStepTests`.
 
-### Bewusst NICHT in diesem Step:
+### Deliberately NOT in this step:
 
-MCP-Tool-Erweiterung für Studio, Auto-Run nach Materialization, Studio-Iterationen ("Lass nochmal nachdenken"), Lerneffekte aus Audit-Trail, Custom-Executor-Vorschlag, Cost-Budgets, Bulk-Import von Templates.
+An MCP-tool extension for Studio, auto-run after materialization, Studio iterations ("think again"), learning effects from the audit trail, a custom-executor proposal, cost budgets, bulk import of templates.
 
 ---
 
-## D-039: Studio-Extensions (14. Mai 2026)
+## D-039: Studio extensions (14 May 2026)
 
-**Feature:** MCP-API für Template Studio + Analysis-History-Komponente + Welcome-Stats-Erweiterung.
+**Feature:** an MCP API for Template Studio + an analysis-history component + a welcome-stats extension.
 
-### Entscheidungen:
+### Decisions:
 
-**1. MCP-Tool-Design:** Zwei separate Tools statt einem kombiniertem — `analyze_template_proposal` (Analyse + Persistierung) und `materialize_template_proposal` (Materialisierung nach User-Review). Trennung ermöglicht asynchronen Workflow: Analyse → Review → Materialisierung mit optionalen Edits dazwischen. Die `AnalysisId` aus Schritt 1 verknüpft beide Aufrufe.
+**1. MCP tool design:** two separate tools instead of one combined — `analyze_template_proposal` (analysis + persistence) and `materialize_template_proposal` (materialization after user review). The split enables an asynchronous workflow: analyze → review → materialize with optional edits in between. The `AnalysisId` from step 1 links both calls.
 
-**2. `TemplateStudioHistoryItem` als Core-Record:** Leichtgewichtige Projektion für History-Queries im `Core.Persistence`-Namespace, um die Schicht `Infrastructure → Application` zu vermeiden. Der `ReasoningSummary` wird aus dem `AnalysisResultJson`-JSONB deserialisiert (kein eigenes DB-Feld) — vertretbar für max. 10 Einträge per Page.
+**2. `TemplateStudioHistoryItem` as a Core record:** a lightweight projection for history queries in the `Core.Persistence` namespace, to avoid the `Infrastructure → Application` layering. The `ReasoningSummary` is deserialized from the `AnalysisResultJson` JSONB (no own DB field) — defensible for max. 10 entries per page.
 
-**3. `StudioAnalysesPage` und `StudioAnalysisHistoryEntry` im Application-Layer:** Analog zum HasMore-Pagination-Pattern aller anderen List-Endpunkte. Die UI-Komponente injiziert `ITemplateStudioService` direkt — kein separates Controller-Layer.
+**3. `StudioAnalysesPage` and `StudioAnalysisHistoryEntry` in the application layer:** analogous to the HasMore pagination pattern of all other list endpoints. The UI component injects `ITemplateStudioService` directly — no separate controller layer.
 
-**4. Studio-Kosten separat von Run-Kosten:** `WelcomeStats` bekommt `StudioAnalysesThisMonth` und `StudioCostThisMonth` als eigene Felder, nicht in `TotalCostThisMonth` aggregiert. Studio-Analysen sind Konfigurationskosten, keine Ausführungskosten — User soll beide Dimensionen separat sehen.
+**4. Studio costs separate from run costs:** `WelcomeStats` gets `StudioAnalysesThisMonth` and `StudioCostThisMonth` as its own fields, not aggregated into `TotalCostThisMonth`. Studio analyses are configuration costs, not execution costs — the user should see both dimensions separately.
 
-**5. `StudioAnalysisHistoryList`-Komponente ohne StateContainer:** Lokaler State in der Komponente selbst (`_analyses`, `_currentPage`, `_expandedId`). Re-Analyze-Callback via `EventCallback<string>` — Parent (`TemplateStudio.razor`) setzt `_taskDescription` und springt damit zurück in Eingabe-Mode.
+**5. `StudioAnalysisHistoryList` component without a StateContainer:** local state in the component itself (`_analyses`, `_currentPage`, `_expandedId`). A re-analyze callback via `EventCallback<string>` — the parent (`TemplateStudio.razor`) sets `_taskDescription` and thereby jumps back into input mode.
 
-### Kein Schema-Change:
+### No schema change:
 
-Alle Tabellen (insbesondere `TemplateStudioAnalyses`) existieren seit Step17 — kein neuer Migration-Step. `TemplateStudioHistoryItem` ist nur eine Code-Abstraktion, keine DB-Entität.
+All tables (in particular `TemplateStudioAnalyses`) exist since Step17 — no new migration step. `TemplateStudioHistoryItem` is only a code abstraction, not a DB entity.
 
 ### Tests:
 
-625 bestehende C#-Tests unverändert grün + 40 neue Tests. Neue Test-Klassen: `AnalyzeTemplateProposalToolTests` (9), `MaterializeTemplateProposalToolTests` (9), `TemplateStudioServiceListRecentAnalysesTests` (7), `StudioAnalysisHistoryListTests` (13), `WelcomeStatsTests` (4). Orchestrator-Timing-Tests (2 Stück) waren bereits pre-existing flaky — bestehen isoliert, schlagen unter Full-Suite durch Thread-Timing-Sensitivität fehl (kein neues Problem).
+625 existing C# tests unchanged green + 40 new tests. New test classes: `AnalyzeTemplateProposalToolTests` (9), `MaterializeTemplateProposalToolTests` (9), `TemplateStudioServiceListRecentAnalysesTests` (7), `StudioAnalysisHistoryListTests` (13), `WelcomeStatsTests` (4). The orchestrator-timing tests (2 of them) were already pre-existing flaky — they pass in isolation, fail under the full suite due to thread-timing sensitivity (not a new problem).
 
-### Bewusst NICHT in diesem Step:
+### Deliberately NOT in this step:
 
-Auto-Run nach Materialization, Studio-Iterationen, Cost-Budget-Alerts, Bulk-Export von Analyse-Historien, E-Mail-Notification nach abgeschlossener Analyse.
-
----
-
-## D-040: Grounding-Provider-Profile CRUD-UI Catch-Up (2026-05-15)
-
-**Kontext:** Die Spec für diesen Catch-Up-Step ging davon aus, die Grounding-Provider-CRUD-UI „fehlt komplett". Nach Code-Exploration stellte sich heraus, dass `GroundingProvidersIndex.razor` und `GroundingProviderEditor.razor` bereits vollständig implementiert waren — inkl. System/Custom-Split, Tavily- und Vector-Store-Felder, DataAnnotations-Validierung, Delete-Modal und allen 5 `ICrewService`-Grounding-Methoden. Die Seiten folgten bereits exakt dem Reviewer/Executor/Advisor-Muster. Die eigentliche Lücke lag nicht in der CRUD-Implementierung, sondern in: (a) einem abweichenden Routen-Schema (Spec wollte `/grounding-providers`, `/create`, `/edit/{name}`, `/view/{name}`), (b) fehlenden Gap-Features und (c) fehlendem Dashboard-Eintrag und Tests.
-
-**Entscheidungen:**
-
-**D-040/1 — Routen-Schema:** Spec-Routen übernommen (`/crew/profiles/grounding-providers`, `/create`, `/edit/{name}`, `/view/{name}`). Die bestehenden Routen (`/crew/profiles/grounding`, `/new`, `/{name}`) matchten zwar das echte Reviewer/Executor/Advisor-Muster — aber die User-Entscheidung favorisierte Spec-Konformität. Asymmetrie zu den Geschwister-Seiten (die `/new` und `/{name}` verwenden) wird in einem Folge-Step durch Angleichung der anderen drei Profile-Typen adressiert (Empfehlung: Reviewer/Executor/Advisor auf konsistentes Schema vereinheitlichen).
-
-**D-040/2 — Separate View-Page für System-Profile:** Neues `GroundingProviderView.razor` mit `@page "/crew/profiles/grounding-providers/view/{name}"` statt inline read-only Banner im Editor. Ermöglicht klare System-Präsentation ohne editierbares Formular. Reviewer/Executor/Advisor behalten das Inline-Banner-Pattern — mögliche Aufgabe für Folge-Step-Harmonisierung.
-
-**D-040/3 — Vector-Store Scope-Selector:** `Scope`-Feld (global/run-local/both) im Editor exponiert. Bestehende Custom-Vector-Store-Profile (vor diesem Step erstellt) hatten keinen `Scope`-Schlüssel in `ProviderSettings` — `From()` defaultet auf `"both"` zur Wahrung des bisherigen ungefilterten Verhaltens. Neue Profile: Default `"global"`. Backend-Mapping: `"both"` → `null`-Filter → keine Einschränkung (funktioniert ohne Backend-Änderung, bestätigt durch `VectorStoreGroundingProvider.cs:44-49`).
-
-**D-040/4 — ProviderType immutable bei Edit:** `InputSelect` für ProviderType bekommt `disabled="@(!IsNew)"`. Typ-spezifische Settings (Tavily vs. Vector-Store) sind nicht zwischen Types migrierbar — User muss altes Profil löschen und neues anlegen.
-
-**D-040/5 — Delete-Cascade-Verhalten (verifiziert):** Kein Cascade-Delete aus `CrewTemplates` bei Profil-Löschung. `CrewTemplate.GroundingProviderNames` ist JSONB-String-Array ohne FK-Beziehung zu `GroundingProviderProfiles`. Gelöschte Profile hinterlassen Dangling-Namen in Templates; zur Laufzeit löst `GetGroundingProviderProfileAsync` → `null` auf. Identisch zum Verhalten bei Reviewer/Advisor-Profil-Löschung. `DeleteConfirmationModal` fordert exakte Namens-Eingabe als Sicherheitsschicht. Folge-Step-Empfehlung: Template-Referenz-Listing im Delete-Modal.
-
-**D-040/6 — NavMenu-Eintrag:** Einziger Grounding-Providers-NavLink im NavMenu. Reviewer/Executor/Advisor haben keine NavMenu-Einträge (nur via `/crew`-Dashboard erreichbar). Diese Asymmetrie ist bewusst (Spec-AC #12 explizit). Empfehlung Folge-Step: Crew-Profile-Sektion im NavMenu oder alle vier Typen gleich behandeln.
-
-**Lehre (Ursprung der Lücke):** Die Grounding-Provider-CRUD-Pages wurden beim Tavily-Step (D-035) korrekt mitimplementiert — aber ohne CrewIndex-Dashboard-Eintrag, ohne bUnit-UI-Tests und ohne Routen-Schema-Alignment auf die Spec. Kein Page-Code wurde vergessen; die organisatorische Lücke lag in fehlenden Routen-Konventionen und Test-Coverage.
+Auto-run after materialization, Studio iterations, cost-budget alerts, bulk export of analysis histories, email notification after a completed analysis.
 
 ---
 
-## 16. Mai 2026 — MCP OAuth 2.1 Authorization Server (PS-9-Erweiterung)
+## D-040: grounding-provider-profile CRUD-UI catch-up (2026-05-15)
 
-### D-041: Self-hosted OAuth 2.1 AS für Claude Desktop / Claude.ai Custom Connectors
+**Context:** the spec for this catch-up step assumed the grounding-provider CRUD UI was "completely missing". After code exploration it turned out that `GroundingProvidersIndex.razor` and `GroundingProviderEditor.razor` were already fully implemented — incl. system/custom split, Tavily and vector-store fields, DataAnnotations validation, the delete modal and all 5 `ICrewService` grounding methods. The pages already followed the reviewer/executor/advisor pattern exactly. The actual gap was not in the CRUD implementation but in: (a) a deviating route schema (the spec wanted `/grounding-providers`, `/create`, `/edit/{name}`, `/view/{name}`), (b) missing gap features and (c) a missing dashboard entry and tests.
 
-**Datum:** 16. Mai 2026
-**Bericht:** [reports/feature-mcp-oauth-report.md](reports/feature-mcp-oauth-report.md)
-**Branch:** `feat/mcp-oauth` → PR gegen `main`
-**Reviewer-Iterationen:** 9 (Iteration 9: alle fünf R1–R5 mit 0 Findings)
-**Tests:** 803 grün (+ 1 bekannter E2E-Flake-Skip), 92 neue OAuth-Tests. **14 Conventional-Commits.**
+**Decisions:**
 
-**Kontext:** Claude Code CLI funktioniert mit statischem Bearer-Token (`ATELIER_MCP_TOKEN`). Claude Desktop Custom Connectors und Claude.ai Web Custom Connectors sprechen ausschließlich OAuth — statisches Bearer-Token reicht dort nicht. Ziel: self-hosted minimaler OAuth-2.1-Authorization-Server, der neben dem statischen Auth weiterläuft.
+**D-040/1 — route schema:** spec routes adopted (`/crew/profiles/grounding-providers`, `/create`, `/edit/{name}`, `/view/{name}`). The existing routes (`/crew/profiles/grounding`, `/new`, `/{name}`) did match the real reviewer/executor/advisor pattern — but the user decision favored spec conformance. The asymmetry to the sibling pages (which use `/new` and `/{name}`) is addressed in a follow-up step by aligning the other three profile types (recommendation: unify reviewer/executor/advisor onto a consistent schema).
 
-**Kernentscheidungen:**
+**D-040/2 — a separate view page for system profiles:** a new `GroundingProviderView.razor` with `@page "/crew/profiles/grounding-providers/view/{name}"` instead of an inline read-only banner in the editor. Enables a clear system presentation without an editable form. Reviewer/executor/advisor keep the inline-banner pattern — a possible task for a follow-up harmonization step.
 
-**D-041/1 — Self-hosted AS statt externem IdP:** OAuth-2.1-AS direkt in Geef.Atelier implementiert (kein Keycloak, Auth0 etc.). Begründung: Single-User-Kontext, kein Deployment-Overhead, volle Kontrolle über Token-Lebenszyklus. Scope ausschließlich `mcp:full` (kein Multi-Scope-Design).
+**D-040/3 — vector-store scope selector:** a `Scope` field (global/run-local/both) exposed in the editor. Existing custom vector-store profiles (created before this step) had no `Scope` key in `ProviderSettings` — `From()` defaults to `"both"` to preserve the previous unfiltered behaviour. New profiles: default `"global"`. Backend mapping: `"both"` → `null` filter → no restriction (works without a backend change, confirmed by `VectorStoreGroundingProvider.cs:44-49`).
 
-**D-041/2 — Opaque Tokens + SHA-256 statt JWT:** Tokens sind kryptografisch zufällige 32-Byte-Strings (Base64Url), in der DB ausschließlich als SHA-256-Hash gespeichert (`RandomNumberGenerator.GetBytes(32)`). Vorteil: kein JWKS-Endpoint, keine asymmetrische Kryptographie-Infrastruktur, Token-Revocation einfach (Hash in DB markieren), keine Tokengröße im HTTP-Header.
+**D-040/4 — ProviderType immutable on edit:** the `InputSelect` for ProviderType gets `disabled="@(!IsNew)"`. Type-specific settings (Tavily vs. vector-store) are not migratable between types — the user must delete the old profile and create a new one.
 
-**D-041/3 — PKCE strikt S256, kein `plain`:** `code_challenge_method=plain` wird abgelehnt. Authorization-Server erzwingt S256 per `string.Equals(..., StringComparison.Ordinal)`-Check. Public Clients (keine Client-Secrets) — `token_endpoint_auth_method=none`.
+**D-040/5 — delete-cascade behaviour (verified):** no cascade delete from `CrewTemplates` on profile deletion. `CrewTemplate.GroundingProviderNames` is a JSONB string array without an FK relationship to `GroundingProviderProfiles`. Deleted profiles leave dangling names in templates; at runtime `GetGroundingProviderProfileAsync` resolves to `null`. Identical to the behaviour on reviewer/advisor profile deletion. `DeleteConfirmationModal` requires the exact name input as a safety layer. Follow-up-step recommendation: template-reference listing in the delete modal.
 
-**D-041/4 — Loopback-Sonderregel (RFC 8252):** Redirect-URIs werden exakt verglichen. Ausnahme: `http://127.0.0.1`-URIs erlauben beliebigen Port (RFC 8252 §7.3). Nie auf andere Hosts angewandt. `localhost` wird nicht als Loopback behandelt (nur `127.0.0.1`).
+**D-040/6 — NavMenu entry:** the only grounding-providers NavLink in the NavMenu. Reviewer/executor/advisor have no NavMenu entries (reachable only via the `/crew` dashboard). This asymmetry is deliberate (spec AC #12 explicit). Follow-up-step recommendation: a crew-profile section in the NavMenu or treat all four types equally.
 
-**D-041/5 — Refresh-Token-Rotation + Reuse-Detection:** Jeder Token-Refresh gibt ein neues Paar (Access + Refresh) aus und invalidiert den alten Refresh-Token atomisch via SQL `UPDATE WHERE UsedAt IS NULL`. Erneuter Einsatz eines bereits verbrauchten Refresh-Tokens (Diebstahl-Indikator per RFC 6819) löst sofortige Revocation aller aktiven Tokens des Users aus (`RevokeAllUserTokensAsync`).
-
-**D-041/6 — Endpoint-Mapping Minimal-API + Razor-Consent:** Maschinelle OAuth-Endpoints als Minimal-API-Extensions (`OAuthEndpoints.cs`, `WellKnownEndpoints.cs`) — kein MVC-Stack. `GET /oauth/authorize` als Razor-Page (`OAuthAuthorize.razor`, `@attribute [Authorize]`, Static SSR) — nutzt bestehende Cookie-Auth + Return-URL-Mechanismus von `Login.razor` ohne zusätzliches Plumbing.
-
-**D-041/7 — `ITokenValidator` evolviert zu `TokenValidationOutcome`:** Interface-Result erweitert von `bool` auf `TokenValidationOutcome { IsValid, Kind, Subject, ClientId, Scope }`. `StaticTokenValidator` → `Kind="static-bearer"` (Verhalten identisch). `OAuthAccessTokenValidator` neu. `CompositeTokenValidator` als neue `ITokenValidator`-Registrierung: erst statisch, dann OAuth. `BearerTokenHandler` baut Claims aus Outcome. Backwards-Compat: statischer Pfad bit-identisch zu vorher.
-
-**D-041/8 — Backwards-Compat Claude Code CLI:** `ATELIER_MCP_TOKEN` weiterhin voll funktional. `CompositeTokenValidator` prüft statisches Token zuerst — Claude Code CLI-Requests passieren den OAuth-Pfad nie. Beide Auth-Pfade koexistieren ohne Konfigurationsänderung.
-
-**D-041/9 — Audit-Log + Cleanup-BackgroundService:** Alle relevanten OAuth-Operationen schreiben `OAuthAuditLogEntry` (5 Tabellen, Migration `Step19McpOAuth`). `OAuthCleanupBackgroundService` löscht abgelaufene Auth-Codes und Access-/Refresh-Tokens; Audit-Log bleibt permanent (Forensik).
-
-**Akzeptierte Abweichungen vom Blueprint (dokumentiert in `geef_architecture.md`):**
-- `token_type_hint` in Revocation: SHOULD laut RFC 7009, nicht implementiert (akzeptiert)
-- `scopes_supported` im Metadata-Endpoint: String statt Array (akzeptiert, da nur ein Scope)
-- TOCTOU-Fenster zwischen `FindByXxxAsync` und `ConsumeAsync`: kein exploitbares Sicherheitsproblem (atomare `ConsumeAsync`-Implementierung via `UPDATE WHERE UsedAt IS NULL`; akzeptiert)
+**Lesson (origin of the gap):** the grounding-provider CRUD pages were correctly co-implemented at the Tavily step (D-035) — but without a CrewIndex dashboard entry, without bUnit UI tests and without a route-schema alignment to the spec. No page code was forgotten; the organizational gap was in missing route conventions and test coverage.
 
 ---
 
-## D-042 — Run-Sichtbarkeits-Isolation (User Run Isolation)
+## 16 May 2026 — MCP OAuth 2.1 authorization server (PS-9 extension)
 
-*Datum: 17. Mai 2026 | Bericht: [reports/feature-run-user-isolation-report.md](reports/feature-run-user-isolation-report.md)*
+### D-041: self-hosted OAuth 2.1 AS for Claude Desktop / Claude.ai custom connectors
 
-Run-Sichtbarkeit auf eigenen Account eingeschränkt. Admin-Override via explizite Toggles ("Alle Benutzer anzeigen", "System-weite Statistiken anzeigen"). Grundlage: OAuth (Step19) + Multi-User (Step20).
+**Date:** 16 May 2026
+**Report:** [reports/feature-mcp-oauth-report.md](reports/feature-mcp-oauth-report.md)
+**Branch:** `feat/mcp-oauth` → PR against `main`
+**Reviewer iterations:** 9 (iteration 9: all five R1–R5 with 0 findings)
+**Tests:** 803 green (+ 1 known E2E-flake skip), 92 new OAuth tests. **14 conventional commits.**
 
-**D-042/1 — Username als Isolation-Schlüssel:** `Runs.CreatedByUser` (String) als User-Identifier beibehalten. Kein Wechsel auf UserId-FK — Username ist seit Step20 stabil, Migration wäre rein kosmetisch ohne Sicherheitsgewinn.
+**Context:** Claude Code CLI works with a static bearer token (`ATELIER_MCP_TOKEN`). Claude Desktop custom connectors and Claude.ai web custom connectors speak OAuth exclusively — a static bearer token is not enough there. Goal: a self-hosted minimal OAuth 2.1 authorization server that runs alongside the static auth.
 
-**D-042/2 — null-Semantik für Admin-Bypass:** `requestingUsername = null` bedeutet systemweit in allen Service- und Repository-Methoden. Caller entscheidet (nicht der Service) anhand der User-Claims ob Admin-Mode. Vermeidet Code-Duplikation zwischen Web und MCP.
+**Core decisions:**
 
-**D-042/3 — 403 für Web-UI, generische Meldung für MCP:** RunDetail zeigt explizite 403-Seite ("Kein Zugriff — dieser Run gehört einem anderen Benutzer") — klare UX. MCP-Tools geben `null` zurück (= "Run not found or access denied") — verhindert Run-Existenz-Leak via API.
+**D-041/1 — self-hosted AS instead of an external IdP:** the OAuth 2.1 AS implemented directly in Geef.Atelier (no Keycloak, Auth0 etc.). Rationale: single-user context, no deployment overhead, full control over the token lifecycle. Scope exclusively `mcp:full` (no multi-scope design).
 
-**D-042/4 — Static-Bearer-Token → Admin-Mapping:** Runs via `ATELIER_MCP_TOKEN` (Claude Code CLI) werden dem konfigurierten Admin-User zugeordnet (neu: `ATELIER_MCP__STATIC_TOKEN_USER`, Default: `ATELIER_USER`). Kein Backfill bestehender "mcp-client"-Runs. Sicherheits-Fix: Timing-Leak (Length-Pre-Check vor `FixedTimeEquals`) entfernt.
+**D-041/2 — opaque tokens + SHA-256 instead of JWT:** tokens are cryptographically random 32-byte strings (Base64Url), stored in the DB exclusively as a SHA-256 hash (`RandomNumberGenerator.GetBytes(32)`). Advantage: no JWKS endpoint, no asymmetric-crypto infrastructure, token revocation simple (mark the hash in the DB), no token size in the HTTP header.
 
-**D-042/5 — Welcome-Stats-Default für Admin: eigene Stats:** Admin sieht standardmäßig eigene Stats; system-weite via Toggle. Verhindert unbeabsichtigte Privacy-Implikationen bei Multi-User-Setup.
+**D-041/3 — PKCE strictly S256, no `plain`:** `code_challenge_method=plain` is rejected. The authorization server enforces S256 via a `string.Equals(..., StringComparison.Ordinal)` check. Public clients (no client secrets) — `token_endpoint_auth_method=none`.
 
-**D-042/6 — Kein Cascade-Delete bei User-Löschung:** Runs bleiben in der DB erhalten wenn User gelöscht wird. Admin sieht verwaiste Runs. Runs sind historische Wertdaten — destruktiver Auto-Delete inakzeptabel.
+**D-041/4 — loopback special rule (RFC 8252):** redirect URIs are compared exactly. Exception: `http://127.0.0.1` URIs allow any port (RFC 8252 §7.3). Never applied to other hosts. `localhost` is not treated as loopback (only `127.0.0.1`).
 
-**D-042/7 — Index `IX_Runs_CreatedByUser`:** Migration Step21 fügt Index auf `Runs.CreatedByUser` hinzu. Filter-Performance bei wachsender Run-Zahl.
+**D-041/5 — refresh-token rotation + reuse detection:** every token refresh issues a new pair (access + refresh) and invalidates the old refresh token atomically via SQL `UPDATE WHERE UsedAt IS NULL`. Reuse of an already-consumed refresh token (a theft indicator per RFC 6819) triggers immediate revocation of all of the user's active tokens (`RevokeAllUserTokensAsync`).
+
+**D-041/6 — endpoint mapping Minimal-API + Razor consent:** the machine OAuth endpoints as Minimal-API extensions (`OAuthEndpoints.cs`, `WellKnownEndpoints.cs`) — no MVC stack. `GET /oauth/authorize` as a Razor page (`OAuthAuthorize.razor`, `@attribute [Authorize]`, static SSR) — uses the existing cookie auth + return-URL mechanism of `Login.razor` without additional plumbing.
+
+**D-041/7 — `ITokenValidator` evolved to `TokenValidationOutcome`:** the interface result extended from `bool` to `TokenValidationOutcome { IsValid, Kind, Subject, ClientId, Scope }`. `StaticTokenValidator` → `Kind="static-bearer"` (behaviour identical). `OAuthAccessTokenValidator` new. `CompositeTokenValidator` as a new `ITokenValidator` registration: static first, then OAuth. `BearerTokenHandler` builds claims from the outcome. Backward compat: the static path bit-identical to before.
+
+**D-041/8 — backward compat Claude Code CLI:** `ATELIER_MCP_TOKEN` still fully functional. `CompositeTokenValidator` checks the static token first — Claude Code CLI requests never pass through the OAuth path. Both auth paths coexist without a configuration change.
+
+**D-041/9 — audit log + cleanup background service:** all relevant OAuth operations write `OAuthAuditLogEntry` (5 tables, migration `Step19McpOAuth`). `OAuthCleanupBackgroundService` deletes expired auth codes and access/refresh tokens; the audit log stays permanent (forensics).
+
+**Accepted deviations from the blueprint (documented in `geef_architecture.md`):**
+- `token_type_hint` in revocation: SHOULD per RFC 7009, not implemented (accepted)
+- `scopes_supported` in the metadata endpoint: string instead of array (accepted, since only one scope)
+- TOCTOU window between `FindByXxxAsync` and `ConsumeAsync`: not an exploitable security problem (atomic `ConsumeAsync` implementation via `UPDATE WHERE UsedAt IS NULL`; accepted)
+
+---
+
+## D-042 — run-visibility isolation (user run isolation)
+
+*Date: 17 May 2026 | Report: [reports/feature-run-user-isolation-report.md](reports/feature-run-user-isolation-report.md)*
+
+Run visibility restricted to one's own account. Admin override via explicit toggles ("show all users", "show system-wide statistics"). Foundation: OAuth (Step19) + multi-user (Step20).
+
+**D-042/1 — username as the isolation key:** `Runs.CreatedByUser` (string) retained as the user identifier. No switch to a UserId FK — the username is stable since Step20, a migration would be purely cosmetic with no security gain.
+
+**D-042/2 — null semantics for admin bypass:** `requestingUsername = null` means system-wide in all service and repository methods. The caller decides (not the service) based on the user claims whether admin mode applies. Avoids code duplication between Web and MCP.
+
+**D-042/3 — 403 for the web UI, a generic message for MCP:** RunDetail shows an explicit 403 page ("No access — this run belongs to another user") — clear UX. MCP tools return `null` (= "Run not found or access denied") — prevents a run-existence leak via the API.
+
+**D-042/4 — static-bearer-token → admin mapping:** runs via `ATELIER_MCP_TOKEN` (Claude Code CLI) are attributed to the configured admin user (new: `ATELIER_MCP__STATIC_TOKEN_USER`, default: `ATELIER_USER`). No backfill of existing "mcp-client" runs. Security fix: the timing leak (length pre-check before `FixedTimeEquals`) removed.
+
+**D-042/5 — welcome-stats default for the admin: own stats:** the admin sees their own stats by default; system-wide via a toggle. Prevents unintended privacy implications in a multi-user setup.
+
+**D-042/6 — no cascade delete on user deletion:** runs remain in the DB when a user is deleted. The admin sees orphaned runs. Runs are historical value data — a destructive auto-delete is unacceptable.
+
+**D-042/7 — index `IX_Runs_CreatedByUser`:** migration Step21 adds an index on `Runs.CreatedByUser`. Filter performance as the run count grows.

@@ -1,139 +1,138 @@
-# 07 — Design-System
+# 07 — Design system
 
-*Letzte Aktualisierung: 2026-05-17 (Mock-Stub-Status auf aktuellen Feature-Stand gebracht; Tokens/Themes/Typografie unverändert seit PS-3-Design-Translation)*
+*[Deutsch](07-design-system_de.md) · **English***
 
-Das Atelier-Design-System ist aus dem Mockup (`docs/design/atelier-mockups/`) in die Blazor-Server-App übertragen worden (PS-3). Dieser Leitfaden beschreibt Tokens, Themes, Typografie, Komponenten-Inventar und Mock-Stubs für zukünftige Entwicklung.
+*Last updated: 2026-05-17 (mock-stub status brought up to the current feature state; tokens/themes/typography unchanged since the PS-3 design translation)*
 
-## Theme-System
+The Atelier design system was ported from the mockup (`docs/design/atelier-mockups/`) into the Blazor Server app (PS-3). This guide describes tokens, themes, typography, the component inventory and the mock stubs for future development.
 
-### Paletten
+## Theme system
 
-Drei CSS-Paletten via `html.palette-{name}`-Klasse:
+### Palettes
 
-| Name | Klasse | Charakter |
+Three CSS palettes via the `html.palette-{name}` class:
+
+| Name | Class | Character |
 |------|--------|-----------|
-| Vellum | `palette-vellum` | Hell, Pergament-Töne — **Production-Default** |
-| Noir | `palette-noir` | Dunkel, Tinte auf Papier |
-| Petrol | `palette-petrol` | Kühles Teal-Dunkelblau |
+| Vellum | `palette-vellum` | Light, parchment tones — **production default** |
+| Noir | `palette-noir` | Dark, ink on paper |
+| Petrol | `palette-petrol` | Cool teal dark blue |
 
-**Default:** `palette-vellum` (gesetzt via `App.razor` aus Cookie `Atelier.Theme`; ohne Cookie default Vellum).
+**Default:** `palette-vellum` (set via `App.razor` from the `Atelier.Theme` cookie; without a cookie it defaults to Vellum).
 
-### Theme-Cookie
+### Theme cookie
 
-| Eigenschaft | Wert |
+| Property | Value |
 |------------|------|
 | Name | `Atelier.Theme` |
-| Werte | `vellum`, `noir`, `petrol` |
-| MaxAge | 365 Tage |
-| HttpOnly | `false` (JS-Interop liest/setzt) |
+| Values | `vellum`, `noir`, `petrol` |
+| MaxAge | 365 days |
+| HttpOnly | `false` (JS interop reads/sets it) |
 | SameSite | Strict |
-| Secure | Nur in Production |
-| Logout | Löscht Cookie NICHT |
+| Secure | Production only |
+| Logout | Does NOT delete the cookie |
 
-### Theme-Wechsel-Mechanik
+### Theme-switch mechanics
 
-Primär: `window.atelier.setTheme(name)` (JS-Interop) — wechselt sofort ohne Page-Reload, setzt Cookie.
+Primary: `window.atelier.setTheme(name)` (JS interop) — switches instantly without a page reload, sets the cookie.
 
-Fallback: `POST /settings/theme` (Form-POST) — für No-JS-Szenarios, Redirect zum Referer.
+Fallback: `POST /settings/theme` (form POST) — for no-JS scenarios, redirect to the referer.
 
-### Server-seitiges Rendering
+### Server-side rendering
 
-`App.razor` liest `Atelier.Theme`-Cookie via `IHttpContextAccessor` und rendert `<html class="palette-@Theme">` server-seitig — kein Flash-of-Wrong-Theme.
+`App.razor` reads the `Atelier.Theme` cookie via `IHttpContextAccessor` and renders `<html class="palette-@Theme">` server-side — no flash of wrong theme.
 
-## Typografie
+## Typography
 
-Drei selbst-gehostete Variable-Fonts in `wwwroot/fonts/` (OFL-lizenziert):
+Three self-hosted variable fonts in `wwwroot/fonts/` (OFL-licensed):
 
-| Familie | CSS-Variable | Verwendung | Gewichts-Range |
+| Family | CSS variable | Usage | Weight range |
 |---------|-------------|-----------|---------------|
-| Newsreader | `var(--font-display)` | Überschriften, Manuscript | 200–800 |
-| Geist | `var(--font-ui)` | UI-Text, Labels | 100–900 |
-| JetBrains Mono | `var(--font-mono)` | Code, IDs, Mono-Tags | 100–800 |
+| Newsreader | `var(--font-display)` | Headings, manuscript | 200–800 |
+| Geist | `var(--font-ui)` | UI text, labels | 100–900 |
+| JetBrains Mono | `var(--font-mono)` | Code, IDs, mono tags | 100–800 |
 
-Keine externen Font-Requests — DSGVO-konform.
+No external font requests — GDPR-compliant.
 
-## Severity-Mapping
+## Severity mapping
 
-Aus D-025 (PS-2) übernommen; UI-Darstellung in PS-3 implementiert:
+Taken from D-025 (PS-2); UI rendering implemented in PS-3:
 
-| Atelier-Enum | CSS-Klasse | Shape-Mark |
+| Atelier enum | CSS class | Shape mark |
 |-------------|-----------|-----------|
-| Critical | `severity critical` | Dreieck |
-| Major | `severity major` | Raute |
-| Minor | `severity minor` | Kreis |
-| Info | `severity info` | Querbalken |
+| Critical | `severity critical` | Triangle |
+| Major | `severity major` | Diamond |
+| Minor | `severity minor` | Circle |
+| Info | `severity info` | Bar |
 
-## Status-Badge
+## Status badge
 
-| RunStatus | CSS-Klasse | Glyph-Shape | data-status |
+| RunStatus | CSS class | Glyph shape | data-status |
 |-----------|-----------|------------|------------|
 | Pending | `status pending` | Ring (border) | `Pending` |
-| Running | `status running` | Puls-Animation | `Running` |
-| Completed | `status completed` | Häkchen | `Completed` |
+| Running | `status running` | Pulse animation | `Running` |
+| Completed | `status completed` | Checkmark | `Completed` |
 | Failed | `status failed` | X | `Failed` |
 | Aborted | `status aborted` | Diagonal | `Aborted` |
 
-## Reviewer-Display-Mapping
+## Reviewer display mapping
 
-Code-Klassen bleiben unverändert (keine Breaking Changes in Persistenz/Schema):
+Code class names stay unchanged (no breaking changes in persistence/schema):
 
-| Code-Name | UI-Anzeige |
+| Code name | UI display |
 |-----------|-----------|
 | `BriefingTreueReviewer` | `BriefingFidelity` |
 | `KlarheitReviewer` | `Clarity` |
-| Alle anderen | Unverändert (Fallback) |
+| All others | Unchanged (fallback) |
 
-Implementierung: `Geef.Atelier.Web.Display.ReviewerDisplay.ToDisplay(name)`.
+Implementation: `Geef.Atelier.Web.Display.ReviewerDisplay.ToDisplay(name)`.
 
-## Komponenten-Inventar
+## Component inventory
 
-### Neue Komponenten (PS-3)
+### New components (PS-3)
 
-| Datei | Beschreibung |
+| File | Description |
 |-------|-------------|
-| `Brand.razor` | Crest + Wordmark (geef.atelier) |
-| `ThemeSwitcher.razor` | Drei Theme-Buttons mit data-testid |
-| `GlobalPulse.razor` | Laufende-Runs-Anzeige (Stub) |
-| `ReconnectBanner.razor` | Blazor-Error-UI mit Reconnect-Text |
-| `RunRow.razor` | Grid-Zeile in der Runs-Liste |
-| `FilterPill.razor` | Status-Filter-Button mit Count |
-| `ProgressPip.razor` | Iterations-Fortschritts-Pip |
-| `Press.razor` | Pipeline-Stage-Visualisierung (3 Seals + 2 Ribbons) |
-| `Manuscript.razor` | Finales Manuskript mit Copy-Button |
-| `Icons/Icon*.razor` | 16 hairline SVG-Icons |
+| `Brand.razor` | Crest + wordmark (geef.atelier) |
+| `ThemeSwitcher.razor` | Three theme buttons with data-testid |
+| `GlobalPulse.razor` | Running-runs indicator (stub) |
+| `ReconnectBanner.razor` | Blazor error UI with reconnect text |
+| `RunRow.razor` | Grid row in the runs list |
+| `FilterPill.razor` | Status filter button with count |
+| `ProgressPip.razor` | Iteration-progress pip |
+| `Press.razor` | Pipeline stage visualization (3 seals + 2 ribbons) |
+| `Manuscript.razor` | Final manuscript with copy button |
+| `Icons/Icon*.razor` | 16 hairline SVG icons |
 
-### Aktualisierte Komponenten
+### Updated components
 
-| Datei | Änderung |
+| File | Change |
 |-------|---------|
-| `StatusBadge.razor` | Shape-Glyph, data-status Attribut |
-| `SeverityBadge.razor` | Shape-Mark via Clip-Path |
-| `IterationPanel.razor` | Collapse, Severity-Pills, Evolution-Footer |
-| `FindingItem.razor` | ReviewerDisplay-Mapping, Resolved-Badge |
-| `MainLayout.razor` | Sticky Nav, kein Sidebar |
-| `NavMenu.razor` | Flat Links, kein Bootstrap |
-| `UserMenu.razor` | Dropdown mit ThemeSwitcher |
+| `StatusBadge.razor` | Shape glyph, data-status attribute |
+| `SeverityBadge.razor` | Shape mark via clip-path |
+| `IterationPanel.razor` | Collapse, severity pills, evolution footer |
+| `FindingItem.razor` | ReviewerDisplay mapping, resolved badge |
+| `MainLayout.razor` | Sticky nav, no sidebar |
+| `NavMenu.razor` | Flat links, no Bootstrap |
+| `UserMenu.razor` | Dropdown with ThemeSwitcher |
 
-## Mock-Stubs (.coming-soon)
+## Mock stubs (.coming-soon)
 
-Diese Liste war zur PS-3-Design-Translation der Stand der noch nicht angebundenen
-UI-Elemente. Aktueller Status (Mai 2026):
+This list was, at the PS-3 design translation, the state of the not-yet-connected UI elements. Current status (May 2026):
 
-| Element | Damaliger Stub | Heutiger Stand |
+| Element | Stub back then | State today |
 |---------|----------------|----------------|
-| Welcome-Stats | `—` in Stat-Tiles | ✅ Implementiert (`IRunService.GetWelcomeStatsAsync`, pro Nutzer isoliert) |
-| Cost-Anzeige (RunDetail) | `$ —` | ✅ Implementiert (Cost-Tracking, `Runs.CostTotal` / `IterationActorCosts`) |
-| Account-Funktionen | Disabled | ✅ Implementiert: Multi-User (`/admin/users`), verbundene Clients (`/account/connected-clients`) |
-| „Profile"-Eintrag im `UserMenu` | Disabled | ⏳ Weiterhin Stub (`.coming-soon`) — der separate Profil-Menüpunkt selbst ist noch nicht angebunden |
-| Export-Button (Manuscript) | Disabled | ⏳ Weiterhin Stub — DOCX/PDF-*Export* bleibt out of scope (siehe [01-vision-and-scope.md](01-vision-and-scope.md)) |
+| Welcome stats | `—` in stat tiles | ✅ Implemented (`IRunService.GetWelcomeStatsAsync`, per-user isolated) |
+| Cost display (RunDetail) | `$ —` | ✅ Implemented (cost tracking, `Runs.CostTotal` / `IterationActorCosts`) |
+| Account functions | Disabled | ✅ Implemented: multi-user (`/admin/users`), connected clients (`/account/connected-clients`) |
+| "Profile" entry in `UserMenu` | Disabled | ⏳ Still a stub (`.coming-soon`) — the separate profile menu item itself is not yet wired up |
+| Export button (Manuscript) | Disabled | ⏳ Still a stub — DOCX/PDF *export* remains out of scope (see [01-vision-and-scope.md](01-vision-and-scope.md)) |
 
-Die CSS-Klasse `.coming-soon` (gedämpfte Farbe, Tooltip) wird noch an zwei Stellen
-verwendet: dem Export-Button (`Manuscript.razor`) und dem „Profile"-Eintrag im
-`UserMenu.razor`.
+The CSS class `.coming-soon` (dimmed color, tooltip) is still used in two places: the export button (`Manuscript.razor`) and the "Profile" entry in `UserMenu.razor`.
 
-## CSS-Architektur
+## CSS architecture
 
-- **Globales Stylesheet:** `wwwroot/atelier.css` — umfangreiches globales Stylesheet (CSS Custom Properties, drei Paletten, alle Komponenten-Basics); wächst mit neuen Features mit
-- **Scoped CSS:** `.razor.css` pro Komponente für Layout-Overrides
-- **Bootstrap:** vollständig entfernt in PS-3
-- **Kein Inline-Styling** in Komponenten (außer minimal in Pages)
+- **Global stylesheet:** `wwwroot/atelier.css` — a large global stylesheet (CSS custom properties, three palettes, all component basics); grows with new features
+- **Scoped CSS:** `.razor.css` per component for layout overrides
+- **Bootstrap:** fully removed in PS-3
+- **No inline styling** in components (except minimally in pages)

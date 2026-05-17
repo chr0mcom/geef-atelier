@@ -1,43 +1,45 @@
-# Endpoint-Referenz
+# Endpoint reference
 
-*Letzte Aktualisierung: 2026-05-17 (POST /oauth/consent ergänzt; Web-UI-/Account-Endpunkte ergänzt)*
+*[Deutsch](09-endpoint-reference_de.md) · **English***
 
-Alle HTTP-Endpunkte von Geef.Atelier, die extern erreichbar sind — MCP, OAuth 2.1
-sowie die Web-UI-/Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`.
+*Last updated: 2026-05-17 (POST /oauth/consent added; web-UI/account endpoints added)*
+
+All externally reachable HTTP endpoints of Geef.Atelier — MCP, OAuth 2.1
+and the web-UI/account endpoints. Base URL: `https://geef.stefan-bechtel.de`.
 
 ---
 
-## MCP-Endpunkt
+## MCP endpoint
 
-| Endpunkt | Methode | Auth |
+| Endpoint | Method | Auth |
 |----------|---------|------|
-| `/mcp` | POST | Bearer-Token (statisch oder OAuth) |
+| `/mcp` | POST | Bearer token (static or OAuth) |
 
-Der eigentliche MCP-Endpunkt. Clients senden hier ihre JSON-RPC-Requests (Tool-Calls). Unterstützt Streamable-HTTP-Transport (`Stateless=true`).
+The actual MCP endpoint. Clients send their JSON-RPC requests (tool calls) here. Supports the Streamable-HTTP transport (`Stateless=true`).
 
-**Auth-Möglichkeiten:**
+**Auth options:**
 
-- **Claude Code CLI:** `Authorization: Bearer <ATELIER_MCP_TOKEN>` (statisches Token aus `.env`)
-- **Claude Desktop / Claude.ai:** OAuth-2.1-Access-Token (Bearer), ausgestellt nach dem unten beschriebenen OAuth-Flow
+- **Claude Code CLI:** `Authorization: Bearer <ATELIER_MCP_TOKEN>` (static token from `.env`)
+- **Claude Desktop / Claude.ai:** OAuth 2.1 access token (bearer), issued after the OAuth flow described below
 
-Wenn kein oder ein ungültiges Token mitgeschickt wird, antwortet der Server mit `401 Unauthorized` und dem Header:
+If no token or an invalid token is sent, the server responds with `401 Unauthorized` and the header:
 ```
 WWW-Authenticate: Bearer resource_metadata="https://geef.stefan-bechtel.de/.well-known/oauth-protected-resource"
 ```
-Darüber entdecken OAuth-fähige Clients automatisch den Authorization Server.
+Through this, OAuth-capable clients discover the authorization server automatically.
 
 ---
 
-## OAuth-Endpunkte
+## OAuth endpoints
 
 ### Discovery
 
 #### `GET /.well-known/oauth-authorization-server`
 
-**Auth:** Keine  
+**Auth:** None  
 **RFC:** 8414
 
-Gibt die Server-Metadaten als JSON zurück. Clients nutzen diesen Endpunkt zur automatischen Discovery aller anderen OAuth-Endpunkte.
+Returns the server metadata as JSON. Clients use this endpoint to automatically discover all other OAuth endpoints.
 
 ```json
 {
@@ -58,10 +60,10 @@ Gibt die Server-Metadaten als JSON zurück. Clients nutzen diesen Endpunkt zur a
 
 #### `GET /.well-known/oauth-protected-resource`
 
-**Auth:** Keine  
-**RFC:** Draft (MCP Resource Metadata)
+**Auth:** None  
+**RFC:** Draft (MCP resource metadata)
 
-Gibt Metadaten zur geschützten Ressource (dem MCP-Server) zurück.
+Returns metadata about the protected resource (the MCP server).
 
 ```json
 {
@@ -74,35 +76,35 @@ Gibt Metadaten zur geschützten Ressource (dem MCP-Server) zurück.
 
 ---
 
-### Client-Registrierung
+### Client registration
 
 #### `POST /oauth/register`
 
-**Auth:** Keine (oder optionaler `Authorization: Bearer <REGISTRATION_TOKEN>` wenn konfiguriert)  
+**Auth:** None (or an optional `Authorization: Bearer <REGISTRATION_TOKEN>` if configured)  
 **RFC:** 7591 — Dynamic Client Registration
 
-Registriert einen neuen OAuth-Client. Typischerweise vom MCP-Client automatisch aufgerufen.
+Registers a new OAuth client. Typically called automatically by the MCP client.
 
 **Request (JSON):**
 ```json
 {
-  "client_name": "Mein Client",
+  "client_name": "My Client",
   "redirect_uris": ["https://example.com/callback"],
-  "client_id": "mein-client-id",
+  "client_id": "my-client-id",
   "logo_uri": null,
   "client_uri": null
 }
 ```
 
-`client_id` ist optional — wird weggelassen, generiert der Server eine UUID. `client_name` und `redirect_uris` sind Pflichtfelder.
+`client_id` is optional — if omitted, the server generates a UUID. `client_name` and `redirect_uris` are mandatory fields.
 
 **Response (201):**
 ```json
 {
-  "client_id": "mein-client-id",
+  "client_id": "my-client-id",
   "client_id_issued_at": 1747390000,
   "redirect_uris": ["https://example.com/callback"],
-  "client_name": "Mein Client",
+  "client_name": "My Client",
   "token_endpoint_auth_method": "none",
   "grant_types": ["authorization_code", "refresh_token"],
   "response_types": ["code"]
@@ -111,27 +113,27 @@ Registriert einen neuen OAuth-Client. Typischerweise vom MCP-Client automatisch 
 
 ---
 
-### Authorization-Code-Flow
+### Authorization-code flow
 
 #### `GET /oauth/authorize`
 
-**Auth:** Cookie (Geef.Atelier-Login — wird bei fehlender Session zu `/login` weitergeleitet)
+**Auth:** Cookie (Geef.Atelier login — redirected to `/login` if there is no session)
 
-Startet den Authorization-Code-Flow. Zeigt dem eingeloggten Nutzer die Consent-Seite mit Client-Name und beantragter Berechtigung.
+Starts the authorization-code flow. Shows the logged-in user the consent page with the client name and the requested permission.
 
-**Pflicht-Query-Parameter:**
+**Mandatory query parameters:**
 
-| Parameter | Beschreibung |
+| Parameter | Description |
 |-----------|-------------|
-| `response_type` | Muss `code` sein |
-| `client_id` | Registrierte Client-ID |
-| `redirect_uri` | Muss exakt mit einer registrierten URI übereinstimmen |
-| `code_challenge` | PKCE-Challenge (Base64Url-codierter SHA-256-Hash des Verifiers) |
-| `code_challenge_method` | Muss `S256` sein (`plain` wird abgelehnt) |
+| `response_type` | Must be `code` |
+| `client_id` | Registered client ID |
+| `redirect_uri` | Must exactly match a registered URI |
+| `code_challenge` | PKCE challenge (Base64Url-encoded SHA-256 hash of the verifier) |
+| `code_challenge_method` | Must be `S256` (`plain` is rejected) |
 
-**Optionale Parameter:** `scope`, `state`
+**Optional parameters:** `scope`, `state`
 
-Beispiel-URL wie sie Claude Desktop aufruft:
+Example URL as Claude Desktop calls it:
 ```
 https://geef.stefan-bechtel.de/oauth/authorize
   ?response_type=code
@@ -139,38 +141,38 @@ https://geef.stefan-bechtel.de/oauth/authorize
   &redirect_uri=https%3A%2F%2Fclaude.ai%2Fapi%2Fmcp%2Fauth_callback
   &code_challenge=Oaa_K782ehJ6ZNf-INVXFk1mEKtzQz7xOERSXZUiGXA
   &code_challenge_method=S256
-  &state=<zufälliger-state>
+  &state=<random-state>
   &scope=mcp%3Afull
 ```
 
-Die `GET /oauth/authorize`-Seite ist eine server-gerenderte Blazor-Consent-Seite
-(`[Authorize]` Cookie). Die Approve/Deny-Entscheidung wird per Formular-POST an
-`/oauth/consent` gesendet (siehe unten) — nicht an `/oauth/authorize` selbst.
+The `GET /oauth/authorize` page is a server-rendered Blazor consent page
+(`[Authorize]` cookie). The approve/deny decision is sent via form POST to
+`/oauth/consent` (see below) — not to `/oauth/authorize` itself.
 
 ---
 
 #### `POST /oauth/consent`
 
-**Auth:** Cookie (Geef.Atelier-Login) + Anti-Forgery-Token  
+**Auth:** Cookie (Geef.Atelier login) + anti-forgery token  
 **Content-Type:** `application/x-www-form-urlencoded`
 
-Submit-Ziel der Consent-Seite. Verarbeitet die Zustimmung/Ablehnung des Nutzers,
-erzeugt bei Zustimmung den Authorization-Code und führt den Redirect aus.
+Submit target of the consent page. Processes the user's approval/denial,
+on approval creates the authorization code and performs the redirect.
 
-**Nach Zustimmung:** Redirect zu `redirect_uri?code=<auth_code>&state=<state>`  
-**Nach Ablehnung:** Redirect zu `redirect_uri?error=access_denied&state=<state>`  
-**Bei ungültigem Request:** Fehlerseite (kein Redirect — schützt vor Open-Redirect)
+**On approval:** redirect to `redirect_uri?code=<auth_code>&state=<state>`  
+**On denial:** redirect to `redirect_uri?error=access_denied&state=<state>`  
+**On an invalid request:** error page (no redirect — protects against open redirect)
 
 ---
 
-### Token-Endpunkt
+### Token endpoint
 
 #### `POST /oauth/token`
 
-**Auth:** Keine (Public Clients — Authentifizierung über PKCE statt Client-Secret)  
+**Auth:** None (public clients — authentication via PKCE instead of a client secret)  
 **Content-Type:** `application/x-www-form-urlencoded`
 
-Tauscht einen Authorization-Code gegen Tokens oder erneuert über Refresh-Token.
+Exchanges an authorization code for tokens or renews via a refresh token.
 
 **Grant: `authorization_code`**
 
@@ -201,11 +203,11 @@ grant_type=refresh_token
 }
 ```
 
-Response-Header: `Cache-Control: no-store`, `Pragma: no-cache` (RFC 6749 §5.1).
+Response headers: `Cache-Control: no-store`, `Pragma: no-cache` (RFC 6749 §5.1).
 
-**Fehlerverhalten:**
-- Ungültiger oder verbrauchter Code → `400 invalid_grant`
-- Refresh-Token bereits benutzt → `400 invalid_grant` **+ sofortige Revocation aller Tokens des Nutzers** (Diebstahl-Erkennung nach RFC 6819)
+**Error behaviour:**
+- Invalid or consumed code → `400 invalid_grant`
+- Refresh token already used → `400 invalid_grant` **+ immediate revocation of all of the user's tokens** (theft detection per RFC 6819)
 
 ---
 
@@ -213,11 +215,11 @@ Response-Header: `Cache-Control: no-store`, `Pragma: no-cache` (RFC 6749 §5.1).
 
 #### `POST /oauth/revoke`
 
-**Auth:** Keine  
+**Auth:** None  
 **Content-Type:** `application/x-www-form-urlencoded`  
 **RFC:** 7009
 
-Widerruft einen Access-Token oder Refresh-Token. Gibt immer `200 OK` zurück (auch wenn das Token unbekannt ist).
+Revokes an access token or refresh token. Always returns `200 OK` (even if the token is unknown).
 
 ```
 token=<token>
@@ -226,60 +228,60 @@ token=<token>
 
 ---
 
-## Web-UI- & Account-Endpunkte
+## Web-UI & account endpoints
 
-Die Web-Oberfläche ist Blazor Server (Cookie-Auth). Auswahl der relevanten,
-extern erreichbaren Routen:
+The web interface is Blazor Server (cookie auth). A selection of the relevant,
+externally reachable routes:
 
-| Endpunkt | Methode | Auth | Zweck |
+| Endpoint | Method | Auth | Purpose |
 |----------|---------|------|-------|
-| `/` | GET | Cookie | Startseite / Atelier-Übersicht |
-| `/health` | GET | Keine | Health-Check (`Healthy`) — für Reverse-Proxy/Container-Lifecycle |
-| `/login` | GET/POST | Keine | Login-Seite (Static SSR) |
-| `/auth/logout` | POST | Cookie | Logout (Anti-Forgery, Minimal-API) |
-| `/settings/theme` | POST | Keine | Theme-Wechsel-Fallback (No-JS), Redirect zum Referer |
-| `/hubs/runs` | WS | — | SignalR-Hub für Live-Run-Updates |
-| `/admin/users` | GET | Cookie (Admin) | Benutzerverwaltung |
-| `/admin/oauth-clients` | GET | Cookie (Admin) | OAuth-Client-Verwaltung |
-| `/account/connected-clients` | GET | Cookie | Selbstverwaltung der eigenen verbundenen OAuth-Clients |
-| `/crew`, `/crew/templates`, `/crew/profiles/*`, `/crew/studio`, `/crew/knowledge` | GET | Cookie | Crew-/Template-/Profil-/Studio-/Wissensbasis-Verwaltung |
-| `/runs`, `/runs/{id}`, `/new` | GET | Cookie | Run-Liste, Run-Detail, neuer Auftrag |
+| `/` | GET | Cookie | Home page / Atelier overview |
+| `/health` | GET | None | Health check (`Healthy`) — for the reverse proxy/container lifecycle |
+| `/login` | GET/POST | None | Login page (static SSR) |
+| `/auth/logout` | POST | Cookie | Logout (anti-forgery, Minimal API) |
+| `/settings/theme` | POST | None | Theme-switch fallback (no-JS), redirect to the referer |
+| `/hubs/runs` | WS | — | SignalR hub for live run updates |
+| `/admin/users` | GET | Cookie (admin) | User management |
+| `/admin/oauth-clients` | GET | Cookie (admin) | OAuth client management |
+| `/account/connected-clients` | GET | Cookie | Self-service for one's own connected OAuth clients |
+| `/crew`, `/crew/templates`, `/crew/profiles/*`, `/crew/studio`, `/crew/knowledge` | GET | Cookie | Crew/template/profile/Studio/knowledge-base management |
+| `/runs`, `/runs/{id}`, `/new` | GET | Cookie | Run list, run detail, new job |
 
-Run-bezogene Seiten unterliegen der Run-User-Isolation (D-042): jeder Nutzer sieht
-nur eigene Runs; der Admin kann per explizitem Umschalter systemweit sehen.
+Run-related pages are subject to run-user isolation (D-042): each user sees
+only their own runs; the admin can see system-wide via an explicit toggle.
 
 ---
 
-## Token-Design
+## Token design
 
-| Eigenschaft | Wert |
+| Property | Value |
 |-------------|------|
-| Format | Opaque — 32-Byte Zufallsdaten, Base64Url-codiert |
-| Speicherung | Nur SHA-256-Hash in der Datenbank |
-| Generierung | `RandomNumberGenerator.GetBytes(32)` |
-| Vergleich | `CryptographicOperations.FixedTimeEquals` |
-| Access-Token-Lebensdauer | 1 Stunde |
-| Refresh-Token-Lebensdauer | 30 Tage, Rotation bei jedem Refresh |
-| Scope | Nur `mcp:full` (Vollzugriff auf den MCP-Server) |
+| Format | Opaque — 32 bytes of random data, Base64Url-encoded |
+| Storage | Only the SHA-256 hash in the database |
+| Generation | `RandomNumberGenerator.GetBytes(32)` |
+| Comparison | `CryptographicOperations.FixedTimeEquals` |
+| Access-token lifetime | 1 hour |
+| Refresh-token lifetime | 30 days, rotated on every refresh |
+| Scope | Only `mcp:full` (full access to the MCP server) |
 
 ---
 
-## Vollständiger Flow (Zusammenfassung)
+## Full flow (summary)
 
 ```
-Client                          Geef.Atelier                    Browser/Nutzer
+Client                          Geef.Atelier                    Browser/user
   │                                 │                                 │
   │── GET /.well-known/oauth-... ──>│                                 │
-  │<── Server-Metadaten ────────────│                                 │
+  │<── server metadata ─────────────│                                 │
   │                                 │                                 │
   │── POST /oauth/register ────────>│                                 │
   │<── client_id ───────────────────│                                 │
   │                                 │                                 │
-  │── Öffne Browser mit GET ────────────────────────────────────────>│
+  │── open browser with GET ────────────────────────────────────────>│
   │   /oauth/authorize?...          │                                 │
-  │                                 │<── Login (falls nötig) ─────────│
-  │                                 │<── Consent "Zugriff gewähren" ──│
-  │                                 │── Redirect ?code=... ──────────>│
+  │                                 │<── login (if needed) ───────────│
+  │                                 │<── consent "grant access" ──────│
+  │                                 │── redirect ?code=... ──────────>│
   │<── code (via redirect_uri) ─────────────────────────────────────│
   │                                 │                                 │
   │── POST /oauth/token ───────────>│                                 │
@@ -288,5 +290,5 @@ Client                          Geef.Atelier                    Browser/Nutzer
   │                                 │                                 │
   │── POST /mcp ───────────────────>│                                 │
   │   Authorization: Bearer <token> │                                 │
-  │<── Tool-Response ───────────────│                                 │
+  │<── tool response ───────────────│                                 │
 ```

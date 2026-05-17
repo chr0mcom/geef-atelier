@@ -1,294 +1,298 @@
-# Walking Skeleton — Bauplan
+# Walking Skeleton — build plan
 
-*Letzte Aktualisierung: 2026-05-17 (Doku-Bereinigung: dupliziertes Schritt-1-Statusfeld und versehentlich angehängtes Prompt-Fragment entfernt; Verweis auf Post-Skeleton-Verlauf ergänzt. Inhaltlich ein historischer Bauplan — dated Status-/PS-Blöcke werden bewusst nicht rückdatiert.)*
+*[Deutsch](03-walking-skeleton-plan_de.md) · **English***
 
-Das Walking Skeleton ist die kleinste end-to-end-funktionale Version von Geef.Atelier: ein Auftrag wird über die UI oder via MCP gestellt, eine echte Geef-Pipeline läuft (mit echten LLM-Calls), Live-Status ist sichtbar, das Ergebnis wird angezeigt und persistiert. Quellen-Upload, Klassifikator, dynamische Crew, Advisor, Multi-Format-Export — alles weitere kommt später.
+*Last updated: 2026-05-17 (documentation cleanup: removed a duplicated Step-1 status field and an accidentally appended prompt fragment; added a pointer to the post-skeleton history. Substantively a historical build plan — dated status/PS blocks are deliberately not back-dated.)*
 
-## Strategie
+The walking skeleton is the smallest end-to-end functional version of Geef.Atelier: a job is submitted via the UI or via MCP, a real Geef pipeline runs (with real LLM calls), live status is visible, the result is displayed and persisted. Source upload, classifier, dynamic crew, advisor, multi-format export — everything else comes later.
 
-Jeder Schritt ist einzeln verifizierbar. Kein Schritt setzt voraus, dass alles davor perfekt ist. Nach jedem Schritt sollte das System in einem testbaren Zustand sein. Schritte werden in Reihenfolge umgesetzt, weil jeder auf Vorgängern aufbaut — aber bei Bedarf darf gestoppt, refaktoriert oder neu gedacht werden, bevor der nächste startet.
+## Strategy
+
+Every step is individually verifiable. No step assumes everything before it is perfect. After each step the system should be in a testable state. Steps are implemented in order because each builds on its predecessors — but where needed it is permissible to stop, refactor or rethink before the next one starts.
 
 ---
 
-## Parallele Migrations-Tracks
+## Parallel migration tracks
 
-Während die nummerierten Schritte sequenziell durchlaufen werden, gibt es parallele Migrations-Tracks für strukturelle Umbauten, die durch Ereignisse außerhalb des Walking-Skeleton-Plans ausgelöst wurden. Sie laufen auf eigenen Branches und werden nicht automatisch in main gemerged — der Brainstorming-Maintainer entscheidet den Merge-Zeitpunkt.
+While the numbered steps are worked through sequentially, there are parallel migration tracks for structural rebuilds triggered by events outside the walking-skeleton plan. They run on their own branches and are not automatically merged into main — the brainstorming maintainer decides the merge timing.
 
-### M1 — Provider-Migration auf OpenAI-konforme APIs
+### M1 — provider migration to OpenAI-compatible APIs
 
 **Branch:** `feature/openai-compatible-providers`
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** Branch `feature/openai-compatible-providers` gepusht (4 Commits + 1 nachgereichter Bericht-Commit). 31/31 Tests grün (9 ohne Docker, 22 weitere via Postgres/Orchestrator-Testcontainer). Architect-Antworten zu allen sechs Schwerpunkten getroffen — markante Entscheidung: `LlmActor`-Enum existiert nur als Typen-Dokumentation, Lookup über String-Keys. Workflow-Abweichung: keine formalen R1–R5-Reviewer-Pässe (durch Subagent-Self-Reviews + Build/Test ersetzt) — R2-Nachholpass nach Merge empfohlen. Bericht: [reports/migration-01-report.md](reports/migration-01-report.md). Details siehe Decisions-Log D-018.
-**Merge-Status:** ✅ **Abgeschlossen** (Push-Range `28daafb..ad90f65`). main enthält jetzt Schritte 1–7 + M1 zusammen. Branch `feature/openai-compatible-providers` kann gelöscht werden.
-**Offen vor Schritt 7:** Real-OpenRouter-Integration-Test (`AtelierPipelineRunsAgainstOpenRouter`) einmal mit echtem Bearer-Key ausführen — verifiziert Modell-ID-Stabilität, Tool-Use-Verhalten, Latenz.
-**Auslöser:** D-017 — Anthropic-OAuth-Token wird von Messages-API nicht akzeptiert; Pay-as-you-go-Bearer-Key vermeidbar; Multi-Provider-Vorteil sofort nutzbar.
-**Scope:** Ersetzt anthropic-spezifischen LLM-Layer durch OpenAI-API-konformen Adapter (Default: OpenRouter). Pro-Akteur-Modell-Konfiguration. Tool-Use-Format wechselt auf OpenAI-`function`-Schema.
-**Nicht im Scope:** Pipeline-Struktur, EventSink, Persistierung, Orchestrator, Domain-Modell.
-**Empfohlener Merge-Zeitpunkt:** Vor Schritt 7 (UI), damit die UI direkt gegen die neuen Provider-Verträge gebaut wird.
+**Status:** ✅ **Completed on 10 May 2026.** Branch `feature/openai-compatible-providers` pushed (4 commits + 1 follow-up report commit). 31/31 tests green (9 without Docker, 22 more via the Postgres/orchestrator test container). Architect answers given for all six focal points — notable decision: the `LlmActor` enum exists only as type documentation, lookup via string keys. Workflow deviation: no formal R1–R5 reviewer passes (replaced by subagent self-reviews + build/test) — R2 catch-up pass after merge recommended. Report: [reports/migration-01-report.md](reports/migration-01-report.md). Details see decisions log D-018.
+**Merge status:** ✅ **Completed** (push range `28daafb..ad90f65`). main now contains steps 1–7 + M1 together. Branch `feature/openai-compatible-providers` can be deleted.
+**Open before step 7:** run the real-OpenRouter integration test (`AtelierPipelineRunsAgainstOpenRouter`) once with a real bearer key — verifies model-ID stability, tool-use behaviour, latency.
+**Trigger:** D-017 — the Anthropic OAuth token is not accepted by the Messages API; a pay-as-you-go bearer key is avoidable; the multi-provider advantage is immediately usable.
+**Scope:** replaces the Anthropic-specific LLM layer with an OpenAI-API-compatible adapter (default: OpenRouter). Per-actor model configuration. The tool-use format switches to the OpenAI `function` schema.
+**Not in scope:** pipeline structure, event sink, persistence, orchestrator, domain model.
+**Recommended merge timing:** before step 7 (UI), so the UI is built directly against the new provider contracts.
 **Prompt:** [prompts/migration-01-openai-compatible-providers.md](prompts/migration-01-openai-compatible-providers.md)
 
 ---
 
-## Die zehn Schritte
+## The ten steps
 
-### Schritt 1 — Solution-Setup mit Postgres und EF Core
+### Step 1 — solution setup with Postgres and EF Core
 
-**Ziel:** Lauffähige Solution mit allen Projekten, Postgres-Anbindung über Npgsql und EF Core, erste Migration angelegt, Docker-Compose für lokale Entwicklung.
+**Goal:** a runnable solution with all projects, Postgres connection via Npgsql and EF Core, the first migration created, Docker Compose for local development.
 
-**Umfang:**
-- Solution `Geef.Atelier.sln` mit vier Projekten (Core, Infrastructure, Web, Mcp) plus Tests
-- Geef SDK referenziert (NuGet wenn verfügbar, sonst dokumentiert wie eingebunden)
-- DbContext mit den vier Entities (Runs, Iterations, Findings, Events)
-- Migration angelegt, gegen lokale Postgres ausführbar
-- `docker-compose.yml` für lokale Entwicklung mit App + Postgres
-- Health-Check-Endpoint
-- README im Repo
+**Scope:**
+- Solution `Geef.Atelier.sln` with four projects (Core, Infrastructure, Web, Mcp) plus Tests
+- Geef SDK referenced (NuGet if available, otherwise documented how it is wired in)
+- DbContext with the four entities (Runs, Iterations, Findings, Events)
+- Migration created, runnable against local Postgres
+- `docker-compose.yml` for local development with app + Postgres
+- Health-check endpoint
+- README in the repo
 
-**Akzeptanzkriterien:**
-- `dotnet build` ohne Fehler oder Warnungen über Skeleton-Code
-- `dotnet ef database update` läuft erfolgreich gegen Postgres
-- `docker compose up` startet App und DB; Health-Check antwortet 200 OK
-- Tests-Projekt enthält mindestens einen Smoke-Test (DbContext lädt, Migration läuft in Test-DB)
+**Acceptance criteria:**
+- `dotnet build` without errors or warnings over skeleton code
+- `dotnet ef database update` runs successfully against Postgres
+- `docker compose up` starts app and DB; health check answers 200 OK
+- Tests project contains at least one smoke test (DbContext loads, migration runs in the test DB)
 
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, alle 5 Reviewer durch (1 CRITICAL + 4 MAJOR Findings, alle behoben). 9 Conventional-Commits. Bericht: [reports/step-01-report.md](reports/step-01-report.md). Details siehe Decisions-Log D-010.
+**Status:** ✅ **Completed on 10 May 2026.** 1 reviewer iteration, all 5 reviewers passed (1 CRITICAL + 4 MAJOR findings, all fixed). 9 conventional commits. Report: [reports/step-01-report.md](reports/step-01-report.md). Details see decisions log D-010.
 
 ---
 
-### Schritt 2 — Pipeline-Skelett mit Stub-Providern
+### Step 2 — pipeline skeleton with stub providers
 
-**Ziel:** Geef-Pipeline läuft mit ausgeklügelten Stub-Providern, ohne echte LLM-Calls. Beweist, dass Convergence-Loop und EventSink funktionieren.
+**Goal:** the Geef pipeline runs with elaborate stub providers, without real LLM calls. Proves that the convergence loop and event sink work.
 
-**Umfang:**
-- `BriefingGroundingStep` (Stub: Briefing in Context schreiben)
-- `LlmExecutionStep` (Stub: Echo + Iterations-Marker)
-- Zwei `LlmReviewer` (Stub: Iteration 1 = Findings, Iteration 2+ = keine Findings)
+**Scope:**
+- `BriefingGroundingStep` (stub: write the briefing into the context)
+- `LlmExecutionStep` (stub: echo + iteration marker)
+- Two `LlmReviewer` (stub: iteration 1 = findings, iteration 2+ = no findings)
 - `MarkdownFinalizer`
-- Pipeline-Builder-Konfiguration mit `MaxIterationsPolicy(3)` und `ParallelEvaluationStrategy`
-- Einfacher Konsolen-Test, der die Pipeline einmal ausführt
+- Pipeline-builder configuration with `MaxIterationsPolicy(3)` and `ParallelEvaluationStrategy`
+- A simple console test that runs the pipeline once
 
-**Akzeptanzkriterien:**
-- Pipeline läuft 2 Iterationen und konvergiert
-- Alle Geef-Events werden in der Konsole geloggt
-- Final-Output enthält den erwarteten Marker
+**Acceptance criteria:**
+- Pipeline runs 2 iterations and converges
+- All Geef events are logged to the console
+- The final output contains the expected marker
 
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, alle 5 Reviewer mit 0 aktionierbaren Findings durch. 7/7 Tests grün (5 Schritt-1-Tests + 2 neue Pipeline-Tests). 6 SDK-Realfakt-Korrekturen vs. Bau-Prompt (FindingSeverity-Enum, DefaultConvergencePolicy, UseMiddleware-Generic, Evaluation-Event-Namen, IterationHistory-Workaround, Namespace-Alias). Bericht: [reports/step-02-report.md](reports/step-02-report.md). Details siehe Decisions-Log D-012.
-
----
-
-### Schritt 3 — Anthropic-Client und echte Provider
-
-**Ziel:** Stubs ersetzen durch echte Anthropic-API-Aufrufe.
-
-**Umfang:**
-- `IAnthropicClient` mit `CompleteAsync(systemPrompt, userPrompt, options)`
-- HTTP-Implementierung gegen `/v1/messages`
-- API-Key aus `IConfiguration` (`ANTHROPIC_API_KEY`)
-- `LlmExecutionStep` ruft Anthropic mit Executor-System-Prompt + Briefing + PreviousFindings
-- `LlmReviewer` ruft Anthropic mit Reviewer-System-Prompt + Artefakt; Reviewer-Output als JSON-strukturiert
-- `ReviewerResponseSchema` definieren (findings: [{severity, message}])
-
-**Akzeptanzkriterien:**
-- Pipeline läuft mit echtem Anthropic-Modell und konvergiert (mit einem trivialen Briefing)
-- Token-Verbrauch wird erfasst und im Final-Output ausgewiesen
-- Strukturierter Reviewer-Output wird korrekt geparst
-
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, 2 MAJOR-Findings vor Phase 4 behoben (defensive JSON-Deserialisierung). 11/11 Tests grün (4 neue Mock-Tests + 7 Regression). Anthropic-Tool-Use mit `submit_review`, `Microsoft.Extensions.Http.Resilience` via `AddStandardResilienceHandler`, `ConvergenceFailedException` bei `AbortOnCritical=true` verifiziert. 14 Conventional-Commits. Bericht: [reports/step-03-report.md](reports/step-03-report.md). Details siehe Decisions-Log D-013.
-
-**Offen:** Integration-Test `AtelierPipelineRealAnthropicTests` wurde nicht mit echtem API-Key ausgeführt — vor Schritt 5 nachholen.
-
-**Hinweis:** Die in Schritt 3 etablierte Anthropic-spezifische LLM-Schicht wird durch Migration M1 (siehe oben) durch eine OpenAI-API-konforme Provider-Schicht ersetzt. Die Pipeline-Struktur und Convergence-Logik aus Schritt 3 bleiben unverändert; nur der Client-Adapter und die Konfigurations-Records ändern sich. Details siehe D-017 im Decisions-Log.
+**Status:** ✅ **Completed on 10 May 2026.** 1 reviewer iteration, all 5 reviewers passed with 0 actionable findings. 7/7 tests green (5 step-1 tests + 2 new pipeline tests). 6 SDK-reality corrections vs. the build prompt (FindingSeverity enum, DefaultConvergencePolicy, UseMiddleware generic, evaluation event names, IterationHistory workaround, namespace alias). Report: [reports/step-02-report.md](reports/step-02-report.md). Details see decisions log D-012.
 
 ---
 
-### Schritt 4 — EventSink und Persistierung
+### Step 3 — Anthropic client and real providers
 
-**Ziel:** Jeder Run wird mit allen Iterationen, Findings und Events in Postgres gespeichert.
+**Goal:** replace the stubs with real Anthropic API calls.
 
-**Umfang:**
-- `PostgresEventSink` (Implementierung von `IGeefEventSink`)
-- Iterations-Snapshots werden bei `ExecutionPhaseCompleted` extrahiert und persistiert
-- Findings werden bei `EvaluationPhaseCompleted` persistiert
-- Token- und Kosten-Akkumulation pro Run
+**Scope:**
+- `IAnthropicClient` with `CompleteAsync(systemPrompt, userPrompt, options)`
+- HTTP implementation against `/v1/messages`
+- API key from `IConfiguration` (`ANTHROPIC_API_KEY`)
+- `LlmExecutionStep` calls Anthropic with the executor system prompt + briefing + PreviousFindings
+- `LlmReviewer` calls Anthropic with the reviewer system prompt + artifact; reviewer output as structured JSON
+- Define `ReviewerResponseSchema` (findings: [{severity, message}])
 
-**Akzeptanzkriterien:**
-- Nach einem Pipeline-Run sind in der DB: ein Run, mehrere Iterations, Findings (für die Iterationen, in denen welche gefunden wurden), und ein vollständiger Event-Log
-- Kein doppeltes Event, keine verlorene Iteration
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, 1 MAJOR-Finding (volatile-Annotation für `_lastExecutionContext`) behoben. 15/15 Tests grün (4 neue Persistence-Tests + 11 Regression). PostgresEventSink mit Variante-A-RunId-Propagation, IRunPersistenceService in Core, typisiertes Token-Tracking via `ContextKey<AnthropicTokenUsage>`, Critical-Abort-Findings aus `PipelineFailedEvent.History` (SDK via Dekompilierung verifiziert). 13 Conventional-Commits. Bericht: [reports/step-04-report.md](reports/step-04-report.md). Details siehe Decisions-Log D-015.
+**Acceptance criteria:**
+- The pipeline runs with a real Anthropic model and converges (with a trivial briefing)
+- Token usage is captured and reported in the final output
+- Structured reviewer output is parsed correctly
 
-**Offen (verschoben):** `AtelierPipelineRealAnthropicTests` mit echtem API-Bearer-Key — kein Key in Session-Umgebung verfügbar. Real-Lauf in Schritt 5 oder später, wenn Bearer-Key bereitgestellt wird.
+**Status:** ✅ **Completed on 10 May 2026.** 1 reviewer iteration, 2 MAJOR findings fixed before phase 4 (defensive JSON deserialization). 11/11 tests green (4 new mock tests + 7 regression). Anthropic tool use with `submit_review`, `Microsoft.Extensions.Http.Resilience` via `AddStandardResilienceHandler`, `ConvergenceFailedException` for `AbortOnCritical=true` verified. 14 conventional commits. Report: [reports/step-03-report.md](reports/step-03-report.md). Details see decisions log D-013.
+
+**Open:** the integration test `AtelierPipelineRealAnthropicTests` was not run with a real API key — catch up before step 5.
+
+**Note:** the Anthropic-specific LLM layer established in step 3 is replaced by migration M1 (see above) with an OpenAI-API-compatible provider layer. The pipeline structure and convergence logic from step 3 remain unchanged; only the client adapter and the configuration records change. Details see D-017 in the decisions log.
 
 ---
 
-### Schritt 5 — RunOrchestratorService
+### Step 4 — event sink and persistence
 
-✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, 6 Findings (alle behoben). Bericht: [docs/reports/step-05-report.md](reports/step-05-report.md). D-016.
+**Goal:** every run is stored in Postgres with all its iterations, findings and events.
 
-**Ziel:** Asynchrone Auftragsverarbeitung über einen `BackgroundService`. Aufträge werden mit Status `Pending` in die DB geschrieben; der Service nimmt sie auf, führt die Pipeline aus, schreibt das Ergebnis zurück.
+**Scope:**
+- `PostgresEventSink` (implementation of `IGeefEventSink`)
+- Iteration snapshots are extracted and persisted at `ExecutionPhaseCompleted`
+- Findings are persisted at `EvaluationPhaseCompleted`
+- Token and cost accumulation per run
 
-**Umfang:**
+**Acceptance criteria:**
+- After a pipeline run, the DB contains: one run, several iterations, findings (for the iterations in which any were found), and a complete event log
+- No duplicate event, no lost iteration
+
+**Status:** ✅ **Completed on 10 May 2026.** 1 reviewer iteration, 1 MAJOR finding (volatile annotation for `_lastExecutionContext`) fixed. 15/15 tests green (4 new persistence tests + 11 regression). PostgresEventSink with variant-A RunId propagation, IRunPersistenceService in Core, typed token tracking via `ContextKey<AnthropicTokenUsage>`, critical-abort findings from `PipelineFailedEvent.History` (SDK verified via decompilation). 13 conventional commits. Report: [reports/step-04-report.md](reports/step-04-report.md). Details see decisions log D-015.
+
+**Open (deferred):** `AtelierPipelineRealAnthropicTests` with a real API bearer key — no key available in the session environment. Real run in step 5 or later, once a bearer key is provided.
+
+---
+
+### Step 5 — RunOrchestratorService
+
+✅ **Completed on 10 May 2026.** 1 reviewer iteration, 6 findings (all fixed). Report: [docs/reports/step-05-report.md](reports/step-05-report.md). D-016.
+
+**Goal:** asynchronous job processing via a `BackgroundService`. Jobs are written to the DB with status `Pending`; the service picks them up, runs the pipeline, writes the result back.
+
+**Scope:**
 - `RunOrchestratorService : BackgroundService`
-- Polling-Intervall (2 Sekunden Default) für `Pending`-Runs; atomarer `Pending→Running`-Claim
-- `SemaphoreSlim`-Concurrency-Gate + Task-Tracking (`_runTasks`) mit Drain beim Stop
-- Crash-Recovery beim Service-Start: alle `Running`-Runs → `Failed/"Service restarted"`
-- Cancellation-Strategie γ: nur `StoppingToken`; `OverrideToAbortedAsync` mit `CancellationToken.None`
+- Polling interval (2 seconds default) for `Pending` runs; atomic `Pending→Running` claim
+- `SemaphoreSlim` concurrency gate + task tracking (`_runTasks`) with drain on stop
+- Crash recovery at service start: all `Running` runs → `Failed/"Service restarted"`
+- Cancellation strategy γ: only `StoppingToken`; `OverrideToAbortedAsync` with `CancellationToken.None`
 - `OrchestratorOptions` (PollingInterval, MaxConcurrentRuns) in `Core/Configuration/`
-- `GatedFakeAnthropicClient` für deterministische Concurrency-Tests
+- `GatedFakeAnthropicClient` for deterministic concurrency tests
 
-**Akzeptanzkriterien:**
-- ✅ Mehrere Runs nacheinander automatisch verarbeitet (E2E Pending→Completed)
-- ✅ App-Restart markiert laufende Runs als Failed/"Service restarted"
-- ✅ Nie mehr als MaxConcurrentRuns=2 Runs gleichzeitig (5/5 deterministisch)
-- ✅ StopAsync mid-flight → Status=Aborted
-- ✅ 19/19 Tests grün; AC8 Skip (OAuth-only)
+**Acceptance criteria:**
+- ✅ Several runs processed automatically one after another (E2E Pending→Completed)
+- ✅ App restart marks running runs as Failed/"Service restarted"
+- ✅ Never more than MaxConcurrentRuns=2 runs simultaneously (5/5 deterministic)
+- ✅ StopAsync mid-flight → status=Aborted
+- ✅ 19/19 tests green; AC8 skipped (OAuth-only)
 
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration; 4 MAJOR R2 (Drain-Race, Test-Precondition-Guards) + 2 MAJOR R4 (Doku-Updates) — alle behoben. 19/19 Tests grün (4 neue Orchestrator-Tests + 15 Regression), Concurrency-Test 5/5 deterministisch via `GatedFakeAnthropicClient`. Atomarer Pending→Running-Claim, `SemaphoreSlim` + `ConcurrentDictionary<Guid, Task>` + `WhenAll`-Drain, Crash-Recovery beim Service-Start, Cancellation via Option γ (nur StoppingToken). 11 Conventional-Commits. Bericht: [reports/step-05-report.md](reports/step-05-report.md). Details siehe Decisions-Log D-016.
+**Status:** ✅ **Completed on 10 May 2026.** 1 reviewer iteration; 4 MAJOR R2 (drain race, test-precondition guards) + 2 MAJOR R4 (doc updates) — all fixed. 19/19 tests green (4 new orchestrator tests + 15 regression), concurrency test 5/5 deterministic via `GatedFakeAnthropicClient`. Atomic Pending→Running claim, `SemaphoreSlim` + `ConcurrentDictionary<Guid, Task>` + `WhenAll` drain, crash recovery at service start, cancellation via option γ (only StoppingToken). 11 conventional commits. Report: [reports/step-05-report.md](reports/step-05-report.md). Details see decisions log D-016.
 
-**Offen (verschoben):** AC8 (Real-Anthropic-Test mit Bearer-Key) — 3. Mal Skip wegen OAuth-only Token in Session. `CancelRunAsync` als Stub-Implementierung folgt in Schritt 6 zusammen mit DB-Flag-Migration.
-
----
-
-### Schritt 6 — IRunService als Application-Service-Layer
-
-**Ziel:** Saubere Anwendungslogik-Schicht, die von beiden Frontends (Web-UI und MCP-Server) konsumiert wird.
-
-**Umfang:**
-- `IRunService`-Interface in neuem `Geef.Atelier.Application`-Projekt (Option B, User bestätigt)
-- Methoden: `SubmitRunAsync`, `GetRunAsync`, `ListRunsAsync`, `CancelRunAsync`
-- `IRunRepository` in Core, `RunRepository` in Infrastructure (Variante β — keine Infra-Dep in Application)
-- `RunEntity.CancellationRequested`-Flag + EF-Migration `Step06Cancellation`
-- Cancellation-Watcher im Orchestrator (Pattern A, pro-Run, pollt DB jede `CancellationPollingInterval`)
-- DI-Registrierung `AddAtelierApplication()` + `AddAtelierApplication()` in Program.cs
-
-**Akzeptanzkriterien:**
-- ✅ `SubmitRunAsync` + `GetRunAsync`: End-to-End Pending→Completed
-- ✅ `ListRunsAsync`: sortiert nach `CreatedAt desc`, filterbar nach Status
-- ✅ `CancelRunAsync` mid-flight: DB-Flag → Watcher → CTS → Pipeline-OCE → Aborted
-- ✅ `CancelRunAsync` für terminalen Run: false (idempotent)
-- ✅ Input-Validierung: leeres/null-Briefing, null-configJson, ungültiges JSON
-- ✅ `dotnet test`: 31/31 grün (5 neue Application-Tests + 26 Regression)
-- ✅ AC9: Skip — kein Live-API-Key in Session (Eskalations-Hinweis vor Schritt 9)
-
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 2 Reviewer-Iterationen, 2 R2-MAJOR-Findings (ServiceProvider-Disposal, Test-Race) behoben. 31/31 Tests grün (5 neue Application-Tests). Variante β (Application-Layer ohne Infrastructure-Dep, IRunRepository in Core), Cancellation-Watcher Pattern A (pro-Run-Task), DB-Flag `RunEntity.CancellationRequested` mit Migration `Step06Cancellation`. 6 Conventional-Commits. Bericht: [reports/step-06-report.md](reports/step-06-report.md). Details siehe Decisions-Log D-019.
-Details siehe Decisions-Log D-017 (Schritt-6-Abschnitt)
+**Open (deferred):** AC8 (real-Anthropic test with a bearer key) — skipped a 3rd time due to an OAuth-only token in the session. `CancelRunAsync` as a stub implementation follows in step 6 together with the DB-flag migration.
 
 ---
 
-### Schritt 7 — Blazor-UI
+### Step 6 — IRunService as the application service layer
 
-**Status:** ✅ **Abgeschlossen am 11. Mai 2026.** 2 Reviewer-Iterationen, 1 R2-CRITICAL (fehlendes try/catch in `SignalRRunNotifier`) behoben — doppelter Fail-Safe-Pattern etabliert. 55/55 Tests grün (4 neue bUnit + 4 neue Playwright E2E + bestehende Persistence/Orchestrator/Application). Drei Pages (`/new`, `/runs`, `/runs/{id}`), 9 UI-Komponenten in `Components/UI/` mit scoped CSS, SignalR-Hub `RunHub` mit zwei Groups (`run-{id}` + `all-runs`), `IRunNotifier` in Core und `SignalRRunNotifier` in Web als Singleton. **AC8 endlich grün:** OpenRouter-Real-Pipeline mit 5–12s Latenz und 174–523 Tokens pro Run verifiziert. 12 Conventional-Commits in `main`. Bericht: [reports/step-07-report.md](reports/step-07-report.md). Details siehe Decisions-Log D-020.
+**Goal:** a clean application-logic layer consumed by both frontends (web UI and MCP server).
 
-**Workflow-Festlegung dieser Stufe:** Plan-Phase-Integration etabliert sich als Architect-Form (seit Schritt 5 verwendet); `geef_architecture.md` als Pflicht-Artefakt wird in der Praxis durch Plan-Dokumente äquivalent ersetzt — R4 prüft Architektur-Compliance gegen den Plan. Atelier-Auslegung der "keine HTML in Pages"-Regel: triviale Page-Steuerelemente (einfache `<button>`/`<div>` ohne State) dürfen in Pages bleiben, nur wiederverwendbare UI-**Logik** muss in `Components/UI/`.
+**Scope:**
+- `IRunService` interface in a new `Geef.Atelier.Application` project (option B, user confirmed)
+- Methods: `SubmitRunAsync`, `GetRunAsync`, `ListRunsAsync`, `CancelRunAsync`
+- `IRunRepository` in Core, `RunRepository` in Infrastructure (variant β — no infra dep in Application)
+- `RunEntity.CancellationRequested` flag + EF migration `Step06Cancellation`
+- Cancellation watcher in the orchestrator (pattern A, per-run, polls the DB every `CancellationPollingInterval`)
+- DI registration `AddAtelierApplication()` + `AddAtelierApplication()` in Program.cs
 
----
+**Acceptance criteria:**
+- ✅ `SubmitRunAsync` + `GetRunAsync`: end-to-end Pending→Completed
+- ✅ `ListRunsAsync`: sorted by `CreatedAt desc`, filterable by status
+- ✅ `CancelRunAsync` mid-flight: DB flag → watcher → CTS → pipeline OCE → Aborted
+- ✅ `CancelRunAsync` for a terminal run: false (idempotent)
+- ✅ Input validation: empty/null briefing, null configJson, invalid JSON
+- ✅ `dotnet test`: 31/31 green (5 new application tests + 26 regression)
+- ✅ AC9: skipped — no live API key in the session (escalation note before step 9)
 
-### Schritt 8 — Auth (Cookie für UI, Token für MCP-Vorbereitung)
-
-**Ziel:** Anwendung ist nicht mehr ungeschützt im Internet erreichbar.
-
-**Voraussetzung:** Schritte 1–7 + M1 in main. AC8 (Real-OpenRouter-Test) grün. Schritt 8 baut auf der etablierten UI-Schicht (drei Pages + SignalR-Hub) auf und ergänzt Auth-Middleware + Login-Page. Single-User-Setup mit Cookie-basierter Auth.
-
-**Umfang:**
-- Cookie-Auth für die Web-UI; ein User aus Environment-Variablen
-- Login-Page (Static SSR), Logout-Endpoint (`POST /auth/logout`)
-- Bearer-Token-Auth-Schema vorbereitet für MCP-Server (im nächsten Schritt aktiviert)
-- Gesundheitscheck bleibt unauthentifiziert
-
-**Akzeptanzkriterien:**
-- ✅ Ohne Login: Redirect auf Login-Page (`/login?ReturnUrl=…`)
-- ✅ Mit Login (admin/DevPassword! als Dev-Default): alle UI-Routen erreichbar, Logout-Button sichtbar
-- ✅ Falsche Credentials: Login schlägt fehl, "Ungültige Anmeldedaten"-Banner, kein Cookie
-- ✅ Logout → Cookie gelöscht, folgende Auth-Routen redirigierten wieder zu /login
-- ✅ `/health` weiterhin anonym (AllowAnonymous)
-- ✅ `tools/HashPassword` CLI für BCrypt-Hash-Generierung
-- ✅ 71/71 Tests grün (55 bestehende + 16 neue)
-
-**Status:** ✅ **Abgeschlossen am 11. Mai 2026.** 4 Reviewer-Iterationen (R1–R5 alle 0 Findings). 71/71 Tests grün (55 Regression + 4 Application-Auth + 6 bUnit + 6 Playwright-E2E). Cookie-Auth: BCrypt wf=11, 30d SlidingExpiration, HttpOnly, SameSite=Strict, SecurePolicy Dev/Prod-Switch. Login als Static SSR (`@formname`-Pflicht). Logout via `POST /auth/logout` mit AntiforgeryToken. `TestAuthenticationHandler` in Tests für Bypass. Arch-Trade-off: RunHub ohne `[Authorize]` (Blazor Server server-side HubConnection kann Browser-Cookies nicht forwarden — SSR-Pre-render würde 401 erhalten). `ForwardedHeaders`-Middleware vor `UseAuthentication` (Traefik-TLS-Vorbereitung). 13 Conventional-Commits. Bericht: [reports/step-08-report.md](reports/step-08-report.md). Details siehe Decisions-Log D-021.
+**Status:** ✅ **Completed on 10 May 2026.** 2 reviewer iterations, 2 R2-MAJOR findings (ServiceProvider disposal, test race) fixed. 31/31 tests green (5 new application tests). Variant β (application layer without an Infrastructure dep, IRunRepository in Core), cancellation watcher pattern A (per-run task), DB flag `RunEntity.CancellationRequested` with migration `Step06Cancellation`. 6 conventional commits. Report: [reports/step-06-report.md](reports/step-06-report.md). Details see decisions log D-019.
+Details see decisions log D-017 (step-6 section)
 
 ---
 
-### Schritt 9 — MCP-Server ✅
+### Step 7 — Blazor UI
 
-**Ziel:** Zweiter Frontend-Adapter neben der Web-UI. Externe MCP-Clients (Claude Desktop, Claude Code, eigene Agenten) können Aufträge stellen, Status abfragen, Ergebnisse abholen.
+**Status:** ✅ **Completed on 11 May 2026.** 2 reviewer iterations, 1 R2-CRITICAL (missing try/catch in `SignalRRunNotifier`) fixed — double fail-safe pattern established. 55/55 tests green (4 new bUnit + 4 new Playwright E2E + existing persistence/orchestrator/application). Three pages (`/new`, `/runs`, `/runs/{id}`), 9 UI components in `Components/UI/` with scoped CSS, SignalR hub `RunHub` with two groups (`run-{id}` + `all-runs`), `IRunNotifier` in Core and `SignalRRunNotifier` in Web as a singleton. **AC8 finally green:** OpenRouter real pipeline verified with 5–12s latency and 174–523 tokens per run. 12 conventional commits in `main`. Report: [reports/step-07-report.md](reports/step-07-report.md). Details see decisions log D-020.
 
-**Voraussetzung:** Schritte 1–8 + M1 in main. App auf `95.216.100.213:8080` mit Cookie-Auth bereits erreichbar. Schritt 9 fügt einen zweiten Auth-Pfad (Bearer-Token) und einen zweiten Frontend-Adapter (MCP) hinzu — bestehende Cookie-UI bleibt unverändert.
+**Workflow decision at this stage:** plan-phase integration establishes itself as the architect form (used since step 5); `geef_architecture.md` as a mandatory artifact is in practice equivalently replaced by plan documents — R4 checks architecture compliance against the plan. Atelier interpretation of the "no HTML in pages" rule: trivial page controls (simple `<button>`/`<div>` without state) may remain in pages, only reusable UI **logic** must live in `Components/UI/`.
 
-**Architekturelle Implikation:** Mit Schritt 9 hat das System zum ersten Mal **zwei parallel laufende Frontends** über denselben Application-Service-Layer (`IRunService`). Das ist der eigentliche Lackmustest für die Schichten-Disziplin der bisherigen Schritte. Wenn `IRunService` und seine Verträge sauber genug sind, sollte MCP keine Pipeline-/Domain-/Orchestrator-Änderungen erfordern.
+---
 
-**Umfang:**
-- `Geef.Atelier.Mcp` als **Class Library** (Tool-Definitionen), gehostet im Web-Projekt
-- Verwendung von `ModelContextProtocol.AspNetCore` v1.3.0 (offizielles Anthropic+Microsoft SDK)
-- Transport: Streamable HTTP (Stateless=true), Endpunkt `/mcp`
+### Step 8 — auth (cookie for UI, token for MCP preparation)
+
+**Goal:** the application is no longer reachable unprotected on the internet.
+
+**Prerequisite:** steps 1–7 + M1 in main. AC8 (real-OpenRouter test) green. Step 8 builds on the established UI layer (three pages + SignalR hub) and adds auth middleware + a login page. Single-user setup with cookie-based auth.
+
+**Scope:**
+- Cookie auth for the web UI; one user from environment variables
+- Login page (static SSR), logout endpoint (`POST /auth/logout`)
+- Bearer-token auth scheme prepared for the MCP server (activated in the next step)
+- The health check stays unauthenticated
+
+**Acceptance criteria:**
+- ✅ Without login: redirect to the login page (`/login?ReturnUrl=…`)
+- ✅ With login (admin/DevPassword! as the dev default): all UI routes reachable, logout button visible
+- ✅ Wrong credentials: login fails, "Invalid credentials" banner, no cookie
+- ✅ Logout → cookie deleted, subsequent auth routes redirect to /login again
+- ✅ `/health` still anonymous (AllowAnonymous)
+- ✅ `tools/HashPassword` CLI for BCrypt-hash generation
+- ✅ 71/71 tests green (55 existing + 16 new)
+
+**Status:** ✅ **Completed on 11 May 2026.** 4 reviewer iterations (R1–R5 all 0 findings). 71/71 tests green (55 regression + 4 application-auth + 6 bUnit + 6 Playwright E2E). Cookie auth: BCrypt wf=11, 30d SlidingExpiration, HttpOnly, SameSite=Strict, SecurePolicy dev/prod switch. Login as static SSR (`@formname` mandatory). Logout via `POST /auth/logout` with AntiforgeryToken. `TestAuthenticationHandler` in tests for bypass. Arch trade-off: RunHub without `[Authorize]` (Blazor Server server-side HubConnection cannot forward browser cookies — the SSR pre-render would receive 401). `ForwardedHeaders` middleware before `UseAuthentication` (Traefik-TLS preparation). 13 conventional commits. Report: [reports/step-08-report.md](reports/step-08-report.md). Details see decisions log D-021.
+
+---
+
+### Step 9 — MCP server ✅
+
+**Goal:** a second frontend adapter alongside the web UI. External MCP clients (Claude Desktop, Claude Code, own agents) can submit jobs, query status, fetch results.
+
+**Prerequisite:** steps 1–8 + M1 in main. App reachable at `95.216.100.213:8080` with cookie auth already. Step 9 adds a second auth path (bearer token) and a second frontend adapter (MCP) — the existing cookie UI stays unchanged.
+
+**Architectural implication:** with step 9 the system has, for the first time, **two frontends running in parallel** over the same application service layer (`IRunService`). This is the actual litmus test for the layering discipline of the previous steps. If `IRunService` and its contracts are clean enough, MCP should require no pipeline/domain/orchestrator changes.
+
+**Scope:**
+- `Geef.Atelier.Mcp` as a **class library** (tool definitions), hosted in the Web project
+- Use of `ModelContextProtocol.AspNetCore` v1.3.0 (the official Anthropic+Microsoft SDK)
+- Transport: Streamable HTTP (Stateless=true), endpoint `/mcp`
 - Tools:
-  - `submit_request(briefing, options?)` → gibt neue Run-ID zurück
-  - `get_run_status(run_id)` → aktueller Status mit Phase, Iteration, Tokens, Kosten
-  - `get_run_result(run_id)` → finaler Text (nur bei Status=Completed)
-  - `list_runs(limit?, status_filter?)` → Liste der letzten Runs
-  - `get_run_details(run_id)` → vollständige Details mit Iterationen und Findings
-  - `cancel_run(run_id)` → gibt `bool` zurück
-- Multi-Auth: Cookie (UI, Default-Scheme) + Bearer (MCP, via `McpPolicy`)
+  - `submit_request(briefing, options?)` → returns a new run ID
+  - `get_run_status(run_id)` → current status with phase, iteration, tokens, cost
+  - `get_run_result(run_id)` → final text (only when status=Completed)
+  - `list_runs(limit?, status_filter?)` → list of recent runs
+  - `get_run_details(run_id)` → full details with iterations and findings
+  - `cancel_run(run_id)` → returns `bool`
+- Multi-auth: cookie (UI, default scheme) + bearer (MCP, via `McpPolicy`)
 - `ITokenValidator` in Application, `BearerTokenHandler` in Web
-- Alle Tools rufen `IRunService` (kein direkter DB-Zugriff)
+- All tools call `IRunService` (no direct DB access)
 
-**Akzeptanzkriterien:**
-- MCP-Inspector kann sich verbinden und alle Tools auflisten
-- Auftrag via MCP stellen, parallel in der Web-UI live mitverfolgen
-- Ergebnis via MCP abholen entspricht dem in der UI
+**Acceptance criteria:**
+- The MCP inspector can connect and list all tools
+- Submit a job via MCP, follow it live in parallel in the web UI
+- Fetching the result via MCP matches the one in the UI
 
-**Status:** ✅ **Abgeschlossen am 11. Mai 2026.** 1 Reviewer-Iteration, 0 Critical/Important Findings (1 R2-Minor zu Dummy-FixedTimeEquals behoben). 85/85 Tests grün (14 neue: 3 StaticTokenValidator + 4 BearerHandler + 5 MCP-Unit + 2 MCP-E2E). MCP-Library: `ModelContextProtocol.AspNetCore 1.3.0` (offiziell Microsoft+Anthropic). `Geef.Atelier.Mcp` als Class Library (kein zweiter Web-Host). Multi-Auth: Cookie default + Bearer via `McpPolicy`, kein Cross-Interferenz. Endpoint `/mcp` im Web-Host, `RunEntity.CreatedByUser` als Audit-Trail-Vorbereitung. 14 Conventional-Commits. Bericht: [reports/step-09-report.md](reports/step-09-report.md). Details siehe Decisions-Log D-022 (vom Executor selbst geschrieben).
+**Status:** ✅ **Completed on 11 May 2026.** 1 reviewer iteration, 0 critical/important findings (1 R2-minor about a dummy FixedTimeEquals fixed). 85/85 tests green (14 new: 3 StaticTokenValidator + 4 BearerHandler + 5 MCP unit + 2 MCP E2E). MCP library: `ModelContextProtocol.AspNetCore 1.3.0` (officially Microsoft+Anthropic). `Geef.Atelier.Mcp` as a class library (no second web host). Multi-auth: cookie default + bearer via `McpPolicy`, no cross-interference. Endpoint `/mcp` in the web host, `RunEntity.CreatedByUser` as audit-trail preparation. 14 conventional commits. Report: [reports/step-09-report.md](reports/step-09-report.md). Details see decisions log D-022 (written by the executor itself).
 
-**Lackmustest bestanden:** Zwei parallel laufende Frontends (UI über Cookie, MCP über Bearer) nutzen denselben `IRunService` ohne jegliche Eingriffe in Pipeline-/Domain-/Orchestrator-Code. Die Onion-Architektur trägt.
+**Litmus test passed:** two frontends running in parallel (UI via cookie, MCP via bearer) use the same `IRunService` without any intervention in pipeline/domain/orchestrator code. The onion architecture holds.
 
-**Bekannte Tech-Debt für Post-Skeleton:** `LiveUpdateFlowTests` (E2E) zeigt gelegentliche Timeouts unter Voll-Test-Lauf bei Ressourcenknappheit. Im Einzellauf stabil. Kein Blocker für Schritt 10.
----
-
-### Schritt 10 — Dockerfile und Compose-Setup für Production
-
-**Status:** ✅ Abgeschlossen am 2026-05-11. 1 Reviewer-Iteration, 0 Findings. Bericht: docs/reports/step-10-report.md. D-023.
-
-**Ziel:** Deploybar auf dem Zielserver.
-
-**Voraussetzung:** Alle 9 Schritte + M1 in main. App-Container läuft bereits auf `95.216.100.213:8080` (Direkt-Port aus Schritt-8-R5). 85/85 Tests grün, alle Frontends (UI + MCP) funktional verifiziert.
-
-**Scope-Reduktion gegenüber ursprünglicher Plan-Form:** Schritt 10 ist kein klassischer "Initial-Deploy" — der Container ist bereits funktional auf dem Zielserver. Schritt 10 ist **Routing-und-TLS-Setup**: Traefik-Labels für `geef.stefan-bechtel.de`, Let's-Encrypt-Zertifikat, Direkt-Port-Exposure abschalten, Cookie-`SecurePolicy.Always` aktivieren. Aufwand: deutlich geringer als initial geplant.
-
-**Aus Schritt-9-Bericht Empfehlungen-Sektion bereits vorbereitet:** Vollständige Env-Var-Liste, Traefik-Label-Vorlage, Migration-Strategie (Auto-on-Startup bleibt), SignalR-WebSocket-Routing-Hinweis. Architect prüft in Phase 1.4 vor allem die Übereinstimmung mit der existierenden Traefik-Server-Konvention auf `/srv/CLAUDE.md` oder `/srv/docker/docs/`.
-
-**Umfang:**
-- Multi-Stage `Dockerfile` (.NET 10 SDK build → ASP.NET Core 10 runtime)
-- Non-root User im Container
-- Healthcheck im Image
-- `docker-compose.prod.yml` für Production: nur die App, Postgres-Connection-String zeigt auf existierende Server-Postgres-Instanz
-- Environment-Variable-Dokumentation (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `POSTGRES_CONNECTION_STRING`, `ATELIER_USER`, `ATELIER_PASSWORD_HASH`, `ATELIER_MCP_TOKEN`)
-- Migration läuft beim Container-Start automatisch (oder als Init-Container/Migrations-Job)
-
-**Akzeptanzkriterien:**
-- Container baut und startet ohne manuelle Eingriffe
-- App verbindet sich mit der bestehenden Postgres-Instanz
-- Health-Check und Auth funktionieren hinter Reverse-Proxy
-
-**Hinweis aus Schritt-8-Bericht:** Die App läuft bereits auf `95.216.100.213:8080` (ohne Traefik-Routing) und wurde dort von R5 für die Auth-Flows verifiziert. Schritt 10 wird damit kein klassischer "ersten-Deploy" mehr, sondern ein **Routing-und-Domain-Setup**: Traefik-Labels für `geef.stefan-bechtel.de`, TLS-Termination, ggf. Production-Hardening (z.B. Migration-Strategie revisiten). Der Aufwand reduziert sich erheblich, weil das Container-Image bereits funktional ist.
+**Known tech debt for post-skeleton:** `LiveUpdateFlowTests` (E2E) shows occasional timeouts under a full test run when resources are scarce. Stable when run individually. Not a blocker for step 10.
 
 ---
 
-## Was bewusst NICHT im Skeleton ist
+### Step 10 — Dockerfile and Compose setup for production
 
-Damit der Scope klar bleibt:
+**Status:** ✅ Completed on 2026-05-11. 1 reviewer iteration, 0 findings. Report: docs/reports/step-10-report.md. D-023.
 
-- **Quellen-Upload und RAG** (kommt mit pgvector in einem späteren Schritt)
-- **Klassifikator und dynamische Crew-Composition** (Crew ist im Skeleton fest verdrahtet)
-- **Multi-Provider-Adapter** für OpenAI und OpenRouter (Skeleton nutzt nur Anthropic; Reviewer können dasselbe Anbieter-API mit anderem Modell nutzen)
-- **Advisor-Integration** (Skeleton nutzt Geef-Advisor-Pattern noch nicht)
-- **Echtes Crash-Resume** mit Wiederaufsatz an der letzten abgeschlossenen Phase (Skeleton macht naives Failed-Markieren)
-- **Cost-Budget-Caps** mit Abbruch bei Überschreitung
-- **Export nach DOCX/PDF** (Skeleton liefert Markdown)
-- **Crew-Templates und Reviewer-Profile** als versionierte Daten (Skeleton hat zwei hartkodierte Reviewer)
-- **OAuth-2.0** für MCP (Skeleton nutzt Bearer-Token)
+**Goal:** deployable on the target server.
 
-## Post-Skeleton-Schritte
+**Prerequisite:** all 9 steps + M1 in main. The app container already runs at `95.216.100.213:8080` (direct port from step-8 R5). 85/85 tests green, all frontends (UI + MCP) functionally verified.
 
-### PS-1: Postgres-Backup ✅ (2026-05-11)
-Automatischer täglicher Backup-Service (`prodrigestivill/postgres-backup-local:16`), Retention 7/4/6, Volume `geef-atelier-backups`, Restore-Skript `scripts/restore-backup.sh`. D-024. Bericht: `docs/reports/post-skeleton-01-postgres-backup-report.md`.
+**Scope reduction vs. the original plan form:** step 10 is not a classic "initial deploy" — the container is already functional on the target server. Step 10 is **routing-and-TLS setup**: Traefik labels for `geef.stefan-bechtel.de`, a Let's Encrypt certificate, turning off direct port exposure, enabling cookie `SecurePolicy.Always`. Effort: significantly less than initially planned.
 
-### PS-2: Reviewer-Kalibrierung ✅ (2026-05-12)
-4-stufige Severity-Taxonomie (critical/major/minor/info) mit Anti-Pattern-Regel + Hadwiger-Nelson-Negativbeispiel in Reviewer-Prompts. `ConvergenceOptions` (`AbortOnCritical=false` Default). Tool-Schema-Update. Executor-Iteration-2+-Schärfung. 11 neue Tests. D-025. Bericht: `docs/reports/post-skeleton-02-reviewer-calibration-report.md`.
+**Already prepared from the step-9 report's recommendations section:** the complete env-var list, a Traefik label template, the migration strategy (auto-on-startup stays), a SignalR-WebSocket routing note. In phase 1.4 the architect mainly checks alignment with the existing Traefik server convention in `/srv/CLAUDE.md` or `/srv/docker/docs/`.
 
-> **Hinweis:** Dies ist der historische Walking-Skeleton-Bauplan. Alle zehn Skeleton-Schritte sowie der parallele Migrations-Track M1 sind abgeschlossen. Der vollständige Post-Skeleton-Verlauf — Design-System (PS-3), CLI-Provider-Adapter/-Split (PS-4), Crew-System (PS-5/6), Advisor-Pässe (PS-7), Grounding-Provider & Vector-Store-RAG, Run-Attachments, Cost-Tracking, Template Studio, Domain-Templates, MCP-OAuth 2.1, Multi-User und Run-User-Isolation — ist chronologisch im [Decisions-Log](05-decisions-log.md) (Einträge D-024 ff.) und im Überblick in der [Projekt-README](../README.md) dokumentiert. Die vorstehenden PS-1/PS-2-Einträge sind der ursprüngliche Stand dieses Plans und werden als historische Notiz bewusst nicht rückwirkend ergänzt.
+**Scope:**
+- Multi-stage `Dockerfile` (.NET 10 SDK build → ASP.NET Core 10 runtime)
+- Non-root user in the container
+- Healthcheck in the image
+- `docker-compose.prod.yml` for production: only the app, the Postgres connection string points at the existing server Postgres instance
+- Environment-variable documentation (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `POSTGRES_CONNECTION_STRING`, `ATELIER_USER`, `ATELIER_PASSWORD_HASH`, `ATELIER_MCP_TOKEN`)
+- The migration runs automatically at container start (or as an init container/migration job)
+
+**Acceptance criteria:**
+- The container builds and starts without manual intervention
+- The app connects to the existing Postgres instance
+- Health check and auth work behind the reverse proxy
+
+**Note from the step-8 report:** the app already runs at `95.216.100.213:8080` (without Traefik routing) and was verified there by R5 for the auth flows. Step 10 is therefore no longer a classic "first deploy" but a **routing-and-domain setup**: Traefik labels for `geef.stefan-bechtel.de`, TLS termination, possibly production hardening (e.g. revisiting the migration strategy). The effort is considerably reduced because the container image is already functional.
+
+---
+
+## What is deliberately NOT in the skeleton
+
+To keep the scope clear:
+
+- **Source upload and RAG** (comes with pgvector in a later step)
+- **Classifier and dynamic crew composition** (the crew is hard-wired in the skeleton)
+- **Multi-provider adapter** for OpenAI and OpenRouter (the skeleton uses only Anthropic; reviewers can use the same provider API with a different model)
+- **Advisor integration** (the skeleton does not yet use the Geef advisor pattern)
+- **Real crash resume** with resumption at the last completed phase (the skeleton does naive Failed-marking)
+- **Cost-budget caps** with abort on overrun
+- **Export to DOCX/PDF** (the skeleton produces Markdown)
+- **Crew templates and reviewer profiles** as versioned data (the skeleton has two hard-coded reviewers)
+- **OAuth 2.0** for MCP (the skeleton uses a bearer token)
+
+## Post-skeleton steps
+
+### PS-1: Postgres backup ✅ (2026-05-11)
+Automatic daily backup service (`prodrigestivill/postgres-backup-local:16`), retention 7/4/6, volume `geef-atelier-backups`, restore script `scripts/restore-backup.sh`. D-024. Report: `docs/reports/post-skeleton-01-postgres-backup-report.md`.
+
+### PS-2: reviewer calibration ✅ (2026-05-12)
+4-level severity taxonomy (critical/major/minor/info) with an anti-pattern rule + the Hadwiger–Nelson negative example in the reviewer prompts. `ConvergenceOptions` (`AbortOnCritical=false` default). Tool-schema update. Executor iteration-2+ sharpening. 11 new tests. D-025. Report: `docs/reports/post-skeleton-02-reviewer-calibration-report.md`.
+
+> **Note:** this is the historical walking-skeleton build plan. All ten skeleton steps as well as the parallel migration track M1 are completed. The complete post-skeleton history — design system (PS-3), CLI-provider adapter/split (PS-4), crew system (PS-5/6), advisor passes (PS-7), grounding providers & vector-store RAG, run attachments, cost tracking, Template Studio, domain templates, MCP OAuth 2.1, multi-user and run-user isolation — is documented chronologically in the [decisions log](05-decisions-log.md) (entries D-024 ff.) and in overview form in the [project README](../README.md). The PS-1/PS-2 entries above are the original state of this plan and are deliberately not amended retroactively, as a historical note.

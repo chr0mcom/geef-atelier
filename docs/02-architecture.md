@@ -1,24 +1,26 @@
-# Architektur
+# Architecture
 
-*Letzte Aktualisierung: 2026-05-17 (Datenmodell, LLM-/Auth-Schicht und MCP-Auth auf aktuellen Stand gebracht: Crew-Profil-System, OAuth 2.1, Multi-User, Run-User-Isolation)*
+*[Deutsch](02-architecture_de.md) · **English***
 
-## Schichtenbild
+*Last updated: 2026-05-17 (data model, LLM/auth layer and MCP auth brought up to date: crew-profile system, OAuth 2.1, multi-user, run-user isolation)*
+
+## Layer diagram
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│                    Frontends (zwei Adapter)                    │
+│                    Frontends (two adapters)                    │
 │  ┌──────────────────────────────┐  ┌─────────────────────────┐ │
-│  │  Web-UI (Blazor Server)      │  │  MCP-Server             │ │
+│  │  Web UI (Blazor Server)      │  │  MCP server             │ │
 │  │  - /new, /runs, /runs/{id}   │  │  - submit_request       │ │
-│  │  - SignalR Live-Stream       │  │  - get_run_status       │ │
-│  │  - Cookie-Auth               │  │  - get_run_result       │ │
+│  │  - SignalR live stream       │  │  - get_run_status       │ │
+│  │  - Cookie auth               │  │  - get_run_result       │ │
 │  └──────────────┬───────────────┘  └─────────────┬───────────┘ │
 │                 │                                │             │
 └─────────────────┼────────────────────────────────┼─────────────┘
                   │                                │
                   ▼                                ▼
 ┌────────────────────────────────────────────────────────────────┐
-│              Application Service Layer  (IRunService)          │
+│              Application service layer  (IRunService)          │
 │  - SubmitRunAsync(briefing, sources, options) -> RunId         │
 │  - GetRunStatusAsync(runId) -> RunStatus                       │
 │  - GetRunResultAsync(runId) -> Result                          │
@@ -28,84 +30,84 @@
                                │
                                ▼
 ┌────────────────────────────────────────────────────────────────┐
-│                     Background Orchestrator                    │
-│  - BackgroundService pollt Pending-Runs                        │
-│  - Baut Geef-Pipeline aus Run-Konfiguration                    │
-│  - Führt PipelineRunner.RunAsync() aus                         │
-│  - Custom IGeefEventSink schreibt Events in DB + SignalR       │
+│                     Background orchestrator                    │
+│  - BackgroundService polls pending runs                        │
+│  - Builds the Geef pipeline from the run configuration         │
+│  - Runs PipelineRunner.RunAsync()                              │
+│  - A custom IGeefEventSink writes events to DB + SignalR       │
 └──────────────────────────────┬─────────────────────────────────┘
                                │
                                ▼
 ┌────────────────────────────────────────────────────────────────┐
-│                       Geef SDK Pipeline                        │
-│   Grounding → Execution → Evaluation (Loop) → Finalize         │
+│                       Geef SDK pipeline                        │
+│   Grounding → Execution → Evaluation (loop) → Finalize         │
 │                                                                 │
-│   Provider-Implementierungen leben in Infrastructure:           │
+│   Provider implementations live in Infrastructure:              │
 │   - BriefingGroundingStep                                       │
-│   - LlmExecutionStep      (Multi-Provider-fähig)                │
-│   - LlmReviewer           (Multi-Provider-fähig, getaggt)       │
+│   - LlmExecutionStep      (multi-provider capable)              │
+│   - LlmReviewer           (multi-provider capable, tagged)      │
 │   - MarkdownFinalizer                                           │
 └──────────────────────────────┬─────────────────────────────────┘
                                │
                                ▼
 ┌────────────────────────────────────────────────────────────────┐
-│                          Persistenz                            │
+│                          Persistence                           │
 │   Postgres via EF Core                                         │
-│   Tabellen: Runs, Iterations, Findings, Events                 │
+│   Tables: Runs, Iterations, Findings, Events                   │
 └────────────────────────────────────────────────────────────────┘
 ```
 
-## Solution-Struktur
+## Solution structure
 
 ```
 Geef.Atelier.slnx
 ├── src/
-│   ├── Geef.Atelier.Core/           // Domain-Records, Interfaces (IRunRepository,
-│   │                                // IRunPersistenceService), Pipeline-Konfig-Records
-│   ├── Geef.Atelier.Application/    // IRunService-Vertrag + RunService-Implementierung,
+│   ├── Geef.Atelier.Core/           // Domain records, interfaces (IRunRepository,
+│   │                                // IRunPersistenceService), pipeline-config records
+│   ├── Geef.Atelier.Application/    // IRunService contract + RunService implementation,
 │   │                                // ApplicationServiceExtensions (AddAtelierApplication)
-│   ├── Geef.Atelier.Infrastructure/ // EF Core, LLM-Clients (OpenAiCompatibleClient),
-│   │                                // EventSink, Provider-Implementierungen, Repositories
+│   ├── Geef.Atelier.Infrastructure/ // EF Core, LLM clients (OpenAiCompatibleClient),
+│   │                                // event sink, provider implementations, repositories
 │   ├── Geef.Atelier.Web/            // Blazor Server: UI + BackgroundService
-│   │                                // (RunOrchestratorService), DI-Composition
-│   └── Geef.Atelier.Mcp/            // Class Library: MCP-Tool-Definitionen,
-   │                                // gehostet im Web-Projekt (shared DI, shared Container)
+│   │                                // (RunOrchestratorService), DI composition
+│   └── Geef.Atelier.Mcp/            // Class library: MCP tool definitions,
+   │                                // hosted in the Web project (shared DI, shared container)
 └── tests/
     └── Geef.Atelier.Tests/          // xUnit
 ```
 
-**Begründung der Aufteilung:**
+**Rationale for the split:**
 
-- **Core** ist LLM-frei und persistenz-frei — enthält nur Records, Interfaces, Domain-Logik. Damit testbar ohne Infrastruktur.
-- **Infrastructure** kapselt alle externen Abhängigkeiten (Postgres, LLM-APIs, Geef SDK). Provider-Implementierungen leben hier, weil sie LLM-Clients und Repositories brauchen.
-- **Web** hostet die UI, den `BackgroundService` und die `IRunService`-Implementierung. Letztere könnte später in ein eigenes Projekt wandern, ist aber im Skeleton hier am praktischsten.
-- **Mcp** ist eine **Class Library** (kein eigener Host). Sie enthält alle MCP-Tool-Definitionen. Der MCP-Endpoint lebt im `Web`-Projekt (Pfad `/mcp`), das `Geef.Atelier.Mcp` referenziert und die Tools im selben DI-Container registriert. Vorteile: kein zweiter Host-Prozess, `IRunService` und alle Singletons (SignalR, DbContext) werden direkt geteilt, kein HTTP-Hop zwischen MCP und Application Layer.
+- **Core** is LLM-free and persistence-free — it contains only records, interfaces, domain logic. Thus testable without infrastructure.
+- **Infrastructure** encapsulates all external dependencies (Postgres, LLM APIs, Geef SDK). Provider implementations live here because they need LLM clients and repositories.
+- **Web** hosts the UI, the `BackgroundService` and the `IRunService` implementation. The latter could later move into its own project but is most practical here in the skeleton.
+- **Mcp** is a **class library** (no own host). It contains all MCP tool definitions. The MCP endpoint lives in the `Web` project (path `/mcp`), which references `Geef.Atelier.Mcp` and registers the tools in the same DI container. Advantages: no second host process, `IRunService` and all singletons (SignalR, DbContext) are shared directly, no HTTP hop between MCP and the application layer.
 
-## Datenmodell
+## Data model
 
-Stand Mai 2026 umfasst das Schema **21 Tabellen**, hand-geschriebene Migrationen
-`InitialCreate` + `Step06`/`Step09`–`Step21`. Gruppiert:
+As of May 2026 the schema comprises **21 tables**, with hand-written migrations
+`InitialCreate` + `Step06`/`Step09`–`Step21`. Grouped:
 
-| Gruppe | Tabellen | Eingeführt |
+| Group | Tables | Introduced |
 |---|---|---|
-| Run-Kern | `Runs`, `Iterations`, `Findings`, `Events` | InitialCreate |
-| Crew/Profile | `ReviewerProfiles`, `ExecutorProfiles`, `CrewTemplates` | Step10 |
+| Run core | `Runs`, `Iterations`, `Findings`, `Events` | InitialCreate |
+| Crew/profiles | `ReviewerProfiles`, `ExecutorProfiles`, `CrewTemplates` | Step10 |
 | Advisor | `AdvisorProfiles`, `AdvisorConsultations` | Step11 |
 | Grounding | `GroundingProviderProfiles`, `GroundingConsultations` | Step13 |
-| Vector-Store/RAG | `KnowledgeDocuments`, `KnowledgeDocumentChunks` | Step14 |
-| Cost-Tracking | `IterationActorCosts` | Step16 |
+| Vector-store/RAG | `KnowledgeDocuments`, `KnowledgeDocumentChunks` | Step14 |
+| Cost tracking | `IterationActorCosts` | Step16 |
 | Template Studio | `TemplateStudioAnalyses` | Step17 |
-| Multi-User | `Users` | Step20 |
+| Multi-user | `Users` | Step20 |
 | OAuth 2.1 | `OAuthClients`, `OAuthAuthorizationCodes`, `OAuthAccessTokens`, `OAuthRefreshTokens`, `OAuthAuditLog` | Step19 |
 
-Die vier Run-Kern-Tabellen sind nachfolgend im Detail dokumentiert; die übrigen
-Gruppen sind in den jeweiligen Feature-Abschnitten bzw. im [Decisions-Log](05-decisions-log.md)
-(D-028 ff.) beschrieben. `Runs` trägt zusätzlich Spalten aus späteren Migrationen
+The four run-core tables are documented in detail below; the other groups are
+described in their respective feature sections or in the [decisions log](05-decisions-log.md)
+(D-028 ff.). `Runs` additionally carries columns from later migrations
 (`CreatedByUser`, `CostTotal`, `CrewTemplateName`, `CrewSnapshot`, `AdvisorRetryAttempted`).
 
 ### Runs
 
-| Spalte | Typ | Bemerkung |
+| Column | Type | Note |
 |---|---|---|
 | Id | uuid (PK) | |
 | CreatedAt | timestamptz | |
@@ -113,30 +115,30 @@ Gruppen sind in den jeweiligen Feature-Abschnitten bzw. im [Decisions-Log](05-de
 | CompletedAt | timestamptz | nullable |
 | Status | varchar(50) | Pending / Running / Completed / Failed / Aborted |
 | BriefingText | text | |
-| ConfigJson | jsonb | Modell-Auswahl, Budget — als Snapshot bei Erstellung |
-| FinalText | text | nullable, gesetzt wenn Status=Completed |
-| ErrorMessage | text | nullable, gesetzt wenn Status=Failed |
-| TokensTotal | int | accumuliert über alle LLM-Calls |
-| CostTotal | numeric(10,4) | accumuliert |
-| CancellationRequested | bool | true wenn User den Run abbrechen möchte |
-| CrewTemplateName | varchar(100) | nullable; Name des Templates (z.B. `"klassik"`). Null = Custom-Crew-Submit. |
-| CrewSnapshot | jsonb | nullable; vollständig eingebetteter CrewSnapshot zum Zeitpunkt des Submits. |
-| AdvisorRetryAttempted | bool | nullable; true wenn OnConvergenceFailure-Retry bereits durchgeführt wurde (Single-Retry-Cap). |
-| CreatedByUser | text | nullable; Username des erstellenden Nutzers (Run-User-Isolation, D-042). Index `IX_Runs_CreatedByUser` (Step21). |
+| ConfigJson | jsonb | model selection, budget — a snapshot at creation time |
+| FinalText | text | nullable, set when Status=Completed |
+| ErrorMessage | text | nullable, set when Status=Failed |
+| TokensTotal | int | accumulated over all LLM calls |
+| CostTotal | numeric(10,4) | accumulated |
+| CancellationRequested | bool | true when the user wants to cancel the run |
+| CrewTemplateName | varchar(100) | nullable; name of the template (e.g. `"klassik"`). Null = custom-crew submit. |
+| CrewSnapshot | jsonb | nullable; the fully embedded CrewSnapshot at submit time. |
+| AdvisorRetryAttempted | bool | nullable; true when an OnConvergenceFailure retry has already been performed (single-retry cap). |
+| CreatedByUser | text | nullable; username of the creating user (run-user isolation, D-042). Index `IX_Runs_CreatedByUser` (Step21). |
 
 ### Iterations
 
-| Spalte | Typ | Bemerkung |
+| Column | Type | Note |
 |---|---|---|
 | Id | uuid (PK) | |
 | RunId | uuid (FK) | |
-| IterationNumber | int | 1-basiert |
-| ArtifactText | text | Snapshot des Textes nach dieser Iteration |
+| IterationNumber | int | 1-based |
+| ArtifactText | text | snapshot of the text after this iteration |
 | CreatedAt | timestamptz | |
 
 ### Findings
 
-| Spalte | Typ | Bemerkung |
+| Column | Type | Note |
 |---|---|---|
 | Id | uuid (PK) | |
 | IterationId | uuid (FK) | |
@@ -147,121 +149,121 @@ Gruppen sind in den jeweiligen Feature-Abschnitten bzw. im [Decisions-Log](05-de
 
 ### Events
 
-| Spalte | Typ | Bemerkung |
+| Column | Type | Note |
 |---|---|---|
 | Id | bigint (PK, identity) | |
 | RunId | uuid (FK) | |
-| EventType | varchar(100) | aus Geef-EventSink-Vokabular |
+| EventType | varchar(100) | from the Geef event-sink vocabulary |
 | PayloadJson | jsonb | |
 | CreatedAt | timestamptz | |
 
 **Indices:**
-- `Runs.Status` (für Background-Polling)
-- `Events.RunId` (für Detail-View)
-- `Iterations.RunId` (für Detail-View)
+- `Runs.Status` (for background polling)
+- `Events.RunId` (for the detail view)
+- `Iterations.RunId` (for the detail view)
 
-## Crew-System (PS-5)
+## Crew system (PS-5)
 
-Jeder Run verwendet eine **Crew** aus Executor + Reviewers. Profile sind wiederverwendbare Konfigurationsbausteine.
+Every run uses a **crew** of an executor + reviewers. Profiles are reusable configuration building blocks.
 
-### Neue Tabellen (Migration Step10 + Step11)
+### New tables (migration Step10 + Step11)
 
-| Tabelle | Migration | Inhalt |
+| Table | Migration | Content |
 |---|---|---|
-| `ReviewerProfiles` | Step10 | Custom Reviewer-Profile (System-Profile leben als Code-Konstanten in `SystemCrew`). |
-| `ExecutorProfiles` | Step10 | Custom Executor-Profile. |
-| `CrewTemplates` | Step10 | Custom Crew-Templates. |
-| `AdvisorProfiles` | Step11 | Custom Advisor-Profile. |
-| `AdvisorConsultations` | Step11 | Persistierte Advisor-Outputs pro Iteration. |
+| `ReviewerProfiles` | Step10 | Custom reviewer profiles (system profiles live as code constants in `SystemCrew`). |
+| `ExecutorProfiles` | Step10 | Custom executor profiles. |
+| `CrewTemplates` | Step10 | Custom crew templates. |
+| `AdvisorProfiles` | Step11 | Custom advisor profiles. |
+| `AdvisorConsultations` | Step11 | Persisted advisor outputs per iteration. |
 
 ### ProfileBasedReviewer / ProfileBasedExecutor
 
-Ersetzen die alten `LlmReviewer` / `LlmExecutionStep`. Verwenden `ILlmClientResolver.ForProfile(provider, model, maxTokens?)` statt Actor-basierter Auflösung.
+Replace the old `LlmReviewer` / `LlmExecutionStep`. They use `ILlmClientResolver.ForProfile(provider, model, maxTokens?)` instead of actor-based resolution.
 
 ### EvaluationStrategies
 
-Alle vier Strategien via Geef-SDK: `Parallel`, `Sequential`, `FailFast`, `PriorityOrdered`.
+All four strategies via the Geef SDK: `Parallel`, `Sequential`, `FailFast`, `PriorityOrdered`.
 
-Weitere Details: [`08-crew-system.md`](08-crew-system.md).
+More details: [`08-crew-system.md`](08-crew-system.md).
 
-## Advisor-Pipeline-Schicht (PS-7)
+## Advisor pipeline layer (PS-7)
 
-Advisors werden als Decorator um `IExecutionStep` realisiert. Der `AdvisorAwareExecutor` schiebt sich transparent vor jeden Executor-Aufruf, ohne das Geef-SDK zu modifizieren (D-031(a)).
+Advisors are realized as a decorator around `IExecutionStep`. The `AdvisorAwareExecutor` slots transparently in front of every executor call without modifying the Geef SDK (D-031(a)).
 
-### Decorator-Kette
+### Decorator chain
 
 ```
 AtelierPipelineFactory
-  └── AdvisorAwareExecutor (IExecutionStep-Decorator)
-        1. Filtert Advisors nach Trigger (BeforeFirst / BeforeEvery)
-        2. ProfileBasedAdvisor: LLM-Call (plain text), persistiert AdvisorConsultation
-        3. Schreibt Output → context[AtelierContextKeys.AdvisorBlock]
-        4. Delegiert an ProfileBasedExecutor (echter Execution-Step)
+  └── AdvisorAwareExecutor (IExecutionStep decorator)
+        1. Filters advisors by trigger (BeforeFirst / BeforeEvery)
+        2. ProfileBasedAdvisor: LLM call (plain text), persists AdvisorConsultation
+        3. Writes the output → context[AtelierContextKeys.AdvisorBlock]
+        4. Delegates to ProfileBasedExecutor (the real execution step)
 ```
 
 ### AtelierContextKeys.AdvisorBlock
 
-Der Advisor-Output landet als einzelner Text-Block im `IRunContext`. Format:
+The advisor output ends up as a single text block in the `IRunContext`. Format:
 
 ```
 [ADVISOR: briefing-clarifier]
-<Advisor-Output-Text>
+<advisor output text>
 
 [ADVISOR: devils-advocate]
-<Advisor-Output-Text>
+<advisor output text>
 ```
 
-Executor-System-Prompt kann diesen Block explizit referenzieren. Mehrere Advisors akkumulieren sequenziell (D-031(d)).
+The executor system prompt can explicitly reference this block. Multiple advisors accumulate sequentially (D-031(d)).
 
-### Convergence-Failure-Retry
+### Convergence-failure retry
 
 ```
 ConvergenceFailedException
   → RunOrchestratorService.TryConvergenceFailureRetryAsync
-      ├── RunEntity.AdvisorRetryAttempted == true → Status = Failed (kein zweiter Retry)
-      └── AdvisorRetryAttempted = true → OnConvergenceFailure-Advisors aktiviert → Pipeline-Retry
+      ├── RunEntity.AdvisorRetryAttempted == true → Status = Failed (no second retry)
+      └── AdvisorRetryAttempted = true → OnConvergenceFailure advisors enabled → pipeline retry
 ```
 
-`RunEntity.AdvisorRetryAttempted` (Migration Step11) ist der Single-Retry-Cap (D-031(e)).
+`RunEntity.AdvisorRetryAttempted` (migration Step11) is the single-retry cap (D-031(e)).
 
-### DB-Erweiterungen (Migration Step11AdvisorSystem)
+### DB extensions (migration Step11AdvisorSystem)
 
-| Neu | Inhalt |
+| New | Content |
 |---|---|
-| `AdvisorProfiles` | Custom Advisor-Profile |
-| `AdvisorConsultations` | Persistierter Advisor-Output pro Iteration (RunId, IterationNumber, AdvisorName, OutputText) |
-| `Runs.AdvisorRetryAttempted` | bool nullable — Retry-Cap-Flag |
+| `AdvisorProfiles` | Custom advisor profiles |
+| `AdvisorConsultations` | Persisted advisor output per iteration (RunId, IterationNumber, AdvisorName, OutputText) |
+| `Runs.AdvisorRetryAttempted` | bool nullable — retry-cap flag |
 
-Weitere Details: [`08-crew-system.md`](08-crew-system.md) → Sektion "Advisor-Pässe (PS-7)".
+More details: [`08-crew-system.md`](08-crew-system.md) → section "Advisor passes (PS-7)".
 
-## Mapping auf GEEF-Provider (PS-7-Stand)
+## Mapping to GEEF providers (PS-7 state)
 
-| GEEF-Phase | Provider-Implementierung | Verhalten |
+| GEEF phase | Provider implementation | Behaviour |
 |---|---|---|
-| Grounding | `BriefingGroundingStep` | Schreibt das Briefing in den Context, keine externen Quellen |
-| Pre-Execution | `AdvisorAwareExecutor` (Decorator) | Konsultiert BeforeFirst/BeforeEvery-Advisors; schreibt AdvisorBlock in Context |
-| Execution | `ProfileBasedExecutor` | LLM-Call mit Profil-SystemPrompt + PreviousFindings + AdvisorBlock; Modell aus `ExecutorProfile` |
-| Evaluation | `ProfileBasedReviewer` × N | N Reviewer aus `CrewSnapshot.Reviewers`; Strategie konfigurierbar |
-| Finalize | `MarkdownFinalizer` | Wrappt finalen Text in `FinalizedDocument`-Record |
-| Convergence-Failure | `TryConvergenceFailureRetryAsync` | Aktiviert OnConvergenceFailure-Advisors, Single-Retry (AdvisorRetryAttempted-Cap) |
+| Grounding | `BriefingGroundingStep` | Writes the briefing into the context, no external sources |
+| Pre-execution | `AdvisorAwareExecutor` (decorator) | Consults BeforeFirst/BeforeEvery advisors; writes the AdvisorBlock into the context |
+| Execution | `ProfileBasedExecutor` | LLM call with the profile system prompt + PreviousFindings + AdvisorBlock; model from the `ExecutorProfile` |
+| Evaluation | `ProfileBasedReviewer` × N | N reviewers from `CrewSnapshot.Reviewers`; strategy configurable |
+| Finalize | `MarkdownFinalizer` | Wraps the final text in a `FinalizedDocument` record |
+| Convergence failure | `TryConvergenceFailureRetryAsync` | Enables OnConvergenceFailure advisors, single retry (AdvisorRetryAttempted cap) |
 
-**Convergence-Policy:** `DefaultConvergencePolicy` aus `ConvergenceOptions`, überschreibbar per `ConvergencePolicyOverride` im CrewTemplate.
+**Convergence policy:** `DefaultConvergencePolicy` from `ConvergenceOptions`, overridable via `ConvergencePolicyOverride` in the CrewTemplate.
 
-**Evaluation-Strategy:** `Parallel` (Standard). Alle vier Strategien wählbar per Template.
+**Evaluation strategy:** `Parallel` (default). All four strategies selectable per template.
 
-## LLM-Provider-Schicht (umgesetzt in Migration M1 und CLI-Provider-Split, D-017/D-032)
+## LLM provider layer (implemented in migration M1 and the CLI-provider split, D-017/D-032)
 
-Die LLM-Schicht ist **OpenAI-API-konform** implementiert. Drei konfigurierte Provider (Stand CLI-Provider-Split):
+The LLM layer is implemented **OpenAI-API-compatible**. Three configured providers (as of the CLI-provider split):
 
-| Provider-Name | Endpoint | Abrechnung |
+| Provider name | Endpoint | Billing |
 |---|---|---|
-| `openrouter` | `https://openrouter.ai/api/v1` | Pay-per-Token |
-| `claude-cli` | `http://cli-proxy:8090/v1/claude` | Claude Subscription |
-| `codex-cli`  | `http://cli-proxy:8090/v1/codex`  | Codex Subscription |
+| `openrouter` | `https://openrouter.ai/api/v1` | Pay-per-token |
+| `claude-cli` | `http://cli-proxy:8090/v1/claude` | Claude subscription |
+| `codex-cli`  | `http://cli-proxy:8090/v1/codex`  | Codex subscription |
 
-Der `cli-proxy`-Side-Container (FastAPI, Python) stellt zwei explizite Endpunkte bereit, die direkt an die jeweilige CLI routen — ohne Model-Name-Heuristik. Ein Legacy-Endpunkt `/v1/chat/completions` bleibt für Backward-Kompatibilität erhalten und loggt eine Deprecation-Warning.
+The `cli-proxy` side container (FastAPI, Python) exposes two explicit endpoints that route directly to the respective CLI — without a model-name heuristic. A legacy endpoint `/v1/chat/completions` is retained for backward compatibility and logs a deprecation warning.
 
-### Abstraktion
+### Abstraction
 
 ```csharp
 public interface ILlmClient
@@ -270,16 +272,16 @@ public interface ILlmClient
 }
 ```
 
-`OpenAiCompatibleClient` ist die einzige Implementierung im Skeleton. Weitere OpenAI-kompatible Endpoints (OpenAI direkt, lokales Ollama, Together AI) sind durch Anpassen von `LlmOptions.Endpoint` ansprechbar — ohne Code-Änderung.
+`OpenAiCompatibleClient` is the only implementation in the skeleton. Further OpenAI-compatible endpoints (OpenAI directly, local Ollama, Together AI) are addressable by adjusting `LlmOptions.Endpoint` — without a code change.
 
-### Provider-Konfiguration und Modell-Wahl
+### Provider configuration and model choice
 
-> **Hinweis:** Das ursprüngliche flache `Llm.Actors`-Schema (ein fester Modell-Eintrag
-> je Akteur in `appsettings.json`) ist seit dem Crew-System (D-028) abgelöst. Modell-
-> und Provider-Wahl sind heute **datengetrieben** Teil der Reviewer-/Executor-/Advisor-
-> **Profile** (siehe [`08-crew-system.md`](08-crew-system.md)), nicht der App-Konfiguration.
+> **Note:** the original flat `Llm.Actors` schema (one fixed model entry per actor
+> in `appsettings.json`) has been superseded since the crew system (D-028). Model
+> and provider choice are today **data-driven** parts of the reviewer/executor/advisor
+> **profiles** (see [`08-crew-system.md`](08-crew-system.md)), not of the app configuration.
 
-`appsettings.json` konfiguriert nur noch die **Provider-Endpunkte** (Multi-Provider,
+`appsettings.json` only configures the **provider endpoints** (multi-provider,
 D-027/D-032):
 
 ```json
@@ -294,273 +296,273 @@ D-027/D-032):
 }
 ```
 
-API-Key-Override via Environment-Variable, z.B. `Llm__Providers__openrouter__ApiKey`
-bzw. `LLM_OPENROUTER_API_KEY` (Env-Fallback). Welcher Akteur welchen Provider und
-welches Modell nutzt, bestimmt das jeweilige Profil im `CrewSnapshot` des Runs
-(`ILlmClientResolver.ForProfile`). Der Leitstern **Modell-Pluralismus** wird damit
-pro Crew/Template ausgespielt: Reviewer laufen bewusst auf Fremd-Modellen relativ zum
-Executor (Default-System-Crew: Executor `claude-cli`, Reviewer überwiegend `codex-cli`).
+API-key override via environment variable, e.g. `Llm__Providers__openrouter__ApiKey`
+or `LLM_OPENROUTER_API_KEY` (env fallback). Which actor uses which provider and
+which model is determined by the respective profile in the run's `CrewSnapshot`
+(`ILlmClientResolver.ForProfile`). The guiding principle **model pluralism** is thus
+played out per crew/template: reviewers deliberately run on foreign models relative
+to the executor (default system crew: executor `claude-cli`, reviewers mostly `codex-cli`).
 
-### Token-Tracking
+### Token tracking
 
-`LlmTokenUsage` (`InputTokens`, `OutputTokens`) wird pro Iteration vom `ProfileBasedExecutor`/`ProfileBasedReviewer` in den `IRunContext` gesetzt und von `PostgresEventSink` in `Runs.TokensTotal` akkumuliert (Wire-Namen `prompt_tokens`/`completion_tokens` der OpenAI-API). Seit dem Cost-Tracking (Step16) werden zusätzlich pro Akteur und Iteration die Kosten in `IterationActorCosts` persistiert und in `Runs.CostTotal` aggregiert.
+`LlmTokenUsage` (`InputTokens`, `OutputTokens`) is set per iteration by `ProfileBasedExecutor`/`ProfileBasedReviewer` into the `IRunContext` and accumulated by `PostgresEventSink` into `Runs.TokensTotal` (wire names `prompt_tokens`/`completion_tokens` of the OpenAI API). Since cost tracking (Step16) the per-actor, per-iteration costs are additionally persisted in `IterationActorCosts` and aggregated into `Runs.CostTotal`.
 
-## UI-Architektur (Schritt 7)
+## UI architecture (step 7)
 
 ### Pages
 
-Drei Blazor Server Pages in `src/Geef.Atelier.Web/Components/Pages/`:
+Three Blazor Server pages in `src/Geef.Atelier.Web/Components/Pages/`:
 
-| Route | Komponente | Funktion |
+| Route | Component | Function |
 |---|---|---|
-| `/new` | `New.razor` | Submit-Formular. `EditForm` + `DataAnnotationsValidator`. Redirect zu `/runs/{id}` nach Submit. |
-| `/runs` | `Runs.razor` | Run-Liste. Status-Filter via Query-Parameter. `HubConnection` auf `all-runs`-Group. Live-Update via `AnyRunUpdated`-Event. |
-| `/runs/{id}` | `RunDetail.razor` | Run-Detail. `HubConnection` auf `run-{id}`-Group. Live-Update via `RunUpdated`-Event. Cancel-Button für Pending/Running. |
+| `/new` | `New.razor` | Submit form. `EditForm` + `DataAnnotationsValidator`. Redirect to `/runs/{id}` after submit. |
+| `/runs` | `Runs.razor` | Run list. Status filter via query parameter. `HubConnection` on the `all-runs` group. Live update via the `AnyRunUpdated` event. |
+| `/runs/{id}` | `RunDetail.razor` | Run detail. `HubConnection` on the `run-{id}` group. Live update via the `RunUpdated` event. Cancel button for Pending/Running. |
 
-### SignalR-Hub (`RunHub`)
+### SignalR hub (`RunHub`)
 
-`src/Geef.Atelier.Web/Hubs/RunHub.cs` — gemappt auf `/hubs/runs`.
+`src/Geef.Atelier.Web/Hubs/RunHub.cs` — mapped to `/hubs/runs`.
 
-Zwei Groups:
-- `run-{runId}` — Detail-Page-Subscriber. Sendet `"RunUpdated"` nach jedem Persist-Event.
-- `all-runs` — Runs-Listen-Page-Subscriber. Sendet `"AnyRunUpdated"` nach jedem Persist-Event.
+Two groups:
+- `run-{runId}` — detail-page subscribers. Sends `"RunUpdated"` after every persist event.
+- `all-runs` — runs-list-page subscribers. Sends `"AnyRunUpdated"` after every persist event.
 
-Browser-Clients verwenden `HubConnectionBuilder.WithUrl("/hubs/runs").WithAutomaticReconnect()`. Reconnect-Handler re-joinst die Group. Pages implementieren `IAsyncDisposable` mit `Leave`-Aufruf + Hub-Dispose.
+Browser clients use `HubConnectionBuilder.WithUrl("/hubs/runs").WithAutomaticReconnect()`. The reconnect handler re-joins the group. Pages implement `IAsyncDisposable` with a `Leave` call + hub dispose.
 
 ### `IRunNotifier` / `SignalRRunNotifier`
 
-`IRunNotifier` lebt in Core (`Core/Notifications/`). `PostgresEventSink` (Infrastructure) konsumiert den Vertrag — ohne Web-Dependency. `SignalRRunNotifier` lebt in Web, injiziert `IHubContext<RunHub>`, Singleton-Lifetime. Notifier-Aufrufe sind best-effort (`try/catch`).
+`IRunNotifier` lives in Core (`Core/Notifications/`). `PostgresEventSink` (Infrastructure) consumes the contract — without a Web dependency. `SignalRRunNotifier` lives in Web, injects `IHubContext<RunHub>`, singleton lifetime. Notifier calls are best-effort (`try/catch`).
 
-**Sequenz User-Submit → Live-View:**
+**Sequence user-submit → live view:**
 
 ```
 Browser /new  →  IRunService.SubmitRunAsync  →  RunEntity (Pending) in DB
                                                 ↓
                                       RunOrchestratorService (BackgroundService)
-                                        pollt Pending, setzt Running-Claim
+                                        polls Pending, sets the Running claim
                                                 ↓
-                                      Geef-SDK-Pipeline (Grounding → Execution → Evaluation → Finalize)
+                                      Geef SDK pipeline (Grounding → Execution → Evaluation → Finalize)
                                                 ↓
                                       PostgresEventSink
-                                        (a) schreibt Event in DB
+                                        (a) writes the event to the DB
                                         (b) IRunNotifier.NotifyRunUpdatedAsync
                                                 ↓
                                       SignalRRunNotifier → IHubContext<RunHub>
-                                        → run-{id}-Group: "RunUpdated"
-                                        → all-runs-Group: "AnyRunUpdated"
+                                        → run-{id} group: "RunUpdated"
+                                        → all-runs group: "AnyRunUpdated"
                                                 ↓
                                       Browser HubConnection.On("RunUpdated")
                                         → IRunService.GetRunAsync → StateHasChanged
 ```
 
-### UI-Komponenten-Library (`Components/UI/`)
+### UI component library (`Components/UI/`)
 
-9 Komponenten, alle mit scoped `.razor.css`:
+9 components, all with scoped `.razor.css`:
 `StatusBadge`, `SeverityBadge`, `RunCard`, `IterationPanel`, `FindingItem`, `RunHeader`, `SubmitForm`, `EmptyState`, `CancelButton`.
 
-**Workflow-Regel:** Semantische UI-Elemente (Buttons, Forms, Badges, Listen) sind Komponenten. Layout-`div`-Tags in Pages erlaubt.
+**Workflow rule:** semantic UI elements (buttons, forms, badges, lists) are components. Layout `div` tags in pages are allowed.
 
-### PS-6 Crew-Verwaltungs-Pages
+### PS-6 crew-management pages
 
-| URL | Komponente | Beschreibung |
+| URL | Component | Description |
 |---|---|---|
-| `/crew` | `CrewIndex` | Landing-Page mit Überblick über Templates + Profile |
-| `/crew/templates` | `CrewTemplatesIndex` | Liste aller Templates (System + Custom) |
-| `/crew/templates/new` | `CrewTemplateEditor` | Neues Template anlegen |
-| `/crew/templates/{name}` | `CrewTemplateEditor` | Template bearbeiten / System-Template duplizieren |
-| `/crew/profiles/reviewers` | `ReviewerProfilesIndex` | Liste aller Reviewer-Profile |
-| `/crew/profiles/reviewers/new` | `ReviewerProfileEditor` | Neues Reviewer-Profil anlegen |
-| `/crew/profiles/reviewers/{name}` | `ReviewerProfileEditor` | Reviewer-Profil bearbeiten |
-| `/crew/profiles/executors` | `ExecutorProfilesIndex` | Liste aller Executor-Profile |
-| `/crew/profiles/executors/new` | `ExecutorProfileEditor` | Neues Executor-Profil anlegen |
-| `/crew/profiles/executors/{name}` | `ExecutorProfileEditor` | Executor-Profil bearbeiten |
+| `/crew` | `CrewIndex` | Landing page with an overview of templates + profiles |
+| `/crew/templates` | `CrewTemplatesIndex` | List of all templates (system + custom) |
+| `/crew/templates/new` | `CrewTemplateEditor` | Create a new template |
+| `/crew/templates/{name}` | `CrewTemplateEditor` | Edit a template / duplicate a system template |
+| `/crew/profiles/reviewers` | `ReviewerProfilesIndex` | List of all reviewer profiles |
+| `/crew/profiles/reviewers/new` | `ReviewerProfileEditor` | Create a new reviewer profile |
+| `/crew/profiles/reviewers/{name}` | `ReviewerProfileEditor` | Edit a reviewer profile |
+| `/crew/profiles/executors` | `ExecutorProfilesIndex` | List of all executor profiles |
+| `/crew/profiles/executors/new` | `ExecutorProfileEditor` | Create a new executor profile |
+| `/crew/profiles/executors/{name}` | `ExecutorProfileEditor` | Edit an executor profile |
 
-Neue UI-Komponenten (PS-6): `CrewBadge`, `CrewSelector`, `CrewSummary`, `ReviewerPicker`, `ProfileEditorForm`, `Modal`, `DeleteConfirmationModal`.
+New UI components (PS-6): `CrewBadge`, `CrewSelector`, `CrewSummary`, `ReviewerPicker`, `ProfileEditorForm`, `Modal`, `DeleteConfirmationModal`.
 
-## Frontend-Stack-Entscheidung
+## Frontend stack decision
 
-**Blazor Server.** Begründung: derselbe .NET-Stack wie Geef SDK, kein Kontextwechsel; SignalR ist eingebaut und beliefert den Live-Status quasi gratis; Single-User heißt keine Skalierungs-Sorgen; lokale UI-Latenz ist dank Server-Hosting und Reverse-Proxy unkritisch. Falls später ein Wechsel zu Blazor WebAssembly oder React+API nötig wird, bleibt das Backend (`IRunService`, MCP-Server, Pipeline) unverändert.
+**Blazor Server.** Rationale: the same .NET stack as the Geef SDK, no context switch; SignalR is built in and feeds the live status practically for free; single-user means no scaling worries; local UI latency is uncritical thanks to server hosting and the reverse proxy. Should a switch to Blazor WebAssembly or React+API become necessary later, the backend (`IRunService`, MCP server, pipeline) stays unchanged.
 
-## Auth-Strategie (umgesetzt in Schritt 8, siehe D-021)
+## Auth strategy (implemented in step 8, see D-021)
 
-### Web-UI — Cookie-Auth
+### Web UI — cookie auth
 
-> **Multi-User seit Step20 (D-041-Umfeld):** Ursprünglich Single-User aus
-> Environment-Variablen; inzwischen **DB-basierte Mehrbenutzerverwaltung**
-> (Tabelle `Users`, BCrypt). Der Admin-Account wird beim Start aus
-> `ATELIER_USER`/`ATELIER_PASSWORD_HASH` geseedet/synchronisiert; weitere
-> Konten verwaltet der Admin unter `/admin/users` (`IUserAdminService`).
-> `IUserAuthenticator` liefert seitdem ein `AtelierUser?` (statt nur `bool`).
-> Die Cookie-Konfiguration unten gilt unverändert.
+> **Multi-user since Step20 (D-041 timeframe):** originally single-user from
+> environment variables; now **DB-based multi-user management**
+> (table `Users`, BCrypt). The admin account is seeded/synchronized at startup
+> from `ATELIER_USER`/`ATELIER_PASSWORD_HASH`; further accounts are managed by
+> the admin at `/admin/users` (`IUserAdminService`). `IUserAuthenticator` has
+> since returned an `AtelierUser?` (instead of just `bool`). The cookie
+> configuration below applies unchanged.
 
-BCrypt-Hash (work factor 11) wird via `tools/HashPassword/` erzeugt.
+The BCrypt hash (work factor 11) is generated via `tools/HashPassword/`.
 
-**Cookie-Konfiguration:**
+**Cookie configuration:**
 
-| Option | Wert |
+| Option | Value |
 |---|---|
-| Cookie-Name | `Atelier.Auth` |
+| Cookie name | `Atelier.Auth` |
 | `HttpOnly` | `true` |
-| `SameSite` | `Strict` (Produktion) / `Lax` (Test-Env) |
-| `SecurePolicy` | `SameAsRequest` (Dev) / `Always` (Prod) |
-| `ExpireTimeSpan` | 30 Tage |
+| `SameSite` | `Strict` (production) / `Lax` (test env) |
+| `SecurePolicy` | `SameAsRequest` (dev) / `Always` (prod) |
+| `ExpireTimeSpan` | 30 days |
 | `SlidingExpiration` | `true` |
 | `LoginPath` | `/login` |
 
-**Login-Flow (Static SSR):**
+**Login flow (static SSR):**
 
 ```
-Anonymer Browser → /runs → [Authorize] → RedirectToLogin
+Anonymous browser → /runs → [Authorize] → RedirectToLogin
   → NavigationManager.NavigateTo("/login?ReturnUrl=%2Fruns")
-  → Login.razor (Static SSR, kein @rendermode)
-  → POST /login (Blazor Static SSR Form-Handler, @formname="login-form")
+  → Login.razor (static SSR, no @rendermode)
+  → POST /login (Blazor static SSR form handler, @formname="login-form")
   → IUserAuthenticator.ValidateCredentialsAsync (BCrypt.Verify)
-  → HttpContext.SignInAsync → Cookie gesetzt → Redirect zu /runs
+  → HttpContext.SignInAsync → cookie set → redirect to /runs
 ```
 
-**Wichtig: Login-Page muss Static SSR bleiben.** `@rendermode InteractiveServer` würde die Form-POST im WebSocket-Kontext abwickeln ohne `HttpContext` → `SignInAsync` wäre nicht aufrufbar. Das `@formname="login-form"`-Attribut auf dem `<form>`-Element ist Pflicht für Blazor Static SSR Form-Routing.
+**Important: the login page must stay static SSR.** `@rendermode InteractiveServer` would handle the form POST in a WebSocket context without an `HttpContext` → `SignInAsync` would not be callable. The `@formname="login-form"` attribute on the `<form>` element is mandatory for Blazor static SSR form routing.
 
-**Logout:** `POST /auth/logout` (Minimal API) mit `<AntiforgeryToken />` in der `UserMenu`-Komponente. GET-Logout wäre ein CSRF-Angriffspunkt.
+**Logout:** `POST /auth/logout` (Minimal API) with `<AntiforgeryToken />` in the `UserMenu` component. A GET logout would be a CSRF attack vector.
 
-**`IUserAuthenticator`-Schicht:**
+**`IUserAuthenticator` layer:**
 
 ```
-Geef.Atelier.Core/Configuration/AtelierUserOptions.cs   → POCO für Username/PasswordHash
-Geef.Atelier.Application/Auth/IUserAuthenticator.cs     → Interface (Application, nicht Infrastructure)
+Geef.Atelier.Core/Configuration/AtelierUserOptions.cs   → POCO for username/password hash
+Geef.Atelier.Application/Auth/IUserAuthenticator.cs     → interface (Application, not Infrastructure)
 Geef.Atelier.Application/Auth/AtelierUserAuthenticator.cs → BCrypt.Verify + CryptographicOperations.FixedTimeEquals
 Geef.Atelier.Application/Auth/ApplicationAuthExtensions.cs → AddAtelierAuth(IServiceCollection, IConfiguration)
 ```
 
-`AtelierUserAuthenticator` ist `internal sealed`. Env-Var-Fallback (`ATELIER_USER`/`ATELIER_PASSWORD_HASH`) wird in `ApplicationAuthExtensions` aufgelöst — docker-compose-User müssen nicht die ASP.NET-Core-Doppelunderstrich-Konvention kennen.
+`AtelierUserAuthenticator` is `internal sealed`. The env-var fallback (`ATELIER_USER`/`ATELIER_PASSWORD_HASH`) is resolved in `ApplicationAuthExtensions` — docker-compose users do not need to know the ASP.NET Core double-underscore convention.
 
-**Timing-Schutz:** `FixedTimeEquals` für Username-Vergleich, `BCrypt.Verify` aufgerufen auch bei falschem Username (konstante Timing-Eigenschaft). Kein Username/Password-Hash wird in Logs geschrieben — nur `"Login attempt rejected"` (ohne PII).
+**Timing protection:** `FixedTimeEquals` for the username comparison, `BCrypt.Verify` called even for a wrong username (constant-timing property). No username/password hash is written to logs — only `"Login attempt rejected"` (without PII).
 
-**Lazy-Fail bei fehlender Konfiguration:** Service startet auch ohne Env-Vars, Login gibt `false` zurück. Health-Check bleibt anonym (`.AllowAnonymous()` auf `MapHealthChecks`). Init-Warning-Log beim ersten fehlkonfigurierten Login-Versuch.
+**Lazy-fail on missing configuration:** the service starts even without env vars, login returns `false`. The health check stays anonymous (`.AllowAnonymous()` on `MapHealthChecks`). An init-warning log on the first misconfigured login attempt.
 
-**`ForwardedHeaders` vor `UseAuthentication`:**
+**`ForwardedHeaders` before `UseAuthentication`:**
 
 ```csharp
-app.UseForwardedHeaders();   // ZUERST — damit Request.IsHttps korrekt ist
+app.UseForwardedHeaders();   // FIRST — so that Request.IsHttps is correct
 app.UseAuthentication();
 app.UseAuthorization();
 ```
 
-Traefik terminiert TLS und leitet HTTP weiter. Ohne `UseForwardedHeaders` würde `SecurePolicy.Always` in Produktion Cookies blockieren. `KnownIPNetworks.Clear()` öffnet für alle Proxy-IPs (Docker-Netzwerk-invariant).
+Traefik terminates TLS and forwards HTTP. Without `UseForwardedHeaders`, `SecurePolicy.Always` would block cookies in production. `KnownIPNetworks.Clear()` opens it for all proxy IPs (Docker-network invariant).
 
-**RunHub ohne `[Authorize]` (architektonischer Trade-off):**
+**RunHub without `[Authorize]` (an architectural trade-off):**
 
-`RunHub` hat kein `[Authorize]`-Attribut. Begründung: Blazor Server's `HubConnectionBuilder` erzeugt server-seitige SignalR-Verbindungen, die Browser-Cookies nicht weiterleiten. Mit `[Authorize]` auf dem Hub würde das SSR-Pre-Render-Phase 401 erhalten und Blazor Circuit-Initialisierung schlägt fehl. Mitigation: Alle subscribenden Pages (`/new`, `/runs`, `/runs/{id}`) tragen `@attribute [Authorize]` — unauthentifizierte User können die Pages nicht laden, also auch keine Hub-Verbindung aufbauen.
+`RunHub` has no `[Authorize]` attribute. Rationale: Blazor Server's `HubConnectionBuilder` creates server-side SignalR connections that do not forward browser cookies. With `[Authorize]` on the hub, the SSR pre-render phase would receive 401 and Blazor circuit initialization would fail. Mitigation: all subscribing pages (`/new`, `/runs`, `/runs/{id}`) carry `@attribute [Authorize]` — unauthenticated users cannot load the pages, hence cannot open a hub connection either.
 
-### Test-Auth-Bypass
+### Test auth bypass
 
-`TestAuthenticationHandler` (in `tests/Geef.Atelier.Tests/Web/E2E/`, `internal sealed`) markiert jeden Request als pre-authenticated mit `ClaimTypes.Name = "test-user"`. `WebTestHost.StartAsync(authenticated: true/false)` — `true` aktiviert den Test-Handler, `false` startet echte Cookie-Auth mit BCrypt-wf=4-Hash für LoginFlow/LogoutFlow-Tests. **Der Handler darf nie in `Program.cs` oder dem Web-Projekt referenziert werden.**
+`TestAuthenticationHandler` (in `tests/Geef.Atelier.Tests/Web/E2E/`, `internal sealed`) marks every request as pre-authenticated with `ClaimTypes.Name = "test-user"`. `WebTestHost.StartAsync(authenticated: true/false)` — `true` activates the test handler, `false` starts real cookie auth with a BCrypt-wf=4 hash for LoginFlow/LogoutFlow tests. **The handler must never be referenced in `Program.cs` or the Web project.**
 
-### MCP-Server — Bearer-Token / Multi-Auth (umgesetzt in Schritt 9, siehe D-022)
+### MCP server — bearer token / multi-auth (implemented in step 9, see D-022)
 
-**Multi-Auth-Schema-Setup:** Die Anwendung nutzt zwei parallele Authentication Schemes.
+**Multi-auth scheme setup:** the application uses two parallel authentication schemes.
 
-| Scheme | Name | Zweck |
+| Scheme | Name | Purpose |
 |---|---|---|
-| Cookie | `CookieAuthenticationDefaults.AuthenticationScheme` | Web-UI, Default-Scheme |
-| Bearer | `"Bearer"` | MCP-Endpoint `/mcp`, explizit via `McpPolicy` |
+| Cookie | `CookieAuthenticationDefaults.AuthenticationScheme` | Web UI, default scheme |
+| Bearer | `"Bearer"` | MCP endpoint `/mcp`, explicitly via `McpPolicy` |
 
-**Default-Scheme:** Cookie (alle Blazor-Routen, `[Authorize]` ohne Argument).
+**Default scheme:** cookie (all Blazor routes, `[Authorize]` without an argument).
 
-**MCP-Endpoint:** Ist explizit mit `RequireAuthorization("McpPolicy")` geschützt. Die `McpPolicy` setzt das Authentication-Scheme auf `"Bearer"`, sodass der MCP-Pfad nie Cookie-Auth versucht.
+**MCP endpoint:** explicitly protected with `RequireAuthorization("McpPolicy")`. The `McpPolicy` sets the authentication scheme to `"Bearer"` so the MCP path never attempts cookie auth.
 
-**`ITokenValidator` / `BearerTokenHandler` (Stand nach D-041 OAuth 2.1):**
+**`ITokenValidator` / `BearerTokenHandler` (state after D-041 OAuth 2.1):**
 
-`ITokenValidator.ValidateTokenAsync` liefert seit D-041 ein reiches Ergebnis
-`TokenValidationOutcome { IsValid, Kind, Subject, ClientId, Scope }` (nicht mehr nur `bool`).
+`ITokenValidator.ValidateTokenAsync` has returned, since D-041, a rich result
+`TokenValidationOutcome { IsValid, Kind, Subject, ClientId, Scope }` (no longer just `bool`).
 
 ```
-Geef.Atelier.Application/Auth/ITokenValidator.cs           → Interface (Application Layer)
-Geef.Atelier.Application/Auth/StaticTokenValidator.cs      → Statisches ATELIER_MCP_TOKEN
+Geef.Atelier.Application/Auth/ITokenValidator.cs           → interface (application layer)
+Geef.Atelier.Application/Auth/StaticTokenValidator.cs      → static ATELIER_MCP_TOKEN
                                                               (FixedTimeEquals); Kind="static-bearer"
-Geef.Atelier.Application/Auth/OAuthAccessTokenValidator.cs → OAuth-Access-Token via DB-Lookup
-                                                              (SHA-256-Hash); Subject = OAuth-Nutzer
-Geef.Atelier.Application/Auth/CompositeTokenValidator.cs   → registriert als ITokenValidator:
-                                                              prüft statisch, dann OAuth
-Geef.Atelier.Web/Auth/BearerTokenHandler.cs                → AuthenticationHandler; baut Claims
-                                                              aus dem Outcome (Name/NameIdentifier/Role)
+Geef.Atelier.Application/Auth/OAuthAccessTokenValidator.cs → OAuth access token via DB lookup
+                                                              (SHA-256 hash); Subject = OAuth user
+Geef.Atelier.Application/Auth/CompositeTokenValidator.cs   → registered as ITokenValidator:
+                                                              checks static, then OAuth
+Geef.Atelier.Web/Auth/BearerTokenHandler.cs                → AuthenticationHandler; builds claims
+                                                              from the outcome (Name/NameIdentifier/Role)
 ```
 
-`BearerTokenHandler` mappt das Outcome auf Claims: `ClaimTypes.Name` ← `Subject`,
-`ClaimTypes.NameIdentifier` ← `ClientId ?? Subject`, und für statisches Bearer-Token
-`ClaimTypes.Role = "admin"`. Damit greift die Run-User-Isolation (D-042) auch über MCP:
-OAuth-Runs gehören dem autorisierenden Nutzer, statische-Token-Runs dem Admin.
-`ICurrentUserService`/`HttpContextCurrentUserService` exponieren `Username`/`IsAdmin`
-für Service- und MCP-Schicht.
+`BearerTokenHandler` maps the outcome onto claims: `ClaimTypes.Name` ← `Subject`,
+`ClaimTypes.NameIdentifier` ← `ClientId ?? Subject`, and for the static bearer token
+`ClaimTypes.Role = "admin"`. Run-user isolation (D-042) therefore also applies over MCP:
+OAuth runs belong to the authorizing user, static-token runs to the admin.
+`ICurrentUserService`/`HttpContextCurrentUserService` expose `Username`/`IsAdmin`
+for the service and MCP layers.
 
-**OAuth 2.1 ist seit D-041 vollständig implementiert** (kein „nach dem Skeleton“ mehr):
-self-hosted Authorization Server mit Pflicht-PKCE/S256, Opaque-Tokens (nur SHA-256 in DB),
-Refresh-Rotation + Reuse-Detection. Endpunkt- und Flow-Details siehe
-[`04-mcp-integration.md`](04-mcp-integration.md) und [`09-endpoint-reference.md`](09-endpoint-reference.md);
-Begründungen im [Decisions-Log](05-decisions-log.md) D-041. Beide Auth-Pfade
-(statisches Bearer-Token für Claude Code CLI, OAuth 2.1 für Claude Desktop/Claude.ai)
-koexistieren ohne Konfigurationsänderung.
+**OAuth 2.1 has been fully implemented since D-041** (no more "after the skeleton"):
+a self-hosted authorization server with mandatory PKCE/S256, opaque tokens (only SHA-256 in the DB),
+refresh rotation + reuse detection. Endpoint and flow details see
+[`04-mcp-integration.md`](04-mcp-integration.md) and [`09-endpoint-reference.md`](09-endpoint-reference.md);
+rationale in the [decisions log](05-decisions-log.md) D-041. Both auth paths
+(static bearer token for Claude Code CLI, OAuth 2.1 for Claude Desktop/Claude.ai)
+coexist without a configuration change.
 
-## Production-Deployment
+## Production deployment
 
-### Traefik-Flow
+### Traefik flow
 
 ```
 Browser → HTTPS:443 → Traefik (TLS via Let's Encrypt, cert-resolver 'le') → HTTP:8080 → geef-atelier-web container → ASP.NET
 ```
 
-Traefik terminiert TLS und leitet HTTP (Port 8080) an den Container weiter. Der Container selbst exponiert keinen Port nach außen (`ports:` entfällt im Production-Compose).
+Traefik terminates TLS and forwards HTTP (port 8080) to the container. The container itself exposes no port to the outside (`ports:` is omitted in the production compose).
 
-### TLS und Traefik-Konfiguration
+### TLS and Traefik configuration
 
-| Parameter | Wert |
+| Parameter | Value |
 |---|---|
-| Externes Netzwerk | `proxy` (Server-Konvention) |
-| Cert-Resolver | `le` (HTTP-Challenge via `web`-Entry-Point) |
-| Entry-Point (HTTPS) | `websecure` |
-| HTTP→HTTPS-Redirect | Global in `traefik.yml` (kein App-seitiger Redirect-Router) |
-| Middleware-Chain | `chain@file` (secure-headers + compression + rate-limit, Server-Konvention) |
-| `traefik.docker.network` | `proxy` (Pflicht wenn Container in mehreren Netzwerken) |
+| External network | `proxy` (server convention) |
+| Cert resolver | `le` (HTTP challenge via the `web` entry point) |
+| Entry point (HTTPS) | `websecure` |
+| HTTP→HTTPS redirect | Global in `traefik.yml` (no app-side redirect router) |
+| Middleware chain | `chain@file` (secure-headers + compression + rate-limit, server convention) |
+| `traefik.docker.network` | `proxy` (mandatory when a container is in multiple networks) |
 
-### Cookie-SecurePolicy in Production
+### Cookie SecurePolicy in production
 
-`ASPNETCORE_ENVIRONMENT=Production` aktiviert `CookieSecurePolicy.Always`. Die `ForwardedHeaders`-Middleware (vor `UseAuthentication` gesetzt, siehe Auth-Strategie-Abschnitt) liest `X-Forwarded-Proto=https` von Traefik und stellt sicher, dass `Request.IsHttps == true` — ohne dies würde `SecurePolicy.Always` Cookies blockieren, weil der Container HTTP sieht, nicht HTTPS.
+`ASPNETCORE_ENVIRONMENT=Production` enables `CookieSecurePolicy.Always`. The `ForwardedHeaders` middleware (placed before `UseAuthentication`, see the auth-strategy section) reads `X-Forwarded-Proto=https` from Traefik and ensures `Request.IsHttps == true` — without this, `SecurePolicy.Always` would block cookies because the container sees HTTP, not HTTPS.
 
-### Multi-Auth über HTTPS
+### Multi-auth over HTTPS
 
-Cookie-Auth für die Web-UI und Bearer-Auth für den MCP-Endpoint (`/mcp`) funktionieren identisch über HTTPS: TLS wird bei Traefik terminiert, der Container empfängt HTTP. Die Auth-Schicht der Anwendung sieht keinen Unterschied zum Dev-Betrieb — lediglich `SecurePolicy.Always` und `SameSite=Strict` sind in Production aktiv.
+Cookie auth for the web UI and bearer auth for the MCP endpoint (`/mcp`) work identically over HTTPS: TLS is terminated at Traefik, the container receives HTTP. The application's auth layer sees no difference from dev operation — only `SecurePolicy.Always` and `SameSite=Strict` are active in production.
 
-### Postgres-Strategie (Server-Konvention)
+### Postgres strategy (server convention)
 
-Jede Anwendung auf diesem Server betreibt einen eigenen Postgres-Container im selben Compose-File (`own-Postgres-per-App`-Pattern). Kein geteilter Datenbank-Host — Isolation und einfaches Backup pro App.
+Every application on this server runs its own Postgres container in the same compose file (the `own-Postgres-per-app` pattern). No shared database host — isolation and easy per-app backup.
 
-### Backup-Strategie (Post-Skeleton Schritt 1)
+### Backup strategy (post-skeleton step 1)
 
-Der `postgres-backup`-Service (`prodrigestivill/postgres-backup-local:16`) läuft als dritter Container im Production-Stack:
+The `postgres-backup` service (`prodrigestivill/postgres-backup-local:16`) runs as a third container in the production stack:
 
-- **Schedule:** täglich 03:00 UTC (`0 3 * * *`)
-- **Retention:** 7 Tages-, 4 Wochen-, 6 Monats-Snapshots
-- **Volume:** `geef-atelier-backups` (Named Volume, unabhängig vom DB-Volume)
-- **Format:** `.sql.gz` (gzip-komprimiertes pg_dump SQL, Compression Level 6)
-- **Restore:** `scripts/restore-backup.sh <datei.sql.gz>` (stoppt `web`, restored, startet `web` neu)
+- **Schedule:** daily at 03:00 UTC (`0 3 * * *`)
+- **Retention:** 7 daily, 4 weekly, 6 monthly snapshots
+- **Volume:** `geef-atelier-backups` (named volume, independent of the DB volume)
+- **Format:** `.sql.gz` (gzip-compressed pg_dump SQL, compression level 6)
+- **Restore:** `scripts/restore-backup.sh <file.sql.gz>` (stops `web`, restores, restarts `web`)
 
-Kein App-Code-Eingriff — reiner Compose-Service. Backup-Container braucht nur das interne `geef-atelier-network` (kein `proxy`).
+No app-code intervention — a pure compose service. The backup container only needs the internal `geef-atelier-network` (no `proxy`).
 
-### Reviewer-Kalibrierung
+### Reviewer calibration
 
-Severity-Taxonomie, Anti-Pattern-Regel und Convergence-Policy-Strategie sind in [`docs/06-reviewer-calibration.md`](06-reviewer-calibration.md) beschrieben. Neue Reviewer-Rollen müssen den dort definierten Standard übernehmen.
+The severity taxonomy, the anti-pattern rule and the convergence-policy strategy are described in [`docs/06-reviewer-calibration.md`](06-reviewer-calibration.md). New reviewer roles must adopt the standard defined there.
 
-### Deployment-Ablauf
+### Deployment procedure
 
-1. `.env`-File generieren via `openssl rand` + `tools/HashPassword` (gitignored, nie ins Repo).
-2. `docker build --no-cache -t geef-atelier .` im `build/`-Verzeichnis.
-3. `docker compose -f docker-compose.prod.yml up -d` startet App + Postgres; Auto-Migration on Startup (D-010) läuft beim ersten Start.
-4. Traefik erkennt den Container via Docker-Labels, stellt Let's-Encrypt-Zertifikat aus.
+1. Generate the `.env` file via `openssl rand` + `tools/HashPassword` (gitignored, never into the repo).
+2. `docker build --no-cache -t geef-atelier .` in the `build/` directory.
+3. `docker compose -f docker-compose.prod.yml up -d` starts app + Postgres; auto-migration on startup (D-010) runs on first start.
+4. Traefik detects the container via Docker labels, issues the Let's Encrypt certificate.
 
 ## Observability
 
-Geef bringt vieles eingebaut mit:
-- `IGeefEventSink` für strukturierte Events → Custom-Sink schreibt in DB und SignalR
-- `System.Diagnostics.ActivitySource("Geef.Sdk")` für Distributed Tracing → kann später an OpenTelemetry-Collector angeschlossen werden
-- Middleware-Pipeline für Cross-Cutting (Timeout, ExceptionHandling, Tracing) — alle eingebauten Middleware werden im Skeleton genutzt
+Geef brings a lot built in:
+- `IGeefEventSink` for structured events → the custom sink writes to the DB and SignalR
+- `System.Diagnostics.ActivitySource("Geef.Sdk")` for distributed tracing → can later be connected to an OpenTelemetry collector
+- A middleware pipeline for cross-cutting concerns (timeout, exception handling, tracing) — all built-in middleware is used in the skeleton
 
-Logging via `Microsoft.Extensions.Logging` mit Console-Sink im Skeleton; strukturierte Logs (Serilog mit Postgres-Sink) sind eine spätere Option.
+Logging via `Microsoft.Extensions.Logging` with a console sink in the skeleton; structured logs (Serilog with a Postgres sink) are a later option.

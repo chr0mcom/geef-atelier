@@ -1,43 +1,45 @@
-# Geef.Atelier — Projektdokumentation
+# Geef.Atelier — Project documentation
 
-Dies ist die laufend gepflegte Doku zum Projekt **Geef.Atelier** — einer Text-Manufaktur, die auf dem [Geef SDK](https://github.com/chr0mcom/geef) aufbaut und dessen GEEF-Pipeline (Grounding / Execution / Evaluation / Finalize) produktiv nutzt, um hochwertige Texte beliebiger Sorte zu erzeugen.
+*[Deutsch](README_de.md) · **English***
 
-Die Doku entsteht parallel zum Brainstorming und wird nach jeder Entscheidungsrunde aktualisiert. Wenn ein Thema noch nicht ausgearbeitet ist, steht das explizit im jeweiligen Dokument.
+This is the continuously maintained documentation for **Geef.Atelier** — a text manufactory built on the [Geef SDK](https://github.com/chr0mcom/geef) that puts its GEEF pipeline (Grounding / Execution / Evaluation / Finalize) into productive use to produce high-quality texts of any kind.
 
-## Dokumentenstruktur
+The documentation evolves alongside the brainstorming and is updated after every decision round. When a topic is not yet worked out, that is stated explicitly in the respective document.
 
-| Datei | Inhalt | Typ |
+## Document structure
+
+| File | Content | Type |
 |---|---|---|
-| [01-vision-and-scope.md](01-vision-and-scope.md) | Was ist das Projekt, was nicht, für wen, in welchem Umfeld | Living |
-| [02-architecture.md](02-architecture.md) | Schichten, Komponenten, Datenfluss, DB-Schema | Living |
-| [03-walking-skeleton-plan.md](03-walking-skeleton-plan.md) | Der ursprüngliche 10-Schritte-Bauplan (historisch; Skeleton abgeschlossen) | Historisch |
-| [04-mcp-integration.md](04-mcp-integration.md) | MCP-Server: Tools, Auth (Bearer + OAuth 2.1), Transport | Living |
-| [05-decisions-log.md](05-decisions-log.md) | Chronologisches, append-only Protokoll aller Architektur-Entscheidungen (D-001 ff.) | Historisch |
-| [06-reviewer-calibration.md](06-reviewer-calibration.md) | Severity-Taxonomie und Convergence-Policy-Standard für Reviewer | Living |
-| [07-design-system.md](07-design-system.md) | Theme-System, Typografie, Komponenten-Inventar (Stand Design-Translation PS-3) | Living |
-| [08-crew-system.md](08-crew-system.md) | Crew-/Profil-/Template-System, System-Profile, Advisor-Pässe | Living |
-| [09-endpoint-reference.md](09-endpoint-reference.md) | Referenz aller extern erreichbaren HTTP-Endpunkte (MCP, OAuth, Web/Account) | Living |
+| [01-vision-and-scope.md](01-vision-and-scope.md) | What the project is, what it is not, for whom, in what environment | Living |
+| [02-architecture.md](02-architecture.md) | Layers, components, data flow, DB schema | Living |
+| [03-walking-skeleton-plan.md](03-walking-skeleton-plan.md) | The original 10-step build plan (historical; skeleton completed) | Historical |
+| [04-mcp-integration.md](04-mcp-integration.md) | MCP server: tools, auth (bearer + OAuth 2.1), transport | Living |
+| [05-decisions-log.md](05-decisions-log.md) | Chronological, append-only log of all architecture decisions (D-001 ff.) | Historical |
+| [06-reviewer-calibration.md](06-reviewer-calibration.md) | Severity taxonomy and convergence-policy standard for reviewers | Living |
+| [07-design-system.md](07-design-system.md) | Theme system, typography, component inventory (as of design translation PS-3) | Living |
+| [08-crew-system.md](08-crew-system.md) | Crew/profile/template system, system profiles, advisor passes | Living |
+| [09-endpoint-reference.md](09-endpoint-reference.md) | Reference of all externally reachable HTTP endpoints (MCP, OAuth, Web/Account) | Living |
 
-> **Interne Arbeitsverzeichnisse (nicht im öffentlichen Repository):**
-> `docs/prompts/` (schritt-spezifische Bau-Prompts) und `docs/reports/` (persistente
-> Abschlussberichte je Bau-Schritt) sind bewusst über `.gitignore` ausgeschlossen und
-> existieren nur in der lokalen Arbeitskopie. Verweise auf `reports/…` bzw. `prompts/…`
-> in den historischen Dokumenten dienen der Provenienz und sind auf GitHub nicht
-> auflösbar — das ist beabsichtigt.
+> **Internal working directories (not in the public repository):**
+> `docs/prompts/` (step-specific build prompts) and `docs/reports/` (persistent
+> completion reports per build step) are deliberately excluded via `.gitignore` and
+> exist only in the local working copy. References to `reports/…` or `prompts/…`
+> in the historical documents serve provenance and are not resolvable on GitHub —
+> this is intentional.
 
-## Verbindlicher Entwicklungs-Workflow
+## Binding development workflow
 
-Im übergeordneten Infrastruktur-Repository unter `/srv/docker/docs/` liegen die übergreifenden Prozess-Vorgaben, allen voran **`geef-workflow.md`** — die kanonische Anweisung an Claude Code, *wie* gebaut wird (außerhalb dieses Repositories, daher hier nicht verlinkt). Sie definiert die vier Phasen (Grounding / Execution / Evaluation / Finalize), die fünf Reviewer und die Advisor-Konsultationen. Alle Bau-Prompts in `docs/prompts/` verweisen darauf und ergänzen nur den schritt-spezifischen Scope. Die weiteren Dateien in jenem Ordner (z.B. `docker-deployment.md`, `contact-protection.md`) sind ebenfalls verbindlich und müssen beachtet werden.
+The cross-cutting process rules live in the parent infrastructure repository under `/srv/docker/docs/`, foremost **`geef-workflow.md`** — the canonical instruction to Claude Code on *how* things are built (outside this repository, hence not linked here). It defines the four phases (Grounding / Execution / Evaluation / Finalize), the five reviewers and the advisor consultations. All build prompts in `docs/prompts/` reference it and only add the step-specific scope. The other files in that folder (e.g. `docker-deployment.md`, `contact-protection.md`) are likewise binding and must be observed.
 
 ## Status
 
-- **Phase:** Walking Skeleton abgeschlossen; produktiv unter `https://geef.stefan-bechtel.de`. Zahlreiche Post-Skeleton-Erweiterungen ausgeliefert (Crew-System, Advisor-Pässe, Grounding/Vector-Store-RAG, Run-Attachments, Cost-Tracking, Template Studio, Domain-Templates, MCP-OAuth 2.1, Multi-User, Run-User-Isolation).
-- **Letzte Aktualisierung:** 17. Mai 2026
-- **Aktueller Stand & nächste Schritte:** siehe [Projekt-README](../README.md) (Implementierungsstand) und [Decisions-Log](05-decisions-log.md) (chronologische Entscheidungshistorie, zuletzt D-042).
+- **Phase:** Walking skeleton completed; in production at `https://geef.stefan-bechtel.de`. Numerous post-skeleton extensions shipped (crew system, advisor passes, grounding/vector-store RAG, run attachments, cost tracking, Template Studio, domain templates, MCP OAuth 2.1, multi-user, run-user isolation).
+- **Last updated:** 17 May 2026
+- **Current state & next steps:** see the [project README](../README.md) (implementation status) and the [decisions log](05-decisions-log.md) (chronological decision history, most recently D-042).
 
-## Konventionen
+## Conventions
 
-- Dokumentation auf Deutsch (passend zum Brainstorming-Kontext)
-- Code, Code-Kommentare und XML-Doc-Comments auf Englisch (passend zum Geef SDK)
-- Entscheidungen werden im Decisions-Log dokumentiert, bevor sie in andere Dokumente einfließen
-- Living Document: keine Versionsnummern, stattdessen "Letzte Aktualisierung" pro Datei
+- Documentation is bilingual: the English file (`X.md`) is the primary version, the German original is preserved as `X_de.md`; both are kept in sync
+- Code, code comments and XML-doc comments in English (matching the Geef SDK)
+- Decisions are recorded in the decisions log before they flow into other documents
+- Living document: no version numbers, instead a "Last updated" field per file

@@ -1,41 +1,43 @@
-# 08 — Crew-System (PS-5)
+# 08 — Crew system (PS-5)
 
-Letzte Aktualisierung: 2026-05-17 (System-Profile/-Advisors/-Templates auf aktuellen `SystemCrew`-Stand gebracht: CLI-Provider, Domain-Templates)
+*[Deutsch](08-crew-system_de.md) · **English***
 
-## Überblick
+Last updated: 2026-05-17 (system profiles/advisors/templates brought up to the current `SystemCrew` state: CLI providers, domain templates)
 
-Das Crew-System ersetzt die in PS-2 hartkodierte Dreier-Crew (Executor + BriefingTreueReviewer + KlarheitReviewer) durch ein konfigurierbares Profil- und Template-System. Jeder Run erhält beim Einreichen einen vollständig eingebetteten **CrewSnapshot**, der die Reproduzierbarkeit des Runs auch dann garantiert, wenn Profile später geändert oder gelöscht werden.
+## Overview
 
-## Kernbegriffe
+The crew system replaces the three-member crew hard-coded in PS-2 (executor + BriefingTreueReviewer + KlarheitReviewer) with a configurable profile and template system. On submission every run receives a fully embedded **CrewSnapshot** that guarantees the run's reproducibility even if profiles are changed or deleted later.
 
-| Begriff | Bedeutung |
+## Core concepts
+
+| Term | Meaning |
 |---|---|
-| **ExecutorProfile** | LLM-Akteur der den Draft erstellt. Trägt System-Prompt, Provider, Modell, MaxTokens. |
-| **ReviewerProfile** | LLM-Akteur der den Draft bewertet. Gleiche Felder. `Priority` für sequenzielle Strategien via `IReviewer.Priority`. |
-| **CrewTemplate** | Komponiert Executor + Reviewers + EvaluationStrategy + optionalen ConvergenceOverride + Advisor-Profile. |
-| **CrewSnapshot** | Vollständig eingebettete Kopie des CrewTemplates (inkl. aller Profil-Daten) zum Zeitpunkt der Run-Einreichung. Persistiert als JSONB auf `Runs.CrewSnapshot`. |
-| **AdvisorProfile** | LLM-Akteur für konsultative Pässe vor oder nach der Execution. Trägt `AdvisorMode` + `AdvisorTrigger`. Funktional ab PS-7. |
+| **ExecutorProfile** | The LLM actor that creates the draft. Carries system prompt, provider, model, MaxTokens. |
+| **ReviewerProfile** | The LLM actor that assesses the draft. Same fields. `Priority` for sequential strategies via `IReviewer.Priority`. |
+| **CrewTemplate** | Composes executor + reviewers + EvaluationStrategy + an optional ConvergenceOverride + advisor profiles. |
+| **CrewSnapshot** | A fully embedded copy of the CrewTemplate (incl. all profile data) at run-submission time. Persisted as JSONB in `Runs.CrewSnapshot`. |
+| **AdvisorProfile** | An LLM actor for consultative passes before or after execution. Carries `AdvisorMode` + `AdvisorTrigger`. Functional from PS-7. |
 
 ## EvaluationStrategies
 
-| Enum-Wert | SDK-Klasse | Verhalten |
+| Enum value | SDK class | Behaviour |
 |---|---|---|
-| `Parallel` | `ParallelEvaluationStrategy` | Alle Reviewer parallel, alle Findings gesammelt. Standard. |
-| `Sequential` | `SequentialEvaluationStrategy` | Reviewer nacheinander in Listen-Reihenfolge, alle abwarten. |
-| `FailFast` | `FailFastEvaluationStrategy` | Wie Sequential, Abbruch nach erstem Critical-Finding. |
-| `Priority` | `PriorityOrderedEvaluationStrategy` | Reviewer in `Priority`-Reihenfolge (nicht Listenreihenfolge). |
+| `Parallel` | `ParallelEvaluationStrategy` | All reviewers in parallel, all findings collected. Default. |
+| `Sequential` | `SequentialEvaluationStrategy` | Reviewers one after another in list order, all awaited. |
+| `FailFast` | `FailFastEvaluationStrategy` | Like Sequential, aborts after the first critical finding. |
+| `Priority` | `PriorityOrderedEvaluationStrategy` | Reviewers in `Priority` order (not list order). |
 
-**Hinweis:** Bei `Parallel` ist die Reihenfolge in `ReviewerProfileNames` nur dokumentatorisch. Bei `Sequential` und `Priority` ist sie signifikant.
+**Note:** with `Parallel` the order in `ReviewerProfileNames` is only documentary. With `Sequential` and `Priority` it is significant.
 
-## System-Profile (Code-Konstanten)
+## System profiles (code constants)
 
-Definiert in `Geef.Atelier.Core.Domain.Crew.SystemCrew` (read-only, versioniert mit dem Code):
+Defined in `Geef.Atelier.Core.Domain.Crew.SystemCrew` (read-only, versioned with the code):
 
-Provider/Modelle Stand Mai 2026 (nach der Umstellung auf die Subscription-CLIs,
-D-027/D-032): Executor und Anthropic-Reviewer laufen über `claude-cli`, die übrigen
-Reviewer über `codex-cli`. Modell-Pluralismus bleibt gewahrt (Reviewer ≠ Executor-Modell).
+Providers/models as of May 2026 (after the switch to the subscription CLIs,
+D-027/D-032): the executor and the Anthropic reviewer run via `claude-cli`, the other
+reviewers via `codex-cli`. Model pluralism is preserved (reviewer ≠ executor model).
 
-| Name | Typ | Provider / Modell |
+| Name | Type | Provider / Model |
 |---|---|---|
 | `default-executor` | ExecutorProfile | `claude-cli` / `anthropic/claude-opus-4.7` |
 | `briefing-fidelity` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
@@ -47,25 +49,24 @@ Reviewer über `codex-cli`. Modell-Pluralismus bleibt gewahrt (Reviewer ≠ Exec
 | `marketing-audience-clarity` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
 | `marketing-conversion-strength` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
 
-**System-Templates** (vier): `klassik` (Evaluation `Parallel`, keine Advisors —
-reproduziert das ursprüngliche PS-2-Verhalten) sowie die Domain-Templates
-`juristisch` (`Sequential`, Advisor `legal-domain-expert`),
-`akademisch` (`Sequential`, Advisor `academic-rigor-advisor`) und
-`marketing` (`Parallel`, keine Advisors).
+**System templates** (four): `klassik` (evaluation `Parallel`, no advisors —
+reproduces the original PS-2 behaviour) plus the domain templates
+`juristisch` (`Sequential`, advisor `legal-domain-expert`),
+`akademisch` (`Sequential`, advisor `academic-rigor-advisor`) and
+`marketing` (`Parallel`, no advisors).
 
-## Custom-Profile
+## Custom profiles
 
-- Werden in der DB (`ReviewerProfiles`, `ExecutorProfiles`, `CrewTemplates`) gespeichert.
-- Name erhält automatisch den Prefix `"custom-"` (idempotent, kein Doppelpräfix).
-- System-Profile sind read-only: Update/Delete wirft `InvalidOperationException("System profile is read-only — copy it as a custom variant.")`.
+- Stored in the DB (`ReviewerProfiles`, `ExecutorProfiles`, `CrewTemplates`).
+- The name automatically receives the prefix `"custom-"` (idempotent, no double prefix).
+- System profiles are read-only: update/delete throws `InvalidOperationException("System profile is read-only — copy it as a custom variant.")`.
 - API: `ICrewService.CreateCustomReviewerProfileAsync(profile)`.
 
-## CrewSnapshot-Format (SchemaVersion 1)
+## CrewSnapshot format (SchemaVersion 1)
 
-> Das folgende Beispiel zeigt die **Struktur**. Die `provider`/`model`-Werte sind
-> illustrativ — die aktuell gültigen System-Werte stehen in der Tabelle
-> „System-Profile" oben; ein realer Snapshot enthält die zum Submit-Zeitpunkt
-> gültigen Werte.
+> The following example shows the **structure**. The `provider`/`model` values are
+> illustrative — the currently valid system values are in the "System profiles"
+> table above; a real snapshot contains the values valid at submit time.
 
 ```json
 {
@@ -90,13 +91,13 @@ reproduziert das ursprüngliche PS-2-Verhalten) sowie die Domain-Templates
 }
 ```
 
-Serialisiert mit `JsonNamingPolicy.CamelCase`. Gespeichert auf `Runs.CrewSnapshot` (JSONB).
+Serialized with `JsonNamingPolicy.CamelCase`. Stored in `Runs.CrewSnapshot` (JSONB).
 
-## Advisor-Pässe (PS-7)
+## Advisor passes (PS-7)
 
-Advisors sind konsultative LLM-Akteure, die zu definierten Zeitpunkten in der Pipeline ausgeführt werden. Ihr Output fließt als gekennzeichneter Kontext-Block in den Run — der Executor und nachfolgende Reviewer sehen ihn, ohne dass das Geef-SDK-Kern modifiziert werden muss.
+Advisors are consultative LLM actors run at defined points in the pipeline. Their output flows as a marked context block into the run — the executor and subsequent reviewers see it without the Geef SDK core having to be modified.
 
-### AdvisorProfile-Schema
+### AdvisorProfile schema
 
 ```csharp
 public sealed record AdvisorProfile(
@@ -108,95 +109,95 @@ public enum AdvisorMode    { Strategic, Critical, DevilsAdvocate, DomainExpert }
 public enum AdvisorTrigger { BeforeFirstExecution, BeforeEveryExecution, OnConvergenceFailure }
 ```
 
-### Trigger-Typen
+### Trigger types
 
-| Trigger | Bedeutung |
+| Trigger | Meaning |
 |---|---|
-| `BeforeFirstExecution` | Advisor wird einmalig vor Iteration 1 konsultiert. Geeignet für strategische Briefing-Analyse. |
-| `BeforeEveryExecution` | Advisor wird vor jeder Iteration konsultiert. Geeignet für kritische Gegenstimmen. |
-| `OnConvergenceFailure` | Advisor wird nur bei Convergence-Failure konsultiert; danach folgt ein einmaliger Retry-Durchlauf. |
+| `BeforeFirstExecution` | The advisor is consulted once before iteration 1. Suitable for strategic briefing analysis. |
+| `BeforeEveryExecution` | The advisor is consulted before every iteration. Suitable for critical counter-voices. |
+| `OnConvergenceFailure` | The advisor is consulted only on a convergence failure; a single retry run follows afterwards. |
 
-### System-Advisors
+### System advisors
 
-Provider/Modell Stand Mai 2026: alle System-Advisors laufen über
+Provider/model as of May 2026: all system advisors run via
 `claude-cli` / `anthropic/claude-opus-4.7`.
 
-| Name | Mode | Trigger | Zweck |
+| Name | Mode | Trigger | Purpose |
 |---|---|---|---|
-| `briefing-clarifier` | Strategic | BeforeFirstExecution | Analysiert das Briefing vor dem ersten Executor-Pass und liefert strukturierte Klärungshinweise. |
-| `devils-advocate` | DevilsAdvocate | BeforeEveryExecution | Hinterfragt vor jeder Iteration die geplante Executor-Richtung kritisch, um Fehler durch blinden Fortschritt zu vermeiden. |
-| `legal-domain-expert` | DomainExpert | BeforeFirstExecution | Domänen-Input für juristische Texte (Template `juristisch`). |
-| `academic-rigor-advisor` | Critical | BeforeEveryExecution | Wissenschaftliche Strenge/Argumentationsqualität (Template `akademisch`). |
+| `briefing-clarifier` | Strategic | BeforeFirstExecution | Analyzes the briefing before the first executor pass and delivers structured clarification hints. |
+| `devils-advocate` | DevilsAdvocate | BeforeEveryExecution | Critically questions the planned executor direction before every iteration, to avoid errors through blind progress. |
+| `legal-domain-expert` | DomainExpert | BeforeFirstExecution | Domain input for legal texts (template `juristisch`). |
+| `academic-rigor-advisor` | Critical | BeforeEveryExecution | Scientific rigor/argumentation quality (template `akademisch`). |
 
-### Pipeline-Integration via Decorator
+### Pipeline integration via decorator
 
-Der `AdvisorAwareExecutor` (in `Infrastructure/Pipeline/`) dekoriert `IExecutionStep` und schiebt sich transparent vor jeden Executor-Aufruf:
+The `AdvisorAwareExecutor` (in `Infrastructure/Pipeline/`) decorates `IExecutionStep` and slots transparently in front of every executor call:
 
 ```
 AdvisorAwareExecutor.ExecuteAsync(context)
-  1. Filtert Advisors nach aktivem Trigger (BeforeFirst nur bei Iteration 1, BeforeEvery immer)
-  2. Ruft ProfileBasedAdvisor für jeden passenden Advisor sequenziell auf
-  3. Schreibt Output als "[ADVISOR: <name>]\n<text>" in context[AtelierContextKeys.AdvisorBlock]
-  4. Persistiert AdvisorConsultation-Record (Tabelle AdvisorConsultations)
-  5. Delegiert an den echten IExecutionStep
+  1. Filters advisors by the active trigger (BeforeFirst only at iteration 1, BeforeEvery always)
+  2. Calls ProfileBasedAdvisor sequentially for each matching advisor
+  3. Writes the output as "[ADVISOR: <name>]\n<text>" into context[AtelierContextKeys.AdvisorBlock]
+  4. Persists an AdvisorConsultation record (table AdvisorConsultations)
+  5. Delegates to the real IExecutionStep
 ```
 
-`AtelierPipelineFactory.BuildWithAdvisorContext(snapshot, context)` wired den Decorator und stellt sicher, dass der Advisor-Block im `IRunContext` propagiert wird.
+`AtelierPipelineFactory.BuildWithAdvisorContext(snapshot, context)` wires the decorator and ensures the advisor block is propagated in the `IRunContext`.
 
-### Advisor-Failure-Verhalten
+### Advisor-failure behaviour
 
-Advisor-LLM-Calls sind nicht best-effort. Eine Exception in `ProfileBasedAdvisor` bubbled durch `AdvisorAwareExecutor` und bricht den Run mit `Status=Failed` ab (D-031(c)). Stiller Weiterlauf würde einen möglicherweise korrumpierten Kontext maskieren.
+Advisor LLM calls are not best-effort. An exception in `ProfileBasedAdvisor` bubbles through `AdvisorAwareExecutor` and aborts the run with `Status=Failed` (D-031(c)). Silently continuing would mask a possibly corrupted context.
 
-### Convergence-Failure-Retry-Mechanismus
+### Convergence-failure retry mechanism
 
 ```
 Pipeline → ConvergenceFailedException
   → RunOrchestratorService.TryConvergenceFailureRetryAsync
-      1. Prüft RunEntity.AdvisorRetryAttempted — true → eskaliert zu Failed (kein zweiter Retry)
-      2. Setzt AdvisorRetryAttempted = true in DB
-      3. Aktiviert OnConvergenceFailure-Advisors im nächsten Run-Kontext
-      4. Startet Pipeline-Durchlauf erneut (einmalig)
-      5. Zweites ConvergenceFailedException → Failed (kein weiterer Retry)
+      1. Checks RunEntity.AdvisorRetryAttempted — true → escalates to Failed (no second retry)
+      2. Sets AdvisorRetryAttempted = true in the DB
+      3. Enables OnConvergenceFailure advisors in the next run context
+      4. Restarts the pipeline run (once)
+      5. A second ConvergenceFailedException → Failed (no further retry)
 ```
 
-**Single-Retry-Cap:** `RunEntity.AdvisorRetryAttempted` (Migration Step11) verhindert Endlos-Schleifen. Multi-Retry mit konfigurierbarer Wiederholungsanzahl ist als Future Work dokumentiert.
+**Single-retry cap:** `RunEntity.AdvisorRetryAttempted` (migration Step11) prevents infinite loops. Multi-retry with a configurable retry count is documented as future work.
 
-### DB-Tabellen (Migration Step11AdvisorSystem)
+### DB tables (migration Step11AdvisorSystem)
 
-| Tabelle | Inhalt |
+| Table | Content |
 |---|---|
-| `AdvisorProfiles` | Custom Advisor-Profile (System-Advisors leben als Code-Konstanten in `SystemCrew`). |
-| `AdvisorConsultations` | Persistierte Advisor-Outputs pro Iteration und Advisor (RunId, IterationNumber, AdvisorName, OutputText, CreatedAt). |
+| `AdvisorProfiles` | Custom advisor profiles (system advisors live as code constants in `SystemCrew`). |
+| `AdvisorConsultations` | Persisted advisor outputs per iteration and advisor (RunId, IterationNumber, AdvisorName, OutputText, CreatedAt). |
 
-Spalte `RunEntity.AdvisorRetryAttempted` (bool, nullable) auf `Runs`-Tabelle.
+Column `RunEntity.AdvisorRetryAttempted` (bool, nullable) on the `Runs` table.
 
-### UI-Komponenten (PS-7)
+### UI components (PS-7)
 
-| Komponente | Zweck |
+| Component | Purpose |
 |---|---|
-| `AdvisorPicker` | Available/Selected-Liste analog `ReviewerPicker`, mit Trigger-Anzeige |
-| `AdvisorConsultationsBlock` | Klappsection auf RunDetail-Page: zeigt alle Consultations pro Iteration |
-| `AdvisorProfilesIndex` | Liste aller Advisor-Profile (System + Custom) unter `/crew/profiles/advisors` |
-| `AdvisorProfileEditor` | CRUD-Editor für Custom Advisor-Profile |
+| `AdvisorPicker` | Available/selected list analogous to `ReviewerPicker`, with a trigger indicator |
+| `AdvisorConsultationsBlock` | Collapsible section on the RunDetail page: shows all consultations per iteration |
+| `AdvisorProfilesIndex` | List of all advisor profiles (system + custom) at `/crew/profiles/advisors` |
+| `AdvisorProfileEditor` | CRUD editor for custom advisor profiles |
 
-`ProfileEditorForm` wurde um `ShowAdvisorFields` + Mode/Trigger Radio-Groups erweitert (wiederverwendbar für Reviewer, Executor und Advisor).
+`ProfileEditorForm` was extended with `ShowAdvisorFields` + mode/trigger radio groups (reusable for reviewer, executor and advisor).
 
-### MCP-Tool
+### MCP tool
 
-`list_advisor_profiles` — listet alle Advisor-Profile (System + Custom).
+`list_advisor_profiles` — lists all advisor profiles (system + custom).
 
-## API-Pfade
+## API paths
 
-### Template-basierter Submit (Standard)
+### Template-based submit (default)
 
 ```csharp
 await runService.SubmitRunAsync(
     briefingText: "...",
     configJson:   "{}",
-    crewTemplateName: "klassik");  // null → Standard "klassik"
+    crewTemplateName: "klassik");  // null → default "klassik"
 ```
 
-### Custom-Crew-Submit
+### Custom-crew submit
 
 ```csharp
 var spec = new CrewSpec(
@@ -208,61 +209,61 @@ var spec = new CrewSpec(
 await runService.SubmitRunAsync("...", "{}", customCrew: spec);
 ```
 
-### MCP-Tools
+### MCP tools
 
-- `list_crew_templates` — listet alle Templates (System + Custom).
-- `list_reviewer_profiles` — listet alle Reviewer-Profile (System + Custom).
-- `list_advisor_profiles` — listet alle Advisor-Profile (System + Custom).
-- `list_grounding_provider_profiles` — listet alle Grounding-Provider-Profile.
-- `submit_request` — erweitert um `crew_template` und `custom_crew` (JSON-String).
+- `list_crew_templates` — lists all templates (system + custom).
+- `list_reviewer_profiles` — lists all reviewer profiles (system + custom).
+- `list_advisor_profiles` — lists all advisor profiles (system + custom).
+- `list_grounding_provider_profiles` — lists all grounding-provider profiles.
+- `submit_request` — extended with `crew_template` and `custom_crew` (JSON string).
 
-Vollständige Tool-Liste (13 Tools): siehe [09-endpoint-reference.md](09-endpoint-reference.md) und die [Projekt-README](../README.md).
+Full tool list (13 tools): see [09-endpoint-reference.md](09-endpoint-reference.md) and the [project README](../README.md).
 
-## Reviewer-Name-Migration
+## Reviewer-name migration
 
-| Alt (pre-PS-5) | Neu (PS-5) |
+| Old (pre-PS-5) | New (PS-5) |
 |---|---|
 | `BriefingTreueReviewer` | `briefing-fidelity` |
 | `KlarheitReviewer` | `clarity` |
 
-Migration Step10 benennt historische `Findings.ReviewerName`-Werte um. `ReviewerDisplay.ToDisplay()` enthält beide Varianten als Fallback.
+Migration Step10 renames historical `Findings.ReviewerName` values. `ReviewerDisplay.ToDisplay()` contains both variants as a fallback.
 
-## Systemtrennung (Namespace)
+## System separation (namespace)
 
-- `Core/Domain/Crew/` — alle Domain-Records (keine Infrastruktur-Abhängigkeit).
-- `Core/Domain/Crew/SystemPrompts.cs` — System-Prompt-Texte (lang, gehören semantisch zu System-Profilen).
-- `Infrastructure/Pipeline/ProfileBasedReviewer.cs` / `ProfileBasedExecutor.cs` — Geef-SDK-Adapter.
-- `Application/Crew/CrewService.cs` + `CrewSnapshotBuilder.cs` — orchestriert Repo-Lookups + Snapshot-Konstruktion.
+- `Core/Domain/Crew/` — all domain records (no infrastructure dependency).
+- `Core/Domain/Crew/SystemPrompts.cs` — system-prompt texts (long, semantically belong to the system profiles).
+- `Infrastructure/Pipeline/ProfileBasedReviewer.cs` / `ProfileBasedExecutor.cs` — Geef SDK adapters.
+- `Application/Crew/CrewService.cs` + `CrewSnapshotBuilder.cs` — orchestrates repo lookups + snapshot construction.
 
-## PS-6 — UI-Pfade und Konventionen
+## PS-6 — UI paths and conventions
 
-### Routing-Map
+### Routing map
 
-| URL | Komponente | Beschreibung |
+| URL | Component | Description |
 |---|---|---|
-| `/crew` | `CrewIndex` | Landing-Page mit Überblick über Templates + Profile |
-| `/crew/templates` | `CrewTemplatesIndex` | Liste aller Templates (System + Custom) |
-| `/crew/templates/new` | `CrewTemplateEditor` | Neues Template anlegen |
-| `/crew/templates/{name}` | `CrewTemplateEditor` | Template bearbeiten / System-Template duplizieren |
-| `/crew/profiles/reviewers` | `ReviewerProfilesIndex` | Liste aller Reviewer-Profile |
-| `/crew/profiles/reviewers/new` | `ReviewerProfileEditor` | Neues Reviewer-Profil anlegen |
-| `/crew/profiles/reviewers/{name}` | `ReviewerProfileEditor` | Reviewer-Profil bearbeiten |
-| `/crew/profiles/executors` | `ExecutorProfilesIndex` | Liste aller Executor-Profile |
-| `/crew/profiles/executors/new` | `ExecutorProfileEditor` | Neues Executor-Profil anlegen |
-| `/crew/profiles/executors/{name}` | `ExecutorProfileEditor` | Executor-Profil bearbeiten |
+| `/crew` | `CrewIndex` | Landing page with an overview of templates + profiles |
+| `/crew/templates` | `CrewTemplatesIndex` | List of all templates (system + custom) |
+| `/crew/templates/new` | `CrewTemplateEditor` | Create a new template |
+| `/crew/templates/{name}` | `CrewTemplateEditor` | Edit a template / duplicate a system template |
+| `/crew/profiles/reviewers` | `ReviewerProfilesIndex` | List of all reviewer profiles |
+| `/crew/profiles/reviewers/new` | `ReviewerProfileEditor` | Create a new reviewer profile |
+| `/crew/profiles/reviewers/{name}` | `ReviewerProfileEditor` | Edit a reviewer profile |
+| `/crew/profiles/executors` | `ExecutorProfilesIndex` | List of all executor profiles |
+| `/crew/profiles/executors/new` | `ExecutorProfileEditor` | Create a new executor profile |
+| `/crew/profiles/executors/{name}` | `ExecutorProfileEditor` | Edit an executor profile |
 
-### UI-Komponenten
+### UI components
 
-| Komponente | Ort | Zweck |
+| Component | Location | Purpose |
 |---|---|---|
-| `CrewBadge` | `Components/UI/` | Dezenter Text-Badge mit Template-Namen in RunRow |
-| `CrewSelector` | `Components/UI/` | Dropdown zur Template-Auswahl auf der NewRun-Page |
-| `CrewSummary` | `Components/UI/` | Click-to-Expand Crew-Übersicht auf RunDetail-Page |
-| `ReviewerPicker` | `Components/UI/` | Available/Selected-Liste mit Up/Down-Reordering |
-| `ProfileEditorForm` | `Components/UI/` | Generisches Form für Reviewer- und Executor-Profile |
-| `Modal` | `Components/UI/` | Generische Modal-Komponente mit Backdrop |
-| `DeleteConfirmationModal` | `Components/UI/` | Bestätigungs-Modal: User muss Namen tippen |
+| `CrewBadge` | `Components/UI/` | Subtle text badge with the template name in RunRow |
+| `CrewSelector` | `Components/UI/` | Dropdown for template selection on the NewRun page |
+| `CrewSummary` | `Components/UI/` | Click-to-expand crew overview on the RunDetail page |
+| `ReviewerPicker` | `Components/UI/` | Available/selected list with up/down reordering |
+| `ProfileEditorForm` | `Components/UI/` | Generic form for reviewer and executor profiles |
+| `Modal` | `Components/UI/` | Generic modal component with a backdrop |
+| `DeleteConfirmationModal` | `Components/UI/` | Confirmation modal: the user must type the name |
 
-### Name-Constraints
+### Name constraints
 
-Pattern `^[a-z0-9\-]+$`, max 64 Zeichen — gilt für alle Profile- und Template-Namen (Custom-Prefix exkl.). Form-Validierung via `DataAnnotations.RegularExpression`. Service-Layer ist idempotent bzgl. `custom-`-Prefix.
+Pattern `^[a-z0-9\-]+$`, max 64 characters — applies to all profile and template names (custom prefix excluded). Form validation via `DataAnnotations.RegularExpression`. The service layer is idempotent regarding the `custom-` prefix.

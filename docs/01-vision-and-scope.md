@@ -1,64 +1,66 @@
-# Vision und Scope
+# Vision and Scope
 
-*Letzte Aktualisierung: 17. Mai 2026 (Scope an Mehrbenutzer-Stand angeglichen)*
+*[Deutsch](01-vision-and-scope_de.md) · **English***
+
+*Last updated: 17 May 2026 (scope aligned with the multi-user state)*
 
 ## Vision
 
-**Geef.Atelier** ist eine Text-Manufaktur: ein Atelier aus spezialisierten KI-Rollen (Executor, Reviewer, optional Advisor), das je nach Werkstück unterschiedlich besetzt wird. Der Unterschied zu einem klassischen "GPT-Wrapper" ist nicht Bedienung oder Preis, sondern dass die Maschine *vor der Arbeit entscheidet, wie sie arbeitet* (adaptive Crew-Komposition) und *während der Arbeit transparent macht, was sie tut* (Prozess-Sichtbarkeit über Iterations- und Findings-Trail).
+**Geef.Atelier** is a text manufactory: an atelier of specialized AI roles (executor, reviewer, optionally advisor) staffed differently depending on the piece of work. The difference from a classic "GPT wrapper" is not the UX or the price, but that the machine *decides how it works before it works* (adaptive crew composition) and *makes transparent what it does while it works* (process visibility via an iteration and findings trail).
 
-Das Projekt ist die produktive Anwendung des [Geef SDK](https://github.com/chr0mcom/geef): Es nutzt das GEEF-Pipeline-Pattern (Grounding / Execution / Evaluation / Finalize) und die Erweiterungen (Convergence-Policies, Evaluation-Strategies, Advisor-Pattern, EventSink, Middleware), um Texte in Höchstqualität zu erzeugen.
+The project is the productive application of the [Geef SDK](https://github.com/chr0mcom/geef): it uses the GEEF pipeline pattern (Grounding / Execution / Evaluation / Finalize) and the extensions (convergence policies, evaluation strategies, advisor pattern, event sink, middleware) to produce texts of the highest quality.
 
-## Leitsterne
+## Guiding principles
 
-1. **Adaptive Crew-Komposition** — Der Klassifikator erkennt die Textsorte und stellt aus einem getaggten Reviewer-/Advisor-Pool die passende Crew zusammen. Spezialisierung passiert über Daten (Reviewer-Profile, Crew-Templates), nicht über Code-Branches.
-2. **Prozess-Transparenz** — Jeder Run hinterlässt einen vollständigen Trail: alle Iterationen, alle Findings, alle Advisor-Konsultationen. Vertrauen entsteht durch Nachvollziehbarkeit.
-3. **Modell-Pluralismus** — Reviewer nutzen bewusst andere Modelle als der Executor, um echte Außenperspektive zu erzeugen statt Selbstbestätigung.
+1. **Adaptive crew composition** — the classifier recognizes the text type and assembles the matching crew from a tagged reviewer/advisor pool. Specialization happens through data (reviewer profiles, crew templates), not code branches.
+2. **Process transparency** — every run leaves a complete trail: all iterations, all findings, all advisor consultations. Trust comes from traceability.
+3. **Model pluralism** — reviewers deliberately use models other than the executor's, to create a genuine outside perspective instead of self-confirmation.
 
-## In Scope
+## In scope
 
-- Generische Pipeline für beliebige Textsorten (juristische Schriftsätze, Fachartikel, Marketing, akademische Texte, Briefe, Gedichte, …)
-- Mehrbenutzer-Hosting auf eigenem Docker-Server: DB-basierte Benutzerverwaltung (BCrypt), Run-Sichtbarkeit pro Nutzer isoliert, Admin-Override per expliziten Umschaltern
-- Web-UI (Blazor Server) für Auftragserteilung, Live-Status, Ergebnis-Abholung
-- MCP-Server-Schnittstelle, damit externe KI-Clients (Claude Desktop, Claude Code, Custom-Agents) Aufträge erteilen und Ergebnisse abholen können — Auth über statisches Bearer-Token oder self-hosted OAuth 2.1
-- Multi-Provider-LLM-Support: OpenRouter (Pay-per-Token) sowie Subscription-CLIs (Claude Code, Codex) über einen lokalen Proxy; Reviewer/Advisor bewusst mit Fremd-Modellen
-- Quellen-Übergabe in mehreren Formen: Datei-Upload (PDF, DOCX, TXT, MD), URLs, Freitext-Briefing, Stil-Referenztexte; semantische Wissensbasis (Vector-Store-RAG) und Run-lokale Attachments
-- Fire-and-Forget-Workflow: Auftrag starten, später Status prüfen, am Ende Ergebnis abholen — keine Mensch-im-Loop-Eingriffe während des Runs
-- Persistente Run-Historie mit vollständigem Iterations-Trail
+- Generic pipeline for arbitrary text types (legal briefs, technical articles, marketing, academic texts, letters, poems, …)
+- Multi-user hosting on a self-owned Docker server: DB-based user management (BCrypt), per-user isolated run visibility, admin override via explicit toggles
+- Web UI (Blazor Server) for submitting jobs, live status, picking up results
+- MCP server interface so external AI clients (Claude Desktop, Claude Code, custom agents) can submit jobs and fetch results — auth via static bearer token or self-hosted OAuth 2.1
+- Multi-provider LLM support: OpenRouter (pay-per-token) plus subscription CLIs (Claude Code, Codex) via a local proxy; reviewers/advisors deliberately on foreign models
+- Source ingestion in several forms: file upload (PDF, DOCX, TXT, MD), URLs, free-text briefing, style reference texts; semantic knowledge base (vector-store RAG) and run-local attachments
+- Fire-and-forget workflow: start a job, check status later, fetch the result at the end — no human-in-the-loop interventions during the run
+- Persistent run history with a complete iteration trail
 
-## Out of Scope (vorerst)
+## Out of scope (for now)
 
-- Echte Mandantenfähigkeit / Multi-Tenant-Isolation (das System ist Mehrbenutzer, aber single-tenant: ein Admin, gemeinsame Konfiguration; pro Nutzer ist nur die Run-Sichtbarkeit isoliert)
-- Öffentlicher Zugang ohne Auth
-- Mensch-im-Loop zwischen Iterationen (bewusst nicht implementiert; Fire-and-Forget bleibt das Modell)
-- Mobile Apps oder native Clients
-- Kommerzielles Hosting, Billing, Abrechnung
-- Echte Memory-Backed-Advisors mit Cross-Run-Lernen
-- Domänen-spezifische Datenbank-Connectors (z.B. juristische Datenbanken wie dejure.org oder Beck-Online) — später optional
-- **Export** jenseits von Markdown: DOCX-/PDF-*Ausgabe* ist weiterhin out of scope. (Hinweis: PDF/DOCX/TXT/MD als *Eingabe*/Quelle ist umgesetzt — siehe „In Scope“.)
+- True multi-tenancy / tenant isolation (the system is multi-user but single-tenant: one admin, shared configuration; only run visibility is isolated per user)
+- Public access without auth
+- Human-in-the-loop between iterations (deliberately not implemented; fire-and-forget remains the model)
+- Mobile apps or native clients
+- Commercial hosting, billing, invoicing
+- True memory-backed advisors with cross-run learning
+- Domain-specific database connectors (e.g. legal databases such as dejure.org or Beck-Online) — optional later
+- **Export** beyond Markdown: DOCX/PDF *output* remains out of scope. (Note: PDF/DOCX/TXT/MD as *input*/source is implemented — see "In scope".)
 
-## Zielnutzer
+## Target users
 
-Mehrere benannte Benutzerkonten, verwaltet durch einen Admin. Die Anwendung ist nicht mandantenfähig (keine Tenant-Trennung von Konfiguration oder Crew-Daten), aber jeder Nutzer sieht nur seine eigenen Runs; der Admin kann optional alles einsehen. Authentifizierung ist Pflicht, weil die App über das öffentliche Internet erreichbar ist (Server-Hosting).
+Several named user accounts, managed by an admin. The application is not multi-tenant (no tenant separation of configuration or crew data), but each user sees only their own runs; the admin can optionally view everything. Authentication is mandatory because the app is reachable over the public internet (server hosting).
 
-## Hosting-Umgebung
+## Hosting environment
 
-- Docker-Container auf eigenem Server
-- Postgres ist bereits als Datenbankdienst auf dem Server vorhanden — das Projekt nutzt diese existierende Postgres-Instanz, kein separater DB-Container nötig (außer für lokale Entwicklung)
-- Reverse-Proxy (Traefik / Nginx) übernimmt TLS-Terminierung
-- API-Keys, Connection-Strings, Auth-Secrets über Environment-Variablen / Docker Secrets
-- Persistente Datenhaltung in Postgres (inkl. pgvector für die semantische Wissensbasis); hochgeladene Quellen werden indexiert in der Datenbank gehalten
+- Docker container on a self-owned server
+- Postgres is already present as a database service on the server — the project uses this existing Postgres instance, no separate DB container needed (except for local development)
+- A reverse proxy (Traefik / Nginx) handles TLS termination
+- API keys, connection strings, auth secrets via environment variables / Docker secrets
+- Persistent data storage in Postgres (incl. pgvector for the semantic knowledge base); uploaded sources are kept indexed in the database
 
-## Erfolgs-Kriterium für das Skeleton
+## Success criterion for the skeleton
 
-> **Status:** Dieses Skeleton-Erfolgskriterium ist seit Mai 2026 vollständig erfüllt; die App läuft produktiv. Die unten als „danach“ genannten Erweiterungen (Quellen-Upload/RAG, Crew-Komposition, Advisor-Pässe) sind inzwischen ausgeliefert. Die folgende Liste bleibt als ursprüngliche Definition des Minimal-Ziels erhalten.
+> **Status:** This skeleton success criterion has been fully met since May 2026; the app runs in production. The extensions listed below as "afterwards" (source upload/RAG, crew composition, advisor passes) have since been shipped. The following list is retained as the original definition of the minimal goal.
 
-Das Walking Skeleton (siehe [03-walking-skeleton-plan.md](03-walking-skeleton-plan.md)) ist erfolgreich, wenn:
+The walking skeleton (see [03-walking-skeleton-plan.md](03-walking-skeleton-plan.md)) is successful when:
 
-1. Ein Auftrag mit reinem Text-Briefing über die Web-UI startbar ist.
-2. Die Pipeline mit Anthropic als Executor und zwei festen Reviewern (z.B. mit OpenAI-Modell) durchläuft, ohne dass der User eingreifen muss.
-3. Während des Runs ein Live-Status in der UI sichtbar ist (aktuelle Phase, Iteration, Findings).
-4. Nach Abschluss der finale Text in der UI angezeigt wird.
-5. Derselbe Workflow auch über den MCP-Server funktioniert (Auftrag absetzen, Status abfragen, Ergebnis abholen via MCP-Tools).
-6. Die ganze Anwendung als Docker-Container deploybar ist und sich an die existierende Postgres-Instanz anbindet.
+1. A job with a plain text briefing can be started via the web UI.
+2. The pipeline runs with Anthropic as executor and two fixed reviewers (e.g. with an OpenAI model) without the user having to intervene.
+3. A live status is visible in the UI during the run (current phase, iteration, findings).
+4. After completion the final text is shown in the UI.
+5. The same workflow also works via the MCP server (submit a job, query status, fetch the result via MCP tools).
+6. The whole application is deployable as a Docker container and connects to the existing Postgres instance.
 
-Alles weitere (Quellen-Upload, Klassifikator, dynamische Crew, Advisor, Multi-Format-Export) sind Erweiterungen *nach* dem Skeleton.
+Everything else (source upload, classifier, dynamic crew, advisor, multi-format export) are extensions *after* the skeleton.

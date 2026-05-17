@@ -1,62 +1,64 @@
 # Geef.Atelier
 
-Text-Generations-Pipeline-Plattform auf Basis des [Geef SDK](https://github.com/chr0mcom/geef). Mehrere Modelle arbeiten in konfigurierbaren Crews zusammen — Executor schreibt, Reviewer bewerten, die Pipeline iteriert bis zur Konvergenz.
+*[Deutsch](README_de.md) · **English***
 
-## Implementierungsstand
+Text-generation pipeline platform built on the [Geef SDK](https://github.com/chr0mcom/geef). Multiple models collaborate in configurable crews — the executor writes, the reviewers assess, and the pipeline iterates until convergence.
 
-**Schritt 1 ✅** Solution-Struktur, Postgres-Persistence, Health-Check, Docker-Compose.
+## Implementation status
 
-**Schritt 2 ✅** In-memory Geef-Pipeline mit Stub-Providern — kein LLM, kein DB-Zugriff. Convergence-Loop, EventSink, alle vier Provider-Verträge implementiert und mit xUnit-Tests abgedeckt.
+**Step 1 ✅** Solution structure, Postgres persistence, health check, Docker Compose.
 
-**Schritt 3 ✅** Echte Anthropic-API-Aufrufe — `IAnthropicClient`, `LlmExecutionStep`, zwei `LlmReviewer` (Tool Use). Polly-Resilience.
+**Step 2 ✅** In-memory Geef pipeline with stub providers — no LLM, no DB access. Convergence loop, event sink, all four provider contracts implemented and covered by xUnit tests.
 
-**Schritt 4 ✅** Postgres-Persistierung — `PostgresEventSink` schreibt jeden Pipeline-Run mit Iterationen, Findings, Token-Verbrauch und Event-Log in die DB.
+**Step 3 ✅** Real Anthropic API calls — `IAnthropicClient`, `LlmExecutionStep`, two `LlmReviewer` (tool use). Polly resilience.
 
-**Schritt 5 ✅** BackgroundService-Orchestrierung — `RunOrchestratorService` pollt für Pending-Runs, setzt atomaren Claim, führt die Geef-Pipeline concurrent aus, recovert crashed Runs beim Start.
+**Step 4 ✅** Postgres persistence — `PostgresEventSink` writes every pipeline run with its iterations, findings, token usage and event log to the DB.
 
-**Schritt 6 ✅** Application-Service-Layer — `IRunService` (Submit/Get/List/Cancel), `IRunRepository`, Cancellation-Watcher.
+**Step 5 ✅** BackgroundService orchestration — `RunOrchestratorService` polls for pending runs, sets an atomic claim, runs the Geef pipeline concurrently, and recovers crashed runs on startup.
 
-**Schritt 7 ✅** Blazor-UI — drei Pages (`/new`, `/runs`, `/runs/{id}`), SignalR-Hub mit Live-Status, 9 UI-Komponenten, bUnit- und Playwright-Tests.
+**Step 6 ✅** Application service layer — `IRunService` (Submit/Get/List/Cancel), `IRunRepository`, cancellation watcher.
 
-**Schritt 8 ✅** Cookie-Auth — Single-User-Login, `[Authorize]` auf Pages, Login/Logout, `TestAuthenticationHandler` für E2E-Tests.
+**Step 7 ✅** Blazor UI — three pages (`/new`, `/runs`, `/runs/{id}`), SignalR hub with live status, 9 UI components, bUnit and Playwright tests.
 
-**Schritt 9+ ✅** Crew-System, Advisor-Pässe, Template Studio, Domain-Templates, Grounding-Provider-CRUD, Vector-Store-RAG, PDF-Support, Cost-Tracking.
+**Step 8 ✅** Cookie auth — single-user login, `[Authorize]` on pages, login/logout, `TestAuthenticationHandler` for E2E tests.
 
-**MCP-OAuth ✅** Self-hosted OAuth 2.1 Authorization Server (RFC 8414/7591/7636/7009/8252) — Authorization-Code-Flow mit Pflicht-PKCE/S256, Opaque Tokens, Refresh-Rotation, Reuse-Detection.
+**Step 9+ ✅** Crew system, advisor passes, Template Studio, domain templates, grounding-provider CRUD, vector-store RAG, PDF support, cost tracking.
 
-**Multi-User ✅** DB-basierte Benutzerverwaltung mit BCrypt, Admin-UI unter `/admin/users`, Startup-Seeding des Admin-Accounts aus Env-Vars.
+**MCP OAuth ✅** Self-hosted OAuth 2.1 authorization server (RFC 8414/7591/7636/7009/8252) — authorization-code flow with mandatory PKCE/S256, opaque tokens, refresh rotation, reuse detection.
 
-**Run-User-Isolation ✅** Jeder Nutzer sieht nur seine eigenen Runs; Admin-Override per expliziten Umschaltern. MCP-Runs werden dem autorisierenden OAuth-Nutzer zugeordnet, Claude-Code-CLI-Runs (statisches Token) dem Admin (D-042).
+**Multi-user ✅** DB-based user management with BCrypt, admin UI at `/admin/users`, startup seeding of the admin account from env vars.
 
-Aktuell: **über 800 Tests** (grün; 2 bekannte Testcontainers-Flakes).
+**Run-user isolation ✅** Each user sees only their own runs; admin override via explicit toggles. MCP runs are attributed to the authorizing OAuth user, Claude Code CLI runs (static token) to the admin (D-042).
 
-Vollständiger Scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope.md)
+Currently: **over 800 tests** (green; 2 known Testcontainers flakes).
+
+Full scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope.md)
 
 ---
 
-## Lokaler Start
+## Local startup
 
 ```bash
-# App + Postgres starten
+# Start app + Postgres
 docker compose -f docker-compose.dev.yml up --build -d
 
-# Health-Check
+# Health check
 curl http://localhost:8080/health   # → Healthy
 
-# Stack stoppen
+# Stop the stack
 docker compose -f docker-compose.dev.yml down
 ```
 
-## Auth-Setup
+## Auth setup
 
-### Benutzer
+### Users
 
-Die App unterstützt mehrere Benutzerkonten. Der erste Admin-Account wird automatisch aus Env-Vars gesetzt und beim Start angelegt bzw. synchronisiert:
+The app supports multiple user accounts. The first admin account is set automatically from env vars and is created or synchronized on startup:
 
 ```bash
-# BCrypt-Hash für ein Passwort generieren (work factor 11)
-dotnet run --project tools/HashPassword -- "DeinPasswort"
-# Ausgabe: $2a$11$...
+# Generate a BCrypt hash for a password (work factor 11)
+dotnet run --project tools/HashPassword -- "YourPassword"
+# Output: $2a$11$...
 ```
 
 ```env
@@ -64,16 +66,16 @@ ATELIER_USER=stefan
 ATELIER_PASSWORD_HASH=$2a$11$...
 ```
 
-Weitere Benutzer können im Admin-Panel unter `/admin/users` angelegt werden (nur für den Admin-Account sichtbar).
+Further users can be created in the admin panel at `/admin/users` (visible only to the admin account).
 
-**Dev-Defaults** (nur für lokale Entwicklung, in `docker-compose.dev.yml`):
+**Dev defaults** (local development only, in `docker-compose.dev.yml`):
 - Username: `admin`
-- Passwort: `DevPassword!`
+- Password: `DevPassword!`
 
-### MCP-Token (Claude Code CLI)
+### MCP token (Claude Code CLI)
 
 ```bash
-# Zufälligen Token generieren
+# Generate a random token
 openssl rand -hex 32
 ```
 
@@ -86,11 +88,11 @@ ATELIER_MCP_TOKEN=<hex-token>
 ## Tests
 
 ```bash
-# Benötigt laufenden Docker-Daemon (Testcontainers)
+# Requires a running Docker daemon (Testcontainers)
 dotnet test
 ```
 
-## Migration manuell ausführen
+## Run a migration manually
 
 ```bash
 dotnet ef database update \
@@ -100,11 +102,11 @@ dotnet ef database update \
 
 ---
 
-## MCP-Server
+## MCP server
 
-Der MCP-Server läuft unter `/mcp`. Zwei Auth-Pfade stehen parallel zur Verfügung:
+The MCP server is served at `/mcp`. Two auth paths are available in parallel:
 
-### Pfad A: Statisches Bearer-Token (Claude Code CLI)
+### Path A: Static bearer token (Claude Code CLI)
 
 ```json
 {
@@ -121,87 +123,87 @@ Der MCP-Server läuft unter `/mcp`. Zwei Auth-Pfade stehen parallel zur Verfügu
 }
 ```
 
-### Pfad B: OAuth 2.1 (Claude Desktop / Claude.ai Custom Connector)
+### Path B: OAuth 2.1 (Claude Desktop / Claude.ai custom connector)
 
-URL `https://<your-domain>/mcp` im Client eintragen — der Client erkennt den `WWW-Authenticate`-Header mit der Resource-Metadata-URL und startet den OAuth-Flow automatisch (Dynamic Client Registration → Browser-Login → Consent-Seite → Token-Exchange).
+Enter the URL `https://<your-domain>/mcp` in the client — the client detects the `WWW-Authenticate` header carrying the resource-metadata URL and starts the OAuth flow automatically (dynamic client registration → browser login → consent page → token exchange).
 
-Voraussetzung: Der OAuth-Client muss im Admin-Panel unter `/admin/oauth-clients` registriert sein, oder der Client registriert sich selbst per Dynamic Client Registration (`POST /oauth/register`).
+Prerequisite: the OAuth client must be registered in the admin panel at `/admin/oauth-clients`, or the client registers itself via dynamic client registration (`POST /oauth/register`).
 
-### MCP-Tools
+### MCP tools
 
-**Run-Management:**
-- `submit_request` — Neuen Run einreichen (optional: `crew_template`, `custom_crew`)
-- `get_run_status` — Status eines Runs abfragen
-- `get_run_result` — Ergebnis eines abgeschlossenen Runs abrufen
-- `list_runs` — Letzte Runs auflisten
-- `get_run_details` — Detailinformationen inkl. Iterationen abrufen
-- `cancel_run` — Laufenden Run abbrechen
+**Run management:**
+- `submit_request` — submit a new run (optional: `crew_template`, `custom_crew`)
+- `get_run_status` — query the status of a run
+- `get_run_result` — retrieve the result of a completed run
+- `list_runs` — list recent runs
+- `get_run_details` — retrieve detailed information including iterations
+- `cancel_run` — cancel a running run
 
-**Crew-System:**
-- `list_crew_templates` — Verfügbare Crew-Templates (System + Custom)
-- `list_reviewer_profiles` — Verfügbare Reviewer-Profile (System + Custom)
-- `list_advisor_profiles` — Verfügbare Advisor-Profile (System + Custom)
-- `list_grounding_provider_profiles` — Verfügbare Grounding-Provider-Profile (System + Custom)
+**Crew system:**
+- `list_crew_templates` — available crew templates (system + custom)
+- `list_reviewer_profiles` — available reviewer profiles (system + custom)
+- `list_advisor_profiles` — available advisor profiles (system + custom)
+- `list_grounding_provider_profiles` — available grounding-provider profiles (system + custom)
 
-**Wissensbasis & Template Studio:**
-- `list_knowledge_documents` — Globale Wissensbasis-Dokumente auflisten
-- `analyze_template_proposal` — Aufgabenbeschreibung analysieren, Template-Vorschlag erzeugen (persistiert)
-- `materialize_template_proposal` — Geprüften Vorschlag als Custom-Template + -Profile materialisieren
+**Knowledge base & Template Studio:**
+- `list_knowledge_documents` — list global knowledge-base documents
+- `analyze_template_proposal` — analyze a task description, produce a template proposal (persisted)
+- `materialize_template_proposal` — materialize a reviewed proposal as a custom template + profiles
 
-Insgesamt 13 MCP-Tools. Vollständige Endpoint-Dokumentation: [docs/09-endpoint-reference.md](docs/09-endpoint-reference.md)
+13 MCP tools in total. Full endpoint documentation: [docs/09-endpoint-reference.md](docs/09-endpoint-reference.md)
 
 ---
 
-## Crew-System
+## Crew system
 
-Jeder Run verwendet eine konfigurierbare Crew aus Executor (schreibt den Draft) und Reviewern (bewerten den Draft). Das Standard-Template `"klassik"` reproduziert das ursprüngliche Verhalten mit zwei Reviewern in paralleler Ausführung.
+Every run uses a configurable crew of an executor (writes the draft) and reviewers (assess the draft). The default template `"klassik"` reproduces the original behaviour with two reviewers running in parallel.
 
-**Verfügbare Evaluation-Strategien:** `Parallel` (Standard), `Sequential`, `FailFast`, `Priority`.
+**Available evaluation strategies:** `Parallel` (default), `Sequential`, `FailFast`, `Priority`.
 
-**System-Profile** sind im Code versioniert und read-only. **Custom-Profile** können per `ICrewService` oder MCP erstellt und in der DB gespeichert werden.
+**System profiles** are versioned in code and read-only. **Custom profiles** can be created via `ICrewService` or MCP and are stored in the DB.
 
-Jeder Run speichert einen vollständig eingebetteten **CrewSnapshot** in der DB — damit bleibt der Run reproduzierbar, auch wenn Profile später geändert werden.
+Every run stores a fully embedded **CrewSnapshot** in the DB — so the run stays reproducible even if profiles are changed later.
 
-### Crew-Verwaltung in der UI
+### Crew management in the UI
 
-| Seite | URL |
+| Page | URL |
 |-------|-----|
-| Crew-Übersicht | `/crew` |
-| Template-Liste | `/crew/templates` |
-| Template anlegen/bearbeiten | `/crew/templates/new`, `/crew/templates/{name}` |
-| Reviewer-Profile | `/crew/profiles/reviewers` |
-| Executor-Profile | `/crew/profiles/executors` |
-| Grounding-Provider | `/crew/profiles/grounding-providers` |
+| Crew overview | `/crew` |
+| Template list | `/crew/templates` |
+| Create/edit template | `/crew/templates/new`, `/crew/templates/{name}` |
+| Reviewer profiles | `/crew/profiles/reviewers` |
+| Executor profiles | `/crew/profiles/executors` |
+| Grounding providers | `/crew/profiles/grounding-providers` |
 
 Details: [docs/08-crew-system.md](docs/08-crew-system.md)
 
 ---
 
-## Production-Deployment
+## Production deployment
 
-Voraussetzungen: Traefik läuft auf dem Server, DNS der Domain zeigt auf den Server.
+Prerequisites: Traefik is running on the server, the domain's DNS points to the server.
 
-### Erste Einrichtung
+### Initial setup
 
-**1. Secrets generieren:**
+**1. Generate secrets:**
 
 ```bash
-# BCrypt-Hash für das UI-Passwort (work factor 11)
-dotnet run --project tools/HashPassword -- "DeinPasswort"
+# BCrypt hash for the UI password (work factor 11)
+dotnet run --project tools/HashPassword -- "YourPassword"
 
-# MCP-Token (64 Hex-Zeichen)
+# MCP token (64 hex characters)
 openssl rand -hex 32
 
-# Postgres-Passwort
+# Postgres password
 openssl rand -base64 24
 ```
 
-**2. `.env`-Datei anlegen** (niemals in Git committen — ist gitignored):
+**2. Create the `.env` file** (never commit to Git — it is gitignored):
 
 ```env
 POSTGRES_DB=geef_atelier
 POSTGRES_USER=geef_atelier
-POSTGRES_PASSWORD=<generiertes-passwort>
+POSTGRES_PASSWORD=<generated-password>
 
 ATELIER_USER=<admin-username>
 ATELIER_PASSWORD_HASH=<bcrypt-hash>
@@ -210,85 +212,85 @@ ATELIER_DOMAIN=<your-domain>
 
 LLM_OPENROUTER_API_KEY=<openrouter-api-key>
 
-# Tavily Web Search (https://tavily.com) — optional
+# Tavily web search (https://tavily.com) — optional
 TAVILY_API_KEY=
 ```
 
-**3. Stack starten:**
+**3. Start the stack:**
 
 ```bash
 docker compose up -d --build
 ```
 
-Migrations laufen automatisch beim Start. Health-Check: `https://<your-domain>/health`.
+Migrations run automatically on startup. Health check: `https://<your-domain>/health`.
 
-### Neustart / Update
+### Restart / update
 
 ```bash
 docker compose build --no-cache web && docker compose up -d web
 docker compose logs -f web
 ```
 
-### Wichtige URLs
+### Important URLs
 
-| URL | Beschreibung |
+| URL | Description |
 |-----|--------------|
-| `https://<your-domain>/` | Web-UI (Cookie-Auth) |
-| `https://<your-domain>/health` | Health-Check |
-| `https://<your-domain>/mcp` | MCP-Endpunkt (Bearer / OAuth 2.1) |
-| `https://<your-domain>/admin/users` | Benutzerverwaltung (nur Admin) |
-| `https://<your-domain>/admin/oauth-clients` | OAuth-Client-Verwaltung (nur Admin) |
-| `https://<your-domain>/.well-known/oauth-authorization-server` | OAuth Server Metadata |
+| `https://<your-domain>/` | Web UI (cookie auth) |
+| `https://<your-domain>/health` | Health check |
+| `https://<your-domain>/mcp` | MCP endpoint (bearer / OAuth 2.1) |
+| `https://<your-domain>/admin/users` | User management (admin only) |
+| `https://<your-domain>/admin/oauth-clients` | OAuth client management (admin only) |
+| `https://<your-domain>/.well-known/oauth-authorization-server` | OAuth server metadata |
 
 ---
 
-## Backup & Restore
+## Backup & restore
 
-Der `postgres-backup`-Container erstellt automatisch tägliche Backups.
+The `postgres-backup` container creates daily backups automatically.
 
-- **Zeitplan:** täglich 03:00 UTC
-- **Retention:** 7 Tages-, 4 Wochen-, 6 Monats-Snapshots
-- **Speicherort:** Docker-Volume `geef-atelier-backups`
-- **Format:** `.sql.gz` (gzip-komprimiertes pg_dump)
+- **Schedule:** daily at 03:00 UTC
+- **Retention:** 7 daily, 4 weekly, 6 monthly snapshots
+- **Location:** Docker volume `geef-atelier-backups`
+- **Format:** `.sql.gz` (gzip-compressed pg_dump)
 
 ```bash
-# Backup manuell auslösen
+# Trigger a backup manually
 docker compose exec postgres-backup /backup.sh
 
-# Backups inspizieren
+# Inspect backups
 docker compose exec postgres-backup ls -lh /backups/last/
 
-# Backup aus Volume kopieren
-docker cp geef-atelier-postgres-backup:/backups/last/<datei>.sql.gz ./
+# Copy a backup out of the volume
+docker cp geef-atelier-postgres-backup:/backups/last/<file>.sql.gz ./
 ```
 
 ### Restore
 
 ```bash
 docker compose stop web
-./scripts/restore-backup.sh <pfad-zur-backup-datei.sql.gz>
+./scripts/restore-backup.sh <path-to-backup-file.sql.gz>
 curl https://<your-domain>/health
 ```
 
-> **Hinweis:** `scripts/restore-backup.sh` überschreibt alle bestehenden Daten. Vor dem Restore eine aktuelle Kopie sichern.
+> **Note:** `scripts/restore-backup.sh` overwrites all existing data. Take a fresh copy before restoring.
 
 ---
 
-## Projektstruktur
+## Project structure
 
 ```
 src/
-  Geef.Atelier.Core/           Domain-Entities, Interfaces — keine externen Abhängigkeiten
-  Geef.Atelier.Application/    IRunService, IOAuthService, IUserAdminService u.a.
-  Geef.Atelier.Infrastructure/ EF Core, Npgsql, LLM-Clients, Geef.Sdk-Provider-Impl.
-  Geef.Atelier.Web/            Blazor Server, BackgroundService, Endpoints, MCP-Server
-  Geef.Atelier.Mcp/            MCP-Tool-Definitionen (Class Library)
+  Geef.Atelier.Core/           Domain entities, interfaces — no external dependencies
+  Geef.Atelier.Application/    IRunService, IOAuthService, IUserAdminService, etc.
+  Geef.Atelier.Infrastructure/ EF Core, Npgsql, LLM clients, Geef.Sdk provider impl.
+  Geef.Atelier.Web/            Blazor Server, BackgroundService, endpoints, MCP server
+  Geef.Atelier.Mcp/            MCP tool definitions (class library)
 tests/
   Geef.Atelier.Tests/          xUnit + Testcontainers + bUnit
 tools/
-  HashPassword/                BCrypt-Hash-Generator CLI
+  HashPassword/                BCrypt hash generator CLI
 docs/
-  reports/                     Abschlussberichte je Bau-Schritt
+  reports/                     Completion reports per build step
 ```
 
 ## Stack

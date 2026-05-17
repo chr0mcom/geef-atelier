@@ -1,49 +1,51 @@
 # Brand Assets — Geef.Atelier
 
-Source-of-Truth für alle Brand-Assets. 43 PNGs aus der initialen Brand-Generierungs-Session (Mai 2026).
+*[Deutsch](README_de.md) · **English***
 
-## Asset-Gruppen
+Source of truth for all brand assets. 43 PNGs from the initial brand-generation session (May 2026).
 
-### Master-Mark (Quill)
+## Asset groups
 
-Freigestellte Feder/Quill in drei Tintefarb-Varianten (1254×1254 px, transparenter Hintergrund):
+### Master mark (quill)
 
-| Datei | Variante | Verwendung |
+A cut-out quill in three ink-color variants (1254×1254 px, transparent background):
+
+| File | Variant | Usage |
 |---|---|---|
-| `quill-dark.png` | Dunkle Tinte | Vellum-Palette (heller Hintergrund) |
-| `quill-light.png` | Helle Tinte | Noir-Palette (dunkler Hintergrund) |
-| `quill-sand.png` | Sand-Tinte | Petrol-Palette (dunkler Hintergrund) |
-| `quill-master.png` | Master | Referenz, nicht direkt verwendet |
+| `quill-dark.png` | Dark ink | Vellum palette (light background) |
+| `quill-light.png` | Light ink | Noir palette (dark background) |
+| `quill-sand.png` | Sand ink | Petrol palette (dark background) |
+| `quill-master.png` | Master | Reference, not used directly |
 
-### App-Icons (1024×1024 px, mit Hintergrund)
+### App icons (1024×1024 px, with background)
 
-| Datei | Palette |
+| File | Palette |
 |---|---|
-| `icon-vellum.png` | Vellum (hell, warm) |
-| `icon-noir.png` | Noir (dunkel, amber) |
-| `icon-petrol.png` | Petrol (dunkel, cyan) |
+| `icon-vellum.png` | Vellum (light, warm) |
+| `icon-noir.png` | Noir (dark, amber) |
+| `icon-petrol.png` | Petrol (dark, cyan) |
 
-### Favicon-Sets
+### Favicon sets
 
-Drei Sets in den Größen 16/24/32/48/64/96/128/192/256/512 px:
+Three sets in the sizes 16/24/32/48/64/96/128/192/256/512 px:
 
-| Prefix | Beschreibung |
+| Prefix | Description |
 |---|---|
-| `favicon-vellum-*.png` | Vellum-Palette — **Default** |
-| `favicon-noir-*.png` | Noir-Palette — Dark-Mode-Hint im Browser |
-| `favicon-transparent-*.png` | Transparenter Hintergrund |
+| `favicon-vellum-*.png` | Vellum palette — **default** |
+| `favicon-noir-*.png` | Noir palette — dark-mode hint in the browser |
+| `favicon-transparent-*.png` | Transparent background |
 
-Direkt adressierte Größen (ohne Prefix) sind Duplikate des Vellum-Sets:
+Directly addressed sizes (without a prefix) are duplicates of the Vellum set:
 
-| Datei | Quelle |
+| File | Source |
 |---|---|
 | `favicon-16.png` | = favicon-vellum-16.png |
 | `favicon-32.png` | = favicon-vellum-32.png |
-| `favicon-64.png` | direkt adressierte Größe (Vellum-Set) |
-| `favicon-192.png` | Genutzt als Apple-Touch-Icon |
-| `favicon-512.png` | PWA-Icon |
+| `favicon-64.png` | directly addressed size (Vellum set) |
+| `favicon-192.png` | Used as the Apple touch icon |
+| `favicon-512.png` | PWA icon |
 
-## Theme-Mapping
+## Theme mapping
 
 | Palette | brand-mark | hero-mark |
 |---|---|---|
@@ -51,9 +53,9 @@ Direkt adressierte Größen (ohne Prefix) sind Duplikate des Vellum-Sets:
 | `palette-noir` | `mark-light.png` (= quill-light) | `mark-light.png` |
 | `palette-petrol` | `mark-sand.png` (= quill-sand) | `mark-sand.png` |
 
-## Production-Asset-Ablage
+## Production asset layout
 
-Production-Assets liegen in `src/Geef.Atelier.Web/wwwroot/`:
+Production assets live in `src/Geef.Atelier.Web/wwwroot/`:
 
 ```
 wwwroot/
@@ -76,7 +78,7 @@ wwwroot/
 
 ## TODOs
 
-- **Hairline-Verstärkung ≤32px**: Aktuelles Favicon-Set bei kleinen Größen (16/24/32px) ggf. zu fein. Nach Production-Verifikation entscheiden ob nachgeschärft werden soll.
-- **Stempel-Asset**: War im ursprünglichen Mockup geplant, aber nicht im generierten Set enthalten. Für späteren Design-Sprint vorgemerkt.
-- **Watermark im Manuscript**: Quill-Mark als subtiles Wasserzeichen auf dem Manuskript-Paper wäre stimmig. Scope-Drift für diesen Step — separater TODO.
-- **Wordmark/Schriftzug**: Programmatische Wordmark aus Fonts; keine separate Schriftzug-Grafik generiert.
+- **Hairline reinforcement ≤32px**: the current favicon set may be too fine at small sizes (16/24/32px). Decide after production verification whether it should be sharpened.
+- **Stamp asset**: was planned in the original mockup but not included in the generated set. Noted for a later design sprint.
+- **Watermark in the manuscript**: a quill mark as a subtle watermark on the manuscript paper would be fitting. Scope drift for this step — a separate TODO.
+- **Wordmark/lettering**: a programmatic wordmark from fonts; no separate lettering graphic was generated.
