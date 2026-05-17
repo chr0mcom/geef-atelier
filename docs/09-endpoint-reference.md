@@ -1,8 +1,9 @@
 # Endpoint-Referenz
 
-*Letzte Aktualisierung: 2026-05-16*
+*Letzte Aktualisierung: 2026-05-17 (POST /oauth/consent ergänzt; Web-UI-/Account-Endpunkte ergänzt)*
 
-Alle HTTP-Endpunkte von Geef.Atelier, die extern erreichbar sind. Basis-URL: `https://geef.stefan-bechtel.de`.
+Alle HTTP-Endpunkte von Geef.Atelier, die extern erreichbar sind — MCP, OAuth 2.1
+sowie die Web-UI-/Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`.
 
 ---
 
@@ -142,6 +143,20 @@ https://geef.stefan-bechtel.de/oauth/authorize
   &scope=mcp%3Afull
 ```
 
+Die `GET /oauth/authorize`-Seite ist eine server-gerenderte Blazor-Consent-Seite
+(`[Authorize]` Cookie). Die Approve/Deny-Entscheidung wird per Formular-POST an
+`/oauth/consent` gesendet (siehe unten) — nicht an `/oauth/authorize` selbst.
+
+---
+
+#### `POST /oauth/consent`
+
+**Auth:** Cookie (Geef.Atelier-Login) + Anti-Forgery-Token  
+**Content-Type:** `application/x-www-form-urlencoded`
+
+Submit-Ziel der Consent-Seite. Verarbeitet die Zustimmung/Ablehnung des Nutzers,
+erzeugt bei Zustimmung den Authorization-Code und führt den Redirect aus.
+
 **Nach Zustimmung:** Redirect zu `redirect_uri?code=<auth_code>&state=<state>`  
 **Nach Ablehnung:** Redirect zu `redirect_uri?error=access_denied&state=<state>`  
 **Bei ungültigem Request:** Fehlerseite (kein Redirect — schützt vor Open-Redirect)
@@ -208,6 +223,30 @@ Widerruft einen Access-Token oder Refresh-Token. Gibt immer `200 OK` zurück (au
 token=<token>
 &client_id=<client_id>
 ```
+
+---
+
+## Web-UI- & Account-Endpunkte
+
+Die Web-Oberfläche ist Blazor Server (Cookie-Auth). Auswahl der relevanten,
+extern erreichbaren Routen:
+
+| Endpunkt | Methode | Auth | Zweck |
+|----------|---------|------|-------|
+| `/` | GET | Cookie | Startseite / Atelier-Übersicht |
+| `/health` | GET | Keine | Health-Check (`Healthy`) — für Reverse-Proxy/Container-Lifecycle |
+| `/login` | GET/POST | Keine | Login-Seite (Static SSR) |
+| `/auth/logout` | POST | Cookie | Logout (Anti-Forgery, Minimal-API) |
+| `/settings/theme` | POST | Keine | Theme-Wechsel-Fallback (No-JS), Redirect zum Referer |
+| `/hubs/runs` | WS | — | SignalR-Hub für Live-Run-Updates |
+| `/admin/users` | GET | Cookie (Admin) | Benutzerverwaltung |
+| `/admin/oauth-clients` | GET | Cookie (Admin) | OAuth-Client-Verwaltung |
+| `/account/connected-clients` | GET | Cookie | Selbstverwaltung der eigenen verbundenen OAuth-Clients |
+| `/crew`, `/crew/templates`, `/crew/profiles/*`, `/crew/studio`, `/crew/knowledge` | GET | Cookie | Crew-/Template-/Profil-/Studio-/Wissensbasis-Verwaltung |
+| `/runs`, `/runs/{id}`, `/new` | GET | Cookie | Run-Liste, Run-Detail, neuer Auftrag |
+
+Run-bezogene Seiten unterliegen der Run-User-Isolation (D-042): jeder Nutzer sieht
+nur eigene Runs; der Admin kann per explizitem Umschalter systemweit sehen.
 
 ---
 

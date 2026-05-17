@@ -1,6 +1,6 @@
 # Vision und Scope
 
-*Letzte Aktualisierung: 10. Mai 2026*
+*Letzte Aktualisierung: 17. Mai 2026 (Scope an Mehrbenutzer-Stand angeglichen)*
 
 ## Vision
 
@@ -17,28 +17,28 @@ Das Projekt ist die produktive Anwendung des [Geef SDK](https://github.com/chr0m
 ## In Scope
 
 - Generische Pipeline für beliebige Textsorten (juristische Schriftsätze, Fachartikel, Marketing, akademische Texte, Briefe, Gedichte, …)
-- Single-User-Hosting auf eigenem Docker-Server
+- Mehrbenutzer-Hosting auf eigenem Docker-Server: DB-basierte Benutzerverwaltung (BCrypt), Run-Sichtbarkeit pro Nutzer isoliert, Admin-Override per expliziten Umschaltern
 - Web-UI (Blazor Server) für Auftragserteilung, Live-Status, Ergebnis-Abholung
-- MCP-Server-Schnittstelle, damit externe KI-Clients (Claude Desktop, Claude Code, Custom-Agents) Aufträge erteilen und Ergebnisse abholen können
-- Multi-Provider-LLM-Support: Anthropic (Abo), OpenAI (Abo), OpenRouter (für spezielle Modelle als Reviewer/Advisor)
-- Quellen-Übergabe in mehreren Formen: Datei-Upload (PDF, DOCX, TXT, MD), URLs, Freitext-Briefing, Stil-Referenztexte
+- MCP-Server-Schnittstelle, damit externe KI-Clients (Claude Desktop, Claude Code, Custom-Agents) Aufträge erteilen und Ergebnisse abholen können — Auth über statisches Bearer-Token oder self-hosted OAuth 2.1
+- Multi-Provider-LLM-Support: OpenRouter (Pay-per-Token) sowie Subscription-CLIs (Claude Code, Codex) über einen lokalen Proxy; Reviewer/Advisor bewusst mit Fremd-Modellen
+- Quellen-Übergabe in mehreren Formen: Datei-Upload (PDF, DOCX, TXT, MD), URLs, Freitext-Briefing, Stil-Referenztexte; semantische Wissensbasis (Vector-Store-RAG) und Run-lokale Attachments
 - Fire-and-Forget-Workflow: Auftrag starten, später Status prüfen, am Ende Ergebnis abholen — keine Mensch-im-Loop-Eingriffe während des Runs
 - Persistente Run-Historie mit vollständigem Iterations-Trail
 
 ## Out of Scope (vorerst)
 
-- Multi-User / Tenant-Isolation
+- Echte Mandantenfähigkeit / Multi-Tenant-Isolation (das System ist Mehrbenutzer, aber single-tenant: ein Admin, gemeinsame Konfiguration; pro Nutzer ist nur die Run-Sichtbarkeit isoliert)
 - Öffentlicher Zugang ohne Auth
-- Mensch-im-Loop zwischen Iterationen (kann später nachgerüstet werden, ist aber explizit nicht im Skeleton)
+- Mensch-im-Loop zwischen Iterationen (bewusst nicht implementiert; Fire-and-Forget bleibt das Modell)
 - Mobile Apps oder native Clients
 - Kommerzielles Hosting, Billing, Abrechnung
-- Echte Memory-Backed-Advisors mit Cross-Run-Lernen (kommt nach Skeleton)
+- Echte Memory-Backed-Advisors mit Cross-Run-Lernen
 - Domänen-spezifische Datenbank-Connectors (z.B. juristische Datenbanken wie dejure.org oder Beck-Online) — später optional
-- Export-Formate jenseits von Markdown (DOCX, PDF kommen erst nach Skeleton)
+- **Export** jenseits von Markdown: DOCX-/PDF-*Ausgabe* ist weiterhin out of scope. (Hinweis: PDF/DOCX/TXT/MD als *Eingabe*/Quelle ist umgesetzt — siehe „In Scope“.)
 
 ## Zielnutzer
 
-Single-User: der Projekt-Inhaber. Die Anwendung muss nicht mandantenfähig sein, aber sie muss authentifiziert sein, weil sie über das öffentliche Internet erreichbar ist (Server-Hosting).
+Mehrere benannte Benutzerkonten, verwaltet durch einen Admin. Die Anwendung ist nicht mandantenfähig (keine Tenant-Trennung von Konfiguration oder Crew-Daten), aber jeder Nutzer sieht nur seine eigenen Runs; der Admin kann optional alles einsehen. Authentifizierung ist Pflicht, weil die App über das öffentliche Internet erreichbar ist (Server-Hosting).
 
 ## Hosting-Umgebung
 
@@ -46,9 +46,11 @@ Single-User: der Projekt-Inhaber. Die Anwendung muss nicht mandantenfähig sein,
 - Postgres ist bereits als Datenbankdienst auf dem Server vorhanden — das Projekt nutzt diese existierende Postgres-Instanz, kein separater DB-Container nötig (außer für lokale Entwicklung)
 - Reverse-Proxy (Traefik / Nginx) übernimmt TLS-Terminierung
 - API-Keys, Connection-Strings, Auth-Secrets über Environment-Variablen / Docker Secrets
-- Persistente File-Storage über Docker-Volume (für hochgeladene Quellen — kommt nach Skeleton)
+- Persistente Datenhaltung in Postgres (inkl. pgvector für die semantische Wissensbasis); hochgeladene Quellen werden indexiert in der Datenbank gehalten
 
 ## Erfolgs-Kriterium für das Skeleton
+
+> **Status:** Dieses Skeleton-Erfolgskriterium ist seit Mai 2026 vollständig erfüllt; die App läuft produktiv. Die unten als „danach“ genannten Erweiterungen (Quellen-Upload/RAG, Crew-Komposition, Advisor-Pässe) sind inzwischen ausgeliefert. Die folgende Liste bleibt als ursprüngliche Definition des Minimal-Ziels erhalten.
 
 Das Walking Skeleton (siehe [03-walking-skeleton-plan.md](03-walking-skeleton-plan.md)) ist erfolgreich, wenn:
 

@@ -26,7 +26,9 @@ Text-Generations-Pipeline-Plattform auf Basis des [Geef SDK](https://github.com/
 
 **Multi-User ✅** DB-basierte Benutzerverwaltung mit BCrypt, Admin-UI unter `/admin/users`, Startup-Seeding des Admin-Accounts aus Env-Vars.
 
-Aktuell: **~800 Tests** (798 grün + 2 bekannte Testcontainers-Flakes).
+**Run-User-Isolation ✅** Jeder Nutzer sieht nur seine eigenen Runs; Admin-Override per expliziten Umschaltern. MCP-Runs werden dem autorisierenden OAuth-Nutzer zugeordnet, Claude-Code-CLI-Runs (statisches Token) dem Admin (D-042).
+
+Aktuell: **über 800 Tests** (grün; 2 bekannte Testcontainers-Flakes).
 
 Vollständiger Scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope.md)
 
@@ -138,8 +140,15 @@ Voraussetzung: Der OAuth-Client muss im Admin-Panel unter `/admin/oauth-clients`
 **Crew-System:**
 - `list_crew_templates` — Verfügbare Crew-Templates (System + Custom)
 - `list_reviewer_profiles` — Verfügbare Reviewer-Profile (System + Custom)
+- `list_advisor_profiles` — Verfügbare Advisor-Profile (System + Custom)
+- `list_grounding_provider_profiles` — Verfügbare Grounding-Provider-Profile (System + Custom)
 
-Vollständige Endpoint-Dokumentation: [docs/09-endpoint-reference.md](docs/09-endpoint-reference.md)
+**Wissensbasis & Template Studio:**
+- `list_knowledge_documents` — Globale Wissensbasis-Dokumente auflisten
+- `analyze_template_proposal` — Aufgabenbeschreibung analysieren, Template-Vorschlag erzeugen (persistiert)
+- `materialize_template_proposal` — Geprüften Vorschlag als Custom-Template + -Profile materialisieren
+
+Insgesamt 13 MCP-Tools. Vollständige Endpoint-Dokumentation: [docs/09-endpoint-reference.md](docs/09-endpoint-reference.md)
 
 ---
 

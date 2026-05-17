@@ -1,6 +1,6 @@
 # Reviewer-Kalibrierung
 
-*Letzte Aktualisierung: 2026-05-12 (PS2: Reviewer-Kalibrierung eingeführt)*
+*Letzte Aktualisierung: 2026-05-17 (Code-Referenzen auf Crew-Profil-System aktualisiert; Severity-Taxonomie inhaltlich unverändert)*
 
 Dieses Dokument beschreibt den **Atelier-Standard für Reviewer-Severity** und die **Convergence-Policy-Strategie**. Es ist normatives Referenzdokument für alle, die Reviewer-Prompts anpassen oder neue Reviewer hinzufügen.
 
@@ -47,7 +47,7 @@ Das `submit_review`-Tool akzeptiert:
 "severity": { "enum": ["critical", "major", "minor", "info"] }
 ```
 
-**Backwards-Kompat:** `LlmReviewer.MapSeverity()` akzeptiert weiterhin `"error"` (→ `SdkSeverity.Error`) und `"warning"` (→ `SdkSeverity.Warning`) als Fallback für den Fall, dass das LLM vom Schema abweicht.
+**Backwards-Kompat:** `ProfileBasedReviewer.MapSeverity()` (in `src/Geef.Atelier.Infrastructure/Pipeline/ProfileBasedReviewer.cs`) akzeptiert weiterhin `"error"` (→ `SdkSeverity.Error`) und `"warning"` (→ `SdkSeverity.Warning`) als Fallback für den Fall, dass das LLM vom Schema abweicht.
 
 ## Convergence-Policy
 
@@ -79,11 +79,14 @@ Wenn ein Deployment absolute Qualitätssicherheit erfordert und Reviewer-Kalibri
 
 ## Neue Reviewer hinzufügen
 
-1. System-Prompt in `AtelierSystemPrompts.cs` als `public const string` anlegen.
-2. Den **vollständigen Severity-Taxonomie-Block** aus `BriefingTreue` oder `Klarheit` kopieren — kein eigenes Schema erfinden.
-3. Den Anti-Pattern-Abschnitt und das Hadwiger-Nelson-Beispiel übernehmen.
-4. Reviewer in `AtelierPipelineFactory.Build()` registrieren.
-5. `LlmOptions.Actors`-Eintrag in `appsettings.json` hinzufügen.
+Seit dem Crew-System (D-028) sind Reviewer **datengetriebene Profile**, keine Code-Klassen
+mehr (`LlmReviewer`/`AtelierSystemPrompts` wurden entfernt). Ein neuer System-Reviewer:
+
+1. System-Prompt als `public const string` in `src/Geef.Atelier.Core/Domain/Crew/SystemPrompts.cs` anlegen.
+2. Den **vollständigen Severity-Taxonomie-Block** aus einem bestehenden System-Reviewer (z.B. `briefing-fidelity` oder `clarity`) übernehmen — kein eigenes Schema erfinden.
+3. Den Anti-Pattern-Abschnitt und das Hadwiger-Nelson-Beispiel mitkopieren.
+4. Den Reviewer als `ReviewerProfile`-Konstante in `SystemCrew` (`src/Geef.Atelier.Core/Domain/Crew/SystemCrew.cs`) registrieren — mit Provider/Modell gemäß Modell-Pluralismus-Konvention (Fremd-Modell relativ zum Executor).
+5. Bei Bedarf einem System-`CrewTemplate` in `SystemCrew` zur Reviewer-Liste hinzufügen. Custom-Reviewer entstehen stattdessen über `ICrewService` / die `/crew/profiles/reviewers`-UI — kein Code nötig.
 6. `SeverityClassificationTests` um den neuen Reviewer-Namen erweitern (falls reviewer-spezifisch getestet).
 
 D-025 dokumentiert die Entscheidungspunkte hinter dieser Kalibrierung.

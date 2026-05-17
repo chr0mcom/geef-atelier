@@ -1,6 +1,6 @@
 # 07 — Design-System
 
-*Letzte Aktualisierung: 2026-05-12 (PS-3: Design-Translation)*
+*Letzte Aktualisierung: 2026-05-17 (Mock-Stub-Status auf aktuellen Feature-Stand gebracht; Tokens/Themes/Typografie unverändert seit PS-3-Design-Translation)*
 
 Das Atelier-Design-System ist aus dem Mockup (`docs/design/atelier-mockups/`) in die Blazor-Server-App übertragen worden (PS-3). Dieser Leitfaden beschreibt Tokens, Themes, Typografie, Komponenten-Inventar und Mock-Stubs für zukünftige Entwicklung.
 
@@ -116,20 +116,24 @@ Implementierung: `Geef.Atelier.Web.Display.ReviewerDisplay.ToDisplay(name)`.
 
 ## Mock-Stubs (.coming-soon)
 
-Folgende UI-Elemente zeigen "Coming soon" und sind noch nicht mit echtem Backend verbunden:
+Diese Liste war zur PS-3-Design-Translation der Stand der noch nicht angebundenen
+UI-Elemente. Aktueller Status (Mai 2026):
 
-| Element | Sichtbar als | Backend-Voraussetzung |
-|---------|-------------|----------------------|
-| Welcome-Stats | `—` in Stat-Tiles | Aggregations-Queries in `IRunService` |
-| Cost-Anzeige (RunDetail) | `$ —` | `RunEntity.CostTotal` > 0 (PS-Roadmap: Cost-Tracking) |
-| Export-Button (Manuscript) | Disabled | Export-Service (DOCX/PDF) |
-| Profile-MenuItem | Disabled | Multi-User-Auth |
+| Element | Damaliger Stub | Heutiger Stand |
+|---------|----------------|----------------|
+| Welcome-Stats | `—` in Stat-Tiles | ✅ Implementiert (`IRunService.GetWelcomeStatsAsync`, pro Nutzer isoliert) |
+| Cost-Anzeige (RunDetail) | `$ —` | ✅ Implementiert (Cost-Tracking, `Runs.CostTotal` / `IterationActorCosts`) |
+| Account-Funktionen | Disabled | ✅ Implementiert: Multi-User (`/admin/users`), verbundene Clients (`/account/connected-clients`) |
+| „Profile"-Eintrag im `UserMenu` | Disabled | ⏳ Weiterhin Stub (`.coming-soon`) — der separate Profil-Menüpunkt selbst ist noch nicht angebunden |
+| Export-Button (Manuscript) | Disabled | ⏳ Weiterhin Stub — DOCX/PDF-*Export* bleibt out of scope (siehe [01-vision-and-scope.md](01-vision-and-scope.md)) |
 
-CSS-Klasse: `.coming-soon` (gedämpfte Farbe, Tooltip).
+Die CSS-Klasse `.coming-soon` (gedämpfte Farbe, Tooltip) wird noch an zwei Stellen
+verwendet: dem Export-Button (`Manuscript.razor`) und dem „Profile"-Eintrag im
+`UserMenu.razor`.
 
 ## CSS-Architektur
 
-- **Globales Stylesheet:** `wwwroot/atelier.css` (1835 Zeilen) — CSS Custom Properties, drei Paletten, alle Komponenten-Basics
+- **Globales Stylesheet:** `wwwroot/atelier.css` — umfangreiches globales Stylesheet (CSS Custom Properties, drei Paletten, alle Komponenten-Basics); wächst mit neuen Features mit
 - **Scoped CSS:** `.razor.css` pro Komponente für Layout-Overrides
 - **Bootstrap:** vollständig entfernt in PS-3
 - **Kein Inline-Styling** in Komponenten (außer minimal in Pages)

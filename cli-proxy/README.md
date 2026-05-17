@@ -18,7 +18,9 @@ Der Proxy ist intern im Docker-Netzwerk erreichbar (`http://cli-proxy:8090`) und
 | `POST` | `/v1/claude/chat/completions` | Direkt zur claude CLI — kein Model-Name-Routing |
 | `POST` | `/v1/codex/chat/completions`  | Direkt zur codex CLI — kein Model-Name-Routing |
 | `POST` | `/v1/chat/completions` | **DEPRECATED** Legacy-Endpoint mit Model-Name-Routing. Loggt WARNING. |
-| `GET`  | `/v1/models` | Liste unterstützter Modelle |
+| `GET`  | `/v1/claude/models` | Statische Modell-Liste der claude CLI |
+| `GET`  | `/v1/codex/models` | Statische Modell-Liste der codex CLI |
+| `GET`  | `/v1/models` | **DEPRECATED** kombinierte Legacy-Modell-Liste |
 | `GET`  | `/health` | Health-Check mit CLI-Status |
 
 ### Explizite Endpoints (empfohlen)
@@ -100,13 +102,16 @@ In `appsettings.json` / Umgebungsvariablen:
         "Endpoint": "http://cli-proxy:8090/v1/codex",
         "ApiKey": ""
       }
-    },
-    "Actors": {
-      "Executor": { "Provider": "claude-cli", "Model": "claude-opus-4-5" }
     }
   }
 }
 ```
+
+> **Hinweis:** `appsettings.json` konfiguriert nur die Provider-Endpunkte. Welcher
+> Akteur welchen Provider und welches Modell nutzt, bestimmen seit dem Crew-System
+> die Reviewer-/Executor-/Advisor-**Profile** (siehe
+> [`docs/08-crew-system.md`](../docs/08-crew-system.md)) — nicht mehr ein
+> `Llm.Actors`-Block.
 
 ## Concurrency
 

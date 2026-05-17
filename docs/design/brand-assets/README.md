@@ -1,6 +1,6 @@
 # Brand Assets — Geef.Atelier
 
-Source-of-Truth für alle Brand-Assets. 42 PNGs aus der initialen Brand-Generierungs-Session (Mai 2026).
+Source-of-Truth für alle Brand-Assets. 43 PNGs aus der initialen Brand-Generierungs-Session (Mai 2026).
 
 ## Asset-Gruppen
 
@@ -39,6 +39,7 @@ Direkt adressierte Größen (ohne Prefix) sind Duplikate des Vellum-Sets:
 |---|---|
 | `favicon-16.png` | = favicon-vellum-16.png |
 | `favicon-32.png` | = favicon-vellum-32.png |
+| `favicon-64.png` | direkt adressierte Größe (Vellum-Set) |
 | `favicon-192.png` | Genutzt als Apple-Touch-Icon |
 | `favicon-512.png` | PWA-Icon |
 

@@ -1,6 +1,6 @@
 # Architektur
 
-*Letzte Aktualisierung: 2026-05-13 (PS-7: Advisor-Pipeline-Schicht ergänzt)*
+*Letzte Aktualisierung: 2026-05-17 (Datenmodell, LLM-/Auth-Schicht und MCP-Auth auf aktuellen Stand gebracht: Crew-Profil-System, OAuth 2.1, Multi-User, Run-User-Isolation)*
 
 ## Schichtenbild
 
@@ -58,7 +58,7 @@
 ## Solution-Struktur
 
 ```
-Geef.Atelier.sln
+Geef.Atelier.slnx
 ├── src/
 │   ├── Geef.Atelier.Core/           // Domain-Records, Interfaces (IRunRepository,
 │   │                                // IRunPersistenceService), Pipeline-Konfig-Records
@@ -81,9 +81,27 @@ Geef.Atelier.sln
 - **Web** hostet die UI, den `BackgroundService` und die `IRunService`-Implementierung. Letztere könnte später in ein eigenes Projekt wandern, ist aber im Skeleton hier am praktischsten.
 - **Mcp** ist eine **Class Library** (kein eigener Host). Sie enthält alle MCP-Tool-Definitionen. Der MCP-Endpoint lebt im `Web`-Projekt (Pfad `/mcp`), das `Geef.Atelier.Mcp` referenziert und die Tools im selben DI-Container registriert. Vorteile: kein zweiter Host-Prozess, `IRunService` und alle Singletons (SignalR, DbContext) werden direkt geteilt, kein HTTP-Hop zwischen MCP und Application Layer.
 
-## Datenmodell (Skeleton-Stand)
+## Datenmodell
 
-Neun Tabellen (Stand PS-7). `AdvisorConsultations` und `AdvisorProfiles` wurden mit Migration Step11AdvisorSystem eingeführt.
+Stand Mai 2026 umfasst das Schema **21 Tabellen**, hand-geschriebene Migrationen
+`InitialCreate` + `Step06`/`Step09`–`Step21`. Gruppiert:
+
+| Gruppe | Tabellen | Eingeführt |
+|---|---|---|
+| Run-Kern | `Runs`, `Iterations`, `Findings`, `Events` | InitialCreate |
+| Crew/Profile | `ReviewerProfiles`, `ExecutorProfiles`, `CrewTemplates` | Step10 |
+| Advisor | `AdvisorProfiles`, `AdvisorConsultations` | Step11 |
+| Grounding | `GroundingProviderProfiles`, `GroundingConsultations` | Step13 |
+| Vector-Store/RAG | `KnowledgeDocuments`, `KnowledgeDocumentChunks` | Step14 |
+| Cost-Tracking | `IterationActorCosts` | Step16 |
+| Template Studio | `TemplateStudioAnalyses` | Step17 |
+| Multi-User | `Users` | Step20 |
+| OAuth 2.1 | `OAuthClients`, `OAuthAuthorizationCodes`, `OAuthAccessTokens`, `OAuthRefreshTokens`, `OAuthAuditLog` | Step19 |
+
+Die vier Run-Kern-Tabellen sind nachfolgend im Detail dokumentiert; die übrigen
+Gruppen sind in den jeweiligen Feature-Abschnitten bzw. im [Decisions-Log](05-decisions-log.md)
+(D-028 ff.) beschrieben. `Runs` trägt zusätzlich Spalten aus späteren Migrationen
+(`CreatedByUser`, `CostTotal`, `CrewTemplateName`, `CrewSnapshot`, `AdvisorRetryAttempted`).
 
 ### Runs
 
@@ -104,6 +122,7 @@ Neun Tabellen (Stand PS-7). `AdvisorConsultations` und `AdvisorProfiles` wurden 
 | CrewTemplateName | varchar(100) | nullable; Name des Templates (z.B. `"klassik"`). Null = Custom-Crew-Submit. |
 | CrewSnapshot | jsonb | nullable; vollständig eingebetteter CrewSnapshot zum Zeitpunkt des Submits. |
 | AdvisorRetryAttempted | bool | nullable; true wenn OnConvergenceFailure-Retry bereits durchgeführt wurde (Single-Retry-Cap). |
+| CreatedByUser | text | nullable; Username des erstellenden Nutzers (Run-User-Isolation, D-042). Index `IX_Runs_CreatedByUser` (Step21). |
 
 ### Iterations
 
@@ -253,30 +272,38 @@ public interface ILlmClient
 
 `OpenAiCompatibleClient` ist die einzige Implementierung im Skeleton. Weitere OpenAI-kompatible Endpoints (OpenAI direkt, lokales Ollama, Together AI) sind durch Anpassen von `LlmOptions.Endpoint` ansprechbar — ohne Code-Änderung.
 
-### Pro-Akteur-Modell-Konfiguration
+### Provider-Konfiguration und Modell-Wahl
 
-Jeder Pipeline-Akteur (Executor, BriefingTreueReviewer, KlarheitReviewer) hat eine eigene Modell-Konfiguration in `appsettings.json`:
+> **Hinweis:** Das ursprüngliche flache `Llm.Actors`-Schema (ein fester Modell-Eintrag
+> je Akteur in `appsettings.json`) ist seit dem Crew-System (D-028) abgelöst. Modell-
+> und Provider-Wahl sind heute **datengetrieben** Teil der Reviewer-/Executor-/Advisor-
+> **Profile** (siehe [`08-crew-system.md`](08-crew-system.md)), nicht der App-Konfiguration.
+
+`appsettings.json` konfiguriert nur noch die **Provider-Endpunkte** (Multi-Provider,
+D-027/D-032):
 
 ```json
 {
   "Llm": {
-    "Endpoint": "https://openrouter.ai/api/v1",
-    "ApiKey": "",
-    "DefaultModel": "anthropic/claude-opus-4.7",
-    "Actors": {
-      "Executor":              { "Model": "anthropic/claude-opus-4.7", "MaxTokens": 8192 },
-      "BriefingTreueReviewer": { "Model": "anthropic/claude-opus-4.7", "MaxTokens": 2048 },
-      "KlarheitReviewer":      { "Model": "anthropic/claude-opus-4.7", "MaxTokens": 2048 }
+    "Providers": {
+      "openrouter": { "Endpoint": "https://openrouter.ai/api/v1", "ApiKey": "" },
+      "claude-cli": { "Endpoint": "http://cli-proxy:8090/v1/claude", "ApiKey": "" },
+      "codex-cli":  { "Endpoint": "http://cli-proxy:8090/v1/codex",  "ApiKey": "" }
     }
   }
 }
 ```
 
-Der Leitstern **Modell-Pluralismus** ist damit konfigurativ sofort verfügbar: Executor kann ein anderes Modell nutzen als die Reviewer. Beispiel: `anthropic/claude-opus-4.7` für den Executor, `openai/gpt-5` + `google/gemini-2.5-pro` für die Reviewer. API-Key-Override via Environment-Variable: `Llm__ApiKey`.
+API-Key-Override via Environment-Variable, z.B. `Llm__Providers__openrouter__ApiKey`
+bzw. `LLM_OPENROUTER_API_KEY` (Env-Fallback). Welcher Akteur welchen Provider und
+welches Modell nutzt, bestimmt das jeweilige Profil im `CrewSnapshot` des Runs
+(`ILlmClientResolver.ForProfile`). Der Leitstern **Modell-Pluralismus** wird damit
+pro Crew/Template ausgespielt: Reviewer laufen bewusst auf Fremd-Modellen relativ zum
+Executor (Default-System-Crew: Executor `claude-cli`, Reviewer überwiegend `codex-cli`).
 
 ### Token-Tracking
 
-`LlmTokenUsage` (`InputTokens`, `OutputTokens`) wird pro Iteration vom `LlmExecutionStep` in `AtelierContextKeys.TokenUsage` gesetzt und von `PostgresEventSink` in `Runs.TokensTotal` akkumuliert. Property-Namen identisch zu Schritt 3; nur der Wire-Name ändert sich (`prompt_tokens`/`completion_tokens` in der OpenAI-API).
+`LlmTokenUsage` (`InputTokens`, `OutputTokens`) wird pro Iteration vom `ProfileBasedExecutor`/`ProfileBasedReviewer` in den `IRunContext` gesetzt und von `PostgresEventSink` in `Runs.TokensTotal` akkumuliert (Wire-Namen `prompt_tokens`/`completion_tokens` der OpenAI-API). Seit dem Cost-Tracking (Step16) werden zusätzlich pro Akteur und Iteration die Kosten in `IterationActorCosts` persistiert und in `Runs.CostTotal` aggregiert.
 
 ## UI-Architektur (Schritt 7)
 
@@ -358,7 +385,15 @@ Neue UI-Komponenten (PS-6): `CrewBadge`, `CrewSelector`, `CrewSummary`, `Reviewe
 
 ### Web-UI — Cookie-Auth
 
-Ein fester User aus Environment-Variablen. BCrypt-Hash (work factor 11) via `tools/HashPassword/`.
+> **Multi-User seit Step20 (D-041-Umfeld):** Ursprünglich Single-User aus
+> Environment-Variablen; inzwischen **DB-basierte Mehrbenutzerverwaltung**
+> (Tabelle `Users`, BCrypt). Der Admin-Account wird beim Start aus
+> `ATELIER_USER`/`ATELIER_PASSWORD_HASH` geseedet/synchronisiert; weitere
+> Konten verwaltet der Admin unter `/admin/users` (`IUserAdminService`).
+> `IUserAuthenticator` liefert seitdem ein `AtelierUser?` (statt nur `bool`).
+> Die Cookie-Konfiguration unten gilt unverändert.
+
+BCrypt-Hash (work factor 11) wird via `tools/HashPassword/` erzeugt.
 
 **Cookie-Konfiguration:**
 
@@ -433,18 +468,37 @@ Traefik terminiert TLS und leitet HTTP weiter. Ohne `UseForwardedHeaders` würde
 
 **MCP-Endpoint:** Ist explizit mit `RequireAuthorization("McpPolicy")` geschützt. Die `McpPolicy` setzt das Authentication-Scheme auf `"Bearer"`, sodass der MCP-Pfad nie Cookie-Auth versucht.
 
-**`ITokenValidator` / `BearerTokenHandler`:**
+**`ITokenValidator` / `BearerTokenHandler` (Stand nach D-041 OAuth 2.1):**
+
+`ITokenValidator.ValidateTokenAsync` liefert seit D-041 ein reiches Ergebnis
+`TokenValidationOutcome { IsValid, Kind, Subject, ClientId, Scope }` (nicht mehr nur `bool`).
 
 ```
-Geef.Atelier.Application/Auth/ITokenValidator.cs      → Interface (Application Layer)
-Geef.Atelier.Application/Auth/AtelierTokenValidator.cs → Implementierung: konstanter Zeitvergleich vs. ATELIER_MCP_TOKEN
-Geef.Atelier.Web/Auth/BearerTokenHandler.cs           → AuthenticationHandler<AuthenticationSchemeOptions>
-                                                         liest Authorization-Header, delegiert an ITokenValidator
+Geef.Atelier.Application/Auth/ITokenValidator.cs           → Interface (Application Layer)
+Geef.Atelier.Application/Auth/StaticTokenValidator.cs      → Statisches ATELIER_MCP_TOKEN
+                                                              (FixedTimeEquals); Kind="static-bearer"
+Geef.Atelier.Application/Auth/OAuthAccessTokenValidator.cs → OAuth-Access-Token via DB-Lookup
+                                                              (SHA-256-Hash); Subject = OAuth-Nutzer
+Geef.Atelier.Application/Auth/CompositeTokenValidator.cs   → registriert als ITokenValidator:
+                                                              prüft statisch, dann OAuth
+Geef.Atelier.Web/Auth/BearerTokenHandler.cs                → AuthenticationHandler; baut Claims
+                                                              aus dem Outcome (Name/NameIdentifier/Role)
 ```
 
-`ITokenValidator` lebt in Application (ohne Web-Dependency). `BearerTokenHandler` lebt in Web und ist der einzige Ort mit ASP.NET-Core-Auth-Primitiven im Bearer-Pfad. Token wird aus `ATELIER_MCP_TOKEN` gelesen; fehlt die Variable, schlägt jede Bearer-Anfrage fehl.
+`BearerTokenHandler` mappt das Outcome auf Claims: `ClaimTypes.Name` ← `Subject`,
+`ClaimTypes.NameIdentifier` ← `ClientId ?? Subject`, und für statisches Bearer-Token
+`ClaimTypes.Role = "admin"`. Damit greift die Run-User-Isolation (D-042) auch über MCP:
+OAuth-Runs gehören dem autorisierenden Nutzer, statische-Token-Runs dem Admin.
+`ICurrentUserService`/`HttpContextCurrentUserService` exponieren `Username`/`IsAdmin`
+für Service- und MCP-Schicht.
 
-OAuth-2.0-Flow ist im MCP-Standard vorgesehen — kommt nach dem Skeleton, wenn echter Multi-Client-Bedarf entsteht.
+**OAuth 2.1 ist seit D-041 vollständig implementiert** (kein „nach dem Skeleton“ mehr):
+self-hosted Authorization Server mit Pflicht-PKCE/S256, Opaque-Tokens (nur SHA-256 in DB),
+Refresh-Rotation + Reuse-Detection. Endpunkt- und Flow-Details siehe
+[`04-mcp-integration.md`](04-mcp-integration.md) und [`09-endpoint-reference.md`](09-endpoint-reference.md);
+Begründungen im [Decisions-Log](05-decisions-log.md) D-041. Beide Auth-Pfade
+(statisches Bearer-Token für Claude Code CLI, OAuth 2.1 für Claude Desktop/Claude.ai)
+koexistieren ohne Konfigurationsänderung.
 
 ## Production-Deployment
 

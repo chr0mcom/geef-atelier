@@ -1,6 +1,6 @@
 # 08 — Crew-System (PS-5)
 
-Letzte Aktualisierung: 2026-05-13 (PS-7: Advisor-Pässe-Sektion ergänzt)
+Letzte Aktualisierung: 2026-05-17 (System-Profile/-Advisors/-Templates auf aktuellen `SystemCrew`-Stand gebracht: CLI-Provider, Domain-Templates)
 
 ## Überblick
 
@@ -31,13 +31,27 @@ Das Crew-System ersetzt die in PS-2 hartkodierte Dreier-Crew (Executor + Briefin
 
 Definiert in `Geef.Atelier.Core.Domain.Crew.SystemCrew` (read-only, versioniert mit dem Code):
 
-| Name | Typ | Provider / Modell | Begründung |
-|---|---|---|---|
-| `default-executor` | ExecutorProfile | openrouter / `anthropic/claude-opus-4.7` | Kontinuität mit PS-2, starkes Drafting-Modell. |
-| `briefing-fidelity` | ReviewerProfile | openrouter / `google/gemini-2.5-flash` | Außen-Modell für Briefing-Abdeckungs-Check. |
-| `clarity` | ReviewerProfile | openrouter / `openai/gpt-5.5-mini` | Zweites Außen-Modell, andere Familie als Briefing-Fidelity. |
+Provider/Modelle Stand Mai 2026 (nach der Umstellung auf die Subscription-CLIs,
+D-027/D-032): Executor und Anthropic-Reviewer laufen über `claude-cli`, die übrigen
+Reviewer über `codex-cli`. Modell-Pluralismus bleibt gewahrt (Reviewer ≠ Executor-Modell).
 
-Das einzige System-Template ist `"klassik"`: reproduziert exakt das PS-2-Verhalten.
+| Name | Typ | Provider / Modell |
+|---|---|---|
+| `default-executor` | ExecutorProfile | `claude-cli` / `anthropic/claude-opus-4.7` |
+| `briefing-fidelity` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
+| `clarity` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
+| `legal-jargon-precision` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
+| `legal-clause-risk` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
+| `academic-citation-readiness` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
+| `academic-argumentation-rigor` | ReviewerProfile | `claude-cli` / `anthropic/claude-opus-4.7` |
+| `marketing-audience-clarity` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
+| `marketing-conversion-strength` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
+
+**System-Templates** (vier): `klassik` (Evaluation `Parallel`, keine Advisors —
+reproduziert das ursprüngliche PS-2-Verhalten) sowie die Domain-Templates
+`juristisch` (`Sequential`, Advisor `legal-domain-expert`),
+`akademisch` (`Sequential`, Advisor `academic-rigor-advisor`) und
+`marketing` (`Parallel`, keine Advisors).
 
 ## Custom-Profile
 
@@ -47,6 +61,11 @@ Das einzige System-Template ist `"klassik"`: reproduziert exakt das PS-2-Verhalt
 - API: `ICrewService.CreateCustomReviewerProfileAsync(profile)`.
 
 ## CrewSnapshot-Format (SchemaVersion 1)
+
+> Das folgende Beispiel zeigt die **Struktur**. Die `provider`/`model`-Werte sind
+> illustrativ — die aktuell gültigen System-Werte stehen in der Tabelle
+> „System-Profile" oben; ein realer Snapshot enthält die zum Submit-Zeitpunkt
+> gültigen Werte.
 
 ```json
 {
@@ -99,10 +118,15 @@ public enum AdvisorTrigger { BeforeFirstExecution, BeforeEveryExecution, OnConve
 
 ### System-Advisors
 
-| Name | Mode | Trigger | Modell | Zweck |
-|---|---|---|---|---|
-| `briefing-clarifier` | Strategic | BeforeFirstExecution | `google/gemini-2.5-flash` | Analysiert das Briefing vor dem ersten Executor-Pass und liefert strukturierte Klärungshinweise. |
-| `devils-advocate` | DevilsAdvocate | BeforeEveryExecution | `openai/gpt-4o-mini` | Hinterfragt vor jeder Iteration die geplante Executor-Richtung kritisch, um Schreibfehler durch blinden Fortschritt zu vermeiden. |
+Provider/Modell Stand Mai 2026: alle System-Advisors laufen über
+`claude-cli` / `anthropic/claude-opus-4.7`.
+
+| Name | Mode | Trigger | Zweck |
+|---|---|---|---|
+| `briefing-clarifier` | Strategic | BeforeFirstExecution | Analysiert das Briefing vor dem ersten Executor-Pass und liefert strukturierte Klärungshinweise. |
+| `devils-advocate` | DevilsAdvocate | BeforeEveryExecution | Hinterfragt vor jeder Iteration die geplante Executor-Richtung kritisch, um Fehler durch blinden Fortschritt zu vermeiden. |
+| `legal-domain-expert` | DomainExpert | BeforeFirstExecution | Domänen-Input für juristische Texte (Template `juristisch`). |
+| `academic-rigor-advisor` | Critical | BeforeEveryExecution | Wissenschaftliche Strenge/Argumentationsqualität (Template `akademisch`). |
 
 ### Pipeline-Integration via Decorator
 
@@ -187,8 +211,12 @@ await runService.SubmitRunAsync("...", "{}", customCrew: spec);
 ### MCP-Tools
 
 - `list_crew_templates` — listet alle Templates (System + Custom).
-- `list_reviewer_profiles` — listet alle Reviewer-Profile.
+- `list_reviewer_profiles` — listet alle Reviewer-Profile (System + Custom).
+- `list_advisor_profiles` — listet alle Advisor-Profile (System + Custom).
+- `list_grounding_provider_profiles` — listet alle Grounding-Provider-Profile.
 - `submit_request` — erweitert um `crew_template` und `custom_crew` (JSON-String).
+
+Vollständige Tool-Liste (13 Tools): siehe [09-endpoint-reference.md](09-endpoint-reference.md) und die [Projekt-README](../README.md).
 
 ## Reviewer-Name-Migration
 

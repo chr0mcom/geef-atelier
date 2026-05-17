@@ -1,6 +1,6 @@
 # Walking Skeleton — Bauplan
 
-*Letzte Aktualisierung: 2026-05-12 (PS2: Reviewer-Kalibrierung ergänzt)*
+*Letzte Aktualisierung: 2026-05-17 (Doku-Bereinigung: dupliziertes Schritt-1-Statusfeld und versehentlich angehängtes Prompt-Fragment entfernt; Verweis auf Post-Skeleton-Verlauf ergänzt. Inhaltlich ein historischer Bauplan — dated Status-/PS-Blöcke werden bewusst nicht rückdatiert.)*
 
 Das Walking Skeleton ist die kleinste end-to-end-funktionale Version von Geef.Atelier: ein Auftrag wird über die UI oder via MCP gestellt, eine echte Geef-Pipeline läuft (mit echten LLM-Calls), Live-Status ist sichtbar, das Ergebnis wird angezeigt und persistiert. Quellen-Upload, Klassifikator, dynamische Crew, Advisor, Multi-Format-Export — alles weitere kommt später.
 
@@ -48,8 +48,6 @@ Während die nummerierten Schritte sequenziell durchlaufen werden, gibt es paral
 - `dotnet ef database update` läuft erfolgreich gegen Postgres
 - `docker compose up` startet App und DB; Health-Check antwortet 200 OK
 - Tests-Projekt enthält mindestens einen Smoke-Test (DbContext lädt, Migration läuft in Test-DB)
-
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, alle 5 Reviewer durch (1 CRITICAL + 4 MAJOR Findings, alle behoben). 9 Conventional-Commits. Bericht: [reports/step-01-report.md](reports/step-01-report.md). Details siehe Decisions-Log D-010.
 
 **Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, alle 5 Reviewer durch (1 CRITICAL + 4 MAJOR Findings, alle behoben). 9 Conventional-Commits. Bericht: [reports/step-01-report.md](reports/step-01-report.md). Details siehe Decisions-Log D-010.
 
@@ -293,24 +291,4 @@ Automatischer täglicher Backup-Service (`prodrigestivill/postgres-backup-local:
 ### PS-2: Reviewer-Kalibrierung ✅ (2026-05-12)
 4-stufige Severity-Taxonomie (critical/major/minor/info) mit Anti-Pattern-Regel + Hadwiger-Nelson-Negativbeispiel in Reviewer-Prompts. `ConvergenceOptions` (`AbortOnCritical=false` Default). Tool-Schema-Update. Executor-Iteration-2+-Schärfung. 11 neue Tests. D-025. Bericht: `docs/reports/post-skeleton-02-reviewer-calibration-report.md`.
 
-## Wo
-
-Im File `docs/03-walking-skeleton-plan.md`, **im Abschnitt "Schritt 1 — Solution-Setup mit Postgres und EF Core"**, ganz am Ende des Schritt-1-Blocks (direkt vor dem `---`-Trenner zu Schritt 2).
-
-## Was ersetzen
-
-**Alte Zeile:**
-```markdown
-**Status:** Prompt vorbereitet (siehe [prompts/step-01-solution-setup.md](prompts/step-01-solution-setup.md))
-```
-
-**Neuer Block:**
-```markdown
-**Status:** ✅ **Abgeschlossen am 10. Mai 2026.** 1 Reviewer-Iteration, alle 5 Reviewer durch (1 CRITICAL + 4 MAJOR Findings, alle behoben). 9 Conventional-Commits. Bericht: [reports/step-01-report.md](reports/step-01-report.md). Details siehe Decisions-Log D-010.
-```
-
-## Zusätzlich
-
-Im Header der Datei das Datum aktualisieren:
-```markdown
-*Letzte Aktualisierung: 10. Mai 2026 (Schritt 1 abgeschlossen)*
+> **Hinweis:** Dies ist der historische Walking-Skeleton-Bauplan. Alle zehn Skeleton-Schritte sowie der parallele Migrations-Track M1 sind abgeschlossen. Der vollständige Post-Skeleton-Verlauf — Design-System (PS-3), CLI-Provider-Adapter/-Split (PS-4), Crew-System (PS-5/6), Advisor-Pässe (PS-7), Grounding-Provider & Vector-Store-RAG, Run-Attachments, Cost-Tracking, Template Studio, Domain-Templates, MCP-OAuth 2.1, Multi-User und Run-User-Isolation — ist chronologisch im [Decisions-Log](05-decisions-log.md) (Einträge D-024 ff.) und im Überblick in der [Projekt-README](../README.md) dokumentiert. Die vorstehenden PS-1/PS-2-Einträge sind der ursprüngliche Stand dieses Plans und werden als historische Notiz bewusst nicht rückwirkend ergänzt.

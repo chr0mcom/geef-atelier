@@ -1,6 +1,6 @@
 # MCP-Integration
 
-*Letzte Aktualisierung: 2026-05-16 (PS-9-Erweiterung: OAuth 2.1 Authorization Server ergänzt, D-041)*
+*Letzte Aktualisierung: 2026-05-17 (Endpunkt-Tabelle präzisiert, vollständige Tool-Liste und Run-User-Isolation D-042 ergänzt)*
 
 ## Warum MCP
 
@@ -115,6 +115,31 @@ Bricht einen laufenden Run ab. Gibt `true` zurück, wenn der Abbruch ausgelöst 
 
 **Output:** `bool` (`true` | `false`)
 
+### Weitere Tools (Crew, Wissensbasis, Template Studio)
+
+Neben den sechs Run-Tools bietet der Server sieben weitere — insgesamt **13 MCP-Tools**:
+
+| Tool | Zweck |
+|---|---|
+| `list_crew_templates` | Crew-Templates auflisten (System + Custom) |
+| `list_reviewer_profiles` | Reviewer-Profile auflisten (System + Custom) |
+| `list_advisor_profiles` | Advisor-Profile auflisten (System + Custom) |
+| `list_grounding_provider_profiles` | Grounding-Provider-Profile auflisten |
+| `list_knowledge_documents` | Globale Wissensbasis-Dokumente auflisten |
+| `analyze_template_proposal` | Aufgabenbeschreibung analysieren, Template-Vorschlag erzeugen (persistiert) |
+| `materialize_template_proposal` | Geprüften Vorschlag als Custom-Template + -Profile materialisieren |
+
+Vollständige Parameter-/Schema-Details: [`09-endpoint-reference.md`](09-endpoint-reference.md).
+
+### Run-Sichtbarkeit über MCP (D-042)
+
+Seit der Run-User-Isolation sind Runs pro Nutzer getrennt sichtbar — auch über MCP:
+Über OAuth gestellte/abgefragte Runs gehören dem autorisierenden Nutzer; Requests mit
+statischem `ATELIER_MCP_TOKEN` (Claude Code CLI) werden dem Admin zugeordnet.
+`list_runs`/`get_run_*` liefern nur die Runs des jeweiligen Nutzers (kein
+Run-Existenz-Leak); ist der Aufrufer Admin, kann er mit dem `list_runs`-Parameter
+`includeAllUsers=true` systemweit sehen (für Nicht-Admins wirkungslos).
+
 ## SDK
 
 **`ModelContextProtocol.AspNetCore` v1.3.0** — das offizielle Anthropic+Microsoft C# SDK ([modelcontextprotocol/csharp-sdk](https://github.com/modelcontextprotocol/csharp-sdk)). Die Tools werden als `[McpServerTool]`-annotierte Methoden in `Geef.Atelier.Mcp` (Class Library) definiert und über `AddMcpServer().WithToolsFromAssembly()` im Web-Host registriert.
@@ -150,10 +175,12 @@ Self-hosted OAuth-2.1-Authorization-Server, direkt in Geef.Atelier implementiert
 | `/.well-known/oauth-authorization-server` | GET | RFC 8414 Server Metadata |
 | `/.well-known/oauth-protected-resource` | GET | MCP Resource Metadata |
 | `/oauth/register` | POST | RFC 7591 Dynamic Client Registration |
-| `/oauth/authorize` | GET/POST | Authorization-Code-Flow + Consent |
+| `/oauth/authorize` | GET | Consent-Seite (Blazor, `[Authorize]` Cookie — bei fehlender Session Redirect auf `/login`) |
+| `/oauth/consent` | POST | Approve/Deny-Submit der Consent-Seite → Redirect zur `redirect_uri` |
 | `/oauth/token` | POST | Token-Endpoint (authorization_code + refresh_token) |
 | `/oauth/revoke` | POST | RFC 7009 Token-Revocation |
-| `/account/connected-clients` | GET | Verwaltung verbundener Clients (UI) |
+| `/account/connected-clients` | GET | Selbstverwaltung verbundener Clients (Nutzer-UI) |
+| `/admin/oauth-clients` | GET | OAuth-Client-Verwaltung (nur Admin) |
 
 **Flow:**
 
