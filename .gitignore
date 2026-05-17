@@ -419,6 +419,17 @@ FodyWeavers.xsd
 docs/prompts/
 docs/reports/
 
+# Datenbank-Backups / Dumps (nie ins Repo — potenziell sensible Daten)
+backup/
+
+# GEEF-Workflow-Arbeitsdateien (Phase-4.3-Cleanup; nie ins öffentliche Repo)
+geef_plan.md
+geef_architecture.md
+geef_eval_log.md
+geef_advisor_*.md
+geef_review_*.md
+geef_test_runner.sh
+
 # AI assistant config
 CLAUDE.md
 
