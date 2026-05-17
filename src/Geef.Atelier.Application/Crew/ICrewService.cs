@@ -13,7 +13,10 @@ public interface ICrewService
 {
     // --- Reviewer profiles ---
 
+    /// <summary>Lists reviewer profiles. Custom profiles always; built-in system profiles only when <paramref name="includeSystem"/> is true.</summary>
     Task<IReadOnlyList<ReviewerProfile>> ListReviewerProfilesAsync(bool includeSystem = true, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the reviewer profile (system or custom) with the exact <paramref name="name"/>, or null if none exists.</summary>
     Task<ReviewerProfile?> GetReviewerProfileAsync(string name, CancellationToken cancellationToken = default);
 
     /// <summary>Creates a custom reviewer profile. The name is auto-prefixed with <c>"custom-"</c> if not already present.</summary>
@@ -34,7 +37,10 @@ public interface ICrewService
 
     // --- Executor profiles ---
 
+    /// <summary>Lists executor profiles. Custom profiles always; built-in system profiles only when <paramref name="includeSystem"/> is true.</summary>
     Task<IReadOnlyList<ExecutorProfile>> ListExecutorProfilesAsync(bool includeSystem = true, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the executor profile (system or custom) with the exact <paramref name="name"/>, or null if none exists.</summary>
     Task<ExecutorProfile?> GetExecutorProfileAsync(string name, CancellationToken cancellationToken = default);
 
     /// <summary>Creates a custom executor profile. The name is auto-prefixed with <c>"custom-"</c> if not already present.</summary>
@@ -55,7 +61,10 @@ public interface ICrewService
 
     // --- Advisor profiles ---
 
+    /// <summary>Lists advisor profiles. Custom profiles always; built-in system profiles only when <paramref name="includeSystem"/> is true.</summary>
     Task<IReadOnlyList<AdvisorProfile>> ListAdvisorProfilesAsync(bool includeSystem = true, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the advisor profile (system or custom) with the exact <paramref name="name"/>, or null if none exists.</summary>
     Task<AdvisorProfile?> GetAdvisorProfileAsync(string name, CancellationToken cancellationToken = default);
 
     /// <summary>Creates a custom advisor profile. The name is auto-prefixed with <c>"custom-"</c> if not already present.</summary>
@@ -76,7 +85,10 @@ public interface ICrewService
 
     // --- Grounding-provider profiles ---
 
+    /// <summary>Lists grounding-provider profiles. Custom profiles always; built-in system profiles only when <paramref name="includeSystem"/> is true.</summary>
     Task<IReadOnlyList<GroundingProviderProfile>> ListGroundingProviderProfilesAsync(bool includeSystem = true, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the grounding-provider profile (system or custom) with the exact <paramref name="name"/>, or null if none exists.</summary>
     Task<GroundingProviderProfile?> GetGroundingProviderProfileAsync(string name, CancellationToken cancellationToken = default);
 
     /// <summary>Creates a custom grounding-provider profile. The name is auto-prefixed with <c>"custom-"</c> if not already present.</summary>
@@ -97,7 +109,10 @@ public interface ICrewService
 
     // --- Crew templates ---
 
+    /// <summary>Lists crew templates. Custom templates always; built-in system templates (klassik, juristisch, akademisch, marketing) only when <paramref name="includeSystem"/> is true.</summary>
     Task<IReadOnlyList<CrewTemplate>> ListCrewTemplatesAsync(bool includeSystem = true, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the crew template (system or custom) with the exact <paramref name="name"/>, or null if none exists.</summary>
     Task<CrewTemplate?> GetCrewTemplateAsync(string name, CancellationToken cancellationToken = default);
 
     /// <summary>Creates a custom crew template. The name is auto-prefixed with <c>"custom-"</c> if not already present.</summary>
