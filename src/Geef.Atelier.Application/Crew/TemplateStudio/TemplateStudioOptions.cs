@@ -11,4 +11,35 @@ public sealed class TemplateStudioOptions
 
     /// <summary>Cosine similarity threshold above which an existing profile is considered a duplicate.</summary>
     public double SimilarityThreshold { get; set; } = 0.85;
+
+    /// <summary>Default field values applied when the meta-LLM omits a field for a proposed profile.</summary>
+    public StudioDefaults Defaults { get; set; } = new();
+}
+
+/// <summary>Default values for proposed profile fields when the meta-LLM leaves them blank.</summary>
+public sealed class StudioDefaults
+{
+    // Reviewer defaults
+    public string ReviewerModel { get; set; } = "openai/gpt-4o-mini";
+    public string ReviewerProvider { get; set; } = "openrouter";
+    public int ReviewerMaxTokens { get; set; } = 2048;
+
+    // Executor defaults
+    public string ExecutorModel { get; set; } = "anthropic/claude-opus-4-7";
+    public string ExecutorProvider { get; set; } = "openrouter";
+    public int ExecutorMaxTokens { get; set; } = 4096;
+
+    // Advisor defaults
+    public string AdvisorModel { get; set; } = "openai/gpt-4o-mini";
+    public string AdvisorProvider { get; set; } = "openrouter";
+    public int AdvisorMaxTokens { get; set; } = 2048;
+    public string AdvisorMode { get; set; } = "Strategic";
+    public string AdvisorTrigger { get; set; } = "BeforeFirstExecution";
+
+    // GroundingProvider defaults
+    public string GroundingProviderType { get; set; } = "tavily";
+    public string GroundingProviderProvider { get; set; } = "openrouter";
+
+    // Template defaults
+    public string EvaluationStrategy { get; set; } = "Sequential";
 }

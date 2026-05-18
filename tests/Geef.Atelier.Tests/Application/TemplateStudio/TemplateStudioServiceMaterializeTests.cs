@@ -166,6 +166,19 @@ public sealed class TemplateStudioServiceMaterializeTests
             });
     }
 
+    private sealed class NoopAtomicTransactionFactory : IAtomicTransactionFactory
+    {
+        public Task<IAtomicTransaction> BeginAsync(CancellationToken ct = default)
+            => Task.FromResult<IAtomicTransaction>(new NoopTransaction());
+
+        private sealed class NoopTransaction : IAtomicTransaction
+        {
+            public Task CommitAsync(CancellationToken ct = default)  => Task.CompletedTask;
+            public Task RollbackAsync(CancellationToken ct = default) => Task.CompletedTask;
+            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -188,6 +201,7 @@ public sealed class TemplateStudioServiceMaterializeTests
             new NoopPricingCatalog(),
             repo,
             similarityService,
+            new NoopAtomicTransactionFactory(),
             opts);
     }
 

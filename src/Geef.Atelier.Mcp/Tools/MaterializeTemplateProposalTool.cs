@@ -35,7 +35,7 @@ public static class MaterializeTemplateProposalTool
     private static ProposedTemplate MapTemplate(ProposedTemplateDto dto) => new(
         dto.Name, dto.DisplayName, dto.Description, dto.ExecutorProfileName,
         dto.ReviewerProfileNames, dto.AdvisorProfileNames, dto.GroundingProviderProfileNames,
-        dto.EvaluationStrategy);
+        dto.EvaluationStrategy, dto.EvaluationStrategyReasoning);
 
     private static ProposedProfile MapProfile(ProposedProfileDto dto)
     {
@@ -46,7 +46,9 @@ public static class MaterializeTemplateProposalTool
             profileType, dto.Name, dto.DisplayName, dto.Description,
             dto.Model, dto.Provider, dto.SystemPrompt, dto.MaxTokens,
             dto.ReviewerFocus, dto.AdvisorMode, dto.AdvisorTrigger,
-            dto.GroundingProviderType, dto.GroundingProviderSettings);
+            dto.GroundingProviderType, dto.GroundingProviderSettings,
+            dto.ModelReasoning, dto.SystemPromptReasoning, dto.OverallReasoning,
+            dto.ModeReasoning, dto.TriggerReasoning);
     }
 }
 

@@ -41,13 +41,15 @@ public static class AnalyzeTemplateProposalTool
     private static ProposedTemplateDto MapTemplate(ProposedTemplate t) => new(
         t.Name, t.DisplayName, t.Description, t.ExecutorProfileName,
         t.ReviewerProfileNames, t.AdvisorProfileNames, t.GroundingProviderProfileNames,
-        t.EvaluationStrategy);
+        t.EvaluationStrategy, t.EvaluationStrategyReasoning);
 
     private static ProposedProfileDto MapProfile(ProposedProfile p) => new(
         p.ProfileType.ToString(), p.Name, p.DisplayName, p.Description,
         p.Model, p.Provider, p.SystemPrompt, p.MaxTokens,
         p.ReviewerFocus, p.AdvisorMode, p.AdvisorTrigger,
-        p.GroundingProviderType, p.GroundingProviderSettings);
+        p.GroundingProviderType, p.GroundingProviderSettings,
+        p.ModelReasoning, p.SystemPromptReasoning, p.OverallReasoning,
+        p.ModeReasoning, p.TriggerReasoning);
 }
 
 public sealed record AnalyzeTemplateProposalOutput(
@@ -73,7 +75,8 @@ public sealed record ProposedTemplateDto(
     IReadOnlyList<string> ReviewerProfileNames,
     IReadOnlyList<string> AdvisorProfileNames,
     IReadOnlyList<string> GroundingProviderProfileNames,
-    string EvaluationStrategy);
+    string EvaluationStrategy,
+    string? EvaluationStrategyReasoning = null);
 
 public sealed record ProposedProfileDto(
     string ProfileType,
@@ -88,4 +91,9 @@ public sealed record ProposedProfileDto(
     string? AdvisorMode,
     string? AdvisorTrigger,
     string? GroundingProviderType,
-    Dictionary<string, string>? GroundingProviderSettings);
+    Dictionary<string, string>? GroundingProviderSettings,
+    string? ModelReasoning = null,
+    string? SystemPromptReasoning = null,
+    string? OverallReasoning = null,
+    string? ModeReasoning = null,
+    string? TriggerReasoning = null);

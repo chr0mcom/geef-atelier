@@ -1,0 +1,375 @@
+@using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Core.Domain.Crew.Advisors
+@using Geef.Atelier.Core.Domain.Crew.Profiles
+@using Geef.Atelier.Core.Domain.Crew.TemplateStudio
+@using Geef.Atelier.Web.Resources
+@inject ICrewService CrewService
+@inject IProviderCatalog ProviderCatalog
+
+<div class="studio-slot @(ShowValidation && !IsValid ? "studio-slot--invalid" : "")"
+     data-testid="@SlotTestId">
+
+    <div class="studio-slot-header">
+        <span class="studio-slot-label">@SlotLabel</span>
+        @if (CanSwitchMode)
+        {
+            <div class="studio-slot-toggle" role="group" aria-label="Modus wählen">
+                <button type="button"
+                        class="toggle-btn @(Mode == StudioSlotMode.UseExisting ? "active" : "")"
+                        @onclick="() => SetMode(StudioSlotMode.UseExisting)"
+                        data-testid="@($"slot-toggle-use-existing-{SlotTestSuffix}")">
+                    Vorhanden nutzen
+                </button>
+                <button type="button"
+                        class="toggle-btn @(Mode == StudioSlotMode.CreateNew ? "active" : "")"
+                        @onclick="() => SetMode(StudioSlotMode.CreateNew)"
+                        data-testid="@($"slot-toggle-create-new-{SlotTestSuffix}")">
+                    Neu erstellen
+                </button>
+            </div>
+        }
+    </div>
+
+    @if (Mode == StudioSlotMode.UseExisting)
+    {
+        <div class="field">
+            <label>Profil auswählen</label>
+            <select value="@ExistingProfileName"
+                    @onchange="OnExistingProfileChange"
+                    data-testid="@($"slot-existing-select-{SlotTestSuffix}")">
+                <option value="">— bitte wählen —</option>
+                @foreach (var p in _availableProfiles)
+                {
+                    <option value="@p.Name">@p.DisplayName @(p.IsSystem ? "(System)" : string.Empty)</option>
+                }
+            </select>
+            @if (ShowValidation && string.IsNullOrEmpty(ExistingProfileName))
+            {
+                <span class="validation-error" data-testid="slot-validation-error">Bitte ein Profil auswählen.</span>
+            }
+        </div>
+    }
+    else // CreateNew
+    {
+        @if (Draft is not null)
+        {
+            <div class="field">
+                <label>Name (intern, kebab-case)</label>
+                <input type="text"
+                       value="@Draft.Name"
+                       @oninput="OnNameInput"
+                       data-testid="@($"slot-name-{SlotTestSuffix}")" />
+                <FieldHelp Text="@StudioFieldHelps.ProfileName" DataTestId="field-help-profilename" />
+                @if (ShowValidation && string.IsNullOrWhiteSpace(Draft.Name))
+                {
+                    <span class="validation-error">Name ist erforderlich.</span>
+                }
+            </div>
+
+            <div class="field">
+                <label>Anzeigename</label>
+                <input type="text"
+                       value="@Draft.DisplayName"
+                       @oninput="OnDisplayNameInput"
+                       data-testid="@($"slot-displayname-{SlotTestSuffix}")" />
+                <FieldHelp Text="@StudioFieldHelps.ProfileDisplayName" DataTestId="field-help-profiledisplayname" />
+                @if (ShowValidation && string.IsNullOrWhiteSpace(Draft.DisplayName))
+                {
+                    <span class="validation-error">Anzeigename ist erforderlich.</span>
+                }
+            </div>
+
+            <div class="field">
+                <label>Beschreibung</label>
+                <input type="text"
+                       value="@Draft.Description"
+                       @oninput="OnDescriptionInput"
+                       data-testid="@($"slot-description-{SlotTestSuffix}")" />
+                <FieldHelp Text="@StudioFieldHelps.ProfileDescription" DataTestId="field-help-profiledescription" />
+            </div>
+
+            <div class="field">
+                <label>Provider</label>
+                <select value="@Draft.Provider"
+                        @onchange="OnProviderChange"
+                        data-testid="@($"slot-provider-{SlotTestSuffix}")">
+                    <option value="">— bitte wählen —</option>
+                    @foreach (var p in _providers)
+                    {
+                        <option value="@p.Name">@p.DisplayName</option>
+                    }
+                </select>
+                <FieldHelp Text="@StudioFieldHelps.Provider" DataTestId="field-help-provider" />
+                @if (ShowValidation && string.IsNullOrEmpty(Draft.Provider))
+                {
+                    <span class="validation-error">Provider ist erforderlich.</span>
+                }
+            </div>
+
+            <div class="field">
+                <label>Modell</label>
+                <ModelSelector Provider="@Draft.Provider"
+                               Value="@Draft.Model"
+                               ValueChanged="@(v => UpdateDraft(d => d with { Model = v }))"
+                               DataTestId="@($"slot-model-{SlotTestSuffix}")" />
+                <FieldHelp Text="@StudioFieldHelps.Model" DataTestId="field-help-model" />
+                @if (!string.IsNullOrEmpty(Draft.ModelReasoning))
+                {
+                    <div class="field-reasoning" data-testid="slot-model-reasoning">💡 @Draft.ModelReasoning</div>
+                }
+            </div>
+
+            <div class="field">
+                <label>Max. Tokens</label>
+                <input type="number" min="256" max="32768"
+                       value="@(Draft.MaxTokens?.ToString() ?? string.Empty)"
+                       @oninput="OnMaxTokensInput"
+                       data-testid="@($"slot-maxtokens-{SlotTestSuffix}")" />
+                <FieldHelp Text="@StudioFieldHelps.MaxTokens" DataTestId="field-help-maxtokens" />
+            </div>
+
+            <div class="field">
+                <label>System-Prompt</label>
+                <textarea rows="5"
+                          value="@Draft.SystemPrompt"
+                          @oninput="OnSystemPromptInput"
+                          data-testid="@($"slot-systemprompt-{SlotTestSuffix}")"
+                          style="font-family: var(--font-mono, monospace)"></textarea>
+                <FieldHelp Text="@StudioFieldHelps.SystemPrompt" DataTestId="field-help-systemprompt" />
+                @if (!string.IsNullOrEmpty(Draft.SystemPromptReasoning))
+                {
+                    <div class="field-reasoning" data-testid="slot-systemprompt-reasoning">💡 @Draft.SystemPromptReasoning</div>
+                }
+                @if (ShowValidation && string.IsNullOrWhiteSpace(Draft.SystemPrompt))
+                {
+                    <span class="validation-error">System-Prompt ist erforderlich.</span>
+                }
+            </div>
+
+            @if (Draft.ProfileType == ProposedProfileType.Reviewer)
+            {
+                <div class="field">
+                    <label>Reviewer-Fokus (optional)</label>
+                    <input type="text"
+                           value="@(Draft.ReviewerFocus ?? string.Empty)"
+                           @oninput="OnReviewerFocusInput"
+                           data-testid="slot-reviewerfocus" />
+                    <FieldHelp Text="@StudioFieldHelps.ReviewerFocus" DataTestId="field-help-reviewerfocus" />
+                </div>
+            }
+
+            @if (Draft.ProfileType == ProposedProfileType.Advisor)
+            {
+                <div class="field">
+                    <label>Advisor-Modus</label>
+                    <select value="@(Draft.AdvisorMode ?? "Strategic")"
+                            @onchange="OnAdvisorModeChange"
+                            data-testid="slot-advisormode">
+                        @foreach (var mode in Enum.GetNames<AdvisorMode>())
+                        {
+                            <option value="@mode">@mode</option>
+                        }
+                    </select>
+                    <FieldHelp Text="@StudioFieldHelps.AdvisorMode" DataTestId="field-help-advisormode" />
+                    @if (!string.IsNullOrEmpty(Draft.ModeReasoning))
+                    {
+                        <div class="field-reasoning" data-testid="slot-mode-reasoning">💡 @Draft.ModeReasoning</div>
+                    }
+                </div>
+
+                <div class="field">
+                    <label>Advisor-Trigger</label>
+                    <select value="@(Draft.AdvisorTrigger ?? "BeforeFirstExecution")"
+                            @onchange="OnAdvisorTriggerChange"
+                            data-testid="slot-advisortrigger">
+                        @foreach (var trigger in Enum.GetNames<AdvisorTrigger>())
+                        {
+                            <option value="@trigger">@trigger</option>
+                        }
+                    </select>
+                    <FieldHelp Text="@StudioFieldHelps.AdvisorTrigger" DataTestId="field-help-advisortrigger" />
+                    @if (!string.IsNullOrEmpty(Draft.TriggerReasoning))
+                    {
+                        <div class="field-reasoning" data-testid="slot-trigger-reasoning">💡 @Draft.TriggerReasoning</div>
+                    }
+                </div>
+            }
+
+            @if (Draft.ProfileType == ProposedProfileType.GroundingProvider)
+            {
+                <div class="field">
+                    <label>Grounding-Typ</label>
+                    <select value="@(Draft.GroundingProviderType ?? "tavily")"
+                            @onchange="OnGroundingTypeChange"
+                            data-testid="slot-groundingtype">
+                        <option value="tavily">Tavily (Web-Suche)</option>
+                        <option value="vector_store">VectorStore (eigene Dokumente)</option>
+                    </select>
+                    <FieldHelp Text="@StudioFieldHelps.GroundingProviderType" DataTestId="field-help-groundingtype" />
+                </div>
+
+                <div class="field">
+                    <label>Einstellungen</label>
+                    @if (Draft.GroundingProviderType == "vector_store")
+                    {
+                        <input type="text"
+                               value="@GetCollectionName()"
+                               @oninput="OnCollectionNameInput"
+                               placeholder="Collection-Name"
+                               data-testid="slot-grounding-collectionname" />
+                    }
+                    else
+                    {
+                        <input type="text"
+                               value="@GetApiKey()"
+                               @oninput="OnApiKeyInput"
+                               placeholder="API-Key"
+                               data-testid="slot-grounding-apikey" />
+                    }
+                    <FieldHelp Text="@StudioFieldHelps.GroundingProviderSettings" DataTestId="field-help-groundingsettings" />
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(Draft.OverallReasoning))
+            {
+                <div class="field-reasoning overall-reasoning" data-testid="slot-overall-reasoning">
+                    <strong>KI-Begründung:</strong> @Draft.OverallReasoning
+                </div>
+            }
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ProposedProfileType ProfileType { get; set; }
+    [Parameter, EditorRequired] public string SlotLabel { get; set; } = "";
+    [Parameter] public bool CanSwitchMode { get; set; } = true;
+    [Parameter] public StudioSlotMode Mode { get; set; } = StudioSlotMode.CreateNew;
+    [Parameter] public EventCallback<StudioSlotMode> ModeChanged { get; set; }
+    [Parameter] public string? ExistingProfileName { get; set; }
+    [Parameter] public EventCallback<string?> ExistingProfileNameChanged { get; set; }
+    [Parameter] public ProposedProfile? Draft { get; set; }
+    [Parameter] public EventCallback<ProposedProfile?> DraftChanged { get; set; }
+    [Parameter] public bool ShowValidation { get; set; }
+
+    private sealed record ProfileSummary(string Name, string DisplayName, bool IsSystem);
+
+    private IReadOnlyList<ProviderInfo> _providers = [];
+    private IReadOnlyList<ProfileSummary> _availableProfiles = [];
+
+    private string SlotTestSuffix => SlotLabel.ToLowerInvariant().Replace(' ', '-');
+    private string SlotTestId => $"studio-slot-{SlotTestSuffix}";
+
+    public bool IsValid => Mode == StudioSlotMode.UseExisting
+        ? !string.IsNullOrEmpty(ExistingProfileName)
+        : Draft is not null &&
+          !string.IsNullOrWhiteSpace(Draft.Name) &&
+          !string.IsNullOrWhiteSpace(Draft.DisplayName) &&
+          !string.IsNullOrEmpty(Draft.Provider) &&
+          !string.IsNullOrWhiteSpace(Draft.SystemPrompt);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _providers = ProviderCatalog.ListProviders();
+        await LoadAvailableProfilesAsync();
+    }
+
+    private async Task LoadAvailableProfilesAsync()
+    {
+        _availableProfiles = ProfileType switch
+        {
+            ProposedProfileType.Reviewer =>
+                (await CrewService.ListReviewerProfilesAsync(includeSystem: true))
+                    .Select(p => new ProfileSummary(p.Name, p.DisplayName, p.IsSystem)).ToList(),
+            ProposedProfileType.Advisor =>
+                (await CrewService.ListAdvisorProfilesAsync(includeSystem: true))
+                    .Select(p => new ProfileSummary(p.Name, p.DisplayName, p.IsSystem)).ToList(),
+            ProposedProfileType.GroundingProvider =>
+                (await CrewService.ListGroundingProviderProfilesAsync(includeSystem: true))
+                    .Select(p => new ProfileSummary(p.Name, p.DisplayName, p.IsSystem)).ToList(),
+            ProposedProfileType.Executor =>
+                (await CrewService.ListExecutorProfilesAsync(includeSystem: true))
+                    .Select(p => new ProfileSummary(p.Name, p.DisplayName, p.IsSystem)).ToList(),
+            _ => []
+        };
+    }
+
+    private async Task SetMode(StudioSlotMode mode)
+    {
+        Mode = mode;
+        await ModeChanged.InvokeAsync(mode);
+    }
+
+    private async Task OnExistingProfileChange(ChangeEventArgs e)
+    {
+        var name = e.Value?.ToString();
+        await ExistingProfileNameChanged.InvokeAsync(string.IsNullOrEmpty(name) ? null : name);
+    }
+
+    private async Task UpdateDraft(Func<ProposedProfile, ProposedProfile> update)
+    {
+        if (Draft is not null)
+            await DraftChanged.InvokeAsync(update(Draft));
+    }
+
+    private Task OnNameInput(ChangeEventArgs e)
+        => UpdateDraft(d => d with { Name = e.Value?.ToString() ?? string.Empty });
+
+    private Task OnDisplayNameInput(ChangeEventArgs e)
+        => UpdateDraft(d => d with { DisplayName = e.Value?.ToString() ?? string.Empty });
+
+    private Task OnDescriptionInput(ChangeEventArgs e)
+        => UpdateDraft(d => d with { Description = e.Value?.ToString() ?? string.Empty });
+
+    private Task OnSystemPromptInput(ChangeEventArgs e)
+        => UpdateDraft(d => d with { SystemPrompt = e.Value?.ToString() ?? string.Empty });
+
+    private Task OnReviewerFocusInput(ChangeEventArgs e)
+        => UpdateDraft(d => d with { ReviewerFocus = e.Value?.ToString() });
+
+    private async Task OnProviderChange(ChangeEventArgs e)
+    {
+        var provider = e.Value?.ToString() ?? string.Empty;
+        await UpdateDraft(d => d with { Provider = provider, Model = string.Empty });
+    }
+
+    private Task OnAdvisorModeChange(ChangeEventArgs e)
+        => UpdateDraft(d => d with { AdvisorMode = e.Value?.ToString() });
+
+    private Task OnAdvisorTriggerChange(ChangeEventArgs e)
+        => UpdateDraft(d => d with { AdvisorTrigger = e.Value?.ToString() });
+
+    private Task OnGroundingTypeChange(ChangeEventArgs e)
+        => UpdateDraft(d => d with { GroundingProviderType = e.Value?.ToString() });
+
+    private async Task OnMaxTokensInput(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString();
+        var parsed = int.TryParse(raw, out var val) ? (int?)val : null;
+        await UpdateDraft(d => d with { MaxTokens = parsed });
+    }
+
+    private string GetSetting(string key)
+        => Draft?.GroundingProviderSettings?.TryGetValue(key, out var v) == true ? v : string.Empty;
+
+    private string GetCollectionName() => GetSetting("collection_name");
+    private string GetApiKey() => GetSetting("api_key");
+
+    private Task OnCollectionNameInput(ChangeEventArgs e)
+        => SetSetting("collection_name", e.Value?.ToString() ?? string.Empty);
+
+    private Task OnApiKeyInput(ChangeEventArgs e)
+        => SetSetting("api_key", e.Value?.ToString() ?? string.Empty);
+
+    private async Task SetSetting(string key, string value)
+    {
+        await UpdateDraft(d =>
+        {
+            var settings = d.GroundingProviderSettings is not null
+                ? new Dictionary<string, string>(d.GroundingProviderSettings)
+                : new Dictionary<string, string>();
+            settings[key] = value;
+            return d with { GroundingProviderSettings = settings };
+        });
+    }
+}

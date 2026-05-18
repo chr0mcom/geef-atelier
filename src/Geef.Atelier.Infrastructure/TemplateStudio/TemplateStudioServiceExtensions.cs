@@ -13,6 +13,7 @@ public static class TemplateStudioServiceExtensions
     {
         services.Configure<TemplateStudioOptions>(configuration.GetSection("TemplateStudio"));
         services.AddScoped<ProfileSimilarityService>();
+        services.AddScoped<IAtomicTransactionFactory, EfAtomicTransactionFactory>();
         services.AddScoped<ITemplateStudioService, TemplateStudioService>();
         return services;
     }

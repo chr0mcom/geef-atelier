@@ -28,6 +28,13 @@ internal static class TemplateStudioPrompts
         4. Propose Grounding Providers only when the task requires external sources or fact-checking
         5. System prompts must be concrete, focused, max 100 words, in English
         6. Use the same language for your reasoning_summary as the user used in their task description
+        7. For each new profile you propose, fill in model and provider when you have a strong reason,
+           or leave them empty to let the system apply sensible defaults
+        8. Include optional reasoning fields (model_reasoning, system_prompt_reasoning, overall_reasoning,
+           mode_reasoning, trigger_reasoning, evaluation_strategy_reasoning) to explain your choices —
+           the user will see these explanations in the edit UI to understand why you proposed each value
+        9. profile_type may be "reviewer", "advisor", "grounding_provider", or "executor" —
+           propose an executor profile only when the default executor is genuinely insufficient
 
         Examples:
 
