@@ -2,7 +2,7 @@
 
 *[English](08-crew-system.md) · **Deutsch***
 
-Letzte Aktualisierung: 2026-05-17 (System-Profile/-Advisors/-Templates auf aktuellen `SystemCrew`-Stand gebracht: CLI-Provider, Domain-Templates)
+Letzte Aktualisierung: 2026-05-18 (Template-Studio-Abschnitt + Routing-Map-Eintrag für D-043 ergänzt)
 
 ## Überblick
 
@@ -252,6 +252,7 @@ Migration Step10 benennt historische `Findings.ReviewerName`-Werte um. `Reviewer
 | `/crew/profiles/executors` | `ExecutorProfilesIndex` | Liste aller Executor-Profile |
 | `/crew/profiles/executors/new` | `ExecutorProfileEditor` | Neues Executor-Profil anlegen |
 | `/crew/profiles/executors/{name}` | `ExecutorProfileEditor` | Executor-Profil bearbeiten |
+| `/crew/studio` | `TemplateStudio` | KI-gestützter Template-Wizard (Analyse → Review → Edit → Materialisierung) |
 
 ### UI-Komponenten
 
@@ -268,3 +269,44 @@ Migration Step10 benennt historische `Findings.ReviewerName`-Werte um. `Reviewer
 ### Name-Constraints
 
 Pattern `^[a-z0-9\-]+$`, max 64 Zeichen — gilt für alle Profile- und Template-Namen (Custom-Prefix exkl.). Form-Validierung via `DataAnnotations.RegularExpression`. Service-Layer ist idempotent bzgl. `custom-`-Prefix.
+
+## Template Studio (D-043)
+
+Das Template Studio unter `/crew/studio` ist ein KI-gestützter Wizard, der für eine beschriebene Aufgabe eine vollständige Crew-Konfiguration vorschlägt. Der Nutzer kann jeden Vorschlag im Edit-Step prüfen und bearbeiten, bevor er in die DB materialisiert wird.
+
+### Wizard-Schritte
+
+| Schritt | Komponente | Beschreibung |
+|---|---|---|
+| TaskInput | `StudioTaskInputStep` | Freitext-Aufgabenbeschreibung; löst LLM-Analyse aus |
+| Analyzing | `StudioAnalyzingStep` | Lade-Indikator während das Meta-LLM läuft |
+| Review | `StudioReviewStep` | Zeigt den KI-Vorschlag; Option, ein bestehendes Template zu verwenden |
+| Edit | `StudioEditStep` | Vollständiger Editor für das vorgeschlagene Template und alle Profile |
+| Confirmation | `StudioConfirmationStep` | Zeigt Materialisierungs-Ergebnis; startet einen Run |
+
+### StudioEditStep — Feld-Parität (D-043)
+
+Der Edit-Step exponiert das vollständige Feld-Set für das Template und jeden Profil-Slot:
+
+**Template-Felder:** DisplayName, Description, EvaluationStrategy (Dropdown), EvaluationStrategyReasoning (read-only, vom LLM)
+
+**Pro Profil-Slot (Executor / Reviewer × N / Advisor × N / GroundingProvider × N):**
+- **UseExisting / CreateNew Toggle** — bestehendes Profil per Name wählen oder neues Profil inline konfigurieren
+- **CreateNew-Felder:** Name (kebab-case), DisplayName, Description, Provider, Modell (`ModelSelector`), MaxTokens, System-Prompt
+- **Reviewer-spezifisch:** ReviewerFocus (optional)
+- **Advisor-spezifisch:** AdvisorMode (Strategic / Critical / DevilsAdvocate), AdvisorTrigger (BeforeFirstExecution / BeforeEveryExecution / OnConvergenceFailure)
+- **GroundingProvider-spezifisch:** GroundingProviderType (Tavily / VectorStore), Typ-spezifische Einstellungen (API-Key oder Collection-Name)
+- **Reasoning-Anzeige:** LLM-Begründungen pro Feld, read-only (aus `analyze_template_proposal`)
+- **Field-Helps:** Deutsche Inline-Hinweise für jedes Feld (`StudioFieldHelps.cs`)
+
+### Schlüssel-Komponenten
+
+| Komponente | Zweck |
+|---|---|
+| `StudioProfileSlot.razor` | UseExisting/CreateNew-Toggle + vollständiges Inline-Profil-Form; bettet `ModelSelector` ein |
+| `FieldHelp.razor` | Inline-Hinweis unterhalb jedes Feldes |
+| `StudioFieldHelps.cs` | Zentrale deutsche Field-Help-Text-Konstanten |
+
+### Materialisierung (atomar, D-043/7)
+
+`TemplateStudioService.MaterializeAsync` kapselt alle DB-Schreibvorgänge in einer einzelnen EF-Core-Transaktion (`IAtomicTransactionFactory`). Ablauf: Validierung → Begin → Profile anlegen (Executor, Reviewer, Advisor, GroundingProvider) → Template anlegen → Commit. Explizites Rollback bei jedem Fehler — kein Halb-materialisierter Zustand. `MarkMaterializedAsync` (markiert den Analyse-Datensatz als verbraucht) läuft innerhalb der Transaktion.

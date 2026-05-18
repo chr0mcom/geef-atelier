@@ -22,7 +22,7 @@ Text-generation pipeline platform built on the [Geef SDK](https://github.com/chr
 
 **Step 8 ✅** Cookie auth — single-user login, `[Authorize]` on pages, login/logout, `TestAuthenticationHandler` for E2E tests.
 
-**Step 9+ ✅** Crew system, advisor passes, Template Studio, domain templates, grounding-provider CRUD, vector-store RAG, PDF support, cost tracking.
+**Step 9+ ✅** Crew system, advisor passes, Template Studio (with full-field edit, D-043), domain templates, grounding-provider CRUD, vector-store RAG, PDF support, cost tracking.
 
 **MCP OAuth ✅** Self-hosted OAuth 2.1 authorization server (RFC 8414/7591/7636/7009/8252) — authorization-code flow with mandatory PKCE/S256, opaque tokens, refresh rotation, reuse detection.
 
@@ -174,6 +174,7 @@ Every run stores a fully embedded **CrewSnapshot** in the DB — so the run stay
 | Reviewer profiles | `/crew/profiles/reviewers` |
 | Executor profiles | `/crew/profiles/executors` |
 | Grounding providers | `/crew/profiles/grounding-providers` |
+| Template Studio (AI-assisted template creation) | `/crew/studio` |
 
 Details: [docs/08-crew-system.md](docs/08-crew-system.md)
 

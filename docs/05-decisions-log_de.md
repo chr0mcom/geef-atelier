@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-17 (Run-User-Isolation: D-042 ergänzt)*
+*Letzte Aktualisierung: 2026-05-18 (Template Studio Complete Edit: D-043 ergänzt)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -787,3 +787,27 @@ Run-Sichtbarkeit auf eigenen Account eingeschränkt. Admin-Override via explizit
 **D-042/6 — Kein Cascade-Delete bei User-Löschung:** Runs bleiben in der DB erhalten wenn User gelöscht wird. Admin sieht verwaiste Runs. Runs sind historische Wertdaten — destruktiver Auto-Delete inakzeptabel.
 
 **D-042/7 — Index `IX_Runs_CreatedByUser`:** Migration Step21 fügt Index auf `Runs.CreatedByUser` hinzu. Filter-Performance bei wachsender Run-Zahl.
+
+---
+
+## D-043 — Template Studio Complete Edit (vollständiger Edit-Flow)
+
+*(2026-05-18 — Branch `feat/studio-complete-edit`, PR #16, Merge-SHA `ee317e7`)*
+
+Das Template Studio (`/crew/studio`) hatte bisher nur minimale Edit-Felder im `StudioEditStep` (Template-DisplayName, je Profil nur SystemPrompt). Provider, Modell, MaxTokens, Advisor-Mode/Trigger, Grounding-Settings, UseExisting/CreateNew-Toggle pro Slot und Field-Helps fehlten — Nutzer mussten nach einer Studio-Analyse in die separaten `/crew/profiles/…`-Editoren wechseln. D-043 liefert vollständige Feld-Parität ohne Nachbearbeitung.
+
+**D-043/1 — Lean Extension: flaches Domain-Modell, additive nullable Reasoning-Felder.** `ProposedProfile` und `ProposedTemplate` bleiben flache Records mit String-Namen-Referenzen. Additive nullable Felder ergänzt: `ModelReasoning?`, `SystemPromptReasoning?`, `OverallReasoning?`, `ModeReasoning?`, `TriggerReasoning?` auf `ProposedProfile`; `EvaluationStrategyReasoning?` auf `ProposedTemplate`. Backwards-Compat: alte `AnalysisResultJson` (ohne Reasoning) deserialisiert weiterhin korrekt — neue Felder defaulten auf `null`. Keine Wrapper-Records, keine DB-Migration.
+
+**D-043/2 — Lean Reuse: existierende Komponenten unverändert.** `ModelSelector.razor`, `ReviewerPicker`, `AdvisorPicker`, `GroundingProviderPicker`, `ProfileEditorForm.razor` und alle Live-Editor-Pages bleiben unverändert (kein Regressionsrisiko). Das Studio erhält eine eigene `StudioProfileSlot.razor` (Picker↔Inline-Toggle, kein per-Slot-Submit, kontinuierliches Binding), die `ModelSelector` und Field-Helps einbettet.
+
+**D-043/3 — UseExisting vs. CreateNew = UI-State only.** `StudioSlotMode`-Enum (`UseExisting`/`CreateNew`) lebt in `StudioEditStep.razor` als private `SlotState`-Klasse. CreateNew → Draft landet in `FinalNewProfiles` + Name in `FinalTemplate.*Names`. UseExisting → Name zeigt auf existierendes Profil, kein Eintrag in `FinalNewProfiles`. Domain-API (`MaterializationRequest`) unverändert.
+
+**D-043/4 — Field-Help-Resource: zentral, Deutsch, Spec-verbatim.** `StudioFieldHelps.cs` (statische Konstanten) hält alle Field-Help-Texte auf Deutsch. `FieldHelp.razor` rendert Inline-Hinweise unterhalb jedes Feldes. Jedes Studio-Edit-Feld (Template und alle Profil-Typen) hat einen FieldHelp. Keine Inline-Help-Strings in Komponenten.
+
+**D-043/5 — Defaults in `appsettings.json TemplateStudio:Defaults`.** Neue `StudioDefaults`-Unterklasse von `TemplateStudioOptions` (Reviewer/Executor/Advisor/GroundingProvider/EvaluationStrategy-Defaults). Werte gegen existierende System-Profile kalibriert. LLM-null-Felder werden in `TemplateStudioService.ApplyDefaults` aus Defaults befüllt.
+
+**D-043/6 — Additives Tool-/MCP-Schema, Backwards-Compat.** `TemplateProposalTool.cs`-Schema: `profile_type`-Enum um `"executor"` erweitert; optionale Reasoning-Properties ergänzt. `ProposedTemplateDto`/`ProposedProfileDto` um nullable Reasoning-Felder erweitert (Default `null`). Alte MCP-Inputs ohne Reasoning oder ohne Executor-Type funktionieren weiterhin.
+
+**D-043/7 — Atomare Materialisierung via `IAtomicTransactionFactory`.** `TemplateStudioService.MaterializeAsync` nutzt `IAtomicTransactionFactory` (testbare Abstraktion über EF-Core-`AtelierDbContext`-Transaktion). Ablauf: vollständige Validierung → Begin → Profile anlegen → Template anlegen → Commit; explizites `RollbackAsync` bei jedem Fehler. `CreateProfileAsync` um Executor-Zweig erweitert. `MarkMaterializedAsync` innerhalb der Transaktion (korrekt: wird bei fehlgeschlagenem Commit zurückgerollt). `GetDefaultMaxTokens` gibt `null` für GroundingProvider zurück (kein LLM-MaxTokens). `ValidateAvailabilityAsync` überspringt GroundingProvider-Profile (nutzen Tavily/VectorStore, keine LLM-Modelle).
+
+**D-043/8 — Akzeptierte Architektur-Abweichungen.** Slot-State und `BuildRequest()` leben in `StudioEditStep`, nicht in `TemplateStudio.razor` (architektonisch sauberere Kapselung). `bool ShowValidation` statt `ValidationMessages`-Store (einfacher, korrekt). `GroundingProviderProvider = "openrouter"` als Default — semantisch übernehmen Grounding-Profile diesen Wert, er wird in `CreateProfileAsync` für Grounding nicht genutzt (kein LLM-Aufruf). `IAtomicTransactionFactory`-Abstraktion statt direkter `AppDbContext`-Injection (architektonisch überlegen). Diese Abweichungen wurden im Eval-Loop geprüft und akzeptiert.

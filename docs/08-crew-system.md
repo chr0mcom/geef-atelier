@@ -251,6 +251,7 @@ Migration Step10 renames historical `Findings.ReviewerName` values. `ReviewerDis
 | `/crew/profiles/executors` | `ExecutorProfilesIndex` | List of all executor profiles |
 | `/crew/profiles/executors/new` | `ExecutorProfileEditor` | Create a new executor profile |
 | `/crew/profiles/executors/{name}` | `ExecutorProfileEditor` | Edit an executor profile |
+| `/crew/studio` | `TemplateStudio` | AI-assisted template wizard (analyze → review → edit → materialize) |
 
 ### UI components
 
@@ -267,3 +268,44 @@ Migration Step10 renames historical `Findings.ReviewerName` values. `ReviewerDis
 ### Name constraints
 
 Pattern `^[a-z0-9\-]+$`, max 64 characters — applies to all profile and template names (custom prefix excluded). Form validation via `DataAnnotations.RegularExpression`. The service layer is idempotent regarding the `custom-` prefix.
+
+## Template Studio (D-043)
+
+The Template Studio at `/crew/studio` is an AI-assisted wizard that proposes a complete crew configuration for a described task and lets the user review and edit every field before materializing to the DB.
+
+### Wizard steps
+
+| Step | Component | Description |
+|---|---|---|
+| TaskInput | `StudioTaskInputStep` | Free-text task description; triggers LLM analysis |
+| Analyzing | `StudioAnalyzingStep` | Loading indicator while the meta-LLM runs |
+| Review | `StudioReviewStep` | Shows the AI proposal; option to use an existing template instead |
+| Edit | `StudioEditStep` | Full-field editor for the proposed template and all profiles |
+| Confirmation | `StudioConfirmationStep` | Shows materialization result; launches a run |
+
+### StudioEditStep field parity (D-043)
+
+The Edit step exposes the full field set for the template and every profile slot:
+
+**Template fields:** DisplayName, Description, EvaluationStrategy (dropdown), EvaluationStrategyReasoning (read-only, from LLM)
+
+**Per profile slot (Executor / Reviewer × N / Advisor × N / GroundingProvider × N):**
+- **UseExisting / CreateNew toggle** — pick an existing profile by name, or configure a new one inline
+- **CreateNew fields:** Name (kebab-case), DisplayName, Description, Provider, Model (`ModelSelector`), MaxTokens, SystemPrompt
+- **Reviewer-specific:** ReviewerFocus (optional)
+- **Advisor-specific:** AdvisorMode (Strategic / Critical / DevilsAdvocate), AdvisorTrigger (BeforeFirstExecution / BeforeEveryExecution / OnConvergenceFailure)
+- **GroundingProvider-specific:** GroundingProviderType (Tavily / VectorStore), type-specific settings (API key or collection name)
+- **Reasoning display:** LLM reasoning per field, read-only (from `analyze_template_proposal`)
+- **Field-Helps:** inline German help texts for every field (`StudioFieldHelps.cs`)
+
+### Key components
+
+| Component | Purpose |
+|---|---|
+| `StudioProfileSlot.razor` | UseExisting/CreateNew toggle + full inline profile form; embeds `ModelSelector` |
+| `FieldHelp.razor` | Inline hint rendered below every field |
+| `StudioFieldHelps.cs` | Central German-language help-text constants |
+
+### Materialization (atomic, D-043/7)
+
+`TemplateStudioService.MaterializeAsync` wraps all DB writes in a single EF Core transaction (`IAtomicTransactionFactory`). Order: validate → begin → create profiles (Executor, Reviewer, Advisor, GroundingProvider) → create template → commit. Explicit rollback on any error — no half-materialized state. `MarkMaterializedAsync` (marks the analysis record as consumed) runs inside the transaction.

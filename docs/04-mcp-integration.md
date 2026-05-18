@@ -133,6 +133,43 @@ Besides the six run tools the server offers seven more — **13 MCP tools** in t
 
 Full parameter/schema details: [`09-endpoint-reference.md`](09-endpoint-reference.md).
 
+#### `analyze_template_proposal`
+
+Runs a meta-LLM that analyzes the task description and produces a structured `TemplateStudioAnalysis` persisted in the DB.
+
+**Input:** `{ "task_description": "string" }`
+
+**Output:** `TemplateStudioAnalysis` — includes `id` (UUID, needed for `materialize_template_proposal`), a `proposed_template` (DisplayName, Description, EvaluationStrategy, optional `evaluation_strategy_reasoning`), and a list of `proposed_new_profiles`. Each profile carries: `profile_type` (`"reviewer"` | `"advisor"` | `"grounding_provider"` | `"executor"`), Name, DisplayName, Description, Provider, Model, MaxTokens, SystemPrompt, plus type-specific optional fields (ReviewerFocus, AdvisorMode, AdvisorTrigger, GroundingProviderType, GroundingProviderSettings) and optional LLM reasoning fields (`model_reasoning`, `system_prompt_reasoning`, `overall_reasoning`, `mode_reasoning`, `trigger_reasoning`). Missing fields are filled from `appsettings TemplateStudio:Defaults` server-side.
+
+Backwards-compatible: old inputs without executor type or reasoning fields continue to work.
+
+#### `materialize_template_proposal`
+
+Atomically writes all new profiles and the crew template to the DB in a single transaction.
+
+**Input:**
+```json
+{
+  "analysis_id": "uuid",
+  "final_template": {
+    "display_name": "...", "description": "...", "evaluation_strategy": "Sequential",
+    "executor_profile_name": "...", "reviewer_profile_names": ["..."],
+    "advisor_profile_names": ["..."], "grounding_provider_profile_names": ["..."]
+  },
+  "final_new_profiles": [
+    {
+      "profile_type": "reviewer", "name": "custom-my-reviewer",
+      "display_name": "...", "system_prompt": "...", "provider": "openrouter",
+      "model": "openai/gpt-4o-mini", "max_tokens": 2048
+    }
+  ]
+}
+```
+
+`final_new_profiles` contains only profiles the user chose to create fresh (CreateNew mode). Profiles in UseExisting mode appear only by name in `final_template.*_profile_names`.
+
+**Output:** `{ "created_template_name": "custom-..." }` — the name of the materialized template, ready to pass to `submit_request` as `crew_template`.
+
 ### Run visibility over MCP (D-042)
 
 Since run-user isolation, runs are visible per user separately — including over MCP:
