@@ -149,7 +149,7 @@ public static class SystemCrew
         ExecutorProfileName: DefaultExecutorProfile.Name,
         ReviewerProfileNames: new[] { BriefingFidelityProfile.Name, LegalJargonPrecisionProfile.Name, LegalClauseRiskProfile.Name },
         EvaluationStrategy: EvaluationStrategy.Sequential,
-        ConvergenceOverride: null,
+        ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 12, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
         AdvisorProfileNames: new[] { "legal-domain-expert" },
         GroundingProviderNames: new[] { "tavily-basic", "run-attachments" },
         IsSystem: true);
