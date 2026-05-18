@@ -92,14 +92,19 @@ internal sealed class TemplateStudioService(
         await using var transaction = await transactionFactory.BeginAsync(ct);
         try
         {
+            // Track old→final name mapping so template references are updated to actual stored names.
+            // CreateCustom*Async auto-prefixes with "custom-", so "my-profile" becomes "custom-my-profile".
+            var nameMapping = new Dictionary<string, string>(StringComparer.Ordinal);
             var createdProfileNames = new List<string>();
             foreach (var profile in request.FinalNewProfiles)
             {
-                var name = await CreateProfileAsync(profile, warnings, ct);
-                createdProfileNames.Add(name);
+                var finalName = await CreateProfileAsync(profile, warnings, ct);
+                createdProfileNames.Add(finalName);
+                nameMapping[profile.Name] = finalName;
             }
 
-            var templateName = await CreateTemplateAsync(request.FinalTemplate, ct);
+            var resolvedTemplate = ApplyProfileNameMapping(request.FinalTemplate, nameMapping);
+            var templateName = await CreateTemplateAsync(resolvedTemplate, ct);
             await analysisRepository.MarkMaterializedAsync(analysisId, templateName, ct);
 
             await transaction.CommitAsync(ct);
@@ -372,6 +377,20 @@ internal sealed class TemplateStudioService(
             default:
                 throw new NotSupportedException($"Profile type {profile.ProfileType} is not supported for creation.");
         }
+    }
+
+    // Maps profile names referenced by a template through a dictionary of old→final names.
+    // Names not in the dictionary (existing profiles) are passed through unchanged.
+    private static ProposedTemplate ApplyProfileNameMapping(ProposedTemplate template, Dictionary<string, string> map)
+    {
+        string Resolve(string name) => map.TryGetValue(name, out var final) ? final : name;
+        return template with
+        {
+            ExecutorProfileName           = Resolve(template.ExecutorProfileName),
+            ReviewerProfileNames          = template.ReviewerProfileNames.Select(Resolve).ToList(),
+            AdvisorProfileNames           = template.AdvisorProfileNames.Select(Resolve).ToList(),
+            GroundingProviderProfileNames = template.GroundingProviderProfileNames.Select(Resolve).ToList(),
+        };
     }
 
     private async Task<string> CreateTemplateAsync(ProposedTemplate template, CancellationToken ct)

@@ -57,7 +57,11 @@ public sealed class TemplateStudioServiceMaterializeTests
         public Task<ExecutorProfile> UpdateCustomExecutorProfileAsync(ExecutorProfile profile, CancellationToken ct = default) => Task.FromResult(profile);
         public Task DeleteCustomExecutorProfileAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
 
-        public Task<AdvisorProfile> CreateCustomAdvisorProfileAsync(AdvisorProfile profile, CancellationToken ct = default) => Task.FromResult(profile);
+        public Task<AdvisorProfile> CreateCustomAdvisorProfileAsync(AdvisorProfile profile, CancellationToken ct = default)
+        {
+            var withPrefix = profile with { Name = SystemCrew.EnsureCustomPrefix(profile.Name) };
+            return Task.FromResult(withPrefix);
+        }
         public Task<AdvisorProfile> UpdateCustomAdvisorProfileAsync(AdvisorProfile profile, CancellationToken ct = default) => Task.FromResult(profile);
         public Task DeleteCustomAdvisorProfileAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
 
@@ -285,6 +289,42 @@ public sealed class TemplateStudioServiceMaterializeTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => svc.MaterializeAsync(Guid.NewGuid(), request, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task MaterializeAsync_ResolvesTemplateProfleNamesToCustomPrefixedNames()
+    {
+        // Regression: newly created profiles get auto-prefixed with "custom-" by CrewService.
+        // The template's profile name lists must be updated to use those final names,
+        // otherwise ResolveSnapshotAsync fails when starting a run.
+        var crewService = new CapturingCrewService();
+        var repo = new InMemoryAnalysisRepository();
+        var svc = CreateService(crewService, repo);
+
+        var template = new ProposedTemplate(
+            Name: "my-template",
+            DisplayName: "My Template",
+            Description: "Test",
+            ExecutorProfileName: "default-executor",
+            ReviewerProfileNames: ["my-reviewer"],   // proposed without "custom-" prefix
+            AdvisorProfileNames: ["my-advisor"],      // proposed without "custom-" prefix
+            GroundingProviderProfileNames: [],
+            EvaluationStrategy: "Sequential");
+
+        var reviewerProfile = MakeReviewerProfile("my-reviewer");
+        var advisorProfile = new ProposedProfile(
+            ProposedProfileType.Advisor, "my-advisor", "My Advisor", "Advises.", "gpt-4o-mini",
+            "openrouter", "Be strategic.", null, null, "Strategic", "BeforeFirstExecution", null, null);
+
+        var request = new MaterializationRequest(template, [reviewerProfile, advisorProfile]);
+        await svc.MaterializeAsync(Guid.NewGuid(), request, CancellationToken.None);
+
+        var stored = Assert.Single(crewService.CreatedTemplates);
+        // Template must reference the final prefixed names, not the original proposal names.
+        Assert.Contains("custom-my-reviewer", stored.ReviewerProfileNames);
+        Assert.DoesNotContain("my-reviewer", stored.ReviewerProfileNames);
+        Assert.Contains("custom-my-advisor", stored.AdvisorProfileNames);
+        Assert.DoesNotContain("my-advisor", stored.AdvisorProfileNames);
     }
 
     [Fact]
