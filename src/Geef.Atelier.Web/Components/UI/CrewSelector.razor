@@ -5,7 +5,7 @@
 <div class="crew-selector-row">
     <label class="field">
         <span class="field-label">Crew</span>
-        <select data-testid="crew-selector" @bind="Value" @bind:event="onchange">
+        <select data-testid="crew-selector" value="@Value" @onchange="OnSelectionChangedAsync">
             @foreach (var t in _templates)
             {
                 <option value="@t.Name">
@@ -29,6 +29,12 @@
         if (Value == null && _templates.Count > 0)
             Value = _templates.FirstOrDefault(t => t.Name == SystemCrew.KlassikTemplateName)?.Name
                     ?? _templates[0].Name;
+    }
+
+    private async Task OnSelectionChangedAsync(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString();
+        await ValueChanged.InvokeAsync(Value);
     }
 
     private static string Truncate(string s, int max) =>

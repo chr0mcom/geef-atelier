@@ -72,6 +72,27 @@ public sealed class CrewSelectorTests : TestContext
     }
 
     [Fact]
+    public void SelectingDifferentOption_InvokesValueChanged_SoParentBindingUpdates()
+    {
+        RegisterCrewService(
+        [
+            MakeTemplate(SystemCrew.KlassikTemplateName, "Klassik", isSystem: true),
+            MakeTemplate("custom-crew", "My Custom Crew"),
+        ]);
+
+        string? capturedValue = null;
+        var cut = RenderComponent<CrewSelector>(p =>
+        {
+            p.Add(c => c.Value, SystemCrew.KlassikTemplateName);
+            p.Add(c => c.ValueChanged, (string? v) => capturedValue = v);
+        });
+
+        cut.Find("[data-testid='crew-selector']").Change("custom-crew");
+
+        Assert.Equal("custom-crew", capturedValue);
+    }
+
+    [Fact]
     public void WithEmptyTemplateList_RendersEmptySelect_NocrashOccurs()
     {
         RegisterCrewService([]);
