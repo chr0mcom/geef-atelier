@@ -61,7 +61,7 @@ public sealed class LlmOptionsMultiProviderTests
         var opts = BuildOptions("""{ "Llm": {} }""");
 
         Assert.Equal("openrouter", opts.Value.DefaultProvider);
-        Assert.Equal(4096, opts.Value.DefaultMaxTokens);
+        Assert.Equal(16384, opts.Value.DefaultMaxTokens);
         Assert.Empty(opts.Value.Providers);
         Assert.Empty(opts.Value.Actors);
     }

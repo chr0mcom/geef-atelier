@@ -54,7 +54,7 @@ public sealed class LlmClientResolverTests
 
         var (_, _, maxTokens) = resolver.ForActor("BriefingTreueReviewer");
 
-        Assert.Equal(4096, maxTokens); // DefaultMaxTokens
+        Assert.Equal(16384, maxTokens); // DefaultMaxTokens
     }
 
     [Fact]

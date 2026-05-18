@@ -11,7 +11,7 @@ public sealed class LlmOptions
     /// <summary>Fallback provider name when an actor's Provider field is empty.</summary>
     public string DefaultProvider { get; set; } = "openrouter";
 
-    public int DefaultMaxTokens { get; set; } = 4096;
+    public int DefaultMaxTokens { get; set; } = 16384;
 
     public sealed class ProviderConfig
     {

@@ -33,7 +33,7 @@ public sealed class StudioDefaults
     // Executor defaults
     public string ExecutorModel { get; set; } = "anthropic/claude-opus-4-7";
     public string ExecutorProvider { get; set; } = "openrouter";
-    public int ExecutorMaxTokens { get; set; } = 16384;
+    public int ExecutorMaxTokens { get; set; } = 60000;
 
     // Advisor defaults
     public string AdvisorModel { get; set; } = "openai/gpt-4o-mini";

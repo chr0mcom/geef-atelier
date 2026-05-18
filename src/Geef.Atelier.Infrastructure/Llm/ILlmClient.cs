@@ -12,7 +12,7 @@ public sealed record LlmRequest
     public required string Model { get; init; }
     public required string SystemPrompt { get; init; }
     public required string UserPrompt { get; init; }
-    public int MaxTokens { get; init; } = 4096;
+    public int MaxTokens { get; init; } = 16384;
     public IReadOnlyList<LlmTool>? Tools { get; init; }
 
     /// <summary>
