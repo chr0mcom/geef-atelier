@@ -123,13 +123,30 @@ internal sealed class TemplateStudioService(
         var executors = await crewService.ListExecutorProfilesAsync(includeSystem: true, ct);
         var providers = providerCatalog.ListProviders();
 
+        // Build per-provider model lists so the LLM can select accurate, current model IDs.
+        var modelLines = new List<string>();
+        foreach (var provider in providers)
+        {
+            var models = await modelCatalog.ListModelsAsync(provider.Name, ct);
+            var recommended = models.Where(m => m.IsRecommended).Select(m => m.Id).ToList();
+            var rest = models.Where(m => !m.IsRecommended).Select(m => m.Id).Take(15).ToList();
+            if (recommended.Count > 0)
+                modelLines.Add($"  {provider.Name} RECOMMENDED: {string.Join(", ", recommended)}");
+            if (rest.Count > 0)
+                modelLines.Add($"  {provider.Name} also available: {string.Join(", ", rest)}");
+        }
+        var modelsBlock = modelLines.Count > 0
+            ? string.Join("\n", modelLines)
+            : "  (no model catalog available — use provider defaults)";
+
         return $"""
             Templates: {string.Join(", ", templates.Select(t => $"{t.Name} ({t.Description})"))}
             Executor profiles: {string.Join(", ", executors.Select(e => e.Name))}
             Reviewer profiles: {string.Join(", ", reviewers.Select(r => $"{r.Name} ({r.Description})"))}
             Advisor profiles: {string.Join(", ", advisors.Select(a => $"{a.Name} ({a.Description})"))}
             Grounding provider profiles: {string.Join(", ", grounding.Select(g => g.Name))}
-            Available providers: {string.Join(", ", providers.Select(p => p.Name))}
+            Available providers and their current models (use ONLY these exact IDs):
+            {modelsBlock}
             """;
     }
 
@@ -167,7 +184,7 @@ internal sealed class TemplateStudioService(
                 ReviewerProfileNames:          GetStringArray(ptEl, "reviewer_profile_names"),
                 AdvisorProfileNames:           GetStringArray(ptEl, "advisor_profile_names"),
                 GroundingProviderProfileNames: GetStringArray(ptEl, "grounding_provider_profile_names"),
-                EvaluationStrategy:            ptEl.TryGetProperty("evaluation_strategy", out var evEl) ? evEl.GetString() ?? "Sequential" : "Sequential",
+                EvaluationStrategy:            NormalizeEvaluationStrategy(ptEl.TryGetProperty("evaluation_strategy", out var evEl) ? evEl.GetString() : null),
                 EvaluationStrategyReasoning:   ptEl.TryGetProperty("evaluation_strategy_reasoning", out var esrEl) ? esrEl.GetString() : null);
         }
 
@@ -404,4 +421,15 @@ internal sealed class TemplateStudioService(
             .Select(s => s!)
             .ToList();
     }
+
+    private static string NormalizeEvaluationStrategy(string? raw) => raw?.Trim() switch
+    {
+        { } s when s.Equals("Parallel",   StringComparison.OrdinalIgnoreCase) => "Parallel",
+        { } s when s.Equals("FailFast",   StringComparison.OrdinalIgnoreCase)
+                || s.Equals("fail_fast",  StringComparison.OrdinalIgnoreCase)
+                || s.Equals("FailFast",   StringComparison.Ordinal)           => "FailFast",
+        { } s when s.Equals("Priority",   StringComparison.OrdinalIgnoreCase) => "Priority",
+        { } s when s.Equals("Sequential", StringComparison.OrdinalIgnoreCase) => "Sequential",
+        _ => "Sequential"
+    };
 }

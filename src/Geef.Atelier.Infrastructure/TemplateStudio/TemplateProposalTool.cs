@@ -42,7 +42,10 @@ internal static class TemplateProposalTool
                         "reviewer_profile_names": { "type": "array", "items": { "type": "string" } },
                         "advisor_profile_names": { "type": "array", "items": { "type": "string" } },
                         "grounding_provider_profile_names": { "type": "array", "items": { "type": "string" } },
-                        "evaluation_strategy": { "type": "string" },
+                        "evaluation_strategy": {
+                            "type": "string",
+                            "enum": ["Sequential", "Parallel", "FailFast", "Priority"]
+                        },
                         "evaluation_strategy_reasoning": { "type": "string" }
                     }
                 },
@@ -60,9 +63,18 @@ internal static class TemplateProposalTool
                             "provider": { "type": "string" },
                             "system_prompt": { "type": "string" },
                             "max_tokens": { "type": "integer" },
-                            "reviewer_focus": { "type": "string" },
-                            "advisor_mode": { "type": "string" },
-                            "advisor_trigger": { "type": "string" },
+                            "reviewer_focus": {
+                                "type": "string",
+                                "description": "Concise focus hint for the reviewer, e.g. 'legal clause risk' or 'argument strength'. Required for reviewer profiles."
+                            },
+                            "advisor_mode": {
+                                "type": "string",
+                                "enum": ["Strategic", "Critical", "DevilsAdvocate", "DomainExpert"]
+                            },
+                            "advisor_trigger": {
+                                "type": "string",
+                                "enum": ["BeforeFirstExecution", "BeforeEveryExecution", "OnConvergenceFailure"]
+                            },
                             "grounding_provider_type": { "type": "string" },
                             "grounding_provider_settings": { "type": "object" },
                             "model_reasoning": { "type": "string" },
