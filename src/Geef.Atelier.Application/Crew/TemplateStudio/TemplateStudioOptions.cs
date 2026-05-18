@@ -4,10 +4,11 @@ namespace Geef.Atelier.Application.Crew.TemplateStudio;
 public sealed class TemplateStudioOptions
 {
     /// <summary>OpenRouter model identifier for the meta-LLM analysis call.</summary>
-    public string Model { get; set; } = "anthropic/claude-sonnet-4-5";
+    public string Model { get; set; } = "anthropic/claude-opus-4-7";
 
-    /// <summary>Max tokens for the meta-LLM analysis response.</summary>
-    public int MaxTokens { get; set; } = 4096;
+    /// <summary>Max tokens for the meta-LLM analysis response. Must accommodate several
+    /// fully structured profile system prompts plus reasoning fields in a single tool call.</summary>
+    public int MaxTokens { get; set; } = 8192;
 
     /// <summary>Cosine similarity threshold above which an existing profile is considered a duplicate.</summary>
     public double SimilarityThreshold { get; set; } = 0.85;
