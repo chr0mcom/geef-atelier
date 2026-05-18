@@ -20,20 +20,25 @@ public sealed class TemplateStudioOptions
 /// <summary>Default values for proposed profile fields when the meta-LLM leaves them blank.</summary>
 public sealed class StudioDefaults
 {
+    /// <summary>Hard lower bound for any proposed profile's max-tokens budget. Profiles produce
+    /// fully structured output (multi-finding reviews, multi-point advice, full drafts); a small
+    /// budget silently truncates that output, so even meta-LLM-proposed values are clamped up to this.</summary>
+    public const int MinMaxTokens = 10000;
+
     // Reviewer defaults
     public string ReviewerModel { get; set; } = "openai/gpt-4o-mini";
     public string ReviewerProvider { get; set; } = "openrouter";
-    public int ReviewerMaxTokens { get; set; } = 2048;
+    public int ReviewerMaxTokens { get; set; } = 16384;
 
     // Executor defaults
     public string ExecutorModel { get; set; } = "anthropic/claude-opus-4-7";
     public string ExecutorProvider { get; set; } = "openrouter";
-    public int ExecutorMaxTokens { get; set; } = 4096;
+    public int ExecutorMaxTokens { get; set; } = 16384;
 
     // Advisor defaults
     public string AdvisorModel { get; set; } = "openai/gpt-4o-mini";
     public string AdvisorProvider { get; set; } = "openrouter";
-    public int AdvisorMaxTokens { get; set; } = 2048;
+    public int AdvisorMaxTokens { get; set; } = 16384;
     public string AdvisorMode { get; set; } = "Strategic";
     public string AdvisorTrigger { get; set; } = "BeforeFirstExecution";
 

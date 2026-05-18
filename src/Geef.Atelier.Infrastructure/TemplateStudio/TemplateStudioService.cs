@@ -242,7 +242,7 @@ internal sealed class TemplateStudioService(
     {
         Model    = string.IsNullOrEmpty(p.Model)    ? GetDefaultModel(p.ProfileType, d)    : p.Model,
         Provider = string.IsNullOrEmpty(p.Provider) ? GetDefaultProvider(p.ProfileType, d) : p.Provider,
-        MaxTokens = p.MaxTokens ?? GetDefaultMaxTokens(p.ProfileType, d),
+        MaxTokens = ClampMaxTokens(p.ProfileType, p.MaxTokens ?? GetDefaultMaxTokens(p.ProfileType, d)),
         AdvisorMode    = p.ProfileType == ProposedProfileType.Advisor && string.IsNullOrEmpty(p.AdvisorMode)    ? d.AdvisorMode    : p.AdvisorMode,
         AdvisorTrigger = p.ProfileType == ProposedProfileType.Advisor && string.IsNullOrEmpty(p.AdvisorTrigger) ? d.AdvisorTrigger : p.AdvisorTrigger,
         GroundingProviderType = p.ProfileType == ProposedProfileType.GroundingProvider && string.IsNullOrEmpty(p.GroundingProviderType) ? d.GroundingProviderType : p.GroundingProviderType
@@ -271,6 +271,13 @@ internal sealed class TemplateStudioService(
         ProposedProfileType.GroundingProvider => null,
         _                                     => d.ReviewerMaxTokens
     };
+
+    // Grounding providers do no LLM generation (null budget); every generating profile is clamped
+    // up to the hard floor so a small meta-LLM-proposed value cannot silently truncate output.
+    private static int? ClampMaxTokens(ProposedProfileType type, int? maxTokens) =>
+        type == ProposedProfileType.GroundingProvider
+            ? null
+            : Math.Max(maxTokens ?? StudioDefaults.MinMaxTokens, StudioDefaults.MinMaxTokens);
 
     private static void ValidateReviewerCount(ProposedTemplate template)
     {
