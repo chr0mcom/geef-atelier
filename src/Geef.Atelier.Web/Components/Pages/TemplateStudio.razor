@@ -3,6 +3,7 @@
 @attribute [Authorize]
 @using Geef.Atelier.Application.Crew.TemplateStudio
 @using Geef.Atelier.Core.Domain.Crew.TemplateStudio
+@using Microsoft.Extensions.Options
 @inject ITemplateStudioService StudioService
 @inject NavigationManager Nav
 
@@ -11,7 +12,7 @@
 <div class="studio-page" data-testid="studio-page">
     <div class="page-header">
         <h1>Crew Studio</h1>
-        <p class="studio-subtitle">Describe a task and let the AI propose a crew configuration.</p>
+        <p class="studio-subtitle">Beschreibe eine Aufgabe und lass die KI eine Crew-Konfiguration vorschlagen.</p>
     </div>
 
     @switch (_step)
@@ -32,7 +33,7 @@
         case StudioStep.Review:
             <StudioReviewStep
                 Analysis="@(_analysis!)"
-                OnUseExistingTemplate="UseExistingTemplateAsync"
+                OnUseExistingTemplate="UseExistingTemplate"
                 OnProceedToEdit="GoToEdit"
                 OnRestart="Restart" />
             break;
@@ -40,9 +41,6 @@
         case StudioStep.Edit:
             <StudioEditStep
                 Analysis="@(_analysis!)"
-                EditedTemplate="@(_editedTemplate!)"
-                EditedTemplateChanged="@(v => _editedTemplate = v)"
-                EditedProfiles="@_editedProfiles"
                 OnSave="MaterializeAsync"
                 OnBack="BackToReview" />
             break;
@@ -66,8 +64,6 @@
     private StudioStep _step = StudioStep.TaskInput;
     private string _taskDescription = "";
     private TemplateStudioAnalysis? _analysis;
-    private ProposedTemplate? _editedTemplate;
-    private List<ProposedProfile> _editedProfiles = new();
     private MaterializationResult? _materializationResult;
     private string? _error;
 
@@ -80,13 +76,11 @@
         try
         {
             _analysis = await StudioService.AnalyzeAsync(_taskDescription);
-            _editedTemplate = _analysis.ProposedTemplate;
-            _editedProfiles = _analysis.ProposedNewProfiles.ToList();
             _step = StudioStep.Review;
         }
         catch (Exception ex)
         {
-            _error = $"Analysis failed: {ex.Message}";
+            _error = $"Analyse fehlgeschlagen: {ex.Message}";
             _step = StudioStep.TaskInput;
         }
     }
@@ -105,31 +99,27 @@
     {
         _taskDescription = "";
         _analysis = null;
-        _editedTemplate = null;
-        _editedProfiles = new();
         _materializationResult = null;
         _error = null;
         _step = StudioStep.TaskInput;
     }
 
-    private void UseExistingTemplateAsync(string templateName)
+    private void UseExistingTemplate(string templateName)
     {
         Nav.NavigateTo($"/new?template={Uri.EscapeDataString(templateName)}");
     }
 
-    private async Task MaterializeAsync()
+    private async Task MaterializeAsync(MaterializationRequest request)
     {
-        if (_editedTemplate is null) return;
         _error = null;
         try
         {
-            var request = new MaterializationRequest(_editedTemplate, _editedProfiles);
             _materializationResult = await StudioService.MaterializeAsync(_analysis!.Id, request);
             _step = StudioStep.Confirmation;
         }
         catch (Exception ex)
         {
-            _error = $"Save failed: {ex.Message}";
+            _error = $"Speichern fehlgeschlagen: {ex.Message}";
         }
     }
 

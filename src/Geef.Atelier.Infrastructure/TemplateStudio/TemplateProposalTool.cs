@@ -42,7 +42,8 @@ internal static class TemplateProposalTool
                         "reviewer_profile_names": { "type": "array", "items": { "type": "string" } },
                         "advisor_profile_names": { "type": "array", "items": { "type": "string" } },
                         "grounding_provider_profile_names": { "type": "array", "items": { "type": "string" } },
-                        "evaluation_strategy": { "type": "string" }
+                        "evaluation_strategy": { "type": "string" },
+                        "evaluation_strategy_reasoning": { "type": "string" }
                     }
                 },
                 "proposed_new_profiles": {
@@ -51,7 +52,7 @@ internal static class TemplateProposalTool
                         "type": "object",
                         "required": ["profile_type", "name", "display_name", "description", "model", "provider", "system_prompt"],
                         "properties": {
-                            "profile_type": { "type": "string", "enum": ["reviewer", "advisor", "grounding_provider"] },
+                            "profile_type": { "type": "string", "enum": ["reviewer", "advisor", "grounding_provider", "executor"] },
                             "name": { "type": "string" },
                             "display_name": { "type": "string" },
                             "description": { "type": "string" },
@@ -63,7 +64,12 @@ internal static class TemplateProposalTool
                             "advisor_mode": { "type": "string" },
                             "advisor_trigger": { "type": "string" },
                             "grounding_provider_type": { "type": "string" },
-                            "grounding_provider_settings": { "type": "object" }
+                            "grounding_provider_settings": { "type": "object" },
+                            "model_reasoning": { "type": "string" },
+                            "system_prompt_reasoning": { "type": "string" },
+                            "overall_reasoning": { "type": "string" },
+                            "mode_reasoning": { "type": "string" },
+                            "trigger_reasoning": { "type": "string" }
                         }
                     }
                 },

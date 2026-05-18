@@ -1,0 +1,9 @@
+@if (!string.IsNullOrEmpty(Text))
+{
+    <small class="field-help" data-testid="@DataTestId">@Text</small>
+}
+
+@code {
+    [Parameter] public string Text { get; set; } = "";
+    [Parameter] public string DataTestId { get; set; } = "field-help";
+}

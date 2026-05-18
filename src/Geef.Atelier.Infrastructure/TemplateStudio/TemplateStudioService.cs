@@ -21,6 +21,7 @@ internal sealed class TemplateStudioService(
     IPricingCatalog pricingCatalog,
     ITemplateStudioAnalysisRepository analysisRepository,
     ProfileSimilarityService similarityService,
+    IAtomicTransactionFactory transactionFactory,
     IOptions<TemplateStudioOptions> options) : ITemplateStudioService
 {
     public async Task<TemplateStudioAnalysis> AnalyzeAsync(string taskDescription, CancellationToken ct = default)
@@ -46,7 +47,8 @@ internal sealed class TemplateStudioService(
                 $"Template Studio meta-LLM did not call the required tool (finish_reason='{response.FinishReason}').");
 
         var proposal = ParseProposal(response.ToolArgumentsJson);
-        var deduplicated = await DeduplicateProfilesAsync(proposal.ProposedNewProfiles, opts.SimilarityThreshold, ct);
+        var withDefaults = proposal.ProposedNewProfiles.Select(p => ApplyDefaults(p, opts.Defaults)).ToList();
+        var deduplicated = await DeduplicateProfilesAsync(withDefaults, opts.SimilarityThreshold, ct);
 
         var cost = pricingCatalog.CalculateCostEur(model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens);
 
@@ -82,21 +84,32 @@ internal sealed class TemplateStudioService(
         Guid analysisId, MaterializationRequest request, CancellationToken ct = default)
     {
         ValidateNotSystemProfiles(request);
+        ValidateReviewerCount(request.FinalTemplate);
 
         var warnings = new List<string>();
         await ValidateAvailabilityAsync(request.FinalNewProfiles, warnings, ct);
-        var createdProfileNames = new List<string>();
 
-        foreach (var profile in request.FinalNewProfiles)
+        await using var transaction = await transactionFactory.BeginAsync(ct);
+        try
         {
-            var name = await CreateProfileAsync(profile, warnings, ct);
-            createdProfileNames.Add(name);
+            var createdProfileNames = new List<string>();
+            foreach (var profile in request.FinalNewProfiles)
+            {
+                var name = await CreateProfileAsync(profile, warnings, ct);
+                createdProfileNames.Add(name);
+            }
+
+            var templateName = await CreateTemplateAsync(request.FinalTemplate, ct);
+            await analysisRepository.MarkMaterializedAsync(analysisId, templateName, ct);
+
+            await transaction.CommitAsync(ct);
+            return new MaterializationResult(templateName, createdProfileNames, warnings);
         }
-
-        var templateName = await CreateTemplateAsync(request.FinalTemplate, ct);
-        await analysisRepository.MarkMaterializedAsync(analysisId, templateName, ct);
-
-        return new MaterializationResult(templateName, createdProfileNames, warnings);
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
     }
 
     // --- Private helpers ---
@@ -154,7 +167,8 @@ internal sealed class TemplateStudioService(
                 ReviewerProfileNames:          GetStringArray(ptEl, "reviewer_profile_names"),
                 AdvisorProfileNames:           GetStringArray(ptEl, "advisor_profile_names"),
                 GroundingProviderProfileNames: GetStringArray(ptEl, "grounding_provider_profile_names"),
-                EvaluationStrategy:            ptEl.TryGetProperty("evaluation_strategy", out var evEl) ? evEl.GetString() ?? "Sequential" : "Sequential");
+                EvaluationStrategy:            ptEl.TryGetProperty("evaluation_strategy", out var evEl) ? evEl.GetString() ?? "Sequential" : "Sequential",
+                EvaluationStrategyReasoning:   ptEl.TryGetProperty("evaluation_strategy_reasoning", out var esrEl) ? esrEl.GetString() : null);
         }
 
         var newProfiles = root.TryGetProperty("proposed_new_profiles", out var profilesEl)
@@ -174,6 +188,7 @@ internal sealed class TemplateStudioService(
         {
             "advisor"            => ProposedProfileType.Advisor,
             "grounding_provider" => ProposedProfileType.GroundingProvider,
+            "executor"           => ProposedProfileType.Executor,
             _                    => ProposedProfileType.Reviewer
         };
 
@@ -190,15 +205,61 @@ internal sealed class TemplateStudioService(
             Name:                      el.GetProperty("name").GetString()!,
             DisplayName:               el.GetProperty("display_name").GetString()!,
             Description:               el.GetProperty("description").GetString()!,
-            Model:                     el.GetProperty("model").GetString()!,
-            Provider:                  el.GetProperty("provider").GetString()!,
-            SystemPrompt:              el.GetProperty("system_prompt").GetString()!,
+            Model:                     el.TryGetProperty("model", out var mEl)    ? mEl.GetString() ?? "" : "",
+            Provider:                  el.TryGetProperty("provider", out var pEl) ? pEl.GetString() ?? "" : "",
+            SystemPrompt:              el.TryGetProperty("system_prompt", out var spEl) ? spEl.GetString() ?? "" : "",
             MaxTokens:                 el.TryGetProperty("max_tokens", out var mtEl) && mtEl.ValueKind == JsonValueKind.Number ? mtEl.GetInt32() : null,
             ReviewerFocus:             el.TryGetProperty("reviewer_focus", out var rfEl)  ? rfEl.GetString()  : null,
             AdvisorMode:               el.TryGetProperty("advisor_mode", out var amEl)    ? amEl.GetString()  : null,
             AdvisorTrigger:            el.TryGetProperty("advisor_trigger", out var atEl) ? atEl.GetString()  : null,
             GroundingProviderType:     el.TryGetProperty("grounding_provider_type", out var gptEl) ? gptEl.GetString() : null,
-            GroundingProviderSettings: groundingSettings);
+            GroundingProviderSettings: groundingSettings,
+            ModelReasoning:            el.TryGetProperty("model_reasoning", out var mrEl)           ? mrEl.GetString()  : null,
+            SystemPromptReasoning:     el.TryGetProperty("system_prompt_reasoning", out var sprEl)  ? sprEl.GetString() : null,
+            OverallReasoning:          el.TryGetProperty("overall_reasoning", out var orEl)         ? orEl.GetString()  : null,
+            ModeReasoning:             el.TryGetProperty("mode_reasoning", out var modEl)           ? modEl.GetString() : null,
+            TriggerReasoning:          el.TryGetProperty("trigger_reasoning", out var trEl)         ? trEl.GetString()  : null);
+    }
+
+    private static ProposedProfile ApplyDefaults(ProposedProfile p, StudioDefaults d) => p with
+    {
+        Model    = string.IsNullOrEmpty(p.Model)    ? GetDefaultModel(p.ProfileType, d)    : p.Model,
+        Provider = string.IsNullOrEmpty(p.Provider) ? GetDefaultProvider(p.ProfileType, d) : p.Provider,
+        MaxTokens = p.MaxTokens ?? GetDefaultMaxTokens(p.ProfileType, d),
+        AdvisorMode    = p.ProfileType == ProposedProfileType.Advisor && string.IsNullOrEmpty(p.AdvisorMode)    ? d.AdvisorMode    : p.AdvisorMode,
+        AdvisorTrigger = p.ProfileType == ProposedProfileType.Advisor && string.IsNullOrEmpty(p.AdvisorTrigger) ? d.AdvisorTrigger : p.AdvisorTrigger,
+        GroundingProviderType = p.ProfileType == ProposedProfileType.GroundingProvider && string.IsNullOrEmpty(p.GroundingProviderType) ? d.GroundingProviderType : p.GroundingProviderType
+    };
+
+    private static string GetDefaultModel(ProposedProfileType type, StudioDefaults d) => type switch
+    {
+        ProposedProfileType.Executor         => d.ExecutorModel,
+        ProposedProfileType.Advisor          => d.AdvisorModel,
+        ProposedProfileType.GroundingProvider => string.Empty,
+        _                                    => d.ReviewerModel
+    };
+
+    private static string GetDefaultProvider(ProposedProfileType type, StudioDefaults d) => type switch
+    {
+        ProposedProfileType.Executor          => d.ExecutorProvider,
+        ProposedProfileType.Advisor           => d.AdvisorProvider,
+        ProposedProfileType.GroundingProvider => d.GroundingProviderProvider,
+        _                                     => d.ReviewerProvider
+    };
+
+    private static int? GetDefaultMaxTokens(ProposedProfileType type, StudioDefaults d) => type switch
+    {
+        ProposedProfileType.Executor          => d.ExecutorMaxTokens,
+        ProposedProfileType.Advisor           => d.AdvisorMaxTokens,
+        ProposedProfileType.GroundingProvider => null,
+        _                                     => d.ReviewerMaxTokens
+    };
+
+    private static void ValidateReviewerCount(ProposedTemplate template)
+    {
+        if (template.ReviewerProfileNames.Count == 0)
+            throw new InvalidOperationException(
+                "A crew template must have at least one reviewer profile. Add a reviewer before saving.");
     }
 
     private async Task<IReadOnlyList<ProposedProfile>> DeduplicateProfilesAsync(
@@ -271,6 +332,19 @@ internal sealed class TemplateStudioService(
                     IsSystem:         false), ct);
                 return created.Name;
             }
+            case ProposedProfileType.Executor:
+            {
+                var created = await crewService.CreateCustomExecutorProfileAsync(new ExecutorProfile(
+                    Name:         profile.Name,
+                    DisplayName:  profile.DisplayName,
+                    Description:  profile.Description,
+                    SystemPrompt: profile.SystemPrompt,
+                    Provider:     profile.Provider,
+                    Model:        profile.Model,
+                    MaxTokens:    profile.MaxTokens,
+                    IsSystem:     false), ct);
+                return created.Name;
+            }
             default:
                 throw new NotSupportedException($"Profile type {profile.ProfileType} is not supported for creation.");
         }
@@ -301,6 +375,9 @@ internal sealed class TemplateStudioService(
     {
         foreach (var profile in profiles)
         {
+            if (profile.ProfileType == ProposedProfileType.GroundingProvider)
+                continue; // Grounding providers use dedicated provider types (Tavily/VectorStore), not LLM models.
+
             try
             {
                 var models = await modelCatalog.ListModelsAsync(profile.Provider, ct);

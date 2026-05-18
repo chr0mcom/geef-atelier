@@ -1,113 +1,393 @@
+@using Geef.Atelier.Application.Crew.TemplateStudio
 @using Geef.Atelier.Core.Domain.Crew.TemplateStudio
+@using Geef.Atelier.Web.Resources
+@using Microsoft.Extensions.Options
+@inject IOptions<TemplateStudioOptions> Options
 
 <div class="studio-edit" data-testid="studio-edit-step">
-    <h2>Review and edit</h2>
-    <p class="edit-hint">Edit the proposed configuration before saving. All fields are optional to change.</p>
+    <h2>Konfiguration bearbeiten</h2>
+    <p class="edit-hint">Überprüfe die KI-Empfehlung und passe die Felder nach Bedarf an.</p>
 
-    @if (EditedTemplate is not null)
+    @if (_template is not null)
     {
         <div class="edit-section">
             <h3>Template</h3>
+
             <div class="field">
-                <label>Display Name</label>
-                <input type="text" value="@EditedTemplate.DisplayName"
+                <label>Anzeigename</label>
+                <input type="text"
+                       value="@_template.DisplayName"
                        @oninput="OnDisplayNameInput"
                        data-testid="template-display-name" />
+                <FieldHelp Text="@StudioFieldHelps.DisplayName" DataTestId="field-help-displayname" />
             </div>
+
             <div class="field">
-                <label>Description</label>
-                <textarea rows="2" value="@EditedTemplate.Description"
+                <label>Beschreibung</label>
+                <textarea rows="2"
+                          value="@_template.Description"
                           @oninput="OnDescriptionInput"
                           data-testid="template-description"></textarea>
+                <FieldHelp Text="@StudioFieldHelps.Description" DataTestId="field-help-description" />
             </div>
+
             <div class="field">
-                <label>Evaluation Strategy</label>
-                <select value="@EditedTemplate.EvaluationStrategy"
+                <label>Evaluierungsstrategie</label>
+                <select value="@_template.EvaluationStrategy"
                         @onchange="OnStrategyChange"
                         data-testid="template-strategy">
-                    <option value="Sequential">Sequential</option>
-                    <option value="Parallel">Parallel</option>
-                    <option value="FailFast">Fail Fast</option>
-                    <option value="Priority">Priority</option>
+                    <option value="Sequential">Sequential – Reviewer nacheinander</option>
+                    <option value="Parallel">Parallel – alle gleichzeitig</option>
+                    <option value="FailFast">FailFast – Stopp beim ersten Fund</option>
+                    <option value="Priority">Priority – nach Priorität gewichtet</option>
                 </select>
-            </div>
-        </div>
-
-        @if (EditedProfiles.Count > 0)
-        {
-            <div class="edit-section">
-                <h3>New profiles to create</h3>
-                @foreach (var profile in EditedProfiles)
+                <FieldHelp Text="@StudioFieldHelps.EvaluationStrategy" DataTestId="field-help-strategy" />
+                @if (!string.IsNullOrEmpty(_template.EvaluationStrategyReasoning))
                 {
-                    var capturedProfile = profile;
-                    <div class="proposed-profile-edit" data-testid="profile-edit-@profile.Name">
-                        <div class="profile-edit-header">
-                            <strong>@profile.DisplayName</strong>
-                            <span class="profile-type-badge">@profile.ProfileType</span>
-                        </div>
-                        <div class="field">
-                            <label>System Prompt</label>
-                            <textarea rows="4" value="@profile.SystemPrompt"
-                                      @oninput="e => OnProfilePromptInput(capturedProfile, e)"
-                                      data-testid="profile-prompt-@profile.Name"
-                                      style="font-family: var(--font-mono, monospace)"></textarea>
-                        </div>
+                    <div class="field-reasoning" data-testid="template-strategy-reasoning">
+                        💡 @_template.EvaluationStrategyReasoning
                     </div>
                 }
             </div>
-        }
-    }
+        </div>
 
-    <div class="edit-actions">
-        <button type="button" class="btn primary"
-                @onclick="OnSave"
-                data-testid="save-button">
-            Save and create
-        </button>
-        <button type="button" class="btn ghost"
-                @onclick="OnBack"
-                data-testid="back-button">
-            ← Back
-        </button>
-    </div>
+        <div class="edit-section">
+            <h3>Executor</h3>
+            @if (_executorSlot is not null)
+            {
+                <StudioProfileSlot ProfileType="ProposedProfileType.Executor"
+                                   SlotLabel="Executor"
+                                   CanSwitchMode="true"
+                                   Mode="@_executorSlot.Mode"
+                                   ModeChanged="@(m => { _executorSlot.Mode = m; StateHasChanged(); })"
+                                   ExistingProfileName="@_executorSlot.ExistingProfileName"
+                                   ExistingProfileNameChanged="@(n => { _executorSlot.ExistingProfileName = n; StateHasChanged(); })"
+                                   Draft="@_executorSlot.Draft"
+                                   DraftChanged="@(d => { _executorSlot.Draft = d; StateHasChanged(); })"
+                                   ShowValidation="@_showValidation" />
+            }
+        </div>
+
+        <div class="edit-section">
+            <h3>Reviewer</h3>
+            @for (var i = 0; i < _reviewerSlots.Count; i++)
+            {
+                var slot = _reviewerSlots[i];
+                var index = i;
+                <div class="slot-row" data-testid="@($"reviewer-slot-row-{index}")">
+                    <StudioProfileSlot ProfileType="ProposedProfileType.Reviewer"
+                                       SlotLabel="@($"Reviewer {index + 1}")"
+                                       CanSwitchMode="true"
+                                       Mode="@slot.Mode"
+                                       ModeChanged="@(m => { slot.Mode = m; StateHasChanged(); })"
+                                       ExistingProfileName="@slot.ExistingProfileName"
+                                       ExistingProfileNameChanged="@(n => { slot.ExistingProfileName = n; StateHasChanged(); })"
+                                       Draft="@slot.Draft"
+                                       DraftChanged="@(d => { slot.Draft = d; StateHasChanged(); })"
+                                       ShowValidation="@_showValidation" />
+                    <div class="slot-actions">
+                        <button type="button" class="btn ghost btn-sm"
+                                disabled="@(index == 0)"
+                                @onclick="() => MoveReviewer(index, -1)"
+                                data-testid="@($"reviewer-up-{index}")">▲</button>
+                        <button type="button" class="btn ghost btn-sm"
+                                disabled="@(index == _reviewerSlots.Count - 1)"
+                                @onclick="() => MoveReviewer(index, 1)"
+                                data-testid="@($"reviewer-down-{index}")">▼</button>
+                        <button type="button" class="btn ghost btn-sm danger"
+                                @onclick="() => RemoveReviewer(index)"
+                                data-testid="@($"reviewer-remove-{index}")">Entfernen</button>
+                    </div>
+                </div>
+            }
+            <div class="slot-add-actions">
+                <button type="button" class="btn ghost btn-sm"
+                        @onclick="AddReviewerSlot"
+                        data-testid="add-reviewer-btn">+ Reviewer hinzufügen</button>
+            </div>
+            @if (_showValidation && _reviewerSlots.Count == 0)
+            {
+                <span class="validation-error" data-testid="reviewer-empty-error">Mindestens ein Reviewer ist erforderlich.</span>
+            }
+        </div>
+
+        <div class="edit-section">
+            <h3>Advisor <span class="optional-label">(optional)</span></h3>
+            @for (var i = 0; i < _advisorSlots.Count; i++)
+            {
+                var slot = _advisorSlots[i];
+                var index = i;
+                <div class="slot-row" data-testid="@($"advisor-slot-row-{index}")">
+                    <StudioProfileSlot ProfileType="ProposedProfileType.Advisor"
+                                       SlotLabel="@($"Advisor {index + 1}")"
+                                       CanSwitchMode="true"
+                                       Mode="@slot.Mode"
+                                       ModeChanged="@(m => { slot.Mode = m; StateHasChanged(); })"
+                                       ExistingProfileName="@slot.ExistingProfileName"
+                                       ExistingProfileNameChanged="@(n => { slot.ExistingProfileName = n; StateHasChanged(); })"
+                                       Draft="@slot.Draft"
+                                       DraftChanged="@(d => { slot.Draft = d; StateHasChanged(); })"
+                                       ShowValidation="@_showValidation" />
+                    <div class="slot-actions">
+                        <button type="button" class="btn ghost btn-sm danger"
+                                @onclick="() => RemoveAdvisor(index)"
+                                data-testid="@($"advisor-remove-{index}")">Entfernen</button>
+                    </div>
+                </div>
+            }
+            <div class="slot-add-actions">
+                <button type="button" class="btn ghost btn-sm"
+                        @onclick="AddAdvisorSlot"
+                        data-testid="add-advisor-btn">+ Advisor hinzufügen</button>
+            </div>
+        </div>
+
+        <div class="edit-section">
+            <h3>Grounding-Provider <span class="optional-label">(optional)</span></h3>
+            @for (var i = 0; i < _groundingSlots.Count; i++)
+            {
+                var slot = _groundingSlots[i];
+                var index = i;
+                <div class="slot-row" data-testid="@($"grounding-slot-row-{index}")">
+                    <StudioProfileSlot ProfileType="ProposedProfileType.GroundingProvider"
+                                       SlotLabel="@($"Grounding {index + 1}")"
+                                       CanSwitchMode="true"
+                                       Mode="@slot.Mode"
+                                       ModeChanged="@(m => { slot.Mode = m; StateHasChanged(); })"
+                                       ExistingProfileName="@slot.ExistingProfileName"
+                                       ExistingProfileNameChanged="@(n => { slot.ExistingProfileName = n; StateHasChanged(); })"
+                                       Draft="@slot.Draft"
+                                       DraftChanged="@(d => { slot.Draft = d; StateHasChanged(); })"
+                                       ShowValidation="@_showValidation" />
+                    <div class="slot-actions">
+                        <button type="button" class="btn ghost btn-sm danger"
+                                @onclick="() => RemoveGrounding(index)"
+                                data-testid="@($"grounding-remove-{index}")">Entfernen</button>
+                    </div>
+                </div>
+            }
+            <div class="slot-add-actions">
+                <button type="button" class="btn ghost btn-sm"
+                        @onclick="AddGroundingSlot"
+                        data-testid="add-grounding-btn">+ Grounding-Provider hinzufügen</button>
+            </div>
+        </div>
+
+        @if (_showValidation && !AreAllSlotsValid())
+        {
+            <div class="validation-panel" role="alert" data-testid="validation-panel">
+                Bitte fülle alle Pflichtfelder aus, bevor du speicherst.
+            </div>
+        }
+
+        <div class="edit-actions">
+            <button type="button" class="btn primary"
+                    disabled="@(_materializing)"
+                    @onclick="OnSaveClick"
+                    data-testid="save-button">
+                @if (_materializing)
+                {
+                    <span>Speichern…</span>
+                }
+                else
+                {
+                    <span>Speichern und materialisieren</span>
+                }
+            </button>
+            <button type="button" class="btn ghost"
+                    disabled="@_materializing"
+                    @onclick="OnBack"
+                    data-testid="back-button">
+                ← Zurück
+            </button>
+        </div>
+    }
 </div>
 
 @code {
     [Parameter, EditorRequired] public TemplateStudioAnalysis Analysis { get; set; } = null!;
-    [Parameter, EditorRequired] public ProposedTemplate EditedTemplate { get; set; } = null!;
-    [Parameter] public EventCallback<ProposedTemplate> EditedTemplateChanged { get; set; }
-    [Parameter, EditorRequired] public List<ProposedProfile> EditedProfiles { get; set; } = [];
-    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback<MaterializationRequest> OnSave { get; set; }
     [Parameter] public EventCallback OnBack { get; set; }
 
-    private async Task UpdateTemplate(ProposedTemplate updated)
+    private sealed class SlotState(
+        StudioSlotMode mode,
+        string? existingProfileName,
+        ProposedProfile? draft)
     {
-        await EditedTemplateChanged.InvokeAsync(updated);
+        public StudioSlotMode Mode { get; set; } = mode;
+        public string? ExistingProfileName { get; set; } = existingProfileName;
+        public ProposedProfile? Draft { get; set; } = draft;
     }
 
-    private void UpdateProfile(ProposedProfile original, ProposedProfile updated)
+    private ProposedTemplate? _template;
+    private SlotState? _executorSlot;
+    private List<SlotState> _reviewerSlots = [];
+    private List<SlotState> _advisorSlots = [];
+    private List<SlotState> _groundingSlots = [];
+    private bool _showValidation;
+    private bool _materializing;
+
+    protected override void OnParametersSet()
     {
-        var idx = EditedProfiles.IndexOf(original);
-        if (idx >= 0) EditedProfiles[idx] = updated;
+        if (_template is null)
+            InitializeFromAnalysis();
     }
+
+    private void InitializeFromAnalysis()
+    {
+        var proposed = Analysis.ProposedTemplate;
+        if (proposed is null) return;
+
+        _template = proposed;
+        var newProfiles = Analysis.ProposedNewProfiles;
+
+        _executorSlot = BuildSlot(proposed.ExecutorProfileName, ProposedProfileType.Executor, newProfiles);
+
+        _reviewerSlots = proposed.ReviewerProfileNames
+            .Select(name => BuildSlot(name, ProposedProfileType.Reviewer, newProfiles))
+            .ToList();
+
+        _advisorSlots = proposed.AdvisorProfileNames
+            .Select(name => BuildSlot(name, ProposedProfileType.Advisor, newProfiles))
+            .ToList();
+
+        _groundingSlots = proposed.GroundingProviderProfileNames
+            .Select(name => BuildSlot(name, ProposedProfileType.GroundingProvider, newProfiles))
+            .ToList();
+    }
+
+    private static SlotState BuildSlot(string profileName, ProposedProfileType type, IReadOnlyList<ProposedProfile> newProfiles)
+    {
+        var draft = newProfiles.FirstOrDefault(p => p.Name == profileName && p.ProfileType == type);
+        return draft is not null
+            ? new SlotState(StudioSlotMode.CreateNew, null, draft)
+            : new SlotState(StudioSlotMode.UseExisting, profileName, null);
+    }
+
+    private void AddReviewerSlot()
+    {
+        var d = Options.Value.Defaults;
+        var draft = new ProposedProfile(
+            ProfileType: ProposedProfileType.Reviewer,
+            Name: string.Empty, DisplayName: string.Empty, Description: string.Empty,
+            Model: d.ReviewerModel, Provider: d.ReviewerProvider, SystemPrompt: string.Empty,
+            MaxTokens: d.ReviewerMaxTokens,
+            ReviewerFocus: null, AdvisorMode: null, AdvisorTrigger: null,
+            GroundingProviderType: null, GroundingProviderSettings: null);
+        _reviewerSlots.Add(new SlotState(StudioSlotMode.CreateNew, null, draft));
+    }
+
+    private void AddAdvisorSlot()
+    {
+        var d = Options.Value.Defaults;
+        var draft = new ProposedProfile(
+            ProfileType: ProposedProfileType.Advisor,
+            Name: string.Empty, DisplayName: string.Empty, Description: string.Empty,
+            Model: d.AdvisorModel, Provider: d.AdvisorProvider, SystemPrompt: string.Empty,
+            MaxTokens: d.AdvisorMaxTokens,
+            ReviewerFocus: null, AdvisorMode: d.AdvisorMode, AdvisorTrigger: d.AdvisorTrigger,
+            GroundingProviderType: null, GroundingProviderSettings: null);
+        _advisorSlots.Add(new SlotState(StudioSlotMode.CreateNew, null, draft));
+    }
+
+    private void AddGroundingSlot()
+    {
+        var d = Options.Value.Defaults;
+        var draft = new ProposedProfile(
+            ProfileType: ProposedProfileType.GroundingProvider,
+            Name: string.Empty, DisplayName: string.Empty, Description: string.Empty,
+            Model: string.Empty, Provider: d.GroundingProviderProvider, SystemPrompt: string.Empty,
+            MaxTokens: null,
+            ReviewerFocus: null, AdvisorMode: null, AdvisorTrigger: null,
+            GroundingProviderType: d.GroundingProviderType, GroundingProviderSettings: null);
+        _groundingSlots.Add(new SlotState(StudioSlotMode.CreateNew, null, draft));
+    }
+
+    private void MoveReviewer(int index, int direction)
+    {
+        var target = index + direction;
+        if (target < 0 || target >= _reviewerSlots.Count) return;
+        (_reviewerSlots[index], _reviewerSlots[target]) = (_reviewerSlots[target], _reviewerSlots[index]);
+    }
+
+    private void RemoveReviewer(int index) => _reviewerSlots.RemoveAt(index);
+    private void RemoveAdvisor(int index) => _advisorSlots.RemoveAt(index);
+    private void RemoveGrounding(int index) => _groundingSlots.RemoveAt(index);
 
     private async Task OnDisplayNameInput(ChangeEventArgs e)
-    {
-        await UpdateTemplate(EditedTemplate with { DisplayName = e.Value?.ToString() ?? string.Empty });
-    }
+        => _template = _template! with { DisplayName = e.Value?.ToString() ?? string.Empty };
 
     private async Task OnDescriptionInput(ChangeEventArgs e)
-    {
-        await UpdateTemplate(EditedTemplate with { Description = e.Value?.ToString() ?? string.Empty });
-    }
+        => _template = _template! with { Description = e.Value?.ToString() ?? string.Empty };
 
     private async Task OnStrategyChange(ChangeEventArgs e)
+        => _template = _template! with { EvaluationStrategy = e.Value?.ToString() ?? "Sequential" };
+
+    private bool AreAllSlotsValid()
     {
-        await UpdateTemplate(EditedTemplate with { EvaluationStrategy = e.Value?.ToString() ?? "Sequential" });
+        if (_reviewerSlots.Count == 0) return false;
+        if (_executorSlot is not null && !IsSlotValid(_executorSlot)) return false;
+        if (_reviewerSlots.Any(s => !IsSlotValid(s))) return false;
+        if (_advisorSlots.Any(s => !IsSlotValid(s))) return false;
+        if (_groundingSlots.Any(s => !IsSlotValid(s))) return false;
+        return true;
     }
 
-    private void OnProfilePromptInput(ProposedProfile original, ChangeEventArgs e)
+    private static bool IsSlotValid(SlotState slot) => slot.Mode == StudioSlotMode.UseExisting
+        ? !string.IsNullOrEmpty(slot.ExistingProfileName)
+        : slot.Draft is not null &&
+          !string.IsNullOrWhiteSpace(slot.Draft.Name) &&
+          !string.IsNullOrWhiteSpace(slot.Draft.DisplayName) &&
+          !string.IsNullOrEmpty(slot.Draft.Provider) &&
+          !string.IsNullOrWhiteSpace(slot.Draft.SystemPrompt);
+
+    private async Task OnSaveClick()
     {
-        UpdateProfile(original, original with { SystemPrompt = e.Value?.ToString() ?? string.Empty });
+        _showValidation = true;
+        if (!AreAllSlotsValid()) return;
+
+        _materializing = true;
+        try
+        {
+            await OnSave.InvokeAsync(BuildRequest());
+        }
+        finally
+        {
+            _materializing = false;
+        }
+    }
+
+    private MaterializationRequest BuildRequest()
+    {
+        static string ResolveName(SlotState s) =>
+            s.Mode == StudioSlotMode.UseExisting ? s.ExistingProfileName! : s.Draft!.Name;
+
+        var executorName = _executorSlot is not null ? ResolveName(_executorSlot) : string.Empty;
+        var reviewerNames = _reviewerSlots.Select(ResolveName).ToList();
+        var advisorNames = _advisorSlots.Select(ResolveName).ToList();
+        var groundingNames = _groundingSlots.Select(ResolveName).ToList();
+
+        var finalTemplate = _template! with
+        {
+            ExecutorProfileName = executorName,
+            ReviewerProfileNames = reviewerNames,
+            AdvisorProfileNames = advisorNames,
+            GroundingProviderProfileNames = groundingNames
+        };
+
+        var newProfiles = new List<ProposedProfile>();
+        if (_executorSlot?.Mode == StudioSlotMode.CreateNew && _executorSlot.Draft is not null)
+            newProfiles.Add(_executorSlot.Draft);
+        newProfiles.AddRange(_reviewerSlots
+            .Where(s => s.Mode == StudioSlotMode.CreateNew && s.Draft is not null)
+            .Select(s => s.Draft!));
+        newProfiles.AddRange(_advisorSlots
+            .Where(s => s.Mode == StudioSlotMode.CreateNew && s.Draft is not null)
+            .Select(s => s.Draft!));
+        newProfiles.AddRange(_groundingSlots
+            .Where(s => s.Mode == StudioSlotMode.CreateNew && s.Draft is not null)
+            .Select(s => s.Draft!));
+
+        return new MaterializationRequest(finalTemplate, newProfiles);
     }
 }

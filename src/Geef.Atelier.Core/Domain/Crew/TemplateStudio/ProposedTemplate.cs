@@ -9,4 +9,5 @@ public sealed record ProposedTemplate(
     IReadOnlyList<string> ReviewerProfileNames,
     IReadOnlyList<string> AdvisorProfileNames,
     IReadOnlyList<string> GroundingProviderProfileNames,
-    string EvaluationStrategy);
+    string EvaluationStrategy,
+    string? EvaluationStrategyReasoning = null);
