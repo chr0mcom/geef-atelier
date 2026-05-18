@@ -4,8 +4,8 @@
         <textarea id="task-description"
                   rows="6"
                   placeholder="Describe what you want to do regularly. The more specific, the better the Studio can suggest matching crew components."
-                  @bind="TaskDescription"
-                  @bind:event="oninput"
+                  value="@TaskDescription"
+                  @oninput="HandleInput"
                   data-testid="task-description-input"
                   class="task-textarea"></textarea>
         <small class="cost-hint">~€0.02–0.05 per analysis</small>
@@ -24,4 +24,10 @@
     [Parameter] public string TaskDescription { get; set; } = "";
     [Parameter] public EventCallback<string> TaskDescriptionChanged { get; set; }
     [Parameter] public EventCallback OnAnalyze { get; set; }
+
+    private async Task HandleInput(ChangeEventArgs e)
+    {
+        TaskDescription = e.Value?.ToString() ?? "";
+        await TaskDescriptionChanged.InvokeAsync(TaskDescription);
+    }
 }
