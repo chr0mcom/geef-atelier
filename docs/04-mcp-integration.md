@@ -2,7 +2,7 @@
 
 *[Deutsch](04-mcp-integration_de.md) · **English***
 
-*Last updated: 2026-05-17 (endpoint table made precise, complete tool list and run-user isolation D-042 added)*
+*Last updated: 2026-05-18 (Studio profile example updated to current MaxTokens defaults + server-side floor note, D-043/9)*
 
 ## Why MCP
 
@@ -160,13 +160,13 @@ Atomically writes all new profiles and the crew template to the DB in a single t
     {
       "profile_type": "reviewer", "name": "custom-my-reviewer",
       "display_name": "...", "system_prompt": "...", "provider": "openrouter",
-      "model": "openai/gpt-4o-mini", "max_tokens": 2048
+      "model": "openai/gpt-4o-mini", "max_tokens": 16384
     }
   ]
 }
 ```
 
-`final_new_profiles` contains only profiles the user chose to create fresh (CreateNew mode). Profiles in UseExisting mode appear only by name in `final_template.*_profile_names`.
+`final_new_profiles` contains only profiles the user chose to create fresh (CreateNew mode). Profiles in UseExisting mode appear only by name in `final_template.*_profile_names`. A `max_tokens` below the hard floor (`StudioDefaults.MinMaxTokens = 10000`) is clamped up server-side; omitting it applies the `TemplateStudio:Defaults` value (Reviewer/Advisor 16384, Executor 60000).
 
 **Output:** `{ "created_template_name": "custom-..." }` — the name of the materialized template, ready to pass to `submit_request` as `crew_template`.
 

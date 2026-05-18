@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-05-18 (Template Studio Complete Edit: D-043 added)*
+*Last updated: 2026-05-18 (Template Studio Complete Edit: D-043 added; D-043/9 post-deploy corrections — prompt anatomy, Meta-LLM Opus 4.7, MaxTokens floor)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -628,7 +628,7 @@ A new page `/crew/studio`: the user describes a task in natural language, a meta
 
 | Area | Decision |
 |---|---|
-| **Meta-LLM** | `anthropic/claude-sonnet-4-5` via OpenRouter; configurable via `appsettings.json:TemplateStudio:Model` |
+| **Meta-LLM** | `anthropic/claude-opus-4-7` via OpenRouter (upgraded from `claude-sonnet-4-5`, see D-043/9); configurable via `appsettings.json:TemplateStudio:Model` |
 | **Structured output** | OpenAI tool use (`submit_template_proposal` tool with a full JSON schema); no free-text parsing |
 | **Edit-before-save mandatory** | The wizard allows no skip from Review → Confirmation; hallucination protection via mandatory review |
 | **Subsequent editability** | Studio creates only `custom-` records via `ICrewService.CreateCustom…`; system profiles are only referenced, never modified |
@@ -811,3 +811,8 @@ Full field parity in the Studio Edit-Step so the Studio workflow requires no pos
 **D-043/7 — Atomic materialization via IAtomicTransactionFactory.** `TemplateStudioService.MaterializeAsync` uses `IAtomicTransactionFactory` (testable abstraction over EF Core `AtelierDbContext` transaction). Full validate → begin → create profiles → create template → commit; explicit `RollbackAsync` on any error. `CreateProfileAsync` extended with Executor branch. `MarkMaterializedAsync` called inside the transaction (correct: rolled back if CommitAsync fails). `GetDefaultMaxTokens` returns `null` for GroundingProvider (no LLM MaxTokens). `ValidateAvailabilityAsync` skips GroundingProvider profiles (they use Tavily/VectorStore, not LLM models).
 
 **D-043/8 — Accepted architecture deviations.** Slot-state and `BuildRequest()` live in `StudioEditStep`, not `TemplateStudio.razor` (architecturally cleaner encapsulation). `bool ShowValidation` instead of `ValidationMessages` store (simpler, correct). `GroundingProviderProvider = "openrouter"` default — semantically the grounding profiles inherit this but the value is unused in `CreateProfileAsync` for grounding (no LLM call). `IAtomicTransactionFactory` abstraction instead of direct `AppDbContext` injection (architecturally superior). These deviations were reviewed and accepted in the evaluation.
+
+**D-043/9 — Post-deploy corrections (2026-05-18, after browser smoke).** Three quality issues surfaced when the deployed Studio was exercised and were fixed in follow-up commits:
+- **Generated profile prompts now follow the full Atelier profile anatomy.** The meta-prompt no longer caps system prompts at "100 words"; it mandates the same structure as the hand-authored system profiles in `SystemPrompts.cs` — for reviewers: role line, `submit_review` instruction, the 4-tier severity taxonomy with concrete domain examples, the ANTI-PATTERN calibration block, a domain focus checklist, and the "Respond in the language of the user briefing" line; for advisors: role line, "strategic guidance only", a numbered 2–5 observation list, conciseness rule, iteration-variance rule for `BeforeEveryExecution`. A full worked reviewer+advisor example was added to the few-shot. The advisor-discouraging principle was reversed: advisors are now actively encouraged whenever the task benefits from upfront/per-iteration guidance.
+- **Meta-LLM upgraded** from `anthropic/claude-sonnet-4-5` to `anthropic/claude-opus-4-7`; `TemplateStudio:MaxTokens` raised 4096 → 8192 (a single tool call now carries several fully structured prompts).
+- **MaxTokens floor.** `StudioDefaults.MinMaxTokens = 10000` clamps every generating profile up to that floor in `ApplyDefaults`, even when the meta-LLM proposes a smaller value (GroundingProvider stays `null`). Studio defaults raised: Reviewer/Advisor `MaxTokens` 2048 → 16384, Executor 4096 → 60000. The same too-low default affected all `MaxTokens: null` system profiles via `LlmOptions.DefaultMaxTokens`, raised 4096 → 16384; explicit actor configs `BriefingTreueReviewer`/`KlarheitReviewer` 2048 → 16384, `Executor` 8192 → 60000. `GroundingQueryExtractor` deliberately stays at 256 (it extracts only a short search query).

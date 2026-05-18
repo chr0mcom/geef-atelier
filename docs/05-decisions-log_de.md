@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-18 (Template Studio Complete Edit: D-043 ergänzt)*
+*Letzte Aktualisierung: 2026-05-18 (Template Studio Complete Edit: D-043 ergänzt; D-043/9 Post-Deploy-Korrekturen — Prompt-Anatomie, Meta-LLM Opus 4.7, MaxTokens-Floor)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -628,7 +628,7 @@ Neue Seite `/crew/studio`: User beschreibt eine Aufgabe in natürlicher Sprache,
 
 | Bereich | Entscheidung |
 |---|---|
-| **Meta-LLM** | `anthropic/claude-sonnet-4-5` via OpenRouter; konfigurierbar über `appsettings.json:TemplateStudio:Model` |
+| **Meta-LLM** | `anthropic/claude-opus-4-7` via OpenRouter (von `claude-sonnet-4-5` hochgestuft, siehe D-043/9); konfigurierbar über `appsettings.json:TemplateStudio:Model` |
 | **Strukturiertes Output** | OpenAI Tool-Use (`submit_template_proposal`-Tool mit vollständigem JSON-Schema); kein Freitext-Parsing |
 | **Edit-vor-Save-Pflicht** | Wizard erlaubt keinen Skip von Review → Confirmation; Halluzinationsschutz durch Pflicht-Review |
 | **Nachträgliche Bearbeitbarkeit** | Studio erstellt nur `custom-`-Records via `ICrewService.CreateCustom…`; System-Profile werden nur referenziert, niemals modifiziert |
@@ -811,3 +811,8 @@ Das Template Studio (`/crew/studio`) hatte bisher nur minimale Edit-Felder im `S
 **D-043/7 — Atomare Materialisierung via `IAtomicTransactionFactory`.** `TemplateStudioService.MaterializeAsync` nutzt `IAtomicTransactionFactory` (testbare Abstraktion über EF-Core-`AtelierDbContext`-Transaktion). Ablauf: vollständige Validierung → Begin → Profile anlegen → Template anlegen → Commit; explizites `RollbackAsync` bei jedem Fehler. `CreateProfileAsync` um Executor-Zweig erweitert. `MarkMaterializedAsync` innerhalb der Transaktion (korrekt: wird bei fehlgeschlagenem Commit zurückgerollt). `GetDefaultMaxTokens` gibt `null` für GroundingProvider zurück (kein LLM-MaxTokens). `ValidateAvailabilityAsync` überspringt GroundingProvider-Profile (nutzen Tavily/VectorStore, keine LLM-Modelle).
 
 **D-043/8 — Akzeptierte Architektur-Abweichungen.** Slot-State und `BuildRequest()` leben in `StudioEditStep`, nicht in `TemplateStudio.razor` (architektonisch sauberere Kapselung). `bool ShowValidation` statt `ValidationMessages`-Store (einfacher, korrekt). `GroundingProviderProvider = "openrouter"` als Default — semantisch übernehmen Grounding-Profile diesen Wert, er wird in `CreateProfileAsync` für Grounding nicht genutzt (kein LLM-Aufruf). `IAtomicTransactionFactory`-Abstraktion statt direkter `AppDbContext`-Injection (architektonisch überlegen). Diese Abweichungen wurden im Eval-Loop geprüft und akzeptiert.
+
+**D-043/9 — Post-Deploy-Korrekturen (2026-05-18, nach Browser-Smoke).** Drei Qualitätsmängel traten beim Testen des deployten Studios auf und wurden in Folge-Commits behoben:
+- **Generierte Profil-Prompts folgen jetzt der vollständigen Atelier-Profil-Anatomie.** Der Meta-Prompt limitiert System-Prompts nicht mehr auf „100 Wörter"; er schreibt dieselbe Struktur vor wie die handgeschriebenen System-Profile in `SystemPrompts.cs` — Reviewer: Rollen-Zeile, `submit_review`-Anweisung, 4-stufige Severity-Taxonomie mit konkreten domänenspezifischen Beispielen, ANTI-PATTERN-Kalibrierung, Domänen-Fokus-Checkliste, „Respond in the language of the user briefing"; Advisor: Rollen-Zeile, „strategic guidance only", nummerierte 2–5-Beobachtungsliste, Kürze-Regel, Iterations-Varianz-Regel bei `BeforeEveryExecution`. Ein vollständiges Reviewer+Advisor-Beispiel wurde dem Few-Shot ergänzt. Das Advisor-abratende Prinzip wurde umgekehrt: Advisors werden jetzt aktiv ermutigt, wann immer die Aufgabe von Vorab-/Pro-Iteration-Beratung profitiert.
+- **Meta-LLM hochgestuft** von `anthropic/claude-sonnet-4-5` auf `anthropic/claude-opus-4-7`; `TemplateStudio:MaxTokens` 4096 → 8192 (ein Tool-Call trägt jetzt mehrere vollständig strukturierte Prompts).
+- **MaxTokens-Floor.** `StudioDefaults.MinMaxTokens = 10000` zieht in `ApplyDefaults` jedes generierende Profil auf diesen Floor hoch, auch wenn die Meta-LLM einen kleineren Wert vorschlägt (GroundingProvider bleibt `null`). Studio-Defaults erhöht: Reviewer/Advisor `MaxTokens` 2048 → 16384, Executor 4096 → 60000. Derselbe Zu-niedrig-Default betraf über `LlmOptions.DefaultMaxTokens` alle `MaxTokens: null`-System-Profile, erhöht 4096 → 16384; explizite Actor-Configs `BriefingTreueReviewer`/`KlarheitReviewer` 2048 → 16384, `Executor` 8192 → 60000. `GroundingQueryExtractor` bleibt bewusst bei 256 (extrahiert nur eine kurze Suchanfrage).
