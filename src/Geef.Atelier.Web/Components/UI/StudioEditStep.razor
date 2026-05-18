@@ -1,7 +1,9 @@
+@using Geef.Atelier.Application.Crew
 @using Geef.Atelier.Application.Crew.TemplateStudio
 @using Geef.Atelier.Core.Domain.Crew.TemplateStudio
 @using Geef.Atelier.Web.Resources
 @using Microsoft.Extensions.Options
+@inject ICrewService CrewService
 @inject IOptions<TemplateStudioOptions> Options
 
 <div class="studio-edit" data-testid="studio-edit-step">
@@ -64,7 +66,8 @@
                                    ExistingProfileNameChanged="@(n => { _executorSlot.ExistingProfileName = n; StateHasChanged(); })"
                                    Draft="@_executorSlot.Draft"
                                    DraftChanged="@(d => { _executorSlot.Draft = d; StateHasChanged(); })"
-                                   ShowValidation="@_showValidation" />
+                                   ShowValidation="@_showValidation"
+                                   PreloadedProfiles="@_executorOptions" />
             }
         </div>
 
@@ -84,7 +87,8 @@
                                        ExistingProfileNameChanged="@(n => { slot.ExistingProfileName = n; StateHasChanged(); })"
                                        Draft="@slot.Draft"
                                        DraftChanged="@(d => { slot.Draft = d; StateHasChanged(); })"
-                                       ShowValidation="@_showValidation" />
+                                       ShowValidation="@_showValidation"
+                                       PreloadedProfiles="@_reviewerOptions" />
                     <div class="slot-actions">
                         <button type="button" class="btn ghost btn-sm"
                                 disabled="@(index == 0)"
@@ -127,7 +131,8 @@
                                        ExistingProfileNameChanged="@(n => { slot.ExistingProfileName = n; StateHasChanged(); })"
                                        Draft="@slot.Draft"
                                        DraftChanged="@(d => { slot.Draft = d; StateHasChanged(); })"
-                                       ShowValidation="@_showValidation" />
+                                       ShowValidation="@_showValidation"
+                                       PreloadedProfiles="@_advisorOptions" />
                     <div class="slot-actions">
                         <button type="button" class="btn ghost btn-sm danger"
                                 @onclick="() => RemoveAdvisor(index)"
@@ -158,7 +163,8 @@
                                        ExistingProfileNameChanged="@(n => { slot.ExistingProfileName = n; StateHasChanged(); })"
                                        Draft="@slot.Draft"
                                        DraftChanged="@(d => { slot.Draft = d; StateHasChanged(); })"
-                                       ShowValidation="@_showValidation" />
+                                       ShowValidation="@_showValidation"
+                                       PreloadedProfiles="@_groundingOptions" />
                     <div class="slot-actions">
                         <button type="button" class="btn ghost btn-sm danger"
                                 @onclick="() => RemoveGrounding(index)"
@@ -226,6 +232,24 @@
     private List<SlotState> _groundingSlots = [];
     private bool _showValidation;
     private bool _materializing;
+
+    private IReadOnlyList<StudioProfileOption> _executorOptions = [];
+    private IReadOnlyList<StudioProfileOption> _reviewerOptions = [];
+    private IReadOnlyList<StudioProfileOption> _advisorOptions = [];
+    private IReadOnlyList<StudioProfileOption> _groundingOptions = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load all profile lists sequentially to avoid concurrent DbContext operations.
+        _reviewerOptions = (await CrewService.ListReviewerProfilesAsync(includeSystem: true))
+            .Select(p => new StudioProfileOption(p.Name, p.DisplayName, p.IsSystem)).ToList();
+        _advisorOptions = (await CrewService.ListAdvisorProfilesAsync(includeSystem: true))
+            .Select(p => new StudioProfileOption(p.Name, p.DisplayName, p.IsSystem)).ToList();
+        _executorOptions = (await CrewService.ListExecutorProfilesAsync(includeSystem: true))
+            .Select(p => new StudioProfileOption(p.Name, p.DisplayName, p.IsSystem)).ToList();
+        _groundingOptions = (await CrewService.ListGroundingProviderProfilesAsync(includeSystem: true))
+            .Select(p => new StudioProfileOption(p.Name, p.DisplayName, p.IsSystem)).ToList();
+    }
 
     protected override void OnParametersSet()
     {

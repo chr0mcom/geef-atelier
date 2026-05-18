@@ -244,6 +244,8 @@
     [Parameter, EditorRequired] public ProposedProfileType ProfileType { get; set; }
     [Parameter, EditorRequired] public string SlotLabel { get; set; } = "";
     [Parameter] public bool CanSwitchMode { get; set; } = true;
+    /// <summary>Pre-loaded profile options from the parent. When set, skips the per-slot DB query.</summary>
+    [Parameter] public IReadOnlyList<StudioProfileOption>? PreloadedProfiles { get; set; }
     [Parameter] public StudioSlotMode Mode { get; set; } = StudioSlotMode.CreateNew;
     [Parameter] public EventCallback<StudioSlotMode> ModeChanged { get; set; }
     [Parameter] public string? ExistingProfileName { get; set; }
@@ -271,7 +273,10 @@
     protected override async Task OnInitializedAsync()
     {
         _providers = ProviderCatalog.ListProviders();
-        await LoadAvailableProfilesAsync();
+        if (PreloadedProfiles is not null)
+            _availableProfiles = PreloadedProfiles.Select(p => new ProfileSummary(p.Name, p.DisplayName, p.IsSystem)).ToList();
+        else
+            await LoadAvailableProfilesAsync();
     }
 
     private async Task LoadAvailableProfilesAsync()
