@@ -34,9 +34,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddLlmClient(builder.Configuration)
     .AddStandardResilienceHandler(options =>
     {
-        options.TotalRequestTimeout.Timeout        = TimeSpan.FromMinutes(5);
-        options.AttemptTimeout.Timeout             = TimeSpan.FromMinutes(4);
-        options.CircuitBreaker.SamplingDuration    = TimeSpan.FromMinutes(10);
+        options.TotalRequestTimeout.Timeout        = TimeSpan.FromMinutes(30);
+        options.AttemptTimeout.Timeout             = TimeSpan.FromMinutes(28);
+        options.CircuitBreaker.SamplingDuration    = TimeSpan.FromMinutes(60);
         options.Retry.MaxRetryAttempts             = 2;
     });
 
