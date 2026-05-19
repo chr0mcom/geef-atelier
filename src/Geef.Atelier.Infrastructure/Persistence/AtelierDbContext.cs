@@ -6,6 +6,7 @@ using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.OAuth;
 using Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge;
+using Geef.Atelier.Infrastructure.Persistence.Providers;
 using Geef.Atelier.Infrastructure.Persistence.TemplateStudio;
 using Microsoft.EntityFrameworkCore;
 
@@ -40,6 +41,8 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     internal DbSet<TemplateStudioAnalysisEntity> TemplateStudioAnalyses => Set<TemplateStudioAnalysisEntity>();
 
     internal DbSet<AtelierUser> Users => Set<AtelierUser>();
+
+    internal DbSet<ProviderEntity> Providers => Set<ProviderEntity>();
 
     internal DbSet<OAuthClient> OAuthClients => Set<OAuthClient>();
     internal DbSet<OAuthAuthorizationCode> OAuthAuthorizationCodes => Set<OAuthAuthorizationCode>();

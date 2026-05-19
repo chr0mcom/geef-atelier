@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-05-19 (D-046 added: Run Resume)*
+*Last updated: 2026-05-19 (D-047 added: Custom Providers — CRUD-Entity)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -874,3 +874,33 @@ When a run ends in `Aborted` or `Failed` status, the user can restart it with on
 **D-046/6 — Migration `Step23RunResume`.** Two new nullable columns on `Runs`: `ParentRunId uuid NULL` (FK to `Runs.Id` with `ON DELETE SET NULL`) and `SeedDraftText text NULL`. Index `IX_Runs_ParentRunId` for parent→children lookups.
 
 **Tests:** 1021 (1017 green + 4 known Playwright flakes). New test classes: `RunServiceResumeTests` (12 tests), `SeedDraftGroundingStepTests` (3 tests), `ProfileBasedExecutorSeedDraftTests` (3 tests), `ResumeRunDialogTests` (10 tests).
+
+---
+
+## D-047 — Custom Providers: CRUD-Entity für HTTP- und CLI-Provider
+
+*Datum: 19. Mai 2026*
+
+Provider werden zur sechsten CRUD-Entity in Geef.Atelier — anlegbar, editierbar, deaktivierbar und löschbar über die UI. Zwei Typen: **HTTP** (OpenAI-kompatibler Endpoint mit konfigurierbarem Auth-Header, optionalem models-Endpoint, Manual-Model-List und Cost-Tracking-Feldern) und **CLI** (Subprocess via cli-proxy mit vier CLI-Kinds: Claude, Codex, Gemini, Generic). 11 eingebaute System-Provider (8 HTTP + 3 CLI) ersetzen das bisherige statische `ProviderCatalog`-Dictionary. Der `IProviderService` (DB-basiert) ist ab sofort die primäre Quelle; `IProviderCatalog` bleibt als dünner Wrapper für bestehende Callsites (Legacy-Shim, nicht neu verwenden). Migration `Step24CustomProviders`.
+
+**D-047/1 — `anthropic-direct` wird nicht als HTTP-Provider bereitgestellt.** Die Anthropic-API nutzt ein anderes Request-Format als die OpenAI-kompatible REST-Schicht. Ein generischer HTTP-Provider würde `system`, `thinking`-Blocks und die `anthropic-version`-Header-Konvention nicht korrekt abbilden. Anthropic bleibt ausschließlich als `claude-cli`-System-Provider erreichbar. Rationale: korrekte Ergebnisse vor Vollständigkeit.
+
+**D-047/2 — `opencode-cli` wird nicht als eingebauter CLI-Provider geliefert.** Der Installationsmechanismus von OpenCode im Docker-Container war zum Zeitpunkt der Implementierung nicht stabil verifiziert. Nutzer können OpenCode als Custom-CLI-Provider mit `cli_kind=generic` selbst konfigurieren, sobald der Binary lokal verfügbar ist. Eine zukünftige Entscheidung kann OpenCode als System-Provider nachrüsten, sobald ein reproduzierbares Container-Build-Verfahren vorliegt.
+
+**D-047/3 — Settings werden als `Dictionary<string, JsonElement>` (JSONB) gespeichert; typisierte Wrapper-Records lesen daraus.** `HttpProviderSettings.FromSettings()` und `CliProviderSettings.FromSettings()` sind pure Factory-Methoden ohne Seiteneffekte. Das JSONB-Format erlaubt additive Erweiterungen ohne Migrations-Churn; der Code bleibt typsicher durch die Records. Der `Provider`-Domain-Record selbst ist persistenz-frei (kein EF-Attribut).
+
+**D-047/4 — System-Provider sind unveränderlich und nicht löschbar; Custom-Provider benötigen das Präfix `custom-`.** `ProviderService.EnsureCustomPrefix()` erzwingt den Präfix beim Anlegen. System-Provider werden durch `SystemProviders.IsSystemProviderName()` erkannt und von allen Mutationsoperationen ausgeschlossen. Das Präfix verhindert Namenskollisionen mit zukünftigen System-Providern und macht Custom-Einträge im Dropdown auf einen Blick erkennbar.
+
+**D-047/5 — Delete ist nur erlaubt, wenn kein Profil den Provider referenziert (Cascade-Schutz).** `IProviderRepository.IsReferencedByAnyProfileAsync()` prüft per Raw-SQL `COUNT` über vier Profil-Tabellen (ReviewerProfiles, ExecutorProfiles, AdvisorProfiles, FinalizerProfiles — letztere via JSONB `->>'provider'` auf die `Settings`-Spalte). Soft-Disable via `SetActiveAsync` ist immer möglich; inaktive Provider erscheinen nicht in neuen Profil-Formularen, bestehende Profile (eingefroren im `CrewSnapshot`) bleiben funktionsfähig.
+
+**D-047/6 — `LlmClientResolver` cached `Provider`-Lookups per Name via `ConcurrentDictionary<string, Lazy<Provider?>>` mit `LazyThreadSafetyMode.ExecutionAndPublication`.** Die `Lazy`-Wrapper garantieren, dass die asynchrone DB-Initialisierung pro Provider-Name exakt einmal ausgeführt wird, auch bei parallelen Anfragen. Fallback-Reihenfolge: DB-Provider → `LlmOptions.ProvidersFallback` (appsettings) → Exception. Der Resolver kann den Cache per Provider invalidieren, wenn `IProviderService` einen Update-Event signalisiert.
+
+**D-047/7 — ModelCatalog: Cache-TTL von 24h auf 1h gesenkt; pro-Provider-Quellenauswahl.** HTTP-Provider mit `models_endpoint` rufen live ab; ohne `models_endpoint` wird die statische `manual_model_list` aus den Settings geliefert; CLI-Provider liefern ihre statische `models`-Liste aus den Settings. `IsUsingFallback()` signalisiert veraltete Cache-Zustände an die UI (Stale-Warning-Banner in `ModelSelector.razor`).
+
+**D-047/8 — CLI-Proxy erhält einen generischen Endpoint `/v1/cli/{provider_name}/...` und einen internen Backend-Sync.** `ProviderConfigSync` lädt alle 60 s die aktiven CLI-Provider-Konfigurationen vom Backend-Endpoint `GET /api/internal/providers/cli` (abgesichert mit `X-Internal-Token`-Header). Der Endpoint ist mit `.AllowAnonymous()` registriert und prüft das Token manuell, damit keine Cookie-Auth-Middleware greift. Legacy-Endpoints `/v1/claude/...` und `/v1/codex/...` bleiben als Shims bestehen und routen auf den neuen generischen Endpoint.
+
+**D-047/9 — `GeminiAdapter` und `GenericAdapter` als neue CLI-Adapter-Klassen mit abstrakter `CliAdapter`-Basisklasse.** Die abstrakte Basisklasse erzwingt `execute()`, `list_models()` und `health_check()` (Default: `shutil.which`). `GeminiAdapter` setzt `env["HOME"] = auth_volume` für den Token-Speicher und parst JSON mit Text-Fallback. `GenericAdapter` verwendet `prompt_args_template` (Substitution: `{prompt}`, `{model}`), `stdin_mode` und `output_format` (text/openai-json/jsonl). OpenCode ist bewusst ausgelassen (D-047/2).
+
+**D-047/10 — `ProviderCatalog` (Legacy-Shim) verwendet `volatile CachedResult?` mit 5-Minuten-TTL.** Der Shim vermeidet Thread-Pool-Hunger durch synchrones Warten auf DB-Calls: nur bei Cache-Miss wird `.GetAwaiter().GetResult()` aufgerufen; danach antwortet er aus dem Speicher. `record CachedResult(IReadOnlyList<ProviderInfo> Items, DateTimeOffset Expiry)` ist unveränderlich. Der Shim ist als `[Obsolete]` markiert — alle neuen Callsites sollen `IProviderService` direkt nutzen.
+
+**Tests:** 1065 gesamt (1061 grün + 4 bekannte Flakes unverändert). Neue .NET-Testklassen: `ProviderTests` (12), `ProviderServiceTests` (15), `ProviderRepositoryTests` (9), `ProvidersIndexTests` (8). Neue Python-Tests: `test_gemini_adapter.py` (7), `test_generic_adapter.py` (8), `test_provider_sync.py` (7) — 22 neue Python-Tests, 67 gesamt grün.

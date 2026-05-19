@@ -237,6 +237,7 @@ app.MapWellKnownEndpoints();
 app.MapOAuthEndpoints();
 app.MapSettingsEndpoints();
 app.MapArtifactEndpoints();
+app.MapProviderEndpoints();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

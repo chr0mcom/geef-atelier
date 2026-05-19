@@ -1,9 +1,11 @@
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Core.Persistence.OAuth;
+using Geef.Atelier.Core.Persistence.Providers;
 using Geef.Atelier.Core.Persistence.TemplateStudio;
 using Geef.Atelier.Infrastructure.Persistence.Crew;
 using Geef.Atelier.Infrastructure.Persistence.OAuth;
+using Geef.Atelier.Infrastructure.Persistence.Providers;
 using Geef.Atelier.Infrastructure.Persistence.TemplateStudio;
 using Geef.Atelier.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +27,7 @@ public static class PersistenceServiceExtensions
         services.AddScoped<IGroundingProviderProfileRepository, GroundingProviderProfileRepository>();
         services.AddScoped<IGroundingConsultationRepository, GroundingConsultationRepository>();
         services.AddScoped<IFinalizerProfileRepository, FinalizerProfileRepository>();
+        services.AddScoped<IProviderRepository, ProviderRepository>();
         services.AddScoped<IRunArtifactRepository, RunArtifactRepository>();
         services.AddScoped<ITemplateStudioAnalysisRepository, TemplateStudioAnalysisRepository>();
         services.AddScoped<IOAuthClientRepository, OAuthClientRepository>();

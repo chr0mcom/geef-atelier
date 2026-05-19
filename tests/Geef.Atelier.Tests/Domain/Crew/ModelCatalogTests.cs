@@ -1,12 +1,11 @@
 using System.Net;
-using System.Net.Http.Json;
-using System.Text.Json;
+using Geef.Atelier.Application.Providers;
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Providers;
 using Geef.Atelier.Infrastructure.Crew;
-using Geef.Atelier.Infrastructure.Llm;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Tests.Domain.Crew;
 
@@ -21,19 +20,21 @@ public sealed class ModelCatalogTests : IDisposable
 
     public void Dispose() => _cache.Dispose();
 
-    private static IOptions<LlmOptions> BuildOptions(string providerName = "openrouter", string endpoint = "https://fake-provider.test/v1") =>
-        Options.Create(new LlmOptions
-        {
-            Providers = new Dictionary<string, LlmOptions.ProviderConfig>
-            {
-                [providerName] = new LlmOptions.ProviderConfig { Endpoint = endpoint }
-            }
-        });
-
-    private ModelCatalog BuildCatalog(HttpMessageHandler handler, string providerName = "openrouter", string endpoint = "https://fake-provider.test/v1")
+    private ModelCatalog BuildCatalog(HttpMessageHandler handler, Provider? provider = null)
     {
-        var factory = new FakeHttpClientFactory(new HttpClient(handler) { BaseAddress = new Uri(endpoint) });
-        return new ModelCatalog(factory, _cache, BuildOptions(providerName, endpoint), NullLogger<ModelCatalog>.Instance);
+        var resolvedProvider = provider ?? SystemProviders.OpenRouter;
+        var factory = new FakeHttpClientFactory(new HttpClient(handler));
+        var scopeFactory = BuildScopeFactory(resolvedProvider);
+        return new ModelCatalog(factory, _cache, scopeFactory, NullLogger<ModelCatalog>.Instance);
+    }
+
+    private static IServiceScopeFactory BuildScopeFactory(Provider? provider)
+    {
+        var fakeService = new FakeProviderService(provider);
+        var services = new ServiceCollection();
+        services.AddSingleton<IProviderService>(fakeService);
+        var sp = services.BuildServiceProvider();
+        return sp.GetRequiredService<IServiceScopeFactory>();
     }
 
     [Fact]
@@ -90,14 +91,13 @@ public sealed class ModelCatalogTests : IDisposable
     [Fact]
     public async Task ListModelsAsync_UsesFallback_WhenProviderUnknown()
     {
-        var factory  = new FakeHttpClientFactory(new HttpClient(FakeHttpHandler.Fail(HttpStatusCode.NotFound)));
-        var options  = Options.Create(new LlmOptions()); // no providers configured
-        var catalog  = new ModelCatalog(factory, _cache, options, NullLogger<ModelCatalog>.Instance);
+        var handler = FakeHttpHandler.Fail(HttpStatusCode.NotFound);
+        var scopeFactory = BuildScopeFactory(null); // no provider returned
+        var factory = new FakeHttpClientFactory(new HttpClient(handler));
+        var catalog = new ModelCatalog(factory, _cache, scopeFactory, NullLogger<ModelCatalog>.Instance);
 
         var models = await catalog.ListModelsAsync("openrouter");
 
-        // Unknown provider — StaticModelFallback.For("openrouter") still returns the known list
-        // because the static fallback is keyed by name independently.
         Assert.True(catalog.IsUsingFallback("openrouter"));
     }
 
@@ -128,10 +128,10 @@ public sealed class ModelCatalogTests : IDisposable
     [Fact]
     public async Task StaticFallback_ForClaudeCli_ReturnsExpectedModels()
     {
-        // Static fallback should have known claude-cli models — no HTTP call needed.
         var models = StaticModelFallback.ForClaudeCli;
         Assert.Contains(models, m => m.Id.Contains("claude-opus"));
-        Assert.True(models.All(m => m.IsRecommended == (m.IsRecommended)));
+        Assert.True(models.All(m => m.IsRecommended == m.IsRecommended));
+        await Task.CompletedTask;
     }
 
     [Fact]
@@ -139,6 +139,7 @@ public sealed class ModelCatalogTests : IDisposable
     {
         var models = StaticModelFallback.For("unknown-xyz");
         Assert.Empty(models);
+        await Task.CompletedTask;
     }
 }
 
@@ -150,7 +151,7 @@ internal sealed class FakeHttpHandler(HttpStatusCode statusCode, string? body) :
 {
     public int CallCount { get; private set; }
 
-    public static FakeHttpHandler Ok(string body)   => new(HttpStatusCode.OK, body);
+    public static FakeHttpHandler Ok(string body) => new(HttpStatusCode.OK, body);
     public static FakeHttpHandler Fail(HttpStatusCode code) => new(code, null);
 
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -166,4 +167,28 @@ internal sealed class FakeHttpHandler(HttpStatusCode statusCode, string? body) :
 internal sealed class FakeHttpClientFactory(HttpClient client) : IHttpClientFactory
 {
     public HttpClient CreateClient(string name) => client;
+}
+
+internal sealed class FakeProviderService(Provider? provider) : IProviderService
+{
+    public Task<IReadOnlyList<Provider>> ListAsync(bool includeInactive = false, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<Provider>>(provider is not null ? [provider] : []);
+
+    public Task<Provider?> GetByNameAsync(string name, CancellationToken ct = default)
+        => Task.FromResult(provider?.Name == name ? provider : null);
+
+    public Task<Provider> CreateCustomAsync(Provider p, CancellationToken ct = default)
+        => Task.FromResult(p);
+
+    public Task<Provider> UpdateCustomAsync(string name, Provider p, CancellationToken ct = default)
+        => Task.FromResult(p);
+
+    public Task DeleteCustomAsync(string name, CancellationToken ct = default)
+        => Task.CompletedTask;
+
+    public Task SetActiveAsync(string name, bool isActive, CancellationToken ct = default)
+        => Task.CompletedTask;
+
+    public Task<ConnectionTestResult> TestConnectionAsync(string name, CancellationToken ct = default)
+        => Task.FromResult(new ConnectionTestResult(true, 0, null, null));
 }

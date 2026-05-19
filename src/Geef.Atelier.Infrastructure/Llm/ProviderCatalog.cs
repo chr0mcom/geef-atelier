@@ -1,21 +1,29 @@
 using Geef.Atelier.Application.Crew;
-using Microsoft.Extensions.Options;
+using Geef.Atelier.Application.Providers;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Geef.Atelier.Infrastructure.Llm;
 
-internal sealed class ProviderCatalog(IOptions<LlmOptions> options) : IProviderCatalog
+internal sealed class ProviderCatalog(IServiceScopeFactory scopeFactory) : IProviderCatalog
 {
-    private static readonly IReadOnlyDictionary<string, string> DisplayNames =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["openrouter"]  = "OpenRouter (HTTP, pay-per-token)",
-            ["claude-cli"]  = "Claude (Subscription CLI)",
-            ["codex-cli"]   = "Codex (Subscription CLI)",
-        };
+    private volatile CachedResult? _cached;
 
-    public IReadOnlyList<ProviderInfo> ListProviders() =>
-        options.Value.Providers.Keys
-            .OrderBy(k => k, StringComparer.OrdinalIgnoreCase)
-            .Select(name => new ProviderInfo(name, DisplayNames.TryGetValue(name, out var display) ? display : name))
+    private sealed record CachedResult(IReadOnlyList<ProviderInfo> Items, DateTimeOffset Expiry);
+
+    public IReadOnlyList<ProviderInfo> ListProviders()
+    {
+        var cached = _cached;
+        if (cached is not null && DateTimeOffset.UtcNow < cached.Expiry)
+            return cached.Items;
+
+        using var scope = scopeFactory.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IProviderService>();
+        var providers = service.ListAsync(includeInactive: false).GetAwaiter().GetResult();
+        var items = providers
+            .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(p => new ProviderInfo(p.Name, p.DisplayName))
             .ToList();
+        _cached = new CachedResult(items, DateTimeOffset.UtcNow.AddMinutes(5));
+        return items;
+    }
 }

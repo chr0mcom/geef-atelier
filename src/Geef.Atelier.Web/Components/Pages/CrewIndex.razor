@@ -7,7 +7,10 @@
 @using Geef.Atelier.Core.Domain.Crew.Finalizers
 @using Geef.Atelier.Core.Domain.Crew.Grounding
 @using Geef.Atelier.Core.Domain.Crew.Profiles
+@using Geef.Atelier.Application.Providers
+@using Geef.Atelier.Core.Domain.Providers
 @inject ICrewService CrewService
+@inject IProviderService ProviderService
 
 <PageTitle>Crew — Atelier</PageTitle>
 
@@ -158,6 +161,31 @@
         <a href="/crew/profiles/finalizers" class="view-all-link">View all finalizer profiles →</a>
     </section>
 
+    <section class="crew-section" data-testid="providers-section">
+        <div class="crew-section-header">
+            <h2>Providers</h2>
+            <a href="/crew/providers/create" class="btn small">+ New</a>
+        </div>
+        @if (_providers.Count == 0)
+        {
+            <p class="text-muted">No custom providers configured yet.</p>
+        }
+        else
+        {
+            <ul class="crew-item-list">
+                @foreach (var p in _providers.Take(5))
+                {
+                    <li>
+                        <a href="@(p.IsSystem ? $"/crew/providers/view/{p.Name}" : (p.Type == ProviderType.Cli ? $"/crew/providers/edit/cli/{p.Name}" : $"/crew/providers/edit/{p.Name}"))">@p.DisplayName</a>
+                        @if (p.IsSystem) { <span class="crew-badge">System</span> }
+                        @if (!p.IsActive) { <span class="text-muted">(inactive)</span> }
+                    </li>
+                }
+            </ul>
+        }
+        <a href="/crew/providers" class="view-all-link">View all providers →</a>
+    </section>
+
     <section class="crew-section" data-testid="knowledge-base-section">
         <div class="crew-section-header">
             <h2>Knowledge Base</h2>
@@ -175,6 +203,7 @@
     private IReadOnlyList<AdvisorProfile> _advisors = [];
     private IReadOnlyList<GroundingProviderProfile> _groundingProviders = [];
     private IReadOnlyList<FinalizerProfile> _finalizers = [];
+    private IReadOnlyList<Provider> _providers = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -184,5 +213,6 @@
         _advisors = await CrewService.ListAdvisorProfilesAsync(includeSystem: true);
         _groundingProviders = await CrewService.ListGroundingProviderProfilesAsync(includeSystem: true);
         _finalizers = await CrewService.ListFinalizerProfilesAsync(includeSystem: true);
+        _providers = await ProviderService.ListAsync(includeInactive: true);
     }
 }

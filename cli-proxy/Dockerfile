@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get install -y --no-install-recommends nodejs \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install claude and codex CLIs globally.
-RUN npm install -g @anthropic-ai/claude-code @openai/codex
+# Install claude, codex and gemini CLIs globally.
+RUN npm install -g @anthropic-ai/claude-code @openai/codex @google/gemini-cli
 
 # Install Python dependencies.
 WORKDIR /app
@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir ".[dev]"
 COPY src/ ./src/
 
 # Auth directories — expected to be volume-mounted in production.
-RUN mkdir -p /auth/claude /auth/codex
+RUN mkdir -p /auth/claude /auth/codex /auth/gemini
 
 EXPOSE 8090
 

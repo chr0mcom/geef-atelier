@@ -1,6 +1,10 @@
 using System.Net;
 using System.Text;
+using Geef.Atelier.Application.Providers;
+using Geef.Atelier.Core.Domain.Providers;
 using Geef.Atelier.Infrastructure.Llm;
+using Geef.Atelier.Tests.Domain.Crew;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Tests.Llm;
@@ -14,7 +18,7 @@ public sealed class LlmClientResolverTests
         Options.Create(new LlmOptions
         {
             DefaultProvider = defaultProvider,
-            Providers       = providers ?? new()
+            ProvidersFallback = providers ?? new()
             {
                 ["openrouter"] = new() { Endpoint = "https://openrouter.ai/api/v1", ApiKey = "key1" },
                 ["claude-cli"] = new() { Endpoint = "http://cli-proxy:8090/v1/claude", ApiKey = "" },
@@ -29,16 +33,27 @@ public sealed class LlmClientResolverTests
 
     private static IHttpClientFactory MakeFactory()
     {
-        // Returns a client with a mock handler that always 200-OKs.
         var handler = new AlwaysOkHandler();
         var factory = new FakeHttpClientFactory(new HttpClient(handler));
         return factory;
     }
 
+    /// <summary>
+    /// Returns a scope factory whose <see cref="IProviderService"/> always returns null,
+    /// forcing the resolver to fall back to <see cref="LlmOptions.ProvidersFallback"/>.
+    /// </summary>
+    private static IServiceScopeFactory MakeScopeFactory()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IProviderService>(new FakeProviderService(null));
+        var sp = services.BuildServiceProvider();
+        return sp.GetRequiredService<IServiceScopeFactory>();
+    }
+
     [Fact]
     public void ForActor_ReturnsConfiguredClientAndModel()
     {
-        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions());
+        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions(), MakeScopeFactory());
 
         var (client, model, maxTokens) = resolver.ForActor("Executor");
 
@@ -50,7 +65,7 @@ public sealed class LlmClientResolverTests
     [Fact]
     public void ForActor_FallsBackToDefaultMaxTokens_WhenNotSet()
     {
-        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions());
+        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions(), MakeScopeFactory());
 
         var (_, _, maxTokens) = resolver.ForActor("BriefingTreueReviewer");
 
@@ -60,9 +75,8 @@ public sealed class LlmClientResolverTests
     [Fact]
     public void ForActor_UsesDifferentProvidersPerActor()
     {
-        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions());
+        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions(), MakeScopeFactory());
 
-        // Both should resolve without exception even though they use different providers.
         var (clientA, _, _) = resolver.ForActor("Executor");
         var (clientB, _, _) = resolver.ForActor("BriefingTreueReviewer");
 
@@ -73,7 +87,7 @@ public sealed class LlmClientResolverTests
     [Fact]
     public void ForActor_ThrowsOnUnknownActor()
     {
-        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions());
+        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions(), MakeScopeFactory());
 
         Assert.Throws<InvalidOperationException>(() => resolver.ForActor("NonExistentActor"));
     }
@@ -81,11 +95,10 @@ public sealed class LlmClientResolverTests
     [Fact]
     public void ForActor_ThrowsWhenProviderNotConfigured()
     {
-        var opts = MakeOptions(actors: new()
-        {
-            ["Executor"] = new() { Provider = "missing-provider", Model = "some-model" }
-        });
-        var resolver = new LlmClientResolver(MakeFactory(), opts);
+        var opts = MakeOptions(
+            providers: new() { ["openrouter"] = new() { Endpoint = "https://openrouter.ai/api/v1", ApiKey = "" } },
+            actors: new() { ["Executor"] = new() { Provider = "missing-provider", Model = "some-model" } });
+        var resolver = new LlmClientResolver(MakeFactory(), opts, MakeScopeFactory());
 
         Assert.Throws<InvalidOperationException>(() => resolver.ForActor("Executor"));
     }
@@ -97,9 +110,8 @@ public sealed class LlmClientResolverTests
         {
             ["Executor"] = new() { Provider = "", Model = "some-model" }
         });
-        var resolver = new LlmClientResolver(MakeFactory(), opts);
+        var resolver = new LlmClientResolver(MakeFactory(), opts, MakeScopeFactory());
 
-        // DefaultProvider is "openrouter" which is configured.
         var (client, model, _) = resolver.ForActor("Executor");
         Assert.NotNull(client);
         Assert.Equal("some-model", model);
@@ -108,7 +120,7 @@ public sealed class LlmClientResolverTests
     [Fact]
     public void ForProfile_ResolvesClaudeCliProvider()
     {
-        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions());
+        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions(), MakeScopeFactory());
 
         var (client, model, maxTokens) = resolver.ForProfile("claude-cli", "claude-opus-4.7", 4096);
 
@@ -120,7 +132,7 @@ public sealed class LlmClientResolverTests
     [Fact]
     public void ForProfile_ResolvesCodexCliProvider()
     {
-        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions());
+        var resolver = new LlmClientResolver(MakeFactory(), MakeOptions(), MakeScopeFactory());
 
         var (client, model, maxTokens) = resolver.ForProfile("codex-cli", "gpt-4o", 2048);
 

@@ -1,30 +1,34 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Application.Providers;
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Providers;
 using Geef.Atelier.Infrastructure.Llm;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Infrastructure.Crew;
 
 /// <summary>
-/// Fetches available models from each provider's <c>/models</c> endpoint, caches results for 24 h,
+/// Fetches available models from each provider's configured models endpoint, caches results for 1 h,
 /// and falls back to <see cref="StaticModelFallback"/> when the endpoint is unreachable.
+/// Supports HTTP providers with a <c>models_endpoint</c> setting as well as CLI providers whose
+/// model list is embedded in their settings.
 /// </summary>
 internal sealed class ModelCatalog(
-    IHttpClientFactory               httpClientFactory,
-    IMemoryCache                     cache,
-    IOptions<LlmOptions>             options,
-    ILogger<ModelCatalog>            logger) : IModelCatalog
+    IHttpClientFactory httpClientFactory,
+    IMemoryCache cache,
+    IServiceScopeFactory scopeFactory,
+    ILogger<ModelCatalog> logger) : IModelCatalog
 {
-    private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(24);
+    private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(1);
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
     // Per-provider semaphores prevent thundering-herd on simultaneous cache misses.
-    private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks  = new();
-    private readonly ConcurrentDictionary<string, bool>          _fallbackFlags = new();
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new();
+    private readonly ConcurrentDictionary<string, bool> _fallbackFlags = new();
 
     private static string CacheKey(string providerName) => $"model-catalog:{providerName}";
 
@@ -55,8 +59,11 @@ internal sealed class ModelCatalog(
             if (cache.TryGetValue(CacheKey(providerName), out IReadOnlyList<ModelInfo>? cached) && cached is not null)
                 return cached;
 
-            var result = await TryFetchFromEndpointAsync(providerName, ct)
-                         ?? UseFallback(providerName);
+            var provider = await LoadProviderAsync(providerName, ct);
+
+            var result = provider is not null
+                ? await TryFetchFromProviderAsync(provider, providerName, ct) ?? UseFallback(providerName)
+                : UseFallback(providerName);
 
             cache.Set(CacheKey(providerName), result, CacheTtl);
             return result;
@@ -67,19 +74,67 @@ internal sealed class ModelCatalog(
         }
     }
 
-    private async Task<IReadOnlyList<ModelInfo>?> TryFetchFromEndpointAsync(string providerName, CancellationToken ct)
+    private async Task<Provider?> LoadProviderAsync(string providerName, CancellationToken ct)
     {
-        if (!options.Value.Providers.TryGetValue(providerName, out var providerCfg))
+        using var scope = scopeFactory.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<IProviderService>();
+        return await service.GetByNameAsync(providerName, ct);
+    }
+
+    private async Task<IReadOnlyList<ModelInfo>?> TryFetchFromProviderAsync(
+        Provider provider, string providerName, CancellationToken ct)
+    {
+        if (provider.Type == ProviderType.Cli)
+            return BuildCliModels(provider, providerName);
+
+        // HTTP provider
+        var settings = HttpProviderSettings.FromSettings(provider.Settings);
+
+        if (settings.ModelsEndpoint is not { Length: > 0 } modelsPath)
         {
-            logger.LogWarning("ModelCatalog: unknown provider '{Provider}'; using fallback.", providerName);
+            // No live endpoint — use manual list from settings or static fallback.
+            if (settings.ManualModelList is { Count: > 0 } manual)
+                return BuildFromManualList(manual, providerName);
+
             return null;
         }
 
-        var modelsUrl = providerCfg.Endpoint.TrimEnd('/') + "/models";
+        var endpoint = settings.EndpointEnvOverride is { Length: > 0 } envVar
+            ? (Environment.GetEnvironmentVariable(envVar) ?? settings.Endpoint)
+            : settings.Endpoint;
+
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            logger.LogWarning("ModelCatalog: provider '{Provider}' has no configured endpoint; using fallback.", providerName);
+            return null;
+        }
+
+        var modelsUrl = endpoint.TrimEnd('/') + modelsPath;
+        return await FetchFromUrlAsync(modelsUrl, settings, providerName, ct);
+    }
+
+    private async Task<IReadOnlyList<ModelInfo>?> FetchFromUrlAsync(
+        string modelsUrl, HttpProviderSettings settings, string providerName, CancellationToken ct)
+    {
         try
         {
-            var http = httpClientFactory.CreateClient("llm");
-            using var response = await http.GetAsync(modelsUrl, ct);
+            var http = httpClientFactory.CreateClient(HttpClientNames.Llm);
+            using var request = new HttpRequestMessage(HttpMethod.Get, modelsUrl);
+
+            if (settings.ApiKeyEnv is { Length: > 0 } keyEnv)
+            {
+                var apiKey = Environment.GetEnvironmentVariable(keyEnv) ?? string.Empty;
+                if (apiKey.Length > 0)
+                {
+                    var headerValue = settings.AuthHeaderFormat.Replace("{key}", apiKey);
+                    request.Headers.TryAddWithoutValidation(settings.AuthHeaderName, headerValue);
+                }
+            }
+
+            foreach (var (header, value) in settings.DefaultHeaders)
+                request.Headers.TryAddWithoutValidation(header, value);
+
+            using var response = await http.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
 
             using var stream = await response.Content.ReadAsStreamAsync(ct);
@@ -94,9 +149,9 @@ internal sealed class ModelCatalog(
                 {
                     recommendations.TryGetValue(d.Id!, out var rec);
                     return new ModelInfo(
-                        Id:            d.Id!,
-                        DisplayName:   rec?.DisplayName ?? d.Id!,
-                        Description:   rec?.Description,
+                        Id: d.Id!,
+                        DisplayName: rec?.DisplayName ?? d.Id!,
+                        Description: rec?.Description,
                         IsRecommended: rec?.IsRecommended ?? false);
                 })
                 .OrderByDescending(m => m.IsRecommended)
@@ -109,9 +164,44 @@ internal sealed class ModelCatalog(
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning(ex, "ModelCatalog: failed to fetch models for '{Provider}' from {Url}; will use fallback.", providerName, modelsUrl);
+            logger.LogWarning(ex, "ModelCatalog: failed to fetch models for '{Provider}' from {Url}; will use fallback.",
+                providerName, modelsUrl);
             return null;
         }
+    }
+
+    private static IReadOnlyList<ModelInfo> BuildCliModels(Provider provider, string providerName)
+    {
+        var cliSettings = CliProviderSettings.FromSettings(provider.Settings);
+        if (cliSettings.Models is { Count: > 0 } models)
+        {
+            var recommendations = BuildRecommendationLookup(providerName);
+            return models.Select(id =>
+            {
+                recommendations.TryGetValue(id, out var rec);
+                return new ModelInfo(
+                    Id: id,
+                    DisplayName: rec?.DisplayName ?? id,
+                    Description: rec?.Description,
+                    IsRecommended: rec?.IsRecommended ?? false);
+            }).ToList();
+        }
+
+        return StaticModelFallback.For(providerName);
+    }
+
+    private static IReadOnlyList<ModelInfo> BuildFromManualList(IReadOnlyList<string> manual, string providerName)
+    {
+        var recommendations = BuildRecommendationLookup(providerName);
+        return manual.Select(id =>
+        {
+            recommendations.TryGetValue(id, out var rec);
+            return new ModelInfo(
+                Id: id,
+                DisplayName: rec?.DisplayName ?? id,
+                Description: rec?.Description,
+                IsRecommended: rec?.IsRecommended ?? false);
+        }).ToList();
     }
 
     private IReadOnlyList<ModelInfo> UseFallback(string providerName)
