@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 
@@ -26,6 +27,15 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// Fully-dereferenced grounding-provider profiles. Empty for templates without web-research.
 /// Grounding runs once at the start of a run (not per iteration).
 /// </param>
+/// <param name="Finalizers">
+/// Fully-dereferenced finalizer profiles in execution order. Null or empty for templates without
+/// post-processing steps. Trailing-optional so snapshots created before this field was introduced
+/// remain deserializable.
+/// </param>
+/// <param name="RunFinalizersOnMaxAttempts">
+/// When <c>true</c>, finalizers also execute if the run exhausts max iterations without converging.
+/// Trailing-optional; defaults to <c>false</c> for backward compatibility.
+/// </param>
 public sealed record CrewSnapshot(
     int SchemaVersion,
     string? TemplateName,
@@ -34,7 +44,9 @@ public sealed record CrewSnapshot(
     EvaluationStrategy EvaluationStrategy,
     ConvergencePolicyOverride? ConvergenceOverride,
     IReadOnlyList<Advisors.AdvisorProfile> Advisors,
-    IReadOnlyList<GroundingProviderProfile>? GroundingProviders = null)
+    IReadOnlyList<GroundingProviderProfile>? GroundingProviders = null,
+    IReadOnlyList<FinalizerProfile>? Finalizers = null,
+    bool RunFinalizersOnMaxAttempts = false)
 {
     /// <summary>Current snapshot schema version. Bump when the format changes incompatibly.</summary>
     public const int CurrentSchemaVersion = 1;

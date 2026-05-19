@@ -45,4 +45,13 @@ public sealed class RunEntity
     public decimal? TotalCostEur { get; set; }
     public decimal? LlmCostEur { get; set; }
     public decimal? GroundingCostEur { get; set; }
+
+    // Finalizer tracking — null when no finalizers ran or when the run predates Step22.
+    public decimal? FinalizerCostEur { get; set; }
+
+    /// <summary>
+    /// Set when one or more finalizer steps fail. The run status remains <c>Completed</c>;
+    /// this field captures the partial-failure description for display in the UI.
+    /// </summary>
+    public string? FinalizerErrorMessage { get; set; }
 }

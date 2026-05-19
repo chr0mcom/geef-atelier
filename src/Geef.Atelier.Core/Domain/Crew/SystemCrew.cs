@@ -1,4 +1,5 @@
 using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 
@@ -338,6 +339,232 @@ public static class SystemCrew
     /// <summary>True when the supplied name matches a system grounding-provider profile.</summary>
     public static bool IsSystemGroundingProviderName(string name) =>
         GroundingProviderProfiles.ContainsKey(name);
+
+    // ── System Finalizer Profiles ──────────────────────────────────────────────────
+
+    // ─ FileExport (6 profiles) ─────────────────────────────────────────────────
+
+    public static readonly FinalizerProfile ExportMarkdownProfile = new(
+        Name: "export-markdown",
+        DisplayName: "Export: Markdown",
+        Description: "Saves the final text as a Markdown (.md) file on the export volume.",
+        FinalizerType: FinalizerType.FileExport,
+        Settings: new Dictionary<string, string> { [FileExportSettings.KeyFormat] = "markdown" },
+        IsSystem: true);
+
+    public static readonly FinalizerProfile ExportHtmlProfile = new(
+        Name: "export-html",
+        DisplayName: "Export: HTML",
+        Description: "Converts the final Markdown to a self-contained HTML document and saves it on the export volume.",
+        FinalizerType: FinalizerType.FileExport,
+        Settings: new Dictionary<string, string> { [FileExportSettings.KeyFormat] = "html" },
+        IsSystem: true);
+
+    public static readonly FinalizerProfile ExportPdfProfile = new(
+        Name: "export-pdf",
+        DisplayName: "Export: PDF",
+        Description: "Converts the final Markdown to a PDF document (via QuestPDF) and saves it on the export volume.",
+        FinalizerType: FinalizerType.FileExport,
+        Settings: new Dictionary<string, string> { [FileExportSettings.KeyFormat] = "pdf" },
+        IsSystem: true);
+
+    public static readonly FinalizerProfile ExportDocxProfile = new(
+        Name: "export-docx",
+        DisplayName: "Export: DOCX",
+        Description: "Converts the final Markdown to a Word document (.docx) and saves it on the export volume.",
+        FinalizerType: FinalizerType.FileExport,
+        Settings: new Dictionary<string, string> { [FileExportSettings.KeyFormat] = "docx" },
+        IsSystem: true);
+
+    public static readonly FinalizerProfile ExportTxtProfile = new(
+        Name: "export-txt",
+        DisplayName: "Export: Plain Text",
+        Description: "Strips Markdown syntax and saves the final text as plain UTF-8 on the export volume.",
+        FinalizerType: FinalizerType.FileExport,
+        Settings: new Dictionary<string, string> { [FileExportSettings.KeyFormat] = "txt" },
+        IsSystem: true);
+
+    public static readonly FinalizerProfile ExportJsonProfile = new(
+        Name: "export-json",
+        DisplayName: "Export: JSON",
+        Description: "Wraps the final text in a JSON envelope (with run-id, template, and timestamp) and saves it on the export volume.",
+        FinalizerType: FinalizerType.FileExport,
+        Settings: new Dictionary<string, string> { [FileExportSettings.KeyFormat] = "json" },
+        IsSystem: true);
+
+    // ─ MetadataEnrich (3 profiles) ─────────────────────────────────────────────
+
+    public static readonly FinalizerProfile AddFrontMatterProfile = new(
+        Name: "add-front-matter",
+        DisplayName: "Add Front Matter",
+        Description: "Prepends a YAML front-matter block (title, date, template, run-id) to the final Markdown text.",
+        FinalizerType: FinalizerType.MetadataEnrich,
+        Settings: new Dictionary<string, string> { [MetadataEnrichSettings.KeyEnricherType] = MetadataEnrichSettings.FrontMatter },
+        IsSystem: true);
+
+    public static readonly FinalizerProfile AddWordCountFooterProfile = new(
+        Name: "add-word-count-footer",
+        DisplayName: "Add Word-Count Footer",
+        Description: "Appends a human-readable footer with the exact word count, character count, and estimated reading time.",
+        FinalizerType: FinalizerType.MetadataEnrich,
+        Settings: new Dictionary<string, string> { [MetadataEnrichSettings.KeyEnricherType] = MetadataEnrichSettings.WordCountFooter },
+        IsSystem: true);
+
+    public static readonly FinalizerProfile AddReadingLevelProfile = new(
+        Name: "add-reading-level",
+        DisplayName: "Add Reading Level",
+        Description: "Computes a Flesch Reading Ease score and appends a brief readability summary to the final text.",
+        FinalizerType: FinalizerType.MetadataEnrich,
+        Settings: new Dictionary<string, string> { [MetadataEnrichSettings.KeyEnricherType] = MetadataEnrichSettings.ReadingLevel },
+        IsSystem: true);
+
+    // ─ ExternalSink (2 profiles) ───────────────────────────────────────────────
+
+    public static readonly FinalizerProfile WebhookSinkProfile = new(
+        Name: "webhook-sink",
+        DisplayName: "Webhook Sink",
+        Description: "POSTs the final text as JSON to a configured webhook URL. Customize URL and optional auth header in settings.",
+        FinalizerType: FinalizerType.ExternalSink,
+        Settings: new Dictionary<string, string>
+        {
+            [WebhookSinkSettings.KeySinkKind] = WebhookSinkSettings.SinkKindValue,
+            [WebhookSinkSettings.KeyUrl] = "",
+            [WebhookSinkSettings.KeyContentType] = "application/json",
+            [WebhookSinkSettings.KeyTimeoutSeconds] = "30",
+        },
+        IsSystem: true);
+
+    public static readonly FinalizerProfile EmailSinkProfile = new(
+        Name: "email-sink",
+        DisplayName: "E-Mail Sink",
+        Description: "Sends the final text to a configured e-mail address via SMTP. SMTP credentials are resolved from environment variables at runtime.",
+        FinalizerType: FinalizerType.ExternalSink,
+        Settings: new Dictionary<string, string>
+        {
+            [EmailSinkSettings.KeySinkKind] = EmailSinkSettings.SinkKindValue,
+            [EmailSinkSettings.KeyToAddress] = "",
+            [EmailSinkSettings.KeySubject] = "Geef.Atelier — Run Result",
+            [EmailSinkSettings.KeyAttachAsFile] = "false",
+            [EmailSinkSettings.KeyAttachmentFormat] = "markdown",
+        },
+        IsSystem: true);
+
+    // ─ Transform (6 profiles) ──────────────────────────────────────────────────
+
+    public static readonly FinalizerProfile AntiAiVoiceProfile = new(
+        Name: "anti-ai-voice",
+        DisplayName: "Anti-AI-Voice Polish",
+        Description: "Removes AI-typical phrasing patterns (hedge stacking, filler phrases, synthetic transitions) while preserving every factual claim and the author's intentional style.",
+        FinalizerType: FinalizerType.Transform,
+        Settings: new Dictionary<string, string>
+        {
+            [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformAntiAiVoice,
+            [TransformSettings.KeyProvider] = "codex-cli",
+            [TransformSettings.KeyModel] = "gpt-5.5",
+            [TransformSettings.KeyMaxTokens] = "8192",
+        },
+        IsSystem: true);
+
+    public static readonly FinalizerProfile ToneFormalizationProfile = new(
+        Name: "tone-formalization",
+        DisplayName: "Tone: Formalization",
+        Description: "Shifts the register of the final text toward formal academic or professional prose without altering its content.",
+        FinalizerType: FinalizerType.Transform,
+        Settings: new Dictionary<string, string>
+        {
+            [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformToneFormalization,
+            [TransformSettings.KeyProvider] = "codex-cli",
+            [TransformSettings.KeyModel] = "gpt-5.5",
+            [TransformSettings.KeyMaxTokens] = "8192",
+        },
+        IsSystem: true);
+
+    public static readonly FinalizerProfile ToneCasualProfile = new(
+        Name: "tone-casual",
+        DisplayName: "Tone: Casual",
+        Description: "Rewrites the final text in a conversational, approachable register suitable for blog posts or social content.",
+        FinalizerType: FinalizerType.Transform,
+        Settings: new Dictionary<string, string>
+        {
+            [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformToneCasual,
+            [TransformSettings.KeyProvider] = "codex-cli",
+            [TransformSettings.KeyModel] = "gpt-5.5",
+            [TransformSettings.KeyMaxTokens] = "8192",
+        },
+        IsSystem: true);
+
+    public static readonly FinalizerProfile ExecutiveSummaryProfile = new(
+        Name: "executive-summary",
+        DisplayName: "Executive Summary",
+        Description: "Prepends a 3–5 sentence executive summary in the language of the text, then appends the full original below a horizontal rule.",
+        FinalizerType: FinalizerType.Transform,
+        Settings: new Dictionary<string, string>
+        {
+            [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformExecutiveSummary,
+            [TransformSettings.KeyProvider] = "codex-cli",
+            [TransformSettings.KeyModel] = "gpt-5.5",
+            [TransformSettings.KeyMaxTokens] = "8192",
+        },
+        IsSystem: true);
+
+    public static readonly FinalizerProfile KeyTakeawaysProfile = new(
+        Name: "key-takeaways",
+        DisplayName: "Key Takeaways",
+        Description: "Appends a bulleted list of 5–7 key takeaways distilled from the final text.",
+        FinalizerType: FinalizerType.Transform,
+        Settings: new Dictionary<string, string>
+        {
+            [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformKeyTakeaways,
+            [TransformSettings.KeyProvider] = "codex-cli",
+            [TransformSettings.KeyModel] = "gpt-5.5",
+            [TransformSettings.KeyMaxTokens] = "8192",
+        },
+        IsSystem: true);
+
+    public static readonly FinalizerProfile GlossaryProfile = new(
+        Name: "glossary",
+        DisplayName: "Glossary",
+        Description: "Identifies up to 10 domain-specific terms in the final text and appends brief, plain-language definitions as a glossary.",
+        FinalizerType: FinalizerType.Transform,
+        Settings: new Dictionary<string, string>
+        {
+            [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformGlossary,
+            [TransformSettings.KeyProvider] = "codex-cli",
+            [TransformSettings.KeyModel] = "gpt-5.5",
+            [TransformSettings.KeyMaxTokens] = "8192",
+        },
+        IsSystem: true);
+
+    /// <summary>All system finalizer profiles, indexed by name.</summary>
+    public static readonly IReadOnlyDictionary<string, FinalizerProfile> FinalizerProfiles =
+        new Dictionary<string, FinalizerProfile>
+        {
+            // FileExport
+            [ExportMarkdownProfile.Name]      = ExportMarkdownProfile,
+            [ExportHtmlProfile.Name]          = ExportHtmlProfile,
+            [ExportPdfProfile.Name]           = ExportPdfProfile,
+            [ExportDocxProfile.Name]          = ExportDocxProfile,
+            [ExportTxtProfile.Name]           = ExportTxtProfile,
+            [ExportJsonProfile.Name]          = ExportJsonProfile,
+            // MetadataEnrich
+            [AddFrontMatterProfile.Name]      = AddFrontMatterProfile,
+            [AddWordCountFooterProfile.Name]  = AddWordCountFooterProfile,
+            [AddReadingLevelProfile.Name]     = AddReadingLevelProfile,
+            // ExternalSink
+            [WebhookSinkProfile.Name]         = WebhookSinkProfile,
+            [EmailSinkProfile.Name]           = EmailSinkProfile,
+            // Transform
+            [AntiAiVoiceProfile.Name]         = AntiAiVoiceProfile,
+            [ToneFormalizationProfile.Name]   = ToneFormalizationProfile,
+            [ToneCasualProfile.Name]          = ToneCasualProfile,
+            [ExecutiveSummaryProfile.Name]    = ExecutiveSummaryProfile,
+            [KeyTakeawaysProfile.Name]        = KeyTakeawaysProfile,
+            [GlossaryProfile.Name]            = GlossaryProfile,
+        };
+
+    /// <summary>True when the supplied name matches a system finalizer profile.</summary>
+    public static bool IsSystemFinalizerName(string name) =>
+        FinalizerProfiles.ContainsKey(name);
 
     /// <summary>Ensures the supplied name carries the <c>"custom-"</c> prefix; idempotent.</summary>
     public static string EnsureCustomPrefix(string name) =>

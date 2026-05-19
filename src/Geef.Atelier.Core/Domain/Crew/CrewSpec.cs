@@ -17,17 +17,25 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// Names of grounding-provider profiles to run before the executor begins.
 /// Defaults to an empty list when the field is absent from the JSON payload.
 /// </param>
+/// <param name="FinalizerProfileNames">
+/// Names of finalizer profiles to run after the crew converges, in execution order.
+/// Defaults to an empty list when the field is absent from the JSON payload.
+/// </param>
 public sealed record CrewSpec(
     string ExecutorProfileName,
     IReadOnlyList<string> ReviewerProfileNames,
     EvaluationStrategy EvaluationStrategy,
     ConvergencePolicyOverride? ConvergenceOverride,
     IReadOnlyList<string>? AdvisorProfileNames = null,
-    IReadOnlyList<string>? GroundingProviderNames = null)
+    IReadOnlyList<string>? GroundingProviderNames = null,
+    IReadOnlyList<string>? FinalizerProfileNames = null)
 {
     /// <summary>Resolved advisor profile names; never null after construction.</summary>
     public IReadOnlyList<string> AdvisorProfileNames { get; init; } = AdvisorProfileNames ?? Array.Empty<string>();
 
     /// <summary>Resolved grounding-provider profile names; never null after construction.</summary>
     public IReadOnlyList<string> GroundingProviderNames { get; init; } = GroundingProviderNames ?? Array.Empty<string>();
+
+    /// <summary>Resolved finalizer profile names; never null after construction.</summary>
+    public IReadOnlyList<string> FinalizerProfileNames { get; init; } = FinalizerProfileNames ?? Array.Empty<string>();
 }

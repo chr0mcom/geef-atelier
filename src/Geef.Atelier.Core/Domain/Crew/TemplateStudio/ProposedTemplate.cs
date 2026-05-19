@@ -10,4 +10,7 @@ public sealed record ProposedTemplate(
     IReadOnlyList<string> AdvisorProfileNames,
     IReadOnlyList<string> GroundingProviderProfileNames,
     string EvaluationStrategy,
-    string? EvaluationStrategyReasoning = null);
+    IReadOnlyList<string>? FinalizerProfileNames = null,
+    bool RunFinalizersOnMaxAttempts = false,
+    string? EvaluationStrategyReasoning = null,
+    string? FinalizerReasoning = null);

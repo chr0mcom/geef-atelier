@@ -31,6 +31,14 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// True for templates defined as code constants in <see cref="SystemCrew"/>; false for user-created
 /// templates persisted in the database. System templates are read-only at runtime.
 /// </param>
+/// <param name="FinalizerProfileNames">
+/// Names of finalizer profiles to run after the crew converges, in execution order.
+/// Empty list means no post-processing steps.
+/// </param>
+/// <param name="RunFinalizersOnMaxAttempts">
+/// When <c>true</c>, finalizers also execute if the run exhausts max iterations without converging,
+/// using the last iteration's artifact text as input. Defaults to <c>false</c>.
+/// </param>
 public sealed record CrewTemplate(
     string Name,
     string DisplayName,
@@ -41,4 +49,10 @@ public sealed record CrewTemplate(
     ConvergencePolicyOverride? ConvergenceOverride,
     IReadOnlyList<string> AdvisorProfileNames,
     IReadOnlyList<string> GroundingProviderNames,
-    bool IsSystem);
+    bool IsSystem,
+    IReadOnlyList<string>? FinalizerProfileNames = null,
+    bool RunFinalizersOnMaxAttempts = false)
+{
+    /// <summary>Resolved finalizer profile names; never null after construction.</summary>
+    public IReadOnlyList<string> FinalizerProfileNames { get; init; } = FinalizerProfileNames ?? Array.Empty<string>();
+}
