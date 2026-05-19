@@ -6,62 +6,147 @@
 @inject ICrewService CrewService
 @inject NavigationManager Nav
 
-<PageTitle>Finalizer ansehen — Atelier</PageTitle>
+<PageTitle>@(_profile?.DisplayName ?? "Finalizer Profile") — Atelier</PageTitle>
 
-<div class="crew-view" data-testid="finalizer-view">
+<div class="crew-editor" data-testid="finalizer-view">
+    <div class="page-header">
+        <h1>@(_profile?.DisplayName ?? "")</h1>
+        <a href="/crew/profiles/finalizers" class="btn ghost">← Back</a>
+    </div>
+
     @if (_loading)
     {
-        <p>Lade…</p>
+        <p>Loading…</p>
     }
     else if (_profile is null)
     {
-        <p class="text-muted">Profil nicht gefunden.</p>
+        <p>Profile not found.</p>
     }
     else
     {
-        <div class="page-header">
-            <h1>
-                @_profile.DisplayName
-                @if (_profile.IsSystem) { <span class="crew-badge">System</span> }
-            </h1>
-            <a href="/crew/profiles/finalizers" class="btn ghost">← Zurück</a>
-        </div>
+        @if (_profile.IsSystem)
+        {
+            <div class="info-banner">
+                System profile — read-only. Use <strong>Duplicate as custom</strong> to create an editable copy.
+            </div>
+        }
 
-        <dl class="crew-view-fields">
-            <dt>Name (Slug)</dt>
+        <dl class="profile-detail" data-testid="profile-detail">
+            <dt>Name</dt>
             <dd data-testid="view-name">@_profile.Name</dd>
 
-            <dt>Typ</dt>
-            <dd data-testid="view-type">@GetTypeLabel(_profile.FinalizerType)</dd>
+            <dt>Display Name</dt>
+            <dd data-testid="view-display-name">@_profile.DisplayName</dd>
 
-            <dt>Beschreibung</dt>
+            <dt>Description</dt>
             <dd data-testid="view-description">@(string.IsNullOrEmpty(_profile.Description) ? "—" : _profile.Description)</dd>
+
+            <dt>Type</dt>
+            <dd data-testid="view-type">@GetTypeLabel(_profile.FinalizerType)</dd>
         </dl>
 
-        <h2>Einstellungen</h2>
-        <dl class="crew-view-fields">
-            @foreach (var kv in _profile.Settings.OrderBy(x => x.Key))
-            {
-                <dt>@kv.Key</dt>
-                <dd data-testid="view-setting-@kv.Key">
-                    @if (kv.Key.Contains("Auth", StringComparison.OrdinalIgnoreCase) ||
-                         kv.Key.Contains("Password", StringComparison.OrdinalIgnoreCase))
+        @switch (_profile.FinalizerType)
+        {
+            case FinalizerType.FileExport:
+                {
+                    var s = FileExportSettings.From(_profile.Settings);
+                    <h2>Export Settings</h2>
+                    <dl class="profile-detail">
+                        <dt>Format</dt>
+                        <dd data-testid="view-setting-format">@GetFormatLabel(s.Format)</dd>
+                    </dl>
+                }
+                break;
+
+            case FinalizerType.MetadataEnrich:
+                {
+                    var s = MetadataEnrichSettings.From(_profile.Settings);
+                    <h2>Enrichment Settings</h2>
+                    <dl class="profile-detail">
+                        <dt>Enrichment Type</dt>
+                        <dd data-testid="view-setting-enrichertype">@GetEnricherLabel(s.EnricherType)</dd>
+                    </dl>
+                }
+                break;
+
+            case FinalizerType.ExternalSink:
+                {
+                    var sinkKind = _profile.Settings.GetValueOrDefault(WebhookSinkSettings.KeySinkKind, WebhookSinkSettings.SinkKindValue);
+                    <h2>Sink Settings</h2>
+                    @if (sinkKind == EmailSinkSettings.SinkKindValue)
                     {
-                        <em>konfiguriert</em>
+                        var s = EmailSinkSettings.From(_profile.Settings);
+                        <dl class="profile-detail">
+                            <dt>Sink Type</dt>
+                            <dd>Email (SMTP)</dd>
+                            <dt>Recipient</dt>
+                            <dd data-testid="view-setting-toaddress">@(string.IsNullOrEmpty(s.ToAddress) ? "—" : s.ToAddress)</dd>
+                            <dt>Subject</dt>
+                            <dd data-testid="view-setting-subject">@s.Subject</dd>
+                            <dt>Attach as File</dt>
+                            <dd data-testid="view-setting-attachasfile">@(s.AttachAsFile ? "Yes" : "No")</dd>
+                            @if (s.AttachAsFile)
+                            {
+                                <dt>Attachment Format</dt>
+                                <dd data-testid="view-setting-attachmentformat">@GetFormatLabel(s.AttachmentFormat)</dd>
+                            }
+                        </dl>
                     }
                     else
                     {
-                        @(string.IsNullOrEmpty(kv.Value) ? "—" : kv.Value)
+                        var s = WebhookSinkSettings.From(_profile.Settings);
+                        <dl class="profile-detail">
+                            <dt>Sink Type</dt>
+                            <dd>Webhook (HTTP POST)</dd>
+                            <dt>URL</dt>
+                            <dd data-testid="view-setting-url">@(string.IsNullOrEmpty(s.Url) ? "—" : s.Url)</dd>
+                            <dt>Auth Header</dt>
+                            <dd data-testid="view-setting-authheader">@(s.AuthHeader is not null ? "configured" : "—")</dd>
+                            <dt>Content-Type</dt>
+                            <dd data-testid="view-setting-contenttype">@s.ContentType</dd>
+                            <dt>Timeout (seconds)</dt>
+                            <dd data-testid="view-setting-timeout">@s.TimeoutSeconds</dd>
+                        </dl>
                     }
-                </dd>
-            }
-        </dl>
+                }
+                break;
 
-        @if (!_profile.IsSystem)
+            case FinalizerType.Transform:
+                {
+                    var s = TransformSettings.From(_profile.Settings);
+                    <h2>Transform Settings</h2>
+                    <dl class="profile-detail">
+                        <dt>Provider</dt>
+                        <dd data-testid="view-setting-provider">@s.Provider</dd>
+                        <dt>Model</dt>
+                        <dd data-testid="view-setting-model">@s.Model</dd>
+                        <dt>Max Tokens</dt>
+                        <dd data-testid="view-setting-maxtokens">@s.MaxTokens</dd>
+                        <dt>System Prompt</dt>
+                        <dd data-testid="view-setting-systemprompt">
+                            <pre class="system-prompt-view">@s.SystemPrompt</pre>
+                        </dd>
+                    </dl>
+                }
+                break;
+        }
+
+        <div class="editor-actions">
+            @if (_profile.IsSystem)
+            {
+                <button type="button" class="btn primary" @onclick="DuplicateAsCustom" disabled="@_duplicating">
+                    @(_duplicating ? "Creating…" : "Duplicate as custom")
+                </button>
+            }
+            else
+            {
+                <a href="/crew/profiles/finalizers/edit/@_profile.Name" class="btn primary">Edit</a>
+            }
+        </div>
+
+        @if (!string.IsNullOrEmpty(_error))
         {
-            <div class="form-actions">
-                <a href="/crew/profiles/finalizers/edit/@_profile.Name" class="btn primary">Bearbeiten</a>
-            </div>
+            <div class="error-banner" style="margin-top:1rem;">@_error</div>
         }
     }
 </div>
@@ -71,6 +156,8 @@
 
     private FinalizerProfile? _profile;
     private bool _loading = true;
+    private bool _duplicating;
+    private string? _error;
 
     protected override async Task OnInitializedAsync()
     {
@@ -78,12 +165,56 @@
         _loading = false;
     }
 
+    private async Task DuplicateAsCustom()
+    {
+        if (_profile is null) return;
+        _duplicating = true;
+        _error = null;
+        try
+        {
+            var copy = _profile with
+            {
+                Name = _profile.Name + "-copy",
+                DisplayName = _profile.DisplayName + " (Copy)",
+                IsSystem = false,
+                CreatedAt = null,
+                UpdatedAt = null,
+            };
+            var created = await CrewService.CreateCustomFinalizerProfileAsync(copy);
+            Nav.NavigateTo($"/crew/profiles/finalizers/edit/{Uri.EscapeDataString(created.Name)}");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            _duplicating = false;
+        }
+    }
+
     private static string GetTypeLabel(FinalizerType type) => type switch
     {
-        FinalizerType.FileExport     => "Datei-Export",
-        FinalizerType.MetadataEnrich => "Metadaten-Anreicherung",
-        FinalizerType.ExternalSink   => "Externer Empfänger",
-        FinalizerType.Transform      => "KI-Transformation",
+        FinalizerType.FileExport     => "File Export",
+        FinalizerType.MetadataEnrich => "Metadata Enrichment",
+        FinalizerType.ExternalSink   => "External Sink",
+        FinalizerType.Transform      => "AI Transform",
         _                            => type.ToString(),
+    };
+
+    private static string GetFormatLabel(string format) => format switch
+    {
+        "markdown" => "Markdown (.md)",
+        "html"     => "HTML (.html)",
+        "pdf"      => "PDF (.pdf)",
+        "docx"     => "Word Document (.docx)",
+        "txt"      => "Plain Text (.txt)",
+        "json"     => "JSON (.json)",
+        _          => format,
+    };
+
+    private static string GetEnricherLabel(string type) => type switch
+    {
+        "front-matter"      => "Front Matter (YAML header)",
+        "word-count-footer" => "Word Count Footer",
+        "reading-level"     => "Reading Level Estimate",
+        _                   => type,
     };
 }

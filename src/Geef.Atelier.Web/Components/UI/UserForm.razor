@@ -9,12 +9,12 @@
     }
 
     <div class="form-group">
-        <label for="uf-username">Benutzername *</label>
+        <label for="uf-username">Username *</label>
         <input id="uf-username" type="text" class="form-control"
                value="@Username"
                @oninput="e => OnUsernameChanged.InvokeAsync(e.Value?.ToString())"
                data-testid="input-username"
-               placeholder="Benutzername" />
+               placeholder="Username" />
     </div>
 
     <div class="form-group">
@@ -26,12 +26,12 @@
     </div>
 
     <div class="form-group">
-        <label for="uf-email">E-Mail (optional)</label>
+        <label for="uf-email">Email (optional)</label>
         <input id="uf-email" type="email" class="form-control"
                value="@Email"
                @oninput="e => OnEmailChanged.InvokeAsync(e.Value?.ToString())"
                data-testid="input-email"
-               placeholder="E-Mail-Adresse" />
+               placeholder="Email address" />
     </div>
 
     <div class="form-group form-check">
@@ -39,17 +39,17 @@
                checked="@IsActive"
                @onchange="e => OnIsActiveChanged.InvokeAsync((bool)(e.Value ?? true))"
                data-testid="input-is-active" />
-        <label for="uf-active">Aktiv</label>
+        <label for="uf-active">Active</label>
     </div>
 
     <div class="form-actions">
         <button type="button" class="btn primary" @onclick="OnSave" disabled="@IsSaving"
                 data-testid="btn-save">
-            @(IsSaving ? "Speichern…" : "Speichern")
+            @(IsSaving ? "Saving…" : "Save")
         </button>
         <button type="button" class="btn ghost" @onclick="OnCancel" disabled="@IsSaving"
                 data-testid="btn-cancel">
-            Abbrechen
+            Cancel
         </button>
     </div>
 </div>
@@ -70,6 +70,6 @@
     [Parameter] public EventCallback<string?> OnEmailChanged   { get; set; }
     [Parameter] public EventCallback<bool>   OnIsActiveChanged { get; set; }
 
-    private string _passwordLabel       => PasswordRequired ? "Passwort *" : "Passwort (leer lassen = unverändert)";
-    private string _passwordPlaceholder => PasswordRequired ? "Passwort" : "Neues Passwort (optional)";
+    private string _passwordLabel       => PasswordRequired ? "Password *" : "Password (leave blank to keep unchanged)";
+    private string _passwordPlaceholder => PasswordRequired ? "Password" : "New password (optional)";
 }

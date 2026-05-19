@@ -30,9 +30,9 @@
     else if (_forbidden)
     {
         <div class="forbidden-banner">
-            <h2>Kein Zugriff</h2>
-            <p>Dieser Run gehört einem anderen Benutzer.</p>
-            <a href="/runs" class="btn ghost">← Zurück zur Übersicht</a>
+            <h2>No access</h2>
+            <p>This run belongs to another user.</p>
+            <a href="/runs" class="btn ghost">← Back to all runs</a>
         </div>
     }
     else if (_notFound)
@@ -71,7 +71,7 @@
                 @if (_details.Run.ParentRunId.HasValue)
                 {
                     <div class="row">
-                        <span class="label">Fortgesetzt von</span>
+                        <span class="label">Resumed from</span>
                         <span class="val">
                             <a href="/runs/@_details.Run.ParentRunId.Value" class="t-mono">
                                 @_details.Run.ParentRunId.Value.ToString("N")[..8].ToUpperInvariant()
@@ -90,7 +90,7 @@
                     <div class="actions">
                         <button class="btn secondary" data-testid="resume-run-button"
                                 @onclick="OpenResumeDialog">
-                            Fortsetzen
+                            Resume
                         </button>
                     </div>
                 }
@@ -165,20 +165,20 @@
         @if (_artifacts.Count > 0)
         {
             <div class="run-artifacts-section" data-testid="artifacts-section">
-                <h2>Finalizer-Artefakte</h2>
+                <h2>Finalizer Artifacts</h2>
                 @if (!string.IsNullOrEmpty(_details.Run.FinalizerErrorMessage))
                 {
                     <div class="warning-banner" data-testid="finalizer-error">
-                        Teilfehler: @_details.Run.FinalizerErrorMessage
+                        Partial error: @_details.Run.FinalizerErrorMessage
                     </div>
                 }
                 <table class="crew-table">
                     <thead>
                         <tr>
                             <th>Finalizer</th>
-                            <th>Typ</th>
+                            <th>Type</th>
                             <th>Details</th>
-                            <th>Erstellt</th>
+                            <th>Created</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -300,7 +300,7 @@
 
     static string GetArtifactTypeLabel(ArtifactType t) => t switch
     {
-        ArtifactType.File   => "Datei",
+        ArtifactType.File   => "File",
         ArtifactType.Url    => "URL",
         ArtifactType.Status => "Status",
         _                   => t.ToString(),

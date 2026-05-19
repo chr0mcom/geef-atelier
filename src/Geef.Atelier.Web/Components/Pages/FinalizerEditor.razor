@@ -8,17 +8,17 @@
 @inject ICrewService CrewService
 @inject NavigationManager Nav
 
-<PageTitle>@(IsNew ? "Neuer Finalizer" : "Finalizer bearbeiten") — Atelier</PageTitle>
+<PageTitle>@(IsNew ? "New Finalizer" : "Edit Finalizer") — Atelier</PageTitle>
 
 <div class="crew-editor" data-testid="finalizer-editor">
     <div class="page-header">
-        <h1>@(IsNew ? "Neuer Finalizer" : $"Bearbeiten: {_displayName}")</h1>
-        <a href="/crew/profiles/finalizers" class="btn ghost">← Zurück</a>
+        <h1>@(IsNew ? "New Finalizer" : $"Edit: {_displayName}")</h1>
+        <a href="/crew/profiles/finalizers" class="btn ghost">← Back</a>
     </div>
 
     @if (_loading)
     {
-        <p>Lade…</p>
+        <p>Loading…</p>
     }
     else
     {
@@ -34,118 +34,118 @@
                 <label>Name (Slug)</label>
                 <InputText @bind-Value="_form.Name" class="form-input" placeholder="export-pdf" data-testid="input-name" />
                 <ValidationMessage For="() => _form.Name" />
-                <small class="form-hint">Gespeichert als <code>custom-…</code>. Nur Kleinbuchstaben, Ziffern und Bindestriche.</small>
+                <small class="form-hint">Saved as <code>custom-…</code>. Lowercase letters, digits and hyphens only.</small>
             </div>
 
             <div class="form-row">
-                <label>Anzeigename</label>
-                <InputText @bind-Value="_form.DisplayName" class="form-input" placeholder="PDF-Export" data-testid="input-display-name" />
+                <label>Display Name</label>
+                <InputText @bind-Value="_form.DisplayName" class="form-input" placeholder="PDF Export" data-testid="input-display-name" />
                 <ValidationMessage For="() => _form.DisplayName" />
             </div>
 
             <div class="form-row">
-                <label>Beschreibung</label>
+                <label>Description</label>
                 <InputTextArea @bind-Value="_form.Description" class="form-input" rows="2" data-testid="input-description" />
             </div>
 
             <div class="form-row">
-                <label>Finalizer-Typ</label>
+                <label>Finalizer Type</label>
                 <InputSelect @bind-Value="_form.FinalizerType" disabled="@(!IsNew)" class="form-input" data-testid="input-finalizer-type">
-                    <option value="@FinalizerType.FileExport">Datei-Export</option>
-                    <option value="@FinalizerType.MetadataEnrich">Metadaten-Anreicherung</option>
-                    <option value="@FinalizerType.ExternalSink">Externer Empfänger</option>
-                    <option value="@FinalizerType.Transform">KI-Transformation</option>
+                    <option value="@FinalizerType.FileExport">File Export</option>
+                    <option value="@FinalizerType.MetadataEnrich">Metadata Enrichment</option>
+                    <option value="@FinalizerType.ExternalSink">External Sink</option>
+                    <option value="@FinalizerType.Transform">AI Transform</option>
                 </InputSelect>
                 @if (!IsNew)
                 {
-                    <small class="form-hint">Der Typ kann nach dem Erstellen nicht geändert werden.</small>
+                    <small class="form-hint">The type cannot be changed after creation.</small>
                 }
             </div>
 
             @switch (_form.FinalizerType)
             {
                 case FinalizerType.FileExport:
-                    <div class="form-section-header">Export-Einstellungen</div>
+                    <div class="form-section-header">Export Settings</div>
                     <div class="form-row">
                         <label>Format</label>
                         <InputSelect @bind-Value="_form.ExportFormat" class="form-input" data-testid="input-export-format">
                             <option value="markdown">Markdown (.md)</option>
                             <option value="html">HTML (.html)</option>
                             <option value="pdf">PDF (.pdf)</option>
-                            <option value="docx">Word-Dokument (.docx)</option>
-                            <option value="txt">Nur Text (.txt)</option>
+                            <option value="docx">Word Document (.docx)</option>
+                            <option value="txt">Plain Text (.txt)</option>
                             <option value="json">JSON (.json)</option>
                         </InputSelect>
                     </div>
                     break;
 
                 case FinalizerType.MetadataEnrich:
-                    <div class="form-section-header">Anreicherungs-Einstellungen</div>
+                    <div class="form-section-header">Enrichment Settings</div>
                     <div class="form-row">
-                        <label>Anreicherungstyp</label>
+                        <label>Enrichment Type</label>
                         <InputSelect @bind-Value="_form.EnricherType" class="form-input" data-testid="input-enricher-type">
-                            <option value="front-matter">Front Matter (YAML-Kopfzeile)</option>
-                            <option value="word-count-footer">Wortzahl-Fußzeile</option>
-                            <option value="reading-level">Leseniveau-Schätzung</option>
+                            <option value="front-matter">Front Matter (YAML header)</option>
+                            <option value="word-count-footer">Word Count Footer</option>
+                            <option value="reading-level">Reading Level Estimate</option>
                         </InputSelect>
                     </div>
                     break;
 
                 case FinalizerType.ExternalSink:
-                    <div class="form-section-header">Empfänger-Einstellungen</div>
+                    <div class="form-section-header">Sink Settings</div>
                     <div class="form-row">
-                        <label>Empfängertyp</label>
+                        <label>Sink Type</label>
                         <InputSelect @bind-Value="_form.SinkKind" class="form-input" data-testid="input-sink-kind">
                             <option value="webhook">Webhook (HTTP POST)</option>
-                            <option value="email">E-Mail (SMTP)</option>
+                            <option value="email">Email (SMTP)</option>
                         </InputSelect>
                     </div>
                     @if (_form.SinkKind == "webhook")
                     {
                         <div class="form-row">
-                            <label>Webhook-URL</label>
+                            <label>Webhook URL</label>
                             <InputText @bind-Value="_form.WebhookUrl" class="form-input" placeholder="https://example.com/hook" data-testid="input-webhook-url" />
                         </div>
                         <div class="form-row">
-                            <label>Auth-Header (optional)</label>
+                            <label>Auth Header (optional)</label>
                             <InputText @bind-Value="_form.WebhookAuthHeader" class="form-input" placeholder="Bearer <token>" data-testid="input-webhook-auth" />
-                            <small class="form-hint">Wird im Klartext in der Datenbank gespeichert und niemals in Logs ausgegeben.</small>
+                            <small class="form-hint">Stored in plain text in the database, never written to logs.</small>
                         </div>
                         <div class="form-row">
                             <label>Content-Type</label>
                             <InputText @bind-Value="_form.WebhookContentType" class="form-input" placeholder="application/json" data-testid="input-webhook-content-type" />
                         </div>
                         <div class="form-row">
-                            <label>Timeout (Sekunden)</label>
+                            <label>Timeout (seconds)</label>
                             <InputNumber @bind-Value="_form.WebhookTimeout" class="form-input" min="5" max="300" data-testid="input-webhook-timeout" />
                         </div>
                     }
                     else
                     {
                         <div class="form-row">
-                            <label>Empfänger-E-Mail</label>
-                            <InputText @bind-Value="_form.EmailTo" class="form-input" placeholder="empfaenger@example.com" data-testid="input-email-to" />
+                            <label>Recipient Email</label>
+                            <InputText @bind-Value="_form.EmailTo" class="form-input" placeholder="recipient@example.com" data-testid="input-email-to" />
                         </div>
                         <div class="form-row">
-                            <label>Betreff</label>
-                            <InputText @bind-Value="_form.EmailSubject" class="form-input" placeholder="Geef.Atelier — Ergebnis" data-testid="input-email-subject" />
+                            <label>Subject</label>
+                            <InputText @bind-Value="_form.EmailSubject" class="form-input" placeholder="Geef.Atelier — Result" data-testid="input-email-subject" />
                         </div>
                         <div class="form-row">
                             <label class="form-checkbox-label">
                                 <InputCheckbox @bind-Value="_form.EmailAttachAsFile" data-testid="input-email-attach" />
-                                Als Anhang senden
+                                Send as attachment
                             </label>
                         </div>
                         @if (_form.EmailAttachAsFile)
                         {
                             <div class="form-row">
-                                <label>Anhang-Format</label>
+                                <label>Attachment Format</label>
                                 <InputSelect @bind-Value="_form.EmailAttachmentFormat" class="form-input" data-testid="input-email-format">
                                     <option value="markdown">Markdown (.md)</option>
                                     <option value="html">HTML (.html)</option>
                                     <option value="pdf">PDF (.pdf)</option>
-                                    <option value="docx">Word-Dokument (.docx)</option>
-                                    <option value="txt">Nur Text (.txt)</option>
+                                    <option value="docx">Word Document (.docx)</option>
+                                    <option value="txt">Plain Text (.txt)</option>
                                 </InputSelect>
                             </div>
                         }
@@ -153,23 +153,23 @@
                     break;
 
                 case FinalizerType.Transform:
-                    <div class="form-section-header">Transformations-Einstellungen</div>
+                    <div class="form-section-header">Transform Settings</div>
                     <div class="form-row">
-                        <label>System-Prompt</label>
+                        <label>System Prompt</label>
                         <InputTextArea @bind-Value="_form.SystemPrompt" class="form-input" rows="6"
-                            placeholder="Anweisung für die KI-Transformation…" data-testid="input-system-prompt" />
-                        <small class="form-hint">Tipp: Füge „Respond in the language of the input text." am Ende ein.</small>
+                            placeholder="Instructions for the AI transform…" data-testid="input-system-prompt" />
+                        <small class="form-hint">Tip: append "Respond in the language of the input text." at the end.</small>
                     </div>
                     <div class="form-row">
                         <label>Provider</label>
                         <InputText @bind-Value="_form.TransformProvider" class="form-input" placeholder="codex-cli" data-testid="input-transform-provider" />
                     </div>
                     <div class="form-row">
-                        <label>Modell</label>
+                        <label>Model</label>
                         <InputText @bind-Value="_form.TransformModel" class="form-input" placeholder="gpt-5.5" data-testid="input-transform-model" />
                     </div>
                     <div class="form-row">
-                        <label>Max. Tokens</label>
+                        <label>Max Tokens</label>
                         <InputNumber @bind-Value="_form.TransformMaxTokens" class="form-input" min="256" max="64000" data-testid="input-transform-max-tokens" />
                     </div>
                     break;
@@ -177,9 +177,9 @@
 
             <div class="form-actions">
                 <button type="submit" class="btn primary" data-testid="btn-save">
-                    @(IsNew ? "Erstellen" : "Speichern")
+                    @(IsNew ? "Create" : "Save")
                 </button>
-                <a href="/crew/profiles/finalizers" class="btn ghost">Abbrechen</a>
+                <a href="/crew/profiles/finalizers" class="btn ghost">Cancel</a>
             </div>
         </EditForm>
     }
@@ -231,10 +231,10 @@
 
     private sealed class FinalizerFormModel
     {
-        [Required(ErrorMessage = "Name ist erforderlich.")]
+        [Required(ErrorMessage = "Name is required.")]
         public string Name { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Anzeigename ist erforderlich.")]
+        [Required(ErrorMessage = "Display name is required.")]
         public string DisplayName { get; set; } = string.Empty;
 
         public string Description { get; set; } = string.Empty;
@@ -249,22 +249,22 @@
         // ExternalSink
         public string SinkKind { get; set; } = WebhookSinkSettings.SinkKindValue;
 
-        [Url(ErrorMessage = "Bitte eine gültige URL eingeben.")]
+        [Url(ErrorMessage = "Please enter a valid URL.")]
         public string WebhookUrl { get; set; } = string.Empty;
 
         public string WebhookAuthHeader { get; set; } = string.Empty;
         public string WebhookContentType { get; set; } = "application/json";
         public int WebhookTimeout { get; set; } = 30;
 
-        [EmailAddress(ErrorMessage = "Bitte eine gültige E-Mail-Adresse eingeben.")]
+        [EmailAddress(ErrorMessage = "Please enter a valid email address.")]
         public string EmailTo { get; set; } = string.Empty;
 
-        public string EmailSubject { get; set; } = "Geef.Atelier — Ergebnis";
+        public string EmailSubject { get; set; } = "Geef.Atelier — Result";
         public bool EmailAttachAsFile { get; set; } = false;
         public string EmailAttachmentFormat { get; set; } = "markdown";
 
         // Transform
-        [Required(ErrorMessage = "System-Prompt ist erforderlich.")]
+        [Required(ErrorMessage = "System prompt is required.")]
         public string SystemPrompt { get; set; } = string.Empty;
 
         public string TransformProvider { get; set; } = "codex-cli";

@@ -7,12 +7,12 @@
 @inject IUserAdminService UserAdmin
 @inject AuthenticationStateProvider AuthStateProvider
 
-<PageTitle>Benutzerverwaltung — Geef.Atelier</PageTitle>
+<PageTitle>User Management — Geef.Atelier</PageTitle>
 
 <div class="user-management" data-testid="user-management-page">
     <div class="page-header">
-        <h1>Benutzerverwaltung</h1>
-        <a href="/runs" class="btn ghost" data-testid="btn-back">← Zurück</a>
+        <h1>User Management</h1>
+        <a href="/runs" class="btn ghost" data-testid="btn-back">← Back</a>
     </div>
 
     @if (!string.IsNullOrEmpty(_error))
@@ -27,23 +27,23 @@
 
     @if (_loading)
     {
-        <p>Laden…</p>
+        <p>Loading…</p>
     }
     else
     {
         <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-            <h2 style="margin:0;">Benutzer</h2>
+            <h2 style="margin:0;">Users</h2>
             @if (_editingUser is null && !_showCreateForm)
             {
                 <button class="btn primary" @onclick="ShowCreateForm" data-testid="btn-new-user">
-                    + Neuer Benutzer
+                    + New User
                 </button>
             }
         </div>
 
         @if (_showCreateForm)
         {
-            <UserForm Title="Neuer Benutzer"
+            <UserForm Title="New User"
                       Username="@_formUsername"
                       Email="@_formEmail"
                       PasswordRequired="true"
@@ -66,7 +66,7 @@
 
                     @if (_editingUser?.UserId == user.UserId)
                     {
-                        <UserForm Title="Benutzer bearbeiten"
+                        <UserForm Title="Edit User"
                                   Username="@_formUsername"
                                   Email="@_formEmail"
                                   PasswordRequired="false"
@@ -90,38 +90,38 @@
                             }
                             @if (!user.IsActive)
                             {
-                                <span class="badge badge-inactive" data-testid="badge-inactive-@user.UserId">Inaktiv</span>
+                                <span class="badge badge-inactive" data-testid="badge-inactive-@user.UserId">Inactive</span>
                             }
                             @if (!string.IsNullOrEmpty(user.Email))
                             {
                                 <span class="user-meta" data-testid="email-@user.UserId">@user.Email</span>
                             }
-                            <span class="user-meta">Erstellt: @user.CreatedAt.ToString("yyyy-MM-dd")</span>
+                            <span class="user-meta">Created: @user.CreatedAt.ToString("yyyy-MM-dd")</span>
                         </div>
                         <div class="user-actions">
                             @if (!user.IsAdmin || user.UserId != _currentAdminId)
                             {
                                 <button class="btn ghost small" @onclick="() => StartEdit(user)"
                                         data-testid="btn-edit-@user.UserId">
-                                    Bearbeiten
+                                    Edit
                                 </button>
                                 @if (_confirmDeleteUserId == user.UserId)
                                 {
-                                    <span class="delete-confirm-text">Wirklich löschen?</span>
+                                    <span class="delete-confirm-text">Really delete?</span>
                                     <button class="btn danger small" @onclick="() => DeleteUserAsync(user.UserId)"
                                             data-testid="btn-confirm-delete-@user.UserId">
-                                        Ja
+                                        Yes
                                     </button>
                                     <button class="btn ghost small" @onclick="CancelDelete"
                                             data-testid="btn-cancel-delete-@user.UserId">
-                                        Nein
+                                        No
                                     </button>
                                 }
                                 else
                                 {
                                     <button class="btn danger small" @onclick="() => _confirmDeleteUserId = user.UserId"
                                             data-testid="btn-delete-@user.UserId">
-                                        Löschen
+                                        Delete
                                     </button>
                                 }
                             }
@@ -213,12 +213,12 @@
     {
         if (string.IsNullOrWhiteSpace(_formUsername))
         {
-            _formError = "Benutzername ist erforderlich.";
+            _formError = "Username is required.";
             return;
         }
         if (string.IsNullOrWhiteSpace(_formPassword))
         {
-            _formError = "Passwort ist erforderlich.";
+            _formError = "Password is required.";
             return;
         }
 
@@ -228,7 +228,7 @@
         {
             await UserAdmin.CreateUserAsync(_formUsername.Trim(), _formPassword, _formEmail?.Trim(), CancellationToken.None);
             _showCreateForm = false;
-            _success = $"Benutzer \"{_formUsername.Trim()}\" wurde angelegt.";
+            _success = $"User \"{_formUsername.Trim()}\" created.";
             await LoadAsync();
         }
         catch (Exception ex)
@@ -247,7 +247,7 @@
 
         if (string.IsNullOrWhiteSpace(_formUsername))
         {
-            _formError = "Benutzername ist erforderlich.";
+            _formError = "Username is required.";
             return;
         }
 
@@ -264,7 +264,7 @@
                 _formIsActive,
                 CancellationToken.None);
             _editingUser = null;
-            _success = $"Benutzer \"{_formUsername.Trim()}\" wurde aktualisiert.";
+            _success = $"User \"{_formUsername.Trim()}\" updated.";
             await LoadAsync();
         }
         catch (Exception ex)
@@ -285,7 +285,7 @@
         try
         {
             await UserAdmin.DeleteUserAsync(userId, CancellationToken.None);
-            _success = "Benutzer wurde gelöscht.";
+            _success = "User deleted.";
             await LoadAsync();
         }
         catch (Exception ex)

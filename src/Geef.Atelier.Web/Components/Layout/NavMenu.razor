@@ -1,3 +1,6 @@
+@inject NavigationManager Nav
+@implements IDisposable
+
 <div class="nav-links">
     <NavLink class="nav-link" href="/" Match="NavLinkMatch.All" ActiveClass="active">
         Atelier
@@ -6,30 +9,69 @@
         Runs
     </NavLink>
     <NavLink class="nav-link" href="/new" ActiveClass="active">
-        New briefing
+        New
     </NavLink>
-    <NavLink class="nav-link" href="/crew/templates" Match="NavLinkMatch.Prefix" ActiveClass="active">
-        Templates
-    </NavLink>
-    <NavLink class="nav-link" href="/crew/studio" ActiveClass="active">
-        Crew Studio
-    </NavLink>
-    <NavLink class="nav-link" href="/crew/profiles/reviewers" Match="NavLinkMatch.Prefix" ActiveClass="active">
-        Reviewers
-    </NavLink>
-    <NavLink class="nav-link" href="/crew/profiles/executors" Match="NavLinkMatch.Prefix" ActiveClass="active">
-        Executors
-    </NavLink>
-    <NavLink class="nav-link" href="/crew/profiles/advisors" Match="NavLinkMatch.Prefix" ActiveClass="active">
-        Advisors
-    </NavLink>
-    <NavLink class="nav-link" href="/crew/profiles/grounding-providers" Match="NavLinkMatch.Prefix" ActiveClass="active">
-        Groundings
-    </NavLink>
-    <NavLink class="nav-link" href="/crew/profiles/finalizers" Match="NavLinkMatch.Prefix" ActiveClass="active">
-        Finalizer
-    </NavLink>
+
+    <div class="nav-group @(_crewOpen ? "open" : "")">
+        <button class="nav-link nav-group-trigger @(IsCrewActive() ? "active" : "")"
+                @onclick="ToggleCrew"
+                aria-expanded="@_crewOpen"
+                aria-haspopup="true">
+            Crew
+            <span class="nav-group-chevron" aria-hidden="true">▾</span>
+        </button>
+        @if (_crewOpen)
+        {
+            <div class="nav-dropdown" role="menu">
+                <NavLink class="nav-link" href="/crew/templates" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                    Templates
+                </NavLink>
+                <NavLink class="nav-link" href="/crew/studio" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                    Studio
+                </NavLink>
+                <div class="nav-dropdown-sep">Profiles</div>
+                <NavLink class="nav-link" href="/crew/profiles/reviewers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                    Reviewers
+                </NavLink>
+                <NavLink class="nav-link" href="/crew/profiles/executors" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                    Executors
+                </NavLink>
+                <NavLink class="nav-link" href="/crew/profiles/advisors" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                    Advisors
+                </NavLink>
+                <NavLink class="nav-link" href="/crew/profiles/grounding-providers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                    Groundings
+                </NavLink>
+                <NavLink class="nav-link" href="/crew/profiles/finalizers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                    Finalizers
+                </NavLink>
+            </div>
+        }
+    </div>
+
     <NavLink class="nav-link" href="/crew/knowledge" ActiveClass="active">
-        Knowledge Base
+        Knowledge
     </NavLink>
 </div>
+
+@code {
+    bool _crewOpen = false;
+
+    bool IsCrewActive() => Nav.Uri.Contains("/crew/");
+
+    void ToggleCrew() => _crewOpen = !_crewOpen;
+    void CloseCrew()  => _crewOpen = false;
+
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _crewOpen = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+}

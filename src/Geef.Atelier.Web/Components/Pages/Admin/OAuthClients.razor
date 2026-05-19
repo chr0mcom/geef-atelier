@@ -6,12 +6,12 @@
 @inject IOAuthService OAuthService
 @inject IConfiguration Configuration
 
-<PageTitle>OAuth-Clients — Geef.Atelier</PageTitle>
+<PageTitle>OAuth Clients — Geef.Atelier</PageTitle>
 
 <div class="user-management" data-testid="oauth-clients-page">
     <div class="page-header">
-        <h1>OAuth-Clients</h1>
-        <a href="/runs" class="btn ghost" data-testid="btn-back">← Zurück</a>
+        <h1>OAuth Clients</h1>
+        <a href="/runs" class="btn ghost" data-testid="btn-back">← Back</a>
     </div>
 
     @if (!string.IsNullOrEmpty(_error))
@@ -26,16 +26,16 @@
 
     @if (_loading)
     {
-        <p>Laden…</p>
+        <p>Loading…</p>
     }
     else
     {
         <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-            <h2 style="margin:0;">Registrierte Clients</h2>
+            <h2 style="margin:0;">Registered Clients</h2>
             @if (!_showCreateForm)
             {
                 <button class="btn primary" @onclick="ShowCreateForm" data-testid="btn-new-client">
-                    + Neuer Client
+                    + New Client
                 </button>
             }
         </div>
@@ -43,7 +43,7 @@
         @if (_showCreateForm)
         {
             <div class="user-form" data-testid="create-client-form">
-                <h3>Neuen Client registrieren</h3>
+                <h3>Register New Client</h3>
 
                 @if (!string.IsNullOrEmpty(_formError))
                 {
@@ -55,19 +55,19 @@
                     <input id="fc-name" type="text" class="form-control"
                            @bind="_formClientName"
                            data-testid="input-client-name"
-                           placeholder="z.B. Claude.ai" />
+                           placeholder="e.g. Claude.ai" />
                 </div>
 
                 <div class="form-group">
-                    <label for="fc-id">Client-ID (leer = automatisch generiert)</label>
+                    <label for="fc-id">Client ID (empty = auto-generated)</label>
                     <input id="fc-id" type="text" class="form-control"
                            @bind="_formClientId"
                            data-testid="input-client-id"
-                           placeholder="z.B. claude-ai" />
+                           placeholder="e.g. claude-ai" />
                 </div>
 
                 <div class="form-group">
-                    <label for="fc-uris">Redirect-URIs * <small>(eine pro Zeile)</small></label>
+                    <label for="fc-uris">Redirect URIs * <small>(one per line)</small></label>
                     <textarea id="fc-uris" class="form-control" rows="3"
                               @bind="_formRedirectUris"
                               data-testid="input-redirect-uris"
@@ -77,11 +77,11 @@
                 <div class="form-actions">
                     <button type="button" class="btn primary" @onclick="CreateClientAsync"
                             disabled="@_saving" data-testid="btn-create-client">
-                        @(_saving ? "Registrieren…" : "Registrieren")
+                        @(_saving ? "Registering…" : "Register")
                     </button>
                     <button type="button" class="btn ghost" @onclick="CancelCreate"
                             disabled="@_saving" data-testid="btn-cancel-create">
-                        Abbrechen
+                        Cancel
                     </button>
                 </div>
             </div>
@@ -90,15 +90,15 @@
         @if (_newClientResult is not null)
         {
             <div class="alert alert-success" style="font-family:monospace;" data-testid="new-client-result">
-                <strong>Client registriert:</strong><br/>
-                Client-ID: <strong>@_newClientResult.ClientId</strong>
+                <strong>Client registered:</strong><br/>
+                Client ID: <strong>@_newClientResult.ClientId</strong>
             </div>
         }
 
         <div class="users-list" data-testid="clients-list">
             @if (_clients.Count == 0)
             {
-                <div class="empty-state-inline" data-testid="empty-state">Keine Clients registriert.</div>
+                <div class="empty-state-inline" data-testid="empty-state">No clients registered.</div>
             }
             else
             {
@@ -112,26 +112,26 @@
                             {
                                 <span class="user-meta">↪ @uri</span>
                             }
-                            <span class="user-meta">Erstellt: @client.CreatedAt.ToString("yyyy-MM-dd HH:mm") UTC</span>
+                            <span class="user-meta">Created: @client.CreatedAt.ToString("yyyy-MM-dd HH:mm") UTC</span>
                         </div>
                         <div class="user-actions">
                             @if (_confirmDeleteClientId == client.ClientId)
                             {
-                                <span class="delete-confirm-text">Wirklich löschen?</span>
+                                <span class="delete-confirm-text">Really delete?</span>
                                 <button class="btn danger small" @onclick="() => DeleteClientAsync(client.ClientId)"
                                         data-testid="btn-confirm-delete-@client.ClientId">
-                                    Ja
+                                    Yes
                                 </button>
                                 <button class="btn ghost small" @onclick="() => _confirmDeleteClientId = null"
                                         data-testid="btn-cancel-delete-@client.ClientId">
-                                    Nein
+                                    No
                                 </button>
                             }
                             else
                             {
                                 <button class="btn danger small" @onclick="() => _confirmDeleteClientId = client.ClientId"
                                         data-testid="btn-delete-@client.ClientId">
-                                    Löschen
+                                    Delete
                                 </button>
                             }
                         </div>
@@ -199,7 +199,7 @@
     {
         if (string.IsNullOrWhiteSpace(_formClientName))
         {
-            _formError = "Name ist erforderlich.";
+            _formError = "Name is required.";
             return;
         }
 
@@ -210,7 +210,7 @@
 
         if (uris.Count == 0)
         {
-            _formError = "Mindestens eine Redirect-URI ist erforderlich.";
+            _formError = "At least one redirect URI is required.";
             return;
         }
 
@@ -227,7 +227,7 @@
 
             _newClientResult = await OAuthService.RegisterClientAsync(request, CancellationToken.None);
             _showCreateForm  = false;
-            _success         = $"Client \"{_formClientName.Trim()}\" wurde registriert.";
+            _success         = $"Client \"{_formClientName.Trim()}\" registered.";
             await LoadAsync();
         }
         catch (Exception ex)
@@ -247,7 +247,7 @@
         try
         {
             await OAuthService.DeleteClientAsync(clientId, CancellationToken.None);
-            _success = "Client wurde gelöscht.";
+            _success = "Client deleted.";
             if (_newClientResult?.ClientId == clientId)
                 _newClientResult = null;
             await LoadAsync();

@@ -4,7 +4,7 @@
 {
     <Modal Show="Show" OnClose="OnCancel" CloseOnBackdropClick="true" DataTestId="resume-dialog">
         <Title>
-            <span>Run fortsetzen</span>
+            <span>Resume run</span>
         </Title>
         <ChildContent>
             <div class="resume-mode-selector">
@@ -16,11 +16,11 @@
                            @onchange="() => _useSeedDraft = true"
                            disabled="@(!HasIterations)" />
                     <span>
-                        <strong>Mit letztem Entwurf fortsetzen</strong>
-                        <span class="field-hint">Die KI bekommt den letzten Entwurf als Ausgangspunkt.</span>
+                        <strong>Continue with last draft</strong>
+                        <span class="field-hint">The AI receives the last draft as a starting point.</span>
                         @if (!HasIterations)
                         {
-                            <span class="field-hint t-muted">(Kein Entwurf verfügbar)</span>
+                            <span class="field-hint t-muted">(No draft available)</span>
                         }
                     </span>
                 </label>
@@ -31,14 +31,14 @@
                            checked="@(!_useSeedDraft)"
                            @onchange="() => _useSeedDraft = false" />
                     <span>
-                        <strong>Komplett neu starten</strong>
-                        <span class="field-hint">Selbes Briefing, keine Seedvorlage.</span>
+                        <strong>Clean start</strong>
+                        <span class="field-hint">Same briefing, no seed draft.</span>
                     </span>
                 </label>
             </div>
 
             <div class="form-field">
-                <label>Max. Iterationen</label>
+                <label>Max. Iterations</label>
                 <input type="number"
                        data-testid="resume-max-iterations"
                        class="input-narrow"
@@ -46,19 +46,19 @@
                        max="30"
                        value="@_maxIterations"
                        @onchange="e => int.TryParse(e.Value?.ToString(), out _maxIterations)" />
-                <FieldHelp Text="Wie viele Iterationen die KI maximal durchführen soll." />
+                <FieldHelp Text="Maximum number of iterations the AI should run." />
             </div>
         </ChildContent>
         <Actions>
             <button type="button" class="btn primary"
                     data-testid="resume-confirm-button"
                     @onclick="HandleConfirm">
-                Fortsetzen
+                Resume
             </button>
             <button type="button" class="btn ghost"
                     data-testid="resume-cancel-button"
                     @onclick="() => OnCancel.InvokeAsync()">
-                Abbrechen
+                Cancel
             </button>
         </Actions>
     </Modal>
