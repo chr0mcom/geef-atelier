@@ -169,15 +169,25 @@ internal sealed class RunOrchestratorService(
             await using var scope = scopeFactory.CreateAsyncScope();
             var consultations = scope.ServiceProvider.GetRequiredService<IAdvisorConsultationRepository>();
 
-            var runner = AtelierPipelineFactory.Build(
-                snapshot, llmClientResolver, convergenceOptions,
-                consultationRepository: consultations,
-                runId: run.Id,
-                loggerFactory: loggerFactory,
-                additionalSinks: [sink],
-                groundingProviderFactory: groundingProviderFactory,
-                pricingCatalog: pricingCatalog,
-                costAccumulator: accumulator);
+            var runner = run.SeedDraftText is not null
+                ? AtelierPipelineFactory.BuildWithSeedDraft(
+                    snapshot, llmClientResolver, convergenceOptions, run.SeedDraftText,
+                    consultationRepository: consultations,
+                    runId: run.Id,
+                    loggerFactory: loggerFactory,
+                    additionalSinks: [sink],
+                    groundingProviderFactory: groundingProviderFactory,
+                    pricingCatalog: pricingCatalog,
+                    costAccumulator: accumulator)
+                : AtelierPipelineFactory.Build(
+                    snapshot, llmClientResolver, convergenceOptions,
+                    consultationRepository: consultations,
+                    runId: run.Id,
+                    loggerFactory: loggerFactory,
+                    additionalSinks: [sink],
+                    groundingProviderFactory: groundingProviderFactory,
+                    pricingCatalog: pricingCatalog,
+                    costAccumulator: accumulator);
 
             try
             {
