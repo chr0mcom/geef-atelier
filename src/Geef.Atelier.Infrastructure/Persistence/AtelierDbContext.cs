@@ -1,6 +1,7 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.OAuth;
@@ -26,6 +27,10 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
 
     public DbSet<GroundingProviderProfile> GroundingProviderProfiles => Set<GroundingProviderProfile>();
     public DbSet<GroundingConsultation> GroundingConsultations => Set<GroundingConsultation>();
+
+    public DbSet<FinalizerProfile> FinalizerProfiles => Set<FinalizerProfile>();
+    public DbSet<RunArtifact> RunArtifacts => Set<RunArtifact>();
+    public DbSet<FinalizationActorCost> FinalizationActorCosts => Set<FinalizationActorCost>();
 
     public DbSet<IterationActorCostEntity> IterationActorCosts => Set<IterationActorCostEntity>();
 
