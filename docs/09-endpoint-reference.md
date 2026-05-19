@@ -2,7 +2,7 @@
 
 *[Deutsch](09-endpoint-reference_de.md) · **English***
 
-*Last updated: 2026-05-17 (POST /oauth/consent added; web-UI/account endpoints added)*
+*Last updated: 2026-05-19 (artifact download endpoint added; MCP tools list_run_artifacts + download_run_artifact added)*
 
 All externally reachable HTTP endpoints of Geef.Atelier — MCP, OAuth 2.1
 and the web-UI/account endpoints. Base URL: `https://geef.stefan-bechtel.de`.
@@ -27,6 +27,62 @@ If no token or an invalid token is sent, the server responds with `401 Unauthori
 WWW-Authenticate: Bearer resource_metadata="https://geef.stefan-bechtel.de/.well-known/oauth-protected-resource"
 ```
 Through this, OAuth-capable clients discover the authorization server automatically.
+
+### MCP tools
+
+The MCP server exposes the following tools callable via the `/mcp` endpoint. Run-related tools enforce the same run-user isolation as the web UI (D-042): non-admin users can only access their own runs.
+
+#### `list_run_artifacts`
+
+Lists all artifacts produced by a run.
+
+**Input:**
+```json
+{ "run_id": "<uuid>" }
+```
+
+**Output:** Array of artifact objects:
+```json
+[
+  {
+    "artifact_id": "<uuid>",
+    "finalizer_profile_name": "<string>",
+    "artifact_type": "File|Url|Status",
+    "filename": "<string|null>",
+    "content_type": "<string|null>",
+    "size_bytes": 12345,
+    "storage_uri": "<string>",
+    "status_message": "<string|null>",
+    "created_at": "<ISO8601>"
+  }
+]
+```
+
+Returns an empty array if the run has no artifacts. Auth: owner check (same run isolation as other run tools).
+
+---
+
+#### `download_run_artifact`
+
+Downloads the binary content of a `File`-type artifact, returned as Base64.
+
+**Input:**
+```json
+{ "run_id": "<uuid>", "artifact_id": "<uuid>" }
+```
+
+**Output:**
+```json
+{
+  "artifact_id": "<uuid>",
+  "filename": "<string>",
+  "content_type": "<string>",
+  "size_bytes": 12345,
+  "content_base64": "<base64-encoded file content>"
+}
+```
+
+Only works for `ArtifactType.File` artifacts. Reads the file from the `ExportPath` on disk and returns the raw bytes as Base64. Auth: owner check.
 
 ---
 
@@ -249,6 +305,32 @@ externally reachable routes:
 
 Run-related pages are subject to run-user isolation (D-042): each user sees
 only their own runs; the admin can see system-wide via an explicit toggle.
+
+---
+
+## Artifact download endpoint
+
+### `GET /runs/{runId:guid}/artifacts/{artifactId:guid}/download`
+
+**Auth:** `.RequireAuthorization()` — requires an active session (cookie or bearer token)
+
+Downloads an artifact file that was produced by a finalizer during a run. Only artifacts of type `File` can be downloaded; `Url` and `Status` artifacts return 404.
+
+**Owner check:** Non-admin users may only download artifacts belonging to their own runs. The check is performed via `IRunService.GetRunAsync` with the requesting username. Admin users bypass the owner check.
+
+**Security note:** A path containment guard (`Path.GetFullPath` comparison) prevents directory traversal attacks on the server-side file path.
+
+**Success response:** `200 OK` — file stream with `Content-Disposition: attachment` (filename from the artifact record).
+
+**Error responses:**
+
+| Status | Condition |
+|--------|-----------|
+| `401 Unauthorized` | Not authenticated |
+| `403 Forbidden` | Authenticated but not the run owner (and not admin) |
+| `404 Not Found` | `runId` or `artifactId` not found |
+| `404 Not Found` | Artifact exists but is type `Url` or `Status` (not `File`) |
+| `404 Not Found` | File not found on disk |
 
 ---
 

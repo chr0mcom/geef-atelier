@@ -2,7 +2,7 @@
 
 *[English](09-endpoint-reference.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-17 (POST /oauth/consent ergänzt; Web-UI-/Account-Endpunkte ergänzt)*
+*Letzte Aktualisierung: 2026-05-19 (Artefakt-Download-Endpunkt ergänzt; MCP-Tools list_run_artifacts + download_run_artifact ergänzt)*
 
 Alle HTTP-Endpunkte von Geef.Atelier, die extern erreichbar sind — MCP, OAuth 2.1
 sowie die Web-UI-/Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`.
@@ -27,6 +27,62 @@ Wenn kein oder ein ungültiges Token mitgeschickt wird, antwortet der Server mit
 WWW-Authenticate: Bearer resource_metadata="https://geef.stefan-bechtel.de/.well-known/oauth-protected-resource"
 ```
 Darüber entdecken OAuth-fähige Clients automatisch den Authorization Server.
+
+### MCP-Tools
+
+Der MCP-Server stellt folgende Tools bereit, die über den `/mcp`-Endpunkt aufgerufen werden können. Run-bezogene Tools erzwingen dieselbe Run-User-Isolation wie die Web-UI (D-042): Nicht-Admin-Nutzer können nur auf eigene Runs zugreifen.
+
+#### `list_run_artifacts`
+
+Listet alle Artefakte auf, die ein Run erzeugt hat.
+
+**Eingabe:**
+```json
+{ "run_id": "<uuid>" }
+```
+
+**Ausgabe:** Array von Artefakt-Objekten:
+```json
+[
+  {
+    "artifact_id": "<uuid>",
+    "finalizer_profile_name": "<string>",
+    "artifact_type": "File|Url|Status",
+    "filename": "<string|null>",
+    "content_type": "<string|null>",
+    "size_bytes": 12345,
+    "storage_uri": "<string>",
+    "status_message": "<string|null>",
+    "created_at": "<ISO8601>"
+  }
+]
+```
+
+Gibt ein leeres Array zurück, wenn der Run keine Artefakte hat. Auth: Owner-Check (gleiche Run-Isolation wie andere Run-Tools).
+
+---
+
+#### `download_run_artifact`
+
+Lädt den binären Inhalt eines `File`-Artefakts herunter und gibt ihn als Base64 zurück.
+
+**Eingabe:**
+```json
+{ "run_id": "<uuid>", "artifact_id": "<uuid>" }
+```
+
+**Ausgabe:**
+```json
+{
+  "artifact_id": "<uuid>",
+  "filename": "<string>",
+  "content_type": "<string>",
+  "size_bytes": 12345,
+  "content_base64": "<base64-kodierter Dateiinhalt>"
+}
+```
+
+Funktioniert nur für `ArtifactType.File`-Artefakte. Liest die Datei vom `ExportPath` auf der Festplatte und gibt die rohen Bytes als Base64 zurück. Auth: Owner-Check.
 
 ---
 
@@ -249,6 +305,32 @@ extern erreichbaren Routen:
 
 Run-bezogene Seiten unterliegen der Run-User-Isolation (D-042): jeder Nutzer sieht
 nur eigene Runs; der Admin kann per explizitem Umschalter systemweit sehen.
+
+---
+
+## Artefakt-Download-Endpunkt
+
+### `GET /runs/{runId:guid}/artifacts/{artifactId:guid}/download`
+
+**Auth:** `.RequireAuthorization()` — erfordert eine aktive Session (Cookie oder Bearer-Token)
+
+Lädt eine Artefakt-Datei herunter, die ein Finalizer während eines Runs erzeugt hat. Nur Artefakte vom Typ `File` können heruntergeladen werden; `Url`- und `Status`-Artefakte liefern 404.
+
+**Owner-Check:** Nicht-Admin-Nutzer dürfen nur Artefakte aus eigenen Runs herunterladen. Die Prüfung erfolgt über `IRunService.GetRunAsync` mit dem anfragenden Benutzernamen. Admin-Nutzer umgehen den Owner-Check.
+
+**Sicherheitshinweis:** Ein Path-Containment-Guard (`Path.GetFullPath`-Vergleich) verhindert Directory-Traversal-Angriffe auf den serverseitigen Dateipfad.
+
+**Erfolgsantwort:** `200 OK` — Datei-Stream mit `Content-Disposition: attachment` (Dateiname aus dem Artefakt-Datensatz).
+
+**Fehlerantworten:**
+
+| Status | Bedingung |
+|--------|-----------|
+| `401 Unauthorized` | Nicht authentifiziert |
+| `403 Forbidden` | Authentifiziert, aber nicht der Run-Eigentümer (und kein Admin) |
+| `404 Not Found` | `runId` oder `artifactId` nicht gefunden |
+| `404 Not Found` | Artefakt vorhanden, aber vom Typ `Url` oder `Status` (nicht `File`) |
+| `404 Not Found` | Datei nicht auf der Festplatte gefunden |
 
 ---
 

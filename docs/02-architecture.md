@@ -2,7 +2,7 @@
 
 *[Deutsch](02-architecture_de.md) · **English***
 
-*Last updated: 2026-05-17 (data model, LLM/auth layer and MCP auth brought up to date: crew-profile system, OAuth 2.1, multi-user, run-user isolation)*
+*Last updated: 2026-05-19 (data model, LLM/auth layer and MCP auth brought up to date: crew-profile system, OAuth 2.1, multi-user, run-user isolation, Finalizer-Foundation Step22, Run-Resume Step23)*
 
 ## Layer diagram
 
@@ -67,7 +67,9 @@ Geef.Atelier.slnx
 │   ├── Geef.Atelier.Application/    // IRunService contract + RunService implementation,
 │   │                                // ApplicationServiceExtensions (AddAtelierApplication)
 │   ├── Geef.Atelier.Infrastructure/ // EF Core, LLM clients (OpenAiCompatibleClient),
-│   │                                // event sink, provider implementations, repositories
+│   │                                // event sink, provider implementations, repositories,
+│   │                                // Finalizers/ (4 executor implementations),
+│   │                                // FormatConverters/ (Markdig, QuestPDF, OpenXml, PlaintextStripper)
 │   ├── Geef.Atelier.Web/            // Blazor Server: UI + BackgroundService
 │   │                                // (RunOrchestratorService), DI composition
 │   └── Geef.Atelier.Mcp/            // Class library: MCP tool definitions,
@@ -85,8 +87,8 @@ Geef.Atelier.slnx
 
 ## Data model
 
-As of May 2026 the schema comprises **21 tables**, with hand-written migrations
-`InitialCreate` + `Step06`/`Step09`–`Step21`. Grouped:
+As of May 2026 the schema comprises **27 tables**, with hand-written migrations
+`InitialCreate` + `Step06`/`Step09`–`Step23`. Grouped:
 
 | Group | Tables | Introduced |
 |---|---|---|
@@ -99,11 +101,13 @@ As of May 2026 the schema comprises **21 tables**, with hand-written migrations
 | Template Studio | `TemplateStudioAnalyses` | Step17 |
 | Multi-user | `Users` | Step20 |
 | OAuth 2.1 | `OAuthClients`, `OAuthAuthorizationCodes`, `OAuthAccessTokens`, `OAuthRefreshTokens`, `OAuthAuditLog` | Step19 |
+| Finalizer | `FinalizerProfiles`, `RunArtifacts`, `FinalizationActorCosts` | Step22 |
 
 The four run-core tables are documented in detail below; the other groups are
 described in their respective feature sections or in the [decisions log](05-decisions-log.md)
 (D-028 ff.). `Runs` additionally carries columns from later migrations
-(`CreatedByUser`, `CostTotal`, `CrewTemplateName`, `CrewSnapshot`, `AdvisorRetryAttempted`).
+(`CreatedByUser`, `CostTotal`, `CrewTemplateName`, `CrewSnapshot`, `AdvisorRetryAttempted`,
+`FinalizerCostEur`, `FinalizerErrorMessage`, `ParentRunId`, `SeedDraftText`).
 
 ### Runs
 
@@ -125,6 +129,10 @@ described in their respective feature sections or in the [decisions log](05-deci
 | CrewSnapshot | jsonb | nullable; the fully embedded CrewSnapshot at submit time. |
 | AdvisorRetryAttempted | bool | nullable; true when an OnConvergenceFailure retry has already been performed (single-retry cap). |
 | CreatedByUser | text | nullable; username of the creating user (run-user isolation, D-042). Index `IX_Runs_CreatedByUser` (Step21). |
+| FinalizerCostEur | numeric(10,6) | nullable; accumulated cost of all Transform-finalizer LLM calls (Step22). |
+| FinalizerErrorMessage | text | nullable; error message when a finalizer chain partially or fully failed (Step22). |
+| ParentRunId | uuid (FK→Runs) | nullable; self-referential, no cascade — set when this run was resumed from another run (Step23). |
+| SeedDraftText | text | nullable; last artifact text copied from the parent run's final iteration, used to seed iteration 1 of this resumed run (Step23). |
 
 ### Iterations
 
@@ -161,6 +169,58 @@ described in their respective feature sections or in the [decisions log](05-deci
 - `Runs.Status` (for background polling)
 - `Events.RunId` (for the detail view)
 - `Iterations.RunId` (for the detail view)
+
+### FinalizerProfiles (Step22)
+
+| Column | Type | Note |
+|---|---|---|
+| Name | varchar(100) (PK) | |
+| DisplayName | varchar(200) | |
+| Description | text | nullable |
+| FinalizerType | varchar(50) | `FileExport` / `MetadataEnrich` / `ExternalSink` / `Transform` |
+| Settings | jsonb | type-specific configuration |
+| IsSystem | bool | true for built-in system profiles |
+| CreatedAt | timestamptz | |
+| UpdatedAt | timestamptz | |
+
+### RunArtifacts (Step22)
+
+| Column | Type | Note |
+|---|---|---|
+| Id | uuid (PK) | |
+| RunId | uuid (FK→Runs ON DELETE CASCADE) | |
+| FinalizerProfileName | varchar(100) | name of the finalizer profile that produced this artifact |
+| ArtifactType | enum | `File` / `Url` / `Status` |
+| Filename | text | nullable; original filename for File artifacts |
+| ContentType | text | nullable; MIME type for File artifacts |
+| SizeBytes | bigint | nullable; byte size for File artifacts |
+| StorageUri | text | path or URL to the stored artifact |
+| StatusMessage | text | nullable; human-readable status or error message |
+| CreatedAt | timestamptz | |
+
+### FinalizationActorCosts (Step22)
+
+| Column | Type | Note |
+|---|---|---|
+| Id | uuid (PK) | |
+| RunId | uuid (FK→Runs ON DELETE CASCADE) | |
+| ActorName | varchar(200) | name of the Transform-finalizer actor |
+| ModelName | varchar(200) | LLM model used |
+| InputTokens | int | |
+| OutputTokens | int | |
+| CostEur | numeric(10,6) | nullable |
+| CreatedAt | timestamptz | |
+
+### New columns on existing tables (Step22 — Finalizer-Foundation)
+
+| Table | Column | Type | Note |
+|---|---|---|---|
+| `CrewTemplates` | `FinalizerProfileNames` | jsonb | ordered array of finalizer profile name strings |
+| `CrewTemplates` | `RunFinalizersOnMaxAttempts` | bool | default false; if true, finalizers run even when convergence fails |
+
+### New columns on existing tables (Step23 — Run-Resume)
+
+See `Runs` table above (`ParentRunId`, `SeedDraftText`).
 
 ## Crew system (PS-5)
 
@@ -244,7 +304,7 @@ More details: [`08-crew-system.md`](08-crew-system.md) → section "Advisor pass
 | Pre-execution | `AdvisorAwareExecutor` (decorator) | Consults BeforeFirst/BeforeEvery advisors; writes the AdvisorBlock into the context |
 | Execution | `ProfileBasedExecutor` | LLM call with the profile system prompt + PreviousFindings + AdvisorBlock; model from the `ExecutorProfile` |
 | Evaluation | `ProfileBasedReviewer` × N | N reviewers from `CrewSnapshot.Reviewers`; strategy configurable |
-| Finalize | `MarkdownFinalizer` | Wraps the final text in a `FinalizedDocument` record |
+| Finalize | `IFinalizerExecutor` chain | Runs after convergence. Iterates `snapshot.Finalizers` in order. Each `IFinalizerExecutor` produces zero or one `RunArtifact` (File, Url, or Status). Transform finalizers may update `currentText`. `RunFinalizersOnMaxAttempts=true` causes finalizers to run even on convergence failure. Partial-success contract: a failing finalizer records a Status artifact and the chain continues; run status stays Completed. |
 | Convergence failure | `TryConvergenceFailureRetryAsync` | Enables OnConvergenceFailure advisors, single retry (AdvisorRetryAttempted cap) |
 
 **Convergence policy:** `DefaultConvergencePolicy` from `ConvergenceOptions`, overridable via `ConvergencePolicyOverride` in the CrewTemplate.

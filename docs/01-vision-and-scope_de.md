@@ -2,7 +2,7 @@
 
 *[English](01-vision-and-scope.md) · **Deutsch***
 
-*Letzte Aktualisierung: 17. Mai 2026 (Scope an Mehrbenutzer-Stand angeglichen)*
+*Letzte Aktualisierung: 19. Mai 2026 (Scope an Finalizer-Foundation und Run-Resume angeglichen)*
 
 ## Vision
 
@@ -26,6 +26,8 @@ Das Projekt ist die produktive Anwendung des [Geef SDK](https://github.com/chr0m
 - Quellen-Übergabe in mehreren Formen: Datei-Upload (PDF, DOCX, TXT, MD), URLs, Freitext-Briefing, Stil-Referenztexte; semantische Wissensbasis (Vector-Store-RAG) und Run-lokale Attachments
 - Fire-and-Forget-Workflow: Auftrag starten, später Status prüfen, am Ende Ergebnis abholen — keine Mensch-im-Loop-Eingriffe während des Runs
 - Persistente Run-Historie mit vollständigem Iterations-Trail
+- Run-Fortsetzung: einen fehlgeschlagenen oder abgebrochenen Run ab dem letzten Draft-Text (Seed-Modus) oder mit frischer Pipeline (Clean-Modus) fortsetzen — D-046
+- Datei-Export in den Formaten md / html / pdf / docx / txt / json über die Finalizer-Pipeline (D-044); die fünf Finalizer-Profil-Typen (FileExport, MetadataEnrich, ExternalSink, Transform) sind als Teil des Crew-Systems implementiert
 
 ## Out of Scope (vorerst)
 
@@ -36,7 +38,7 @@ Das Projekt ist die produktive Anwendung des [Geef SDK](https://github.com/chr0m
 - Kommerzielles Hosting, Billing, Abrechnung
 - Echte Memory-Backed-Advisors mit Cross-Run-Lernen
 - Domänen-spezifische Datenbank-Connectors (z.B. juristische Datenbanken wie dejure.org oder Beck-Online) — später optional
-- **Export** jenseits von Markdown: DOCX-/PDF-*Ausgabe* ist weiterhin out of scope. (Hinweis: PDF/DOCX/TXT/MD als *Eingabe*/Quelle ist umgesetzt — siehe „In Scope“.)
+- Direkter „Export”-Button in der Briefing-UI: ein mit einem Klick erreichbarer Export-Button in der Run-/Briefing-Oberfläche ist nicht implementiert. (Datei-Export in md/html/pdf/docx/txt/json *ist* implementiert, aber ausschließlich über die Finalizer-Pipeline, die im Crew-Template konfiguriert wird — siehe „In Scope” oben.)
 
 ## Zielnutzer
 

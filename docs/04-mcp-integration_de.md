@@ -2,7 +2,7 @@
 
 *[English](04-mcp-integration.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-18 (Studio-Profil-Beispiel auf aktuelle MaxTokens-Defaults + serverseitigen Floor-Hinweis aktualisiert, D-043/9)*
+*Letzte Aktualisierung: 2026-05-19 (list_run_artifacts + download_run_artifact ergänzt, Finalizer-Profil-Felder in Template-Studio-Tools, D-044)*
 
 ## Warum MCP
 
@@ -119,7 +119,7 @@ Bricht einen laufenden Run ab. Gibt `true` zurück, wenn der Abbruch ausgelöst 
 
 ### Weitere Tools (Crew, Wissensbasis, Template Studio)
 
-Neben den sechs Run-Tools bietet der Server sieben weitere — insgesamt **13 MCP-Tools**:
+Neben den sechs Run-Tools bietet der Server neun weitere — insgesamt **15 MCP-Tools**:
 
 | Tool | Zweck |
 |---|---|
@@ -130,6 +130,8 @@ Neben den sechs Run-Tools bietet der Server sieben weitere — insgesamt **13 MC
 | `list_knowledge_documents` | Globale Wissensbasis-Dokumente auflisten |
 | `analyze_template_proposal` | Aufgabenbeschreibung analysieren, Template-Vorschlag erzeugen (persistiert) |
 | `materialize_template_proposal` | Geprüften Vorschlag als Custom-Template + -Profile materialisieren |
+| `list_run_artifacts` | Alle RunArtifacts eines abgeschlossenen Runs auflisten (erzeugt von Finalizern) |
+| `download_run_artifact` | Binärinhalt eines File-Artifacts als Base64 herunterladen |
 
 Vollständige Parameter-/Schema-Details: [`09-endpoint-reference.md`](09-endpoint-reference_de.md).
 
@@ -139,9 +141,14 @@ Führt ein Meta-LLM aus, das die Aufgabenbeschreibung analysiert und eine strukt
 
 **Input:** `{ "task_description": "string" }`
 
-**Output:** `TemplateStudioAnalysis` — enthält `id` (UUID, benötigt für `materialize_template_proposal`), ein `proposed_template` (DisplayName, Description, EvaluationStrategy, optional `evaluation_strategy_reasoning`) und eine Liste von `proposed_new_profiles`. Jedes Profil trägt: `profile_type` (`"reviewer"` | `"advisor"` | `"grounding_provider"` | `"executor"`), Name, DisplayName, Description, Provider, Modell, MaxTokens, SystemPrompt sowie typ-spezifische optionale Felder (ReviewerFocus, AdvisorMode, AdvisorTrigger, GroundingProviderType, GroundingProviderSettings) und optionale LLM-Reasoning-Felder (`model_reasoning`, `system_prompt_reasoning`, `overall_reasoning`, `mode_reasoning`, `trigger_reasoning`). Fehlende Felder werden serverseitig aus `appsettings TemplateStudio:Defaults` befüllt.
+**Output:** `TemplateStudioAnalysis` — enthält `id` (UUID, benötigt für `materialize_template_proposal`), ein `proposed_template` (DisplayName, Description, EvaluationStrategy, optional `evaluation_strategy_reasoning`, optionales `finalizer_profile_names`-Array, optionales `finalizer_reasoning`) und zwei Listen:
 
-Backwards-kompatibel: Alte Inputs ohne Executor-Typ oder Reasoning-Felder funktionieren weiterhin.
+- `proposed_new_profiles` — Crew-/Advisor-/Grounding-/Executor-Profile. Jedes Profil trägt: `profile_type` (`"reviewer"` | `"advisor"` | `"grounding_provider"` | `"executor"`), Name, DisplayName, Description, Provider, Modell, MaxTokens, SystemPrompt sowie typ-spezifische optionale Felder (ReviewerFocus, AdvisorMode, AdvisorTrigger, GroundingProviderType, GroundingProviderSettings) und optionale LLM-Reasoning-Felder (`model_reasoning`, `system_prompt_reasoning`, `overall_reasoning`, `mode_reasoning`, `trigger_reasoning`).
+- `proposed_new_finalizer_profiles` — Finalizer-Profil-Vorschläge. Jedes Profil trägt: `name`, `display_name`, `description`, `finalizer_type` (`"FileExport"` | `"MetadataEnrich"` | `"ExternalSink"` | `"Transform"`), `settings` (Objekt), `finalizer_type_reasoning` (optionaler String).
+
+Fehlende Felder werden serverseitig aus `appsettings TemplateStudio:Defaults` befüllt.
+
+Backwards-kompatibel: Alte Inputs ohne Finalizer-Felder funktionieren weiterhin — es werden standardmäßig keine Finalizer gesetzt.
 
 #### `materialize_template_proposal`
 
@@ -154,7 +161,9 @@ Schreibt alle neuen Profile und das Crew-Template atomar in einer einzigen Trans
   "final_template": {
     "display_name": "...", "description": "...", "evaluation_strategy": "Sequential",
     "executor_profile_name": "...", "reviewer_profile_names": ["..."],
-    "advisor_profile_names": ["..."], "grounding_provider_profile_names": ["..."]
+    "advisor_profile_names": ["..."], "grounding_provider_profile_names": ["..."],
+    "finalizer_profile_names": ["..."],
+    "finalizer_reasoning": "optionaler String"
   },
   "final_new_profiles": [
     {
@@ -162,13 +171,63 @@ Schreibt alle neuen Profile und das Crew-Template atomar in einer einzigen Trans
       "display_name": "...", "system_prompt": "...", "provider": "openrouter",
       "model": "openai/gpt-4o-mini", "max_tokens": 16384
     }
+  ],
+  "final_new_finalizer_profiles": [
+    {
+      "name": "custom-my-exporter", "display_name": "...", "description": "...",
+      "finalizer_type": "FileExport", "settings": {}
+    }
   ]
 }
 ```
 
-`final_new_profiles` enthält nur Profile, die der Nutzer im CreateNew-Modus neu anlegen wollte. Profile im UseExisting-Modus erscheinen nur als Name in `final_template.*_profile_names`. Ein `max_tokens` unterhalb des harten Floors (`StudioDefaults.MinMaxTokens = 10000`) wird serverseitig hochgezogen; ohne Angabe greift der `TemplateStudio:Defaults`-Wert (Reviewer/Advisor 16384, Executor 60000).
+`final_new_profiles` enthält nur Profile, die der Nutzer im CreateNew-Modus neu anlegen wollte. Profile im UseExisting-Modus erscheinen nur als Name in `final_template.*_profile_names`. `final_new_finalizer_profiles` folgt demselben Muster für Finalizer-Profile. Ein `max_tokens` unterhalb des harten Floors (`StudioDefaults.MinMaxTokens = 10000`) wird serverseitig hochgezogen; ohne Angabe greift der `TemplateStudio:Defaults`-Wert (Reviewer/Advisor 16384, Executor 60000). Das Weglassen von `finalizer_profile_names` oder `final_new_finalizer_profiles` ist backwards-kompatibel (keine Finalizer werden angehängt).
 
 **Output:** `{ "created_template_name": "custom-..." }` — Name des materialisierten Templates; kann direkt als `crew_template` an `submit_request` übergeben werden.
+
+#### `list_run_artifacts`
+
+Listet alle RunArtifacts auf, die von Finalizern für einen abgeschlossenen Run erzeugt wurden.
+
+**Input:** `{ "run_id": "uuid (required)" }`
+
+**Auth:** Owner-Isolation — Nicht-Admins sehen nur Artifacts ihrer eigenen Runs.
+
+**Output:** Array von Artifact-Objekten:
+```json
+[
+  {
+    "artifact_id": "uuid",
+    "finalizer_profile_name": "string",
+    "artifact_type": "File | Url | Status",
+    "filename": "string oder null",
+    "content_type": "string oder null",
+    "size_bytes": 12345,
+    "storage_uri": "string — Dateipfad (File), URL (Url) oder 'error'/'info' (Status)",
+    "status_message": "string oder null",
+    "created_at": "2026-05-19T10:00:00Z"
+  }
+]
+```
+
+#### `download_run_artifact`
+
+Lädt den Binärinhalt eines File-Artifacts als Base64 herunter. Funktioniert nur für `artifact_type: "File"` — für Url- und Status-Typen wird ein Fehler zurückgegeben. Nützlich für KI-Agenten, die erzeugte PDFs, DOCX, HTML usw. programmatisch abrufen müssen.
+
+**Input:** `{ "run_id": "uuid (required)", "artifact_id": "uuid (required)" }`
+
+**Auth:** Owner-Isolation.
+
+**Output:**
+```json
+{
+  "artifact_id": "uuid",
+  "filename": "string",
+  "content_type": "string",
+  "size_bytes": 12345,
+  "content_base64": "string"
+}
+```
 
 ### Run-Sichtbarkeit über MCP (D-042)
 

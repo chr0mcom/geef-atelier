@@ -2,7 +2,7 @@
 
 *[Deutsch](01-vision-and-scope_de.md) · **English***
 
-*Last updated: 17 May 2026 (scope aligned with the multi-user state)*
+*Last updated: 19 May 2026 (scope aligned with Finalizer-Foundation and Run-Resume)*
 
 ## Vision
 
@@ -26,6 +26,8 @@ The project is the productive application of the [Geef SDK](https://github.com/c
 - Source ingestion in several forms: file upload (PDF, DOCX, TXT, MD), URLs, free-text briefing, style reference texts; semantic knowledge base (vector-store RAG) and run-local attachments
 - Fire-and-forget workflow: start a job, check status later, fetch the result at the end — no human-in-the-loop interventions during the run
 - Persistent run history with a complete iteration trail
+- Run resumption: continue a failed or aborted run from its last draft text (seed mode) or with a fresh pipeline (clean mode) — D-046
+- File export in formats md / html / pdf / docx / txt / json via the Finalizer pipeline (D-044); the five Finalizer profile types (FileExport, MetadataEnrich, ExternalSink, Transform) are implemented as part of the crew system
 
 ## Out of scope (for now)
 
@@ -36,7 +38,7 @@ The project is the productive application of the [Geef SDK](https://github.com/c
 - Commercial hosting, billing, invoicing
 - True memory-backed advisors with cross-run learning
 - Domain-specific database connectors (e.g. legal databases such as dejure.org or Beck-Online) — optional later
-- **Export** beyond Markdown: DOCX/PDF *output* remains out of scope. (Note: PDF/DOCX/TXT/MD as *input*/source is implemented — see "In scope".)
+- Direct "Export" button in the briefing UI: a one-click export button accessible from the run/briefing UI is not implemented. (File export in md/html/pdf/docx/txt/json *is* implemented, but only via the Finalizer pipeline configured in a crew template — see "In scope" above.)
 
 ## Target users
 
