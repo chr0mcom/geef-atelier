@@ -4,6 +4,7 @@ using Geef.Atelier.Application.Crew.TemplateStudio;
 using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.Crew.TemplateStudio;
@@ -121,12 +122,13 @@ internal sealed class TemplateStudioService(
 
     private async Task<string> BuildContextAsync(CancellationToken ct)
     {
-        var templates = await crewService.ListCrewTemplatesAsync(includeSystem: true, ct);
-        var reviewers = await crewService.ListReviewerProfilesAsync(includeSystem: true, ct);
-        var advisors  = await crewService.ListAdvisorProfilesAsync(includeSystem: true, ct);
-        var grounding = await crewService.ListGroundingProviderProfilesAsync(includeSystem: true, ct);
-        var executors = await crewService.ListExecutorProfilesAsync(includeSystem: true, ct);
-        var providers = providerCatalog.ListProviders();
+        var templates  = await crewService.ListCrewTemplatesAsync(includeSystem: true, ct);
+        var reviewers  = await crewService.ListReviewerProfilesAsync(includeSystem: true, ct);
+        var advisors   = await crewService.ListAdvisorProfilesAsync(includeSystem: true, ct);
+        var grounding  = await crewService.ListGroundingProviderProfilesAsync(includeSystem: true, ct);
+        var executors  = await crewService.ListExecutorProfilesAsync(includeSystem: true, ct);
+        var finalizers = await crewService.ListFinalizerProfilesAsync(includeSystem: true, ct);
+        var providers  = providerCatalog.ListProviders();
 
         // Build per-provider model lists so the LLM can select accurate, current model IDs.
         var modelLines = new List<string>();
@@ -150,6 +152,7 @@ internal sealed class TemplateStudioService(
             Reviewer profiles: {string.Join(", ", reviewers.Select(r => $"{r.Name} ({r.Description})"))}
             Advisor profiles: {string.Join(", ", advisors.Select(a => $"{a.Name} ({a.Description})"))}
             Grounding provider profiles: {string.Join(", ", grounding.Select(g => g.Name))}
+            Finalizer profiles: {string.Join(", ", finalizers.Select(f => $"{f.Name} ({f.FinalizerType})"))}
             Available providers and their current models (use ONLY these exact IDs):
             {modelsBlock}
             """;
@@ -190,7 +193,11 @@ internal sealed class TemplateStudioService(
                 AdvisorProfileNames:           GetStringArray(ptEl, "advisor_profile_names"),
                 GroundingProviderProfileNames: GetStringArray(ptEl, "grounding_provider_profile_names"),
                 EvaluationStrategy:            NormalizeEvaluationStrategy(ptEl.TryGetProperty("evaluation_strategy", out var evEl) ? evEl.GetString() : null),
-                EvaluationStrategyReasoning:   ptEl.TryGetProperty("evaluation_strategy_reasoning", out var esrEl) ? esrEl.GetString() : null);
+                EvaluationStrategyReasoning:   ptEl.TryGetProperty("evaluation_strategy_reasoning", out var esrEl) ? esrEl.GetString() : null,
+                FinalizerProfileNames:         GetStringArray(ptEl, "finalizer_profile_names").Count > 0
+                                                   ? GetStringArray(ptEl, "finalizer_profile_names") : null,
+                RunFinalizersOnMaxAttempts:    ptEl.TryGetProperty("run_finalizers_on_max_attempts", out var rfEl) && rfEl.GetBoolean(),
+                FinalizerReasoning:            ptEl.TryGetProperty("finalizer_reasoning", out var frEl) ? frEl.GetString() : null);
         }
 
         var newProfiles = root.TryGetProperty("proposed_new_profiles", out var profilesEl)
@@ -211,6 +218,7 @@ internal sealed class TemplateStudioService(
             "advisor"            => ProposedProfileType.Advisor,
             "grounding_provider" => ProposedProfileType.GroundingProvider,
             "executor"           => ProposedProfileType.Executor,
+            "finalizer"          => ProposedProfileType.Finalizer,
             _                    => ProposedProfileType.Reviewer
         };
 
@@ -219,6 +227,13 @@ internal sealed class TemplateStudioService(
             settingsEl.ValueKind == JsonValueKind.Object)
         {
             groundingSettings = settingsEl.EnumerateObject()
+                .ToDictionary(p => p.Name, p => p.Value.GetString() ?? "");
+        }
+
+        Dictionary<string, string>? finalizerSettings = null;
+        if (el.TryGetProperty("finalizer_settings", out var fsEl) && fsEl.ValueKind == JsonValueKind.Object)
+        {
+            finalizerSettings = fsEl.EnumerateObject()
                 .ToDictionary(p => p.Name, p => p.Value.GetString() ?? "");
         }
 
@@ -236,11 +251,14 @@ internal sealed class TemplateStudioService(
             AdvisorTrigger:            el.TryGetProperty("advisor_trigger", out var atEl) ? atEl.GetString()  : null,
             GroundingProviderType:     el.TryGetProperty("grounding_provider_type", out var gptEl) ? gptEl.GetString() : null,
             GroundingProviderSettings: groundingSettings,
+            FinalizerType:             el.TryGetProperty("finalizer_type", out var ftEl)  ? ftEl.GetString()  : null,
+            FinalizerSettings:         finalizerSettings,
             ModelReasoning:            el.TryGetProperty("model_reasoning", out var mrEl)           ? mrEl.GetString()  : null,
             SystemPromptReasoning:     el.TryGetProperty("system_prompt_reasoning", out var sprEl)  ? sprEl.GetString() : null,
             OverallReasoning:          el.TryGetProperty("overall_reasoning", out var orEl)         ? orEl.GetString()  : null,
             ModeReasoning:             el.TryGetProperty("mode_reasoning", out var modEl)           ? modEl.GetString() : null,
-            TriggerReasoning:          el.TryGetProperty("trigger_reasoning", out var trEl)         ? trEl.GetString()  : null);
+            TriggerReasoning:          el.TryGetProperty("trigger_reasoning", out var trEl)         ? trEl.GetString()  : null,
+            FinalizerReasoning:        el.TryGetProperty("finalizer_reasoning", out var frEl)       ? frEl.GetString()  : null);
     }
 
     private static ProposedProfile ApplyDefaults(ProposedProfile p, StudioDefaults d) => p with
@@ -255,10 +273,11 @@ internal sealed class TemplateStudioService(
 
     private static string GetDefaultModel(ProposedProfileType type, StudioDefaults d) => type switch
     {
-        ProposedProfileType.Executor         => d.ExecutorModel,
-        ProposedProfileType.Advisor          => d.AdvisorModel,
+        ProposedProfileType.Executor          => d.ExecutorModel,
+        ProposedProfileType.Advisor           => d.AdvisorModel,
         ProposedProfileType.GroundingProvider => string.Empty,
-        _                                    => d.ReviewerModel
+        ProposedProfileType.Finalizer         => string.Empty, // only Transform finalizers use a model
+        _                                     => d.ReviewerModel
     };
 
     private static string GetDefaultProvider(ProposedProfileType type, StudioDefaults d) => type switch
@@ -266,6 +285,7 @@ internal sealed class TemplateStudioService(
         ProposedProfileType.Executor          => d.ExecutorProvider,
         ProposedProfileType.Advisor           => d.AdvisorProvider,
         ProposedProfileType.GroundingProvider => d.GroundingProviderProvider,
+        ProposedProfileType.Finalizer         => string.Empty,
         _                                     => d.ReviewerProvider
     };
 
@@ -274,13 +294,14 @@ internal sealed class TemplateStudioService(
         ProposedProfileType.Executor          => d.ExecutorMaxTokens,
         ProposedProfileType.Advisor           => d.AdvisorMaxTokens,
         ProposedProfileType.GroundingProvider => null,
+        ProposedProfileType.Finalizer         => null,
         _                                     => d.ReviewerMaxTokens
     };
 
-    // Grounding providers do no LLM generation (null budget); every generating profile is clamped
-    // up to the hard floor so a small meta-LLM-proposed value cannot silently truncate output.
+    // Grounding providers and non-Transform finalizers do no LLM generation; every generating
+    // profile is clamped up to the hard floor so a small meta-LLM-proposed value cannot truncate.
     private static int? ClampMaxTokens(ProposedProfileType type, int? maxTokens) =>
-        type == ProposedProfileType.GroundingProvider
+        type is ProposedProfileType.GroundingProvider or ProposedProfileType.Finalizer
             ? null
             : Math.Max(maxTokens ?? StudioDefaults.MinMaxTokens, StudioDefaults.MinMaxTokens);
 
@@ -374,6 +395,20 @@ internal sealed class TemplateStudioService(
                     IsSystem:     false), ct);
                 return created.Name;
             }
+            case ProposedProfileType.Finalizer:
+            {
+                var finalizerType = Enum.TryParse<FinalizerType>(profile.FinalizerType ?? "FileExport", out var ft)
+                    ? ft : FinalizerType.FileExport;
+                var settings = profile.FinalizerSettings ?? new Dictionary<string, string>();
+                var created = await crewService.CreateCustomFinalizerProfileAsync(new FinalizerProfile(
+                    Name:          profile.Name,
+                    DisplayName:   profile.DisplayName,
+                    Description:   profile.Description,
+                    FinalizerType: finalizerType,
+                    Settings:      settings,
+                    IsSystem:      false), ct);
+                return created.Name;
+            }
             default:
                 throw new NotSupportedException($"Profile type {profile.ProfileType} is not supported for creation.");
         }
@@ -390,6 +425,7 @@ internal sealed class TemplateStudioService(
             ReviewerProfileNames          = template.ReviewerProfileNames.Select(Resolve).ToList(),
             AdvisorProfileNames           = template.AdvisorProfileNames.Select(Resolve).ToList(),
             GroundingProviderProfileNames = template.GroundingProviderProfileNames.Select(Resolve).ToList(),
+            FinalizerProfileNames         = template.FinalizerProfileNames?.Select(Resolve).ToList(),
         };
     }
 
@@ -399,16 +435,18 @@ internal sealed class TemplateStudioService(
             ? s : EvaluationStrategy.Sequential;
 
         var created = await crewService.CreateCustomCrewTemplateAsync(new CrewTemplate(
-            Name:                  template.Name,
-            DisplayName:           template.DisplayName,
-            Description:           template.Description,
-            ExecutorProfileName:   template.ExecutorProfileName,
-            ReviewerProfileNames:  template.ReviewerProfileNames,
-            EvaluationStrategy:    strategy,
-            ConvergenceOverride:   null,
-            AdvisorProfileNames:   template.AdvisorProfileNames,
-            GroundingProviderNames: template.GroundingProviderProfileNames,
-            IsSystem:              false), ct);
+            Name:                      template.Name,
+            DisplayName:               template.DisplayName,
+            Description:               template.Description,
+            ExecutorProfileName:       template.ExecutorProfileName,
+            ReviewerProfileNames:      template.ReviewerProfileNames,
+            EvaluationStrategy:        strategy,
+            ConvergenceOverride:       null,
+            AdvisorProfileNames:       template.AdvisorProfileNames,
+            GroundingProviderNames:    template.GroundingProviderProfileNames,
+            IsSystem:                  false,
+            FinalizerProfileNames:     template.FinalizerProfileNames ?? [],
+            RunFinalizersOnMaxAttempts: template.RunFinalizersOnMaxAttempts), ct);
 
         return created.Name;
     }
@@ -418,8 +456,8 @@ internal sealed class TemplateStudioService(
     {
         foreach (var profile in profiles)
         {
-            if (profile.ProfileType == ProposedProfileType.GroundingProvider)
-                continue; // Grounding providers use dedicated provider types (Tavily/VectorStore), not LLM models.
+            if (profile.ProfileType is ProposedProfileType.GroundingProvider or ProposedProfileType.Finalizer)
+                continue; // These profile types use dedicated non-LLM backends, not model catalog entries.
 
             try
             {

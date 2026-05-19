@@ -41,9 +41,16 @@ internal static class TemplateStudioPrompts
         9. Include reasoning fields (model_reasoning, system_prompt_reasoning, overall_reasoning,
            mode_reasoning, trigger_reasoning, evaluation_strategy_reasoning) to explain your choices —
            the user will see these explanations in the edit UI
-        10. profile_type may be "reviewer", "advisor", "grounding_provider", or "executor" —
-            propose an executor profile only when the default executor is genuinely insufficient
+        10. profile_type may be "reviewer", "advisor", "grounding_provider", "executor", or "finalizer" —
+            propose an executor profile only when the default executor is genuinely insufficient;
+            propose a finalizer profile ONLY when the user's task explicitly involves export, delivery,
+            style transformation, or metadata enrichment — be conservative, most tasks need no finalizer
         11. evaluation_strategy must be exactly one of: Sequential, Parallel, FailFast, Priority
+        12. For FINALIZER profiles, set "finalizer_type" to one of: "FileExport", "MetadataEnrich",
+            "ExternalSink", "Transform". Set "finalizer_settings" as a flat string-to-string dict.
+            Finalizer profiles do not need model/provider/system_prompt unless they are Transform type.
+            Transform finalizers DO need model, provider, and system_prompt (a concise rewriting
+            instruction + "Respond in the language of the input text.").
 
         Required system-prompt structure (mirror the existing Atelier system profiles exactly):
 
@@ -77,6 +84,12 @@ internal static class TemplateStudioPrompts
         e) If the advisor_trigger is BeforeEveryExecution, add a "Rules for iteration variance:"
            paragraph telling it to shift focus across iterations and quote the phrase it challenges.
         f) Verbatim final line: "Respond in the language of the user briefing."
+
+        For a FINALIZER profile of type "Transform", the system_prompt MUST contain:
+        a) One sentence defining the transformation goal (e.g. "Rewrite the text in a more natural,
+           human voice, eliminating AI-typical patterns.").
+        b) 3–6 concrete transformation rules specific to the goal.
+        c) Verbatim final line: "Respond in the language of the input text."
 
         Examples:
 
@@ -119,6 +132,21 @@ internal static class TemplateStudioPrompts
             "trigger_reasoning": "BeforeFirstExecution: constraints are stable, one upfront pass is sufficient."
           }
         ]
+
+        --- Example 4 (POSITIVE): Task requires export and voice transformation — use finalizers ---
+        Task: "Draft a press release and export it as a Word document, polished to sound authentically human."
+        Analysis: Requires export delivery (DOCX) and voice transformation. Two finalizers make sense:
+        an anti-AI-voice Transform finalizer and a FileExport finalizer for DOCX output.
+        Result: proposed_template includes finalizer_profile_names=["anti-ai-voice", "export-docx"],
+        proposed_new_profiles contains one FileExport finalizer (export-docx, format=docx) if
+        "export-docx" does not already exist in the system finalizer profiles.
+
+        --- Example 5 (NEGATIVE): Analytical task — do NOT add finalizers ---
+        Task: "Analyse this research paper and write a critical summary highlighting methodological gaps."
+        Analysis: Pure text-generation task. No export, delivery, or style-transformation requested.
+        Result: finalizer_profile_names=[] (empty), no finalizer profiles proposed.
+        Rationale: Finalizers add pipeline stages with real cost; only add them when the user's
+        intent explicitly includes export, webhook delivery, or documented style transformation.
 
         You MUST respond by calling the submit_template_proposal tool.
         """;
