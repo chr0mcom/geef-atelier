@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-05-19 (D-047 added: Custom Providers — CRUD-Entity)*
+*Last updated: 2026-05-19 (D-048 added: Workshop Dashboard)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -904,3 +904,29 @@ Provider werden zur sechsten CRUD-Entity in Geef.Atelier — anlegbar, editierba
 **D-047/10 — `ProviderCatalog` (Legacy-Shim) verwendet `volatile CachedResult?` mit 5-Minuten-TTL.** Der Shim vermeidet Thread-Pool-Hunger durch synchrones Warten auf DB-Calls: nur bei Cache-Miss wird `.GetAwaiter().GetResult()` aufgerufen; danach antwortet er aus dem Speicher. `record CachedResult(IReadOnlyList<ProviderInfo> Items, DateTimeOffset Expiry)` ist unveränderlich. Der Shim ist als `[Obsolete]` markiert — alle neuen Callsites sollen `IProviderService` direkt nutzen.
 
 **Tests:** 1065 gesamt (1061 grün + 4 bekannte Flakes unverändert). Neue .NET-Testklassen: `ProviderTests` (12), `ProviderServiceTests` (15), `ProviderRepositoryTests` (9), `ProvidersIndexTests` (8). Neue Python-Tests: `test_gemini_adapter.py` (7), `test_generic_adapter.py` (8), `test_provider_sync.py` (7) — 22 neue Python-Tests, 67 gesamt grün.
+
+---
+
+## D-048 — Workshop Dashboard: 13-Widget Live Dashboard as Entry Screen
+
+*Date: 19 May 2026*
+
+The primitive home screen (`/`) — hero + 4 stat tiles + recent runs list — is replaced by a full 13-widget Workshop Dashboard, ported 1:1 from a React prototype (`docs/design/dashboard-prototype/`, 6 JSX files). All 13 widgets are Blazor Server components with live SignalR updates, three-theme design system (Vellum/Noir/Petrol), and an admin scope toggle (My/All Workshops).
+
+**Widgets:** WelcomeStrip (streak, CraftMark, today count), LivePressStatus (active runs rail with phase mapping), LedgerStats (cost + run counts, trend arrows), ActivityCalendar (365-day heatmap lvl-0..4), CrewDna (template distribution), CostForgeSankey (provider×role cost flows), IterationSweetSpot (histogram), ManuscriptsGallery (last 12 completed), TokenStream (sparkline by role), CriticsBenchMatrix (reviewer pass rates), ProviderBench (per-provider stats), KnowledgeBaseWidget (docs + chunks + top files), DayBookStream (live activity feed, 7-source UNION ALL).
+
+**D-048/1 — `RunStatus` stored as string — raw SQL inserts use `'Completed'`, not integer `2`.** `RunConfiguration` has `HasConversion<string>()` — the DB column stores the enum name as text (`'Completed'`, `'Pending'`, etc.). All raw-SQL test inserts must use the string form. Inserting integer `2` stores the text `"2"` which EF's `WHERE Status = 'Completed'` never matches. Discovered and fixed during test stabilization.
+
+**D-048/2 — `IDashboardService` registration moved from `LlmServiceExtensions` to `AddAtelierPersistence`.** The E2E test host uses a fake `ILlmClientResolver` and never calls `AddLlmClient()`. `SignalRRunNotifier` injects `IDashboardService` — leaving the registration inside LLM extensions caused DI validation failures for all E2E tests. Moving it to `AddAtelierPersistence()` (which the test host always calls via `builder.Services.AddAtelierPersistence()`) resolves the issue without modifying the test host.
+
+**D-048/3 — `DashboardRepository` date parameters require explicit UTC offset.** The server runs at UTC+2. `DateTimeOffset.UtcNow.Date` returns `DateTime` with `Kind=Unspecified`; Npgsql converts it using the local timezone (UTC+2 offset), producing a parameter Npgsql rejects for `timestamptz` columns. Fixed by constructing `new DateTimeOffset(utcNow.UtcDateTime.Date, TimeSpan.Zero)` everywhere a date-boundary is needed.
+
+**D-048/4 — CSS authored from scratch; no `atelier-dashboard.css` existed in the prototype.** The React prototype had no CSS file — only JSX `className` attributes and one HTML reference file. `wwwroot/atelier-dashboard.css` was authored from the JSX class names combined with the existing CSS variable system in `wwwroot/atelier.css`. All layout classes are global (no scoped Blazor CSS). Responsive breakpoints: ≤768 px collapses multi-column layouts to single column.
+
+**D-048/5 — Naming conflicts between Blazor component classes and Core domain records.** Three components (`WelcomeStrip.razor`, `LedgerStats.razor`, `CriticsBenchMatrix.razor`) share their class name with identically-named Core domain records. Resolution: `[Parameter]` property declarations use fully-qualified type names (`Geef.Atelier.Core.Domain.Dashboard.WelcomeStrip`) instead of file renames, preserving the component naming convention.
+
+**D-048/6 — Day-Book UNION ALL (7 sources) cached, no materialized view.** The Day-Book stream queries 7 sources in a single async UNION (completed runs, failed/aborted runs, knowledge documents, providers, OAuth clients, materialized templates, admin user events). Results are cached for 45 s in `DashboardService`. A PostgreSQL materialized view was explicitly excluded per plan constraints to avoid background-refresh complexity.
+
+**D-048/7 — Migration Step25: `WordCount` on `Runs`, `ProviderName` on actor cost tables, performance indexes.** `Runs.WordCount` (int, nullable) backfilled via `regexp_split_to_array`. `IterationActorCosts.ProviderName` and `FinalizationActorCosts.ProviderName` backfilled via JSONB lateral join against `CrewSnapshot` (exact match), falling back to `split_part(ModelName,'/',1)` with provider-family heuristics. Index `IX_Runs_CreatedAt` (BTREE) added for heatmap and ledger range queries.
+
+**Tests:** 1079 total (1074 green + 4 known flakes unchanged). New: `DashboardRepositoryTests` (6), `DashboardPerformanceTests` (2), `Step25MigrationTests` (4), plus 46 bUnit widget component tests.

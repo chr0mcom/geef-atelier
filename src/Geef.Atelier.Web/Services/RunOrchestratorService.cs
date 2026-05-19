@@ -576,6 +576,7 @@ internal sealed class RunOrchestratorService(
                     InputTokens  = cost.InputTokens,
                     OutputTokens = cost.OutputTokens,
                     CostEur      = cost.CostEur,
+                    ProviderName = cost.ProviderName,
                     CreatedAt    = DateTimeOffset.UtcNow
                 });
             }
@@ -692,6 +693,7 @@ internal sealed class RunOrchestratorService(
                         InputTokens = result.InputTokens,
                         OutputTokens = result.OutputTokens,
                         CostEur = result.CostEur,
+                        ProviderName = result.ProviderName,
                         CreatedAt = DateTimeOffset.UtcNow,
                     });
                 }

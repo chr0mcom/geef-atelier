@@ -20,6 +20,7 @@ namespace Geef.Atelier.Application.Crew.Finalizers;
 /// <param name="ModelName">Model used for cost attribution; empty string for non-LLM finalizers.</param>
 /// <param name="InputTokens">Input tokens consumed; 0 for non-LLM finalizers.</param>
 /// <param name="OutputTokens">Output tokens consumed; 0 for non-LLM finalizers.</param>
+/// <param name="ProviderName">Provider that served this finalizer step; null for non-LLM finalizers.</param>
 public sealed record FinalizerExecutionResult(
     string? UpdatedText,
     RunArtifact? Artifact,
@@ -27,4 +28,5 @@ public sealed record FinalizerExecutionResult(
     string ActorName,
     string ModelName = "",
     int InputTokens = 0,
-    int OutputTokens = 0);
+    int OutputTokens = 0,
+    string? ProviderName = null);

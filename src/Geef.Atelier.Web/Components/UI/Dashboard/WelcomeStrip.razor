@@ -1,0 +1,19 @@
+@using Geef.Atelier.Core.Domain.Dashboard
+
+<div class="dash-welcome">
+    <div>
+        <div class="greet">Good work, @Data.Username</div>
+        <div class="meta">
+            <span>Today: <strong>@Data.TodayCount</strong> manuscripts</span>
+            <span class="streak">@Data.StreakDays-day streak</span>
+            <span>@Data.TotalManuscripts total</span>
+        </div>
+    </div>
+    <div class="meta">
+        <span>Craft mark: <strong>@Data.CraftMark.ToString("F0")%</strong></span>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Geef.Atelier.Core.Domain.Dashboard.WelcomeStrip Data { get; set; } = null!;
+}

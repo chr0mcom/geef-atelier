@@ -1,0 +1,37 @@
+@using Geef.Atelier.Core.Domain.Dashboard
+
+<div class="dash-card">
+    <div class="dash-card-head">
+        <span class="card-title">Provider Bench</span>
+        <span class="card-sub">30 days</span>
+    </div>
+    @if (!Data.Rows.Any())
+    {
+        <div class="empty">No provider activity</div>
+    }
+    else
+    {
+        <div class="providers">
+            @foreach (var row in Data.Rows)
+            {
+                <div class="provider-row">
+                    <div class="global-pulse" style="background:@StateColor(row.State)"></div>
+                    <div class="provider-name">@row.DisplayName</div>
+                    <div class="provider-type">@row.RequestCount req</div>
+                    <div class="provider-when">€@row.CostEur.ToString("N4")</div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ProviderBench Data { get; set; } = null!;
+
+    static string StateColor(ProviderState state) => state switch
+    {
+        ProviderState.Active  => "var(--hero)",
+        ProviderState.Idle    => "var(--ink-3)",
+        _                     => "var(--surface-3)"
+    };
+}

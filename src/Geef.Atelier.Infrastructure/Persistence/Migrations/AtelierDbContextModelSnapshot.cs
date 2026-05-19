@@ -420,6 +420,9 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
                     b.Property<int>("OutputTokens")
                         .HasColumnType("integer");
 
+                    b.Property<string>("ProviderName")
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
 
                     b.HasIndex("IterationId")
@@ -550,12 +553,21 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
                     b.Property<string>("SeedDraftText")
                         .HasColumnType("text");
 
+                    b.Property<int?>("WordCount")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Status");
 
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("IX_Runs_CreatedAt");
+
                     b.HasIndex("ParentRunId")
                         .HasDatabaseName("IX_Runs_ParentRunId");
+
+                    b.HasIndex("Status", "CompletedAt")
+                        .HasDatabaseName("IX_Runs_Status_CompletedAt");
 
                     b.ToTable("Runs");
                 });

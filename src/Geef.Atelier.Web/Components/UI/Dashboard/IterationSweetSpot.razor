@@ -1,0 +1,33 @@
+@using Geef.Atelier.Core.Domain.Dashboard
+
+<div class="dash-card">
+    <div class="dash-card-head">
+        <span class="card-title">Sweet Spot</span>
+        <span class="card-sub">Convergence iterations</span>
+    </div>
+    @if (Data.TotalRuns == 0)
+    {
+        <div class="empty">No completed runs</div>
+    }
+    else
+    {
+        var maxCount = Data.Buckets.Select(b => b.Count).DefaultIfEmpty(1).Max();
+        <div class="hist">
+            @foreach (var bucket in Data.Buckets)
+            {
+                var h = maxCount > 0 ? (double)bucket.Count / maxCount * 56 : 0;
+                <div class="hist-sweet-strip">
+                    <div class="bar" style="height:@h.ToString("F1")px"></div>
+                    <div class="x-label">@bucket.Iterations</div>
+                </div>
+            }
+        </div>
+        <div class="hist-verdict">
+            Mean: @Data.MeanIterations.ToString("F1") iterations · @Data.TotalRuns runs
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SweetSpotHistogram Data { get; set; } = null!;
+}

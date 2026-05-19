@@ -1,0 +1,56 @@
+@using Geef.Atelier.Core.Domain.Dashboard
+
+<div class="dash-card">
+    <div class="dash-card-head">
+        <span class="card-title">Knowledge Base</span>
+        <span class="card-sub">@Data.DocumentCount docs</span>
+    </div>
+    @if (Data.DocumentCount == 0)
+    {
+        <div class="empty">No documents indexed</div>
+    }
+    else
+    {
+        <div class="kb-block">
+            <div class="kb-side">
+                <div class="kb-stat">
+                    <span class="key">Documents</span>
+                    <span class="value">@Data.DocumentCount</span>
+                </div>
+                <div class="kb-stat">
+                    <span class="key">Chunks</span>
+                    <span class="value">@Data.ChunkCount</span>
+                </div>
+                <div class="kb-stat">
+                    <span class="key">Size</span>
+                    <span class="value">@FormatBytes(Data.TotalBytes)</span>
+                </div>
+            </div>
+            @if (Data.TopFiles.Any())
+            {
+                <div class="kb-side">
+                    @foreach (var f in Data.TopFiles.Take(5))
+                    {
+                        <div class="file">
+                            <span class="quiet t-mono">@f.FileName</span>
+                            @if (f.ReferenceCount is { } rc)
+                            {
+                                <span class="quiet">·&nbsp;@rc ref</span>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public KnowledgeBaseStats Data { get; set; } = null!;
+
+    static string FormatBytes(long b)
+        => b >= 1_073_741_824 ? $"{b / 1_073_741_824.0:F1} GB"
+         : b >= 1_048_576     ? $"{b / 1_048_576.0:F1} MB"
+         : b >= 1_024         ? $"{b / 1_024.0:F0} KB"
+         : $"{b} B";
+}

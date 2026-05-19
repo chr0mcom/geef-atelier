@@ -1,9 +1,12 @@
+using Geef.Atelier.Application.Dashboard;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Core.Persistence.OAuth;
 using Geef.Atelier.Core.Persistence.Providers;
 using Geef.Atelier.Core.Persistence.TemplateStudio;
+using Geef.Atelier.Infrastructure.Dashboard;
 using Geef.Atelier.Infrastructure.Persistence.Crew;
+using Geef.Atelier.Infrastructure.Persistence.Dashboard;
 using Geef.Atelier.Infrastructure.Persistence.OAuth;
 using Geef.Atelier.Infrastructure.Persistence.Providers;
 using Geef.Atelier.Infrastructure.Persistence.TemplateStudio;
@@ -35,6 +38,9 @@ public static class PersistenceServiceExtensions
         services.AddScoped<IOAuthAccessTokenRepository, OAuthAccessTokenRepository>();
         services.AddScoped<IOAuthRefreshTokenRepository, OAuthRefreshTokenRepository>();
         services.AddScoped<IOAuthAuditLogRepository, OAuthAuditLogRepository>();
+        services.AddScoped<IDashboardRepository, DashboardRepository>();
+        services.AddMemoryCache();
+        services.AddSingleton<IDashboardService, DashboardService>();
         return services;
     }
 }

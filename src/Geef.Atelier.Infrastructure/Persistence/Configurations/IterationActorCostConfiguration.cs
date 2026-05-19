@@ -26,6 +26,10 @@ internal sealed class IterationActorCostConfiguration : IEntityTypeConfiguration
             .HasColumnType("numeric(10,6)")
             .IsRequired(false);
 
+        builder.Property(c => c.ProviderName)
+            .HasColumnType("text")
+            .IsRequired(false);
+
         builder.HasOne(c => c.Iteration)
             .WithMany(i => i.ActorCosts)
             .HasForeignKey(c => c.IterationId)

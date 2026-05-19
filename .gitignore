@@ -418,6 +418,7 @@ FodyWeavers.xsd
 # Internal build docs (prompts, deployment reports)
 docs/prompts/
 docs/reports/
+docs/superpowers/
 
 # Datenbank-Backups / Dumps (nie ins Repo — potenziell sensible Daten)
 backup/

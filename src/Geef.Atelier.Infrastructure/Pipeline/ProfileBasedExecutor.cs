@@ -89,7 +89,8 @@ internal sealed class ProfileBasedExecutor(
                 model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens);
             costAccumulator.RecordActorCost(
                 iter, ActorType.Executor, profile.Name, model,
-                response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur);
+                response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur,
+                providerName: profile.Provider);
         }
 
         var updated = context

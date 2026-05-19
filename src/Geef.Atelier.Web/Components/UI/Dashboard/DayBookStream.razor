@@ -1,0 +1,47 @@
+@using Geef.Atelier.Core.Domain.Dashboard
+
+<div class="dash-card">
+    <div class="dash-card-head">
+        <span class="card-title">Day Book</span>
+        <span class="card-sub">Recent activity</span>
+    </div>
+    @if (!Data.Any())
+    {
+        <div class="empty">No recent activity</div>
+    }
+    else
+    {
+        <div class="daybook">
+            @foreach (var entry in Data)
+            {
+                <div class="dl @KindClass(entry.Kind)">
+                    <span class="verb">@entry.Verb</span>
+                    <span class="what" title="@entry.Detail">@entry.Subject</span>
+                    <span class="when">@FormatAge(entry.At)</span>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<DayBookEntry> Data { get; set; } = [];
+
+    static string KindClass(DayBookKind kind) => kind switch
+    {
+        DayBookKind.RunCompleted     => "kind-run-ok",
+        DayBookKind.RunFailed        => "kind-run-fail",
+        DayBookKind.DocumentIndexed  => "kind-doc",
+        DayBookKind.TemplateCreated  => "kind-template",
+        _                            => string.Empty
+    };
+
+    static string FormatAge(DateTimeOffset at)
+    {
+        var diff = DateTimeOffset.UtcNow - at;
+        if (diff.TotalMinutes < 60)  return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalHours   < 24)  return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays    < 7)   return $"{(int)diff.TotalDays}d ago";
+        return at.ToString("dd MMM");
+    }
+}

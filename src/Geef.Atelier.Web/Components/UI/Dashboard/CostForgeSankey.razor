@@ -1,0 +1,32 @@
+@using Geef.Atelier.Core.Domain.Dashboard
+
+<div class="dash-card">
+    <div class="dash-card-head">
+        <span class="card-title">Cost Forge</span>
+        <span class="card-sub">€@Data.TotalEur.ToString("N4") · 30 days</span>
+    </div>
+    @if (Data.Flows.Count == 0)
+    {
+        <div class="empty">No cost data</div>
+    }
+    else
+    {
+        <div class="sankey">
+            @foreach (var flow in Data.Flows)
+            {
+                var barPct = Math.Max(4.0, flow.Share * 100);
+                <div class="node">
+                    <div class="area" style="width:@barPct.ToString("F1")%;height:28px"></div>
+                    <div class="node-label">
+                        <span class="primary">@flow.Provider → @flow.ActorRole</span>
+                        <span class="small">€@flow.CostEur.ToString("N4") (@(flow.Share * 100).ToString("F0")%)</span>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public CostForge Data { get; set; } = null!;
+}

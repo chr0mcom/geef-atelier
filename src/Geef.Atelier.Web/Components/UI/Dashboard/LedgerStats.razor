@@ -1,0 +1,17 @@
+@using Geef.Atelier.Core.Domain.Dashboard
+
+<div class="dash-card">
+    <div class="dash-card-head">
+        <span class="card-title">Ledger</span>
+    </div>
+    <div class="ledger">
+        <LedgerTileView Label="Today"      Tile="@Data.Today" />
+        <LedgerTileView Label="This Week"  Tile="@Data.ThisWeek" />
+        <LedgerTileView Label="This Month" Tile="@Data.ThisMonth" />
+        <LedgerTileView Label="All Time"   Tile="@Data.AllTime" />
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Geef.Atelier.Core.Domain.Dashboard.LedgerStats Data { get; set; } = null!;
+}
