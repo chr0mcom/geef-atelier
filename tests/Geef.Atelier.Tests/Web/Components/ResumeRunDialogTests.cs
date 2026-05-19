@@ -128,6 +128,23 @@ public sealed class ResumeRunDialogTests : TestContext
     }
 
     [Fact]
+    public async Task Confirm_ZeroMaxIterations_SendsNullOverride()
+    {
+        ResumeOptions? captured = null;
+        var cut = RenderComponent<ResumeRunDialog>(p =>
+        {
+            p.Add(c => c.Show, true);
+            p.Add(c => c.DefaultMaxIterations, 3);
+            p.Add(c => c.OnConfirm, EventCallback.Factory.Create<ResumeOptions>(this, opts => captured = opts));
+        });
+
+        cut.Find("[data-testid='resume-max-iterations']").Change("0");
+        await cut.Find("[data-testid='resume-confirm-button']").ClickAsync(new());
+
+        Assert.Null(captured!.MaxIterationsOverride);
+    }
+
+    [Fact]
     public async Task Cancel_InvokesOnCancel()
     {
         var cancelled = false;

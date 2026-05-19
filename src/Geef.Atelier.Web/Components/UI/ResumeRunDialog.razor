@@ -70,7 +70,7 @@
     [Parameter] public int DefaultMaxIterations { get; set; } = 3;
     [Parameter] public EventCallback<ResumeOptions> OnConfirm { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
-    [Parameter] public Guid ParentRunId { get; set; }
+    [EditorRequired, Parameter] public Guid ParentRunId { get; set; }
 
     private bool _useSeedDraft;
     private int  _maxIterations;
