@@ -4,4 +4,5 @@ public sealed record RunSummaryDto(
     string RunId,
     string Status,
     DateTimeOffset CreatedAt,
-    string? CreatedByUser);
+    string? CreatedByUser,
+    int ArtifactCount = 0);
