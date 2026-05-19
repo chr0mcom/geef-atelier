@@ -15,7 +15,8 @@ internal sealed class DashboardRepository(AtelierDbContext db) : IDashboardRepos
     public async Task<WelcomeStrip> GetWelcomeStripAsync(
         string username, bool isAdmin, DashboardScope scope, CancellationToken ct)
     {
-        var today = DateTimeOffset.UtcNow.Date;
+        var utcNow   = DateTimeOffset.UtcNow;
+        var today    = new DateTimeOffset(utcNow.UtcDateTime.Date, TimeSpan.Zero);
         var tomorrow = today.AddDays(1);
         var scopedUser = scope == DashboardScope.My ? username : null;
 
@@ -156,9 +157,10 @@ internal sealed class DashboardRepository(AtelierDbContext db) : IDashboardRepos
 
     public async Task<ActivityHeatmap> GetActivityHeatmapAsync(string? username, CancellationToken ct)
     {
-        var since = DateTime.UtcNow.Date.AddDays(-364);
+        var sinceUtc = new DateTimeOffset(DateTime.UtcNow.Date.AddDays(-364), TimeSpan.Zero);
+        var todayUtc = new DateTimeOffset(DateTime.UtcNow.Date, TimeSpan.Zero);
         var q = db.Runs.AsNoTracking()
-            .Where(r => r.CreatedAt >= since
+            .Where(r => r.CreatedAt >= sinceUtc
                      && (username == null || r.CreatedByUser == username))
             .GroupBy(r => r.CreatedAt.Date)
             .Select(g => new { Date = g.Key, Count = g.Count() });
@@ -168,19 +170,19 @@ internal sealed class DashboardRepository(AtelierDbContext db) : IDashboardRepos
 
         var maxCount = dict.Values.DefaultIfEmpty(0).Max();
         var cells = new List<HeatmapCell>();
-        for (var d = since; d <= DateTime.UtcNow.Date; d = d.AddDays(1))
+        for (var d = sinceUtc; d <= todayUtc; d = d.AddDays(1))
         {
-            var date  = DateOnly.FromDateTime(d);
+            var date  = DateOnly.FromDateTime(d.UtcDateTime);
             var count = dict.GetValueOrDefault(date, 0);
             var level = maxCount == 0 ? 0 : (int)Math.Round((double)count / maxCount * 4);
             cells.Add(new HeatmapCell(date, count, level));
         }
 
         var peak = dict.Count == 0
-            ? new PeakAttribution(DateOnly.FromDateTime(DateTime.UtcNow), 0)
+            ? new PeakAttribution(DateOnly.FromDateTime(DateTime.UtcNow.Date), 0)
             : dict.MaxBy(kv => kv.Value) is { } p
                 ? new PeakAttribution(p.Key, p.Value)
-                : new PeakAttribution(DateOnly.FromDateTime(DateTime.UtcNow), 0);
+                : new PeakAttribution(DateOnly.FromDateTime(DateTime.UtcNow.Date), 0);
 
         return new ActivityHeatmap(cells, peak);
     }
