@@ -57,7 +57,7 @@ public sealed class RunEntity
 
     /// <summary>
     /// Set when this run was created as a resume of an existing run.
-    /// The parent run is never modified; its status stays Aborted or Failed.
+    /// The parent run is never modified; it remains in its terminal status.
     /// </summary>
     public Guid? ParentRunId { get; init; }
 

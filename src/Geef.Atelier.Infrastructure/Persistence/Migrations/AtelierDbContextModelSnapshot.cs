@@ -559,6 +559,7 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
 
                     b.ToTable("Runs");
                 });
+
             modelBuilder.Entity("Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge.KnowledgeDocumentEntity", b =>
                 {
                     b.Property<Guid>("Id")
