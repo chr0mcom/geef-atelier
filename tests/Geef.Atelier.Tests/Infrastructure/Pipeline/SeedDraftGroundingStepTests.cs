@@ -21,8 +21,7 @@ public sealed class SeedDraftGroundingStepTests
         var step   = new SeedDraftGroundingStep("my seed draft text");
         var result = await step.RunAsync("briefing", CancellationToken.None);
 
-        Assert.True(result.Context.TryGet(AtelierContextKeys.SeedDraft, out var seedDraft));
-        Assert.Equal("my seed draft text", seedDraft);
+        Assert.Equal("my seed draft text", result.Context.GetRequired(AtelierContextKeys.SeedDraft));
     }
 
     [Fact]
