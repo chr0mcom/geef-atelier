@@ -1,3 +1,4 @@
+using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
@@ -92,6 +93,7 @@ public sealed class CrewServiceAutoPrexfixTests
             executorRepo  ?? new InMemoryExecutorProfileRepository(),
             advisorRepo   ?? new InMemoryAdvisorProfileRepository(),
             groundingRepo ?? new InMemoryGroundingProviderProfileRepository(),
+            new InMemoryFinalizerProfileRepository(),
             templateRepo  ?? new InMemoryCrewTemplateRepository());
 
     private static ReviewerProfile BuildReviewerProfile(string name) => new(

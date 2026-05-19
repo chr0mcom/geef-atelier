@@ -1,3 +1,4 @@
+using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
@@ -70,6 +71,7 @@ public sealed class CrewServiceAdvisorCrudTests
             executorRepo  ?? new InMemoryExecutorProfileRepository(),
             advisorRepo   ?? new InMemoryAdvisorProfileRepository(),
             groundingRepo ?? new InMemoryGroundingProviderProfileRepository(),
+            new InMemoryFinalizerProfileRepository(),
             templateRepo  ?? new InMemoryCrewTemplateRepository());
 
     private static AdvisorProfile BuildAdvisorProfile(string name) => new(

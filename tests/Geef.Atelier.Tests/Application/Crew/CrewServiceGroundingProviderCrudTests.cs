@@ -1,3 +1,4 @@
+using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
@@ -88,6 +89,7 @@ public sealed class CrewServiceGroundingProviderCrudTests
             new InMemoryExecutorProfileRepository(),
             new InMemoryAdvisorProfileRepository(),
             groundingRepo ?? new InMemoryGroundingProviderProfileRepository(),
+            new InMemoryFinalizerProfileRepository(),
             new InMemoryCrewTemplateRepository());
 
     private static GroundingProviderProfile BuildProfile(string name) => new(
