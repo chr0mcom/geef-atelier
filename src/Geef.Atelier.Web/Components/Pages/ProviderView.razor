@@ -1,0 +1,225 @@
+@page "/crew/providers/view/{name}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Application.Providers
+@using Geef.Atelier.Core.Domain.Providers
+@inject IProviderService ProviderService
+@inject NavigationManager Nav
+
+<PageTitle>@(_provider?.DisplayName ?? "Provider") — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="provider-view">
+    <div class="page-header">
+        <h1>@(_provider?.DisplayName ?? "")</h1>
+        <a href="/crew/providers" class="btn ghost">← Back</a>
+    </div>
+
+    @if (_loading)
+    {
+        <p>Loading…</p>
+    }
+    else if (_provider is null)
+    {
+        <p>Provider not found.</p>
+    }
+    else
+    {
+        @if (_provider.IsSystem)
+        {
+            <div class="info-banner">
+                System provider — read-only. Use <strong>Clone as Custom</strong> to create an editable copy.
+            </div>
+        }
+
+        <dl class="profile-detail" data-testid="profile-detail">
+            <dt>Name</dt>
+            <dd data-testid="view-name">@_provider.Name</dd>
+
+            <dt>Display Name</dt>
+            <dd data-testid="view-display-name">@_provider.DisplayName</dd>
+
+            <dt>Description</dt>
+            <dd data-testid="view-description">@(string.IsNullOrEmpty(_provider.Description) ? "—" : _provider.Description)</dd>
+
+            <dt>Type</dt>
+            <dd data-testid="view-type">@(_provider.Type == ProviderType.Http ? "HTTP" : "CLI")</dd>
+
+            <dt>Status</dt>
+            <dd data-testid="view-status">@(_provider.IsActive ? "Active" : "Inactive")</dd>
+
+            <dt>Source</dt>
+            <dd data-testid="view-source">@(_provider.IsSystem ? "System" : "Custom")</dd>
+        </dl>
+
+        @if (_provider.Type == ProviderType.Http)
+        {
+            var s = HttpProviderSettings.FromSettings(_provider.Settings);
+            <h2>HTTP Settings</h2>
+            <dl class="profile-detail" data-testid="http-settings">
+                <dt>Endpoint</dt>
+                <dd data-testid="view-endpoint">@(string.IsNullOrEmpty(s.Endpoint) ? "—" : s.Endpoint)</dd>
+
+                <dt>API Key Env Var</dt>
+                <dd data-testid="view-api-key-env">@(s.ApiKeyEnv ?? "—")</dd>
+
+                <dt>Endpoint Override Env Var</dt>
+                <dd data-testid="view-endpoint-env-override">@(s.EndpointEnvOverride ?? "—")</dd>
+
+                <dt>Auth Header Name</dt>
+                <dd data-testid="view-auth-header-name">@s.AuthHeaderName</dd>
+
+                <dt>Auth Header Format</dt>
+                <dd data-testid="view-auth-header-format">@s.AuthHeaderFormat</dd>
+
+                <dt>Models Endpoint</dt>
+                <dd data-testid="view-models-endpoint">@(s.ModelsEndpoint ?? "—")</dd>
+
+                @if (s.DefaultHeaders.Count > 0)
+                {
+                    <dt>Default Headers</dt>
+                    <dd data-testid="view-default-headers">
+                        @foreach (var kv in s.DefaultHeaders)
+                        {
+                            <div>@kv.Key: @kv.Value</div>
+                        }
+                    </dd>
+                }
+
+                @if (s.ManualModelList is { Count: > 0 })
+                {
+                    <dt>Manual Models</dt>
+                    <dd data-testid="view-manual-models">
+                        @foreach (var m in s.ManualModelList)
+                        {
+                            <div>@m</div>
+                        }
+                    </dd>
+                }
+
+                <dt>Cost per Input Token (EUR)</dt>
+                <dd data-testid="view-cost-input">@(s.CostPerInputTokenEur ?? "—")</dd>
+
+                <dt>Cost per Output Token (EUR)</dt>
+                <dd data-testid="view-cost-output">@(s.CostPerOutputTokenEur ?? "—")</dd>
+            </dl>
+        }
+        else
+        {
+            var s = CliProviderSettings.FromSettings(_provider.Settings);
+            <h2>CLI Settings</h2>
+            <dl class="profile-detail" data-testid="cli-settings">
+                <dt>CLI Kind</dt>
+                <dd data-testid="view-cli-kind">@s.CliKind</dd>
+
+                <dt>Binary</dt>
+                <dd data-testid="view-binary">@(string.IsNullOrEmpty(s.Binary) ? "—" : s.Binary)</dd>
+
+                <dt>Auth Volume</dt>
+                <dd data-testid="view-auth-volume">@(s.AuthVolume ?? "—")</dd>
+
+                <dt>Auth Command</dt>
+                <dd data-testid="view-auth-command">@(s.AuthCommand ?? "—")</dd>
+
+                <dt>Auth Env Var Alternative</dt>
+                <dd data-testid="view-auth-env-var-alternative">@(s.AuthEnvVarAlternative ?? "—")</dd>
+
+                <dt>Max Concurrent</dt>
+                <dd data-testid="view-max-concurrent">@s.MaxConcurrent</dd>
+
+                <dt>Models</dt>
+                <dd data-testid="view-models">
+                    @if (s.Models.Count == 0)
+                    {
+                        <span>—</span>
+                    }
+                    else
+                    {
+                        @foreach (var m in s.Models)
+                        {
+                            <div>@m</div>
+                        }
+                    }
+                </dd>
+
+                <dt>Stdin Mode</dt>
+                <dd data-testid="view-stdin-mode">@(s.StdinMode == true ? "Yes" : "No")</dd>
+
+                <dt>Output Format</dt>
+                <dd data-testid="view-output-format">@(s.OutputFormat ?? "—")</dd>
+
+                <dt>Output JSON Path</dt>
+                <dd data-testid="view-output-json-path">@(s.OutputJsonPath ?? "—")</dd>
+            </dl>
+        }
+
+        <div class="editor-actions">
+            @if (_provider.IsSystem)
+            {
+                <button type="button" class="btn primary" @onclick="CloneAsCustom" disabled="@_cloning"
+                        data-testid="btn-clone">
+                    @(_cloning ? "Creating…" : "Clone as Custom")
+                </button>
+            }
+            else
+            {
+                @if (_provider.Type == ProviderType.Http)
+                {
+                    <a href="/crew/providers/edit/@_provider.Name" class="btn primary">Edit</a>
+                }
+                else
+                {
+                    <a href="/crew/providers/edit/cli/@_provider.Name" class="btn primary">Edit</a>
+                }
+            }
+        </div>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="error-banner" style="margin-top:1rem;" data-testid="view-error">@_error</div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public string Name { get; set; } = string.Empty;
+
+    private Provider? _provider;
+    private bool _loading = true;
+    private bool _cloning;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _provider = await ProviderService.GetByNameAsync(Name);
+        _loading = false;
+    }
+
+    private async Task CloneAsCustom()
+    {
+        if (_provider is null) return;
+        _cloning = true;
+        _error = null;
+        try
+        {
+            var copy = _provider with
+            {
+                Name = "custom-" + _provider.Name,
+                DisplayName = _provider.DisplayName + " (Copy)",
+                IsSystem = false,
+                IsActive = true,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow,
+            };
+            var created = await ProviderService.CreateCustomAsync(copy);
+            var editRoute = created.Type == ProviderType.Cli
+                ? $"/crew/providers/edit/cli/{Uri.EscapeDataString(created.Name)}"
+                : $"/crew/providers/edit/{Uri.EscapeDataString(created.Name)}";
+            Nav.NavigateTo(editRoute);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+            _cloning = false;
+        }
+    }
+}

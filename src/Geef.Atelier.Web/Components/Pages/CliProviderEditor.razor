@@ -1,0 +1,344 @@
+@page "/crew/providers/create/cli"
+@page "/crew/providers/edit/cli/{name}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using System.Text.Json
+@using Geef.Atelier.Application.Providers
+@using Geef.Atelier.Core.Domain.Providers
+@using Geef.Atelier.Web.Resources
+@inject IProviderService ProviderService
+@inject NavigationManager Nav
+
+<PageTitle>@(IsNew ? "New CLI Provider" : "Edit CLI Provider") — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="cli-provider-editor">
+    <div class="page-header">
+        <h1>@(IsNew ? "New CLI Provider" : $"Edit: {_displayName}")</h1>
+        <a href="/crew/providers" class="btn ghost">← Back</a>
+    </div>
+
+    @if (_loading)
+    {
+        <p>Loading…</p>
+    }
+    else
+    {
+        <EditForm Model="_form" OnValidSubmit="SaveAsync" class="crew-form">
+            <DataAnnotationsValidator />
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="error-banner" data-testid="editor-error">@_error</div>
+            }
+
+            <div class="form-row">
+                <label>Name (Slug)</label>
+                <InputText @bind-Value="_form.Name" class="form-input" placeholder="my-cli-provider" data-testid="input-name" />
+                <ValidationMessage For="() => _form.Name" />
+                <FieldHelp Text="@ProviderFieldHelps.Name" DataTestId="help-name" />
+            </div>
+
+            <div class="form-row">
+                <label>Display Name</label>
+                <InputText @bind-Value="_form.DisplayName" class="form-input" placeholder="My CLI Provider" data-testid="input-display-name" />
+                <ValidationMessage For="() => _form.DisplayName" />
+                <FieldHelp Text="@ProviderFieldHelps.DisplayName" DataTestId="help-display-name" />
+            </div>
+
+            <div class="form-row">
+                <label>Description</label>
+                <InputTextArea @bind-Value="_form.Description" class="form-input" rows="2" data-testid="input-description" />
+                <FieldHelp Text="@ProviderFieldHelps.Description" DataTestId="help-description" />
+            </div>
+
+            <div class="form-row">
+                <label>CLI Kind</label>
+                <InputSelect @bind-Value="_form.CliKind" class="form-input" data-testid="input-cli-kind">
+                    <option value="claude">Claude (Anthropic Claude Code CLI)</option>
+                    <option value="codex">Codex (OpenAI Codex CLI)</option>
+                    <option value="gemini">Gemini (Google Gemini CLI)</option>
+                    <option value="generic">Generic (Custom CLI tool)</option>
+                </InputSelect>
+                <FieldHelp Text="@ProviderFieldHelps.CliKind" DataTestId="help-cli-kind" />
+            </div>
+
+            @if (_form.CliKind != "generic")
+            {
+                <div class="info-banner" data-testid="builtin-info">
+                    This is a built-in CLI kind. Binary and authentication settings are preconfigured. Only <strong>Max Concurrent</strong> and <strong>Models</strong> can be adjusted.
+                </div>
+            }
+
+            <div class="form-row">
+                <label>Max Concurrent</label>
+                <InputNumber @bind-Value="_form.MaxConcurrent" class="form-input" min="1" max="10" data-testid="input-max-concurrent" />
+                <FieldHelp Text="@ProviderFieldHelps.CliMaxConcurrent" DataTestId="help-max-concurrent" />
+            </div>
+
+            <div class="form-row">
+                <label>Models (one per line)</label>
+                <InputTextArea @bind-Value="_form.Models" class="form-input" rows="4"
+                    placeholder="google/gemini-2.5-pro&#10;google/gemini-2.5-flash" data-testid="input-models" />
+                <FieldHelp Text="@ProviderFieldHelps.CliModels" DataTestId="help-models" />
+            </div>
+
+            @if (_form.CliKind == "generic")
+            {
+                <div class="form-section-header">Binary &amp; Invocation</div>
+
+                <div class="form-row">
+                    <label>Binary</label>
+                    <InputText @bind-Value="_form.Binary" class="form-input" placeholder="mycli" data-testid="input-binary" />
+                    <ValidationMessage For="() => _form.Binary" />
+                    <FieldHelp Text="@ProviderFieldHelps.CliBinary" DataTestId="help-binary" />
+                </div>
+
+                <div class="form-row">
+                    <label class="form-checkbox-label">
+                        <InputCheckbox @bind-Value="_form.StdinMode" data-testid="input-stdin-mode" />
+                        Stdin mode (pass prompt via stdin instead of argument)
+                    </label>
+                    <FieldHelp Text="@ProviderFieldHelps.CliStdinMode" DataTestId="help-stdin-mode" />
+                </div>
+
+                @if (!_form.StdinMode)
+                {
+                    <div class="form-row">
+                        <label>Prompt Args Template (one arg per line)</label>
+                        <InputTextArea @bind-Value="_form.PromptArgsTemplate" class="form-input" rows="4"
+                            placeholder="-p&#10;{prompt}&#10;--model&#10;{model}" data-testid="input-prompt-args" />
+                        <FieldHelp Text="@ProviderFieldHelps.CliPromptArgsTemplate" DataTestId="help-prompt-args" />
+                    </div>
+                }
+
+                <div class="form-section-header">Output</div>
+
+                <div class="form-row">
+                    <label>Output Format</label>
+                    <InputSelect @bind-Value="_form.OutputFormat" class="form-input" data-testid="input-output-format">
+                        <option value="text">text (plain text)</option>
+                        <option value="openai-json">openai-json (OpenAI-compatible JSON)</option>
+                        <option value="jsonl">jsonl (streaming JSON, last event)</option>
+                    </InputSelect>
+                    <FieldHelp Text="@ProviderFieldHelps.CliOutputFormat" DataTestId="help-output-format" />
+                </div>
+
+                @if (_form.OutputFormat != "text")
+                {
+                    <div class="form-row">
+                        <label>Output JSON Path (optional)</label>
+                        <InputText @bind-Value="_form.OutputJsonPath" class="form-input" placeholder="response" data-testid="input-output-json-path" />
+                        <FieldHelp Text="@ProviderFieldHelps.CliOutputJsonPath" DataTestId="help-output-json-path" />
+                    </div>
+                }
+            }
+
+            <div class="form-row">
+                <label class="form-checkbox-label">
+                    <InputCheckbox @bind-Value="_form.IsActive" data-testid="input-is-active" />
+                    Active
+                </label>
+                <FieldHelp Text="@ProviderFieldHelps.IsActive" DataTestId="help-is-active" />
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn primary" disabled="@_saving" data-testid="btn-save">
+                    @(_saving ? "Saving…" : IsNew ? "Create" : "Save")
+                </button>
+                <a href="/crew/providers" class="btn ghost">Cancel</a>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Name { get; set; }
+
+    private bool IsNew => string.IsNullOrEmpty(Name);
+    private bool _loading = true;
+    private bool _saving;
+    private string _displayName = string.Empty;
+    private string? _error;
+    private CliFormModel _form = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!IsNew && Name is not null)
+        {
+            var existing = await ProviderService.GetByNameAsync(Name);
+            if (existing is null || existing.IsSystem)
+            {
+                Nav.NavigateTo("/crew/providers");
+                return;
+            }
+            _displayName = existing.DisplayName;
+            _form = CliFormModel.From(existing);
+        }
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            var provider = _form.ToProvider();
+            if (IsNew)
+                await ProviderService.CreateCustomAsync(provider);
+            else
+                await ProviderService.UpdateCustomAsync(Name!, provider);
+
+            Nav.NavigateTo("/crew/providers");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private sealed class CliFormModel
+    {
+        [Required(ErrorMessage = "Name is required.")]
+        [RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Only lowercase letters, numbers, and hyphens.")]
+        [MaxLength(64)]
+        public string Name { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Display name is required.")]
+        [MaxLength(200)]
+        public string DisplayName { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+        public string CliKind { get; set; } = "generic";
+        public int MaxConcurrent { get; set; } = 2;
+        public string Models { get; set; } = string.Empty;
+
+        // Generic-only fields
+        [RequiredIf(nameof(CliKind), "generic", ErrorMessage = "Binary is required for generic CLI providers.")]
+        public string Binary { get; set; } = string.Empty;
+
+        public bool StdinMode { get; set; } = false;
+        public string PromptArgsTemplate { get; set; } = string.Empty;
+        public string OutputFormat { get; set; } = "text";
+        public string OutputJsonPath { get; set; } = string.Empty;
+        public bool IsActive { get; set; } = true;
+
+        public static CliFormModel From(Provider p)
+        {
+            var s = CliProviderSettings.FromSettings(p.Settings);
+            var promptArgs = s.PromptArgsTemplate is { Count: > 0 }
+                ? string.Join("\n", s.PromptArgsTemplate)
+                : string.Empty;
+            return new CliFormModel
+            {
+                Name = p.Name,
+                DisplayName = p.DisplayName,
+                Description = p.Description,
+                CliKind = s.CliKind,
+                MaxConcurrent = s.MaxConcurrent,
+                Models = s.Models.Count > 0 ? string.Join("\n", s.Models) : string.Empty,
+                Binary = s.Binary,
+                StdinMode = s.StdinMode ?? false,
+                PromptArgsTemplate = promptArgs,
+                OutputFormat = s.OutputFormat ?? "text",
+                OutputJsonPath = s.OutputJsonPath ?? string.Empty,
+                IsActive = p.IsActive,
+            };
+        }
+
+        public Provider ToProvider()
+        {
+            var models = Models
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(m => m.Length > 0)
+                .ToList();
+
+            var modelsJson = JsonSerializer.Serialize(models);
+            var settings = new Dictionary<string, JsonElement>
+            {
+                ["cli_kind"] = JsonDocument.Parse(JsonSerializer.Serialize(CliKind)).RootElement.Clone(),
+                ["max_concurrent"] = JsonDocument.Parse(MaxConcurrent.ToString()).RootElement.Clone(),
+                ["models"] = JsonDocument.Parse(modelsJson).RootElement.Clone(),
+            };
+
+            void AddStr(string key, string? value)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                    settings[key] = JsonDocument.Parse(JsonSerializer.Serialize(value)).RootElement.Clone();
+            }
+
+            void AddBool(string key, bool value) =>
+                settings[key] = JsonDocument.Parse(value ? "true" : "false").RootElement.Clone();
+
+            if (CliKind == "generic")
+            {
+                AddStr("binary", Binary);
+                AddBool("stdin_mode", StdinMode);
+                AddStr("output_format", OutputFormat);
+                AddStr("output_json_path", OutputJsonPath);
+
+                if (!StdinMode && !string.IsNullOrWhiteSpace(PromptArgsTemplate))
+                {
+                    var args = PromptArgsTemplate
+                        .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                        .ToList();
+                    settings["prompt_args_template"] = JsonDocument.Parse(JsonSerializer.Serialize(args)).RootElement.Clone();
+                }
+            }
+            else
+            {
+                // Built-in CLIs: set the binary name matching the kind
+                AddStr("binary", CliKind);
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            return new Provider(
+                Name: Name,
+                DisplayName: DisplayName,
+                Description: Description,
+                Type: ProviderType.Cli,
+                Settings: settings,
+                IsSystem: false,
+                IsActive: IsActive,
+                CreatedAt: now,
+                UpdatedAt: now
+            );
+        }
+    }
+
+    /// <summary>Validates that a field is required only when another field has a specific value.</summary>
+    private sealed class RequiredIfAttribute : ValidationAttribute
+    {
+        private readonly string _dependentProperty;
+        private readonly string _dependentValue;
+        private readonly string? _customErrorMessage;
+
+        public RequiredIfAttribute(string dependentProperty, string dependentValue, string? errorMessage = null)
+        {
+            _dependentProperty = dependentProperty;
+            _dependentValue = dependentValue;
+            _customErrorMessage = errorMessage;
+        }
+
+        protected override ValidationResult? IsValid(object? value, ValidationContext context)
+        {
+            var instance = context.ObjectInstance;
+            var prop = instance.GetType().GetProperty(_dependentProperty);
+            var actual = prop?.GetValue(instance)?.ToString();
+            if (!string.Equals(actual, _dependentValue, StringComparison.Ordinal))
+                return ValidationResult.Success;
+
+            if (value is string s && !string.IsNullOrWhiteSpace(s))
+                return ValidationResult.Success;
+            if (value is not null && value is not string)
+                return ValidationResult.Success;
+
+            return new ValidationResult(_customErrorMessage ?? $"{context.DisplayName} is required.", [context.MemberName!]);
+        }
+    }
+}

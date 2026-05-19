@@ -1,0 +1,27 @@
+@page "/crew/providers/create"
+@attribute [Authorize]
+@inject NavigationManager Nav
+
+<PageTitle>Create Provider — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="provider-type-selection">
+    <div class="page-header">
+        <h1>Create Provider</h1>
+        <a href="/crew/providers" class="btn ghost">← Back</a>
+    </div>
+
+    <p class="text-muted">Choose the provider type:</p>
+
+    <div class="provider-type-cards">
+        <div class="provider-type-card" data-testid="type-http" @onclick='() => Nav.NavigateTo("/crew/providers/create/http")'>
+            <h3>HTTP Provider</h3>
+            <p>OpenAI-compatible HTTP endpoint. Provide a base URL and API key. Suitable for OpenAI, Groq, Together AI, local OpenAI-compatible servers, and any other HTTP-based LLM service.</p>
+            <a href="/crew/providers/create/http" class="btn primary">Select HTTP →</a>
+        </div>
+        <div class="provider-type-card" data-testid="type-cli" @onclick='() => Nav.NavigateTo("/crew/providers/create/cli")'>
+            <h3>CLI Provider</h3>
+            <p>Subprocess wrapper for local CLI tools such as Claude Code, Codex, or Gemini CLI. Uses your subscription instead of paying per API token. Also supports custom CLI tools.</p>
+            <a href="/crew/providers/create/cli" class="btn primary">Select CLI →</a>
+        </div>
+    </div>
+</div>

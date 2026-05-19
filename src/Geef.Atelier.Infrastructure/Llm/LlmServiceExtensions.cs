@@ -18,12 +18,13 @@ public static class LlmServiceExtensions
         IConfiguration configuration)
     {
         services.Configure<LlmOptions>(configuration.GetSection("Llm"));
+        services.Configure<CliProxyOptions>(configuration.GetSection("CliProxy"));
         services.AddSingleton<ILlmClientResolver, LlmClientResolver>();
         services.AddSingleton<IProviderCatalog, ProviderCatalog>();
         services.AddMemoryCache();
         services.AddSingleton<IModelCatalog, ModelCatalog>();
 
-        return services.AddHttpClient("llm", client =>
+        return services.AddHttpClient(HttpClientNames.Llm, client =>
         {
             client.DefaultRequestHeaders.Add("HTTP-Referer", "https://github.com/chr0mcom/geef-atelier");
             client.DefaultRequestHeaders.Add("X-Title", "Geef.Atelier");

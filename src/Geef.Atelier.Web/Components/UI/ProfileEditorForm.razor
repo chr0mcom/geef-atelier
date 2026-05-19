@@ -1,7 +1,9 @@
 @using System.ComponentModel.DataAnnotations
 @using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Application.Providers
 @using Geef.Atelier.Core.Domain.Crew.Advisors
-@inject IProviderCatalog ProviderCatalog
+@using Geef.Atelier.Core.Domain.Providers
+@inject IProviderService ProviderService
 
 <div class="profile-editor-form" data-testid="profile-editor">
     @if (!string.IsNullOrEmpty(Error))
@@ -45,10 +47,18 @@
         <div class="field">
             <label>Provider</label>
             <InputSelect @bind-Value="_form.Provider" disabled="@IsSystem">
-                @foreach (var p in _providers)
-                {
-                    <option value="@p.Name">@p.DisplayName</option>
-                }
+                <optgroup label="HTTP Providers">
+                    @foreach (var p in _providers.Where(p => p.Type == ProviderType.Http && p.IsActive))
+                    {
+                        <option value="@p.Name">@p.DisplayName</option>
+                    }
+                </optgroup>
+                <optgroup label="CLI Providers">
+                    @foreach (var p in _providers.Where(p => p.Type == ProviderType.Cli && p.IsActive))
+                    {
+                        <option value="@p.Name">@p.DisplayName</option>
+                    }
+                </optgroup>
             </InputSelect>
             <small class="field-hint">OpenRouter is billed per token. Claude-CLI and Codex-CLI use a local subscription.</small>
             <ValidationMessage For="() => _form.Provider" />
@@ -161,14 +171,14 @@
     [Parameter] public EventCallback OnDuplicate { get; set; }
 
     private bool IsNew => ProfileName == null;
-    private IReadOnlyList<ProviderInfo> _providers = [];
+    private IReadOnlyList<Provider> _providers = [];
     private ProfileFormModel _form = new();
     private ModelSelector? _modelSelector;
     private bool _showCustomModelWarning = false;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        _providers = ProviderCatalog.ListProviders();
+        _providers = await ProviderService.ListAsync(includeInactive: false);
         // For new profiles, fall back to the first available provider so ModelSelector loads immediately.
         var effectiveProvider = !string.IsNullOrEmpty(Provider) ? Provider
             : _providers.Count > 0 ? _providers[0].Name : "";

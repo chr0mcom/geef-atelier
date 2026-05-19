@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import shutil
 from contextlib import asynccontextmanager
 
 import claude_adapter
 import codex_adapter
+from adapters import get_adapter
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from openai_format import (
@@ -16,10 +18,19 @@ from openai_format import (
     make_text_response,
     make_tool_response,
 )
+from provider_sync import ProviderConfigSync
 from tool_use_parser import build_tool_system_prompt, extract_json
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Provider sync setup
+# ---------------------------------------------------------------------------
+
+BACKEND_URL = os.getenv("ATELIER_BACKEND_URL", "http://web:8080")
+INTERNAL_TOKEN = os.getenv("ATELIER_INTERNAL_API_TOKEN", "")
+provider_sync = ProviderConfigSync(BACKEND_URL, INTERNAL_TOKEN)
 
 
 @asynccontextmanager
@@ -27,6 +38,9 @@ async def lifespan(app: FastAPI):  # noqa: ANN001
     # Re-initialise semaphores after the event loop is running.
     claude_adapter._semaphore = asyncio.Semaphore(claude_adapter.MAX_CONCURRENT)
     codex_adapter._semaphore = asyncio.Semaphore(codex_adapter.MAX_CONCURRENT)
+    # Sync provider configs from backend (best-effort; failure is non-fatal).
+    await provider_sync.sync_now()
+    asyncio.create_task(provider_sync.background_sync_loop(interval=60))
     yield
 
 
@@ -132,7 +146,62 @@ async def _call_codex(req: ChatCompletionRequest) -> ChatCompletionResponse:
 
 
 # ---------------------------------------------------------------------------
-# Endpoints
+# Generic CLI provider endpoint (new)
+# ---------------------------------------------------------------------------
+
+@app.post("/v1/cli/{provider_name}/chat/completions")
+async def cli_chat_completions(provider_name: str, req: ChatCompletionRequest) -> JSONResponse:
+    """Generic endpoint: routes to the CLI adapter configured for provider_name."""
+    if req.stream:
+        raise HTTPException(status_code=400, detail="Streaming is not supported by the CLI proxy.")
+
+    config = provider_sync.get_provider_config(provider_name)
+    if config is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"CLI provider '{provider_name}' not found or not active",
+        )
+
+    settings = config.get("settings", {})
+    cli_kind = settings.get("cli_kind", "generic")
+
+    try:
+        adapter = get_adapter(cli_kind)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        result = await adapter.execute(config, req.model_dump())
+        return JSONResponse(result)
+    except Exception as exc:
+        log.error("CLI adapter error for %s: %s", provider_name, exc)
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.get("/v1/cli/{provider_name}/models")
+async def cli_list_models(provider_name: str) -> JSONResponse:
+    """List models available for a configured CLI provider."""
+    config = provider_sync.get_provider_config(provider_name)
+    if config is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"CLI provider '{provider_name}' not found",
+        )
+
+    settings = config.get("settings", {})
+    cli_kind = settings.get("cli_kind", "generic")
+
+    try:
+        adapter = get_adapter(cli_kind)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    models = await adapter.list_models(config)
+    return JSONResponse({"object": "list", "data": [{"id": m, "object": "model"} for m in models]})
+
+
+# ---------------------------------------------------------------------------
+# Legacy endpoints — kept for backwards compatibility
 # ---------------------------------------------------------------------------
 
 @app.post("/v1/claude/chat/completions", response_model=ChatCompletionResponse)
@@ -195,8 +264,8 @@ async def codex_models() -> JSONResponse:
 async def list_models() -> JSONResponse:
     """Legacy combined model list. Use /v1/claude/models or /v1/codex/models instead."""
     claude_data = [{"id": m, "object": "model", "owned_by": "anthropic"} for m in claude_adapter.list_models()]
-    codex_models = await codex_adapter.list_models_async()
-    codex_data   = [{"id": m, "object": "model", "owned_by": "openai"} for m in codex_models]
+    codex_model_list = await codex_adapter.list_models_async()
+    codex_data = [{"id": m, "object": "model", "owned_by": "openai"} for m in codex_model_list]
     return JSONResponse({"object": "list", "data": claude_data + codex_data})
 
 
@@ -204,10 +273,13 @@ async def list_models() -> JSONResponse:
 async def health() -> JSONResponse:
     claude_ok = shutil.which("claude") is not None
     codex_ok = shutil.which("codex") is not None
+    gemini_ok = shutil.which("gemini") is not None
     return JSONResponse({
         "status": "ok",
         "cli_status": {
             "claude": "ready" if claude_ok else "not_found",
             "codex": "ready" if codex_ok else "not_found",
+            "gemini": "ready" if gemini_ok else "not_found",
         },
+        "synced_providers": provider_sync.all_provider_names(),
     })

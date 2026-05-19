@@ -1,0 +1,150 @@
+@page "/crew/providers"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Application.Providers
+@using Geef.Atelier.Core.Domain.Providers
+@inject IProviderService ProviderService
+
+<PageTitle>Providers — Atelier</PageTitle>
+
+<div class="crew-profiles-index">
+    <div class="page-header">
+        <h1>Providers</h1>
+        <a href="/crew/providers/create" class="btn primary">+ New Provider</a>
+    </div>
+
+    @if (_loading)
+    {
+        <p>Loading…</p>
+    }
+    else if (_providers.Count == 0)
+    {
+        <p class="text-muted">No providers configured yet.</p>
+    }
+    else
+    {
+        <table class="crew-table" data-testid="providers-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Source</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in _providers)
+                {
+                    <tr data-testid="provider-row-@p.Name">
+                        <td>
+                            @if (p.IsSystem)
+                            {
+                                <a href="/crew/providers/view/@p.Name">@p.DisplayName</a>
+                            }
+                            else
+                            {
+                                <a href="@GetEditRoute(p)">@p.DisplayName</a>
+                            }
+                        </td>
+                        <td>@(p.Type == ProviderType.Http ? "HTTP" : "CLI")</td>
+                        <td>
+                            @if (p.IsActive)
+                            {
+                                <span class="crew-badge">Active</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">Inactive</span>
+                            }
+                        </td>
+                        <td>
+                            @if (p.IsSystem)
+                            {
+                                <span class="crew-badge">System</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">Custom</span>
+                            }
+                        </td>
+                        <td class="crew-table-actions">
+                            @if (p.IsSystem)
+                            {
+                                <a href="/crew/providers/view/@p.Name" class="btn small">View</a>
+                            }
+                            else
+                            {
+                                <a href="@GetEditRoute(p)" class="btn small">Edit</a>
+                                <button class="btn small @(p.IsActive ? "danger" : "primary")"
+                                        @onclick="() => ToggleActiveAsync(p)"
+                                        data-testid="toggle-@p.Name">
+                                    @(p.IsActive ? "Disable" : "Enable")
+                                </button>
+                                <button class="btn small danger" @onclick="() => _toDelete = p"
+                                        data-testid="delete-@p.Name">Delete</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="error-banner" data-testid="error-msg">@_error</div>
+    }
+</div>
+
+<DeleteConfirmationModal
+    Show="_toDelete != null"
+    ItemName="@(_toDelete?.Name ?? "")"
+    ItemKind="Provider"
+    OnConfirm="ExecuteDeleteAsync"
+    OnCancel="() => _toDelete = null" />
+
+@code {
+    private IReadOnlyList<Provider> _providers = [];
+    private Provider? _toDelete;
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _providers = await ProviderService.ListAsync(includeInactive: true);
+        _loading = false;
+    }
+
+    private async Task ToggleActiveAsync(Provider p)
+    {
+        _error = null;
+        try
+        {
+            await ProviderService.SetActiveAsync(p.Name, !p.IsActive);
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private static string GetEditRoute(Provider p) =>
+        p.Type == ProviderType.Cli
+            ? $"/crew/providers/edit/cli/{p.Name}"
+            : $"/crew/providers/edit/{p.Name}";
+
+    private async Task ExecuteDeleteAsync()
+    {
+        if (_toDelete is null) return;
+        var name = _toDelete.Name;
+        _toDelete = null;
+        _error = null;
+        try
+        {
+            await ProviderService.DeleteCustomAsync(name);
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+}

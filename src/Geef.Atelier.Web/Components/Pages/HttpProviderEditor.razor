@@ -1,0 +1,352 @@
+@page "/crew/providers/create/http"
+@page "/crew/providers/edit/{name}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using System.Text.Json
+@using Geef.Atelier.Application.Providers
+@using Geef.Atelier.Core.Domain.Providers
+@using Geef.Atelier.Web.Resources
+@inject IProviderService ProviderService
+@inject NavigationManager Nav
+
+<PageTitle>@(IsNew ? "New HTTP Provider" : "Edit Provider") — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="http-provider-editor">
+    <div class="page-header">
+        <h1>@(IsNew ? "New HTTP Provider" : $"Edit: {_displayName}")</h1>
+        <a href="/crew/providers" class="btn ghost">← Back</a>
+    </div>
+
+    @if (_loading)
+    {
+        <p>Loading…</p>
+    }
+    else
+    {
+        <EditForm Model="_form" OnValidSubmit="SaveAsync" class="crew-form">
+            <DataAnnotationsValidator />
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="error-banner" data-testid="editor-error">@_error</div>
+            }
+
+            <div class="form-row">
+                <label>Name (Slug)</label>
+                <InputText @bind-Value="_form.Name" class="form-input" placeholder="my-http-provider" data-testid="input-name" />
+                <ValidationMessage For="() => _form.Name" />
+                <FieldHelp Text="@ProviderFieldHelps.Name" DataTestId="help-name" />
+            </div>
+
+            <div class="form-row">
+                <label>Display Name</label>
+                <InputText @bind-Value="_form.DisplayName" class="form-input" placeholder="My HTTP Provider" data-testid="input-display-name" />
+                <ValidationMessage For="() => _form.DisplayName" />
+                <FieldHelp Text="@ProviderFieldHelps.DisplayName" DataTestId="help-display-name" />
+            </div>
+
+            <div class="form-row">
+                <label>Description</label>
+                <InputTextArea @bind-Value="_form.Description" class="form-input" rows="2" data-testid="input-description" />
+                <FieldHelp Text="@ProviderFieldHelps.Description" DataTestId="help-description" />
+            </div>
+
+            <div class="form-section-header">Endpoint</div>
+
+            <div class="form-row">
+                <label>Base URL</label>
+                <InputText @bind-Value="_form.Endpoint" class="form-input" placeholder="https://api.example.com/v1" data-testid="input-endpoint" />
+                <ValidationMessage For="() => _form.Endpoint" />
+                <FieldHelp Text="@ProviderFieldHelps.HttpEndpoint" DataTestId="help-endpoint" />
+            </div>
+
+            <div class="form-row">
+                <label>API Key Environment Variable</label>
+                <InputText @bind-Value="_form.ApiKeyEnv" class="form-input" placeholder="MY_PROVIDER_API_KEY" data-testid="input-api-key-env" />
+                <FieldHelp Text="@ProviderFieldHelps.HttpApiKeyEnv" DataTestId="help-api-key-env" />
+            </div>
+
+            <div class="form-row">
+                <label>Endpoint Override Env Var (optional)</label>
+                <InputText @bind-Value="_form.EndpointEnvOverride" class="form-input" placeholder="MY_PROVIDER_ENDPOINT" data-testid="input-endpoint-env-override" />
+                <FieldHelp Text="@ProviderFieldHelps.HttpEndpointEnvOverride" DataTestId="help-endpoint-env-override" />
+            </div>
+
+            <div class="form-section-header">Authentication</div>
+
+            <div class="form-row">
+                <label>Auth Header Name</label>
+                <InputText @bind-Value="_form.AuthHeaderName" class="form-input" placeholder="Authorization" data-testid="input-auth-header-name" />
+                <FieldHelp Text="@ProviderFieldHelps.HttpAuthHeaderName" DataTestId="help-auth-header-name" />
+            </div>
+
+            <div class="form-row">
+                <label>Auth Header Format</label>
+                <InputText @bind-Value="_form.AuthHeaderFormat" class="form-input" placeholder="Bearer {key}" data-testid="input-auth-header-format" />
+                <FieldHelp Text="@ProviderFieldHelps.HttpAuthHeaderFormat" DataTestId="help-auth-header-format" />
+            </div>
+
+            <div class="form-section-header">Models</div>
+
+            <div class="form-row">
+                <label>Models Endpoint (optional)</label>
+                <InputText @bind-Value="_form.ModelsEndpoint" class="form-input" placeholder="/models" data-testid="input-models-endpoint" />
+                <FieldHelp Text="@ProviderFieldHelps.HttpModelsEndpoint" DataTestId="help-models-endpoint" />
+            </div>
+
+            <div class="form-row">
+                <label>Manual Model List (optional)</label>
+                <InputTextArea @bind-Value="_form.ManualModelList" class="form-input" rows="4"
+                    placeholder="gpt-4o&#10;gpt-4o-mini&#10;o1" data-testid="input-manual-models" />
+                <FieldHelp Text="@ProviderFieldHelps.HttpManualModelList" DataTestId="help-manual-models" />
+            </div>
+
+            <div class="form-section-header">Advanced</div>
+
+            <div class="form-row">
+                <label>Default Headers (optional)</label>
+                <InputTextArea @bind-Value="_form.DefaultHeaders" class="form-input" rows="3"
+                    placeholder="HTTP-Referer: https://example.com&#10;X-Title: My App" data-testid="input-default-headers" />
+                <FieldHelp Text="@ProviderFieldHelps.HttpDefaultHeaders" DataTestId="help-default-headers" />
+            </div>
+
+            <div class="form-row">
+                <label>Cost per Input Token (EUR, optional)</label>
+                <InputText @bind-Value="_form.CostPerInputToken" class="form-input" placeholder="0.000003" data-testid="input-cost-input" />
+                <FieldHelp Text="@ProviderFieldHelps.HttpCostPerInputToken" DataTestId="help-cost-input" />
+            </div>
+
+            <div class="form-row">
+                <label>Cost per Output Token (EUR, optional)</label>
+                <InputText @bind-Value="_form.CostPerOutputToken" class="form-input" placeholder="0.000015" data-testid="input-cost-output" />
+                <FieldHelp Text="@ProviderFieldHelps.HttpCostPerOutputToken" DataTestId="help-cost-output" />
+            </div>
+
+            <div class="form-row">
+                <label class="form-checkbox-label">
+                    <InputCheckbox @bind-Value="_form.IsActive" data-testid="input-is-active" />
+                    Active
+                </label>
+                <FieldHelp Text="@ProviderFieldHelps.IsActive" DataTestId="help-is-active" />
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn primary" disabled="@_saving" data-testid="btn-save">
+                    @(_saving ? "Saving…" : IsNew ? "Create" : "Save")
+                </button>
+                <a href="/crew/providers" class="btn ghost">Cancel</a>
+            </div>
+        </EditForm>
+
+        @if (!IsNew)
+        {
+            <div class="form-section-header" style="margin-top: 2rem;">Connection Test</div>
+            <div class="form-row">
+                <button type="button" class="btn primary" @onclick="TestConnectionAsync" disabled="@_testing" data-testid="btn-test-connection">
+                    @(_testing ? "Testing…" : "Test Connection")
+                </button>
+                @if (_testResult is not null)
+                {
+                    @if (_testResult.Success)
+                    {
+                        <div class="info-banner" data-testid="test-result-success">
+                            Connection successful — @_testResult.LatencyMs ms
+                            @if (!string.IsNullOrEmpty(_testResult.ResponseSample))
+                            {
+                                <pre class="system-prompt-view">@_testResult.ResponseSample</pre>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="error-banner" data-testid="test-result-error">
+                            Connection failed: @_testResult.ErrorMessage
+                        </div>
+                    }
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public string? Name { get; set; }
+
+    private bool IsNew => string.IsNullOrEmpty(Name);
+    private bool _loading = true;
+    private bool _saving;
+    private bool _testing;
+    private string _displayName = string.Empty;
+    private string? _error;
+    private ConnectionTestResult? _testResult;
+    private HttpFormModel _form = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!IsNew && Name is not null)
+        {
+            var existing = await ProviderService.GetByNameAsync(Name);
+            if (existing is null || existing.IsSystem)
+            {
+                Nav.NavigateTo("/crew/providers");
+                return;
+            }
+            _displayName = existing.DisplayName;
+            _form = HttpFormModel.From(existing);
+        }
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            var provider = _form.ToProvider();
+            if (IsNew)
+                await ProviderService.CreateCustomAsync(provider);
+            else
+                await ProviderService.UpdateCustomAsync(Name!, provider);
+
+            Nav.NavigateTo("/crew/providers");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task TestConnectionAsync()
+    {
+        if (Name is null) return;
+        _testing = true;
+        _testResult = null;
+        try
+        {
+            _testResult = await ProviderService.TestConnectionAsync(Name);
+        }
+        catch (Exception ex)
+        {
+            _testResult = new ConnectionTestResult(false, 0, ex.Message, null);
+        }
+        finally
+        {
+            _testing = false;
+        }
+    }
+
+    private sealed class HttpFormModel
+    {
+        [Required(ErrorMessage = "Name is required.")]
+        [RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Only lowercase letters, numbers, and hyphens.")]
+        [MaxLength(64)]
+        public string Name { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Display name is required.")]
+        [MaxLength(200)]
+        public string DisplayName { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Endpoint is required.")]
+        public string Endpoint { get; set; } = string.Empty;
+
+        public string ApiKeyEnv { get; set; } = string.Empty;
+        public string EndpointEnvOverride { get; set; } = string.Empty;
+        public string AuthHeaderName { get; set; } = "Authorization";
+        public string AuthHeaderFormat { get; set; } = "Bearer {key}";
+        public string ModelsEndpoint { get; set; } = string.Empty;
+        public string ManualModelList { get; set; } = string.Empty;
+        public string DefaultHeaders { get; set; } = string.Empty;
+        public string CostPerInputToken { get; set; } = string.Empty;
+        public string CostPerOutputToken { get; set; } = string.Empty;
+        public bool IsActive { get; set; } = true;
+
+        public static HttpFormModel From(Provider p)
+        {
+            var s = HttpProviderSettings.FromSettings(p.Settings);
+            var headersText = string.Join("\n", s.DefaultHeaders.Select(kv => $"{kv.Key}: {kv.Value}"));
+            var modelsText = s.ManualModelList is { Count: > 0 } ? string.Join("\n", s.ManualModelList) : string.Empty;
+            return new HttpFormModel
+            {
+                Name = p.Name,
+                DisplayName = p.DisplayName,
+                Description = p.Description,
+                Endpoint = s.Endpoint,
+                ApiKeyEnv = s.ApiKeyEnv ?? string.Empty,
+                EndpointEnvOverride = s.EndpointEnvOverride ?? string.Empty,
+                AuthHeaderName = s.AuthHeaderName,
+                AuthHeaderFormat = s.AuthHeaderFormat,
+                ModelsEndpoint = s.ModelsEndpoint ?? string.Empty,
+                ManualModelList = modelsText,
+                DefaultHeaders = headersText,
+                CostPerInputToken = s.CostPerInputTokenEur ?? string.Empty,
+                CostPerOutputToken = s.CostPerOutputTokenEur ?? string.Empty,
+                IsActive = p.IsActive,
+            };
+        }
+
+        public Provider ToProvider()
+        {
+            var settings = new Dictionary<string, JsonElement>();
+
+            void AddStr(string key, string value) =>
+                settings[key] = JsonDocument.Parse(JsonSerializer.Serialize(value)).RootElement.Clone();
+
+            void AddNullableStr(string key, string? value)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                    settings[key] = JsonDocument.Parse(JsonSerializer.Serialize(value)).RootElement.Clone();
+                else
+                    settings[key] = JsonDocument.Parse("null").RootElement.Clone();
+            }
+
+            AddStr("endpoint", Endpoint.Trim());
+            AddNullableStr("api_key_env", ApiKeyEnv);
+            AddNullableStr("endpoint_env_override", EndpointEnvOverride);
+            AddStr("auth_header_name", string.IsNullOrWhiteSpace(AuthHeaderName) ? "Authorization" : AuthHeaderName.Trim());
+            AddStr("auth_header_format", string.IsNullOrWhiteSpace(AuthHeaderFormat) ? "Bearer {key}" : AuthHeaderFormat.Trim());
+            AddNullableStr("models_endpoint", ModelsEndpoint);
+            AddNullableStr("cost_per_input_token_eur", CostPerInputToken);
+            AddNullableStr("cost_per_output_token_eur", CostPerOutputToken);
+
+            // Default headers: parse "Key: Value" lines
+            var headers = new Dictionary<string, string>();
+            foreach (var line in DefaultHeaders.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                var idx = line.IndexOf(':', StringComparison.Ordinal);
+                if (idx > 0)
+                    headers[line[..idx].Trim()] = line[(idx + 1)..].Trim();
+            }
+            if (headers.Count > 0)
+                settings["default_headers"] = JsonDocument.Parse(JsonSerializer.Serialize(headers)).RootElement.Clone();
+
+            // Manual model list: one per line
+            var models = ManualModelList
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(m => m.Length > 0)
+                .ToList();
+            if (models.Count > 0)
+                settings["models"] = JsonDocument.Parse(JsonSerializer.Serialize(models)).RootElement.Clone();
+
+            var now = DateTimeOffset.UtcNow;
+            return new Provider(
+                Name: Name,
+                DisplayName: DisplayName,
+                Description: Description,
+                Type: ProviderType.Http,
+                Settings: settings,
+                IsSystem: false,
+                IsActive: IsActive,
+                CreatedAt: now,
+                UpdatedAt: now
+            );
+        }
+    }
+}
