@@ -115,5 +115,8 @@ public sealed class GetRunDetailsMcpOwnerCheckTests
 
         public Task<WelcomeStats> GetWelcomeStatsAsync(string? requestingUsername, CancellationToken cancellationToken = default)
             => Task.FromResult(new WelcomeStats(0, 0, 0, 0, 0, 0));
+
+        public Task<Guid> ResumeRunAsync(ResumeOptions options, string? requestingUsername, CancellationToken cancellationToken = default)
+            => throw new NotImplementedException();
     }
 }

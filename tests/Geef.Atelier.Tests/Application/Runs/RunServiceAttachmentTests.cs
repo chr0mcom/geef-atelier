@@ -192,6 +192,11 @@ public sealed class RunServiceAttachmentTests
             LastFailureMessage = errorMessage;
             return Task.CompletedTask;
         }
+
+        public Task<Guid> CreateResumedRunAsync(string briefingText, string configJson,
+            string? createdByUser, string? crewTemplateName, string? crewSnapshotJson,
+            Guid parentRunId, string? seedDraftText, CancellationToken cancellationToken = default)
+            => Task.FromResult(Guid.NewGuid());
     }
 
     private sealed class CapturingKnowledgeService : IKnowledgeService

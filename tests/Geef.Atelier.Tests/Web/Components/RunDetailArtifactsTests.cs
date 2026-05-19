@@ -150,6 +150,8 @@ public sealed class RunDetailArtifactsTests : TestContext
                 GroundingConsultations: Array.Empty<GroundingConsultation>()));
         public Task<WelcomeStats> GetWelcomeStatsAsync(string? user, CancellationToken ct = default) =>
             Task.FromResult(new WelcomeStats(0, 0, 0, 0, 0, 0));
+        public Task<Guid> ResumeRunAsync(ResumeOptions options, string? user, CancellationToken ct = default) =>
+            throw new NotImplementedException();
     }
 
     private sealed class StubArtifactRepository(IReadOnlyList<RunArtifact> artifacts)

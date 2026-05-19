@@ -268,6 +268,11 @@ public sealed class RunServiceUserIsolationTests
 
         public Task MarkRunFailedAsync(Guid runId, string errorMessage, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+
+        public Task<Guid> CreateResumedRunAsync(string briefingText, string configJson,
+            string? createdByUser, string? crewTemplateName, string? crewSnapshotJson,
+            Guid parentRunId, string? seedDraftText, CancellationToken cancellationToken = default)
+            => Task.FromResult(Guid.NewGuid());
     }
 
     private sealed class MinimalAdvisorConsultationRepository : IAdvisorConsultationRepository

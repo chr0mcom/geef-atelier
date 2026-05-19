@@ -126,6 +126,10 @@ internal sealed class RunService(
         => repository.GetWelcomeStatsAsync(requestingUsername, cancellationToken);
 
     /// <inheritdoc/>
+    public Task<Guid> ResumeRunAsync(ResumeOptions options, string? requestingUsername, CancellationToken cancellationToken = default)
+        => throw new NotImplementedException();
+
+    /// <inheritdoc/>
     public async Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
     {
         var details = await repository.GetDetailsAsync(runId, cancellationToken);

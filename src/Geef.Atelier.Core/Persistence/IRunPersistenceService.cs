@@ -22,4 +22,18 @@ public interface IRunPersistenceService
     /// No-ops if the run does not exist or is already in a terminal state.
     /// </summary>
     Task MarkRunFailedAsync(Guid runId, string errorMessage, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a new run that resumes a previously aborted or failed run.
+    /// Sets <c>ParentRunId</c> and optionally <c>SeedDraftText</c>.
+    /// </summary>
+    Task<Guid> CreateResumedRunAsync(
+        string briefingText,
+        string configJson,
+        string? createdByUser,
+        string? crewTemplateName,
+        string? crewSnapshotJson,
+        Guid parentRunId,
+        string? seedDraftText,
+        CancellationToken cancellationToken = default);
 }
