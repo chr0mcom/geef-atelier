@@ -68,10 +68,30 @@
                 <div class="row"><span class="label">Submitted</span><span class="val">@_details.Run.CreatedAt.LocalDateTime.ToString("HH:mm")</span></div>
                 <div class="row"><span class="label">Tokens</span><span class="val">@(_details.Run.TokensTotal > 0 ? _details.Run.TokensTotal.ToString("N0") : "—")</span></div>
                 <div class="row"><span class="label">Cost</span><span class="val" data-testid="run-cost">@FormatRunCost(_details.Run)</span></div>
+                @if (_details.Run.ParentRunId.HasValue)
+                {
+                    <div class="row">
+                        <span class="label">Fortgesetzt von</span>
+                        <span class="val">
+                            <a href="/runs/@_details.Run.ParentRunId.Value" class="t-mono">
+                                @_details.Run.ParentRunId.Value.ToString("N")[..8].ToUpperInvariant()
+                            </a>
+                        </span>
+                    </div>
+                }
                 @if (_details.Run.Status is RunStatus.Pending or RunStatus.Running)
                 {
                     <div class="actions">
                         <CancelButton RunId="_details.Run.Id" OnCancelled="HandleCancelledAsync" />
+                    </div>
+                }
+                @if (_details.Run.Status is RunStatus.Aborted or RunStatus.Failed)
+                {
+                    <div class="actions">
+                        <button class="btn secondary" data-testid="resume-run-button"
+                                @onclick="OpenResumeDialog">
+                            Fortsetzen
+                        </button>
                     </div>
                 }
             </div>
@@ -95,6 +115,14 @@
         <PromoteAttachmentModal @bind-Show="_showPromoteModal"
                                Document="_promoteCandidate"
                                OnConfirm="HandlePromoteAsync" />
+
+        <ResumeRunDialog
+            Show="@_showResumeDialog"
+            HasIterations="@(_details?.Iterations.Count > 0)"
+            DefaultMaxIterations="@GetEffectiveMaxIterations()"
+            ParentRunId="@RunId"
+            OnConfirm="HandleResumeConfirmedAsync"
+            OnCancel="() => _showResumeDialog = false" />
 
         @if (_details is not null && _viewModel is not null)
         {
@@ -209,6 +237,7 @@
     KnowledgeDocument? _promoteCandidate;
     string? _promoteError;
     string? _requestingUser;
+    bool _showResumeDialog;
 
     string _shortId => RunId.ToString("N")[..8].ToUpperInvariant();
 
@@ -339,6 +368,33 @@
     {
         await LoadAsync();
         StateHasChanged();
+    }
+
+    void OpenResumeDialog() => _showResumeDialog = true;
+
+    int GetEffectiveMaxIterations()
+    {
+        if (_details?.Run.CrewSnapshot is { } json)
+        {
+            var snapshot = CrewSnapshot.Deserialize(json);
+            if (snapshot?.ConvergenceOverride?.MaxIterations is { } max)
+                return max;
+        }
+        return 3;
+    }
+
+    async Task HandleResumeConfirmedAsync(ResumeOptions opts)
+    {
+        _showResumeDialog = false;
+        try
+        {
+            var newRunId = await RunService.ResumeRunAsync(opts, _requestingUser);
+            Nav.NavigateTo($"/runs/{newRunId}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Resume failed for run {RunId}", RunId);
+        }
     }
 
     static string Truncate(string s, int max) =>
