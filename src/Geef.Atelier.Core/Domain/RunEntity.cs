@@ -54,4 +54,17 @@ public sealed class RunEntity
     /// this field captures the partial-failure description for display in the UI.
     /// </summary>
     public string? FinalizerErrorMessage { get; set; }
+
+    /// <summary>
+    /// Set when this run was created as a resume of an existing run.
+    /// The parent run is never modified; its status stays Aborted or Failed.
+    /// </summary>
+    public Guid? ParentRunId { get; init; }
+
+    /// <summary>
+    /// The artifact text of the last completed iteration of the parent run,
+    /// injected as seed draft for the first pipeline iteration.
+    /// Null for clean-retry resumes and for runs that were not resumed.
+    /// </summary>
+    public string? SeedDraftText { get; init; }
 }

@@ -515,6 +515,12 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
                     b.Property<string>("ErrorMessage")
                         .HasColumnType("text");
 
+                    b.Property<string>("FinalizerErrorMessage")
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("FinalizerCostEur")
+                        .HasColumnType("numeric(10,6)");
+
                     b.Property<string>("FinalText")
                         .HasColumnType("text");
 
@@ -538,9 +544,18 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
                     b.Property<decimal?>("TotalCostEur")
                         .HasColumnType("numeric(10,6)");
 
+                    b.Property<Guid?>("ParentRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SeedDraftText")
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Status");
+
+                    b.HasIndex("ParentRunId")
+                        .HasDatabaseName("IX_Runs_ParentRunId");
 
                     b.ToTable("Runs");
                 });

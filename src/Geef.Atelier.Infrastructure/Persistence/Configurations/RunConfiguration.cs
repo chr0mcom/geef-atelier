@@ -55,5 +55,9 @@ internal sealed class RunConfiguration : IEntityTypeConfiguration<RunEntity>
             .IsRequired(false);
 
         builder.HasIndex(r => r.Status);
+
+        builder.Property(r => r.ParentRunId).IsRequired(false);
+        builder.Property(r => r.SeedDraftText).IsRequired(false);
+        builder.HasIndex(r => r.ParentRunId).HasDatabaseName("IX_Runs_ParentRunId");
     }
 }
