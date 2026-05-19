@@ -1,5 +1,6 @@
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 
@@ -106,6 +107,30 @@ public interface ICrewService
     /// profiles or when the target name is already taken.
     /// </summary>
     Task<string> RenameCustomGroundingProviderProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default);
+
+    // --- Finalizer profiles ---
+
+    /// <summary>Lists finalizer profiles. Custom profiles always; built-in system profiles only when <paramref name="includeSystem"/> is true.</summary>
+    Task<IReadOnlyList<FinalizerProfile>> ListFinalizerProfilesAsync(bool includeSystem = true, CancellationToken cancellationToken = default);
+
+    /// <summary>Returns the finalizer profile (system or custom) with the exact <paramref name="name"/>, or null if none exists.</summary>
+    Task<FinalizerProfile?> GetFinalizerProfileAsync(string name, CancellationToken cancellationToken = default);
+
+    /// <summary>Creates a custom finalizer profile. The name is auto-prefixed with <c>"custom-"</c> if not already present.</summary>
+    Task<FinalizerProfile> CreateCustomFinalizerProfileAsync(FinalizerProfile profile, CancellationToken cancellationToken = default);
+
+    /// <summary>Updates a custom finalizer profile. Throws <see cref="InvalidOperationException"/> for system profiles.</summary>
+    Task<FinalizerProfile> UpdateCustomFinalizerProfileAsync(FinalizerProfile profile, CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes a custom finalizer profile by name. Throws <see cref="InvalidOperationException"/> for system profiles.</summary>
+    Task DeleteCustomFinalizerProfileAsync(string name, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Renames a custom finalizer profile, cascading the new name into every custom crew template
+    /// that references it. Returns the final (custom-prefixed) name. Throws for system profiles
+    /// or when the target name is already taken.
+    /// </summary>
+    Task<string> RenameCustomFinalizerProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default);
 
     // --- Crew templates ---
 

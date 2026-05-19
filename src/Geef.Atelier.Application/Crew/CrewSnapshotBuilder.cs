@@ -1,5 +1,6 @@
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 
@@ -18,6 +19,7 @@ public static class CrewSnapshotBuilder
         Func<string, CancellationToken, Task<ReviewerProfile?>> reviewerLookup,
         Func<string, CancellationToken, Task<AdvisorProfile?>> advisorLookup,
         Func<string, CancellationToken, Task<GroundingProviderProfile?>> groundingLookup,
+        Func<string, CancellationToken, Task<FinalizerProfile?>>? finalizerLookup = null,
         CancellationToken cancellationToken = default)
     {
         var executor = await executorLookup(template.ExecutorProfileName, cancellationToken)
@@ -27,6 +29,9 @@ public static class CrewSnapshotBuilder
         var reviewers = await ResolveReviewersAsync(template.ReviewerProfileNames, reviewerLookup, cancellationToken);
         var advisors = await ResolveAdvisorsAsync(template.AdvisorProfileNames, advisorLookup, cancellationToken);
         var groundingProviders = await ResolveGroundingProvidersAsync(template.GroundingProviderNames, groundingLookup, cancellationToken);
+        var finalizers = finalizerLookup is not null
+            ? await ResolveFinalizersAsync(template.FinalizerProfileNames, finalizerLookup, cancellationToken)
+            : null;
 
         return new CrewSnapshot(
             SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
@@ -36,7 +41,9 @@ public static class CrewSnapshotBuilder
             EvaluationStrategy: template.EvaluationStrategy,
             ConvergenceOverride: template.ConvergenceOverride,
             Advisors: advisors,
-            GroundingProviders: groundingProviders);
+            GroundingProviders: groundingProviders,
+            Finalizers: finalizers,
+            RunFinalizersOnMaxAttempts: template.RunFinalizersOnMaxAttempts);
     }
 
     /// <summary>Builds a snapshot from an inline crew spec (no template name), resolving all referenced profiles.</summary>
@@ -46,6 +53,7 @@ public static class CrewSnapshotBuilder
         Func<string, CancellationToken, Task<ReviewerProfile?>> reviewerLookup,
         Func<string, CancellationToken, Task<AdvisorProfile?>> advisorLookup,
         Func<string, CancellationToken, Task<GroundingProviderProfile?>> groundingLookup,
+        Func<string, CancellationToken, Task<FinalizerProfile?>>? finalizerLookup = null,
         CancellationToken cancellationToken = default)
     {
         var executor = await executorLookup(spec.ExecutorProfileName, cancellationToken)
@@ -55,6 +63,9 @@ public static class CrewSnapshotBuilder
         var reviewers = await ResolveReviewersAsync(spec.ReviewerProfileNames, reviewerLookup, cancellationToken);
         var advisors = await ResolveAdvisorsAsync(spec.AdvisorProfileNames, advisorLookup, cancellationToken);
         var groundingProviders = await ResolveGroundingProvidersAsync(spec.GroundingProviderNames, groundingLookup, cancellationToken);
+        var finalizers = finalizerLookup is not null
+            ? await ResolveFinalizersAsync(spec.FinalizerProfileNames, finalizerLookup, cancellationToken)
+            : null;
 
         return new CrewSnapshot(
             SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
@@ -64,7 +75,8 @@ public static class CrewSnapshotBuilder
             EvaluationStrategy: spec.EvaluationStrategy,
             ConvergenceOverride: spec.ConvergenceOverride,
             Advisors: advisors,
-            GroundingProviders: groundingProviders);
+            GroundingProviders: groundingProviders,
+            Finalizers: finalizers);
     }
 
     private static async Task<IReadOnlyList<ReviewerProfile>> ResolveReviewersAsync(
@@ -108,6 +120,21 @@ public static class CrewSnapshotBuilder
             var profile = await groundingLookup(name, cancellationToken);
             if (profile is not null) result.Add(profile);
             // Silently skip missing providers (profile deleted after template creation)
+        }
+        return result;
+    }
+
+    private static async Task<IReadOnlyList<FinalizerProfile>> ResolveFinalizersAsync(
+        IReadOnlyList<string> names,
+        Func<string, CancellationToken, Task<FinalizerProfile?>> finalizerLookup,
+        CancellationToken cancellationToken)
+    {
+        var result = new List<FinalizerProfile>(names.Count);
+        foreach (var name in names)
+        {
+            var profile = await finalizerLookup(name, cancellationToken);
+            if (profile is not null) result.Add(profile);
+            // Silently skip missing finalizers (profile deleted after template creation)
         }
         return result;
     }
