@@ -40,7 +40,10 @@ async def complete(prompt: str, model: str | None, max_tokens: int | None) -> st
 
 
 async def _run_claude(prompt: str, model: str | None, max_tokens: int | None) -> str:
-    args = ["claude", "-p", "--output-format", "json"]
+    # Allowlist ONLY web tools — no Bash/Edit/Write, so no full permission bypass.
+    # Comma-separated single token: a space-separated variadic would greedily
+    # consume the trailing prompt positional.
+    args = ["claude", "-p", "--output-format", "json", "--allowedTools", "WebSearch,WebFetch"]
 
     if model:
         # Strip provider prefix and normalize dots to dashes

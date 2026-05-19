@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-05-19 (Finalizer-Foundation: D-044 added)*
+*Last updated: 2026-05-19 (D-045 added: model-driven web search on the CLI providers)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -842,3 +842,13 @@ Adds a complete Finalizer phase as the fifth profile type (FileExport, MetadataE
 **D-044/8 — Webhook auth-header stored plaintext.** The webhook authentication header is stored as plaintext in the `FinalizerProfiles` JSONB column and embedded in `CrewSnapshot` on every run. It is never logged or included in Status artifacts. Encryption at rest (e.g. `IDataProtectionProvider`) was considered but deferred: the auth header is a low-sensitivity bearer token (webhook endpoint security), not a user credential, and the production database is on a private network. UI hints corrected from "verschlüsselt gespeichert" to "im Klartext in der Datenbank gespeichert" (found by R2 reviewer).
 
 **D-044/9 — MaxFileSizeBytes enforced before write.** `FileExportFinalizerExecutor` checks `bytes.Length > _options.MaxFileSizeBytes` after conversion but before writing to disk. Produces a `Status` artifact on violation. Default: 50 MB. Found by R2 reviewer (was defined in options but not enforced in first pass).
+
+---
+
+## D-045 — Model-driven web search on the CLI providers
+
+*Date: 19 May 2026*
+
+The `claude-cli` and `codex-cli` providers now run with web search enabled, so an actor can autonomously fetch current web information during generation. `claude` is invoked with `--allowedTools "WebSearch,WebFetch"` (web tools only — no Bash/Edit/Write, no full permission bypass); `codex` with the global `--search` flag placed **before** the `exec` subcommand (`codex exec` rejects it as a subcommand argument — discovered during live testing, the flag is global). Cost is subscription-covered (no per-search billing).
+
+**Deliberate tradeoff:** sources the model searches are consumed internally and are **not** captured into `GroundingConsultation` / RunDetail — CLI web search has no citation or observability trail. This was accepted in favor of a minimal two-line adapter change over a Tavily-as-MCP-tool pipeline. The Tavily grounding provider remains the path for explicit, deterministic, cost-tracked, citable pre-briefing enrichment; the two are complementary. OpenRouter-routed actors (single-shot `OpenAiCompatibleClient`) cannot do agentic web search. Safety unchanged: codex `--search` has no per-call approval, claude allowlists only web tools — no new interaction/permission-prompt risk.

@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-18 (Template Studio Complete Edit: D-043 ergänzt; D-043/9 Post-Deploy-Korrekturen — Prompt-Anatomie, Meta-LLM Opus 4.7, MaxTokens-Floor)*
+*Letzte Aktualisierung: 2026-05-19 (D-044 nachgetragen + D-045 ergänzt: modell-gesteuerte Websuche auf den CLI-Providern)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -816,3 +816,39 @@ Das Template Studio (`/crew/studio`) hatte bisher nur minimale Edit-Felder im `S
 - **Generierte Profil-Prompts folgen jetzt der vollständigen Atelier-Profil-Anatomie.** Der Meta-Prompt limitiert System-Prompts nicht mehr auf „100 Wörter"; er schreibt dieselbe Struktur vor wie die handgeschriebenen System-Profile in `SystemPrompts.cs` — Reviewer: Rollen-Zeile, `submit_review`-Anweisung, 4-stufige Severity-Taxonomie mit konkreten domänenspezifischen Beispielen, ANTI-PATTERN-Kalibrierung, Domänen-Fokus-Checkliste, „Respond in the language of the user briefing"; Advisor: Rollen-Zeile, „strategic guidance only", nummerierte 2–5-Beobachtungsliste, Kürze-Regel, Iterations-Varianz-Regel bei `BeforeEveryExecution`. Ein vollständiges Reviewer+Advisor-Beispiel wurde dem Few-Shot ergänzt. Das Advisor-abratende Prinzip wurde umgekehrt: Advisors werden jetzt aktiv ermutigt, wann immer die Aufgabe von Vorab-/Pro-Iteration-Beratung profitiert.
 - **Meta-LLM hochgestuft** von `anthropic/claude-sonnet-4-5` auf `anthropic/claude-opus-4-7`; `TemplateStudio:MaxTokens` 4096 → 8192 (ein Tool-Call trägt jetzt mehrere vollständig strukturierte Prompts).
 - **MaxTokens-Floor.** `StudioDefaults.MinMaxTokens = 10000` zieht in `ApplyDefaults` jedes generierende Profil auf diesen Floor hoch, auch wenn die Meta-LLM einen kleineren Wert vorschlägt (GroundingProvider bleibt `null`). Studio-Defaults erhöht: Reviewer/Advisor `MaxTokens` 2048 → 16384, Executor 4096 → 60000. Derselbe Zu-niedrig-Default betraf über `LlmOptions.DefaultMaxTokens` alle `MaxTokens: null`-System-Profile, erhöht 4096 → 16384; explizite Actor-Configs `BriefingTreueReviewer`/`KlarheitReviewer` 2048 → 16384, `Executor` 8192 → 60000. `GroundingQueryExtractor` bleibt bewusst bei 256 (extrahiert nur eine kurze Suchanfrage).
+
+---
+
+## D-044 — Finalizer-Foundation: Fünfter Profil-Typ, vollständige System-Library
+
+*Datum: 19. Mai 2026 | Bericht: [reports/feature-finalizer-foundation-report.md](reports/feature-finalizer-foundation-report.md)*
+
+Ergänzt eine vollständige Finalizer-Phase als fünften Profil-Typ (FileExport, MetadataEnrich, ExternalSink, Transform) mit 17 System-Profilen, sortierbarer Pipeline-Kette in Templates, Run-Artifacts-Speicherung + Download-Endpoint, vollständiger CRUD-UI, Studio-Integration und MCP-Tools. Vervollständigt das „F" im GEEF-Akronym.
+
+**D-044/1 — Flaches Domain-Modell, GroundingProvider-Pattern.** `FinalizerProfile` ist ein flacher Record mit `Dictionary<string,string>` Settings (JSONB) und `IsSystem`. Kein Wrapper-Domain-Modell. Typisierte Settings-Records (`FileExportSettings`, `MetadataEnrichSettings`, `WebhookSinkSettings`, `EmailSinkSettings`, `TransformSettings`) kapseln das Dict in allen Executor-Implementierungen. Begründung: Konsistenz mit dem bestehenden GroundingProvider-Pattern; vermeidet eine zweite Abstraktionsebene.
+
+**D-044/2 — Separate `FinalizationActorCosts`-Tabelle (keine `IterationActorCosts`-Erweiterung).** Eine neue `FinalizationActorCosts`-Tabelle (Id, RunId FK CASCADE, ActorName, ModelName, InputTokens, OutputTokens, CostEur, CreatedAt) ersetzt die Erweiterung von `IterationActorCosts`. `IterationActorCosts.IterationId` ist ein Pflicht-FK — ein nullable FK würde Fragilität und semantische Verschmutzung einführen. Finalizer-Kosten aggregieren zu `Runs.FinalizerCostEur`. Begründung: sauberere Trennung, keine FK-Migration auf der bestehenden Iteration-Tabelle.
+
+**D-044/3 — Partial-Success-Vertrag (kein neuer RunStatus-Enum-Wert).** Finalizer-Fehler erzeugen ein `ArtifactType.Status`-Artifact und setzen `Runs.FinalizerErrorMessage`. Der Run-Status bleibt `Completed`. Kein `CompletedWithFinalizerErrors`-Enum-Wert wird eingeführt (vermeidet Enum-Proliferation und nachgelagerte Serialisierungs-Migration). Der Fehler ist in der RunDetail-UI über die Artifacts-Sektion sichtbar.
+
+**D-044/4 — Pipeline-Einfügung: FinalText aus der DB nachladen.** `ExecuteFinalizationAsync` wird im `RunOrchestratorService` nach `FinalizeRunCostsAsync` eingefügt. Es lädt die Run-Entity aus der Datenbank neu, weil `PostgresEventSink` den `FinalText` direkt beim `PipelineCompletedEvent` schreibt — der Orchestrator hält ihn nicht im Speicher. Beim Grounding entdeckt (Spec-Pseudocode war falsch).
+
+**D-044/5 — MaxAttempts-Pfad deckt Advisor-Retry-Fehlschlag ab.** Wenn `RunFinalizersOnMaxAttempts=true`, laufen Finalizer nicht nur, wenn die Haupt-Pipeline nicht konvergiert, sondern auch, wenn der `OnConvergenceFailure`-Advisor-Retry ebenfalls fehlschlägt. Das äußere `catch (ConvergenceFailedException)` umschließt `TryConvergenceFailureRetryAsync` jetzt mit einem verschachtelten try-catch, setzt `retryAlsoFailed=true` und fährt mit `ExecuteFinalizationOnMaxAttemptsAsync` fort. In der Evaluation gefunden (R1-Reviewer).
+
+**D-044/6 — System-Profil-Namen: bewusste Abweichung vom Spec-Entwurf.** Die Spec listete Namen wie `add-frontmatter`, `send-webhook`, `de-hedging`, `length-adjust-500`. Die Implementierung nutzt aussagekräftigere, intern konsistente Namen: `add-front-matter`, `webhook-sink`, `tone-formalization`, `tone-casual`, `executive-summary`, `key-takeaways`, `glossary`, `add-reading-level`. Das Table-of-Contents-Profil (`add-toc`) wurde nicht implementiert; `add-reading-level` wurde stattdessen ergänzt. Begründung: die implementierten Namen sind für Endnutzer klarer, intern konsistent (durchgängig lowercase-hyphenated), und das System ist selbstdokumentierend. Zum Einführungszeitpunkt hängen keine bestehenden Daten von diesen Namen ab. Anerkannt per D-044 (vom R1-Reviewer gefunden).
+
+**D-044/7 — ExportPath-Containment + GUID-basierte Dateipfade (Path-Traversal-Prävention).** Der Download-Endpoint validiert, dass der aufgelöste `Path.GetFullPath(StorageUri)` mit `Path.GetFullPath(ExportPath)` beginnt. Dateipfade werden als `{ExportPath}/{runId:N}/{filename}` konstruiert, wobei `runId` aus dem GUID-typisierten Routen-Parameter stammt und `filename` aus einem DB-gespeicherten Wert (niemals aus Nutzereingabe). Defense-in-Depth: sowohl die GUID-Routen-Constraint als auch der `Path.GetFullPath`-Containment-Check müssen bestehen.
+
+**D-044/8 — Webhook-Auth-Header im Klartext gespeichert.** Der Webhook-Authentifizierungs-Header wird als Klartext in der `FinalizerProfiles`-JSONB-Spalte gespeichert und bei jedem Run in den `CrewSnapshot` eingebettet. Er wird niemals geloggt oder in Status-Artifacts aufgenommen. Verschlüsselung at-rest (z.B. `IDataProtectionProvider`) wurde erwogen, aber zurückgestellt: der Auth-Header ist ein Bearer-Token niedriger Sensitivität (Webhook-Endpoint-Sicherheit), kein Nutzer-Credential, und die Produktions-Datenbank liegt in einem privaten Netzwerk. UI-Hinweise von „verschlüsselt gespeichert" zu „im Klartext in der Datenbank gespeichert" korrigiert (vom R2-Reviewer gefunden).
+
+**D-044/9 — MaxFileSizeBytes vor dem Schreiben erzwungen.** `FileExportFinalizerExecutor` prüft `bytes.Length > _options.MaxFileSizeBytes` nach der Konvertierung, aber vor dem Schreiben auf die Platte. Erzeugt bei Verletzung ein `Status`-Artifact. Default: 50 MB. Vom R2-Reviewer gefunden (war in den Options definiert, aber im ersten Durchlauf nicht erzwungen).
+
+---
+
+## D-045 — Modell-gesteuerte Websuche auf den CLI-Providern
+
+*Datum: 19. Mai 2026*
+
+Die Provider `claude-cli` und `codex-cli` laufen jetzt mit aktivierter Websuche, sodass ein Akteur während der Generierung selbst aktuelle Web-Informationen holen kann. `claude` wird mit `--allowedTools "WebSearch,WebFetch"` aufgerufen (nur Web-Tools — kein Bash/Edit/Write, kein voller Permission-Bypass); `codex` mit dem globalen `--search`-Flag **vor** dem `exec`-Subcommand (`codex exec` lehnt es als Subcommand-Argument ab — im Live-Test entdeckt, das Flag ist global). Kosten sind abo-gedeckt (keine Per-Search-Abrechnung).
+
+**Bewusster Trade-off:** Vom Modell gesuchte Quellen werden intern verarbeitet und **nicht** in `GroundingConsultation` / RunDetail erfasst — die CLI-Websuche hat keine Citation- oder Nachvollziehbarkeits-Spur. Das wurde zugunsten einer minimalen Zwei-Zeilen-Adapter-Änderung gegenüber einer Tavily-als-MCP-Tool-Pipeline akzeptiert. Der Tavily-Grounding-Provider bleibt der Pfad für explizite, deterministische, kostengetrackte, zitierbare Vor-Briefing-Anreicherung; beide ergänzen sich. OpenRouter-geroutete Akteure (single-shot `OpenAiCompatibleClient`) können keine agentische Websuche durchführen. Sicherheit unverändert: codex `--search` ohne Per-Call-Approval, claude allowlistet nur Web-Tools — kein neues Interaktions-/Permission-Prompt-Risiko.

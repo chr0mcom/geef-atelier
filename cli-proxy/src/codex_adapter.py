@@ -104,7 +104,10 @@ async def _run_codex(prompt: str, model: str | None, max_tokens: int | None) -> 
     try:
         # --skip-git-repo-check: the proxy container is not a git repo, and codex
         # exec otherwise refuses to run ("Not inside a trusted directory").
-        args = ["codex", "exec", "--skip-git-repo-check"]
+        # --search is a GLOBAL flag and must precede the `exec` subcommand
+        # (codex exec rejects it). It enables the native Responses web_search
+        # tool with no per-call approval.
+        args = ["codex", "--search", "exec", "--skip-git-repo-check"]
 
         if model:
             bare_model = model.split("/")[-1] if "/" in model else model

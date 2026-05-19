@@ -64,6 +64,30 @@ async def test_complete_strips_provider_prefix():
 
 
 @pytest.mark.asyncio
+async def test_complete_enables_web_search():
+    proc = _make_proc()
+    captured: list[list] = []
+
+    async def fake_exec(*args, **kwargs):
+        captured.append(list(args))
+        return proc
+
+    with (
+        patch("asyncio.create_subprocess_exec", fake_exec),
+        patch("builtins.open", mock_open(read_data="ok")),
+        patch("os.unlink"),
+        patch("tempfile.NamedTemporaryFile") as mock_tmp,
+    ):
+        mock_tmp.return_value.__enter__.return_value.name = "/tmp/fake.txt"
+        await codex_adapter.complete("test", None, None)
+
+    args = captured[0]
+    # --search is a global flag and MUST precede the `exec` subcommand.
+    assert "--search" in args
+    assert args.index("--search") < args.index("exec")
+
+
+@pytest.mark.asyncio
 async def test_complete_raises_on_nonzero_exit():
     proc = _make_proc(returncode=1, stderr="quota exceeded")
 

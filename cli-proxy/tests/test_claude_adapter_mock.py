@@ -60,6 +60,28 @@ async def test_complete_strips_provider_prefix():
 
 
 @pytest.mark.asyncio
+async def test_complete_allowlists_only_web_tools():
+    output = json.dumps({"result": "ok"})
+    proc = _make_proc(output)
+
+    captured: list[list] = []
+
+    async def fake_exec(*args, **kwargs):
+        captured.append(list(args))
+        return proc
+
+    with patch("asyncio.create_subprocess_exec", fake_exec):
+        await claude_adapter.complete("test", None, None)
+
+    args = captured[0]
+    tools_index = args.index("--allowedTools")
+    assert args[tools_index + 1] == "WebSearch,WebFetch"
+    # No full bypass / no shell or edit tools leaked in.
+    assert "--dangerously-skip-permissions" not in args
+    assert "Bash" not in args[tools_index + 1]
+
+
+@pytest.mark.asyncio
 async def test_complete_raises_on_nonzero_exit():
     proc = _make_proc("", returncode=1, stderr="auth error")
 

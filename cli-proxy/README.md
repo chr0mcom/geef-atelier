@@ -47,6 +47,17 @@ If the request contains `tools` + `tool_choice`, the schema is embedded as a pro
 
 The CLI output is then scanned for a JSON block (incl. Markdown-fence stripping) and returned as a `tool_calls` response.
 
+## Web search
+
+Both backends run with the model-driven web search tool enabled, so an actor can autonomously decide to fetch current information from the web during generation:
+
+- **claude** — invoked with `--allowedTools "WebSearch,WebFetch"`. Only the web tools are allowlisted; Bash/Edit/Write are **not** enabled (no full permission bypass).
+- **codex** — invoked with the global `--search` flag, placed **before** the `exec` subcommand (codex rejects it as an `exec` argument). It enables the native Responses `web_search` tool with no per-call approval.
+
+**Cost:** web search runs on the subscription (Claude / Codex), not metered per search — no Tavily-style per-request billing on the CLI path.
+
+**Scope / limitation:** the sources the model searches are consumed internally and are **not** captured into `GroundingConsultation` / RunDetail. There is no citation or observability trail for CLI web search — that remains the job of the Tavily grounding provider (explicit, deterministic pre-briefing enrichment). The two are complementary, not either/or. OpenRouter-routed actors (single-shot) cannot perform agentic web search.
+
 ## Setup (production)
 
 ### 1. Build the images

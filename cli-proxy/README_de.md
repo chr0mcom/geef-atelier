@@ -47,6 +47,17 @@ Wenn der Request `tools` + `tool_choice` enthält, wird das Schema als Prompt-Ad
 
 Der CLI-Output wird dann auf einen JSON-Block gescannt (inkl. Markdown-Fence-Stripping) und als `tool_calls`-Response zurückgegeben.
 
+## Websuche
+
+Beide Backends laufen mit aktiviertem modell-gesteuertem Web-Search-Tool — ein Akteur kann während der Generierung selbst entscheiden, aktuelle Informationen aus dem Web zu holen:
+
+- **claude** — Aufruf mit `--allowedTools "WebSearch,WebFetch"`. Nur die Web-Tools sind allowlisted; Bash/Edit/Write sind **nicht** aktiviert (kein voller Permission-Bypass).
+- **codex** — Aufruf mit dem globalen `--search`-Flag, platziert **vor** dem `exec`-Subcommand (codex lehnt es als `exec`-Argument ab). Es aktiviert das native Responses-`web_search`-Tool ohne Per-Call-Approval.
+
+**Kosten:** Die Websuche läuft über das Abo (Claude / Codex), nicht pro Suche abgerechnet — kein Tavily-artiges Per-Request-Billing auf dem CLI-Pfad.
+
+**Scope / Einschränkung:** Die vom Modell gesuchten Quellen werden intern verarbeitet und **nicht** in `GroundingConsultation` / RunDetail erfasst. Es gibt keine Citation- oder Nachvollziehbarkeits-Spur für die CLI-Websuche — das bleibt Aufgabe des Tavily-Grounding-Providers (explizite, deterministische Vor-Briefing-Anreicherung). Beide ergänzen sich, sind kein Entweder-oder. OpenRouter-geroutete Akteure (single-shot) können keine agentische Websuche durchführen.
+
 ## Setup (Production)
 
 ### 1. Images bauen
