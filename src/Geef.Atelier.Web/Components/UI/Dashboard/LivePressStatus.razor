@@ -1,0 +1,57 @@
+@using Geef.Atelier.Core.Domain.Dashboard
+
+<div class="dash-card press-card">
+    <div class="dash-card-head">
+        <span class="card-title">Press</span>
+        @if (Data.State != PressState.Idle)
+        {
+            <span class="pulse-tag">Live</span>
+        }
+    </div>
+
+    @if (Data.State == PressState.Idle)
+    {
+        <div class="idle">
+            Press is idle
+            @if (Data.IdleSince is { } since)
+            {
+                <span class="since"> · last completed @since.ToString("dd MMM, HH:mm")</span>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="press-runs">
+            @foreach (var run in Data.Runs)
+            {
+                <div class="press-run">
+                    <div class="compact-rail">@(run.TemplateName ?? "klassik") · iter @run.Iteration / @run.MaxIterations</div>
+                    <div class="phase-rail">
+                        @for (var p = 0; p < 4; p++)
+                        {
+                            var pipClass = p < run.Phase ? "pip done" : p == run.Phase ? "pip active" : "pip";
+                            <div class="@pipClass"></div>
+                        }
+                    </div>
+                    <div class="press-meta-line">
+                        <span>@PhaseLabel(run.Phase)</span>
+                        <span>@run.RunId.ToString("N")[..8].ToUpperInvariant()</span>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public PressStatus Data { get; set; } = null!;
+
+    static string PhaseLabel(int phase) => phase switch
+    {
+        0 => "Grounding",
+        1 => "Execution",
+        2 => "Evaluation",
+        3 => "Finalizing",
+        _ => "Unknown"
+    };
+}

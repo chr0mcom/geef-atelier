@@ -1,0 +1,31 @@
+@using Geef.Atelier.Core.Domain.Dashboard
+
+<div class="dash-card">
+    <div class="dash-card-head">
+        <span class="card-title">Manuscripts</span>
+        <span class="card-sub">Recent completed</span>
+    </div>
+    <div class="gallery">
+        @foreach (var ms in Data)
+        {
+            <a class="ms-card" href="/runs/@ms.RunId">
+                <div class="body">@ms.BriefingSnippet</div>
+                <div class="meta">
+                    @if (ms.TemplateName is not null) { <span>@ms.TemplateName</span> }
+                    <span>@ms.WordCount words</span>
+                    @if (ms.CostEur is { } c) { <span>€@c.ToString("N4")</span> }
+                    <span>@ms.Iterations iter</span>
+                    <span>@ms.CompletedAt.ToString("dd MMM")</span>
+                </div>
+            </a>
+        }
+        @if (!Data.Any())
+        {
+            <div class="empty">No manuscripts yet</div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ManuscriptCard> Data { get; set; } = [];
+}

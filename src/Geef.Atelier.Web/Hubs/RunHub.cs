@@ -24,6 +24,28 @@ public sealed class RunHub : Hub
     public Task LeaveAllRunsGroupAsync() =>
         Groups.RemoveFromGroupAsync(Context.ConnectionId, AllRunsGroup);
 
+    /// <summary>Subscribes the caller to live dashboard updates for their own runs.</summary>
+    public Task JoinDashboardGroupAsync(string username) =>
+        Groups.AddToGroupAsync(Context.ConnectionId, DashboardGroup(username));
+
+    /// <summary>Unsubscribes the caller from personal dashboard updates.</summary>
+    public Task LeaveDashboardGroupAsync(string username) =>
+        Groups.RemoveFromGroupAsync(Context.ConnectionId, DashboardGroup(username));
+
+    /// <summary>Subscribes the caller to the admin all-users dashboard group.</summary>
+    public Task JoinDashboardAllGroupAsync() =>
+        Groups.AddToGroupAsync(Context.ConnectionId, DashboardAllGroup);
+
+    /// <summary>Unsubscribes the caller from the admin all-users dashboard group.</summary>
+    public Task LeaveDashboardAllGroupAsync() =>
+        Groups.RemoveFromGroupAsync(Context.ConnectionId, DashboardAllGroup);
+
+    /// <summary>Name of the SignalR group for admin all-scope dashboard live updates.</summary>
+    public const string DashboardAllGroup = "dashboard-all";
+
     /// <summary>Returns the SignalR group name for a given run id.</summary>
     internal static string GroupName(Guid runId) => $"run-{runId}";
+
+    /// <summary>Returns the SignalR group name for a user's personal dashboard.</summary>
+    internal static string DashboardGroup(string username) => $"dashboard-{username}";
 }

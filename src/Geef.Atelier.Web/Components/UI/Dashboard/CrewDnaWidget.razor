@@ -1,0 +1,29 @@
+@using Geef.Atelier.Core.Domain.Dashboard
+
+<div class="dash-card">
+    <div class="dash-card-head">
+        <span class="card-title">Crew DNA</span>
+        <span class="card-sub">30 days</span>
+    </div>
+    @if (Data.Entries.Count == 0)
+    {
+        <div class="crew-empty">No runs yet</div>
+    }
+    else
+    {
+        <div class="crew-cols">
+            @foreach (var e in Data.Entries)
+            {
+                <div class="crew-entry">
+                    <div class="name">@e.DisplayName</div>
+                    <div class="bar-row"><div class="bar-fill" style="width:@((e.Share*100).ToString("F1"))%"></div></div>
+                    <div class="v">@e.Count</div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public CrewDna Data { get; set; } = null!;
+}

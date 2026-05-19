@@ -1,0 +1,29 @@
+@using Geef.Atelier.Core.Domain.Dashboard
+
+<div class="ledger-tile">
+    <div class="label">@Label</div>
+    <div class="value">
+        €@Tile.CostEur.ToString("N2")
+        <span class="suffix @TrendClass">@TrendSymbol @Math.Abs(Tile.TrendPct).ToString("N0")%</span>
+    </div>
+    <div class="count">@Tile.RunCount @(Tile.RunCount == 1 ? "run" : "runs")</div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public LedgerTile Tile { get; set; } = null!;
+
+    string TrendClass => Tile.Trend switch
+    {
+        TrendDirection.Up   => "trend-up",
+        TrendDirection.Down => "trend-down",
+        _                   => "trend-flat"
+    };
+
+    string TrendSymbol => Tile.Trend switch
+    {
+        TrendDirection.Up   => "▲",
+        TrendDirection.Down => "▼",
+        _                   => "—"
+    };
+}

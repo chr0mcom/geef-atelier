@@ -17,5 +17,9 @@ public sealed class FinalizationActorCost
     public required int InputTokens { get; init; }
     public required int OutputTokens { get; init; }
     public decimal? CostEur { get; init; }
+
+    /// <summary>The provider that served this finalizer call, e.g. "claude-cli" or "openrouter". Null for pre-Step25 rows.</summary>
+    public string? ProviderName { get; init; }
+
     public required DateTimeOffset CreatedAt { get; init; }
 }

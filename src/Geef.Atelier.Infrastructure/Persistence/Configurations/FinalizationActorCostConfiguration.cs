@@ -18,6 +18,7 @@ internal sealed class FinalizationActorCostConfiguration : IEntityTypeConfigurat
         builder.Property(c => c.InputTokens).IsRequired();
         builder.Property(c => c.OutputTokens).IsRequired();
         builder.Property(c => c.CostEur).HasColumnType("numeric(10,6)").IsRequired(false);
+        builder.Property(c => c.ProviderName).HasColumnType("text").IsRequired(false);
         builder.Property(c => c.CreatedAt).IsRequired();
 
         builder.HasIndex(c => c.RunId);

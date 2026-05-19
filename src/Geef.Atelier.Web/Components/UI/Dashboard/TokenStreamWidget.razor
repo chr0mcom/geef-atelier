@@ -1,0 +1,35 @@
+@using Geef.Atelier.Core.Domain.Dashboard
+
+<div class="dash-card">
+    <div class="dash-card-head">
+        <span class="card-title">Token Stream</span>
+        <span class="card-sub">30 days</span>
+    </div>
+    @if (Data.Sparkline.Any())
+    {
+        var max = Data.Sparkline.Select(d => d.Tokens).DefaultIfEmpty(1).Max();
+        <div class="spark">
+            @foreach (var day in Data.Sparkline)
+            {
+                var h = max > 0 ? (double)day.Tokens / max * 36 : 0;
+                <div style="width:6px;background:var(--hero);border-radius:2px 2px 0 0;height:@h.ToString("F1")px;min-height:1px;align-self:flex-end" title="@day.Date.ToString("d MMM"): @day.Tokens tokens"></div>
+            }
+        </div>
+    }
+    <div class="spark-stat">
+        <div class="item"><div class="key">Total</div><div class="av">@FormatK(Data.TotalTokens)</div></div>
+        <div class="item"><div class="key">Exec</div><div class="av">@FormatK(Data.ExecutorTokens)</div></div>
+        <div class="item"><div class="key">Review</div><div class="av">@FormatK(Data.ReviewerTokens)</div></div>
+        <div class="item"><div class="key">Advisor</div><div class="av">@FormatK(Data.AdvisorTokens)</div></div>
+        <div class="item"><div class="key">Finalizer</div><div class="av">@FormatK(Data.FinalizerTokens)</div></div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TokenStream Data { get; set; } = null!;
+
+    static string FormatK(long n)
+        => n >= 1_000_000 ? $"{n / 1_000_000.0:F1}M"
+         : n >= 1_000     ? $"{n / 1_000.0:F0}K"
+         : n.ToString();
+}

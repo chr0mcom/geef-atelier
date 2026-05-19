@@ -1,151 +1,171 @@
 @page "/"
 @rendermode InteractiveServer
 @attribute [Authorize]
-@inject IRunService RunService
-@inject NavigationManager Nav
+@implements IAsyncDisposable
+@inject IDashboardService DashboardService
 @inject AuthenticationStateProvider AuthProvider
-@using Geef.Atelier.Core.Domain
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject IHttpContextAccessor Http
+@using Geef.Atelier.Application.Dashboard
+@using Geef.Atelier.Core.Domain.Dashboard
+@using Microsoft.AspNetCore.SignalR.Client
 
-<PageTitle>Atelier — Geef.Atelier</PageTitle>
+<PageTitle>Workshop — Geef.Atelier</PageTitle>
 
-<div class="welcome">
-    <div class="welcome-hero">
-        <h1>
-            A briefing well-given<br />
-            is half the <em>manuscript</em>.
-        </h1>
-        <div class="meta">
-            <div class="greeting">@_greeting · Atelier open</div>
-        </div>
-    </div>
+@if (_snapshot is null)
+{
+    <div class="dash-loading">Loading workshop…</div>
+}
+else
+{
+    <div class="dashboard">
 
-    <div class="welcome-cta">
-        <a class="cta-card" href="/new">
-            <div class="glyph-stamp" aria-hidden="true">¶</div>
-            <div class="t-eyebrow eyebrow">Begin</div>
-            <h2>Hand the crew a new briefing</h2>
-            <p>
-                Describe what should be written and to whom. The crew will draft, review,
-                revise — and return when it converges or after three iterations.
-            </p>
-            <div class="arrow">⟶ Open the form</div>
-        </a>
-        <div class="welcome-side">
-            @if (_isAdmin)
-            {
-                <label class="admin-toggle">
-                    <input type="checkbox" @bind="_showAll" @bind:after="LoadAdminViewAsync" />
-                    Show all users
-                </label>
-            }
-            <div class="stat-tile" data-testid="stat-runs-this-month">
-                <div class="label">This month</div>
-                <div class="value">@(_stats?.RunsThisMonth.ToString() ?? "—")</div>
-                <div class="delta">runs</div>
-            </div>
-            <div class="stat-tile" data-testid="stat-convergence-rate">
-                <div class="label">Convergence rate</div>
-                <div class="value">@FormatRate(_stats?.ConvergenceRate)</div>
-                <div class="delta">completed runs</div>
-            </div>
-            <div class="stat-tile" data-testid="stat-cost-this-month">
-                <div class="label">Cost this month</div>
-                <div class="value">@FormatCost(_stats?.TotalCostThisMonth)</div>
-                <div class="delta">LLM + research</div>
-            </div>
-            <div class="stat-tile" data-testid="stat-studio-analyses">
-                <div class="label">Studio analyses</div>
-                <div class="value">@(_stats?.StudioAnalysesThisMonth.ToString() ?? "—")</div>
-                <div class="delta">this month</div>
-            </div>
-        </div>
-    </div>
+        <WelcomeStrip Data="_snapshot.WelcomeStrip" />
 
-    <div>
-        <div class="t-eyebrow eyebrow" style="margin-bottom:6px">The workbench</div>
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
-            <h2 style="font-family:var(--font-display);font-weight:300;font-size:28px;letter-spacing:-0.012em;margin:0">
-                Recent work
-            </h2>
-            <a href="/runs" style="font-family:var(--font-mono);font-size:11px;color:var(--ink-3);letter-spacing:.06em">
-                ALL RUNS ⟶
-            </a>
-        </div>
-        @if (_recentRuns is null)
+        @if (_isAdmin)
         {
-            <div class="recent-list">
-                <EmptyState Message="Loading…" />
+            <div class="dash-scope-bar">
+                <button class="scope-btn @(_scope == DashboardScope.My  ? "active" : "")"
+                        @onclick="@(() => SetScopeAsync(DashboardScope.My))">My Workshop</button>
+                <button class="scope-btn @(_scope == DashboardScope.All ? "active" : "")"
+                        @onclick="@(() => SetScopeAsync(DashboardScope.All))">All Workshops</button>
             </div>
         }
-        else if (_recentRuns.Count == 0)
-        {
-            <div class="recent-list">
-                <EmptyState Message="No runs yet — hand the crew your first briefing." />
-            </div>
-        }
-        else
-        {
-            <div class="recent-list">
-                @foreach (var run in _recentRuns)
-                {
-                    <div class="recent-row" @onclick="@(() => Nav.NavigateTo("/runs/" + run.Id))" role="button" tabindex="0">
-                        <div class="when">@TimeAgo(run.CreatedAt)</div>
-                        <div class="briefing-snip">@Truncate(run.BriefingText, 70)</div>
-                        <div class="meta t-mono">@(run.TokensTotal > 0 ? run.TokensTotal.ToString("N0") + " tok" : "—")</div>
-                        <StatusBadge Status="run.Status" />
-                    </div>
-                }
-            </div>
-        }
+
+        <div class="dash-section dash-3col">
+            <LivePressStatus Data="_snapshot.Press" />
+            <LedgerStats Data="_snapshot.Ledger" />
+            <ActivityCalendar Data="_snapshot.Heatmap" />
+        </div>
+
+        <div class="dash-section dash-3col">
+            <CrewDnaWidget Data="_snapshot.CrewDna" />
+            <CostForgeSankey Data="_snapshot.CostForge" />
+            <IterationSweetSpot Data="_snapshot.SweetSpot" />
+        </div>
+
+        <div class="dash-section dash-2col-gallery">
+            <ManuscriptsGallery Data="_snapshot.Manuscripts" />
+        </div>
+
+        <div class="dash-section dash-3col">
+            <TokenStreamWidget Data="_snapshot.TokenStream" />
+            <CriticsBenchMatrix Data="_snapshot.CriticsBench" />
+            <ProviderBenchWidget Data="_snapshot.ProviderBench" />
+        </div>
+
+        <div class="dash-section dash-3col">
+            <KnowledgeBaseWidget Data="_snapshot.KnowledgeBase" />
+            <DayBookStream Data="_liveDayBook" />
+        </div>
+
     </div>
-</div>
+}
 
 @code {
-    IReadOnlyList<RunEntity>? _recentRuns;
-    WelcomeStats? _stats;
-    string _greeting = string.Empty;
-    bool _isAdmin;
-    string? _currentUsername;
-    bool _showAll;
+    DashboardSnapshot?      _snapshot;
+    List<DayBookEntry>      _liveDayBook = [];
+    DashboardScope          _scope       = DashboardScope.My;
+    bool                    _isAdmin;
+    string                  _username    = string.Empty;
+    HubConnection?          _hub;
 
     protected override async Task OnInitializedAsync()
     {
-        var auth     = await AuthProvider.GetAuthenticationStateAsync();
-        _isAdmin         = auth.User.IsInRole("admin");
-        _currentUsername = auth.User.Identity?.Name;
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        _isAdmin  = auth.User.IsInRole("admin");
+        _username = auth.User.Identity?.Name ?? string.Empty;
 
-        await LoadAdminViewAsync();
-        _greeting   = DateTime.Now.ToString("dddd · HH:mm");
+        // Read scope from cookie (only available during SSR pass)
+        var scopeCookie = Http.HttpContext?.Request.Cookies["Atelier.DashboardScope"];
+        _scope = (scopeCookie == "all" && _isAdmin) ? DashboardScope.All : DashboardScope.My;
+
+        await LoadSnapshotAsync();
+        await InitHubAsync();
     }
 
-    // Admin defaults to their own view; the toggle opts into the system-wide /
-    // all-users view for both the recent-runs list and the stats tiles at once.
-    async Task LoadAdminViewAsync()
+    async Task LoadSnapshotAsync()
     {
-        var username = (_showAll && _isAdmin) ? null : _currentUsername;
-        _recentRuns = await RunService.ListRunsAsync(5, requestingUsername: username);
-        _stats      = await RunService.GetWelcomeStatsAsync(requestingUsername: username, CancellationToken.None);
+        if (string.IsNullOrEmpty(_username)) return;
+        _snapshot    = await DashboardService.GetSnapshotAsync(_username, _isAdmin, _scope);
+        _liveDayBook = [.._snapshot.DayBook];
     }
 
-    static string TimeAgo(DateTimeOffset dt)
+    async Task SetScopeAsync(DashboardScope newScope)
     {
-        var diff = DateTimeOffset.UtcNow - dt;
-        if (diff.TotalMinutes < 1) return "just now";
-        if (diff.TotalHours < 1)   return $"{(int)diff.TotalMinutes}m ago";
-        if (diff.TotalDays < 1)    return $"{(int)diff.TotalHours}h ago";
-        return $"{(int)diff.TotalDays}d ago";
+        if (_scope == newScope) return;
+        await LeaveHubGroupsAsync();
+        _scope = newScope;
+        await JS.InvokeVoidAsync("window.atelier.setDashboardScope",
+            newScope == DashboardScope.All ? "all" : "my");
+        await LoadSnapshotAsync();
+        await JoinHubGroupsAsync();
+        StateHasChanged();
     }
 
-    static string Truncate(string s, int max) =>
-        s.Length > max ? s[..max] + "…" : s;
-
-    static string FormatRate(double? rate) =>
-        rate.HasValue ? $"{rate.Value:P0}" : "—";
-
-    static string FormatCost(decimal? eur)
+    async Task InitHubAsync()
     {
-        if (!eur.HasValue || eur.Value == 0m) return "—";
-        if (eur.Value < 0.01m) return $"~€{eur.Value:F4}";
-        return $"€{eur.Value:F2}";
+        _hub = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/hubs/runs"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hub.On<DashboardEvent>("DashboardUpdated", async evt =>
+        {
+            if (evt.Kind == DashboardEventKind.PressUpdated)
+            {
+                // Cache already invalidated by notifier; fresh fetch
+                if (!string.IsNullOrEmpty(_username))
+                {
+                    _snapshot    = await DashboardService.GetSnapshotAsync(_username, _isAdmin, _scope);
+                    _liveDayBook = _liveDayBook.Count > 0 ? _liveDayBook : [.._snapshot.DayBook];
+                }
+            }
+            else if (evt.Kind == DashboardEventKind.DayBookUpdated && evt.DayBookEntry is { } entry)
+            {
+                _liveDayBook.Insert(0, entry);
+                if (_liveDayBook.Count > 12)
+                    _liveDayBook.RemoveAt(_liveDayBook.Count - 1);
+            }
+
+            await InvokeAsync(StateHasChanged);
+        });
+
+        _hub.Reconnected += async _ =>
+        {
+            await JoinHubGroupsAsync();
+            await LoadSnapshotAsync();
+            await InvokeAsync(StateHasChanged);
+        };
+
+        await _hub.StartAsync();
+        await JoinHubGroupsAsync();
+    }
+
+    async Task JoinHubGroupsAsync()
+    {
+        if (_hub?.State != HubConnectionState.Connected || string.IsNullOrEmpty(_username))
+            return;
+        await _hub.SendAsync("JoinDashboardGroupAsync", _username);
+        if (_isAdmin && _scope == DashboardScope.All)
+            await _hub.SendAsync("JoinDashboardAllGroupAsync");
+    }
+
+    async Task LeaveHubGroupsAsync()
+    {
+        if (_hub?.State != HubConnectionState.Connected || string.IsNullOrEmpty(_username))
+            return;
+        try { await _hub.SendAsync("LeaveDashboardGroupAsync", _username); } catch { }
+        try { await _hub.SendAsync("LeaveDashboardAllGroupAsync"); } catch { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hub is not null)
+        {
+            await LeaveHubGroupsAsync();
+            await _hub.DisposeAsync();
+        }
     }
 }

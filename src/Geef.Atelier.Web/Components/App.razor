@@ -9,6 +9,7 @@
     <base href="/" />
     <ResourcePreloader />
     <link rel="stylesheet" href="@Assets["atelier.css"]" />
+    <link rel="stylesheet" href="@Assets["atelier-dashboard.css"]" />
     <link rel="stylesheet" href="@Assets["Geef.Atelier.Web.styles.css"]" />
     <ImportMap />
     <!-- Modern PNG favicons -->
@@ -44,6 +45,16 @@
         {
             var v = Http.HttpContext?.Request.Cookies["Atelier.Theme"];
             return v is not null && AllowedThemes.Contains(v) ? v : "vellum";
+        }
+    }
+
+    /// <summary>Dashboard scope read from cookie; defaults to "my".</summary>
+    internal string DashboardScope
+    {
+        get
+        {
+            var v = Http.HttpContext?.Request.Cookies["Atelier.DashboardScope"];
+            return v == "all" ? "all" : "my";
         }
     }
 }

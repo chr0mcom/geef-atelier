@@ -1,0 +1,39 @@
+@using Geef.Atelier.Core.Domain.Dashboard
+
+<div class="dash-card">
+    <div class="dash-card-head">
+        <span class="card-title">Critics Bench</span>
+        <span class="card-sub">30 days</span>
+    </div>
+    @if (!Data.Rows.Any())
+    {
+        <div class="empty">No reviewer activity</div>
+    }
+    else
+    {
+        <div class="crit-matrix">
+            @foreach (var row in Data.Rows)
+            {
+                <div class="reviewer">
+                    <div class="name">@row.DisplayName</div>
+                    <div class="fill"><span style="width:@((row.PassRate * 100).ToString("F0"))%"></span></div>
+                    <div class="pass">@row.Passes</div>
+                    <div class="sep">/</div>
+                    <div class="fail">@row.Fails</div>
+                </div>
+            }
+        </div>
+        @if (Data.Rows.Any())
+        {
+            var strictest = Data.Rows.MinBy(r => r.PassRate);
+            if (strictest is not null)
+            {
+                <div class="strictest">Strictest: @strictest.DisplayName (@(strictest.PassRate * 100).ToString("F0")%)</div>
+            }
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Geef.Atelier.Core.Domain.Dashboard.CriticsBenchMatrix Data { get; set; } = null!;
+}

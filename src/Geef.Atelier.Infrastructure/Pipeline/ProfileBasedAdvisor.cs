@@ -53,7 +53,8 @@ internal sealed class ProfileBasedAdvisor(
                 model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens);
             costAccumulator.RecordActorCost(
                 iterationNumber, ActorType.Advisor, profile.Name, model,
-                response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur);
+                response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur,
+                providerName: profile.Provider);
         }
 
         var consultation = new AdvisorConsultation(

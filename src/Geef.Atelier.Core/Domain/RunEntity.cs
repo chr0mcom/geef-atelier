@@ -67,4 +67,10 @@ public sealed class RunEntity
     /// Null for clean-retry resumes and for runs that were not resumed.
     /// </summary>
     public string? SeedDraftText { get; init; }
+
+    /// <summary>
+    /// Word count of <see cref="FinalText"/>, computed once when the pipeline completes.
+    /// Null for runs before Step25 migration or when <see cref="FinalText"/> is null/empty.
+    /// </summary>
+    public int? WordCount { get; set; }
 }

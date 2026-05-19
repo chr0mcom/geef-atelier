@@ -55,7 +55,8 @@ internal sealed class ProfileBasedReviewer(
                 model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens);
             costAccumulator.RecordActorCost(
                 iter, ActorType.Reviewer, profile.Name, model,
-                response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur);
+                response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur,
+                providerName: profile.Provider);
         }
 
         if (response.FinishReason != "tool_calls" || response.ToolArgumentsJson is null)

@@ -76,6 +76,7 @@ internal sealed class TransformFinalizerExecutor(
             ActorName: profile.Name,
             ModelName: settings.Model,
             InputTokens: inputTokens,
-            OutputTokens: outputTokens);
+            OutputTokens: outputTokens,
+            ProviderName: settings.Provider);
     }
 }

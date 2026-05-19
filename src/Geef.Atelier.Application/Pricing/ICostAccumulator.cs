@@ -16,7 +16,8 @@ public interface ICostAccumulator
         string modelName,
         int inputTokens,
         int outputTokens,
-        decimal? costEur);
+        decimal? costEur,
+        string? providerName = null);
 
     /// <summary>Returns all accumulated records and clears the internal buffer.</summary>
     IReadOnlyList<PendingActorCost> Flush();
@@ -29,4 +30,5 @@ public sealed record PendingActorCost(
     string ModelName,
     int InputTokens,
     int OutputTokens,
-    decimal? CostEur);
+    decimal? CostEur,
+    string? ProviderName = null);

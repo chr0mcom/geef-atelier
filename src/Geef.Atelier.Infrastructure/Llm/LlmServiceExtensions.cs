@@ -1,5 +1,7 @@
 using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Application.Dashboard;
 using Geef.Atelier.Infrastructure.Crew;
+using Geef.Atelier.Infrastructure.Dashboard;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -23,6 +25,7 @@ public static class LlmServiceExtensions
         services.AddSingleton<IProviderCatalog, ProviderCatalog>();
         services.AddMemoryCache();
         services.AddSingleton<IModelCatalog, ModelCatalog>();
+        services.AddSingleton<IDashboardService, DashboardService>();
 
         return services.AddHttpClient(HttpClientNames.Llm, client =>
         {

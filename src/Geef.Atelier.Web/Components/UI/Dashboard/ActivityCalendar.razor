@@ -1,0 +1,47 @@
+@using Geef.Atelier.Core.Domain.Dashboard
+
+<div class="dash-card">
+    <div class="dash-card-head">
+        <span class="card-title">Activity</span>
+        @if (Data.Peak.Count > 0)
+        {
+            <span class="card-sub peak">Peak: @Data.Peak.Date.ToString("d MMM") — @Data.Peak.Count runs</span>
+        }
+    </div>
+    <div class="calendar-wrap">
+        <div class="heatmap">
+            @{
+                var cols = GroupIntoWeeks(Data.Cells);
+            }
+            @foreach (var week in cols)
+            {
+                <div class="heatmap-col">
+                    @foreach (var cell in week)
+                    {
+                        <div class="heatmap-cell lvl-@cell.Level" title="@cell.Date.ToString("d MMM yyyy"): @cell.Count runs"></div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public ActivityHeatmap Data { get; set; } = null!;
+
+    static List<List<HeatmapCell>> GroupIntoWeeks(IReadOnlyList<HeatmapCell> cells)
+    {
+        var weeks = new List<List<HeatmapCell>>();
+        List<HeatmapCell>? current = null;
+        foreach (var cell in cells)
+        {
+            if (current is null || cell.Date.DayOfWeek == DayOfWeek.Sunday)
+            {
+                current = [];
+                weeks.Add(current);
+            }
+            current.Add(cell);
+        }
+        return weeks;
+    }
+}

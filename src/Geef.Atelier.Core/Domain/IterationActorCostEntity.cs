@@ -19,6 +19,9 @@ public sealed class IterationActorCostEntity
     /// <summary>Cost in EUR, or null when the model is not in the pricing table.</summary>
     public decimal? CostEur { get; init; }
 
+    /// <summary>The provider that served this actor call, e.g. "claude-cli" or "openrouter". Null for pre-Step25 rows.</summary>
+    public string? ProviderName { get; init; }
+
     public required DateTimeOffset CreatedAt { get; init; }
 
     public IterationEntity Iteration { get; init; } = null!;
