@@ -6,6 +6,7 @@
 @using Geef.Atelier.Application.Crew
 @using Geef.Atelier.Core.Domain.Crew
 @using Geef.Atelier.Core.Domain.Crew.Advisors
+@using Geef.Atelier.Core.Domain.Crew.Finalizers
 @using Geef.Atelier.Core.Domain.Crew.Grounding
 @using Geef.Atelier.Core.Domain.Crew.Profiles
 @using Geef.Atelier.Infrastructure.Configuration
@@ -72,6 +73,24 @@
                                         Selected="_form.GroundingProviderNames"
                                         SelectedChanged="names => _form.GroundingProviderNames = names" />
             </div>
+
+            <div class="field">
+                <label>Finalizer (optionale Pipeline nach dem Run)</label>
+                <FinalizerPicker AllProfiles="_finalizerProfiles"
+                                 Selected="_form.FinalizerProfileNames"
+                                 SelectedChanged="names => _form.FinalizerProfileNames = names" />
+            </div>
+
+            @if (_form.FinalizerProfileNames.Count > 0)
+            {
+                <div class="field">
+                    <label class="form-checkbox-label">
+                        <InputCheckbox @bind-Value="_form.RunFinalizersOnMaxAttempts" data-testid="run-finalizers-on-max-attempts" />
+                        Finalizer auch bei MaxIterations ausführen
+                    </label>
+                    <small class="form-hint">Wenn aktiviert, werden Finalizer auch dann ausgeführt, wenn die Pipeline nicht konvergiert. Der Run wird als abgeschlossen markiert, nicht als fehlgeschlagen.</small>
+                </div>
+            }
 
             <div class="field">
                 <label>Advisors</label>
@@ -174,6 +193,7 @@
     private IReadOnlyList<ExecutorProfile> _executors = [];
     private IReadOnlyList<AdvisorProfile> _advisorProfiles = [];
     private IReadOnlyList<GroundingProviderProfile> _groundingProviderProfiles = [];
+    private IReadOnlyList<FinalizerProfile> _finalizerProfiles = [];
 
     private TemplateFormModel _form = new();
 
@@ -183,6 +203,7 @@
         _executors = await CrewService.ListExecutorProfilesAsync(includeSystem: true);
         _advisorProfiles = await CrewService.ListAdvisorProfilesAsync(includeSystem: true);
         _groundingProviderProfiles = await CrewService.ListGroundingProviderProfilesAsync(includeSystem: true);
+        _finalizerProfiles = await CrewService.ListFinalizerProfilesAsync(includeSystem: true);
 
         var defaults = ConvergenceOpts.Value;
         if (!IsNew)
@@ -283,6 +304,9 @@
 
         public List<string> GroundingProviderNames { get; set; } = [];
 
+        public List<string> FinalizerProfileNames { get; set; } = [];
+        public bool RunFinalizersOnMaxAttempts { get; set; } = false;
+
         public EvaluationStrategy EvaluationStrategy { get; set; } = EvaluationStrategy.Parallel;
 
         public int? MaxIterations { get; set; }
@@ -299,6 +323,8 @@
             AdvisorProfileNames = t.AdvisorProfileNames.ToList(),
             ReviewerProfileNames = t.ReviewerProfileNames.ToList(),
             GroundingProviderNames = t.GroundingProviderNames.ToList(),
+            FinalizerProfileNames = (t.FinalizerProfileNames ?? []).ToList(),
+            RunFinalizersOnMaxAttempts = t.RunFinalizersOnMaxAttempts,
             EvaluationStrategy = t.EvaluationStrategy,
             MaxIterations = t.ConvergenceOverride?.MaxIterations ?? d.MaxIterations,
             AbortOnCritical = t.ConvergenceOverride?.AbortOnCritical ?? d.AbortOnCritical,
@@ -339,7 +365,9 @@
                 ConvergenceOverride: overr,
                 AdvisorProfileNames: AdvisorProfileNames,
                 GroundingProviderNames: GroundingProviderNames,
-                IsSystem: false);
+                IsSystem: false,
+                FinalizerProfileNames: FinalizerProfileNames,
+                RunFinalizersOnMaxAttempts: RunFinalizersOnMaxAttempts);
         }
     }
 }

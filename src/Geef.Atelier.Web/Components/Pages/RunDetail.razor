@@ -4,6 +4,7 @@
 @implements IAsyncDisposable
 @inject IRunService RunService
 @inject IKnowledgeService KnowledgeService
+@inject IRunArtifactRepository ArtifactRepository
 @inject NavigationManager Nav
 @inject ILogger<RunDetail> Logger
 @inject AuthenticationStateProvider AuthProvider
@@ -13,7 +14,9 @@
 @using Geef.Atelier.Core.Domain
 @using Geef.Atelier.Core.Domain.Crew
 @using Geef.Atelier.Core.Domain.Crew.Advisors
+@using Geef.Atelier.Core.Domain.Crew.Finalizers
 @using Geef.Atelier.Core.Domain.Crew.Knowledge
+@using Geef.Atelier.Core.Persistence
 @using Geef.Atelier.Web.Display
 @using Geef.Atelier.Web.Components.UI
 
@@ -65,10 +68,30 @@
                 <div class="row"><span class="label">Submitted</span><span class="val">@_details.Run.CreatedAt.LocalDateTime.ToString("HH:mm")</span></div>
                 <div class="row"><span class="label">Tokens</span><span class="val">@(_details.Run.TokensTotal > 0 ? _details.Run.TokensTotal.ToString("N0") : "—")</span></div>
                 <div class="row"><span class="label">Cost</span><span class="val" data-testid="run-cost">@FormatRunCost(_details.Run)</span></div>
+                @if (_details.Run.ParentRunId.HasValue)
+                {
+                    <div class="row">
+                        <span class="label">Fortgesetzt von</span>
+                        <span class="val">
+                            <a href="/runs/@_details.Run.ParentRunId.Value" class="t-mono">
+                                @_details.Run.ParentRunId.Value.ToString("N")[..8].ToUpperInvariant()
+                            </a>
+                        </span>
+                    </div>
+                }
                 @if (_details.Run.Status is RunStatus.Pending or RunStatus.Running)
                 {
                     <div class="actions">
                         <CancelButton RunId="_details.Run.Id" OnCancelled="HandleCancelledAsync" />
+                    </div>
+                }
+                @if (_details.Run.Status is RunStatus.Aborted or RunStatus.Failed)
+                {
+                    <div class="actions">
+                        <button class="btn secondary" data-testid="resume-run-button"
+                                @onclick="OpenResumeDialog">
+                            Fortsetzen
+                        </button>
                     </div>
                 }
             </div>
@@ -92,6 +115,14 @@
         <PromoteAttachmentModal @bind-Show="_showPromoteModal"
                                Document="_promoteCandidate"
                                OnConfirm="HandlePromoteAsync" />
+
+        <ResumeRunDialog
+            Show="@_showResumeDialog"
+            HasIterations="@(_details?.Iterations.Count > 0)"
+            DefaultMaxIterations="@GetEffectiveMaxIterations()"
+            ParentRunId="@RunId"
+            OnConfirm="HandleResumeConfirmedAsync"
+            OnCancel="() => _showResumeDialog = false" />
 
         @if (_details is not null && _viewModel is not null)
         {
@@ -131,6 +162,58 @@
             </div>
         }
 
+        @if (_artifacts.Count > 0)
+        {
+            <div class="run-artifacts-section" data-testid="artifacts-section">
+                <h2>Finalizer-Artefakte</h2>
+                @if (!string.IsNullOrEmpty(_details.Run.FinalizerErrorMessage))
+                {
+                    <div class="warning-banner" data-testid="finalizer-error">
+                        Teilfehler: @_details.Run.FinalizerErrorMessage
+                    </div>
+                }
+                <table class="crew-table">
+                    <thead>
+                        <tr>
+                            <th>Finalizer</th>
+                            <th>Typ</th>
+                            <th>Details</th>
+                            <th>Erstellt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var a in _artifacts)
+                        {
+                            <tr data-testid="artifact-row-@a.Id">
+                                <td>@a.FinalizerProfileName</td>
+                                <td>@GetArtifactTypeLabel(a.ArtifactType)</td>
+                                <td>
+                                    @if (a.ArtifactType == ArtifactType.File && a.Filename is not null)
+                                    {
+                                        <a href="/runs/@RunId/artifacts/@a.Id/download"
+                                           class="btn small"
+                                           data-testid="artifact-download-@a.Id">
+                                            @a.Filename (@FormatBytes(a.SizeBytes ?? 0))
+                                        </a>
+                                    }
+                                    else if (a.ArtifactType == ArtifactType.Url)
+                                    {
+                                        <a href="@a.StorageUri" target="_blank" rel="noopener noreferrer"
+                                           data-testid="artifact-url-@a.Id">@a.StorageUri</a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">@(a.StatusMessage ?? a.StorageUri)</span>
+                                    }
+                                </td>
+                                <td>@a.CreatedAt.ToString("HH:mm:ss")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
         @if (_details.Run.Status == RunStatus.Completed && !string.IsNullOrEmpty(_details.Run.FinalText))
         {
             <Manuscript Run="_details.Run" IterationCount="@_details.Iterations.Count" />
@@ -149,10 +232,12 @@
     CrewSnapshot?  _snapshot;
     List<KnowledgeDocument> _runAttachments = [];
     IReadOnlyList<Guid>     _runAttachmentDocumentIds = [];
+    IReadOnlyList<RunArtifact> _artifacts = [];
     bool _showPromoteModal;
     KnowledgeDocument? _promoteCandidate;
     string? _promoteError;
     string? _requestingUser;
+    bool _showResumeDialog;
 
     string _shortId => RunId.ToString("N")[..8].ToUpperInvariant();
 
@@ -202,6 +287,30 @@
             _runAttachments = [];
         }
         _runAttachmentDocumentIds = _runAttachments.Select(a => a.Id).ToArray();
+        try
+        {
+            _artifacts = await ArtifactRepository.ListByRunAsync(RunId, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load run artifacts for run {RunId}", RunId);
+            _artifacts = [];
+        }
+    }
+
+    static string GetArtifactTypeLabel(ArtifactType t) => t switch
+    {
+        ArtifactType.File   => "Datei",
+        ArtifactType.Url    => "URL",
+        ArtifactType.Status => "Status",
+        _                   => t.ToString(),
+    };
+
+    static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024):F1} MB";
     }
 
     void OpenPromoteModal(KnowledgeDocument doc)
@@ -259,6 +368,33 @@
     {
         await LoadAsync();
         StateHasChanged();
+    }
+
+    void OpenResumeDialog() => _showResumeDialog = true;
+
+    int GetEffectiveMaxIterations()
+    {
+        if (_details?.Run.CrewSnapshot is { } json)
+        {
+            var snapshot = CrewSnapshot.Deserialize(json);
+            if (snapshot?.ConvergenceOverride?.MaxIterations is { } max)
+                return max;
+        }
+        return 3;
+    }
+
+    async Task HandleResumeConfirmedAsync(ResumeOptions opts)
+    {
+        _showResumeDialog = false;
+        try
+        {
+            var newRunId = await RunService.ResumeRunAsync(opts, _requestingUser);
+            Nav.NavigateTo($"/runs/{newRunId}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Resume failed for run {RunId}", RunId);
+        }
     }
 
     static string Truncate(string s, int max) =>

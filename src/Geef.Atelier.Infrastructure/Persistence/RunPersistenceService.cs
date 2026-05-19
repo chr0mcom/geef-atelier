@@ -56,4 +56,36 @@ internal sealed class RunPersistenceService(AtelierDbContext db) : IRunPersisten
                 .SetProperty(r => r.CompletedAt,  DateTimeOffset.UtcNow),
                 cancellationToken);
     }
+
+    /// <inheritdoc/>
+    public async Task<Guid> CreateResumedRunAsync(
+        string briefingText,
+        string configJson,
+        string? createdByUser,
+        string? crewTemplateName,
+        string? crewSnapshotJson,
+        Guid parentRunId,
+        string? seedDraftText,
+        CancellationToken cancellationToken = default)
+    {
+        var run = new RunEntity
+        {
+            Id               = Guid.NewGuid(),
+            CreatedAt        = DateTimeOffset.UtcNow,
+            Status           = RunStatus.Pending,
+            BriefingText     = briefingText,
+            ConfigJson       = configJson,
+            CreatedByUser    = createdByUser,
+            CrewTemplateName = crewTemplateName,
+            CrewSnapshot     = crewSnapshotJson,
+            TokensTotal      = 0,
+            CostTotal        = 0m,
+            ParentRunId      = parentRunId,
+            SeedDraftText    = seedDraftText,
+        };
+
+        db.Runs.Add(run);
+        await db.SaveChangesAsync(cancellationToken);
+        return run.Id;
+    }
 }

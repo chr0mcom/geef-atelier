@@ -63,5 +63,18 @@ internal sealed class CrewTemplateConfiguration : IEntityTypeConfiguration<CrewT
                 v => v == null ? null : JsonSerializer.Serialize(v, JsonOpts),
                 v => v == null ? null : JsonSerializer.Deserialize<ConvergencePolicyOverride>(v, JsonOpts))
             .IsRequired(false);
+
+        builder.Property(t => t.FinalizerProfileNames)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, JsonOpts),
+                v => (IReadOnlyList<string>)JsonSerializer.Deserialize<List<string>>(v, JsonOpts)!,
+                StringListComparer)
+            .IsRequired()
+            .HasDefaultValueSql("'[]'::jsonb");
+
+        builder.Property(t => t.RunFinalizersOnMaxAttempts)
+            .IsRequired()
+            .HasDefaultValue(false);
     }
 }

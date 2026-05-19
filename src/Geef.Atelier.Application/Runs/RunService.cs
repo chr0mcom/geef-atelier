@@ -126,6 +126,58 @@ internal sealed class RunService(
         => repository.GetWelcomeStatsAsync(requestingUsername, cancellationToken);
 
     /// <inheritdoc/>
+    public async Task<Guid> ResumeRunAsync(ResumeOptions options, string? requestingUsername, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        var details = await repository.GetDetailsAsync(options.ParentRunId, cancellationToken);
+        if (details is null)
+            throw new InvalidOperationException($"Run {options.ParentRunId} not found.");
+
+        if (requestingUsername is not null && details.Run.CreatedByUser != requestingUsername)
+            throw new InvalidOperationException(
+                $"Run {options.ParentRunId} does not belong to user {requestingUsername}.");
+
+        if (details.Run.Status is not (RunStatus.Aborted or RunStatus.Failed))
+            throw new InvalidOperationException(
+                $"Run {options.ParentRunId} is in status {details.Run.Status} and cannot be resumed. Only Aborted and Failed runs are resumable.");
+
+        string? seedDraftText = null;
+        if (options.UseSeedDraft && details.Iterations.Count > 0)
+        {
+            seedDraftText = details.Iterations
+                .OrderByDescending(i => i.Iteration.IterationNumber)
+                .First()
+                .Iteration.ArtifactText;
+        }
+
+        var snapshotJson = details.Run.CrewSnapshot;
+        if (options.MaxIterationsOverride.HasValue && !string.IsNullOrEmpty(snapshotJson))
+        {
+            var snapshot = CrewSnapshot.Deserialize(snapshotJson);
+            if (snapshot is not null)
+            {
+                var patched = snapshot with
+                {
+                    ConvergenceOverride = (snapshot.ConvergenceOverride ?? new ConvergencePolicyOverride(null, null, null, null))
+                        with { MaxIterations = options.MaxIterationsOverride }
+                };
+                snapshotJson = JsonSerializer.Serialize(patched, SnapshotJsonOpts);
+            }
+        }
+
+        return await persistence.CreateResumedRunAsync(
+            details.Run.BriefingText,
+            details.Run.ConfigJson,
+            details.Run.CreatedByUser,
+            details.Run.CrewTemplateName,
+            snapshotJson,
+            options.ParentRunId,
+            seedDraftText,
+            cancellationToken);
+    }
+
+    /// <inheritdoc/>
     public async Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
     {
         var details = await repository.GetDetailsAsync(runId, cancellationToken);

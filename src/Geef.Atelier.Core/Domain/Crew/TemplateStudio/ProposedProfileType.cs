@@ -6,5 +6,6 @@ public enum ProposedProfileType
     Reviewer,
     Executor,
     Advisor,
-    GroundingProvider
+    GroundingProvider,
+    Finalizer
 }

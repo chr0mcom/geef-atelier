@@ -36,6 +36,8 @@ services:
       - "traefik.http.routers.geef-atelier.middlewares=chain@file"
       - "traefik.http.services.geef-atelier.loadbalancer.server.port=8080"
       - "com.centurylinklabs.watchtower.enable=false"
+    volumes:
+      - geef-atelier-exports:/app/exports
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -125,3 +127,4 @@ volumes:
   geef_atelier_postgres_data:
   geef-atelier-backups:
   geef-atelier-cli-auth:
+  geef-atelier-exports:

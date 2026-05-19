@@ -68,4 +68,16 @@ public interface IRunService
     Task<WelcomeStats> GetWelcomeStatsAsync(
         string? requestingUsername,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates a new run that resumes a previously aborted or failed run.
+    /// Returns the ID of the newly created run.
+    /// Throws <see cref="InvalidOperationException"/> if the parent run does not exist,
+    /// does not belong to <paramref name="requestingUsername"/> (when non-null),
+    /// or is not in a resumable state (Aborted or Failed).
+    /// </summary>
+    Task<Guid> ResumeRunAsync(
+        ResumeOptions options,
+        string? requestingUsername,
+        CancellationToken cancellationToken = default);
 }

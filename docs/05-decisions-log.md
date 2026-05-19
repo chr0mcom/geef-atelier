@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-05-18 (Template Studio Complete Edit: D-043 added; D-043/9 post-deploy corrections — prompt anatomy, Meta-LLM Opus 4.7, MaxTokens floor)*
+*Last updated: 2026-05-19 (Finalizer-Foundation: D-044 added)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -816,3 +816,29 @@ Full field parity in the Studio Edit-Step so the Studio workflow requires no pos
 - **Generated profile prompts now follow the full Atelier profile anatomy.** The meta-prompt no longer caps system prompts at "100 words"; it mandates the same structure as the hand-authored system profiles in `SystemPrompts.cs` — for reviewers: role line, `submit_review` instruction, the 4-tier severity taxonomy with concrete domain examples, the ANTI-PATTERN calibration block, a domain focus checklist, and the "Respond in the language of the user briefing" line; for advisors: role line, "strategic guidance only", a numbered 2–5 observation list, conciseness rule, iteration-variance rule for `BeforeEveryExecution`. A full worked reviewer+advisor example was added to the few-shot. The advisor-discouraging principle was reversed: advisors are now actively encouraged whenever the task benefits from upfront/per-iteration guidance.
 - **Meta-LLM upgraded** from `anthropic/claude-sonnet-4-5` to `anthropic/claude-opus-4-7`; `TemplateStudio:MaxTokens` raised 4096 → 8192 (a single tool call now carries several fully structured prompts).
 - **MaxTokens floor.** `StudioDefaults.MinMaxTokens = 10000` clamps every generating profile up to that floor in `ApplyDefaults`, even when the meta-LLM proposes a smaller value (GroundingProvider stays `null`). Studio defaults raised: Reviewer/Advisor `MaxTokens` 2048 → 16384, Executor 4096 → 60000. The same too-low default affected all `MaxTokens: null` system profiles via `LlmOptions.DefaultMaxTokens`, raised 4096 → 16384; explicit actor configs `BriefingTreueReviewer`/`KlarheitReviewer` 2048 → 16384, `Executor` 8192 → 60000. `GroundingQueryExtractor` deliberately stays at 256 (it extracts only a short search query).
+
+---
+
+## D-044 — Finalizer-Foundation: Fünfter Profil-Typ, vollständige System-Library
+
+*Date: 19 May 2026 | Report: [reports/feature-finalizer-foundation-report.md](reports/feature-finalizer-foundation-report.md)*
+
+Adds a complete Finalizer phase as the fifth profile type (FileExport, MetadataEnrich, ExternalSink, Transform) with 17 system profiles, sortable pipeline chain in templates, Run Artifacts storage + download endpoint, full CRUD UI, Studio integration, and MCP tools. Completes the „F" in the GEEF acronym.
+
+**D-044/1 — Flat domain model, GroundingProvider pattern.** `FinalizerProfile` is a flat record with `Dictionary<string,string>` Settings (JSONB) and `IsSystem`. No wrapper domain model. Typed settings records (`FileExportSettings`, `MetadataEnrichSettings`, `WebhookSinkSettings`, `EmailSinkSettings`, `TransformSettings`) wrap the dict in all executor implementations. Rationale: consistency with existing GroundingProvider pattern; avoids introducing a second abstraction level.
+
+**D-044/2 — Separate `FinalizationActorCosts` table (not `IterationActorCosts` extension).** A new `FinalizationActorCosts` table (Id, RunId FK CASCADE, ActorName, ModelName, InputTokens, OutputTokens, CostEur, CreatedAt) replaces extending `IterationActorCosts`. `IterationActorCosts.IterationId` is a required FK — adding a nullable FK would introduce fragility and semantic pollution. Finalizer costs aggregate to `Runs.FinalizerCostEur`. Rationale: cleaner separation, no FK migration on the existing iteration table.
+
+**D-044/3 — Partial-success contract (no new RunStatus enum value).** Finalizer errors produce an `ArtifactType.Status` artifact and set `Runs.FinalizerErrorMessage`. The Run status remains `Completed`. No `CompletedWithFinalizerErrors` enum value is introduced (avoided enum proliferation and downstream serialization migration). The error is visible in the RunDetail UI via the artifacts section.
+
+**D-044/4 — Pipeline insertion: reload FinalText from DB.** `ExecuteFinalizationAsync` is inserted in `RunOrchestratorService` after `FinalizeRunCostsAsync`. It reloads the Run entity from the database because `PostgresEventSink` writes `FinalText` directly on `PipelineCompletedEvent` — the orchestrator does not hold it in memory. Discovered during grounding (spec pseudocode was incorrect).
+
+**D-044/5 — MaxAttempts path covers advisor-retry failure.** When `RunFinalizersOnMaxAttempts=true`, finalizers run not only when the main pipeline fails to converge but also when the `OnConvergenceFailure` advisor retry also fails. The outer `catch (ConvergenceFailedException)` now wraps `TryConvergenceFailureRetryAsync` in a nested try-catch, setting `retryAlsoFailed=true` and proceeding to `ExecuteFinalizationOnMaxAttemptsAsync`. Found during Evaluation (R1 reviewer).
+
+**D-044/6 — System profile names: deliberate deviation from spec draft.** The spec listed names such as `add-frontmatter`, `send-webhook`, `de-hedging`, `length-adjust-500`. The implementation uses more descriptive, internally consistent names: `add-front-matter`, `webhook-sink`, `tone-formalization`, `tone-casual`, `executive-summary`, `key-takeaways`, `glossary`, `add-reading-level`. The Table of Contents profile (`add-toc`) was not implemented; `add-reading-level` was substituted. Rationale: the implemented names are clearer to end users, internally consistent (all lowercase-hyphenated), and the system is self-documenting. No existing data depends on these names at the time of introduction. Acknowledged per D-044 (found by R1 reviewer).
+
+**D-044/7 — ExportPath containment + GUID-based file paths (path-traversal prevention).** Download endpoint validates that the resolved `Path.GetFullPath(StorageUri)` starts with `Path.GetFullPath(ExportPath)`. File paths are constructed as `{ExportPath}/{runId:N}/{filename}` where `runId` comes from the GUID-typed route parameter and `filename` from a DB-stored value (never from user input). Defense-in-depth: both the GUID route constraint and the `Path.GetFullPath` containment check must pass.
+
+**D-044/8 — Webhook auth-header stored plaintext.** The webhook authentication header is stored as plaintext in the `FinalizerProfiles` JSONB column and embedded in `CrewSnapshot` on every run. It is never logged or included in Status artifacts. Encryption at rest (e.g. `IDataProtectionProvider`) was considered but deferred: the auth header is a low-sensitivity bearer token (webhook endpoint security), not a user credential, and the production database is on a private network. UI hints corrected from "verschlüsselt gespeichert" to "im Klartext in der Datenbank gespeichert" (found by R2 reviewer).
+
+**D-044/9 — MaxFileSizeBytes enforced before write.** `FileExportFinalizerExecutor` checks `bytes.Length > _options.MaxFileSizeBytes` after conversion but before writing to disk. Produces a `Status` artifact on violation. Default: 50 MB. Found by R2 reviewer (was defined in options but not enforced in first pass).

@@ -10,7 +10,7 @@ namespace Geef.Atelier.Infrastructure.Persistence.Crew;
 /// </summary>
 internal static class CrewTemplateCascade
 {
-    internal enum ListRef { Reviewer, Advisor, Grounding }
+    internal enum ListRef { Reviewer, Advisor, Grounding, Finalizer }
 
     /// <summary>Repoints the scalar <c>ExecutorProfileName</c> of every custom template that references <paramref name="oldName"/>.</summary>
     public static Task RenameExecutorRefAsync(
@@ -31,6 +31,7 @@ internal static class CrewTemplateCascade
                 ListRef.Reviewer  => t.ReviewerProfileNames,
                 ListRef.Advisor   => t.AdvisorProfileNames,
                 ListRef.Grounding => t.GroundingProviderNames,
+                ListRef.Finalizer => t.FinalizerProfileNames,
                 _                 => throw new ArgumentOutOfRangeException(nameof(field)),
             };
             if (!current.Contains(oldName))
@@ -42,6 +43,7 @@ internal static class CrewTemplateCascade
                 ListRef.Reviewer  => t with { ReviewerProfileNames = replaced },
                 ListRef.Advisor   => t with { AdvisorProfileNames = replaced },
                 ListRef.Grounding => t with { GroundingProviderNames = replaced },
+                ListRef.Finalizer => t with { FinalizerProfileNames = replaced },
                 _                 => t,
             };
             db.Entry(t).CurrentValues.SetValues(updated);

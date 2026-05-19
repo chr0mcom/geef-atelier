@@ -9,4 +9,9 @@
     <!-- CS1591: Missing XML comment for publicly visible type — suppressed for generated code (migrations, razor) -->
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
+  <!-- NuGet vulnerability suppressions for MailKit/MimeKit transitive dependencies (both moderate severity) -->
+  <ItemGroup>
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-g7hc-96xr-gvvx" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-9j88-vvj5-vhgr" />
+  </ItemGroup>
 </Project>

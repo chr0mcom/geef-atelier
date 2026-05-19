@@ -39,9 +39,18 @@ public static class AnalyzeTemplateProposalTool
         CreatedAt: a.CreatedAt);
 
     private static ProposedTemplateDto MapTemplate(ProposedTemplate t) => new(
-        t.Name, t.DisplayName, t.Description, t.ExecutorProfileName,
-        t.ReviewerProfileNames, t.AdvisorProfileNames, t.GroundingProviderProfileNames,
-        t.EvaluationStrategy, t.EvaluationStrategyReasoning);
+        Name:                          t.Name,
+        DisplayName:                   t.DisplayName,
+        Description:                   t.Description,
+        ExecutorProfileName:           t.ExecutorProfileName,
+        ReviewerProfileNames:          t.ReviewerProfileNames,
+        AdvisorProfileNames:           t.AdvisorProfileNames,
+        GroundingProviderProfileNames: t.GroundingProviderProfileNames,
+        EvaluationStrategy:            t.EvaluationStrategy,
+        EvaluationStrategyReasoning:   t.EvaluationStrategyReasoning,
+        FinalizerProfileNames:         t.FinalizerProfileNames,
+        RunFinalizersOnMaxAttempts:    t.RunFinalizersOnMaxAttempts,
+        FinalizerReasoning:            t.FinalizerReasoning);
 
     private static ProposedProfileDto MapProfile(ProposedProfile p) => new(
         p.ProfileType.ToString(), p.Name, p.DisplayName, p.Description,
@@ -49,7 +58,8 @@ public static class AnalyzeTemplateProposalTool
         p.ReviewerFocus, p.AdvisorMode, p.AdvisorTrigger,
         p.GroundingProviderType, p.GroundingProviderSettings,
         p.ModelReasoning, p.SystemPromptReasoning, p.OverallReasoning,
-        p.ModeReasoning, p.TriggerReasoning);
+        p.ModeReasoning, p.TriggerReasoning,
+        p.FinalizerType, p.FinalizerSettings, p.FinalizerReasoning);
 }
 
 public sealed record AnalyzeTemplateProposalOutput(
@@ -76,7 +86,10 @@ public sealed record ProposedTemplateDto(
     IReadOnlyList<string> AdvisorProfileNames,
     IReadOnlyList<string> GroundingProviderProfileNames,
     string EvaluationStrategy,
-    string? EvaluationStrategyReasoning = null);
+    string? EvaluationStrategyReasoning = null,
+    IReadOnlyList<string>? FinalizerProfileNames = null,
+    bool RunFinalizersOnMaxAttempts = false,
+    string? FinalizerReasoning = null);
 
 public sealed record ProposedProfileDto(
     string ProfileType,
@@ -96,4 +109,7 @@ public sealed record ProposedProfileDto(
     string? SystemPromptReasoning = null,
     string? OverallReasoning = null,
     string? ModeReasoning = null,
-    string? TriggerReasoning = null);
+    string? TriggerReasoning = null,
+    string? FinalizerType = null,
+    Dictionary<string, string>? FinalizerSettings = null,
+    string? FinalizerReasoning = null);

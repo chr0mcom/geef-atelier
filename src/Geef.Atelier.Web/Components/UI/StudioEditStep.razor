@@ -3,6 +3,7 @@
 @using Geef.Atelier.Core.Domain.Crew.TemplateStudio
 @using Geef.Atelier.Web.Resources
 @using Microsoft.Extensions.Options
+@using Geef.Atelier.Core.Domain.Crew.Finalizers
 @inject ICrewService CrewService
 @inject IOptions<TemplateStudioOptions> Options
 
@@ -51,6 +52,20 @@
                     </div>
                 }
             </div>
+
+            @if (_finalizerSlots.Count > 0)
+            {
+                <div class="field checkbox-field">
+                    <label>
+                        <input type="checkbox"
+                               checked="@_template.RunFinalizersOnMaxAttempts"
+                               @onchange="OnRunFinalizersOnMaxAttemptsChange"
+                               data-testid="run-finalizers-on-max-attempts" />
+                        Finalizer auch bei maximalen Iterationen ausführen
+                    </label>
+                    <FieldHelp Text="@StudioFieldHelps.RunFinalizersOnMaxAttempts" DataTestId="field-help-run-finalizers-on-max" />
+                </div>
+            }
         </div>
 
         <div class="edit-section">
@@ -179,6 +194,47 @@
             </div>
         </div>
 
+        <div class="edit-section">
+            <h3>Finalizer <span class="optional-label">(optional)</span></h3>
+            <FieldHelp Text="@StudioFieldHelps.FinalizerProfiles" DataTestId="field-help-finalizer-profiles" />
+            @for (var i = 0; i < _finalizerSlots.Count; i++)
+            {
+                var slot = _finalizerSlots[i];
+                var index = i;
+                <div class="slot-row" data-testid="@($"finalizer-slot-row-{index}")">
+                    <StudioProfileSlot ProfileType="ProposedProfileType.Finalizer"
+                                       SlotLabel="@($"Finalizer {index + 1}")"
+                                       CanSwitchMode="true"
+                                       Mode="@slot.Mode"
+                                       ModeChanged="@(m => { slot.Mode = m; StateHasChanged(); })"
+                                       ExistingProfileName="@slot.ExistingProfileName"
+                                       ExistingProfileNameChanged="@(n => { slot.ExistingProfileName = n; StateHasChanged(); })"
+                                       Draft="@slot.Draft"
+                                       DraftChanged="@(d => { slot.Draft = d; StateHasChanged(); })"
+                                       ShowValidation="@_showValidation"
+                                       PreloadedProfiles="@_finalizerOptions" />
+                    <div class="slot-actions">
+                        <button type="button" class="btn ghost btn-sm"
+                                disabled="@(index == 0)"
+                                @onclick="() => MoveFinalizer(index, -1)"
+                                data-testid="@($"finalizer-up-{index}")">▲</button>
+                        <button type="button" class="btn ghost btn-sm"
+                                disabled="@(index == _finalizerSlots.Count - 1)"
+                                @onclick="() => MoveFinalizer(index, 1)"
+                                data-testid="@($"finalizer-down-{index}")">▼</button>
+                        <button type="button" class="btn ghost btn-sm danger"
+                                @onclick="() => RemoveFinalizer(index)"
+                                data-testid="@($"finalizer-remove-{index}")">Entfernen</button>
+                    </div>
+                </div>
+            }
+            <div class="slot-add-actions">
+                <button type="button" class="btn ghost btn-sm"
+                        @onclick="AddFinalizerSlot"
+                        data-testid="add-finalizer-btn">+ Finalizer hinzufügen</button>
+            </div>
+        </div>
+
         @if (_showValidation && !AreAllSlotsValid())
         {
             <div class="validation-panel" role="alert" data-testid="validation-panel">
@@ -230,6 +286,7 @@
     private List<SlotState> _reviewerSlots = [];
     private List<SlotState> _advisorSlots = [];
     private List<SlotState> _groundingSlots = [];
+    private List<SlotState> _finalizerSlots = [];
     private bool _showValidation;
     private bool _materializing;
 
@@ -237,6 +294,7 @@
     private IReadOnlyList<StudioProfileOption> _reviewerOptions = [];
     private IReadOnlyList<StudioProfileOption> _advisorOptions = [];
     private IReadOnlyList<StudioProfileOption> _groundingOptions = [];
+    private IReadOnlyList<StudioProfileOption> _finalizerOptions = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -248,6 +306,8 @@
         _executorOptions = (await CrewService.ListExecutorProfilesAsync(includeSystem: true))
             .Select(p => new StudioProfileOption(p.Name, p.DisplayName, p.IsSystem)).ToList();
         _groundingOptions = (await CrewService.ListGroundingProviderProfilesAsync(includeSystem: true))
+            .Select(p => new StudioProfileOption(p.Name, p.DisplayName, p.IsSystem)).ToList();
+        _finalizerOptions = (await CrewService.ListFinalizerProfilesAsync(includeSystem: true))
             .Select(p => new StudioProfileOption(p.Name, p.DisplayName, p.IsSystem)).ToList();
     }
 
@@ -277,6 +337,10 @@
 
         _groundingSlots = proposed.GroundingProviderProfileNames
             .Select(name => BuildSlot(name, ProposedProfileType.GroundingProvider, newProfiles))
+            .ToList();
+
+        _finalizerSlots = (proposed.FinalizerProfileNames ?? [])
+            .Select(name => BuildSlot(name, ProposedProfileType.Finalizer, newProfiles))
             .ToList();
     }
 
@@ -327,6 +391,19 @@
         _groundingSlots.Add(new SlotState(StudioSlotMode.CreateNew, null, draft));
     }
 
+    private void AddFinalizerSlot()
+    {
+        var draft = new ProposedProfile(
+            ProfileType: ProposedProfileType.Finalizer,
+            Name: string.Empty, DisplayName: string.Empty, Description: string.Empty,
+            Model: string.Empty, Provider: string.Empty, SystemPrompt: string.Empty,
+            MaxTokens: null,
+            ReviewerFocus: null, AdvisorMode: null, AdvisorTrigger: null,
+            GroundingProviderType: null, GroundingProviderSettings: null,
+            FinalizerType: "FileExport", FinalizerSettings: new Dictionary<string, string> { ["format"] = "markdown" });
+        _finalizerSlots.Add(new SlotState(StudioSlotMode.CreateNew, null, draft));
+    }
+
     private void MoveReviewer(int index, int direction)
     {
         var target = index + direction;
@@ -334,9 +411,17 @@
         (_reviewerSlots[index], _reviewerSlots[target]) = (_reviewerSlots[target], _reviewerSlots[index]);
     }
 
+    private void MoveFinalizer(int index, int direction)
+    {
+        var target = index + direction;
+        if (target < 0 || target >= _finalizerSlots.Count) return;
+        (_finalizerSlots[index], _finalizerSlots[target]) = (_finalizerSlots[target], _finalizerSlots[index]);
+    }
+
     private void RemoveReviewer(int index) => _reviewerSlots.RemoveAt(index);
     private void RemoveAdvisor(int index) => _advisorSlots.RemoveAt(index);
     private void RemoveGrounding(int index) => _groundingSlots.RemoveAt(index);
+    private void RemoveFinalizer(int index) => _finalizerSlots.RemoveAt(index);
 
     private async Task OnDisplayNameInput(ChangeEventArgs e)
         => _template = _template! with { DisplayName = e.Value?.ToString() ?? string.Empty };
@@ -347,6 +432,9 @@
     private async Task OnStrategyChange(ChangeEventArgs e)
         => _template = _template! with { EvaluationStrategy = e.Value?.ToString() ?? "Sequential" };
 
+    private void OnRunFinalizersOnMaxAttemptsChange(ChangeEventArgs e)
+        => _template = _template! with { RunFinalizersOnMaxAttempts = e.Value is true };
+
     private bool AreAllSlotsValid()
     {
         if (_reviewerSlots.Count == 0) return false;
@@ -354,6 +442,7 @@
         if (_reviewerSlots.Any(s => !IsSlotValid(s))) return false;
         if (_advisorSlots.Any(s => !IsSlotValid(s))) return false;
         if (_groundingSlots.Any(s => !IsSlotValid(s))) return false;
+        if (_finalizerSlots.Any(s => !IsFinalizerSlotValid(s))) return false;
         return true;
     }
 
@@ -364,6 +453,19 @@
           !string.IsNullOrWhiteSpace(slot.Draft.DisplayName) &&
           !string.IsNullOrEmpty(slot.Draft.Provider) &&
           !string.IsNullOrWhiteSpace(slot.Draft.SystemPrompt);
+
+    // Finalizer validation: Name + DisplayName required; Transform also needs Provider+SystemPrompt.
+    private static bool IsFinalizerSlotValid(SlotState slot)
+    {
+        if (slot.Mode == StudioSlotMode.UseExisting)
+            return !string.IsNullOrEmpty(slot.ExistingProfileName);
+        if (slot.Draft is null) return false;
+        if (string.IsNullOrWhiteSpace(slot.Draft.Name) || string.IsNullOrWhiteSpace(slot.Draft.DisplayName))
+            return false;
+        if (slot.Draft.FinalizerType == "Transform")
+            return !string.IsNullOrEmpty(slot.Draft.Provider) && !string.IsNullOrWhiteSpace(slot.Draft.SystemPrompt);
+        return true;
+    }
 
     private async Task OnSaveClick()
     {
@@ -390,13 +492,15 @@
         var reviewerNames = _reviewerSlots.Select(ResolveName).ToList();
         var advisorNames = _advisorSlots.Select(ResolveName).ToList();
         var groundingNames = _groundingSlots.Select(ResolveName).ToList();
+        var finalizerNames = _finalizerSlots.Select(ResolveName).ToList();
 
         var finalTemplate = _template! with
         {
-            ExecutorProfileName = executorName,
-            ReviewerProfileNames = reviewerNames,
-            AdvisorProfileNames = advisorNames,
-            GroundingProviderProfileNames = groundingNames
+            ExecutorProfileName           = executorName,
+            ReviewerProfileNames          = reviewerNames,
+            AdvisorProfileNames           = advisorNames,
+            GroundingProviderProfileNames = groundingNames,
+            FinalizerProfileNames         = finalizerNames.Count > 0 ? finalizerNames : null,
         };
 
         var newProfiles = new List<ProposedProfile>();
@@ -409,6 +513,9 @@
             .Where(s => s.Mode == StudioSlotMode.CreateNew && s.Draft is not null)
             .Select(s => s.Draft!));
         newProfiles.AddRange(_groundingSlots
+            .Where(s => s.Mode == StudioSlotMode.CreateNew && s.Draft is not null)
+            .Select(s => s.Draft!));
+        newProfiles.AddRange(_finalizerSlots
             .Where(s => s.Mode == StudioSlotMode.CreateNew && s.Draft is not null)
             .Select(s => s.Draft!));
 

@@ -45,4 +45,26 @@ public sealed class RunEntity
     public decimal? TotalCostEur { get; set; }
     public decimal? LlmCostEur { get; set; }
     public decimal? GroundingCostEur { get; set; }
+
+    // Finalizer tracking — null when no finalizers ran or when the run predates Step22.
+    public decimal? FinalizerCostEur { get; set; }
+
+    /// <summary>
+    /// Set when one or more finalizer steps fail. The run status remains <c>Completed</c>;
+    /// this field captures the partial-failure description for display in the UI.
+    /// </summary>
+    public string? FinalizerErrorMessage { get; set; }
+
+    /// <summary>
+    /// Set when this run was created as a resume of an existing run.
+    /// The parent run is never modified; it remains in its terminal status.
+    /// </summary>
+    public Guid? ParentRunId { get; init; }
+
+    /// <summary>
+    /// The artifact text of the last completed iteration of the parent run,
+    /// injected as seed draft for the first pipeline iteration.
+    /// Null for clean-retry resumes and for runs that were not resumed.
+    /// </summary>
+    public string? SeedDraftText { get; init; }
 }

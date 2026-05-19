@@ -18,6 +18,10 @@ _semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 # Home directory for codex auth — mounted as a volume in the container.
 CODEX_HOME = os.getenv("CODEX_HOME", "/auth/codex")
 
+# Hard cap on how long a single codex CLI call may run.
+# Increase for workloads that produce very long outputs (e.g. 30-page documents).
+CLI_TIMEOUT_SECONDS = int(os.getenv("CLI_TIMEOUT_SECONDS", "1800"))
+
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 _OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 _SKIP_KEYWORDS = ("image", "audio", "vision", "dall-e", "whisper", "tts", "chat-latest")
@@ -117,10 +121,10 @@ async def _run_codex(prompt: str, model: str | None, max_tokens: int | None) -> 
             env=env,
         )
         try:
-            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=270)
+            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
         except asyncio.TimeoutError:
             proc.kill()
-            raise RuntimeError("codex CLI timed out after 4.5 minutes")
+            raise RuntimeError(f"codex CLI timed out after {CLI_TIMEOUT_SECONDS} seconds")
 
         if proc.returncode != 0:
             err = stderr.decode(errors="replace").strip()

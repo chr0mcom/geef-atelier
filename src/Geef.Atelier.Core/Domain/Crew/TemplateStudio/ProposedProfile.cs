@@ -22,9 +22,13 @@ public sealed record ProposedProfile(
     // Grounding-specific
     string? GroundingProviderType,
     Dictionary<string, string>? GroundingProviderSettings,
+    // Finalizer-specific — null for non-finalizer profile types
+    string? FinalizerType = null,
+    Dictionary<string, string>? FinalizerSettings = null,
     // Reasoning fields — null when LLM did not provide a rationale
     string? ModelReasoning = null,
     string? SystemPromptReasoning = null,
     string? OverallReasoning = null,
     string? ModeReasoning = null,
-    string? TriggerReasoning = null);
+    string? TriggerReasoning = null,
+    string? FinalizerReasoning = null);

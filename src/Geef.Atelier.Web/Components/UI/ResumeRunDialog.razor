@@ -1,0 +1,93 @@
+@using Geef.Atelier.Application.Runs
+
+@if (Show)
+{
+    <Modal Show="Show" OnClose="OnCancel" CloseOnBackdropClick="true" DataTestId="resume-dialog">
+        <Title>
+            <span>Run fortsetzen</span>
+        </Title>
+        <ChildContent>
+            <div class="resume-mode-selector">
+                <label class="resume-mode-option">
+                    <input type="radio"
+                           data-testid="resume-mode-seed"
+                           name="resume-mode"
+                           checked="@_useSeedDraft"
+                           @onchange="() => _useSeedDraft = true"
+                           disabled="@(!HasIterations)" />
+                    <span>
+                        <strong>Mit letztem Entwurf fortsetzen</strong>
+                        <span class="field-hint">Die KI bekommt den letzten Entwurf als Ausgangspunkt.</span>
+                        @if (!HasIterations)
+                        {
+                            <span class="field-hint t-muted">(Kein Entwurf verfügbar)</span>
+                        }
+                    </span>
+                </label>
+                <label class="resume-mode-option">
+                    <input type="radio"
+                           data-testid="resume-mode-clean"
+                           name="resume-mode"
+                           checked="@(!_useSeedDraft)"
+                           @onchange="() => _useSeedDraft = false" />
+                    <span>
+                        <strong>Komplett neu starten</strong>
+                        <span class="field-hint">Selbes Briefing, keine Seedvorlage.</span>
+                    </span>
+                </label>
+            </div>
+
+            <div class="form-field">
+                <label>Max. Iterationen</label>
+                <input type="number"
+                       data-testid="resume-max-iterations"
+                       class="input-narrow"
+                       min="1"
+                       max="30"
+                       value="@_maxIterations"
+                       @onchange="e => int.TryParse(e.Value?.ToString(), out _maxIterations)" />
+                <FieldHelp Text="Wie viele Iterationen die KI maximal durchführen soll." />
+            </div>
+        </ChildContent>
+        <Actions>
+            <button type="button" class="btn primary"
+                    data-testid="resume-confirm-button"
+                    @onclick="HandleConfirm">
+                Fortsetzen
+            </button>
+            <button type="button" class="btn ghost"
+                    data-testid="resume-cancel-button"
+                    @onclick="() => OnCancel.InvokeAsync()">
+                Abbrechen
+            </button>
+        </Actions>
+    </Modal>
+}
+
+@code {
+    [Parameter] public bool Show { get; set; }
+    [Parameter] public bool HasIterations { get; set; }
+    [Parameter] public int DefaultMaxIterations { get; set; } = 3;
+    [Parameter] public EventCallback<ResumeOptions> OnConfirm { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [EditorRequired, Parameter] public Guid ParentRunId { get; set; }
+
+    private bool _useSeedDraft;
+    private int  _maxIterations;
+
+    protected override void OnParametersSet()
+    {
+        if (!Show) return;
+        _useSeedDraft  = HasIterations;
+        _maxIterations = DefaultMaxIterations;
+    }
+
+    private async Task HandleConfirm()
+    {
+        var opts = new ResumeOptions(
+            ParentRunId:           ParentRunId,
+            UseSeedDraft:          _useSeedDraft,
+            MaxIterationsOverride: _maxIterations > 0 ? _maxIterations : null);
+        await OnConfirm.InvokeAsync(opts);
+    }
+}

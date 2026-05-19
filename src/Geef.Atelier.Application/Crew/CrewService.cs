@@ -1,5 +1,6 @@
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Persistence.Crew;
@@ -11,11 +12,13 @@ internal sealed class CrewService(
     IExecutorProfileRepository executorRepo,
     IAdvisorProfileRepository advisorRepo,
     IGroundingProviderProfileRepository groundingRepo,
+    IFinalizerProfileRepository finalizerRepo,
     ICrewTemplateRepository templateRepo) : ICrewService
 {
     private const string ReadOnlyMessage = "System profile is read-only — copy it as a custom variant.";
     private const string ReadOnlyAdvisorMessage = "System advisor profile is read-only — copy it as a custom variant.";
     private const string ReadOnlyGroundingMessage = "System grounding-provider profile is read-only — copy it as a custom variant.";
+    private const string ReadOnlyFinalizerMessage = "System finalizer profile is read-only — copy it as a custom variant.";
     private const string ReadOnlyTemplateMessage = "System template is read-only — copy it as a custom variant.";
 
     // --- Reviewer profiles ---
@@ -192,6 +195,62 @@ internal sealed class CrewService(
             n => GetGroundingProviderProfileAsync(n, cancellationToken),
             (o, n) => groundingRepo.RenameAsync(o, n, cancellationToken));
 
+    // --- Finalizer profiles ---
+
+    public async Task<IReadOnlyList<FinalizerProfile>> ListFinalizerProfilesAsync(
+        bool includeSystem = true, CancellationToken cancellationToken = default)
+    {
+        var custom = await finalizerRepo.ListAsync(cancellationToken);
+        if (!includeSystem)
+            return custom;
+        var system = SystemCrew.FinalizerProfiles.Values.ToList();
+        return [.. system, .. custom];
+    }
+
+    public async Task<FinalizerProfile?> GetFinalizerProfileAsync(
+        string name, CancellationToken cancellationToken = default)
+    {
+        if (SystemCrew.FinalizerProfiles.TryGetValue(name, out var system))
+            return system;
+        return await finalizerRepo.GetByNameAsync(name, cancellationToken);
+    }
+
+    public async Task<FinalizerProfile> CreateCustomFinalizerProfileAsync(
+        FinalizerProfile profile, CancellationToken cancellationToken = default)
+    {
+        if (SystemCrew.IsSystemFinalizerName(profile.Name))
+            throw new InvalidOperationException(ReadOnlyFinalizerMessage);
+        var baseName = SystemCrew.EnsureCustomPrefix(profile.Name);
+        var uniqueName = await UniqueNameAsync(baseName, n => finalizerRepo.GetByNameAsync(n, cancellationToken));
+        var normalized = profile with { Name = uniqueName, IsSystem = false, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow };
+        await finalizerRepo.CreateAsync(normalized, cancellationToken);
+        return normalized;
+    }
+
+    public async Task<FinalizerProfile> UpdateCustomFinalizerProfileAsync(
+        FinalizerProfile profile, CancellationToken cancellationToken = default)
+    {
+        if (SystemCrew.IsSystemFinalizerName(profile.Name))
+            throw new InvalidOperationException(ReadOnlyFinalizerMessage);
+        var updated = profile with { UpdatedAt = DateTimeOffset.UtcNow };
+        await finalizerRepo.UpdateAsync(updated, cancellationToken);
+        return updated;
+    }
+
+    public Task DeleteCustomFinalizerProfileAsync(string name, CancellationToken cancellationToken = default)
+    {
+        if (SystemCrew.IsSystemFinalizerName(name))
+            throw new InvalidOperationException(ReadOnlyFinalizerMessage);
+        return finalizerRepo.DeleteAsync(name, cancellationToken);
+    }
+
+    public Task<string> RenameCustomFinalizerProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default)
+        => RenameAsync(
+            oldName, newName, ReadOnlyFinalizerMessage,
+            SystemCrew.IsSystemFinalizerName,
+            n => GetFinalizerProfileAsync(n, cancellationToken),
+            (o, n) => finalizerRepo.RenameAsync(o, n, cancellationToken));
+
     // --- Crew templates ---
 
     public Task<IReadOnlyList<CrewTemplate>> ListCrewTemplatesAsync(bool includeSystem = true, CancellationToken cancellationToken = default)
@@ -285,6 +344,7 @@ internal sealed class CrewService(
                 (name, ct) => reviewerRepo.GetByNameAsync(name, ct),
                 (name, ct) => advisorRepo.GetByNameAsync(name, ct),
                 (name, ct) => GetGroundingProviderProfileAsync(name, ct),
+                (name, ct) => GetFinalizerProfileAsync(name, ct),
                 cancellationToken);
 
         var templateName = crewTemplateName ?? SystemCrew.KlassikTemplateName;
@@ -297,6 +357,7 @@ internal sealed class CrewService(
             (name, ct) => reviewerRepo.GetByNameAsync(name, ct),
             (name, ct) => advisorRepo.GetByNameAsync(name, ct),
             (name, ct) => GetGroundingProviderProfileAsync(name, ct),
+            (name, ct) => GetFinalizerProfileAsync(name, ct),
             cancellationToken);
     }
 }

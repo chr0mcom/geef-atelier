@@ -1,0 +1,353 @@
+@page "/crew/profiles/finalizers/create"
+@page "/crew/profiles/finalizers/edit/{name}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Core.Domain.Crew.Finalizers
+@inject ICrewService CrewService
+@inject NavigationManager Nav
+
+<PageTitle>@(IsNew ? "Neuer Finalizer" : "Finalizer bearbeiten") — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="finalizer-editor">
+    <div class="page-header">
+        <h1>@(IsNew ? "Neuer Finalizer" : $"Bearbeiten: {_displayName}")</h1>
+        <a href="/crew/profiles/finalizers" class="btn ghost">← Zurück</a>
+    </div>
+
+    @if (_loading)
+    {
+        <p>Lade…</p>
+    }
+    else
+    {
+        <EditForm Model="_form" OnValidSubmit="SaveAsync" class="crew-form">
+            <DataAnnotationsValidator />
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="error-banner" data-testid="editor-error">@_error</div>
+            }
+
+            <div class="form-row">
+                <label>Name (Slug)</label>
+                <InputText @bind-Value="_form.Name" class="form-input" placeholder="export-pdf" data-testid="input-name" />
+                <ValidationMessage For="() => _form.Name" />
+                <small class="form-hint">Gespeichert als <code>custom-…</code>. Nur Kleinbuchstaben, Ziffern und Bindestriche.</small>
+            </div>
+
+            <div class="form-row">
+                <label>Anzeigename</label>
+                <InputText @bind-Value="_form.DisplayName" class="form-input" placeholder="PDF-Export" data-testid="input-display-name" />
+                <ValidationMessage For="() => _form.DisplayName" />
+            </div>
+
+            <div class="form-row">
+                <label>Beschreibung</label>
+                <InputTextArea @bind-Value="_form.Description" class="form-input" rows="2" data-testid="input-description" />
+            </div>
+
+            <div class="form-row">
+                <label>Finalizer-Typ</label>
+                <InputSelect @bind-Value="_form.FinalizerType" disabled="@(!IsNew)" class="form-input" data-testid="input-finalizer-type">
+                    <option value="@FinalizerType.FileExport">Datei-Export</option>
+                    <option value="@FinalizerType.MetadataEnrich">Metadaten-Anreicherung</option>
+                    <option value="@FinalizerType.ExternalSink">Externer Empfänger</option>
+                    <option value="@FinalizerType.Transform">KI-Transformation</option>
+                </InputSelect>
+                @if (!IsNew)
+                {
+                    <small class="form-hint">Der Typ kann nach dem Erstellen nicht geändert werden.</small>
+                }
+            </div>
+
+            @switch (_form.FinalizerType)
+            {
+                case FinalizerType.FileExport:
+                    <div class="form-section-header">Export-Einstellungen</div>
+                    <div class="form-row">
+                        <label>Format</label>
+                        <InputSelect @bind-Value="_form.ExportFormat" class="form-input" data-testid="input-export-format">
+                            <option value="markdown">Markdown (.md)</option>
+                            <option value="html">HTML (.html)</option>
+                            <option value="pdf">PDF (.pdf)</option>
+                            <option value="docx">Word-Dokument (.docx)</option>
+                            <option value="txt">Nur Text (.txt)</option>
+                            <option value="json">JSON (.json)</option>
+                        </InputSelect>
+                    </div>
+                    break;
+
+                case FinalizerType.MetadataEnrich:
+                    <div class="form-section-header">Anreicherungs-Einstellungen</div>
+                    <div class="form-row">
+                        <label>Anreicherungstyp</label>
+                        <InputSelect @bind-Value="_form.EnricherType" class="form-input" data-testid="input-enricher-type">
+                            <option value="front-matter">Front Matter (YAML-Kopfzeile)</option>
+                            <option value="word-count-footer">Wortzahl-Fußzeile</option>
+                            <option value="reading-level">Leseniveau-Schätzung</option>
+                        </InputSelect>
+                    </div>
+                    break;
+
+                case FinalizerType.ExternalSink:
+                    <div class="form-section-header">Empfänger-Einstellungen</div>
+                    <div class="form-row">
+                        <label>Empfängertyp</label>
+                        <InputSelect @bind-Value="_form.SinkKind" class="form-input" data-testid="input-sink-kind">
+                            <option value="webhook">Webhook (HTTP POST)</option>
+                            <option value="email">E-Mail (SMTP)</option>
+                        </InputSelect>
+                    </div>
+                    @if (_form.SinkKind == "webhook")
+                    {
+                        <div class="form-row">
+                            <label>Webhook-URL</label>
+                            <InputText @bind-Value="_form.WebhookUrl" class="form-input" placeholder="https://example.com/hook" data-testid="input-webhook-url" />
+                        </div>
+                        <div class="form-row">
+                            <label>Auth-Header (optional)</label>
+                            <InputText @bind-Value="_form.WebhookAuthHeader" class="form-input" placeholder="Bearer <token>" data-testid="input-webhook-auth" />
+                            <small class="form-hint">Wird im Klartext in der Datenbank gespeichert und niemals in Logs ausgegeben.</small>
+                        </div>
+                        <div class="form-row">
+                            <label>Content-Type</label>
+                            <InputText @bind-Value="_form.WebhookContentType" class="form-input" placeholder="application/json" data-testid="input-webhook-content-type" />
+                        </div>
+                        <div class="form-row">
+                            <label>Timeout (Sekunden)</label>
+                            <InputNumber @bind-Value="_form.WebhookTimeout" class="form-input" min="5" max="300" data-testid="input-webhook-timeout" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="form-row">
+                            <label>Empfänger-E-Mail</label>
+                            <InputText @bind-Value="_form.EmailTo" class="form-input" placeholder="empfaenger@example.com" data-testid="input-email-to" />
+                        </div>
+                        <div class="form-row">
+                            <label>Betreff</label>
+                            <InputText @bind-Value="_form.EmailSubject" class="form-input" placeholder="Geef.Atelier — Ergebnis" data-testid="input-email-subject" />
+                        </div>
+                        <div class="form-row">
+                            <label class="form-checkbox-label">
+                                <InputCheckbox @bind-Value="_form.EmailAttachAsFile" data-testid="input-email-attach" />
+                                Als Anhang senden
+                            </label>
+                        </div>
+                        @if (_form.EmailAttachAsFile)
+                        {
+                            <div class="form-row">
+                                <label>Anhang-Format</label>
+                                <InputSelect @bind-Value="_form.EmailAttachmentFormat" class="form-input" data-testid="input-email-format">
+                                    <option value="markdown">Markdown (.md)</option>
+                                    <option value="html">HTML (.html)</option>
+                                    <option value="pdf">PDF (.pdf)</option>
+                                    <option value="docx">Word-Dokument (.docx)</option>
+                                    <option value="txt">Nur Text (.txt)</option>
+                                </InputSelect>
+                            </div>
+                        }
+                    }
+                    break;
+
+                case FinalizerType.Transform:
+                    <div class="form-section-header">Transformations-Einstellungen</div>
+                    <div class="form-row">
+                        <label>System-Prompt</label>
+                        <InputTextArea @bind-Value="_form.SystemPrompt" class="form-input" rows="6"
+                            placeholder="Anweisung für die KI-Transformation…" data-testid="input-system-prompt" />
+                        <small class="form-hint">Tipp: Füge „Respond in the language of the input text." am Ende ein.</small>
+                    </div>
+                    <div class="form-row">
+                        <label>Provider</label>
+                        <InputText @bind-Value="_form.TransformProvider" class="form-input" placeholder="codex-cli" data-testid="input-transform-provider" />
+                    </div>
+                    <div class="form-row">
+                        <label>Modell</label>
+                        <InputText @bind-Value="_form.TransformModel" class="form-input" placeholder="gpt-5.5" data-testid="input-transform-model" />
+                    </div>
+                    <div class="form-row">
+                        <label>Max. Tokens</label>
+                        <InputNumber @bind-Value="_form.TransformMaxTokens" class="form-input" min="256" max="64000" data-testid="input-transform-max-tokens" />
+                    </div>
+                    break;
+            }
+
+            <div class="form-actions">
+                <button type="submit" class="btn primary" data-testid="btn-save">
+                    @(IsNew ? "Erstellen" : "Speichern")
+                </button>
+                <a href="/crew/profiles/finalizers" class="btn ghost">Abbrechen</a>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Name { get; set; }
+
+    private bool IsNew => string.IsNullOrEmpty(Name);
+    private bool _loading = true;
+    private string _displayName = string.Empty;
+    private string? _error;
+    private FinalizerFormModel _form = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!IsNew && Name is not null)
+        {
+            var existing = await CrewService.GetFinalizerProfileAsync(Name);
+            if (existing is null)
+            {
+                Nav.NavigateTo("/crew/profiles/finalizers");
+                return;
+            }
+            _displayName = existing.DisplayName;
+            _form = FinalizerFormModel.From(existing);
+        }
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _error = null;
+        try
+        {
+            var profile = _form.ToProfile();
+            if (IsNew)
+                await CrewService.CreateCustomFinalizerProfileAsync(profile);
+            else
+                await CrewService.UpdateCustomFinalizerProfileAsync(profile);
+
+            Nav.NavigateTo("/crew/profiles/finalizers");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private sealed class FinalizerFormModel
+    {
+        [Required(ErrorMessage = "Name ist erforderlich.")]
+        public string Name { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Anzeigename ist erforderlich.")]
+        public string DisplayName { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+        public FinalizerType FinalizerType { get; set; } = FinalizerType.FileExport;
+
+        // FileExport
+        public string ExportFormat { get; set; } = "markdown";
+
+        // MetadataEnrich
+        public string EnricherType { get; set; } = MetadataEnrichSettings.FrontMatter;
+
+        // ExternalSink
+        public string SinkKind { get; set; } = WebhookSinkSettings.SinkKindValue;
+
+        [Url(ErrorMessage = "Bitte eine gültige URL eingeben.")]
+        public string WebhookUrl { get; set; } = string.Empty;
+
+        public string WebhookAuthHeader { get; set; } = string.Empty;
+        public string WebhookContentType { get; set; } = "application/json";
+        public int WebhookTimeout { get; set; } = 30;
+
+        [EmailAddress(ErrorMessage = "Bitte eine gültige E-Mail-Adresse eingeben.")]
+        public string EmailTo { get; set; } = string.Empty;
+
+        public string EmailSubject { get; set; } = "Geef.Atelier — Ergebnis";
+        public bool EmailAttachAsFile { get; set; } = false;
+        public string EmailAttachmentFormat { get; set; } = "markdown";
+
+        // Transform
+        [Required(ErrorMessage = "System-Prompt ist erforderlich.")]
+        public string SystemPrompt { get; set; } = string.Empty;
+
+        public string TransformProvider { get; set; } = "codex-cli";
+        public string TransformModel { get; set; } = "gpt-5.5";
+        public int TransformMaxTokens { get; set; } = 4096;
+
+        public static FinalizerFormModel From(FinalizerProfile p)
+        {
+            var m = new FinalizerFormModel
+            {
+                Name = p.Name,
+                DisplayName = p.DisplayName,
+                Description = p.Description,
+                FinalizerType = p.FinalizerType,
+            };
+            switch (p.FinalizerType)
+            {
+                case FinalizerType.FileExport:
+                    var fe = FileExportSettings.From(p.Settings);
+                    m.ExportFormat = fe.Format;
+                    break;
+                case FinalizerType.MetadataEnrich:
+                    var me = MetadataEnrichSettings.From(p.Settings);
+                    m.EnricherType = me.EnricherType;
+                    break;
+                case FinalizerType.ExternalSink:
+                    var sk = p.Settings.GetValueOrDefault(WebhookSinkSettings.KeySinkKind, WebhookSinkSettings.SinkKindValue);
+                    m.SinkKind = sk;
+                    if (sk == EmailSinkSettings.SinkKindValue)
+                    {
+                        var es = EmailSinkSettings.From(p.Settings);
+                        m.EmailTo = es.ToAddress;
+                        m.EmailSubject = es.Subject;
+                        m.EmailAttachAsFile = es.AttachAsFile;
+                        m.EmailAttachmentFormat = es.AttachmentFormat;
+                    }
+                    else
+                    {
+                        var ws = WebhookSinkSettings.From(p.Settings);
+                        m.WebhookUrl = ws.Url;
+                        m.WebhookAuthHeader = ws.AuthHeader ?? string.Empty;
+                        m.WebhookContentType = ws.ContentType;
+                        m.WebhookTimeout = ws.TimeoutSeconds;
+                    }
+                    break;
+                case FinalizerType.Transform:
+                    var ts = TransformSettings.From(p.Settings);
+                    m.SystemPrompt = ts.SystemPrompt;
+                    m.TransformProvider = ts.Provider;
+                    m.TransformModel = ts.Model;
+                    m.TransformMaxTokens = ts.MaxTokens;
+                    break;
+            }
+            return m;
+        }
+
+        public FinalizerProfile ToProfile()
+        {
+            var settings = FinalizerType switch
+            {
+                FinalizerType.FileExport =>
+                    new FileExportSettings(ExportFormat).ToDict(),
+                FinalizerType.MetadataEnrich =>
+                    new MetadataEnrichSettings(EnricherType).ToDict(),
+                FinalizerType.ExternalSink when SinkKind == EmailSinkSettings.SinkKindValue =>
+                    new EmailSinkSettings(EmailTo, EmailSubject, EmailAttachAsFile, EmailAttachmentFormat).ToDict(),
+                FinalizerType.ExternalSink =>
+                    new WebhookSinkSettings(
+                        WebhookUrl,
+                        string.IsNullOrWhiteSpace(WebhookAuthHeader) ? null : WebhookAuthHeader,
+                        WebhookContentType,
+                        WebhookTimeout).ToDict(),
+                FinalizerType.Transform =>
+                    new TransformSettings(SystemPrompt, TransformProvider, TransformModel, TransformMaxTokens).ToDict(),
+                _ => [],
+            };
+            return new FinalizerProfile(
+                Name: Name,
+                DisplayName: DisplayName,
+                Description: Description,
+                FinalizerType: FinalizerType,
+                Settings: settings,
+                IsSystem: false);
+        }
+    }
+}

@@ -11,6 +11,10 @@ _semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 # Home directory for claude auth — mounted as a volume in the container.
 CLAUDE_HOME = os.getenv("CLAUDE_HOME", "/auth/claude")
 
+# Hard cap on how long a single claude CLI call may run.
+# Increase for workloads that produce very long outputs (e.g. 30-page documents).
+CLI_TIMEOUT_SECONDS = int(os.getenv("CLI_TIMEOUT_SECONDS", "1800"))
+
 # Static model list — the claude CLI has no model-listing command.
 # Update this list when new Claude models become available.
 STATIC_MODELS = [
@@ -56,10 +60,10 @@ async def _run_claude(prompt: str, model: str | None, max_tokens: int | None) ->
         env=env,
     )
     try:
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=270)
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
         proc.kill()
-        raise RuntimeError("claude CLI timed out after 4.5 minutes")
+        raise RuntimeError(f"claude CLI timed out after {CLI_TIMEOUT_SECONDS} seconds")
 
     raw = stdout.decode(errors="replace").strip()
 

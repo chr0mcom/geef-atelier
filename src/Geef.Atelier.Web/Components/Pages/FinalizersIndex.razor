@@ -1,0 +1,131 @@
+@page "/crew/profiles/finalizers"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Core.Domain.Crew.Finalizers
+@inject ICrewService CrewService
+
+<PageTitle>Finalizer — Atelier</PageTitle>
+
+<div class="crew-profiles-index">
+    <div class="page-header">
+        <h1>Finalizer</h1>
+        <a href="/crew/profiles/finalizers/create" class="btn primary">+ Neues Profil</a>
+    </div>
+
+    @if (_profiles.Count == 0)
+    {
+        <p class="text-muted">Keine Finalizer-Profile vorhanden.</p>
+    }
+    else
+    {
+        <table class="crew-table" data-testid="finalizer-list">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Typ</th>
+                    <th>Beschreibung</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in _profiles)
+                {
+                    <tr data-testid="finalizer-row-@p.Name">
+                        <td>
+                            @p.DisplayName
+                            @if (p.IsSystem) { <span class="crew-badge">System</span> }
+                        </td>
+                        <td>@GetTypeLabel(p.FinalizerType)</td>
+                        <td>
+                            @if (!string.IsNullOrEmpty(p.Description))
+                            {
+                                <span title="@p.Description">
+                                    @(p.Description.Length > 70 ? p.Description[..70] + "…" : p.Description)
+                                </span>
+                            }
+                        </td>
+                        <td class="crew-table-actions">
+                            @if (p.IsSystem)
+                            {
+                                <a href="/crew/profiles/finalizers/view/@p.Name" class="btn small">Ansehen</a>
+                                <button class="btn small primary" @onclick="() => DuplicateAsync(p)">Als Custom duplizieren</button>
+                                <button class="btn small disabled-action" disabled title="System-Profil — nicht löschbar">Löschen</button>
+                            }
+                            else
+                            {
+                                <a href="/crew/profiles/finalizers/edit/@p.Name" class="btn small">Bearbeiten</a>
+                                <button class="btn small danger" @onclick="() => _toDelete = p">Löschen</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="error-banner">@_error</div>
+    }
+</div>
+
+<DeleteConfirmationModal
+    Show="_toDelete != null"
+    ItemName="@(_toDelete?.Name ?? "")"
+    ItemKind="Profil"
+    OnConfirm="ExecuteDeleteAsync"
+    OnCancel="() => _toDelete = null" />
+
+@code {
+    private IReadOnlyList<FinalizerProfile> _profiles = [];
+    private FinalizerProfile? _toDelete;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _profiles = await CrewService.ListFinalizerProfilesAsync(includeSystem: true);
+    }
+
+    private async Task DuplicateAsync(FinalizerProfile original)
+    {
+        _error = null;
+        try
+        {
+            var copy = original with
+            {
+                Name = original.Name + "-copy",
+                DisplayName = original.DisplayName + " (Kopie)",
+                IsSystem = false,
+                CreatedAt = null,
+                UpdatedAt = null,
+            };
+            await CrewService.CreateCustomFinalizerProfileAsync(copy);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task ExecuteDeleteAsync()
+    {
+        if (_toDelete is null) return;
+        var name = _toDelete.Name;
+        _toDelete = null;
+        try { await CrewService.DeleteCustomFinalizerProfileAsync(name); await LoadAsync(); }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private static string GetTypeLabel(FinalizerType type) => type switch
+    {
+        FinalizerType.FileExport     => "Datei-Export",
+        FinalizerType.MetadataEnrich => "Metadaten-Anreicherung",
+        FinalizerType.ExternalSink   => "Externer Empfänger",
+        FinalizerType.Transform      => "KI-Transformation",
+        _                            => type.ToString(),
+    };
+}

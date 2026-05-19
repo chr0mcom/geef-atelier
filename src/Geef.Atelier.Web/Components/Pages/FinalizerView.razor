@@ -1,0 +1,89 @@
+@page "/crew/profiles/finalizers/view/{name}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Core.Domain.Crew.Finalizers
+@inject ICrewService CrewService
+@inject NavigationManager Nav
+
+<PageTitle>Finalizer ansehen — Atelier</PageTitle>
+
+<div class="crew-view" data-testid="finalizer-view">
+    @if (_loading)
+    {
+        <p>Lade…</p>
+    }
+    else if (_profile is null)
+    {
+        <p class="text-muted">Profil nicht gefunden.</p>
+    }
+    else
+    {
+        <div class="page-header">
+            <h1>
+                @_profile.DisplayName
+                @if (_profile.IsSystem) { <span class="crew-badge">System</span> }
+            </h1>
+            <a href="/crew/profiles/finalizers" class="btn ghost">← Zurück</a>
+        </div>
+
+        <dl class="crew-view-fields">
+            <dt>Name (Slug)</dt>
+            <dd data-testid="view-name">@_profile.Name</dd>
+
+            <dt>Typ</dt>
+            <dd data-testid="view-type">@GetTypeLabel(_profile.FinalizerType)</dd>
+
+            <dt>Beschreibung</dt>
+            <dd data-testid="view-description">@(string.IsNullOrEmpty(_profile.Description) ? "—" : _profile.Description)</dd>
+        </dl>
+
+        <h2>Einstellungen</h2>
+        <dl class="crew-view-fields">
+            @foreach (var kv in _profile.Settings.OrderBy(x => x.Key))
+            {
+                <dt>@kv.Key</dt>
+                <dd data-testid="view-setting-@kv.Key">
+                    @if (kv.Key.Contains("Auth", StringComparison.OrdinalIgnoreCase) ||
+                         kv.Key.Contains("Password", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <em>konfiguriert</em>
+                    }
+                    else
+                    {
+                        @(string.IsNullOrEmpty(kv.Value) ? "—" : kv.Value)
+                    }
+                </dd>
+            }
+        </dl>
+
+        @if (!_profile.IsSystem)
+        {
+            <div class="form-actions">
+                <a href="/crew/profiles/finalizers/edit/@_profile.Name" class="btn primary">Bearbeiten</a>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public string Name { get; set; } = string.Empty;
+
+    private FinalizerProfile? _profile;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _profile = await CrewService.GetFinalizerProfileAsync(Name);
+        _loading = false;
+    }
+
+    private static string GetTypeLabel(FinalizerType type) => type switch
+    {
+        FinalizerType.FileExport     => "Datei-Export",
+        FinalizerType.MetadataEnrich => "Metadaten-Anreicherung",
+        FinalizerType.ExternalSink   => "Externer Empfänger",
+        FinalizerType.Transform      => "KI-Transformation",
+        _                            => type.ToString(),
+    };
+}

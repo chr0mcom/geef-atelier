@@ -1,5 +1,6 @@
 @using Geef.Atelier.Application.Crew
 @using Geef.Atelier.Core.Domain.Crew.Advisors
+@using Geef.Atelier.Core.Domain.Crew.Finalizers
 @using Geef.Atelier.Core.Domain.Crew.Profiles
 @using Geef.Atelier.Core.Domain.Crew.TemplateStudio
 @using Geef.Atelier.Web.Resources
@@ -88,63 +89,67 @@
                 <FieldHelp Text="@StudioFieldHelps.ProfileDescription" DataTestId="field-help-profiledescription" />
             </div>
 
-            <div class="field">
-                <label>Provider</label>
-                <select value="@Draft.Provider"
-                        @onchange="OnProviderChange"
-                        data-testid="@($"slot-provider-{SlotTestSuffix}")">
-                    <option value="">— bitte wählen —</option>
-                    @foreach (var p in _providers)
+            @if (Draft.ProfileType != ProposedProfileType.Finalizer || Draft.FinalizerType == "Transform")
+            {
+                <div class="field">
+                    <label>Provider</label>
+                    <select value="@Draft.Provider"
+                            @onchange="OnProviderChange"
+                            data-testid="@($"slot-provider-{SlotTestSuffix}")">
+                        <option value="">— bitte wählen —</option>
+                        @foreach (var p in _providers)
+                        {
+                            <option value="@p.Name">@p.DisplayName</option>
+                        }
+                    </select>
+                    <FieldHelp Text="@StudioFieldHelps.Provider" DataTestId="field-help-provider" />
+                    @if (ShowValidation && string.IsNullOrEmpty(Draft.Provider))
                     {
-                        <option value="@p.Name">@p.DisplayName</option>
+                        <span class="validation-error">Provider ist erforderlich.</span>
                     }
-                </select>
-                <FieldHelp Text="@StudioFieldHelps.Provider" DataTestId="field-help-provider" />
-                @if (ShowValidation && string.IsNullOrEmpty(Draft.Provider))
-                {
-                    <span class="validation-error">Provider ist erforderlich.</span>
-                }
-            </div>
+                </div>
 
-            <div class="field">
-                <label>Modell</label>
-                <ModelSelector Provider="@Draft.Provider"
-                               Value="@Draft.Model"
-                               ValueChanged="@(v => UpdateDraft(d => d with { Model = v }))"
-                               DataTestId="@($"slot-model-{SlotTestSuffix}")" />
-                <FieldHelp Text="@StudioFieldHelps.Model" DataTestId="field-help-model" />
-                @if (!string.IsNullOrEmpty(Draft.ModelReasoning))
-                {
-                    <div class="field-reasoning" data-testid="slot-model-reasoning">💡 @Draft.ModelReasoning</div>
-                }
-            </div>
+                <div class="field">
+                    <label>Modell</label>
+                    <ModelSelector Provider="@Draft.Provider"
+                                   Value="@Draft.Model"
+                                   ValueChanged="@(v => UpdateDraft(d => d with { Model = v }))"
+                                   DataTestId="@($"slot-model-{SlotTestSuffix}")" />
+                    <FieldHelp Text="@StudioFieldHelps.Model" DataTestId="field-help-model" />
+                    @if (!string.IsNullOrEmpty(Draft.ModelReasoning))
+                    {
+                        <div class="field-reasoning" data-testid="slot-model-reasoning">💡 @Draft.ModelReasoning</div>
+                    }
+                </div>
 
-            <div class="field">
-                <label>Max. Tokens</label>
-                <input type="number" min="256" max="32768"
-                       value="@(Draft.MaxTokens?.ToString() ?? string.Empty)"
-                       @oninput="OnMaxTokensInput"
-                       data-testid="@($"slot-maxtokens-{SlotTestSuffix}")" />
-                <FieldHelp Text="@StudioFieldHelps.MaxTokens" DataTestId="field-help-maxtokens" />
-            </div>
+                <div class="field">
+                    <label>Max. Tokens</label>
+                    <input type="number" min="256" max="32768"
+                           value="@(Draft.MaxTokens?.ToString() ?? string.Empty)"
+                           @oninput="OnMaxTokensInput"
+                           data-testid="@($"slot-maxtokens-{SlotTestSuffix}")" />
+                    <FieldHelp Text="@StudioFieldHelps.MaxTokens" DataTestId="field-help-maxtokens" />
+                </div>
 
-            <div class="field">
-                <label>System-Prompt</label>
-                <textarea rows="5"
-                          value="@Draft.SystemPrompt"
-                          @oninput="OnSystemPromptInput"
-                          data-testid="@($"slot-systemprompt-{SlotTestSuffix}")"
-                          style="font-family: var(--font-mono, monospace)"></textarea>
-                <FieldHelp Text="@StudioFieldHelps.SystemPrompt" DataTestId="field-help-systemprompt" />
-                @if (!string.IsNullOrEmpty(Draft.SystemPromptReasoning))
-                {
-                    <div class="field-reasoning" data-testid="slot-systemprompt-reasoning">💡 @Draft.SystemPromptReasoning</div>
-                }
-                @if (ShowValidation && string.IsNullOrWhiteSpace(Draft.SystemPrompt))
-                {
-                    <span class="validation-error">System-Prompt ist erforderlich.</span>
-                }
-            </div>
+                <div class="field">
+                    <label>System-Prompt</label>
+                    <textarea rows="5"
+                              value="@Draft.SystemPrompt"
+                              @oninput="OnSystemPromptInput"
+                              data-testid="@($"slot-systemprompt-{SlotTestSuffix}")"
+                              style="font-family: var(--font-mono, monospace)"></textarea>
+                    <FieldHelp Text="@(Draft.ProfileType == ProposedProfileType.Finalizer ? StudioFieldHelps.FinalizerTransformSystemPrompt : StudioFieldHelps.SystemPrompt)"
+                               DataTestId="field-help-systemprompt" />
+                    @if (!string.IsNullOrEmpty(Draft.SystemPromptReasoning))
+                    {
+                        <div class="field-reasoning" data-testid="slot-systemprompt-reasoning">💡 @Draft.SystemPromptReasoning</div>
+                    }
+                    @if (ShowValidation && string.IsNullOrWhiteSpace(Draft.SystemPrompt))
+                    {
+                        <span class="validation-error">System-Prompt ist erforderlich.</span>
+                    }
+                </div>
+            }
 
             @if (Draft.ProfileType == ProposedProfileType.Reviewer)
             {
@@ -230,6 +235,114 @@
                 </div>
             }
 
+            @if (Draft.ProfileType == ProposedProfileType.Finalizer)
+            {
+                <div class="field">
+                    <label>Finalizer-Typ</label>
+                    <select value="@(Draft.FinalizerType ?? "FileExport")"
+                            @onchange="OnFinalizerTypeChange"
+                            data-testid="slot-finalizertype">
+                        <option value="FileExport">FileExport – Datei exportieren</option>
+                        <option value="MetadataEnrich">MetadataEnrich – Metadaten anreichern</option>
+                        <option value="ExternalSink">ExternalSink – Webhook oder E-Mail</option>
+                        <option value="Transform">Transform – KI-Transformation</option>
+                    </select>
+                    <FieldHelp Text="@StudioFieldHelps.FinalizerType" DataTestId="field-help-finalizertype" />
+                    @if (!string.IsNullOrEmpty(Draft.FinalizerReasoning))
+                    {
+                        <div class="field-reasoning" data-testid="slot-finalizer-reasoning">💡 @Draft.FinalizerReasoning</div>
+                    }
+                </div>
+
+                @if (Draft.FinalizerType == "FileExport" || string.IsNullOrEmpty(Draft.FinalizerType))
+                {
+                    <div class="field">
+                        <label>Dateiformat</label>
+                        <select value="@GetFinalizerSetting("format", "markdown")"
+                                @onchange="OnFinalizerFormatChange"
+                                data-testid="slot-finalizer-format">
+                            <option value="markdown">Markdown (.md)</option>
+                            <option value="html">HTML (.html)</option>
+                            <option value="pdf">PDF (.pdf)</option>
+                            <option value="docx">Word-Dokument (.docx)</option>
+                            <option value="txt">Plaintext (.txt)</option>
+                        </select>
+                        <FieldHelp Text="@StudioFieldHelps.FinalizerFileFormat" DataTestId="field-help-finalizerformat" />
+                    </div>
+                }
+
+                @if (Draft.FinalizerType == "MetadataEnrich")
+                {
+                    <div class="field">
+                        <label>Anreicherungstyp</label>
+                        <select value="@GetFinalizerSetting("enricher", "front-matter")"
+                                @onchange="OnFinalizerEnricherChange"
+                                data-testid="slot-finalizer-enricher">
+                            <option value="front-matter">Front-Matter (YAML-Header)</option>
+                            <option value="word-count-footer">Wortzahl-Fußzeile</option>
+                            <option value="reading-level">Leseniveau (Flesch-Kincaid)</option>
+                        </select>
+                        <FieldHelp Text="@StudioFieldHelps.FinalizerEnricherType" DataTestId="field-help-finalizerenricher" />
+                    </div>
+                }
+
+                @if (Draft.FinalizerType == "ExternalSink")
+                {
+                    <div class="field">
+                        <label>Kanal</label>
+                        <select value="@GetFinalizerSetting("sink", "webhook")"
+                                @onchange="OnFinalizerSinkChange"
+                                data-testid="slot-finalizer-sink">
+                            <option value="webhook">Webhook (HTTP-POST)</option>
+                            <option value="email">E-Mail (SMTP)</option>
+                        </select>
+                        <FieldHelp Text="@StudioFieldHelps.FinalizerSinkType" DataTestId="field-help-finalizersink" />
+                    </div>
+                    @if (GetFinalizerSetting("sink", "webhook") == "webhook")
+                    {
+                        <div class="field">
+                            <label>Webhook-URL</label>
+                            <input type="text"
+                                   value="@GetFinalizerSetting("url", string.Empty)"
+                                   @oninput="OnFinalizerUrlInput"
+                                   placeholder="https://..."
+                                   data-testid="slot-finalizer-webhookurl" />
+                            <FieldHelp Text="@StudioFieldHelps.FinalizerWebhookUrl" DataTestId="field-help-finalizerwebhookurl" />
+                        </div>
+                        <div class="field">
+                            <label>Auth-Header (optional)</label>
+                            <input type="password"
+                                   value="@GetFinalizerSetting("auth_header", string.Empty)"
+                                   @oninput="OnFinalizerAuthHeaderInput"
+                                   placeholder="Bearer …"
+                                   data-testid="slot-finalizer-authheader" />
+                            <FieldHelp Text="@StudioFieldHelps.FinalizerWebhookAuthHeader" DataTestId="field-help-finalizerauth" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="field">
+                            <label>Empfänger</label>
+                            <input type="email"
+                                   value="@GetFinalizerSetting("to", string.Empty)"
+                                   @oninput="OnFinalizerEmailToInput"
+                                   placeholder="empfaenger@example.com"
+                                   data-testid="slot-finalizer-emailto" />
+                            <FieldHelp Text="@StudioFieldHelps.FinalizerEmailTo" DataTestId="field-help-finalizeremailtto" />
+                        </div>
+                        <div class="field">
+                            <label>Betreff</label>
+                            <input type="text"
+                                   value="@GetFinalizerSetting("subject", string.Empty)"
+                                   @oninput="OnFinalizerSubjectInput"
+                                   placeholder="Ergebnis von {template}"
+                                   data-testid="slot-finalizer-emailsubject" />
+                            <FieldHelp Text="@StudioFieldHelps.FinalizerEmailSubject" DataTestId="field-help-finalizersubject" />
+                        </div>
+                    }
+                }
+            }
+
             @if (!string.IsNullOrEmpty(Draft.OverallReasoning))
             {
                 <div class="field-reasoning overall-reasoning" data-testid="slot-overall-reasoning">
@@ -262,13 +375,23 @@
     private string SlotTestSuffix => SlotLabel.ToLowerInvariant().Replace(' ', '-');
     private string SlotTestId => $"studio-slot-{SlotTestSuffix}";
 
-    public bool IsValid => Mode == StudioSlotMode.UseExisting
-        ? !string.IsNullOrEmpty(ExistingProfileName)
-        : Draft is not null &&
-          !string.IsNullOrWhiteSpace(Draft.Name) &&
-          !string.IsNullOrWhiteSpace(Draft.DisplayName) &&
-          !string.IsNullOrEmpty(Draft.Provider) &&
-          !string.IsNullOrWhiteSpace(Draft.SystemPrompt);
+    public bool IsValid
+    {
+        get
+        {
+            if (Mode == StudioSlotMode.UseExisting)
+                return !string.IsNullOrEmpty(ExistingProfileName);
+            if (Draft is null) return false;
+            if (string.IsNullOrWhiteSpace(Draft.Name) || string.IsNullOrWhiteSpace(Draft.DisplayName))
+                return false;
+            if (Draft.ProfileType == ProposedProfileType.Finalizer)
+            {
+                return Draft.FinalizerType != "Transform" ||
+                       (!string.IsNullOrEmpty(Draft.Provider) && !string.IsNullOrWhiteSpace(Draft.SystemPrompt));
+            }
+            return !string.IsNullOrEmpty(Draft.Provider) && !string.IsNullOrWhiteSpace(Draft.SystemPrompt);
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -294,6 +417,9 @@
                     .Select(p => new ProfileSummary(p.Name, p.DisplayName, p.IsSystem)).ToList(),
             ProposedProfileType.Executor =>
                 (await CrewService.ListExecutorProfilesAsync(includeSystem: true))
+                    .Select(p => new ProfileSummary(p.Name, p.DisplayName, p.IsSystem)).ToList(),
+            ProposedProfileType.Finalizer =>
+                (await CrewService.ListFinalizerProfilesAsync(includeSystem: true))
                     .Select(p => new ProfileSummary(p.Name, p.DisplayName, p.IsSystem)).ToList(),
             _ => []
         };
@@ -347,6 +473,30 @@
     private Task OnGroundingTypeChange(ChangeEventArgs e)
         => UpdateDraft(d => d with { GroundingProviderType = e.Value?.ToString() });
 
+    private Task OnFinalizerTypeChange(ChangeEventArgs e)
+        => UpdateDraft(d => d with { FinalizerType = e.Value?.ToString() });
+
+    private Task OnFinalizerFormatChange(ChangeEventArgs e)
+        => SetFinalizerSetting("format", e.Value?.ToString() ?? "markdown");
+
+    private Task OnFinalizerEnricherChange(ChangeEventArgs e)
+        => SetFinalizerSetting("enricher", e.Value?.ToString() ?? "front-matter");
+
+    private Task OnFinalizerSinkChange(ChangeEventArgs e)
+        => SetFinalizerSetting("sink", e.Value?.ToString() ?? "webhook");
+
+    private Task OnFinalizerUrlInput(ChangeEventArgs e)
+        => SetFinalizerSetting("url", e.Value?.ToString() ?? string.Empty);
+
+    private Task OnFinalizerAuthHeaderInput(ChangeEventArgs e)
+        => SetFinalizerSetting("auth_header", e.Value?.ToString() ?? string.Empty);
+
+    private Task OnFinalizerEmailToInput(ChangeEventArgs e)
+        => SetFinalizerSetting("to", e.Value?.ToString() ?? string.Empty);
+
+    private Task OnFinalizerSubjectInput(ChangeEventArgs e)
+        => SetFinalizerSetting("subject", e.Value?.ToString() ?? string.Empty);
+
     private async Task OnMaxTokensInput(ChangeEventArgs e)
     {
         var raw = e.Value?.ToString();
@@ -377,4 +527,17 @@
             return d with { GroundingProviderSettings = settings };
         });
     }
+
+    private string GetFinalizerSetting(string key, string defaultValue)
+        => Draft?.FinalizerSettings?.TryGetValue(key, out var v) == true ? v : defaultValue;
+
+    private Task SetFinalizerSetting(string key, string value)
+        => UpdateDraft(d =>
+        {
+            var settings = d.FinalizerSettings is not null
+                ? new Dictionary<string, string>(d.FinalizerSettings)
+                : new Dictionary<string, string>();
+            settings[key] = value;
+            return d with { FinalizerSettings = settings };
+        });
 }

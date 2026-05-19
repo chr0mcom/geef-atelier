@@ -5,6 +5,7 @@ using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
+using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Knowledge;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Persistence;
@@ -267,6 +268,11 @@ public sealed class RunServiceUserIsolationTests
 
         public Task MarkRunFailedAsync(Guid runId, string errorMessage, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+
+        public Task<Guid> CreateResumedRunAsync(string briefingText, string configJson,
+            string? createdByUser, string? crewTemplateName, string? crewSnapshotJson,
+            Guid parentRunId, string? seedDraftText, CancellationToken cancellationToken = default)
+            => Task.FromResult(Guid.NewGuid());
     }
 
     private sealed class MinimalAdvisorConsultationRepository : IAdvisorConsultationRepository
@@ -318,6 +324,12 @@ public sealed class RunServiceUserIsolationTests
         public Task<GroundingProviderProfile> UpdateCustomGroundingProviderProfileAsync(GroundingProviderProfile profile, CancellationToken cancellationToken = default) => Task.FromResult(profile);
         public Task DeleteCustomGroundingProviderProfileAsync(string name, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<string> RenameCustomGroundingProviderProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default) => Task.FromResult(newName);
+        public Task<IReadOnlyList<FinalizerProfile>> ListFinalizerProfilesAsync(bool includeSystem = true, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<FinalizerProfile>>([]);
+        public Task<FinalizerProfile?> GetFinalizerProfileAsync(string name, CancellationToken ct = default) => Task.FromResult<FinalizerProfile?>(null);
+        public Task<FinalizerProfile> CreateCustomFinalizerProfileAsync(FinalizerProfile profile, CancellationToken ct = default) => Task.FromResult(profile);
+        public Task<FinalizerProfile> UpdateCustomFinalizerProfileAsync(FinalizerProfile profile, CancellationToken ct = default) => Task.FromResult(profile);
+        public Task DeleteCustomFinalizerProfileAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<string> RenameCustomFinalizerProfileAsync(string oldName, string newName, CancellationToken ct = default) => Task.FromResult(newName);
         public Task<IReadOnlyList<CrewTemplate>> ListCrewTemplatesAsync(bool includeSystem = true, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<CrewTemplate>>([]);
         public Task<CrewTemplate?> GetCrewTemplateAsync(string name, CancellationToken cancellationToken = default) => Task.FromResult<CrewTemplate?>(null);
         public Task<CrewTemplate> CreateCustomCrewTemplateAsync(CrewTemplate template, CancellationToken cancellationToken = default) => Task.FromResult(template);

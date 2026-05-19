@@ -33,9 +33,18 @@ public static class MaterializeTemplateProposalTool
     }
 
     private static ProposedTemplate MapTemplate(ProposedTemplateDto dto) => new(
-        dto.Name, dto.DisplayName, dto.Description, dto.ExecutorProfileName,
-        dto.ReviewerProfileNames, dto.AdvisorProfileNames, dto.GroundingProviderProfileNames,
-        dto.EvaluationStrategy, dto.EvaluationStrategyReasoning);
+        Name:                          dto.Name,
+        DisplayName:                   dto.DisplayName,
+        Description:                   dto.Description,
+        ExecutorProfileName:           dto.ExecutorProfileName,
+        ReviewerProfileNames:          dto.ReviewerProfileNames,
+        AdvisorProfileNames:           dto.AdvisorProfileNames,
+        GroundingProviderProfileNames: dto.GroundingProviderProfileNames,
+        EvaluationStrategy:            dto.EvaluationStrategy,
+        EvaluationStrategyReasoning:   dto.EvaluationStrategyReasoning,
+        FinalizerProfileNames:         dto.FinalizerProfileNames,
+        RunFinalizersOnMaxAttempts:    dto.RunFinalizersOnMaxAttempts,
+        FinalizerReasoning:            dto.FinalizerReasoning);
 
     private static ProposedProfile MapProfile(ProposedProfileDto dto)
     {
@@ -47,8 +56,9 @@ public static class MaterializeTemplateProposalTool
             dto.Model, dto.Provider, dto.SystemPrompt, dto.MaxTokens,
             dto.ReviewerFocus, dto.AdvisorMode, dto.AdvisorTrigger,
             dto.GroundingProviderType, dto.GroundingProviderSettings,
+            dto.FinalizerType, dto.FinalizerSettings,
             dto.ModelReasoning, dto.SystemPromptReasoning, dto.OverallReasoning,
-            dto.ModeReasoning, dto.TriggerReasoning);
+            dto.ModeReasoning, dto.TriggerReasoning, dto.FinalizerReasoning);
     }
 }
 

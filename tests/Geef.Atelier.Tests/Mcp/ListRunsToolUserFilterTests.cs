@@ -1,6 +1,8 @@
 using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Crew.Finalizers;
+using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Mcp.Tools;
 
 namespace Geef.Atelier.Tests.Mcp;
@@ -11,13 +13,15 @@ namespace Geef.Atelier.Tests.Mcp;
 /// </summary>
 public sealed class ListRunsToolUserFilterTests
 {
+    private static readonly FakeArtifactRepository _artifactRepo = new();
+
     [Fact]
     public async Task ListRuns_NonAdmin_AlwaysSeesOwnRuns()
     {
         var service     = new RecordingRunService();
         var currentUser = new FakeUser("alice", isAdmin: false);
 
-        await ListRunsTool.ListRuns(service, currentUser, includeAllUsers: false);
+        await ListRunsTool.ListRuns(service, currentUser, _artifactRepo, includeAllUsers: false);
 
         Assert.Equal("alice", service.LastRequestingUsername);
     }
@@ -28,7 +32,7 @@ public sealed class ListRunsToolUserFilterTests
         var service     = new RecordingRunService();
         var currentUser = new FakeUser("admin", isAdmin: true);
 
-        await ListRunsTool.ListRuns(service, currentUser, includeAllUsers: false);
+        await ListRunsTool.ListRuns(service, currentUser, _artifactRepo, includeAllUsers: false);
 
         Assert.Equal("admin", service.LastRequestingUsername);
     }
@@ -39,7 +43,7 @@ public sealed class ListRunsToolUserFilterTests
         var service     = new RecordingRunService();
         var currentUser = new FakeUser("admin", isAdmin: true);
 
-        await ListRunsTool.ListRuns(service, currentUser, includeAllUsers: true);
+        await ListRunsTool.ListRuns(service, currentUser, _artifactRepo, includeAllUsers: true);
 
         // null = admin bypass: returns all users' runs
         Assert.Null(service.LastRequestingUsername);
@@ -52,7 +56,7 @@ public sealed class ListRunsToolUserFilterTests
         var currentUser = new FakeUser("alice", isAdmin: false);
 
         // Non-admin cannot escalate privilege even if they pass includeAllUsers=true
-        await ListRunsTool.ListRuns(service, currentUser, includeAllUsers: true);
+        await ListRunsTool.ListRuns(service, currentUser, _artifactRepo, includeAllUsers: true);
 
         Assert.Equal("alice", service.LastRequestingUsername);
     }
@@ -66,6 +70,18 @@ public sealed class ListRunsToolUserFilterTests
         public string? Username    => username;
         public bool IsAuthenticated => true;
         public bool IsAdmin         => isAdmin;
+    }
+
+    private sealed class FakeArtifactRepository : IRunArtifactRepository
+    {
+        public Task<IReadOnlyList<RunArtifact>> ListByRunAsync(Guid runId, CancellationToken ct)
+            => Task.FromResult<IReadOnlyList<RunArtifact>>([]);
+        public Task<RunArtifact?> GetByIdAsync(Guid artifactId, CancellationToken ct)
+            => Task.FromResult<RunArtifact?>(null);
+        public Task<RunArtifact> CreateAsync(RunArtifact artifact, CancellationToken ct)
+            => Task.FromResult(artifact);
+        public Task DeleteByRunAsync(Guid runId, CancellationToken ct)
+            => Task.CompletedTask;
     }
 
     /// <summary>Captures the requestingUsername argument passed to ListRunsAsync.</summary>
@@ -100,5 +116,8 @@ public sealed class ListRunsToolUserFilterTests
 
         public Task<WelcomeStats> GetWelcomeStatsAsync(string? requestingUsername, CancellationToken cancellationToken = default)
             => Task.FromResult(new WelcomeStats(0, 0, 0, 0, 0, 0));
+
+        public Task<Guid> ResumeRunAsync(ResumeOptions options, string? requestingUsername, CancellationToken cancellationToken = default)
+            => throw new NotImplementedException();
     }
 }
