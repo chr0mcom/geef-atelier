@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-19 (D-046 ergänzt: Run-Resume)*
+*Letzte Aktualisierung: 2026-05-19 (D-047 + D-048 ergänzt: Custom Providers + Workshop-Dashboard)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -874,3 +874,59 @@ Wenn ein Run mit Status `Aborted` oder `Failed` endet, kann der Nutzer ihn jetzt
 **D-046/6 — Migration `Step23RunResume`.** Zwei neue nullable Spalten auf `Runs`: `ParentRunId uuid NULL` (FK auf `Runs.Id` mit `ON DELETE SET NULL`) und `SeedDraftText text NULL`. Index `IX_Runs_ParentRunId` für Parent→Children-Lookups.
 
 **Tests:** 1021 (1017 grün + 4 bekannte Playwright-Flakes). Neue Test-Klassen: `RunServiceResumeTests` (12 Tests), `SeedDraftGroundingStepTests` (3 Tests), `ProfileBasedExecutorSeedDraftTests` (3 Tests), `ResumeRunDialogTests` (10 Tests).
+
+---
+
+## D-047 — Custom Providers: CRUD-Entity für HTTP- und CLI-Provider
+
+*Datum: 19. Mai 2026*
+
+Provider werden zur sechsten CRUD-Entity in Geef.Atelier — anlegbar, editierbar, deaktivierbar und löschbar über die UI. Zwei Typen: **HTTP** (OpenAI-kompatibler Endpoint mit konfigurierbarem Auth-Header, optionalem models-Endpoint, Manual-Model-List und Cost-Tracking-Feldern) und **CLI** (Subprocess via cli-proxy mit vier CLI-Kinds: Claude, Codex, Gemini, Generic). 11 eingebaute System-Provider (8 HTTP + 3 CLI) ersetzen das bisherige statische `ProviderCatalog`-Dictionary. Der `IProviderService` (DB-basiert) ist ab sofort die primäre Quelle; `IProviderCatalog` bleibt als dünner Wrapper für bestehende Callsites (Legacy-Shim, nicht neu verwenden). Migration `Step24CustomProviders`.
+
+**D-047/1 — `anthropic-direct` wird nicht als HTTP-Provider bereitgestellt.** Die Anthropic-API nutzt ein anderes Request-Format als die OpenAI-kompatible REST-Schicht. Ein generischer HTTP-Provider würde `system`, `thinking`-Blocks und die `anthropic-version`-Header-Konvention nicht korrekt abbilden. Anthropic bleibt ausschließlich als `claude-cli`-System-Provider erreichbar. Rationale: korrekte Ergebnisse vor Vollständigkeit.
+
+**D-047/2 — `opencode-cli` wird nicht als eingebauter CLI-Provider geliefert.** Der Installationsmechanismus von OpenCode im Docker-Container war zum Zeitpunkt der Implementierung nicht stabil verifiziert. Nutzer können OpenCode als Custom-CLI-Provider mit `cli_kind=generic` selbst konfigurieren, sobald der Binary lokal verfügbar ist. Eine zukünftige Entscheidung kann OpenCode als System-Provider nachrüsten, sobald ein reproduzierbares Container-Build-Verfahren vorliegt.
+
+**D-047/3 — Settings werden als `Dictionary<string, JsonElement>` (JSONB) gespeichert; typisierte Wrapper-Records lesen daraus.** `HttpProviderSettings.FromSettings()` und `CliProviderSettings.FromSettings()` sind pure Factory-Methoden ohne Seiteneffekte. Das JSONB-Format erlaubt additive Erweiterungen ohne Migrations-Churn; der Code bleibt typsicher durch die Records. Der `Provider`-Domain-Record selbst ist persistenz-frei (kein EF-Attribut).
+
+**D-047/4 — System-Provider sind unveränderlich und nicht löschbar; Custom-Provider benötigen das Präfix `custom-`.** `ProviderService.EnsureCustomPrefix()` erzwingt den Präfix beim Anlegen. System-Provider werden durch `SystemProviders.IsSystemProviderName()` erkannt und von allen Mutationsoperationen ausgeschlossen. Das Präfix verhindert Namenskollisionen mit zukünftigen System-Providern und macht Custom-Einträge im Dropdown auf einen Blick erkennbar.
+
+**D-047/5 — Delete ist nur erlaubt, wenn kein Profil den Provider referenziert (Cascade-Schutz).** `IProviderRepository.IsReferencedByAnyProfileAsync()` prüft per Raw-SQL `COUNT` über vier Profil-Tabellen (ReviewerProfiles, ExecutorProfiles, AdvisorProfiles, FinalizerProfiles — letztere via JSONB `->>'provider'` auf die `Settings`-Spalte). Soft-Disable via `SetActiveAsync` ist immer möglich; inaktive Provider erscheinen nicht in neuen Profil-Formularen, bestehende Profile (eingefroren im `CrewSnapshot`) bleiben funktionsfähig.
+
+**D-047/6 — `LlmClientResolver` cached `Provider`-Lookups per Name via `ConcurrentDictionary<string, Lazy<Provider?>>` mit `LazyThreadSafetyMode.ExecutionAndPublication`.** Die `Lazy`-Wrapper garantieren, dass die asynchrone DB-Initialisierung pro Provider-Name exakt einmal ausgeführt wird, auch bei parallelen Anfragen. Fallback-Reihenfolge: DB-Provider → `LlmOptions.ProvidersFallback` (appsettings) → Exception. Der Resolver kann den Cache per Provider invalidieren, wenn `IProviderService` einen Update-Event signalisiert.
+
+**D-047/7 — ModelCatalog: Cache-TTL von 24h auf 1h gesenkt; pro-Provider-Quellenauswahl.** HTTP-Provider mit `models_endpoint` rufen live ab; ohne `models_endpoint` wird die statische `manual_model_list` aus den Settings geliefert; CLI-Provider liefern ihre statische `models`-Liste aus den Settings. `IsUsingFallback()` signalisiert veraltete Cache-Zustände an die UI (Stale-Warning-Banner in `ModelSelector.razor`).
+
+**D-047/8 — CLI-Proxy erhält einen generischen Endpoint `/v1/cli/{provider_name}/...` und einen internen Backend-Sync.** `ProviderConfigSync` lädt alle 60 s die aktiven CLI-Provider-Konfigurationen vom Backend-Endpoint `GET /api/internal/providers/cli` (abgesichert mit `X-Internal-Token`-Header). Der Endpoint ist mit `.AllowAnonymous()` registriert und prüft das Token manuell, damit keine Cookie-Auth-Middleware greift. Legacy-Endpoints `/v1/claude/...` und `/v1/codex/...` bleiben als Shims bestehen und routen auf den neuen generischen Endpoint.
+
+**D-047/9 — `GeminiAdapter` und `GenericAdapter` als neue CLI-Adapter-Klassen mit abstrakter `CliAdapter`-Basisklasse.** Die abstrakte Basisklasse erzwingt `execute()`, `list_models()` und `health_check()` (Default: `shutil.which`). `GeminiAdapter` setzt `env["HOME"] = auth_volume` für den Token-Speicher und parst JSON mit Text-Fallback. `GenericAdapter` verwendet `prompt_args_template` (Substitution: `{prompt}`, `{model}`), `stdin_mode` und `output_format` (text/openai-json/jsonl). OpenCode ist bewusst ausgelassen (D-047/2).
+
+**D-047/10 — `ProviderCatalog` (Legacy-Shim) verwendet `volatile CachedResult?` mit 5-Minuten-TTL.** Der Shim vermeidet Thread-Pool-Hunger durch synchrones Warten auf DB-Calls: nur bei Cache-Miss wird `.GetAwaiter().GetResult()` aufgerufen; danach antwortet er aus dem Speicher. `record CachedResult(IReadOnlyList<ProviderInfo> Items, DateTimeOffset Expiry)` ist unveränderlich. Der Shim ist als `[Obsolete]` markiert — alle neuen Callsites sollen `IProviderService` direkt nutzen.
+
+**Tests:** 1065 gesamt (1061 grün + 4 bekannte Flakes unverändert). Neue .NET-Testklassen: `ProviderTests` (12), `ProviderServiceTests` (15), `ProviderRepositoryTests` (9), `ProvidersIndexTests` (8). Neue Python-Tests: `test_gemini_adapter.py` (7), `test_generic_adapter.py` (8), `test_provider_sync.py` (7) — 22 neue Python-Tests, 67 gesamt grün.
+
+---
+
+## D-048 — Workshop-Dashboard: 13-Widget-Live-Dashboard als Einstiegsscreen
+
+*Datum: 19. Mai 2026*
+
+Der primitive Einstiegsscreen (`/`) — Hero + 4 Stat-Tiles + Recent-Runs-Liste — wird durch ein vollständiges 13-Widget-Workshop-Dashboard ersetzt, das 1:1 aus einem React-Prototypen portiert wurde (`docs/design/dashboard-prototype/`, 6 JSX-Dateien). Alle 13 Widgets sind Blazor-Server-Komponenten mit Live-SignalR-Updates, Drei-Theme-Design-System (Vellum/Noir/Petrol) und einem Admin-Scope-Toggle (My/All Workshops).
+
+**Widgets:** WelcomeStrip (Streak, CraftMark, Heute-Zähler), LivePressStatus (aktive Runs-Rail mit Phasen-Mapping), LedgerStats (Kosten + Run-Zähler, Trend-Pfeile), ActivityCalendar (365-Tage-Heatmap lvl-0..4), CrewDna (Template-Verteilung), CostForgeSankey (Provider×Rolle-Kostenflüsse), IterationSweetSpot (Histogramm), ManuscriptsGallery (letzte 12 abgeschlossene), TokenStream (Sparkline nach Rolle), CriticsBenchMatrix (Reviewer-Pass-Raten), ProviderBench (Provider-Statistiken), KnowledgeBaseWidget (Docs + Chunks + Top-Dateien), DayBookStream (Live-Aktivitäts-Feed, 7-Quellen-UNION-ALL).
+
+**D-048/1 — `RunStatus` wird als String gespeichert — Raw-SQL-Inserts verwenden `'Completed'`, nicht die Ganzzahl `2`.** `RunConfiguration` hat `HasConversion<string>()` — die DB-Spalte speichert den Enum-Namen als Text (`'Completed'`, `'Pending'` usw.). Alle Raw-SQL-Test-Inserts müssen die String-Form nutzen. Ein Insert mit Ganzzahl `2` speichert den Text `"2"`, der von EFs `WHERE Status = 'Completed'` nie gefunden wird. Entdeckt und behoben bei der Test-Stabilisierung.
+
+**D-048/2 — `IDashboardService`-Registrierung von `LlmServiceExtensions` nach `AddAtelierPersistence` verschoben.** Der E2E-TestHost verwendet einen Fake-`ILlmClientResolver` und ruft `AddLlmClient()` nie auf. `SignalRRunNotifier` injiziert `IDashboardService` — die Registrierung in den LLM-Extensions verursachte DI-Validierungsfehler bei allen E2E-Tests. Die Verschiebung nach `AddAtelierPersistence()` (das der TestHost immer aufruft) löst das Problem ohne Änderung am TestHost.
+
+**D-048/3 — `DashboardRepository`-Datums-Parameter benötigen expliziten UTC-Offset.** Der Server läuft auf UTC+2. `DateTimeOffset.UtcNow.Date` gibt `DateTime` mit `Kind=Unspecified` zurück; Npgsql konvertiert es mit der Lokalzeit (UTC+2-Offset), was für `timestamptz`-Spalten abgelehnt wird. Behoben durch explizites `new DateTimeOffset(utcNow.UtcDateTime.Date, TimeSpan.Zero)` überall wo Datumsgrenzen benötigt werden.
+
+**D-048/4 — CSS von Grund auf neu geschrieben; kein `atelier-dashboard.css` im Prototyp vorhanden.** Der React-Prototyp enthielt keine CSS-Datei — nur JSX-`className`-Attribute und eine HTML-Referenzdatei. `wwwroot/atelier-dashboard.css` wurde aus den JSX-Klassennamen kombiniert mit dem bestehenden CSS-Variablen-System in `wwwroot/atelier.css` geschrieben. Alle Layout-Klassen sind global (kein Blazor-Scoped-CSS). Responsive Breakpoints: ≤768 px kollabiert Mehrspaltenlayouts auf eine Spalte.
+
+**D-048/5 — Namenskonflikte zwischen Blazor-Komponentenklassen und Core-Domain-Records.** Drei Komponenten (`WelcomeStrip.razor`, `LedgerStats.razor`, `CriticsBenchMatrix.razor`) teilen ihren Klassennamen mit gleichnamigen Core-Domain-Records. Lösung: `[Parameter]`-Property-Deklarationen verwenden vollqualifizierte Typnamen (`Geef.Atelier.Core.Domain.Dashboard.WelcomeStrip`) statt Datei-Umbenennung, was die Komponenten-Namenskonvention beibehält.
+
+**D-048/6 — Day-Book UNION ALL (7 Quellen) gecacht, keine Materialized View.** Der Day-Book-Stream fragt 7 Quellen in einem einzigen asynchronen UNION ab (abgeschlossene Runs, fehlgeschlagene/abgebrochene Runs, Knowledge-Dokumente, Provider, OAuth-Clients, materialisierte Templates, Admin-User-Events). Ergebnisse werden für 45 s im `DashboardService` gecacht. Eine PostgreSQL-Materialized-View wurde explizit ausgeschlossen (Plan-Constraint „was du NICHT tust").
+
+**D-048/7 — Migration Step25: `WordCount` auf `Runs`, `ProviderName` auf Actor-Cost-Tabellen, Performance-Indizes.** `Runs.WordCount` (int, nullable) per `regexp_split_to_array` backgefüllt. `IterationActorCosts.ProviderName` und `FinalizationActorCosts.ProviderName` per JSONB-Lateral-Join gegen `CrewSnapshot` (Exakt-Match), Fallback auf `split_part(ModelName,'/',1)` mit Provider-Familie-Heuristiken. Index `IX_Runs_CreatedAt` (BTREE) für Heatmap- und Ledger-Range-Abfragen ergänzt.
+
+**Tests:** 1079 gesamt (1074 grün + 4 bekannte Flakes unverändert). Neu: `DashboardRepositoryTests` (6), `DashboardPerformanceTests` (2), `Step25MigrationTests` (4), plus 46 bUnit-Widget-Komponenten-Tests.
