@@ -4,6 +4,7 @@
 @implements IAsyncDisposable
 @inject IRunService RunService
 @inject IKnowledgeService KnowledgeService
+@inject IRunArtifactRepository ArtifactRepository
 @inject NavigationManager Nav
 @inject ILogger<RunDetail> Logger
 @inject AuthenticationStateProvider AuthProvider
@@ -13,7 +14,9 @@
 @using Geef.Atelier.Core.Domain
 @using Geef.Atelier.Core.Domain.Crew
 @using Geef.Atelier.Core.Domain.Crew.Advisors
+@using Geef.Atelier.Core.Domain.Crew.Finalizers
 @using Geef.Atelier.Core.Domain.Crew.Knowledge
+@using Geef.Atelier.Core.Persistence
 @using Geef.Atelier.Web.Display
 @using Geef.Atelier.Web.Components.UI
 
@@ -131,6 +134,58 @@
             </div>
         }
 
+        @if (_artifacts.Count > 0)
+        {
+            <div class="run-artifacts-section" data-testid="artifacts-section">
+                <h2>Finalizer-Artefakte</h2>
+                @if (!string.IsNullOrEmpty(_details.Run.FinalizerErrorMessage))
+                {
+                    <div class="warning-banner" data-testid="finalizer-error">
+                        Teilfehler: @_details.Run.FinalizerErrorMessage
+                    </div>
+                }
+                <table class="crew-table">
+                    <thead>
+                        <tr>
+                            <th>Finalizer</th>
+                            <th>Typ</th>
+                            <th>Details</th>
+                            <th>Erstellt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var a in _artifacts)
+                        {
+                            <tr data-testid="artifact-row-@a.Id">
+                                <td>@a.FinalizerProfileName</td>
+                                <td>@GetArtifactTypeLabel(a.ArtifactType)</td>
+                                <td>
+                                    @if (a.ArtifactType == ArtifactType.File && a.Filename is not null)
+                                    {
+                                        <a href="/runs/@RunId/artifacts/@a.Id/download"
+                                           class="btn small"
+                                           data-testid="artifact-download-@a.Id">
+                                            @a.Filename (@FormatBytes(a.SizeBytes ?? 0))
+                                        </a>
+                                    }
+                                    else if (a.ArtifactType == ArtifactType.Url)
+                                    {
+                                        <a href="@a.StorageUri" target="_blank" rel="noopener noreferrer"
+                                           data-testid="artifact-url-@a.Id">@a.StorageUri</a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">@(a.StatusMessage ?? a.StorageUri)</span>
+                                    }
+                                </td>
+                                <td>@a.CreatedAt.ToString("HH:mm:ss")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
         @if (_details.Run.Status == RunStatus.Completed && !string.IsNullOrEmpty(_details.Run.FinalText))
         {
             <Manuscript Run="_details.Run" IterationCount="@_details.Iterations.Count" />
@@ -149,6 +204,7 @@
     CrewSnapshot?  _snapshot;
     List<KnowledgeDocument> _runAttachments = [];
     IReadOnlyList<Guid>     _runAttachmentDocumentIds = [];
+    IReadOnlyList<RunArtifact> _artifacts = [];
     bool _showPromoteModal;
     KnowledgeDocument? _promoteCandidate;
     string? _promoteError;
@@ -202,6 +258,30 @@
             _runAttachments = [];
         }
         _runAttachmentDocumentIds = _runAttachments.Select(a => a.Id).ToArray();
+        try
+        {
+            _artifacts = await ArtifactRepository.ListByRunAsync(RunId, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load run artifacts for run {RunId}", RunId);
+            _artifacts = [];
+        }
+    }
+
+    static string GetArtifactTypeLabel(ArtifactType t) => t switch
+    {
+        ArtifactType.File   => "Datei",
+        ArtifactType.Url    => "URL",
+        ArtifactType.Status => "Status",
+        _                   => t.ToString(),
+    };
+
+    static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024):F1} MB";
     }
 
     void OpenPromoteModal(KnowledgeDocument doc)

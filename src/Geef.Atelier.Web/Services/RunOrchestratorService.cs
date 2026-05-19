@@ -1,11 +1,14 @@
 using System.Collections.Concurrent;
+using Geef.Atelier.Application.Crew.Finalizers;
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Notifications;
+using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
@@ -29,7 +32,8 @@ internal sealed class RunOrchestratorService(
     ILogger<RunOrchestratorService>     logger,
     IGroundingProviderFactory?          groundingProviderFactory = null,
     IPricingCatalog?                    pricingCatalog = null,
-    IOptions<CostTrackingOptions>?      costTrackingOptions = null) : BackgroundService
+    IOptions<CostTrackingOptions>?      costTrackingOptions = null,
+    IFinalizerExecutorFactory?          finalizerExecutorFactory = null) : BackgroundService
 {
     private readonly OrchestratorOptions _opts = options.Value;
     private readonly SemaphoreSlim _slots = new(options.Value.MaxConcurrentRuns, options.Value.MaxConcurrentRuns);
@@ -180,22 +184,57 @@ internal sealed class RunOrchestratorService(
                 await runner.RunAsync(run.BriefingText, cts.Token);
                 if (accumulator is not null)
                     await FinalizeRunCostsAsync(run.Id, accumulator, cts.Token);
+                await ExecuteFinalizationAsync(run.Id, snapshot, cts.Token);
             }
             catch (ConvergenceFailedException convergenceEx)
             {
                 logger.LogWarning(convergenceEx,
                     "Run {RunId} failed to converge; checking for OnConvergenceFailure advisors.", run.Id);
 
-                var retried = await TryConvergenceFailureRetryAsync(
-                    run, snapshot, cts.Token);
-
-                if (!retried)
+                bool retried;
+                bool retryAlsoFailed = false;
+                try
                 {
-                    // No retry was performed — propagate so the outer handler marks it Failed.
-                    throw;
+                    retried = await TryConvergenceFailureRetryAsync(run, snapshot, cts.Token);
                 }
-                // Retry ran: status was written inside TryConvergenceFailureRetryAsync.
-                try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
+                catch (ConvergenceFailedException retryEx)
+                {
+                    // The OnConvergenceFailure advisor retry also failed — treat as max-attempts path.
+                    logger.LogWarning(retryEx,
+                        "Run {RunId} advisor-retry also failed to converge.", run.Id);
+                    retried = true;
+                    retryAlsoFailed = true;
+                }
+
+                bool shouldRunFinalizers = finalizerExecutorFactory is not null &&
+                    snapshot.RunFinalizersOnMaxAttempts &&
+                    snapshot.Finalizers?.Count > 0;
+
+                if (!retried || retryAlsoFailed)
+                {
+                    if (shouldRunFinalizers)
+                    {
+                        // Run finalizers on max-attempts: use last iteration text, mark as Completed.
+                        await ExecuteFinalizationOnMaxAttemptsAsync(run, snapshot, cts.Token);
+                        try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
+                    }
+                    else if (!retried)
+                    {
+                        // No retry, no max-attempts finalizer — propagate so outer handler marks Failed.
+                        throw;
+                    }
+                    else
+                    {
+                        // Retry also failed, no finalizers — outer catch (Exception) will mark Failed.
+                        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(convergenceEx).Throw();
+                        throw; // unreachable; satisfies compiler
+                    }
+                }
+                else
+                {
+                    // Retry ran and succeeded: status was written inside TryConvergenceFailureRetryAsync.
+                    try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
+                }
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -581,5 +620,151 @@ internal sealed class RunOrchestratorService(
         {
             logger.LogError(ex, "Failed to finalize cost tracking for run {RunId}.", runId);
         }
+    }
+
+    /// <summary>
+    /// Runs the finalizer chain for a converged run. Reloads <c>FinalText</c> from the DB because
+    /// <c>PostgresEventSink</c> writes it directly on <c>PipelineCompletedEvent</c>.
+    /// Finalizer errors never abort the run — they are recorded as <see cref="ArtifactType.Status"/>
+    /// artifacts and the error message is set on the run row (partial-success contract).
+    /// </summary>
+    private async Task ExecuteFinalizationAsync(
+        Guid runId,
+        CrewSnapshot snapshot,
+        CancellationToken ct)
+    {
+        if (finalizerExecutorFactory is null) return;
+        var finalizers = snapshot.Finalizers;
+        if (finalizers is null || finalizers.Count == 0) return;
+
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
+        var artifactRepo = scope.ServiceProvider.GetRequiredService<IRunArtifactRepository>();
+
+        var run = await db.Runs.AsNoTracking().FirstOrDefaultAsync(r => r.Id == runId, ct);
+        if (run is null) return;
+
+        var finalText = run.FinalText ?? string.Empty;
+        var completedAt = run.CompletedAt ?? DateTimeOffset.UtcNow;
+        var currentText = finalText;
+        var errorMessages = new List<string>();
+        var costEntities = new List<FinalizationActorCost>();
+
+        var baseContext = new FinalizerExecutionContext(
+            RunId: runId,
+            TemplateName: snapshot.TemplateName,
+            FinalText: finalText,
+            CurrentText: currentText,
+            RunCompletedAt: completedAt);
+
+        foreach (var profile in finalizers)
+        {
+            try
+            {
+                var executor = finalizerExecutorFactory.GetExecutor(profile.FinalizerType);
+                var ctx = baseContext with { CurrentText = currentText };
+                var result = await executor.ExecuteAsync(profile, ctx, ct);
+
+                if (result.UpdatedText is not null)
+                    currentText = result.UpdatedText;
+
+                if (result.Artifact is not null)
+                    await artifactRepo.CreateAsync(result.Artifact, ct);
+
+                if (result.InputTokens > 0)
+                {
+                    costEntities.Add(new FinalizationActorCost
+                    {
+                        Id = Guid.NewGuid(),
+                        RunId = runId,
+                        ActorName = result.ActorName,
+                        ModelName = result.ModelName,
+                        InputTokens = result.InputTokens,
+                        OutputTokens = result.OutputTokens,
+                        CostEur = result.CostEur,
+                        CreatedAt = DateTimeOffset.UtcNow,
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Finalizer {Profile} threw unexpectedly for run {RunId}.",
+                    profile.Name, runId);
+                errorMessages.Add($"{profile.Name}: {ex.Message}");
+
+                // Persist a Status artifact so the failure is visible in the Run detail UI.
+                var errorArtifact = new RunArtifact
+                {
+                    Id = Guid.NewGuid(),
+                    RunId = runId,
+                    FinalizerProfileName = profile.Name,
+                    ArtifactType = ArtifactType.Status,
+                    StorageUri = "error",
+                    StatusMessage = $"Unexpected error: {ex.Message}",
+                    CreatedAt = DateTimeOffset.UtcNow,
+                };
+                try { await artifactRepo.CreateAsync(errorArtifact, ct); }
+                catch (Exception dbEx)
+                {
+                    logger.LogError(dbEx,
+                        "Failed to persist error artifact for finalizer {Profile}, run {RunId}.",
+                        profile.Name, runId);
+                }
+            }
+        }
+
+        // Persist finalizer costs
+        if (costEntities.Count > 0)
+        {
+            db.FinalizationActorCosts.AddRange(costEntities);
+            await db.SaveChangesAsync(ct);
+        }
+
+        // Update run: FinalText (if transforms changed it), FinalizerCostEur, FinalizerErrorMessage
+        var totalFinalizerCost = costEntities.Any(c => c.CostEur.HasValue)
+            ? costEntities.Sum(c => c.CostEur ?? 0m)
+            : (decimal?)null;
+        var errorMsg = errorMessages.Count > 0 ? string.Join("; ", errorMessages) : null;
+
+        await db.Runs
+            .Where(r => r.Id == runId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.FinalText,             currentText)
+                .SetProperty(r => r.FinalizerCostEur,      totalFinalizerCost)
+                .SetProperty(r => r.FinalizerErrorMessage,  errorMsg),
+                ct);
+    }
+
+    /// <summary>
+    /// Runs the finalizer chain when MaxAttempts was reached (ConvergenceFailedException) and
+    /// <c>RunFinalizersOnMaxAttempts=true</c>. Uses the last iteration's <c>ArtifactText</c> as input,
+    /// then marks the run as Completed so it does not end up as Failed.
+    /// </summary>
+    private async Task ExecuteFinalizationOnMaxAttemptsAsync(
+        RunEntity run,
+        CrewSnapshot snapshot,
+        CancellationToken ct)
+    {
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
+
+        // Get the last iteration's ArtifactText (the best text produced before convergence failed)
+        var lastText = await db.Iterations
+            .Where(i => i.RunId == run.Id)
+            .OrderByDescending(i => i.IterationNumber)
+            .Select(i => i.ArtifactText)
+            .FirstOrDefaultAsync(ct) ?? run.BriefingText;
+
+        // Mark run as Completed with the last known text so finalizers can proceed
+        await db.Runs
+            .Where(r => r.Id == run.Id)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.Status,    RunStatus.Completed)
+                .SetProperty(r => r.FinalText, lastText)
+                .SetProperty(r => r.CompletedAt, DateTimeOffset.UtcNow),
+                ct);
+
+        // Now run the normal finalization chain using the last text as both FinalText and CurrentText
+        await ExecuteFinalizationAsync(run.Id, snapshot, ct);
     }
 }

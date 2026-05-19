@@ -67,4 +67,54 @@ public static class StudioFieldHelps
 
     public const string MaxQueriesPerRun =
         "Wie viele Suchanfragen pro Ausführung maximal gestellt werden dürfen (1–5).";
+
+    // --- Finalizer-spezifisch ---
+    public const string FinalizerType =
+        "Art des Finalizers: " +
+        "FileExport – exportiert den Text in eine Datei (Markdown, HTML, PDF, DOCX, TXT). " +
+        "MetadataEnrich – reichert den Text mit Metadaten an (Front-Matter, Wortzahl, Lesbarkeit). " +
+        "ExternalSink – sendet den Text an einen Webhook oder per E-Mail. " +
+        "Transform – verändert den Text durch ein KI-Modell (z. B. Anti-AI-Stimme).";
+
+    public const string FinalizerFileFormat =
+        "Zieldateiformat: markdown, html, pdf, docx, txt. PDF und DOCX werden serverseitig generiert.";
+
+    public const string FinalizerEnricherType =
+        "Art der Metadaten-Anreicherung: " +
+        "front-matter – YAML-Header mit Titel, Erstellungszeit und Wortzahl. " +
+        "word-count-footer – Wortzahl und Lesezeit als Fußzeile. " +
+        "reading-level – Flesch-Kincaid-Leseniveau als Hinweis im Text.";
+
+    public const string FinalizerSinkType =
+        "Zielkanal: webhook – HTTP-POST an eine URL. email – E-Mail-Versand via SMTP.";
+
+    public const string FinalizerWebhookUrl =
+        "Ziel-URL für den Webhook-POST. Die URL wird nicht in Logs gespeichert.";
+
+    public const string FinalizerWebhookAuthHeader =
+        "Optionaler HTTP-Autorisierungs-Header (z. B. \"Bearer my-token\"). " +
+        "Wird nicht angezeigt und nicht geloggt.";
+
+    public const string FinalizerEmailTo =
+        "Empfänger-E-Mail-Adresse. SMTP muss serverseitig konfiguriert sein (Umgebungsvariablen).";
+
+    public const string FinalizerEmailSubject =
+        "Betreffzeile der E-Mail. Unterstützt Platzhalter: {run-id}, {template}, {timestamp}.";
+
+    public const string FinalizerEmailAttach =
+        "Wenn aktiviert, wird der Text als Dateianhang mitgeschickt (Dateiname aus Profil-Name).";
+
+    public const string FinalizerTransformSystemPrompt =
+        "Anweisung für die KI-Transformation. Sei konkret: was soll geändert werden und was nicht. " +
+        "Beispiel: \"Schreibe den Text in einer natürlichen, menschlichen Stimme um. Vermeide KI-typische Satzkonstruktionen.\" " +
+        "Endet immer mit: 'Respond in the language of the input text.'";
+
+    public const string FinalizerProfiles =
+        "Finalizer werden nach dem Konvergenz-Schritt in der angegebenen Reihenfolge ausgeführt. " +
+        "Transform-Finalizer ändern den Text; Export- und Sink-Finalizer erzeugen Artefakte. " +
+        "Reihenfolge: erst transformieren, dann exportieren.";
+
+    public const string RunFinalizersOnMaxAttempts =
+        "Wenn aktiviert, laufen die Finalizer auch wenn die Konvergenz nach maximalen Iterationen scheitert — " +
+        "der letzte Executor-Entwurf wird dann als Ergebnis verwendet.";
 }

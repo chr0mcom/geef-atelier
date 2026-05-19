@@ -13,6 +13,7 @@ using Geef.Atelier.Infrastructure.Pricing;
 using Geef.Atelier.Infrastructure.Knowledge;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
+using Geef.Atelier.Infrastructure.Finalizers;
 using Geef.Atelier.Infrastructure.TemplateStudio;
 using Geef.Atelier.Mcp;
 using Geef.Atelier.Web.Auth;
@@ -59,6 +60,7 @@ builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection("Pri
 builder.Services.Configure<CostTrackingOptions>(builder.Configuration.GetSection("CostTracking"));
 builder.Services.AddSingleton<IPricingCatalog, PricingCatalog>();
 builder.Services.AddTemplateStudio(builder.Configuration);
+builder.Services.AddFinalizers(builder.Configuration);
 
 builder.Services.Configure<OrchestratorOptions>(builder.Configuration.GetSection("Orchestrator"));
 builder.Services.Configure<ConvergenceOptions>(builder.Configuration.GetSection("Convergence"));
@@ -234,6 +236,7 @@ app.MapAuthEndpoints();
 app.MapWellKnownEndpoints();
 app.MapOAuthEndpoints();
 app.MapSettingsEndpoints();
+app.MapArtifactEndpoints();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
