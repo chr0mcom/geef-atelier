@@ -30,7 +30,11 @@ Text-Generations-Pipeline-Plattform auf Basis des [Geef SDK](https://github.com/
 
 **Run-User-Isolation ✅** Jeder Nutzer sieht nur seine eigenen Runs; Admin-Override per expliziten Umschaltern. MCP-Runs werden dem autorisierenden OAuth-Nutzer zugeordnet, Claude-Code-CLI-Runs (statisches Token) dem Admin (D-042).
 
-Aktuell: **über 800 Tests** (grün; 2 bekannte Testcontainers-Flakes).
+**Finalizer-Pipeline ✅** 5. Profil-Typ — FinalizerProfile mit vier Typen (FileExport, MetadataEnrich, ExternalSink, Transform). 17 System-Profile. RunArtifact-Entity (File mit Download, Url, Status). Download-Endpunkt mit Owner-Check. FinalizerPicker + RunFinalizersOnMaxAttempts im CrewTemplateEditor. RunDetail-Artefakt-Tabelle. Studio-Integration. 2 neue MCP-Tools (D-044, 19. Mai 2026).
+
+**Run-Resume ✅** Einen fehlgeschlagenen oder abgebrochenen Run dort fortsetzen, wo er aufgehört hat — Seed-Modus (weiter mit letztem Draft) oder Clean-Modus (neuer Start mit gleichem Briefing). „Fortsetzen"-Button in RunDetail, ResumeRunDialog mit MaxIterations-Override. ParentRunId-Link in RunDetail (PR #18, 19. Mai 2026).
+
+Aktuell: **über 1000 Tests** (grün; 4 bekannte Testcontainers-Flakes).
 
 Vollständiger Scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope_de.md)
 
@@ -150,7 +154,11 @@ Voraussetzung: Der OAuth-Client muss im Admin-Panel unter `/admin/oauth-clients`
 - `analyze_template_proposal` — Aufgabenbeschreibung analysieren, Template-Vorschlag erzeugen (persistiert)
 - `materialize_template_proposal` — Geprüften Vorschlag als Custom-Template + -Profile materialisieren
 
-Insgesamt 13 MCP-Tools. Vollständige Endpoint-Dokumentation: [docs/09-endpoint-reference.md](docs/09-endpoint-reference_de.md)
+**Artefakte:**
+- `list_run_artifacts` — RunArtifakte eines abgeschlossenen Runs auflisten
+- `download_run_artifact` — Artefakt-Inhalt herunterladen (Base64 für Dateien, URL für externe Sinks)
+
+Insgesamt 15 MCP-Tools. Vollständige Endpoint-Dokumentation: [docs/09-endpoint-reference.md](docs/09-endpoint-reference_de.md)
 
 ---
 
@@ -174,6 +182,7 @@ Jeder Run speichert einen vollständig eingebetteten **CrewSnapshot** in der DB 
 | Reviewer-Profile | `/crew/profiles/reviewers` |
 | Executor-Profile | `/crew/profiles/executors` |
 | Grounding-Provider | `/crew/profiles/grounding-providers` |
+| Finalizer-Profile | `/crew/profiles/finalizers` |
 | Template Studio (KI-gestützte Template-Erstellung) | `/crew/studio` |
 
 Details: [docs/08-crew-system.md](docs/08-crew-system_de.md)

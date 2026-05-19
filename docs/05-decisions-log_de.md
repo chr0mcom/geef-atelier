@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-19 (D-044 nachgetragen + D-045 ergänzt: modell-gesteuerte Websuche auf den CLI-Providern)*
+*Letzte Aktualisierung: 2026-05-19 (D-046 ergänzt: Run-Resume)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -852,3 +852,25 @@ Ergänzt eine vollständige Finalizer-Phase als fünften Profil-Typ (FileExport,
 Die Provider `claude-cli` und `codex-cli` laufen jetzt mit aktivierter Websuche, sodass ein Akteur während der Generierung selbst aktuelle Web-Informationen holen kann. `claude` wird mit `--allowedTools "WebSearch,WebFetch"` aufgerufen (nur Web-Tools — kein Bash/Edit/Write, kein voller Permission-Bypass); `codex` mit dem globalen `--search`-Flag **vor** dem `exec`-Subcommand (`codex exec` lehnt es als Subcommand-Argument ab — im Live-Test entdeckt, das Flag ist global). Kosten sind abo-gedeckt (keine Per-Search-Abrechnung).
 
 **Bewusster Trade-off:** Vom Modell gesuchte Quellen werden intern verarbeitet und **nicht** in `GroundingConsultation` / RunDetail erfasst — die CLI-Websuche hat keine Citation- oder Nachvollziehbarkeits-Spur. Das wurde zugunsten einer minimalen Zwei-Zeilen-Adapter-Änderung gegenüber einer Tavily-als-MCP-Tool-Pipeline akzeptiert. Der Tavily-Grounding-Provider bleibt der Pfad für explizite, deterministische, kostengetrackte, zitierbare Vor-Briefing-Anreicherung; beide ergänzen sich. OpenRouter-geroutete Akteure (single-shot `OpenAiCompatibleClient`) können keine agentische Websuche durchführen. Sicherheit unverändert: codex `--search` ohne Per-Call-Approval, claude allowlistet nur Web-Tools — kein neues Interaktions-/Permission-Prompt-Risiko.
+
+---
+
+## D-046 — Run-Resume: Fortsetzen wo aufgehört
+
+*Datum: 19. Mai 2026 | PR #18 auf `main` gemerged*
+
+Wenn ein Run mit Status `Aborted` oder `Failed` endet, kann der Nutzer ihn jetzt mit einem Klick neu starten. Zwei Modi stehen zur Verfügung: **Seed-Modus** (`ArtifactText` der letzten abgeschlossenen Iteration wird als Seed-Draft in Iteration 1 des neuen Runs injiziert — der Executor überarbeitet statt von Scratch zu beginnen) und **Clean-Modus** (identisches Briefing und Crew, frische Pipeline). Ein optionaler `MaxIterationsOverride` erlaubt die Anpassung der Konvergenz-Grenze für den fortgesetzten Run.
+
+**D-046/1 — Seed-Draft via neuen Grounding-Step, kein Mid-Pipeline-Checkpoint.** Das Geef-SDK hat keinen Resume-from-Checkpoint-Mechanismus. Stattdessen wird `SeedDraftGroundingStep` (implementiert `IGroundingStep`) als Grounding-Step für fortgesetzte Runs genutzt. Er setzt zwei Context-Keys: `AtelierContextKeys.GroundedBrief` (Briefing-Text) und `AtelierContextKeys.SeedDraft` (ArtifactText der letzten abgeschlossenen Iteration). In Iteration 1 liest `ProfileBasedExecutor` den `SeedDraft`-Key und nutzt einen „überarbeite diesen unterbrochenen Draft"-Prompt statt „schreibe von Scratch". Ab Iteration 2 wird der Key ignoriert. Begründung: minimale SDK-Kopplung, keine neue Abstraktion über den bestehenden `IGroundingStep`-Vertrag hinaus.
+
+**D-046/2 — `AtelierPipelineFactory.BuildWithSeedDraft` spiegelt `BuildWithAdvisorContext`.** Eine neue statische Factory-Methode mit denselben optionalen Parametern (loggerFactory, additionalSinks, groundingProviderFactory, pricingCatalog, costAccumulator), aber `SeedDraftGroundingStep` statt des normalen Briefing-Grounding-Steps. Der Orchestrator dispatcht auf diesen Pfad, wenn `run.SeedDraftText is not null`. Advisor-Pässe und Cost-Tracking funktionieren identisch zum normalen Pfad.
+
+**D-046/3 — `MaxIterationsOverride` in `CrewSnapshot.ConvergenceOverride` gepatcht.** Das `CrewSnapshot`-JSON des Parent-Runs wird deserialisiert, das `ConvergenceOverride.MaxIterations`-Feld mit dem Override-Wert aktualisiert (oder ein neuer `ConvergenceOverride`-Record erstellt, falls `null`), und der gepatchte Snapshot für den fortgesetzten Run re-serialisiert. Begründung: Konvergenz-Settings leben in `CrewSnapshot`, nicht in `ConfigJson` — der Snapshot-Deserialisierungs-Pfad hält alle Crew-Logik an einem Ort.
+
+**D-046/4 — Owner-Check + Non-Resumable-Status-Guard in `RunService.ResumeRunAsync`.** Der Service lehnt Resume-Versuche ab, wenn: (a) der Parent-Run nicht gefunden wird, (b) der anfragende Nutzer nicht der Besitzer ist (außer `requestingUsername` ist `null` für Admin-Bypass), oder (c) der Run-Status nicht `Aborted` oder `Failed` ist. Der Check nutzt dieselbe `null`-Username-Semantik wie D-042/2 (Admin-Bypass für MCP).
+
+**D-046/5 — `ResumeRunDialog` als modales Blazor-Komponent.** `[EditorRequired, Parameter] Guid ParentRunId`, `bool HasIterations` (steuert Vorauswahl des Modus), `int DefaultMaxIterations`, `EventCallback<ResumeOptions> OnConfirm`, `EventCallback OnCancel`. Seed-Modus ist vorausgewählt wenn `HasIterations=true`; Clean-Modus sonst. `MaxIterationsOverride` ist `null` wenn das Feld `0` oder leer ist (Fallback auf die Konvergenz-Policy des Runs). `data-testid`-Attribute auf allen interaktiven Elementen für bUnit-Tests.
+
+**D-046/6 — Migration `Step23RunResume`.** Zwei neue nullable Spalten auf `Runs`: `ParentRunId uuid NULL` (FK auf `Runs.Id` mit `ON DELETE SET NULL`) und `SeedDraftText text NULL`. Index `IX_Runs_ParentRunId` für Parent→Children-Lookups.
+
+**Tests:** 1021 (1017 grün + 4 bekannte Playwright-Flakes). Neue Test-Klassen: `RunServiceResumeTests` (12 Tests), `SeedDraftGroundingStepTests` (3 Tests), `ProfileBasedExecutorSeedDraftTests` (3 Tests), `ResumeRunDialogTests` (10 Tests).

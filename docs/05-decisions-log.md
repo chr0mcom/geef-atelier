@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-05-19 (D-045 added: model-driven web search on the CLI providers)*
+*Last updated: 2026-05-19 (D-046 added: Run Resume)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -852,3 +852,25 @@ Adds a complete Finalizer phase as the fifth profile type (FileExport, MetadataE
 The `claude-cli` and `codex-cli` providers now run with web search enabled, so an actor can autonomously fetch current web information during generation. `claude` is invoked with `--allowedTools "WebSearch,WebFetch"` (web tools only — no Bash/Edit/Write, no full permission bypass); `codex` with the global `--search` flag placed **before** the `exec` subcommand (`codex exec` rejects it as a subcommand argument — discovered during live testing, the flag is global). Cost is subscription-covered (no per-search billing).
 
 **Deliberate tradeoff:** sources the model searches are consumed internally and are **not** captured into `GroundingConsultation` / RunDetail — CLI web search has no citation or observability trail. This was accepted in favor of a minimal two-line adapter change over a Tavily-as-MCP-tool pipeline. The Tavily grounding provider remains the path for explicit, deterministic, cost-tracked, citable pre-briefing enrichment; the two are complementary. OpenRouter-routed actors (single-shot `OpenAiCompatibleClient`) cannot do agentic web search. Safety unchanged: codex `--search` has no per-call approval, claude allowlists only web tools — no new interaction/permission-prompt risk.
+
+---
+
+## D-046 — Run Resume: continue from where you left off
+
+*Date: 19 May 2026 | PR #18 merged to `main`*
+
+When a run ends in `Aborted` or `Failed` status, the user can restart it with one click. Two modes are available: **Seed mode** (the last completed iteration's `ArtifactText` is injected as a seed draft into iteration 1 of the new run — the executor refines rather than starting from scratch) and **Clean mode** (identical briefing and crew, fresh pipeline). An optional `MaxIterationsOverride` lets the user adjust the convergence limit for the resumed run.
+
+**D-046/1 — Seed draft via a new grounding step, not a mid-pipeline checkpoint.** The Geef SDK pipeline has no resume-from-checkpoint mechanism. Instead, `SeedDraftGroundingStep` (implementing `IGroundingStep`) is used as the grounding step for resumed runs. It sets two context keys: `AtelierContextKeys.GroundedBrief` (the briefing text) and `AtelierContextKeys.SeedDraft` (the artifact text of the last completed iteration). On iteration 1, `ProfileBasedExecutor` reads the `SeedDraft` key and uses a "revise this interrupted draft" prompt instead of "write from scratch". On iteration 2+, the key is ignored. Rationale: minimal SDK coupling, no new abstraction beyond the existing `IGroundingStep` contract.
+
+**D-046/2 — `AtelierPipelineFactory.BuildWithSeedDraft` mirrors `BuildWithAdvisorContext`.** A new static factory method with the same optional parameters (loggerFactory, additionalSinks, groundingProviderFactory, pricingCatalog, costAccumulator) but substituting `SeedDraftGroundingStep` for the normal briefing grounding step. The orchestrator dispatches to this path when `run.SeedDraftText is not null`. Advisor passes and cost tracking work identically to the normal path.
+
+**D-046/3 — `MaxIterationsOverride` patched into `CrewSnapshot.ConvergenceOverride`.** The parent run's `CrewSnapshot` JSON is deserialized, the `ConvergenceOverride.MaxIterations` field is updated with the override value (or a new `ConvergenceOverride` record is created if `null`), and the patched snapshot is re-serialized for the resumed run. Rationale: convergence settings live in `CrewSnapshot`, not in `ConfigJson` — reusing the snapshot deserialization path keeps all crew logic in one place.
+
+**D-046/4 — Owner check + non-resumable status guard in `RunService.ResumeRunAsync`.** The service rejects resume attempts if: (a) the parent run is not found, (b) the requesting user is not the owner (unless `requestingUsername` is `null` for admin bypass), or (c) the run's status is not `Aborted` or `Failed`. The check uses the same `null`-username semantics as D-042/2 (admin bypass for MCP).
+
+**D-046/5 — `ResumeRunDialog` as a modal Blazor component.** `[EditorRequired, Parameter] Guid ParentRunId`, `bool HasIterations` (controls which mode is pre-selected), `int DefaultMaxIterations`, `EventCallback<ResumeOptions> OnConfirm`, `EventCallback OnCancel`. Seed mode is pre-selected when `HasIterations=true`; Clean mode otherwise. `MaxIterationsOverride` is `null` when the field is `0` or empty (falls back to the run's own convergence policy). `data-testid` attributes on all interactive elements for bUnit tests.
+
+**D-046/6 — Migration `Step23RunResume`.** Two new nullable columns on `Runs`: `ParentRunId uuid NULL` (FK to `Runs.Id` with `ON DELETE SET NULL`) and `SeedDraftText text NULL`. Index `IX_Runs_ParentRunId` for parent→children lookups.
+
+**Tests:** 1021 (1017 green + 4 known Playwright flakes). New test classes: `RunServiceResumeTests` (12 tests), `SeedDraftGroundingStepTests` (3 tests), `ProfileBasedExecutorSeedDraftTests` (3 tests), `ResumeRunDialogTests` (10 tests).

@@ -30,7 +30,11 @@ Text-generation pipeline platform built on the [Geef SDK](https://github.com/chr
 
 **Run-user isolation ✅** Each user sees only their own runs; admin override via explicit toggles. MCP runs are attributed to the authorizing OAuth user, Claude Code CLI runs (static token) to the admin (D-042).
 
-Currently: **over 800 tests** (green; 2 known Testcontainers flakes).
+**Finalizer pipeline ✅** 5th profile type — FinalizerProfile with four types (FileExport, MetadataEnrich, ExternalSink, Transform). 17 system profiles. RunArtifact entity (File with download, Url, Status). Download endpoint with owner check. FinalizerPicker + RunFinalizersOnMaxAttempts in CrewTemplateEditor. RunDetail artifact table. Studio integration. 2 new MCP tools (D-044, 2026-05-19).
+
+**Run-Resume ✅** Resume a failed or aborted run from where it left off — Seed mode (continue from last draft) or Clean mode (fresh start with same briefing). "Fortsetzen" button in RunDetail, ResumeRunDialog with MaxIterations override. ParentRunId link shown in RunDetail (PR #18, 2026-05-19).
+
+Currently: **over 1000 tests** (green; 4 known Testcontainers flakes).
 
 Full scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope.md)
 
@@ -150,7 +154,11 @@ Prerequisite: the OAuth client must be registered in the admin panel at `/admin/
 - `analyze_template_proposal` — analyze a task description, produce a template proposal (persisted)
 - `materialize_template_proposal` — materialize a reviewed proposal as a custom template + profiles
 
-13 MCP tools in total. Full endpoint documentation: [docs/09-endpoint-reference.md](docs/09-endpoint-reference.md)
+**Artifacts:**
+- `list_run_artifacts` — list RunArtifacts from a completed run
+- `download_run_artifact` — download artifact content (Base64 for files, URL for external sinks)
+
+15 MCP tools in total. Full endpoint documentation: [docs/09-endpoint-reference.md](docs/09-endpoint-reference.md)
 
 ---
 
@@ -174,6 +182,7 @@ Every run stores a fully embedded **CrewSnapshot** in the DB — so the run stay
 | Reviewer profiles | `/crew/profiles/reviewers` |
 | Executor profiles | `/crew/profiles/executors` |
 | Grounding providers | `/crew/profiles/grounding-providers` |
+| Finalizer profiles | `/crew/profiles/finalizers` |
 | Template Studio (AI-assisted template creation) | `/crew/studio` |
 
 Details: [docs/08-crew-system.md](docs/08-crew-system.md)

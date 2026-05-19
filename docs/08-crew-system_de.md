@@ -2,7 +2,7 @@
 
 *[English](08-crew-system.md) · **Deutsch***
 
-Letzte Aktualisierung: 2026-05-18 (Template-Studio-Abschnitt + Routing-Map-Eintrag für D-043 ergänzt)
+Letzte Aktualisierung: 2026-05-19 (Finalizer-Profile-Abschnitt ergänzt — Step22 / D-044)
 
 ## Überblick
 
@@ -17,6 +17,7 @@ Das Crew-System ersetzt die in PS-2 hartkodierte Dreier-Crew (Executor + Briefin
 | **CrewTemplate** | Komponiert Executor + Reviewers + EvaluationStrategy + optionalen ConvergenceOverride + Advisor-Profile. |
 | **CrewSnapshot** | Vollständig eingebettete Kopie des CrewTemplates (inkl. aller Profil-Daten) zum Zeitpunkt der Run-Einreichung. Persistiert als JSONB auf `Runs.CrewSnapshot`. |
 | **AdvisorProfile** | LLM-Akteur für konsultative Pässe vor oder nach der Execution. Trägt `AdvisorMode` + `AdvisorTrigger`. Funktional ab PS-7. |
+| **FinalizerProfile** | Nachverarbeitungs-Akteur, der nach der GEEF-Convergence-Schleife läuft. Trägt `FinalizerType` + typisierte Settings. Erzeugt `RunArtifact`-Datensätze. Funktional ab Step22 (D-044). |
 
 ## EvaluationStrategies
 
@@ -187,6 +188,106 @@ Spalte `RunEntity.AdvisorRetryAttempted` (bool, nullable) auf `Runs`-Tabelle.
 
 `list_advisor_profiles` — listet alle Advisor-Profile (System + Custom).
 
+## Finalizer-Profile (Step22 / D-044)
+
+Finalizer sind Nachverarbeitungs-Akteure, die **nach** Abschluss der GEEF-Convergence-Schleife ausgeführt werden (oder, optional, wenn diese scheitert). Sie transformieren oder exportieren den Abschluss-Draft und erzeugen dabei `RunArtifact`-Datensätze.
+
+### FinalizerProfile-Schema
+
+```csharp
+public sealed record FinalizerProfile(
+    string Name, string DisplayName, string Description,
+    FinalizerType FinalizerType, Dictionary<string, string> Settings,
+    bool IsSystem, DateTime CreatedAt, DateTime UpdatedAt);
+
+public enum FinalizerType
+{
+    FileExport    = 0,
+    MetadataEnrich = 1,
+    ExternalSink  = 2,
+    Transform     = 3,
+}
+```
+
+`FinalizerType` ist **nach der Erstellung unveränderlich**. Typisierte Settings-Records (`FileExportSettings`, `MetadataEnrichSettings`, `WebhookSinkSettings`, `EmailSinkSettings`, `TransformSettings`) kapseln das `Dictionary<string,string> Settings` für typsicheren Zugriff.
+
+### Pipeline-Position
+
+Finalizer laufen sequenziell in der in `CrewTemplate.FinalizerProfileNames` festgelegten Reihenfolge, nachdem die Convergence-Schleife beendet wurde. Das Flag `CrewTemplate.RunFinalizersOnMaxAttempts` steuert, ob Finalizer auch bei einem Convergence-Failure (Max-Attempts überschritten) ausgeführt werden.
+
+### RunArtifact-Entity
+
+Jede Finalizer-Ausführung hinterlässt einen `RunArtifact`-Datensatz:
+
+| Feld | Typ | Beschreibung |
+|---|---|---|
+| `Id` | Guid | Primärschlüssel |
+| `RunId` | Guid | FK → `Runs` |
+| `FinalizerProfileName` | string | Name des erzeugenden Finalizers |
+| `ArtifactType` | enum `{File, Url, Status}` | Art der Speicherung |
+| `Filename` | string? | Dateiname (für `File`-Artefakte) |
+| `ContentType` | string? | MIME-Typ |
+| `SizeBytes` | long? | Dateigröße in Bytes |
+| `StorageUri` | string | Speicherpfad oder URL |
+| `StatusMessage` | string? | Lesbarer Status (für `Status`-Artefakte) |
+| `CreatedAt` | DateTime | Erstellungszeitpunkt |
+
+### System-Finalizer-Profile (17)
+
+| Name | Typ | Beschreibung |
+|---|---|---|
+| `export-markdown` | FileExport | Exportiert den Abschluss-Draft als Markdown-Datei |
+| `export-html` | FileExport | Exportiert den Abschluss-Draft als HTML-Datei |
+| `export-pdf` | FileExport | Exportiert den Abschluss-Draft als PDF-Datei |
+| `export-docx` | FileExport | Exportiert den Abschluss-Draft als DOCX-Datei |
+| `export-txt` | FileExport | Exportiert den Abschluss-Draft als Plaintext-Datei |
+| `export-json` | FileExport | Exportiert das Run-Ergebnis als strukturierte JSON-Datei |
+| `add-front-matter` | MetadataEnrich | Fügt YAML-Front-Matter mit Run-Metadaten voran |
+| `add-word-count-footer` | MetadataEnrich | Hängt eine Wortzahl-Fußzeile an den Draft |
+| `add-reading-level` | MetadataEnrich | Hängt eine Lesbarkeits-Annotation (Flesch–Kincaid) an |
+| `webhook-sink` | ExternalSink | Sendet das Artefakt per POST an eine konfigurierte Webhook-URL |
+| `email-sink` | ExternalSink | Versendet das Artefakt als E-Mail-Anhang |
+| `anti-ai-voice` | Transform | Schreibt den Draft um, um erkennbare KI-Formulierungen zu reduzieren |
+| `tone-formalization` | Transform | Hebt das Register des Drafts auf formell/akademisch an |
+| `tone-casual` | Transform | Senkt das Register des Drafts auf konversationell ab |
+| `executive-summary` | Transform | Erzeugt eine prägnante Executive-Summary und stellt sie voran |
+| `key-takeaways` | Transform | Hängt eine Bullet-Point-Zusammenfassung der wichtigsten Punkte an |
+| `glossary` | Transform | Hängt ein Glossar fachspezifischer Begriffe an |
+
+### DB-Tabellen (Migration Step22)
+
+| Tabelle | Inhalt |
+|---|---|
+| `FinalizerProfiles` | Custom-Finalizer-Profile (System-Profile leben als Code-Konstanten in `SystemCrew`). |
+| `RunArtifacts` | Ein Datensatz pro Finalizer-Output pro Run (siehe RunArtifact-Entity oben). |
+| `FinalizationActorCosts` | Kosten-Datensätze pro Run und Finalizer für LLM-gestützte Transforms. |
+
+Neue Spalten in bestehenden Tabellen:
+
+| Tabelle | Spalte | Typ | Beschreibung |
+|---|---|---|---|
+| `CrewTemplates` | `FinalizerProfileNames` | JSONB | Geordnete Liste der Finalizer-Profilnamen |
+| `CrewTemplates` | `RunFinalizersOnMaxAttempts` | boolean | Finalizer auch bei Convergence-Failure ausführen |
+| `Runs` | `FinalizerCostEur` | numeric | Gesamt-LLM-Kosten der Finalizer für diesen Run |
+| `Runs` | `FinalizerErrorMessage` | text | Fehlermeldung, falls ein Finalizer fehlgeschlagen ist |
+
+### UI-Komponenten (Step22)
+
+| Komponente | Zweck |
+|---|---|
+| `FinalizerPicker` | Available/Selected-Liste für Finalizer-Profile im `CrewTemplateEditor` |
+| `FinalizerProfilesIndex` | Liste aller Finalizer-Profile (System + Custom) unter `/crew/profiles/finalizers` |
+| `FinalizerProfileEditor` | CRUD-Editor für Custom-Finalizer-Profile |
+| `FinalizerProfileView` | Read-only-Ansicht für System-Finalizer-Profile |
+| `RunArtifactsTable` | Klappsection mit Artefakten auf der RunDetail-Page |
+
+Der `CrewTemplateEditor` wurde um einen `FinalizerPicker` und den `RunFinalizersOnMaxAttempts`-Toggle erweitert.
+
+### MCP-Tools (Step22)
+
+- `list_run_artifacts` — listet alle Artefakte, die für einen bestimmten Run erzeugt wurden.
+- `download_run_artifact` — lädt ein bestimmtes Run-Artefakt herunter (Owner-Check + Path-Containment erzwungen).
+
 ## API-Pfade
 
 ### Template-basierter Submit (Standard)
@@ -216,9 +317,11 @@ await runService.SubmitRunAsync("...", "{}", customCrew: spec);
 - `list_reviewer_profiles` — listet alle Reviewer-Profile (System + Custom).
 - `list_advisor_profiles` — listet alle Advisor-Profile (System + Custom).
 - `list_grounding_provider_profiles` — listet alle Grounding-Provider-Profile.
+- `list_run_artifacts` — listet alle Artefakte, die für einen bestimmten Run erzeugt wurden.
+- `download_run_artifact` — lädt ein bestimmtes Run-Artefakt herunter (Owner-Check + Path-Containment erzwungen).
 - `submit_request` — erweitert um `crew_template` und `custom_crew` (JSON-String).
 
-Vollständige Tool-Liste (13 Tools): siehe [09-endpoint-reference.md](09-endpoint-reference_de.md) und die [Projekt-README](../README_de.md).
+Vollständige Tool-Liste (15 Tools): siehe [09-endpoint-reference.md](09-endpoint-reference_de.md) und die [Projekt-README](../README_de.md).
 
 ## Reviewer-Name-Migration
 
@@ -252,6 +355,14 @@ Migration Step10 benennt historische `Findings.ReviewerName`-Werte um. `Reviewer
 | `/crew/profiles/executors` | `ExecutorProfilesIndex` | Liste aller Executor-Profile |
 | `/crew/profiles/executors/new` | `ExecutorProfileEditor` | Neues Executor-Profil anlegen |
 | `/crew/profiles/executors/{name}` | `ExecutorProfileEditor` | Executor-Profil bearbeiten |
+| `/crew/profiles/advisors` | `AdvisorProfilesIndex` | Liste aller Advisor-Profile (System + Custom) |
+| `/crew/profiles/advisors/new` | `AdvisorProfileEditor` | Neues Advisor-Profil anlegen |
+| `/crew/profiles/advisors/{name}` | `AdvisorProfileEditor` | Advisor-Profil bearbeiten |
+| `/crew/profiles/grounding-providers` | `GroundingProviderIndex` | Liste aller Grounding-Provider-Profile |
+| `/crew/profiles/finalizers` | `FinalizerProfilesIndex` | Liste aller Finalizer-Profile (System + Custom) |
+| `/crew/profiles/finalizers/create` | `FinalizerProfileEditor` | Custom-Finalizer-Profil anlegen |
+| `/crew/profiles/finalizers/edit/{name}` | `FinalizerProfileEditor` | Custom-Finalizer-Profil bearbeiten |
+| `/crew/profiles/finalizers/view/{name}` | `FinalizerProfileView` | System-Finalizer-Profil ansehen (read-only) |
 | `/crew/studio` | `TemplateStudio` | KI-gestützter Template-Wizard (Analyse → Review → Edit → Materialisierung) |
 
 ### UI-Komponenten
@@ -290,12 +401,13 @@ Der Edit-Step exponiert das vollständige Feld-Set für das Template und jeden P
 
 **Template-Felder:** DisplayName, Description, EvaluationStrategy (Dropdown), EvaluationStrategyReasoning (read-only, vom LLM)
 
-**Pro Profil-Slot (Executor / Reviewer × N / Advisor × N / GroundingProvider × N):**
+**Pro Profil-Slot (Executor / Reviewer × N / Advisor × N / GroundingProvider × N / Finalizer × N):**
 - **UseExisting / CreateNew Toggle** — bestehendes Profil per Name wählen oder neues Profil inline konfigurieren
 - **CreateNew-Felder:** Name (kebab-case), DisplayName, Description, Provider, Modell (`ModelSelector`), MaxTokens, System-Prompt
 - **Reviewer-spezifisch:** ReviewerFocus (optional)
 - **Advisor-spezifisch:** AdvisorMode (Strategic / Critical / DevilsAdvocate), AdvisorTrigger (BeforeFirstExecution / BeforeEveryExecution / OnConvergenceFailure)
 - **GroundingProvider-spezifisch:** GroundingProviderType (Tavily / VectorStore), Typ-spezifische Einstellungen (API-Key oder Collection-Name)
+- **Finalizer-spezifisch:** FinalizerType (FileExport / MetadataEnrich / ExternalSink / Transform), Typ-spezifische Einstellungen
 - **Reasoning-Anzeige:** LLM-Begründungen pro Feld, read-only (aus `analyze_template_proposal`)
 - **Field-Helps:** Deutsche Inline-Hinweise für jedes Feld (`StudioFieldHelps.cs`)
 
@@ -309,4 +421,6 @@ Der Edit-Step exponiert das vollständige Feld-Set für das Template und jeden P
 
 ### Materialisierung (atomar, D-043/7)
 
-`TemplateStudioService.MaterializeAsync` kapselt alle DB-Schreibvorgänge in einer einzelnen EF-Core-Transaktion (`IAtomicTransactionFactory`). Ablauf: Validierung → Begin → Profile anlegen (Executor, Reviewer, Advisor, GroundingProvider) → Template anlegen → Commit. Explizites Rollback bei jedem Fehler — kein Halb-materialisierter Zustand. `MarkMaterializedAsync` (markiert den Analyse-Datensatz als verbraucht) läuft innerhalb der Transaktion.
+`TemplateStudioService.MaterializeAsync` kapselt alle DB-Schreibvorgänge in einer einzelnen EF-Core-Transaktion (`IAtomicTransactionFactory`). Ablauf: Validierung → Begin → Profile anlegen (Executor, Reviewer, Advisor, GroundingProvider, Finalizer) → Template anlegen → Commit. Explizites Rollback bei jedem Fehler — kein Halb-materialisierter Zustand. `MarkMaterializedAsync` (markiert den Analyse-Datensatz als verbraucht) läuft innerhalb der Transaktion.
+
+Finalizer-Vorschläge erscheinen in der LLM-Analyse-Ausgabe des Studios; `TemplateStudioService.CreateProfileAsync` behandelt den Finalizer-Zweig; `StudioEditStep` stellt den Finalizer-Slot-Abschnitt neben den übrigen Profil-Slots bereit.
