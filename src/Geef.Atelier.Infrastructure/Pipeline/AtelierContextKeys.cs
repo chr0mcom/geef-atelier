@@ -21,4 +21,11 @@ internal static class AtelierContextKeys
     /// the advisor block and user prompt.
     /// </summary>
     public static readonly ContextKey<string>         GroundingContext  = new("geef:atelier:grounding-context");
+
+    /// <summary>
+    /// Injected by <c>SeedDraftGroundingStep</c> for resume runs. Contains the artifact text of the
+    /// last completed iteration of the parent run. <c>ProfileBasedExecutor</c> uses it on iteration 1
+    /// to prime the LLM with a prior draft rather than generating from scratch.
+    /// </summary>
+    public static readonly ContextKey<string>         SeedDraft        = new("geef:atelier:seed-draft");
 }

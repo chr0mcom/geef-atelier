@@ -23,7 +23,23 @@ internal sealed class ProfileBasedExecutor(
         string userPrompt;
         if (iter == 1)
         {
-            userPrompt = $"Briefing:\n{brief}\n\nWrite a text according to the briefing.";
+            if (context.TryGet(AtelierContextKeys.SeedDraft, out var seedDraft) && seedDraft is not null)
+            {
+                userPrompt = $"""
+                    Briefing:
+                    {brief}
+
+                    Previous draft (from an interrupted run — revise and improve it):
+                    {seedDraft}
+
+                    Revise the draft to better fulfill the briefing. Improve quality, address any
+                    weaknesses you can identify, and make the text more polished.
+                    """;
+            }
+            else
+            {
+                userPrompt = $"Briefing:\n{brief}\n\nWrite a text according to the briefing.";
+            }
         }
         else
         {

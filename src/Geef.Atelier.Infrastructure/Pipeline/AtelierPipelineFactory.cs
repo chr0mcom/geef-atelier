@@ -121,6 +121,56 @@ internal static class AtelierPipelineFactory
     }
 
     /// <summary>
+    /// Builds the pipeline like <see cref="Build"/>, but also injects the last completed iteration's
+    /// artifact text as a seed draft into the initial run context. Used by the orchestrator for resume
+    /// runs where <paramref name="seedDraftText"/> is non-null.
+    /// </summary>
+    public static GeefPipelineRunner<FinalizedDocument> BuildWithSeedDraft(
+        CrewSnapshot snapshot,
+        ILlmClientResolver resolver,
+        IOptions<ConvergenceOptions> convergenceOptions,
+        string seedDraftText,
+        IAdvisorConsultationRepository? consultationRepository = null,
+        Guid runId = default,
+        ILoggerFactory? loggerFactory = null,
+        IEnumerable<IGeefEventSink>? additionalSinks = null,
+        IGroundingProviderFactory? groundingProviderFactory = null,
+        IPricingCatalog? pricingCatalog = null,
+        ICostAccumulator? costAccumulator = null)
+    {
+        IGroundingStep grounding = new SeedDraftGroundingStep(seedDraftText);
+        if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
+        {
+            grounding = new MultiProviderGroundingStep(
+                grounding, snapshot.GroundingProviders, groundingProviderFactory, runId,
+                loggerFactory?.CreateLogger<MultiProviderGroundingStep>()
+                    ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance);
+        }
+
+        IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);
+
+        var preExecutionAdvisors = snapshot.Advisors
+            .Where(a => a.Trigger != AdvisorTrigger.OnConvergenceFailure)
+            .ToList();
+
+        if (preExecutionAdvisors.Count > 0 && consultationRepository is not null)
+        {
+            var advisorInstances = preExecutionAdvisors
+                .Select(a => new ProfileBasedAdvisor(a, resolver, consultationRepository, pricingCatalog, costAccumulator))
+                .ToList();
+            execution = new AdvisorAwareExecutor(execution, advisorInstances, runId);
+        }
+
+        var reviewers = snapshot.Reviewers
+            .Select(r => (IReviewer)new ProfileBasedReviewer(r, resolver, pricingCatalog, costAccumulator));
+        var finalizer = new MarkdownFinalizer();
+
+        return BuildWithProviders(grounding, execution, reviewers, finalizer,
+            convergenceOptions, snapshot.ConvergenceOverride,
+            snapshot.EvaluationStrategy, loggerFactory, additionalSinks);
+    }
+
+    /// <summary>
     /// Builds the pipeline with explicitly supplied providers. Used in tests to inject stubs or fakes.
     /// </summary>
     public static GeefPipelineRunner<FinalizedDocument> BuildWithProviders(
