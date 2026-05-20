@@ -1,4 +1,5 @@
 using Geef.Atelier.Application.Crew.Grounding;
+using Geef.Atelier.Application.Grounding;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,6 +23,8 @@ public static class GroundingServiceExtensions
         services.AddSingleton<IGroundingProvider, TavilyGroundingProvider>();
         services.AddSingleton<IGroundingProvider, VectorStoreGroundingProvider>();
         services.AddSingleton<IGroundingProviderFactory, GroundingProviderFactory>();
+
+        services.AddScoped<IGroundingRefiner, GroundingRefiner>();
 
         return services;
     }
