@@ -29,6 +29,7 @@ public static class PersistenceServiceExtensions
         services.AddScoped<IAdvisorConsultationRepository, AdvisorConsultationRepository>();
         services.AddScoped<IGroundingProviderProfileRepository, GroundingProviderProfileRepository>();
         services.AddScoped<IGroundingConsultationRepository, GroundingConsultationRepository>();
+        services.AddScoped<IGroundingActorCostRepository, GroundingActorCostRepository>();
         services.AddScoped<IFinalizerProfileRepository, FinalizerProfileRepository>();
         services.AddScoped<IProviderRepository, ProviderRepository>();
         services.AddScoped<IRunArtifactRepository, RunArtifactRepository>();

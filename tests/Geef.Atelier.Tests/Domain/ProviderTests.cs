@@ -25,7 +25,8 @@ public sealed class ProviderTests
         Assert.True(SystemProviders.ProvidersByName.ContainsKey("claude-cli"));
         Assert.True(SystemProviders.ProvidersByName.ContainsKey("codex-cli"));
         Assert.True(SystemProviders.ProvidersByName.ContainsKey("gemini-cli"));
-        Assert.Equal(11, SystemProviders.ProvidersByName.Count);
+        Assert.True(SystemProviders.ProvidersByName.ContainsKey("xai"));
+        Assert.Equal(12, SystemProviders.ProvidersByName.Count);
     }
 
     [Fact]

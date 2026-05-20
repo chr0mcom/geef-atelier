@@ -18,7 +18,9 @@ public static class ListGroundingProviderProfilesTool
         return profiles
             .Select(p => new GroundingProviderProfileDto(
                 p.Name, p.DisplayName, p.Description,
-                p.ProviderType, p.MaxQueriesPerRun, p.IsSystem))
+                p.ProviderType, p.MaxQueriesPerRun, p.IsSystem,
+                RefinementEnabled: p.RefinementBinding is not null,
+                RefinementMode: p.RefinementBinding is not null ? p.RefinementMode.ToString().ToLowerInvariant() : null))
             .ToList();
     }
 }

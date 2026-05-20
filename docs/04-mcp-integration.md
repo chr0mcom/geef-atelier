@@ -2,7 +2,7 @@
 
 *[Deutsch](04-mcp-integration_de.md) · **English***
 
-*Last updated: 2026-05-20 (Transform-Finalizer mit LLM-Binding-Beispiel, Phase E / Doku-Ergänzung)*
+*Last updated: 2026-05-20 (Grounding-Refinement: `list_grounding_provider_profiles`-Schema + `groundingProviderSettings`-Refinement-Keys dokumentiert)*
 
 ## Why MCP
 
@@ -126,7 +126,7 @@ Besides the six run tools the server offers nine more — **15 MCP tools** in to
 | `list_crew_templates` | List crew templates (system + custom) |
 | `list_reviewer_profiles` | List reviewer profiles (system + custom) |
 | `list_advisor_profiles` | List advisor profiles (system + custom) |
-| `list_grounding_provider_profiles` | List grounding-provider profiles |
+| `list_grounding_provider_profiles` | List grounding-provider profiles (incl. `refinementEnabled` / `refinementMode`) |
 | `list_knowledge_documents` | List global knowledge-base documents |
 | `analyze_template_proposal` | Analyze a task description, produce a template proposal (persisted) |
 | `materialize_template_proposal` | Materialize a reviewed proposal as a custom template + profiles |
@@ -134,6 +134,23 @@ Besides the six run tools the server offers nine more — **15 MCP tools** in to
 | `download_run_artifact` | Download the binary content of a File artifact as Base64 |
 
 Full parameter/schema details: [`09-endpoint-reference.md`](09-endpoint-reference.md).
+
+#### `list_grounding_provider_profiles`
+
+**Input:** `{ "includeSystem": bool (default true) }`
+
+**Output:** Array of grounding-provider profile objects. Each profile includes:
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | string | Profile identifier |
+| `displayName` | string | Human-readable name |
+| `description` | string | Purpose description |
+| `providerType` | string | `"Tavily"` or `"VectorStore"` |
+| `maxQueriesPerRun` | int? | Maximum queries this provider may issue per run |
+| `isSystem` | boolean | Whether this is a built-in system profile |
+| `refinementEnabled` | boolean | Whether KI-Refinement is configured for this provider |
+| `refinementMode` | string \| null | `"filter"` or `"synthesize"` (null when `refinementEnabled` is false) |
 
 #### `analyze_template_proposal`
 
@@ -193,6 +210,8 @@ Atomically writes all new profiles and the crew template to the DB in a single t
 ```
 
 `final_new_profiles` contains only profiles the user chose to create fresh (CreateNew mode). Profiles in UseExisting mode appear only by name in `final_template.*_profile_names`. `final_new_finalizer_profiles` follows the same pattern for finalizer profiles. A `max_tokens` below the hard floor (`StudioDefaults.MinMaxTokens = 10000`) is clamped up server-side; omitting it applies the `TemplateStudio:Defaults` value (Reviewer/Advisor 16384, Executor 60000). Omitting `finalizer_profile_names` or `final_new_finalizer_profiles` is backwards-compatible (no finalizers attached).
+
+**Grounding-Provider-Refinement keys in `groundingProviderSettings`:** The `GroundingProviderSettings` dict for a `grounding_provider` profile accepts all KI-Refinement keys (`refinementProvider`, `refinementModel`, `refinementMaxTokens`, `refinementTemperature`, `refinementMode`, `refinementInstructions`) as flat string entries. All keys are optional and backwards-compatible — profiles without these keys behave exactly as before (no refinement pass).
 
 **Output:** `{ "created_template_name": "custom-..." }` — the name of the materialized template, ready to pass to `submit_request` as `crew_template`.
 

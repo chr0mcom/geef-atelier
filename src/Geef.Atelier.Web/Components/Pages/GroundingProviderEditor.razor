@@ -3,12 +3,16 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Application.Providers
 @using Geef.Atelier.Core.Domain.Crew
 @using Geef.Atelier.Core.Domain.Crew.Grounding
+@using Geef.Atelier.Core.Domain.Providers
 @using Geef.Atelier.Web.Display
+@using Geef.Atelier.Web.Resources
 @using Geef.Atelier.Infrastructure.Grounding
 @using Microsoft.Extensions.Options
 @inject ICrewService CrewService
+@inject IProviderService ProviderService
 @inject NavigationManager Nav
 @inject IOptions<TavilyOptions> TavilyOpts
 
@@ -128,6 +132,86 @@
                 <small class="form-hint">1–5, default 1. Leave empty for no limit.</small>
             </div>
 
+            <div class="form-section">
+                <h3>KI-Refinement</h3>
+
+                <div class="form-row">
+                    <label class="form-check-label">
+                        <InputCheckbox @bind-Value="_form.RefinementEnabled" disabled="@_isReadOnly" />
+                        KI-Refinement aktivieren
+                    </label>
+                    <FieldHelp Text="@GroundingFieldHelps.RefinementEnabled" />
+                </div>
+
+                @if (_form.RefinementEnabled)
+                {
+                    <div class="form-row">
+                        <label>Refinement-Anbieter</label>
+                        <select @bind="_form.RefinementProvider" @bind:after="OnRefinementProviderChanged" disabled="@_isReadOnly"
+                                data-testid="refinement-provider-select">
+                            <option value="">-- Anbieter wählen --</option>
+                            <optgroup label="HTTP">
+                                @foreach (var p in _providers.Where(x => x.IsActive && x.Type == ProviderType.Http))
+                                {
+                                    <option value="@p.Name">@p.DisplayName</option>
+                                }
+                            </optgroup>
+                            <optgroup label="CLI">
+                                @foreach (var p in _providers.Where(x => x.IsActive && x.Type == ProviderType.Cli))
+                                {
+                                    <option value="@p.Name">@p.DisplayName</option>
+                                }
+                            </optgroup>
+                        </select>
+                        <FieldHelp Text="@GroundingFieldHelps.RefinementProvider" />
+                    </div>
+
+                    <div class="form-row">
+                        <label>Refinement-Modell</label>
+                        <ModelSelector Provider="@_form.RefinementProvider"
+                                       @bind-Value="_form.RefinementModel"
+                                       Disabled="@_isReadOnly"
+                                       DataTestId="refinement-model-selector" />
+                        <FieldHelp Text="@GroundingFieldHelps.RefinementModel" />
+                    </div>
+
+                    <div class="form-row">
+                        <label>Max. Token</label>
+                        <InputNumber @bind-Value="_form.RefinementMaxTokens" min="256" class="form-input" data-testid="refinement-max-tokens-input" />
+                        <FieldHelp Text="@GroundingFieldHelps.RefinementMaxTokens" />
+                    </div>
+
+                    <div class="form-row">
+                        <label>Temperature (optional)</label>
+                        <input type="number" step="0.1" min="0" max="2"
+                               value="@(_form.RefinementTemperature?.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) ?? "")"
+                               @onchange="OnRefinementTemperatureChanged"
+                               disabled="@_isReadOnly"
+                               placeholder="leer = Anbieter-Standard"
+                               class="form-input"
+                               data-testid="refinement-temperature-input" />
+                        <FieldHelp Text="@GroundingFieldHelps.RefinementTemperature" />
+                    </div>
+
+                    <div class="form-row">
+                        <label>Refinement-Modus</label>
+                        <select @bind="_form.RefinementMode" disabled="@_isReadOnly" class="form-input" data-testid="refinement-mode-select">
+                            <option value="0">Filter — irrelevante Quellen verwerfen</option>
+                            <option value="1">Synthesize — Quellen zu einem Text zusammenfassen</option>
+                        </select>
+                        <FieldHelp Text="@GroundingFieldHelps.RefinementMode" />
+                    </div>
+
+                    <div class="form-row">
+                        <label>Zusatz-Anweisungen (optional)</label>
+                        <InputTextArea @bind-Value="_form.RefinementInstructions" rows="3" disabled="@_isReadOnly" class="form-input"
+                                       placeholder="z. B. Verwirf alle Quellen ohne Jahreszahl 2025/2026"
+                                       data-testid="refinement-instructions-input" />
+                        <FieldHelp Text="@GroundingFieldHelps.RefinementInstructions" />
+                    </div>
+                }
+            </div>
+
             <div class="form-actions">
                 <button type="submit" class="btn primary" disabled="@_saving" data-testid="btn-save">
                     @(_saving ? "Saving…" : IsNew ? "Create" : "Save")
@@ -156,6 +240,7 @@
     [Parameter] public string? Name { get; set; }
 
     private bool IsNew => Name == null;
+    private bool _isReadOnly => false;
     private bool _loading = true;
     private bool _saving;
     private bool _showDeleteModal;
@@ -163,9 +248,12 @@
     private string _displayName = "";
 
     private GroundingFormModel _form = new();
+    private IReadOnlyList<Provider> _providers = [];
 
     protected override async Task OnInitializedAsync()
     {
+        _providers = await ProviderService.ListAsync(includeInactive: false);
+
         if (!IsNew)
         {
             var profile = await CrewService.GetGroundingProviderProfileAsync(Name!);
@@ -176,6 +264,21 @@
         }
 
         _loading = false;
+    }
+
+    private void OnRefinementProviderChanged()
+    {
+        _form.RefinementModel = "";
+    }
+
+    private void OnRefinementTemperatureChanged(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(raw))
+            _form.RefinementTemperature = null;
+        else if (double.TryParse(raw, System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var d))
+            _form.RefinementTemperature = d;
     }
 
     private void NavigateBack() => Nav.NavigateTo("/crew/profiles/grounding-providers");
@@ -251,6 +354,14 @@
         [System.ComponentModel.DataAnnotations.Range(1, 5, ErrorMessage = "Must be between 1 and 5")]
         public int? MaxQueriesPerRun { get; set; } = 1;
 
+        public bool RefinementEnabled { get; set; }
+        public string RefinementProvider { get; set; } = "";
+        public string RefinementModel { get; set; } = "";
+        public int RefinementMaxTokens { get; set; } = 2048;
+        public double? RefinementTemperature { get; set; }
+        public int RefinementMode { get; set; } = 0; // 0 = Filter, 1 = Synthesize
+        public string RefinementInstructions { get; set; } = "";
+
         public static GroundingFormModel From(GroundingProviderProfile p)
         {
             p.ProviderSettings.TryGetValue("Tier", out var tier);
@@ -271,7 +382,14 @@
                 TopK = int.TryParse(topKStr, out var tk) ? tk : 5,
                 TagFilter = tagFilter ?? "",
                 Scope = scope ?? "both",
-                MaxQueriesPerRun = p.MaxQueriesPerRun
+                MaxQueriesPerRun = p.MaxQueriesPerRun,
+                RefinementEnabled = p.RefinementBinding is not null,
+                RefinementProvider = p.ProviderSettings.GetValueOrDefault(GroundingProviderProfile.KeyRefinementProvider, ""),
+                RefinementModel = p.ProviderSettings.GetValueOrDefault(GroundingProviderProfile.KeyRefinementModel, ""),
+                RefinementMaxTokens = int.TryParse(p.ProviderSettings.GetValueOrDefault(GroundingProviderProfile.KeyRefinementMaxTokens), out var mt) ? mt : 2048,
+                RefinementTemperature = double.TryParse(p.ProviderSettings.GetValueOrDefault(GroundingProviderProfile.KeyRefinementTemperature), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var t) ? t : null,
+                RefinementMode = int.TryParse(p.ProviderSettings.GetValueOrDefault(GroundingProviderProfile.KeyRefinementMode), out var m) ? m : 0,
+                RefinementInstructions = p.ProviderSettings.GetValueOrDefault(GroundingProviderProfile.KeyRefinementInstructions, ""),
             };
         }
 
@@ -296,6 +414,19 @@
                     ["IncludeAnswer"] = IncludeAnswer ? "true" : "false"
                 };
             }
+
+            if (RefinementEnabled && !string.IsNullOrWhiteSpace(RefinementProvider) && !string.IsNullOrWhiteSpace(RefinementModel))
+            {
+                settings[GroundingProviderProfile.KeyRefinementProvider] = RefinementProvider;
+                settings[GroundingProviderProfile.KeyRefinementModel] = RefinementModel;
+                settings[GroundingProviderProfile.KeyRefinementMaxTokens] = RefinementMaxTokens.ToString();
+                settings[GroundingProviderProfile.KeyRefinementMode] = RefinementMode.ToString();
+                if (RefinementTemperature.HasValue)
+                    settings[GroundingProviderProfile.KeyRefinementTemperature] = RefinementTemperature.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                if (!string.IsNullOrWhiteSpace(RefinementInstructions))
+                    settings[GroundingProviderProfile.KeyRefinementInstructions] = RefinementInstructions.Trim();
+            }
+
             return new GroundingProviderProfile(
                 Name: SystemCrew.EnsureCustomPrefix(Name),
                 DisplayName: DisplayName,

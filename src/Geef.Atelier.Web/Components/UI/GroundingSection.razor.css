@@ -76,3 +76,54 @@
 .chevron.up {
     transform: rotate(180deg);
 }
+
+.refinement-outcome {
+    margin-top: 8px;
+}
+
+.badge-refinement {
+    background: color-mix(in oklch, var(--surface) 80%, var(--bg) 20%);
+    border: 1px solid var(--hairline-soft);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 0.8rem;
+    color: var(--ink-2);
+}
+
+.refinement-skip-banner {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-top: 8px;
+    font-size: 0.875rem;
+}
+
+.refinement-dropped summary {
+    cursor: pointer;
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.refinement-dropped ul {
+    margin-top: 4px;
+    padding-left: 1.25rem;
+}
+
+.refinement-synthesis {
+    background: #f0f4ff;
+    border-left: 3px solid #4a6cf7;
+    padding: 8px 12px;
+    margin-top: 8px;
+}
+
+.refinement-synthesis h4 {
+    margin: 0 0 4px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.refinement-synthesis p {
+    margin: 0;
+    font-size: 0.875rem;
+}

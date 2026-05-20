@@ -89,6 +89,16 @@ public static class SystemProviders
         authHeaderFormat: "{key}"
     );
 
+    /// <summary>xAI Grok models via the OpenAI-compatible API.</summary>
+    public static readonly Provider XAi = CreateHttpProvider(
+        name: "xai",
+        displayName: "xAI (Grok)",
+        description: "xAI's Grok models via the OpenAI-compatible API. Requires an xAI API key. Models include Grok 3 and Grok 3 Mini.",
+        endpoint: "https://api.x.ai/v1",
+        apiKeyEnv: "XAI_API_KEY",
+        modelsEndpoint: "/models"
+    );
+
     /// <summary>Template for any other OpenAI-compatible endpoint.</summary>
     public static readonly Provider OpenAiCompatibleGeneric = CreateHttpProvider(
         name: "openai-compatible-generic",
@@ -152,6 +162,7 @@ public static class SystemProviders
             [DeepSeek.Name] = DeepSeek,
             [OllamaLocal.Name] = OllamaLocal,
             [AzureOpenAi.Name] = AzureOpenAi,
+            [XAi.Name] = XAi,
             [OpenAiCompatibleGeneric.Name] = OpenAiCompatibleGeneric,
             [ClaudeCli.Name] = ClaudeCli,
             [CodexCli.Name] = CodexCli,

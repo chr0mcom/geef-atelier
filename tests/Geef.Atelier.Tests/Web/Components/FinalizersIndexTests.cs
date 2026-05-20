@@ -31,7 +31,7 @@ public sealed class FinalizersIndexTests : TestContext
 
         var cut = RenderComponent<FinalizersIndex>();
 
-        Assert.Contains("Keine Finalizer-Profile vorhanden.", cut.Markup);
+        Assert.Contains("No finalizer profiles yet.", cut.Markup);
     }
 
     [Fact]

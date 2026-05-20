@@ -93,7 +93,8 @@ internal sealed class VectorStoreGroundingProvider(
             EnrichedContext: enrichedContext,
             Citations: citations,
             TokensOrCreditsUsed: embedding.TokenCount,
-            CostEur: embedding.CostEur);
+            CostEur: embedding.CostEur,
+            ConsultationId: consultation.Id);
     }
 
     private static string BuildEnrichedContext(

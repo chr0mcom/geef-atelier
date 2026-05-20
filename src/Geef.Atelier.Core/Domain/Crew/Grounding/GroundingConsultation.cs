@@ -12,6 +12,7 @@ namespace Geef.Atelier.Core.Domain.Crew.Grounding;
 /// <param name="TokensOrCreditsUsed">Provider-specific unit; credits for Tavily, tokens for vector stores.</param>
 /// <param name="CostEur">Estimated cost in EUR, or <c>null</c> when not calculable.</param>
 /// <param name="CreatedAt">UTC timestamp when the consultation was recorded.</param>
+/// <param name="RefinementOutcome">The outcome of the refinement pass, or <c>null</c> when no refinement was configured.</param>
 public sealed record GroundingConsultation(
     Guid Id,
     Guid RunId,
@@ -20,4 +21,5 @@ public sealed record GroundingConsultation(
     IReadOnlyList<SourceCitation> Citations,
     int TokensOrCreditsUsed,
     decimal? CostEur,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    RefinementOutcome? RefinementOutcome = null);

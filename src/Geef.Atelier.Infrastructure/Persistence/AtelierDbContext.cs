@@ -28,6 +28,7 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
 
     public DbSet<GroundingProviderProfile> GroundingProviderProfiles => Set<GroundingProviderProfile>();
     public DbSet<GroundingConsultation> GroundingConsultations => Set<GroundingConsultation>();
+    public DbSet<GroundingActorCost> GroundingActorCosts => Set<GroundingActorCost>();
 
     public DbSet<FinalizerProfile> FinalizerProfiles => Set<FinalizerProfile>();
     public DbSet<RunArtifact> RunArtifacts => Set<RunArtifact>();
