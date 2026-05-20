@@ -12,9 +12,11 @@ namespace Geef.Atelier.Core.Domain.Crew.Grounding;
 /// <param name="Citations">Structured citation data for display in the UI.</param>
 /// <param name="TokensOrCreditsUsed">Provider-specific cost unit (credits for Tavily).</param>
 /// <param name="CostEur">Estimated cost in EUR, or <c>null</c> when not calculable.</param>
+/// <param name="ConsultationId">The persisted <see cref="GroundingConsultation"/> id, set after the consultation is recorded.</param>
 public sealed record GroundingResult(
     string ProviderName,
     string EnrichedContext,
     IReadOnlyList<SourceCitation> Citations,
     int TokensOrCreditsUsed,
-    decimal? CostEur);
+    decimal? CostEur,
+    Guid? ConsultationId = null);

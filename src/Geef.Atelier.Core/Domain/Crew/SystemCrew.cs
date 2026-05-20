@@ -198,6 +198,27 @@ public static class SystemCrew
         MaxQueriesPerRun: 1,
         IsSystem: true);
 
+    /// <summary>System grounding-provider profile for Tavily Advanced web-search with LLM-based citation filtering (1 credit/search, ~10 sources).</summary>
+    public static readonly GroundingProviderProfile TavilyRefinedProfile = new(
+        Name: "tavily-refined",
+        DisplayName: "Tavily Web Search (AI-filtered)",
+        Description: "Tavily web search with LLM-based citation filtering: irrelevant sources are automatically removed.",
+        ProviderType: "tavily",
+        ProviderSettings: new Dictionary<string, string>
+        {
+            ["Tier"]              = "advanced",
+            ["MaxResults"]        = "10",
+            ["IncludeAnswer"]     = "true",
+            ["MinRelevanceScore"] = "0.3",
+            ["ExtractQuery"]      = "true",
+            [GroundingProviderProfile.KeyRefinementProvider]    = "openrouter",
+            [GroundingProviderProfile.KeyRefinementModel]       = "google/gemini-2.0-flash-lite",
+            [GroundingProviderProfile.KeyRefinementMaxTokens]   = "2048",
+            [GroundingProviderProfile.KeyRefinementMode]        = "0",
+        },
+        MaxQueriesPerRun: 1,
+        IsSystem: true);
+
     /// <summary>System grounding-provider profile for the full knowledge base (vector-store, Top-5 results, no tag filter).</summary>
     public static readonly GroundingProviderProfile KnowledgeBaseDefaultProfile = new(
         Name: "knowledge-base-default",
@@ -307,7 +328,8 @@ public static class SystemCrew
     public static readonly IReadOnlyDictionary<string, GroundingProviderProfile> GroundingProviderProfiles =
         new Dictionary<string, GroundingProviderProfile>
         {
-            [TavilyBasicProfile.Name] = TavilyBasicProfile,
+            [TavilyBasicProfile.Name]    = TavilyBasicProfile,
+            [TavilyRefinedProfile.Name]  = TavilyRefinedProfile,
             [KnowledgeBaseDefaultProfile.Name] = KnowledgeBaseDefaultProfile,
             [RunAttachmentsProfile.Name] = RunAttachmentsProfile,
         };

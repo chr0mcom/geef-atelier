@@ -1,3 +1,6 @@
+using System.Globalization;
+using Geef.Atelier.Core.Domain.Llm;
+
 namespace Geef.Atelier.Core.Domain.Crew.Grounding;
 
 /// <summary>
@@ -23,4 +26,49 @@ public sealed record GroundingProviderProfile(
     string ProviderType,
     Dictionary<string, string> ProviderSettings,
     int? MaxQueriesPerRun,
-    bool IsSystem);
+    bool IsSystem)
+{
+    public const string KeyRefinementProvider     = "refinementProvider";
+    public const string KeyRefinementModel        = "refinementModel";
+    public const string KeyRefinementMaxTokens    = "refinementMaxTokens";
+    public const string KeyRefinementTemperature  = "refinementTemperature";
+    public const string KeyRefinementMode         = "refinementMode";
+    public const string KeyRefinementInstructions = "refinementInstructions";
+
+    /// <summary>
+    /// Returns a configured <see cref="LlmBinding"/> when all mandatory refinement keys are present,
+    /// or <c>null</c> when no refinement is configured for this profile.
+    /// </summary>
+    public LlmBinding? RefinementBinding
+    {
+        get
+        {
+            var provider = ProviderSettings.GetValueOrDefault(KeyRefinementProvider);
+            var model    = ProviderSettings.GetValueOrDefault(KeyRefinementModel);
+            if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(model))
+                return null;
+            var maxTokens = int.TryParse(ProviderSettings.GetValueOrDefault(KeyRefinementMaxTokens), out var mt) ? mt : 2048;
+            double? temperature = double.TryParse(ProviderSettings.GetValueOrDefault(KeyRefinementTemperature),
+                NumberStyles.Any, CultureInfo.InvariantCulture, out var t) ? t : null;
+            return new LlmBinding(provider, model, maxTokens, temperature);
+        }
+    }
+
+    /// <summary>
+    /// The refinement mode to apply; defaults to <see cref="GroundingRefinementMode.Filter"/>
+    /// when the key is absent or unparseable.
+    /// </summary>
+    public GroundingRefinementMode RefinementMode
+    {
+        get
+        {
+            if (int.TryParse(ProviderSettings.GetValueOrDefault(KeyRefinementMode), out var m))
+                return (GroundingRefinementMode)m;
+            return GroundingRefinementMode.Filter;
+        }
+    }
+
+    /// <summary>Optional free-text instructions for the refinement prompt; <c>null</c> when not set.</summary>
+    public string? RefinementInstructions =>
+        ProviderSettings.TryGetValue(KeyRefinementInstructions, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
+}
