@@ -15,6 +15,11 @@ internal sealed class GroundingConsultationConfiguration : IEntityTypeConfigurat
         v => v.Aggregate(0, (h, c) => HashCode.Combine(h, c.GetHashCode())),
         v => (IReadOnlyList<SourceCitation>)v.ToList());
 
+    private static readonly ValueComparer<RefinementOutcome?> RefinementOutcomeComparer = new(
+        (a, b) => a == b,
+        v => v == null ? 0 : v.GetHashCode(),
+        v => v == null ? null : new RefinementOutcome(v.RefinedCitations.ToList(), v.DroppedCitations.ToList(), v.SynthesizedText, v.WasSkipped, v.SkipReason));
+
     public void Configure(EntityTypeBuilder<GroundingConsultation> builder)
     {
         builder.ToTable("GroundingConsultations");
@@ -36,6 +41,14 @@ internal sealed class GroundingConsultationConfiguration : IEntityTypeConfigurat
                 CitationsComparer)
             .IsRequired()
             .HasDefaultValueSql("'[]'::jsonb");
+
+        builder.Property(c => c.RefinementOutcome)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                v => v == null ? null : JsonSerializer.Serialize(v, JsonOpts),
+                v => v == null ? null : JsonSerializer.Deserialize<RefinementOutcome>(v, JsonOpts),
+                RefinementOutcomeComparer)
+            .IsRequired(false);
 
         builder.HasIndex(c => c.RunId).HasDatabaseName("IX_GroundingConsultations_RunId");
     }

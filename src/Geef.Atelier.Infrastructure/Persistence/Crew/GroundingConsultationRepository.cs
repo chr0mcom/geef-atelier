@@ -21,4 +21,12 @@ internal sealed class GroundingConsultationRepository(AtelierDbContext db) : IGr
             .Where(c => c.RunId == runId)
             .OrderBy(c => c.CreatedAt)
             .ToListAsync(ct);
+
+    /// <inheritdoc/>
+    public async Task UpdateRefinementOutcomeAsync(Guid consultationId, RefinementOutcome outcome, CancellationToken ct)
+    {
+        await db.GroundingConsultations
+            .Where(c => c.Id == consultationId)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.RefinementOutcome, outcome), ct);
+    }
 }
