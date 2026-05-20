@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Geef SDK — prerelease until stable release; TODO: bump to stable once published -->
+    <PackageVersion Include="AngleSharp" Version="1.4.0" />
     <PackageVersion Include="Geef.Sdk" Version="1.0.0-ci.1" />
     <!-- EF Core + Postgres -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
