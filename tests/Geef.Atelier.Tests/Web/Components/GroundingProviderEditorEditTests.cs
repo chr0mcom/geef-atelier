@@ -1,12 +1,14 @@
 using Bunit;
 using Bunit.TestDoubles;
 using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Application.Providers;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Grounding;
+using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Web.Components.Pages;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,6 +30,7 @@ public sealed class GroundingProviderEditorEditTests : TestContext
     {
         var profile = MakeGrounding("custom-tavily-adv", isSystem: false);
         Services.AddSingleton<ICrewService>(new StubCrewService(profile));
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
@@ -42,6 +45,7 @@ public sealed class GroundingProviderEditorEditTests : TestContext
     {
         var profile = MakeGrounding("custom-tavily-adv", isSystem: false);
         Services.AddSingleton<ICrewService>(new StubCrewService(profile));
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
@@ -56,6 +60,7 @@ public sealed class GroundingProviderEditorEditTests : TestContext
     {
         var profile = MakeGrounding("custom-tavily-adv", isSystem: false);
         Services.AddSingleton<ICrewService>(new StubCrewService(profile));
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
@@ -70,6 +75,7 @@ public sealed class GroundingProviderEditorEditTests : TestContext
     {
         var profile = MakeGrounding("tavily-basic", isSystem: true);
         Services.AddSingleton<ICrewService>(new StubCrewService(profile));
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
@@ -84,6 +90,7 @@ public sealed class GroundingProviderEditorEditTests : TestContext
     {
         var profile = MakeGrounding("custom-tavily-adv", isSystem: false);
         Services.AddSingleton<ICrewService>(new StubCrewService(profile));
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
@@ -96,6 +103,7 @@ public sealed class GroundingProviderEditorEditTests : TestContext
     public void CreateMode_NoDeleteButton()
     {
         Services.AddSingleton<ICrewService>(new StubCrewService(null));
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 

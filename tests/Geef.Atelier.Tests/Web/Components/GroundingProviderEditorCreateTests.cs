@@ -1,12 +1,14 @@
 using Bunit;
 using Bunit.TestDoubles;
 using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Application.Providers;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Grounding;
+using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Web.Components.Pages;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -26,6 +28,7 @@ public sealed class GroundingProviderEditorCreateTests : TestContext
     public void RendersDataTestIdGroundingProviderEditor()
     {
         Services.AddSingleton<ICrewService>(new StubCrewService());
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
@@ -38,6 +41,7 @@ public sealed class GroundingProviderEditorCreateTests : TestContext
     public void CreateForm_DefaultProviderType_IsTavily_ShowsTavilyFields()
     {
         Services.AddSingleton<ICrewService>(new StubCrewService());
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
@@ -53,6 +57,7 @@ public sealed class GroundingProviderEditorCreateTests : TestContext
     public void CreateForm_WhenProviderTypeSwitchedToVectorStore_ShowsVectorStoreFields()
     {
         Services.AddSingleton<ICrewService>(new StubCrewService());
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
@@ -68,6 +73,7 @@ public sealed class GroundingProviderEditorCreateTests : TestContext
     public void CreateForm_WhenProviderTypeSwitchedToVectorStore_TavilyFieldsHidden()
     {
         Services.AddSingleton<ICrewService>(new StubCrewService());
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
@@ -82,6 +88,7 @@ public sealed class GroundingProviderEditorCreateTests : TestContext
     public void TavilyKeyWarning_ShownWhenApiKeyIsEmpty()
     {
         Services.AddSingleton<ICrewService>(new StubCrewService());
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions()));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
@@ -94,6 +101,7 @@ public sealed class GroundingProviderEditorCreateTests : TestContext
     public void TavilyKeyWarning_NotShownWhenApiKeyIsSet()
     {
         Services.AddSingleton<ICrewService>(new StubCrewService());
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "sk-test" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
@@ -106,6 +114,7 @@ public sealed class GroundingProviderEditorCreateTests : TestContext
     public void MaxQueriesPerRun_DefaultsToOne()
     {
         Services.AddSingleton<ICrewService>(new StubCrewService());
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
@@ -119,6 +128,7 @@ public sealed class GroundingProviderEditorCreateTests : TestContext
     public void NameInput_HasPlaceholder_LegalDocsSearch()
     {
         Services.AddSingleton<ICrewService>(new StubCrewService());
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 

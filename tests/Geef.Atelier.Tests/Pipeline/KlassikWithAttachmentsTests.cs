@@ -241,6 +241,9 @@ public sealed class KlassikWithAttachmentsTests
         public Task<IReadOnlyList<GroundingConsultation>> GetByRunIdAsync(Guid runId, CancellationToken ct)
             => Task.FromResult<IReadOnlyList<GroundingConsultation>>(
                 _store.Where(c => c.RunId == runId).ToList());
+
+        public Task UpdateRefinementOutcomeAsync(Guid consultationId, RefinementOutcome outcome, CancellationToken ct)
+            => Task.CompletedTask;
     }
 
     private sealed class SingleProviderFactory(IGroundingProvider provider) : IGroundingProviderFactory

@@ -1,12 +1,14 @@
 using Bunit;
 using Bunit.TestDoubles;
 using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Application.Providers;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Grounding;
+using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Web.Components.Pages;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -29,6 +31,7 @@ public sealed class GroundingProviderScopeTests : TestContext
     public void CreateForm_WhenSwitchedToVectorStore_ScopeDefaultsToGlobal()
     {
         Services.AddSingleton<ICrewService>(new StubCrewService(null));
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
@@ -46,6 +49,7 @@ public sealed class GroundingProviderScopeTests : TestContext
     {
         var profile = MakeVectorStoreProfile("custom-vs", "run-local");
         Services.AddSingleton<ICrewService>(new StubCrewService(profile));
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
@@ -61,6 +65,7 @@ public sealed class GroundingProviderScopeTests : TestContext
         // Profile has no "Scope" key in ProviderSettings (legacy profile)
         var profile = MakeVectorStoreProfile("custom-vs-legacy", scope: null);
         Services.AddSingleton<ICrewService>(new StubCrewService(profile));
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
@@ -75,6 +80,7 @@ public sealed class GroundingProviderScopeTests : TestContext
     public void ScopeSelect_HasThreeOptions_GlobalRunLocalBoth()
     {
         Services.AddSingleton<ICrewService>(new StubCrewService(null));
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
@@ -93,6 +99,7 @@ public sealed class GroundingProviderScopeTests : TestContext
     {
         var profile = MakeVectorStoreProfile("custom-vs-global", "global");
         Services.AddSingleton<ICrewService>(new StubCrewService(profile));
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         Services.AddSingleton<IOptions<TavilyOptions>>(Options.Create(new TavilyOptions { ApiKey = "test-key" }));
         this.AddTestAuthorization().SetAuthorized("test-user");
 
