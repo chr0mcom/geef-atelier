@@ -2,7 +2,7 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-05-19 (Finalizer Profiles section added — Step22 / D-044)
+Last updated: 2026-05-20 (LLM-Binding bei Transform-Finalizern — Phase E / Doku-Ergänzung)
 
 ## Overview
 
@@ -252,6 +252,19 @@ Each finalizer execution records its output as a `RunArtifact`:
 | `executive-summary` | Transform | Produces a concise executive-summary prepended to the draft |
 | `key-takeaways` | Transform | Appends a bullet-point key-takeaways section |
 | `glossary` | Transform | Appends a glossary of domain-specific terms |
+
+### LLM-Binding bei Transform-Finalizern
+
+Transform-Finalizer führen einen LLM-Call aus, um den finalen Draft zu transformieren. Das gebundene Modell kann pro Profil konfiguriert werden:
+
+- **Anbieter:** Jeder aktive Custom- oder System-Provider (HTTP oder CLI)
+- **Modell:** Frei wählbar; für Tone-Transformationen reichen günstige Modelle (z.B. `gpt-4o-mini`)
+- **MaxTokens:** Maximale Ausgabelänge (Mindest-Floor von 10000 gilt)
+- **Temperature** (optional): leer = Anbieter-Standard, 0.0 = deterministisch, 2.0 = sehr kreativ
+
+**System-Transform-Finalizer** (`anti-ai-voice`, `tone-formalization`, `tone-casual`, `executive-summary`, `key-takeaways`, `glossary`) sind read-only. Ihre Binding-Einstellungen können durch Klonen als Custom-Profil überschrieben werden.
+
+Das `LlmBinding`-Konzept wird in Step 2 (Grounding-Refinement) und Step 3 (KI-Grounding-Typen) wiederverwendet.
 
 ### DB tables (migration Step22)
 

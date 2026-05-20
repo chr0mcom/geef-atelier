@@ -1,6 +1,7 @@
 using Bunit;
 using Bunit.TestDoubles;
 using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Application.Providers;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Web.Components.Pages;
@@ -27,6 +28,7 @@ public sealed class FinalizerEditorTests : TestContext
     public void Create_RendersEditorForm()
     {
         Services.AddSingleton<ICrewService>(new StubCrewService());
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         this.AddTestAuthorization().SetAuthorized("user");
 
         var cut = RenderComponent<FinalizerEditor>();
@@ -40,6 +42,7 @@ public sealed class FinalizerEditorTests : TestContext
     public void Create_DefaultType_ShowsFileExportFields()
     {
         Services.AddSingleton<ICrewService>(new StubCrewService());
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         this.AddTestAuthorization().SetAuthorized("user");
 
         var cut = RenderComponent<FinalizerEditor>();
@@ -54,6 +57,7 @@ public sealed class FinalizerEditorTests : TestContext
         var profile = MakeFinalizer("custom-enrich", FinalizerType.MetadataEnrich);
         var crew = new StubCrewService(profile);
         Services.AddSingleton<ICrewService>(crew);
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         this.AddTestAuthorization().SetAuthorized("user");
 
         var cut = RenderComponent<FinalizerEditor>(p => p.Add(e => e.Name, "custom-enrich"));
@@ -76,6 +80,7 @@ public sealed class FinalizerEditorTests : TestContext
             UpdatedAt: DateTimeOffset.UtcNow);
         var crew = new StubCrewService(profile);
         Services.AddSingleton<ICrewService>(crew);
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         this.AddTestAuthorization().SetAuthorized("user");
 
         var cut = RenderComponent<FinalizerEditor>(p => p.Add(e => e.Name, "custom-webhook"));
@@ -88,6 +93,7 @@ public sealed class FinalizerEditorTests : TestContext
     {
         var profile = MakeFinalizer("custom-export", FinalizerType.FileExport);
         Services.AddSingleton<ICrewService>(new StubCrewService(profile));
+        Services.AddSingleton<IProviderService>(new FakeProviderService());
         this.AddTestAuthorization().SetAuthorized("user");
 
         var cut = RenderComponent<FinalizerEditor>(p => p.Add(e => e.Name, "custom-export"));

@@ -1,6 +1,9 @@
 using Geef.Atelier.Application.Crew.Finalizers;
+using Geef.Atelier.Application.Providers;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Infrastructure.Finalizers;
+using Geef.Atelier.Tests.Fakes;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -160,9 +163,13 @@ public sealed class FinalizerChainTests
     public async Task Transform_Executor_UpdatesCurrentText()
     {
         var fakeLlm = new ConstantTextClient("Polished text output.");
+        var services = new ServiceCollection();
+        services.AddSingleton<IProviderService>(new FakeProviderService());
+        var scopeFactory = services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
         var executor = new TransformFinalizerExecutor(
             new Tests.Llm.TestLlmClientResolver(fakeLlm),
             new NullPricingCatalog(),
+            scopeFactory,
             NullLogger<TransformFinalizerExecutor>.Instance);
 
         var profile = new FinalizerProfile("anti-ai-voice", "Anti-AI-Voice", "desc",

@@ -51,6 +51,17 @@ internal static class TemplateStudioPrompts
             Finalizer profiles do not need model/provider/system_prompt unless they are Transform type.
             Transform finalizers DO need model, provider, and system_prompt (a concise rewriting
             instruction + "Respond in the language of the input text.").
+            For finalizer profiles of type "Transform": include "Provider", "Model", and "MaxTokens"
+            as keys inside the "finalizer_settings" dictionary. Choose a cost-effective model since
+            transforms (tone changes, summaries, voice rewrites) do not require top-tier models.
+            Example finalizer_settings for a Transform finalizer:
+              "finalizer_type": "Transform",
+              "finalizer_settings": {
+                "Provider": "openrouter",
+                "Model": "openai/gpt-4o-mini",
+                "MaxTokens": "8192",
+                "SystemPrompt": "..."
+              }
 
         Required system-prompt structure (mirror the existing Atelier system profiles exactly):
 

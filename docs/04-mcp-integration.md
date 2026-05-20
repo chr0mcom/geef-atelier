@@ -2,7 +2,7 @@
 
 *[Deutsch](04-mcp-integration_de.md) · **English***
 
-*Last updated: 2026-05-19 (list_run_artifacts + download_run_artifact added, finalizer profile fields in Template Studio tools, D-044)*
+*Last updated: 2026-05-20 (Transform-Finalizer mit LLM-Binding-Beispiel, Phase E / Doku-Ergänzung)*
 
 ## Why MCP
 
@@ -176,6 +176,17 @@ Atomically writes all new profiles and the crew template to the DB in a single t
     {
       "name": "custom-my-exporter", "display_name": "...", "description": "...",
       "finalizer_type": "FileExport", "settings": {}
+    },
+    {
+      "name": "custom-my-transform", "display_name": "Mein Transform", "description": "...",
+      "finalizer_type": "Transform",
+      "settings": {
+        "Provider": "openrouter",
+        "Model": "openai/gpt-4o-mini",
+        "MaxTokens": "8192",
+        "SystemPrompt": "...",
+        "Temperature": "0.5"
+      }
     }
   ]
 }

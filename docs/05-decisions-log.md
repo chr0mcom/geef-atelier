@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-05-19 (D-048 added: Workshop Dashboard)*
+*Last updated: 2026-05-20 (D-049 added: LLM-Binding — Provider+Model-Auswahl wo KI in Profilen läuft)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -930,3 +930,31 @@ The primitive home screen (`/`) — hero + 4 stat tiles + recent runs list — i
 **D-048/7 — Migration Step25: `WordCount` on `Runs`, `ProviderName` on actor cost tables, performance indexes.** `Runs.WordCount` (int, nullable) backfilled via `regexp_split_to_array`. `IterationActorCosts.ProviderName` and `FinalizationActorCosts.ProviderName` backfilled via JSONB lateral join against `CrewSnapshot` (exact match), falling back to `split_part(ModelName,'/',1)` with provider-family heuristics. Index `IX_Runs_CreatedAt` (BTREE) added for heatmap and ledger range queries.
 
 **Tests:** 1079 total (1074 green + 4 known flakes unchanged). New: `DashboardRepositoryTests` (6), `DashboardPerformanceTests` (2), `Step25MigrationTests` (4), plus 46 bUnit widget component tests.
+
+---
+
+## D-049 — LLM-Binding: Explicit Provider+Model Selection for All AI-Using Profile Slots
+
+*Date: 20 May 2026*
+
+Step 1 of 3 in the Grounding Improvement Series. Introduces a reusable `LlmBinding` value object and makes the provider/model choice explicit at every profile slot that calls an LLM — specifically Transform Finalizers (previously showing plain text inputs) and the Template Studio meta-LLM (previously using a hardcoded provider). Lays the foundation for Step 2 (Grounding Refinement) and Step 3 (AI-assisted Grounding Types) which will consume `LlmBinding` from their respective profile slots.
+
+**Phase 1.2 Befund (blocking prerequisite, ermittelt):** `TransformFinalizerExecutor` already read Provider/Model/MaxTokens from `TransformSettings` via `llmClientResolver.ForProfile(settings.Provider, settings.Model, settings.MaxTokens)` — not hardcoded. All 6 System-Transform-Finalizer used `codex-cli` / `gpt-5.5` / `8192` MaxTokens explicitly in `SystemCrew.cs`. Template Studio: provider hardcoded as `"openrouter"` in `TemplateStudioService.cs:34`, model/maxTokens from `TemplateStudioOptions`. `FinalizationActorCost.ProviderName` column existed since Step25 but was not being written by the executor.
+
+**D-049/1 — `LlmBinding` is a Core sealed record in `Geef.Atelier.Core.Domain.Llm`, not in Infrastructure.** Fields: `Provider`, `Model`, `MaxTokens`, `double? Temperature` (optional, null = provider default). Exposed as `TransformSettings.Binding` (computed property) and `TransformSettings.WithBinding(LlmBinding)`. This keeps the domain model clean and makes `LlmBinding` directly consumable by Step 2/3 without Infrastructure coupling.
+
+**D-049/2 — `TransformSettings` retains flat JSONB keys rather than switching to nested object.** The existing `Dictionary<string,string>` format (keys `Provider`, `Model`, `MaxTokens`, `SystemPrompt`) is preserved. A nested `{"llmBinding": {...}}` would break all existing CrewSnapshots. `LlmBinding` is exposed as a computed property only. `Temperature` is added as a new optional flat key, written only when non-null (InvariantCulture dot-separator for round-trip safety).
+
+**D-049/3 — No data migration required.** System Transform Finalizers already carry explicit Provider/Model/MaxTokens values in their Settings dict (seeded in Step22). Custom Finalizers without Temperature get `null` via `TransformSettings.From()` fallback — provider-default behavior. `CrewSnapshot` backwards-compatibility is automatic: old snapshots without Temperature parse to `null` via the trailing-optional `From()` logic.
+
+**D-049/4 — `TransformFinalizerExecutor` validates provider liveness before the LLM call.** Uses `IServiceScopeFactory` (constructor-injected) to resolve `IProviderService` per request (executor is singleton; `IProviderService` is scoped). If the provider is missing or inactive: returns a `Status`-type `RunArtifact` with a clear error message; the Run itself is NOT aborted (partial-success contract from D-044). `ProviderName` is now correctly written to `FinalizationActorCost`.
+
+**D-049/5 — `FinalizerEditor.razor` Transform section replaces plain `InputText` with Provider dropdown + `ModelSelector`.** Provider dropdown uses `<optgroup label="HTTP">` / `<optgroup label="CLI">` from `IProviderService.ListAsync(includeInactive: false)`. `ModelSelector` (reused from D-047) handles live model loading per provider. Temperature is an optional `<input type="number" step="0.1" min="0" max="2">` field. System-Transform-Finalizer slots are read-only (`CanEdit = IsNew || !profile.IsSystem`). New field-help constants in `FinalizerFieldHelps.cs`.
+
+**D-049/6 — Template Studio meta-LLM provider is now configurable via appsettings.** `TemplateStudioOptions` gains `Provider` (default `"openrouter"`) so deployers can route the Studio's analysis call to any active provider without code changes. Existing behavior is preserved by default.
+
+**D-049/7 — Studio meta-prompt extended to suggest cost-effective models for Transform Finalizers.** The system prompt now includes an explicit instruction: when proposing a Transform Finalizer, include `Provider`, `Model`, and `MaxTokens` in `finalizerSettings` and choose a cost-effective model (e.g., `gpt-4o-mini`, `gemini-flash`) since tone/style transforms do not require top-tier models. MCP `materialize_template_proposal` passes `finalizerSettings` keys through 1:1 — no schema changes needed.
+
+**D-049/8 — `Executor/Reviewer/Advisor` profiles are NOT refactored to use `LlmBinding`.** These profiles have established `Provider`/`Model`/`MaxTokens` fields with 1074+ tests depending on them. Merging them into `LlmBinding` is a separate cleanup step with its own risk profile. Conceptually the same; physically separate — no persistence breaking change.
+
+**Tests:** 1095 total (1089 green + 4 known flakes unchanged, 1 skipped). New: `LlmBindingTests` (5), `TransformSettingsTests` (12), `TransformFinalizerExecutor` inactive-provider test (+1), bUnit `FinalizerEditorTests` IProviderService registration fix (5 previously broken tests now green). Total new passing tests: +15.
