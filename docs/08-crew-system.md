@@ -335,41 +335,57 @@ await runService.SubmitRunAsync("...", "{}", customCrew: spec);
 
 Full tool list (15 tools): see [09-endpoint-reference.md](09-endpoint-reference.md) and the [project README](../README.md).
 
-## Grounding-Provider-Profile (D-036 / D-040)
+## Grounding Provider Profiles (D-036 / D-040 / D-051)
 
-Grounding-Provider reichern das Briefing vor der GEEF-Ausführungsschleife mit externem Kontext an.
+Grounding providers enrich the briefing with external context before the GEEF execution loop.
 
-### Provider-Typen
+### Provider Types
 
-| Typ | Implementierung | Beschreibung | Settings |
+| Type | Implementation | Description | Settings |
 |---|---|---|---|
-| `tavily` | `TavilyGroundingProvider` | Web-Suche via Tavily API (Basic oder Advanced). API-Key pro Profil. | `Tier` (basic/advanced), `MaxResults`, `IncludeAnswer` |
-| `vector-store` | `VectorStoreGroundingProvider` | Semantische Suche in einer pgvector-Sammlung. Scope: `global`, `run-local` oder `both`. | `TopK`, `Scope`, `TagFilter` |
-| `static-context` | `StaticContextGroundingProvider` | Kuratierter Fixtext, der immer unverändert injiziert wird. Keine externe API. Ideal für Style-Guides, Glossare, Markenstimme. | `label`, `content` (max 200.000 Zeichen, Soft-Limit 50.000) |
-| `url-fetch` | `UrlFetchGroundingProvider` | Fetcht konkrete URLs, bereinigt HTML via AngleSharp, gibt Textinhalt zurück. SSRF-Guard blockiert private IPs. | `urls` (newline-separated), `maxContentPerUrl` (Default 8000), `stripBoilerplate` (bool, Default true) |
-| `news-search` | `NewsSearchGroundingProvider` | Tavily-API mit `topic=news` + `days`-Filter. Für zeitkritische Themen. Attribution via `PublishedDate`. | `recencyDays` (Default 7), `newsMaxResults` (Default 5), `newsSearchDepth` (basic/advanced) |
+| `tavily` | `TavilyGroundingProvider` | Web search via Tavily API (basic or advanced). API key per profile. | `Tier` (basic/advanced), `MaxResults`, `IncludeAnswer` |
+| `vector-store` | `VectorStoreGroundingProvider` | Semantic search in a pgvector collection. Scope: `global`, `run-local`, or `both`. | `TopK`, `Scope`, `TagFilter` |
+| `static-context` | `StaticContextGroundingProvider` | Curated fixed text injected unchanged at every run. No external API. Ideal for style guides, glossaries, brand voice. | `label`, `content` (max 200,000 chars, soft limit 50,000) |
+| `url-fetch` | `UrlFetchGroundingProvider` | Fetches specific URLs, cleans HTML via HtmlAgilityPack, returns text content. SSRF guard blocks private IPs. | `urls` (newline-separated), `maxContentPerUrl` (default 8000), `stripBoilerplate` (bool, default true) |
+| `news-search` | `NewsSearchGroundingProvider` | Tavily API with `topic=news` + `days` filter. For time-critical topics. Attribution via `PublishedDate`. | `recencyDays` (default 7), `newsMaxResults` (default 5), `newsSearchDepth` (basic/advanced) |
 
-### KI-Refinement
+### SSRF Protection (`url-fetch`)
 
-Jeder Grounding-Provider kann optional mit einem KI-Refinement-Pass konfiguriert werden. Nach dem Fetch läuft — wenn konfiguriert — ein LLM über die Rohergebnisse.
+The `UrlSafetyValidator` component runs before every HTTP request for the `url-fetch` provider:
 
-**Konfiguration** (flache Keys in `ProviderSettings`):
-| Key | Typ | Beschreibung |
+- **Schema check:** Only `http` and `https`. All others (`file://`, `ftp://`, custom schemes) → blocked.
+- **DNS resolution:** Every hostname is resolved via `Dns.GetHostAddressesAsync`; **all** resulting IPs are checked (not just the first).
+- **IPv4 blocklist:** `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.0/8`, `169.254.0.0/16` (link-local + cloud metadata), `0.0.0.0/8`, `100.64.0.0/10`, `224.0.0.0/4`
+- **IPv6 blocklist:** `::1`, `fc00::/7`, `fe80::/10`, `ff00::/8`, `64:ff9b::/96`, IPv4-mapped IPv6 (unwrapped and re-checked)
+- **Redirect chain:** Max 3 hops; each redirect target IP is re-validated against the full blocklist.
+- **Timeout:** 10 seconds hard cap per request; response body capped at 5 MB.
+
+Blocked or failed URLs are skipped (warning logged, noted in the source citation); the run itself is not aborted.
+
+### AI Refinement
+
+Every grounding provider can optionally be configured with an AI refinement pass. After the fetch, an LLM processes the raw results — if configured.
+
+**Configuration** (flat keys in `ProviderSettings`):
+
+| Key | Type | Description |
 |---|---|---|
-| `refinementProvider` | string | LLM-Anbieter (z. B. `openrouter`) |
-| `refinementModel` | string | Modell (z. B. `google/gemini-2.0-flash-lite`) |
-| `refinementMaxTokens` | int | Max. Token für Refinement-Antwort |
-| `refinementTemperature` | double? | Optional; leer = Anbieter-Standard |
+| `refinementProvider` | string | LLM provider (e.g. `openrouter`) |
+| `refinementModel` | string | Model (e.g. `google/gemini-2.0-flash-lite`) |
+| `refinementMaxTokens` | int | Max tokens for the refinement response |
+| `refinementTemperature` | double? | Optional; empty = provider default |
 | `refinementMode` | int | `0` = Filter, `1` = Synthesize |
-| `refinementInstructions` | string? | Optionale Zusatz-Anweisungen |
+| `refinementInstructions` | string? | Optional additional instructions |
 
-**Modi:**
-- **Filter** (Standard): Jede Quelle wird behalten oder verworfen. Attribution bleibt 1:1 erhalten.
-- **Synthesize**: Alle Quellen werden zu einem kohärenten Text zusammengefasst (`[n]`-Referenzen). Originalquellen bleiben als Referenz-Anhang erhalten.
+**Modes:**
+- **Filter** (default): Each source is kept or discarded individually. Attribution remains 1:1.
+- **Synthesize:** All sources are merged into a coherent text (`[n]` references). Original sources are preserved as a reference appendix.
 
-**Graceful Degradation:** Ist der Refinement-Anbieter inaktiv oder schlägt der LLM-Call fehl, werden die Rohergebnisse unverändert durchgereicht. Der Run wird nicht abgebrochen. Die Grounding-Visualisierung zeigt einen Hinweis.
+**Graceful degradation:** If the refinement provider is inactive or the LLM call fails, raw results are passed through unchanged. The run is not aborted. The grounding visualization shows a notice.
 
-**System-Provider `tavily-refined`:** Sofort nutzbares Demo-Profil — Tavily Advanced mit Filter-Refinement via `google/gemini-2.0-flash-lite`.
+**System profile `tavily-news`:** New — Tavily news search (`topic=news`, `recencyDays=7`) with filter refinement via `google/gemini-2.0-flash-lite`. Suitable for time-critical topics.
+
+**System profile `tavily-refined`:** Ready-to-use demo profile — Tavily Advanced with filter refinement via `google/gemini-2.0-flash-lite`.
 
 ## Reviewer-name migration
 

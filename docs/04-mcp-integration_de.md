@@ -2,7 +2,7 @@
 
 *[English](04-mcp-integration.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-19 (list_run_artifacts + download_run_artifact ergänzt, Finalizer-Profil-Felder in Template-Studio-Tools, D-044)*
+*Letzte Aktualisierung: 2026-05-20 (D-051: neue providerType-Werte static-context, url-fetch, news-search in list_grounding_provider_profiles + materialize_template_proposal dokumentiert)*
 
 ## Warum MCP
 
@@ -135,6 +135,23 @@ Neben den sechs Run-Tools bietet der Server neun weitere — insgesamt **15 MCP-
 
 Vollständige Parameter-/Schema-Details: [`09-endpoint-reference.md`](09-endpoint-reference_de.md).
 
+#### `list_grounding_provider_profiles`
+
+**Input:** `{ "includeSystem": bool (default true) }`
+
+**Output:** Array von Grounding-Provider-Profil-Objekten. Jedes Profil enthält:
+
+| Feld | Typ | Beschreibung |
+|---|---|---|
+| `name` | string | Profilbezeichner |
+| `displayName` | string | Anzeigename |
+| `description` | string | Zweckbeschreibung |
+| `providerType` | string | `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"` oder `"news-search"` |
+| `maxQueriesPerRun` | int? | Maximale Anfragen pro Run |
+| `isSystem` | boolean | Ob es sich um ein eingebautes System-Profil handelt |
+| `refinementEnabled` | boolean | Ob ein KI-Refinement konfiguriert ist |
+| `refinementMode` | string \| null | `"filter"` oder `"synthesize"` (null wenn kein Refinement) |
+
 #### `analyze_template_proposal`
 
 Führt ein Meta-LLM aus, das die Aufgabenbeschreibung analysiert und eine strukturierte `TemplateStudioAnalysis` erzeugt, die in der DB persistiert wird.
@@ -182,6 +199,10 @@ Schreibt alle neuen Profile und das Crew-Template atomar in einer einzigen Trans
 ```
 
 `final_new_profiles` enthält nur Profile, die der Nutzer im CreateNew-Modus neu anlegen wollte. Profile im UseExisting-Modus erscheinen nur als Name in `final_template.*_profile_names`. `final_new_finalizer_profiles` folgt demselben Muster für Finalizer-Profile. Ein `max_tokens` unterhalb des harten Floors (`StudioDefaults.MinMaxTokens = 10000`) wird serverseitig hochgezogen; ohne Angabe greift der `TemplateStudio:Defaults`-Wert (Reviewer/Advisor 16384, Executor 60000). Das Weglassen von `finalizer_profile_names` oder `final_new_finalizer_profiles` ist backwards-kompatibel (keine Finalizer werden angehängt).
+
+**Grounding-Provider-Typen:** `providerType` (bzw. `GroundingProviderType` im Proposal) kann folgende Werte haben: `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"`, `"news-search"`. Jeder Typ erwartet typ-spezifische Settings-Keys (siehe `08-crew-system_de.md` Provider-Typen-Tabelle).
+
+**Grounding-Provider-Refinement-Keys in `groundingProviderSettings`:** Das `GroundingProviderSettings`-Dict für ein `grounding_provider`-Profil akzeptiert alle KI-Refinement-Keys (`refinementProvider`, `refinementModel`, `refinementMaxTokens`, `refinementTemperature`, `refinementMode`, `refinementInstructions`) als flache String-Einträge. Alle Keys sind optional und backwards-kompatibel — Profile ohne diese Keys verhalten sich wie bisher (kein Refinement-Pass).
 
 **Output:** `{ "created_template_name": "custom-..." }` — Name des materialisierten Templates; kann direkt als `crew_template` an `submit_request` übergeben werden.
 

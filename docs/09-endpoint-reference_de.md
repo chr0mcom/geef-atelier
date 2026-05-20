@@ -2,7 +2,7 @@
 
 *[English](09-endpoint-reference.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-19 (Artefakt-Download-Endpunkt ergänzt; MCP-Tools list_run_artifacts + download_run_artifact ergänzt)*
+*Letzte Aktualisierung: 2026-05-20 (D-051: list_grounding_provider_profiles ergänzt; providerType-Werte auf alle fünf Typen erweitert)*
 
 Alle HTTP-Endpunkte von Geef.Atelier, die extern erreichbar sind — MCP, OAuth 2.1
 sowie die Web-UI-/Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`.
@@ -59,6 +59,61 @@ Listet alle Artefakte auf, die ein Run erzeugt hat.
 ```
 
 Gibt ein leeres Array zurück, wenn der Run keine Artefakte hat. Auth: Owner-Check (gleiche Run-Isolation wie andere Run-Tools).
+
+---
+
+#### `list_grounding_provider_profiles`
+
+Listet alle Grounding-Provider-Profile (System + Custom) auf.
+
+**Eingabe:** `{ "includeSystem": bool (default true) }`
+
+**Ausgabe:** Array von Grounding-Provider-Profil-Objekten:
+```json
+[
+  {
+    "name": "tavily-refined",
+    "displayName": "Tavily Refined",
+    "description": "...",
+    "providerType": "tavily",
+    "maxQueriesPerRun": 3,
+    "isSystem": true,
+    "refinementEnabled": true,
+    "refinementMode": "filter"
+  },
+  {
+    "name": "tavily-news",
+    "displayName": "Tavily News",
+    "description": "...",
+    "providerType": "news-search",
+    "maxQueriesPerRun": 1,
+    "isSystem": true,
+    "refinementEnabled": true,
+    "refinementMode": "filter"
+  },
+  {
+    "name": "custom-mein-provider",
+    "displayName": "Mein Provider",
+    "description": "...",
+    "providerType": "vector-store",
+    "maxQueriesPerRun": null,
+    "isSystem": false,
+    "refinementEnabled": false,
+    "refinementMode": null
+  }
+]
+```
+
+| Feld | Typ | Beschreibung |
+|---|---|---|
+| `name` | string | Profilbezeichner |
+| `displayName` | string | Anzeigename |
+| `description` | string | Zweckbeschreibung |
+| `providerType` | string | `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"` oder `"news-search"` |
+| `maxQueriesPerRun` | int? | Max. Anfragen pro Run (null = unbegrenzt) |
+| `isSystem` | boolean | Eingebautes System-Profil |
+| `refinementEnabled` | boolean | Ob ein KI-Refinement konfiguriert ist |
+| `refinementMode` | string \| null | `"filter"` oder `"synthesize"` (null wenn kein Refinement) |
 
 ---
 

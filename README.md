@@ -34,7 +34,11 @@ Text-generation pipeline platform built on the [Geef SDK](https://github.com/chr
 
 **Run-Resume ✅** Resume a failed or aborted run from where it left off — Seed mode (continue from last draft) or Clean mode (fresh start with same briefing). "Fortsetzen" button in RunDetail, ResumeRunDialog with MaxIterations override. ParentRunId link shown in RunDetail (PR #18, 2026-05-19).
 
-Currently: **over 1000 tests** (green; 4 known Testcontainers flakes).
+**Grounding Refinement ✅** Optional AI filter pass after every grounding provider fetch — Filter mode (keep/drop per source with reasoning) and Synthesize mode (merge all sources into a coherent text with `[n]` citations). Configurable per provider via `LlmBinding` (D-049/D-050, PR #22, 2026-05-20).
+
+**Grounding Types ✅** Three new grounding-provider types alongside the existing `tavily` and `vector-store` providers: `static-context` (curated fixed text — style guides, glossaries, brand voice), `url-fetch` (fetch specific URLs with SSRF guard blocking all private/cloud-metadata IPs), and `news-search` (Tavily news topic with date filter). New system profile `tavily-news`. Dashboard cost aggregation now includes Grounding Refiner costs (D-051, PR #23, 2026-05-20).
+
+Currently: **over 1200 tests** (green; 4 known Testcontainers flakes).
 
 Full scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope.md)
 
@@ -222,7 +226,7 @@ ATELIER_DOMAIN=<your-domain>
 
 LLM_OPENROUTER_API_KEY=<openrouter-api-key>
 
-# Tavily web search (https://tavily.com) — optional
+# Tavily web search (https://tavily.com) — optional; required for tavily, news-search, and tavily-news grounding profiles
 TAVILY_API_KEY=
 ```
 

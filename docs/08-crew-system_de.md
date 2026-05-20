@@ -2,7 +2,7 @@
 
 *[English](08-crew-system.md) · **Deutsch***
 
-Letzte Aktualisierung: 2026-05-19 (Finalizer-Profile-Abschnitt ergänzt — Step22 / D-044)
+Letzte Aktualisierung: 2026-05-20 (D-051: drei neue Grounding-Provider-Typen — static-context, url-fetch, news-search)
 
 ## Überblick
 
@@ -322,6 +322,58 @@ await runService.SubmitRunAsync("...", "{}", customCrew: spec);
 - `submit_request` — erweitert um `crew_template` und `custom_crew` (JSON-String).
 
 Vollständige Tool-Liste (15 Tools): siehe [09-endpoint-reference.md](09-endpoint-reference_de.md) und die [Projekt-README](../README_de.md).
+
+## Grounding-Provider-Profile (D-036 / D-040 / D-051)
+
+Grounding-Provider reichern das Briefing vor der GEEF-Ausführungsschleife mit externem Kontext an.
+
+### Provider-Typen
+
+| Typ | Implementierung | Beschreibung | Settings |
+|---|---|---|---|
+| `tavily` | `TavilyGroundingProvider` | Web-Suche via Tavily API (Basic oder Advanced). API-Key pro Profil. | `Tier` (basic/advanced), `MaxResults`, `IncludeAnswer` |
+| `vector-store` | `VectorStoreGroundingProvider` | Semantische Suche in einer pgvector-Sammlung. Scope: `global`, `run-local` oder `both`. | `TopK`, `Scope`, `TagFilter` |
+| `static-context` | `StaticContextGroundingProvider` | Kuratierter Fixtext, der bei jedem Run unverändert injiziert wird. Keine externe API. Ideal für Style-Guides, Glossare, Markenstimme. | `label`, `content` (max 200.000 Zeichen, Soft-Limit 50.000) |
+| `url-fetch` | `UrlFetchGroundingProvider` | Fetcht konkrete URLs, bereinigt HTML via HtmlAgilityPack, gibt Textinhalt zurück. SSRF-Guard blockiert private IPs. | `urls` (newline-separated), `maxContentPerUrl` (Default 8000), `stripBoilerplate` (bool, Default true) |
+| `news-search` | `NewsSearchGroundingProvider` | Tavily-API mit `topic=news` + `days`-Filter. Für zeitkritische Themen. Attribution via `PublishedDate`. | `recencyDays` (Default 7), `newsMaxResults` (Default 5), `newsSearchDepth` (basic/advanced) |
+
+### SSRF-Schutz (`url-fetch`)
+
+Die `UrlSafetyValidator`-Komponente wird vor jedem HTTP-Request beim `url-fetch`-Provider ausgeführt:
+
+- **Schema-Check:** Nur `http` und `https`. Alle anderen (`file://`, `ftp://`, custom) → blockiert.
+- **DNS-Auflösung:** Jeder Hostname wird via `Dns.GetHostAddressesAsync` aufgelöst; **alle** resultierenden IPs werden geprüft (nicht nur die erste).
+- **IPv4-Blockliste:** `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.0/8`, `169.254.0.0/16` (Link-Local + Cloud-Metadata), `0.0.0.0/8`, `100.64.0.0/10`, `224.0.0.0/4`
+- **IPv6-Blockliste:** `::1`, `fc00::/7`, `fe80::/10`, `ff00::/8`, `64:ff9b::/96`, IPv4-mapped IPv6 (entpackt und erneut geprüft)
+- **Redirect-Kette:** Max. 3 Hops; jede Redirect-Ziel-IP wird erneut gegen die vollständige Blockliste geprüft.
+- **Timeout:** 10 Sekunden hard-cap pro Request; Response-Body auf 5 MB begrenzt.
+
+Blockierte oder fehlgeschlagene URLs werden übersprungen (Warnung geloggt, in Source-Citation vermerkt); der Run selbst wird nicht abgebrochen.
+
+### KI-Refinement
+
+Jeder Grounding-Provider kann optional mit einem KI-Refinement-Pass konfiguriert werden. Nach dem Fetch läuft — wenn konfiguriert — ein LLM über die Rohergebnisse.
+
+**Konfiguration** (flache Keys in `ProviderSettings`):
+
+| Key | Typ | Beschreibung |
+|---|---|---|
+| `refinementProvider` | string | LLM-Anbieter (z. B. `openrouter`) |
+| `refinementModel` | string | Modell (z. B. `google/gemini-2.0-flash-lite`) |
+| `refinementMaxTokens` | int | Max. Token für Refinement-Antwort |
+| `refinementTemperature` | double? | Optional; leer = Anbieter-Standard |
+| `refinementMode` | int | `0` = Filter, `1` = Synthesize |
+| `refinementInstructions` | string? | Optionale Zusatz-Anweisungen |
+
+**Modi:**
+- **Filter** (Standard): Jede Quelle wird einzeln behalten oder verworfen. Attribution bleibt 1:1 erhalten.
+- **Synthesize**: Alle Quellen werden zu einem kohärenten Text zusammengefasst (`[n]`-Referenzen). Originalquellen bleiben als Referenz-Anhang erhalten.
+
+**Graceful Degradation:** Ist der Refinement-Anbieter inaktiv oder schlägt der LLM-Call fehl, werden die Rohergebnisse unverändert durchgereicht. Der Run wird nicht abgebrochen. Die Grounding-Visualisierung zeigt einen Hinweis.
+
+**System-Profil `tavily-news`:** Neu — Tavily-Newssuche (`topic=news`, `recencyDays=7`) mit Filter-Refinement via `google/gemini-2.0-flash-lite`. Geeignet für zeitkritische Themen.
+
+**System-Profil `tavily-refined`:** Sofort nutzbares Demo-Profil — Tavily Advanced mit Filter-Refinement via `google/gemini-2.0-flash-lite`.
 
 ## Reviewer-Name-Migration
 

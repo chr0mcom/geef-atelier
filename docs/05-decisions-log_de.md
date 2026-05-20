@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-19 (D-047 + D-048 ergänzt: Custom Providers + Workshop-Dashboard)*
+*Letzte Aktualisierung: 2026-05-20 (D-049 / D-050 / D-051 ergänzt: LlmBinding, Grounding-Refinement, Grounding-Typen)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -930,3 +930,75 @@ Der primitive Einstiegsscreen (`/`) — Hero + 4 Stat-Tiles + Recent-Runs-Liste 
 **D-048/7 — Migration Step25: `WordCount` auf `Runs`, `ProviderName` auf Actor-Cost-Tabellen, Performance-Indizes.** `Runs.WordCount` (int, nullable) per `regexp_split_to_array` backgefüllt. `IterationActorCosts.ProviderName` und `FinalizationActorCosts.ProviderName` per JSONB-Lateral-Join gegen `CrewSnapshot` (Exakt-Match), Fallback auf `split_part(ModelName,'/',1)` mit Provider-Familie-Heuristiken. Index `IX_Runs_CreatedAt` (BTREE) für Heatmap- und Ledger-Range-Abfragen ergänzt.
 
 **Tests:** 1079 gesamt (1074 grün + 4 bekannte Flakes unverändert). Neu: `DashboardRepositoryTests` (6), `DashboardPerformanceTests` (2), `Step25MigrationTests` (4), plus 46 bUnit-Widget-Komponenten-Tests.
+
+---
+
+## D-049 — LLM-Binding: Explizite Provider+Modell-Auswahl für alle KI-nutzenden Profil-Slots
+
+*Datum: 20. Mai 2026*
+
+Schritt 1 von 3 der Grounding-Verbesserungs-Serie. Führt einen wiederverwendbaren `LlmBinding`-Value-Object ein und macht die Provider-/Modell-Wahl bei allen Profil-Slots explizit, die ein LLM aufrufen — insbesondere Transform-Finalizer (bisher Plain-Text-Inputs) und das Template-Studio-Meta-LLM (bisher hartkodierter Provider). Legt das Fundament für Schritt 2 (Grounding-Refinement) und Schritt 3 (KI-gestützte Grounding-Typen), die `LlmBinding` aus ihren jeweiligen Profil-Slots verbrauchen.
+
+**D-049/1 — `LlmBinding` ist ein Core-Sealed-Record in `Geef.Atelier.Core.Domain.Llm`, nicht in Infrastructure.** Felder: `Provider`, `Model`, `MaxTokens`, `double? Temperature` (optional, null = Anbieter-Standard). Exponiert als `TransformSettings.Binding` (computed property) und `TransformSettings.WithBinding(LlmBinding)`.
+
+**D-049/2 — `TransformSettings` behält flache JSONB-Keys statt verschachteltem Objekt.** Das bestehende `Dictionary<string,string>`-Format (Keys `Provider`, `Model`, `MaxTokens`, `SystemPrompt`) bleibt erhalten — ein verschachteltes `{"llmBinding": {...}}` würde alle bestehenden CrewSnapshots brechen. `LlmBinding` ist nur als computed property exponiert. `Temperature` wird als neuer optionaler flacher Key ergänzt.
+
+**D-049/3 — Keine Datenmigration erforderlich.** System-Transform-Finalizer tragen bereits explizite Provider/Modell/MaxTokens-Werte im Settings-Dict (in Step22 geseedet). Custom-Finalizer ohne Temperature erhalten `null` via `TransformSettings.From()`-Fallback.
+
+**D-049/4 — `TransformFinalizerExecutor` prüft Provider-Liveness vor dem LLM-Call.** Nutzt `IServiceScopeFactory` (Constructor-injiziert), um `IProviderService` per Request aufzulösen. Wenn der Provider fehlt oder inaktiv ist: gibt ein `Status`-Typ-`RunArtifact` mit klarer Fehlermeldung zurück; der Run selbst wird NICHT abgebrochen (Partial-Success-Vertrag aus D-044).
+
+**D-049/5 — `FinalizerEditor.razor` Transform-Sektion ersetzt Plain-`InputText` durch Provider-Dropdown + `ModelSelector`.** Provider-Dropdown verwendet `<optgroup label="HTTP">` / `<optgroup label="CLI">`. `ModelSelector` (aus D-047 wiederverwendet) übernimmt Live-Modell-Loading. Temperature ist ein optionales `<input type="number" step="0.1" min="0" max="2">`-Feld.
+
+**D-049/6 — Template-Studio-Meta-LLM-Provider ist nun via appsettings konfigurierbar.** `TemplateStudioOptions` erhält `Provider` (Default `"openrouter"`).
+
+**Tests:** 1095 gesamt (1089 grün + 4 bekannte Flakes + 1 Skip). Neu: `LlmBindingTests` (5), `TransformSettingsTests` (12), bUnit `FinalizerEditorTests` (+5 vorher defekte Tests jetzt grün).
+
+---
+
+## D-050 — Grounding-Refinement: optionaler KI-Filter nach Provider-Fetch
+
+*Datum: 20. Mai 2026*
+
+Schritt 2 von 3 der Grounding-Verbesserungs-Serie. Grounding-Provider lieferten Rohdaten ungefiltert ans Briefing. Irrelevante Web-Treffer, redundante Chunks und verrauschte Snippets zwangen den Executor zur manuellen Auswahl — Token-Verschwendung, Qualitätseinbußen.
+
+**Entscheidungen:**
+- **Pro-Provider-Refinement:** Jeder Provider bekommt optional einen eigenen Refiner — Web-Refinement (Noise) und RAG-Refinement (Redundanz) sind unterschiedliche Aufgaben. Kein globaler Cross-Provider-Pass.
+- **Flache Settings-Keys** im bestehenden `GroundingProviderProfile.ProviderSettings`-Dict (`refinementProvider`, `refinementModel`, `refinementMaxTokens`, `refinementTemperature`, `refinementMode`, `refinementInstructions`) — backwards-kompatibel, keine Snapshot-Migration.
+- **`LlmBinding` aus D-049 wiederverwendet** — kein neues Binding-Konzept. `RefinementBinding: LlmBinding?`-Property auf `GroundingProviderProfile`.
+- **`GroundingResult.ConsultationId: Guid?`** — Provider setzen dieses Feld nach Persistenz; der Orchestrator aktualisiert die gespeicherte Consultation mit dem `RefinementOutcome`.
+- **Filter- und Synthesize-Modus** mit Tool-Use-Schema (`submit_refinement`). Filter: pro-Quelle keep/drop mit Begründung. Synthesize: kohärenter Text mit `[n]`-Referenzen + Originalquellen-Liste.
+- **Graceful Degradation**: Provider inaktiv oder LLM-Fehler → Rohergebnisse durchgereicht, `WasSkipped=true`, Run NICHT abgebrochen.
+- **Hard-Cap 20 Quellen** an den Refiner; Überschuss ungefiltert beibehalten.
+- **`GroundingActorCosts`-Tabelle** (Migration Step27) analog zu `FinalizationActorCosts` — Refiner-Kosten tracken.
+- **`tavily-refined` System-Provider** als sofort nutzbares Demo-Profil (Tavily Advanced + Filter-Refinement).
+- **Grounding-Visualisierung** erweitert: Raw-Count → Refined-Count Badge, verworfene Quellen einklappbar, Synthesize-Text-Block, Skip-Hinweis bei Fehler.
+
+**Tests:** 1118 gesamt. Neu: ~23 Tests für Refinement-Logik (GroundingRefinerTests, MultiProviderGroundingStepRefinementTests, GroundingProviderEditorRefinementTests).
+
+---
+
+## D-051 — Grounding-Typen erweitern: Static-Context, URL-Fetch, News-Search
+
+*Datum: 20. Mai 2026 | PR #23 (feat/grounding-types)*
+
+Schritt 3 von 3 der Grounding-Verbesserungs-Serie. Das Grounding-System kannte nach D-050 nur zwei Provider-Typen: `tavily` und `vector-store`. Reale Nutzungsszenarien brauchen: kuratierten Fixtext, gezieltes URL-Fetching bekannter Quellen und zeitkritische Newssuche.
+
+**Drei neue `IGroundingProvider`-Typen:**
+
+1. **`static-context`** — kuratierter Text, immer unverändert injiziert, keine externe API, kein LLM. Soft-Limit 50.000 Zeichen (UI-Warnung), Hard-Cap 200.000 Zeichen server-side.
+2. **`url-fetch`** — HTTP-Fetch bekannter URLs, HTML-Bereinigung via HtmlAgilityPack 1.12.4, **SSRF-Guard als eigene Infrastructure-Komponente** (`IUrlSafetyValidator`). AngleSharp wurde erwogen, verursachte aber einen bUnit-Assemblierungskonflikt — HAP als Drop-in.
+3. **`news-search`** — Tavily-API mit `topic=news` + `days`-Parameter, `SourceCitation.PublishedDate: DateTimeOffset?` (trailing-optional, backwards-compat) neu.
+
+**Knackpunkte:**
+
+1. **HTML-Cleaning:** HtmlAgilityPack 1.12.4 (MIT). Boilerplate-Tags (script/style/nav/header/footer/aside) entfernen, OG-Title oder `<title>` extrahieren, Whitespace normalisieren. Refiner aus D-050 übernimmt Restbereinigung.
+2. **SSRF-Guard (sicherheitskritisch):** `UrlSafetyValidator` prüft Schema (nur http/https), löst DNS auf (alle IPs), prüft IPv4- und IPv6-Private-Ranges inkl. Cloud-Metadata (169.254.0.0/16). Redirect-Kette manuell, max. 3 Hops, jede Hop-IP erneut geprüft. `SocketsHttpHandler` mit `AllowAutoRedirect = false`.
+3. **`urls`-Speicherung:** Newline-getrennte Zeichenkette im Settings-Dict — robust gegen Kommas in Query-Strings.
+4. **Dashboard-Stage-Label:** `GroundingActorCosts` fließt als dritte Source in Cost-Forge und Provider-Bench ein; Stage-Label `"Refiner"`.
+5. **`GroundingProviderTypes`-Konstanten-Klasse** eingeführt — kein Magic-String mehr in Providers. System-Profil `tavily-news` in `SystemCrew` ergänzt.
+
+**Konsequenzen:**
+- Refiner aus D-050 ist typ-agnostisch — alle drei neuen Typen erhalten automatisch Refinement wenn konfiguriert.
+- SSRF-Guard als wiederverwendbare Komponente (`IUrlSafetyValidator`) für zukünftigen `rest-api`-Provider (Step 4).
+
+**Tests:** 1234 gesamt (1228 grün + 4 bekannte Flakes + 1 Skip + 1 Skip neu). Neu: ~115 neue Tests (SSRF-Validierung, Provider-Logik, UI-Komponenten, Dashboard-Cost-Aggregation).

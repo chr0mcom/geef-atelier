@@ -1000,7 +1000,7 @@ Drei neue `IGroundingProvider`-Typen implementiert, die demselben Factory/DI/Con
 
 ### Knackpunkte und Entscheidungen
 
-1. **HTML-Cleaning:** AngleSharp 1.4.0 (MIT) + eigene Readability-Heuristik (script/style/nav/header/footer/aside entfernen). Refiner aus D-050 übernimmt Restbereinigung.
+1. **HTML-Cleaning:** HtmlAgilityPack 1.12.4 (MIT) + eigene Readability-Heuristik (script/style/nav/header/footer/aside entfernen). AngleSharp wurde erwogen (MIT, ~1 MB), verursachte aber einen `MissingMethodException`-Konflikt mit bUnit (das AngleSharp intern nutzt) im Test-AppDomain — daher HAP als Drop-in. Der Wrapper heißt weiterhin `AngleSharpHtmlContentExtractor` (Name aus Plan beibehalten, minimaler Diff). Refiner aus D-050 übernimmt Restbereinigung.
 
 2. **SSRF-Guard (sicherheitskritisch):** `UrlSafetyValidator` prüft Schema (nur http/https), löst DNS auf (alle IPs, nicht nur erste), prüft IPv4- und IPv6-Private-Ranges inkl. Cloud-Metadata (169.254.0.0/16). Redirect-Kette manuell mit max. 3 Hops, jede Hop-IP erneut geprüft. `SocketsHttpHandler` mit `AllowAutoRedirect = false`.
 

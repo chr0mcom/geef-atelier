@@ -2,7 +2,7 @@
 
 *[Deutsch](09-endpoint-reference_de.md) · **English***
 
-*Last updated: 2026-05-20 (Grounding-Refinement: `refinementEnabled`/`refinementMode` zu `list_grounding_provider_profiles` hinzugefügt)*
+*Last updated: 2026-05-20 (D-051: `providerType` values updated to include `static-context`, `url-fetch`, `news-search`)*
 
 All externally reachable HTTP endpoints of Geef.Atelier — MCP, OAuth 2.1
 and the web-UI/account endpoints. Base URL: `https://geef.stefan-bechtel.de`.
@@ -75,8 +75,18 @@ Lists all grounding-provider profiles (system + custom).
     "name": "tavily-refined",
     "displayName": "Tavily Refined",
     "description": "...",
-    "providerType": "Tavily",
+    "providerType": "tavily",
     "maxQueriesPerRun": 3,
+    "isSystem": true,
+    "refinementEnabled": true,
+    "refinementMode": "filter"
+  },
+  {
+    "name": "tavily-news",
+    "displayName": "Tavily News",
+    "description": "...",
+    "providerType": "news-search",
+    "maxQueriesPerRun": 1,
     "isSystem": true,
     "refinementEnabled": true,
     "refinementMode": "filter"
@@ -85,7 +95,7 @@ Lists all grounding-provider profiles (system + custom).
     "name": "custom-my-provider",
     "displayName": "My Provider",
     "description": "...",
-    "providerType": "VectorStore",
+    "providerType": "vector-store",
     "maxQueriesPerRun": null,
     "isSystem": false,
     "refinementEnabled": false,
@@ -99,10 +109,10 @@ Lists all grounding-provider profiles (system + custom).
 | `name` | string | Profile identifier |
 | `displayName` | string | Human-readable name |
 | `description` | string | Purpose description |
-| `providerType` | string | `"Tavily"` or `"VectorStore"` |
+| `providerType` | string | `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"`, or `"news-search"` |
 | `maxQueriesPerRun` | int? | Max queries per run (null = unlimited) |
 | `isSystem` | boolean | Built-in system profile |
-| `refinementEnabled` | boolean | Whether KI-Refinement is configured |
+| `refinementEnabled` | boolean | Whether AI refinement is configured |
 | `refinementMode` | string \| null | `"filter"` or `"synthesize"` (null when not enabled) |
 
 ---

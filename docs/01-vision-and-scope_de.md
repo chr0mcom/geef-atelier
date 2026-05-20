@@ -2,7 +2,7 @@
 
 *[English](01-vision-and-scope.md) · **Deutsch***
 
-*Letzte Aktualisierung: 19. Mai 2026 (Scope an Finalizer-Foundation und Run-Resume angeglichen)*
+*Letzte Aktualisierung: 20. Mai 2026 (Scope an Grounding-Typen D-051 angeglichen: static-context, url-fetch, news-search)*
 
 ## Vision
 
@@ -28,6 +28,7 @@ Das Projekt ist die produktive Anwendung des [Geef SDK](https://github.com/chr0m
 - Persistente Run-Historie mit vollständigem Iterations-Trail
 - Run-Fortsetzung: einen fehlgeschlagenen oder abgebrochenen Run ab dem letzten Draft-Text (Seed-Modus) oder mit frischer Pipeline (Clean-Modus) fortsetzen — D-046
 - Datei-Export in den Formaten md / html / pdf / docx / txt / json über die Finalizer-Pipeline (D-044); die fünf Finalizer-Profil-Typen (FileExport, MetadataEnrich, ExternalSink, Transform) sind als Teil des Crew-Systems implementiert
+- Grounding-Anreicherung in mehreren Formen: Tavily-Websuche (`tavily`), semantische Vector-Store-RAG (`vector-store`), kuratierter Fixtext für Style-Guides und Glossare (`static-context`), gezieltes URL-Fetching mit SSRF-Schutz (`url-fetch`) und Tavily-Newssuche mit Datumsfilter (`news-search`); jeder Provider unterstützt optional einen KI-Refinement-Pass (D-050/D-051)
 
 ## Out of Scope (vorerst)
 
