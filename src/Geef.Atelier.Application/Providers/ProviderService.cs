@@ -17,8 +17,10 @@ internal sealed class ProviderService(
     {
         var systemProviders = SystemProviders.ProvidersByName.Values.ToList();
 
-        // Custom providers from DB; active-only filter applied unless caller wants all.
-        var customProviders = await repository.ListAsync(includeInactive: includeInactive, ct);
+        // Custom providers from DB only (IsSystem=false); system providers come from in-memory constants above.
+        // Without this filter, system providers seeded by migrations would appear twice.
+        var dbProviders = await repository.ListAsync(includeInactive: includeInactive, ct);
+        var customProviders = dbProviders.Where(p => !p.IsSystem).ToList();
 
         return [.. systemProviders, .. customProviders];
     }

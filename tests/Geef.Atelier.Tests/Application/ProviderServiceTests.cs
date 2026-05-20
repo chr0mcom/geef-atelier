@@ -24,7 +24,7 @@ public sealed class ProviderServiceTests
 
         var providers = await service.ListAsync(includeInactive: false);
 
-        Assert.Equal(11, providers.Count(p => p.IsSystem));
+        Assert.Equal(12, providers.Count(p => p.IsSystem));
     }
 
     [Fact]
