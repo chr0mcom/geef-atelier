@@ -1,7 +1,9 @@
 using Geef.Atelier.Application.Crew.Finalizers;
 using Geef.Atelier.Application.Pricing;
+using Geef.Atelier.Application.Providers;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Infrastructure.Llm;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Geef.Atelier.Infrastructure.Finalizers;
@@ -9,6 +11,7 @@ namespace Geef.Atelier.Infrastructure.Finalizers;
 internal sealed class TransformFinalizerExecutor(
     ILlmClientResolver llmClientResolver,
     IPricingCatalog pricingCatalog,
+    IServiceScopeFactory scopeFactory,
     ILogger<TransformFinalizerExecutor> logger) : IFinalizerExecutor
 {
     public FinalizerType Type => FinalizerType.Transform;
@@ -25,6 +28,33 @@ internal sealed class TransformFinalizerExecutor(
             logger.LogWarning("Transform finalizer {Profile} has no system prompt configured; skipping.",
                 profile.Name);
             return new FinalizerExecutionResult(null, null, null, profile.Name);
+        }
+
+        // Validate that the configured provider exists and is active.
+        await using (var scope = scopeFactory.CreateAsyncScope())
+        {
+            var providerService = scope.ServiceProvider.GetRequiredService<IProviderService>();
+            var provider = await providerService.GetByNameAsync(settings.Provider, cancellationToken);
+            if (provider is null || !provider.IsActive)
+            {
+                logger.LogWarning(
+                    "Transform finalizer {Profile}: provider '{Provider}' not found or inactive; skipping.",
+                    profile.Name, settings.Provider);
+                return new FinalizerExecutionResult(
+                    UpdatedText: null,
+                    Artifact: new RunArtifact
+                    {
+                        Id = Guid.NewGuid(),
+                        RunId = context.RunId,
+                        FinalizerProfileName = profile.Name,
+                        ArtifactType = ArtifactType.Status,
+                        StorageUri = "error",
+                        StatusMessage = $"Finalizer provider '{settings.Provider}' not found or inactive",
+                        CreatedAt = DateTimeOffset.UtcNow,
+                    },
+                    CostEur: null,
+                    ActorName: profile.Name);
+            }
         }
 
         string? updatedText = null;

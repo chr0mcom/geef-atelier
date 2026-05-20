@@ -2,7 +2,7 @@
 
 *[Deutsch](09-endpoint-reference_de.md) · **English***
 
-*Last updated: 2026-05-19 (artifact download endpoint added; MCP tools list_run_artifacts + download_run_artifact added)*
+*Last updated: 2026-05-20 (Transform-Finalizer LLM-Binding-Schema, Phase E / Doku-Ergänzung)*
 
 All externally reachable HTTP endpoints of Geef.Atelier — MCP, OAuth 2.1
 and the web-UI/account endpoints. Base URL: `https://geef.stefan-bechtel.de`.
@@ -331,6 +331,22 @@ Downloads an artifact file that was produced by a finalizer during a run. Only a
 | `404 Not Found` | `runId` or `artifactId` not found |
 | `404 Not Found` | Artifact exists but is type `Url` or `Status` (not `File`) |
 | `404 Not Found` | File not found on disk |
+
+---
+
+## Transform-Finalizer LLM-Binding
+
+Custom Transform-Finalizer profiles can configure the LLM that powers the transformation. When creating or editing a finalizer profile via `materialize_template_proposal` or the UI, the `settings` object for Transform-type finalizers may include these optional keys:
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `Provider` | string | Provider name (e.g., `"openrouter"`, `"claude-cli"`). Must match an active provider. |
+| `Model` | string | Model identifier (e.g., `"openai/gpt-4o-mini"`, `"anthropic/claude-opus-4.7"`). |
+| `MaxTokens` | string | Maximum output tokens. Must be ≥ 10000. |
+| `SystemPrompt` | string | The transformation instruction (e.g., "Rewrite this in a formal tone"). |
+| `Temperature` | string (optional) | Temperature for sampling (0.0 to 2.0). If omitted, the provider default is used. |
+
+System Transform-Finalizer profiles are read-only; clone them as a custom profile to override LLM bindings.
 
 ---
 

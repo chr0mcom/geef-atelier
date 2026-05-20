@@ -3,6 +3,9 @@ namespace Geef.Atelier.Application.Crew.TemplateStudio;
 /// <summary>Configuration options for the Template Studio meta-LLM calls.</summary>
 public sealed class TemplateStudioOptions
 {
+    /// <summary>LLM provider name for Studio meta-analysis calls. Defaults to "openrouter".</summary>
+    public string Provider { get; set; } = "openrouter";
+
     /// <summary>OpenRouter model identifier for the meta-LLM analysis call.</summary>
     public string Model { get; set; } = "anthropic/claude-opus-4-7";
 

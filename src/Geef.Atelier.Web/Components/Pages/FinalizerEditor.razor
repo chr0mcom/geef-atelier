@@ -4,8 +4,12 @@
 @rendermode InteractiveServer
 @using System.ComponentModel.DataAnnotations
 @using Geef.Atelier.Application.Crew
+@using Geef.Atelier.Application.Providers
 @using Geef.Atelier.Core.Domain.Crew.Finalizers
+@using Geef.Atelier.Core.Domain.Providers
+@using Geef.Atelier.Web.Resources
 @inject ICrewService CrewService
+@inject IProviderService ProviderService
 @inject NavigationManager Nav
 
 <PageTitle>@(IsNew ? "New Finalizer" : "Edit Finalizer") — Atelier</PageTitle>
@@ -158,19 +162,54 @@
                         <label>System Prompt</label>
                         <InputTextArea @bind-Value="_form.SystemPrompt" class="form-input" rows="6"
                             placeholder="Instructions for the AI transform…" data-testid="input-system-prompt" />
-                        <small class="form-hint">Tip: append "Respond in the language of the input text." at the end.</small>
+                        <small class="form-hint">Tipp: Endet mit „Respond in the language of the input text."</small>
+                        <FieldHelp Text="@StudioFieldHelps.FinalizerTransformSystemPrompt" DataTestId="field-help-transform-system-prompt" />
                     </div>
-                    <div class="form-row">
-                        <label>Provider</label>
-                        <InputText @bind-Value="_form.TransformProvider" class="form-input" placeholder="codex-cli" data-testid="input-transform-provider" />
+                    <div class="field">
+                        <label>Anbieter</label>
+                        <select class="form-input"
+                                value="@_form.TransformProvider"
+                                @onchange="OnTransformProviderChanged"
+                                disabled="@(!CanEdit)"
+                                data-testid="input-transform-provider">
+                            <optgroup label="HTTP">
+                                @foreach (var p in _providers.Where(x => x.IsActive && x.Type == ProviderType.Http))
+                                {
+                                    <option value="@p.Name" selected="@(_form.TransformProvider == p.Name)">@p.DisplayName</option>
+                                }
+                            </optgroup>
+                            <optgroup label="CLI">
+                                @foreach (var p in _providers.Where(x => x.IsActive && x.Type == ProviderType.Cli))
+                                {
+                                    <option value="@p.Name" selected="@(_form.TransformProvider == p.Name)">@p.DisplayName</option>
+                                }
+                            </optgroup>
+                        </select>
+                        <FieldHelp Text="@FinalizerFieldHelps.TransformProvider" DataTestId="field-help-transform-provider" />
                     </div>
-                    <div class="form-row">
-                        <label>Model</label>
-                        <InputText @bind-Value="_form.TransformModel" class="form-input" placeholder="gpt-5.5" data-testid="input-transform-model" />
+                    <div class="field">
+                        <label>Modell</label>
+                        <ModelSelector Provider="@_form.TransformProvider"
+                                       @bind-Value="_form.TransformModel"
+                                       Disabled="@(!CanEdit)"
+                                       DataTestId="input-transform-model" />
+                        <FieldHelp Text="@FinalizerFieldHelps.TransformModel" DataTestId="field-help-transform-model" />
                     </div>
-                    <div class="form-row">
+                    <div class="field">
                         <label>Max Tokens</label>
-                        <InputNumber @bind-Value="_form.TransformMaxTokens" class="form-input" min="256" max="64000" data-testid="input-transform-max-tokens" />
+                        <InputNumber @bind-Value="_form.TransformMaxTokens" class="form-input" min="1024" max="64000" data-testid="input-transform-max-tokens" />
+                        <FieldHelp Text="@FinalizerFieldHelps.TransformMaxTokens" DataTestId="field-help-transform-max-tokens" />
+                    </div>
+                    <div class="field">
+                        <label>Temperature <span class="text-muted">(optional)</span></label>
+                        <input type="number" class="form-input"
+                               step="0.1" min="0" max="2"
+                               value="@(_form.TransformTemperature?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "")"
+                               @onchange="OnTemperatureChanged"
+                               disabled="@(!CanEdit)"
+                               data-testid="input-transform-temperature"
+                               placeholder="leer = Anbieter-Standard" />
+                        <FieldHelp Text="@FinalizerFieldHelps.TransformTemperature" DataTestId="field-help-transform-temperature" />
                     </div>
                     break;
             }
@@ -189,13 +228,17 @@
     [Parameter] public string? Name { get; set; }
 
     private bool IsNew => string.IsNullOrEmpty(Name);
+    private bool CanEdit => IsNew || !_form.IsSystem;
     private bool _loading = true;
     private string _displayName = string.Empty;
     private string? _error;
     private FinalizerFormModel _form = new();
+    private IReadOnlyList<Provider> _providers = [];
 
     protected override async Task OnInitializedAsync()
     {
+        _providers = await ProviderService.ListAsync(includeInactive: false);
+
         if (!IsNew && Name is not null)
         {
             var existing = await CrewService.GetFinalizerProfileAsync(Name);
@@ -208,6 +251,22 @@
             _form = FinalizerFormModel.From(existing);
         }
         _loading = false;
+    }
+
+    private void OnTransformProviderChanged(ChangeEventArgs e)
+    {
+        _form.TransformProvider = e.Value?.ToString() ?? "";
+        _form.TransformModel = "";
+    }
+
+    private void OnTemperatureChanged(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(raw))
+            _form.TransformTemperature = null;
+        else if (double.TryParse(raw, System.Globalization.NumberStyles.Any,
+                 System.Globalization.CultureInfo.InvariantCulture, out var t))
+            _form.TransformTemperature = t;
     }
 
     private async Task SaveAsync()
@@ -263,6 +322,8 @@
         public bool EmailAttachAsFile { get; set; } = false;
         public string EmailAttachmentFormat { get; set; } = "markdown";
 
+        public bool IsSystem { get; set; } = false;
+
         // Transform
         [Required(ErrorMessage = "System prompt is required.")]
         public string SystemPrompt { get; set; } = string.Empty;
@@ -270,6 +331,7 @@
         public string TransformProvider { get; set; } = "codex-cli";
         public string TransformModel { get; set; } = "gpt-5.5";
         public int TransformMaxTokens { get; set; } = 4096;
+        public double? TransformTemperature { get; set; } = null;
 
         public static FinalizerFormModel From(FinalizerProfile p)
         {
@@ -279,6 +341,7 @@
                 DisplayName = p.DisplayName,
                 Description = p.Description,
                 FinalizerType = p.FinalizerType,
+                IsSystem = p.IsSystem,
             };
             switch (p.FinalizerType)
             {
@@ -316,6 +379,7 @@
                     m.TransformProvider = ts.Provider;
                     m.TransformModel = ts.Model;
                     m.TransformMaxTokens = ts.MaxTokens;
+                    m.TransformTemperature = ts.Temperature;
                     break;
             }
             return m;
@@ -338,7 +402,7 @@
                         WebhookContentType,
                         WebhookTimeout).ToDict(),
                 FinalizerType.Transform =>
-                    new TransformSettings(SystemPrompt, TransformProvider, TransformModel, TransformMaxTokens).ToDict(),
+                    new TransformSettings(SystemPrompt, TransformProvider, TransformModel, TransformMaxTokens, TransformTemperature).ToDict(),
                 _ => [],
             };
             return new FinalizerProfile(
