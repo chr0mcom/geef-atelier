@@ -2,6 +2,7 @@ using Geef.Atelier.Core.Domain.Dashboard;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Persistence.Dashboard;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 namespace Geef.Atelier.Tests.Persistence;
 
@@ -121,5 +122,62 @@ public sealed class DashboardRepositoryTests(PostgresFixture fixture)
         var entries = await repo.GetDayBookAsync(user, false, DashboardScope.My, CancellationToken.None);
 
         Assert.True(entries.Count <= 12, $"Expected <=12, got {entries.Count}");
+    }
+
+    [Fact]
+    public async Task GetCostForgeAsync_IncludesGroundingActorCosts()
+    {
+        await using var db = fixture.NewContext();
+        var repo = new DashboardRepository(db);
+        var user = $"grnd-cost-{Guid.NewGuid():N}";
+
+        await CreateCompletedRun(db, user);
+
+        var runId = await db.Runs.Where(r => r.CreatedByUser == user)
+            .Select(r => r.Id)
+            .FirstAsync();
+
+        await db.Database.ExecuteSqlRawAsync(
+            @"INSERT INTO ""GroundingActorCosts""
+              (""Id"", ""RunId"", ""GroundingProviderName"", ""ActorName"", ""ProviderName"",
+               ""ModelName"", ""InputTokens"", ""OutputTokens"", ""CostEur"", ""CreatedAt"")
+              VALUES ({0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, NOW())",
+            Guid.NewGuid(), runId, "tavily-refined", "grounding-refiner",
+            "openrouter", "google/gemini-2.0-flash-lite", 100, 50, 0.001m);
+
+        var forge = await repo.GetCostForgeAsync(user, CancellationToken.None);
+
+        // Should have at least one Refiner flow contributed by the grounding cost row
+        var refinerFlow = forge.Flows.FirstOrDefault(f => f.ActorRole == "Refiner");
+        Assert.NotNull(refinerFlow);
+        Assert.Equal("openrouter", refinerFlow!.Provider);
+    }
+
+    [Fact]
+    public async Task GetProviderBenchAsync_IncludesGroundingActorCosts()
+    {
+        await using var db = fixture.NewContext();
+        var repo = new DashboardRepository(db);
+        var user = $"grnd-bench-{Guid.NewGuid():N}";
+
+        await CreateCompletedRun(db, user);
+
+        var runId = await db.Runs.Where(r => r.CreatedByUser == user)
+            .Select(r => r.Id)
+            .FirstAsync();
+
+        await db.Database.ExecuteSqlRawAsync(
+            @"INSERT INTO ""GroundingActorCosts""
+              (""Id"", ""RunId"", ""GroundingProviderName"", ""ActorName"", ""ProviderName"",
+               ""ModelName"", ""InputTokens"", ""OutputTokens"", ""CostEur"", ""CreatedAt"")
+              VALUES ({0}, {1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, NOW())",
+            Guid.NewGuid(), runId, "tavily-basic", "grounding-refiner",
+            "openrouter-bench", "google/gemini-2.0-flash-lite", 200, 80, 0.002m);
+
+        var bench = await repo.GetProviderBenchAsync(CancellationToken.None);
+
+        var openrouterRow = bench.Rows.FirstOrDefault(r => r.ProviderName == "openrouter-bench");
+        Assert.NotNull(openrouterRow);
+        Assert.True(openrouterRow!.RequestCount >= 1);
     }
 }

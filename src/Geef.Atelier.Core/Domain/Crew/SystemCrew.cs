@@ -239,6 +239,25 @@ public static class SystemCrew
         MaxQueriesPerRun: 1,
         IsSystem: true);
 
+    /// <summary>System grounding-provider profile for recent news via Tavily news topic with LLM-based noise filtering.</summary>
+    public static readonly GroundingProviderProfile TavilyNewsProfile = new(
+        Name: "tavily-news",
+        DisplayName: "Tavily News (recent + AI-filtered)",
+        Description: "Recent news via Tavily news topic (last 7 days), filtered by an LLM refiner to remove noise.",
+        ProviderType: GroundingProviderTypes.NewsSearch,
+        ProviderSettings: new Dictionary<string, string>
+        {
+            [GroundingProviderProfile.KeyRecencyDays]         = "7",
+            [GroundingProviderProfile.KeyNewsMaxResults]      = "5",
+            [GroundingProviderProfile.KeyNewsSearchDepth]     = "basic",
+            [GroundingProviderProfile.KeyRefinementProvider]  = "openrouter",
+            [GroundingProviderProfile.KeyRefinementModel]     = "google/gemini-2.0-flash-lite",
+            [GroundingProviderProfile.KeyRefinementMaxTokens] = "2048",
+            [GroundingProviderProfile.KeyRefinementMode]      = "0",
+        },
+        MaxQueriesPerRun: 1,
+        IsSystem: true);
+
     /// <summary>All system reviewer profiles, indexed by name.</summary>
     public static readonly IReadOnlyDictionary<string, ReviewerProfile> ReviewerProfiles =
         new Dictionary<string, ReviewerProfile>
@@ -328,10 +347,11 @@ public static class SystemCrew
     public static readonly IReadOnlyDictionary<string, GroundingProviderProfile> GroundingProviderProfiles =
         new Dictionary<string, GroundingProviderProfile>
         {
-            [TavilyBasicProfile.Name]    = TavilyBasicProfile,
-            [TavilyRefinedProfile.Name]  = TavilyRefinedProfile,
+            [TavilyBasicProfile.Name]          = TavilyBasicProfile,
+            [TavilyRefinedProfile.Name]        = TavilyRefinedProfile,
             [KnowledgeBaseDefaultProfile.Name] = KnowledgeBaseDefaultProfile,
-            [RunAttachmentsProfile.Name] = RunAttachmentsProfile,
+            [RunAttachmentsProfile.Name]       = RunAttachmentsProfile,
+            [TavilyNewsProfile.Name]           = TavilyNewsProfile,
         };
 
     /// <summary>All system crew templates, indexed by name.</summary>

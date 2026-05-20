@@ -5,6 +5,8 @@
   <ItemGroup>
     <!-- Geef SDK — prerelease until stable release; TODO: bump to stable once published -->
     <PackageVersion Include="Geef.Sdk" Version="1.0.0-ci.1" />
+    <!-- HTML parsing for url-fetch provider (bUnit already brings AngleSharp transitively; use HAP to avoid conflicts) -->
+    <PackageVersion Include="HtmlAgilityPack" Version="1.12.4" />
     <!-- EF Core + Postgres -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />

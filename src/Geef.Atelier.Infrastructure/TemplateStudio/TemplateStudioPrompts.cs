@@ -28,7 +28,21 @@ internal static class TemplateStudioPrompts
            (DomainExpert/Strategic, BeforeFirstExecution) or per-iteration critical challenge
            (Critical/DevilsAdvocate, BeforeEveryExecution). Do not default to reviewers only — a
            well-formed crew for a non-trivial domain task almost always includes at least one advisor.
-        4. Propose Grounding Providers only when the task requires external sources or fact-checking
+        4. Propose Grounding Providers only when the task requires external sources or fact-checking.
+           Choose the grounding_provider_type based on the task:
+           - "static-context": when the briefing contains brand-specific vocabulary, a style guide,
+             a glossary, or any fixed context that should be injected unchanged every run. Best for
+             brand consistency, domain terminology, regulatory boilerplate.
+           - "url-fetch": when the user's briefing already references specific URLs or well-known
+             sources. Only propose this when you can include concrete grounding_provider_settings
+             with a "urls" key (newline-separated). Never invent URLs — only materialize this type
+             when the briefing clearly identifies specific pages to fetch.
+           - "news-search": when the task is explicitly time-sensitive and current events matter
+             (e.g. "news about X today", "latest development in Y"). Uses Tavily news topic.
+             Settings: "recencyDays" (default "7"), "newsMaxResults" (default "5").
+           - "tavily": for general web research where relevant sources are not yet known.
+             Settings: "Tier" ("basic" or "advanced"), "MaxResults", "IncludeAnswer".
+           For "static-context", always include "label" and "content" in grounding_provider_settings.
         5. System prompts MUST follow the Atelier profile anatomy below (see "Required system-prompt
            structure"). They are NOT one-line behaviour descriptions. Write them in English, fully
            structured, typically 150–350 words. A shallow prompt is a rejected prompt.
@@ -62,6 +76,17 @@ internal static class TemplateStudioPrompts
                 "MaxTokens": "8192",
                 "SystemPrompt": "..."
               }
+
+        For a GROUNDING_PROVIDER profile:
+        a) Set "grounding_provider_type" to one of: "tavily", "vector-store", "static-context",
+           "url-fetch", "news-search".
+        b) Set "grounding_provider_settings" as a flat string-to-string dict with the type-relevant
+           keys (see Principle 4 above).
+        c) Do NOT set model/provider/system_prompt for grounding providers — they are data-fetching,
+           not LLM-based (except for the optional refinement, which is configured via settings keys
+           "refinementProvider", "refinementModel", "refinementMaxTokens", "refinementMode").
+        d) Use "name" and "display_name" that reflect the data source (e.g. "brand-style-guide",
+           "company-news-feed", "product-urls").
 
         Required system-prompt structure (mirror the existing Atelier system profiles exactly):
 

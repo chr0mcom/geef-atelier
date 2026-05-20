@@ -2,7 +2,7 @@
 
 *[Deutsch](04-mcp-integration_de.md) · **English***
 
-*Last updated: 2026-05-20 (Grounding-Refinement: `list_grounding_provider_profiles`-Schema + `groundingProviderSettings`-Refinement-Keys dokumentiert)*
+*Last updated: 2026-05-20 (D-051: neue providerType-Werte static-context, url-fetch, news-search in list_grounding_provider_profiles + materialize_template_proposal dokumentiert)*
 
 ## Why MCP
 
@@ -146,7 +146,7 @@ Full parameter/schema details: [`09-endpoint-reference.md`](09-endpoint-referenc
 | `name` | string | Profile identifier |
 | `displayName` | string | Human-readable name |
 | `description` | string | Purpose description |
-| `providerType` | string | `"Tavily"` or `"VectorStore"` |
+| `providerType` | string | `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"`, or `"news-search"` |
 | `maxQueriesPerRun` | int? | Maximum queries this provider may issue per run |
 | `isSystem` | boolean | Whether this is a built-in system profile |
 | `refinementEnabled` | boolean | Whether KI-Refinement is configured for this provider |
@@ -210,6 +210,8 @@ Atomically writes all new profiles and the crew template to the DB in a single t
 ```
 
 `final_new_profiles` contains only profiles the user chose to create fresh (CreateNew mode). Profiles in UseExisting mode appear only by name in `final_template.*_profile_names`. `final_new_finalizer_profiles` follows the same pattern for finalizer profiles. A `max_tokens` below the hard floor (`StudioDefaults.MinMaxTokens = 10000`) is clamped up server-side; omitting it applies the `TemplateStudio:Defaults` value (Reviewer/Advisor 16384, Executor 60000). Omitting `finalizer_profile_names` or `final_new_finalizer_profiles` is backwards-compatible (no finalizers attached).
+
+**Grounding-Provider-Typen:** `providerType` (bzw. `GroundingProviderType` im Proposal) kann folgende Werte haben: `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"`, `"news-search"`. Jeder Typ erwartet typ-spezifische Settings-Keys (siehe `08-crew-system.md` Provider-Typen-Tabelle).
 
 **Grounding-Provider-Refinement keys in `groundingProviderSettings`:** The `GroundingProviderSettings` dict for a `grounding_provider` profile accepts all KI-Refinement keys (`refinementProvider`, `refinementModel`, `refinementMaxTokens`, `refinementTemperature`, `refinementMode`, `refinementInstructions`) as flat string entries. All keys are optional and backwards-compatible — profiles without these keys behave exactly as before (no refinement pass).
 

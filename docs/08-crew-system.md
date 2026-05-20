@@ -2,7 +2,7 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-05-20 (Grounding-Provider-Refinement: KI-Refinement-Sektion + Provider-Typen-Übersicht hinzugefügt)
+Last updated: 2026-05-20 (D-051: drei neue Grounding-Provider-Typen — static-context, url-fetch, news-search)
 
 ## Overview
 
@@ -341,10 +341,13 @@ Grounding-Provider reichern das Briefing vor der GEEF-Ausführungsschleife mit e
 
 ### Provider-Typen
 
-| Typ | Implementierung | Beschreibung |
-|---|---|---|
-| `Tavily` | `TavilyGroundingProvider` | Web-Suche via Tavily API (Basic oder Advanced). API-Key pro Profil. |
-| `VectorStore` | `VectorStoreGroundingProvider` | Semantische Suche in einer pgvector-Sammlung. Scope: `global`, `run-local` oder `both`. |
+| Typ | Implementierung | Beschreibung | Settings |
+|---|---|---|---|
+| `tavily` | `TavilyGroundingProvider` | Web-Suche via Tavily API (Basic oder Advanced). API-Key pro Profil. | `Tier` (basic/advanced), `MaxResults`, `IncludeAnswer` |
+| `vector-store` | `VectorStoreGroundingProvider` | Semantische Suche in einer pgvector-Sammlung. Scope: `global`, `run-local` oder `both`. | `TopK`, `Scope`, `TagFilter` |
+| `static-context` | `StaticContextGroundingProvider` | Kuratierter Fixtext, der immer unverändert injiziert wird. Keine externe API. Ideal für Style-Guides, Glossare, Markenstimme. | `label`, `content` (max 200.000 Zeichen, Soft-Limit 50.000) |
+| `url-fetch` | `UrlFetchGroundingProvider` | Fetcht konkrete URLs, bereinigt HTML via AngleSharp, gibt Textinhalt zurück. SSRF-Guard blockiert private IPs. | `urls` (newline-separated), `maxContentPerUrl` (Default 8000), `stripBoilerplate` (bool, Default true) |
+| `news-search` | `NewsSearchGroundingProvider` | Tavily-API mit `topic=news` + `days`-Filter. Für zeitkritische Themen. Attribution via `PublishedDate`. | `recencyDays` (Default 7), `newsMaxResults` (Default 5), `newsSearchDepth` (basic/advanced) |
 
 ### KI-Refinement
 
