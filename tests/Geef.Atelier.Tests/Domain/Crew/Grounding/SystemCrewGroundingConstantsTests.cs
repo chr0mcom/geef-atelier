@@ -1,4 +1,5 @@
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Grounding;
 
 namespace Geef.Atelier.Tests.Domain.Crew.Grounding;
 
@@ -55,5 +56,31 @@ public sealed class SystemCrewGroundingConstantsTests
     public void IsSystemGroundingProviderName_ReturnsFalseForCustom()
     {
         Assert.False(SystemCrew.IsSystemGroundingProviderName("custom-my-provider"));
+    }
+
+    [Fact]
+    public void TavilyNewsProfile_IsSystem()
+    {
+        Assert.True(SystemCrew.TavilyNewsProfile.IsSystem);
+    }
+
+    [Fact]
+    public void TavilyNewsProfile_HasCorrectProviderType()
+    {
+        Assert.Equal("news-search", SystemCrew.TavilyNewsProfile.ProviderType);
+    }
+
+    [Fact]
+    public void TavilyNewsProfile_HasExpectedSettings()
+    {
+        var settings = SystemCrew.TavilyNewsProfile.ProviderSettings;
+        Assert.Equal("7", settings[GroundingProviderProfile.KeyRecencyDays]);
+        Assert.Equal("5", settings[GroundingProviderProfile.KeyNewsMaxResults]);
+    }
+
+    [Fact]
+    public void GroundingProviderProfiles_ContainsTavilyNews()
+    {
+        Assert.True(SystemCrew.GroundingProviderProfiles.ContainsKey("tavily-news"));
     }
 }
