@@ -61,6 +61,9 @@
                 <InputSelect @bind-Value="_form.ProviderType" disabled="@(!IsNew)" class="form-input" data-testid="input-provider-type">
                     <option value="tavily">Tavily Web Search</option>
                     <option value="vector-store">Vector Store (Knowledge Base)</option>
+                    <option value="static-context">Static Context (kuratierter Text)</option>
+                    <option value="url-fetch">URL Fetch (konkrete URLs)</option>
+                    <option value="news-search">News Search (Tavily News + Datum)</option>
                 </InputSelect>
             </div>
 
@@ -126,11 +129,99 @@
                 </div>
             }
 
-            <div class="form-row">
-                <label>Max Queries per Run</label>
-                <InputNumber @bind-Value="_form.MaxQueriesPerRun" class="form-input" data-testid="input-max-queries" />
-                <small class="form-hint">1–5, default 1. Leave empty for no limit.</small>
-            </div>
+            @if (_form.ProviderType == "static-context")
+            {
+                <div class="form-row">
+                    <label>Quellenname (Label)</label>
+                    <InputText @bind-Value="_form.StaticLabel" class="form-input"
+                               placeholder="z. B. Markenstimme, Style Guide Q2 2026"
+                               disabled="@_isReadOnly"
+                               data-testid="input-static-label" />
+                    <FieldHelp Text="@GroundingFieldHelps.StaticContextLabel" />
+                </div>
+
+                <div class="form-row">
+                    <label>Inhalt</label>
+                    <InputTextArea @bind-Value="_form.StaticContent" rows="10" class="form-input"
+                                   disabled="@_isReadOnly"
+                                   placeholder="Füge hier deinen kuratierten Text ein (Glossar, Style Guide, Markenstimme …)"
+                                   data-testid="input-static-content" />
+                    @if ((_form.StaticContent ?? "").Length > 50_000)
+                    {
+                        <small class="form-hint form-hint--warn">
+                            ⚠ Inhalt ist länger als 50.000 Zeichen. Sehr große Texte gehören besser in die Knowledge-Base (Vector-Store-Provider).
+                        </small>
+                    }
+                    <FieldHelp Text="@GroundingFieldHelps.StaticContextContent" />
+                </div>
+            }
+
+            @if (_form.ProviderType == "url-fetch")
+            {
+                <div class="form-row">
+                    <label>URLs (eine pro Zeile)</label>
+                    <InputTextArea @bind-Value="_form.Urls" rows="5" class="form-input"
+                                   disabled="@_isReadOnly"
+                                   placeholder="https://example.com/article&#10;https://docs.example.org/api"
+                                   data-testid="input-urls" />
+                    <FieldHelp Text="@GroundingFieldHelps.UrlFetchUrls" />
+                </div>
+
+                <div class="form-row">
+                    <label>Max. Zeichen pro URL</label>
+                    <InputNumber @bind-Value="_form.MaxContentPerUrl" class="form-input" min="500" max="100000"
+                                 disabled="@_isReadOnly"
+                                 data-testid="input-max-content-per-url" />
+                    <FieldHelp Text="@GroundingFieldHelps.UrlFetchMaxContent" />
+                </div>
+
+                <div class="form-row">
+                    <label class="form-check-label">
+                        <InputCheckbox @bind-Value="_form.StripBoilerplate" disabled="@_isReadOnly" data-testid="input-strip-boilerplate" />
+                        Boilerplate entfernen (Navigation, Werbung, Cookie-Banner)
+                    </label>
+                    <FieldHelp Text="@GroundingFieldHelps.UrlFetchStripBoilerplate" />
+                </div>
+            }
+
+            @if (_form.ProviderType == "news-search")
+            {
+                <div class="form-row">
+                    <label>Aktualität (Tage)</label>
+                    <InputNumber @bind-Value="_form.RecencyDays" class="form-input" min="1" max="365"
+                                 disabled="@_isReadOnly"
+                                 data-testid="input-recency-days" />
+                    <FieldHelp Text="@GroundingFieldHelps.NewsSearchRecencyDays" />
+                </div>
+
+                <div class="form-row">
+                    <label>Max. Treffer</label>
+                    <InputNumber @bind-Value="_form.NewsMaxResults" class="form-input" min="1" max="20"
+                                 disabled="@_isReadOnly"
+                                 data-testid="input-news-max-results" />
+                    <FieldHelp Text="@GroundingFieldHelps.NewsSearchMaxResults" />
+                </div>
+
+                <div class="form-row">
+                    <label>Suchtiefe</label>
+                    <InputSelect @bind-Value="_form.NewsSearchDepth" class="form-input"
+                                 disabled="@_isReadOnly"
+                                 data-testid="input-news-search-depth">
+                        <option value="basic">Basic (schneller, günstiger)</option>
+                        <option value="advanced">Advanced (gründlicher, mehr Credits)</option>
+                    </InputSelect>
+                    <FieldHelp Text="@GroundingFieldHelps.NewsSearchDepth" />
+                </div>
+            }
+
+            @if (_form.ProviderType != "static-context")
+            {
+                <div class="form-row">
+                    <label>Max Queries per Run</label>
+                    <InputNumber @bind-Value="_form.MaxQueriesPerRun" class="form-input" data-testid="input-max-queries" />
+                    <small class="form-hint">1–5, default 1. Leave empty for no limit.</small>
+                </div>
+            }
 
             <div class="form-section">
                 <h3>KI-Refinement</h3>
@@ -362,6 +453,20 @@
         public int RefinementMode { get; set; } = 0; // 0 = Filter, 1 = Synthesize
         public string RefinementInstructions { get; set; } = "";
 
+        // static-context
+        public string StaticLabel { get; set; } = "";
+        public string StaticContent { get; set; } = "";
+
+        // url-fetch
+        public string Urls { get; set; } = "";
+        public int MaxContentPerUrl { get; set; } = 8000;
+        public bool StripBoilerplate { get; set; } = true;
+
+        // news-search
+        public int RecencyDays { get; set; } = 7;
+        public int NewsMaxResults { get; set; } = 5;
+        public string NewsSearchDepth { get; set; } = "basic";
+
         public static GroundingFormModel From(GroundingProviderProfile p)
         {
             p.ProviderSettings.TryGetValue("Tier", out var tier);
@@ -390,30 +495,51 @@
                 RefinementTemperature = double.TryParse(p.ProviderSettings.GetValueOrDefault(GroundingProviderProfile.KeyRefinementTemperature), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var t) ? t : null,
                 RefinementMode = int.TryParse(p.ProviderSettings.GetValueOrDefault(GroundingProviderProfile.KeyRefinementMode), out var m) ? m : 0,
                 RefinementInstructions = p.ProviderSettings.GetValueOrDefault(GroundingProviderProfile.KeyRefinementInstructions, ""),
+                StaticLabel = p.StaticLabel ?? "",
+                StaticContent = p.StaticContent ?? "",
+                Urls = string.Join("\n", p.Urls),
+                MaxContentPerUrl = p.MaxContentPerUrl,
+                StripBoilerplate = p.StripBoilerplate,
+                RecencyDays = p.RecencyDays,
+                NewsMaxResults = p.NewsMaxResults,
+                NewsSearchDepth = p.NewsSearchDepth ?? "basic",
             };
         }
 
         public GroundingProviderProfile ToProfile()
         {
-            Dictionary<string, string> settings;
-            if (ProviderType == "vector-store")
+            Dictionary<string, string> settings = ProviderType switch
             {
-                settings = new Dictionary<string, string>
+                "vector-store" => new Dictionary<string, string>
                 {
                     ["TopK"] = TopK.ToString(),
                     ["TagFilter"] = TagFilter,
                     ["Scope"] = Scope
-                };
-            }
-            else
-            {
-                settings = new Dictionary<string, string>
+                },
+                "static-context" => new Dictionary<string, string>
+                {
+                    [GroundingProviderProfile.KeyStaticContent] = StaticContent,
+                    [GroundingProviderProfile.KeyStaticLabel] = StaticLabel
+                },
+                "url-fetch" => new Dictionary<string, string>
+                {
+                    [GroundingProviderProfile.KeyUrls] = Urls,
+                    [GroundingProviderProfile.KeyMaxContentPerUrl] = MaxContentPerUrl.ToString(),
+                    [GroundingProviderProfile.KeyStripBoilerplate] = StripBoilerplate ? "true" : "false"
+                },
+                "news-search" => new Dictionary<string, string>
+                {
+                    [GroundingProviderProfile.KeyRecencyDays] = RecencyDays.ToString(),
+                    [GroundingProviderProfile.KeyNewsMaxResults] = NewsMaxResults.ToString(),
+                    [GroundingProviderProfile.KeyNewsSearchDepth] = NewsSearchDepth
+                },
+                _ => new Dictionary<string, string>   // tavily (default)
                 {
                     ["Tier"] = Tier,
                     ["MaxResults"] = MaxResults.ToString(),
                     ["IncludeAnswer"] = IncludeAnswer ? "true" : "false"
-                };
-            }
+                }
+            };
 
             if (RefinementEnabled && !string.IsNullOrWhiteSpace(RefinementProvider) && !string.IsNullOrWhiteSpace(RefinementModel))
             {
@@ -427,13 +553,15 @@
                     settings[GroundingProviderProfile.KeyRefinementInstructions] = RefinementInstructions.Trim();
             }
 
+            var maxQueries = ProviderType == "static-context" ? 1 : MaxQueriesPerRun;
+
             return new GroundingProviderProfile(
                 Name: SystemCrew.EnsureCustomPrefix(Name),
                 DisplayName: DisplayName,
                 Description: Description,
                 ProviderType: ProviderType,
                 ProviderSettings: settings,
-                MaxQueriesPerRun: MaxQueriesPerRun,
+                MaxQueriesPerRun: maxQueries,
                 IsSystem: false);
         }
     }
