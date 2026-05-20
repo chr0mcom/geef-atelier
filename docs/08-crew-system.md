@@ -2,7 +2,7 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-05-20 (LLM-Binding bei Transform-Finalizern — Phase E / Doku-Ergänzung)
+Last updated: 2026-05-20 (Grounding-Provider-Refinement: KI-Refinement-Sektion + Provider-Typen-Übersicht hinzugefügt)
 
 ## Overview
 
@@ -334,6 +334,39 @@ await runService.SubmitRunAsync("...", "{}", customCrew: spec);
 - `submit_request` — extended with `crew_template` and `custom_crew` (JSON string).
 
 Full tool list (15 tools): see [09-endpoint-reference.md](09-endpoint-reference.md) and the [project README](../README.md).
+
+## Grounding-Provider-Profile (D-036 / D-040)
+
+Grounding-Provider reichern das Briefing vor der GEEF-Ausführungsschleife mit externem Kontext an.
+
+### Provider-Typen
+
+| Typ | Implementierung | Beschreibung |
+|---|---|---|
+| `Tavily` | `TavilyGroundingProvider` | Web-Suche via Tavily API (Basic oder Advanced). API-Key pro Profil. |
+| `VectorStore` | `VectorStoreGroundingProvider` | Semantische Suche in einer pgvector-Sammlung. Scope: `global`, `run-local` oder `both`. |
+
+### KI-Refinement
+
+Jeder Grounding-Provider kann optional mit einem KI-Refinement-Pass konfiguriert werden. Nach dem Fetch läuft — wenn konfiguriert — ein LLM über die Rohergebnisse.
+
+**Konfiguration** (flache Keys in `ProviderSettings`):
+| Key | Typ | Beschreibung |
+|---|---|---|
+| `refinementProvider` | string | LLM-Anbieter (z. B. `openrouter`) |
+| `refinementModel` | string | Modell (z. B. `google/gemini-2.0-flash-lite`) |
+| `refinementMaxTokens` | int | Max. Token für Refinement-Antwort |
+| `refinementTemperature` | double? | Optional; leer = Anbieter-Standard |
+| `refinementMode` | int | `0` = Filter, `1` = Synthesize |
+| `refinementInstructions` | string? | Optionale Zusatz-Anweisungen |
+
+**Modi:**
+- **Filter** (Standard): Jede Quelle wird behalten oder verworfen. Attribution bleibt 1:1 erhalten.
+- **Synthesize**: Alle Quellen werden zu einem kohärenten Text zusammengefasst (`[n]`-Referenzen). Originalquellen bleiben als Referenz-Anhang erhalten.
+
+**Graceful Degradation:** Ist der Refinement-Anbieter inaktiv oder schlägt der LLM-Call fehl, werden die Rohergebnisse unverändert durchgereicht. Der Run wird nicht abgebrochen. Die Grounding-Visualisierung zeigt einen Hinweis.
+
+**System-Provider `tavily-refined`:** Sofort nutzbares Demo-Profil — Tavily Advanced mit Filter-Refinement via `google/gemini-2.0-flash-lite`.
 
 ## Reviewer-name migration
 

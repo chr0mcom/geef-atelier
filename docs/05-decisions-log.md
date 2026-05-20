@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-05-20 (D-049 added: LLM-Binding — Provider+Model-Auswahl wo KI in Profilen läuft)*
+*Last updated: 2026-05-20 (D-050 added: Grounding-Refinement — optionaler KI-Filter nach Provider-Fetch)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -958,3 +958,25 @@ Step 1 of 3 in the Grounding Improvement Series. Introduces a reusable `LlmBindi
 **D-049/8 — `Executor/Reviewer/Advisor` profiles are NOT refactored to use `LlmBinding`.** These profiles have established `Provider`/`Model`/`MaxTokens` fields with 1074+ tests depending on them. Merging them into `LlmBinding` is a separate cleanup step with its own risk profile. Conceptually the same; physically separate — no persistence breaking change.
 
 **Tests:** 1095 total (1089 green + 4 known flakes unchanged, 1 skipped). New: `LlmBindingTests` (5), `TransformSettingsTests` (12), `TransformFinalizerExecutor` inactive-provider test (+1), bUnit `FinalizerEditorTests` IProviderService registration fix (5 previously broken tests now green). Total new passing tests: +15.
+
+---
+
+## D-050 — Grounding-Refinement: optionaler KI-Filter nach Provider-Fetch (2026-05-20)
+
+**Kontext:** Grounding-Provider lieferten Rohdaten ungefiltert ans Briefing. Irrelevante Web-Treffer, redundante Chunks und verrauschte Snippets zwangen den Executor zur manuellen Auswahl — Token-Verschwendung, Qualitätseinbußen.
+
+**Entscheidungen:**
+- **Pro-Provider-Refinement** (Option A): jeder Provider bekommt optional einen eigenen Refiner — Web-Refinement (Noise) und RAG-Refinement (Redundanz) sind unterschiedliche Aufgaben. Kein globaler Cross-Provider-Pass (separates optionales Feature für später).
+- **Flache Settings-Keys** im bestehenden `GroundingProviderProfile.ProviderSettings`-Dict (`refinementProvider`, `refinementModel`, `refinementMaxTokens`, `refinementTemperature`, `refinementMode`, `refinementInstructions`) — backwards-kompatibel, keine Snapshot-Migration nötig.
+- **`LlmBinding` aus D-049 wiederverwendet** — kein neues Binding-Konzept. `RefinementBinding: LlmBinding?`-Property auf `GroundingProviderProfile`.
+- **`GroundingResult.ConsultationId: Guid?`** — Provider setzen dieses Feld nach Persistenz; der Orchestrator aktualisiert die gespeicherte Consultation mit dem `RefinementOutcome` (UPDATE-Pattern).
+- **Filter- und Synthesize-Modus** mit Tool-Use-Schema (`submit_refinement`). Filter: pro-Quelle keep/drop mit Begründung. Synthesize: kohärenter Text mit `[n]`-Referenzen + Original-Quellen-Liste erhalten. Attribution in beiden Modi vollständig.
+- **Graceful Degradation**: Provider inaktiv oder LLM-Fehler → Rohergebnisse durchgereicht, `WasSkipped=true`, Run NICHT abgebrochen. Konsistent mit D-044 (partial-success-Vertrag).
+- **Hard-Cap 20 Quellen** an den Refiner; Überschuss ungefiltert beibehalten.
+- **`GroundingActorCosts`-Tabelle** (Migration Step27) analog zu `FinalizationActorCosts` (D-044) — Refiner-Call-Kosten tracken.
+- **`tavily-refined` System-Provider** als sofort nutzbares Demo-Profil (Tavily Advanced + Filter-Refinement, günstigstes Modell).
+- **Grounding-Visualisierung** erweitert: Raw-Count → Refined-Count Badge, verworfene Quellen einklappbar mit Begründung, Synthesize-Text-Block, Skip-Hinweis bei Fehler.
+
+**Nicht in diesem Step:** Globaler Cross-Provider-Pass, Refinement-Caching, neue Grounding-Provider-Typen (Step 3), Refinement für Executor/Reviewer/Advisor, Embeddings-basierte Vorfilterung.
+
+**Fundament für:** D-051 (neue Grounding-Typen: url-fetch, news-search, academic-search nutzen denselben Refiner).

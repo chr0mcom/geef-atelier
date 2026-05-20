@@ -2,7 +2,7 @@
 
 *[Deutsch](09-endpoint-reference_de.md) · **English***
 
-*Last updated: 2026-05-20 (Transform-Finalizer LLM-Binding-Schema, Phase E / Doku-Ergänzung)*
+*Last updated: 2026-05-20 (Grounding-Refinement: `refinementEnabled`/`refinementMode` zu `list_grounding_provider_profiles` hinzugefügt)*
 
 All externally reachable HTTP endpoints of Geef.Atelier — MCP, OAuth 2.1
 and the web-UI/account endpoints. Base URL: `https://geef.stefan-bechtel.de`.
@@ -59,6 +59,51 @@ Lists all artifacts produced by a run.
 ```
 
 Returns an empty array if the run has no artifacts. Auth: owner check (same run isolation as other run tools).
+
+---
+
+#### `list_grounding_provider_profiles`
+
+Lists all grounding-provider profiles (system + custom).
+
+**Input:** `{ "includeSystem": bool (default true) }`
+
+**Output:** Array of grounding-provider profile objects:
+```json
+[
+  {
+    "name": "tavily-refined",
+    "displayName": "Tavily Refined",
+    "description": "...",
+    "providerType": "Tavily",
+    "maxQueriesPerRun": 3,
+    "isSystem": true,
+    "refinementEnabled": true,
+    "refinementMode": "filter"
+  },
+  {
+    "name": "custom-my-provider",
+    "displayName": "My Provider",
+    "description": "...",
+    "providerType": "VectorStore",
+    "maxQueriesPerRun": null,
+    "isSystem": false,
+    "refinementEnabled": false,
+    "refinementMode": null
+  }
+]
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | string | Profile identifier |
+| `displayName` | string | Human-readable name |
+| `description` | string | Purpose description |
+| `providerType` | string | `"Tavily"` or `"VectorStore"` |
+| `maxQueriesPerRun` | int? | Max queries per run (null = unlimited) |
+| `isSystem` | boolean | Built-in system profile |
+| `refinementEnabled` | boolean | Whether KI-Refinement is configured |
+| `refinementMode` | string \| null | `"filter"` or `"synthesize"` (null when not enabled) |
 
 ---
 

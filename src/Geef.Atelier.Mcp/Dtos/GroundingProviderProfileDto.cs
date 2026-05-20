@@ -6,4 +6,6 @@ public sealed record GroundingProviderProfileDto(
     string Description,
     string ProviderType,
     int? MaxQueriesPerRun,
-    bool IsSystem);
+    bool IsSystem,
+    bool RefinementEnabled,
+    string? RefinementMode);
