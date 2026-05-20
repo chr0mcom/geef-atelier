@@ -11,9 +11,11 @@ namespace Geef.Atelier.Core.Domain.Crew.Grounding;
 /// <param name="Snippet">Relevant extract from the source (max 300 chars as surfaced in the UI).</param>
 /// <param name="DocumentReference">Document/chunk reference for vector-store sources; <c>null</c> for web-search.</param>
 /// <param name="RelevanceScore">Optional relevance score returned by the provider (e.g. 0.0–1.0).</param>
+/// <param name="PublishedDate">Optional publication date returned by news-search providers; <c>null</c> for all other source types.</param>
 public sealed record SourceCitation(
     string Title,
     string? Url,
     string Snippet,
     string? DocumentReference,
-    double? RelevanceScore);
+    double? RelevanceScore,
+    DateTimeOffset? PublishedDate = null);
