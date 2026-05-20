@@ -241,6 +241,18 @@ internal sealed class DashboardRepository(AtelierDbContext db) : IDashboardRepos
             })
             .ToListAsync(ct);
 
+        // Grounding actor costs
+        var groundingCosts = await db.GroundingActorCosts.AsNoTracking()
+            .Join(db.Runs.AsNoTracking(), g => g.RunId, r => r.Id, (g, r) => new { g, r })
+            .Where(x => x.r.CreatedAt >= since && (username == null || x.r.CreatedByUser == username))
+            .Select(x => new
+            {
+                Provider  = x.g.ProviderName ?? "unknown",
+                ActorRole = "Refiner",
+                Cost      = x.g.CostEur ?? 0m
+            })
+            .ToListAsync(ct);
+
         var flows = new List<CostFlow>();
         var allCosts = iterCosts
             .Select(x => (
@@ -254,6 +266,7 @@ internal sealed class DashboardRepository(AtelierDbContext db) : IDashboardRepos
                 },
                 Cost: x.Cost))
             .Concat(finCosts.Select(x => (Provider: x.Provider, Role: x.ActorRole, Cost: x.Cost)))
+            .Concat(groundingCosts.Select(x => (Provider: x.Provider, Role: x.ActorRole, Cost: x.Cost)))
             .ToList();
 
         var total = allCosts.Sum(x => x.Cost);
@@ -460,8 +473,22 @@ internal sealed class DashboardRepository(AtelierDbContext db) : IDashboardRepos
             })
             .ToListAsync(ct);
 
+        var groundingRows = await db.GroundingActorCosts.AsNoTracking()
+            .Where(x => x.CreatedAt >= since && x.ProviderName != null)
+            .GroupBy(x => x.ProviderName!)
+            .Select(g => new
+            {
+                Provider     = g.Key,
+                Requests     = g.Count(),
+                Cost         = g.Sum(x => x.CostEur ?? 0m),
+                InputTokens  = (long)g.Sum(x => (long)x.InputTokens),
+                OutputTokens = (long)g.Sum(x => (long)x.OutputTokens)
+            })
+            .ToListAsync(ct);
+
         var combined = iterRows
             .Concat(finRows.Select(x => new { x.Provider, x.Requests, x.Cost, x.InputTokens, x.OutputTokens }))
+            .Concat(groundingRows.Select(x => new { x.Provider, x.Requests, x.Cost, x.InputTokens, x.OutputTokens }))
             .GroupBy(x => x.Provider)
             .Select(g =>
             {
