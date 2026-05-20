@@ -86,6 +86,53 @@
                                     }
                                 </ol>
                             }
+                            @if (consultation.RefinementOutcome is { WasSkipped: true } skipped)
+                            {
+                                <div class="refinement-skip-banner">
+                                    <span class="icon">⚠</span>
+                                    Refinement übersprungen — Rohergebnisse werden verwendet.
+                                    @if (!string.IsNullOrWhiteSpace(skipped.SkipReason))
+                                    {
+                                        <span class="reason"> (@skipped.SkipReason)</span>
+                                    }
+                                </div>
+                            }
+                            else if (consultation.RefinementOutcome is { WasSkipped: false } outcome)
+                            {
+                                <div class="refinement-outcome">
+                                    <span class="badge badge-refinement">@consultation.Citations.Count Quellen → @outcome.RefinedCitations.Count behalten</span>
+                                    @if (outcome.SynthesizedText is not null)
+                                    {
+                                        <div class="refinement-synthesis">
+                                            <h4>Synthesisierter Kontext</h4>
+                                            <p>@outcome.SynthesizedText</p>
+                                        </div>
+                                    }
+                                    @if (outcome.DroppedCitations.Count > 0)
+                                    {
+                                        <details class="refinement-dropped">
+                                            <summary>@outcome.DroppedCitations.Count verworfene Quelle(n)</summary>
+                                            <ul>
+                                                @foreach (var dropped in outcome.DroppedCitations)
+                                                {
+                                                    <li>
+                                                        <strong>@dropped.Original.Title</strong>
+                                                        @if (!string.IsNullOrWhiteSpace(dropped.Original.Url))
+                                                        {
+                                                            <span> — <a href="@dropped.Original.Url" target="_blank">Link</a></span>
+                                                        }
+                                                        else if (!string.IsNullOrWhiteSpace(dropped.Original.DocumentReference))
+                                                        {
+                                                            <span> — @dropped.Original.DocumentReference</span>
+                                                        }
+                                                        <br /><em>Grund: @dropped.Reason</em>
+                                                    </li>
+                                                }
+                                            </ul>
+                                        </details>
+                                    }
+                                </div>
+                            }
                         </div>
                     }
                 </div>
