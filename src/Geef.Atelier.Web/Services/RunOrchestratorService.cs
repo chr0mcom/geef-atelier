@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Geef.Atelier.Application.Crew.Finalizers;
 using Geef.Atelier.Application.Crew.Grounding;
+using Geef.Atelier.Application.Grounding;
 using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
@@ -167,7 +168,9 @@ internal sealed class RunOrchestratorService(
             var accumulator = costTrackingEnabled ? new RunCostAccumulator() : null;
 
             await using var scope = scopeFactory.CreateAsyncScope();
-            var consultations = scope.ServiceProvider.GetRequiredService<IAdvisorConsultationRepository>();
+            var consultations            = scope.ServiceProvider.GetRequiredService<IAdvisorConsultationRepository>();
+            var groundingRefiner         = scope.ServiceProvider.GetService<IGroundingRefiner>();
+            var groundingConsultationRepo = scope.ServiceProvider.GetService<IGroundingConsultationRepository>();
 
             var runner = run.SeedDraftText is not null
                 ? AtelierPipelineFactory.BuildWithSeedDraft(
@@ -178,7 +181,9 @@ internal sealed class RunOrchestratorService(
                     additionalSinks: [sink],
                     groundingProviderFactory: groundingProviderFactory,
                     pricingCatalog: pricingCatalog,
-                    costAccumulator: accumulator)
+                    costAccumulator: accumulator,
+                    groundingRefiner: groundingRefiner,
+                    groundingConsultationRepository: groundingConsultationRepo)
                 : AtelierPipelineFactory.Build(
                     snapshot, llmClientResolver, convergenceOptions,
                     consultationRepository: consultations,
@@ -187,7 +192,9 @@ internal sealed class RunOrchestratorService(
                     additionalSinks: [sink],
                     groundingProviderFactory: groundingProviderFactory,
                     pricingCatalog: pricingCatalog,
-                    costAccumulator: accumulator);
+                    costAccumulator: accumulator,
+                    groundingRefiner: groundingRefiner,
+                    groundingConsultationRepository: groundingConsultationRepo);
 
             try
             {
@@ -406,8 +413,9 @@ internal sealed class RunOrchestratorService(
         var retrySink       = new PostgresEventSink(run.Id, scopeFactory, runNotifier, retrySinkLogger);
 
         await using var retryScope = scopeFactory.CreateAsyncScope();
-        var retryConsultations = retryScope.ServiceProvider
-            .GetRequiredService<IAdvisorConsultationRepository>();
+        var retryConsultations        = retryScope.ServiceProvider.GetRequiredService<IAdvisorConsultationRepository>();
+        var retryGroundingRefiner     = retryScope.ServiceProvider.GetService<IGroundingRefiner>();
+        var retryGroundingConsultRepo = retryScope.ServiceProvider.GetService<IGroundingConsultationRepository>();
 
         var costTrackingEnabled = costTrackingOptions?.Value.Enabled ?? false;
         var retryAccumulator = costTrackingEnabled ? new RunCostAccumulator() : null;
@@ -423,7 +431,9 @@ internal sealed class RunOrchestratorService(
             additionalSinks: [retrySink],
             groundingProviderFactory: groundingProviderFactory,
             pricingCatalog: pricingCatalog,
-            costAccumulator: retryAccumulator);
+            costAccumulator: retryAccumulator,
+            groundingRefiner: retryGroundingRefiner,
+            groundingConsultationRepository: retryGroundingConsultRepo);
 
         // The retry pipeline writes its own status via PostgresEventSink just like the main run.
         // ConvergenceFailedException from the retry is intentionally not caught here — it propagates

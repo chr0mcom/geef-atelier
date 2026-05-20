@@ -1,4 +1,5 @@
 using Geef.Atelier.Application.Crew.Grounding;
+using Geef.Atelier.Application.Grounding;
 using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
@@ -35,7 +36,9 @@ internal static class AtelierPipelineFactory
         IEnumerable<IGeefEventSink>? additionalSinks = null,
         IGroundingProviderFactory? groundingProviderFactory = null,
         IPricingCatalog? pricingCatalog = null,
-        ICostAccumulator? costAccumulator = null)
+        ICostAccumulator? costAccumulator = null,
+        IGroundingRefiner? groundingRefiner = null,
+        IGroundingConsultationRepository? groundingConsultationRepository = null)
     {
         IGroundingStep grounding = new BriefingGroundingStep();
         if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
@@ -43,7 +46,9 @@ internal static class AtelierPipelineFactory
             grounding = new MultiProviderGroundingStep(
                 grounding, snapshot.GroundingProviders, groundingProviderFactory, runId,
                 loggerFactory?.CreateLogger<MultiProviderGroundingStep>()
-                    ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance);
+                    ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance,
+                groundingRefiner,
+                groundingConsultationRepository);
         }
 
         IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);
@@ -86,7 +91,9 @@ internal static class AtelierPipelineFactory
         IEnumerable<IGeefEventSink>? additionalSinks = null,
         IGroundingProviderFactory? groundingProviderFactory = null,
         IPricingCatalog? pricingCatalog = null,
-        ICostAccumulator? costAccumulator = null)
+        ICostAccumulator? costAccumulator = null,
+        IGroundingRefiner? groundingRefiner = null,
+        IGroundingConsultationRepository? groundingConsultationRepository = null)
     {
         IGroundingStep grounding = new AdvisorContextGroundingStep(advisorContextBlock);
         if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
@@ -94,7 +101,9 @@ internal static class AtelierPipelineFactory
             grounding = new MultiProviderGroundingStep(
                 grounding, snapshot.GroundingProviders, groundingProviderFactory, runId,
                 loggerFactory?.CreateLogger<MultiProviderGroundingStep>()
-                    ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance);
+                    ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance,
+                groundingRefiner,
+                groundingConsultationRepository);
         }
 
         IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);
@@ -136,7 +145,9 @@ internal static class AtelierPipelineFactory
         IEnumerable<IGeefEventSink>? additionalSinks = null,
         IGroundingProviderFactory? groundingProviderFactory = null,
         IPricingCatalog? pricingCatalog = null,
-        ICostAccumulator? costAccumulator = null)
+        ICostAccumulator? costAccumulator = null,
+        IGroundingRefiner? groundingRefiner = null,
+        IGroundingConsultationRepository? groundingConsultationRepository = null)
     {
         IGroundingStep grounding = new SeedDraftGroundingStep(seedDraftText);
         if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
@@ -144,7 +155,9 @@ internal static class AtelierPipelineFactory
             grounding = new MultiProviderGroundingStep(
                 grounding, snapshot.GroundingProviders, groundingProviderFactory, runId,
                 loggerFactory?.CreateLogger<MultiProviderGroundingStep>()
-                    ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance);
+                    ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance,
+                groundingRefiner,
+                groundingConsultationRepository);
         }
 
         IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);

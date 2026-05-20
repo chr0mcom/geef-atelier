@@ -63,8 +63,8 @@ internal sealed class TavilyGroundingProvider(
                 logger.LogInformation(
                     "Tavily grounding: run={RunId} provider={Profile} skipped (briefing not search-worthy).",
                     runId, profile.Name);
-                await PersistConsultationAsync(runId, profile.Name, briefingText, [], 0, null, ct);
-                return new GroundingResult(profile.Name, string.Empty, [], 0, null);
+                var skippedId = await PersistConsultationAsync(runId, profile.Name, briefingText, [], 0, null, ct);
+                return new GroundingResult(profile.Name, string.Empty, [], 0, null, skippedId);
             }
             query = extracted.Query;
         }
@@ -113,17 +113,18 @@ internal sealed class TavilyGroundingProvider(
             ? string.Empty
             : BuildEnrichedContext(result.Answer, citations);
 
-        await PersistConsultationAsync(runId, profile.Name, query, citations, 1, costEur, ct);
+        var consultationId = await PersistConsultationAsync(runId, profile.Name, query, citations, 1, costEur, ct);
 
         return new GroundingResult(
             ProviderName: profile.Name,
             EnrichedContext: enrichedContext,
             Citations: citations,
             TokensOrCreditsUsed: 1,
-            CostEur: costEur);
+            CostEur: costEur,
+            ConsultationId: consultationId);
     }
 
-    private async Task PersistConsultationAsync(
+    private async Task<Guid> PersistConsultationAsync(
         Guid runId,
         string providerName,
         string query,
@@ -145,6 +146,7 @@ internal sealed class TavilyGroundingProvider(
         await using var scope = scopeFactory.CreateAsyncScope();
         var consultationRepository = scope.ServiceProvider.GetRequiredService<IGroundingConsultationRepository>();
         await consultationRepository.CreateAsync(consultation, ct);
+        return consultation.Id;
     }
 
     private static string BuildEnrichedContext(string? answer, IReadOnlyList<SourceCitation> citations)
