@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-05-20 (D-050 added: Grounding-Refinement — optionaler KI-Filter nach Provider-Fetch)*
+*Last updated: 2026-05-20 (D-051 added: Grounding-Typen erweitern — Static-Context, URL-Fetch, News-Search)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -980,3 +980,40 @@ Step 1 of 3 in the Grounding Improvement Series. Introduces a reusable `LlmBindi
 **Nicht in diesem Step:** Globaler Cross-Provider-Pass, Refinement-Caching, neue Grounding-Provider-Typen (Step 3), Refinement für Executor/Reviewer/Advisor, Embeddings-basierte Vorfilterung.
 
 **Fundament für:** D-051 (neue Grounding-Typen: url-fetch, news-search, academic-search nutzen denselben Refiner).
+
+## D-051 — Grounding-Typen erweitern: Static-Context, URL-Fetch, News-Search
+
+**Datum:** 2026-05-20  
+**Status:** Umgesetzt in PR #23 (feat/grounding-types)
+
+### Kontext
+
+Das Grounding-System kannte nach D-050 nur zwei Provider-Typen: `tavily` (allgemeine Websuche) und `vector-store` (RAG). Reale Nutzungsszenarien brauchen aber: kuratierten Fixtext (Style-Guide, Glossar), gezieltes URL-Fetching bekannter Quellen und zeitkritische Newssuche.
+
+### Entscheidung
+
+Drei neue `IGroundingProvider`-Typen implementiert, die demselben Factory/DI/ConsultationId-Pattern wie die bestehenden Provider folgen:
+
+1. **`static-context`** — kuratierter Text, immer unverändert injiziert, keine externe API, kein LLM.
+2. **`url-fetch`** — HTTP-Fetch bekannter URLs, HTML-Bereinigung via AngleSharp, **SSRF-Guard als eigene Infrastructure-Komponente** (`IUrlSafetyValidator`).
+3. **`news-search`** — Tavily-API mit `topic=news` + `days`-Parameter, `SourceCitation.PublishedDate` neu.
+
+### Knackpunkte und Entscheidungen
+
+1. **HTML-Cleaning:** AngleSharp 1.4.0 (MIT) + eigene Readability-Heuristik (script/style/nav/header/footer/aside entfernen). Refiner aus D-050 übernimmt Restbereinigung.
+
+2. **SSRF-Guard (sicherheitskritisch):** `UrlSafetyValidator` prüft Schema (nur http/https), löst DNS auf (alle IPs, nicht nur erste), prüft IPv4- und IPv6-Private-Ranges inkl. Cloud-Metadata (169.254.0.0/16). Redirect-Kette manuell mit max. 3 Hops, jede Hop-IP erneut geprüft. `SocketsHttpHandler` mit `AllowAutoRedirect = false`.
+
+3. **`urls`-Speicherung:** Newline-getrennte Zeichenkette im Settings-Dict — robust gegen Kommas in Query-Strings, konsistent mit anderen Textareas.
+
+4. **`static-context content`:** Soft-Limit 50.000 Zeichen mit UI-Warnung; Hard-Cap 200.000 Zeichen server-side.
+
+5. **Dashboard-Stage-Label:** `GroundingActorCosts` fließt als dritte Source in Cost-Forge und Provider-Bench ein; Stage-Label `"Refiner"` für Grounding-Kosten (konsistent mit Iteration/Finalizer-Pattern).
+
+### Konsequenzen
+
+- Refiner aus D-050 ist typ-agnostisch — alle drei neuen Typen erhalten automatisch Refinement wenn konfiguriert.
+- `SourceCitation.PublishedDate: DateTimeOffset?` als trailing-optional hinzugefügt (backwards-compat).
+- `GroundingProviderTypes`-Konstanten-Klasse eingeführt — kein Magic-String mehr in Providers.
+- System-Profil `tavily-news` in `SystemCrew` für sofortige Nutzbarkeit.
+- SSRF-Guard als wiederverwendbare Komponente (`IUrlSafetyValidator`) für zukünftigen `rest-api`-Provider (Step 4).
