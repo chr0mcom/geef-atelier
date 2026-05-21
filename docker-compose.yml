@@ -24,6 +24,8 @@ services:
         condition: service_healthy
       cli-proxy:
         condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - geef-atelier-network
       - proxy

@@ -72,9 +72,11 @@ internal sealed class ProviderRepository(AtelierDbContext db) : IProviderReposit
     {
         // Checks reviewer, executor, and advisor profiles (direct "Provider" column),
         // plus finalizer profiles (Settings JSONB key "provider").
+        // EF Core 8 wraps SqlQueryRaw<int> with SELECT s."Value" FROM (...) AS s,
+        // so the column must be aliased "Value".
         const string sql =
             """
-            SELECT COUNT(*)::int FROM (
+            SELECT COUNT(*)::int AS "Value" FROM (
                 SELECT 1 FROM "ReviewerProfiles"  WHERE "Provider" = {0}
                 UNION ALL
                 SELECT 1 FROM "ExecutorProfiles"  WHERE "Provider" = {0}
