@@ -12,7 +12,7 @@ internal sealed class LlmClientResolver(
     IServiceScopeFactory scopeFactory) : ILlmClientResolver
 {
     // One OpenAiCompatibleClient per provider, shared and thread-safe.
-    private readonly ConcurrentDictionary<string, ILlmClient> _clients = new();
+    private readonly ConcurrentDictionary<string, ILlmClient> _clients = new(StringComparer.OrdinalIgnoreCase);
 
     // Provider lookup cache: avoids re-entering a scope on every call.
     // Lazy<T> with ExecutionAndPublication ensures the factory runs exactly once per provider.
@@ -57,7 +57,7 @@ internal sealed class LlmClientResolver(
         });
     }
 
-    private (string Endpoint, string ApiKey) ResolveProviderConnection(string providerName)
+    private (string Endpoint, string? ApiKey) ResolveProviderConnection(string providerName)
     {
         // 1. Try IProviderService (DB custom + system constants).
         var provider = LoadProvider(providerName);
@@ -70,9 +70,12 @@ internal sealed class LlmClientResolver(
                 ? (Environment.GetEnvironmentVariable(envVar) ?? settings.Endpoint)
                 : settings.Endpoint;
 
-            var apiKey = settings.ApiKeyEnv is { Length: > 0 } keyEnv
+            // null  → keyless provider (e.g. Ollama): no auth header, no guard
+            // ""    → ApiKeyEnv configured but env var not set: will throw in client
+            // "…"   → valid key
+            string? apiKey = settings.ApiKeyEnv is { Length: > 0 } keyEnv
                 ? (Environment.GetEnvironmentVariable(keyEnv) ?? string.Empty)
-                : string.Empty;
+                : null;
 
             return (endpoint, apiKey);
         }

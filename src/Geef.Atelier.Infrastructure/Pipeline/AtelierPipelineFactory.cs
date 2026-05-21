@@ -65,8 +65,7 @@ internal static class AtelierPipelineFactory
             execution = new AdvisorAwareExecutor(execution, advisorInstances, runId);
         }
 
-        var reviewers = snapshot.Reviewers
-            .Select(r => (IReviewer)new ProfileBasedReviewer(r, resolver, pricingCatalog, costAccumulator));
+        var reviewers = ResolveReviewers(snapshot.Reviewers, resolver, pricingCatalog, costAccumulator);
         var finalizer = new MarkdownFinalizer();
 
         return BuildWithProviders(grounding, execution, reviewers, finalizer,
@@ -120,8 +119,7 @@ internal static class AtelierPipelineFactory
             execution = new AdvisorAwareExecutor(execution, advisorInstances, runId);
         }
 
-        var reviewers = snapshot.Reviewers
-            .Select(r => (IReviewer)new ProfileBasedReviewer(r, resolver, pricingCatalog, costAccumulator));
+        var reviewers = ResolveReviewers(snapshot.Reviewers, resolver, pricingCatalog, costAccumulator);
         var finalizer = new MarkdownFinalizer();
 
         return BuildWithProviders(grounding, execution, reviewers, finalizer,
@@ -174,8 +172,7 @@ internal static class AtelierPipelineFactory
             execution = new AdvisorAwareExecutor(execution, advisorInstances, runId);
         }
 
-        var reviewers = snapshot.Reviewers
-            .Select(r => (IReviewer)new ProfileBasedReviewer(r, resolver, pricingCatalog, costAccumulator));
+        var reviewers = ResolveReviewers(snapshot.Reviewers, resolver, pricingCatalog, costAccumulator);
         var finalizer = new MarkdownFinalizer();
 
         return BuildWithProviders(grounding, execution, reviewers, finalizer,
@@ -224,5 +221,21 @@ internal static class AtelierPipelineFactory
         }
 
         return builder.Build();
+    }
+
+    /// <summary>
+    /// Returns profile-based reviewers, or a single <see cref="AutoApproveReviewer"/> when the
+    /// snapshot has no reviewers (single-pass / reviewer-free template).
+    /// </summary>
+    private static IEnumerable<IReviewer> ResolveReviewers(
+        IReadOnlyList<Geef.Atelier.Core.Domain.Crew.Profiles.ReviewerProfile> profiles,
+        ILlmClientResolver resolver,
+        IPricingCatalog? pricingCatalog,
+        ICostAccumulator? costAccumulator)
+    {
+        if (profiles.Count == 0)
+            return [new AutoApproveReviewer()];
+
+        return profiles.Select(r => (IReviewer)new ProfileBasedReviewer(r, resolver, pricingCatalog, costAccumulator));
     }
 }

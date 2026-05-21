@@ -5,11 +5,13 @@ namespace Geef.Atelier.Infrastructure.Llm;
 internal sealed class OpenAiCompatibleClient(
     HttpClient httpClient,
     string endpoint,
-    string apiKey) : ILlmClient
+    string? apiKey) : ILlmClient
 {
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(apiKey))
+        // null  → keyless provider (e.g. Ollama): skip auth header entirely
+        // ""    → ApiKeyEnv env var was configured but not set in the environment
+        if (apiKey is not null && apiKey.Length == 0)
             throw new InvalidOperationException(
                 "LLM API key is not configured. Set the environment variable for the provider's ApiKey.");
 
@@ -17,8 +19,9 @@ internal sealed class OpenAiCompatibleClient(
         var body = OpenAiMessageFormat.SerializeRequest(request);
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseEndpoint}/chat/completions");
 
-        // Set key per-request to avoid leaking it into shared HttpClient headers.
-        httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
+        // Only add auth header when an API key is configured.
+        if (apiKey is { Length: > 0 })
+            httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
         httpRequest.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
         using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
