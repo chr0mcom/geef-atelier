@@ -92,6 +92,19 @@
                                 @onclick="OpenResumeDialog">
                             Resume
                         </button>
+                        <button class="btn danger" data-testid="delete-run-button"
+                                @onclick="() => _showDeleteModal = true">
+                            Delete
+                        </button>
+                    </div>
+                }
+                @if (_details.Run.Status is RunStatus.Completed)
+                {
+                    <div class="actions">
+                        <button class="btn danger" data-testid="delete-run-button"
+                                @onclick="() => _showDeleteModal = true">
+                            Delete
+                        </button>
                     </div>
                 }
             </div>
@@ -123,6 +136,13 @@
             ParentRunId="@RunId"
             OnConfirm="HandleResumeConfirmedAsync"
             OnCancel="() => _showResumeDialog = false" />
+
+        <DeleteConfirmationModal
+            Show="_showDeleteModal"
+            ItemName="@_shortId"
+            ItemKind="Run"
+            OnConfirm="ExecuteDeleteAsync"
+            OnCancel="() => _showDeleteModal = false" />
 
         @if (_details is not null && _viewModel is not null)
         {
@@ -238,6 +258,7 @@
     string? _promoteError;
     string? _requestingUser;
     bool _showResumeDialog;
+    bool _showDeleteModal;
 
     string _shortId => RunId.ToString("N")[..8].ToUpperInvariant();
 
@@ -371,6 +392,13 @@
     }
 
     void OpenResumeDialog() => _showResumeDialog = true;
+
+    async Task ExecuteDeleteAsync()
+    {
+        _showDeleteModal = false;
+        await RunService.DeleteRunAsync(RunId, _requestingUser);
+        Nav.NavigateTo("/runs");
+    }
 
     int GetEffectiveMaxIterations()
     {

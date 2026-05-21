@@ -152,6 +152,7 @@ public sealed class RunDetailArtifactsTests : TestContext
             Task.FromResult(new WelcomeStats(0, 0, 0, 0, 0, 0));
         public Task<Guid> ResumeRunAsync(ResumeOptions options, string? user, CancellationToken ct = default) =>
             throw new NotImplementedException();
+        public Task<bool> DeleteRunAsync(Guid runId, string? requestingUsername, CancellationToken ct = default) => Task.FromResult(true);
     }
 
     private sealed class StubArtifactRepository(IReadOnlyList<RunArtifact> artifacts)

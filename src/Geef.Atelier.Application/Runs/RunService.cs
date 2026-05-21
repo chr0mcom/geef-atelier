@@ -228,4 +228,17 @@ internal sealed class RunService(
             advisorsByIteration,
             groundingConsultations);
     }
+
+    /// <inheritdoc/>
+    public async Task<bool> DeleteRunAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
+    {
+        var run = await GetRunAsync(runId, requestingUsername, cancellationToken);
+        if (run is null) return false;
+
+        if (run.Status is RunStatus.Pending or RunStatus.Running)
+            throw new InvalidOperationException("Running or pending runs cannot be deleted. Cancel the run first.");
+
+        await repository.DeleteAsync(runId, cancellationToken);
+        return true;
+    }
 }

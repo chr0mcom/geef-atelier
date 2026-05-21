@@ -240,6 +240,7 @@ public sealed class RunServiceAttachmentTests
         public Task<bool> RequestCancellationAsync(Guid runId, CancellationToken cancellationToken = default) => Task.FromResult(false);
         public Task<RunDetails?> GetDetailsAsync(Guid runId, CancellationToken cancellationToken = default) => Task.FromResult<RunDetails?>(null);
         public Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default) => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m, 0, 0m));
+        public Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class StubCrewService : ICrewService

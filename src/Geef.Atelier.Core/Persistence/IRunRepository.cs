@@ -30,4 +30,10 @@ public interface IRunRepository
     /// Studio-analysis stats are never user-scoped.
     /// </summary>
     Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Permanently deletes the run with the given ID and all associated data (iterations, findings, events, etc.).
+    /// No-op if the run does not exist.
+    /// </summary>
+    Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default);
 }

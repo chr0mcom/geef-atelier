@@ -6,6 +6,7 @@
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthProvider
 @using Microsoft.AspNetCore.SignalR.Client
+@using Geef.Atelier.Core.Domain
 
 <PageTitle>Runs — Geef.Atelier</PageTitle>
 
@@ -58,6 +59,15 @@
                         <div class="run-user-badge">@run.CreatedByUser</div>
                     }
                     <RunRow Run="run" OnOpen="@(() => Nav.NavigateTo($"/runs/{run.Id}"))" />
+                    @if (run.Status is RunStatus.Completed or RunStatus.Failed or RunStatus.Aborted)
+                    {
+                        <button class="btn small danger run-delete-btn"
+                                data-testid="delete-run-@run.Id"
+                                @onclick:stopPropagation="true"
+                                @onclick="@(() => _toDelete = run)">
+                            Delete
+                        </button>
+                    }
                 </div>
             }
         </div>
@@ -68,6 +78,18 @@
         New briefing
     </a>
 </div>
+
+@if (!string.IsNullOrEmpty(_deleteError))
+{
+    <div class="error-banner" data-testid="delete-error">@_deleteError</div>
+}
+
+<DeleteConfirmationModal
+    Show="_toDelete != null"
+    ItemName="@(_toDelete?.Id.ToString("N")[..8].ToUpperInvariant() ?? "")"
+    ItemKind="Run"
+    OnConfirm="ExecuteDeleteAsync"
+    OnCancel="() => _toDelete = null" />
 
 @code {
     [SupplyParameterFromQuery] public string? Status { get; set; }
@@ -89,6 +111,8 @@
     bool                      _isAdmin;
     string?                   _currentUsername;
     bool                      _showAllUsers;
+    RunEntity?                _toDelete;
+    string?                   _deleteError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -128,6 +152,20 @@
 
         await _hub.StartAsync();
         await _hub.SendAsync("JoinAllRunsGroupAsync");
+    }
+
+    async Task ExecuteDeleteAsync()
+    {
+        if (_toDelete is null) return;
+        var id = _toDelete.Id;
+        _toDelete = null;
+        _deleteError = null;
+        try
+        {
+            await RunService.DeleteRunAsync(id, _currentUsername);
+            await LoadRunsAsync();
+        }
+        catch (Exception ex) { _deleteError = ex.Message; }
     }
 
     async Task ApplyFilterAsync(RunStatus? status)

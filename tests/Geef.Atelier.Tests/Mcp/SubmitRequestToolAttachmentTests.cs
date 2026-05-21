@@ -150,5 +150,6 @@ public sealed class SubmitRequestToolAttachmentTests
         public Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, string? requestingUsername, CancellationToken ct = default) => Task.FromResult<RunWithGroundingViewModel?>(null);
         public Task<WelcomeStats> GetWelcomeStatsAsync(string? requestingUsername, CancellationToken ct = default) => Task.FromResult(new WelcomeStats(0, 0, 0, 0, 0, 0));
         public Task<Guid> ResumeRunAsync(ResumeOptions options, string? requestingUsername, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<bool> DeleteRunAsync(Guid runId, string? requestingUsername, CancellationToken ct = default) => Task.FromResult(true);
     }
 }

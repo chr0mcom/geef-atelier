@@ -68,5 +68,6 @@ public sealed class CancelRunToolReturnsBooleanTests
 
         public Task<Guid> ResumeRunAsync(ResumeOptions options, string? requestingUsername, CancellationToken cancellationToken = default)
             => throw new NotImplementedException();
+        public Task<bool> DeleteRunAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) => Task.FromResult(true);
     }
 }

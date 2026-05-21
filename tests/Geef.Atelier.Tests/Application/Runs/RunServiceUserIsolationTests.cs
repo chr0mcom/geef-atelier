@@ -231,6 +231,8 @@ public sealed class RunServiceUserIsolationTests
 
         public Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default)
             => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m, 0, 0m));
+
+        public Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     /// <summary>Records the arguments passed to ListAsync so tests can inspect them.</summary>
@@ -255,6 +257,8 @@ public sealed class RunServiceUserIsolationTests
 
         public Task<WelcomeStats> GetWelcomeStatsAsync(string? username, CancellationToken cancellationToken = default)
             => Task.FromResult(new WelcomeStats(0, 0.0, 0.0, 0m, 0, 0m));
+
+        public Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class MinimalPersistenceService : IRunPersistenceService

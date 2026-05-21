@@ -80,4 +80,15 @@ public interface IRunService
         ResumeOptions options,
         string? requestingUsername,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Permanently deletes a run and all its associated data (iterations, findings, events, costs, artifacts).
+    /// Returns <c>false</c> if the run does not exist or belongs to a different user (when
+    /// <paramref name="requestingUsername"/> is non-null). Pass <c>null</c> to bypass the ownership check.
+    /// Throws <see cref="InvalidOperationException"/> if the run is still Pending or Running.
+    /// </summary>
+    Task<bool> DeleteRunAsync(
+        Guid runId,
+        string? requestingUsername,
+        CancellationToken cancellationToken = default);
 }

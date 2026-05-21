@@ -101,4 +101,8 @@ internal sealed class RunRepository(AtelierDbContext db) : IRunRepository
         return new WelcomeStats(runsThisMonth, convergenceRate, avgIterations, totalCostThisMonth,
             studioAnalysesThisMonth, studioCostThisMonth);
     }
+
+    /// <inheritdoc/>
+    public async Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default)
+        => await db.Runs.Where(r => r.Id == runId).ExecuteDeleteAsync(cancellationToken);
 }
