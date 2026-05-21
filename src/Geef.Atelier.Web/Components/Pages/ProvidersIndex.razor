@@ -72,6 +72,11 @@
                             @if (p.IsSystem)
                             {
                                 <a href="/crew/providers/view/@p.Name" class="btn small">View</a>
+                                <button class="btn small @(p.IsActive ? "danger" : "primary")"
+                                        @onclick="() => ToggleActiveAsync(p)"
+                                        data-testid="toggle-@p.Name">
+                                    @(p.IsActive ? "Disable" : "Enable")
+                                </button>
                             }
                             else
                             {

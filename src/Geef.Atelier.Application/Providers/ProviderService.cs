@@ -15,14 +15,25 @@ internal sealed class ProviderService(
     /// <inheritdoc/>
     public async Task<IReadOnlyList<Provider>> ListAsync(bool includeInactive = false, CancellationToken ct = default)
     {
-        var systemProviders = SystemProviders.ProvidersByName.Values.ToList();
+        // Always load all DB providers so we can read active-state overrides for system providers.
+        var allDbProviders = await repository.ListAsync(includeInactive: true, ct);
 
-        // Custom providers from DB only (IsSystem=false); system providers come from in-memory constants above.
-        // Without this filter, system providers seeded by migrations would appear twice.
-        var dbProviders = await repository.ListAsync(includeInactive: includeInactive, ct);
-        var customProviders = dbProviders.Where(p => !p.IsSystem).ToList();
+        // DB rows for system providers carry the persisted active-state (may differ from the code default of true).
+        var systemActiveStates = allDbProviders
+            .Where(p => p.IsSystem)
+            .ToDictionary(p => p.Name, p => p.IsActive);
 
-        return [.. systemProviders, .. customProviders];
+        // Merge: code-constant system providers with DB active-state override when present.
+        var systemProviders = SystemProviders.ProvidersByName.Values
+            .Select(p => systemActiveStates.TryGetValue(p.Name, out var active) ? p with { IsActive = active } : p);
+
+        var customProviders = allDbProviders.Where(p => !p.IsSystem);
+
+        var all = systemProviders.Concat(customProviders);
+        if (!includeInactive)
+            all = all.Where(p => p.IsActive);
+
+        return [.. all];
     }
 
     /// <inheritdoc/>
@@ -76,9 +87,17 @@ internal sealed class ProviderService(
     /// <inheritdoc/>
     public async Task SetActiveAsync(string name, bool isActive, CancellationToken ct = default)
     {
-        // System providers are always considered active; silently skip.
         if (SystemProviders.IsSystemProviderName(name))
+        {
+            // Persist the active-state override for this system provider.
+            // If the provider was added to SystemProviders after the seeding migration, insert its DB row now.
+            var existing = await repository.GetByNameAsync(name, ct);
+            if (existing is null)
+                await repository.CreateAsync(SystemProviders.ProvidersByName[name] with { IsActive = isActive }, ct);
+            else
+                await repository.SetActiveAsync(name, isActive, ct);
             return;
+        }
 
         await repository.SetActiveAsync(name, isActive, ct);
     }
