@@ -18,6 +18,24 @@
     if (reduced) { el.classList.add('in'); } else { revealObs.observe(el); }
   });
 
+  // Film — click the poster overlay to start the demo with sound
+  var filmStage = document.querySelector('.lp-film-stage');
+  if (filmStage) {
+    var filmVideo = filmStage.querySelector('.lp-film-video');
+    var filmPlay = filmStage.querySelector('.lp-film-play');
+    if (filmVideo && filmPlay) {
+      filmPlay.addEventListener('click', function () {
+        filmStage.classList.add('playing');
+        filmVideo.controls = true;   // reveal native controls only once playing
+        filmVideo.play();
+      });
+      filmVideo.addEventListener('play', function () {
+        filmStage.classList.add('playing');
+        filmVideo.controls = true;
+      });
+    }
+  }
+
   // GEEF flow choreography — phases G → E → E-loop → F
   var flow = document.querySelector('.geef-flow');
   if (!flow) return;

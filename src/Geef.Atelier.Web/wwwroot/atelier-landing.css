@@ -701,6 +701,113 @@ body[data-static="1"] .geef-flow .loop .loop-path { animation: none !important; 
 .geef-phase .iter-badge b { color: var(--hero); font-family: var(--font-mono); font-weight: 500; }
 
 /* ============================================================
+   FILM — framed 60-second demo player
+   ============================================================ */
+.lp-film .lp-film-head { text-align: center; max-width: 64ch; margin: 0 auto 44px; }
+.lp-film .lp-film-head .lp-h2 { max-width: none; margin: 16px auto 0; }
+.lp-film .lp-film-head .lp-lede { margin: 18px auto 0; }
+
+.lp-film-frame {
+  position: relative;
+  max-width: 980px;
+  margin: 0 auto;
+  border: 1px solid var(--hairline-soft);
+  border-radius: 3px;
+  background: var(--surface);
+  padding: 40px 18px 18px;
+  overflow: hidden;
+}
+.lp-film-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg, color-mix(in oklch, var(--hairline-soft) 60%, transparent) 0, color-mix(in oklch, var(--hairline-soft) 60%, transparent) 1px, transparent 1px, transparent 28px),
+    repeating-linear-gradient(90deg, color-mix(in oklch, var(--hairline-soft) 60%, transparent) 0, color-mix(in oklch, var(--hairline-soft) 60%, transparent) 1px, transparent 1px, transparent 28px);
+  opacity: 0.3;
+  pointer-events: none;
+}
+.lp-film-colophon {
+  position: absolute;
+  top: 16px; left: 18px;
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--ink-3); z-index: 4; display: flex; gap: 14px;
+}
+.lp-film-colophon b { color: var(--hero); font-weight: 500; }
+.lp-film-colophon-r {
+  position: absolute;
+  top: 16px; right: 18px;
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--ink-3); z-index: 4;
+}
+
+.lp-film-stage {
+  position: relative;
+  z-index: 2;
+  aspect-ratio: 16 / 9;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--bg-deep, #000);
+  box-shadow: 0 30px 80px -50px color-mix(in oklch, var(--hero) 40%, transparent);
+}
+.lp-film-video {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+  object-fit: cover;
+  background: #000;
+}
+
+/* play overlay — hidden once the film starts */
+.lp-film-play {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  border: none;
+  cursor: pointer;
+  color: var(--on-hero);
+  background:
+    radial-gradient(circle at 50% 46%, color-mix(in oklch, #000 18%, transparent), color-mix(in oklch, #000 42%, transparent));
+  transition: opacity .35s ease;
+}
+.lp-film-stage.playing .lp-film-play { opacity: 0; pointer-events: none; }
+.lp-film-play-disc {
+  width: 76px; height: 76px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--hero);
+  color: var(--on-hero);
+  box-shadow: 0 14px 40px -12px color-mix(in oklch, var(--hero) 80%, transparent);
+  transition: transform .2s ease, box-shadow .25s ease;
+  padding-left: 3px;
+}
+.lp-film-play:hover .lp-film-play-disc {
+  transform: scale(1.06);
+  box-shadow: 0 18px 50px -12px color-mix(in oklch, var(--hero) 90%, transparent);
+}
+.lp-film-play:active .lp-film-play-disc { transform: scale(0.98); }
+.lp-film-play-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.5);
+}
+@media (max-width: 760px) {
+  .lp-film-frame { padding: 36px 12px 12px; }
+  .lp-film-play-disc { width: 62px; height: 62px; }
+}
+
+/* ============================================================
    CREW — masthead / cast sheet
    ============================================================ */
 .lp-crew {
