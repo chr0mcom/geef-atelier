@@ -2,7 +2,7 @@
 
 *[Deutsch](06-reviewer-calibration_de.md) · **English***
 
-*Last updated: 2026-05-17 (code references updated to the crew-profile system; severity taxonomy unchanged in substance)*
+*Last updated: 2026-05-22 (D-054: learning-evaluation crew calibration added; AbortOnCritical=true rationale for gate crews)*
 
 This document describes the **Atelier standard for reviewer severity** and the **convergence-policy strategy**. It is the normative reference for anyone adjusting reviewer prompts or adding new reviewers.
 
@@ -91,3 +91,30 @@ Since the crew system (D-028) reviewers are **data-driven profiles**, no longer 
 6. Extend `SeverityClassificationTests` with the new reviewer name (if tested reviewer-specifically).
 
 D-025 documents the decision points behind this calibration.
+
+## Learning-evaluation crew — strict calibration (D-054)
+
+The `learning-evaluation` crew uses `AbortOnCritical=true` with `MaxIterations=2`. This is a deliberate inversion of the standard default (`AbortOnCritical=false`): the crew is a **quality gate**, not a text-improvement loop. A single critical finding must block the learning from reaching the store.
+
+### Three reviewers, three model families (multi-model pluralism)
+
+| Profile | Model | Responsibility | Critical = |
+|---|---|---|---|
+| `learning-factual-grounding` | openrouter / gpt-4.1 | Every claim must be traceable to the structured run facts. Hallucinated or unsupported statements = Critical | Fabricated claim with no support in the run facts |
+| `learning-value` | openrouter / gemini-2.5-pro | The learning must be non-obvious and generalisable. Trivial, banal = Critical | "Any practitioner already knows this" |
+| `learning-generalizability` | anthropic / claude-opus-4-7 | Must be a repeatable pattern, not a one-run artefact. Single-case-only = Critical | "No reason to expect this to generalise" |
+
+Three different model families are used deliberately to reduce correlated blind spots in the gate.
+
+### Anti-patterns for learning reviewers
+
+The standard anti-pattern rules apply (see above). In addition:
+
+- A learning that is well-known in academic literature but **genuinely useful as a practical reminder** → at most `minor`
+- A domain-specific insight that is obvious **within its domain but not across domains** → `info`
+- A probabilistic rather than deterministic pattern → at most `minor` for generalizability
+- A learning that covers a **narrow sub-domain** — narrow scope is fine if it is consistent
+
+### Recursion guard
+
+`LearningExtractFinalizerExecutor` checks `run.Kind == RunKind.Learning` and returns immediately — the extractor never fires inside a Learning-Run. `LearningPublishFinalizerExecutor` checks `run.Kind != RunKind.Learning` and returns immediately for Standard-Runs. This two-guard invariant is covered by a dedicated test class.

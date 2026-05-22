@@ -2,7 +2,7 @@
 
 *[English](01-vision-and-scope.md) · **Deutsch***
 
-*Letzte Aktualisierung: 20. Mai 2026 (Scope an Grounding-Typen D-051 angeglichen: static-context, url-fetch, news-search)*
+*Letzte Aktualisierung: 22. Mai 2026 (D-054: Continuous-Learning-Loop in den Scope aufgenommen; learning-retrieval-Providertyp)*
 
 ## Vision
 
@@ -28,7 +28,8 @@ Das Projekt ist die produktive Anwendung des [Geef SDK](https://github.com/chr0m
 - Persistente Run-Historie mit vollständigem Iterations-Trail
 - Run-Fortsetzung: einen fehlgeschlagenen oder abgebrochenen Run ab dem letzten Draft-Text (Seed-Modus) oder mit frischer Pipeline (Clean-Modus) fortsetzen — D-046
 - Datei-Export in den Formaten md / html / pdf / docx / txt / json über die Finalizer-Pipeline (D-044); die fünf Finalizer-Profil-Typen (FileExport, MetadataEnrich, ExternalSink, Transform) sind als Teil des Crew-Systems implementiert
-- Grounding-Anreicherung in mehreren Formen: Tavily-Websuche (`tavily`), semantische Vector-Store-RAG (`vector-store`), kuratierter Fixtext für Style-Guides und Glossare (`static-context`), gezieltes URL-Fetching mit SSRF-Schutz (`url-fetch`) und Tavily-Newssuche mit Datumsfilter (`news-search`); jeder Provider unterstützt optional einen KI-Refinement-Pass (D-050/D-051)
+- Grounding-Anreicherung in mehreren Formen: Tavily-Websuche (`tavily`), semantische Vector-Store-RAG (`vector-store`), kuratierter Fixtext für Style-Guides und Glossare (`static-context`), gezieltes URL-Fetching mit SSRF-Schutz (`url-fetch`), Tavily-Newssuche mit Datumsfilter (`news-search`), akademische Literaturrecherche bei arXiv / Semantic Scholar / OpenAlex (`academic-search`) und generisches REST-Endpoint-Grounding mit SSRF-Schutz und JSONPath-Extraktion (`rest-api`); jeder Provider unterstützt optional einen KI-Refinement-Pass (D-050–D-052); domänen-bewusste Abfrage aus dem Learning-Store (`learning-retrieval`, D-054)
+- **Continuous-Learning-Loop (D-054):** Ein opt-in-`learning-extractor`-Finalizer extrahiert strukturierte Fakten aus abgeschlossenen Runs und stößt fire-and-forget einen dedizierten Qualitäts-Gate-Run an (`learning-evaluation`-Crew). Nur Learnings, die das Gate konvergent durchlaufen (drei strenge Reviewer, `AbortOnCritical=true`, Multi-Modell-Pluralismus), werden als `Approved` im Learning-Store gespeichert (`LearningEntries`-Tabelle, getrennter Namespace von der kuratierten Wissensbasis). Der `learning-retrieval`-Grounding-Provider spielt sie gewichtet nach Domänen-Ähnlichkeit in spätere Runs ein. Verwaltungs-UI unter `/crew/learnings`; MCP-Tool `list_learnings`. Drei Schutzmechanismen gegen Model Collapse: (1) getrennter Namespace, (2) auditierbares Gate, (3) ausschließlich strukturierte Fakten
 
 ## Out of Scope (vorerst)
 
@@ -37,7 +38,7 @@ Das Projekt ist die produktive Anwendung des [Geef SDK](https://github.com/chr0m
 - Mensch-im-Loop zwischen Iterationen (bewusst nicht implementiert; Fire-and-Forget bleibt das Modell)
 - Mobile Apps oder native Clients
 - Kommerzielles Hosting, Billing, Abrechnung
-- Echte Memory-Backed-Advisors mit Cross-Run-Lernen
+- Ungefiltertes Cross-Run-Self-RAG (bewusst verworfen; der Continuous-Learning-Loop oben bietet gegatetes Cross-Run-Lernen mit drei Schutzmechanismen gegen Model Collapse)
 - Domänen-spezifische Datenbank-Connectors (z.B. juristische Datenbanken wie dejure.org oder Beck-Online) — später optional
 - Direkter „Export”-Button in der Briefing-UI: ein mit einem Klick erreichbarer Export-Button in der Run-/Briefing-Oberfläche ist nicht implementiert. (Datei-Export in md/html/pdf/docx/txt/json *ist* implementiert, aber ausschließlich über die Finalizer-Pipeline, die im Crew-Template konfiguriert wird — siehe „In Scope” oben.)
 

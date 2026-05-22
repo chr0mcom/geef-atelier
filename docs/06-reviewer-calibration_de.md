@@ -2,7 +2,7 @@
 
 *[English](06-reviewer-calibration.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-17 (Code-Referenzen auf Crew-Profil-System aktualisiert; Severity-Taxonomie inhaltlich unverändert)*
+*Letzte Aktualisierung: 2026-05-22 (D-054: Learning-Evaluation-Crew-Kalibrierung ergänzt; AbortOnCritical=true-Begründung für Gate-Crews)*
 
 Dieses Dokument beschreibt den **Atelier-Standard für Reviewer-Severity** und die **Convergence-Policy-Strategie**. Es ist normatives Referenzdokument für alle, die Reviewer-Prompts anpassen oder neue Reviewer hinzufügen.
 
@@ -92,3 +92,30 @@ mehr (`LlmReviewer`/`AtelierSystemPrompts` wurden entfernt). Ein neuer System-Re
 6. `SeverityClassificationTests` um den neuen Reviewer-Namen erweitern (falls reviewer-spezifisch getestet).
 
 D-025 dokumentiert die Entscheidungspunkte hinter dieser Kalibrierung.
+
+## Learning-Evaluation-Crew — strenge Kalibrierung (D-054)
+
+Die `learning-evaluation`-Crew verwendet `AbortOnCritical=true` mit `MaxIterations=2`. Das ist eine bewusste Umkehrung des Standard-Defaults (`AbortOnCritical=false`): Die Crew ist ein **Qualitäts-Gate**, keine Text-Verbesserungs-Schleife. Ein einzelnes Critical-Finding muss das Learning vom Store fernhalten.
+
+### Drei Reviewer, drei Modellfamilien (Multi-Modell-Pluralismus)
+
+| Profil | Modell | Zuständigkeit | Critical = |
+|---|---|---|---|
+| `learning-factual-grounding` | openrouter / gpt-4.1 | Jede Behauptung muss auf strukturierten Run-Fakten basieren. Halluzinierte oder nicht abgesicherte Aussagen = Critical | Erfundene Behauptung ohne Grundlage in den Run-Fakten |
+| `learning-value` | openrouter / gemini-2.5-pro | Das Learning muss nicht-offensichtlich und generalisierbar sein. Trivial, banal = Critical | „Das weiß jede Praktikerin bereits" |
+| `learning-generalizability` | anthropic / claude-opus-4-7 | Muss ein wiederholbares Muster sein, kein Einzel-Run-Artefakt. Nur-ein-Fall = Critical | „Kein Grund, diese Verallgemeinerung zu erwarten" |
+
+Drei verschiedene Modellfamilien werden bewusst eingesetzt, um korrelierte blinde Flecken im Gate zu reduzieren.
+
+### Anti-Pattern für Learning-Reviewer
+
+Die Standard-Anti-Pattern-Regeln gelten (siehe oben). Zusätzlich:
+
+- Ein Learning, das in der Fachliteratur bekannt ist, aber **als praktische Erinnerung genuinen Wert hat** → höchstens `minor`
+- Eine domänenspezifische Erkenntnis, die **innerhalb ihrer Domäne offensichtlich, domänenübergreifend aber nicht trivial ist** → `info`
+- Ein probabilistisches statt deterministisches Muster → höchstens `minor` bei Generalisierbarkeit
+- Ein Learning mit **engem Sub-Domänen-Scope** — enger Scope ist in Ordnung, wenn er konsistent ist
+
+### Rekursions-Guard
+
+`LearningExtractFinalizerExecutor` prüft `run.Kind == RunKind.Learning` und kehrt sofort zurück — der Extraktor löst niemals innerhalb eines Learning-Runs aus. `LearningPublishFinalizerExecutor` prüft `run.Kind != RunKind.Learning` und kehrt für Standard-Runs sofort zurück. Diese Zwei-Guard-Invariante ist durch eine eigene Testklasse abgedeckt.

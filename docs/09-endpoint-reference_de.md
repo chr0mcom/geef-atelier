@@ -2,7 +2,7 @@
 
 *[English](09-endpoint-reference.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-20 (D-051: list_grounding_provider_profiles ergänzt; providerType-Werte auf alle fünf Typen erweitert)*
+*Letzte Aktualisierung: 2026-05-22 (D-054: Tool list_learnings ergänzt; providerType um learning-retrieval erweitert)*
 
 Alle HTTP-Endpunkte von Geef.Atelier, die extern erreichbar sind — MCP, OAuth 2.1
 sowie die Web-UI-/Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`.
@@ -109,7 +109,7 @@ Listet alle Grounding-Provider-Profile (System + Custom) auf.
 | `name` | string | Profilbezeichner |
 | `displayName` | string | Anzeigename |
 | `description` | string | Zweckbeschreibung |
-| `providerType` | string | `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"` oder `"news-search"` |
+| `providerType` | string | `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"`, `"news-search"`, `"academic-search"`, `"rest-api"` oder `"learning-retrieval"` |
 | `maxQueriesPerRun` | int? | Max. Anfragen pro Run (null = unbegrenzt) |
 | `isSystem` | boolean | Eingebautes System-Profil |
 | `refinementEnabled` | boolean | Ob ein KI-Refinement konfiguriert ist |
@@ -138,6 +138,53 @@ Lädt den binären Inhalt eines `File`-Artefakts herunter und gibt ihn als Base6
 ```
 
 Funktioniert nur für `ArtifactType.File`-Artefakte. Liest die Datei vom `ExportPath` auf der Festplatte und gibt die rohen Bytes als Base64 zurück. Auth: Owner-Check.
+
+---
+
+#### `list_learnings`
+
+Listet Learning-Einträge aus dem Learning-Store (D-054).
+
+**Input:**
+```json
+{
+  "status_filter": "Proposed|Approved|Rejected",
+  "domain_filter": "<string>"
+}
+```
+
+Beide Parameter sind optional. Ohne `status_filter` werden alle Status zurückgegeben; ohne `domain_filter` alle Domänen.
+
+**Output:** Array von Learning-Entry-Objekten:
+```json
+[
+  {
+    "id": "<uuid>",
+    "text": "<string, auf 300 Zeichen gekürzt>",
+    "domain": "<string>",
+    "status": "Proposed|Approved|Rejected",
+    "source_run_id": "<uuid>",
+    "learning_run_id": "<uuid|null>",
+    "owner_username": "<string>",
+    "created_at": "<ISO8601>",
+    "approved_at": "<ISO8601|null>"
+  }
+]
+```
+
+| Feld | Typ | Beschreibung |
+|---|---|---|
+| `id` | uuid | Learning-Entry-Bezeichner |
+| `text` | string | Der kondensierte Lerntext, auf 300 Zeichen gekürzt |
+| `domain` | string | Template-Name des Quell-Runs (für Domänen-Boost-Retrieval) |
+| `status` | string | `"Proposed"`, `"Approved"` oder `"Rejected"` |
+| `source_run_id` | uuid | Der Standard-Run, der die Extraktion ausgelöst hat |
+| `learning_run_id` | uuid \| null | Der Learning-Evaluation-Run, der den Eintrag verarbeitet hat (null solange Proposed) |
+| `owner_username` | string | Geerbt vom erstellenden Nutzer des Quell-Runs |
+| `created_at` | ISO8601 | Extraktions-Zeitstempel |
+| `approved_at` | ISO8601 \| null | Genehmigungs-Zeitstempel (null solange Proposed oder Rejected) |
+
+**Hinweis:** `structured_facts_json` wird bewusst nicht exponiert — das rohe Fakten-JSON ist für MCP-Kontext zu umfangreich und nur über die Web-UI zugänglich. Auth: Standard-Run-User-Isolation; Nicht-Admin-Nutzer sehen nur ihre eigenen Einträge.
 
 ---
 

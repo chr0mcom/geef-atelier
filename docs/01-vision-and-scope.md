@@ -2,7 +2,7 @@
 
 *[Deutsch](01-vision-and-scope_de.md) · **English***
 
-*Last updated: 22 May 2026 (scope aligned with D-052: academic-search, rest-api providers added)*
+*Last updated: 22 May 2026 (D-054: continuous learning loop added to scope; learning-retrieval provider type)*
 
 ## Vision
 
@@ -28,7 +28,8 @@ The project is the productive application of the [Geef SDK](https://github.com/c
 - Persistent run history with a complete iteration trail
 - Run resumption: continue a failed or aborted run from its last draft text (seed mode) or with a fresh pipeline (clean mode) — D-046
 - File export in formats md / html / pdf / docx / txt / json via the Finalizer pipeline (D-044); the five Finalizer profile types (FileExport, MetadataEnrich, ExternalSink, Transform) are implemented as part of the crew system
-- Grounding enrichment in multiple forms: Tavily web search (`tavily`), semantic vector-store RAG (`vector-store`), curated fixed text for style guides and glossaries (`static-context`), specific URL fetching with SSRF protection (`url-fetch`), and Tavily news search with date filter (`news-search`); each provider supports an optional AI refinement pass (D-050/D-051/D-052); academic paper retrieval (`academic-search`) and generic REST endpoint grounding (`rest-api`) added (D-052)
+- Grounding enrichment in multiple forms: Tavily web search (`tavily`), semantic vector-store RAG (`vector-store`), curated fixed text for style guides and glossaries (`static-context`), specific URL fetching with SSRF protection (`url-fetch`), Tavily news search with date filter (`news-search`), academic paper retrieval from arXiv / Semantic Scholar / OpenAlex (`academic-search`), and generic REST endpoint grounding with SSRF protection and JSONPath extraction (`rest-api`); each provider supports an optional AI refinement pass (D-050–D-052); domain-aware retrieval from the learning store (`learning-retrieval`, D-054)
+- **Continuous learning loop (D-054):** an opt-in `learning-extractor` finalizer extracts structured facts from completed runs and fires a dedicated quality-gate run (`learning-evaluation` crew) fire-and-forget. Only learnings that converge through the gate (three strict reviewers, `AbortOnCritical=true`, multi-model pluralism) are stored as `Approved` in the learning store (`LearningEntries` table, separate namespace from the curated knowledge base). The `learning-retrieval` grounding provider re-injects them into later runs weighted by domain similarity. Management UI at `/crew/learnings`; MCP tool `list_learnings`. Three protective mechanisms against model collapse: (1) separate namespace, (2) auditable gate, (3) structured facts only
 
 ## Out of scope (for now)
 
@@ -37,7 +38,7 @@ The project is the productive application of the [Geef SDK](https://github.com/c
 - Human-in-the-loop between iterations (deliberately not implemented; fire-and-forget remains the model)
 - Mobile apps or native clients
 - Commercial hosting, billing, invoicing
-- True memory-backed advisors with cross-run learning
+- Unfiltered cross-run self-RAG (deliberately rejected; the continuous learning loop above provides gated cross-run learning with three protective mechanisms against model collapse)
 - Domain-specific database connectors (e.g. legal databases such as dejure.org or Beck-Online) — optional later
 - Direct "Export" button in the briefing UI: a one-click export button accessible from the run/briefing UI is not implemented. (File export in md/html/pdf/docx/txt/json *is* implemented, but only via the Finalizer pipeline configured in a crew template — see "In scope" above.)
 

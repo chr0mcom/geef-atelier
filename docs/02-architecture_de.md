@@ -2,7 +2,7 @@
 
 *[English](02-architecture.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-19 (Datenmodell, LLM-/Auth-Schicht und MCP-Auth auf aktuellen Stand gebracht: Crew-Profil-System, OAuth 2.1, Multi-User, Run-User-Isolation, Finalizer-Foundation Step22, Run-Resume Step23)*
+*Letzte Aktualisierung: 2026-05-22 (D-054: RunKind-Spalte auf Runs, LearningEntries-Tabelle, LearningExtract/LearningPublish-Finalizer-Typen, learning-retrieval-Grounding-Provider, /crew/learnings-UI-Page)*
 
 ## Schichtenbild
 
@@ -87,8 +87,8 @@ Geef.Atelier.slnx
 
 ## Datenmodell
 
-Stand Mai 2026 umfasst das Schema **27 Tabellen**, hand-geschriebene Migrationen
-`InitialCreate` + `Step06`/`Step09`–`Step23`. Gruppiert:
+Stand Mai 2026 umfasst das Schema **28 Tabellen**, hand-geschriebene Migrationen
+`InitialCreate` + `Step06`/`Step09`–`Step30`. Gruppiert:
 
 | Gruppe | Tabellen | Eingeführt |
 |---|---|---|
@@ -102,12 +102,13 @@ Stand Mai 2026 umfasst das Schema **27 Tabellen**, hand-geschriebene Migrationen
 | Multi-User | `Users` | Step20 |
 | OAuth 2.1 | `OAuthClients`, `OAuthAuthorizationCodes`, `OAuthAccessTokens`, `OAuthRefreshTokens`, `OAuthAuditLog` | Step19 |
 | Finalizer | `FinalizerProfiles`, `RunArtifacts`, `FinalizationActorCosts` | Step22 |
+| Learning | `LearningEntries` | Step30 |
 
 Die vier Run-Kern-Tabellen sind nachfolgend im Detail dokumentiert; die übrigen
 Gruppen sind in den jeweiligen Feature-Abschnitten bzw. im [Decisions-Log](05-decisions-log_de.md)
 (D-028 ff.) beschrieben. `Runs` trägt zusätzlich Spalten aus späteren Migrationen
 (`CreatedByUser`, `CostTotal`, `CrewTemplateName`, `CrewSnapshot`, `AdvisorRetryAttempted`,
-`FinalizerCostEur`, `FinalizerErrorMessage`, `ParentRunId`, `SeedDraftText`).
+`FinalizerCostEur`, `FinalizerErrorMessage`, `ParentRunId`, `SeedDraftText`, `Kind`).
 
 ### Runs
 
@@ -133,6 +134,7 @@ Gruppen sind in den jeweiligen Feature-Abschnitten bzw. im [Decisions-Log](05-de
 | FinalizerErrorMessage | text | nullable; Fehlermeldung, wenn die Finalizer-Kette teilweise oder vollständig fehlschlug (Step22). |
 | ParentRunId | uuid (FK→Runs) | nullable; selbstreferenziell, kein Cascade — gesetzt, wenn dieser Run aus einem anderen Run fortgesetzt wurde (Step23). |
 | SeedDraftText | text | nullable; letzter Artifact-Text aus der Abschluss-Iteration des Parent-Runs, der als Seed für Iteration 1 dieses Runs verwendet wurde (Step23). |
+| Kind | int | `0 = Standard` (Standard), `1 = Learning` — steuert die beiden Learning-Finalizer; bestehende Rows defaulten auf Standard (Step30). |
 
 ### Iterations
 
@@ -177,7 +179,7 @@ Gruppen sind in den jeweiligen Feature-Abschnitten bzw. im [Decisions-Log](05-de
 | Name | varchar(100) (PK) | |
 | DisplayName | varchar(200) | |
 | Description | text | nullable |
-| FinalizerType | varchar(50) | `FileExport` / `MetadataEnrich` / `ExternalSink` / `Transform` |
+| FinalizerType | int | `0 = FileExport` / `1 = MetadataEnrich` / `2 = ExternalSink` / `3 = Transform` / `4 = LearningExtract` / `5 = LearningPublish` |
 | Settings | jsonb | typspezifische Konfiguration |
 | IsSystem | bool | true für eingebaute System-Profile |
 | CreatedAt | timestamptz | |
@@ -221,6 +223,47 @@ Gruppen sind in den jeweiligen Feature-Abschnitten bzw. im [Decisions-Log](05-de
 ### Neue Spalten auf bestehenden Tabellen (Step23 — Run-Resume)
 
 Siehe `Runs`-Tabelle oben (`ParentRunId`, `SeedDraftText`).
+
+### FinalizerProfiles — Typwerte (Step22 + Step30)
+
+| `FinalizerType`-Wert | Bedeutung | Eingeführt |
+|---|---|---|
+| `0` — `FileExport` | Schreibt den Abschlusstext in eine Datei im konfigurierten Format (md, html, pdf, docx, txt, json) | Step22 |
+| `1` — `MetadataEnrich` | Reichert Run-Metadaten an (Tags, Titelextraktion, …) | Step22 |
+| `2` — `ExternalSink` | Schiebt den Abschlusstext an einen externen Service-Endpunkt | Step22 |
+| `3` — `Transform` | Wendet einen LLM-Transformations-Pass auf den Text an (Zusammenfassung, Übersetzung, …) | Step22 |
+| `4` — `LearningExtract` | Extrahiert strukturierte Learnings aus einem abgeschlossenen Run und stößt fire-and-forget einen Learning-Evaluation-Gate-Run an (opt-in; an kein Standard-Template angehängt) | Step30 |
+| `5` — `LearningPublish` | Veröffentlicht genehmigte Learning-Kandidaten im Learning-Store oder markiert abgelehnte. Läuft innerhalb der `learning-evaluation`-Crew | Step30 |
+
+### LearningEntries (Step30)
+
+Der Learning-Store. Physisch getrennt von der kuratierten Wissensbasis (`KnowledgeDocuments`) — ein konstitutiver Schutzmechanismus gegen Model Collapse.
+
+| Spalte | Typ | Bemerkung |
+|---|---|---|
+| Id | uuid (PK) | |
+| Text | text | Der kondensierte, gate-genehmigte Lerntext |
+| SourceRunId | uuid (FK→Runs ON DELETE SET NULL) | Der Standard-Run, der die Extraktion ausgelöst hat |
+| LearningRunId | uuid (FK→Runs ON DELETE SET NULL) | nullable; der Learning-Evaluation-Run, der diesen Eintrag genehmigt/abgelehnt hat |
+| Domain | text | Template-Name des Quell-Runs — für Domänen-Boost-Retrieval |
+| Status | int | `0 = Proposed`, `1 = Approved`, `2 = Rejected` |
+| StructuredFactsJson | text | Maschinen-lesbares JSON der rohen Run-Fakten, vom Extraktor zusammengestellt |
+| OwnerUsername | text | Geerbt vom `CreatedByUser` des Quell-Runs |
+| CreatedAt | timestamptz | |
+| ApprovedAt | timestamptz | nullable; gesetzt, wenn der Publisher den Eintrag als Approved markiert |
+| Embedding | vector(1536) | nullable; berechnet von `IEmbeddingProvider` zum Genehmigungszeitpunkt; als pgvector gespeichert |
+
+**Indizes:**
+- `IX_LearningEntries_Domain_Status` — Composite-BTree für gefilterte Listen-Queries
+- `IX_LearningEntries_Embedding_HNSW` — HNSW-Index mit `vector_cosine_ops` für Cosine-Similarity-Retrieval
+
+**pgvector Raw-SQL-Pattern:** `Pgvector.EFCore` 0.3.0 ist mit Npgsql 10.x inkompatibel. Die `Embedding`-Spalte ist in EF als `string` abgebildet (Value-Converter); alle Insert- und Cosine-Search-Operationen nutzen raw ADO.NET mit `NpgsqlParameter(NpgsqlDbType.Vector)` — identisch mit dem `VectorSearchRepository`-Muster (D-036).
+
+### Neue Spalten auf bestehenden Tabellen (Step30 — Continuous Learning)
+
+| Tabelle | Spalte | Typ | Bemerkung |
+|---|---|---|---|
+| `Runs` | `Kind` | int | `0 = Standard` (Standard), `1 = Learning` |
 
 ## Crew-System (PS-5)
 
@@ -304,8 +347,21 @@ Weitere Details: [`08-crew-system.md`](08-crew-system_de.md) → Sektion "Adviso
 | Pre-Execution | `AdvisorAwareExecutor` (Decorator) | Konsultiert BeforeFirst/BeforeEvery-Advisors; schreibt AdvisorBlock in Context |
 | Execution | `ProfileBasedExecutor` | LLM-Call mit Profil-SystemPrompt + PreviousFindings + AdvisorBlock; Modell aus `ExecutorProfile` |
 | Evaluation | `ProfileBasedReviewer` × N | N Reviewer aus `CrewSnapshot.Reviewers`; Strategie konfigurierbar |
-| Finalize | `IFinalizerExecutor`-Kette | Läuft nach der Konvergenz. Iteriert `snapshot.Finalizers` der Reihe nach. Jeder `IFinalizerExecutor` erzeugt null oder ein `RunArtifact` (File, Url oder Status). Transform-Finalizer können `currentText` aktualisieren. `RunFinalizersOnMaxAttempts=true` lässt Finalizer auch bei Convergence-Failure laufen. Partial-Success-Vertrag: ein fehlschlagender Finalizer schreibt ein Status-Artifact und die Kette läuft weiter; der Run-Status bleibt Completed. |
+| Finalize | `IFinalizerExecutor`-Kette | Läuft nach der Konvergenz. Iteriert `snapshot.Finalizers` der Reihe nach. Jeder `IFinalizerExecutor` erzeugt null oder ein `RunArtifact` (File, Url oder Status). Transform-Finalizer können `currentText` aktualisieren. `RunFinalizersOnMaxAttempts=true` lässt Finalizer auch bei Convergence-Failure laufen. Partial-Success-Vertrag: ein fehlschlagender Finalizer schreibt ein Status-Artifact und die Kette läuft weiter; der Run-Status bleibt Completed. Learning-Finalizer (`LearningExtract`, `LearningPublish`) tragen je einen Rekursions-Guard: Der Extraktor überspringt Learning-Runs, der Publisher überspringt Standard-Runs. |
 | Convergence-Failure | `TryConvergenceFailureRetryAsync` | Aktiviert OnConvergenceFailure-Advisors, Single-Retry (AdvisorRetryAttempted-Cap) |
+
+**Grounding-Provider-Typen (ProviderType-String):**
+
+| `ProviderType` | Implementierung | Bemerkung |
+|---|---|---|
+| `tavily` | `TavilyGroundingProvider` | Tavily-Websuche |
+| `vector-store` | `VectorStoreGroundingProvider` | Semantische Suche über kuratierte `KnowledgeDocuments` (pgvector) |
+| `static-context` | `StaticContextGroundingProvider` | Verbatim-Fixtext; Style-Guides, Glossare |
+| `url-fetch` | `UrlFetchGroundingProvider` | Fetcht eine URL mit SSRF-Guard |
+| `news-search` | `TavilyNewsGroundingProvider` | Tavily-Newssuche mit Datumsfilter |
+| `academic-search` | `AcademicSearchGroundingProvider` | arXiv / Semantic Scholar / OpenAlex-Adapter |
+| `rest-api` | `RestApiGroundingProvider` | Generischer authentifizierter REST-Endpunkt mit JSONPath-Extraktion |
+| `learning-retrieval` | `LearningRetrievalGroundingProvider` | Cosine-Similarity-Suche über `Approved`-`LearningEntries`; Domänen-Boost-Ranking (`finalScore = similarity × sameDomainBoost \| crossDomainPenalty`); Citations nutzen `learning://{id}`-Schema; in Templates nach kuratierten Wissens-Providern platzieren |
 
 **Convergence-Policy:** `DefaultConvergencePolicy` aus `ConvergenceOptions`, überschreibbar per `ConvergencePolicyOverride` im CrewTemplate.
 
@@ -436,6 +492,7 @@ Browser /new  →  IRunService.SubmitRunAsync  →  RunEntity (Pending) in DB
 | `/crew/profiles/executors` | `ExecutorProfilesIndex` | Liste aller Executor-Profile |
 | `/crew/profiles/executors/new` | `ExecutorProfileEditor` | Neues Executor-Profil anlegen |
 | `/crew/profiles/executors/{name}` | `ExecutorProfileEditor` | Executor-Profil bearbeiten |
+| `/crew/learnings` | `LearningsIndex` | Learning-Einträge aus dem Learning-Store auflisten, filtern, genehmigen, ablehnen und löschen (D-054) |
 
 Neue UI-Komponenten (PS-6): `CrewBadge`, `CrewSelector`, `CrewSummary`, `ReviewerPicker`, `ProfileEditorForm`, `Modal`, `DeleteConfirmationModal`.
 

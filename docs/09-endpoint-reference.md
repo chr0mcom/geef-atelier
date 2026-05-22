@@ -2,7 +2,7 @@
 
 *[Deutsch](09-endpoint-reference_de.md) · **English***
 
-*Last updated: 2026-05-20 (D-051: `providerType` values updated to include `static-context`, `url-fetch`, `news-search`)*
+*Last updated: 2026-05-22 (D-054: `list_learnings` tool added; `providerType` updated to include `learning-retrieval`)*
 
 All externally reachable HTTP endpoints of Geef.Atelier — MCP, OAuth 2.1
 and the web-UI/account endpoints. Base URL: `https://geef.stefan-bechtel.de`.
@@ -109,7 +109,7 @@ Lists all grounding-provider profiles (system + custom).
 | `name` | string | Profile identifier |
 | `displayName` | string | Human-readable name |
 | `description` | string | Purpose description |
-| `providerType` | string | `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"`, or `"news-search"` |
+| `providerType` | string | `"tavily"`, `"vector-store"`, `"static-context"`, `"url-fetch"`, `"news-search"`, `"academic-search"`, `"rest-api"`, or `"learning-retrieval"` |
 | `maxQueriesPerRun` | int? | Max queries per run (null = unlimited) |
 | `isSystem` | boolean | Built-in system profile |
 | `refinementEnabled` | boolean | Whether AI refinement is configured |
@@ -138,6 +138,53 @@ Downloads the binary content of a `File`-type artifact, returned as Base64.
 ```
 
 Only works for `ArtifactType.File` artifacts. Reads the file from the `ExportPath` on disk and returns the raw bytes as Base64. Auth: owner check.
+
+---
+
+#### `list_learnings`
+
+Lists learning entries from the learning store (D-054).
+
+**Input:**
+```json
+{
+  "status_filter": "Proposed|Approved|Rejected",
+  "domain_filter": "<string>"
+}
+```
+
+Both parameters are optional. Omit `status_filter` to return all statuses; omit `domain_filter` to return all domains.
+
+**Output:** Array of learning entry objects:
+```json
+[
+  {
+    "id": "<uuid>",
+    "text": "<string, truncated to 300 chars>",
+    "domain": "<string>",
+    "status": "Proposed|Approved|Rejected",
+    "source_run_id": "<uuid>",
+    "learning_run_id": "<uuid|null>",
+    "owner_username": "<string>",
+    "created_at": "<ISO8601>",
+    "approved_at": "<ISO8601|null>"
+  }
+]
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | uuid | Learning entry identifier |
+| `text` | string | The condensed learning text, truncated to 300 characters |
+| `domain` | string | Template name of the source run (used for domain-boost retrieval) |
+| `status` | string | `"Proposed"`, `"Approved"`, or `"Rejected"` |
+| `source_run_id` | uuid | The standard run that triggered the extraction |
+| `learning_run_id` | uuid \| null | The learning-evaluation run that processed this entry (null while Proposed) |
+| `owner_username` | string | Inherited from the source run's creating user |
+| `created_at` | ISO8601 | Extraction timestamp |
+| `approved_at` | ISO8601 \| null | Approval timestamp (null while Proposed or Rejected) |
+
+**Note:** `structured_facts_json` is intentionally not exposed — the raw fact JSON is too verbose for MCP context and is only accessible via the web UI. Auth: standard run-user isolation; non-admin users see only their own entries.
 
 ---
 
