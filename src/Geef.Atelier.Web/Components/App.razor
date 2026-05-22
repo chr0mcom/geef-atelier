@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="@Assets["atelier.css"]" />
     <link rel="stylesheet" href="@Assets["atelier-dashboard.css"]" />
     <link rel="stylesheet" href="@Assets["Geef.Atelier.Web.styles.css"]" />
-    @if (IsLanding)
+    @if (UsesLandingChrome)
     {
         <link rel="stylesheet" href="@Assets["atelier-landing.css"]" />
     }
@@ -47,7 +47,18 @@
 @code {
     static readonly HashSet<string> AllowedThemes = ["vellum", "noir", "petrol"];
 
+    /// <summary>Public, pre-login pages that share the landing design language.</summary>
+    static readonly HashSet<string> PublicLandingPaths =
+    [
+        "/", "/pricing", "/docs", "/self-host", "/status",
+        "/changelog", "/contact", "/imprint", "/privacy", "/terms",
+    ];
+
     bool IsLanding => Http.HttpContext?.Request.Path.Value == "/";
+
+    /// <summary>True for any public landing-styled page — drives shared CSS + chrome.</summary>
+    bool UsesLandingChrome =>
+        PublicLandingPaths.Contains(Http.HttpContext?.Request.Path.Value ?? "");
 
     string Theme
     {
@@ -58,8 +69,8 @@
         }
     }
 
-    string HtmlRootClass => $"palette-{Theme}{(IsLanding ? " landing-root" : "")}";
-    string BodyClass => IsLanding ? "landing-body" : "";
+    string HtmlRootClass => $"palette-{Theme}{(UsesLandingChrome ? " landing-root" : "")}";
+    string BodyClass => UsesLandingChrome ? "landing-body" : "";
 
     /// <summary>Dashboard scope read from cookie; defaults to "my".</summary>
     internal string DashboardScope
