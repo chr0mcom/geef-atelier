@@ -64,6 +64,8 @@
                     <option value="static-context">Static Context (kuratierter Text)</option>
                     <option value="url-fetch">URL Fetch (konkrete URLs)</option>
                     <option value="news-search">News Search (Tavily News + Datum)</option>
+                    <option value="academic-search">Academic Search (arXiv / Semantic Scholar / OpenAlex)</option>
+                    <option value="rest-api">REST-API (beliebiger HTTP-Endpunkt, JSON)</option>
                 </InputSelect>
             </div>
 
@@ -211,6 +213,147 @@
                         <option value="advanced">Advanced (gründlicher, mehr Credits)</option>
                     </InputSelect>
                     <FieldHelp Text="@GroundingFieldHelps.NewsSearchDepth" />
+                </div>
+            }
+
+            @if (_form.ProviderType == "academic-search")
+            {
+                <div class="form-row">
+                    <label>Quelle</label>
+                    <InputSelect @bind-Value="_form.AcademicSource" class="form-input"
+                                 disabled="@_isReadOnly"
+                                 data-testid="input-academic-source">
+                        <option value="semantic-scholar">Semantic Scholar (breit, optionaler Key)</option>
+                        <option value="arxiv">arXiv (Preprints CS/Physik/Math, kein Key)</option>
+                        <option value="openalex">OpenAlex (sehr breit, modern)</option>
+                    </InputSelect>
+                    <FieldHelp Text="@GroundingFieldHelps.AcademicSource" />
+                </div>
+
+                <div class="form-row">
+                    <label>Max. Paper</label>
+                    <InputNumber @bind-Value="_form.AcademicMaxPapers" class="form-input" min="1" max="20"
+                                 disabled="@_isReadOnly"
+                                 data-testid="input-academic-max-papers" />
+                    <FieldHelp Text="@GroundingFieldHelps.AcademicMaxPapers" />
+                </div>
+
+                <div class="form-row">
+                    <label>Datum ab (optional)</label>
+                    <InputText @bind-Value="_form.AcademicDateFrom" class="form-input"
+                               placeholder="z. B. 2024 oder 2024-01-01"
+                               disabled="@_isReadOnly"
+                               data-testid="input-academic-date-from" />
+                    <FieldHelp Text="@GroundingFieldHelps.AcademicDateFrom" />
+                </div>
+
+                <div class="form-row">
+                    <label>Suchfeld-Einschränkung (optional)</label>
+                    <InputText @bind-Value="_form.AcademicFields" class="form-input"
+                               placeholder="leer = alle Felder"
+                               disabled="@_isReadOnly"
+                               data-testid="input-academic-fields" />
+                    <FieldHelp Text="@GroundingFieldHelps.AcademicFields" />
+                </div>
+
+                <div class="form-row">
+                    <label>API-Key-ENV-Variable (optional)</label>
+                    <InputText @bind-Value="_form.AcademicApiKeyEnv" class="form-input"
+                               placeholder="z. B. SEMANTIC_SCHOLAR_API_KEY"
+                               disabled="@_isReadOnly"
+                               data-testid="input-academic-api-key-env" />
+                    <FieldHelp Text="@GroundingFieldHelps.AcademicApiKeyEnv" />
+                </div>
+            }
+
+            @if (_form.ProviderType == "rest-api")
+            {
+                <div class="form-row">
+                    <label>URL</label>
+                    <InputText @bind-Value="_form.RestApiUrl" class="form-input"
+                               placeholder="https://api.example.com/search?q={briefing}"
+                               disabled="@_isReadOnly"
+                               data-testid="input-rest-api-url" />
+                    <FieldHelp Text="@GroundingFieldHelps.RestApiUrl" />
+                </div>
+
+                <div class="form-row">
+                    <label>Methode</label>
+                    <InputSelect @bind-Value="_form.RestApiMethod" class="form-input"
+                                 disabled="@_isReadOnly"
+                                 data-testid="input-rest-api-method">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                    </InputSelect>
+                    <FieldHelp Text="@GroundingFieldHelps.RestApiMethod" />
+                </div>
+
+                @if (_form.RestApiMethod == "POST")
+                {
+                    <div class="form-row">
+                        <label>Body-Template (POST)</label>
+                        <InputTextArea @bind-Value="_form.RestApiBodyTemplate" rows="4" class="form-input"
+                                       placeholder="{\"query\": \"{briefing}\", \"limit\": 10}"
+                                       disabled="@_isReadOnly"
+                                       data-testid="input-rest-api-body-template" />
+                        <FieldHelp Text="@GroundingFieldHelps.RestApiBodyTemplate" />
+                    </div>
+                }
+
+                <div class="form-row">
+                    <label>JSONPath (Antwort-Pfad, optional)</label>
+                    <InputText @bind-Value="_form.RestApiResponsePath" class="form-input"
+                               placeholder="$.results oder $.data[*].content"
+                               disabled="@_isReadOnly"
+                               data-testid="input-rest-api-response-path" />
+                    <FieldHelp Text="@GroundingFieldHelps.RestApiResponsePath" />
+                </div>
+
+                <div class="form-row">
+                    <label>Max. Items</label>
+                    <InputNumber @bind-Value="_form.RestApiMaxItems" class="form-input" min="1" max="50"
+                                 disabled="@_isReadOnly"
+                                 data-testid="input-rest-api-max-items" />
+                    <FieldHelp Text="@GroundingFieldHelps.RestApiMaxItems" />
+                </div>
+
+                <div class="form-row">
+                    <label>Auth-Header-ENV-Variable (optional)</label>
+                    <InputText @bind-Value="_form.RestApiAuthHeaderEnv" class="form-input"
+                               placeholder="z. B. MY_API_TOKEN"
+                               disabled="@_isReadOnly"
+                               data-testid="input-rest-api-auth-header-env" />
+                    <FieldHelp Text="@GroundingFieldHelps.RestApiAuthHeaderEnv" />
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(_form.RestApiAuthHeaderEnv))
+                {
+                    <div class="form-row">
+                        <label>Auth-Header-Name</label>
+                        <InputText @bind-Value="_form.RestApiAuthHeaderName" class="form-input"
+                                   placeholder="Authorization"
+                                   disabled="@_isReadOnly"
+                                   data-testid="input-rest-api-auth-header-name" />
+                        <FieldHelp Text="@GroundingFieldHelps.RestApiAuthHeaderName" />
+                    </div>
+
+                    <div class="form-row">
+                        <label>Auth-Header-Format</label>
+                        <InputText @bind-Value="_form.RestApiAuthHeaderFormat" class="form-input"
+                                   placeholder="Bearer {token}"
+                                   disabled="@_isReadOnly"
+                                   data-testid="input-rest-api-auth-header-format" />
+                        <FieldHelp Text="@GroundingFieldHelps.RestApiAuthHeaderFormat" />
+                    </div>
+                }
+
+                <div class="form-row">
+                    <label>Zusatz-Header (JSON, optional)</label>
+                    <InputTextArea @bind-Value="_form.RestApiHeaders" rows="3" class="form-input"
+                                   placeholder="{\"Accept\": \"application/json\"}"
+                                   disabled="@_isReadOnly"
+                                   data-testid="input-rest-api-headers" />
+                    <FieldHelp Text="@GroundingFieldHelps.RestApiHeaders" />
                 </div>
             }
 
@@ -467,6 +610,24 @@
         public int NewsMaxResults { get; set; } = 5;
         public string NewsSearchDepth { get; set; } = "basic";
 
+        // academic-search
+        public string AcademicSource { get; set; } = "semantic-scholar";
+        public int AcademicMaxPapers { get; set; } = 5;
+        public string AcademicDateFrom { get; set; } = "";
+        public string AcademicFields { get; set; } = "";
+        public string AcademicApiKeyEnv { get; set; } = "";
+
+        // rest-api
+        public string RestApiUrl { get; set; } = "";
+        public string RestApiMethod { get; set; } = "GET";
+        public string RestApiHeaders { get; set; } = "";
+        public string RestApiBodyTemplate { get; set; } = "";
+        public string RestApiResponsePath { get; set; } = "";
+        public int RestApiMaxItems { get; set; } = 10;
+        public string RestApiAuthHeaderEnv { get; set; } = "";
+        public string RestApiAuthHeaderName { get; set; } = "Authorization";
+        public string RestApiAuthHeaderFormat { get; set; } = "Bearer {token}";
+
         public static GroundingFormModel From(GroundingProviderProfile p)
         {
             p.ProviderSettings.TryGetValue("Tier", out var tier);
@@ -503,6 +664,20 @@
                 RecencyDays = p.RecencyDays,
                 NewsMaxResults = p.NewsMaxResults,
                 NewsSearchDepth = p.NewsSearchDepth ?? "basic",
+                AcademicSource = p.AcademicSource,
+                AcademicMaxPapers = p.AcademicMaxPapers,
+                AcademicDateFrom = p.AcademicDateFrom ?? "",
+                AcademicFields = p.AcademicFields ?? "",
+                AcademicApiKeyEnv = p.AcademicApiKeyEnv ?? "",
+                RestApiUrl = p.RestApiUrl ?? "",
+                RestApiMethod = p.RestApiMethod,
+                RestApiHeaders = p.ProviderSettings.GetValueOrDefault(GroundingProviderProfile.KeyRestApiHeaders, ""),
+                RestApiBodyTemplate = p.RestApiBodyTemplate ?? "",
+                RestApiResponsePath = p.RestApiResponsePath ?? "",
+                RestApiMaxItems = p.RestApiMaxItems,
+                RestApiAuthHeaderEnv = p.RestApiAuthHeaderEnv ?? "",
+                RestApiAuthHeaderName = p.RestApiAuthHeaderName,
+                RestApiAuthHeaderFormat = p.RestApiAuthHeaderFormat,
             };
         }
 
@@ -533,6 +708,8 @@
                     [GroundingProviderProfile.KeyNewsMaxResults] = NewsMaxResults.ToString(),
                     [GroundingProviderProfile.KeyNewsSearchDepth] = NewsSearchDepth
                 },
+                "academic-search" => BuildAcademicSettings(),
+                "rest-api" => BuildRestApiSettings(),
                 _ => new Dictionary<string, string>   // tavily (default)
                 {
                     ["Tier"] = Tier,
@@ -553,7 +730,7 @@
                     settings[GroundingProviderProfile.KeyRefinementInstructions] = RefinementInstructions.Trim();
             }
 
-            var maxQueries = ProviderType == "static-context" ? 1 : MaxQueriesPerRun;
+            var maxQueries = ProviderType is "static-context" or "rest-api" ? MaxQueriesPerRun ?? 1 : MaxQueriesPerRun;
 
             return new GroundingProviderProfile(
                 Name: SystemCrew.EnsureCustomPrefix(Name),
@@ -563,6 +740,45 @@
                 ProviderSettings: settings,
                 MaxQueriesPerRun: maxQueries,
                 IsSystem: false);
+        }
+
+        private Dictionary<string, string> BuildAcademicSettings()
+        {
+            var s = new Dictionary<string, string>
+            {
+                [GroundingProviderProfile.KeyAcademicSource]    = AcademicSource,
+                [GroundingProviderProfile.KeyAcademicMaxPapers] = AcademicMaxPapers.ToString(),
+            };
+            if (!string.IsNullOrWhiteSpace(AcademicDateFrom))
+                s[GroundingProviderProfile.KeyAcademicDateFrom] = AcademicDateFrom.Trim();
+            if (!string.IsNullOrWhiteSpace(AcademicFields))
+                s[GroundingProviderProfile.KeyAcademicFields] = AcademicFields.Trim();
+            if (!string.IsNullOrWhiteSpace(AcademicApiKeyEnv))
+                s[GroundingProviderProfile.KeyAcademicApiKeyEnv] = AcademicApiKeyEnv.Trim();
+            return s;
+        }
+
+        private Dictionary<string, string> BuildRestApiSettings()
+        {
+            var s = new Dictionary<string, string>
+            {
+                [GroundingProviderProfile.KeyRestApiUrl]     = RestApiUrl,
+                [GroundingProviderProfile.KeyRestApiMethod]  = RestApiMethod,
+                [GroundingProviderProfile.KeyRestApiMaxItems] = RestApiMaxItems.ToString(),
+            };
+            if (!string.IsNullOrWhiteSpace(RestApiHeaders))
+                s[GroundingProviderProfile.KeyRestApiHeaders] = RestApiHeaders.Trim();
+            if (!string.IsNullOrWhiteSpace(RestApiBodyTemplate))
+                s[GroundingProviderProfile.KeyRestApiBodyTemplate] = RestApiBodyTemplate;
+            if (!string.IsNullOrWhiteSpace(RestApiResponsePath))
+                s[GroundingProviderProfile.KeyRestApiResponsePath] = RestApiResponsePath.Trim();
+            if (!string.IsNullOrWhiteSpace(RestApiAuthHeaderEnv))
+            {
+                s[GroundingProviderProfile.KeyRestApiAuthHeaderEnv]    = RestApiAuthHeaderEnv.Trim();
+                s[GroundingProviderProfile.KeyRestApiAuthHeaderName]   = RestApiAuthHeaderName;
+                s[GroundingProviderProfile.KeyRestApiAuthHeaderFormat] = RestApiAuthHeaderFormat;
+            }
+            return s;
         }
     }
 }

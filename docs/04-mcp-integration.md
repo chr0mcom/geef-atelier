@@ -2,7 +2,7 @@
 
 *[Deutsch](04-mcp-integration_de.md) · **English***
 
-*Last updated: 2026-05-20 (D-051: neue providerType-Werte static-context, url-fetch, news-search in list_grounding_provider_profiles + materialize_template_proposal dokumentiert)*
+*Last updated: 2026-05-22 (D-052: academic-search und rest-api als neue providerType-Werte in list_grounding_provider_profiles + materialize_template_proposal dokumentiert)*
 
 ## Why MCP
 

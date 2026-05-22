@@ -239,6 +239,24 @@ public static class SystemCrew
         MaxQueriesPerRun: 1,
         IsSystem: true);
 
+    /// <summary>System grounding-provider profile for scientific papers via Semantic Scholar with LLM-based relevance filtering.</summary>
+    public static readonly GroundingProviderProfile AcademicDefaultProfile = new(
+        Name: "academic-default",
+        DisplayName: "Academic Search (Semantic Scholar + AI-filtered)",
+        Description: "Semantic Scholar search for scientific papers, filtered by an LLM refiner to retain only the most relevant results.",
+        ProviderType: GroundingProviderTypes.AcademicSearch,
+        ProviderSettings: new Dictionary<string, string>
+        {
+            [GroundingProviderProfile.KeyAcademicSource]             = "semantic-scholar",
+            [GroundingProviderProfile.KeyAcademicMaxPapers]          = "5",
+            [GroundingProviderProfile.KeyRefinementProvider]         = "openrouter",
+            [GroundingProviderProfile.KeyRefinementModel]            = "google/gemini-2.0-flash-lite",
+            [GroundingProviderProfile.KeyRefinementMaxTokens]        = "2048",
+            [GroundingProviderProfile.KeyRefinementMode]             = "0",
+        },
+        MaxQueriesPerRun: 1,
+        IsSystem: true);
+
     /// <summary>System grounding-provider profile for recent news via Tavily news topic with LLM-based noise filtering.</summary>
     public static readonly GroundingProviderProfile TavilyNewsProfile = new(
         Name: "tavily-news",
@@ -352,6 +370,7 @@ public static class SystemCrew
             [KnowledgeBaseDefaultProfile.Name] = KnowledgeBaseDefaultProfile,
             [RunAttachmentsProfile.Name]       = RunAttachmentsProfile,
             [TavilyNewsProfile.Name]           = TavilyNewsProfile,
+            [AcademicDefaultProfile.Name]      = AcademicDefaultProfile,
         };
 
     /// <summary>All system crew templates, indexed by name.</summary>

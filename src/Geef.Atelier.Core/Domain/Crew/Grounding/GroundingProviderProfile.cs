@@ -115,4 +115,76 @@ public sealed record GroundingProviderProfile(
 
     public string? NewsSearchDepth =>
         ProviderSettings.TryGetValue(KeyNewsSearchDepth, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
+
+    // ── Academic-search settings keys ────────────────────────────────────────
+    public const string KeyAcademicSource    = "source";
+    public const string KeyAcademicMaxPapers = "maxPapers";
+    public const string KeyAcademicDateFrom  = "dateFrom";
+    public const string KeyAcademicFields    = "fields";
+    public const string KeyAcademicApiKeyEnv = "apiKeyEnv";
+
+    public string AcademicSource =>
+        ProviderSettings.TryGetValue(KeyAcademicSource, out var v) && !string.IsNullOrWhiteSpace(v) ? v : "semantic-scholar";
+
+    public int AcademicMaxPapers =>
+        ProviderSettings.TryGetValue(KeyAcademicMaxPapers, out var v) && int.TryParse(v, out var n) ? n : 5;
+
+    public string? AcademicDateFrom =>
+        ProviderSettings.TryGetValue(KeyAcademicDateFrom, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
+
+    public string? AcademicFields =>
+        ProviderSettings.TryGetValue(KeyAcademicFields, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
+
+    public string? AcademicApiKeyEnv =>
+        ProviderSettings.TryGetValue(KeyAcademicApiKeyEnv, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
+
+    // ── REST-API settings keys ────────────────────────────────────────────────
+    public const string KeyRestApiUrl             = "url";
+    public const string KeyRestApiMethod          = "method";
+    public const string KeyRestApiHeaders         = "headers";
+    public const string KeyRestApiBodyTemplate    = "bodyTemplate";
+    public const string KeyRestApiResponsePath    = "responsePath";
+    public const string KeyRestApiMaxItems        = "maxItems";
+    public const string KeyRestApiAuthHeaderEnv   = "authHeaderEnv";
+    public const string KeyRestApiAuthHeaderName  = "authHeaderName";
+    public const string KeyRestApiAuthHeaderFormat = "authHeaderFormat";
+
+    public string? RestApiUrl =>
+        ProviderSettings.TryGetValue(KeyRestApiUrl, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
+
+    public string RestApiMethod =>
+        ProviderSettings.TryGetValue(KeyRestApiMethod, out var v) && !string.IsNullOrWhiteSpace(v) ? v.ToUpperInvariant() : "GET";
+
+    public IReadOnlyDictionary<string, string> RestApiHeaders
+    {
+        get
+        {
+            if (!ProviderSettings.TryGetValue(KeyRestApiHeaders, out var raw) || string.IsNullOrWhiteSpace(raw))
+                return new Dictionary<string, string>();
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(raw)
+                       ?? new Dictionary<string, string>();
+            }
+            catch { return new Dictionary<string, string>(); }
+        }
+    }
+
+    public string? RestApiBodyTemplate =>
+        ProviderSettings.TryGetValue(KeyRestApiBodyTemplate, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
+
+    public string? RestApiResponsePath =>
+        ProviderSettings.TryGetValue(KeyRestApiResponsePath, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
+
+    public int RestApiMaxItems =>
+        ProviderSettings.TryGetValue(KeyRestApiMaxItems, out var v) && int.TryParse(v, out var n) ? n : 10;
+
+    public string? RestApiAuthHeaderEnv =>
+        ProviderSettings.TryGetValue(KeyRestApiAuthHeaderEnv, out var v) && !string.IsNullOrWhiteSpace(v) ? v : null;
+
+    public string RestApiAuthHeaderName =>
+        ProviderSettings.TryGetValue(KeyRestApiAuthHeaderName, out var v) && !string.IsNullOrWhiteSpace(v) ? v : "Authorization";
+
+    public string RestApiAuthHeaderFormat =>
+        ProviderSettings.TryGetValue(KeyRestApiAuthHeaderFormat, out var v) && !string.IsNullOrWhiteSpace(v) ? v : "Bearer {token}";
 }
