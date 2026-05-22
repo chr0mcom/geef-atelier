@@ -1,4 +1,5 @@
 using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Application.Crew.Learning;
 using Geef.Atelier.Application.Providers;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,6 +17,7 @@ public static class ApplicationServiceExtensions
         services.AddScoped<IRunService, RunService>();
         services.AddScoped<ICrewService, CrewService>();
         services.AddScoped<IProviderService, ProviderService>();
+        services.AddScoped<ILearningService, LearningService>();
         return services;
     }
 }

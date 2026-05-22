@@ -488,3 +488,49 @@ The Edit step exposes the full field set for the template and every profile slot
 `TemplateStudioService.MaterializeAsync` wraps all DB writes in a single EF Core transaction (`IAtomicTransactionFactory`). Order: validate → begin → create profiles (Executor, Reviewer, Advisor, GroundingProvider, Finalizer) → create template → commit. Explicit rollback on any error — no half-materialized state. `MarkMaterializedAsync` (marks the analysis record as consumed) runs inside the transaction.
 
 Finalizer proposals appear in the Studio's LLM analysis output; `TemplateStudioService.CreateProfileAsync` handles the finalizer branch; `StudioEditStep` exposes the finalizer slot section alongside the other profile slots.
+
+## Continuous Learning Loop (D-054)
+
+### Architecture
+
+```
+NORMAL RUN  →  Finalizer "learning-extractor" (opt-in)
+   ├─ Guard: run.Kind == Learning → return          (recursion stop #1)
+   ├─ Threshold: iterationCount ≥ 2 OR Major+ finding
+   ├─ Assembles structured facts → LearningEntry (Proposed)
+   └─ FIRE-AND-FORGET: SubmitRunAsync(crew=learning-evaluation, Kind=Learning)
+
+LEARNING-RUN  (Kind=Learning, crew "learning-evaluation")
+   ├─ Executor condenses candidate
+   ├─ 3 strict reviewers (AbortOnCritical=true, MaxIterations=2)
+   └─ Finalizer "learning-publisher" (RunFinalizersOnMaxAttempts=true)
+        ├─ Guard: run.Kind != Learning → return      (recursion stop #2)
+        ├─ Convergence  → compute embedding, Approved, written to store
+        └─ Non-conv.    → Rejected, nothing written
+
+LATER RUN  →  Grounding "learning-retrieval"
+   ├─ Embedding search over Approved learnings
+   ├─ Domain-boost: finalScore = similarity × (sameDomain ? boost : penalty)
+   ├─ Curated knowledge (vector-store) outranks learnings by provider order
+   └─ SourceCitation: learning://{id}
+```
+
+### RunKind enum
+
+`Standard = 0` (default) / `Learning = 1`. Carried in `RunEntity.Kind`, passed through `SubmitRunRequest.Kind` and `IRunPersistenceService.CreateRunAsync`. The orchestrator dispatches both kinds identically; the kind only gates the two learning finalizers.
+
+### LearningEntry lifecycle
+
+`Proposed` (extractor wrote it) → `Approved` (publisher + embedding) or `Rejected` (publisher, nothing stored). Manual override possible via `/crew/learnings` UI (owner-checked).
+
+### System profiles added (Step30 migration)
+
+| Name | Type | Notes |
+|---|---|---|
+| `learning-extractor` | Finalizer (LearningExtract) | Not attached to any standard template — opt-in |
+| `learning-publisher` | Finalizer (LearningPublish) | Attached to `learning-evaluation` crew |
+| `learning-evaluation` | CrewTemplate | AbortOnCritical=true, MaxIterations=2, 3 strict reviewers |
+| `learning-retriever-default` | GroundingProvider (LearningRetrieval) | sameDomainBoost=1.0, crossDomainPenalty=0.5, maxLearnings=4 |
+| `learning-factual-grounding` | Reviewer | openrouter/gpt-4.1 |
+| `learning-value` | Reviewer | openrouter/gemini-2.5-pro |
+| `learning-generalizability` | Reviewer | claude-cli/claude-opus-4.7 |

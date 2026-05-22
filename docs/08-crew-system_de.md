@@ -476,3 +476,49 @@ Der Edit-Step exponiert das vollständige Feld-Set für das Template und jeden P
 `TemplateStudioService.MaterializeAsync` kapselt alle DB-Schreibvorgänge in einer einzelnen EF-Core-Transaktion (`IAtomicTransactionFactory`). Ablauf: Validierung → Begin → Profile anlegen (Executor, Reviewer, Advisor, GroundingProvider, Finalizer) → Template anlegen → Commit. Explizites Rollback bei jedem Fehler — kein Halb-materialisierter Zustand. `MarkMaterializedAsync` (markiert den Analyse-Datensatz als verbraucht) läuft innerhalb der Transaktion.
 
 Finalizer-Vorschläge erscheinen in der LLM-Analyse-Ausgabe des Studios; `TemplateStudioService.CreateProfileAsync` behandelt den Finalizer-Zweig; `StudioEditStep` stellt den Finalizer-Slot-Abschnitt neben den übrigen Profil-Slots bereit.
+
+## Kontinuierlicher Lernzyklus (D-054)
+
+### Architektur
+
+```
+NORMALER RUN  →  Finalizer „learning-extractor" (opt-in)
+   ├─ Guard: run.Kind == Learning → return       (Rekursions-Stopp #1)
+   ├─ Schwelle: ≥ 2 Iterationen ODER Major+-Finding
+   ├─ Strukturierte Fakten → LearningEntry (Proposed)
+   └─ FIRE-AND-FORGET: SubmitRunAsync(crew=learning-evaluation, Kind=Learning)
+
+LEARNING-RUN  (Kind=Learning, Crew „learning-evaluation")
+   ├─ Executor kondensiert Kandidat
+   ├─ 3 strenge Reviewer (AbortOnCritical=true, MaxIterations=2)
+   └─ Finalizer „learning-publisher" (RunFinalizersOnMaxAttempts=true)
+        ├─ Guard: run.Kind != Learning → return   (Rekursions-Stopp #2)
+        ├─ Konvergenz  → Embedding berechnen, Approved, in Store schreiben
+        └─ Nicht-Konv. → Rejected, nichts geschrieben
+
+SPÄTERER RUN  →  Grounding „learning-retrieval"
+   ├─ Embedding-Suche über Approved-Learnings
+   ├─ Domänen-Boost: finalScore = similarity × (sameDomain ? boost : penalty)
+   ├─ Kuratiertes Wissen (vector-store) schlägt Learnings per Provider-Reihenfolge
+   └─ SourceCitation: learning://{id}
+```
+
+### `RunKind`-Enum
+
+`Standard = 0` (Standard) / `Learning = 1`. In `RunEntity.Kind` geführt, durch `SubmitRunRequest.Kind` und `IRunPersistenceService.CreateRunAsync` durchgereicht. Der Orchestrator dispatcht beide Arten identisch; das Kind gatet nur die zwei Lern-Finalizer.
+
+### `LearningEntry`-Lebenszyklus
+
+`Proposed` (Extractor) → `Approved` (Publisher + Embedding) oder `Rejected` (Publisher, nichts gespeichert). Manuelles Override über `/crew/learnings` (Owner-Check).
+
+### System-Profile (Migration Step30)
+
+| Name | Typ | Hinweis |
+|---|---|---|
+| `learning-extractor` | Finalizer (LearningExtract) | Kein Standard-Template — opt-in |
+| `learning-publisher` | Finalizer (LearningPublish) | Teil der `learning-evaluation`-Crew |
+| `learning-evaluation` | CrewTemplate | AbortOnCritical=true, MaxIterations=2 |
+| `learning-retriever-default` | GroundingProvider (LearningRetrieval) | sameDomainBoost=1.0, crossDomainPenalty=0.5 |
+| `learning-factual-grounding` | Reviewer | openrouter/gpt-4.1 |
+| `learning-value` | Reviewer | openrouter/gemini-2.5-pro |
+| `learning-generalizability` | Reviewer | claude-cli/claude-opus-4.7 |

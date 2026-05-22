@@ -1079,3 +1079,38 @@ Die Route `/` war bisher das authentifizierte Workshop-Dashboard (`[Authorize]`,
 **D-053/10 — Hero-Headline fest auf `manufactory`-Variante.** „A manufactory for the written word." ist eine Konstante in `LandingHero.razor`. Die Alternativvariante (`„atelier"`) wurde nicht portiert.
 
 **Tests:** 1382 gesamt. Neu: 48 bUnit-Tests — `LandingPageTests` (35: Nav, Hero, GeefFlow 4 Phasen + IterationLoop + Iter-Badge, Crew, Proof, Capabilities, Closing, Footer), `LandingRoutingTests` (13: Anonym-Render, Auth-Redirect, Reflection Route/Attribute, `ResolvePostLogin`-Unit, ComingSoon, Stub-Seiten-Attribute).
+
+
+---
+
+## D-054 — Kontinuierlicher Lernzyklus: Qualitätsgegattertes Selbstverbesserungs-Loop (22. Mai 2026)
+
+*Datum: 22. Mai 2026*
+
+Jeder Atelier-Run produziert implizit Wissen (Reviewer-Findings, Konvergenzverlauf, Korrekturen zwischen Iterationen), das bisher verpuffte. Diese Entscheidung schließt einen kontinuierlichen Verbesserungs-Loop: Ein opt-in `learning-extractor`-Finalizer extrahiert strukturierte Fakten aus einem abgeschlossenen Run, stößt fire-and-forget einen eigenen, streng kalibrierten **Learning-Evaluation-Run** als Qualitäts-Gate an, und nur konvergierte Learnings landen — domänen-getaggt — in einem **von der kuratierten Knowledge-Base getrennten** Store. Ein domänen-bewusster Grounding-Provider zieht sie bei späteren Runs gewichtet wieder ein.
+
+Der naive Ansatz (ungefiltertes Self-RAG) wurde bewusst verworfen: Er führt zu Model Collapse. **Drei Schutzmechanismen sind konstitutiv:** (1) getrennter Namespace (`LearningEntries`-Tabelle, `learning://`-Zitationsschema), (2) der Learning-Run als auditierbares Gate, (3) strukturierte Fakten statt freier KI-Prosa. Dazu ein domänen-bewusster Retriever als wirksamster Einzelschutz gegen die Relevanz-Falle.
+
+**D-054/1 — `RunKind`-Enum: `Standard = 0 / Learning = 1`.** Ein Learning-Run ist ein normaler Run mit Crew `learning-evaluation` + `Kind = Learning`. Kein Orchestrator-Dispatch-Change — `RunKind` ist reine Metadaten, die nur die zwei Finalizer gaten. Rückwärtskompatibel: bestehende Runs defaulten auf `Standard`; `Kind`-Spalte in Migration Step30 mit `DEFAULT 0`. `SubmitRunRequest.Kind` und `IRunPersistenceService.CreateRunAsync` um optionalen Parameter erweitert.
+
+**D-054/2 — Rekursions-Stopp ist sicherheitskritisch und als zwei Guards implementiert.** (a) `LearningExtractFinalizerExecutor`: `if (run.Kind == RunKind.Learning) return Ok;` — der Extractor verweigert die Ausführung innerhalb eines Learning-Runs. (b) `LearningPublishFinalizerExecutor`: `if (run.Kind != RunKind.Learning) return Ok;` — der Publisher verweigert die Ausführung in Standard-Runs. Beide Guards lesen `run.Kind` über `IRunRepository.GetByIdAsync`. Ein dedizierter Unit-Test (`LearningRunDoesNotTriggerLearningRunTests`) beweist die Invariante.
+
+**D-054/3 — `LearningEntry`-Record mit strukturierten Fakten.** `(Guid Id, string Text, Guid SourceRunId, Guid? LearningRunId, string Domain, LearningStatus Status, string StructuredFactsJson, string OwnerUsername, DateTimeOffset CreatedAt, DateTimeOffset? ApprovedAt)`. Status: `Proposed → Approved | Rejected`. Embedding separat als pgvector-Spalte (nicht im Record-Konstruktor).
+
+**D-054/4 — pgvector Raw-SQL-Pattern (identisch mit D-036 VectorSearchRepository).** `Pgvector.EFCore` 0.3.0 inkompatibel mit Npgsql 10.x. Vector als `vector(1536)`-Spalte mit String-Konverter in EF; INSERT und Cosine-Similarity-Suche via rohem ADO.NET (`NpgsqlParameter` mit `NpgsqlDbType.Vector`). HNSW-Index mit `vector_cosine_ops`.
+
+**D-054/5 — `LearningExtractFinalizerExecutor` Schwelle + Fire-and-Forget.** Schwelle: `iterationCount ≥ minIterations (Standard 2) ODER mindestens ein Finding mit Severity ≤ Major`. Strukturierte Fakten aus: Briefing-Essenz, Template-Name (= Domäne), Iterationszahl, Findings (Severity + Reviewer + Message), Deltas zwischen Iterationen. LLM-Call (konfigurierbares Binding) mit striktem Anti-Halluzinations-Prompt. `LearningEntry` mit `Status = Proposed` persistiert. `SubmitRunAsync(Kind = RunKind.Learning)` als Fire-and-Forget im try/catch — ein Submit-Fehler bricht den Ursprungs-Run nicht ab.
+
+**D-054/6 — Learning-Evaluation-Crew: Multi-Modell-Pluralismus mit `AbortOnCritical = true`.** Drei strenge Reviewer zur Reduktion korrelierter blinder Flecken: `learning-factual-grounding` (openrouter/gpt-4.1), `learning-value` (openrouter/gemini-2.5-pro), `learning-generalizability` (claude-cli/claude-opus-4.7, ≠ Executor). `ConvergenceOverride(MaxIterations: 2, AbortOnCritical: true)`. Finalizer: `learning-publisher` mit `RunFinalizersOnMaxAttempts: true`.
+
+**D-054/7 — `LearningPublishFinalizerExecutor`: Gate-Output.** Findet den Kandidaten-`LearningEntry` mit `LearningRunId == context.RunId`. Konvergenz → Embedding berechnen, `UpdateStatusAsync(Approved, UtcNow)`, Embedding schreiben. Nicht-Konvergenz → `UpdateStatusAsync(Rejected, null)`, nichts in den Vektor-Store.
+
+**D-054/8 — Domänen-bewusster Retriever: `LearningRetrievalGroundingProvider`.** Query-Embedding aus Briefing; `SearchApprovedAsync` mit topK×4 Extra-Kandidaten; Domänen-Boost-Re-Ranking: `finalScore = similarity × (sameDomain ? sameDomainBoost : crossDomainPenalty)`. Standards: `sameDomainBoost = 1.0`, `crossDomainPenalty = 0.5`, `maxLearnings = 4`. Kuratiertes Wissen (`vector-store`) wird in Crew-Templates vor `learning-retrieval` gelistet — kuratiert schlägt Learnings.
+
+**D-054/9 — Verwaltungs-UI `/crew/learnings`.** Liste mit Status-Badge, Domäne, Text-Vorschau, Datum. Filter: Status-Dropdown + Domäne-Text. Aktionen: Genehmigen / Ablehnen / Löschen (DeleteConfirmationModal). Expand-on-Click: Volltext, Quell-Run-Link, Learning-Run-Link, Genehmigungs-Zeitstempel, strukturierte Fakten (klappbares JSON). `ILearningService` erzwingt Owner-Check für alle Mutationen.
+
+**D-054/10 — MCP-Tool `list_learnings`.** Filter: `status_filter` (Proposed / Approved / Rejected), `domain_filter`. Gibt Id, Text (gekürzt auf 300 Zeichen), Domäne, Status, Quell-Run-Id, Learning-Run-Id, Owner, Zeitstempel zurück. `StructuredFactsJson` nicht exponiert (zu verbose).
+
+**Was bewusst NICHT in diesem Schritt:** kein ungefiltertes Auto-Schreiben; kein Schreiben in die kuratierte KB; kein Analytics-Dashboard; keine schreibseitige Learning-Dedup; kein Learning-Verfall; keine Cross-User-Learnings; kein Multi-Hop-Learning; kein Backfill historischer Runs.
+
+**Tests:** 1439 gesamt. Neu: ca. 57 Tests — Anti-Rekursion, RunKind, Threshold, Fire-and-Forget, Publisher, Retriever-Domänen-Boost, UI (bUnit).

@@ -113,8 +113,9 @@ public sealed class Step10CrewSystemMigrationTests : IAsyncLifetime
         await context.Database.MigrateAsync();
 
         // Tables exist if these counts don't throw.
-        Assert.Equal(0, await context.ReviewerProfiles.CountAsync());
-        Assert.Equal(0, await context.ExecutorProfiles.CountAsync());
-        Assert.Equal(0, await context.CrewTemplates.CountAsync());
+        // (Later migrations seed system profiles; counts are > 0 after full migration.)
+        Assert.True(await context.ReviewerProfiles.CountAsync() >= 0);
+        Assert.True(await context.ExecutorProfiles.CountAsync() >= 0);
+        Assert.True(await context.CrewTemplates.CountAsync() >= 0);
     }
 }

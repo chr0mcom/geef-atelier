@@ -1,3 +1,5 @@
+using Geef.Atelier.Core.Domain;
+
 namespace Geef.Atelier.Core.Persistence;
 
 public interface IRunPersistenceService
@@ -8,6 +10,7 @@ public interface IRunPersistenceService
         string? createdByUser = null,
         string? crewTemplateName = null,
         string? crewSnapshotJson = null,
+        RunKind kind = RunKind.Standard,
         CancellationToken cancellationToken = default);
 
     /// <summary>

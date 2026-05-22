@@ -50,7 +50,8 @@ public sealed class Step22FinalizersMigrationTests : IAsyncLifetime
             .Where(p => p.IsSystem)
             .CountAsync();
 
-        Assert.Equal(17, count);
+        // Step22 seeds 17; Step30 (D-054) adds 2 more (learning-extractor + learning-publisher)
+        Assert.Equal(19, count);
     }
 
     [Fact]
@@ -60,8 +61,9 @@ public sealed class Step22FinalizersMigrationTests : IAsyncLifetime
         await context.Database.MigrateAsync();
         await context.Database.MigrateAsync();
 
+        // Step22 seeds 17; Step30 (D-054) adds 2 more (learning-extractor + learning-publisher)
         var count = await context.FinalizerProfiles.CountAsync();
-        Assert.Equal(17, count);
+        Assert.Equal(19, count);
     }
 
     [Fact]

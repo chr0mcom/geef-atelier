@@ -206,7 +206,8 @@ public sealed class RunServiceResumeTests
 
         public Task<Guid> CreateRunAsync(string briefingText, string configJson,
             string? createdByUser = null, string? crewTemplateName = null,
-            string? crewSnapshotJson = null, CancellationToken cancellationToken = default)
+            string? crewSnapshotJson = null, RunKind kind = RunKind.Standard,
+            CancellationToken cancellationToken = default)
             => Task.FromResult(Guid.NewGuid());
 
         public Task<Guid> CreateResumedRunAsync(string briefingText, string configJson,

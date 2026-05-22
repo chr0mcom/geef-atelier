@@ -381,3 +381,15 @@ Enter the URL `https://geef.stefan-bechtel.de/mcp` — the client detects `WWW-A
 - Multiple scopes / fine-grained permissions (only `mcp:full`)
 - JWTs / OpenID Connect (opaque tokens + DB lookup is sufficient)
 - Multi-tenant
+
+## `list_learnings` tool (D-054)
+
+| Field | Value |
+|---|---|
+| Tool name | `list_learnings` |
+| Parameters | `status_filter?` (Proposed / Approved / Rejected), `domain_filter?` (string) |
+| Returns | Array of `LearningEntryDto` |
+
+**`LearningEntryDto` fields:** `id`, `text` (truncated to 300 chars), `source_run_id`, `learning_run_id?`, `domain`, `status`, `owner_username`, `created_at`, `approved_at?`.
+
+Use `status_filter=Approved` to retrieve only active learnings that will be used in retrieval. `domain_filter` matches the crew template name of the source run (e.g. `juristisch`, `akademisch`).

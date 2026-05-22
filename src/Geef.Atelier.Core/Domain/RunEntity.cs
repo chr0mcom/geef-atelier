@@ -73,4 +73,10 @@ public sealed class RunEntity
     /// Null for runs before Step25 migration or when <see cref="FinalText"/> is null/empty.
     /// </summary>
     public int? WordCount { get; set; }
+
+    /// <summary>
+    /// Distinguishes standard user-initiated runs from internal learning-evaluation runs.
+    /// Defaults to <see cref="RunKind.Standard"/> for all runs created before Step30.
+    /// </summary>
+    public RunKind Kind { get; init; } = RunKind.Standard;
 }
