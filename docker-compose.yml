@@ -19,6 +19,14 @@ services:
       - Llm__Providers__openrouter__ApiKey=${LLM_OPENROUTER_API_KEY}
       - Tavily__ApiKey=${TAVILY_API_KEY}
       - CliProxy__InternalApiToken=${ATELIER_INTERNAL_API_TOKEN:-}
+      # Per-provider API keys read by ModelCatalog/LLM clients via each provider's api_key_env.
+      - LLM_OPENROUTER_API_KEY=${LLM_OPENROUTER_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - XAI_API_KEY=${XAI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
