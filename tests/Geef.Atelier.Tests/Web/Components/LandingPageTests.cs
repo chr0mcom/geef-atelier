@@ -41,9 +41,12 @@ public sealed class LandingPageTests : TestContext
     {
         var cut = RenderComponent<LandingNav>();
         var midLinks = cut.FindAll(".midnav a");
-        Assert.Contains(midLinks, a => a.GetAttribute("href") == "#geef");
-        Assert.Contains(midLinks, a => a.GetAttribute("href") == "#crew");
-        Assert.Contains(midLinks, a => a.GetAttribute("href") == "#proof");
+        // Absolute (/#…) so the links also resolve from the public stub pages,
+        // where the nav is shared but the anchor targets live on the landing page.
+        Assert.Contains(midLinks, a => a.GetAttribute("href") == "/#geef");
+        Assert.Contains(midLinks, a => a.GetAttribute("href") == "/#crew");
+        Assert.Contains(midLinks, a => a.GetAttribute("href") == "/#proof");
+        Assert.Contains(midLinks, a => a.GetAttribute("href") == "/self-host");
     }
 
     // ── Hero ─────────────────────────────────────────────────────────────
