@@ -1,0 +1,277 @@
+@page "/admin/site-settings"
+@attribute [Authorize(Policy = "AdminPolicy")]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Geef.Atelier.Application.SiteSettings
+@inject ISiteSettingsService SiteSettingsService
+
+<PageTitle>Site Settings — Geef.Atelier</PageTitle>
+
+<div class="page-container" data-testid="site-settings-page">
+    <div class="page-header">
+        <h1>Site Settings</h1>
+        <a href="/runs" class="btn ghost">← Back</a>
+    </div>
+
+    <div class="settings-notice">
+        ⚠️ <strong>Hinweis:</strong> Die hier gespeicherten Angaben erscheinen auf den öffentlichen Rechtsseiten (Impressum, Datenschutz, AGB, Kontakt).
+        Die vorausgefüllten Rechtstexte sind <strong>Vorlagen/Gerüste, kein Rechtsrat</strong>. Bitte lassen Sie die Texte
+        — insbesondere die Datenschutzerklärung — vor dem Live-Gang rechtlich prüfen und an Ihre tatsächlichen
+        Datenverarbeitungen (Auth-Cookies, LLM-Provider, Hosting) anpassen.
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger" data-testid="error-banner">@_error</div>
+    }
+
+    @if (!string.IsNullOrEmpty(_success))
+    {
+        <div class="alert alert-success" data-testid="success-banner">@_success</div>
+    }
+
+    @if (_loading)
+    {
+        <p>Loading…</p>
+    }
+    else
+    {
+        <form class="settings-form" @onsubmit="SaveAsync" data-testid="settings-form">
+            <fieldset>
+                <legend>Betreiber-Daten</legend>
+
+                <div class="form-group">
+                    <label for="operator-name">Betreibername <span class="required">*</span></label>
+                    <input id="operator-name" type="text" @bind="_operatorName" required maxlength="200"
+                           data-testid="input-operator-name"
+                           placeholder="z. B. Max Mustermann oder Mustermann GmbH" />
+                    <span class="field-help">Vollständiger Name oder Firma des Betreibers (für Impressum § 5 DDG).</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="address-street">Straße und Hausnummer <span class="required">*</span></label>
+                    <input id="address-street" type="text" @bind="_addressStreet" required maxlength="300"
+                           data-testid="input-address-street"
+                           placeholder="Musterstraße 1" />
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="address-zip">PLZ <span class="required">*</span></label>
+                        <input id="address-zip" type="text" @bind="_addressZip" required maxlength="20"
+                               data-testid="input-address-zip" placeholder="12345" style="max-width: 120px;" />
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <label for="address-city">Stadt <span class="required">*</span></label>
+                        <input id="address-city" type="text" @bind="_addressCity" required maxlength="100"
+                               data-testid="input-address-city" placeholder="Musterstadt" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="address-country">Land <span class="required">*</span></label>
+                    <input id="address-country" type="text" @bind="_addressCountry" required maxlength="100"
+                           data-testid="input-address-country" placeholder="Deutschland" />
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>Kontakt</legend>
+
+                <div class="form-group">
+                    <label for="contact-email">E-Mail <span class="required">*</span></label>
+                    <input id="contact-email" type="email" @bind="_contactEmail" required maxlength="300"
+                           data-testid="input-contact-email"
+                           placeholder="kontakt@example.com" />
+                    <span class="field-help">Wird auf Impressum, Datenschutz und Kontakt-Seite obfuskiert angezeigt (kein Klartext im HTML-Quelltext).</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="contact-phone">Telefon (optional)</label>
+                    <input id="contact-phone" type="tel" @bind="_contactPhone" maxlength="100"
+                           data-testid="input-contact-phone"
+                           placeholder="+49 123 456789" />
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>Weitere Angaben (optional)</legend>
+
+                <div class="form-group">
+                    <label for="responsible-person">Verantwortlich i. S. d. P. (V.i.S.d.P.)</label>
+                    <input id="responsible-person" type="text" @bind="_responsiblePerson" maxlength="300"
+                           data-testid="input-responsible-person"
+                           placeholder="Name der redaktionell verantwortlichen Person" />
+                    <span class="field-help">Person, die journalistisch-redaktionelle Inhalte verantwortet.</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="vat-id">USt-ID (optional)</label>
+                    <input id="vat-id" type="text" @bind="_vatId" maxlength="50"
+                           data-testid="input-vat-id"
+                           placeholder="DE123456789" />
+                </div>
+
+                <div class="form-group">
+                    <label for="register-info">Registereintrag (optional)</label>
+                    <input id="register-info" type="text" @bind="_registerInfo" maxlength="300"
+                           data-testid="input-register-info"
+                           placeholder="HRB 12345, Amtsgericht Musterstadt" />
+                </div>
+
+                <div class="form-group">
+                    <label for="supervisory-authority">Aufsichtsbehörde (optional)</label>
+                    <input id="supervisory-authority" type="text" @bind="_supervisoryAuthority" maxlength="300"
+                           data-testid="input-supervisory-authority"
+                           placeholder="Landesbeauftragter für Datenschutz, Musterstadt" />
+                </div>
+
+                <div class="form-group">
+                    <label for="jurisdiction">Gerichtsstand (optional)</label>
+                    <input id="jurisdiction" type="text" @bind="_jurisdiction" maxlength="100"
+                           data-testid="input-jurisdiction"
+                           placeholder="Musterstadt" />
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>Individuelle Ergänzungen (Markdown)</legend>
+
+                <div class="form-group">
+                    <label for="privacy-append">Datenschutz-Anhang (Markdown, optional)</label>
+                    <textarea id="privacy-append" @bind="_privacyAppendMarkdown" rows="6"
+                              data-testid="input-privacy-append"
+                              placeholder="Zusätzliche betreiberspezifische Abschnitte für die Datenschutzerklärung (Markdown)."></textarea>
+                    <span class="field-help">Wird nach dem Boilerplate-Text der Datenschutzerklärung angehängt.</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="terms-append">AGB-Anhang (Markdown, optional)</label>
+                    <textarea id="terms-append" @bind="_termsAppendMarkdown" rows="6"
+                              data-testid="input-terms-append"
+                              placeholder="Zusätzliche betreiberspezifische Abschnitte für die Nutzungsbedingungen (Markdown)."></textarea>
+                    <span class="field-help">Wird nach dem Boilerplate-Text der AGB angehängt.</span>
+                </div>
+            </fieldset>
+
+            @if (!string.IsNullOrEmpty(_validationError))
+            {
+                <div class="alert alert-danger" data-testid="validation-error">@_validationError</div>
+            }
+
+            <div class="form-actions">
+                <button type="submit" class="btn primary" disabled="@_saving" data-testid="btn-save">
+                    @(_saving ? "Wird gespeichert…" : "Speichern")
+                </button>
+            </div>
+        </form>
+    }
+</div>
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private string _error = "";
+    private string _success = "";
+    private string _validationError = "";
+
+    private string _operatorName = "";
+    private string _addressStreet = "";
+    private string _addressZip = "";
+    private string _addressCity = "";
+    private string _addressCountry = "Deutschland";
+    private string _contactEmail = "";
+    private string? _contactPhone;
+    private string? _responsiblePerson;
+    private string? _vatId;
+    private string? _registerInfo;
+    private string? _supervisoryAuthority;
+    private string? _jurisdiction;
+    private string? _privacyAppendMarkdown;
+    private string? _termsAppendMarkdown;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var settings = await SiteSettingsService.GetAsync();
+            _operatorName = settings.OperatorName;
+            _addressStreet = settings.AddressStreet;
+            _addressZip = settings.AddressZip;
+            _addressCity = settings.AddressCity;
+            _addressCountry = settings.AddressCountry;
+            _contactEmail = settings.ContactEmail;
+            _contactPhone = settings.ContactPhone;
+            _responsiblePerson = settings.ResponsiblePerson;
+            _vatId = settings.VatId;
+            _registerInfo = settings.RegisterInfo;
+            _supervisoryAuthority = settings.SupervisoryAuthority;
+            _jurisdiction = settings.Jurisdiction;
+            _privacyAppendMarkdown = settings.PrivacyAppendMarkdown;
+            _termsAppendMarkdown = settings.TermsAppendMarkdown;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Fehler beim Laden der Einstellungen: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _validationError = "";
+        _success = "";
+
+        if (string.IsNullOrWhiteSpace(_operatorName))
+        {
+            _validationError = "Betreibername ist erforderlich.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_contactEmail) || !_contactEmail.Contains('@'))
+        {
+            _validationError = "Eine gültige E-Mail-Adresse ist erforderlich.";
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var settings = new Core.Domain.SiteSettings
+            {
+                OperatorName = _operatorName.Trim(),
+                AddressStreet = _addressStreet.Trim(),
+                AddressZip = _addressZip.Trim(),
+                AddressCity = _addressCity.Trim(),
+                AddressCountry = _addressCountry.Trim(),
+                ContactEmail = _contactEmail.Trim(),
+                ContactPhone = NullIfEmpty(_contactPhone),
+                ResponsiblePerson = NullIfEmpty(_responsiblePerson),
+                VatId = NullIfEmpty(_vatId),
+                RegisterInfo = NullIfEmpty(_registerInfo),
+                SupervisoryAuthority = NullIfEmpty(_supervisoryAuthority),
+                Jurisdiction = NullIfEmpty(_jurisdiction),
+                PrivacyAppendMarkdown = NullIfEmpty(_privacyAppendMarkdown),
+                TermsAppendMarkdown = NullIfEmpty(_termsAppendMarkdown),
+                UpdatedAt = DateTimeOffset.UtcNow,
+            };
+
+            await SiteSettingsService.UpdateAsync(settings);
+            _success = "Einstellungen erfolgreich gespeichert.";
+        }
+        catch (Exception ex)
+        {
+            _error = $"Fehler beim Speichern: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private static string? NullIfEmpty(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

@@ -1356,6 +1356,196 @@ body[data-static="1"] .geef-flow .loop .loop-path { animation: none !important; 
   color: var(--ink-3);
 }
 
+/* ============================================================
+   Legal Pages & Docs — shared public sub-page layout
+   ============================================================ */
+.lp-legal-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+.lp-legal-page .lp-container {
+  flex: 1;
+  padding-top: 64px;
+  padding-bottom: 80px;
+}
+
+.legal-content {
+  max-width: 720px;
+  margin: 0 auto;
+}
+.legal-content h1 {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: clamp(28px, 4vw, 44px);
+  letter-spacing: -0.018em;
+  color: var(--ink);
+  margin: 0 0 32px;
+  line-height: 1.15;
+}
+.legal-content h2 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 32px 0 10px;
+  border-bottom: 1px solid var(--hairline-soft);
+  padding-bottom: 6px;
+}
+.legal-content h3 {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink-2);
+  margin: 22px 0 8px;
+}
+.legal-content section { margin-bottom: 12px; }
+.legal-content p, .legal-content address {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--ink-2);
+  margin: 0 0 10px;
+  font-style: normal;
+}
+.legal-content address strong { color: var(--ink); font-weight: 500; }
+.legal-content a { color: var(--hero); text-decoration: underline; text-underline-offset: 3px; }
+
+.legal-disclaimer {
+  background: color-mix(in oklch, var(--hero) 8%, var(--surface));
+  border: 1px solid color-mix(in oklch, var(--hero) 22%, var(--hairline-soft));
+  border-radius: 4px;
+  padding: 14px 18px;
+  font-size: 13px;
+  color: var(--ink-2);
+  margin-bottom: 32px;
+}
+.legal-disclaimer em { font-style: italic; }
+
+.legal-append {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--hairline-soft);
+}
+.legal-append p {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--ink-2);
+}
+.legal-append code, .legal-append pre {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+/* Contact page card */
+.contact-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline-soft);
+  border-radius: 6px;
+  padding: 32px;
+  margin-bottom: 24px;
+}
+.contact-card h2 {
+  border: none;
+  padding: 0;
+  margin: 0 0 16px;
+  font-size: 20px;
+}
+.contact-email-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 8px 0;
+}
+.contact-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  min-width: 56px;
+}
+.contact-note {
+  font-size: 13px;
+  color: var(--ink-3);
+  font-style: italic;
+  margin: 0;
+}
+
+/* Admin settings page */
+.settings-notice {
+  background: color-mix(in oklch, var(--hero) 6%, var(--surface));
+  border: 1px solid color-mix(in oklch, var(--hero) 18%, var(--hairline-soft));
+  border-radius: 4px;
+  padding: 14px 18px;
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+.settings-form fieldset {
+  border: 1px solid var(--hairline-soft);
+  border-radius: 6px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.settings-form legend {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 0 8px;
+}
+.settings-form .form-group { margin-bottom: 18px; }
+.settings-form .form-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.settings-form label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  margin-bottom: 6px;
+}
+.settings-form .required { color: var(--hero); }
+.settings-form input[type="text"],
+.settings-form input[type="email"],
+.settings-form input[type="tel"],
+.settings-form textarea {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline-soft);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--ink);
+  transition: border-color .15s;
+  box-sizing: border-box;
+}
+.settings-form input:focus,
+.settings-form textarea:focus {
+  outline: none;
+  border-color: var(--hero);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--hero) 18%, transparent);
+}
+.settings-form .field-help {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-top: 5px;
+  line-height: 1.5;
+}
+.settings-form .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+}
+
 /* dotted hr */
 .lp-hr {
   height: 1px;

@@ -1,15 +1,18 @@
 using Geef.Atelier.Application.Dashboard;
+using Geef.Atelier.Application.SiteSettings;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Core.Persistence.OAuth;
 using Geef.Atelier.Core.Persistence.Providers;
 using Geef.Atelier.Core.Persistence.TemplateStudio;
+using Geef.Atelier.Infrastructure.SiteSettings;
 using Geef.Atelier.Infrastructure.Dashboard;
 using Geef.Atelier.Infrastructure.Persistence.Crew;
 using Geef.Atelier.Infrastructure.Persistence.Crew.Learning;
 using Geef.Atelier.Infrastructure.Persistence.Dashboard;
 using Geef.Atelier.Infrastructure.Persistence.OAuth;
 using Geef.Atelier.Infrastructure.Persistence.Providers;
+using Geef.Atelier.Infrastructure.Persistence.SiteSettings;
 using Geef.Atelier.Infrastructure.Persistence.TemplateStudio;
 using Geef.Atelier.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,6 +45,8 @@ public static class PersistenceServiceExtensions
         services.AddScoped<IOAuthAuditLogRepository, OAuthAuditLogRepository>();
         services.AddScoped<IDashboardRepository, DashboardRepository>();
         services.AddScoped<ILearningRepository, LearningRepository>();
+        services.AddScoped<ISiteSettingsRepository, SiteSettingsRepository>();
+        services.AddScoped<ISiteSettingsService, SiteSettingsService>();
         services.AddMemoryCache();
         services.AddSingleton<IDashboardService, DashboardService>();
         return services;

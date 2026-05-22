@@ -2,7 +2,51 @@
 @layout Layout.LandingLayout
 @attribute [AllowAnonymous]
 @using Microsoft.AspNetCore.Authorization
+@using Geef.Atelier.Application.SiteSettings
+@inject ISiteSettingsService SiteSettingsService
 
-<PageTitle>Contact — Geef.Atelier</PageTitle>
+<PageTitle>Kontakt — Geef.Atelier</PageTitle>
 
-<ComingSoon Title="Contact" />
+@if (_settings is not null)
+{
+    <div class="lp-legal-page">
+        <LandingNav />
+        <div class="lp-container">
+            <div class="legal-content contact-page">
+                <h1>Kontakt</h1>
+
+                <section class="contact-card">
+                    <h2>@_settings.OperatorName</h2>
+                    <address>
+                        @_settings.AddressStreet<br />
+                        @_settings.AddressZip @_settings.AddressCity<br />
+                        @_settings.AddressCountry
+                    </address>
+                    <p class="contact-email-row">
+                        <span class="contact-label">E-Mail</span>
+                        <EmailObfuscated Email="@_settings.ContactEmail" />
+                    </p>
+                    @if (!string.IsNullOrWhiteSpace(_settings.ContactPhone))
+                    {
+                        <p class="contact-email-row">
+                            <span class="contact-label">Telefon</span>
+                            <span>@_settings.ContactPhone</span>
+                        </p>
+                    }
+                </section>
+
+                <p class="contact-note">
+                    Kein Kontaktformular — E-Mail ist der direkteste Weg.
+                </p>
+            </div>
+        </div>
+        <LandingFooter />
+    </div>
+}
+
+@code {
+    private Core.Domain.SiteSettings? _settings;
+
+    protected override async Task OnInitializedAsync()
+        => _settings = await SiteSettingsService.GetAsync();
+}

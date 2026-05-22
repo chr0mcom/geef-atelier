@@ -1,8 +1,85 @@
 @page "/docs"
-@layout Layout.LandingLayout
-@attribute [AllowAnonymous]
+@page "/docs/{Slug}"
+@layout Layout.MainLayout
+@attribute [Authorize]
 @using Microsoft.AspNetCore.Authorization
+@using Geef.Atelier.Web.Services
+@inject DocsService DocsService
+@inject NavigationManager Nav
 
-<PageTitle>Docs — Geef.Atelier</PageTitle>
+<PageTitle>@_pageTitle — Geef.Atelier</PageTitle>
 
-<ComingSoon Title="Docs" />
+<div class="docs-page" data-testid="docs-page">
+    <aside class="docs-sidebar" data-testid="docs-sidebar">
+        <div class="docs-sidebar-header">
+            <span class="docs-sidebar-label">Documentation</span>
+        </div>
+        <nav class="docs-nav">
+            @foreach (var entry in DocsService.Entries)
+            {
+                var isActive = entry.Slug == _activeSlug;
+                var langSuffix = _german ? "?lang=de" : "";
+                var entryHref = $"/docs/{entry.Slug}{langSuffix}";
+                var navClass = isActive ? "docs-nav-item active" : "docs-nav-item";
+                <a href="@entryHref" class="@navClass" data-testid="sidebar-@entry.Slug">
+                    @entry.Title
+                </a>
+            }
+        </nav>
+    </aside>
+
+    <main class="docs-content" data-testid="docs-content">
+        <div class="docs-toolbar">
+            <a href="/docs/@_activeSlug"
+               class="lang-toggle @(!_german ? "active" : "")"
+               aria-label="English version">EN</a>
+            <span class="lang-sep">|</span>
+            <a href="/docs/@_activeSlug?lang=de"
+               class="lang-toggle @(_german ? "active" : "")"
+               aria-label="Deutsche Version">DE</a>
+        </div>
+
+        @if (_notFound)
+        {
+            <div class="docs-not-found" data-testid="docs-not-found">
+                <h1>Not found</h1>
+                <p>The requested document is not in the allowlist.</p>
+                <a href="/docs">← Back to overview</a>
+            </div>
+        }
+        else
+        {
+            <article class="docs-article markdown-body" data-testid="docs-article">
+                @_content
+            </article>
+        }
+    </main>
+</div>
+
+@code {
+    [Parameter] public string? Slug { get; set; }
+    [SupplyParameterFromQuery(Name = "lang")] public string? Lang { get; set; }
+
+    private MarkupString _content;
+    private bool _notFound;
+    private bool _german;
+    private string _activeSlug = "readme";
+    private string _pageTitle = "Docs";
+
+    protected override void OnParametersSet()
+    {
+        _german = string.Equals(Lang, "de", StringComparison.OrdinalIgnoreCase);
+        _activeSlug = string.IsNullOrWhiteSpace(Slug) ? "readme" : Slug.ToLowerInvariant().Trim('/');
+
+        if (!DocsService.IsAllowed(_activeSlug))
+        {
+            _notFound = true;
+            _pageTitle = "Docs — Not found";
+            return;
+        }
+
+        _notFound = false;
+        _content = DocsService.GetHtml(_activeSlug, _german);
+        _pageTitle = DocsService.Entries.FirstOrDefault(e => e.Slug == _activeSlug)?.Title ?? "Docs";
+    }
+}

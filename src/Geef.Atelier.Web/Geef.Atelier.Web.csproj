@@ -17,6 +17,14 @@
     <InternalsVisibleTo Include="Geef.Atelier.Tests" />
   </ItemGroup>
 
+  <!-- Embed allowlisted docs (README + 01-04 + 06-09). 05-decisions-log is intentionally excluded. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\docs\*.md"
+                      Exclude="..\..\docs\05-decisions-log.md;..\..\docs\05-decisions-log_de.md">
+      <Link>EmbeddedDocs\%(Filename)%(Extension)</Link>
+    </EmbeddedResource>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Markdig" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />

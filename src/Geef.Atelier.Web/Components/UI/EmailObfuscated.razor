@@ -1,0 +1,39 @@
+@* Renders an email address using data-attributes so no cleartext mailto appears in static HTML.
+   JavaScript (inlined below) assembles the address on load. Without JS the address remains hidden.
+   Note: the JS uses String.fromCharCode(64) for "@" to avoid Razor parser conflicts. *@
+
+@{
+    var parts = Email.Split('@');
+    var user = parts.Length == 2 ? parts[0] : "";
+    var domain = parts.Length == 2 ? parts[1] : "";
+}
+
+<a class="obf-email"
+   href="#"
+   data-email-user="@user"
+   data-email-domain="@domain"
+   aria-label="E-Mail-Adresse (wird per JavaScript eingeblendet)">
+    &#91;E&#45;Mail&#93;
+</a>
+
+<script>
+(function () {
+    var at = String.fromCharCode(64);
+    var links = document.querySelectorAll("a.obf-email");
+    for (var i = 0; i < links.length; i++) {
+        var el = links[i];
+        var u = el.getAttribute("data-email-user");
+        var d = el.getAttribute("data-email-domain");
+        if (u && d) {
+            var addr = u + at + d;
+            el.href = "mailto:" + addr;
+            el.textContent = addr;
+        }
+    }
+})();
+</script>
+
+@code {
+    /// <summary>Full email address stored in DB. Split into parts for obfuscation in markup.</summary>
+    [Parameter, EditorRequired] public string Email { get; set; } = "";
+}

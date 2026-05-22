@@ -59,6 +59,7 @@ builder.Services.AddGroundingProviders(builder.Configuration);
 builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection("Pricing"));
 builder.Services.Configure<CostTrackingOptions>(builder.Configuration.GetSection("CostTracking"));
 builder.Services.AddSingleton<IPricingCatalog, PricingCatalog>();
+builder.Services.AddSingleton<DocsService>();
 builder.Services.AddTemplateStudio(builder.Configuration);
 builder.Services.AddFinalizers(builder.Configuration);
 

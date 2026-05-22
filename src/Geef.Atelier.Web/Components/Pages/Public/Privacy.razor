@@ -2,7 +2,105 @@
 @layout Layout.LandingLayout
 @attribute [AllowAnonymous]
 @using Microsoft.AspNetCore.Authorization
+@using Geef.Atelier.Application.SiteSettings
+@using Geef.Atelier.Web.Services
+@inject ISiteSettingsService SiteSettingsService
 
-<PageTitle>Privacy — Geef.Atelier</PageTitle>
+<PageTitle>Datenschutzerklärung — Geef.Atelier</PageTitle>
 
-<ComingSoon Title="Privacy" />
+@if (_settings is not null)
+{
+    <div class="lp-legal-page">
+        <LandingNav />
+        <div class="lp-container">
+            <div class="legal-content">
+                <h1>Datenschutzerklärung</h1>
+                <p class="legal-disclaimer">
+                    ⚠️ <em>Vorlagen-Gerüst — kein Rechtsrat. Der Betreiber muss diese Datenschutzerklärung an die tatsächlichen Datenverarbeitungen (Auth-Cookies, LLM-Provider, Tavily/Grounding-Dienste, Hosting) anpassen und vor dem Live-Gang rechtlich prüfen lassen.</em>
+                </p>
+
+                <section>
+                    <h2>1. Verantwortlicher</h2>
+                    <address>
+                        <strong>@_settings.OperatorName</strong><br />
+                        @_settings.AddressStreet<br />
+                        @_settings.AddressZip @_settings.AddressCity<br />
+                        @_settings.AddressCountry
+                    </address>
+                    <p>E-Mail: <EmailObfuscated Email="@_settings.ContactEmail" /></p>
+                </section>
+
+                <section>
+                    <h2>2. Erhebung und Verarbeitung personenbezogener Daten</h2>
+                    <p>
+                        Beim Besuch dieser Website werden automatisch Daten erhoben, die Ihr Browser an unseren Server übermittelt
+                        (sog. Server-Log-Dateien). Dies sind u. a. IP-Adresse, Datum und Uhrzeit des Abrufs, übertragene Datenmenge
+                        sowie der anfragende Provider. Diese Daten werden für Zwecke der Sicherheit, der Fehleranalyse und der
+                        statistischen Auswertung verarbeitet und nach kurzer Zeit gelöscht.
+                    </p>
+                </section>
+
+                <section>
+                    <h2>3. Cookies und Authentifizierung</h2>
+                    <p>
+                        Diese Anwendung setzt Cookies für die Authentifizierung (Cookie-basiertes Session-Management). Das
+                        Authentifizierungs-Cookie ist technisch notwendig für den Betrieb der Anwendung und kann nicht deaktiviert
+                        werden. Weitere Cookies können für Darstellungseinstellungen (z. B. Farbthema) gesetzt werden.
+                    </p>
+                    <p>Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse am sicheren Betrieb).</p>
+                </section>
+
+                <section>
+                    <h2>4. Externe Dienstleister / Drittanbieter</h2>
+                    <p>
+                        <strong>[Bitte anpassen:]</strong> Diese Anwendung nutzt externe KI-Anbieter (z. B. OpenRouter, OpenAI, Anthropic,
+                        Google, Groq, DeepSeek) sowie Such- und Grounding-Dienste (z. B. Tavily). Bei jeder Anfrage werden
+                        Textinhalte an diese Anbieter übertragen. Es gelten die jeweiligen Datenschutzrichtlinien dieser Anbieter.
+                        Der Betreiber muss die tatsächlich genutzten Dienste vollständig auflisten und die entsprechenden
+                        Verarbeitungsverträge (AVV) abschließen.
+                    </p>
+                </section>
+
+                <section>
+                    <h2>5. Ihre Rechte</h2>
+                    <p>
+                        Sie haben das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung
+                        der Verarbeitung (Art. 18), Datenübertragbarkeit (Art. 20) sowie Widerspruch (Art. 21). Wenden Sie sich
+                        dazu an: <EmailObfuscated Email="@_settings.ContactEmail" />
+                    </p>
+                    <p>
+                        Sie haben zudem das Recht auf Beschwerde bei der zuständigen Datenschutz-Aufsichtsbehörde
+                        @if (!string.IsNullOrWhiteSpace(_settings.SupervisoryAuthority))
+                        {
+                            <span>(@_settings.SupervisoryAuthority)</span>
+                        }.
+                    </p>
+                </section>
+
+                <section>
+                    <h2>6. Datenübermittlung in Drittländer</h2>
+                    <p>
+                        <strong>[Bitte anpassen:]</strong> Bei der Nutzung von KI-Anbietern außerhalb der EU/des EWR erfolgt eine
+                        Übermittlung personenbezogener Daten in Drittländer. Der Betreiber stellt sicher, dass für diese
+                        Übermittlungen geeignete Garantien nach Art. 46 DSGVO vorliegen (z. B. Standardvertragsklauseln).
+                    </p>
+                </section>
+
+                @if (!string.IsNullOrWhiteSpace(_settings.PrivacyAppendMarkdown))
+                {
+                    <div class="legal-append">
+                        @MarkdownRenderer.ToMarkupString(_settings.PrivacyAppendMarkdown)
+                    </div>
+                }
+            </div>
+        </div>
+        <LandingFooter />
+    </div>
+}
+
+@code {
+    private Core.Domain.SiteSettings? _settings;
+
+    protected override async Task OnInitializedAsync()
+        => _settings = await SiteSettingsService.GetAsync();
+}

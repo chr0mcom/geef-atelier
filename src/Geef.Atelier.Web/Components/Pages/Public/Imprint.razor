@@ -2,7 +2,106 @@
 @layout Layout.LandingLayout
 @attribute [AllowAnonymous]
 @using Microsoft.AspNetCore.Authorization
+@using Geef.Atelier.Application.SiteSettings
+@inject ISiteSettingsService SiteSettingsService
 
-<PageTitle>Imprint — Geef.Atelier</PageTitle>
+<PageTitle>Impressum — Geef.Atelier</PageTitle>
 
-<ComingSoon Title="Imprint" />
+@if (_settings is not null)
+{
+    <div class="lp-legal-page">
+        <LandingNav />
+        <div class="lp-container">
+            <div class="legal-content">
+                <h1>Impressum</h1>
+                <p class="legal-disclaimer">
+                    ⚠️ <em>Dieses Impressum enthält Platzhalter. Der Betreiber muss die Angaben vor dem Live-Gang vervollständigen und rechtlich prüfen lassen (§ 5 DDG).</em>
+                </p>
+
+                <section>
+                    <h2>Angaben gemäß § 5 DDG</h2>
+                    <address>
+                        <strong>@_settings.OperatorName</strong><br />
+                        @_settings.AddressStreet<br />
+                        @_settings.AddressZip @_settings.AddressCity<br />
+                        @_settings.AddressCountry
+                    </address>
+                </section>
+
+                <section>
+                    <h2>Kontakt</h2>
+                    <p>
+                        E-Mail: <EmailObfuscated Email="@_settings.ContactEmail" />
+                    </p>
+                    @if (!string.IsNullOrWhiteSpace(_settings.ContactPhone))
+                    {
+                        <p>Telefon: @_settings.ContactPhone</p>
+                    }
+                </section>
+
+                @if (!string.IsNullOrWhiteSpace(_settings.VatId))
+                {
+                    <section>
+                        <h2>Umsatzsteuer-Identifikationsnummer</h2>
+                        <p>Gemäß § 27a Umsatzsteuergesetz: @_settings.VatId</p>
+                    </section>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_settings.RegisterInfo))
+                {
+                    <section>
+                        <h2>Registereintrag</h2>
+                        <p>@_settings.RegisterInfo</p>
+                    </section>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_settings.ResponsiblePerson))
+                {
+                    <section>
+                        <h2>Verantwortlich für den Inhalt (V.i.S.d.P.)</h2>
+                        <p>@_settings.ResponsiblePerson</p>
+                    </section>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_settings.SupervisoryAuthority))
+                {
+                    <section>
+                        <h2>Aufsichtsbehörde</h2>
+                        <p>@_settings.SupervisoryAuthority</p>
+                    </section>
+                }
+
+                <section>
+                    <h2>Haftungsausschluss</h2>
+                    <h3>Haftung für Inhalte</h3>
+                    <p>
+                        Als Diensteanbieter sind wir gemäß § 7 Abs. 1 TMG für eigene Inhalte auf diesen Seiten nach den
+                        allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als Diensteanbieter jedoch nicht
+                        verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu
+                        forschen, die auf eine rechtswidrige Tätigkeit hinweisen.
+                    </p>
+                    <h3>Haftung für Links</h3>
+                    <p>
+                        Unser Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte wir keinen Einfluss haben.
+                        Deshalb können wir für diese fremden Inhalte auch keine Gewähr übernehmen. Für die Inhalte der
+                        verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber der Seiten verantwortlich.
+                    </p>
+                    <h3>Urheberrecht</h3>
+                    <p>
+                        Die durch die Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen
+                        Urheberrecht. Die Vervielfältigung, Bearbeitung, Verbreitung und jede Art der Verwertung außerhalb der
+                        Grenzen des Urheberrechtes bedürfen der schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers.
+                    </p>
+                </section>
+            </div>
+        </div>
+        <LandingFooter />
+    </div>
+}
+
+@code {
+    private Core.Domain.SiteSettings? _settings;
+
+    protected override async Task OnInitializedAsync()
+        => _settings = await SiteSettingsService.GetAsync();
+}

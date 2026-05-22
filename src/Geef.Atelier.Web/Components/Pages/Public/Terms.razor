@@ -2,7 +2,94 @@
 @layout Layout.LandingLayout
 @attribute [AllowAnonymous]
 @using Microsoft.AspNetCore.Authorization
+@using Geef.Atelier.Application.SiteSettings
+@using Geef.Atelier.Web.Services
+@inject ISiteSettingsService SiteSettingsService
 
-<PageTitle>Terms — Geef.Atelier</PageTitle>
+<PageTitle>Nutzungsbedingungen — Geef.Atelier</PageTitle>
 
-<ComingSoon Title="Terms" />
+@if (_settings is not null)
+{
+    <div class="lp-legal-page">
+        <LandingNav />
+        <div class="lp-container">
+            <div class="legal-content">
+                <h1>Nutzungsbedingungen (AGB)</h1>
+                <p class="legal-disclaimer">
+                    ⚠️ <em>Vorlagen-Gerüst — kein Rechtsrat. Der Betreiber muss diese AGB vor dem Live-Gang von einem Rechtsanwalt prüfen und auf die konkreten Nutzungsmodalitäten anpassen lassen.</em>
+                </p>
+
+                <section>
+                    <h2>§ 1 Geltungsbereich</h2>
+                    <p>
+                        Diese Nutzungsbedingungen gelten für die Nutzung der Plattform Geef.Atelier, betrieben von
+                        @_settings.OperatorName, @_settings.AddressStreet, @_settings.AddressZip @_settings.AddressCity
+                        (nachfolgend „Betreiber"). Mit der Nutzung der Plattform erkennt der Nutzer diese Bedingungen an.
+                    </p>
+                </section>
+
+                <section>
+                    <h2>§ 2 Leistungsumfang</h2>
+                    <p>
+                        Geef.Atelier ist eine experimentelle Schreibwerkzeug-Plattform (Beta-Phase), die KI-gestützte
+                        Text-Iteration bereitstellt. Der Betreiber behält sich vor, den Dienst jederzeit zu ändern,
+                        einzuschränken oder einzustellen.
+                    </p>
+                </section>
+
+                <section>
+                    <h2>§ 3 Nutzungsbedingungen und Pflichten</h2>
+                    <p>
+                        Der Nutzer verpflichtet sich, die Plattform nicht für rechtswidrige Zwecke zu verwenden, keine
+                        Schadsoftware zu übertragen, keine Inhalte zu verarbeiten, die Rechte Dritter verletzen, und keine
+                        automatisierten Zugriffe ohne ausdrückliche Genehmigung durchzuführen.
+                    </p>
+                </section>
+
+                <section>
+                    <h2>§ 4 Haftungsbeschränkung</h2>
+                    <p>
+                        Die Plattform befindet sich in der Beta-Phase. Der Betreiber haftet nicht für Schäden, die durch
+                        KI-generierte Inhalte, Ausfälle externer Anbieter oder die Beta-Natur des Dienstes entstehen, sofern
+                        diese nicht auf grober Fahrlässigkeit oder Vorsatz des Betreibers beruhen.
+                    </p>
+                </section>
+
+                <section>
+                    <h2>§ 5 KI-generierte Inhalte</h2>
+                    <p>
+                        Die Plattform nutzt Drittanbieter-KI-Dienste. Der Betreiber übernimmt keine Gewähr für Korrektheit,
+                        Vollständigkeit oder rechtliche Unbedenklichkeit der generierten Texte. Nutzer sind selbst für die
+                        Prüfung und den Einsatz der Ergebnisse verantwortlich.
+                    </p>
+                </section>
+
+                <section>
+                    <h2>§ 6 Gerichtsstand und anwendbares Recht</h2>
+                    <p>
+                        Es gilt deutsches Recht.
+                        @if (!string.IsNullOrWhiteSpace(_settings.Jurisdiction))
+                        {
+                            <span>Gerichtsstand ist @_settings.Jurisdiction.</span>
+                        }
+                    </p>
+                </section>
+
+                @if (!string.IsNullOrWhiteSpace(_settings.TermsAppendMarkdown))
+                {
+                    <div class="legal-append">
+                        @MarkdownRenderer.ToMarkupString(_settings.TermsAppendMarkdown)
+                    </div>
+                }
+            </div>
+        </div>
+        <LandingFooter />
+    </div>
+}
+
+@code {
+    private Core.Domain.SiteSettings? _settings;
+
+    protected override async Task OnInitializedAsync()
+        => _settings = await SiteSettingsService.GetAsync();
+}
