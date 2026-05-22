@@ -1,7 +1,7 @@
 @inject IHttpContextAccessor Http
 
 <!DOCTYPE html>
-<html lang="en" class="palette-@Theme">
+<html lang="en" class="@HtmlRootClass">
 
 <head>
     <meta charset="utf-8" />
@@ -11,6 +11,10 @@
     <link rel="stylesheet" href="@Assets["atelier.css"]" />
     <link rel="stylesheet" href="@Assets["atelier-dashboard.css"]" />
     <link rel="stylesheet" href="@Assets["Geef.Atelier.Web.styles.css"]" />
+    @if (IsLanding)
+    {
+        <link rel="stylesheet" href="@Assets["atelier-landing.css"]" />
+    }
     <ImportMap />
     <!-- Modern PNG favicons -->
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
@@ -26,9 +30,13 @@
     <link rel="manifest" href="site.webmanifest" />
     <HeadOutlet />
     <script defer src="@Assets["js/theme.js"]"></script>
+    @if (IsLanding)
+    {
+        <script defer src="@Assets["js/landing.js"]"></script>
+    }
 </head>
 
-<body>
+<body class="@BodyClass">
     <Routes />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
@@ -39,6 +47,8 @@
 @code {
     static readonly HashSet<string> AllowedThemes = ["vellum", "noir", "petrol"];
 
+    bool IsLanding => Http.HttpContext?.Request.Path.Value == "/";
+
     string Theme
     {
         get
@@ -47,6 +57,9 @@
             return v is not null && AllowedThemes.Contains(v) ? v : "vellum";
         }
     }
+
+    string HtmlRootClass => $"palette-{Theme}{(IsLanding ? " landing-root" : "")}";
+    string BodyClass => IsLanding ? "landing-body" : "";
 
     /// <summary>Dashboard scope read from cookie; defaults to "my".</summary>
     internal string DashboardScope

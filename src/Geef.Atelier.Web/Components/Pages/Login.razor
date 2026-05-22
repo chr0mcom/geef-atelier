@@ -43,7 +43,10 @@
             CookieAuthenticationDefaults.AuthenticationScheme,
             new ClaimsPrincipal(identity));
 
-        var target = string.IsNullOrEmpty(ReturnUrl) ? "/runs" : ReturnUrl;
+        var target = ResolvePostLogin(ReturnUrl);
         HttpContext.Response.Redirect(target);
     }
+
+    internal static string ResolvePostLogin(string? returnUrl) =>
+        string.IsNullOrEmpty(returnUrl) ? "/workshop" : returnUrl;
 }
