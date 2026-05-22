@@ -139,3 +139,19 @@ verwendet: dem Export-Button (`Manuscript.razor`) und dem „Profile"-Eintrag im
 - **Scoped CSS:** `.razor.css` pro Komponente für Layout-Overrides
 - **Bootstrap:** vollständig entfernt in PS-3
 - **Kein Inline-Styling** in Komponenten (außer minimal in Pages)
+
+## Landing-Page (D-053)
+
+**Route:** `/` — `Landing.razor`, `[AllowAnonymous]`, Static SSR (kein `@rendermode`), `LandingLayout.razor`.
+
+**CSS:** `wwwroot/atelier-landing.css` — 1:1-Port des React-Prototyp-`landing.css`. Alle 27 referenzierten CSS-Tokens existierten bereits in allen drei Paletten (`atelier.css`); keine Tokens hinzugefügt.
+
+**JS:** `wwwroot/js/landing.js` — reines IIFE, kein Blazor-Interop. `IntersectionObserver` für Scroll-Reveal (`.lp-reveal` → `.in`). GEEF-Flow-Choreografie: zweiter Observer + `setTimeout`-Sequenz G→E→E-Schleife→F via `is-active`/`has-passed`-Phasen-Klassen. `prefers-reduced-motion` setzt `body[data-static="1"]`, CSS stoppt alle Keyframe-Animationen.
+
+**Komponenten:** `Components/UI/Landing/` — neun Sektions-Komponenten (`LandingNav`, `LandingHero`, `LandingTurn`, `LandingGeefFlow`, `LandingCrew`, `LandingProof`, `LandingCapabilities`, `LandingClosing`, `LandingFooter`) und `LandingIllustrations.razor` (12 Inline-SVGs via `Name`-Parameter + `@switch`).
+
+**Stub-Seiten:** `Components/Pages/Public/` — neun `[AllowAnonymous]`-Static-SSR-Seiten mit `LandingLayout` und `ComingSoon.razor` (`[Parameter, EditorRequired] string Title`): `/pricing`, `/docs`, `/self-host`, `/status`, `/changelog`, `/contact`, `/imprint`, `/privacy`, `/terms`.
+
+**CSS-Klassen-Präfixe:** `lp-nav`, `lp-hero`, `lp-turn`, `lp-reveal`, `lp-caps`, `lp-close`, `lp-footer`, `lp-stub`. GEEF-Flow: `geef-flow`, `geef-phase`. Crew: `crew-sheet`. Proof: `run-mock`. Illustrationen: `press-anim`, `platen`, `paper-in`, `paper-out`, `stamp-glow`, `loop-path`.
+
+**Asset-Einbindung:** `App.razor` injiziert `atelier-landing.css`, `js/landing.js`, `landing-root` (html) und `landing-body` (body) nur bedingt für `Path == "/"` — kein Overhead für authentifizierte App-Routen.

@@ -1049,3 +1049,33 @@ Nach D-051 (url-fetch, news-search, static-context) fehlten noch zwei Grounding-
 **Was NICHT in diesem Schritt:** WebSocket-Grounding, Streaming-Provider, authentifizierte akademische Quellen mit Institutions-Lizenzierung, REST-API-OAuth-Authentifizierungsflows, bUnit-UI-Tests für neue Provider-Sektionen (verschoben).
 
 **Tests:** 1334 gesamt (1324 grün + bekannte Flakes unverändert). Neu: 92 Tests — `GroundingProviderProfileAcademicRestTests` (27), `JsonPathNavigatorTests` (18), `ArxivSourceTests` (17), `AcademicSearchGroundingProviderTests` (17), `RestApiGroundingProviderTests` (9), `AcademicRateLimitRetryTests` (4).
+
+---
+
+## D-053 — Öffentliche Landing-Page: Static-SSR-Startseite auf `/` (2026-05-22)
+
+*Datum: 22. Mai 2026*
+
+Die Route `/` war bisher das authentifizierte Workshop-Dashboard (`[Authorize]`, InteractiveServer). Anonyme Besucher sahen nur die Login-Weiterleitung und erfuhren nie, was Geef.Atelier ist. Eine Design-KI lieferte einen React-Prototyp einer Landing-Page (`docs/design/landing-prototype/`) in derselben Designsprache und mit demselben CSS-Token-System wie das Dashboard. Diese Entscheidung portiert den Prototyp nach Blazor Server und strukturiert die Routing-/Auth-Trennung neu.
+
+**D-053/1 — `/` = öffentliche Landing-Page; `/workshop` = authentifiziertes Dashboard.** `Landing.razor`: `@page "/"`, `[AllowAnonymous]`, `@layout Layout.LandingLayout`, kein `@rendermode` (Static SSR — keine SignalR-Verbindung für anonyme Besucher). `Index.razor` auf `@page "/workshop"` verschoben, `[Authorize]` und `@rendermode InteractiveServer` unverändert. Kein sonstiger Dashboard-Code geändert; SignalR-Hub-Gruppen sind nach Benutzername/Rolle gegliedert, nicht nach Route.
+
+**D-053/2 — Server-seitiger Redirect für eingeloggte Nutzer auf `/`.** Static-SSR-`OnInitializedAsync` mit `[CascadingParameter] Task<AuthenticationState>` und `NavigationManager.NavigateTo("/workshop")` erzeugt vor jeder HTML-Ausgabe einen serverseitigen 302 — kein clientseitiges Flackern. Dasselbe Muster nutzt bereits `RedirectToLogin.razor`. `FakeNavigationManager.Uri` erfasst den Redirect in bUnit-Tests mit `SetAuthorized()`.
+
+**D-053/3 — `LandingLayout.razor` — reines Layout ohne Wrapper-Element.** `LandingLayout.razor` rendert nur `@Body` ohne umschließendes `<main>` oder andere Elemente. `EmptyLayout` wurde abgelehnt, weil es die Ausgabe in `<main class="empty-layout">` mit Flex-Einschränkungen einwickelt, die mit dem vollbreitigen Sektionsdesign der Landing-Page kollidieren.
+
+**D-053/4 — Alle bestehenden `/`-Anker auf `/workshop` umgestellt.** Drei Stellen: `Brand.razor:1` (`href="/workshop"`), `NavMenu.razor:6` (`href="/workshop"`, `Match="NavLinkMatch.All"` beibehalten), `ConnectedClients.razor:14` (Zurück-Link). `<base href="/">` in `App.razor` unverändert.
+
+**D-053/5 — Post-Login-Redirect-Standard von `/runs` auf `/workshop` geändert.** `Login.razor` refaktoriert: `ResolvePostLogin(string? returnUrl)` ist jetzt ein testbarer `internal static`-Helper (Reflection-Test: `ResolvePostLogin(null) == "/workshop"`). `ReturnUrl` aus dem Query-String wird weiterhin berücksichtigt — Deeplinks überleben den Login.
+
+**D-053/6 — Bedingte Asset-Einbindung in `App.razor`.** Landing-CSS (`atelier-landing.css`) und JS (`js/landing.js`) werden nur eingebunden, wenn `Http.HttpContext?.Request.Path.Value == "/"`. `<body>` erhält `class="landing-body"`, `<html>` wird `landing-root` angehängt — serverseitig, kein FOUC. Alle 27 CSS-Tokens aus `atelier-landing.css` existierten bereits in allen drei Paletten (Vellum/Noir/Petrol) in `atelier.css`; keine neuen Tokens notwendig.
+
+**D-053/7 — `landing.js` ist reines JavaScript (kein Blazor-Interop).** Self-invoking IIFE. `IntersectionObserver` steuert Scroll-Reveal (`.lp-reveal` → `.in`). GEEF-Flow-Choreografie nutzt einen zweiten Observer (Threshold 0,32) + `setTimeout`-Sequenz G→E→E-Schleife→F, schaltet `is-active`/`has-passed` pro Phase. `prefers-reduced-motion`: setzt `body[data-static="1"]` und überspringt alle Timer; CSS-`@media` stoppt Keyframe-Animationen. Kein JS-Interop-Register notwendig — Static-SSR-Seiten haben keinen Blazor-Circuit.
+
+**D-053/8 — `LandingIllustrations.razor` nutzt `Name`-Parameter + `@switch`-Block.** Erster Ansatz mit statischen `RenderFragment`-Properties und `__builder =>`-Lambdas im `@code`-Block funktioniert in Razor nicht sauber. Das Switch-Muster auf `[Parameter, EditorRequired] string Name` erlaubt konsumierenden Komponenten, beliebige der 12 SVGs ohne statische Referenz zu rendern. Alle Animations-Klassen (`press-anim`, `platen`, `paper-in`, `paper-out`, `stamp-glow`, `loop-path`) 1:1 portiert.
+
+**D-053/9 — Neun Stub-Seiten, kein Inhalt.** Footer-Links dürfen nicht mit 404 antworten. `/pricing`, `/docs`, `/self-host`, `/status`, `/changelog`, `/contact`, `/imprint`, `/privacy`, `/terms` — je eine `[AllowAnonymous]`-Static-SSR-Seite mit `LandingLayout` und der gemeinsamen `ComingSoon.razor`-Komponente (Parameter `Title`). `/contact` zeigt nur „Coming soon" gemäß `contact-protection.md` — keine Kontaktdaten.
+
+**D-053/10 — Hero-Headline fest auf `manufactory`-Variante.** „A manufactory for the written word." ist eine Konstante in `LandingHero.razor`. Die Alternativvariante (`„atelier"`) wurde nicht portiert.
+
+**Tests:** 1382 gesamt. Neu: 48 bUnit-Tests — `LandingPageTests` (35: Nav, Hero, GeefFlow 4 Phasen + IterationLoop + Iter-Badge, Crew, Proof, Capabilities, Closing, Footer), `LandingRoutingTests` (13: Anonym-Render, Auth-Redirect, Reflection Route/Attribute, `ResolvePostLogin`-Unit, ComingSoon, Stub-Seiten-Attribute).

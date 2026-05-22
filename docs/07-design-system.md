@@ -136,3 +136,19 @@ The CSS class `.coming-soon` (dimmed color, tooltip) is still used in two places
 - **Scoped CSS:** `.razor.css` per component for layout overrides
 - **Bootstrap:** fully removed in PS-3
 - **No inline styling** in components (except minimally in pages)
+
+## Landing page (D-053)
+
+**Route:** `/` — `Landing.razor`, `[AllowAnonymous]`, Static SSR (no `@rendermode`), `LandingLayout.razor`.
+
+**CSS:** `wwwroot/atelier-landing.css` — 1:1 port of the React prototype's `landing.css`. All 27 referenced CSS tokens already existed in all three palettes (`atelier.css`); no tokens added.
+
+**JS:** `wwwroot/js/landing.js` — plain IIFE, no Blazor interop. `IntersectionObserver` for scroll-reveal (`.lp-reveal` → `.in`). GEEF flow choreography: second observer + `setTimeout` sequence G→E→E-loop→F via `is-active`/`has-passed` phase classes. `prefers-reduced-motion` sets `body[data-static="1"]`, CSS stops all keyframe animations.
+
+**Components:** `Components/UI/Landing/` — nine section components (`LandingNav`, `LandingHero`, `LandingTurn`, `LandingGeefFlow`, `LandingCrew`, `LandingProof`, `LandingCapabilities`, `LandingClosing`, `LandingFooter`) and `LandingIllustrations.razor` (12 inline SVGs via `Name` parameter + `@switch`).
+
+**Stub pages:** `Components/Pages/Public/` — nine `[AllowAnonymous]` Static SSR pages using `LandingLayout` and `ComingSoon.razor` (`[Parameter, EditorRequired] string Title`): `/pricing`, `/docs`, `/self-host`, `/status`, `/changelog`, `/contact`, `/imprint`, `/privacy`, `/terms`.
+
+**CSS class prefixes:** `lp-nav`, `lp-hero`, `lp-turn`, `lp-reveal`, `lp-caps`, `lp-close`, `lp-footer`, `lp-stub`. GEEF flow: `geef-flow`, `geef-phase`. Crew: `crew-sheet`. Proof: `run-mock`. Illustrations: `press-anim`, `platen`, `paper-in`, `paper-out`, `stamp-glow`, `loop-path`.
+
+**Asset injection:** `App.razor` injects `atelier-landing.css`, `js/landing.js`, `landing-root` (html), and `landing-body` (body) conditionally only for `Path == "/"` — no overhead for authenticated app routes.

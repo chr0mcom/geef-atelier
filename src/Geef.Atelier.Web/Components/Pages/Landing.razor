@@ -1,0 +1,34 @@
+@page "/"
+@layout Layout.LandingLayout
+@attribute [AllowAnonymous]
+@inject NavigationManager Nav
+@using Microsoft.AspNetCore.Authorization
+
+<PageTitle>Geef.Atelier — A manufactory for the written word</PageTitle>
+<HeadContent>
+    <meta name="description" content="A workshop of AI models that draft, critique, and refine your text in iterations — until the crew is satisfied. Every run reproducible, every reviewer auditable." />
+</HeadContent>
+
+<div class="landing">
+    <LandingNav />
+    <LandingHero />
+    <LandingTurn />
+    <LandingGeefFlow />
+    <LandingCrew />
+    <LandingProof />
+    <LandingCapabilities />
+    <LandingClosing />
+    <LandingFooter />
+</div>
+
+@code {
+    [CascadingParameter] public Task<AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is null) return;
+        var state = await AuthState;
+        if (state.User.Identity?.IsAuthenticated == true)
+            Nav.NavigateTo("/workshop");
+    }
+}
