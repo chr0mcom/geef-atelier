@@ -230,6 +230,11 @@ body::before {
 .t-eyebrow   { font-family: var(--font-ui); font-weight: 500; text-transform: uppercase; letter-spacing: 0.16em; font-size: 11px; color: var(--ink-3); }
 .t-caption   { font-size: 12px; color: var(--ink-3); }
 
+/* Blazor FocusOnNavigate moves focus to the page <h1> for screen-reader
+   announcement. The heading is not keyboard-reachable (tabindex=-1), so its
+   default focus ring is visual noise on load — suppress it. */
+h1[tabindex="-1"]:focus { outline: none; }
+
 /* ============================================================
    App layout
    ============================================================ */

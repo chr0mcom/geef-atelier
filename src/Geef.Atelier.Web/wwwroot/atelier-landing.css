@@ -54,14 +54,11 @@ html.palette-vellum body.landing-body {
   cursor: pointer; user-select: none;
 }
 .lp-nav .brand .crest {
-  width: 30px; height: 30px;
+  width: 34px; height: 34px;
   border: 1px solid var(--hairline-strong);
   border-radius: 50%;
-  display: grid; place-items: center;
-  color: var(--hero);
-  font-family: var(--font-display);
-  font-size: 15px;
-  background: var(--surface);
+  /* Real brand mark (palette-aware quill nib) on the surface seal. */
+  background: var(--brand-mark) center / 64% no-repeat, var(--surface);
   position: relative;
   overflow: hidden;
 }
@@ -69,7 +66,8 @@ html.palette-vellum body.landing-body {
   content:"";
   position:absolute;
   inset:0;
-  background: radial-gradient(circle at 32% 28%, color-mix(in oklch, var(--hero) 25%, transparent), transparent 65%);
+  background: radial-gradient(circle at 30% 24%, color-mix(in oklch, var(--hero) 16%, transparent), transparent 62%);
+  pointer-events: none;
 }
 .lp-nav .brand .wordmark {
   font-family: var(--font-display);
@@ -525,7 +523,10 @@ body[data-static="1"] .geef-flow .loop .loop-path { animation: none !important; 
   padding: 0 28px;
   border-left: 1px dashed var(--hairline-soft);
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  /* num | icon (fixed) | name+copy | flex spacer (pushes pip-row down).
+     Locking the icon row keeps the phase names aligned across all four
+     columns regardless of copy length. */
+  grid-template-rows: auto 64px auto 1fr;
   gap: 18px;
 }
 .geef-phase:first-child { border-left: none; padding-left: 0; }
@@ -577,12 +578,14 @@ body[data-static="1"] .geef-flow .loop .loop-path { animation: none !important; 
   position: absolute;
   left: 6%;
   right: 6%;
-  top: 50%;
+  /* Sits in the gap between the fixed-height icon row and the phase names
+     (56px pad + ~14px num + 18px gap + 64px icon + half of the 18px gap).
+     Anchored from the top — robust now that the icon row height is fixed. */
+  top: 161px;
   height: 1px;
   background: var(--hairline-soft);
   pointer-events: none;
   z-index: 1;
-  transform: translateY(-30px);
 }
 @media (max-width: 980px) { .geef-flow .ribbon { display: none; } }
 .geef-flow .ribbon .ink {
@@ -596,16 +599,18 @@ body[data-static="1"] .geef-flow .loop .loop-path { animation: none !important; 
 }
 .geef-flow.run .ribbon .ink { width: 100%; }
 
-/* iteration loop between E and E (positions 2 and 3) */
+/* iteration loop between E and E (positions 2 and 3) — arcs over the icon
+   band and ends just above the ribbon, clear of the phase names. Anchored
+   from the top (top + height) so it tracks the fixed icon row. */
 .geef-flow .loop {
   position: absolute;
-  top: 90px;
+  top: 74px;
+  height: 86px;
   left: calc(25% + 14px);
   right: calc(25% + 14px);
-  bottom: 220px;
   pointer-events: none;
   z-index: 1;
-  overflow: hidden;
+  overflow: visible;
 }
 @media (max-width: 980px) { .geef-flow .loop { display: none; } }
 .geef-flow .loop > svg {
@@ -655,6 +660,7 @@ body[data-static="1"] .geef-flow .loop .loop-path { animation: none !important; 
 
 /* small phase status pip */
 .geef-phase .pip-row {
+  align-self: end;
   display: flex; align-items: center; gap: 8px;
   font-family: var(--font-mono);
   font-size: 10px;
@@ -1148,14 +1154,11 @@ body[data-static="1"] .geef-flow .loop .loop-path { animation: none !important; 
   border: 1px solid var(--hero);
   border-radius: 50%;
   margin: 0 auto 36px;
-  display: grid; place-items: center;
-  font-family: var(--font-display);
-  font-style: italic;
-  font-weight: 400;
-  font-size: 38px;
-  color: var(--hero);
   position: relative;
-  background: radial-gradient(circle at 32% 28%, color-mix(in oklch, var(--hero) 18%, transparent), transparent 64%);
+  /* Real brand mark on a hero-tinted wax-seal. */
+  background:
+    var(--brand-mark) center / 50% no-repeat,
+    radial-gradient(circle at 32% 28%, color-mix(in oklch, var(--hero) 18%, transparent), transparent 64%);
 }
 .lp-close .stamp::after {
   content: "";
