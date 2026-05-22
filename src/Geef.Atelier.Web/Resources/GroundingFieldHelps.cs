@@ -44,4 +44,58 @@ public static class GroundingFieldHelps
 
     public const string NewsSearchDepth =
         "Tavily-Suchtiefe: basic (schneller, günstiger) oder advanced (gründlicher, höhere Credit-Kosten).";
+
+    // Academic-search
+    public const string AcademicSource =
+        "Wissenschafts-API: arXiv (Preprints CS/Physik/Math, kein Key), " +
+        "Semantic Scholar (breite Abdeckung, optionaler Key für höhere Rate-Limits), " +
+        "OpenAlex (sehr breit, modern, kostenlos).";
+
+    public const string AcademicMaxPapers =
+        "Maximale Anzahl Paper pro Anfrage. Default 5, empfohlen 3–10.";
+
+    public const string AcademicDateFrom =
+        "Nur Paper ab diesem Datum (ISO-Format: YYYY oder YYYY-MM-DD). Leer = kein Datumsfilter.";
+
+    public const string AcademicFields =
+        "Optionale Suchfeld-Einschränkung (z. B. 'ti' für Titel bei arXiv). Leer = alle Felder.";
+
+    public const string AcademicApiKeyEnv =
+        "ENV-Variablen-Name für den Semantic-Scholar-API-Key (z. B. SEMANTIC_SCHOLAR_API_KEY). " +
+        "Wichtig: Hier den Variablennamen eintragen, nicht den Key selbst! Leer = kein Key (niedrigere Rate-Limits).";
+
+    // REST-API
+    public const string RestApiUrl =
+        "Vollständige URL des Endpunkts (https://…). Platzhalter {briefing} wird durch das URL-kodierte Briefing ersetzt. " +
+        "Sicherheitshinweis: Interne Adressen (localhost, 10.x, 192.168.x, 172.16–31.x, 169.254.x) werden aus " +
+        "Sicherheitsgründen blockiert (SSRF-Schutz). Nur JSON-Antworten werden unterstützt.";
+
+    public const string RestApiMethod =
+        "HTTP-Methode: GET (Standard, Parameter via URL) oder POST (Daten im Body).";
+
+    public const string RestApiHeaders =
+        "Zusätzliche HTTP-Header als JSON-Objekt, z. B. {\"Accept\": \"application/json\"}. " +
+        "Keine Secrets hier hinterlegen — dafür Authentifizierungs-ENV-Variable verwenden.";
+
+    public const string RestApiBodyTemplate =
+        "Request-Body-Template für POST-Anfragen. {briefing} wird durch das JSON-escaped Briefing ersetzt. " +
+        "Beispiel: {\"query\": \"{briefing}\", \"limit\": 10}";
+
+    public const string RestApiResponsePath =
+        "JSONPath zum relevanten Teil der Antwort, z. B. $.results oder $.data[*].content. " +
+        "Leer = gesamte Antwort verwenden.";
+
+    public const string RestApiMaxItems =
+        "Maximale Anzahl extrahierter Array-Items. Default 10.";
+
+    public const string RestApiAuthHeaderEnv =
+        "ENV-Variablen-Name für den Auth-Token (z. B. MY_API_TOKEN). " +
+        "Wichtig: Hier den Variablennamen eintragen, nicht den Token selbst! " +
+        "Der Token wird zur Laufzeit aus der Umgebungsvariable gelesen und taucht niemals in der Datenbank auf.";
+
+    public const string RestApiAuthHeaderName =
+        "Name des Auth-Headers. Standard: Authorization. Andere Beispiele: X-Api-Key, Token.";
+
+    public const string RestApiAuthHeaderFormat =
+        "Format des Header-Werts; {token} wird durch den aufgelösten Token ersetzt. Standard: Bearer {token}.";
 }

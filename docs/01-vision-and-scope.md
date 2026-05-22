@@ -2,7 +2,7 @@
 
 *[Deutsch](01-vision-and-scope_de.md) · **English***
 
-*Last updated: 20 May 2026 (scope aligned with Grounding-Typen D-051: static-context, url-fetch, news-search)*
+*Last updated: 22 May 2026 (scope aligned with D-052: academic-search, rest-api providers added)*
 
 ## Vision
 
@@ -28,7 +28,7 @@ The project is the productive application of the [Geef SDK](https://github.com/c
 - Persistent run history with a complete iteration trail
 - Run resumption: continue a failed or aborted run from its last draft text (seed mode) or with a fresh pipeline (clean mode) — D-046
 - File export in formats md / html / pdf / docx / txt / json via the Finalizer pipeline (D-044); the five Finalizer profile types (FileExport, MetadataEnrich, ExternalSink, Transform) are implemented as part of the crew system
-- Grounding enrichment in multiple forms: Tavily web search (`tavily`), semantic vector-store RAG (`vector-store`), curated fixed text for style guides and glossaries (`static-context`), specific URL fetching with SSRF protection (`url-fetch`), and Tavily news search with date filter (`news-search`); each provider supports an optional AI refinement pass (D-050/D-051)
+- Grounding enrichment in multiple forms: Tavily web search (`tavily`), semantic vector-store RAG (`vector-store`), curated fixed text for style guides and glossaries (`static-context`), specific URL fetching with SSRF protection (`url-fetch`), and Tavily news search with date filter (`news-search`); each provider supports an optional AI refinement pass (D-050/D-051/D-052); academic paper retrieval (`academic-search`) and generic REST endpoint grounding (`rest-api`) added (D-052)
 
 ## Out of scope (for now)
 

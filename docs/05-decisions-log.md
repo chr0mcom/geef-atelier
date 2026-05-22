@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-05-20 (D-051 added: Grounding-Typen erweitern — Static-Context, URL-Fetch, News-Search)*
+*Last updated: 2026-05-22 (D-052 added: Grounding-Providers academic-search and rest-api)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -1017,3 +1017,50 @@ Drei neue `IGroundingProvider`-Typen implementiert, die demselben Factory/DI/Con
 - `GroundingProviderTypes`-Konstanten-Klasse eingeführt — kein Magic-String mehr in Providers.
 - System-Profil `tavily-news` in `SystemCrew` für sofortige Nutzbarkeit.
 - SSRF-Guard als wiederverwendbare Komponente (`IUrlSafetyValidator`) für zukünftigen `rest-api`-Provider (Step 4).
+
+---
+
+## D-052 — Grounding-Providers: academic-search and rest-api (2026-05-22)
+
+**Status:** Implemented in feat/grounding-academic-restapi
+
+### Context
+
+After D-051 (url-fetch, news-search, static-context), the two remaining grounding scenarios described in the feature spec were: scientific paper retrieval from academic APIs, and arbitrary REST endpoint grounding. Both were deferred to a separate step.
+
+### Decisions
+
+**1. `academic-search` provider — three source adapters behind `IAcademicSource`:**
+- `arxiv`: free, Atom/XML, no API key, CS/Physics/Math/Biology coverage.
+- `semantic-scholar`: JSON API, optional `x-api-key` for higher rate-limits. Exponential-backoff retry on HTTP 429 (3 attempts, 2^attempt seconds).
+- `openalex`: JSON API, polite-pool User-Agent, inverted-index abstract reconstruction, exponential-backoff retry on 429.
+- Source selected by `source` settings key (defaults to `semantic-scholar`). Unknown source falls back to `semantic-scholar`.
+- `AcademicSearchOptions(MaxPapers, DateFrom, Fields, ApiKey)` forwarded to adapter; API key resolved from ENV var at runtime (`apiKeyEnv` setting stores the variable NAME, not the value).
+- No new NuGet dependencies: Atom XML via `System.Xml.Linq.XDocument`, JSON via `System.Text.Json`.
+
+**2. `rest-api` provider — security-critical ordering:**
+- Template substitution (`{briefing}` → `Uri.EscapeDataString`) happens BEFORE SSRF validation — a crafted briefing cannot inject an internal URL.
+- `IUrlSafetyValidator` from D-051 reused — zero duplication.
+- Redirect following disabled (`SocketsHttpHandler { AllowAutoRedirect = false }`).
+- `authHeaderEnv` stores the ENV var name; value resolved at runtime, never logged.
+- JSONPath extraction via `JsonPathNavigator` (new, System.Text.Json only, no Newtonsoft/JsonPath.Net dependency).
+- POST body: `{briefing}` JSON-escaped (not URL-encoded) to safely embed inside JSON payloads.
+- `maxItems` default 10 (safety cap, independent of JSONPath result count).
+
+**3. System profile `academic-default`:**
+- Semantic Scholar + openrouter/gemini-2.0-flash-lite filter-refinement, seeded via `Step28AcademicRestApiGrounding` migration.
+- Registered in `SystemCrew.GroundingProviderProfiles`.
+
+**4. `JsonPathNavigator` — lightweight internal JSONPath:**
+- Supports `$`, `$.field`, `$.a.b`, `$.a[*]`, `$.a[*].b`, `$.a[0]` (negative index supported).
+- Zero dependencies; ~120 LOC static class.
+- Not adding `JsonPath.Net` or `Newtonsoft.Json` — they introduced assembly-version conflicts in prior steps.
+
+**5. TemplateStudio meta-prompt updated:**
+- `academic-search` guidance: propose for scholarly/academic briefings; when not to use.
+- `rest-api` guidance: conservative — only propose with a concrete identified API endpoint.
+- `grounding_provider_type` allowed-values list extended.
+
+**What is NOT in this step:** WebSocket grounding, streaming providers, authenticated academic sources with per-institution licensing, REST API POST-based authentication flows (OAuth), Grounding-Provider bUnit UI tests (deferred).
+
+**Tests:** 1334 total (1324 green + pre-existing flakes unchanged). New: 92 tests — `GroundingProviderProfileAcademicRestTests` (27), `JsonPathNavigatorTests` (18), `ArxivSourceTests` (17), `AcademicSearchGroundingProviderTests` (17), `RestApiGroundingProviderTests` (9), `AcademicRateLimitRetryTests` (4).

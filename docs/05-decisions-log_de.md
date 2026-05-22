@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-20 (D-049 / D-050 / D-051 ergänzt: LlmBinding, Grounding-Refinement, Grounding-Typen)*
+*Letzte Aktualisierung: 2026-05-22 (D-052 ergänzt: Grounding-Provider academic-search und rest-api)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -1002,3 +1002,50 @@ Schritt 3 von 3 der Grounding-Verbesserungs-Serie. Das Grounding-System kannte n
 - SSRF-Guard als wiederverwendbare Komponente (`IUrlSafetyValidator`) für zukünftigen `rest-api`-Provider (Step 4).
 
 **Tests:** 1234 gesamt (1228 grün + 4 bekannte Flakes + 1 Skip + 1 Skip neu). Neu: ~115 neue Tests (SSRF-Validierung, Provider-Logik, UI-Komponenten, Dashboard-Cost-Aggregation).
+
+---
+
+## D-052 — Grounding-Provider: academic-search und rest-api (2026-05-22)
+
+*Status: Umgesetzt in feat/grounding-academic-restapi*
+
+### Kontext
+
+Nach D-051 (url-fetch, news-search, static-context) fehlten noch zwei Grounding-Szenarien: wissenschaftliche Literatursuche über akademische APIs und generisches REST-Endpoint-Grounding. Beide wurden in einen eigenen Schritt (Grounding-Verbesserungs-Serie, Schritt 4) ausgelagert.
+
+### Entscheidungen
+
+**1. `academic-search`-Provider — drei Quell-Adapter hinter `IAcademicSource`:**
+- `arxiv`: kostenlos, Atom/XML, kein API-Key, CS/Physik/Mathe/Biologie.
+- `semantic-scholar`: JSON-API, optionaler `x-api-key` für höhere Rate-Limits. Exponentieller Backoff-Retry bei HTTP 429 (3 Versuche, 2^Versuch Sekunden).
+- `openalex`: JSON-API, Polite-Pool-User-Agent, Inverted-Index-Abstract-Rekonstruktion, Backoff-Retry bei 429.
+- Quelle per `source`-Settings-Key konfigurierbar (Standard: `semantic-scholar`). Unbekannte Quelle fällt auf `semantic-scholar` zurück.
+- API-Key: `apiKeyEnv`-Key enthält den NAMEN der Umgebungsvariable, nicht den Wert — zur Laufzeit aufgelöst, nie geloggt.
+- Keine neuen NuGet-Abhängigkeiten: Atom/XML via `System.Xml.Linq.XDocument`, JSON via `System.Text.Json`.
+
+**2. `rest-api`-Provider — sicherheitskritische Reihenfolge:**
+- Template-Substitution (`{briefing}` → `Uri.EscapeDataString`) wird VOR der SSRF-Validierung durchgeführt — ein manipuliertes Briefing kann keine interne URL einschleusen.
+- `IUrlSafetyValidator` aus D-051 wiederverwendet — kein Code-Duplikat.
+- Redirect-Folgen deaktiviert (`SocketsHttpHandler { AllowAutoRedirect = false }`).
+- `authHeaderEnv` speichert nur den Variablennamen; Wert wird zur Laufzeit ausgelesen, nie geloggt.
+- JSONPath-Extraktion via `JsonPathNavigator` (neu, nur `System.Text.Json`, keine Newtonsoft/JsonPath.Net-Abhängigkeit).
+- POST-Body: `{briefing}` wird JSON-escaped (nicht URL-encoded) — sicheres Einbetten in JSON-Payloads.
+- `maxItems` Standard 10 (Sicherheits-Cap, unabhängig von JSONPath-Ergebnismenge).
+
+**3. System-Profil `academic-default`:**
+- Semantic Scholar + openrouter/gemini-2.0-flash-lite Filter-Refinement, geseedet via Migration `Step28AcademicRestApiGrounding`.
+- Registriert in `SystemCrew.GroundingProviderProfiles`.
+
+**4. `JsonPathNavigator` — leichtgewichtiger interner JSONPath:**
+- Unterstützt `$`, `$.field`, `$.a.b`, `$.a[*]`, `$.a[*].b`, `$.a[0]` (negativer Index unterstützt).
+- Keine Abhängigkeiten; ~120 LOC statische Klasse.
+- `JsonPath.Net` oder `Newtonsoft.Json` bewusst nicht eingebunden — verursachten in früheren Steps Assembly-Versionskonflikte.
+
+**5. TemplateStudio-Meta-Prompt aktualisiert:**
+- `academic-search`-Guidance: wann vorschlagen (akademische/wissenschaftliche Briefings), wann nicht.
+- `rest-api`-Guidance: konservativ — nur vorschlagen, wenn ein konkreter API-Endpoint im Briefing klar identifizierbar ist.
+- Erlaubte `grounding_provider_type`-Werte in Tool-Schema erweitert.
+
+**Was NICHT in diesem Schritt:** WebSocket-Grounding, Streaming-Provider, authentifizierte akademische Quellen mit Institutions-Lizenzierung, REST-API-OAuth-Authentifizierungsflows, bUnit-UI-Tests für neue Provider-Sektionen (verschoben).
+
+**Tests:** 1334 gesamt (1324 grün + bekannte Flakes unverändert). Neu: 92 Tests — `GroundingProviderProfileAcademicRestTests` (27), `JsonPathNavigatorTests` (18), `ArxivSourceTests` (17), `AcademicSearchGroundingProviderTests` (17), `RestApiGroundingProviderTests` (9), `AcademicRateLimitRetryTests` (4).

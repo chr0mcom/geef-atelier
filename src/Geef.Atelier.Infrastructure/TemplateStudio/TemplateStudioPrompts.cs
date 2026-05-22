@@ -42,6 +42,16 @@ internal static class TemplateStudioPrompts
              Settings: "recencyDays" (default "7"), "newsMaxResults" (default "5").
            - "tavily": for general web research where relevant sources are not yet known.
              Settings: "Tier" ("basic" or "advanced"), "MaxResults", "IncludeAnswer".
+           - "academic-search": when the task is academic, scientific, or research-oriented and would
+             benefit from grounding in peer-reviewed or preprint papers (e.g. a research summary,
+             literature review, scientific essay). Use this for scholarly/academic briefings.
+             Settings: "source" ("semantic-scholar" [default], "arxiv", or "openalex"),
+             "maxPapers" (default "5"), optional "dateFrom" (ISO year/date), optional "apiKeyEnv".
+           - "rest-api": propose ONLY when the user's briefing clearly identifies a specific data API
+             endpoint that should be fetched (e.g. internal product catalog, analytics endpoint).
+             This type is conservative — do not propose it without a clear concrete data source URL.
+             Settings: "url" (required), "method" ("GET" or "POST"), optional "responsePath" (JSONPath),
+             optional "maxItems" (default "10"), optional "authHeaderEnv".
            For "static-context", always include "label" and "content" in grounding_provider_settings.
         5. System prompts MUST follow the Atelier profile anatomy below (see "Required system-prompt
            structure"). They are NOT one-line behaviour descriptions. Write them in English, fully

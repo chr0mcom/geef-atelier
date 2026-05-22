@@ -8,4 +8,6 @@ public static class GroundingProviderTypes
     public const string StaticContext = "static-context";
     public const string UrlFetch = "url-fetch";
     public const string NewsSearch = "news-search";
+    public const string AcademicSearch = "academic-search";
+    public const string RestApi = "rest-api";
 }
