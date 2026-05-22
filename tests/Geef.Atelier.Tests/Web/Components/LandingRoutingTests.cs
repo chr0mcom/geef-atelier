@@ -118,4 +118,23 @@ public sealed class LandingRoutingTests : TestContext
         var link = cut.Find("a[href='/']");
         Assert.NotNull(link);
     }
+
+    // ── Self-host page ───────────────────────────────────────────────────
+
+    [Fact]
+    public void SelfHost_LinksToAtelierRepoAndSdk()
+    {
+        var cut = RenderComponent<SelfHost>();
+        Assert.Contains(cut.FindAll("a"),
+            a => a.GetAttribute("href") == "https://github.com/chr0mcom/geef-atelier");
+        Assert.Contains(cut.FindAll("a"),
+            a => a.GetAttribute("href") == "https://github.com/chr0mcom/geef");
+    }
+
+    [Fact]
+    public void SelfHost_MentionsMitLicense()
+    {
+        var cut = RenderComponent<SelfHost>();
+        Assert.Contains("MIT", cut.Markup);
+    }
 }
