@@ -164,6 +164,27 @@ public sealed class LandingPageTests : TestContext
         Assert.Equal(6, cards.Count);
     }
 
+    // ── Film ─────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void LandingFilm_RendersVideoWithMp4SourceAndPoster()
+    {
+        var cut = RenderComponent<LandingFilm>();
+        var video = cut.Find(".lp-film-video");
+        Assert.Equal("media/geef-film-poster.jpg", video.GetAttribute("poster"));
+        var source = cut.Find(".lp-film-video source");
+        Assert.Equal("media/geef-film.mp4", source.GetAttribute("src"));
+        Assert.Equal("video/mp4", source.GetAttribute("type"));
+    }
+
+    [Fact]
+    public void LandingFilm_HasPlayOverlayButton()
+    {
+        var cut = RenderComponent<LandingFilm>();
+        var play = cut.Find(".lp-film-play");
+        Assert.Equal("button", play.GetAttribute("type"));
+    }
+
     // ── Closing ──────────────────────────────────────────────────────────
 
     [Fact]
