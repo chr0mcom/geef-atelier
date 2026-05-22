@@ -370,3 +370,15 @@ URL `https://geef.stefan-bechtel.de/mcp` eingeben — der Client erkennt `WWW-Au
 - Mehrere Scopes / feingranulare Berechtigungen (nur `mcp:full`)
 - JWTs / OpenID Connect (Opaque Tokens + DB-Lookup ist ausreichend)
 - Multi-Tenant
+
+## Tool `list_learnings` (D-054)
+
+| Feld | Wert |
+|---|---|
+| Tool-Name | `list_learnings` |
+| Parameter | `status_filter?` (Proposed / Approved / Rejected), `domain_filter?` (String) |
+| Rückgabe | Array von `LearningEntryDto` |
+
+**`LearningEntryDto`-Felder:** `id`, `text` (gekürzt auf 300 Zeichen), `source_run_id`, `learning_run_id?`, `domain`, `status`, `owner_username`, `created_at`, `approved_at?`.
+
+`status_filter=Approved` gibt nur aktive Learnings zurück, die beim Retrieval tatsächlich genutzt werden. `domain_filter` matcht den Crew-Template-Namen des Ursprungs-Runs (z. B. `juristisch`, `akademisch`).

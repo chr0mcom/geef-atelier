@@ -47,7 +47,7 @@ internal sealed class RunService(
 
         var runId = await persistence.CreateRunAsync(
             request.BriefingText, normalizedConfig, request.CreatedByUser,
-            resolvedTemplateName, snapshotJson, cancellationToken);
+            resolvedTemplateName, snapshotJson, request.Kind, cancellationToken);
 
         // Upload run-local attachments and extend the snapshot with RunAttachmentsProfile.
         if (request.Attachments is { Count: > 0 } attachments)

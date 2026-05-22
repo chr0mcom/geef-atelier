@@ -10,4 +10,5 @@ public static class GroundingProviderTypes
     public const string NewsSearch = "news-search";
     public const string AcademicSearch = "academic-search";
     public const string RestApi = "rest-api";
+    public const string LearningRetrieval = "learning-retrieval";
 }

@@ -1,0 +1,230 @@
+@page "/crew/learnings"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using Geef.Atelier.Application.Crew.Learning
+@using Geef.Atelier.Core.Domain.Crew.Learning
+@using Geef.Atelier.Web.Components.UI
+@using Geef.Atelier.Web.Resources
+@inject ILearningService LearningService
+@inject AuthenticationStateProvider AuthState
+@inject NavigationManager Nav
+
+<PageTitle>Learnings — Atelier</PageTitle>
+
+<div class="learnings-index" data-testid="learnings-index">
+    <div class="page-header">
+        <h1>Learnings</h1>
+        <a href="/crew" class="btn ghost" data-testid="btn-back">← Crew</a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger" data-testid="error-banner">@_error</div>
+    }
+    @if (!string.IsNullOrEmpty(_success))
+    {
+        <div class="alert alert-success" data-testid="success-banner">@_success</div>
+    }
+
+    <div class="filter-bar" style="display:flex;gap:1rem;align-items:center;margin-bottom:1.5rem;" data-testid="filter-bar">
+        <label>
+            Status
+            <select @bind="_statusFilter" @bind:after="LoadAsync" class="form-control" data-testid="status-filter">
+                <option value="">Alle</option>
+                <option value="0">Vorgeschlagen</option>
+                <option value="1">Genehmigt</option>
+                <option value="2">Abgelehnt</option>
+            </select>
+        </label>
+        <label>
+            Domäne
+            <input type="text" class="form-control" placeholder="Filter…"
+                   @bind="_domainFilter" @bind:event="oninput" @bind:after="LoadAsync"
+                   data-testid="domain-filter" />
+        </label>
+    </div>
+
+    @if (_loading)
+    {
+        <p>Lade…</p>
+    }
+    else if (_entries.Count == 0)
+    {
+        <p class="text-muted" data-testid="empty-state">Keine Learnings gefunden.</p>
+    }
+    else
+    {
+        <div class="learning-list" data-testid="learning-list">
+            @foreach (var entry in _entries)
+            {
+                <div class="learning-card @(entry.Id == _expandedId ? "expanded" : "")"
+                     data-testid="learning-card">
+                    <div class="learning-card-header" @onclick="() => ToggleExpand(entry.Id)">
+                        <span class="status-badge status-@entry.Status.ToString().ToLower()" data-testid="status-badge">
+                            @StatusLabel(entry.Status)
+                        </span>
+                        <span class="learning-domain" data-testid="learning-domain">@entry.Domain</span>
+                        <span class="learning-preview" data-testid="learning-preview">
+                            @Truncate(entry.Text, 120)
+                        </span>
+                        <span class="learning-date text-muted">@entry.CreatedAt.ToString("yyyy-MM-dd")</span>
+                        <div class="learning-actions" @onclick:stopPropagation="true">
+                            @if (entry.Status != LearningStatus.Approved)
+                            {
+                                <button class="btn ghost sm" data-testid="btn-approve"
+                                        @onclick="() => ApproveAsync(entry)">
+                                    Genehmigen
+                                </button>
+                            }
+                            @if (entry.Status != LearningStatus.Rejected)
+                            {
+                                <button class="btn ghost sm" data-testid="btn-reject"
+                                        @onclick="() => RejectAsync(entry)">
+                                    Ablehnen
+                                </button>
+                            }
+                            <button class="btn ghost sm danger" data-testid="btn-delete"
+                                    @onclick="() => StartDelete(entry)">
+                                Löschen
+                            </button>
+                        </div>
+                    </div>
+                    @if (entry.Id == _expandedId)
+                    {
+                        <div class="learning-card-detail" data-testid="learning-detail">
+                            <div class="learning-text" data-testid="learning-text">
+                                <strong>Learning-Text</strong>
+                                <pre>@entry.Text</pre>
+                            </div>
+                            <div class="learning-meta">
+                                <span><strong>Quell-Run:</strong>
+                                    <a href="/runs/@entry.SourceRunId" data-testid="source-run-link">@entry.SourceRunId.ToString()[..8]…</a>
+                                </span>
+                                @if (entry.LearningRunId.HasValue)
+                                {
+                                    <span><strong>Learning-Run:</strong>
+                                        <a href="/runs/@entry.LearningRunId.Value" data-testid="learning-run-link">@entry.LearningRunId.Value.ToString()[..8]…</a>
+                                    </span>
+                                }
+                                @if (entry.ApprovedAt.HasValue)
+                                {
+                                    <span><strong>Genehmigt:</strong> @entry.ApprovedAt.Value.ToString("yyyy-MM-dd HH:mm")</span>
+                                }
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(entry.StructuredFactsJson))
+                            {
+                                <details data-testid="structured-facts">
+                                    <summary>Strukturierte Fakten (JSON)</summary>
+                                    <pre>@entry.StructuredFactsJson</pre>
+                                </details>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<DeleteConfirmationModal Show="_deleteTarget is not null"
+                         ItemKind="Learning"
+                         ItemName="@(_deleteTarget is null ? "" : Truncate(_deleteTarget.Text, 20))"
+                         OnConfirm="ConfirmDeleteAsync"
+                         OnCancel="CancelDelete" />
+
+@code {
+    private IReadOnlyList<LearningEntry> _entries = [];
+    private bool _loading = true;
+    private string? _error;
+    private string? _success;
+    private string _statusFilter = "";
+    private string _domainFilter = "";
+    private Guid? _expandedId;
+    private LearningEntry? _deleteTarget;
+    private string? _username;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        _username = auth.User.Identity?.Name;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            LearningStatus? status = string.IsNullOrEmpty(_statusFilter)
+                ? null
+                : (LearningStatus)int.Parse(_statusFilter);
+            string? domain = string.IsNullOrWhiteSpace(_domainFilter) ? null : _domainFilter.Trim();
+            _entries = await LearningService.ListAsync(status, domain);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Fehler beim Laden: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ApproveAsync(LearningEntry entry)
+    {
+        _error = null;
+        _success = null;
+        try
+        {
+            await LearningService.ApproveAsync(entry.Id, _username ?? "");
+            _success = "Learning genehmigt.";
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private async Task RejectAsync(LearningEntry entry)
+    {
+        _error = null;
+        _success = null;
+        try
+        {
+            await LearningService.RejectAsync(entry.Id, _username ?? "");
+            _success = "Learning abgelehnt.";
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private void StartDelete(LearningEntry entry) { _deleteTarget = entry; _error = null; _success = null; }
+    private void CancelDelete() => _deleteTarget = null;
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (_deleteTarget is null) return;
+        try
+        {
+            await LearningService.DeleteAsync(_deleteTarget.Id, _username ?? "");
+            _success = "Learning gelöscht.";
+            _deleteTarget = null;
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; _deleteTarget = null; }
+    }
+
+    private void ToggleExpand(Guid id) => _expandedId = _expandedId == id ? null : id;
+
+    private static string StatusLabel(LearningStatus s) => s switch
+    {
+        LearningStatus.Proposed => "Vorgeschlagen",
+        LearningStatus.Approved => "Genehmigt",
+        LearningStatus.Rejected => "Abgelehnt",
+        _ => s.ToString()
+    };
+
+    private static string Truncate(string text, int max) =>
+        text.Length <= max ? text : text[..max] + "…";
+}

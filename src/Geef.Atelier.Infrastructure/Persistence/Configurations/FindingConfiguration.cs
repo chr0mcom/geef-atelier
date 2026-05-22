@@ -20,5 +20,11 @@ internal sealed class FindingConfiguration : IEntityTypeConfiguration<FindingEnt
             .IsRequired();
 
         builder.Property(f => f.Message).IsRequired();
+
+        // Explicit FK so EF Core orders inserts correctly (Step29 added DB constraint).
+        builder.HasOne<IterationEntity>()
+            .WithMany()
+            .HasForeignKey(f => f.IterationId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

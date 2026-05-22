@@ -14,6 +14,7 @@ internal sealed class RunPersistenceService(AtelierDbContext db) : IRunPersisten
         string? createdByUser = null,
         string? crewTemplateName = null,
         string? crewSnapshotJson = null,
+        RunKind kind = RunKind.Standard,
         CancellationToken cancellationToken = default)
     {
         var run = new RunEntity
@@ -27,7 +28,8 @@ internal sealed class RunPersistenceService(AtelierDbContext db) : IRunPersisten
             CrewTemplateName = crewTemplateName,
             CrewSnapshot     = crewSnapshotJson,
             TokensTotal      = 0,
-            CostTotal        = 0m
+            CostTotal        = 0m,
+            Kind             = kind,
         };
 
         db.Runs.Add(run);

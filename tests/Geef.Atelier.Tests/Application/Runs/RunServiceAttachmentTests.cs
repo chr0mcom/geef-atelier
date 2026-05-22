@@ -175,7 +175,8 @@ public sealed class RunServiceAttachmentTests
         public Task<Guid> CreateRunAsync(
             string briefingText, string configJson,
             string? createdByUser = null, string? crewTemplateName = null,
-            string? crewSnapshotJson = null, CancellationToken cancellationToken = default)
+            string? crewSnapshotJson = null, RunKind kind = RunKind.Standard,
+            CancellationToken cancellationToken = default)
         {
             _lastRunId = Guid.NewGuid();
             return Task.FromResult(_lastRunId);

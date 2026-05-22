@@ -264,7 +264,8 @@ public sealed class RunServiceUserIsolationTests
     private sealed class MinimalPersistenceService : IRunPersistenceService
     {
         public Task<Guid> CreateRunAsync(string briefingText, string configJson, string? createdByUser = null,
-            string? crewTemplateName = null, string? crewSnapshotJson = null, CancellationToken cancellationToken = default)
+            string? crewTemplateName = null, string? crewSnapshotJson = null, RunKind kind = RunKind.Standard,
+            CancellationToken cancellationToken = default)
             => Task.FromResult(Guid.NewGuid());
 
         public Task UpdateSnapshotAsync(Guid runId, string snapshotJson, CancellationToken cancellationToken = default)

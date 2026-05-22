@@ -1094,3 +1094,37 @@ The route `/` was previously the authenticated Workshop Dashboard (`[Authorize]`
 **D-053/10 — Hero headline fixed to `manufactory` variant.** "A manufactory for the written word." is a constant in `LandingHero.razor`. The alternative (`"atelier"`) was not ported.
 
 **Tests:** 1382 total. New: 48 bUnit tests — `LandingPageTests` (35: Nav, Hero, GeefFlow 4-phase + IterationLoop + Iter-badge, Crew, Proof, Capabilities, Closing, Footer), `LandingRoutingTests` (13: anonymous render, authenticated redirect, Reflection route/attribute checks, `ResolvePostLogin` unit, ComingSoon, stub page attributes).
+
+---
+
+## D-054 — Continuous Learning Loop: Gated Self-Improvement (2026-05-22)
+
+*Date: 22 May 2026*
+
+Every Atelier run implicitly produces knowledge (reviewer findings, convergence trajectory, iteration deltas) that was previously discarded. This decision closes a continuous improvement loop: an opt-in `learning-extractor` finalizer extracts structured facts from a completed run, fires a dedicated, tightly calibrated **learning-evaluation** crew run as a quality gate (fire-and-forget), and only converged learnings land — domain-tagged — in a **separate store from the curated knowledge base**. A domain-aware grounding provider re-injects them weighted into later runs.
+
+The naive approach (unfiltered self-RAG) was deliberately rejected: it leads to model collapse. **Three protective mechanisms are constitutive:** (1) separate namespace (`LearningEntries` table, `learning://` citation scheme), (2) the Learning-Run as auditable gate, (3) structured facts not free-form LLM prose. Added: a domain-aware retriever as the single most effective protection against the relevance trap.
+
+**D-054/1 — `RunKind` enum: `Standard = 0 / Learning = 1`.** A Learning-Run is a normal run with crew `learning-evaluation` + `Kind = Learning`. No orchestrator dispatch change — `RunKind` is metadata that only gates the two finalizers. Backwards-compatible: existing runs default to `Standard`; `Kind` column added with `DEFAULT 0` in migration Step30. `SubmitRunRequest.Kind` and `IRunPersistenceService.CreateRunAsync` extended with an optional parameter.
+
+**D-054/2 — Recursion stop is safety-critical and implemented as two guards.** (a) `LearningExtractFinalizerExecutor`: `if (run.Kind == RunKind.Learning) return Ok;` — extractor refuses to run inside a Learning-Run, preventing extraction of an extraction. (b) `LearningPublishFinalizerExecutor`: `if (run.Kind != RunKind.Learning) return Ok;` — publisher refuses to run in standard runs. Both guards read `run.Kind` via `IRunRepository.GetByIdAsync`. A dedicated unit test (`LearningRunDoesNotTriggerLearningRunTests`) proves the invariant is respected.
+
+**D-054/3 — `LearningEntry` record with structured facts.** `(Guid Id, string Text, Guid SourceRunId, Guid? LearningRunId, string Domain, LearningStatus Status, string StructuredFactsJson, string OwnerUsername, DateTimeOffset CreatedAt, DateTimeOffset? ApprovedAt)`. Status: `Proposed → Approved | Rejected`. Embedding stored separately as a pgvector column (not in the record constructor).
+
+**D-054/4 — pgvector raw-SQL pattern (same as D-036 VectorSearchRepository).** `Pgvector.EFCore` 0.3.0 is incompatible with Npgsql 10.x. Vector stored as `vector(1536)` column with a string value converter in EF; INSERT and cosine-similarity search use raw ADO.NET (`NpgsqlParameter` with `NpgsqlDbType.Vector`). HNSW index with `vector_cosine_ops`.
+
+**D-054/5 — `LearningExtractFinalizerExecutor` threshold + fire-and-forget.** Threshold: `iterationCount ≥ minIterations (default 2) OR any finding with Severity ≤ Major`. Structured facts assembled from: briefing essence, template name (= domain), iteration count, findings (Severity + Reviewer + Message), deltas between iterations. LLM call (configurable binding) with strict anti-hallucination prompt (only from facts). `LearningEntry` written with `Status = Proposed`. `SubmitRunAsync(Kind = RunKind.Learning)` called fire-and-forget in a try/catch — a submit failure does not fail the original run.
+
+**D-054/6 — Learning-Evaluation crew: multi-model pluralism with `AbortOnCritical = true`.** Three strict reviewers to reduce correlated blind spots: `learning-factual-grounding` (openrouter/gpt-4.1 — hallucination / unsupported claim = Critical), `learning-value` (openrouter/gemini-2.5-pro — trivial/banal = Critical), `learning-generalizability` (claude-cli/claude-opus-4.7, ≠ executor — single-case-only = Critical). `ConvergenceOverride(MaxIterations: 2, AbortOnCritical: true)`. Finalizer chain: `learning-publisher` with `RunFinalizersOnMaxAttempts: true`. No grounding, no advisors.
+
+**D-054/7 — `LearningPublishFinalizerExecutor`: gate output.** Finds the candidate `LearningEntry` with `LearningRunId == context.RunId` (set during fire-and-forget submit). Convergence → compute embedding via `IEmbeddingProvider`, `UpdateStatusAsync(Approved, UtcNow)`, write embedding. Non-convergence → `UpdateStatusAsync(Rejected, null)`, nothing written to the vector store.
+
+**D-054/8 — Domain-aware retriever: `LearningRetrievalGroundingProvider`.** Query embedding from briefing; `SearchApprovedAsync(queryEmbedding, topK × 4)` fetches extra candidates; domain-boost re-ranking in memory: `finalScore = similarity × (sameDomain ? sameDomainBoost : crossDomainPenalty)`. Defaults: `sameDomainBoost = 1.0`, `crossDomainPenalty = 0.5`, `maxLearnings = 4`. After sort + cap: `SourceCitation(DocumentReference: $"learning://{id}")`. Curated knowledge (`vector-store` provider) is listed before `learning-retrieval` in crew templates — curated knowledge outranks learnings by default.
+
+**D-054/9 — Management UI `/crew/learnings`.** Lists all learning entries with status badge (Vorgeschlagen / Genehmigt / Abgelehnt), domain, text preview, dates. Filters: status dropdown + domain text input. Actions: Approve / Reject / Delete (DeleteConfirmationModal). Expand-on-click detail: full text, source run link, learning run link, approved-at timestamp, structured facts (collapsible JSON). Owned by username; `ILearningService` enforces owner-check for all mutations.
+
+**D-054/10 — MCP tool `list_learnings`.** Filters: `status_filter` (Proposed / Approved / Rejected), `domain_filter`. Returns id, text (truncated to 300 chars), domain, status, source run ID, learning run ID, owner, created-at, approved-at. Does not expose raw `StructuredFactsJson` (too verbose for MCP context).
+
+**What is NOT in this step:** unfiltered auto-write (always through the gate); writing to the curated KB; analytics/insights dashboard; write-side learning dedup; learning expiry; cross-user/global learnings; multi-hop learning; backfill of historical runs.
+
+**Tests:** 1439 total. New: ~57 tests — `LearningRunDoesNotTriggerLearningRunTests` (3), `RunKindTests` (5), `LearningStatusTests` (3), `LearningEntryTests` (4), `LearningExtractThresholdTests` (6), `LearningExtractFireAndForgetTests` (4), `LearningPublisherApprovedTests` (5), `LearningPublisherRejectedTests` (3), `LearningRetrieverDomainBoostTests` (8), `LearningRetrieverCapTests` (3), `LearningsManagementTests` (bUnit, 13).

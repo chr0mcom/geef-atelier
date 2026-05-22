@@ -14,4 +14,10 @@ public enum FinalizerType
 
     /// <summary>Applies an LLM pass to transform the final text (e.g. anti-AI-voice polish, tone adjustment).</summary>
     Transform = 3,
+
+    /// <summary>Extracts structured learnings from a completed run and publishes them to the continuous-learning loop.</summary>
+    LearningExtract = 4,
+
+    /// <summary>Evaluates a proposed learning entry through an LLM gate and approves or rejects it.</summary>
+    LearningPublish = 5,
 }

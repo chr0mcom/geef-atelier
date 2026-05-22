@@ -121,6 +121,7 @@ public sealed class FinalizerProfileRepositoryTests(PostgresFixture db)
             .Where(p => p.IsSystem)
             .CountAsync();
 
-        Assert.Equal(17, all);
+        // 17 from Step22 + 2 from Step30 (D-054): learning-extractor + learning-publisher
+        Assert.Equal(19, all);
     }
 }
