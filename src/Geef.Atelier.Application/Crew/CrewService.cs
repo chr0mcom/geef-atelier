@@ -145,11 +145,12 @@ internal sealed class CrewService(
     public async Task<IReadOnlyList<GroundingProviderProfile>> ListGroundingProviderProfilesAsync(
         bool includeSystem = true, CancellationToken cancellationToken = default)
     {
-        var custom = await groundingRepo.ListAsync(cancellationToken);
+        var dbProfiles = await groundingRepo.ListAsync(cancellationToken);
+        var customOnly = dbProfiles.Where(p => !p.IsSystem).ToList();
         if (!includeSystem)
-            return custom;
+            return customOnly;
         var system = SystemCrew.GroundingProviderProfiles.Values.ToList();
-        return [.. system, .. custom];
+        return [.. system, .. customOnly];
     }
 
     public async Task<GroundingProviderProfile?> GetGroundingProviderProfileAsync(
