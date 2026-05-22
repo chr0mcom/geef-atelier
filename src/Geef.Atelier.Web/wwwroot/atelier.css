@@ -2071,7 +2071,8 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
 .crew-templates-index,
 .crew-profiles-index,
 .studio-page,
-.user-management {
+.user-management,
+.learnings-index {
     max-width: 1180px;
     margin: 0 auto;
     padding: 40px 32px 80px;
@@ -2081,6 +2082,152 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
     color: var(--ink-2);
     font-size: 0.9375rem;
     margin: 0;
+}
+
+/* ── Studio — analyzing step ─────────────────────────────── */
+.studio-analyzing {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 3rem 1rem;
+    text-align: center;
+}
+
+.analyzing-spinner {
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 3px solid color-mix(in oklch, var(--hero) 25%, transparent);
+    border-top-color: var(--hero);
+    border-radius: 50%;
+    animation: studio-spin 0.9s linear infinite;
+}
+
+@keyframes studio-spin {
+    to { transform: rotate(360deg); }
+}
+
+.analyzing-status {
+    margin: 0.4rem 0 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.analyzing-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--ink-2);
+}
+
+.analyzing-model {
+    font-family: var(--font-mono, monospace);
+    padding: 0.15rem 0.5rem;
+    background: var(--surface-2, var(--surface));
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+}
+
+.analyzing-elapsed {
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .analyzing-spinner { animation-duration: 2.5s; }
+}
+
+/* ── Studio — analysis model section ─────────────────────── */
+.studio-model-section {
+    margin: 1rem 0 1.5rem;
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    background: var(--surface-2, var(--surface));
+}
+
+.studio-model-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.studio-model-summary::-webkit-details-marker {
+    display: none;
+}
+
+.studio-model-summary::before {
+    content: "▸";
+    color: var(--ink-3);
+    font-size: 0.75rem;
+    transition: transform 0.15s;
+}
+
+.studio-model-section[open] .studio-model-summary::before {
+    transform: rotate(90deg);
+}
+
+.studio-model-summary-label {
+    flex: 1;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.studio-model-summary-value {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.8125rem;
+    color: var(--ink-2);
+}
+
+.studio-model-body {
+    padding: 0.5rem 1rem 1rem;
+    border-top: 1px solid var(--hairline);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.studio-max-tokens-input {
+    width: 160px;
+    padding: 0.5rem 0.625rem;
+    background: var(--surface);
+    border: 1px solid var(--hairline-strong);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    color: var(--ink);
+    font-family: inherit;
+}
+
+.studio-max-tokens-input:focus {
+    outline: none;
+    border-color: var(--hero);
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--hero) 20%, transparent);
+}
+
+.studio-save-default {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-size: 0.875rem;
+    color: var(--ink-2);
+    cursor: pointer;
+}
+
+.studio-save-default input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--hero);
+    cursor: pointer;
 }
 
 .crew-editor {
@@ -2597,6 +2744,94 @@ textarea.form-control {
     min-height: 80px;
 }
 
+/* ── Site Settings admin form ────────────────────────────── */
+.settings-page-wrap {
+    max-width: 680px;
+}
+.settings-notice {
+    padding: 0.875rem 1rem;
+    background: color-mix(in oklch, var(--sv-minor) 12%, var(--surface));
+    border: 1px solid color-mix(in oklch, var(--sv-minor) 40%, transparent);
+    border-radius: 8px;
+    font-size: 0.875rem;
+    color: var(--ink-2);
+    line-height: 1.5;
+    margin-bottom: 1.75rem;
+}
+.settings-notice strong { color: var(--ink); }
+.settings-form fieldset {
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem 0.5rem;
+    margin-bottom: 1.25rem;
+    background: var(--surface-2, var(--surface));
+}
+.settings-form fieldset legend {
+    padding: 0 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+.settings-form .form-group input,
+.settings-form .form-group textarea {
+    width: 100%;
+    padding: 0.5rem 0.625rem;
+    background: var(--surface);
+    border: 1px solid var(--hairline-strong);
+    border-radius: 6px;
+    font-size: 0.875rem;
+    color: var(--ink);
+    font-family: inherit;
+    box-sizing: border-box;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.settings-form .form-group input:focus,
+.settings-form .form-group textarea:focus {
+    outline: none;
+    border-color: var(--hero);
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--hero) 20%, transparent);
+}
+.settings-form .form-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0;
+}
+.settings-form .form-row .form-group { flex: 1; margin-bottom: 0.875rem; }
+.settings-form .field-help {
+    font-size: 0.8rem;
+    color: var(--ink-3);
+    margin-top: 0.2rem;
+    line-height: 1.4;
+}
+.settings-form .required { color: var(--sv-critical); }
+.settings-legal-accept {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: color-mix(in oklch, var(--hero) 6%, var(--surface));
+    border: 1px solid color-mix(in oklch, var(--hero) 25%, transparent);
+    border-radius: 8px;
+    margin-bottom: 1.25rem;
+    cursor: pointer;
+}
+.settings-legal-accept input[type="checkbox"] {
+    margin-top: 0.15rem;
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--hero);
+    cursor: pointer;
+}
+.settings-legal-accept-label {
+    font-size: 0.875rem;
+    color: var(--ink-2);
+    line-height: 1.5;
+}
+.settings-legal-accept-label strong { color: var(--ink); }
+
 /* ── Profile / Template read-only detail view ────────────── */
 .profile-detail {
     display: grid;
@@ -2908,4 +3143,122 @@ textarea.form-control {
     font-weight: 300;
     color: var(--ink);
     margin: 0;
+}
+
+/* ── Learnings Index ─────────────────────────────────────── */
+.learning-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.learning-card {
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    background: var(--surface);
+    overflow: hidden;
+    transition: border-color 0.15s;
+}
+
+.learning-card:hover {
+    border-color: var(--hairline-strong);
+}
+
+.learning-card.expanded {
+    border-color: var(--hero);
+}
+
+.learning-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    flex-wrap: wrap;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+
+.status-badge.status-proposed {
+    background: color-mix(in oklch, var(--hero) 15%, var(--surface));
+    color: var(--hero);
+}
+
+.status-badge.status-approved {
+    background: color-mix(in oklch, oklch(0.7 0.15 145) 15%, var(--surface));
+    color: oklch(0.55 0.15 145);
+}
+
+.status-badge.status-rejected {
+    background: color-mix(in oklch, var(--sv-fail) 15%, var(--surface));
+    color: var(--sv-fail);
+}
+
+.learning-domain {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink-2);
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+}
+
+.learning-preview {
+    flex: 1;
+    font-size: 0.875rem;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.learning-date {
+    font-size: 0.8rem;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.learning-actions {
+    display: flex;
+    gap: 0.375rem;
+    flex-shrink: 0;
+}
+
+.learning-card-detail {
+    padding: 1rem 1rem 1.25rem;
+    border-top: 1px solid var(--hairline);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background: var(--surface-2, var(--surface));
+}
+
+.learning-text pre,
+.learning-card-detail pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin: 0.375rem 0 0;
+}
+
+.learning-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.5rem;
+    font-size: 0.8125rem;
+    color: var(--ink-2);
 }
