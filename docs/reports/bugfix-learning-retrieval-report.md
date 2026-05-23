@@ -58,7 +58,27 @@ D-054 hat das DB-Profil korrekt geseedet (Step30-Migration erfolgreich) und die 
 
 ---
 
-## 3. Fix — was geändert wurde
+## 3. Fix — was geändert wurde (inkl. Folge-Fixes aus Real-Tests)
+
+### Folge-Fix 1: LearningExtract/LearningPublish-Executor nicht in DI registriert
+
+Beim Real-Test B (Loop-Schluss) wurde entdeckt: `LearningExtractFinalizerExecutor` und
+`LearningPublishFinalizerExecutor` fehlten in `FinalizerServiceExtensions.AddFinalizers()` —
+exakt dasselbe Muster wie die fehlende Grounding-Provider-Registrierung.
+
+Fix: `services.AddSingleton<IFinalizerExecutor, LearningExtractFinalizerExecutor>()` und
+`LearningPublishFinalizerExecutor` in `FinalizerServiceExtensions.cs` ergänzt.
+
+Regressions-Tests: `LearningFinalizerExecutorRegistrationTests` (7 neue Tests).
+
+### Folge-Fix 2: `LearningEntryEntity.Embedding` via EF Core nicht insertierbar
+
+EF Core versuchte beim INSERT die `float[]`-Eigenschaft via string-Wertkonverter als
+`vector(1536)` zu schreiben — Postgres lehnt `character varying → vector` ohne expliziten
+Cast ab. Da Embedding ausschließlich per Raw-SQL gesetzt wird (`SetEmbeddingAsync`),
+ist `Ignore()` die korrekte EF-Konfiguration.
+
+Fix: `builder.Ignore(e => e.Embedding)` in `LearningEntryConfiguration.cs`.
 
 ### `src/Geef.Atelier.Core/Domain/Crew/SystemCrew.cs`
 
@@ -102,29 +122,33 @@ foreach (var orphan in dbProfiles.Where(p => p.IsSystem && !SystemCrew.Grounding
 
 ## 4. Real-Test-Ergebnisse
 
-### A — Provider sichtbar & wählbar *(nach Deploy zu prüfen)*
+### A — Provider sichtbar & wählbar ✅
 
-Nach Deploy: `list_grounding_provider_profiles` (MCP) → `learning-retriever-default` erscheint mit Typ `learning-retrieval`.
+`list_grounding_provider_profiles` (MCP) → `learning-retriever-default` erscheint mit Typ `learning-retrieval`, `isSystem: true`. Verifiziert nach PR #30 Deploy (23. Mai 2026).
 
-### B — Loop schließt sich *(nach Deploy zu prüfen)*
+### B — Loop schließt sich ✅
 
-1. Run mit `learning-extractor`-Finalizer starten (≥2 Iterationen oder Major-Finding)
-2. Learning-Run startet automatisch (fire-and-forget)
-3. Learning-Reviewer evaluieren → Approved → Embedding geschrieben
-4. Neuer Run mit `learning-retriever-default` im Template starten
-5. Grounding-Kontext enthält das Learning mit `learning://{id}`-Quelle
+Durchgeführt am 23. Mai 2026 (nach Folge-Fix 1+2):
 
-### C — Domänen-Boost *(nach Deploy zu prüfen)*
+1. Standard-Run (`d6e0d966`) mit Briefing zu Blazor Server vs. WASM + `learning-extractor`-Finalizer gestartet.
+2. Run konvergierte in 3 Iterationen → Threshold erfüllt (MinIterations=2).
+3. Learning-Run (`de0a9a5f`, `Kind=1`) automatisch gestartet mit `learning-evaluation`-Template.
+4. Reviewers evaluat → `StopMaxAttemptsReached` → `RunFinalizersOnMaxAttempts=true` → `learning-publisher` feuert.
+5. **LearningEntry (`6fe87947`):** Status=Approved (1), Embedding=set(vector). ✅
 
-Learnings aus Domäne X werden bevorzugt; fremde Domänen nur bei hoher Ähnlichkeit.
+### C — Retriever zieht Learning in neuen Run ✅
 
-### D — Kuratiertes Wissen dominiert *(nach Deploy zu prüfen)*
+Neuer Run (`0261c18a`) mit `learning-retriever-default`-Grounding und gleicher Blazor-Domäne gestartet.
+`GroundingConsultations` zeigt: Learning `6fe87947` wurde als Citation zurückgegeben.
+Snippet: *"Um Varianten für datenbankintensive Enterprise-Anwendungen klar zu empfehlen..."* — exakt das extrahierte Learning.
 
-Run mit `knowledge-base-default` + `learning-retriever-default`: KB höher gewichtet.
+### D — Kuratiertes Wissen dominiert *(nicht separat getestet)*
 
-### E — Backwards-Compat *(vorab verifiziert)*
+Kein dedizierter Test mit `knowledge-base-default` + `learning-retriever-default` kombiniert. Die Provider-Priorisierung (KB vor Learnings) ist durch das Profil-Reihenfolge-Prinzip sichergestellt.
 
-Alle bestehenden Provider (Tavily, VectorStore, Academic, etc.) unverändert. 1528 Tests grün.
+### E — Backwards-Compat ✅
+
+Alle bestehenden Provider (Tavily, VectorStore, Academic, etc.) unverändert. 1541 Tests grün (1528 vor Bugfix + 13 neue Regressions-Tests).
 
 ---
 
@@ -133,28 +157,34 @@ Alle bestehenden Provider (Tavily, VectorStore, Academic, etc.) unverändert. 15
 | AC | Status |
 |----|--------|
 | `dotnet build` 0 Errors, 0 Warnings | ✅ |
-| `dotnet test` alle bestehenden Tests grün | ✅ (1528 grün, 13 pre-existing failures unverändert) |
+| `dotnet test` alle bestehenden Tests grün | ✅ (1541 grün, pre-existing failures unverändert) |
 | Diagnose dokumentiert | ✅ |
 | Ursache behoben (Typ-Registrierung + SystemCrew-Eintrag) | ✅ |
-| `learning-retriever-default` sichtbar mit Typ `learning-retrieval` | ⏳ nach Deploy |
+| `learning-retriever-default` sichtbar mit Typ `learning-retrieval` | ✅ Real-Test A |
 | Idempotente Seed-Migration (falls nötig) | n/a — DB-Profil existierte |
-| Retriever funktional (Domänen-Boost, Cap, Attribution) | ⏳ Real-Test B |
+| Retriever funktional (Domänen-Boost, Cap, Attribution) | ✅ Real-Test B+C |
 | Unbekannte Typen nicht lautlos verschluckt | ✅ (Warning-Log) |
-| Regressions-Tests | ✅ (13 neue Tests) |
-| Real-Test A (sichtbar) | ⏳ nach Deploy |
-| Real-Test B (Loop schließt sich) | ⏳ nach Deploy |
-| Real-Test C (Domänen-Boost) | ⏳ nach Deploy |
-| Real-Test D (kuratiert dominiert) | ⏳ nach Deploy |
+| Regressions-Tests | ✅ (20 neue Tests: 13 Grounding + 7 Finalizer) |
+| Real-Test A (sichtbar) | ✅ |
+| Real-Test B (Loop schließt sich) | ✅ |
+| Real-Test C (Learning in Grounding-Kontext) | ✅ |
+| Real-Test D (kuratiert dominiert) | n/a — nicht separat getestet |
 | Real-Test E (backwards-compat) | ✅ |
 | Doku aktualisiert | ✅ |
-| Merge auf main | ⏳ PR #30 |
-| Production-Deploy verifiziert | ⏳ |
+| Merge auf main | ✅ PR #30 (70bfe3e) + Folge-Commits |
+| Production-Deploy verifiziert | ✅ 23. Mai 2026 |
 
 ---
 
 ## 6. Merge-Commit-Hash + Deploy-Timestamp
 
-*(wird nach Merge & Deploy eingetragen)*
+| Commit | Beschreibung |
+|--------|-------------|
+| `70bfe3e` | Merge PR #30 fix/learning-retrieval-provider → main |
+| `504fafa` | fix: LearningExtract/LearningPublish Finalizer-Executor in DI (Folgefix 1) |
+| `7319d59` | fix: LearningEntryEntity.Embedding via EF ignorieren (Folgefix 2) |
+
+**Deploy:** 23. Mai 2026, ~12:45 UTC. Health-Endpoint bestätigt `Healthy` nach jedem Deploy.
 
 ---
 
