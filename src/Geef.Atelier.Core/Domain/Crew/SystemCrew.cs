@@ -34,7 +34,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.Executor,
         Provider: "claude-cli",
         Model: "anthropic/claude-opus-4.7",
-        MaxTokens: null,
+        MaxTokens: 256000,
         IsSystem: true);
 
     /// <summary>Briefing-fidelity reviewer — checks the draft against briefing requirements (PS-2 severity calibration).</summary>
