@@ -522,7 +522,7 @@ public static class SystemCrew
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformAntiAiVoice,
             [TransformSettings.KeyProvider] = "codex-cli",
             [TransformSettings.KeyModel] = "gpt-5.5",
-            [TransformSettings.KeyMaxTokens] = "8192",
+            [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);
 
@@ -536,7 +536,7 @@ public static class SystemCrew
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformToneFormalization,
             [TransformSettings.KeyProvider] = "codex-cli",
             [TransformSettings.KeyModel] = "gpt-5.5",
-            [TransformSettings.KeyMaxTokens] = "8192",
+            [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);
 
@@ -550,7 +550,7 @@ public static class SystemCrew
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformToneCasual,
             [TransformSettings.KeyProvider] = "codex-cli",
             [TransformSettings.KeyModel] = "gpt-5.5",
-            [TransformSettings.KeyMaxTokens] = "8192",
+            [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);
 
@@ -564,7 +564,7 @@ public static class SystemCrew
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformExecutiveSummary,
             [TransformSettings.KeyProvider] = "codex-cli",
             [TransformSettings.KeyModel] = "gpt-5.5",
-            [TransformSettings.KeyMaxTokens] = "8192",
+            [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);
 
@@ -578,7 +578,7 @@ public static class SystemCrew
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformKeyTakeaways,
             [TransformSettings.KeyProvider] = "codex-cli",
             [TransformSettings.KeyModel] = "gpt-5.5",
-            [TransformSettings.KeyMaxTokens] = "8192",
+            [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);
 
@@ -592,7 +592,7 @@ public static class SystemCrew
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformGlossary,
             [TransformSettings.KeyProvider] = "codex-cli",
             [TransformSettings.KeyModel] = "gpt-5.5",
-            [TransformSettings.KeyMaxTokens] = "8192",
+            [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);
 

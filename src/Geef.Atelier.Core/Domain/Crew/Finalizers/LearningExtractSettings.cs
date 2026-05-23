@@ -11,7 +11,7 @@ public sealed record LearningExtractSettings(
     public static LearningExtractSettings From(Dictionary<string, string> s) => new(
         Provider:            s.GetValueOrDefault("provider", "openrouter"),
         Model:               s.GetValueOrDefault("model", "openai/gpt-4.1"),
-        MaxTokens:           s.TryGetValue("maxTokens", out var t) && int.TryParse(t, out var n) ? n : 2048,
+        MaxTokens:           s.TryGetValue("maxTokens", out var t) && int.TryParse(t, out var n) ? n : 60000,
         MinIterations:       s.TryGetValue("minIterations", out var mi) && int.TryParse(mi, out var miv) ? miv : 2,
         RequireMajorFinding: s.TryGetValue("requireMajorFinding", out var r) && bool.TryParse(r, out var rb) ? rb : false);
 }
