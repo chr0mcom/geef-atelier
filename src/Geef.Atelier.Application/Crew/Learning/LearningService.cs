@@ -13,22 +13,19 @@ public sealed class LearningService(ILearningRepository repo) : ILearningService
 
     public async Task ApproveAsync(Guid id, string requestingUsername, CancellationToken ct = default)
     {
-        var entry = await repo.GetByIdAsync(id, ct) ?? throw new InvalidOperationException("Learning entry not found.");
-        if (entry.OwnerUsername != requestingUsername) throw new InvalidOperationException("Access denied.");
+        _ = await repo.GetByIdAsync(id, ct) ?? throw new InvalidOperationException("Learning entry not found.");
         await repo.UpdateStatusAsync(id, LearningStatus.Approved, DateTimeOffset.UtcNow, ct);
     }
 
     public async Task RejectAsync(Guid id, string requestingUsername, CancellationToken ct = default)
     {
-        var entry = await repo.GetByIdAsync(id, ct) ?? throw new InvalidOperationException("Learning entry not found.");
-        if (entry.OwnerUsername != requestingUsername) throw new InvalidOperationException("Access denied.");
+        _ = await repo.GetByIdAsync(id, ct) ?? throw new InvalidOperationException("Learning entry not found.");
         await repo.UpdateStatusAsync(id, LearningStatus.Rejected, null, ct);
     }
 
     public async Task DeleteAsync(Guid id, string requestingUsername, CancellationToken ct = default)
     {
-        var entry = await repo.GetByIdAsync(id, ct) ?? throw new InvalidOperationException("Learning entry not found.");
-        if (entry.OwnerUsername != requestingUsername) throw new InvalidOperationException("Access denied.");
+        _ = await repo.GetByIdAsync(id, ct) ?? throw new InvalidOperationException("Learning entry not found.");
         await repo.DeleteAsync(id, ct);
     }
 }
