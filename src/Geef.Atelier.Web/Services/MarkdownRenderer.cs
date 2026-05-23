@@ -12,13 +12,14 @@ public static class MarkdownRenderer
         .DisableHtml()
         .Build();
 
-    /// <summary>Converts Markdown to a <see cref="MarkupString"/> safe for <c>@((MarkupString)...)</c> use.</summary>
-    public static MarkupString ToMarkupString(string? markdown)
+    /// <summary>Renders Markdown to an HTML string.</summary>
+    public static string ToHtml(string? markdown)
     {
-        if (string.IsNullOrWhiteSpace(markdown))
-            return new MarkupString("");
-
-        var html = Markdown.ToHtml(markdown, SafePipeline);
-        return new MarkupString(html);
+        if (string.IsNullOrWhiteSpace(markdown)) return "";
+        return Markdown.ToHtml(markdown, SafePipeline);
     }
+
+    /// <summary>Converts Markdown to a <see cref="MarkupString"/> safe for <c>@((MarkupString)...)</c> use.</summary>
+    public static MarkupString ToMarkupString(string? markdown) =>
+        new(ToHtml(markdown));
 }

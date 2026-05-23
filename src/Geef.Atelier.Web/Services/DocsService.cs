@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Components;
 
 namespace Geef.Atelier.Web.Services;
@@ -27,6 +28,14 @@ public sealed class DocsService
 
     private static readonly IReadOnlyDictionary<string, string> SlugToBaseName =
         Entries.ToDictionary(e => e.Slug, e => e.BaseName);
+
+    private static readonly IReadOnlyDictionary<string, string> BaseNameToSlug =
+        Entries.ToDictionary(e => e.BaseName, e => e.Slug, StringComparer.OrdinalIgnoreCase);
+
+    // Rewrites relative Markdown links (e.g. href="08-crew-system_de.md") to Blazor routes.
+    private static readonly Regex DocLinkRegex = new(
+        @"href=""([^""/\\]+?)(_de)?\.md""",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly Assembly Asm = typeof(DocsService).Assembly;
     private const string ResourcePrefix = "Geef.Atelier.Web.EmbeddedDocs.";
@@ -67,8 +76,20 @@ public sealed class DocsService
     public MarkupString GetHtml(string slug, bool german = false)
     {
         var md = GetMarkdown(slug, german);
-        return md is null ? new MarkupString("") : MarkdownRenderer.ToMarkupString(md);
+        if (md is null) return new MarkupString("");
+        var html = MarkdownRenderer.ToHtml(md);
+        return new MarkupString(RewriteDocLinks(html));
     }
+
+    private static string RewriteDocLinks(string html) =>
+        DocLinkRegex.Replace(html, m =>
+        {
+            var baseName = m.Groups[1].Value;
+            var isDe = m.Groups[2].Success;
+            if (!BaseNameToSlug.TryGetValue(baseName, out var targetSlug))
+                return m.Value;
+            return isDe ? $"href=\"/docs/{targetSlug}?lang=de\"" : $"href=\"/docs/{targetSlug}\"";
+        });
 }
 
 /// <param name="Slug">URL slug used in <c>/docs/{slug}</c>.</param>
