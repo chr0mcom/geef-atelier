@@ -14,9 +14,9 @@ internal sealed class LearningEntryEntity
     public DateTimeOffset? ApprovedAt { get; set; }
 
     /// <summary>
-    /// Stored as vector(1536) in Postgres. EF maps via a string value-converter because
-    /// Pgvector.EntityFrameworkCore 0.3.0 is incompatible with Npgsql 10.x.
-    /// The repository uses raw SQL for insert and similarity search.
+    /// Stored as vector(1536) in Postgres. Null until the embedding is written via raw SQL
+    /// (<see cref="LearningRepository.SetEmbeddingAsync"/>), because EF Core's string
+    /// value-converter cannot cast to the Postgres vector type directly.
     /// </summary>
-    public float[] Embedding { get; set; } = [];
+    public float[]? Embedding { get; set; } = null;
 }
