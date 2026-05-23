@@ -137,7 +137,7 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
-        GroundingProviderNames: new[] { "tavily-basic", "run-attachments", "learning-retriever-default" },
+        GroundingProviderNames: new[] { "tavily-refined", "run-attachments", "learning-retriever-default" },
         FinalizerProfileNames: new[] { "learning-extractor" },
         IsSystem: true);
 
@@ -153,7 +153,7 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Sequential,
         ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 12, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
         AdvisorProfileNames: new[] { "legal-domain-expert" },
-        GroundingProviderNames: new[] { "tavily-basic", "run-attachments", "learning-retriever-default" },
+        GroundingProviderNames: new[] { "tavily-refined", "run-attachments", "learning-retriever-default" },
         FinalizerProfileNames: new[] { "learning-extractor" },
         IsSystem: true);
 
@@ -167,7 +167,7 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Sequential,
         ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 8, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
         AdvisorProfileNames: new[] { "academic-rigor-advisor" },
-        GroundingProviderNames: new[] { "tavily-basic", "run-attachments", "learning-retriever-default" },
+        GroundingProviderNames: new[] { "tavily-refined", "run-attachments", "learning-retriever-default" },
         FinalizerProfileNames: new[] { "learning-extractor" },
         IsSystem: true);
 
@@ -181,7 +181,7 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
-        GroundingProviderNames: new[] { "tavily-basic", "run-attachments", "learning-retriever-default" },
+        GroundingProviderNames: new[] { "tavily-refined", "run-attachments", "learning-retriever-default" },
         FinalizerProfileNames: new[] { "learning-extractor" },
         IsSystem: true);
 

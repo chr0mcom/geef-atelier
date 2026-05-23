@@ -138,10 +138,10 @@ public sealed class KlassikRegressionTests
     }
 
     [Fact]
-    public void KlassikTemplate_HasTavilyBasicGroundingProvider_ConfirmingDefaultInternetAccess()
+    public void KlassikTemplate_HasTavilyRefinedGroundingProvider_ConfirmingDefaultInternetAccess()
     {
-        // All system templates ship with tavily-basic enabled by default.
-        Assert.Contains("tavily-basic", SystemCrew.KlassikTemplate.GroundingProviderNames);
+        // All system templates ship with tavily-refined (AI-filtered web search) enabled by default.
+        Assert.Contains("tavily-refined", SystemCrew.KlassikTemplate.GroundingProviderNames);
     }
 
     /// <summary>

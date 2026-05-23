@@ -45,7 +45,7 @@ public sealed class KlassikUnchangedRegressionTests
     public void KlassikTemplate_HasDefaultGroundingProviders()
     {
         Assert.Equal(3, SystemCrew.KlassikTemplate.GroundingProviderNames.Count);
-        Assert.Contains("tavily-basic", SystemCrew.KlassikTemplate.GroundingProviderNames);
+        Assert.Contains("tavily-refined", SystemCrew.KlassikTemplate.GroundingProviderNames);
         Assert.Contains("run-attachments", SystemCrew.KlassikTemplate.GroundingProviderNames);
         Assert.Contains("learning-retriever-default", SystemCrew.KlassikTemplate.GroundingProviderNames);
     }

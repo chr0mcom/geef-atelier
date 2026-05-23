@@ -41,9 +41,9 @@ public sealed class SystemCrewGroundingConstantsTests
     }
 
     [Fact]
-    public void KlassikTemplate_HasTavilyBasicGroundingProvider()
+    public void KlassikTemplate_HasTavilyRefinedGroundingProvider()
     {
-        Assert.Contains("tavily-basic", SystemCrew.KlassikTemplate.GroundingProviderNames);
+        Assert.Contains("tavily-refined", SystemCrew.KlassikTemplate.GroundingProviderNames);
     }
 
     [Fact]

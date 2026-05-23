@@ -46,7 +46,7 @@ public sealed class SystemCrewDomainTemplatesTests
     public void JuristischTemplate_HasDefaultGroundingProviders()
     {
         Assert.Equal(3, SystemCrew.JuristischTemplate.GroundingProviderNames.Count);
-        Assert.Contains("tavily-basic", SystemCrew.JuristischTemplate.GroundingProviderNames);
+        Assert.Contains("tavily-refined", SystemCrew.JuristischTemplate.GroundingProviderNames);
         Assert.Contains("run-attachments", SystemCrew.JuristischTemplate.GroundingProviderNames);
         Assert.Contains("learning-retriever-default", SystemCrew.JuristischTemplate.GroundingProviderNames);
     }
@@ -93,7 +93,7 @@ public sealed class SystemCrewDomainTemplatesTests
     public void AkademischTemplate_HasDefaultGroundingProviders()
     {
         Assert.Equal(3, SystemCrew.AkademischTemplate.GroundingProviderNames.Count);
-        Assert.Contains("tavily-basic", SystemCrew.AkademischTemplate.GroundingProviderNames);
+        Assert.Contains("tavily-refined", SystemCrew.AkademischTemplate.GroundingProviderNames);
         Assert.Contains("run-attachments", SystemCrew.AkademischTemplate.GroundingProviderNames);
         Assert.Contains("learning-retriever-default", SystemCrew.AkademischTemplate.GroundingProviderNames);
     }
@@ -140,7 +140,7 @@ public sealed class SystemCrewDomainTemplatesTests
     public void MarketingTemplate_HasDefaultGroundingProviders()
     {
         Assert.Equal(3, SystemCrew.MarketingTemplate.GroundingProviderNames.Count);
-        Assert.Contains("tavily-basic", SystemCrew.MarketingTemplate.GroundingProviderNames);
+        Assert.Contains("tavily-refined", SystemCrew.MarketingTemplate.GroundingProviderNames);
         Assert.Contains("run-attachments", SystemCrew.MarketingTemplate.GroundingProviderNames);
         Assert.Contains("learning-retriever-default", SystemCrew.MarketingTemplate.GroundingProviderNames);
     }
