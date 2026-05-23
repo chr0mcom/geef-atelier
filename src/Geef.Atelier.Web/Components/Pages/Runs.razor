@@ -156,7 +156,7 @@
         _deleteError = null;
         try
         {
-            await RunService.DeleteRunAsync(id, _currentUsername);
+            await RunService.DeleteRunAsync(id, _isAdmin ? null : _currentUsername);
             await LoadRunsAsync();
         }
         catch (Exception ex) { _deleteError = ex.Message; }
