@@ -89,7 +89,7 @@ public sealed class SettingsRecordTests
         Assert.Equal(string.Empty, settings.SystemPrompt);
         Assert.Equal("codex-cli", settings.Provider);
         Assert.Equal("gpt-5.5", settings.Model);
-        Assert.Equal(4096, settings.MaxTokens);
+        Assert.Equal(60000, settings.MaxTokens);
     }
 
     [Fact]

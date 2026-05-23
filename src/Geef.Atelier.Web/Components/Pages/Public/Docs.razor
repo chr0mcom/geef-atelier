@@ -1,7 +1,7 @@
 @page "/docs"
 @page "/docs/{Slug}"
 @layout Layout.MainLayout
-@attribute [Authorize]
+@attribute [AllowAnonymous]
 @using Microsoft.AspNetCore.Authorization
 @using Geef.Atelier.Web.Services
 @inject DocsService DocsService

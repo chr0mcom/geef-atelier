@@ -43,11 +43,12 @@ public sealed class SystemCrewDomainTemplatesTests
     }
 
     [Fact]
-    public void JuristischTemplate_HasTavilyBasicGroundingProvider()
+    public void JuristischTemplate_HasDefaultGroundingProviders()
     {
-        Assert.Equal(2, SystemCrew.JuristischTemplate.GroundingProviderNames.Count);
+        Assert.Equal(3, SystemCrew.JuristischTemplate.GroundingProviderNames.Count);
         Assert.Contains("tavily-basic", SystemCrew.JuristischTemplate.GroundingProviderNames);
         Assert.Contains("run-attachments", SystemCrew.JuristischTemplate.GroundingProviderNames);
+        Assert.Contains("learning-retriever-default", SystemCrew.JuristischTemplate.GroundingProviderNames);
     }
 
     // ── Akademisch template ──────────────────────────────────────────────────────
@@ -89,11 +90,12 @@ public sealed class SystemCrewDomainTemplatesTests
     }
 
     [Fact]
-    public void AkademischTemplate_HasTavilyBasicGroundingProvider()
+    public void AkademischTemplate_HasDefaultGroundingProviders()
     {
-        Assert.Equal(2, SystemCrew.AkademischTemplate.GroundingProviderNames.Count);
+        Assert.Equal(3, SystemCrew.AkademischTemplate.GroundingProviderNames.Count);
         Assert.Contains("tavily-basic", SystemCrew.AkademischTemplate.GroundingProviderNames);
         Assert.Contains("run-attachments", SystemCrew.AkademischTemplate.GroundingProviderNames);
+        Assert.Contains("learning-retriever-default", SystemCrew.AkademischTemplate.GroundingProviderNames);
     }
 
     // ── Marketing template ───────────────────────────────────────────────────────
@@ -135,11 +137,12 @@ public sealed class SystemCrewDomainTemplatesTests
     }
 
     [Fact]
-    public void MarketingTemplate_HasTavilyBasicGroundingProvider()
+    public void MarketingTemplate_HasDefaultGroundingProviders()
     {
-        Assert.Equal(2, SystemCrew.MarketingTemplate.GroundingProviderNames.Count);
+        Assert.Equal(3, SystemCrew.MarketingTemplate.GroundingProviderNames.Count);
         Assert.Contains("tavily-basic", SystemCrew.MarketingTemplate.GroundingProviderNames);
         Assert.Contains("run-attachments", SystemCrew.MarketingTemplate.GroundingProviderNames);
+        Assert.Contains("learning-retriever-default", SystemCrew.MarketingTemplate.GroundingProviderNames);
     }
 
     // ── Dictionary completeness ──────────────────────────────────────────────────

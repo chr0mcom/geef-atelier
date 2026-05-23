@@ -6,9 +6,9 @@ using Geef.Atelier.Core.Domain.Crew.Finalizers;
 namespace Geef.Atelier.Tests.Domain.Crew.Finalizers;
 
 /// <summary>
-/// Regression guard: ensures existing system templates (Klassik, domain templates) have not
-/// accidentally received finalizers. Finalizers are opt-in; adding them to existing templates
-/// would change their runtime behaviour silently.
+/// Regression guard: ensures standard system templates (Klassik, domain templates) carry
+/// exactly the expected finalizers. As of D-054 all standard templates ship with
+/// <c>learning-extractor</c> as the single default finalizer.
 /// </summary>
 public sealed class FinalizerRegressionTests
 {
@@ -17,14 +17,15 @@ public sealed class FinalizerRegressionTests
     [InlineData("juristisch")]
     [InlineData("akademisch")]
     [InlineData("marketing")]
-    public void SystemTemplates_HaveNoFinalizers(string templateName)
+    public void SystemTemplates_HaveLearningExtractorFinalizer(string templateName)
     {
         Assert.True(SystemCrew.CrewTemplates.ContainsKey(templateName),
             $"Template '{templateName}' not found in SystemCrew.CrewTemplates");
         var template = SystemCrew.CrewTemplates[templateName];
 
-        // FinalizerProfileNames defaults to empty (not null) when unset
-        Assert.Empty(template.FinalizerProfileNames);
+        // All standard templates ship with learning-extractor as the sole default finalizer.
+        Assert.Single(template.FinalizerProfileNames);
+        Assert.Contains("learning-extractor", template.FinalizerProfileNames);
         Assert.False(template.RunFinalizersOnMaxAttempts);
     }
 
