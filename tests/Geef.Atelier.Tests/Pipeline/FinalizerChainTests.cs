@@ -199,7 +199,7 @@ public sealed class FinalizerChainTests
 
     private sealed class NullPricingCatalog : Geef.Atelier.Application.Pricing.IPricingCatalog
     {
-        public decimal? CalculateCostEur(string modelName, int i, int o) => null;
+        public decimal? CalculateCostEur(string modelName, int i, int o, string? providerName = null) => null;
     }
 
     private sealed class TempDir : IDisposable

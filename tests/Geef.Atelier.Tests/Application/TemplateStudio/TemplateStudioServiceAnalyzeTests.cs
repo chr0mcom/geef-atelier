@@ -91,7 +91,7 @@ public sealed class TemplateStudioServiceAnalyzeTests
 
     private sealed class NoopPricingCatalog : IPricingCatalog
     {
-        public decimal? CalculateCostEur(string modelName, int inputTokens, int outputTokens) => null;
+        public decimal? CalculateCostEur(string modelName, int inputTokens, int outputTokens, string? providerName = null) => null;
     }
 
     private sealed class InMemoryAnalysisRepository : ITemplateStudioAnalysisRepository

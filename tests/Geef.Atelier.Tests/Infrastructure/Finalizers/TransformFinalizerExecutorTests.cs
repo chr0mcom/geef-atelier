@@ -158,7 +158,7 @@ public sealed class TransformFinalizerExecutorTests
 
     private sealed class ZeroPricingCatalog : IPricingCatalog
     {
-        public decimal? CalculateCostEur(string modelName, int inputTokens, int outputTokens) => 0m;
+        public decimal? CalculateCostEur(string modelName, int inputTokens, int outputTokens, string? providerName = null) => 0m;
     }
 
     /// <summary>Provider service that returns null for every lookup (simulates unknown provider).</summary>

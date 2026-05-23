@@ -9,7 +9,8 @@ public sealed class PricingCatalogTests
 {
     private static IPricingCatalog BuildCatalog(
         Dictionary<string, ModelPricing>? models = null,
-        double usdToEurRate = 0.92)
+        double usdToEurRate = 0.92,
+        Dictionary<string, ModelPricing>? providerDefaults = null)
     {
         var opts = new PricingOptions
         {
@@ -17,7 +18,8 @@ public sealed class PricingCatalogTests
             Models = models ?? new Dictionary<string, ModelPricing>
             {
                 ["anthropic/claude-sonnet-4-5"] = new ModelPricing(3m, 15m)
-            }
+            },
+            ProviderDefaults = providerDefaults ?? new Dictionary<string, ModelPricing>()
         };
         return new PricingCatalog(Options.Create(opts), NullLogger<PricingCatalog>.Instance);
     }
@@ -68,6 +70,43 @@ public sealed class PricingCatalogTests
 
         Assert.NotNull(cost);
         Assert.Equal(0.5m, cost!.Value, precision: 6);
+    }
+
+    [Fact]
+    public void CalculateCostEur_UnknownModelWithProviderDefault_UsesProviderFallback()
+    {
+        var catalog = BuildCatalog(
+            providerDefaults: new Dictionary<string, ModelPricing>
+            {
+                ["xai"] = new ModelPricing(1.25m, 2.50m)
+            },
+            usdToEurRate: 1.0);
+
+        // 1M input at $1.25 = $1.25, 0 output → $1.25 EUR
+        var cost = catalog.CalculateCostEur("grok-3-mini", 1_000_000, 0, "xai");
+
+        Assert.NotNull(cost);
+        Assert.Equal(1.25m, cost!.Value, precision: 6);
+    }
+
+    [Fact]
+    public void CalculateCostEur_ModelSpecificPricingTakesPrecedenceOverProviderDefault()
+    {
+        var catalog = BuildCatalog(
+            models: new Dictionary<string, ModelPricing>
+            {
+                ["known/model"] = new ModelPricing(1m, 1m)
+            },
+            providerDefaults: new Dictionary<string, ModelPricing>
+            {
+                ["my-provider"] = new ModelPricing(99m, 99m)
+            },
+            usdToEurRate: 1.0);
+
+        var cost = catalog.CalculateCostEur("known/model", 1_000_000, 0, "my-provider");
+
+        Assert.NotNull(cost);
+        Assert.Equal(1m, cost!.Value, precision: 6);
     }
 
     [Fact]
