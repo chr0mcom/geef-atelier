@@ -137,8 +137,8 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
-        GroundingProviderNames: new[] { "tavily-basic", "run-attachments" },
-        FinalizerProfileNames: Array.Empty<string>(),
+        GroundingProviderNames: new[] { "tavily-basic", "run-attachments", "learning-retriever-default" },
+        FinalizerProfileNames: new[] { "learning-extractor" },
         IsSystem: true);
 
     // ── Domain templates ────────────────────────────────────────────────────────────
@@ -153,8 +153,8 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Sequential,
         ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 12, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
         AdvisorProfileNames: new[] { "legal-domain-expert" },
-        GroundingProviderNames: new[] { "tavily-basic", "run-attachments" },
-        FinalizerProfileNames: Array.Empty<string>(),
+        GroundingProviderNames: new[] { "tavily-basic", "run-attachments", "learning-retriever-default" },
+        FinalizerProfileNames: new[] { "learning-extractor" },
         IsSystem: true);
 
     /// <summary>Akademisch template — for scientific texts: papers, argumentation essays, research texts.</summary>
@@ -167,8 +167,8 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Sequential,
         ConvergenceOverride: null,
         AdvisorProfileNames: new[] { "academic-rigor-advisor" },
-        GroundingProviderNames: new[] { "tavily-basic", "run-attachments" },
-        FinalizerProfileNames: Array.Empty<string>(),
+        GroundingProviderNames: new[] { "tavily-basic", "run-attachments", "learning-retriever-default" },
+        FinalizerProfileNames: new[] { "learning-extractor" },
         IsSystem: true);
 
     /// <summary>Marketing template — for marketing copy: landing pages, emails, ad copy.</summary>
@@ -181,8 +181,8 @@ public static class SystemCrew
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
-        GroundingProviderNames: new[] { "tavily-basic", "run-attachments" },
-        FinalizerProfileNames: Array.Empty<string>(),
+        GroundingProviderNames: new[] { "tavily-basic", "run-attachments", "learning-retriever-default" },
+        FinalizerProfileNames: new[] { "learning-extractor" },
         IsSystem: true);
 
     /// <summary>System grounding-provider profile for Tavily Basic web-search (1 credit/search, ~5 sources).</summary>
