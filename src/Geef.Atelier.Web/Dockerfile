@@ -12,8 +12,9 @@ COPY src/Geef.Atelier.Mcp/Geef.Atelier.Mcp.csproj src/Geef.Atelier.Mcp/
 COPY Geef.Atelier.slnx ./
 RUN dotnet restore src/Geef.Atelier.Web/Geef.Atelier.Web.csproj
 
-# Copy source and publish
+# Copy source and docs (docs/ is embedded as assembly resources by the .csproj)
 COPY src/ src/
+COPY docs/ docs/
 RUN dotnet publish src/Geef.Atelier.Web/Geef.Atelier.Web.csproj \
     -c Release -o /app/publish /p:UseAppHost=false
 
