@@ -2,7 +2,7 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-05-20 (D-051: drei neue Grounding-Provider-Typen — static-context, url-fetch, news-search)
+Last updated: 2026-05-23 (D-057: learning-retriever-default + learning-extractor in alle Standard-Templates)
 
 ## Overview
 
@@ -55,6 +55,8 @@ reproduces the original PS-2 behaviour) plus the domain templates
 `juristisch` (`Sequential`, advisor `legal-domain-expert`),
 `akademisch` (`Sequential`, advisor `academic-rigor-advisor`) and
 `marketing` (`Parallel`, no advisors).
+
+All four standard templates ship with three default grounding providers (`tavily-basic`, `run-attachments`, `learning-retriever-default`) and one default finalizer (`learning-extractor`). The `learning-evaluation` template is the only exception — it carries no grounding providers and no `learning-extractor` (recursion stop).
 
 ## Custom profiles
 
@@ -527,7 +529,7 @@ LATER RUN  →  Grounding "learning-retrieval"
 
 | Name | Type | Notes |
 |---|---|---|
-| `learning-extractor` | Finalizer (LearningExtract) | Not attached to any standard template — opt-in |
+| `learning-extractor` | Finalizer (LearningExtract) | Default in all four standard templates (D-057); not in `learning-evaluation` (recursion stop) |
 | `learning-publisher` | Finalizer (LearningPublish) | Attached to `learning-evaluation` crew |
 | `learning-evaluation` | CrewTemplate | AbortOnCritical=true, MaxIterations=2, 3 strict reviewers |
 | `learning-retriever-default` | GroundingProvider (LearningRetrieval) | sameDomainBoost=1.0, crossDomainPenalty=0.5, maxLearnings=4 |

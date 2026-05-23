@@ -1160,3 +1160,19 @@ Der in D-054 gebaute Loop war produktiv wirkungslos: `learning-retriever-default
 **Tests:** 1541 grün. New: 20 Regressions-Tests — `LearningRetrievalProviderResolutionTests` (8) + `LearningRetrievalProviderListingTests` (5) + `LearningFinalizerExecutorRegistrationTests` (7) — hätten alle drei Ursachen verhindert.
 
 **Commits:** `70bfe3e` (Merge PR #30 fix/learning-retrieval-provider → main) · `504fafa` (Folgefix 1: Finalizer-Executor DI) · `7319d59` (Folgefix 2: EF Embedding ignorieren). Deploy: 23. Mai 2026, ~12:45 UTC. Health-Endpoint bestätigt `Healthy`.
+
+## 23. Mai 2026 — Learning-Loop in alle Standard-Templates (D-057)
+
+### D-057: learning-retriever-default + learning-extractor als Standard in allen Templates
+
+*Branch: `main` / Commits `562d235` + `e935307`*
+
+Alle vier System-Templates (`klassik`, `juristisch`, `akademisch`, `marketing`) erhalten `learning-retriever-default` als dritten Standard-Grounding-Provider (nach `tavily-basic` + `run-attachments`) und `learning-extractor` als einzigen Standard-Finalizer. Das `learning-evaluation`-Template bleibt unverändert (Rekursionsstopp).
+
+**Begründung:** Der Learning-Loop war technisch einsatzbereit, aber ohne Default-Verdrahtung in keinem einzigen Run aktiv. Jeder Standard-Run erzeugt implizit Wissen; der Extractor-Finalizer ist per `run.Kind == Learning`-Guard selbst-schützend. Neue Runs profitieren sofort von domänen-gewichteten Learnings ohne manuellen Template-Edit.
+
+**Mitbehobene Bugs:** `Docs.razor` hatte fälschlicherweise `[Authorize]` statt `[AllowAnonymous]` (Regression aus Step31-Commit c02231a). `TransformSettings`-Default-MaxTokens in Tests war noch auf 4096 statt 60000.
+
+**Geänderte Tests:** `FinalizerRegressionTests` (umbenannt + neue Assertion), `KlassikTemplateGroundingRegressionTests` (Count 2→3), `KlassikUnchangedRegressionTests` (Count 2→3), `SystemCrewDomainTemplatesTests` (3× Count 2→3), `SettingsRecordTests` + `TransformSettingsTests` (MaxTokens-Default 4096→60000).
+
+**Deploy:** 23. Mai 2026, ~14:30 UTC. Health-Endpoint bestätigt `Healthy`.
