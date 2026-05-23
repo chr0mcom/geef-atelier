@@ -1,6 +1,6 @@
 @using Geef.Atelier.Core.Domain
 
-<div class="run-row" @onclick="OnOpen" role="button" tabindex="0">
+<div class="run-row @(CanDelete ? "has-delete" : "")" @onclick="OnOpen" role="button" tabindex="0">
     <div class="run-stamp @StatusCss">
         <span class="inner" aria-hidden="true"></span>
     </div>
@@ -22,11 +22,20 @@
         <ProgressPip State="ProgressPipState.Pending" />
     </div>
     <div class="open-link" aria-hidden="true">OPEN ⟶</div>
+    @if (CanDelete)
+    {
+        <button type="button" class="run-delete-inline" aria-label="Delete run"
+                data-testid="delete-run-@Run.Id"
+                @onclick:stopPropagation="true"
+                @onclick="OnDelete">×</button>
+    }
 </div>
 
 @code {
     [Parameter, EditorRequired] public RunEntity Run { get; set; } = default!;
     [Parameter, EditorRequired] public EventCallback OnOpen { get; set; }
+    [Parameter] public bool CanDelete { get; set; }
+    [Parameter] public EventCallback OnDelete { get; set; }
 
     string StatusCss => Run.Status switch
     {

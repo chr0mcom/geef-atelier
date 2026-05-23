@@ -58,16 +58,10 @@
                     {
                         <div class="run-user-badge">@run.CreatedByUser</div>
                     }
-                    <RunRow Run="run" OnOpen="@(() => Nav.NavigateTo($"/runs/{run.Id}"))" />
-                    @if (run.Status is RunStatus.Completed or RunStatus.Failed or RunStatus.Aborted)
-                    {
-                        <button class="btn small danger run-delete-btn"
-                                data-testid="delete-run-@run.Id"
-                                @onclick:stopPropagation="true"
-                                @onclick="@(() => _toDelete = run)">
-                            Delete
-                        </button>
-                    }
+                    <RunRow Run="run"
+                            OnOpen="@(() => Nav.NavigateTo($"/runs/{run.Id}"))"
+                            CanDelete="@(run.Status is RunStatus.Completed or RunStatus.Failed or RunStatus.Aborted)"
+                            OnDelete="@(() => _toDelete = run)" />
                 </div>
             }
         </div>

@@ -1127,8 +1127,32 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
   transition: background .15s, padding .2s;
   background: linear-gradient(to right, transparent, transparent);
 }
+.run-row.has-delete {
+  grid-template-columns: 28px 130px 1fr auto auto auto;
+}
 .run-row:hover {
   background: color-mix(in oklch, var(--surface) 60%, transparent);
+}
+.run-delete-inline {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink-4);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .15s, color .15s, border-color .15s, background .15s;
+}
+.run-row:hover .run-delete-inline {
+  opacity: 1;
+}
+.run-delete-inline:hover {
+  color: var(--st-failed);
+  border-color: var(--st-failed);
+  background: color-mix(in oklch, var(--st-failed) 8%, transparent);
 }
 .run-row::before {
   content: "";
