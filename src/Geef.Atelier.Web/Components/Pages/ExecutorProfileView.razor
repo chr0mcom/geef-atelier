@@ -44,11 +44,8 @@
             <dt>Model</dt>
             <dd data-testid="detail-model">@_profile.Model</dd>
 
-            @if (_profile.MaxTokens.HasValue)
-            {
-                <dt>Max Tokens</dt>
-                <dd data-testid="detail-max-tokens">@_profile.MaxTokens</dd>
-            }
+            <dt>Max Tokens</dt>
+            <dd data-testid="detail-max-tokens">@(_profile.MaxTokens.HasValue ? _profile.MaxTokens.ToString() : "—")</dd>
 
             <dt>System Prompt</dt>
             <dd data-testid="detail-system-prompt">
