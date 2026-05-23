@@ -10,13 +10,16 @@
 
 <div class="crew-editor" data-testid="knowledge-document-detail">
     <div class="page-header">
-        <h1>@(_document?.Title ?? "Document")</h1>
-        <a href="/crew/knowledge" class="btn ghost" data-testid="btn-back">← Back</a>
+        <div>
+            <div class="t-eyebrow eyebrow">Knowledge Base</div>
+            <h1>@(_document?.Title ?? "Document")</h1>
+        </div>
+        <a href="/crew/knowledge" class="btn ghost" data-testid="btn-back">← Knowledge Base</a>
     </div>
 
     @if (_loading)
     {
-        <p>Loading…</p>
+        <p class="text-muted">Loading…</p>
     }
     else if (_notFound)
     {
@@ -28,166 +31,167 @@
         {
             <div class="alert alert-danger" data-testid="error-banner">@_error</div>
         }
-
         @if (_reindexSuccess)
         {
-            <div class="alert alert-success" data-testid="reindex-success">Document has been re-indexed successfully.</div>
+            <div class="alert alert-success" data-testid="reindex-success">Document re-indexed successfully.</div>
         }
 
-        <dl class="knowledge-detail" data-testid="knowledge-detail">
-            <dt>Title</dt>
-            <dd data-testid="detail-title">@_document.Title</dd>
+        <div class="kdoc-meta-card" data-testid="knowledge-detail">
+            <div class="kdoc-meta-header">
+                <div class="knowledge-doc-type-badge">@FileExt</div>
+                <span class="kdoc-filename">@_document.OriginalFilename</span>
+                <IndexingStatusBadge ChunkCount="_document.ChunkCount" />
+            </div>
+            <div class="kdoc-meta-grid">
+                <span class="kdoc-key" data-testid="detail-size-label">Size</span>
+                <span class="kdoc-val" data-testid="detail-size">@SizeDisplay</span>
 
-            <dt>Description</dt>
-            <dd data-testid="detail-description">@(string.IsNullOrEmpty(_document.Description) ? "—" : _document.Description)</dd>
-
-            <dt>Tags</dt>
-            <dd data-testid="detail-tags">
                 @if (_document.Tags.Count > 0)
                 {
-                    @foreach (var tag in _document.Tags)
-                    {
-                        <span class="crew-badge">@tag</span>
-                    }
+                    <span class="kdoc-key">Tags</span>
+                    <div class="kdoc-val" data-testid="detail-tags">
+                        @foreach (var tag in _document.Tags)
+                        {
+                            <span class="crew-badge">@tag</span>
+                        }
+                    </div>
                 }
-                else
+
+                <span class="kdoc-key">Embedding</span>
+                <span class="kdoc-val" data-testid="detail-embedding-model">@_document.EmbeddingModel</span>
+
+                @if (_document.IndexingCostEur.HasValue)
                 {
-                    <span class="text-muted">—</span>
+                    <span class="kdoc-key">Index cost</span>
+                    <span class="kdoc-val" data-testid="detail-cost">~€@_document.IndexingCostEur.Value.ToString("F4")</span>
                 }
-            </dd>
 
-            <dt>File</dt>
-            <dd data-testid="detail-filename">@_document.OriginalFilename</dd>
+                <span class="kdoc-key">Created</span>
+                <span class="kdoc-val" data-testid="detail-created">@_document.CreatedAt.ToString("yyyy-MM-dd HH:mm") UTC</span>
 
-            <dt>Size</dt>
-            <dd data-testid="detail-size">@FormatBytes(_document.FileSizeBytes)</dd>
+                <span class="kdoc-key">Updated</span>
+                <span class="kdoc-val" data-testid="detail-updated">@_document.UpdatedAt.ToString("yyyy-MM-dd HH:mm") UTC</span>
+            </div>
+        </div>
 
-            <dt>Chunks</dt>
-            <dd data-testid="detail-chunks">
-                <IndexingStatusBadge ChunkCount="_document.ChunkCount" />
-            </dd>
+        @if (!string.IsNullOrEmpty(_document.Description))
+        {
+            <div class="kdoc-section">
+                <div class="kdoc-section-title">Description</div>
+                <div class="kdoc-section-body" data-testid="detail-description">@_document.Description</div>
+            </div>
+        }
 
-            <dt>Embedding Model</dt>
-            <dd data-testid="detail-embedding-model">@_document.EmbeddingModel</dd>
+        @if (!string.IsNullOrEmpty(_document.RawContent))
+        {
+            <div class="kdoc-section">
+                <div class="kdoc-section-title">Content preview</div>
+                <div class="kdoc-content-preview">@ContentPreview</div>
+            </div>
+        }
 
-            @if (_document.IndexingCostEur.HasValue)
-            {
-                <dt>Indexing Cost</dt>
-                <dd data-testid="detail-cost">~€@_document.IndexingCostEur.Value.ToString("F4")</dd>
-            }
-
-            <dt>Created</dt>
-            <dd data-testid="detail-created">@_document.CreatedAt.ToString("yyyy-MM-dd HH:mm") UTC</dd>
-
-            <dt>Updated</dt>
-            <dd data-testid="detail-updated">@_document.UpdatedAt.ToString("yyyy-MM-dd HH:mm") UTC</dd>
-        </dl>
-
-        <div class="form-actions" style="margin-top: 1.5rem;">
+        <div class="kdoc-actions">
             <button class="btn primary" @onclick="ReindexAsync" disabled="@_reindexing" data-testid="btn-reindex">
                 @(_reindexing ? "Re-indexing…" : "Re-Index")
             </button>
-            <button class="btn danger" @onclick="() => _showDeleteConfirm = true" data-testid="btn-delete">Delete</button>
+            <button class="btn danger" @onclick="@(() => _showDeleteConfirm = true)" data-testid="btn-delete">Delete</button>
         </div>
     }
 </div>
 
-@if (_showDeleteConfirm)
-{
-    <div class="modal-backdrop" data-testid="delete-confirm">
-        <div class="modal">
-            <p>Are you sure you want to delete <strong>@_document?.Title</strong>? This cannot be undone.</p>
-            <div class="form-actions">
-                <button class="btn danger" @onclick="DeleteAsync" disabled="@_deleting" data-testid="btn-confirm-delete">
-                    @(_deleting ? "Deleting…" : "Delete")
-                </button>
-                <button class="btn ghost" @onclick="() => _showDeleteConfirm = false">Cancel</button>
-            </div>
-        </div>
-    </div>
-}
+<DeleteConfirmationModal
+    Show="_showDeleteConfirm"
+    ItemName="@(_document?.Title ?? "")"
+    ItemKind="Document"
+    OnConfirm="DeleteAsync"
+    OnCancel="@(() => _showDeleteConfirm = false)" />
 
 @code {
     [Parameter] public Guid DocumentId { get; set; }
 
     private KnowledgeDocument? _document;
-    private bool _loading = true;
-    private bool _notFound;
-    private bool _reindexing;
-    private bool _reindexSuccess;
-    private bool _deleting;
-    private bool _showDeleteConfirm;
+    private bool   _loading = true;
+    private bool   _notFound;
+    private bool   _reindexing;
+    private bool   _reindexSuccess;
+    private bool   _showDeleteConfirm;
     private string? _error;
 
-    protected override async Task OnInitializedAsync()
+    string FileExt
     {
-        await LoadAsync();
+        get
+        {
+            if (_document is null) return "DOC";
+            var ext = System.IO.Path.GetExtension(_document.OriginalFilename).TrimStart('.').ToUpperInvariant();
+            if (ext == "PDF") return "PDF";
+            if (ext == "MD")  return "MD";
+            if (ext == "TXT") return "TXT";
+            return "DOC";
+        }
     }
+
+    string SizeDisplay
+    {
+        get
+        {
+            if (_document is null) return "";
+            var b = _document.FileSizeBytes;
+            if (b < 1_024L)     return $"{b} B";
+            if (b < 1_048_576L) return $"{b / 1024} KB";
+            return $"{b / 1_048_576.0:F1} MB";
+        }
+    }
+
+    string ContentPreview
+    {
+        get
+        {
+            var c = _document?.RawContent ?? "";
+            return c.Length > 800 ? c[..800] + "…" : c;
+        }
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task LoadAsync()
     {
-        _loading = true;
-        _error = null;
-        _notFound = false;
+        _loading       = true;
+        _error         = null;
+        _notFound      = false;
         _reindexSuccess = false;
         try
         {
             _document = await KnowledgeService.GetAsync(DocumentId, CancellationToken.None);
-            if (_document == null)
-                _notFound = true;
+            if (_document == null) _notFound = true;
         }
-        catch (Exception ex)
-        {
-            _error = ex.Message;
-        }
-        finally
-        {
-            _loading = false;
-        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
     }
 
     private async Task ReindexAsync()
     {
-        _reindexing = true;
+        _reindexing    = true;
         _reindexSuccess = false;
-        _error = null;
+        _error          = null;
         try
         {
             await KnowledgeService.ReindexAsync(DocumentId, CancellationToken.None);
             _reindexSuccess = true;
             await LoadAsync();
         }
-        catch (Exception ex)
-        {
-            _error = ex.Message;
-        }
-        finally
-        {
-            _reindexing = false;
-        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _reindexing = false; }
     }
 
     private async Task DeleteAsync()
     {
-        _deleting = true;
-        _error = null;
+        _showDeleteConfirm = false;
+        _error             = null;
         try
         {
             await KnowledgeService.DeleteAsync(DocumentId, CancellationToken.None);
             Nav.NavigateTo("/crew/knowledge");
         }
-        catch (Exception ex)
-        {
-            _error = ex.Message;
-            _deleting = false;
-            _showDeleteConfirm = false;
-        }
-    }
-
-    private static string FormatBytes(long bytes)
-    {
-        if (bytes < 1024) return $"{bytes} B";
-        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
-        return $"{bytes / (1024.0 * 1024):F1} MB";
+        catch (Exception ex) { _error = ex.Message; }
     }
 }

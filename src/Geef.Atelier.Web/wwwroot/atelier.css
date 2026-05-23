@@ -2830,6 +2830,93 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
     margin-top: 1.5rem;
 }
 
+/* ── Knowledge doc detail ───────────────────────────────── */
+.kdoc-meta-card {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+}
+.kdoc-meta-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--hairline-soft);
+    flex-wrap: wrap;
+}
+.kdoc-filename {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--ink-3);
+    flex: 1;
+    letter-spacing: 0.03em;
+}
+.kdoc-meta-grid {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 0.6rem 1rem;
+    align-items: start;
+}
+.kdoc-key {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    padding-top: 3px;
+}
+.kdoc-val {
+    font-size: 13px;
+    color: var(--ink-2);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    line-height: 1.5;
+}
+.kdoc-section {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+}
+.kdoc-section-title {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    margin-bottom: 0.75rem;
+}
+.kdoc-section-body {
+    font-size: 14px;
+    color: var(--ink-2);
+    line-height: 1.65;
+}
+.kdoc-content-preview {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--ink-3);
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 340px;
+    overflow-y: auto;
+    padding: 2px 0;
+}
+.kdoc-content-preview::-webkit-scrollbar { width: 6px; }
+.kdoc-content-preview::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 99px; }
+.kdoc-content-preview::-webkit-scrollbar-track { background: transparent; }
+.kdoc-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+
 /* ── Crew UI — tables ────────────────────────────────────── */
 .crew-table {
     width: 100%;
