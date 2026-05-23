@@ -19,6 +19,8 @@ public static class FinalizerServiceExtensions
         services.AddSingleton<IFinalizerExecutor, MetadataEnrichFinalizerExecutor>();
         services.AddSingleton<IFinalizerExecutor, ExternalSinkFinalizerExecutor>();
         services.AddSingleton<IFinalizerExecutor, TransformFinalizerExecutor>();
+        services.AddSingleton<IFinalizerExecutor, LearningExtractFinalizerExecutor>();
+        services.AddSingleton<IFinalizerExecutor, LearningPublishFinalizerExecutor>();
         services.AddSingleton<IFinalizerExecutorFactory, FinalizerExecutorFactory>();
 
         return services;
