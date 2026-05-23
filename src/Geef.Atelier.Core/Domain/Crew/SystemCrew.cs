@@ -138,7 +138,7 @@ public static class SystemCrew
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
         GroundingProviderNames: new[] { "tavily-basic", "run-attachments" },
-        FinalizerProfileNames: new[] { "learning-extractor" },
+        FinalizerProfileNames: Array.Empty<string>(),
         IsSystem: true);
 
     // ── Domain templates ────────────────────────────────────────────────────────────
@@ -154,7 +154,7 @@ public static class SystemCrew
         ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 12, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
         AdvisorProfileNames: new[] { "legal-domain-expert" },
         GroundingProviderNames: new[] { "tavily-basic", "run-attachments" },
-        FinalizerProfileNames: new[] { "learning-extractor" },
+        FinalizerProfileNames: Array.Empty<string>(),
         IsSystem: true);
 
     /// <summary>Akademisch template — for scientific texts: papers, argumentation essays, research texts.</summary>
@@ -168,7 +168,7 @@ public static class SystemCrew
         ConvergenceOverride: null,
         AdvisorProfileNames: new[] { "academic-rigor-advisor" },
         GroundingProviderNames: new[] { "tavily-basic", "run-attachments" },
-        FinalizerProfileNames: new[] { "learning-extractor" },
+        FinalizerProfileNames: Array.Empty<string>(),
         IsSystem: true);
 
     /// <summary>Marketing template — for marketing copy: landing pages, emails, ad copy.</summary>
@@ -182,7 +182,7 @@ public static class SystemCrew
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
         GroundingProviderNames: new[] { "tavily-basic", "run-attachments" },
-        FinalizerProfileNames: new[] { "learning-extractor" },
+        FinalizerProfileNames: Array.Empty<string>(),
         IsSystem: true);
 
     /// <summary>System grounding-provider profile for Tavily Basic web-search (1 credit/search, ~5 sources).</summary>
@@ -280,6 +280,24 @@ public static class SystemCrew
         MaxQueriesPerRun: 1,
         IsSystem: true);
 
+    /// <summary>
+    /// System grounding-provider profile for the Continuous-Learning-Loop (D-054).
+    /// Retrieves approved learnings from previous runs using cosine similarity with domain-aware boost.
+    /// </summary>
+    public static readonly GroundingProviderProfile LearningRetrieverDefaultProfile = new(
+        Name: "learning-retriever-default",
+        DisplayName: "Learning Retriever (domain-aware)",
+        Description: "Retrieves approved learnings from the learning store using cosine similarity with a domain-boost. Place after curated knowledge providers.",
+        ProviderType: GroundingProviderTypes.LearningRetrieval,
+        ProviderSettings: new Dictionary<string, string>
+        {
+            ["sameDomainBoost"]    = "1.0",
+            ["crossDomainPenalty"] = "0.5",
+            ["maxLearnings"]       = "4",
+        },
+        MaxQueriesPerRun: 1,
+        IsSystem: true);
+
     /// <summary>All system reviewer profiles, indexed by name.</summary>
     public static readonly IReadOnlyDictionary<string, ReviewerProfile> ReviewerProfiles =
         new Dictionary<string, ReviewerProfile>
@@ -369,12 +387,13 @@ public static class SystemCrew
     public static readonly IReadOnlyDictionary<string, GroundingProviderProfile> GroundingProviderProfiles =
         new Dictionary<string, GroundingProviderProfile>
         {
-            [TavilyBasicProfile.Name]          = TavilyBasicProfile,
-            [TavilyRefinedProfile.Name]        = TavilyRefinedProfile,
-            [KnowledgeBaseDefaultProfile.Name] = KnowledgeBaseDefaultProfile,
-            [RunAttachmentsProfile.Name]       = RunAttachmentsProfile,
-            [TavilyNewsProfile.Name]           = TavilyNewsProfile,
-            [AcademicDefaultProfile.Name]      = AcademicDefaultProfile,
+            [TavilyBasicProfile.Name]               = TavilyBasicProfile,
+            [TavilyRefinedProfile.Name]              = TavilyRefinedProfile,
+            [KnowledgeBaseDefaultProfile.Name]       = KnowledgeBaseDefaultProfile,
+            [RunAttachmentsProfile.Name]             = RunAttachmentsProfile,
+            [TavilyNewsProfile.Name]                 = TavilyNewsProfile,
+            [AcademicDefaultProfile.Name]            = AcademicDefaultProfile,
+            [LearningRetrieverDefaultProfile.Name]   = LearningRetrieverDefaultProfile,
         };
 
     /// <summary>All system crew templates, indexed by name.</summary>
