@@ -1,31 +1,64 @@
 @using Geef.Atelier.Core.Domain.Crew.Knowledge
 
 <div class="knowledge-doc-card" data-testid="knowledge-doc-card-@Document.Id">
-    <div class="knowledge-doc-card-main">
-        <a href="/crew/knowledge/@Document.Id" class="knowledge-doc-title">@Document.Title</a>
+    <div class="knowledge-doc-type-badge" aria-hidden="true">@FileExt</div>
+    <div class="knowledge-doc-main">
+        <div class="knowledge-doc-header">
+            <a href="/crew/knowledge/@Document.Id" class="knowledge-doc-title">@Document.Title</a>
+            <span class="knowledge-doc-filename">@Document.OriginalFilename</span>
+        </div>
         @if (!string.IsNullOrEmpty(Document.Description))
         {
             <div class="knowledge-doc-description">
-                @(Document.Description.Length > 120 ? Document.Description[..120] + "…" : Document.Description)
+                @(Document.Description.Length > 180 ? Document.Description[..180] + "…" : Document.Description)
             </div>
         }
-        <div class="knowledge-doc-tags">
+        <div class="knowledge-doc-footer">
+            <IndexingStatusBadge ChunkCount="Document.ChunkCount" />
             @foreach (var tag in Document.Tags)
             {
                 <span class="crew-badge">@tag</span>
             }
+            <span class="knowledge-doc-meta">@SizeDisplay</span>
+            @if (Document.IndexingCostEur.HasValue)
+            {
+                <span class="knowledge-doc-meta">~€@Document.IndexingCostEur.Value.ToString("F4")</span>
+            }
+            <span class="knowledge-doc-meta">@Document.UpdatedAt.ToString("yyyy-MM-dd")</span>
         </div>
     </div>
-    <div class="knowledge-doc-card-meta">
-        <IndexingStatusBadge ChunkCount="Document.ChunkCount" />
-        @if (Document.IndexingCostEur.HasValue)
-        {
-            <span class="knowledge-doc-cost">~€@Document.IndexingCostEur.Value.ToString("F4")</span>
-        }
-        <span class="knowledge-doc-date text-muted">@Document.UpdatedAt.ToString("yyyy-MM-dd")</span>
-    </div>
+    @if (OnDelete.HasDelegate)
+    {
+        <button type="button" class="knowledge-doc-delete" aria-label="Delete @Document.Title"
+                data-testid="delete-doc-@Document.Id"
+                @onclick="OnDelete">×</button>
+    }
 </div>
 
 @code {
     [Parameter, EditorRequired] public KnowledgeDocument Document { get; set; } = null!;
+    [Parameter] public EventCallback OnDelete { get; set; }
+
+    string FileExt
+    {
+        get
+        {
+            var ext = System.IO.Path.GetExtension(Document.OriginalFilename).TrimStart('.').ToUpperInvariant();
+            if (ext == "PDF") return "PDF";
+            if (ext == "MD")  return "MD";
+            if (ext == "TXT") return "TXT";
+            return "DOC";
+        }
+    }
+
+    string SizeDisplay
+    {
+        get
+        {
+            var b = Document.FileSizeBytes;
+            if (b < 1_024L)      return $"{b} B";
+            if (b < 1_048_576L)  return $"{b / 1024} KB";
+            return $"{b / 1_048_576.0:F1} MB";
+        }
+    }
 }

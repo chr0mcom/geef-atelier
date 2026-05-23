@@ -2707,6 +2707,129 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
     font-size: 1.75rem;
 }
 
+/* ── Knowledge doc list ─────────────────────────────────── */
+.knowledge-doc-list {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--hairline-soft);
+    margin-top: 8px;
+}
+.knowledge-doc-card {
+    display: grid;
+    grid-template-columns: 44px 1fr auto;
+    gap: 16px;
+    align-items: center;
+    padding: 18px 12px;
+    border-bottom: 1px solid var(--hairline-soft);
+    position: relative;
+    transition: background .15s;
+}
+.knowledge-doc-card:hover {
+    background: color-mix(in oklch, var(--surface) 60%, transparent);
+}
+.knowledge-doc-type-badge {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 5px 6px;
+    border-radius: 3px;
+    background: color-mix(in oklch, var(--hero) 10%, var(--surface));
+    color: var(--hero);
+    border: 1px solid color-mix(in oklch, var(--hero) 22%, transparent);
+    text-align: center;
+    line-height: 1;
+    justify-self: start;
+}
+.knowledge-doc-main {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+.knowledge-doc-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.knowledge-doc-title {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    text-decoration: none;
+    transition: color .15s;
+}
+.knowledge-doc-title:hover { color: var(--hero); }
+.knowledge-doc-filename {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--ink-4);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.knowledge-doc-description {
+    font-size: 13px;
+    color: var(--ink-3);
+    line-height: 1.5;
+}
+.knowledge-doc-footer {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 2px;
+}
+.knowledge-doc-meta {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+}
+.knowledge-doc-delete {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1;
+    padding: 5px 9px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--ink-4);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .15s, color .15s, border-color .15s, background .15s;
+    align-self: center;
+}
+.knowledge-doc-card:hover .knowledge-doc-delete { opacity: 1; }
+.knowledge-doc-delete:hover {
+    color: var(--st-failed);
+    border-color: var(--st-failed);
+    background: color-mix(in oklch, var(--st-failed) 8%, transparent);
+}
+
+/* Indexing status badge colours */
+.indexed-badge {
+    color: var(--st-completed) !important;
+    border-color: color-mix(in oklch, var(--st-completed) 28%, transparent) !important;
+    background: color-mix(in oklch, var(--st-completed) 8%, transparent) !important;
+}
+.not-indexed-badge {
+    color: var(--ink-3) !important;
+}
+
+.knowledge-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
 /* ── Crew UI — tables ────────────────────────────────────── */
 .crew-table {
     width: 100%;

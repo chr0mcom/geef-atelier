@@ -10,7 +10,10 @@
 
 <div class="crew-profiles-index" data-testid="knowledge-index">
     <div class="page-header">
-        <h1>Knowledge Base</h1>
+        <div>
+            <div class="t-eyebrow eyebrow">Crew</div>
+            <h1>Knowledge Base</h1>
+        </div>
         <a href="/crew/knowledge/upload" class="btn primary" data-testid="btn-upload">+ Upload Document</a>
     </div>
 
@@ -21,82 +24,92 @@
 
     @if (_loading)
     {
-        <p>Loading…</p>
+        <p class="text-muted">Loading…</p>
     }
     else if (_documents.Count == 0)
     {
-        <p class="text-muted" data-testid="empty-state">No documents yet. Upload one to get started.</p>
+        <div class="empty-state" data-testid="empty-state">
+            <h3>No documents yet</h3>
+            <p>Upload a document to make it available to your crew as a knowledge source.</p>
+            <a class="btn primary" href="/crew/knowledge/upload">Upload Document</a>
+        </div>
     }
     else
     {
         <div class="knowledge-doc-list" data-testid="knowledge-doc-list">
             @foreach (var doc in _documents)
             {
-                <KnowledgeDocumentCard Document="doc" />
+                <KnowledgeDocumentCard Document="doc" OnDelete="@(() => _toDelete = doc)" />
             }
         </div>
     }
 
-    <div class="form-actions" style="margin-top: 1.5rem;">
+    <div class="knowledge-actions">
         <button class="btn ghost" @onclick="ReindexAllAsync" disabled="@_reindexing" data-testid="btn-reindex-all">
             @(_reindexing ? "Re-indexing…" : "Re-Index All")
         </button>
+        @if (_reindexSuccess)
+        {
+            <span class="text-muted" data-testid="reindex-success">All documents re-indexed.</span>
+        }
     </div>
-
-    @if (_reindexSuccess)
-    {
-        <p class="text-muted" data-testid="reindex-success">All documents have been re-indexed.</p>
-    }
 </div>
+
+<DeleteConfirmationModal
+    Show="_toDelete != null"
+    ItemName="@(_toDelete?.Title ?? "")"
+    ItemKind="Document"
+    OnConfirm="ExecuteDeleteAsync"
+    OnCancel="@(() => _toDelete = null)" />
 
 @code {
     private IReadOnlyList<KnowledgeDocument> _documents = [];
-    private bool _loading = true;
-    private bool _reindexing;
-    private bool _reindexSuccess;
+    private bool   _loading = true;
+    private bool   _reindexing;
+    private bool   _reindexSuccess;
     private string? _error;
+    private KnowledgeDocument? _toDelete;
 
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadAsync();
-    }
+    protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task LoadAsync()
     {
         _loading = true;
-        _error = null;
+        _error   = null;
         try
         {
             _documents = await KnowledgeService.ListAsync(null, CancellationToken.None, KnowledgeScope.Global);
         }
-        catch (Exception ex)
+        catch (Exception ex) { _error = ex.Message; }
+        finally  { _loading = false; }
+    }
+
+    private async Task ExecuteDeleteAsync()
+    {
+        if (_toDelete is null) return;
+        var id = _toDelete.Id;
+        _toDelete = null;
+        _error    = null;
+        try
         {
-            _error = ex.Message;
+            await KnowledgeService.DeleteAsync(id, CancellationToken.None);
+            await LoadAsync();
         }
-        finally
-        {
-            _loading = false;
-        }
+        catch (Exception ex) { _error = ex.Message; }
     }
 
     private async Task ReindexAllAsync()
     {
-        _reindexing = true;
+        _reindexing    = true;
         _reindexSuccess = false;
-        _error = null;
+        _error          = null;
         try
         {
             await KnowledgeService.ReindexAllAsync(CancellationToken.None);
             _reindexSuccess = true;
             await LoadAsync();
         }
-        catch (Exception ex)
-        {
-            _error = ex.Message;
-        }
-        finally
-        {
-            _reindexing = false;
-        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _reindexing = false; }
     }
 }
