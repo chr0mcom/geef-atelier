@@ -165,7 +165,7 @@ public static class SystemCrew
         ExecutorProfileName: DefaultExecutorProfile.Name,
         ReviewerProfileNames: new[] { BriefingFidelityProfile.Name, AcademicCitationReadinessProfile.Name, AcademicArgumentationRigorProfile.Name },
         EvaluationStrategy: EvaluationStrategy.Sequential,
-        ConvergenceOverride: null,
+        ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 8, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
         AdvisorProfileNames: new[] { "academic-rigor-advisor" },
         GroundingProviderNames: new[] { "tavily-basic", "run-attachments", "learning-retriever-default" },
         FinalizerProfileNames: new[] { "learning-extractor" },
