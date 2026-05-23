@@ -257,7 +257,7 @@ Der Learning-Store. Physisch getrennt von der kuratierten Wissensbasis (`Knowled
 - `IX_LearningEntries_Domain_Status` — Composite-BTree für gefilterte Listen-Queries
 - `IX_LearningEntries_Embedding_HNSW` — HNSW-Index mit `vector_cosine_ops` für Cosine-Similarity-Retrieval
 
-**pgvector Raw-SQL-Pattern:** `Pgvector.EFCore` 0.3.0 ist mit Npgsql 10.x inkompatibel. Die `Embedding`-Spalte ist in EF als `string` abgebildet (Value-Converter); alle Insert- und Cosine-Search-Operationen nutzen raw ADO.NET mit `NpgsqlParameter(NpgsqlDbType.Vector)` — identisch mit dem `VectorSearchRepository`-Muster (D-036).
+**pgvector Raw-SQL-Pattern:** `Pgvector.EFCore` 0.3.0 ist mit Npgsql 10.x inkompatibel — ein string-Value-Converter führt beim INSERT zu `42804: column is of type vector but expression is of type character varying`. Die `Embedding`-Spalte wird daher **von EF Core ignoriert** (`builder.Ignore(e => e.Embedding)` in `LearningEntryConfiguration`); alle Insert- und Cosine-Search-Operationen nutzen raw ADO.NET mit `NpgsqlParameter(NpgsqlDbType.Vector)` — identisch mit dem `VectorSearchRepository`-Muster (D-036). Behoben in D-055 Folgefix 2.
 
 ### Neue Spalten auf bestehenden Tabellen (Step30 — Continuous Learning)
 

@@ -1151,4 +1151,12 @@ Der in D-054 gebaute Loop war produktiv wirkungslos: `learning-retriever-default
 
 **Mitbehobene D-054-Fehler:** `learning-extractor` war fälschlicherweise in alle vier Standard-Templates (Klassik/Juristisch/Akademisch/Marketing) eingetragen; entfernt (Finalizer ist opt-in). Regressions-Test-Guard `SystemTemplates_HaveNoFinalizers` war deshalb rot. `FinalizerProfiles`-Count-Test auf 19 aktualisiert.
 
-**Tests:** 1528 grün. New: 13 Regressions-Tests (`LearningRetrievalProviderResolutionTests` 8, `LearningRetrievalProviderListingTests` 5) — hätten D-055 verhindert.
+**Folgefix 1 — Finalizer-Executor nicht in DI registriert:** Beim ersten echten Loop-Test: `LearningExtractFinalizerExecutor` und `LearningPublishFinalizerExecutor` fehlten in `FinalizerServiceExtensions.AddFinalizers()` — exakt dasselbe Muster wie die Grounding-Provider-Lücke. Fix: beide Executoren in `FinalizerServiceExtensions.cs` ergänzt.
+
+**Folgefix 2 — EF Core kann `vector(1536)` nicht via ValueConverter schreiben:** Beim ersten LearningEntry-INSERT: Postgres `42804: column "Embedding" is of type vector but expression is of type character varying`. `Pgvector.EFCore` 0.3.0 ist mit Npgsql 10.x inkompatibel — der string-ValueConverter funktioniert nicht. Da Embedding ausschließlich via Raw-SQL (`LearningRepository.SetEmbeddingAsync`) gesetzt wird, ist `builder.Ignore(e => e.Embedding)` in `LearningEntryConfiguration.cs` die korrekte Lösung. EF Core berührt die Spalte nie.
+
+**Real-Tests (alle nach Folgefix 1+2):** A (Provider sichtbar, `list_grounding_provider_profiles` zeigt `learning-retriever-default`) ✅ · B (Loop schließt sich: Standard-Run → `learning-extractor` fires → Learning-Run `Kind=1` → `learning-publisher` → `LearningEntry.Status=Approved` + Embedding) ✅ · C (neuer Run mit `learning-retriever-default` zieht Learning als Citation) ✅ · E (Backwards-Compat: alle 1528 Vor-Bugfix-Tests grün) ✅.
+
+**Tests:** 1541 grün. New: 20 Regressions-Tests — `LearningRetrievalProviderResolutionTests` (8) + `LearningRetrievalProviderListingTests` (5) + `LearningFinalizerExecutorRegistrationTests` (7) — hätten alle drei Ursachen verhindert.
+
+**Commits:** `70bfe3e` (Merge PR #30 fix/learning-retrieval-provider → main) · `504fafa` (Folgefix 1: Finalizer-Executor DI) · `7319d59` (Folgefix 2: EF Embedding ignorieren). Deploy: 23. Mai 2026, ~12:45 UTC. Health-Endpoint bestätigt `Healthy`.
