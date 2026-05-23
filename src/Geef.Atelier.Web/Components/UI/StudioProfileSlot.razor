@@ -7,11 +7,26 @@
 @inject ICrewService CrewService
 @inject IProviderCatalog ProviderCatalog
 
-<div class="studio-slot @(ShowValidation && !IsValid ? "studio-slot--invalid" : "")"
+<div class="studio-slot @(ShowValidation && !IsValid ? "studio-slot--invalid" : "") @(_expanded ? "is-open" : "")"
      data-testid="@SlotTestId">
 
-    <div class="studio-slot-header">
+    <button type="button" class="studio-slot-header" @onclick="ToggleExpanded"
+            aria-expanded="@_expanded" data-testid="@($"slot-header-{SlotTestSuffix}")">
+        <span class="slot-chevron">@(_expanded ? "▾" : "▸")</span>
         <span class="studio-slot-label">@SlotLabel</span>
+        <span class="slot-summary">@SummaryText</span>
+        <span class="slot-mode-pill @(Mode == StudioSlotMode.UseExisting ? "is-existing" : "is-new")">
+            @(Mode == StudioSlotMode.UseExisting ? "Vorhanden" : "Neu")
+        </span>
+        @if (ShowValidation && !IsValid)
+        {
+            <span class="slot-invalid-dot" title="Unvollständig" data-testid="@($"slot-invalid-{SlotTestSuffix}")">!</span>
+        }
+    </button>
+
+    @if (_expanded)
+    {
+    <div class="studio-slot-body">
         @if (CanSwitchMode)
         {
             <div class="studio-slot-toggle" role="group" aria-label="Modus wählen">
@@ -29,7 +44,6 @@
                 </button>
             </div>
         }
-    </div>
 
     @if (Mode == StudioSlotMode.UseExisting)
     {
@@ -54,6 +68,7 @@
     {
         @if (Draft is not null)
         {
+            <div class="slot-fields">
             <div class="field">
                 <label>Name (intern, kebab-case)</label>
                 <input type="text"
@@ -80,7 +95,7 @@
                 }
             </div>
 
-            <div class="field">
+            <div class="field field--full">
                 <label>Beschreibung</label>
                 <input type="text"
                        value="@Draft.Description"
@@ -131,7 +146,7 @@
                     <FieldHelp Text="@StudioFieldHelps.MaxTokens" DataTestId="field-help-maxtokens" />
                 </div>
 
-                <div class="field">
+                <div class="field field--full">
                     <label>System-Prompt</label>
                     <textarea rows="5"
                               value="@Draft.SystemPrompt"
@@ -345,11 +360,14 @@
 
             @if (!string.IsNullOrEmpty(Draft.OverallReasoning))
             {
-                <div class="field-reasoning overall-reasoning" data-testid="slot-overall-reasoning">
+                <div class="field-reasoning overall-reasoning field--full" data-testid="slot-overall-reasoning">
                     <strong>KI-Begründung:</strong> @Draft.OverallReasoning
                 </div>
             }
+            </div>
         }
+    }
+    </div>
     }
 </div>
 
@@ -371,9 +389,31 @@
 
     private IReadOnlyList<ProviderInfo> _providers = [];
     private IReadOnlyList<ProfileSummary> _availableProfiles = [];
+    private bool _expanded;
+    private bool _expandInitialized;
 
     private string SlotTestSuffix => SlotLabel.ToLowerInvariant().Replace(' ', '-');
     private string SlotTestId => $"studio-slot-{SlotTestSuffix}";
+
+    /// <summary>Compact one-line summary shown in the collapsed header.</summary>
+    private string SummaryText
+    {
+        get
+        {
+            if (Mode == StudioSlotMode.UseExisting)
+            {
+                if (string.IsNullOrEmpty(ExistingProfileName)) return "— kein Profil gewählt —";
+                var match = _availableProfiles.FirstOrDefault(p => p.Name == ExistingProfileName);
+                return match?.DisplayName ?? ExistingProfileName;
+            }
+            if (Draft is null) return "Neues Profil";
+            if (!string.IsNullOrWhiteSpace(Draft.DisplayName)) return Draft.DisplayName;
+            if (!string.IsNullOrWhiteSpace(Draft.Name)) return Draft.Name;
+            return "Neues Profil (unbenannt)";
+        }
+    }
+
+    private void ToggleExpanded() => _expanded = !_expanded;
 
     public bool IsValid
     {
@@ -400,6 +440,18 @@
             _availableProfiles = PreloadedProfiles.Select(p => new ProfileSummary(p.Name, p.DisplayName, p.IsSystem)).ToList();
         else
             await LoadAvailableProfilesAsync();
+
+        // Start expanded only for freshly-added (empty) drafts that need input; otherwise collapsed
+        // so the parent renders a clean, scannable overview of all slots.
+        _expanded = Mode == StudioSlotMode.CreateNew && string.IsNullOrWhiteSpace(Draft?.Name);
+        _expandInitialized = true;
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Auto-expand invalid slots when the user attempts to save, so the error is visible.
+        if (_expandInitialized && ShowValidation && !IsValid)
+            _expanded = true;
     }
 
     private async Task LoadAvailableProfilesAsync()

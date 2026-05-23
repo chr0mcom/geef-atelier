@@ -15,6 +15,8 @@
         <DataAnnotationsValidator />
         <ValidationSummary />
 
+        <div class="field-grid">
+
         <div class="field">
             <label>Name</label>
             <InputText @bind-Value="_form.Name" disabled="@IsSystem" placeholder="my-profile" />
@@ -30,13 +32,13 @@
             <ValidationMessage For="() => _form.DisplayName" />
         </div>
 
-        <div class="field">
+        <div class="field field--full">
             <label>Description</label>
             <InputTextArea @bind-Value="_form.Description" rows="3" disabled="@IsSystem" />
             <ValidationMessage For="() => _form.Description" />
         </div>
 
-        <div class="field">
+        <div class="field field--full">
             <label>System Prompt (@(_form.SystemPrompt?.Length ?? 0)/8000)</label>
             <InputTextArea @bind-Value="_form.SystemPrompt" rows="15"
                            style="font-family: var(--font-mono, monospace)"
@@ -81,7 +83,7 @@
 
         @if (ShowAdvisorFields)
         {
-            <div class="field">
+            <div class="field field--full">
                 <label>Mode</label>
                 <div class="radio-group" data-testid="advisor-mode-group">
                     @foreach (var mode in Enum.GetValues<AdvisorMode>())
@@ -100,7 +102,7 @@
                 </div>
             </div>
 
-            <div class="field">
+            <div class="field field--full">
                 <label>Trigger</label>
                 <div class="radio-group" data-testid="advisor-trigger-group">
                     @foreach (var trigger in Enum.GetValues<AdvisorTrigger>())
@@ -119,6 +121,8 @@
                 </div>
             </div>
         }
+
+        </div>
 
         <div class="editor-actions">
             @if (!IsSystem)

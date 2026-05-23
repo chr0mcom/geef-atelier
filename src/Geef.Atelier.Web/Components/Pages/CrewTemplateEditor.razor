@@ -38,6 +38,9 @@
             <DataAnnotationsValidator />
             <ValidationSummary />
 
+            <div class="edit-section">
+            <h3>Grunddaten</h3>
+
             <div class="field">
                 <label>Name</label>
                 <InputText @bind-Value="_form.Name" disabled="@_isSystem" placeholder="my-template" />
@@ -56,6 +59,10 @@
                 <label>Description</label>
                 <InputTextArea @bind-Value="_form.Description" rows="3" />
             </div>
+            </div>
+
+            <div class="edit-section">
+            <h3>Crew-Zusammenstellung</h3>
 
             <div class="field">
                 <label>Executor Profile</label>
@@ -105,6 +112,10 @@
                                 Selected="_form.ReviewerProfileNames"
                                 SelectedChanged="names => _form.ReviewerProfileNames = names" />
             </div>
+            </div>
+
+            <div class="edit-section">
+            <h3>Auswertung</h3>
 
             <div class="field">
                 <label>Evaluation Strategy</label>
@@ -121,6 +132,7 @@
                         </label>
                     }
                 </div>
+            </div>
             </div>
 
             <details class="collapsible-section">

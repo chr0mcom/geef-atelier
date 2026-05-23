@@ -1,14 +1,1 @@
-.crew-editor {
-    max-width: 720px;
-}
-
-.page-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.5rem;
-}
-
-.page-header h1 {
-    margin: 0;
-}
+/* Styling consolidated into the global ".crew-editor" design system in atelier.css. */

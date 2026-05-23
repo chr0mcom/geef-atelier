@@ -2230,11 +2230,441 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
     cursor: pointer;
 }
 
-.crew-editor {
-    max-width: 720px;
+/* ══ Studio — Edit/Create step ════════════════════════════════ */
+.studio-edit {
+    max-width: 900px;
     margin: 0 auto;
-    padding: 40px 32px 80px;
+    padding-bottom: 7rem; /* room for sticky action bar */
 }
+
+.studio-edit > h2 {
+    margin: 0 0 0.35rem;
+    font-size: 1.5rem;
+}
+
+.edit-hint {
+    color: var(--ink-2);
+    font-size: 0.9375rem;
+    margin: 0 0 1.5rem;
+}
+
+/* Sections as cards */
+.edit-section {
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 1.25rem 1.35rem 1.1rem;
+    margin-bottom: 1.25rem;
+}
+
+.edit-section > h3 {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px solid var(--hairline-soft);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+
+.optional-label {
+    font-size: 0.75rem;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ink-3);
+}
+
+/* Slot row = the collapsible card + its action toolbar */
+.slot-row { margin-bottom: 0.85rem; }
+.slot-row .studio-slot { margin-bottom: 0; }
+
+.slot-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+}
+
+.slot-add-actions { margin-top: 0.5rem; }
+
+/* Collapsible slot card */
+.studio-slot {
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    background: var(--surface-2, var(--surface));
+    margin-bottom: 0.85rem;
+    overflow: hidden;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.studio-slot.is-open {
+    border-color: color-mix(in oklch, var(--hero) 35%, var(--hairline));
+    box-shadow: 0 1px 3px color-mix(in oklch, var(--ink) 8%, transparent);
+}
+.studio-slot--invalid {
+    border-color: color-mix(in oklch, var(--sv-critical) 55%, transparent) !important;
+}
+
+/* Header is a full-width clickable button */
+.studio-slot-header {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    width: 100%;
+    padding: 0.7rem 0.9rem;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: var(--ink);
+}
+.studio-slot-header:hover { background: color-mix(in oklch, var(--hero) 5%, transparent); }
+
+.slot-chevron {
+    color: var(--ink-3);
+    font-size: 0.7rem;
+    width: 0.8rem;
+    flex-shrink: 0;
+}
+
+.studio-slot-label {
+    font-weight: 600;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+}
+
+.slot-summary {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ink-2);
+    font-size: 0.875rem;
+}
+
+.slot-mode-pill {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding: 0.12rem 0.5rem;
+    border-radius: 999px;
+}
+.slot-mode-pill.is-existing {
+    background: color-mix(in oklch, var(--ink-3) 14%, transparent);
+    color: var(--ink-2);
+}
+.slot-mode-pill.is-new {
+    background: color-mix(in oklch, var(--hero) 16%, transparent);
+    color: var(--hero-deep, var(--hero));
+}
+
+.slot-invalid-dot {
+    flex-shrink: 0;
+    width: 1.05rem;
+    height: 1.05rem;
+    border-radius: 50%;
+    background: var(--sv-critical);
+    color: var(--on-hero, #fff);
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.05rem;
+    text-align: center;
+}
+
+.studio-slot-body {
+    padding: 0.9rem 0.9rem 1rem;
+    border-top: 1px solid var(--hairline-soft);
+}
+
+/* Segmented mode toggle */
+.studio-slot-toggle {
+    display: inline-flex;
+    margin-bottom: 1rem;
+    border: 1px solid var(--hairline-strong, var(--hairline));
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface);
+}
+.studio-slot-toggle .toggle-btn {
+    padding: 0.4rem 0.9rem;
+    border: none;
+    background: transparent;
+    color: var(--ink-2);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.studio-slot-toggle .toggle-btn + .toggle-btn { border-left: 1px solid var(--hairline-soft); }
+.studio-slot-toggle .toggle-btn.active {
+    background: var(--hero);
+    color: var(--on-hero, #fff);
+}
+
+/* Two-column field grid inside a create-new slot */
+.slot-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 1rem;
+}
+.slot-fields .field { margin-bottom: 0.9rem; }
+.slot-fields .field--full { grid-column: 1 / -1; }
+
+/* Reasoning hint boxes — subtle, not dominating */
+.field-reasoning {
+    margin-top: 0.35rem;
+    padding: 0.45rem 0.6rem;
+    background: color-mix(in oklch, var(--st-completed, var(--hero)) 8%, transparent);
+    border-left: 2px solid color-mix(in oklch, var(--st-completed, var(--hero)) 45%, transparent);
+    border-radius: 0 6px 6px 0;
+    font-size: 0.8rem;
+    color: var(--ink-2);
+    line-height: 1.45;
+}
+.field-reasoning.overall-reasoning {
+    background: color-mix(in oklch, var(--hero) 7%, transparent);
+    border-left-color: color-mix(in oklch, var(--hero) 45%, transparent);
+}
+
+/* Inputs/selects/textarea consistency inside slots, template section & all crew editors */
+.studio-edit select,
+.studio-edit textarea,
+.studio-slot select,
+.studio-slot textarea,
+.crew-editor select,
+.crew-editor textarea,
+.crew-editor input[type="text"],
+.crew-editor input[type="email"],
+.crew-editor input[type="number"],
+.crew-editor input[type="password"],
+.crew-editor input[type="url"] {
+    font-family: var(--font-ui);
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--hairline-soft);
+    border-radius: 6px;
+    padding: 10px 12px;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.18s, background 0.18s;
+}
+.studio-edit select:focus,
+.studio-edit textarea:focus,
+.studio-slot select:focus,
+.studio-slot textarea:focus,
+.crew-editor select:focus,
+.crew-editor textarea:focus,
+.crew-editor input:focus { border-color: var(--hero); background: var(--surface-2); }
+.crew-editor input:disabled,
+.crew-editor select:disabled,
+.crew-editor textarea:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: color-mix(in oklch, var(--ink-3) 6%, var(--surface));
+}
+
+.checkbox-field label {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--ink);
+    cursor: pointer;
+}
+.checkbox-field input[type="checkbox"] {
+    width: 1rem; height: 1rem; accent-color: var(--hero); cursor: pointer;
+}
+
+.validation-error {
+    color: var(--sv-critical);
+    font-size: 0.78rem;
+}
+.validation-panel {
+    margin: 1rem 0;
+    padding: 0.75rem 1rem;
+    background: color-mix(in oklch, var(--sv-critical) 10%, transparent);
+    border: 1px solid color-mix(in oklch, var(--sv-critical) 40%, transparent);
+    border-radius: 8px;
+    color: var(--sv-critical);
+    font-size: 0.875rem;
+}
+
+/* Small ghost buttons used for slot actions */
+.btn.btn-sm {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.78rem;
+}
+.btn.btn-sm.danger { color: var(--sv-critical); }
+.btn.btn-sm.danger:hover { background: color-mix(in oklch, var(--sv-critical) 12%, transparent); }
+
+/* Sticky action bar always reachable */
+.edit-actions {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    gap: 0.75rem;
+    padding: 1rem 0.25rem;
+    margin-top: 1rem;
+    background: linear-gradient(to top, var(--bg) 70%, transparent);
+    z-index: 5;
+}
+
+.crew-editor {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 32px 96px;
+}
+
+/* ══ Crew editors — unified design (applies to every /crew editor) ══ */
+
+/* The form body is a clean card panel… */
+.crew-editor form {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    padding: 1.5rem 1.5rem 0.5rem;
+}
+/* …unless the editor already groups its content into .edit-section cards,
+   in which case the form is transparent and the sections are the cards. */
+.crew-editor form:has(.edit-section) {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+.crew-editor .field { margin-bottom: 1.1rem; }
+.crew-editor .field > small,
+.crew-editor .form-hint,
+.crew-editor .field-hint {
+    font-size: 0.8rem;
+    color: var(--ink-3);
+    line-height: 1.45;
+}
+
+/* Opt-in two-column field grid */
+.field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 1rem;
+}
+.field-grid .field--full { grid-column: 1 / -1; }
+
+/* Checkboxes & inline checkbox labels */
+.crew-editor input[type="checkbox"] {
+    width: 1rem; height: 1rem; accent-color: var(--hero); cursor: pointer;
+}
+.form-checkbox-label,
+.crew-editor .checkbox-field label {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+/* Radio groups (evaluation strategy, advisor mode/trigger) */
+.crew-editor .radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+.crew-editor .radio-option {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--hairline-soft);
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 400;
+    font-size: 0.875rem;
+    transition: border-color 0.15s, background 0.15s;
+}
+.crew-editor .radio-option:hover { border-color: var(--hairline-strong, var(--hairline)); }
+.crew-editor .radio-option:has(input:checked) {
+    border-color: var(--hero);
+    background: color-mix(in oklch, var(--hero) 7%, transparent);
+}
+.crew-editor .radio-option input[type="radio"] { accent-color: var(--hero); }
+.crew-editor .radio-option .radio-description {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--ink-3);
+    margin-top: 0.1rem;
+}
+
+/* Collapsible "Advanced" sections */
+.crew-editor .collapsible-section {
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    margin: 1.25rem 0;
+    background: var(--surface-2, var(--surface));
+}
+.crew-editor .collapsible-header {
+    padding: 0.7rem 0.95rem;
+    cursor: pointer;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.crew-editor .collapsible-header::-webkit-details-marker { display: none; }
+.crew-editor .collapsible-header::before {
+    content: "▸"; color: var(--ink-3); font-size: 0.7rem; transition: transform 0.15s;
+}
+.crew-editor .collapsible-section[open] .collapsible-header::before { transform: rotate(90deg); }
+.crew-editor .collapsible-body { padding: 0.25rem 0.95rem 0.6rem; border-top: 1px solid var(--hairline-soft); }
+
+/* Validation summary from EditForm */
+.crew-editor .validation-summary,
+.crew-editor .validation-errors {
+    margin: 0 0 1rem;
+    padding: 0.7rem 0.95rem;
+    list-style: none;
+    background: color-mix(in oklch, var(--sv-critical) 10%, transparent);
+    border: 1px solid color-mix(in oklch, var(--sv-critical) 40%, transparent);
+    border-radius: 8px;
+    color: var(--sv-critical);
+    font-size: 0.85rem;
+}
+.crew-editor .validation-message { color: var(--sv-critical); font-size: 0.78rem; }
+
+/* Sticky action footer — always reachable */
+.crew-editor .editor-actions,
+.crew-editor .form-actions {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin: 1.5rem 0 0;
+    padding: 0.9rem 0;
+    background: linear-gradient(to top, var(--bg) 72%, transparent);
+    z-index: 5;
+}
+.crew-editor .btn.danger {
+    margin-left: auto;
+    color: var(--sv-critical);
+}
+.crew-editor .btn.danger:hover { background: color-mix(in oklch, var(--sv-critical) 12%, transparent); }
 
 .crew-index h1 {
     margin-bottom: 1.5rem;
