@@ -1128,3 +1128,27 @@ The naive approach (unfiltered self-RAG) was deliberately rejected: it leads to 
 **What is NOT in this step:** unfiltered auto-write (always through the gate); writing to the curated KB; analytics/insights dashboard; write-side learning dedup; learning expiry; cross-user/global learnings; multi-hop learning; backfill of historical runs.
 
 **Tests:** 1439 total. New: ~57 tests — `LearningRunDoesNotTriggerLearningRunTests` (3), `RunKindTests` (5), `LearningStatusTests` (3), `LearningEntryTests` (4), `LearningExtractThresholdTests` (6), `LearningExtractFireAndForgetTests` (4), `LearningPublisherApprovedTests` (5), `LearningPublisherRejectedTests` (3), `LearningRetrieverDomainBoostTests` (8), `LearningRetrieverCapTests` (3), `LearningsManagementTests` (bUnit, 13).
+
+---
+
+## 23 May 2026 — Bugfix Learning-Retrieval-Provider (D-055)
+
+### D-055: Bugfix — Continuous-Learning-Loop vollständig schließen
+
+*Branch: `fix/learning-retrieval-provider` / PR #30*
+
+Der in D-054 gebaute Loop war produktiv wirkungslos: `learning-retriever-default` erschien nicht in der Provider-Liste. Diagnose ergab zwei unabhängige Ursachen:
+
+**Ursache 1 — lautloses Wegfiltern (Hauptursache):** `ListGroundingProviderProfilesAsync` gibt `[.. SystemCrew-Konstanten, .. DB-Zeilen-mit-IsSystem==false]` zurück. `learning-retriever-default` hatte `IsSystem=true` in der DB, fehlte aber in `SystemCrew.GroundingProviderProfiles` — es fiel durch beide Siebe ohne Fehlermeldung.
+
+**Ursache 2 — fehlende DI-Registrierung:** `LearningRetrievalGroundingProvider` war nicht in `GroundingServiceExtensions.AddGroundingProviders` registriert. Die Factory hätte bei Laufzeit `InvalidOperationException` geworfen.
+
+**Fix:**
+- `SystemCrew.cs`: `LearningRetrieverDefaultProfile` als Code-Konstante + Eintrag in `GroundingProviderProfiles`-Dictionary.
+- `GroundingServiceExtensions.cs`: `services.AddSingleton<IGroundingProvider, LearningRetrievalGroundingProvider>()` ergänzt.
+- `CrewService.cs`: `ILogger<CrewService>` + Warning-Log wenn DB-System-Profile nicht in `SystemCrew` tracking → verhindert Wiederholung der Fehlerklasse.
+- **Keine neue Migration** — das Profil existierte korrekt in der DB (Step30 lief).
+
+**Mitbehobene D-054-Fehler:** `learning-extractor` war fälschlicherweise in alle vier Standard-Templates (Klassik/Juristisch/Akademisch/Marketing) eingetragen; entfernt (Finalizer ist opt-in). Regressions-Test-Guard `SystemTemplates_HaveNoFinalizers` war deshalb rot. `FinalizerProfiles`-Count-Test auf 19 aktualisiert.
+
+**Tests:** 1528 grün. New: 13 Regressions-Tests (`LearningRetrievalProviderResolutionTests` 8, `LearningRetrievalProviderListingTests` 5) — hätten D-055 verhindert.

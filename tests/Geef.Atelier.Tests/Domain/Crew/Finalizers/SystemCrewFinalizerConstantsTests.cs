@@ -4,15 +4,15 @@ using Geef.Atelier.Core.Domain.Crew.Finalizers;
 namespace Geef.Atelier.Tests.Domain.Crew.Finalizers;
 
 /// <summary>
-/// Verifies SystemCrew exposes all 17 finalizer profiles as documented and
+/// Verifies SystemCrew exposes all 19 finalizer profiles as documented and
 /// that the FinalizerProfiles dictionary is coherent.
 /// </summary>
 public sealed class SystemCrewFinalizerConstantsTests
 {
     [Fact]
-    public void FinalizerProfiles_Contains17Entries()
+    public void FinalizerProfiles_Contains19Entries()
     {
-        Assert.Equal(17, SystemCrew.FinalizerProfiles.Count);
+        Assert.Equal(19, SystemCrew.FinalizerProfiles.Count);
     }
 
     [Theory]

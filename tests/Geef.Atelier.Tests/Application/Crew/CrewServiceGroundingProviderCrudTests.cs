@@ -90,7 +90,8 @@ public sealed class CrewServiceGroundingProviderCrudTests
             new InMemoryAdvisorProfileRepository(),
             groundingRepo ?? new InMemoryGroundingProviderProfileRepository(),
             new InMemoryFinalizerProfileRepository(),
-            new InMemoryCrewTemplateRepository());
+            new InMemoryCrewTemplateRepository(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<CrewService>.Instance);
 
     private static GroundingProviderProfile BuildProfile(string name) => new(
         Name: name,

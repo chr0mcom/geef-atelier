@@ -4,6 +4,7 @@ using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Persistence.Crew;
+using Microsoft.Extensions.Logging;
 
 namespace Geef.Atelier.Application.Crew;
 
@@ -13,7 +14,8 @@ internal sealed class CrewService(
     IAdvisorProfileRepository advisorRepo,
     IGroundingProviderProfileRepository groundingRepo,
     IFinalizerProfileRepository finalizerRepo,
-    ICrewTemplateRepository templateRepo) : ICrewService
+    ICrewTemplateRepository templateRepo,
+    ILogger<CrewService> logger) : ICrewService
 {
     private const string ReadOnlyMessage = "System profile is read-only — copy it as a custom variant.";
     private const string ReadOnlyAdvisorMessage = "System advisor profile is read-only — copy it as a custom variant.";
@@ -149,6 +151,13 @@ internal sealed class CrewService(
         var customOnly = dbProfiles.Where(p => !p.IsSystem).ToList();
         if (!includeSystem)
             return customOnly;
+
+        // Warn about DB system profiles not tracked by SystemCrew — these would otherwise be silently dropped.
+        foreach (var orphan in dbProfiles.Where(p => p.IsSystem && !SystemCrew.GroundingProviderProfiles.ContainsKey(p.Name)))
+            logger.LogWarning(
+                "Grounding-provider profile '{Name}' (type '{Type}') is marked IsSystem in the database but is not registered in SystemCrew.GroundingProviderProfiles. It will not appear in listings. Add it as a code constant to make it visible.",
+                orphan.Name, orphan.ProviderType);
+
         var system = SystemCrew.GroundingProviderProfiles.Values.ToList();
         return [.. system, .. customOnly];
     }
