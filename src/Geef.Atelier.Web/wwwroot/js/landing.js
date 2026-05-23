@@ -34,8 +34,10 @@
         filmVideo.controls = true;
       });
 
-      // Language toggle — swap source + poster, reset to the poster state
-      var langBtns = filmStage.querySelectorAll('.lp-film-lang');
+      // Language toggle — swap source + poster, reset to the poster state.
+      // The buttons live in .lp-film-frame, a sibling wrapper above the stage.
+      var filmScope = filmStage.closest('.lp-film-frame') || document;
+      var langBtns = filmScope.querySelectorAll('.lp-film-lang');
       var filmSource = filmVideo.querySelector('source');
       langBtns.forEach(function (btn) {
         btn.addEventListener('click', function () {

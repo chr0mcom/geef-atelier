@@ -206,6 +206,17 @@ public sealed class LandingPageTests : TestContext
         Assert.Equal("media/geef-film-de-poster.jpg", video.GetAttribute("data-poster-de"));
     }
 
+    [Fact]
+    public void LandingFilm_LangButtonsAndStageShareTheFrame()
+    {
+        // landing.js scopes the language toggle to the .lp-film-frame ancestor of
+        // the stage; the buttons must live in that same frame or the toggle is dead.
+        var cut = RenderComponent<LandingFilm>();
+        var frame = cut.Find(".lp-film-frame");
+        Assert.NotNull(frame.QuerySelector(".lp-film-langs .lp-film-lang"));
+        Assert.NotNull(frame.QuerySelector(".lp-film-stage .lp-film-video"));
+    }
+
     // ── Closing ──────────────────────────────────────────────────────────
 
     [Fact]
