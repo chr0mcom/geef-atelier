@@ -4,6 +4,7 @@
 @using Geef.Atelier.Application.Crew
 @using Geef.Atelier.Core.Domain.Crew
 @using Geef.Atelier.Core.Domain.Crew.Advisors
+@using Geef.Atelier.Core.Domain.Crew.Finalizers
 @using Geef.Atelier.Core.Domain.Crew.Grounding
 @using Geef.Atelier.Core.Domain.Crew.Profiles
 @using Geef.Atelier.Infrastructure.Configuration
@@ -111,6 +112,28 @@
                 }
             </dd>
 
+            <dt>Finalizers</dt>
+            <dd data-testid="detail-finalizers">
+                @if (_template.FinalizerProfileNames.Count == 0)
+                {
+                    <span class="text-muted">—</span>
+                }
+                else
+                {
+                    <ul class="profile-chips">
+                        @foreach (var fName in _template.FinalizerProfileNames)
+                        {
+                            <li class="profile-chip">
+                                @(_finalizers.TryGetValue(fName, out var f) ? f.DisplayName : fName)
+                            </li>
+                        }
+                    </ul>
+                }
+            </dd>
+
+            <dt>Finalizers on Max Attempts</dt>
+            <dd data-testid="detail-finalizers-on-max-attempts">@(_template.RunFinalizersOnMaxAttempts ? "Yes" : "No")</dd>
+
             @{
                 var co = _template.ConvergenceOverride;
                 var d = ConvergenceOpts.Value;
@@ -162,6 +185,7 @@
     private Dictionary<string, ExecutorProfile> _executors = [];
     private Dictionary<string, AdvisorProfile> _advisors = [];
     private Dictionary<string, GroundingProviderProfile> _groundingProviders = [];
+    private Dictionary<string, FinalizerProfile> _finalizers = [];
     private bool _loading = true;
     private bool _duplicating;
     private string? _error;
@@ -173,15 +197,17 @@
         if (_template is null) { Nav.NavigateTo("/crew/templates"); return; }
         if (!_template.IsSystem) { Nav.NavigateTo($"/crew/templates/{Uri.EscapeDataString(Name)}"); return; }
 
-        var reviewerList = await CrewService.ListReviewerProfilesAsync(includeSystem: true);
-        var executorList = await CrewService.ListExecutorProfilesAsync(includeSystem: true);
-        var advisorList  = await CrewService.ListAdvisorProfilesAsync(includeSystem: true);
-        var groundingList = await CrewService.ListGroundingProviderProfilesAsync(includeSystem: true);
+        var reviewerList   = await CrewService.ListReviewerProfilesAsync(includeSystem: true);
+        var executorList   = await CrewService.ListExecutorProfilesAsync(includeSystem: true);
+        var advisorList    = await CrewService.ListAdvisorProfilesAsync(includeSystem: true);
+        var groundingList  = await CrewService.ListGroundingProviderProfilesAsync(includeSystem: true);
+        var finalizerList  = await CrewService.ListFinalizerProfilesAsync(includeSystem: true);
 
-        _reviewers         = reviewerList.ToDictionary(r => r.Name);
-        _executors         = executorList.ToDictionary(e => e.Name);
-        _advisors          = advisorList.ToDictionary(a => a.Name);
+        _reviewers          = reviewerList.ToDictionary(r => r.Name);
+        _executors          = executorList.ToDictionary(e => e.Name);
+        _advisors           = advisorList.ToDictionary(a => a.Name);
         _groundingProviders = groundingList.ToDictionary(g => g.Name);
+        _finalizers         = finalizerList.ToDictionary(f => f.Name);
 
         _loading = false;
     }

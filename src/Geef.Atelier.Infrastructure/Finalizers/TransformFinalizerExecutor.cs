@@ -78,7 +78,7 @@ internal sealed class TransformFinalizerExecutor(
             updatedText = response.Text;
             inputTokens = response.TokenUsage.InputTokens;
             outputTokens = response.TokenUsage.OutputTokens;
-            costEur = pricingCatalog.CalculateCostEur(model, inputTokens, outputTokens);
+            costEur = pricingCatalog.CalculateCostEur(model, inputTokens, outputTokens, settings.Provider);
 
             logger.LogInformation(
                 "Transform finalizer {Profile} completed: {In}→{Out} tokens, model={Model}",

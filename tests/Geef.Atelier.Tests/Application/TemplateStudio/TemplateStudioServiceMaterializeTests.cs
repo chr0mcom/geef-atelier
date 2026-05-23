@@ -213,6 +213,8 @@ public sealed class TemplateStudioServiceMaterializeTests
             repo,
             similarityService,
             new NoopAtomicTransactionFactory(),
+            new FakeStudioSettingsService(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<TemplateStudioService>.Instance,
             opts);
     }
 

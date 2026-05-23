@@ -9,6 +9,7 @@ using Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge;
 using Geef.Atelier.Infrastructure.Persistence.Crew.Learning;
 using Geef.Atelier.Infrastructure.Persistence.Providers;
 using Geef.Atelier.Infrastructure.Persistence.SiteSettings;
+using Geef.Atelier.Infrastructure.Persistence.StudioSettings;
 using Geef.Atelier.Infrastructure.Persistence.TemplateStudio;
 using Microsoft.EntityFrameworkCore;
 
@@ -50,6 +51,8 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     internal DbSet<ProviderEntity> Providers => Set<ProviderEntity>();
 
     internal DbSet<SiteSettingsEntity> SiteSettings => Set<SiteSettingsEntity>();
+
+    internal DbSet<StudioSettingsEntity> StudioSettings => Set<StudioSettingsEntity>();
 
     internal DbSet<OAuthClient> OAuthClients => Set<OAuthClient>();
     internal DbSet<OAuthAuthorizationCode> OAuthAuthorizationCodes => Set<OAuthAuthorizationCode>();

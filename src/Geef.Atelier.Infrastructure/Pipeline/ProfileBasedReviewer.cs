@@ -52,7 +52,7 @@ internal sealed class ProfileBasedReviewer(
         if (costAccumulator is not null)
         {
             var costEur = pricingCatalog?.CalculateCostEur(
-                model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens);
+                model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, profile.Provider);
             costAccumulator.RecordActorCost(
                 iter, ActorType.Reviewer, profile.Name, model,
                 response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur,

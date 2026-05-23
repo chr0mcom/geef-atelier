@@ -457,3 +457,6 @@ CLAUDE.md
 *.msix
 *.msm
 *.msp
+
+# Local-only compose override (provider API key passthrough — never commit)
+docker-compose.override.yml

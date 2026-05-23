@@ -62,9 +62,9 @@ ANTI-PATTERNS (do NOT flag as critical or major):
 • Domain terminology that you personally would phrase differently → info
 
 Respond in the language of the briefing. List each finding as: [SEVERITY] <short title> — <one-sentence explanation>.',
-    'openrouter',
-    'openai/gpt-4.1',
-    2048,
+    'codex-cli',
+    'gpt-5.4-mini',
+    20000,
     true
 ),
 (
@@ -86,9 +86,9 @@ ANTI-PATTERNS (do NOT flag as critical or major):
 • A domain-specific insight that is obvious within that domain but not across domains → info
 
 Respond in the language of the briefing. List each finding as: [SEVERITY] <short title> — <one-sentence explanation>.',
-    'openrouter',
-    'google/gemini-2.5-pro',
-    2048,
+    'google-ai-studio',
+    'gemini-3.5-flash',
+    20000,
     true
 ),
 (
@@ -110,9 +110,9 @@ ANTI-PATTERNS (do NOT flag as critical or major):
 • A learning that is probabilistic rather than deterministic → minor at most
 
 Respond in the language of the briefing. List each finding as: [SEVERITY] <short title> — <one-sentence explanation>.',
-    'anthropic',
-    'claude-opus-4-7',
-    2048,
+    'claude-cli',
+    'claude-haiku-4.5',
+    20000,
     true
 )
 ON CONFLICT (""Name"") DO NOTHING;

@@ -15,9 +15,12 @@
         <div class="lp-container">
             <div class="legal-content">
                 <h1>Datenschutzerklärung</h1>
-                <p class="legal-disclaimer">
-                    ⚠️ <em>Vorlagen-Gerüst — kein Rechtsrat. Der Betreiber muss diese Datenschutzerklärung an die tatsächlichen Datenverarbeitungen (Auth-Cookies, LLM-Provider, Tavily/Grounding-Dienste, Hosting) anpassen und vor dem Live-Gang rechtlich prüfen lassen.</em>
-                </p>
+                @if (!_settings.LegalBoilerplateAccepted)
+                {
+                    <p class="legal-disclaimer">
+                        ⚠️ <em>Vorlagen-Gerüst — kein Rechtsrat. Der Betreiber muss diese Datenschutzerklärung an die tatsächlichen Datenverarbeitungen (Auth-Cookies, LLM-Provider, Tavily/Grounding-Dienste, Hosting) anpassen und vor dem Live-Gang rechtlich prüfen lassen.</em>
+                    </p>
+                }
 
                 <section>
                     <h2>1. Verantwortlicher</h2>

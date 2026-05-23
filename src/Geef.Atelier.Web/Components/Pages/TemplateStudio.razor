@@ -2,9 +2,12 @@
 @rendermode InteractiveServer
 @attribute [Authorize]
 @using Geef.Atelier.Application.Crew.TemplateStudio
+@using Geef.Atelier.Application.Providers
 @using Geef.Atelier.Core.Domain.Crew.TemplateStudio
+@using Geef.Atelier.Core.Domain.Providers
 @using Microsoft.Extensions.Options
 @inject ITemplateStudioService StudioService
+@inject IProviderService ProviderService
 @inject NavigationManager Nav
 
 <PageTitle>Crew Studio — Atelier</PageTitle>
@@ -15,41 +18,54 @@
         <p class="studio-subtitle">Beschreibe eine Aufgabe und lass die KI eine Crew-Konfiguration vorschlagen.</p>
     </div>
 
-    @switch (_step)
+    @if (!_loaded)
     {
-        case StudioStep.TaskInput:
-            <StudioTaskInputStep
-                TaskDescription="@_taskDescription"
-                TaskDescriptionChanged="@(v => _taskDescription = v)"
-                OnAnalyze="StartAnalysisAsync" />
-            <hr class="section-divider" style="margin: 2rem 0;" />
-            <StudioAnalysisHistoryList OnReAnalyze="HandleReAnalyze" />
-            break;
+        <p>Loading…</p>
+    }
+    else
+    {
+        switch (_step)
+        {
+            case StudioStep.TaskInput:
+                <StudioTaskInputStep
+                    TaskDescription="@_taskDescription"
+                    TaskDescriptionChanged="@(v => _taskDescription = v)"
+                    Providers="_providers"
+                    InitialProvider="@_defaultProvider"
+                    InitialModel="@_defaultModel"
+                    InitialMaxTokens="@_defaultMaxTokens"
+                    SaveAsDefault="@_saveAsDefault"
+                    SaveAsDefaultChanged="@(v => _saveAsDefault = v)"
+                    OnAnalyze="StartAnalysisAsync" />
+                <hr class="section-divider" style="margin: 2rem 0;" />
+                <StudioAnalysisHistoryList OnReAnalyze="HandleReAnalyze" />
+                break;
 
-        case StudioStep.Analyzing:
-            <StudioAnalyzingStep />
-            break;
+            case StudioStep.Analyzing:
+                <StudioAnalyzingStep Status="@_analyzeStatus" Provider="@_provider" Model="@_model" />
+                break;
 
-        case StudioStep.Review:
-            <StudioReviewStep
-                Analysis="@(_analysis!)"
-                OnUseExistingTemplate="UseExistingTemplate"
-                OnProceedToEdit="GoToEdit"
-                OnRestart="Restart" />
-            break;
+            case StudioStep.Review:
+                <StudioReviewStep
+                    Analysis="@(_analysis!)"
+                    OnUseExistingTemplate="UseExistingTemplate"
+                    OnProceedToEdit="GoToEdit"
+                    OnRestart="Restart" />
+                break;
 
-        case StudioStep.Edit:
-            <StudioEditStep
-                Analysis="@(_analysis!)"
-                OnSave="MaterializeAsync"
-                OnBack="BackToReview" />
-            break;
+            case StudioStep.Edit:
+                <StudioEditStep
+                    Analysis="@(_analysis!)"
+                    OnSave="MaterializeAsync"
+                    OnBack="BackToReview" />
+                break;
 
-        case StudioStep.Confirmation:
-            <StudioConfirmationStep
-                Result="@(_materializationResult!)"
-                OnStartRun="StartRunWithTemplate" />
-            break;
+            case StudioStep.Confirmation:
+                <StudioConfirmationStep
+                    Result="@(_materializationResult!)"
+                    OnStartRun="StartRunWithTemplate" />
+                break;
+        }
     }
 
     @if (!string.IsNullOrEmpty(_error))
@@ -67,15 +83,52 @@
     private MaterializationResult? _materializationResult;
     private string? _error;
 
-    private async Task StartAnalysisAsync()
+    private string _defaultProvider = "";
+    private string _defaultModel = "";
+    private int _defaultMaxTokens = 8192;
+    private bool _saveAsDefault;
+    private bool _loaded;
+    private IReadOnlyList<Provider> _providers = [];
+
+    // Live state shown on the Analyzing step.
+    private string _provider = "";
+    private string _model = "";
+    private string _analyzeStatus = "";
+
+    // Load the default model and provider list sequentially on the shared scoped DbContext
+    // BEFORE rendering child components, so no two components touch the context concurrently.
+    protected override async Task OnInitializedAsync()
+    {
+        var defaults = await StudioService.GetEffectiveDefaultAsync();
+        _defaultProvider = defaults.Provider;
+        _defaultModel = defaults.Model;
+        _defaultMaxTokens = defaults.MaxTokens > 0 ? defaults.MaxTokens : 8192;
+        _providers = await ProviderService.ListAsync(includeInactive: false);
+        _loaded = true;
+    }
+
+    private async Task StartAnalysisAsync(StudioModelChoice choice)
     {
         if (string.IsNullOrWhiteSpace(_taskDescription)) return;
         _error = null;
+        _provider = choice.Provider;
+        _model = choice.Model;
+        _analyzeStatus = "Analyse wird gestartet…";
         _step = StudioStep.Analyzing;
         StateHasChanged();
         try
         {
-            _analysis = await StudioService.AnalyzeAsync(_taskDescription);
+            if (_saveAsDefault)
+                await StudioService.SaveDefaultAsync(choice);
+
+            // IProgress marshals back to the circuit; update the status text live as phases report.
+            var progress = new Progress<string>(msg =>
+            {
+                _analyzeStatus = msg;
+                InvokeAsync(StateHasChanged);
+            });
+
+            _analysis = await StudioService.AnalyzeAsync(_taskDescription, choice, progress);
             _step = StudioStep.Review;
         }
         catch (Exception ex)

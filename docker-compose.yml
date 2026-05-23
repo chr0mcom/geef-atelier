@@ -49,6 +49,7 @@ services:
       - "com.centurylinklabs.watchtower.enable=false"
     volumes:
       - geef-atelier-exports:/app/exports
+      - geef-atelier-dpkeys:/app/dataprotection-keys
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -143,3 +144,4 @@ volumes:
   geef-atelier-backups:
   geef-atelier-cli-auth:
   geef-atelier-exports:
+  geef-atelier-dpkeys:

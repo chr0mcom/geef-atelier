@@ -1,3 +1,6 @@
+@using Geef.Atelier.Application.Crew.TemplateStudio
+@using Geef.Atelier.Core.Domain.Providers
+
 <div class="studio-task-input" data-testid="studio-task-input-step">
     <div class="field">
         <label for="task-description">Task description</label>
@@ -10,10 +13,61 @@
                   class="task-textarea"></textarea>
         <small class="cost-hint">~€0.02–0.05 per analysis</small>
     </div>
+
+    <details class="studio-model-section" data-testid="studio-model-section">
+        <summary class="studio-model-summary">
+            <span class="studio-model-summary-label">Analysis model</span>
+            <span class="studio-model-summary-value" data-testid="studio-model-summary-value">
+                @(string.IsNullOrEmpty(_provider) ? "default" : _provider) · @(string.IsNullOrEmpty(_model) ? "default" : _model)
+            </span>
+        </summary>
+
+        <div class="studio-model-body">
+            <div class="field">
+                <label>Provider</label>
+                <InputSelect @bind-Value="_provider" data-testid="studio-provider-select">
+                    <optgroup label="HTTP Providers">
+                        @foreach (var p in Providers.Where(p => p.Type == ProviderType.Http && p.IsActive))
+                        {
+                            <option value="@p.Name">@p.DisplayName</option>
+                        }
+                    </optgroup>
+                    <optgroup label="CLI Providers">
+                        @foreach (var p in Providers.Where(p => p.Type == ProviderType.Cli && p.IsActive))
+                        {
+                            <option value="@p.Name">@p.DisplayName</option>
+                        }
+                    </optgroup>
+                </InputSelect>
+                <small class="field-hint">OpenRouter is billed per token. Claude-CLI and Codex-CLI use a local subscription.</small>
+            </div>
+
+            <div class="field">
+                <label>Model</label>
+                <ModelSelector Provider="@_provider"
+                               @bind-Value="_model"
+                               DataTestId="studio-model-selector" />
+            </div>
+
+            <div class="field">
+                <label for="studio-max-tokens">Max Tokens</label>
+                <InputNumber id="studio-max-tokens" @bind-Value="_maxTokens"
+                             class="studio-max-tokens-input" data-testid="studio-max-tokens-input" />
+                <small class="field-hint">Higher values allow richer proposals but cost more. Default is 8192.</small>
+            </div>
+
+            <label class="studio-save-default" data-testid="studio-save-default-label">
+                <input type="checkbox" checked="@_saveAsDefault" @onchange="OnSaveAsDefaultChanged"
+                       data-testid="studio-save-default-checkbox" />
+                <span>Als Standard für künftige Analysen speichern</span>
+            </label>
+        </div>
+    </details>
+
     <div class="studio-actions">
         <button type="button" class="btn primary"
                 disabled="@(string.IsNullOrWhiteSpace(TaskDescription))"
-                @onclick="OnAnalyze"
+                @onclick="HandleAnalyze"
                 data-testid="analyze-button">
             Analyze
         </button>
@@ -23,11 +77,51 @@
 @code {
     [Parameter] public string TaskDescription { get; set; } = "";
     [Parameter] public EventCallback<string> TaskDescriptionChanged { get; set; }
-    [Parameter] public EventCallback OnAnalyze { get; set; }
+
+    /// <summary>Available providers for the dropdown. Supplied by the parent (loaded there to avoid
+    /// concurrent DbContext access during component initialization).</summary>
+    [Parameter] public IReadOnlyList<Provider> Providers { get; set; } = [];
+
+    /// <summary>Seed values for the model controls (the effective default). Applied once.</summary>
+    [Parameter] public string InitialProvider { get; set; } = "";
+    [Parameter] public string InitialModel { get; set; } = "";
+    [Parameter] public int InitialMaxTokens { get; set; } = 8192;
+
+    /// <summary>Invoked when the user clicks Analyze. Carries the selected provider/model/max-tokens.</summary>
+    [Parameter] public EventCallback<StudioModelChoice> OnAnalyze { get; set; }
+
+    /// <summary>True when the user wants the current selection persisted as the new default.</summary>
+    [Parameter] public bool SaveAsDefault { get; set; }
+    [Parameter] public EventCallback<bool> SaveAsDefaultChanged { get; set; }
+
+    private string _provider = "";
+    private string _model = "";
+    private int _maxTokens = 8192;
+    private bool _saveAsDefault;
+    private bool _seeded;
+
+    protected override void OnParametersSet()
+    {
+        if (_seeded) return;
+        _provider = InitialProvider;
+        _model = InitialModel;
+        _maxTokens = InitialMaxTokens > 0 ? InitialMaxTokens : 8192;
+        _saveAsDefault = SaveAsDefault;
+        _seeded = true;
+    }
 
     private async Task HandleInput(ChangeEventArgs e)
     {
         TaskDescription = e.Value?.ToString() ?? "";
         await TaskDescriptionChanged.InvokeAsync(TaskDescription);
     }
+
+    private async Task OnSaveAsDefaultChanged(ChangeEventArgs e)
+    {
+        _saveAsDefault = e.Value is true;
+        await SaveAsDefaultChanged.InvokeAsync(_saveAsDefault);
+    }
+
+    private async Task HandleAnalyze()
+        => await OnAnalyze.InvokeAsync(new StudioModelChoice(_provider, _model, _maxTokens));
 }

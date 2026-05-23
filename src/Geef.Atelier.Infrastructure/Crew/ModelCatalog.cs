@@ -118,6 +118,9 @@ internal sealed class ModelCatalog(
     {
         try
         {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(10));
+
             var http = httpClientFactory.CreateClient(HttpClientNames.Llm);
             using var request = new HttpRequestMessage(HttpMethod.Get, modelsUrl);
 
@@ -134,11 +137,11 @@ internal sealed class ModelCatalog(
             foreach (var (header, value) in settings.DefaultHeaders)
                 request.Headers.TryAddWithoutValidation(header, value);
 
-            using var response = await http.SendAsync(request, ct);
+            using var response = await http.SendAsync(request, timeoutCts.Token);
             response.EnsureSuccessStatusCode();
 
-            using var stream = await response.Content.ReadAsStreamAsync(ct);
-            var root = await JsonSerializer.DeserializeAsync<ModelListResponse>(stream, JsonOpts, ct);
+            using var stream = await response.Content.ReadAsStreamAsync(timeoutCts.Token);
+            var root = await JsonSerializer.DeserializeAsync<ModelListResponse>(stream, JsonOpts, timeoutCts.Token);
             if (root?.Data is not { Count: > 0 } data)
                 return null;
 
@@ -161,6 +164,13 @@ internal sealed class ModelCatalog(
             _fallbackFlags[providerName] = false;
             logger.LogInformation("ModelCatalog: fetched {Count} models for '{Provider}'.", models.Count, providerName);
             return models;
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Timed out (not cancelled by caller) — fall back silently.
+            logger.LogWarning("ModelCatalog: timeout fetching models for '{Provider}' from {Url}; will use fallback.",
+                providerName, modelsUrl);
+            return null;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

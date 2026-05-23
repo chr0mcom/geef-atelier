@@ -1,5 +1,44 @@
+@implements IDisposable
+@using System.Timers
+
 <div class="studio-analyzing" data-testid="studio-analyzing-step">
     <div class="analyzing-spinner" aria-label="Analyzing"></div>
-    <p>Analyzing your task…</p>
-    <small>This may take 5–15 seconds.</small>
+    <p class="analyzing-status" data-testid="studio-analyzing-status">
+        @(string.IsNullOrWhiteSpace(Status) ? "Analyse wird vorbereitet…" : Status)
+    </p>
+    <p class="analyzing-meta">
+        @if (!string.IsNullOrWhiteSpace(Provider) || !string.IsNullOrWhiteSpace(Model))
+        {
+            <span class="analyzing-model" data-testid="studio-analyzing-model">@Provider / @Model</span>
+        }
+        <span class="analyzing-elapsed" data-testid="studio-analyzing-elapsed">@_elapsed s</span>
+    </p>
+    <small>Modell-Katalog wird gesammelt, dann antwortet die Meta-KI (i. d. R. 10–40 s).</small>
 </div>
+
+@code {
+    [Parameter] public string? Status { get; set; }
+    [Parameter] public string? Provider { get; set; }
+    [Parameter] public string? Model { get; set; }
+
+    private int _elapsed;
+    private Timer? _timer;
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(1000);
+        _timer.Elapsed += async (_, _) =>
+        {
+            _elapsed++;
+            await InvokeAsync(StateHasChanged);
+        };
+        _timer.AutoReset = true;
+        _timer.Start();
+    }
+
+    public void Dispose()
+    {
+        _timer?.Stop();
+        _timer?.Dispose();
+    }
+}

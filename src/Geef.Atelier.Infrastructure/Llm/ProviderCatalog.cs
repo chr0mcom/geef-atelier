@@ -16,9 +16,16 @@ internal sealed class ProviderCatalog(IServiceScopeFactory scopeFactory) : IProv
         if (cached is not null && DateTimeOffset.UtcNow < cached.Expiry)
             return cached.Items;
 
-        using var scope = scopeFactory.CreateScope();
-        var service = scope.ServiceProvider.GetRequiredService<IProviderService>();
-        var providers = service.ListAsync(includeInactive: false).GetAwaiter().GetResult();
+        // Offload to the thread pool: callers may run on a single-threaded SynchronizationContext
+        // (e.g. a Blazor Server circuit). Calling the async API with .GetResult() directly there
+        // deadlocks, because the awaited continuation needs the very thread that is blocked here.
+        // Task.Run executes without the captured context, so the continuation resumes on a pool thread.
+        var providers = Task.Run(async () =>
+        {
+            using var scope = scopeFactory.CreateScope();
+            var service = scope.ServiceProvider.GetRequiredService<IProviderService>();
+            return await service.ListAsync(includeInactive: false);
+        }).GetAwaiter().GetResult();
         var items = providers
             .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
             .Select(p => new ProviderInfo(p.Name, p.DisplayName))

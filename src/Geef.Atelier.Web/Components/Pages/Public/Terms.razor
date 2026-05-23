@@ -15,9 +15,12 @@
         <div class="lp-container">
             <div class="legal-content">
                 <h1>Nutzungsbedingungen (AGB)</h1>
-                <p class="legal-disclaimer">
-                    ⚠️ <em>Vorlagen-Gerüst — kein Rechtsrat. Der Betreiber muss diese AGB vor dem Live-Gang von einem Rechtsanwalt prüfen und auf die konkreten Nutzungsmodalitäten anpassen lassen.</em>
-                </p>
+                @if (!_settings.LegalBoilerplateAccepted)
+                {
+                    <p class="legal-disclaimer">
+                        ⚠️ <em>Vorlagen-Gerüst — kein Rechtsrat. Der Betreiber muss diese AGB vor dem Live-Gang von einem Rechtsanwalt prüfen und auf die konkreten Nutzungsmodalitäten anpassen lassen.</em>
+                    </p>
+                }
 
                 <section>
                     <h2>§ 1 Geltungsbereich</h2>

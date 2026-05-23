@@ -25,6 +25,7 @@ internal sealed class SiteSettingsConfiguration : IEntityTypeConfiguration<SiteS
         builder.Property(e => e.Jurisdiction).HasMaxLength(100);
         builder.Property(e => e.PrivacyAppendMarkdown);
         builder.Property(e => e.TermsAppendMarkdown);
+        builder.Property(e => e.LegalBoilerplateAccepted).IsRequired().HasDefaultValue(false);
         builder.Property(e => e.UpdatedAt).IsRequired().HasDefaultValueSql("now()");
     }
 }

@@ -195,15 +195,18 @@ public sealed class TemplateStudioServiceAnalyzeTests
     private static TemplateStudioService CreateService(
         ILlmClient llmClient,
         ITemplateStudioAnalysisRepository? repo = null,
-        ICrewService? crewService = null)
+        ICrewService? crewService = null,
+        IStudioSettingsService? studioSettings = null,
+        TemplateStudioOptions? optionsValue = null)
     {
         var resolver = new TestLlmClientResolver(llmClient, "anthropic/claude-sonnet-4-5", 4096);
         var crew = crewService ?? new EmptyCrewService();
         var repository = repo ?? new InMemoryAnalysisRepository();
         var embeddingProvider = new NoopEmbeddingProvider();
         var similarityService = new ProfileSimilarityService(crew, embeddingProvider);
-        var opts = Options.Create(new TemplateStudioOptions
+        var opts = Options.Create(optionsValue ?? new TemplateStudioOptions
         {
+            Provider = "openrouter",
             Model = "anthropic/claude-sonnet-4-5",
             MaxTokens = 4096,
             SimilarityThreshold = 0.85
@@ -218,8 +221,39 @@ public sealed class TemplateStudioServiceAnalyzeTests
             repository,
             similarityService,
             new NoopAtomicTransactionFactory(),
+            studioSettings ?? new FakeStudioSettingsService(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<TemplateStudioService>.Instance,
             opts);
     }
+
+    // Captures the model/maxTokens that the service actually requested from the LLM client.
+    private sealed class CapturingLlmClient(string toolArgumentsJson) : ILlmClient
+    {
+        public string? CapturedModel { get; private set; }
+        public int CapturedMaxTokens { get; private set; }
+
+        public Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken ct)
+        {
+            CapturedModel = request.Model;
+            CapturedMaxTokens = request.MaxTokens;
+            return Task.FromResult(new LlmResponse
+            {
+                Text = "",
+                FinishReason = "tool_calls",
+                ToolName = TemplateProposalTool.ToolName,
+                ToolArgumentsJson = toolArgumentsJson,
+                TokenUsage = new LlmTokenUsage { InputTokens = 100, OutputTokens = 50 }
+            });
+        }
+    }
+
+    private const string MinimalProposalJson = """
+        {
+            "matched_existing_templates": [],
+            "recommendation": "create_new",
+            "reasoning_summary": "Needs a new template."
+        }
+        """;
 
     // -------------------------------------------------------------------------
     // Tests
@@ -306,5 +340,105 @@ public sealed class TemplateStudioServiceAnalyzeTests
         var result = await svc.AnalyzeAsync("Complex task.", CancellationToken.None);
 
         Assert.True(repo.WasCreated(result.Id));
+    }
+
+    // -------------------------------------------------------------------------
+    // Model resolution: override → persisted default → appsettings default
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task AnalyzeAsync_WithExplicitOverride_UsesOverrideModelAndMaxTokens()
+    {
+        var client = new CapturingLlmClient(MinimalProposalJson);
+        var svc = CreateService(client, studioSettings: new FakeStudioSettingsService());
+
+        await svc.AnalyzeAsync("Task.", new StudioModelChoice("codex-cli", "gpt-5.5", 20000), CancellationToken.None);
+
+        Assert.Equal("gpt-5.5", client.CapturedModel);
+        Assert.Equal(20000, client.CapturedMaxTokens);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_WithoutOverride_UsesPersistedDefault()
+    {
+        var client = new CapturingLlmClient(MinimalProposalJson);
+        var persisted = new FakeStudioSettingsService(new Geef.Atelier.Core.Domain.StudioSettings
+        {
+            Provider = "claude-cli", Model = "claude-haiku-4.5", MaxTokens = 12000
+        });
+        var svc = CreateService(client, studioSettings: persisted);
+
+        await svc.AnalyzeAsync("Task.", CancellationToken.None);
+
+        Assert.Equal("claude-haiku-4.5", client.CapturedModel);
+        Assert.Equal(12000, client.CapturedMaxTokens);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_WithoutOverrideAndNoPersisted_FallsBackToAppsettings()
+    {
+        var client = new CapturingLlmClient(MinimalProposalJson);
+        var svc = CreateService(client, studioSettings: new FakeStudioSettingsService());
+
+        await svc.AnalyzeAsync("Task.", CancellationToken.None);
+
+        Assert.Equal("anthropic/claude-sonnet-4-5", client.CapturedModel);
+        Assert.Equal(4096, client.CapturedMaxTokens);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_WithIncompleteOverride_FallsBackToPersisted()
+    {
+        var client = new CapturingLlmClient(MinimalProposalJson);
+        var persisted = new FakeStudioSettingsService(new Geef.Atelier.Core.Domain.StudioSettings
+        {
+            Provider = "claude-cli", Model = "claude-haiku-4.5", MaxTokens = 12000
+        });
+        var svc = CreateService(client, studioSettings: persisted);
+
+        // Provider present but model empty → incomplete → must not be used as override.
+        await svc.AnalyzeAsync("Task.", new StudioModelChoice("codex-cli", "", 0), CancellationToken.None);
+
+        Assert.Equal("claude-haiku-4.5", client.CapturedModel);
+        Assert.Equal(12000, client.CapturedMaxTokens);
+    }
+
+    [Fact]
+    public async Task GetEffectiveDefaultAsync_NoPersisted_ReturnsAppsettings()
+    {
+        var svc = CreateService(new ToolCallFakeLlmClient(MinimalProposalJson),
+            studioSettings: new FakeStudioSettingsService());
+
+        var choice = await svc.GetEffectiveDefaultAsync(CancellationToken.None);
+
+        Assert.Equal("openrouter", choice.Provider);
+        Assert.Equal("anthropic/claude-sonnet-4-5", choice.Model);
+        Assert.Equal(4096, choice.MaxTokens);
+    }
+
+    [Fact]
+    public async Task SaveDefaultAsync_PersistsChoice()
+    {
+        var store = new FakeStudioSettingsService();
+        var svc = CreateService(new ToolCallFakeLlmClient(MinimalProposalJson), studioSettings: store);
+
+        await svc.SaveDefaultAsync(new StudioModelChoice("codex-cli", "gpt-5.5", 20000), CancellationToken.None);
+
+        Assert.Equal("codex-cli", store.Current.Provider);
+        Assert.Equal("gpt-5.5", store.Current.Model);
+        Assert.Equal(20000, store.Current.MaxTokens);
+    }
+
+    [Fact]
+    public async Task SaveDefaultAsync_WithEmptyChoice_FallsBackToAppsettings()
+    {
+        var store = new FakeStudioSettingsService();
+        var svc = CreateService(new ToolCallFakeLlmClient(MinimalProposalJson), studioSettings: store);
+
+        await svc.SaveDefaultAsync(new StudioModelChoice("", "", 0), CancellationToken.None);
+
+        Assert.Equal("openrouter", store.Current.Provider);
+        Assert.Equal("anthropic/claude-sonnet-4-5", store.Current.Model);
+        Assert.Equal(4096, store.Current.MaxTokens);
     }
 }

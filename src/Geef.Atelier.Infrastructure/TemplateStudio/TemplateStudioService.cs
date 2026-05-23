@@ -10,6 +10,7 @@ using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.Crew.TemplateStudio;
 using Geef.Atelier.Core.Persistence.TemplateStudio;
 using Geef.Atelier.Infrastructure.Llm;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Infrastructure.TemplateStudio;
@@ -23,25 +24,62 @@ internal sealed class TemplateStudioService(
     ITemplateStudioAnalysisRepository analysisRepository,
     ProfileSimilarityService similarityService,
     IAtomicTransactionFactory transactionFactory,
+    IStudioSettingsService studioSettings,
+    ILogger<TemplateStudioService> logger,
     IOptions<TemplateStudioOptions> options) : ITemplateStudioService
 {
-    public async Task<TemplateStudioAnalysis> AnalyzeAsync(string taskDescription, CancellationToken ct = default)
+    public Task<TemplateStudioAnalysis> AnalyzeAsync(string taskDescription, CancellationToken ct = default)
+        => AnalyzeAsync(taskDescription, overrideChoice: null, progress: null, ct);
+
+    public Task<TemplateStudioAnalysis> AnalyzeAsync(
+        string taskDescription, StudioModelChoice? overrideChoice, CancellationToken ct = default)
+        => AnalyzeAsync(taskDescription, overrideChoice, progress: null, ct);
+
+    public async Task<TemplateStudioAnalysis> AnalyzeAsync(
+        string taskDescription, StudioModelChoice? overrideChoice, IProgress<string>? progress, CancellationToken ct = default)
     {
         var opts = options.Value;
+
+        var choice = await ResolveChoiceAsync(overrideChoice, ct);
+        logger.LogInformation("Studio.AnalyzeAsync start: provider={Provider} model={Model} maxTokens={MaxTokens}",
+            choice.Provider, choice.Model, choice.MaxTokens);
+
+        progress?.Report("Sammle verfügbare Modelle der Provider…");
         var context = await BuildContextAsync(ct);
         var systemPrompt = TemplateStudioPrompts.MetaSystemPromptTemplate.Replace("{0}", context);
 
-        var (client, model, maxTokens) = resolver.ForProfile(opts.Provider, opts.Model, opts.MaxTokens);
+        var (client, model, maxTokens) = resolver.ForProfile(choice.Provider, choice.Model, choice.MaxTokens);
 
-        var response = await client.CompleteAsync(new LlmRequest
+        logger.LogInformation("Studio.AnalyzeAsync: context built, calling meta-LLM {Provider}/{Model}", choice.Provider, model);
+        progress?.Report($"Frage Meta-KI an: {choice.Provider} / {model}…");
+
+        // Hard cap on the meta-LLM call so a stalled provider can never hang the analysis indefinitely.
+        using var llmCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        llmCts.CancelAfter(TimeSpan.FromSeconds(150));
+
+        LlmResponse response;
+        try
         {
-            Model        = model,
-            SystemPrompt = systemPrompt,
-            UserPrompt   = $"Task description: {taskDescription}\n\nAnalyse this task and call submit_template_proposal.",
-            MaxTokens    = maxTokens,
-            Tools        = [TemplateProposalTool.Schema],
-            ToolChoice   = $"function:{TemplateProposalTool.ToolName}"
-        }, ct);
+            response = await client.CompleteAsync(new LlmRequest
+            {
+                Model        = model,
+                SystemPrompt = systemPrompt,
+                UserPrompt   = $"Task description: {taskDescription}\n\nAnalyse this task and call submit_template_proposal.",
+                MaxTokens    = maxTokens,
+                Tools        = [TemplateProposalTool.Schema],
+                ToolChoice   = $"function:{TemplateProposalTool.ToolName}"
+            }, llmCts.Token);
+        }
+        catch (OperationCanceledException) when (llmCts.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"Die Meta-KI ({choice.Provider} / {model}) hat nicht innerhalb von 150 Sekunden geantwortet. " +
+                "Bitte erneut versuchen oder einen anderen Provider/Modell wählen.");
+        }
+
+        logger.LogInformation("Studio.AnalyzeAsync: meta-LLM responded finish={Finish} hasTool={HasTool}",
+            response.FinishReason, response.ToolArgumentsJson is not null);
+        progress?.Report("Verarbeite Vorschlag…");
 
         if (response.FinishReason != "tool_calls" || response.ToolArgumentsJson is null)
             throw new InvalidOperationException(
@@ -51,7 +89,7 @@ internal sealed class TemplateStudioService(
         var withDefaults = proposal.ProposedNewProfiles.Select(p => ApplyDefaults(p, opts.Defaults)).ToList();
         var deduplicated = await DeduplicateProfilesAsync(withDefaults, opts.SimilarityThreshold, ct);
 
-        var cost = pricingCatalog.CalculateCostEur(model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens);
+        var cost = pricingCatalog.CalculateCostEur(model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, choice.Provider);
 
         var analysis = new TemplateStudioAnalysis(
             Id:                     Guid.NewGuid(),
@@ -68,6 +106,47 @@ internal sealed class TemplateStudioService(
 
         await analysisRepository.CreateAsync(analysis, ct);
         return analysis;
+    }
+
+    public async Task<StudioModelChoice> GetEffectiveDefaultAsync(CancellationToken ct = default)
+        => await ResolveChoiceAsync(overrideChoice: null, ct);
+
+    public async Task SaveDefaultAsync(StudioModelChoice choice, CancellationToken ct = default)
+    {
+        var opts = options.Value;
+        await studioSettings.UpdateAsync(new Core.Domain.StudioSettings
+        {
+            Provider  = string.IsNullOrWhiteSpace(choice.Provider) ? opts.Provider : choice.Provider.Trim(),
+            Model     = string.IsNullOrWhiteSpace(choice.Model)    ? opts.Model    : choice.Model.Trim(),
+            MaxTokens = choice.MaxTokens > 0 ? choice.MaxTokens : opts.MaxTokens,
+        }, ct);
+    }
+
+    // Resolution order: explicit per-analysis override → persisted default → appsettings default.
+    private async Task<StudioModelChoice> ResolveChoiceAsync(StudioModelChoice? overrideChoice, CancellationToken ct)
+    {
+        var opts = options.Value;
+
+        if (overrideChoice is not null &&
+            !string.IsNullOrWhiteSpace(overrideChoice.Provider) &&
+            !string.IsNullOrWhiteSpace(overrideChoice.Model))
+        {
+            return new StudioModelChoice(
+                overrideChoice.Provider.Trim(),
+                overrideChoice.Model.Trim(),
+                overrideChoice.MaxTokens > 0 ? overrideChoice.MaxTokens : opts.MaxTokens);
+        }
+
+        var persisted = await studioSettings.GetAsync(ct);
+        if (!string.IsNullOrWhiteSpace(persisted.Provider) && !string.IsNullOrWhiteSpace(persisted.Model))
+        {
+            return new StudioModelChoice(
+                persisted.Provider,
+                persisted.Model,
+                persisted.MaxTokens > 0 ? persisted.MaxTokens : opts.MaxTokens);
+        }
+
+        return new StudioModelChoice(opts.Provider, opts.Model, opts.MaxTokens);
     }
 
     public async Task<StudioAnalysesPage> ListRecentAnalysesAsync(int page, int pageSize, CancellationToken ct = default)
@@ -122,6 +201,7 @@ internal sealed class TemplateStudioService(
 
     private async Task<string> BuildContextAsync(CancellationToken ct)
     {
+        logger.LogInformation("Studio.BuildContext: loading crew lists…");
         var templates  = await crewService.ListCrewTemplatesAsync(includeSystem: true, ct);
         var reviewers  = await crewService.ListReviewerProfilesAsync(includeSystem: true, ct);
         var advisors   = await crewService.ListAdvisorProfilesAsync(includeSystem: true, ct);
@@ -129,12 +209,36 @@ internal sealed class TemplateStudioService(
         var executors  = await crewService.ListExecutorProfilesAsync(includeSystem: true, ct);
         var finalizers = await crewService.ListFinalizerProfilesAsync(includeSystem: true, ct);
         var providers  = providerCatalog.ListProviders();
+        logger.LogInformation("Studio.BuildContext: crew lists loaded, fetching models for {Count} providers in parallel…", providers.Count);
 
-        // Build per-provider model lists so the LLM can select accurate, current model IDs.
+        // Fetch every provider's model list in PARALLEL with an overall budget. A single slow or
+        // unreachable provider can no longer serialize/stall the whole analysis: the budget caps
+        // total wait time and any provider that exceeds it (or errors) contributes no models.
+        using var modelCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        modelCts.CancelAfter(TimeSpan.FromSeconds(20));
+
+        var fetches = providers.Select(async provider =>
+        {
+            try
+            {
+                var models = await modelCatalog.ListModelsAsync(provider.Name, modelCts.Token);
+                return (provider.Name, Models: models);
+            }
+            catch
+            {
+                return (provider.Name, Models: (IReadOnlyList<ModelInfo>)[]);
+            }
+        });
+        var fetched = await Task.WhenAll(fetches);
+        var modelsByProvider = fetched.ToDictionary(f => f.Name, f => f.Models);
+        logger.LogInformation("Studio.BuildContext: model fetch complete ({Total} models across {Providers} providers)",
+            fetched.Sum(f => f.Models.Count), fetched.Length);
+
+        // Build per-provider model lists (preserving provider order) so the LLM can pick accurate IDs.
         var modelLines = new List<string>();
         foreach (var provider in providers)
         {
-            var models = await modelCatalog.ListModelsAsync(provider.Name, ct);
+            var models = modelsByProvider.TryGetValue(provider.Name, out var m) ? m : [];
             var recommended = models.Where(m => m.IsRecommended).Select(m => m.Id).ToList();
             var rest = models.Where(m => !m.IsRecommended).Select(m => m.Id).Take(15).ToList();
             if (recommended.Count > 0)

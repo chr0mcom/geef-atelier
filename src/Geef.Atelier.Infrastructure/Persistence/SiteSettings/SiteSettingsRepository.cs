@@ -43,6 +43,7 @@ internal sealed class SiteSettingsRepository(AtelierDbContext db) : ISiteSetting
         entity.Jurisdiction = settings.Jurisdiction;
         entity.PrivacyAppendMarkdown = settings.PrivacyAppendMarkdown;
         entity.TermsAppendMarkdown = settings.TermsAppendMarkdown;
+        entity.LegalBoilerplateAccepted = settings.LegalBoilerplateAccepted;
         entity.UpdatedAt = DateTimeOffset.UtcNow;
 
         await db.SaveChangesAsync(ct);
@@ -77,6 +78,7 @@ internal sealed class SiteSettingsRepository(AtelierDbContext db) : ISiteSetting
         Jurisdiction = e.Jurisdiction,
         PrivacyAppendMarkdown = e.PrivacyAppendMarkdown,
         TermsAppendMarkdown = e.TermsAppendMarkdown,
+        LegalBoilerplateAccepted = e.LegalBoilerplateAccepted,
         UpdatedAt = e.UpdatedAt,
     };
 }

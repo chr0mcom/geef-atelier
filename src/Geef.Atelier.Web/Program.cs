@@ -23,6 +23,7 @@ using Geef.Atelier.Web.Hubs;
 using Geef.Atelier.Web.Notifications;
 using Geef.Atelier.Web.Services;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -30,6 +31,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Persist DataProtection keys to a mounted volume so auth cookies, antiforgery tokens and
+// Blazor circuits survive container restarts/redeploys. Without this, every redeploy rotates
+// the in-container keys, invalidating sessions and breaking active circuits mid-interaction.
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo("/app/dataprotection-keys"))
+    .SetApplicationName("Geef.Atelier");
 
 // OpenAI-compatible LLM client (default: OpenRouter) — set Llm__ApiKey env-var for real calls.
 builder.Services.AddLlmClient(builder.Configuration)

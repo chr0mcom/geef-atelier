@@ -26,7 +26,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 
 COPY --from=build /app/publish .
-RUN chown -R appuser:appgroup /app
+# Pre-create volume mount points so fresh named volumes inherit appuser ownership
+# (DataProtection keys must be writable by the non-root app user).
+RUN mkdir -p /app/dataprotection-keys /app/exports \
+    && chown -R appuser:appgroup /app
 
 USER appuser
 

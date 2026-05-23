@@ -7,24 +7,23 @@
 
 <PageTitle>Site Settings — Geef.Atelier</PageTitle>
 
-<div class="page-container" data-testid="site-settings-page">
+<div class="crew-editor settings-page-wrap" data-testid="site-settings-page">
     <div class="page-header">
         <h1>Site Settings</h1>
-        <a href="/runs" class="btn ghost">← Back</a>
+        <a href="/workshop" class="btn ghost">← Back</a>
     </div>
 
     <div class="settings-notice">
-        ⚠️ <strong>Hinweis:</strong> Die hier gespeicherten Angaben erscheinen auf den öffentlichen Rechtsseiten (Impressum, Datenschutz, AGB, Kontakt).
-        Die vorausgefüllten Rechtstexte sind <strong>Vorlagen/Gerüste, kein Rechtsrat</strong>. Bitte lassen Sie die Texte
-        — insbesondere die Datenschutzerklärung — vor dem Live-Gang rechtlich prüfen und an Ihre tatsächlichen
-        Datenverarbeitungen (Auth-Cookies, LLM-Provider, Hosting) anpassen.
+        ⚠️ <strong>Hinweis:</strong> Die hier gespeicherten Angaben erscheinen auf den öffentlichen Rechtsseiten
+        (Impressum, Datenschutz, AGB). Die vorausgefüllten Rechtstexte sind <strong>Vorlagen — kein Rechtsrat</strong>.
+        Bitte lassen Sie die Texte vor dem Live-Gang rechtlich prüfen und an Ihre tatsächlichen
+        Datenverarbeitungen anpassen.
     </div>
 
     @if (!string.IsNullOrEmpty(_error))
     {
         <div class="alert alert-danger" data-testid="error-banner">@_error</div>
     }
-
     @if (!string.IsNullOrEmpty(_success))
     {
         <div class="alert alert-success" data-testid="success-banner">@_success</div>
@@ -37,31 +36,31 @@
     else
     {
         <form class="settings-form" @onsubmit="SaveAsync" data-testid="settings-form">
+
             <fieldset>
-                <legend>Betreiber-Daten</legend>
+                <legend>Betreiber</legend>
 
                 <div class="form-group">
                     <label for="operator-name">Betreibername <span class="required">*</span></label>
                     <input id="operator-name" type="text" @bind="_operatorName" required maxlength="200"
                            data-testid="input-operator-name"
-                           placeholder="z. B. Max Mustermann oder Mustermann GmbH" />
-                    <span class="field-help">Vollständiger Name oder Firma des Betreibers (für Impressum § 5 DDG).</span>
+                           placeholder="Max Mustermann oder Mustermann GmbH" />
+                    <span class="field-help">Vollständiger Name oder Firma (Impressum § 5 DDG).</span>
                 </div>
 
                 <div class="form-group">
                     <label for="address-street">Straße und Hausnummer <span class="required">*</span></label>
                     <input id="address-street" type="text" @bind="_addressStreet" required maxlength="300"
-                           data-testid="input-address-street"
-                           placeholder="Musterstraße 1" />
+                           data-testid="input-address-street" placeholder="Musterstraße 1" />
                 </div>
 
                 <div class="form-row">
-                    <div class="form-group">
+                    <div class="form-group" style="max-width:140px;">
                         <label for="address-zip">PLZ <span class="required">*</span></label>
                         <input id="address-zip" type="text" @bind="_addressZip" required maxlength="20"
-                               data-testid="input-address-zip" placeholder="12345" style="max-width: 120px;" />
+                               data-testid="input-address-zip" placeholder="12345" />
                     </div>
-                    <div class="form-group" style="flex:1">
+                    <div class="form-group">
                         <label for="address-city">Stadt <span class="required">*</span></label>
                         <input id="address-city" type="text" @bind="_addressCity" required maxlength="100"
                                data-testid="input-address-city" placeholder="Musterstadt" />
@@ -81,16 +80,14 @@
                 <div class="form-group">
                     <label for="contact-email">E-Mail <span class="required">*</span></label>
                     <input id="contact-email" type="email" @bind="_contactEmail" required maxlength="300"
-                           data-testid="input-contact-email"
-                           placeholder="kontakt@example.com" />
-                    <span class="field-help">Wird auf Impressum, Datenschutz und Kontakt-Seite obfuskiert angezeigt (kein Klartext im HTML-Quelltext).</span>
+                           data-testid="input-contact-email" placeholder="kontakt@example.com" />
+                    <span class="field-help">Wird auf Impressum und Datenschutz obfuskiert angezeigt (kein Klartext im HTML).</span>
                 </div>
 
                 <div class="form-group">
                     <label for="contact-phone">Telefon (optional)</label>
                     <input id="contact-phone" type="tel" @bind="_contactPhone" maxlength="100"
-                           data-testid="input-contact-phone"
-                           placeholder="+49 123 456789" />
+                           data-testid="input-contact-phone" placeholder="+49 123 456789" />
                 </div>
             </fieldset>
 
@@ -98,39 +95,37 @@
                 <legend>Weitere Angaben (optional)</legend>
 
                 <div class="form-group">
-                    <label for="responsible-person">Verantwortlich i. S. d. P. (V.i.S.d.P.)</label>
+                    <label for="responsible-person">Verantwortlich i. S. d. P.</label>
                     <input id="responsible-person" type="text" @bind="_responsiblePerson" maxlength="300"
                            data-testid="input-responsible-person"
                            placeholder="Name der redaktionell verantwortlichen Person" />
-                    <span class="field-help">Person, die journalistisch-redaktionelle Inhalte verantwortet.</span>
+                    <span class="field-help">Person, die journalistisch-redaktionelle Inhalte verantwortet (V.i.S.d.P.).</span>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="vat-id">USt-ID</label>
+                        <input id="vat-id" type="text" @bind="_vatId" maxlength="50"
+                               data-testid="input-vat-id" placeholder="DE123456789" />
+                    </div>
+                    <div class="form-group">
+                        <label for="jurisdiction">Gerichtsstand</label>
+                        <input id="jurisdiction" type="text" @bind="_jurisdiction" maxlength="100"
+                               data-testid="input-jurisdiction" placeholder="Musterstadt" />
+                    </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="vat-id">USt-ID (optional)</label>
-                    <input id="vat-id" type="text" @bind="_vatId" maxlength="50"
-                           data-testid="input-vat-id"
-                           placeholder="DE123456789" />
-                </div>
-
-                <div class="form-group">
-                    <label for="register-info">Registereintrag (optional)</label>
+                    <label for="register-info">Registereintrag</label>
                     <input id="register-info" type="text" @bind="_registerInfo" maxlength="300"
-                           data-testid="input-register-info"
-                           placeholder="HRB 12345, Amtsgericht Musterstadt" />
+                           data-testid="input-register-info" placeholder="HRB 12345, Amtsgericht Musterstadt" />
                 </div>
 
                 <div class="form-group">
-                    <label for="supervisory-authority">Aufsichtsbehörde (optional)</label>
+                    <label for="supervisory-authority">Aufsichtsbehörde</label>
                     <input id="supervisory-authority" type="text" @bind="_supervisoryAuthority" maxlength="300"
                            data-testid="input-supervisory-authority"
                            placeholder="Landesbeauftragter für Datenschutz, Musterstadt" />
-                </div>
-
-                <div class="form-group">
-                    <label for="jurisdiction">Gerichtsstand (optional)</label>
-                    <input id="jurisdiction" type="text" @bind="_jurisdiction" maxlength="100"
-                           data-testid="input-jurisdiction"
-                           placeholder="Musterstadt" />
                 </div>
             </fieldset>
 
@@ -138,21 +133,30 @@
                 <legend>Individuelle Ergänzungen (Markdown)</legend>
 
                 <div class="form-group">
-                    <label for="privacy-append">Datenschutz-Anhang (Markdown, optional)</label>
-                    <textarea id="privacy-append" @bind="_privacyAppendMarkdown" rows="6"
+                    <label for="privacy-append">Datenschutz-Anhang (optional)</label>
+                    <textarea id="privacy-append" @bind="_privacyAppendMarkdown" rows="5"
                               data-testid="input-privacy-append"
                               placeholder="Zusätzliche betreiberspezifische Abschnitte für die Datenschutzerklärung (Markdown)."></textarea>
                     <span class="field-help">Wird nach dem Boilerplate-Text der Datenschutzerklärung angehängt.</span>
                 </div>
 
                 <div class="form-group">
-                    <label for="terms-append">AGB-Anhang (Markdown, optional)</label>
-                    <textarea id="terms-append" @bind="_termsAppendMarkdown" rows="6"
+                    <label for="terms-append">AGB-Anhang (optional)</label>
+                    <textarea id="terms-append" @bind="_termsAppendMarkdown" rows="5"
                               data-testid="input-terms-append"
                               placeholder="Zusätzliche betreiberspezifische Abschnitte für die Nutzungsbedingungen (Markdown)."></textarea>
                     <span class="field-help">Wird nach dem Boilerplate-Text der AGB angehängt.</span>
                 </div>
             </fieldset>
+
+            <label class="settings-legal-accept" data-testid="legal-accept-label">
+                <input type="checkbox" @bind="_legalBoilerplateAccepted" data-testid="input-legal-accepted" />
+                <span class="settings-legal-accept-label">
+                    <strong>Ich bestätige</strong>, dass ich die Vorlagen-Rechtstexte (Datenschutzerklärung, AGB, Impressum)
+                    rechtlich prüfen lassen habe bzw. bewusst entscheide, sie in dieser Form zu verwenden.
+                    Der Hinweis-Banner auf den öffentlichen Rechtsseiten wird damit ausgeblendet.
+                </span>
+            </label>
 
             @if (!string.IsNullOrEmpty(_validationError))
             {
@@ -189,26 +193,28 @@
     private string? _jurisdiction;
     private string? _privacyAppendMarkdown;
     private string? _termsAppendMarkdown;
+    private bool _legalBoilerplateAccepted;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
             var settings = await SiteSettingsService.GetAsync();
-            _operatorName = settings.OperatorName;
-            _addressStreet = settings.AddressStreet;
-            _addressZip = settings.AddressZip;
-            _addressCity = settings.AddressCity;
-            _addressCountry = settings.AddressCountry;
-            _contactEmail = settings.ContactEmail;
-            _contactPhone = settings.ContactPhone;
-            _responsiblePerson = settings.ResponsiblePerson;
-            _vatId = settings.VatId;
-            _registerInfo = settings.RegisterInfo;
-            _supervisoryAuthority = settings.SupervisoryAuthority;
-            _jurisdiction = settings.Jurisdiction;
-            _privacyAppendMarkdown = settings.PrivacyAppendMarkdown;
-            _termsAppendMarkdown = settings.TermsAppendMarkdown;
+            _operatorName           = settings.OperatorName;
+            _addressStreet          = settings.AddressStreet;
+            _addressZip             = settings.AddressZip;
+            _addressCity            = settings.AddressCity;
+            _addressCountry         = settings.AddressCountry;
+            _contactEmail           = settings.ContactEmail;
+            _contactPhone           = settings.ContactPhone;
+            _responsiblePerson      = settings.ResponsiblePerson;
+            _vatId                  = settings.VatId;
+            _registerInfo           = settings.RegisterInfo;
+            _supervisoryAuthority   = settings.SupervisoryAuthority;
+            _jurisdiction           = settings.Jurisdiction;
+            _privacyAppendMarkdown  = settings.PrivacyAppendMarkdown;
+            _termsAppendMarkdown    = settings.TermsAppendMarkdown;
+            _legalBoilerplateAccepted = settings.LegalBoilerplateAccepted;
         }
         catch (Exception ex)
         {
@@ -242,21 +248,22 @@
         {
             var settings = new Core.Domain.SiteSettings
             {
-                OperatorName = _operatorName.Trim(),
-                AddressStreet = _addressStreet.Trim(),
-                AddressZip = _addressZip.Trim(),
-                AddressCity = _addressCity.Trim(),
-                AddressCountry = _addressCountry.Trim(),
-                ContactEmail = _contactEmail.Trim(),
-                ContactPhone = NullIfEmpty(_contactPhone),
-                ResponsiblePerson = NullIfEmpty(_responsiblePerson),
-                VatId = NullIfEmpty(_vatId),
-                RegisterInfo = NullIfEmpty(_registerInfo),
-                SupervisoryAuthority = NullIfEmpty(_supervisoryAuthority),
-                Jurisdiction = NullIfEmpty(_jurisdiction),
-                PrivacyAppendMarkdown = NullIfEmpty(_privacyAppendMarkdown),
-                TermsAppendMarkdown = NullIfEmpty(_termsAppendMarkdown),
-                UpdatedAt = DateTimeOffset.UtcNow,
+                OperatorName            = _operatorName.Trim(),
+                AddressStreet           = _addressStreet.Trim(),
+                AddressZip              = _addressZip.Trim(),
+                AddressCity             = _addressCity.Trim(),
+                AddressCountry          = _addressCountry.Trim(),
+                ContactEmail            = _contactEmail.Trim(),
+                ContactPhone            = NullIfEmpty(_contactPhone),
+                ResponsiblePerson       = NullIfEmpty(_responsiblePerson),
+                VatId                   = NullIfEmpty(_vatId),
+                RegisterInfo            = NullIfEmpty(_registerInfo),
+                SupervisoryAuthority    = NullIfEmpty(_supervisoryAuthority),
+                Jurisdiction            = NullIfEmpty(_jurisdiction),
+                PrivacyAppendMarkdown   = NullIfEmpty(_privacyAppendMarkdown),
+                TermsAppendMarkdown     = NullIfEmpty(_termsAppendMarkdown),
+                LegalBoilerplateAccepted = _legalBoilerplateAccepted,
+                UpdatedAt               = DateTimeOffset.UtcNow,
             };
 
             await SiteSettingsService.UpdateAsync(settings);

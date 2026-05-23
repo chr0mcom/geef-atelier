@@ -21,5 +21,7 @@ public sealed record SiteSettings
     public string? PrivacyAppendMarkdown { get; init; }
     /// <summary>Optional operator-specific Markdown appended after the Terms boilerplate.</summary>
     public string? TermsAppendMarkdown { get; init; }
+    /// <summary>When true, the placeholder-warning banner is hidden on Privacy, Terms and Imprint pages.</summary>
+    public bool LegalBoilerplateAccepted { get; init; }
     public DateTimeOffset UpdatedAt { get; init; }
 }

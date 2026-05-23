@@ -164,7 +164,8 @@ public sealed class TemplateStudioServiceDefaultsTests
         return new TemplateStudioService(
             resolver, crew, new EmptyProviderCatalog(), new NoopModelCatalog(),
             new NoopPricingCatalog(), repo, similarityService,
-            new NoopAtomicTransactionFactory(), opts);
+            new NoopAtomicTransactionFactory(), new FakeStudioSettingsService(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<TemplateStudioService>.Instance, opts);
     }
 
     // -------------------------------------------------------------------------

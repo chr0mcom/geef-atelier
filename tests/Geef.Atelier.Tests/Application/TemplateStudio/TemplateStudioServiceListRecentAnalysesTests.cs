@@ -36,6 +36,18 @@ public sealed class TemplateStudioServiceListRecentAnalysesTests
         public Task<TemplateStudioAnalysis> AnalyzeAsync(string taskDescription, CancellationToken ct = default)
             => throw new NotImplementedException();
 
+        public Task<TemplateStudioAnalysis> AnalyzeAsync(string taskDescription, StudioModelChoice? overrideChoice, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<TemplateStudioAnalysis> AnalyzeAsync(string taskDescription, StudioModelChoice? overrideChoice, IProgress<string>? progress, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<StudioModelChoice> GetEffectiveDefaultAsync(CancellationToken ct = default)
+            => Task.FromResult(new StudioModelChoice("openrouter", "test-model", 8192));
+
+        public Task SaveDefaultAsync(StudioModelChoice choice, CancellationToken ct = default)
+            => Task.CompletedTask;
+
         public Task<MaterializationResult> MaterializeAsync(Guid analysisId, MaterializationRequest request, CancellationToken ct = default)
             => throw new NotImplementedException();
     }

@@ -17,5 +17,6 @@ internal sealed class SiteSettingsEntity
     public string? Jurisdiction { get; set; }
     public string? PrivacyAppendMarkdown { get; set; }
     public string? TermsAppendMarkdown { get; set; }
+    public bool LegalBoilerplateAccepted { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }

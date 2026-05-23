@@ -14,9 +14,12 @@
         <div class="lp-container">
             <div class="legal-content">
                 <h1>Impressum</h1>
-                <p class="legal-disclaimer">
-                    ⚠️ <em>Dieses Impressum enthält Platzhalter. Der Betreiber muss die Angaben vor dem Live-Gang vervollständigen und rechtlich prüfen lassen (§ 5 DDG).</em>
-                </p>
+                @if (!_settings.LegalBoilerplateAccepted)
+                {
+                    <p class="legal-disclaimer">
+                        ⚠️ <em>Dieses Impressum enthält Platzhalter. Der Betreiber muss die Angaben vor dem Live-Gang vervollständigen und rechtlich prüfen lassen (§ 5 DDG).</em>
+                    </p>
+                }
 
                 <section>
                     <h2>Angaben gemäß § 5 DDG</h2>
