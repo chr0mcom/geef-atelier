@@ -596,6 +596,22 @@ public static class SystemCrew
         },
         IsSystem: true);
 
+    public static readonly FinalizerProfile LearningExtractorProfile = new(
+        Name: "learning-extractor",
+        DisplayName: "Learning Extractor",
+        Description: "Extracts structured learnings from a completed run and fires a gated learning-evaluation run.",
+        FinalizerType: FinalizerType.LearningExtract,
+        Settings: [],
+        IsSystem: true);
+
+    public static readonly FinalizerProfile LearningPublisherProfile = new(
+        Name: "learning-publisher",
+        DisplayName: "Learning Publisher",
+        Description: "Publishes approved learning candidates to the learning store, or marks rejected ones.",
+        FinalizerType: FinalizerType.LearningPublish,
+        Settings: [],
+        IsSystem: true);
+
     /// <summary>All system finalizer profiles, indexed by name.</summary>
     public static readonly IReadOnlyDictionary<string, FinalizerProfile> FinalizerProfiles =
         new Dictionary<string, FinalizerProfile>
@@ -621,6 +637,9 @@ public static class SystemCrew
             [ExecutiveSummaryProfile.Name]    = ExecutiveSummaryProfile,
             [KeyTakeawaysProfile.Name]        = KeyTakeawaysProfile,
             [GlossaryProfile.Name]            = GlossaryProfile,
+            // Learning Loop
+            [LearningExtractorProfile.Name]   = LearningExtractorProfile,
+            [LearningPublisherProfile.Name]   = LearningPublisherProfile,
         };
 
     /// <summary>True when the supplied name matches a system finalizer profile.</summary>

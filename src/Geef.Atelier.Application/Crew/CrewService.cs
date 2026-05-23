@@ -201,11 +201,13 @@ internal sealed class CrewService(
     public async Task<IReadOnlyList<FinalizerProfile>> ListFinalizerProfilesAsync(
         bool includeSystem = true, CancellationToken cancellationToken = default)
     {
-        var custom = await finalizerRepo.ListAsync(cancellationToken);
+        var dbRows = await finalizerRepo.ListAsync(cancellationToken);
         if (!includeSystem)
-            return custom;
+            return dbRows.Where(p => !p.IsSystem).ToList();
         var system = SystemCrew.FinalizerProfiles.Values.ToList();
-        return [.. system, .. custom];
+        // Exclude DB rows already covered by code-defined system profiles to avoid duplicates.
+        var dbOnly = dbRows.Where(p => !SystemCrew.FinalizerProfiles.ContainsKey(p.Name)).ToList();
+        return [.. system, .. dbOnly];
     }
 
     public async Task<FinalizerProfile?> GetFinalizerProfileAsync(
