@@ -72,7 +72,8 @@ public sealed class CrewServiceAdvisorCrudTests
             advisorRepo   ?? new InMemoryAdvisorProfileRepository(),
             groundingRepo ?? new InMemoryGroundingProviderProfileRepository(),
             new InMemoryFinalizerProfileRepository(),
-            templateRepo  ?? new InMemoryCrewTemplateRepository());
+            templateRepo  ?? new InMemoryCrewTemplateRepository(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<CrewService>.Instance);
 
     private static AdvisorProfile BuildAdvisorProfile(string name) => new(
         Name: name,

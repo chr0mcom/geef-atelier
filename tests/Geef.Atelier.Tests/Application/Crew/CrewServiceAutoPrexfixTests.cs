@@ -94,7 +94,8 @@ public sealed class CrewServiceAutoPrexfixTests
             advisorRepo   ?? new InMemoryAdvisorProfileRepository(),
             groundingRepo ?? new InMemoryGroundingProviderProfileRepository(),
             new InMemoryFinalizerProfileRepository(),
-            templateRepo  ?? new InMemoryCrewTemplateRepository());
+            templateRepo  ?? new InMemoryCrewTemplateRepository(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<CrewService>.Instance);
 
     private static ReviewerProfile BuildReviewerProfile(string name) => new(
         name, name, name, "prompt", "openrouter", "model", null, false);
