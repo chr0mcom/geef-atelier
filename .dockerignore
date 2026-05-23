@@ -6,7 +6,6 @@
 **/bin
 **/*.user
 **/TestResults
-docs/
 *.md
 .editorconfig
 geef_*.md
