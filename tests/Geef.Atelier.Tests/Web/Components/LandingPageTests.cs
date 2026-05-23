@@ -171,9 +171,9 @@ public sealed class LandingPageTests : TestContext
     {
         var cut = RenderComponent<LandingFilm>();
         var video = cut.Find(".lp-film-video");
-        Assert.Equal("media/geef-film-poster.jpg", video.GetAttribute("poster"));
+        Assert.Equal("media/geef-film-en-poster.jpg", video.GetAttribute("poster"));
         var source = cut.Find(".lp-film-video source");
-        Assert.Equal("media/geef-film.mp4", source.GetAttribute("src"));
+        Assert.Equal("media/geef-film-en.mp4", source.GetAttribute("src"));
         Assert.Equal("video/mp4", source.GetAttribute("type"));
     }
 
@@ -183,6 +183,27 @@ public sealed class LandingPageTests : TestContext
         var cut = RenderComponent<LandingFilm>();
         var play = cut.Find(".lp-film-play");
         Assert.Equal("button", play.GetAttribute("type"));
+    }
+
+    [Fact]
+    public void LandingFilm_HasEnglishAndGermanLanguageToggle()
+    {
+        var cut = RenderComponent<LandingFilm>();
+        var en = cut.Find(".lp-film-lang[data-lang=en]");
+        var de = cut.Find(".lp-film-lang[data-lang=de]");
+        Assert.Contains("is-active", en.GetAttribute("class"));
+        Assert.DoesNotContain("is-active", de.GetAttribute("class"));
+    }
+
+    [Fact]
+    public void LandingFilm_VideoCarriesBothLanguageSources()
+    {
+        var cut = RenderComponent<LandingFilm>();
+        var video = cut.Find(".lp-film-video");
+        Assert.Equal("media/geef-film-en.mp4", video.GetAttribute("data-src-en"));
+        Assert.Equal("media/geef-film-de.mp4", video.GetAttribute("data-src-de"));
+        Assert.Equal("media/geef-film-en-poster.jpg", video.GetAttribute("data-poster-en"));
+        Assert.Equal("media/geef-film-de-poster.jpg", video.GetAttribute("data-poster-de"));
     }
 
     // ── Closing ──────────────────────────────────────────────────────────

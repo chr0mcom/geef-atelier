@@ -16,10 +16,19 @@
             </div>
             <div class="lp-film-colophon-r">Reel · 00:60</div>
 
+            <div class="lp-film-langs" role="group" aria-label="Film language" data-testid="film-langs">
+                <button type="button" class="lp-film-lang is-active" data-lang="en"
+                        aria-pressed="true" data-testid="film-lang-en">EN</button>
+                <button type="button" class="lp-film-lang" data-lang="de"
+                        aria-pressed="false" data-testid="film-lang-de">DE</button>
+            </div>
+
             <div class="lp-film-stage" data-testid="film-stage">
                 <video class="lp-film-video" playsinline preload="none"
-                       poster="media/geef-film-poster.jpg" data-testid="film-video">
-                    <source src="media/geef-film.mp4" type="video/mp4" />
+                       poster="media/geef-film-en-poster.jpg" data-testid="film-video"
+                       data-src-en="media/geef-film-en.mp4" data-poster-en="media/geef-film-en-poster.jpg"
+                       data-src-de="media/geef-film-de.mp4" data-poster-de="media/geef-film-de-poster.jpg">
+                    <source src="media/geef-film-en.mp4" type="video/mp4" />
                     Your browser does not support embedded video.
                 </video>
                 <button type="button" class="lp-film-play" data-testid="film-play"

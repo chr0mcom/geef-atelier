@@ -743,6 +743,34 @@ body[data-static="1"] .geef-flow .loop .loop-path { animation: none !important; 
   color: var(--ink-3); z-index: 4;
 }
 
+.lp-film-langs {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  margin: 0 0 12px;
+}
+.lp-film-lang {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 5px 12px;
+  border: 1px solid var(--hairline-soft);
+  border-radius: 2px;
+  background: var(--surface);
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: color .2s ease, border-color .2s ease, background .2s ease;
+}
+.lp-film-lang:hover { color: var(--ink-2); border-color: var(--hairline-strong); }
+.lp-film-lang.is-active {
+  color: var(--on-hero);
+  background: var(--hero);
+  border-color: var(--hero);
+}
+
 .lp-film-stage {
   position: relative;
   z-index: 2;

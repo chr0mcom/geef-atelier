@@ -33,6 +33,39 @@
         filmStage.classList.add('playing');
         filmVideo.controls = true;
       });
+
+      // Language toggle — swap source + poster, reset to the poster state
+      var langBtns = filmStage.querySelectorAll('.lp-film-lang');
+      var filmSource = filmVideo.querySelector('source');
+      langBtns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var lang = btn.getAttribute('data-lang');
+          var src = filmVideo.getAttribute('data-src-' + lang);
+          var poster = filmVideo.getAttribute('data-poster-' + lang);
+          if (!src || btn.classList.contains('is-active')) return;
+
+          var wasPlaying = !filmVideo.paused && !filmVideo.ended;
+          filmVideo.pause();
+          if (filmSource) filmSource.setAttribute('src', src);
+          if (poster) filmVideo.setAttribute('poster', poster);
+          filmVideo.load();
+
+          langBtns.forEach(function (b) {
+            var on = b === btn;
+            b.classList.toggle('is-active', on);
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+          });
+
+          if (wasPlaying) {
+            filmStage.classList.add('playing');
+            filmVideo.controls = true;
+            filmVideo.play();
+          } else {
+            filmStage.classList.remove('playing');
+            filmVideo.controls = false;
+          }
+        });
+      });
     }
   }
 
