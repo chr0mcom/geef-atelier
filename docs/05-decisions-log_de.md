@@ -1114,3 +1114,23 @@ Der naive Ansatz (ungefiltertes Self-RAG) wurde bewusst verworfen: Er führt zu 
 **Was bewusst NICHT in diesem Schritt:** kein ungefiltertes Auto-Schreiben; kein Schreiben in die kuratierte KB; kein Analytics-Dashboard; keine schreibseitige Learning-Dedup; kein Learning-Verfall; keine Cross-User-Learnings; kein Multi-Hop-Learning; kein Backfill historischer Runs.
 
 **Tests:** 1439 gesamt. Neu: ca. 57 Tests — Anti-Rekursion, RunKind, Threshold, Fire-and-Forget, Publisher, Retriever-Domänen-Boost, UI (bUnit).
+
+---
+
+## 23. Mai 2026 — Bugfix Learning-Retrieval-Provider (D-055)
+
+### D-055: Bugfix — Continuous-Learning-Loop vollständig schließen
+
+*Branch: `fix/learning-retrieval-provider` / PR #30*
+
+Der in D-054 gebaute Loop war produktiv wirkungslos: `learning-retriever-default` erschien nicht in der Provider-Liste. Diagnose ergab zwei unabhängige Ursachen:
+
+**Ursache 1 — lautloses Wegfiltern (Hauptursache):** `ListGroundingProviderProfilesAsync` gibt `[.. SystemCrew-Konstanten, .. DB-Zeilen-mit-IsSystem==false]` zurück. `learning-retriever-default` hatte `IsSystem=true` in der DB, fehlte aber in `SystemCrew.GroundingProviderProfiles` — es fiel durch beide Siebe ohne Fehlermeldung.
+
+**Ursache 2 — fehlende DI-Registrierung:** `LearningRetrievalGroundingProvider` war nicht in `GroundingServiceExtensions.AddGroundingProviders` registriert. Die Factory hätte bei Laufzeit `InvalidOperationException` geworfen.
+
+**Fix:** `SystemCrew.cs` um `LearningRetrieverDefaultProfile` ergänzt; DI-Registrierung nachgezogen; `ILogger<CrewService>` + Warning-Log für unverfolgte System-Profile. Keine neue Migration — das DB-Profil existierte korrekt (Step30).
+
+**Mitbehobene D-054-Fehler:** `learning-extractor` fälschlicherweise in alle Standard-Templates eingetragen → entfernt (opt-in). Finalizer-Count-Test auf 19 aktualisiert.
+
+**Tests:** 1528 grün. Neu: 13 Regressions-Tests — hätten D-055 verhindert.
