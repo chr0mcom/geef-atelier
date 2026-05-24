@@ -15,7 +15,15 @@ internal sealed class OAuthClientRepository(AtelierDbContext db) : IOAuthClientR
     public async Task AddAsync(OAuthClient client, CancellationToken ct)
     {
         db.OAuthClients.Add(client);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch
+        {
+            db.Entry(client).State = EntityState.Detached;
+            throw;
+        }
     }
 
     public async Task DeleteAsync(string clientId, CancellationToken ct)

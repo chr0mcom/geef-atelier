@@ -21,6 +21,10 @@ internal sealed class OAuthService(
         var clientId = string.IsNullOrWhiteSpace(request.ClientId)
             ? OAuthCrypto.GenerateToken()
             : request.ClientId.Trim();
+
+        if (await clientRepo.FindByClientIdAsync(clientId, ct) is not null)
+            throw new InvalidOperationException($"A client with ID '{clientId}' already exists.");
+
         var client   = new OAuthClient(
             ClientId: clientId,
             ClientName: request.ClientName,

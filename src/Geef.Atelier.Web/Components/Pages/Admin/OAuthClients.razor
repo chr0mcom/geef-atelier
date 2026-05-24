@@ -197,6 +197,8 @@
 
     private async Task CreateClientAsync()
     {
+        if (_saving) return;
+
         if (string.IsNullOrWhiteSpace(_formClientName))
         {
             _formError = "Name is required.";
