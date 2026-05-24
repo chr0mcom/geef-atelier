@@ -112,6 +112,13 @@ async def _dispatch(req: ChatCompletionRequest) -> str:
         return await codex_adapter.complete(prompt, req.model, max_tokens)
 
 
+_JSON_RETRY_SUFFIX = (
+    "\n\nCRITICAL: Your previous response did not contain valid JSON. "
+    "You MUST respond with ONLY a valid JSON object — no explanation, no prose, no markdown fences. "
+    "Start your response with '{' and end it with '}'. Nothing else."
+)
+
+
 def _build_response(req: ChatCompletionRequest, raw_text: str) -> ChatCompletionResponse:
     """Converts raw CLI output into an OpenAI-compatible response."""
     tool_name = _extract_tool_name(req)
@@ -120,11 +127,15 @@ def _build_response(req: ChatCompletionRequest, raw_text: str) -> ChatCompletion
         json_str = extract_json(raw_text)
         if json_str:
             return make_tool_response(req.model, tool_name, json_str)
-        # Defensive fallback: return as plain text — downstream will handle gracefully.
-        log.warning("Tool-use requested but JSON extraction failed; returning as plain text")
+        log.warning("Tool-use requested but JSON extraction failed; raw=%r", raw_text[:200])
         return make_text_response(req.model, raw_text)
 
     return make_text_response(req.model, raw_text)
+
+
+def _needs_json_retry(resp: ChatCompletionResponse, req: ChatCompletionRequest) -> bool:
+    """Returns True when a tool was expected but the response lacks tool_calls."""
+    return bool(_extract_tool_name(req)) and resp.choices[0].finish_reason != "tool_calls"
 
 
 # ---------------------------------------------------------------------------
@@ -135,14 +146,24 @@ async def _call_claude(req: ChatCompletionRequest) -> ChatCompletionResponse:
     prompt = _build_prompt(req)
     log.info("Dispatching to claude | model=%s | tool=%s", req.model, _extract_tool_name(req))
     raw = await claude_adapter.complete(prompt, req.model, req.max_tokens)
-    return _build_response(req, raw)
+    resp = _build_response(req, raw)
+    if _needs_json_retry(resp, req):
+        log.warning("claude JSON extraction failed — retrying with explicit JSON reminder")
+        raw = await claude_adapter.complete(prompt + _JSON_RETRY_SUFFIX, req.model, req.max_tokens)
+        resp = _build_response(req, raw)
+    return resp
 
 
 async def _call_codex(req: ChatCompletionRequest) -> ChatCompletionResponse:
     prompt = _build_prompt(req)
     log.info("Dispatching to codex | model=%s | tool=%s", req.model, _extract_tool_name(req))
     raw = await codex_adapter.complete(prompt, req.model, req.max_tokens)
-    return _build_response(req, raw)
+    resp = _build_response(req, raw)
+    if _needs_json_retry(resp, req):
+        log.warning("codex JSON extraction failed — retrying with explicit JSON reminder")
+        raw = await codex_adapter.complete(prompt + _JSON_RETRY_SUFFIX, req.model, req.max_tokens)
+        resp = _build_response(req, raw)
+    return resp
 
 
 # ---------------------------------------------------------------------------
