@@ -39,7 +39,8 @@ internal sealed class LlmClientResolver(
     public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
     {
         var client = ResolveClient(provider);
-        return (client, model, maxTokens ?? options.Value.DefaultMaxTokens);
+        var normalised = ModelNameNormalizer.Normalize(provider, model);
+        return (client, normalised, maxTokens ?? options.Value.DefaultMaxTokens);
     }
 
     /// <summary>Clears the provider lookup cache so the next call re-fetches from the service.</summary>

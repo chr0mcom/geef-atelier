@@ -63,7 +63,7 @@ public sealed class ProviderTests
         Assert.Equal("claude", typed.CliKind);
         Assert.Equal("claude", typed.Binary);
         Assert.Equal(2, typed.MaxConcurrent);
-        Assert.Contains("anthropic/claude-opus-4.7", typed.Models);
+        Assert.Contains("claude-opus-4-7", typed.Models);
     }
 
     [Fact]
@@ -102,6 +102,6 @@ public sealed class ProviderTests
         var typed = CliProviderSettings.FromSettings(settings);
         Assert.Equal("gemini", typed.CliKind);
         Assert.Equal("gemini", typed.Binary);
-        Assert.Contains("google/gemini-2.5-pro", typed.Models);
+        Assert.Contains("gemini-2-5-pro", typed.Models);
     }
 }

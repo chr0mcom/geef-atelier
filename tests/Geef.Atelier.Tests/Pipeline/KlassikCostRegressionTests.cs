@@ -36,8 +36,8 @@ public sealed class KlassikCostRegressionTests
                 UsdToEurRate = 0.92,
                 Models = new Dictionary<string, ModelPricing>
                 {
-                    // Executor model from SystemCrew.DefaultExecutorProfile
-                    ["anthropic/claude-opus-4.7"]  = new ModelPricing(15m, 75m),
+                    // Executor model from SystemCrew.DefaultExecutorProfile (canonical name)
+                    ["claude-opus-4-7"]            = new ModelPricing(15m, 75m),
                     // Reviewer models from SystemCrew reviewer profiles
                     ["openai/gpt-4o-mini"]          = new ModelPricing(0.15m, 0.60m),
                     ["anthropic/claude-sonnet-4-5"] = new ModelPricing(3m, 15m),

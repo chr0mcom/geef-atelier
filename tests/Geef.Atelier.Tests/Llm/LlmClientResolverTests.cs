@@ -125,7 +125,7 @@ public sealed class LlmClientResolverTests
         var (client, model, maxTokens) = resolver.ForProfile("claude-cli", "claude-opus-4.7", 4096);
 
         Assert.NotNull(client);
-        Assert.Equal("claude-opus-4.7", model);
+        Assert.Equal("claude-opus-4-7", model); // dots normalized to dashes for claude-cli
         Assert.Equal(4096, maxTokens);
     }
 

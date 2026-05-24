@@ -120,7 +120,7 @@ public static class SystemProviders
         binary: "claude",
         authVolume: "/auth/claude",
         authCommand: "claude auth login",
-        models: ["anthropic/claude-opus-4.7", "anthropic/claude-sonnet-4.6", "anthropic/claude-haiku-4.5"]
+        models: ["claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"]
     );
 
     /// <summary>OpenAI via the official Codex CLI subscription.</summary>
@@ -132,7 +132,7 @@ public static class SystemProviders
         binary: "codex",
         authVolume: "/auth/codex",
         authCommand: "codex auth login",
-        models: ["openai/gpt-5.5", "openai/gpt-5.5-mini", "openai/gpt-4o", "openai/o1", "openai/o3-mini"]
+        models: ["gpt-5.5", "gpt-5.5-mini", "gpt-4o", "o1", "o3-mini"]
     );
 
     /// <summary>Google Gemini via the official Gemini CLI with free-tier quota.</summary>
@@ -145,7 +145,7 @@ public static class SystemProviders
         authVolume: "/auth/gemini",
         authCommand: "gemini",
         authEnvVarAlternative: "GEMINI_API_KEY",
-        models: ["google/gemini-2.5-pro", "google/gemini-2.5-flash", "google/gemini-3.1-pro", "google/gemini-3.1-flash"]
+        models: ["gemini-2-5-pro", "gemini-2-5-flash", "gemini-3-1-pro", "gemini-3-1-flash"]
     );
 
     // Note: opencode-cli is excluded pending Architect verification of install mechanism.
