@@ -1,8 +1,14 @@
 namespace Geef.Atelier.Mcp.Models;
 
+public sealed record FindingDto(
+    string ReviewerName,
+    string Severity,
+    string Message);
+
 public sealed record IterationDto(
     int IterationNumber,
-    string? ArtifactText);
+    string? ArtifactText,
+    IReadOnlyList<FindingDto> Findings);
 
 public sealed record RunDetailsDto(
     string RunId,

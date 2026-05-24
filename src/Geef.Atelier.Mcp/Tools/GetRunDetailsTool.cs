@@ -23,7 +23,11 @@ public static class GetRunDetailsTool
         var iterations = details.Iterations
             .Select(i => new IterationDto(
                 i.Iteration.IterationNumber,
-                i.Iteration.ArtifactText))
+                i.Iteration.ArtifactText,
+                i.Findings.Select(f => new FindingDto(
+                    f.ReviewerName,
+                    f.Severity.ToString(),
+                    f.Message)).ToList()))
             .ToList();
         return new RunDetailsDto(
             details.Run.Id.ToString(),
