@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Geef.Atelier.Application.Crew.Finalizers;
 using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Application.Providers;
@@ -58,7 +59,7 @@ internal sealed class TransformFinalizerExecutor(
         }
 
         string? updatedText = null;
-        RunArtifact? errorArtifact = null;
+        RunArtifact? artifact = null;
         decimal? costEur = null;
         int inputTokens = 0, outputTokens = 0;
 
@@ -75,38 +76,74 @@ internal sealed class TransformFinalizerExecutor(
                 MaxTokens = maxTokens,
             }, cancellationToken);
 
-            updatedText = response.Text;
             inputTokens = response.TokenUsage.InputTokens;
             outputTokens = response.TokenUsage.OutputTokens;
             costEur = pricingCatalog.CalculateCostEur(model, inputTokens, outputTokens, settings.Provider);
 
-            logger.LogInformation(
-                "Transform finalizer {Profile} completed: {In}→{Out} tokens, model={Model}",
-                profile.Name, inputTokens, outputTokens, model);
+            if (string.IsNullOrWhiteSpace(response.Text))
+            {
+                logger.LogWarning(
+                    "Transform finalizer {Profile} returned empty response; original text preserved.", profile.Name);
+                artifact = MakeStatusArtifact(context.RunId, profile.Name, "warning",
+                    "Transform returned empty response — original text preserved.");
+            }
+            else
+            {
+                updatedText = response.Text;
+                var chunks = ParagraphDiff.Compute(context.CurrentText, updatedText);
+                var noChanges = chunks.All(c => c.Op == ParagraphDiff.Op.Equal);
+                var diffJson = BuildDiffJson(settings.Model, settings.Provider, noChanges, chunks);
+                artifact = MakeStatusArtifact(context.RunId, profile.Name,
+                    noChanges ? "no-changes" : "transform-diff", diffJson);
+
+                logger.LogInformation(
+                    "Transform finalizer {Profile} completed: {In}→{Out} tokens, model={Model}, changed={Changed}",
+                    profile.Name, inputTokens, outputTokens, model, !noChanges);
+            }
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Transform finalizer failed for profile {Profile}", profile.Name);
-            errorArtifact = new RunArtifact
-            {
-                Id = Guid.NewGuid(),
-                RunId = context.RunId,
-                FinalizerProfileName = profile.Name,
-                ArtifactType = ArtifactType.Status,
-                StorageUri = "error",
-                StatusMessage = $"Transform failed: {ex.Message}",
-                CreatedAt = DateTimeOffset.UtcNow,
-            };
+            artifact = MakeStatusArtifact(context.RunId, profile.Name, "error",
+                $"Transform failed: {ex.Message}");
         }
 
         return new FinalizerExecutionResult(
             UpdatedText: updatedText,
-            Artifact: errorArtifact,
+            Artifact: artifact,
             CostEur: costEur,
             ActorName: profile.Name,
             ModelName: settings.Model,
             InputTokens: inputTokens,
             OutputTokens: outputTokens,
             ProviderName: settings.Provider);
+    }
+
+    private static RunArtifact MakeStatusArtifact(Guid runId, string profileName, string storageUri, string? message) =>
+        new()
+        {
+            Id = Guid.NewGuid(),
+            RunId = runId,
+            FinalizerProfileName = profileName,
+            ArtifactType = ArtifactType.Status,
+            StorageUri = storageUri,
+            StatusMessage = message,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+    private static string BuildDiffJson(string model, string provider, bool noChanges, IReadOnlyList<ParagraphDiff.Chunk> chunks)
+    {
+        var obj = new
+        {
+            model,
+            provider,
+            noChanges,
+            chunks = chunks.Select(c => new
+            {
+                op = c.Op.ToString().ToLowerInvariant(),
+                text = c.Text
+            }).ToArray()
+        };
+        return JsonSerializer.Serialize(obj, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
     }
 }

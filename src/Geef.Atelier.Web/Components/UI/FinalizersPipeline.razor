@@ -1,0 +1,324 @@
+@using Geef.Atelier.Core.Domain.Crew
+@using Geef.Atelier.Core.Domain.Crew.Finalizers
+@using System.Text.Json
+@using System.Text.RegularExpressions
+
+@if (_steps.Count > 0)
+{
+    <section class="fp-pipeline" data-testid="finalizers-pipeline">
+        <div class="fp-header">
+            <h3>Post-Processing</h3>
+            <span class="fp-count">@_steps.Count @(_steps.Count == 1 ? "step" : "steps")</span>
+        </div>
+
+        <div class="fp-steps">
+            @foreach (var step in _steps)
+            {
+                <div class="fp-step" data-status="@step.Status" data-testid="fp-step-@step.Name">
+                    <div class="fp-step-icon-col">
+                        <div class="fp-step-icon">@((MarkupString)GetIcon(step.Type))</div>
+                        @if (step != _steps[^1])
+                        {
+                            <div class="fp-step-connector"></div>
+                        }
+                    </div>
+                    <div class="fp-step-body">
+                        <div class="fp-step-row">
+                            <span class="fp-step-name">@step.DisplayName</span>
+                            @if (step.ModelLabel is not null)
+                            {
+                                <span class="fp-badge fp-badge-model">@step.ModelLabel</span>
+                            }
+                            <span class="fp-badge fp-badge-status @StatusClass(step.Status)">@StatusLabel(step.Status)</span>
+                        </div>
+
+                        @if (step.Detail is not null)
+                        {
+                            <div class="fp-step-detail">@step.Detail</div>
+                        }
+
+                        @if (step.DiffChunks is not null)
+                        {
+                            var changed = step.DiffChunks.Any(c => c.Op != "equal");
+                            if (!changed)
+                            {
+                                <div class="fp-step-detail fp-no-changes">No changes — text already clean.</div>
+                            }
+                            else
+                            {
+                                var changeCount = step.DiffChunks.Count(c => c.Op == "delete");
+                                var isExpanded = _expanded.Contains(step.Name);
+                                <button class="fp-diff-toggle" @onclick="() => ToggleDiff(step.Name)">
+                                    <span class="fp-diff-chevron @(isExpanded ? "open" : "")">▶</span>
+                                    @changeCount paragraph@(changeCount != 1 ? "s" : "") revised
+                                </button>
+                                @if (isExpanded)
+                                {
+                                    <div class="fp-diff-view" role="region">
+                                        @foreach (var chunk in step.DiffChunks)
+                                        {
+                                            @if (chunk.Op == "equal")
+                                            {
+                                                var preview = TruncateLine(chunk.Text, 120);
+                                                <div class="fp-diff-chunk fp-diff-equal">
+                                                    <span class="fp-diff-label">···</span>
+                                                    <span class="fp-diff-text">@preview</span>
+                                                </div>
+                                            }
+                                            else if (chunk.Op == "delete")
+                                            {
+                                                <div class="fp-diff-chunk fp-diff-delete">
+                                                    <span class="fp-diff-label">−</span>
+                                                    <span class="fp-diff-text">@chunk.Text</span>
+                                                </div>
+                                            }
+                                            else if (chunk.Op == "insert")
+                                            {
+                                                <div class="fp-diff-chunk fp-diff-insert">
+                                                    <span class="fp-diff-label">+</span>
+                                                    <span class="fp-diff-text">@chunk.Text</span>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                }
+                            }
+                        }
+
+                        @if (step.ErrorMessage is not null)
+                        {
+                            <div class="fp-step-error">@step.ErrorMessage</div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public CrewSnapshot? Snapshot { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<RunArtifact> Artifacts { get; set; } = [];
+    [Parameter] public string? FinalText { get; set; }
+
+    private List<PipelineStep> _steps = [];
+    private readonly HashSet<string> _expanded = [];
+
+    protected override void OnParametersSet() => Rebuild();
+
+    private void Rebuild()
+    {
+        _steps = [];
+        if (Snapshot?.Finalizers is not { Count: > 0 } finalizers) return;
+
+        foreach (var f in finalizers)
+        {
+            var artifact = Artifacts.FirstOrDefault(a => a.FinalizerProfileName == f.Name);
+            _steps.Add(BuildStep(f, artifact));
+        }
+    }
+
+    private PipelineStep BuildStep(FinalizerProfile f, RunArtifact? artifact)
+    {
+        var modelLabel = GetModelLabel(f);
+
+        return f.FinalizerType switch
+        {
+            FinalizerType.Transform    => BuildTransformStep(f, artifact, modelLabel),
+            FinalizerType.MetadataEnrich => BuildMetadataStep(f, artifact),
+            FinalizerType.FileExport   => BuildFileStep(f, artifact),
+            FinalizerType.ExternalSink => BuildSinkStep(f, artifact, modelLabel),
+            FinalizerType.LearningExtract => BuildLearningStep(f, artifact),
+            FinalizerType.LearningPublish => BuildLearningStep(f, artifact),
+            _ => new PipelineStep(f.Name, f.DisplayName, f.FinalizerType, "unknown", modelLabel)
+        };
+    }
+
+    // ── Transform ─────────────────────────────────────────────────────────────
+
+    private static PipelineStep BuildTransformStep(FinalizerProfile f, RunArtifact? artifact, string? modelLabel)
+    {
+        if (artifact is null)
+            return new PipelineStep(f.Name, f.DisplayName, f.FinalizerType, "unknown", modelLabel);
+
+        if (artifact.StorageUri == "error")
+            return new PipelineStep(f.Name, f.DisplayName, f.FinalizerType, "error", modelLabel,
+                ErrorMessage: artifact.StatusMessage);
+
+        if (artifact.StorageUri == "warning")
+            return new PipelineStep(f.Name, f.DisplayName, f.FinalizerType, "warning", modelLabel,
+                Detail: artifact.StatusMessage);
+
+        // Parse diff JSON from StatusMessage
+        List<DiffChunk>? chunks = null;
+        if (artifact.StatusMessage is { Length: > 0 } json)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("chunks", out var arr))
+                {
+                    chunks = arr.EnumerateArray()
+                        .Select(el => new DiffChunk(
+                            el.GetProperty("op").GetString() ?? "equal",
+                            el.GetProperty("text").GetString() ?? ""))
+                        .ToList();
+                }
+            }
+            catch { /* graceful degradation for pre-feature runs */ }
+        }
+
+        return new PipelineStep(f.Name, f.DisplayName, f.FinalizerType, "success", modelLabel,
+            DiffChunks: chunks);
+    }
+
+    // ── MetadataEnrich ────────────────────────────────────────────────────────
+
+    private PipelineStep BuildMetadataStep(FinalizerProfile f, RunArtifact? artifact)
+    {
+        if (artifact?.StorageUri == "error")
+            return new PipelineStep(f.Name, f.DisplayName, f.FinalizerType, "error",
+                ErrorMessage: artifact.StatusMessage);
+
+        var detail = ExtractMetadataDetail(f);
+        return new PipelineStep(f.Name, f.DisplayName, f.FinalizerType, "success", Detail: detail);
+    }
+
+    private string? ExtractMetadataDetail(FinalizerProfile f)
+    {
+        if (FinalText is not { Length: > 0 } text) return null;
+        f.Settings.TryGetValue("EnricherType", out var enricherType);
+
+        return enricherType switch
+        {
+            "word-count-footer" => ExtractWordCount(text),
+            "reading-level"     => ExtractReadingLevel(text),
+            "front-matter"      => text.TrimStart().StartsWith("---") ? "YAML front matter added" : null,
+            _ => null
+        };
+    }
+
+    private static string? ExtractWordCount(string text)
+    {
+        var m = Regex.Match(text, @"\*(\d[\d,]*) words · ~(\d+) min read\*");
+        return m.Success ? $"{m.Groups[1].Value} words · ~{m.Groups[2].Value} min read" : null;
+    }
+
+    private static string? ExtractReadingLevel(string text)
+    {
+        var m = Regex.Match(text, @"Estimated reading level: ([^\*\r\n]+)");
+        return m.Success ? m.Groups[1].Value.Trim() : null;
+    }
+
+    // ── FileExport ────────────────────────────────────────────────────────────
+
+    private static PipelineStep BuildFileStep(FinalizerProfile f, RunArtifact? artifact)
+    {
+        if (artifact is null)
+            return new PipelineStep(f.Name, f.DisplayName, f.FinalizerType, "unknown");
+
+        if (artifact.StorageUri == "error")
+            return new PipelineStep(f.Name, f.DisplayName, f.FinalizerType, "error",
+                ErrorMessage: artifact.StatusMessage);
+
+        var detail = artifact.Filename is not null
+            ? $"{artifact.Filename} ({FormatBytes(artifact.SizeBytes ?? 0)})"
+            : null;
+        return new PipelineStep(f.Name, f.DisplayName, f.FinalizerType, "success", Detail: detail);
+    }
+
+    // ── ExternalSink ──────────────────────────────────────────────────────────
+
+    private static PipelineStep BuildSinkStep(FinalizerProfile f, RunArtifact? artifact, string? modelLabel)
+    {
+        if (artifact is null)
+            return new PipelineStep(f.Name, f.DisplayName, f.FinalizerType, "unknown", modelLabel);
+
+        if (artifact.StorageUri == "error")
+            return new PipelineStep(f.Name, f.DisplayName, f.FinalizerType, "error", modelLabel,
+                ErrorMessage: artifact.StatusMessage);
+
+        return new PipelineStep(f.Name, f.DisplayName, f.FinalizerType, "success", modelLabel,
+            Detail: artifact.StorageUri.StartsWith("http") ? artifact.StorageUri : null);
+    }
+
+    // ── LearningExtract / LearningPublish ─────────────────────────────────────
+
+    private static PipelineStep BuildLearningStep(FinalizerProfile f, RunArtifact? artifact)
+    {
+        if (artifact?.StorageUri == "error")
+            return new PipelineStep(f.Name, f.DisplayName, f.FinalizerType, "error",
+                ErrorMessage: artifact.StatusMessage);
+
+        var detail = artifact?.StatusMessage;
+        return new PipelineStep(f.Name, f.DisplayName, f.FinalizerType, "success", Detail: detail);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static string? GetModelLabel(FinalizerProfile f) =>
+        f.Settings.TryGetValue("Model", out var model) && f.Settings.TryGetValue("Provider", out var provider)
+            ? $"{model} · {provider}"
+            : null;
+
+    private static string GetIcon(FinalizerType type) => type switch
+    {
+        FinalizerType.Transform      => "<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M4 20l1.2-4.2L16 5l3 3L8.2 18.8 4 20z'/><path d='M14 7l3 3'/></svg>",
+        FinalizerType.MetadataEnrich => "<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='3' width='18' height='18' rx='2'/><path d='M3 9h18M9 21V9'/></svg>",
+        FinalizerType.FileExport     => "<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4'/><polyline points='7 10 12 15 17 10'/><line x1='12' y1='15' x2='12' y2='3'/></svg>",
+        FinalizerType.ExternalSink   => "<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><line x1='22' y1='2' x2='11' y2='13'/><polygon points='22 2 15 22 11 13 2 9 22 2'/></svg>",
+        FinalizerType.LearningExtract or FinalizerType.LearningPublish
+                                     => "<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M4 19.5A2.5 2.5 0 016.5 17H20'/><path d='M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z'/></svg>",
+        _ => "<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/></svg>"
+    };
+
+    private static string StatusClass(string status) => status switch
+    {
+        "success" => "fp-badge-success",
+        "error"   => "fp-badge-error",
+        "warning" => "fp-badge-warning",
+        _         => "fp-badge-unknown"
+    };
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "success" => "✓ Applied",
+        "error"   => "✗ Error",
+        "warning" => "⚠ Warning",
+        _         => "— Unknown"
+    };
+
+    private static string TruncateLine(string text, int maxLen)
+    {
+        var firstLine = text.Split('\n')[0];
+        return firstLine.Length > maxLen ? firstLine[..maxLen] + "…" : firstLine;
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024):F1} MB";
+    }
+
+    private void ToggleDiff(string name)
+    {
+        if (!_expanded.Add(name))
+            _expanded.Remove(name);
+    }
+
+    // ── Model ─────────────────────────────────────────────────────────────────
+
+    private sealed record PipelineStep(
+        string Name,
+        string DisplayName,
+        FinalizerType Type,
+        string Status,
+        string? ModelLabel = null,
+        string? Detail = null,
+        List<DiffChunk>? DiffChunks = null,
+        string? ErrorMessage = null);
+
+    private sealed record DiffChunk(string Op, string Text);
+}

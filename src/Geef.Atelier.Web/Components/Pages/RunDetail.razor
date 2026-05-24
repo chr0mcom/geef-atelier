@@ -182,31 +182,27 @@
             </div>
         }
 
-        @if (_artifacts.Count > 0)
+        <FinalizersPipeline Snapshot="_snapshot"
+                            Artifacts="_artifacts"
+                            FinalText="@_details.Run.FinalText" />
+
+        @if (_artifacts.Any(a => a.ArtifactType is ArtifactType.File or ArtifactType.Url))
         {
             <div class="run-artifacts-section" data-testid="artifacts-section">
-                <h2>Finalizer Artifacts</h2>
-                @if (!string.IsNullOrEmpty(_details.Run.FinalizerErrorMessage))
-                {
-                    <div class="warning-banner" data-testid="finalizer-error">
-                        Partial error: @_details.Run.FinalizerErrorMessage
-                    </div>
-                }
+                <h2>Downloads</h2>
                 <table class="crew-table">
                     <thead>
                         <tr>
                             <th>Finalizer</th>
-                            <th>Type</th>
-                            <th>Details</th>
+                            <th>File</th>
                             <th>Created</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var a in _artifacts)
+                        @foreach (var a in _artifacts.Where(x => x.ArtifactType is ArtifactType.File or ArtifactType.Url))
                         {
                             <tr data-testid="artifact-row-@a.Id">
                                 <td>@a.FinalizerProfileName</td>
-                                <td>@GetArtifactTypeLabel(a.ArtifactType)</td>
                                 <td>
                                     @if (a.ArtifactType == ArtifactType.File && a.Filename is not null)
                                     {
@@ -216,14 +212,10 @@
                                             @a.Filename (@FormatBytes(a.SizeBytes ?? 0))
                                         </a>
                                     }
-                                    else if (a.ArtifactType == ArtifactType.Url)
+                                    else
                                     {
                                         <a href="@a.StorageUri" target="_blank" rel="noopener noreferrer"
                                            data-testid="artifact-url-@a.Id">@a.StorageUri</a>
-                                    }
-                                    else
-                                    {
-                                        <span class="text-muted">@(a.StatusMessage ?? a.StorageUri)</span>
                                     }
                                 </td>
                                 <td>@a.CreatedAt.ToString("HH:mm:ss")</td>
@@ -318,14 +310,6 @@
             _artifacts = [];
         }
     }
-
-    static string GetArtifactTypeLabel(ArtifactType t) => t switch
-    {
-        ArtifactType.File   => "File",
-        ArtifactType.Url    => "URL",
-        ArtifactType.Status => "Status",
-        _                   => t.ToString(),
-    };
 
     static string FormatBytes(long bytes)
     {

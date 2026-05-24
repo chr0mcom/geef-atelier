@@ -102,8 +102,9 @@ public sealed class RunDetailArtifactsTests : TestContext
     }
 
     [Fact]
-    public void WithStatusArtifact_RowRenderedWithoutDownloadLink()
+    public void WithStatusArtifact_DownloadsSectionNotRendered()
     {
+        // Status artifacts show in FinalizersPipeline, not the downloads table.
         var artifact = new RunArtifact
         {
             Id = Guid.NewGuid(),
@@ -119,7 +120,8 @@ public sealed class RunDetailArtifactsTests : TestContext
 
         var cut = RenderComponent<RunDetail>(p => p.Add(c => c.RunId, _runId));
 
-        cut.Find("[data-testid='artifacts-section']");
+        Assert.Throws<Bunit.ElementNotFoundException>(
+            () => cut.Find("[data-testid='artifacts-section']"));
         Assert.Throws<Bunit.ElementNotFoundException>(
             () => cut.Find($"[data-testid='artifact-download-{artifact.Id}']"));
     }

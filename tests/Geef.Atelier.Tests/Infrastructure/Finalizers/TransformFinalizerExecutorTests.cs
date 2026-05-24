@@ -54,7 +54,51 @@ public sealed class TransformFinalizerExecutorTests
             MakeContext(), default);
 
         Assert.Equal("Transformed text content.", result.UpdatedText);
-        Assert.Null(result.Artifact);
+    }
+
+    [Fact]
+    public async Task Execute_WithChangedText_ProducesDiffArtifact()
+    {
+        var fakeClient = new ConstantTextClient("Para one.\n\nRevised paragraph.\n\nPara three.");
+        var executor = BuildExecutor(fakeClient);
+
+        var result = await executor.ExecuteAsync(
+            ProfileWith("Transform prompt."),
+            MakeContext("Para one.\n\nOriginal paragraph.\n\nPara three."),
+            default);
+
+        Assert.NotNull(result.Artifact);
+        Assert.Equal("transform-diff", result.Artifact!.StorageUri);
+        Assert.Contains("\"delete\"", result.Artifact.StatusMessage);
+        Assert.Contains("\"insert\"", result.Artifact.StatusMessage);
+    }
+
+    [Fact]
+    public async Task Execute_WithUnchangedText_ProducesNoChangesDiffArtifact()
+    {
+        const string text = "Para one.\n\nPara two.";
+        var fakeClient = new ConstantTextClient(text);
+        var executor = BuildExecutor(fakeClient);
+
+        var result = await executor.ExecuteAsync(
+            ProfileWith("Transform prompt."), MakeContext(text), default);
+
+        Assert.NotNull(result.Artifact);
+        Assert.Equal("no-changes", result.Artifact!.StorageUri);
+    }
+
+    [Fact]
+    public async Task Execute_WhenLlmReturnsEmpty_PreservesOriginalAndProducesWarningArtifact()
+    {
+        var fakeClient = new ConstantTextClient(string.Empty);
+        var executor = BuildExecutor(fakeClient);
+
+        var result = await executor.ExecuteAsync(
+            ProfileWith("Transform prompt."), MakeContext("Original text."), default);
+
+        Assert.Null(result.UpdatedText);
+        Assert.NotNull(result.Artifact);
+        Assert.Equal("warning", result.Artifact!.StorageUri);
     }
 
     [Fact]

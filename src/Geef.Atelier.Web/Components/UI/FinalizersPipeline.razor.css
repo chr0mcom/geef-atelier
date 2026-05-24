@@ -1,0 +1,291 @@
+/* ── Container ──────────────────────────────────────────────────────────── */
+
+.fp-pipeline {
+    margin-top: 40px;
+    margin-bottom: 8px;
+}
+
+.fp-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.fp-header h3 {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    margin: 0;
+}
+
+.fp-count {
+    font-size: 11px;
+    color: var(--ink-3);
+}
+
+/* ── Step list ──────────────────────────────────────────────────────────── */
+
+.fp-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.fp-step {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+}
+
+/* ── Icon column ────────────────────────────────────────────────────────── */
+
+.fp-step-icon-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    width: 28px;
+}
+
+.fp-step-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--surface-2);
+    border: 1px solid var(--paper-rule);
+    color: var(--ink-2);
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+}
+
+.fp-step[data-status="success"] .fp-step-icon {
+    background: oklch(from var(--hero) l c h / 0.12);
+    border-color: oklch(from var(--hero) l c h / 0.35);
+    color: var(--hero);
+}
+
+.fp-step[data-status="error"] .fp-step-icon {
+    background: var(--sv-critical-bg);
+    border-color: oklch(from var(--sv-critical-fg) l c h / 0.35);
+    color: var(--sv-critical-fg);
+}
+
+.fp-step[data-status="warning"] .fp-step-icon {
+    background: var(--sv-major-bg);
+    border-color: oklch(from var(--sv-major-fg) l c h / 0.35);
+    color: var(--sv-major-fg);
+}
+
+.fp-step-connector {
+    width: 1px;
+    flex: 1;
+    min-height: 20px;
+    background: var(--paper-rule);
+    margin: 4px 0;
+}
+
+/* ── Step body ──────────────────────────────────────────────────────────── */
+
+.fp-step-body {
+    flex: 1;
+    padding-bottom: 18px;
+    min-width: 0;
+}
+
+.fp-step-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding-top: 5px;
+}
+
+.fp-step-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-1);
+}
+
+/* ── Badges ─────────────────────────────────────────────────────────────── */
+
+.fp-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.fp-badge-model {
+    background: var(--surface-2);
+    color: var(--ink-3);
+    font-family: var(--font-mono);
+    font-size: 10px;
+}
+
+.fp-badge-success {
+    background: oklch(from var(--hero) l c h / 0.12);
+    color: var(--hero);
+}
+
+.fp-badge-error {
+    background: var(--sv-critical-bg);
+    color: var(--sv-critical-fg);
+}
+
+.fp-badge-warning {
+    background: var(--sv-major-bg);
+    color: var(--sv-major-fg);
+}
+
+.fp-badge-unknown {
+    background: var(--surface-2);
+    color: var(--ink-3);
+}
+
+/* ── Detail line ────────────────────────────────────────────────────────── */
+
+.fp-step-detail {
+    font-size: 12px;
+    color: var(--ink-2);
+    margin-top: 4px;
+}
+
+.fp-no-changes {
+    color: var(--ink-3);
+    font-style: italic;
+}
+
+.fp-step-error {
+    font-size: 12px;
+    color: var(--sv-critical-fg);
+    background: var(--sv-critical-bg);
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-top: 6px;
+}
+
+/* ── Diff toggle ────────────────────────────────────────────────────────── */
+
+.fp-diff-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    padding: 3px 0;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: color 0.12s;
+}
+
+.fp-diff-toggle:hover {
+    color: var(--ink-1);
+}
+
+.fp-diff-chevron {
+    font-size: 9px;
+    display: inline-block;
+    transition: transform 0.15s;
+    line-height: 1;
+}
+
+.fp-diff-chevron.open {
+    transform: rotate(90deg);
+}
+
+/* ── Diff view ──────────────────────────────────────────────────────────── */
+
+.fp-diff-view {
+    margin-top: 8px;
+    border: 1px solid var(--paper-rule);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.fp-diff-chunk {
+    display: flex;
+    gap: 10px;
+    padding: 6px 12px;
+    align-items: flex-start;
+}
+
+.fp-diff-chunk + .fp-diff-chunk {
+    border-top: 1px solid var(--paper-rule);
+}
+
+.fp-diff-label {
+    flex-shrink: 0;
+    width: 14px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    margin-top: 1px;
+}
+
+.fp-diff-text {
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+.fp-diff-equal {
+    background: var(--surface);
+    color: var(--ink-3);
+}
+
+.fp-diff-equal .fp-diff-label {
+    color: var(--ink-3);
+}
+
+.fp-diff-delete {
+    background: oklch(0.96 0.025 20);
+    color: oklch(0.38 0.12 20);
+}
+
+html.palette-vellum .fp-diff-delete {
+    background: oklch(0.94 0.025 20);
+}
+
+.fp-diff-delete .fp-diff-label {
+    color: oklch(0.45 0.14 20);
+}
+
+.fp-diff-insert {
+    background: oklch(0.96 0.04 145);
+    color: oklch(0.35 0.10 145);
+}
+
+html.palette-vellum .fp-diff-insert {
+    background: oklch(0.94 0.04 145);
+}
+
+.fp-diff-insert .fp-diff-label {
+    color: oklch(0.40 0.12 145);
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 600px) {
+    .fp-step-row {
+        gap: 6px;
+    }
+
+    .fp-badge-model {
+        display: none;
+    }
+}

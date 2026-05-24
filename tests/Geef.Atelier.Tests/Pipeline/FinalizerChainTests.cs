@@ -180,7 +180,7 @@ public sealed class FinalizerChainTests
         var result = await executor.ExecuteAsync(profile, MakeCtx(Guid.NewGuid(), "Original text."), default);
 
         Assert.Equal("Polished text output.", result.UpdatedText);
-        Assert.Null(result.Artifact);
+        Assert.NotNull(result.Artifact); // transform now always produces a diff artifact
     }
 
     // ── Fakes ──────────────────────────────────────────────────────────────────
