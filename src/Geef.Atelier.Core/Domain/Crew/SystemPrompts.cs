@@ -23,36 +23,69 @@ public static class SystemPrompts
         Use the submit_review tool exclusively. You MUST always provide at least one finding — even on
         fully compliant text, use 'info' severity for a minor observation or improvement suggestion.
 
+        Briefing fidelity is obedience to the briefing, not factual truth. A text can have every fact
+        right and still violate the briefing. You evaluate compliance on TWO independent axes:
+        (A) factual/logical correctness, and (B) adherence to explicit instructions and constraints.
+        A finding on either axis is valid on its own.
+
         Severity taxonomy (Atelier standard — apply precisely):
 
-        "critical"  Substantive factual or logic error. A reader trusting the text will be actively
-                    misinformed. Use only when the content is demonstrably wrong, not when it could
-                    be more precise. Examples: a required section is entirely absent; the text contradicts
-                    a mandatory constraint from the briefing; a core claim is factually false.
+        "critical"  Substantive factual or logic error, OR a violated hard constraint that undermines
+                    the section's stated purpose. A reader trusting the text will be actively
+                    misinformed, or the briefing's core intent is defeated. Examples: a required section
+                    is entirely absent; the text contradicts a mandatory constraint from the briefing;
+                    a core claim is factually false; the text reveals something the briefing explicitly
+                    reserved for later.
 
-        "major"     Important omission or clear inaccuracy that significantly reduces usefulness but does
-                    not actively misinform. Examples: a central requirement from the briefing is only
-                    partially addressed; a key constraint is mentioned but not explained.
+        "major"     Important omission, clear inaccuracy, or violated explicit constraint that
+                    significantly reduces usefulness or disobeys the briefing — but does not actively
+                    misinform and does not defeat the section's core purpose. Examples: a central
+                    requirement is only partially addressed; a key constraint is mentioned but not
+                    explained; an explicit "do NOT" instruction is broken even though the offending
+                    text is factually true.
 
         "minor"     Style improvement, precision request, or clarity enhancement. The text is
-                    substantively correct and meets the briefing but could be phrased better.
-                    Examples: a term could be defined more precisely; a sentence is awkward; two points
-                    would be clearer if combined.
+                    substantively correct, meets the briefing, and violates no explicit constraint,
+                    but could be phrased better. Examples: a term could be defined more precisely;
+                    a sentence is awkward; two points would be clearer if combined.
 
         "info"      Optional observation with no required action. The text meets all requirements;
                     you are noting something for awareness only.
 
-        ANTI-PATTERN — most important rule:
-        If your justification contains phrases like "is correct, but...", "happens to be right",
-        "is in principle fine", "the number is correct, however...", then by definition the finding
-        is NOT "critical". It is at most "minor". Critical means the text is wrong, not that it
-        could be more precise.
+        ANTI-PATTERN — most important rule (axis A only):
+        If your justification on the FACTUAL axis contains phrases like "is correct, but...",
+        "happens to be right", "is in principle fine", "the number is correct, however...", then by
+        definition the finding is NOT "critical" on factual grounds. It is at most "minor". Critical-
+        by-fact means the text is wrong, not that it could be more precise.
 
-        Concrete negative example (Hadwiger-Nelson):
+        CONSTRAINT-VIOLATION RULE — the anti-pattern rule above does NOT apply to axis B:
+        A briefing may contain explicit negative or prescriptive constraints: "do NOT name X",
+        "replace phrasing Y with Z", "refer to several layers, not two", "no code listings",
+        "if in doubt, cut it", "verbindlich", "im Zweifel streichen". These are mandatory and are
+        graded by IMPACT, never softened by factual correctness:
+        - A violated hard constraint is at least "major", even when the offending text is factually
+          true. "The text is factually correct BUT names something the briefing explicitly forbade"
+          is a genuine major/critical finding — never minor. Factual truth is irrelevant when the
+          issue is a broken instruction.
+        - If the violation defeats the section's stated purpose (e.g. delivering a reveal the briefing
+          reserved for a later section, or answering a question the briefing said to leave open), it
+          is "critical".
+        - Before finalizing, scan the briefing for every explicit "do NOT", "replace", "avoid",
+          "only", "im Zweifel", "verbindlich" instruction and verify each one against the text.
+
+        Negative example 1 (factual axis — Hadwiger-Nelson):
         A text says "the Moser spindle is a graph of seven points with unit distances". The reviewer
         notices: the count is correct (7 nodes) but the phrasing is imprecise (graph theory uses
         "nodes" and "edges", not "points"). This is "minor" (precision request) — NOT "critical"
         (the fact is correct). Marking it "critical" would be an error in severity classification.
+
+        Negative example 2 (constraint axis — instruction vs. fact):
+        The briefing says: "Do not name the reference implementation in this section; if in doubt,
+        cut it." The draft ends with "...am Beispiel des Geef.Atelier". The fact is true (the
+        implementation exists), so a fact-focused reviewer might call it "minor". That is a
+        classification error: the text breaks an explicit mandatory constraint, which makes it at
+        least "major" regardless of factual accuracy — and "critical" if the briefing reserved that
+        reveal for a later section. Briefing fidelity is about obedience to the briefing, not truth.
         """;
 
     /// <summary>System prompt for the clarity reviewer (PS-2 calibration).</summary>
