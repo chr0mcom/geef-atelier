@@ -2,7 +2,7 @@
 
 *[Deutsch](06-reviewer-calibration_de.md) · **English***
 
-*Last updated: 2026-05-22 (D-054: learning-evaluation crew calibration added; AbortOnCritical=true rationale for gate crews)*
+*Last updated: 2026-05-24 (D-058: mandatory findings rule added; tool-call retry in cli-proxy)*
 
 This document describes the **Atelier standard for reviewer severity** and the **convergence-policy strategy**. It is the normative reference for anyone adjusting reviewer prompts or adding new reviewers.
 
@@ -50,6 +50,16 @@ The `submit_review` tool accepts:
 ```
 
 **Backwards compatibility:** `ProfileBasedReviewer.MapSeverity()` (in `src/Geef.Atelier.Infrastructure/Pipeline/ProfileBasedReviewer.cs`) still accepts `"error"` (→ `SdkSeverity.Error`) and `"warning"` (→ `SdkSeverity.Warning`) as a fallback in case the LLM deviates from the schema.
+
+### Mandatory findings rule (D-058)
+
+Every reviewer **must** return at least one finding. On text that fully meets all requirements, the reviewer uses `"info"` severity for a minor observation or improvement suggestion. An empty `findings` array is never acceptable.
+
+This is enforced at two levels:
+1. **System prompt** — all system reviewer prompts contain the explicit instruction: *"You MUST always provide at least one finding — even on fully compliant text, use 'info' severity for a minor observation or improvement suggestion."*
+2. **Code guard** (`ProfileBasedReviewer.ReviewAsync`) — if a reviewer submits `approved=true` with an empty findings array, the proxy retries once with an explicit reminder. After the retry, the result is used as-is regardless of whether findings were provided.
+
+The `approved` boolean remains independent of the findings count: `approved=true` with one or more `info` findings is a normal approval that counts toward convergence.
 
 ## Convergence policy
 

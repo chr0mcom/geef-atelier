@@ -2,7 +2,7 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-05-23 (D-057: learning-retriever-default + learning-extractor in alle Standard-Templates)
+Last updated: 2026-05-24 (D-058: canonical CLI model names; mandatory reviewer findings)
 
 ## Overview
 
@@ -40,13 +40,13 @@ reviewers via `codex-cli`. Model pluralism is preserved (reviewer ≠ executor m
 
 | Name | Type | Provider / Model |
 |---|---|---|
-| `default-executor` | ExecutorProfile | `claude-cli` / `anthropic/claude-opus-4.7` |
+| `default-executor` | ExecutorProfile | `claude-cli` / `claude-opus-4-7` |
 | `briefing-fidelity` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
 | `clarity` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
 | `legal-jargon-precision` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
 | `legal-clause-risk` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
 | `academic-citation-readiness` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
-| `academic-argumentation-rigor` | ReviewerProfile | `claude-cli` / `anthropic/claude-opus-4.7` |
+| `academic-argumentation-rigor` | ReviewerProfile | `claude-cli` / `claude-opus-4-7` |
 | `marketing-audience-clarity` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
 | `marketing-conversion-strength` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
 
@@ -123,7 +123,7 @@ public enum AdvisorTrigger { BeforeFirstExecution, BeforeEveryExecution, OnConve
 ### System advisors
 
 Provider/model as of May 2026: all system advisors run via
-`claude-cli` / `anthropic/claude-opus-4.7`.
+`claude-cli` / `claude-opus-4-7`.
 
 | Name | Mode | Trigger | Purpose |
 |---|---|---|---|

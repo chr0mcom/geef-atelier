@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-22 (D-052 ergänzt: Grounding-Provider academic-search und rest-api)*
+*Letzte Aktualisierung: 2026-05-24 (D-058 ergänzt: CLI-Modellnamen-Normalisierung + Pflicht-Findings + cli-proxy JSON-Retry)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -1158,3 +1158,28 @@ Alle vier System-Templates (`klassik`, `juristisch`, `akademisch`, `marketing`) 
 **Geänderte Tests:** `FinalizerRegressionTests` (umbenannt + neue Assertion), `KlassikTemplateGroundingRegressionTests` (Count 2→3), `KlassikUnchangedRegressionTests` (Count 2→3), `SystemCrewDomainTemplatesTests` (3× Count 2→3), `SettingsRecordTests` + `TransformSettingsTests` (MaxTokens-Default 4096→60000).
 
 **Deploy:** 23. Mai 2026, ~14:30 UTC. Health-Endpoint bestätigt `Healthy`.
+
+## 24. Mai 2026 — CLI-Modellnamen-Normalisierung, Pflicht-Findings, JSON-Retry (D-058)
+
+### D-058: Robustheitsfixes — Modellnamen, Reviewer-Qualität, CLI-Proxy-Stabilität
+
+*Commits: `4cf9023` (cli-proxy JSON-Retry) · `7f38c9a` (ModelNameNormalizer) · `fb3c5fa` (Pflicht-Findings)*
+
+Drei unabhängige Stabilitätsfixes nach Analyse zweier produktiver Runs, die alle drei Fehlermuster aufdeckten.
+
+**Fix 1 — cli-proxy JSON-Retry:** Wenn ein CLI-Adapter reinen Text statt der erwarteten JSON-Tool-Call-Ausgabe zurückgibt, wiederholt der Proxy den Aufruf einmalig mit einem expliziten „Antworte NUR mit einem gültigen JSON-Objekt"-Suffix. Vorher erhielt der C#-`ProfileBasedReviewer` `finish_reason='stop'` und markierte den Reviewer als `Failed` — die Iteration lief ohne Findings durch. Neu: `_needs_json_retry()`-Helper + Retry-Branch in `_call_claude` und `_call_codex`. 8 neue Python-Tests.
+
+**Fix 2 — kanonische CLI-Modellnamen:** Modellnamen in `SystemCrew`, `SystemProviders` und Custom-Profilen in der DB lagen in inkonsistenten Formaten vor (`anthropic/claude-opus-4.7`, `claude-haiku-4.5`, `claude-opus-4-7` kamen alle vor). Neuer `ModelNameNormalizer.Normalize(provider, model)` in `Geef.Atelier.Infrastructure.Llm`:
+- Entfernt Vendor-Präfix (`anthropic/`, `openai/`, `google/`) für alle CLI-Provider.
+- Ersetzt Punkte durch Bindestriche für `claude-cli` und `gemini-cli` (kanonisch: `claude-opus-4-7`).
+- **Codex/OpenAI behalten Punkte** — `gpt-5.5` ist der kanonische GPT-Name.
+- `LlmClientResolver.ForProfile` normalisiert an der Call-Site vor der Weiterleitung.
+- Alle System-Profil-Konstanten auf kanonische Namen umgestellt. 16 neue Tests, 6 bestehende aktualisiert.
+
+**Fix 3 — Pflicht-Findings für Reviewer:** Ursache für „4 Reviewer, 0 Findings" in Run `76ae5590`: alle Reviewer-Prompts enthielten explizit *„No findings means approved=true with an empty findings array"* — eine Erlaubnis zur Nachlässigkeit. Behoben auf zwei Ebenen:
+- System-Prompts: Satz entfernt, ersetzt durch *„You MUST always provide at least one finding — even on fully compliant text, use 'info' severity."*
+- Code-Guard (`ProfileBasedReviewer.ReviewAsync`): bei `approved=true && findings.Count==0` wird einmalig mit explizitem Hinweis wiederholt. 6 neue Tests.
+
+**Schlüssel-Invariante:** `approved=true` mit `info`-Findings ist weiterhin eine normale Freigabe, die zur Konvergenz beiträgt. Pflicht-Findings garantiert nur, dass die MARGIN NOTES immer befüllt sind; Ablehnungen werden nicht erzwungen.
+
+**Tests:** 1555 grün (+23 neue; 7 pre-existing Failures unverändert). Deploy: 24. Mai 2026.

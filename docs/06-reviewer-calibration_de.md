@@ -2,7 +2,7 @@
 
 *[English](06-reviewer-calibration.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-22 (D-054: Learning-Evaluation-Crew-Kalibrierung ergänzt; AbortOnCritical=true-Begründung für Gate-Crews)*
+*Letzte Aktualisierung: 2026-05-24 (D-058: Pflicht-Findings-Regel ergänzt; Tool-Call-Retry im cli-proxy)*
 
 Dieses Dokument beschreibt den **Atelier-Standard für Reviewer-Severity** und die **Convergence-Policy-Strategie**. Es ist normatives Referenzdokument für alle, die Reviewer-Prompts anpassen oder neue Reviewer hinzufügen.
 
@@ -50,6 +50,16 @@ Das `submit_review`-Tool akzeptiert:
 ```
 
 **Backwards-Kompat:** `ProfileBasedReviewer.MapSeverity()` (in `src/Geef.Atelier.Infrastructure/Pipeline/ProfileBasedReviewer.cs`) akzeptiert weiterhin `"error"` (→ `SdkSeverity.Error`) und `"warning"` (→ `SdkSeverity.Warning`) als Fallback für den Fall, dass das LLM vom Schema abweicht.
+
+### Pflicht-Findings-Regel (D-058)
+
+Jeder Reviewer **muss** mindestens ein Finding zurückgeben. Bei Text, der alle Anforderungen vollständig erfüllt, verwendet der Reviewer `"info"`-Severity für eine kleine Beobachtung oder Verbesserungsmöglichkeit. Ein leeres `findings`-Array ist nie akzeptabel.
+
+Die Regel wird auf zwei Ebenen durchgesetzt:
+1. **System-Prompt** — alle System-Reviewer-Prompts enthalten die explizite Anweisung: *„You MUST always provide at least one finding — even on fully compliant text, use 'info' severity for a minor observation or improvement suggestion."*
+2. **Code-Guard** (`ProfileBasedReviewer.ReviewAsync`) — liefert ein Reviewer `approved=true` mit leerem Findings-Array, wird der Call einmalig mit einem expliziten Hinweis wiederholt. Nach dem Retry wird das Ergebnis so verwendet wie es kommt.
+
+Das `approved`-Boolean bleibt unabhängig von der Findings-Anzahl: `approved=true` mit einem oder mehreren `info`-Findings ist eine normale Freigabe, die zur Konvergenz beiträgt.
 
 ## Convergence-Policy
 
