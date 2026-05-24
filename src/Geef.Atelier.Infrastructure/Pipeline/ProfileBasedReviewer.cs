@@ -71,7 +71,42 @@ internal sealed class ProfileBasedReviewer(
             };
         }
 
-        return ParseToolInput(response.ToolArgumentsJson);
+        var result = ParseToolInput(response.ToolArgumentsJson);
+
+        // Enforce mandatory findings: approved with zero findings is a shallow review.
+        // Retry once with an explicit reminder before accepting the empty-findings result.
+        if (result.Decision == ReviewDecision.Approved && result.Findings.Count == 0)
+        {
+            const string mandatoryFindingsReminder =
+                "\n\nIMPORTANT: You submitted approved=true with zero findings. Every review MUST include " +
+                "at least one finding. Use 'info' severity for minor observations or suggestions. " +
+                "Re-submit using the submit_review tool now.";
+
+            var retryResponse = await client.CompleteAsync(new LlmRequest
+            {
+                Model        = model,
+                SystemPrompt = profile.SystemPrompt,
+                UserPrompt   = userPrompt + mandatoryFindingsReminder,
+                MaxTokens    = maxTokens,
+                Tools        = [ReviewerToolDefinition.SubmitReview],
+                ToolChoice   = "function:submit_review"
+            }, cancellationToken);
+
+            if (costAccumulator is not null)
+            {
+                var retryCostEur = pricingCatalog?.CalculateCostEur(
+                    model, retryResponse.TokenUsage.InputTokens, retryResponse.TokenUsage.OutputTokens, profile.Provider);
+                costAccumulator.RecordActorCost(
+                    iter, ActorType.Reviewer, profile.Name, model,
+                    retryResponse.TokenUsage.InputTokens, retryResponse.TokenUsage.OutputTokens, retryCostEur,
+                    providerName: profile.Provider);
+            }
+
+            if (retryResponse.FinishReason == "tool_calls" && retryResponse.ToolArgumentsJson is not null)
+                result = ParseToolInput(retryResponse.ToolArgumentsJson);
+        }
+
+        return result;
     }
 
     private ReviewResult ParseToolInput(string toolArgumentsJson)
