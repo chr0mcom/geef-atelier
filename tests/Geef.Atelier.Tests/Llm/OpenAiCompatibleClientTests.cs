@@ -110,6 +110,28 @@ public sealed class OpenAiCompatibleClientTests
             }, CancellationToken.None));
     }
 
+    [Fact]
+    public async Task SurfacesProviderErrorMessageOnFailureStatus()
+    {
+        var errorJson = """{"error":{"message":"This is not a chat model and thus not supported in the v1/chat/completions endpoint.","type":"invalid_request_error","param":"model","code":null}}""";
+        var client = new OpenAiCompatibleClient(
+            CreateMockClient(errorJson, HttpStatusCode.NotFound),
+            "https://api.openai.com/v1",
+            apiKey: "sk-test");
+
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() =>
+            client.CompleteAsync(new LlmRequest
+            {
+                Model        = "gpt-5.5-pro",
+                SystemPrompt = "test",
+                UserPrompt   = "test"
+            }, CancellationToken.None));
+
+        Assert.Equal(HttpStatusCode.NotFound, ex.StatusCode);
+        Assert.Contains("not a chat model", ex.Message);
+        Assert.Contains("gpt-5.5-pro", ex.Message);
+    }
+
     private sealed class MockHttpMessageHandler(string responseJson, HttpStatusCode status) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 
 namespace Geef.Atelier.Infrastructure.Llm;
 
@@ -25,9 +26,40 @@ internal sealed class OpenAiCompatibleClient(
         httpRequest.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
         using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
-        response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException(
+                $"LLM request to '{baseEndpoint}' for model '{request.Model}' failed with " +
+                $"{(int)response.StatusCode} {response.ReasonPhrase}: {ExtractError(json)}",
+                inner: null,
+                statusCode: response.StatusCode);
+
         return OpenAiMessageFormat.DeserializeResponse(json);
+    }
+
+    // Surfaces the provider's actual error text (OpenAI-shaped { "error": { "message": ... } })
+    // instead of the opaque "status code does not indicate success" default.
+    private static string ExtractError(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return "(empty response body)";
+
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("error", out var error))
+            {
+                if (error.ValueKind == JsonValueKind.Object &&
+                    error.TryGetProperty("message", out var message) &&
+                    message.ValueKind == JsonValueKind.String)
+                    return message.GetString() ?? body;
+                if (error.ValueKind == JsonValueKind.String)
+                    return error.GetString() ?? body;
+            }
+        }
+        catch (JsonException) { /* fall through to raw body */ }
+
+        return body.Length > 500 ? body[..500] + "…" : body;
     }
 }
