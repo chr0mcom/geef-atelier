@@ -54,8 +54,9 @@ internal sealed class TemplateStudioService(
         progress?.Report($"Frage Meta-KI an: {choice.Provider} / {model}…");
 
         // Hard cap on the meta-LLM call so a stalled provider can never hang the analysis indefinitely.
+        var timeoutSeconds = opts.AnalysisTimeoutSeconds;
         using var llmCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        llmCts.CancelAfter(TimeSpan.FromSeconds(150));
+        llmCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
 
         LlmResponse response;
         try
@@ -73,7 +74,7 @@ internal sealed class TemplateStudioService(
         catch (OperationCanceledException) when (llmCts.IsCancellationRequested && !ct.IsCancellationRequested)
         {
             throw new TimeoutException(
-                $"Die Meta-KI ({choice.Provider} / {model}) hat nicht innerhalb von 150 Sekunden geantwortet. " +
+                $"Die Meta-KI ({choice.Provider} / {model}) hat nicht innerhalb von {timeoutSeconds} Sekunden geantwortet. " +
                 "Bitte erneut versuchen oder einen anderen Provider/Modell wählen.");
         }
 

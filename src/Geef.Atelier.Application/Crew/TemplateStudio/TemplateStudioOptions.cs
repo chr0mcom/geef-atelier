@@ -16,6 +16,11 @@ public sealed class TemplateStudioOptions
     /// <summary>Cosine similarity threshold above which an existing profile is considered a duplicate.</summary>
     public double SimilarityThreshold { get; set; } = 0.85;
 
+    /// <summary>Hard cap (seconds) on a single meta-LLM analysis call. Heavy reasoning models stream
+    /// their response body well after the 200 headers arrive, so this must accommodate full generation
+    /// of a large tool-call payload, not just connection time.</summary>
+    public int AnalysisTimeoutSeconds { get; set; } = 600;
+
     /// <summary>Default field values applied when the meta-LLM omits a field for a proposed profile.</summary>
     public StudioDefaults Defaults { get; set; } = new();
 }
