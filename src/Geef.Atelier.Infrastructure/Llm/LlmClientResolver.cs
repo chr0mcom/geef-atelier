@@ -54,9 +54,19 @@ internal sealed class LlmClientResolver(
         return _clients.GetOrAdd(providerName, name =>
         {
             var (endpoint, apiKey) = ResolveProviderConnection(name);
-            return new OpenAiCompatibleClient(factory.CreateClient(HttpClientNames.Llm), endpoint, apiKey);
+            var http = factory.CreateClient(HttpClientNames.Llm);
+
+            // OpenAI's pro/reasoning models (e.g. gpt-5.5-pro) are only served on the Responses API,
+            // not /v1/chat/completions. Route any provider that targets api.openai.com accordingly.
+            return TargetsOpenAi(endpoint)
+                ? new OpenAiResponsesClient(http, endpoint, apiKey)
+                : new OpenAiCompatibleClient(http, endpoint, apiKey);
         });
     }
+
+    private static bool TargetsOpenAi(string endpoint) =>
+        Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) &&
+        uri.Host.Equals("api.openai.com", StringComparison.OrdinalIgnoreCase);
 
     private (string Endpoint, string? ApiKey) ResolveProviderConnection(string providerName)
     {
