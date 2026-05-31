@@ -14,7 +14,7 @@ public sealed class CrewSummaryWithAdvisorsTests : TestContext
         Description: "Desc",
         SystemPrompt: "Prompt",
         Provider: "openrouter",
-        Model: "anthropic/claude-opus-4.7",
+        Model: "anthropic/claude-opus-4.8",
         MaxTokens: null,
         IsSystem: false);
 

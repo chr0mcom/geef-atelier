@@ -61,7 +61,7 @@ public sealed class SystemCrewDomainReviewersTests
     {
         Assert.True(SystemCrew.AcademicArgumentationRigorProfile.IsSystem);
         Assert.Equal("claude-cli", SystemCrew.AcademicArgumentationRigorProfile.Provider);
-        Assert.Equal("claude-opus-4-7", SystemCrew.AcademicArgumentationRigorProfile.Model);
+        Assert.Equal("claude-opus-4-8", SystemCrew.AcademicArgumentationRigorProfile.Model);
     }
 
     // ── Marketing reviewers ──────────────────────────────────────────────────────

@@ -63,7 +63,7 @@ public sealed class ProviderTests
         Assert.Equal("claude", typed.CliKind);
         Assert.Equal("claude", typed.Binary);
         Assert.Equal(2, typed.MaxConcurrent);
-        Assert.Contains("claude-opus-4-7", typed.Models);
+        Assert.Contains("claude-opus-4-8", typed.Models);
     }
 
     [Fact]

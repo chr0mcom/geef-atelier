@@ -29,7 +29,7 @@ public sealed class PipelineCostTrackingTests
         Advisors: advisors ?? Array.Empty<AdvisorProfile>());
 
     // Models used by SystemCrew profiles (canonical names — no vendor prefix)
-    private const string ExecutorModel  = "claude-opus-4-7";
+    private const string ExecutorModel  = "claude-opus-4-8";
     private const string ReviewerModel  = "openai/gpt-4o-mini"; // briefing-fidelity + clarity use this
 
     private static IPricingCatalog BuildCatalog() =>
@@ -64,7 +64,7 @@ public sealed class PipelineCostTrackingTests
         var costs = accumulator.Flush();
         var executorCosts = costs.Where(c => c.ActorType == ActorType.Executor).ToList();
         Assert.NotEmpty(executorCosts);
-        // Executor model is from the profile (claude-opus-4-7 = known model → cost not null)
+        // Executor model is from the profile (claude-opus-4-8 = known model → cost not null)
         Assert.All(executorCosts, c =>
         {
             Assert.Equal(ActorType.Executor, c.ActorType);
@@ -131,7 +131,7 @@ public sealed class PipelineCostTrackingTests
     [Fact]
     public async Task Pipeline_UnknownModel_RecordsNullCost()
     {
-        // Build a catalog with only "known-model", but profiles use claude-opus-4-7
+        // Build a catalog with only "known-model", but profiles use claude-opus-4-8
         var accumulator = new RunCostAccumulator();
         var emptyCatalog = new PricingCatalog(
             Options.Create(new PricingOptions { Models = new Dictionary<string, ModelPricing>() }),

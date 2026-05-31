@@ -44,7 +44,7 @@ public sealed class OpenAiCompatibleClientTests
         var client = new OpenAiCompatibleClient(CreateMockClient(responseJson), "https://openrouter.ai/api/v1", "test-key");
         var response = await client.CompleteAsync(new LlmRequest
         {
-            Model        = "anthropic/claude-opus-4.7",
+            Model        = "anthropic/claude-opus-4.8",
             SystemPrompt = "You are a reviewer.",
             UserPrompt   = "Review this."
         }, CancellationToken.None);
@@ -82,7 +82,7 @@ public sealed class OpenAiCompatibleClientTests
         var client = new OpenAiCompatibleClient(CreateMockClient(responseJson), "https://openrouter.ai/api/v1", "test-key");
         var response = await client.CompleteAsync(new LlmRequest
         {
-            Model        = "anthropic/claude-opus-4.7",
+            Model        = "anthropic/claude-opus-4.8",
             SystemPrompt = "You are a writer.",
             UserPrompt   = "Write something."
         }, CancellationToken.None);

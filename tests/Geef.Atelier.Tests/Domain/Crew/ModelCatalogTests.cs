@@ -42,7 +42,7 @@ public sealed class ModelCatalogTests : IDisposable
     {
         var handler = FakeHttpHandler.Ok("""
             {"object":"list","data":[
-                {"id":"anthropic/claude-opus-4.7","object":"model"},
+                {"id":"anthropic/claude-opus-4.8","object":"model"},
                 {"id":"google/gemini-2.5-flash","object":"model"}
             ]}
             """);
@@ -51,7 +51,7 @@ public sealed class ModelCatalogTests : IDisposable
         var models = await catalog.ListModelsAsync("openrouter");
 
         Assert.Equal(2, models.Count);
-        Assert.Contains(models, m => m.Id == "anthropic/claude-opus-4.7");
+        Assert.Contains(models, m => m.Id == "anthropic/claude-opus-4.8");
         Assert.Contains(models, m => m.Id == "google/gemini-2.5-flash");
     }
 
@@ -60,7 +60,7 @@ public sealed class ModelCatalogTests : IDisposable
     {
         var handler = FakeHttpHandler.Ok("""
             {"object":"list","data":[
-                {"id":"anthropic/claude-opus-4.7","object":"model"},
+                {"id":"anthropic/claude-opus-4.8","object":"model"},
                 {"id":"some/unknown-model","object":"model"}
             ]}
             """);
@@ -68,7 +68,7 @@ public sealed class ModelCatalogTests : IDisposable
 
         var models = await catalog.ListModelsAsync("openrouter");
 
-        var opus = models.Single(m => m.Id == "anthropic/claude-opus-4.7");
+        var opus = models.Single(m => m.Id == "anthropic/claude-opus-4.8");
         var unknown = models.Single(m => m.Id == "some/unknown-model");
         Assert.True(opus.IsRecommended);
         Assert.False(unknown.IsRecommended);
@@ -104,7 +104,7 @@ public sealed class ModelCatalogTests : IDisposable
     [Fact]
     public async Task ListModelsAsync_UsesCacheOnSecondCall()
     {
-        var handler = FakeHttpHandler.Ok("""{"object":"list","data":[{"id":"anthropic/claude-opus-4.7"}]}""");
+        var handler = FakeHttpHandler.Ok("""{"object":"list","data":[{"id":"anthropic/claude-opus-4.8"}]}""");
         var catalog = BuildCatalog(handler);
 
         await catalog.ListModelsAsync("openrouter");
@@ -116,7 +116,7 @@ public sealed class ModelCatalogTests : IDisposable
     [Fact]
     public async Task RefreshAsync_BypassesCache()
     {
-        var handler = FakeHttpHandler.Ok("""{"object":"list","data":[{"id":"anthropic/claude-opus-4.7"}]}""");
+        var handler = FakeHttpHandler.Ok("""{"object":"list","data":[{"id":"anthropic/claude-opus-4.8"}]}""");
         var catalog = BuildCatalog(handler);
 
         await catalog.ListModelsAsync("openrouter");

@@ -248,7 +248,7 @@ public sealed class TemplateStudioServiceDefaultsTests
                         "name": "custom-executor",
                         "display_name": "Custom Executor",
                         "description": "Executes tasks.",
-                        "model": "anthropic/claude-opus-4-7",
+                        "model": "anthropic/claude-opus-4-8",
                         "provider": "anthropic",
                         "system_prompt": "Execute carefully."
                     }

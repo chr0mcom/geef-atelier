@@ -26,7 +26,7 @@ public sealed class LlmClientResolverTests
             },
             Actors = actors ?? new()
             {
-                ["Executor"]              = new() { Provider = "openrouter",  Model = "claude-opus-4.7", MaxTokens = 8192 },
+                ["Executor"]              = new() { Provider = "openrouter",  Model = "claude-opus-4.8", MaxTokens = 8192 },
                 ["BriefingTreueReviewer"] = new() { Provider = "claude-cli",  Model = "claude-sonnet-4-5" },
             }
         });
@@ -58,7 +58,7 @@ public sealed class LlmClientResolverTests
         var (client, model, maxTokens) = resolver.ForActor("Executor");
 
         Assert.NotNull(client);
-        Assert.Equal("claude-opus-4.7", model);
+        Assert.Equal("claude-opus-4.8", model);
         Assert.Equal(8192, maxTokens);
     }
 
@@ -122,10 +122,10 @@ public sealed class LlmClientResolverTests
     {
         var resolver = new LlmClientResolver(MakeFactory(), MakeOptions(), MakeScopeFactory());
 
-        var (client, model, maxTokens) = resolver.ForProfile("claude-cli", "claude-opus-4.7", 4096);
+        var (client, model, maxTokens) = resolver.ForProfile("claude-cli", "claude-opus-4.8", 4096);
 
         Assert.NotNull(client);
-        Assert.Equal("claude-opus-4-7", model); // dots normalized to dashes for claude-cli
+        Assert.Equal("claude-opus-4-8", model); // dots normalized to dashes for claude-cli
         Assert.Equal(4096, maxTokens);
     }
 

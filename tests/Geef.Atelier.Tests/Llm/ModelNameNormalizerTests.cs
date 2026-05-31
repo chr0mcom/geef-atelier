@@ -7,10 +7,10 @@ public sealed class ModelNameNormalizerTests
     // ── CLI providers: prefix stripping + dot-to-dash ─────────────────────
 
     [Theory]
-    [InlineData("claude-cli", "anthropic/claude-opus-4.7",  "claude-opus-4-7")]
+    [InlineData("claude-cli", "anthropic/claude-opus-4.8",  "claude-opus-4-8")]
     [InlineData("claude-cli", "anthropic/claude-sonnet-4.6","claude-sonnet-4-6")]
     [InlineData("claude-cli", "anthropic/claude-haiku-4.5", "claude-haiku-4-5")]
-    [InlineData("claude-cli", "claude-opus-4-7",            "claude-opus-4-7")]   // already canonical
+    [InlineData("claude-cli", "claude-opus-4-8",            "claude-opus-4-8")]   // already canonical
     [InlineData("claude-cli", "claude-haiku-4.5",           "claude-haiku-4-5")]  // dots only
     [InlineData("codex-cli",  "openai/gpt-5.5",             "gpt-5.5")]           // dot kept (GPT convention)
     [InlineData("codex-cli",  "gpt-5.5",                    "gpt-5.5")]           // already canonical
@@ -42,14 +42,14 @@ public sealed class ModelNameNormalizerTests
     [Fact]
     public void Normalize_IsCaseInsensitiveForProvider()
     {
-        Assert.Equal("claude-opus-4-7", ModelNameNormalizer.Normalize("CLAUDE-CLI", "anthropic/claude-opus-4.7"));
-        Assert.Equal("claude-opus-4-7", ModelNameNormalizer.Normalize("Claude-Cli", "anthropic/claude-opus-4.7"));
+        Assert.Equal("claude-opus-4-8", ModelNameNormalizer.Normalize("CLAUDE-CLI", "anthropic/claude-opus-4.8"));
+        Assert.Equal("claude-opus-4-8", ModelNameNormalizer.Normalize("Claude-Cli", "anthropic/claude-opus-4.8"));
     }
 
     [Fact]
     public void Normalize_IsIdempotent_ForCliProvider()
     {
-        const string canonical = "claude-opus-4-7";
+        const string canonical = "claude-opus-4-8";
         var once  = ModelNameNormalizer.Normalize("claude-cli", canonical);
         var twice = ModelNameNormalizer.Normalize("claude-cli", once);
         Assert.Equal(canonical, once);

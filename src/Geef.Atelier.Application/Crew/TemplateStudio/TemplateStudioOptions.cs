@@ -7,7 +7,7 @@ public sealed class TemplateStudioOptions
     public string Provider { get; set; } = "openrouter";
 
     /// <summary>OpenRouter model identifier for the meta-LLM analysis call.</summary>
-    public string Model { get; set; } = "anthropic/claude-opus-4.7";
+    public string Model { get; set; } = "anthropic/claude-opus-4.8";
 
     /// <summary>Max tokens for the meta-LLM analysis response. Must accommodate several
     /// fully structured profile system prompts plus reasoning fields in a single tool call.</summary>
@@ -39,7 +39,7 @@ public sealed class StudioDefaults
     public int ReviewerMaxTokens { get; set; } = 16384;
 
     // Executor defaults
-    public string ExecutorModel { get; set; } = "anthropic/claude-opus-4.7";
+    public string ExecutorModel { get; set; } = "anthropic/claude-opus-4.8";
     public string ExecutorProvider { get; set; } = "openrouter";
     public int ExecutorMaxTokens { get; set; } = 60000;
 

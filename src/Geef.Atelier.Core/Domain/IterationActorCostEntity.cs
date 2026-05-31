@@ -10,7 +10,7 @@ public sealed class IterationActorCostEntity
     /// <summary>Profile name, e.g. "default-executor" or "briefing-fidelity".</summary>
     public required string ActorName { get; init; }
 
-    /// <summary>Resolved model identifier, e.g. "anthropic/claude-opus-4.7".</summary>
+    /// <summary>Resolved model identifier, e.g. "anthropic/claude-opus-4.8".</summary>
     public required string ModelName { get; init; }
 
     public required int InputTokens { get; init; }

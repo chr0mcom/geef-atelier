@@ -23,7 +23,7 @@ public sealed class SystemCrewDomainAdvisorsTests
     {
         Assert.True(SystemCrew.LegalDomainExpertProfile.IsSystem);
         Assert.Equal("claude-cli", SystemCrew.LegalDomainExpertProfile.Provider);
-        Assert.Equal("claude-opus-4-7", SystemCrew.LegalDomainExpertProfile.Model);
+        Assert.Equal("claude-opus-4-8", SystemCrew.LegalDomainExpertProfile.Model);
     }
 
     [Fact]
@@ -44,7 +44,7 @@ public sealed class SystemCrewDomainAdvisorsTests
     {
         Assert.True(SystemCrew.AcademicRigorAdvisorProfile.IsSystem);
         Assert.Equal("claude-cli", SystemCrew.AcademicRigorAdvisorProfile.Provider);
-        Assert.Equal("claude-opus-4-7", SystemCrew.AcademicRigorAdvisorProfile.Model);
+        Assert.Equal("claude-opus-4-8", SystemCrew.AcademicRigorAdvisorProfile.Model);
     }
 
     [Fact]

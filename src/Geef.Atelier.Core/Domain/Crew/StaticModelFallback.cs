@@ -9,7 +9,7 @@ public static class StaticModelFallback
 {
     public static readonly IReadOnlyList<ModelInfo> ForOpenRouter = new ModelInfo[]
     {
-        new("anthropic/claude-opus-4.7",    "Claude Opus 4.7",       "Best quality, Anthropic via OpenRouter",          true),
+        new("anthropic/claude-opus-4.8",    "Claude Opus 4.8",       "Best quality, Anthropic via OpenRouter",          true),
         new("anthropic/claude-sonnet-4.5",  "Claude Sonnet 4.5",     "Fast, balanced, Anthropic via OpenRouter",        true),
         new("anthropic/claude-haiku-4.5",   "Claude Haiku 4.5",      "Cheapest Anthropic model via OpenRouter",         true),
         new("google/gemini-2.5-flash",      "Gemini 2.5 Flash",      "Fast, cheap, Google via OpenRouter",              true),
@@ -23,14 +23,13 @@ public static class StaticModelFallback
 
     public static readonly IReadOnlyList<ModelInfo> ForClaudeCli = new ModelInfo[]
     {
-        new("claude-opus-4-7",   "Claude Opus 4.7",   "Best quality, subscription required",  true),
+        new("claude-opus-4-8",   "Claude Opus 4.8",   "Best quality, subscription required",  true),
         new("claude-sonnet-4-6", "Claude Sonnet 4.6", "Fast and balanced",                    true),
         new("claude-haiku-4-5",  "Claude Haiku 4.5",  "Cheapest, basic tasks",                true),
     };
 
     public static readonly IReadOnlyList<ModelInfo> ForCodexCli = new ModelInfo[]
     {
-        new("gpt-5.5-pro",      "GPT-5.5 Pro",      "Newest, most capable, 1M context",  true),
         new("gpt-5.5",          "GPT-5.5",           "Latest generation, 1M context",      true),
         new("gpt-5.4-nano",     "GPT-5.4 Nano",      "Fast and cheap, 400k context",       true),
         new("gpt-5.4-mini",     "GPT-5.4 Mini",      "Balanced, 400k context",             true),

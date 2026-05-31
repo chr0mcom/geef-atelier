@@ -2,7 +2,7 @@ namespace Geef.Atelier.Infrastructure.Llm;
 
 /// <summary>
 /// Normalises model-name strings so that profiles with different notation
-/// (e.g. "anthropic/claude-opus-4.7" vs "claude-opus-4-7") resolve to the
+/// (e.g. "anthropic/claude-opus-4.8" vs "claude-opus-4-8") resolve to the
 /// same canonical form before being forwarded to the CLI proxy.
 ///
 /// Rules (applied in order, only when the provider is a CLI provider):

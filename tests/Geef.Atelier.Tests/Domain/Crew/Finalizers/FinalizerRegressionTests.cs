@@ -39,7 +39,7 @@ public sealed class FinalizerRegressionTests
               "SchemaVersion": 1,
               "TemplateName": "klassik",
               "Executor": { "Name": "default-executor", "DisplayName": "Default", "Description": "",
-                            "SystemPrompt": "", "Provider": "claude-cli", "Model": "anthropic/claude-opus-4.7",
+                            "SystemPrompt": "", "Provider": "claude-cli", "Model": "anthropic/claude-opus-4.8",
                             "MaxTokens": null, "IsSystem": true },
               "Reviewers": [],
               "EvaluationStrategy": 0,

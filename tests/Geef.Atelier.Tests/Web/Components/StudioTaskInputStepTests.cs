@@ -68,7 +68,7 @@ public sealed class StudioTaskInputStepTests : TestContext
         {
             p.Add(c => c.TaskDescription, "Task");
             p.Add(c => c.InitialProvider, "openrouter");
-            p.Add(c => c.InitialModel, "anthropic/claude-opus-4-7");
+            p.Add(c => c.InitialModel, "anthropic/claude-opus-4-8");
             p.Add(c => c.InitialMaxTokens, 8192);
         });
 
