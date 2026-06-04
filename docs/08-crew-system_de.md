@@ -2,7 +2,7 @@
 
 *[English](08-crew-system.md) · **Deutsch***
 
-Letzte Aktualisierung: 2026-05-24 (D-058: kanonische CLI-Modellnamen; Pflicht-Findings für Reviewer)
+Letzte Aktualisierung: 2026-06-04 (Template Studio: Analyse-Pipeline + Materialisierungs-Interna dokumentiert)
 
 ## Überblick
 
@@ -449,6 +449,18 @@ Das Template Studio unter `/crew/studio` ist ein KI-gestützter Wizard, der für
 | Edit | `StudioEditStep` | Vollständiger Editor für das vorgeschlagene Template und alle Profile |
 | Confirmation | `StudioConfirmationStep` | Zeigt Materialisierungs-Ergebnis; startet einen Run |
 
+### Analyse-Pipeline (`AnalyzeAsync`)
+
+`TemplateStudioService.AnalyzeAsync` verwandelt die Freitext-Aufgabenbeschreibung in eine persistierte `TemplateStudioAnalysis`, die den Review- und Edit-Step speist. Die Pipeline:
+
+1. **Modell-Auflösung** — wählt das Meta-LLM in der Reihenfolge: expliziter Pro-Analyse-Override → persistierter Studio-Default (`StudioSettings`) → `appsettings`-Default (`TemplateStudioOptions`).
+2. **Kontext-Aufbau (parallel, budgetiert)** — lädt alle Crew-Listen (Templates, Executors, Reviewer, Advisors, Grounding-Provider, Finalizer) und ruft die Modell-Kataloge aller Provider **parallel** unter einem 20-Sekunden-Budget ab. Ein langsamer oder nicht erreichbarer Provider liefert keine Modelle, statt die gesamte Analyse zu blockieren; empfohlene Modelle werden zuerst gelistet, damit das LLM gültige IDs wählt.
+3. **Meta-LLM-Aufruf (Timeout-gedeckelt)** — ruft das Modell mit dem über `tool_choice` erzwungenen Tool `submit_template_proposal` auf. Ein Hard-Cap (`TemplateStudioOptions.AnalysisTimeoutSeconds`) wandelt einen hängenden Provider in eine `TimeoutException` mit Retry-Hinweis. Eine Antwort ohne Tool-Aufruf löst eine `InvalidOperationException` aus.
+4. **Vorschlags-Parsing** — `ParseProposal` liest das Tool-Call-JSON in `MatchedExistingTemplates`, eine `StudioRecommendation` (`use_existing` / `adapt_existing` / `create_new`), das `ProposedTemplate` sowie die Liste der `ProposedProfile`-Records (jeweils mit feldbezogenen LLM-Begründungen).
+5. **Defaults & Clamping** — `ApplyDefaults` füllt leere Provider/Modell/MaxTokens pro Profiltyp aus `StudioDefaults`. `ClampMaxTokens` erzwingt den `MinMaxTokens`-Floor für generierende Profile (Executor, Reviewer, Advisor) und setzt `null` für Grounding-/Finalizer-Profile (keine eigene LLM-Generierung).
+6. **Deduplizierung** — `ProfileSimilarityService.FindSimilarAsync` verwirft vorgeschlagene Profile, die einem bestehenden zu ähnlich sind (Ähnlichkeit über Name + Prompt, `TemplateStudioOptions.SimilarityThreshold`).
+7. **Kosten & Persistierung** — Input-/Output-Tokens werden über `IPricingCatalog` bepreist; die vollständige Analyse (inkl. Kosten in EUR) wird über `ITemplateStudioAnalysisRepository` gespeichert und zurückgegeben. `ListRecentAnalysesAsync` stellt die Historie bereit (siehe `StudioAnalysisHistoryList`).
+
 ### StudioEditStep — Feld-Parität (D-043)
 
 Der Edit-Step exponiert das vollständige Feld-Set für das Template und jeden Profil-Slot:
@@ -475,9 +487,18 @@ Der Edit-Step exponiert das vollständige Feld-Set für das Template und jeden P
 
 ### Materialisierung (atomar, D-043/7)
 
-`TemplateStudioService.MaterializeAsync` kapselt alle DB-Schreibvorgänge in einer einzelnen EF-Core-Transaktion (`IAtomicTransactionFactory`). Ablauf: Validierung → Begin → Profile anlegen (Executor, Reviewer, Advisor, GroundingProvider, Finalizer) → Template anlegen → Commit. Explizites Rollback bei jedem Fehler — kein Halb-materialisierter Zustand. `MarkMaterializedAsync` (markiert den Analyse-Datensatz als verbraucht) läuft innerhalb der Transaktion.
+`TemplateStudioService.MaterializeAsync` kapselt alle DB-Schreibvorgänge in einer einzelnen EF-Core-Transaktion (`IAtomicTransactionFactory`) und gibt ein `MaterializationResult` zurück (finaler Template-Name, angelegte Profil-Namen, Warnungen).
 
-Finalizer-Vorschläge erscheinen in der LLM-Analyse-Ausgabe des Studios; `TemplateStudioService.CreateProfileAsync` behandelt den Finalizer-Zweig; `StudioEditStep` stellt den Finalizer-Slot-Abschnitt neben den übrigen Profil-Slots bereit.
+**Validierung vor der Transaktion:**
+- `ValidateNotSystemProfiles` — vorgeschlagene Profil-Namen dürfen nicht mit system-reservierten Namen kollidieren.
+- `ValidateReviewerCount` — das Template muss mindestens einen Reviewer tragen.
+- `ValidateAvailabilityAsync` — prüft das Modell jedes generierenden Profils gegen den Provider-Katalog; eine Abweichung erzeugt eine **nicht-blockierende Warnung** (das Modell fehlt evtl. nur im Live-Katalog), keinen Abbruch.
+
+**Transaktions-Ablauf:** Begin → Profile anlegen (Executor, Reviewer, Advisor, GroundingProvider, Finalizer) via `CreateProfileAsync` → Template anlegen via `CreateTemplateAsync` → `MarkMaterializedAsync` (markiert den Analyse-Datensatz als verbraucht) → Commit. Jeder Fehler löst ein explizites Rollback aus — kein halb-materialisierter Zustand.
+
+**Name-Mapping:** `CreateCustom*Async` präfixiert jeden neuen Profil-Namen idempotent mit `custom-`. `MaterializeAsync` merkt sich das Mapping alt→final, und `ApplyProfileNameMapping` schreibt alle Template-Referenzen (Executor, Reviewer, Advisors, Grounding-Provider, Finalizer) auf die tatsächlich gespeicherten Namen um, bevor das Template angelegt wird. Namen, die bereits auf bestehende Profile zeigen, bleiben unverändert. Die Evaluation-Strategie wird normalisiert (`NormalizeEvaluationStrategy`, Default `Sequential`).
+
+Finalizer-Vorschläge erscheinen in der LLM-Analyse-Ausgabe des Studios; `CreateProfileAsync` behandelt den Finalizer-Zweig; `StudioEditStep` stellt den Finalizer-Slot-Abschnitt neben den übrigen Profil-Slots bereit.
 
 ## Kontinuierlicher Lernzyklus (D-054)
 

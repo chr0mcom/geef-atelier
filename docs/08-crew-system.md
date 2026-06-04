@@ -2,7 +2,7 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-05-24 (D-058: canonical CLI model names; mandatory reviewer findings)
+Last updated: 2026-06-04 (Template Studio: analysis pipeline + materialization internals documented)
 
 ## Overview
 
@@ -461,6 +461,18 @@ The Template Studio at `/crew/studio` is an AI-assisted wizard that proposes a c
 | Edit | `StudioEditStep` | Full-field editor for the proposed template and all profiles |
 | Confirmation | `StudioConfirmationStep` | Shows materialization result; launches a run |
 
+### Analysis pipeline (`AnalyzeAsync`)
+
+`TemplateStudioService.AnalyzeAsync` turns the free-text task description into a persisted `TemplateStudioAnalysis` that drives the Review and Edit steps. The pipeline:
+
+1. **Model resolution** — picks the meta-LLM in the order: explicit per-analysis override → persisted Studio default (`StudioSettings`) → `appsettings` default (`TemplateStudioOptions`).
+2. **Context assembly (parallel, budgeted)** — loads all crew lists (templates, executors, reviewers, advisors, grounding providers, finalizers) and fetches every provider's model catalogue **in parallel** under a 20-second budget. A slow or unreachable provider contributes no models instead of stalling the whole analysis; recommended models are listed first so the LLM picks valid IDs.
+3. **Meta-LLM call (timeout-capped)** — calls the model with the `submit_template_proposal` tool forced via `tool_choice`. A hard cap (`TemplateStudioOptions.AnalysisTimeoutSeconds`) turns a stalled provider into a `TimeoutException` with a retry hint. A response without a tool call raises an `InvalidOperationException`.
+4. **Proposal parsing** — `ParseProposal` reads the tool-call JSON into `MatchedExistingTemplates`, a `StudioRecommendation` (`use_existing` / `adapt_existing` / `create_new`), the `ProposedTemplate`, and the list of `ProposedProfile` records (each carrying per-field LLM reasoning).
+5. **Defaults & clamping** — `ApplyDefaults` fills empty provider/model/MaxTokens per profile type from `StudioDefaults`. `ClampMaxTokens` enforces the `MinMaxTokens` floor for generating profiles (Executor, Reviewer, Advisor) and sets `null` for grounding/finalizer profiles (no own LLM generation).
+6. **Deduplication** — `ProfileSimilarityService.FindSimilarAsync` drops proposed profiles that are too close to an existing one (similarity over name + prompt, `TemplateStudioOptions.SimilarityThreshold`).
+7. **Cost & persistence** — input/output tokens are priced via `IPricingCatalog`; the full analysis (incl. cost in EUR) is stored through `ITemplateStudioAnalysisRepository` and returned. `ListRecentAnalysesAsync` exposes the history (see `StudioAnalysisHistoryList`).
+
 ### StudioEditStep field parity (D-043)
 
 The Edit step exposes the full field set for the template and every profile slot:
@@ -487,9 +499,18 @@ The Edit step exposes the full field set for the template and every profile slot
 
 ### Materialization (atomic, D-043/7)
 
-`TemplateStudioService.MaterializeAsync` wraps all DB writes in a single EF Core transaction (`IAtomicTransactionFactory`). Order: validate → begin → create profiles (Executor, Reviewer, Advisor, GroundingProvider, Finalizer) → create template → commit. Explicit rollback on any error — no half-materialized state. `MarkMaterializedAsync` (marks the analysis record as consumed) runs inside the transaction.
+`TemplateStudioService.MaterializeAsync` wraps all DB writes in a single EF Core transaction (`IAtomicTransactionFactory`) and returns a `MaterializationResult` (final template name, created profile names, warnings).
 
-Finalizer proposals appear in the Studio's LLM analysis output; `TemplateStudioService.CreateProfileAsync` handles the finalizer branch; `StudioEditStep` exposes the finalizer slot section alongside the other profile slots.
+**Pre-transaction validation:**
+- `ValidateNotSystemProfiles` — proposed profile names must not collide with system-reserved names.
+- `ValidateReviewerCount` — the template must carry at least one reviewer.
+- `ValidateAvailabilityAsync` — checks each generating profile's model against the provider catalogue; a mismatch produces a **non-blocking warning** (the model may simply be missing from the live catalogue), not an abort.
+
+**Transaction order:** begin → create profiles (Executor, Reviewer, Advisor, GroundingProvider, Finalizer) via `CreateProfileAsync` → create template via `CreateTemplateAsync` → `MarkMaterializedAsync` (marks the analysis record as consumed) → commit. Any error triggers an explicit rollback — no half-materialized state.
+
+**Name mapping:** `CreateCustom*Async` idempotently prefixes every new profile name with `custom-`. `MaterializeAsync` records the old→final mapping and `ApplyProfileNameMapping` rewrites all template references (executor, reviewers, advisors, grounding providers, finalizers) to the actually stored names before the template is created. Names already referring to existing profiles pass through unchanged. The evaluation strategy is normalized (`NormalizeEvaluationStrategy`, default `Sequential`).
+
+Finalizer proposals appear in the Studio's LLM analysis output; `CreateProfileAsync` handles the finalizer branch; `StudioEditStep` exposes the finalizer slot section alongside the other profile slots.
 
 ## Continuous Learning Loop (D-054)
 
