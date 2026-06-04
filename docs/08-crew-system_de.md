@@ -2,7 +2,7 @@
 
 *[English](08-crew-system.md) · **Deutsch***
 
-Letzte Aktualisierung: 2026-06-04 (Template Studio: Analyse-Pipeline + Materialisierungs-Interna dokumentiert)
+Letzte Aktualisierung: 2026-06-04 (D-059: Auto-Crew — Abschnitt Kompositions-Run ergänzt)
 
 ## Überblick
 
@@ -528,7 +528,7 @@ SPÄTERER RUN  →  Grounding „learning-retrieval"
 
 ### `RunKind`-Enum
 
-`Standard = 0` (Standard) / `Learning = 1`. In `RunEntity.Kind` geführt, durch `SubmitRunRequest.Kind` und `IRunPersistenceService.CreateRunAsync` durchgereicht. Der Orchestrator dispatcht beide Arten identisch; das Kind gatet nur die zwei Lern-Finalizer.
+`Standard = 0` (Standard) / `Learning = 1` / `CrewComposition = 2`. In `RunEntity.Kind` geführt, durch `SubmitRunRequest.Kind` und `IRunPersistenceService.CreateRunAsync` durchgereicht. Der Orchestrator dispatcht alle drei Arten identisch; das Kind gatet Finalizer-Wächter und Rekursionsstopps.
 
 ### `LearningEntry`-Lebenszyklus
 
@@ -545,3 +545,83 @@ SPÄTERER RUN  →  Grounding „learning-retrieval"
 | `learning-factual-grounding` | Reviewer | openrouter/gpt-4.1 |
 | `learning-value` | Reviewer | openrouter/gemini-2.5-pro |
 | `learning-generalizability` | Reviewer | claude-cli/claude-opus-4.7 |
+
+## Auto-Crew: Kompositions-Run
+
+Ein Kompositions-Run (`RunKind.CrewComposition = 2`) ist ein vollständiger GEEF-Run, der die GEEF-Evaluierungsschleife nutzt, um eine neue Crew zu komponieren. GEEF-on-GEEF: die Meta-Crew `crew-composer` durchläuft Draft → Critique → Refine → Converge und materialisiert das Ergebnis anschließend über den `crew-materializer`-Finalizer. Siehe D-059 im [Decisions-Log](05-decisions-log_de.md).
+
+### Was ein Kompositions-Run ist
+
+Der Single-Pass-Meta-LLM-Aufruf des Template Studios (D-038) produzierte Crews ohne Selbstkorrektur. Ein Kompositions-Run ersetzt diesen Aufruf durch eine echte GEEF-Pipeline: die Crew `crew-composer` verfeinert ein `CrewSpecArtifact`-JSON iterativ bis zur Konvergenz; danach wandelt der `CrewMaterializeFinalizerExecutor` das konvergierte Spec in echte DB-Datensätze um.
+
+Einstiegspunkt: `/crew/studio` (eigenständige Komposition, `ChainToTaskRun = false` als Standard). Der Nutzer gibt eine Aufgabenbeschreibung ein; das Studio reicht einen `RunKind.CrewComposition`-Run ein und zeigt den Fortschritt via SignalR.
+
+### Die 5 Reviewer von crew-composer
+
+| Name | Typ | Provider / Modell | Rolle |
+|---|---|---|---|
+| `crew-spec-validator` | **Deterministisch** (kein LLM) | — | Prüft das `CrewSpecArtifact`-JSON-Schema in der Schleife; fehlende Pflichtfelder oder ungültige Struktur → Critical-Finding, kein LLM-Aufruf nötig |
+| `crew-diversity-reviewer` | LLM | codex-cli / gpt-5.5 | Prüft Modell-Pluralismus: Executor und Reviewer müssen ≥ 2 verschiedene Provider abdecken |
+| `crew-prompt-quality-reviewer` | LLM | claude-cli / claude-opus-4-7 | Bewertet Qualität, Spezifität und Rollenklarheit jedes System-Prompts |
+| `crew-grounding-fit-reviewer` | LLM | codex-cli / gpt-5.5 | Beurteilt, ob die gewählten Grounding-Provider zur Aufgabendomäne passen |
+| `crew-finalizer-fit-reviewer` | LLM | codex-cli / gpt-5.5 | Prüft, ob die gewählten Finalizer zu den Output-Anforderungen der Aufgabe passen |
+
+Der deterministische `CrewSpecValidatorReviewer` erzeugt Findings ohne LLM-Call und ist das primäre strukturelle Gate. Die vier LLM-Reviewer laufen in der `Parallel`-Strategie.
+
+**ConvergenceOverride:** `MaxIterations = 4`, `AbortOnCritical = false` (damit Validator-Critical-Findings korrigiert werden können, statt einen Abbruch auszulösen), `StagnationThreshold = 3`.
+
+### `CrewSpecArtifact`-Schema
+
+Der `CrewComposerExecutor` erzwingt den Tool-Call `submit_crew_spec` — kein Freitext-Output. Das resultierende JSON folgt diesem Schema:
+
+```json
+{
+  "mode": "existing-template | composed | new",
+  "reuse": "<Template-Name oder null>",
+  "executor": {
+    "name": "...", "provider": "...", "model": "...",
+    "systemPrompt": "...", "maxTokens": null
+  },
+  "reviewers": [
+    { "name": "...", "provider": "...", "model": "...",
+      "systemPrompt": "...", "focus": "..." }
+  ],
+  "advisors": [
+    { "name": "...", "mode": "Strategic|Critical|DevilsAdvocate|DomainExpert",
+      "trigger": "BeforeFirstExecution|BeforeEveryExecution|OnConvergenceFailure",
+      "systemPrompt": "..." }
+  ],
+  "grounding": ["<Profilname>", "..."],
+  "finalizers": ["<Profilname>", "..."],
+  "evaluationStrategy": "Parallel | Sequential | FailFast | Priority",
+  "convergenceOverride": null
+}
+```
+
+**Modus-Semantik:**
+- `existing-template` — bestehendes Template per Name wiederverwenden (`reuse`-Feld); keine DB-Schreibvorgänge.
+- `composed` — neues Template auf Basis des `reuse`-Templates mit Änderungen zusammensetzen.
+- `new` — vollständig neues Template aus den Spec-Feldern anlegen; alle Profile müssen vollständig spezifiziert sein.
+
+Das `reuse`-Feld kodiert das **Dedup-Ergebnis**: findet `CrewMaterializeFinalizerExecutor` in `CrewTemplateEmbeddings` ein Template mit Cosine-Similarity ≥ 0,90, wird der Modus auf `existing-template` downgegradet und `reuse` auf den gematchten Template-Namen gesetzt.
+
+### Schritte des `CrewMaterializeFinalizerExecutor`
+
+Läuft nach Konvergenz des Kompositions-Runs (`FinalizerType.CrewMaterialize = 6`):
+
+1. **Parse** — liest das `CrewSpecArtifact`-JSON aus dem `ArtifactText` der letzten Iteration.
+2. **Validate** — strukturelle Prüfung: Pflichtfelder vorhanden, `reviewers`-Anzahl ≥ 1, Provider-Namen im System aktiv.
+3. **Dedup** — berechnet ein Embedding des Specs, fragt `CrewTemplateEmbeddings` auf Cosine-Similarity ab; überschreitet ein bestehendes Template die 0,90-Schwelle, wird der Modus auf `existing-template` downgegradet (keine neuen DB-Datensätze).
+4. **Materialize** — für Modi `composed` / `new`: legt Profile (Executor, Reviewer × N, Advisor × N, GroundingProvider × N, Finalizer × N) und das Crew-Template in einer einzigen EF-Core-Transaktion an (analog `TemplateStudioService.MaterializeAsync`).
+5. **Embed** — berechnet ein Embedding des neuen Templates und schreibt es in `CrewTemplateEmbeddings` für künftige Dedup-Prüfungen.
+6. **Task-Run verketten** — wenn `ChainToTaskRun = true` und der Kompositions-Run ein Seed-Briefing enthält, wird ein neuer `RunKind.Standard`-Run mit der materialisierten Crew und dem ursprünglichen Briefing eingereicht.
+
+### `ParentCompositionRunId`-Audit-Link
+
+Wird ein Task-Run aus einem Kompositions-Run verkettet, wird `Runs.ParentCompositionRunId` auf die ID des Kompositions-Runs gesetzt. Das ergibt einen vollständigen Audit-Trail: ausgehend von einem beliebigen Task-Run lässt sich über `ParentCompositionRunId` der Kompositions-Run nachvollziehen, der seine Crew erzeugt hat.
+
+### Wächter (Guards)
+
+- `LearningExtractFinalizerExecutor`: `if (run.Kind == RunKind.CrewComposition) return Ok;` — aus Kompositions-Runs werden keine Learnings extrahiert.
+- `CrewMaterializeFinalizerExecutor`: der verkettete Run ist stets `RunKind.Standard`; verschachtelte Komposition ist nicht möglich.
+- `CrewComposerExecutor`: nur für `Kind == CrewComposition` aktiv; andere Run-Arten werden abgewiesen.

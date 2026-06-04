@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-05-24 (D-058 added: CLI model name normalization + mandatory reviewer findings + cli-proxy JSON retry)*
+*Last updated: 2026-06-04 (D-059 added: Auto-Crew — Crew-Komposition als GEEF-Run)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -1201,3 +1201,64 @@ Three independent reliability fixes shipped together after production run analys
 **Key invariant:** `approved=true` with `info` findings is still an approval toward convergence. Mandatory findings only guarantees MARGIN NOTES are populated; it does not force rejections.
 
 **Tests:** 1555 grün (+23 neue; 7 pre-existing Failures unverändert). Deploy: 24. Mai 2026.
+
+---
+
+## 4. Juni 2026 — Auto-Crew: Crew-Komposition als GEEF-Run (D-059)
+
+### D-059: Auto-Crew — vollständige Crew-Komposition als eigener GEEF-Run
+
+*Branch: `feature/auto-crew-composition`*
+
+Das bisherige Template-Studio (D-038) delegierte die Crew-Komposition an einen einzigen Meta-LLM-Aufruf (Single-Pass). Dieser Ansatz erzeugt unvollständige Crews ohne Selbstkorrektur: der LLM-Call kann scheitern, ungültige Profil-Namen erzeugen oder strukturell inkohärente Specs zurückliefern — ohne dass eine Überprüfungsschleife greift.
+
+**Entscheidung:** Crew-Komposition wird selbst ein vollwertiger GEEF-Run (`RunKind.CrewComposition = 2`) mit der Crew `crew-composer`. GEEF-on-GEEF: Draft → Critique → Refine → Converge → Materialize.
+
+**D-059/1 — `RunKind.CrewComposition = 2`.** Das `RunKind`-Enum erhält den Wert `CrewComposition = 2` (neben `Standard = 0` und `Learning = 1`). Ein Kompositions-Run ist ein regulärer GEEF-Run mit Crew `crew-composer` und `Kind = CrewComposition`. Der Orchestrator dispatcht alle drei Arten identisch; `Kind` gatet die Rekursionswächter und steuert den Finalizer-Zweig.
+
+**D-059/2 — Crew `crew-composer` (5 Reviewer, 1 Advisor, Crew-Catalog-Grounding, Finalizer `crew-materializer`).** Die Kompositions-Crew besteht aus:
+- 1 deterministischer Reviewer: `CrewSpecValidatorReviewer` — prüft das JSON-Spec in der Schleife (kein LLM-Call); ein strukturell ungültiges Spec erzeugt ein Critical-Finding und stoppt die Iteration sofort.
+- 4 LLM-Reviewer mit Modell-Pluralismus: `crew-diversity-reviewer` (prüft Reviewer-Vielfalt), `crew-prompt-quality-reviewer` (bewertet System-Prompt-Qualität), `crew-grounding-fit-reviewer` (Grounding-Provider-Eignung), `crew-finalizer-fit-reviewer` (Finalizer-Eignung).
+- 1 Advisor: `crew-catalog-advisor` (BeforeFirstExecution, liest aktuelle Crew-Katalog-Daten als Kontext).
+- Grounding: `crew-catalog` — stellt den vollständigen Katalog aller verfügbaren Profile als Grounding-Kontext bereit (crew-level Dedup via pgvector in `CrewTemplateEmbeddings`).
+- Finalizer: `crew-materializer` (`FinalizerType.CrewMaterialize = 6`), ausgeführt von `CrewMaterializeFinalizerExecutor`.
+- `ConvergenceOverride{MaxIterations = 4, AbortOnCritical = false, StagnationThreshold = 3}` — vier Iterationen genügen für gut strukturierte Kompositions-Aufgaben; AbortOnCritical deaktiviert, damit Validator-Findings korrigierbar sind.
+
+**D-059/3 — `CrewComposerExecutor` erzwingt Tool-Call `submit_crew_spec`.** Der Executor für Kompositions-Runs ist ein spezialisierter `CrewComposerExecutor`, der via `tool_choice` den Tool-Call `submit_crew_spec` erzwingt. Kein Freitext-Output — nur strukturiertes JSON-Spec.
+
+**D-059/4 — `CrewSpecArtifact`-Schema (Kompositions-Spec-JSON).** Das produzierte Spec folgt einem definierten Schema:
+```json
+{
+  "mode": "existing-template | composed | new",
+  "reuse": "<template-name> | null",
+  "executor": { "name": "...", "provider": "...", "model": "...", "systemPrompt": "...", "maxTokens": null },
+  "reviewers": [{ "name": "...", "provider": "...", "model": "...", "systemPrompt": "...", "focus": "..." }],
+  "advisors":  [{ "name": "...", "mode": "...", "trigger": "...", "systemPrompt": "..." }],
+  "grounding": ["..."],
+  "finalizers": ["..."],
+  "evaluationStrategy": "Parallel | Sequential | FailFast | Priority",
+  "convergenceOverride": null
+}
+```
+- Modus `existing-template`: vorhandenes Template wiederverwenden (kein Schreiben in die DB).
+- Modus `composed`: neues Template aus Spec zusammensetzen und materialisieren.
+- Modus `new`: komplett neues Template anlegen.
+
+**D-059/5 — `FinalizerType.CrewMaterialize = 6` / `CrewMaterializeFinalizerExecutor`.** Der Finalizer übernimmt nach Konvergenz des Kompositions-Runs folgende Schritte:
+1. **Parse** — liest das `CrewSpecArtifact`-JSON aus dem finalen Iterations-Text.
+2. **Validate** — strukturelle Prüfung (RequiredFields, Reviewer-Count ≥ 1, gültige Provider-Namen).
+3. **Dedup** — Cosine-Similarity-Prüfung gegen `CrewTemplateEmbeddings` (Schwelle 0,90): zu ähnliche Templates werden nicht doppelt angelegt; stattdessen Modus-Downgrade auf `existing-template`.
+4. **Materialize** — legt Profile (Executor, Reviewer, Advisor, GroundingProvider, Finalizer) und Template in der DB an (atomar, analog `TemplateStudioService.MaterializeAsync`).
+5. **Embed** — berechnet ein Embedding des neuen Templates und schreibt es in `CrewTemplateEmbeddings`.
+6. **Chain Task-Run** — startet optional (`ChainToTaskRun = true`) einen neuen Standard-Run mit der materialisierten Crew und dem ursprünglichen Briefing.
+
+**D-059/6 — Neue DB-Tabelle `CrewTemplateEmbeddings` (pgvector).** Speichert Embeddings materialisierter Crew-Templates für zwei Zwecke: (a) Crew-Catalog-Grounding im Kompositions-Run (semantische Ähnlichkeitssuche über vorhandene Templates), (b) Dedup-Check im Materializer (verhindert funktional identische Templates). Embedding-Dimension: 1536 (analog `LearningEntries`). HNSW-Index mit `vector_cosine_ops`. Raw-ADO.NET-Pattern (identisch D-036/D-054 wegen Pgvector.EFCore-Inkompatibilität mit Npgsql 10.x). Migration: `Step35AutoCrew`.
+
+**D-059/7 — `ParentCompositionRunId` auf `Runs` (Migration Step35).** Neue Spalte `ParentCompositionRunId uuid FK→Runs nullable` auf der `Runs`-Tabelle: verbindet einen Task-Run mit dem Kompositions-Run, der seine Crew erzeugt hat (Audit-Trail). Kein Cascade-Delete. Der Orchestrator setzt diese Spalte beim Chaining automatisch.
+
+**D-059/8 — Studio-Page umgewidmet: eigenständige Komposition (`ChainToTaskRun = false`).** Die bestehende `/crew/studio`-Page übernimmt die Rolle des Kompositions-Einstiegspunkts. Standardmäßig läuft der Kompositions-Run eigenständig ohne direktes Chaining auf einen Task-Run (`ChainToTaskRun = false`); der Nutzer kann das materialisierte Template danach manuell für neue Runs auswählen.
+
+**D-059/9 — Rekursionswächter und Sicherheitsgrenzen.**
+- `LearningExtractFinalizerExecutor`: `if (run.Kind == RunKind.CrewComposition) return Ok;` — verhindert, dass ein Kompositions-Run Learnings extrahiert.
+- `CrewComposerExecutor`: lehnt Runs mit `Kind != CrewComposition` ab.
+- Kein verschachteltes Auto-Compose: `CrewMaterializeFinalizerExecutor` startet niemals einen weiteren Kompositions-Run (guard: `ChainToTaskRun` darf nur einen `RunKind.Standard`-Run starten).

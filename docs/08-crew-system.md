@@ -2,7 +2,7 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-06-04 (Template Studio: analysis pipeline + materialization internals documented)
+Last updated: 2026-06-04 (D-059: Auto-Crew — Composition-Run section added)
 
 ## Overview
 
@@ -540,7 +540,7 @@ LATER RUN  →  Grounding "learning-retrieval"
 
 ### RunKind enum
 
-`Standard = 0` (default) / `Learning = 1`. Carried in `RunEntity.Kind`, passed through `SubmitRunRequest.Kind` and `IRunPersistenceService.CreateRunAsync`. The orchestrator dispatches both kinds identically; the kind only gates the two learning finalizers.
+`Standard = 0` (default) / `Learning = 1` / `CrewComposition = 2`. Carried in `RunEntity.Kind`, passed through `SubmitRunRequest.Kind` and `IRunPersistenceService.CreateRunAsync`. The orchestrator dispatches all three kinds identically; the kind gates finalizer guards and recursion stops.
 
 ### LearningEntry lifecycle
 
@@ -557,3 +557,83 @@ LATER RUN  →  Grounding "learning-retrieval"
 | `learning-factual-grounding` | Reviewer | openrouter/gpt-4.1 |
 | `learning-value` | Reviewer | openrouter/gemini-2.5-pro |
 | `learning-generalizability` | Reviewer | claude-cli/claude-opus-4.7 |
+
+## Auto-Crew: Composition-Run
+
+A Composition-Run (`RunKind.CrewComposition = 2`) is a full GEEF-Run that uses the GEEF evaluation loop to compose a new crew. GEEF-on-GEEF: the meta-crew `crew-composer` goes through draft → critique → refine → converge, then materializes the result via the `crew-materializer` finalizer. See D-059 in the [decisions log](05-decisions-log.md).
+
+### What a Composition-Run is
+
+The Template Studio's single-pass meta-LLM call (D-038) produced crews without self-correction. A Composition-Run replaces that call with a proper GEEF pipeline: the `crew-composer` crew iteratively refines a `CrewSpecArtifact` JSON until convergence, then the `CrewMaterializeFinalizerExecutor` turns the converged spec into real DB records.
+
+Entry point: `/crew/studio` (standalone composition, `ChainToTaskRun = false` by default). The user provides a task description; the studio submits a `RunKind.CrewComposition` run and shows progress via SignalR.
+
+### The 5 reviewers of crew-composer
+
+| Name | Type | Provider / Model | Role |
+|---|---|---|---|
+| `crew-spec-validator` | **Deterministic** (no LLM) | — | Validates the `CrewSpecArtifact` JSON schema in-loop; missing required fields or invalid structure → Critical finding, no LLM call needed |
+| `crew-diversity-reviewer` | LLM | codex-cli / gpt-5.5 | Checks model pluralism: executor and reviewers must span ≥ 2 different providers |
+| `crew-prompt-quality-reviewer` | LLM | claude-cli / claude-opus-4-7 | Evaluates the quality, specificity and role-clarity of every system prompt |
+| `crew-grounding-fit-reviewer` | LLM | codex-cli / gpt-5.5 | Assesses whether the chosen grounding providers match the task domain |
+| `crew-finalizer-fit-reviewer` | LLM | codex-cli / gpt-5.5 | Checks whether the selected finalizers suit the task's output requirements |
+
+The deterministic `CrewSpecValidatorReviewer` produces findings without any LLM call and is the primary structural gate. The four LLM reviewers run in `Parallel` strategy.
+
+**ConvergenceOverride:** `MaxIterations = 4`, `AbortOnCritical = false` (so validator Critical findings are correctable, not fatal), `StagnationThreshold = 3`.
+
+### CrewSpecArtifact schema
+
+The `CrewComposerExecutor` forces the `submit_crew_spec` tool-call — no free-text output. The resulting JSON follows this schema:
+
+```json
+{
+  "mode": "existing-template | composed | new",
+  "reuse": "<template-name or null>",
+  "executor": {
+    "name": "...", "provider": "...", "model": "...",
+    "systemPrompt": "...", "maxTokens": null
+  },
+  "reviewers": [
+    { "name": "...", "provider": "...", "model": "...",
+      "systemPrompt": "...", "focus": "..." }
+  ],
+  "advisors": [
+    { "name": "...", "mode": "Strategic|Critical|DevilsAdvocate|DomainExpert",
+      "trigger": "BeforeFirstExecution|BeforeEveryExecution|OnConvergenceFailure",
+      "systemPrompt": "..." }
+  ],
+  "grounding": ["<profile-name>", "..."],
+  "finalizers": ["<profile-name>", "..."],
+  "evaluationStrategy": "Parallel | Sequential | FailFast | Priority",
+  "convergenceOverride": null
+}
+```
+
+**Mode semantics:**
+- `existing-template` — reuse an existing template by name (`reuse` field); no DB writes.
+- `composed` — assemble a new template from the `reuse` template as a base, with modifications.
+- `new` — create a fully new template from the spec fields; all profiles must be fully specified.
+
+The `reuse` field encodes the **dedup result**: when `CrewMaterializeFinalizerExecutor` finds a template with cosine similarity ≥ 0.90 in `CrewTemplateEmbeddings`, it downgrades the mode to `existing-template` and sets `reuse` to the matched template name.
+
+### CrewMaterializeFinalizerExecutor steps
+
+Runs after convergence of the composition-run (`FinalizerType.CrewMaterialize = 6`):
+
+1. **Parse** — reads the `CrewSpecArtifact` JSON from the final iteration's `ArtifactText`.
+2. **Validate** — structural check: required fields present, `reviewers` count ≥ 1, provider names are active in the system.
+3. **Dedup** — computes an embedding of the spec, queries `CrewTemplateEmbeddings` for cosine similarity; if any existing template exceeds the 0.90 threshold, downgrades mode to `existing-template` (no new DB records).
+4. **Materialize** — for `composed` / `new` modes: creates profiles (Executor, Reviewer × N, Advisor × N, GroundingProvider × N, Finalizer × N) and the crew template in a single EF Core transaction, exactly as `TemplateStudioService.MaterializeAsync` does.
+5. **Embed** — computes an embedding of the new template and inserts it into `CrewTemplateEmbeddings` for future dedup.
+6. **Chain task-run** — if `ChainToTaskRun = true` and the composition-run carries a seed briefing, submits a new `RunKind.Standard` run using the materialized crew and the original briefing text.
+
+### ParentCompositionRunId audit link
+
+When a task-run is chained from a composition-run, `Runs.ParentCompositionRunId` is set to the composition-run's ID. This provides a full audit trail: given any task-run, you can follow `ParentCompositionRunId` to inspect which composition-run created its crew and why.
+
+### Guards
+
+- `LearningExtractFinalizerExecutor`: `if (run.Kind == RunKind.CrewComposition) return Ok;` — no learnings extracted from composition-runs.
+- `CrewMaterializeFinalizerExecutor`: the chained run is always `RunKind.Standard`; no nested composition is possible.
+- `CrewComposerExecutor`: only active for `Kind == CrewComposition`; rejects other run kinds.

@@ -2,7 +2,7 @@
 
 *[Deutsch](02-architecture_de.md) · **English***
 
-*Last updated: 2026-05-22 (D-054: RunKind column on Runs, LearningEntries table, LearningExtract/LearningPublish finalizer types, learning-retrieval grounding provider, /crew/learnings UI page)*
+*Last updated: 2026-06-04 (D-059: CrewComposition RunKind, crew-composer pipeline, CrewMaterialize finalizer type, CrewTemplateEmbeddings table, ParentCompositionRunId column)*
 
 ## Layer diagram
 
@@ -108,7 +108,7 @@ The four run-core tables are documented in detail below; the other groups are
 described in their respective feature sections or in the [decisions log](05-decisions-log.md)
 (D-028 ff.). `Runs` additionally carries columns from later migrations
 (`CreatedByUser`, `CostTotal`, `CrewTemplateName`, `CrewSnapshot`, `AdvisorRetryAttempted`,
-`FinalizerCostEur`, `FinalizerErrorMessage`, `ParentRunId`, `SeedDraftText`, `Kind`).
+`FinalizerCostEur`, `FinalizerErrorMessage`, `ParentRunId`, `SeedDraftText`, `Kind`, `ParentCompositionRunId`).
 
 ### Runs
 
@@ -134,7 +134,8 @@ described in their respective feature sections or in the [decisions log](05-deci
 | FinalizerErrorMessage | text | nullable; error message when a finalizer chain partially or fully failed (Step22). |
 | ParentRunId | uuid (FK→Runs) | nullable; self-referential, no cascade — set when this run was resumed from another run (Step23). |
 | SeedDraftText | text | nullable; last artifact text copied from the parent run's final iteration, used to seed iteration 1 of this resumed run (Step23). |
-| Kind | int | `0 = Standard` (default), `1 = Learning` — gates the two learning finalizers; existing rows default to Standard (Step30). |
+| Kind | int | `0 = Standard` (default), `1 = Learning`, `2 = CrewComposition` — gates finalizers and recursion guards; existing rows default to Standard (Step30/Step35). |
+| ParentCompositionRunId | uuid (FK→Runs) | nullable; self-referential, no cascade — set when this task-run was chained from a composition-run (Step35). Audit link from task-run back to the crew-composer run that created its crew. |
 
 ### Iterations
 
@@ -224,7 +225,7 @@ described in their respective feature sections or in the [decisions log](05-deci
 
 See `Runs` table above (`ParentRunId`, `SeedDraftText`).
 
-### FinalizerProfiles — type values (Step22 + Step30)
+### FinalizerProfiles — type values (Step22 + Step30 + Step35)
 
 | `FinalizerType` value | Meaning | Introduced |
 |---|---|---|
@@ -234,6 +235,7 @@ See `Runs` table above (`ParentRunId`, `SeedDraftText`).
 | `3` — `Transform` | Applies an LLM transformation pass to the text (summary, translation, …) | Step22 |
 | `4` — `LearningExtract` | Extracts structured learnings from a completed run and fires a learning-evaluation gate run fire-and-forget (opt-in; not attached to standard templates) | Step30 |
 | `5` — `LearningPublish` | Publishes approved learning candidates to the learning store, or marks rejected ones. Runs inside the `learning-evaluation` crew | Step30 |
+| `6` — `CrewMaterialize` | Parses the converged `CrewSpecArtifact` JSON, validates it, deduplicates via `CrewTemplateEmbeddings` (threshold 0.90), materializes profiles + template to the DB, embeds the new template, and optionally chains a task-run. Runs only inside the `crew-composer` composition-run | Step35 |
 
 ### LearningEntries (Step30)
 
@@ -264,6 +266,51 @@ The learning store. Physically separate from the curated knowledge base (`Knowle
 | Table | Column | Type | Note |
 |---|---|---|---|
 | `Runs` | `Kind` | int | `0 = Standard` (default), `1 = Learning` |
+
+### CrewTemplateEmbeddings (Step35)
+
+Stores embeddings of materialized crew templates. Used for two purposes: (a) crew-catalog grounding during a composition-run (semantic similarity search over existing templates), (b) dedup check in `CrewMaterializeFinalizerExecutor` (prevents functionally identical templates from being created twice).
+
+| Column | Type | Note |
+|---|---|---|
+| Id | uuid (PK) | |
+| TemplateName | varchar(100) (FK→CrewTemplates ON DELETE CASCADE) | |
+| Embedding | vector(1536) | nullable; computed by `IEmbeddingProvider` at materialization time |
+| CreatedAt | timestamptz | |
+
+**Indices:**
+- `IX_CrewTemplateEmbeddings_Embedding_HNSW` — HNSW index with `vector_cosine_ops` for cosine-similarity retrieval
+
+**pgvector raw-SQL pattern:** same as `LearningEntries` (D-036/D-054) — `Embedding` ignored by EF Core, all insert/search via raw ADO.NET.
+
+### New columns on existing tables (Step35 — Auto-Crew)
+
+| Table | Column | Type | Note |
+|---|---|---|---|
+| `Runs` | `ParentCompositionRunId` | uuid FK→Runs nullable | links a task-run back to the composition-run that created its crew |
+
+## Auto-Crew: Composition-Run pipeline (D-059)
+
+A Composition-Run (`RunKind.CrewComposition = 2`) is a full GEEF-Run whose purpose is to compose a new crew. GEEF-on-GEEF: the meta-crew `crew-composer` runs through the standard draft → critique → refine → converge loop and materializes the result via `CrewMaterializeFinalizerExecutor`.
+
+```
+COMPOSITION-RUN  (Kind=CrewComposition, crew "crew-composer")
+  ├─ Grounding:  crew-catalog (all available profiles as context)
+  ├─ Advisor:    crew-catalog-advisor (BeforeFirstExecution)
+  ├─ Executor:   CrewComposerExecutor (forces submit_crew_spec tool-call)
+  ├─ Reviewers:  CrewSpecValidatorReviewer (deterministic, no LLM)
+  │              + 4 LLM reviewers (diversity, prompt-quality, grounding-fit, finalizer-fit)
+  ├─ ConvergenceOverride: MaxIterations=4, AbortOnCritical=false, StagnationThreshold=3
+  └─ Finalizer:  crew-materializer (FinalizerType.CrewMaterialize=6)
+       ├─ Parse → CrewSpecArtifact JSON
+       ├─ Validate (required fields, reviewer count ≥ 1, provider names)
+       ├─ Dedup via CrewTemplateEmbeddings (threshold 0.90)
+       ├─ Materialize profiles + template (atomic transaction)
+       ├─ Embed new template → CrewTemplateEmbeddings
+       └─ Optionally chain task-run (ChainToTaskRun=true, RunKind.Standard only)
+```
+
+**Recursion guards:** `LearningExtractFinalizerExecutor` skips `Kind == CrewComposition`; `CrewMaterializeFinalizerExecutor` may only chain `RunKind.Standard` runs (no nested composition). See D-059 in the [decisions log](05-decisions-log.md).
 
 ## Crew system (PS-5)
 
