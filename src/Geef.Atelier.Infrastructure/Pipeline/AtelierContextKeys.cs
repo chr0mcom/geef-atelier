@@ -1,3 +1,4 @@
+using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk.Context;
 
@@ -8,6 +9,13 @@ internal static class AtelierContextKeys
     public static readonly ContextKey<string>         GroundedBrief = new("geef:atelier:grounded-brief");
     public static readonly ContextKey<string>         CurrentDraft  = new("geef:atelier:current-draft");
     public static readonly ContextKey<LlmTokenUsage>  TokenUsage    = new("geef:atelier:token-usage");
+
+    /// <summary>
+    /// The executor profile to use for LLM calls. Set by the composition pipeline factory so that
+    /// <see cref="Geef.Atelier.Infrastructure.Composition.CrewComposerExecutor"/> can resolve the
+    /// correct provider/model without requiring it as a constructor argument.
+    /// </summary>
+    public static readonly ContextKey<ExecutorProfile> CompositionExecutorProfile = new("geef:atelier:composition-executor-profile");
 
     /// <summary>
     /// Injected by <c>AdvisorAwareExecutor</c> (or directly by the orchestrator for convergence-failure retries).
