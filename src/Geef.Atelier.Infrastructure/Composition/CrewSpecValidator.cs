@@ -155,7 +155,7 @@ internal sealed class CrewSpecValidator(
     /// checks required inline fields. Optionally verifies the provider/model combination.
     /// </summary>
     private async Task ValidateProfileRefAsync<TProfile>(
-        CrewSpecProfileRef profileRef,
+        CrewPartSpec profileRef,
         string fieldPath,
         Func<string, Task<TProfile?>> catalogLookup,
         List<CrewSpecValidationIssue> issues,
