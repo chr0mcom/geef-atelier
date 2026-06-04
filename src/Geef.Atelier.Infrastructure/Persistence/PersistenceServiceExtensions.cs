@@ -46,6 +46,7 @@ public static class PersistenceServiceExtensions
         services.AddScoped<IOAuthAuditLogRepository, OAuthAuditLogRepository>();
         services.AddScoped<IDashboardRepository, DashboardRepository>();
         services.AddScoped<ILearningRepository, LearningRepository>();
+        services.AddScoped<ICrewTemplateEmbeddingRepository, CrewTemplateEmbeddingRepository>();
         services.AddScoped<ISiteSettingsRepository, SiteSettingsRepository>();
         services.AddScoped<ISiteSettingsService, SiteSettingsService>();
         services.AddScoped<IStudioSettingsRepository, StudioSettingsRepository>();
