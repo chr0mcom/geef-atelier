@@ -14,6 +14,10 @@
             <span>@RunId</span>
             <span>@(Run.TokensTotal > 0 ? Run.TokensTotal.ToString("N0") + " tok" : "—")</span>
             <CrewBadge TemplateName="@Run.CrewTemplateName" />
+            @if (Run.Kind == RunKind.CrewComposition)
+            {
+                <span class="kind-badge kind-composition">⚡ Kompositions-Run</span>
+            }
         </div>
     </div>
     <div class="progress" aria-label="@ProgressLabel">

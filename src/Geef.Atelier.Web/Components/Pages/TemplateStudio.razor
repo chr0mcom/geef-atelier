@@ -3,12 +3,15 @@
 @attribute [Authorize]
 @using Geef.Atelier.Application.Crew.TemplateStudio
 @using Geef.Atelier.Application.Providers
+@using Geef.Atelier.Application.Runs
 @using Geef.Atelier.Core.Domain.Crew.TemplateStudio
 @using Geef.Atelier.Core.Domain.Providers
 @using Microsoft.Extensions.Options
 @inject ITemplateStudioService StudioService
 @inject IProviderService ProviderService
+@inject IRunService RunService
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthProvider
 
 <PageTitle>Crew Studio — Atelier</PageTitle>
 
@@ -37,6 +40,32 @@
                     SaveAsDefault="@_saveAsDefault"
                     SaveAsDefaultChanged="@(v => _saveAsDefault = v)"
                     OnAnalyze="StartAnalysisAsync" />
+                <hr class="section-divider" style="margin: 2rem 0;" />
+                <div class="studio-compose-section" data-testid="studio-compose-section">
+                    <h3>Kompositions-Run starten</h3>
+                    <p class="studio-compose-hint">
+                        Alternativ zum Analyse-Wizard: Starte einen <strong>Kompositions-Run</strong>, der die KI eine passende Crew
+                        für dein Briefing direkt im Hintergrund komponieren lässt — ohne anschließenden Task-Run.
+                        Das Ergebnis erscheint in der Run-Liste.
+                    </p>
+                    @if (_composeError is not null)
+                    {
+                        <div class="error-banner" role="alert">@_composeError</div>
+                    }
+                    <button type="button" class="btn secondary"
+                            disabled="@(string.IsNullOrWhiteSpace(_taskDescription) || _composing)"
+                            @onclick="StartCompositionRunAsync"
+                            data-testid="start-composition-run-button">
+                        @if (_composing)
+                        {
+                            <text>Starte Kompositions-Run…</text>
+                        }
+                        else
+                        {
+                            <text>⚡ Kompositions-Run starten</text>
+                        }
+                    </button>
+                </div>
                 <hr class="section-divider" style="margin: 2rem 0;" />
                 <StudioAnalysisHistoryList OnReAnalyze="HandleReAnalyze" />
                 break;
@@ -94,6 +123,10 @@
     private string _provider = "";
     private string _model = "";
     private string _analyzeStatus = "";
+
+    // Standalone composition-run state.
+    private bool _composing;
+    private string? _composeError;
 
     // Load the default model and provider list sequentially on the shared scoped DbContext
     // BEFORE rendering child components, so no two components touch the context concurrently.
@@ -186,5 +219,31 @@
         _taskDescription = taskDescription;
         _error = null;
         StateHasChanged();
+    }
+
+    private async Task StartCompositionRunAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_taskDescription)) return;
+        _composing = true;
+        _composeError = null;
+        StateHasChanged();
+        try
+        {
+            var auth = await AuthProvider.GetAuthenticationStateAsync();
+            var user = auth.User.Identity?.Name;
+            var runId = await RunService.SubmitRunAsync(new SubmitRunRequest(
+                BriefingText: _taskDescription,
+                ConfigJson: "{}",
+                CreatedByUser: user,
+                CrewTemplateName: null,
+                AutoCompose: true,
+                ChainToTaskRun: false));
+            Nav.NavigateTo($"/runs/{runId}");
+        }
+        catch (Exception ex)
+        {
+            _composeError = $"Kompositions-Run konnte nicht gestartet werden: {ex.Message}";
+            _composing = false;
+        }
     }
 }

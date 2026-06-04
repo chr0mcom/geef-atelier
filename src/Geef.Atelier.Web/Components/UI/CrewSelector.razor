@@ -6,6 +6,7 @@
     <label class="field">
         <span class="field-label">Crew</span>
         <select data-testid="crew-selector" value="@Value" @onchange="OnSelectionChangedAsync">
+            <option value="__auto__">⚡ Auto — passende Crew komponieren lassen (2 Runs, mehr Zeit &amp; Kosten)</option>
             @foreach (var t in _templates)
             {
                 <option value="@t.Name">

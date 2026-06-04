@@ -66,6 +66,13 @@ Be specific. Generic briefings produce generic texts."
 
     <CrewSelector @bind-Value="_crewTemplateName" />
 
+    @if (_crewTemplateName == "__auto__")
+    {
+        <div class="auto-crew-info" role="note">
+            ⚡ <strong>Auto-Komposition:</strong> Zunächst wird ein Kompositions-Run gestartet, der eine passende Crew für dein Briefing entwirft — danach startet automatisch der eigentliche Run. Das dauert etwas länger und verursacht höhere Kosten.
+        </div>
+    }
+
     <div class="newrun-actions">
         <div class="left-hint">⌘ + Enter to hand to the crew · esc to discard</div>
         <div style="display:flex;gap:10px">
@@ -145,12 +152,27 @@ Be specific. Generic briefings produce generic texts."
                 attachments = list;
             }
 
-            var id = await RunService.SubmitRunAsync(new SubmitRunRequest(
-                BriefingText: _briefing,
-                ConfigJson: _configJson,
-                CreatedByUser: user,
-                CrewTemplateName: _crewTemplateName,
-                Attachments: attachments));
+            Guid id;
+            if (_crewTemplateName == "__auto__")
+            {
+                id = await RunService.SubmitRunAsync(new SubmitRunRequest(
+                    BriefingText: _briefing,
+                    ConfigJson: "{}",
+                    CreatedByUser: user,
+                    CrewTemplateName: null,
+                    AutoCompose: true,
+                    ChainToTaskRun: true,
+                    Attachments: attachments));
+            }
+            else
+            {
+                id = await RunService.SubmitRunAsync(new SubmitRunRequest(
+                    BriefingText: _briefing,
+                    ConfigJson: _configJson,
+                    CreatedByUser: user,
+                    CrewTemplateName: _crewTemplateName,
+                    Attachments: attachments));
+            }
             Nav.NavigateTo($"/runs/{id}");
         }
         catch (ArgumentException ex) { _error = ex.Message; }

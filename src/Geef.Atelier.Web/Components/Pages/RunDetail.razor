@@ -51,6 +51,14 @@
             <div>
                 <div class="status-line">
                     <StatusBadge Status="_details.Run.Status" Large="true" />
+                    @if (_details.Run.Kind == RunKind.CrewComposition)
+                    {
+                        <span class="kind-badge kind-composition" title="Kompositions-Run">Kompositions-Run</span>
+                    }
+                    else if (_details.Run.Kind == RunKind.Learning)
+                    {
+                        <span class="kind-badge kind-learning" title="Lern-Run">Lern-Run</span>
+                    }
                     <span class="t-eyebrow eyebrow">
                         Iteration @_details.Iterations.Count of 3
                     </span>
@@ -75,6 +83,17 @@
                         <span class="val">
                             <a href="/runs/@_details.Run.ParentRunId.Value" class="t-mono">
                                 @_details.Run.ParentRunId.Value.ToString("N")[..8].ToUpperInvariant()
+                            </a>
+                        </span>
+                    </div>
+                }
+                @if (_details.Run.ParentCompositionRunId.HasValue)
+                {
+                    <div class="row">
+                        <span class="label">Komponiert durch</span>
+                        <span class="val">
+                            <a href="/runs/@_details.Run.ParentCompositionRunId.Value" class="t-mono" data-testid="composition-run-link">
+                                @_details.Run.ParentCompositionRunId.Value.ToString("N")[..8].ToUpperInvariant()
                             </a>
                         </span>
                     </div>
