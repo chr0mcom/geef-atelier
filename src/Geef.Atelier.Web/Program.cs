@@ -14,7 +14,6 @@ using Geef.Atelier.Infrastructure.Pricing;
 using Geef.Atelier.Infrastructure.Knowledge;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
-using Geef.Atelier.Infrastructure.Composition;
 using Geef.Atelier.Infrastructure.Finalizers;
 using Geef.Atelier.Infrastructure.TemplateStudio;
 using Geef.Atelier.Mcp;
