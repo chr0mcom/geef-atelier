@@ -34,6 +34,7 @@ public static class GroundingServiceExtensions
         services.AddSingleton<IGroundingProvider, AcademicSearchGroundingProvider>();
         services.AddSingleton<IGroundingProvider, RestApiGroundingProvider>();
         services.AddSingleton<IGroundingProvider, LearningRetrievalGroundingProvider>();
+        services.AddSingleton<IGroundingProvider, CrewCatalogGroundingProvider>();
         services.AddSingleton<IGroundingProviderFactory, GroundingProviderFactory>();
 
         // Academic source adapters
