@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Geef.Atelier.Application.Composition;
 using Geef.Atelier.Application.Crew.Finalizers;
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Grounding;
@@ -11,11 +12,13 @@ using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
+using Geef.Atelier.Infrastructure.Composition;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Infrastructure.Pricing;
+using Geef.Sdk;
 using Geef.Sdk.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -172,19 +175,14 @@ internal sealed class RunOrchestratorService(
             var groundingRefiner         = scope.ServiceProvider.GetService<IGroundingRefiner>();
             var groundingConsultationRepo = scope.ServiceProvider.GetService<IGroundingConsultationRepository>();
 
-            var runner = run.SeedDraftText is not null
-                ? AtelierPipelineFactory.BuildWithSeedDraft(
-                    snapshot, llmClientResolver, convergenceOptions, run.SeedDraftText,
-                    consultationRepository: consultations,
-                    runId: run.Id,
-                    loggerFactory: loggerFactory,
-                    additionalSinks: [sink],
-                    groundingProviderFactory: groundingProviderFactory,
-                    pricingCatalog: pricingCatalog,
-                    costAccumulator: accumulator,
-                    groundingRefiner: groundingRefiner,
-                    groundingConsultationRepository: groundingConsultationRepo)
-                : AtelierPipelineFactory.Build(
+            GeefPipelineRunner<FinalizedDocument> runner;
+            if (run.Kind == RunKind.CrewComposition)
+            {
+                var crewSpecValidator = scope.ServiceProvider.GetRequiredService<ICrewSpecValidator>();
+                var validatorReviewer = new CrewSpecValidatorReviewer(crewSpecValidator);
+                var composerExecutor  = scope.ServiceProvider.GetRequiredService<CrewComposerExecutor>();
+
+                runner = AtelierPipelineFactory.Build(
                     snapshot, llmClientResolver, convergenceOptions,
                     consultationRepository: consultations,
                     runId: run.Id,
@@ -194,7 +192,37 @@ internal sealed class RunOrchestratorService(
                     pricingCatalog: pricingCatalog,
                     costAccumulator: accumulator,
                     groundingRefiner: groundingRefiner,
-                    groundingConsultationRepository: groundingConsultationRepo);
+                    groundingConsultationRepository: groundingConsultationRepo,
+                    customExecutionStep: composerExecutor,
+                    specialReviewerResolver: profile =>
+                        profile.Name == "crew-spec-validator" ? validatorReviewer : null);
+            }
+            else
+            {
+                runner = run.SeedDraftText is not null
+                    ? AtelierPipelineFactory.BuildWithSeedDraft(
+                        snapshot, llmClientResolver, convergenceOptions, run.SeedDraftText,
+                        consultationRepository: consultations,
+                        runId: run.Id,
+                        loggerFactory: loggerFactory,
+                        additionalSinks: [sink],
+                        groundingProviderFactory: groundingProviderFactory,
+                        pricingCatalog: pricingCatalog,
+                        costAccumulator: accumulator,
+                        groundingRefiner: groundingRefiner,
+                        groundingConsultationRepository: groundingConsultationRepo)
+                    : AtelierPipelineFactory.Build(
+                        snapshot, llmClientResolver, convergenceOptions,
+                        consultationRepository: consultations,
+                        runId: run.Id,
+                        loggerFactory: loggerFactory,
+                        additionalSinks: [sink],
+                        groundingProviderFactory: groundingProviderFactory,
+                        pricingCatalog: pricingCatalog,
+                        costAccumulator: accumulator,
+                        groundingRefiner: groundingRefiner,
+                        groundingConsultationRepository: groundingConsultationRepo);
+            }
 
             try
             {

@@ -26,6 +26,27 @@ internal static class AtelierPipelineFactory
     /// or <see cref="AdvisorTrigger.BeforeEveryExecution"/>), the executor is wrapped with an
     /// <see cref="AdvisorAwareExecutor"/> decorator that consults them before each iteration.
     /// </summary>
+    /// <param name="snapshot">Fully-dereferenced crew configuration for the run.</param>
+    /// <param name="resolver">LLM client resolver used to create profile-based actors.</param>
+    /// <param name="convergenceOptions">Convergence policy configuration.</param>
+    /// <param name="consultationRepository">Repository for advisor consultation records.</param>
+    /// <param name="runId">Identifier of the run being executed (used for tracing).</param>
+    /// <param name="loggerFactory">Optional logger factory for pipeline event sinks.</param>
+    /// <param name="additionalSinks">Additional event sinks to attach to the pipeline.</param>
+    /// <param name="groundingProviderFactory">Optional factory for grounding providers.</param>
+    /// <param name="pricingCatalog">Optional pricing catalog for cost tracking.</param>
+    /// <param name="costAccumulator">Optional cost accumulator for recording actor costs.</param>
+    /// <param name="groundingRefiner">Optional grounding refiner for provider-backed refinement.</param>
+    /// <param name="groundingConsultationRepository">Optional repository for grounding consultation records.</param>
+    /// <param name="customExecutionStep">
+    /// When non-null, this step is used instead of the default <see cref="ProfileBasedExecutor"/>.
+    /// Advisor wrapping is skipped when a custom execution step is supplied.
+    /// </param>
+    /// <param name="specialReviewerResolver">
+    /// Optional factory called for each <see cref="Geef.Atelier.Core.Domain.Crew.Profiles.ReviewerProfile"/>
+    /// before falling back to <see cref="ProfileBasedReviewer"/>. Return a non-null <see cref="IReviewer"/>
+    /// to substitute the profile-based instance; return <see langword="null"/> to use the default.
+    /// </param>
     public static GeefPipelineRunner<FinalizedDocument> Build(
         CrewSnapshot snapshot,
         ILlmClientResolver resolver,
@@ -38,7 +59,9 @@ internal static class AtelierPipelineFactory
         IPricingCatalog? pricingCatalog = null,
         ICostAccumulator? costAccumulator = null,
         IGroundingRefiner? groundingRefiner = null,
-        IGroundingConsultationRepository? groundingConsultationRepository = null)
+        IGroundingConsultationRepository? groundingConsultationRepository = null,
+        IExecutionStep? customExecutionStep = null,
+        Func<Geef.Atelier.Core.Domain.Crew.Profiles.ReviewerProfile, IReviewer?>? specialReviewerResolver = null)
     {
         IGroundingStep grounding = new BriefingGroundingStep();
         if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
@@ -51,21 +74,29 @@ internal static class AtelierPipelineFactory
                 groundingConsultationRepository);
         }
 
-        IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);
-
-        var preExecutionAdvisors = snapshot.Advisors
-            .Where(a => a.Trigger != AdvisorTrigger.OnConvergenceFailure)
-            .ToList();
-
-        if (preExecutionAdvisors.Count > 0 && consultationRepository is not null)
+        IExecutionStep execution;
+        if (customExecutionStep is not null)
         {
-            var advisorInstances = preExecutionAdvisors
-                .Select(a => new ProfileBasedAdvisor(a, resolver, consultationRepository, pricingCatalog, costAccumulator))
+            execution = customExecutionStep;
+        }
+        else
+        {
+            execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);
+
+            var preExecutionAdvisors = snapshot.Advisors
+                .Where(a => a.Trigger != AdvisorTrigger.OnConvergenceFailure)
                 .ToList();
-            execution = new AdvisorAwareExecutor(execution, advisorInstances, runId);
+
+            if (preExecutionAdvisors.Count > 0 && consultationRepository is not null)
+            {
+                var advisorInstances = preExecutionAdvisors
+                    .Select(a => new ProfileBasedAdvisor(a, resolver, consultationRepository, pricingCatalog, costAccumulator))
+                    .ToList();
+                execution = new AdvisorAwareExecutor(execution, advisorInstances, runId);
+            }
         }
 
-        var reviewers = ResolveReviewers(snapshot.Reviewers, resolver, pricingCatalog, costAccumulator);
+        var reviewers = ResolveReviewers(snapshot.Reviewers, resolver, pricingCatalog, costAccumulator, specialReviewerResolver);
         var finalizer = new MarkdownFinalizer();
 
         return BuildWithProviders(grounding, execution, reviewers, finalizer,
@@ -224,18 +255,31 @@ internal static class AtelierPipelineFactory
     }
 
     /// <summary>
-    /// Returns profile-based reviewers, or a single <see cref="AutoApproveReviewer"/> when the
-    /// snapshot has no reviewers (single-pass / reviewer-free template).
+    /// Returns reviewers for the given profiles, falling back to <see cref="AutoApproveReviewer"/> when
+    /// the profile list is empty (single-pass / reviewer-free template).
+    /// When <paramref name="specialReviewerResolver"/> is supplied, each profile is offered to it first;
+    /// a non-null return value replaces the default <see cref="ProfileBasedReviewer"/> for that profile.
     /// </summary>
     private static IEnumerable<IReviewer> ResolveReviewers(
         IReadOnlyList<Geef.Atelier.Core.Domain.Crew.Profiles.ReviewerProfile> profiles,
         ILlmClientResolver resolver,
         IPricingCatalog? pricingCatalog,
-        ICostAccumulator? costAccumulator)
+        ICostAccumulator? costAccumulator,
+        Func<Geef.Atelier.Core.Domain.Crew.Profiles.ReviewerProfile, IReviewer?>? specialReviewerResolver = null)
     {
         if (profiles.Count == 0)
             return [new AutoApproveReviewer()];
 
-        return profiles.Select(r => (IReviewer)new ProfileBasedReviewer(r, resolver, pricingCatalog, costAccumulator));
+        return profiles.Select(r =>
+        {
+            if (specialReviewerResolver is not null)
+            {
+                var special = specialReviewerResolver(r);
+                if (special is not null)
+                    return special;
+            }
+
+            return (IReviewer)new ProfileBasedReviewer(r, resolver, pricingCatalog, costAccumulator);
+        });
     }
 }
