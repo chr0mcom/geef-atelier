@@ -13,6 +13,7 @@ using Geef.Atelier.Infrastructure.Pricing;
 using Geef.Atelier.Infrastructure.Knowledge;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
+using Geef.Atelier.Infrastructure.Composition;
 using Geef.Atelier.Infrastructure.Finalizers;
 using Geef.Atelier.Infrastructure.TemplateStudio;
 using Geef.Atelier.Mcp;
@@ -70,6 +71,7 @@ builder.Services.AddSingleton<IPricingCatalog, PricingCatalog>();
 builder.Services.AddSingleton<DocsService>();
 builder.Services.AddTemplateStudio(builder.Configuration);
 builder.Services.AddFinalizers(builder.Configuration);
+builder.Services.AddCrewComposition();
 
 builder.Services.Configure<OrchestratorOptions>(builder.Configuration.GetSection("Orchestrator"));
 builder.Services.Configure<ConvergenceOptions>(builder.Configuration.GetSection("Convergence"));
