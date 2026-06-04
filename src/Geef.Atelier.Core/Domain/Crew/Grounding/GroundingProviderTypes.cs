@@ -11,4 +11,5 @@ public static class GroundingProviderTypes
     public const string AcademicSearch = "academic-search";
     public const string RestApi = "rest-api";
     public const string LearningRetrieval = "learning-retrieval";
+    public const string CrewCatalog = "crew-catalog";
 }

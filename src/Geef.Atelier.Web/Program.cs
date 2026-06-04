@@ -8,6 +8,7 @@ using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Embeddings;
+using Geef.Atelier.Infrastructure.Composition;
 using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Pricing;
 using Geef.Atelier.Infrastructure.Knowledge;
@@ -60,6 +61,9 @@ builder.Services.AddAtelierApplication();
 
 builder.Services.AddEmbeddings(builder.Configuration);
 builder.Services.AddKnowledge(builder.Configuration);
+
+// Crew composition infrastructure (ICrewTemplateEmbeddingRepository, etc.)
+builder.Services.AddCrewComposition();
 
 // Grounding providers — ApiKey intentionally not logged; missing key fails at run time, not at startup.
 builder.Services.AddGroundingProviders(builder.Configuration);
