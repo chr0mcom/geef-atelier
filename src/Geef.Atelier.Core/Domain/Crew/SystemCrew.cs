@@ -127,6 +127,174 @@ public static class SystemCrew
         MaxTokens: null,
         IsSystem: true);
 
+    // ── Auto-Crew: crew-composer executor ──────────────────────────────────────
+
+    /// <summary>Executor for the crew-composer system crew — composes Geef.Atelier crews from task descriptions.</summary>
+    public static readonly ExecutorProfile CrewComposerExecutorProfile = new(
+        Name: "crew-composer-executor",
+        DisplayName: "Crew Composer Executor",
+        Description: "Specialist executor for auto-crew composition runs. Analyzes task descriptions and calls submit_crew_spec with a complete crew configuration following Reuse-First and model-plurality rules.",
+        SystemPrompt: SystemPrompts.CrewComposerExecutor,
+        Provider: "claude-cli",
+        Model: "claude-opus-4-8",
+        MaxTokens: 16384,
+        IsSystem: true);
+
+    // ── Auto-Crew: crew-composer reviewers ─────────────────────────────────────
+
+    /// <summary>Deterministic structural validator — actual implementation injected at pipeline build time (Task 7).</summary>
+    public static readonly ReviewerProfile CrewSpecValidatorProfile = new(
+        Name: "crew-spec-validator",
+        DisplayName: "Crew Spec Validator",
+        Description: "Deterministic structural validator for crew specifications. Injected at pipeline build time; this entry provides the profile registration only.",
+        SystemPrompt: SystemPrompts.CrewSpecValidator,
+        Provider: "",
+        Model: "",
+        MaxTokens: null,
+        IsSystem: true);
+
+    /// <summary>Checks that the proposed crew has executor, reviewer(s), and finalizer(s); flags missing roles.</summary>
+    public static readonly ReviewerProfile CrewComposerCompletenessProfile = new(
+        Name: "crew-composer-completeness",
+        DisplayName: "Crew Completeness",
+        Description: "Verifies that the proposed crew spec contains all mandatory roles: executor, at least one reviewer, and at least one finalizer. Flags missing domain-specific roles for domain tasks.",
+        SystemPrompt: SystemPrompts.CrewComposerCompleteness,
+        Provider: "codex-cli",
+        Model: "gpt-5.5",
+        MaxTokens: 4096,
+        IsSystem: true);
+
+    /// <summary>Reviews every new profile's system prompt for completeness and inclusion of the severity taxonomy.</summary>
+    public static readonly ReviewerProfile CrewComposerPromptQualityProfile = new(
+        Name: "crew-composer-prompt-quality",
+        DisplayName: "Prompt Quality",
+        Description: "Audits system prompts in the proposed crew for completeness, task-specificity, and the mandatory severity taxonomy block in reviewer prompts.",
+        SystemPrompt: SystemPrompts.CrewComposerPromptQuality,
+        Provider: "openrouter",
+        Model: "google/gemini-2.5-flash",
+        MaxTokens: 4096,
+        IsSystem: true);
+
+    /// <summary>Checks whether the crew fits the task: domain, models, grounding, and complexity.</summary>
+    public static readonly ReviewerProfile CrewComposerFitProfile = new(
+        Name: "crew-composer-fit",
+        DisplayName: "Crew Fit",
+        Description: "Evaluates whether the proposed crew is appropriate for the task: domain relevance, model choices, grounding configuration, and overall complexity balance.",
+        SystemPrompt: SystemPrompts.CrewComposerFit,
+        Provider: "codex-cli",
+        Model: "gpt-5.5",
+        MaxTokens: 4096,
+        IsSystem: true);
+
+    /// <summary>Checks that reuse references are correct and the right composition mode was chosen.</summary>
+    public static readonly ReviewerProfile CrewComposerReuseCorrectnessProfile = new(
+        Name: "crew-composer-reuse-correctness",
+        DisplayName: "Reuse Correctness",
+        Description: "Verifies that reused profiles fit the task, detects unnecessary duplicates, and checks that the correct composition mode (existing-template / composed / new) was selected.",
+        SystemPrompt: SystemPrompts.CrewComposerReuseCorrectness,
+        Provider: "claude-cli",
+        Model: "claude-opus-4-8",
+        MaxTokens: 4096,
+        IsSystem: true);
+
+    // ── Auto-Crew: crew-design-advisor ─────────────────────────────────────────
+
+    /// <summary>Strategic advisor consulted once before the first composition draft; orients the executor on domain, risks, and crew archetypes.</summary>
+    public static readonly AdvisorProfile CrewDesignAdvisorProfile = new(
+        Name: "crew-design-advisor",
+        DisplayName: "Crew Design Advisor",
+        Description: "Strategic pre-composition advisor. Analyzes the user's task for domain, quality risks, suitable crew archetypes, grounding needs, and complexity calibration before the executor begins.",
+        SystemPrompt: SystemPrompts.CrewDesignAdvisor,
+        Provider: "claude-cli",
+        Model: "claude-opus-4-8",
+        MaxTokens: 4096,
+        Mode: AdvisorMode.Strategic,
+        Trigger: AdvisorTrigger.BeforeFirstExecution,
+        IsSystem: true);
+
+    // ── Auto-Crew: grounding providers ─────────────────────────────────────────
+
+    /// <summary>Crew catalog grounding provider — surfaces existing profiles and templates for Reuse-First lookups.</summary>
+    public static readonly GroundingProviderProfile CrewCatalogDefaultProfile = new(
+        Name: "crew-catalog-default",
+        DisplayName: "Crew Catalog",
+        Description: "Returns the current catalog of system and custom crew profiles and templates. Used by the crew-composer executor to apply Reuse-First before composing new profiles.",
+        ProviderType: GroundingProviderTypes.CrewCatalog,
+        ProviderSettings: new Dictionary<string, string>(),
+        MaxQueriesPerRun: 1,
+        IsSystem: true);
+
+    /// <summary>Static-context grounding provider embedding the binding crew design rules.</summary>
+    public static readonly GroundingProviderProfile CrewDesignRulesProfile = new(
+        Name: "crew-design-rules",
+        DisplayName: "Crew Design Rules",
+        Description: "Injects the binding crew-design rules (model plurality, severity taxonomy, naming constraints, minimum crew, reuse-first) as static context into the composition run.",
+        ProviderType: GroundingProviderTypes.StaticContext,
+        ProviderSettings: new Dictionary<string, string>
+        {
+            [GroundingProviderProfile.KeyStaticContent] =
+                "Crew Design Rules (binding for all auto-composed crews):\n" +
+                "1. Model plurality: reviewer models must differ from the executor model (independent perspective).\n" +
+                "2. Severity taxonomy: every new reviewer prompt MUST include the verbatim taxonomy block.\n" +
+                "3. Naming constraints: ^[a-z0-9\\-]+$, max 64 chars. Custom prefix auto-applied.\n" +
+                "4. System prompt language: English.\n" +
+                "5. Minimum crew: executor + >=1 reviewer + >=1 output finalizer.\n" +
+                "6. Sensible strategy/convergence: Parallel by default; Sequential/Priority only when order matters.\n" +
+                "7. Domain coverage: domain-specific tasks need domain-specific reviewers/advisors/grounding.\n" +
+                "8. Reuse-first: prefer existing profiles before creating new ones; no duplicates.\n\n" +
+                "Severity taxonomy (verbatim -- copy into every new reviewer prompt):\n" +
+                "- critical: substantial factual or logical error; the reader is actively misinformed.\n" +
+                "- major: important omission or clear inaccuracy that significantly reduces usefulness.\n" +
+                "- minor: style improvement, request for precision; substantially correct.\n" +
+                "- info: optional note; no action required.\n" +
+                "Anti-pattern: \"technically correct\" != critical. If correct but could be more precise -> minor at most.",
+            [GroundingProviderProfile.KeyStaticLabel] = "Crew Design Rules",
+        },
+        MaxQueriesPerRun: 1,
+        IsSystem: true);
+
+    // ── Auto-Crew: materializer finalizer ──────────────────────────────────────
+
+    /// <summary>Finalizer that materializes the crew-spec JSON artifact into real database entities.</summary>
+    public static readonly FinalizerProfile CrewMaterializerProfile = new(
+        Name: "crew-materializer",
+        DisplayName: "Crew Materializer",
+        Description: "Materializes the JSON crew-spec produced by a composition run into real executor, reviewer, advisor, grounding-provider, and finalizer profile entities in the database.",
+        FinalizerType: FinalizerType.CrewMaterialize,
+        Settings: new Dictionary<string, string>(),
+        IsSystem: true);
+
+    // ── Auto-Crew: crew-composer template ──────────────────────────────────────
+
+    /// <summary>Name constant for the crew-composer system template.</summary>
+    public const string CrewComposerTemplateName = "crew-composer";
+
+    /// <summary>System crew template for auto-crew composition runs.</summary>
+    public static readonly CrewTemplate CrewComposerTemplate = new(
+        Name: CrewComposerTemplateName,
+        DisplayName: "Crew Composer",
+        Description: "Auto-crew composition: analyzes a task description and produces a complete, validated crew specification ready for materialization. Uses Reuse-First, model plurality, and the full severity taxonomy.",
+        ExecutorProfileName: CrewComposerExecutorProfile.Name,
+        ReviewerProfileNames: new[]
+        {
+            CrewSpecValidatorProfile.Name,
+            CrewComposerCompletenessProfile.Name,
+            CrewComposerPromptQualityProfile.Name,
+            CrewComposerFitProfile.Name,
+            CrewComposerReuseCorrectnessProfile.Name,
+        },
+        EvaluationStrategy: EvaluationStrategy.Parallel,
+        ConvergenceOverride: new ConvergencePolicyOverride(
+            MaxIterations: 4,
+            AbortOnCritical: false,
+            DetectRegression: true,
+            StagnationThreshold: 3),
+        AdvisorProfileNames: new[] { CrewDesignAdvisorProfile.Name },
+        GroundingProviderNames: new[] { CrewCatalogDefaultProfile.Name, CrewDesignRulesProfile.Name },
+        FinalizerProfileNames: new[] { CrewMaterializerProfile.Name },
+        RunFinalizersOnMaxAttempts: false,
+        IsSystem: true);
+
     /// <summary>The only system template in PS-5: the Klassik crew that reproduces the PS-2 hardcoded behaviour.</summary>
     public static readonly CrewTemplate KlassikTemplate = new(
         Name: KlassikTemplateName,
@@ -302,21 +470,28 @@ public static class SystemCrew
     public static readonly IReadOnlyDictionary<string, ReviewerProfile> ReviewerProfiles =
         new Dictionary<string, ReviewerProfile>
         {
-            [BriefingFidelityProfile.Name]              = BriefingFidelityProfile,
-            [ClarityProfile.Name]                       = ClarityProfile,
-            [LegalJargonPrecisionProfile.Name]          = LegalJargonPrecisionProfile,
-            [LegalClauseRiskProfile.Name]               = LegalClauseRiskProfile,
-            [AcademicCitationReadinessProfile.Name]     = AcademicCitationReadinessProfile,
-            [AcademicArgumentationRigorProfile.Name]    = AcademicArgumentationRigorProfile,
-            [MarketingAudienceClarityProfile.Name]      = MarketingAudienceClarityProfile,
-            [MarketingConversionStrengthProfile.Name]   = MarketingConversionStrengthProfile,
+            [BriefingFidelityProfile.Name]                  = BriefingFidelityProfile,
+            [ClarityProfile.Name]                           = ClarityProfile,
+            [LegalJargonPrecisionProfile.Name]              = LegalJargonPrecisionProfile,
+            [LegalClauseRiskProfile.Name]                   = LegalClauseRiskProfile,
+            [AcademicCitationReadinessProfile.Name]         = AcademicCitationReadinessProfile,
+            [AcademicArgumentationRigorProfile.Name]        = AcademicArgumentationRigorProfile,
+            [MarketingAudienceClarityProfile.Name]          = MarketingAudienceClarityProfile,
+            [MarketingConversionStrengthProfile.Name]       = MarketingConversionStrengthProfile,
+            // Auto-Crew composition reviewers
+            [CrewSpecValidatorProfile.Name]                 = CrewSpecValidatorProfile,
+            [CrewComposerCompletenessProfile.Name]          = CrewComposerCompletenessProfile,
+            [CrewComposerPromptQualityProfile.Name]         = CrewComposerPromptQualityProfile,
+            [CrewComposerFitProfile.Name]                   = CrewComposerFitProfile,
+            [CrewComposerReuseCorrectnessProfile.Name]      = CrewComposerReuseCorrectnessProfile,
         };
 
     /// <summary>All system executor profiles, indexed by name.</summary>
     public static readonly IReadOnlyDictionary<string, ExecutorProfile> ExecutorProfiles =
         new Dictionary<string, ExecutorProfile>
         {
-            [DefaultExecutorProfile.Name] = DefaultExecutorProfile,
+            [DefaultExecutorProfile.Name]         = DefaultExecutorProfile,
+            [CrewComposerExecutorProfile.Name]    = CrewComposerExecutorProfile,
         };
 
     // ── Domain advisor profiles ─────────────────────────────────────────────────────
@@ -379,8 +554,9 @@ public static class SystemCrew
         {
             [LegalDomainExpertProfile.Name]      = LegalDomainExpertProfile,
             [AcademicRigorAdvisorProfile.Name]   = AcademicRigorAdvisorProfile,
-            [BriefingClarifierProfile.Name]       = BriefingClarifierProfile,
-            [DevilsAdvocateProfile.Name]          = DevilsAdvocateProfile,
+            [BriefingClarifierProfile.Name]      = BriefingClarifierProfile,
+            [DevilsAdvocateProfile.Name]         = DevilsAdvocateProfile,
+            [CrewDesignAdvisorProfile.Name]      = CrewDesignAdvisorProfile,
         };
 
     /// <summary>All system grounding-provider profiles, indexed by name.</summary>
@@ -394,16 +570,20 @@ public static class SystemCrew
             [TavilyNewsProfile.Name]                 = TavilyNewsProfile,
             [AcademicDefaultProfile.Name]            = AcademicDefaultProfile,
             [LearningRetrieverDefaultProfile.Name]   = LearningRetrieverDefaultProfile,
+            // Auto-Crew grounding providers
+            [CrewCatalogDefaultProfile.Name]         = CrewCatalogDefaultProfile,
+            [CrewDesignRulesProfile.Name]            = CrewDesignRulesProfile,
         };
 
     /// <summary>All system crew templates, indexed by name.</summary>
     public static readonly IReadOnlyDictionary<string, CrewTemplate> CrewTemplates =
         new Dictionary<string, CrewTemplate>
         {
-            [KlassikTemplate.Name]    = KlassikTemplate,
-            [JuristischTemplate.Name] = JuristischTemplate,
-            [AkademischTemplate.Name] = AkademischTemplate,
-            [MarketingTemplate.Name]  = MarketingTemplate,
+            [KlassikTemplate.Name]        = KlassikTemplate,
+            [JuristischTemplate.Name]     = JuristischTemplate,
+            [AkademischTemplate.Name]     = AkademischTemplate,
+            [MarketingTemplate.Name]      = MarketingTemplate,
+            [CrewComposerTemplate.Name]   = CrewComposerTemplate,
         };
 
     /// <summary>
@@ -663,6 +843,8 @@ public static class SystemCrew
             // Learning Loop
             [LearningExtractorProfile.Name]   = LearningExtractorProfile,
             [LearningPublisherProfile.Name]   = LearningPublisherProfile,
+            // Auto-Crew
+            [CrewMaterializerProfile.Name]    = CrewMaterializerProfile,
         };
 
     /// <summary>True when the supplied name matches a system finalizer profile.</summary>

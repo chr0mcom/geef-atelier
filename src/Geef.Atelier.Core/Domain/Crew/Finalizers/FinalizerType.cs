@@ -20,4 +20,7 @@ public enum FinalizerType
 
     /// <summary>Evaluates a proposed learning entry through an LLM gate and approves or rejects it.</summary>
     LearningPublish = 5,
+
+    /// <summary>Materializes a Crew-Spec JSON artifact (produced by a composition run) into real database entities and optionally chains a follow-up task run.</summary>
+    CrewMaterialize = 6,
 }

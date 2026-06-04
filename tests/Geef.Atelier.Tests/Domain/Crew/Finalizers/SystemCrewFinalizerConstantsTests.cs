@@ -12,7 +12,8 @@ public sealed class SystemCrewFinalizerConstantsTests
     [Fact]
     public void FinalizerProfiles_Contains19Entries()
     {
-        Assert.Equal(19, SystemCrew.FinalizerProfiles.Count);
+        // 19 original + 1 auto-crew (crew-materializer)
+        Assert.Equal(20, SystemCrew.FinalizerProfiles.Count);
     }
 
     [Theory]
