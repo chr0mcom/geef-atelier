@@ -40,6 +40,12 @@ internal sealed class RunService(
             { throw new ArgumentException("configJson must be valid JSON.", nameof(request), ex); }
         }
 
+        // Defensive recursion guard: AutoCompose must never be set on a CrewComposition run.
+        // The CrewMaterializeFinalizerExecutor always submits with Kind=Standard and AutoCompose=false;
+        // this guard prevents accidental infinite loops if the caller gets the flags wrong.
+        if (request.Kind == RunKind.CrewComposition && request.AutoCompose)
+            throw new InvalidOperationException("AutoCompose cannot be used inside a CrewComposition run.");
+
         // When AutoCompose is requested, redirect to the fixed composition crew and embed the
         // original task + chain flag into ConfigJson so the materializer can act on them later.
         string effectiveBriefing        = request.BriefingText;
