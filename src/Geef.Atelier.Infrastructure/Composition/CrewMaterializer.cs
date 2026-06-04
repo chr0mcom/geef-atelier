@@ -4,9 +4,9 @@ using Geef.Atelier.Application.Crew.Knowledge;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
+using Geef.Atelier.Core.Domain.Crew.Composition;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
-using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Infrastructure.TemplateStudio;
 using Microsoft.Extensions.Logging;
 
@@ -85,18 +85,18 @@ internal sealed class CrewMaterializer(
             var embedding = await embeddingProvider.CreateAsync(summaryText, cancellationToken);
             var similar = await embeddingRepo.SearchAsync(
                 embedding.Vector,
-                spec.Domain,
+                domainHint: spec.Domain,
                 SameDomainBoost,
                 topK: 3,
-                cancellationToken);
+                ct: cancellationToken);
 
             if (similar.Count > 0 && similar[0].Similarity >= DedupThreshold)
             {
-                var dupName = similar[0].TemplateName;
+                var dupName = similar[0].Entry.TemplateName;
                 logger.LogInformation(
                     "CrewMaterializer: run {RunId} — dedup hit; reusing existing template '{Template}' (similarity={Sim:F3})",
                     sourceRunId, dupName, similar[0].Similarity);
-                warnings.Add($"Dedup: existing template '{dupName}' is {similar[0].Similarity:F3} similar; reused instead of creating new.");
+                warnings.Add($"Dedup: existing template '{dupName}' is similar ({similar[0].Similarity:F3}); reused instead of creating new.");
                 return new MaterializeCrewResult(dupName, WasDuplicate: true, warnings);
             }
         }
@@ -260,10 +260,15 @@ internal sealed class CrewMaterializer(
         {
             var embeddingResult = await embeddingProvider.CreateAsync(summaryText, cancellationToken);
             await embeddingRepo.UpsertAsync(
-                finalTemplateName,
-                spec.Domain,
-                summaryText,
-                embeddingResult.Vector,
+                new CrewTemplateEmbedding
+                {
+                    Id           = Guid.NewGuid(),
+                    TemplateName = finalTemplateName,
+                    Domain       = spec.Domain,
+                    Summary      = summaryText,
+                    Embedding    = embeddingResult.Vector,
+                    CreatedAt    = DateTimeOffset.UtcNow,
+                },
                 cancellationToken);
         }
         catch (Exception ex)
