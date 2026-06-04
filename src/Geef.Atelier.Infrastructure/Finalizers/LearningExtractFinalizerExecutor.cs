@@ -16,7 +16,7 @@ namespace Geef.Atelier.Infrastructure.Finalizers;
 /// <summary>
 /// Extracts a structured learning candidate from a completed run, then fires a
 /// learning-evaluation run as fire-and-forget. Runs only for Standard runs;
-/// returns immediately for Learning runs (recursion guard).
+/// returns immediately for Learning and CrewComposition runs (recursion guard).
 /// </summary>
 internal sealed class LearningExtractFinalizerExecutor(
     ILlmClientResolver llmClientResolver,
@@ -47,9 +47,10 @@ internal sealed class LearningExtractFinalizerExecutor(
                 return Ok(profile.Name);
             }
 
-            if (run.Kind == RunKind.Learning)
+            // Skip on Learning runs (recursion guard) AND on CrewComposition runs (meta-work, no learning from composition)
+            if (run.Kind == RunKind.Learning || run.Kind == RunKind.CrewComposition)
             {
-                logger.LogDebug("LearningExtract: run {RunId} is a Learning run; skipping to prevent recursion.", context.RunId);
+                logger.LogDebug("LearningExtract: run {RunId} is a {Kind} run; skipping to prevent recursion.", context.RunId, run.Kind);
                 return Ok(profile.Name);
             }
 
