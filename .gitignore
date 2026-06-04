@@ -436,6 +436,7 @@ CLAUDE.md
 
 # Git worktrees
 .worktrees/
+.claude/worktrees/
 
 # VS Code files for those working on multiple tools
 .vscode/*
