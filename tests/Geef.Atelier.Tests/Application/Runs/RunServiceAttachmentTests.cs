@@ -176,6 +176,7 @@ public sealed class RunServiceAttachmentTests
             string briefingText, string configJson,
             string? createdByUser = null, string? crewTemplateName = null,
             string? crewSnapshotJson = null, RunKind kind = RunKind.Standard,
+            Guid? parentCompositionRunId = null,
             CancellationToken cancellationToken = default)
         {
             _lastRunId = Guid.NewGuid();

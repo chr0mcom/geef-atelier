@@ -79,4 +79,11 @@ public sealed class RunEntity
     /// Defaults to <see cref="RunKind.Standard"/> for all runs created before Step30.
     /// </summary>
     public RunKind Kind { get; init; } = RunKind.Standard;
+
+    /// <summary>
+    /// Set on task-runs that were automatically triggered by a crew-composition run.
+    /// Points to the <see cref="RunKind.CrewComposition"/> run that produced the crew configuration.
+    /// Null for runs not originated from an auto-compose flow.
+    /// </summary>
+    public Guid? ParentCompositionRunId { get; init; }
 }

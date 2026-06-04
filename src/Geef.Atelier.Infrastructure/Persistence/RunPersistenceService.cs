@@ -15,21 +15,23 @@ internal sealed class RunPersistenceService(AtelierDbContext db) : IRunPersisten
         string? crewTemplateName = null,
         string? crewSnapshotJson = null,
         RunKind kind = RunKind.Standard,
+        Guid? parentCompositionRunId = null,
         CancellationToken cancellationToken = default)
     {
         var run = new RunEntity
         {
-            Id               = Guid.NewGuid(),
-            CreatedAt        = DateTimeOffset.UtcNow,
-            Status           = RunStatus.Pending,
-            BriefingText     = briefingText,
-            ConfigJson       = configJson,
-            CreatedByUser    = createdByUser,
-            CrewTemplateName = crewTemplateName,
-            CrewSnapshot     = crewSnapshotJson,
-            TokensTotal      = 0,
-            CostTotal        = 0m,
-            Kind             = kind,
+            Id                      = Guid.NewGuid(),
+            CreatedAt               = DateTimeOffset.UtcNow,
+            Status                  = RunStatus.Pending,
+            BriefingText            = briefingText,
+            ConfigJson              = configJson,
+            CreatedByUser           = createdByUser,
+            CrewTemplateName        = crewTemplateName,
+            CrewSnapshot            = crewSnapshotJson,
+            TokensTotal             = 0,
+            CostTotal               = 0m,
+            Kind                    = kind,
+            ParentCompositionRunId  = parentCompositionRunId,
         };
 
         db.Runs.Add(run);

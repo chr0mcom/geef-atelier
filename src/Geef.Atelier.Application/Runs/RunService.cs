@@ -40,14 +40,54 @@ internal sealed class RunService(
             { throw new ArgumentException("configJson must be valid JSON.", nameof(request), ex); }
         }
 
-        var snapshot = await crewService.ResolveSnapshotAsync(request.CrewTemplateName, request.CustomCrew, cancellationToken);
+        // When AutoCompose is requested, redirect to the fixed composition crew and embed the
+        // original task + chain flag into ConfigJson so the materializer can act on them later.
+        string effectiveBriefing        = request.BriefingText;
+        string effectiveTemplateName    = request.CrewTemplateName ?? string.Empty;
+        RunKind effectiveKind           = request.Kind;
+
+        if (request.AutoCompose)
+        {
+            effectiveKind        = RunKind.CrewComposition;
+            effectiveTemplateName = "crew-composer";
+            effectiveBriefing    = $"Compose a crew for the following task:\n\n{request.BriefingText}";
+
+            // Embed the original task and chain flag into the config JSON so the materializer
+            // can retrieve them when the composition run completes.
+            using var configDoc  = JsonDocument.Parse(normalizedConfig);
+            var configDict       = new Dictionary<string, JsonElement>(
+                configDoc.RootElement.EnumerateObject()
+                    .Select(p => new KeyValuePair<string, JsonElement>(p.Name, p.Value)));
+
+            var writerOpts = new JsonWriterOptions { Indented = false };
+            using var ms   = new System.IO.MemoryStream();
+            using (var writer = new Utf8JsonWriter(ms, writerOpts))
+            {
+                writer.WriteStartObject();
+                foreach (var (key, val) in configDict)
+                {
+                    writer.WritePropertyName(key);
+                    val.WriteTo(writer);
+                }
+                writer.WriteString("original_task", request.BriefingText);
+                writer.WriteBoolean("chain_to_task_run", request.ChainToTaskRun);
+                writer.WriteEndObject();
+            }
+            normalizedConfig = System.Text.Encoding.UTF8.GetString(ms.ToArray());
+        }
+
+        var snapshot = await crewService.ResolveSnapshotAsync(
+            string.IsNullOrEmpty(effectiveTemplateName) ? null : effectiveTemplateName,
+            request.AutoCompose ? null : request.CustomCrew,
+            cancellationToken);
         var snapshotJson = JsonSerializer.Serialize(snapshot, SnapshotJsonOpts);
         // CrewTemplateName is the template name from snapshot (null for inline spec)
         var resolvedTemplateName = snapshot.TemplateName;
 
         var runId = await persistence.CreateRunAsync(
-            request.BriefingText, normalizedConfig, request.CreatedByUser,
-            resolvedTemplateName, snapshotJson, request.Kind, cancellationToken);
+            effectiveBriefing, normalizedConfig, request.CreatedByUser,
+            resolvedTemplateName, snapshotJson, effectiveKind,
+            request.ParentCompositionRunId, cancellationToken);
 
         // Upload run-local attachments and extend the snapshot with RunAttachmentsProfile.
         if (request.Attachments is { Count: > 0 } attachments)

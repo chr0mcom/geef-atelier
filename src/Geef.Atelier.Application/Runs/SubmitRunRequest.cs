@@ -10,4 +10,7 @@ public sealed record SubmitRunRequest(
     string? CrewTemplateName = null,
     CrewSpec? CustomCrew = null,
     IReadOnlyList<RunAttachmentInput>? Attachments = null,
-    RunKind Kind = RunKind.Standard);
+    RunKind Kind = RunKind.Standard,
+    bool AutoCompose = false,
+    bool ChainToTaskRun = true,
+    Guid? ParentCompositionRunId = null);

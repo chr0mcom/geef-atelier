@@ -11,6 +11,7 @@ public interface IRunPersistenceService
         string? crewTemplateName = null,
         string? crewSnapshotJson = null,
         RunKind kind = RunKind.Standard,
+        Guid? parentCompositionRunId = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
