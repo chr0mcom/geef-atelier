@@ -7,12 +7,14 @@ namespace Geef.Atelier.Infrastructure.Composition;
 public static class CompositionServiceExtensions
 {
     /// <summary>
-    /// Registers <see cref="ICrewSpecValidator"/> and <see cref="CrewSpecValidatorReviewer"/>
-    /// with the DI container.
+    /// Registers composition infrastructure services:
+    /// <see cref="ICrewSpecValidator"/>, <see cref="ICrewMaterializer"/>,
+    /// and their implementations.
     /// </summary>
     public static IServiceCollection AddCrewComposition(this IServiceCollection services)
     {
         services.AddScoped<ICrewSpecValidator, CrewSpecValidator>();
+        services.AddScoped<ICrewMaterializer, CrewMaterializer>();
         return services;
     }
 }

@@ -16,8 +16,12 @@ public sealed class LearningDomainTests
         => Assert.Equal(1, (int)RunKind.Learning);
 
     [Fact]
-    public void RunKind_HasExactlyTwoValues()
-        => Assert.Equal(2, Enum.GetValues<RunKind>().Length);
+    public void RunKind_CrewComposition_HasValue2()
+        => Assert.Equal(2, (int)RunKind.CrewComposition);
+
+    [Fact]
+    public void RunKind_HasExactlyThreeValues()
+        => Assert.Equal(3, Enum.GetValues<RunKind>().Length);
 
     // ── LearningStatus enum ──────────────────────────────────────────────
 
