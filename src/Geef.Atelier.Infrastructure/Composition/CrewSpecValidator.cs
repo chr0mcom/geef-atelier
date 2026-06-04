@@ -1,0 +1,226 @@
+using Geef.Atelier.Application.Composition;
+using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Core.Domain.Crew.Composition;
+
+namespace Geef.Atelier.Infrastructure.Composition;
+
+/// <summary>
+/// Deterministic, non-LLM implementation of <see cref="ICrewSpecValidator"/>.
+/// Validates a Crew-Spec JSON by:
+/// <list type="bullet">
+///   <item>parsing the JSON into a <see cref="CrewSpecArtifact"/>,</item>
+///   <item>resolving every <c>reuse</c> reference against the live profile catalog,</item>
+///   <item>checking that all required fields are present for inline definitions, and</item>
+///   <item>verifying that provider/model combinations exist in the model catalog.</item>
+/// </list>
+/// </summary>
+internal sealed class CrewSpecValidator(
+    ICrewService crewService,
+    IModelCatalog modelCatalog) : ICrewSpecValidator
+{
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<CrewSpecValidationIssue>> ValidateAsync(
+        string specJson,
+        CancellationToken cancellationToken = default)
+    {
+        var issues = new List<CrewSpecValidationIssue>();
+
+        // Step 1 – parse
+        CrewSpecArtifact? spec;
+        try
+        {
+            spec = CrewSpecParser.Parse(specJson);
+        }
+        catch
+        {
+            spec = null;
+        }
+
+        if (spec is null)
+        {
+            issues.Add(new CrewSpecValidationIssue(
+                Field:      "spec_json",
+                Message:    "Invalid JSON or missing required fields (mode not recognised).",
+                IsCritical: true));
+            return issues;
+        }
+
+        // Step 2 – ExistingTemplate mode
+        if (spec.Mode == CrewSpecMode.ExistingTemplate)
+        {
+            if (string.IsNullOrWhiteSpace(spec.ExistingTemplateName))
+            {
+                issues.Add(new CrewSpecValidationIssue(
+                    Field:      "existing_template_name",
+                    Message:    "ExistingTemplate mode requires a non-empty existing_template_name.",
+                    IsCritical: true));
+            }
+            else
+            {
+                var template = await crewService
+                    .GetCrewTemplateAsync(spec.ExistingTemplateName, cancellationToken);
+
+                if (template is null)
+                    issues.Add(new CrewSpecValidationIssue(
+                        Field:      "existing_template_name",
+                        Message:    $"Crew template '{spec.ExistingTemplateName}' was not found in the catalog.",
+                        IsCritical: true));
+            }
+
+            return issues;
+        }
+
+        // Step 3 – Composed mode: executor
+        if (spec.Executor is null)
+        {
+            issues.Add(new CrewSpecValidationIssue(
+                Field:      "executor",
+                Message:    "Executor is required.",
+                IsCritical: true));
+        }
+        else
+        {
+            await ValidateProfileRefAsync(
+                spec.Executor, "executor",
+                name => crewService.GetExecutorProfileAsync(name, cancellationToken),
+                issues, cancellationToken);
+        }
+
+        // Step 4 – reviewers
+        if (spec.Reviewers.Count == 0)
+        {
+            issues.Add(new CrewSpecValidationIssue(
+                Field:      "reviewers",
+                Message:    "At least one reviewer is required.",
+                IsCritical: true));
+        }
+        else
+        {
+            for (var i = 0; i < spec.Reviewers.Count; i++)
+            {
+                await ValidateProfileRefAsync(
+                    spec.Reviewers[i], $"reviewers[{i}]",
+                    name => crewService.GetReviewerProfileAsync(name, cancellationToken),
+                    issues, cancellationToken);
+            }
+        }
+
+        // Step 5 – finalizers
+        if (spec.Finalizers.Count == 0)
+        {
+            issues.Add(new CrewSpecValidationIssue(
+                Field:      "finalizers",
+                Message:    "At least one finalizer is required.",
+                IsCritical: true));
+        }
+        else
+        {
+            for (var i = 0; i < spec.Finalizers.Count; i++)
+            {
+                await ValidateProfileRefAsync(
+                    spec.Finalizers[i], $"finalizers[{i}]",
+                    name => crewService.GetFinalizerProfileAsync(name, cancellationToken),
+                    issues, cancellationToken);
+            }
+        }
+
+        // Step 6 – advisors (optional, but reuse references must resolve)
+        for (var i = 0; i < spec.Advisors.Count; i++)
+        {
+            await ValidateProfileRefAsync(
+                spec.Advisors[i], $"advisors[{i}]",
+                name => crewService.GetAdvisorProfileAsync(name, cancellationToken),
+                issues, cancellationToken);
+        }
+
+        // Step 7 – grounding providers (optional, but reuse references must resolve)
+        for (var i = 0; i < spec.GroundingProviders.Count; i++)
+        {
+            await ValidateProfileRefAsync(
+                spec.GroundingProviders[i], $"grounding_providers[{i}]",
+                name => crewService.GetGroundingProviderProfileAsync(name, cancellationToken),
+                issues, cancellationToken,
+                skipModelCheck: true); // grounding providers use non-LLM backends
+        }
+
+        return issues;
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Validates a single profile reference: resolves <c>reuse</c> names against the catalog, or
+    /// checks required inline fields. Optionally verifies the provider/model combination.
+    /// </summary>
+    private async Task ValidateProfileRefAsync<TProfile>(
+        CrewSpecProfileRef profileRef,
+        string fieldPath,
+        Func<string, Task<TProfile?>> catalogLookup,
+        List<CrewSpecValidationIssue> issues,
+        CancellationToken cancellationToken,
+        bool skipModelCheck = false)
+        where TProfile : class
+    {
+        if (!string.IsNullOrWhiteSpace(profileRef.Reuse))
+        {
+            // Reuse reference — verify catalog entry exists.
+            var found = await catalogLookup(profileRef.Reuse);
+            if (found is null)
+                issues.Add(new CrewSpecValidationIssue(
+                    Field:      $"{fieldPath}.reuse",
+                    Message:    $"Profile '{profileRef.Reuse}' was not found in the catalog.",
+                    IsCritical: true));
+            return;
+        }
+
+        // Inline definition — check required fields.
+        if (string.IsNullOrWhiteSpace(profileRef.Name))
+            issues.Add(new CrewSpecValidationIssue(
+                Field:      $"{fieldPath}.name",
+                Message:    "Inline profile is missing a required 'name' field.",
+                IsCritical: false));
+
+        if (string.IsNullOrWhiteSpace(profileRef.SystemPrompt))
+            issues.Add(new CrewSpecValidationIssue(
+                Field:      $"{fieldPath}.system_prompt",
+                Message:    "Inline profile is missing a required 'system_prompt' field.",
+                IsCritical: false));
+
+        if (string.IsNullOrWhiteSpace(profileRef.Provider))
+            issues.Add(new CrewSpecValidationIssue(
+                Field:      $"{fieldPath}.provider",
+                Message:    "Inline profile is missing a required 'provider' field.",
+                IsCritical: false));
+
+        if (string.IsNullOrWhiteSpace(profileRef.Model))
+            issues.Add(new CrewSpecValidationIssue(
+                Field:      $"{fieldPath}.model",
+                Message:    "Inline profile is missing a required 'model' field.",
+                IsCritical: false));
+
+        // Provider/model availability check (only when all fields present and not skipped)
+        if (!skipModelCheck
+            && !string.IsNullOrWhiteSpace(profileRef.Provider)
+            && !string.IsNullOrWhiteSpace(profileRef.Model))
+        {
+            try
+            {
+                var models = await modelCatalog.ListModelsAsync(profileRef.Provider, cancellationToken);
+                var available = models.Any(m =>
+                    string.Equals(m.Id, profileRef.Model, StringComparison.OrdinalIgnoreCase));
+
+                if (!available)
+                    issues.Add(new CrewSpecValidationIssue(
+                        Field:      $"{fieldPath}.model",
+                        Message:    $"Model '{profileRef.Model}' is not currently available from provider '{profileRef.Provider}'.",
+                        IsCritical: false));
+            }
+            catch
+            {
+                // Network or provider issue — skip availability check gracefully, same as TemplateStudioService.
+            }
+        }
+    }
+}
