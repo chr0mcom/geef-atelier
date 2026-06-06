@@ -117,10 +117,19 @@ internal sealed class CrewSpecValidator(
         {
             for (var i = 0; i < spec.Finalizers.Count; i++)
             {
+                // Only LLM-based finalizers (Transform) need a provider/model.
+                // Deterministic finalizer types (FileExport, MetadataEnrich, ExternalSink,
+                // CrewMaterialize, LearningExtract, LearningPublish) have no LLM call.
+                // For those, skip both the required-field check and the availability check.
+                var finalizerType = spec.Finalizers[i].FinalizerType;
+                var isLlmFinalizer = string.Equals(finalizerType, "Transform", StringComparison.OrdinalIgnoreCase);
+
                 await ValidateProfileRefAsync(
                     spec.Finalizers[i], $"finalizers[{i}]",
                     name => crewService.GetFinalizerProfileAsync(name, cancellationToken),
-                    issues, cancellationToken);
+                    issues, cancellationToken,
+                    skipModelCheck: !isLlmFinalizer,
+                    skipProviderModelRequired: !isLlmFinalizer);
             }
         }
 
@@ -160,7 +169,8 @@ internal sealed class CrewSpecValidator(
         Func<string, Task<TProfile?>> catalogLookup,
         List<CrewSpecValidationIssue> issues,
         CancellationToken cancellationToken,
-        bool skipModelCheck = false)
+        bool skipModelCheck = false,
+        bool skipProviderModelRequired = false)
         where TProfile : class
     {
         if (!string.IsNullOrWhiteSpace(profileRef.Reuse))
@@ -188,17 +198,20 @@ internal sealed class CrewSpecValidator(
                 Message:    "Inline profile is missing a required 'system_prompt' field.",
                 IsCritical: false));
 
-        if (string.IsNullOrWhiteSpace(profileRef.Provider))
-            issues.Add(new CrewSpecValidationIssue(
-                Field:      $"{fieldPath}.provider",
-                Message:    "Inline profile is missing a required 'provider' field.",
-                IsCritical: false));
+        if (!skipProviderModelRequired)
+        {
+            if (string.IsNullOrWhiteSpace(profileRef.Provider))
+                issues.Add(new CrewSpecValidationIssue(
+                    Field:      $"{fieldPath}.provider",
+                    Message:    "Inline profile is missing a required 'provider' field.",
+                    IsCritical: false));
 
-        if (string.IsNullOrWhiteSpace(profileRef.Model))
-            issues.Add(new CrewSpecValidationIssue(
-                Field:      $"{fieldPath}.model",
-                Message:    "Inline profile is missing a required 'model' field.",
-                IsCritical: false));
+            if (string.IsNullOrWhiteSpace(profileRef.Model))
+                issues.Add(new CrewSpecValidationIssue(
+                    Field:      $"{fieldPath}.model",
+                    Message:    "Inline profile is missing a required 'model' field.",
+                    IsCritical: false));
+        }
 
         // Provider/model availability check (only when all fields present and not skipped)
         if (!skipModelCheck

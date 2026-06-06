@@ -234,15 +234,31 @@ public static class SystemCrew
         {
             [GroundingProviderProfile.KeyStaticContent] =
                 "Crew Design Rules (binding for all auto-composed crews):\n" +
+                "\n" +
+                "PROVIDER/MODEL RULES (most critical — any violation fails validation):\n" +
+                "- ONLY use provider names and model IDs from the 'Valid Provider/Model Pairs' catalog injected into the executor prompt.\n" +
+                "- Valid providers: claude-cli, codex-cli, openrouter, openai-direct, google-ai-studio, deepseek, xai, ollama-local.\n" +
+                "- NEVER use openai, google, anthropic, x-ai, or any other invented provider name.\n" +
+                "- Prefer NEWEST top-tier models. Do not use legacy models (gemini-2.5, gpt-4o, claude-opus-4-7, etc.).\n" +
+                "- Recommended defaults: claude-cli/claude-opus-4-8 (executor), codex-cli/gpt-5.5, openrouter/x-ai/grok-4.3 (reviewers).\n" +
+                "\n" +
+                "REUSE-FIRST (reduces validation risk to zero):\n" +
+                "- Default executor: { \"reuse\": \"default-executor\" } — never needs provider/model.\n" +
+                "- Default output finalizer: { \"reuse\": \"learning-extractor\" } — deterministic, never needs provider/model.\n" +
+                "- Deterministic finalizer types (file-export, metadata-enrich, external-sink, crew-materialize, learning-extractor, learning-publisher): do NOT set provider or model.\n" +
+                "- Only LLM-based roles (executor, reviewer, advisor, transform-finalizer) need provider + model.\n" +
+                "\n" +
+                "OTHER BINDING RULES:\n" +
                 "1. Model plurality: reviewer models must differ from the executor model (independent perspective).\n" +
-                "2. Severity taxonomy: every new reviewer prompt MUST include the verbatim taxonomy block.\n" +
-                "3. Naming constraints: ^[a-z0-9\\-]+$, max 64 chars. Custom prefix auto-applied.\n" +
-                "4. System prompt language: English.\n" +
+                "2. Severity taxonomy: every new REVIEWER prompt MUST include the verbatim taxonomy block (advisors/finalizers/grounding do NOT need it).\n" +
+                "3. Naming: ^[a-z0-9\\-]+$, max 64 chars.\n" +
+                "4. Prompts in English.\n" +
                 "5. Minimum crew: executor + >=1 reviewer + >=1 output finalizer.\n" +
-                "6. Sensible strategy/convergence: Parallel by default; Sequential/Priority only when order matters.\n" +
+                "6. Strategy: Parallel by default; Sequential/Priority only when order matters.\n" +
                 "7. Domain coverage: domain-specific tasks need domain-specific reviewers/advisors/grounding.\n" +
-                "8. Reuse-first: prefer existing profiles before creating new ones; no duplicates.\n\n" +
-                "Severity taxonomy (verbatim -- copy into every new reviewer prompt):\n" +
+                "8. Reuse-first: prefer existing profiles; no duplicates.\n" +
+                "\n" +
+                "Severity taxonomy (verbatim — copy into every new reviewer prompt):\n" +
                 "- critical: substantial factual or logical error; the reader is actively misinformed.\n" +
                 "- major: important omission or clear inaccuracy that significantly reduces usefulness.\n" +
                 "- minor: style improvement, request for precision; substantially correct.\n" +
@@ -285,7 +301,7 @@ public static class SystemCrew
         },
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: new ConvergencePolicyOverride(
-            MaxIterations: 4,
+            MaxIterations: 6,
             AbortOnCritical: false,
             DetectRegression: true,
             StagnationThreshold: 3),
