@@ -247,10 +247,26 @@ internal sealed class CrewComposerExecutor(
     // User prompt
     // ---------------------------------------------------------------------------
 
+    private const string TaxonomyReminder = """
+        REMINDER — copy these EXACT 5 lines verbatim into EVERY new (non-reused) reviewer system_prompt:
+        - critical: substantial factual or logical error; the reader is actively misinformed.
+        - major: important omission or clear inaccuracy that significantly reduces usefulness.
+        - minor: style improvement, request for precision; substantially correct.
+        - info: optional note; no action required.
+        Anti-pattern: "technically correct" != critical. If correct but could be more precise -> minor at most.
+        """;
+
     private static string BuildUserPrompt(IRunContext context, string brief, int iter)
     {
         if (iter == 1)
-            return $"Task description:\n{brief}\n\nDesign the optimal crew configuration for this task and call {CrewSpecTool.ToolName}.";
+            return $"""
+                Task description:
+                {brief}
+
+                Design the optimal crew configuration for this task and call {CrewSpecTool.ToolName}.
+
+                {TaxonomyReminder}
+                """;
 
         var findings = ExtractPreviousFindings(context);
         if (findings.Count == 0)
@@ -278,6 +294,8 @@ internal sealed class CrewComposerExecutor(
 
             Revise the crew configuration and call {CrewSpecTool.ToolName} with the updated design.
             Remember: use only provider/model pairs from the catalog in your system prompt.
+
+            {TaxonomyReminder}
             """;
     }
 

@@ -498,12 +498,24 @@ public static class SystemPrompts
         9. **Strategy**: Parallel by default; Sequential or Priority only when order matters.
         10. **Domain coverage**: domain-specific tasks need domain-specific reviewers/advisors/grounding.
 
-        ## Severity taxonomy block (verbatim — copy into every new reviewer prompt)
+        ## MANDATORY: Severity taxonomy for every new reviewer system_prompt
+        Every new (non-reused) reviewer system_prompt MUST contain ALL five of these lines verbatim.
+        Copy them exactly — missing even one line causes a [Critical] rejection by the quality reviewer.
+
+        ===TAXONOMY_START===
         - critical: substantial factual or logical error; the reader is actively misinformed.
         - major: important omission or clear inaccuracy that significantly reduces usefulness.
         - minor: style improvement, request for precision; substantially correct.
         - info: optional note; no action required.
         Anti-pattern: "technically correct" != critical. If correct but could be more precise -> minor at most.
+        ===TAXONOMY_END===
+
+        PRE-SUBMIT CHECKLIST — verify before calling submit_crew_spec:
+        □ Every new inline reviewer's system_prompt contains all 5 lines from TAXONOMY_START to TAXONOMY_END above.
+        □ All provider/model values come from the "Valid Provider/Model Pairs" catalog below.
+        □ Output finalizer is { "reuse": "learning-extractor" } or another reused profile.
+        □ Grounding providers have NO system_prompt, NO provider, NO model fields.
+        □ For tasks requiring literature/external knowledge: a grounding provider IS configured.
 
         ## submit_crew_spec fields
         Call `submit_crew_spec` with:
@@ -552,6 +564,9 @@ public static class SystemPrompts
         - minor: style improvement, request for precision; substantially correct.
         - info: optional note; no action required.
         Anti-pattern: "technically correct" != critical. If correct but could be more precise -> minor at most.
+
+        APPROVAL RULE: Submit approved=true unless you have at least one Critical or Major finding.
+        Minor and Info findings alone MUST NOT block approval — submit approved=true with those findings.
         """;
 
     /// <summary>System prompt for the crew-composer-prompt-quality reviewer.</summary>
@@ -597,6 +612,9 @@ public static class SystemPrompts
         - minor: an advisor lacks the "do not write" delimiter; minor style issues.
         - info: optional observation; no action required.
         Anti-pattern: "technically correct" != critical. If correct but could be more precise -> minor at most.
+
+        APPROVAL RULE: Submit approved=true unless you have at least one Critical or Major finding.
+        Minor and Info findings alone MUST NOT block approval — submit approved=true with those findings.
         """;
 
     /// <summary>System prompt for the crew-composer-fit reviewer.</summary>
@@ -634,6 +652,9 @@ public static class SystemPrompts
         - minor: style improvement, request for precision; substantially correct.
         - info: optional note; no action required.
         Anti-pattern: "technically correct" != critical. If correct but could be more precise -> minor at most.
+
+        APPROVAL RULE: Submit approved=true unless you have at least one Critical or Major finding.
+        Minor and Info findings alone MUST NOT block approval — submit approved=true with those findings.
         """;
 
     /// <summary>System prompt for the crew-composer-reuse-correctness reviewer.</summary>
@@ -665,6 +686,9 @@ public static class SystemPrompts
         - minor: style improvement, request for precision; substantially correct.
         - info: optional note; no action required.
         Anti-pattern: "technically correct" != critical. If correct but could be more precise -> minor at most.
+
+        APPROVAL RULE: Submit approved=true unless you have at least one Critical or Major finding.
+        Minor and Info findings alone MUST NOT block approval — submit approved=true with those findings.
         """;
 
     /// <summary>System prompt for the crew-design-advisor (strategic, before first execution).</summary>
