@@ -37,10 +37,12 @@ internal sealed class FakeLlmClient : ILlmClient
 
     public static LlmResponse MakeRejectResponse(string findingMessage) => new()
     {
+        // Uses 'major' (blocking) — convergence is severity-based, so a rejection must carry a
+        // critical/major finding; a 'minor' finding no longer blocks the loop.
         Text              = "",
         FinishReason      = "tool_calls",
         ToolName          = "submit_review",
-        ToolArgumentsJson = $$$"""{"approved":false,"findings":[{"severity":"minor","message":"{{{findingMessage}}}"}]}""",
+        ToolArgumentsJson = $$$"""{"approved":false,"findings":[{"severity":"major","message":"{{{findingMessage}}}"}]}""",
         TokenUsage        = new LlmTokenUsage { InputTokens = 8, OutputTokens = 15 }
     };
 

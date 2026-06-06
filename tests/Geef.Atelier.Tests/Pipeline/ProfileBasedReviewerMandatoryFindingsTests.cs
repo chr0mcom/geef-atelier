@@ -36,23 +36,41 @@ public sealed class ProfileBasedReviewerMandatoryFindingsTests
 
         var result = await reviewer.ReviewAsync(BuildContext(), CancellationToken.None);
 
-        Assert.Equal(ReviewDecision.Approved, result.Decision);
+        // Severity-based: a single non-blocking (info) finding ⇒ ApprovedWithWarnings, no retry.
+        Assert.Equal(ReviewDecision.ApprovedWithWarnings, result.Decision);
         Assert.Single(result.Findings);
         Assert.Equal(1, client.CallCount);
     }
 
     [Fact]
-    public async Task RejectedWithZeroFindings_NoRetry()
+    public async Task RejectedFlagWithZeroFindings_IsApprovedAndRetried()
     {
-        // Rejected with 0 findings is a different quality problem — not in scope for this enforcement.
-        var client   = new SequencedLlmClient(RejectedWithZeroFindings);
+        // Convergence is severity-based: a review with NO critical/major finding never rejects, even
+        // when the model sets approved=false. Zero findings is a shallow review ⇒ one retry; if the
+        // retry is still empty, the result is Approved with no findings (cannot block on nothing).
+        var client   = new SequencedLlmClient(RejectedWithZeroFindings, RejectedWithZeroFindings);
+        var resolver = new TestLlmClientResolver(client);
+        var reviewer = new ProfileBasedReviewer(TestProfile(), resolver);
+
+        var result = await reviewer.ReviewAsync(BuildContext(), CancellationToken.None);
+
+        Assert.Equal(ReviewDecision.Approved, result.Decision);
+        Assert.Empty(result.Findings);
+        Assert.Equal(2, client.CallCount);
+    }
+
+    [Fact]
+    public async Task MajorFinding_IsRejected_RegardlessOfApprovedFlag()
+    {
+        // Even if the model sets approved=true, a major finding blocks the loop.
+        var client   = new SequencedLlmClient(ApprovedTrueWithMajorFinding);
         var resolver = new TestLlmClientResolver(client);
         var reviewer = new ProfileBasedReviewer(TestProfile(), resolver);
 
         var result = await reviewer.ReviewAsync(BuildContext(), CancellationToken.None);
 
         Assert.Equal(ReviewDecision.Rejected, result.Decision);
-        Assert.Empty(result.Findings);
+        Assert.Single(result.Findings);
         Assert.Equal(1, client.CallCount);
     }
 
@@ -79,7 +97,8 @@ public sealed class ProfileBasedReviewerMandatoryFindingsTests
 
         var result = await reviewer.ReviewAsync(BuildContext(), CancellationToken.None);
 
-        Assert.Equal(ReviewDecision.Approved, result.Decision);
+        // Retry yields one info finding ⇒ ApprovedWithWarnings (non-blocking).
+        Assert.Equal(ReviewDecision.ApprovedWithWarnings, result.Decision);
         Assert.Single(result.Findings);
         Assert.Equal(FindingSeverity.Info, result.Findings[0].Severity);
     }
@@ -141,6 +160,9 @@ public sealed class ProfileBasedReviewerMandatoryFindingsTests
 
     private static LlmResponse RejectedWithZeroFindings => MakeToolResponse(
         """{"approved":false,"findings":[]}""");
+
+    private static LlmResponse ApprovedTrueWithMajorFinding => MakeToolResponse(
+        """{"approved":true,"findings":[{"severity":"major","message":"Missing a required section."}]}""");
 
     private static LlmResponse StopResponse => new()
     {
