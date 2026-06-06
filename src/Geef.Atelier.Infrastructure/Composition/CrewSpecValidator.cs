@@ -72,12 +72,23 @@ internal sealed class CrewSpecValidator(
             return issues;
         }
 
-        // Step 3 – Composed mode: executor
+        // Step 3 – Composed mode: executor.
+        // The executor MUST be a new, inline, task-specialized profile — never reused. A generic
+        // executor produces off-target output, so reuse is a hard (deterministic) rejection.
         if (spec.Executor is null)
         {
             issues.Add(new CrewSpecValidationIssue(
                 Field:      "executor",
                 Message:    "Executor is required.",
+                IsCritical: true));
+        }
+        else if (!string.IsNullOrWhiteSpace(spec.Executor.Reuse))
+        {
+            issues.Add(new CrewSpecValidationIssue(
+                Field:      "executor.reuse",
+                Message:    "The executor must be a new, inline, task-specialized profile — reusing an " +
+                            $"executor (here '{spec.Executor.Reuse}') is not allowed. Define an inline executor " +
+                            "with name, provider, model, max_tokens and a task-specific system_prompt.",
                 IsCritical: true));
         }
         else

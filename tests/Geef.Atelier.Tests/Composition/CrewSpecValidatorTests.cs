@@ -23,21 +23,26 @@ public sealed class CrewSpecValidatorTests
         IGroundingProviderFactory? groundingFactory = null)
     {
         crewService ??= new EmptyCrewService();
-        modelCatalog ??= new EmptyModelCatalog();
+        // Default catalog knows the inline executor's model so InlineExecutor validates cleanly.
+        modelCatalog ??= new KnownModelCatalog("claude-cli", "claude-opus-4-8");
         groundingFactory ??= new StubGroundingFactory("tavily", "academic-search", "vector-store");
         return new CrewSpecValidator(crewService, modelCatalog, groundingFactory);
     }
+
+    /// <summary>A valid inline, task-specialized executor (the executor must never be reused).</summary>
+    private const string InlineExecutor =
+        """{"name": "task-executor", "provider": "claude-cli", "model": "claude-opus-4-8", "max_tokens": 32000, "system_prompt": "You are a specialist writer. Revise the draft on each reviewer finding."}""";
 
     /// <summary>A valid existing-template spec JSON.</summary>
     private static string ExistingTemplateSpec(string templateName) =>
         $$"""{"mode":"existing-template","existing_template_name":"{{templateName}}"}""";
 
-    /// <summary>A minimal valid composed spec JSON (reuse references; no inline fields to validate).</summary>
+    /// <summary>A minimal valid composed spec JSON (inline executor + reuse references).</summary>
     private static string ComposedSpecWith(string? reviewerReuse = null, string? finalizerReuse = null) =>
         $$"""
         {
             "mode": "composed",
-            "executor": {"reuse": "default-executor"},
+            "executor": {{InlineExecutor}},
             "reviewers": [{"reuse": "{{reviewerReuse ?? "briefing-fidelity"}}"}],
             "finalizers": [{"reuse": "{{finalizerReuse ?? "file-export"}}"}]
         }
@@ -48,12 +53,35 @@ public sealed class CrewSpecValidatorTests
         $$"""
         {
             "mode": "composed",
-            "executor": {"reuse": "default-executor"},
+            "executor": {{InlineExecutor}},
             "reviewers": [{"reuse": "briefing-fidelity"}],
             "finalizers": [{"reuse": "file-export"}],
             "grounding_providers": [{"name": "lit-search", "provider_type": "{{providerType}}"}]
         }
         """;
+
+    // ── Tests: executor must be inline/specialized (never reused) ──────────
+
+    [Fact]
+    public async Task ValidateAsync_FlagsCritical_WhenExecutorIsReused()
+    {
+        var crewService = new PreconfiguredCrewService(
+            executorName: "default-executor", reviewerName: "briefing-fidelity", finalizerName: "file-export");
+        var validator = MakeValidator(crewService);
+
+        const string spec = """
+            {
+                "mode": "composed",
+                "executor": {"reuse": "default-executor"},
+                "reviewers": [{"reuse": "briefing-fidelity"}],
+                "finalizers": [{"reuse": "file-export"}]
+            }
+            """;
+
+        var issues = await validator.ValidateAsync(spec);
+
+        Assert.Contains(issues, i => i.Field == "executor.reuse" && i.IsCritical);
+    }
 
     // ── Tests: inline grounding provider_type validation ──────────────────
 
@@ -121,7 +149,7 @@ public sealed class CrewSpecValidatorTests
         const string spec = """
             {
                 "mode": "composed",
-                "executor": {"reuse": "default-executor"},
+                "executor": {"name": "task-executor", "provider": "claude-cli", "model": "claude-opus-4-8", "max_tokens": 32000, "system_prompt": "You are a specialist writer. Revise on findings."},
                 "reviewers": [],
                 "finalizers": [{"reuse": "file-export"}]
             }
@@ -145,7 +173,7 @@ public sealed class CrewSpecValidatorTests
         const string spec = """
             {
                 "mode": "composed",
-                "executor": {"reuse": "default-executor"},
+                "executor": {"name": "task-executor", "provider": "claude-cli", "model": "claude-opus-4-8", "max_tokens": 32000, "system_prompt": "You are a specialist writer. Revise on findings."},
                 "reviewers": [{"reuse": "briefing-fidelity"}],
                 "finalizers": []
             }
@@ -169,7 +197,7 @@ public sealed class CrewSpecValidatorTests
         const string spec = """
             {
                 "mode": "composed",
-                "executor": {"reuse": "default-executor"},
+                "executor": {"name": "task-executor", "provider": "claude-cli", "model": "claude-opus-4-8", "max_tokens": 32000, "system_prompt": "You are a specialist writer. Revise on findings."},
                 "reviewers": [{"reuse": "nonexistent-reviewer"}],
                 "finalizers": [{"reuse": "file-export"}]
             }
@@ -405,5 +433,18 @@ public sealed class CrewSpecValidatorTests
         public IGroundingProvider Create(string providerType) => throw new NotSupportedException();
         public bool IsRegistered(string providerType) => _types.Contains(providerType);
         public IReadOnlyCollection<string> RegisteredTypes => _types;
+    }
+
+    /// <summary>Reports one known (provider, model) pair as available; everything else empty.</summary>
+    private sealed class KnownModelCatalog(string provider, string model) : IModelCatalog
+    {
+        public Task<IReadOnlyList<ModelInfo>> ListModelsAsync(string providerName, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ModelInfo>>(
+                string.Equals(providerName, provider, StringComparison.OrdinalIgnoreCase)
+                    ? [new ModelInfo(model, model, null, true)]
+                    : []);
+        public Task<IReadOnlyList<ModelInfo>> RefreshAsync(string providerName, CancellationToken ct = default)
+            => ListModelsAsync(providerName, ct);
+        public bool IsUsingFallback(string providerName) => false;
     }
 }

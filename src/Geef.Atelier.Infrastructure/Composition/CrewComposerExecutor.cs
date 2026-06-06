@@ -188,7 +188,8 @@ internal sealed class CrewComposerExecutor(
 
         sb.AppendLine();
         sb.AppendLine("**Model plurality rule:** reviewer `model` values MUST differ from the executor `model`.");
-        sb.AppendLine("**Reuse rule:** prefer `reuse: \"default-executor\"` for executor and `reuse: \"learning-extractor\"` for the output finalizer — these are always valid without a provider/model.");
+        sb.AppendLine("**Executor rule:** the executor is ALWAYS a NEW inline, task-specialized profile (never reuse) with generous `max_tokens` (>= 32000). Prefer a top-tier model such as `claude-cli`/`claude-opus-4-8`.");
+        sb.AppendLine("**Reuse rule:** use `reuse: \"learning-extractor\"` for the output finalizer; reuse existing reviewers/advisors/grounding only when they truly fit — these need no provider/model.");
         sb.AppendLine();
 
         // Section 2: Full valid catalog per provider (limited to avoid prompt bloat).

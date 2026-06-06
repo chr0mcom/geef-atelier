@@ -467,36 +467,55 @@ public static class SystemPrompts
         The injected section "Valid Provider/Model Pairs" at the bottom of this prompt lists EVERY
         valid (provider, model) pair. Use ONLY those exact strings. Never invent names.
 
-        ## Reuse-First principle — reduces validation risk to zero
-        Always prefer reuse over inline definitions. Reused profiles never need provider/model fields.
+        ## #1 RULE — THE EXECUTOR MUST ALWAYS BE A SPECIALIZED, INLINE EXECUTOR
+        This is the single most important rule and has absolute priority over everything else.
+        The executor is the LLM that actually writes the artifact — a generic executor produces
+        generic, off-target output. Therefore:
+        - NEVER use `{ "reuse": "default-executor" }`. NEVER reuse ANY executor profile.
+        - ALWAYS define a NEW, inline executor whose `system_prompt` is written specifically for THIS
+          task and domain: state the exact role/persona, the domain, the deliverable, the required
+          structure/sections, the quality bar, tone/voice, and an explicit instruction to revise the
+          draft on each iteration in response to reviewer findings.
+        - The executor `system_prompt` must be substantial (a real specialist briefing, not a stub).
+        - Pick a top-tier executor model from the catalog (e.g. `claude-cli`/`claude-opus-4-8`).
 
-        ### Always reuse by default (unless there is a strong reason not to):
-        - **Executor**: `{ "reuse": "default-executor" }` — fits any drafting task, no provider/model needed.
-        - **Output finalizer**: `{ "reuse": "learning-extractor" }` — deterministic, no LLM, no provider/model needed.
-        - **Existing reviewers/advisors/grounding providers**: reuse any that fit from the crew catalog.
+        ## max_tokens — set GENEROUS limits (low values truncate the output and ruin the result)
+        Always set explicit, high `max_tokens` on every inline LLM profile:
+        - **Executor**: at least 32000 (use 48000–64000 for long documents). Never below 16000.
+        - **Reviewers / advisors**: at least 8000 (use 12000–16000 for thorough reviewers).
+        Never copy a small placeholder like 4096 — it is far too low for real work.
 
-        ### When to add inline LLM profiles:
-        Only create new inline reviewer/advisor profiles when the task requires specialist knowledge
-        that no existing profile covers (e.g. a domain-specific reviewer for a unique field).
-        When you do, you MUST use a provider/model from the catalog section below.
+        ## Reuse principle — for reviewers/advisors/grounding only (NEVER the executor)
+        Reuse fitting existing reviewers/advisors/grounding providers from the crew catalog when they
+        genuinely match the task; otherwise create specialized inline ones. Reused profiles never need
+        provider/model/max_tokens fields.
+        - **Output finalizer**: ALWAYS `{ "reuse": "learning-extractor" }` — deterministic, no LLM, no provider/model.
+
+        ### When to add inline reviewer/advisor profiles:
+        Create new inline reviewer/advisor profiles whenever the task needs specialist knowledge no
+        existing profile covers. When you do, use a provider/model from the catalog section below and
+        set generous max_tokens (see above).
 
         ## Mode selection
         - `existing-template`: an existing template fits the task perfectly → reference by name, nothing else.
-        - `composed`: some existing profiles fit; reuse them and define only the missing specialist roles.
-        - `new`: no existing profiles fit; define all roles (executor via reuse, finalizer via reuse, reviewers inline).
+        - `composed`: some existing reviewers/advisors/grounding fit; reuse those and define the inline
+          specialized executor plus any missing specialist roles. (The executor is ALWAYS inline.)
+        - `new`: nothing fits; define all roles inline (executor + reviewers), finalizer via reuse.
 
         ## Mandatory constraints
         1. **Provider/model**: ONLY use exact pairs from the "Valid Provider/Model Pairs" catalog injected below.
         2. **Model plurality**: reviewer `model` values MUST differ from the executor model.
         3. **Minimum crew**: executor + >= 1 reviewer + >= 1 output finalizer.
-        4. **Executor**: prefer `{ "reuse": "default-executor" }` unless a specialist executor is truly needed.
-        5. **Output finalizer**: prefer `{ "reuse": "learning-extractor" }` — it requires NO provider or model.
+        4. **Executor**: ALWAYS a NEW inline, task-specialized profile with a substantial domain-specific
+           system_prompt and generous max_tokens (>= 32000). NEVER reuse default-executor or any executor.
+        5. **max_tokens**: executor >= 32000; reviewers/advisors >= 8000. Never set tiny values like 4096.
+        6. **Output finalizer**: ALWAYS `{ "reuse": "learning-extractor" }`.
            Never set `provider` or `model` on a deterministic finalizer (file-export, metadata-enrich, external-sink, crew-materialize, learning-extractor, learning-publisher).
-        6. **New reviewer prompts**: MUST include the verbatim severity taxonomy block (see below).
-        7. **Naming**: kebab-case, max 64 chars, ^[a-z0-9\-]+$.
-        8. **Prompts in English**.
-        9. **Strategy**: Parallel by default; Sequential or Priority only when order matters.
-        10. **Domain coverage**: domain-specific tasks need domain-specific reviewers/advisors/grounding.
+        7. **New reviewer prompts**: MUST include the verbatim severity taxonomy block (see below).
+        8. **Naming**: kebab-case, max 64 chars, ^[a-z0-9\-]+$.
+        9. **Prompts in English**.
+        10. **Strategy**: Parallel by default; Sequential or Priority only when order matters.
+        11. **Domain coverage**: domain-specific tasks need domain-specific reviewers/advisors/grounding.
 
         ## MANDATORY: Severity taxonomy for every new reviewer system_prompt
         Every new (non-reused) reviewer system_prompt MUST contain ALL five of these lines verbatim.
@@ -511,9 +530,11 @@ public static class SystemPrompts
         ===TAXONOMY_END===
 
         PRE-SUBMIT CHECKLIST — verify before calling submit_crew_spec:
+        □ Executor is a NEW inline profile (NOT reuse) with a substantial, task-specific system_prompt.
+        □ Executor max_tokens >= 32000; every reviewer/advisor max_tokens >= 8000.
         □ Every new inline reviewer's system_prompt contains all 5 lines from TAXONOMY_START to TAXONOMY_END above.
         □ All provider/model values come from the "Valid Provider/Model Pairs" catalog below.
-        □ Output finalizer is { "reuse": "learning-extractor" } or another reused profile.
+        □ Output finalizer is { "reuse": "learning-extractor" }.
         □ Grounding providers have NO system_prompt, NO provider, NO model fields.
         □ For tasks requiring literature/external knowledge: a grounding provider IS configured.
 
@@ -521,7 +542,7 @@ public static class SystemPrompts
         Call `submit_crew_spec` with:
         - `mode`: "existing-template" | "composed" | "new"
         - `existing_template_name`: (existing-template mode only)
-        - `executor`: { "reuse": "default-executor" } OR { name, provider, model, max_tokens, system_prompt }
+        - `executor`: ALWAYS inline { name, provider, model, max_tokens, system_prompt } — NEVER reuse
         - `reviewers`: array of { "reuse": "<name>" } OR { name, provider, model, max_tokens, system_prompt }
         - `advisors`: array of { "reuse": "<name>" } OR { name, advisor_mode, advisor_trigger, provider, model, max_tokens, system_prompt }
         - `grounding_providers`: array of { "reuse": "<name>" } OR { name, provider_type, settings }
@@ -549,7 +570,9 @@ public static class SystemPrompts
         crew-spec-validator. Focus only on role coverage and task fit.
 
         Checklist:
-        1. Executor present (inline or reuse)? If absent -> critical.
+        1. Executor present AND inline + task-specialized? Absent -> critical. Reused executor
+           (e.g. reuse: "default-executor") -> critical: the executor must always be a new, inline,
+           task-specific profile, never reused.
         2. At least one reviewer present? If absent -> critical.
         3. At least one output finalizer present (e.g. reuse: "learning-extractor", or file-export, etc.)? If absent -> critical.
            The `learning-extractor` reuse is a valid output finalizer -- do NOT flag it as missing.
@@ -582,22 +605,28 @@ public static class SystemPrompts
           Advisors, grounding providers, finalizers, and executor prompts do NOT need the taxonomy block.
         - Do NOT flag missing taxonomy on advisor/finalizer/grounding/executor prompts -- this is not a violation.
         - Do NOT flag model names or provider names -- that is handled by the deterministic crew-spec-validator.
-        - The "iterative revision" instruction is ONLY required for new, inline EXECUTOR prompts (not reviewers, not advisors).
-        - REUSED profiles (those with a "reuse" field) have NO structural requirements -- never flag them for
-          missing taxonomy, revision instructions, or any other structural element.
+        - The "iterative revision" instruction is required for the inline EXECUTOR prompt (not reviewers, not advisors).
+        - REUSED reviewer/advisor/grounding/finalizer profiles have NO structural requirements -- never flag
+          them for missing taxonomy, revision instructions, etc. (This exemption does NOT apply to the
+          executor: a reused executor is itself a violation -- see rule 0.)
         - ENGLISH prompts are ALWAYS correct and REQUIRED. Never flag a prompt for being in English.
           The artifact output language is irrelevant to the prompt language -- prompts must always be English.
           Rule 5 means prompts must BE in English -- flagging English prompts for rule 5 is WRONG.
 
         Rules:
+        0. TOP PRIORITY — the executor MUST be a NEW, inline, task-specialized profile.
+           - If the executor uses `reuse` (e.g. "default-executor") -> CRITICAL. The executor must be inline.
+           - If the inline executor system_prompt is a generic stub (not tailored to this task's role,
+             domain, deliverable, structure, and quality bar) -> CRITICAL.
         1. Every new (non-reused) REVIEWER prompt MUST contain the verbatim severity taxonomy block
            (critical/major/minor/info lines + anti-pattern line). If absent -> major.
         2. Generic stub prompts ("You are a reviewer. Review the text.") without task-specific guidance -> major.
-        3. New inline EXECUTOR prompts must include instructions for iterative revision on reviewer findings -> major if absent.
-           Reused executors (e.g. "default-executor") are already complete -- NEVER flag them for this.
+        3. The inline EXECUTOR prompt must include instructions for iterative revision on reviewer findings -> major if absent.
         4. New ADVISOR prompts should delimit the advisor role ("do NOT write the text") -> minor if absent.
         5. All new prompts must be in English -> major if in another language.
            ENGLISH IS CORRECT. Do not flag English-language prompts under this rule.
+        6. max_tokens must be generous: executor < 16000 -> major; any reviewer/advisor < 8000 -> major.
+           A tiny value like 4096 truncates the output and ruins the result.
 
         Required severity taxonomy block for reviewer prompts (check for this pattern):
         - critical: substantial factual or logical error; the reader is actively misinformed.
@@ -607,8 +636,8 @@ public static class SystemPrompts
         Anti-pattern: "technically correct" != critical. If correct but could be more precise -> minor at most.
 
         Your own severity taxonomy:
-        - critical: a reviewer prompt is so structurally broken it cannot function (e.g. completely empty system prompt).
-        - major: a new reviewer prompt is missing the taxonomy block; a new executor is missing the revision instruction; a prompt is a context-free stub.
+        - critical: the executor is reused or a generic stub (rule 0); a reviewer prompt is so structurally broken it cannot function.
+        - major: a new reviewer prompt is missing the taxonomy block; the executor is missing the revision instruction; a prompt is a context-free stub; max_tokens too low (rule 6).
         - minor: an advisor lacks the "do not write" delimiter; minor style issues.
         - info: optional observation; no action required.
         Anti-pattern: "technically correct" != critical. If correct but could be more precise -> minor at most.
@@ -668,13 +697,19 @@ public static class SystemPrompts
         NOTE: Do NOT flag provider names or model names for validity -- that is handled by the deterministic
         crew-spec-validator. Focus only on reuse correctness and mode selection.
 
+        EXECUTOR EXCEPTION (important): the executor is INTENTIONALLY never reused — it must always be a
+        new, inline, task-specialized profile. NEVER suggest reusing an executor (e.g. "default-executor").
+        Reuse correctness applies only to reviewers, advisors, and grounding providers.
+
         Checks:
         1. Reused profiles must actually fit the task -- a reused "marketing" reviewer in a legal crew -> major.
         2. No unnecessary duplicates: if two new profiles do the same thing as one existing profile -> major.
+           (Exception: the inline executor is always expected to be new -- never flag it as a duplicate.)
         3. Mode correctness:
            - If a complete existing template would have fit -> `mode: existing-template` should have been used;
              using `mode: composed` or `mode: new` instead -> major.
-           - If partial reuse is possible but `mode: new` was used for everything -> major.
+           - If fitting reviewers/advisors/grounding exist but `mode: new` recreated them inline -> major.
+             (The executor being inline is correct and expected, never a reason to prefer another mode.)
         4. Profile naming: names must be kebab-case, <=64 chars, ^[a-z0-9\-]+$ -> major if violated.
         5. No reused profile should be duplicated as a new profile under a different name -> major.
 

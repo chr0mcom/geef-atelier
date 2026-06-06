@@ -283,15 +283,24 @@ internal sealed class CrewMaterializer(
 
     // ── Private builders ─────────────────────────────────────────────────────────
 
+    // Floors guard against an LLM that lowballs max_tokens (e.g. 4096), which truncates the output.
+    // A value above the floor is kept as-is; null or anything below is raised to the floor.
+    private const int ExecutorMaxTokensFloor = 32000;
+    private const int ReviewerMaxTokensFloor = 8000;
+    private const int AdvisorMaxTokensFloor  = 8000;
+
+    private static int ClampMaxTokens(int? value, int floor) =>
+        value is { } v && v > floor ? v : floor;
+
     private static ExecutorProfile BuildExecutorProfile(Core.Domain.Crew.Composition.CrewPartSpec part) =>
         new(
             Name:        part.Name!,
             DisplayName: part.DisplayName ?? part.Name!,
             Description: "Auto-composed executor",
             SystemPrompt: part.SystemPrompt ?? string.Empty,
-            Provider:    part.Provider ?? "openai",
-            Model:       part.Model ?? "gpt-4o",
-            MaxTokens:   part.MaxTokens,
+            Provider:    part.Provider ?? "claude-cli",
+            Model:       part.Model ?? "claude-opus-4-8",
+            MaxTokens:   ClampMaxTokens(part.MaxTokens, ExecutorMaxTokensFloor),
             IsSystem:    false);
 
     private static ReviewerProfile BuildReviewerProfile(Core.Domain.Crew.Composition.CrewPartSpec part) =>
@@ -300,9 +309,9 @@ internal sealed class CrewMaterializer(
             DisplayName: part.DisplayName ?? part.Name!,
             Description: "Auto-composed reviewer",
             SystemPrompt: part.SystemPrompt ?? string.Empty,
-            Provider:    part.Provider ?? "openai",
-            Model:       part.Model ?? "gpt-4o-mini",
-            MaxTokens:   part.MaxTokens,
+            Provider:    part.Provider ?? "claude-cli",
+            Model:       part.Model ?? "claude-sonnet-4-6",
+            MaxTokens:   ClampMaxTokens(part.MaxTokens, ReviewerMaxTokensFloor),
             IsSystem:    false);
 
     private static AdvisorProfile BuildAdvisorProfile(Core.Domain.Crew.Composition.CrewPartSpec part) =>
@@ -311,9 +320,9 @@ internal sealed class CrewMaterializer(
             DisplayName: part.DisplayName ?? part.Name!,
             Description: "Auto-composed advisor",
             SystemPrompt: part.SystemPrompt ?? string.Empty,
-            Provider:    part.Provider ?? "openai",
-            Model:       part.Model ?? "gpt-4o",
-            MaxTokens:   part.MaxTokens,
+            Provider:    part.Provider ?? "claude-cli",
+            Model:       part.Model ?? "claude-sonnet-4-6",
+            MaxTokens:   ClampMaxTokens(part.MaxTokens, AdvisorMaxTokensFloor),
             Mode:        ParseAdvisorMode(part.AdvisorMode),
             Trigger:     ParseAdvisorTrigger(part.AdvisorTrigger),
             IsSystem:    false);
