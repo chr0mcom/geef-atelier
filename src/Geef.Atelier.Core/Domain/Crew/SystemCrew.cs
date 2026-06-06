@@ -45,7 +45,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.BriefingFidelity,
         Provider: "codex-cli",
         Model: "gpt-5.5",
-        MaxTokens: null,
+        MaxTokens: 64000,
         IsSystem: true);
 
     /// <summary>Clarity reviewer — checks argumentation, structure, and style (PS-2 severity calibration).</summary>
@@ -56,7 +56,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.Clarity,
         Provider: "codex-cli",
         Model: "gpt-5.5",
-        MaxTokens: null,
+        MaxTokens: 64000,
         IsSystem: true);
 
     // ── Domain reviewer profiles ────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.LegalJargonPrecision,
         Provider: "codex-cli",
         Model: "gpt-5.5",
-        MaxTokens: null,
+        MaxTokens: 64000,
         IsSystem: true);
 
     /// <summary>Legal clause risk reviewer — identifies problematic or unenforceable contract clauses.</summary>
@@ -80,7 +80,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.LegalClauseRisk,
         Provider: "codex-cli",
         Model: "gpt-5.5",
-        MaxTokens: null,
+        MaxTokens: 64000,
         IsSystem: true);
 
     /// <summary>Academic citation readiness reviewer — marks uncited claims that require sources.</summary>
@@ -91,7 +91,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.AcademicCitationReadiness,
         Provider: "codex-cli",
         Model: "gpt-5.5",
-        MaxTokens: null,
+        MaxTokens: 64000,
         IsSystem: true);
 
     /// <summary>Academic argumentation rigor reviewer — checks logical structure and identifies fallacies.</summary>
@@ -102,7 +102,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.AcademicArgumentationRigor,
         Provider: "claude-cli",
         Model: "claude-opus-4-8",
-        MaxTokens: null,
+        MaxTokens: 64000,
         IsSystem: true);
 
     /// <summary>Marketing audience clarity reviewer — checks if copy matches the defined target audience.</summary>
@@ -113,7 +113,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.MarketingAudienceClarity,
         Provider: "codex-cli",
         Model: "gpt-5.5",
-        MaxTokens: null,
+        MaxTokens: 64000,
         IsSystem: true);
 
     /// <summary>Marketing conversion strength reviewer — checks CTAs, value propositions, and urgency signals.</summary>
@@ -124,7 +124,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.MarketingConversionStrength,
         Provider: "codex-cli",
         Model: "gpt-5.5",
-        MaxTokens: null,
+        MaxTokens: 64000,
         IsSystem: true);
 
     // ── Auto-Crew: crew-composer executor ──────────────────────────────────────
@@ -137,7 +137,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.CrewComposerExecutor,
         Provider: "claude-cli",
         Model: "claude-opus-4-8",
-        MaxTokens: 16384,
+        MaxTokens: 64000,
         IsSystem: true);
 
     // ── Auto-Crew: crew-composer reviewers ─────────────────────────────────────
@@ -150,7 +150,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.CrewSpecValidator,
         Provider: "",
         Model: "",
-        MaxTokens: null,
+        MaxTokens: 64000,
         IsSystem: true);
 
     /// <summary>Checks that the proposed crew has executor, reviewer(s), and finalizer(s); flags missing roles.</summary>
@@ -161,7 +161,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.CrewComposerCompleteness,
         Provider: "codex-cli",
         Model: "gpt-5.5",
-        MaxTokens: 4096,
+        MaxTokens: 64000,
         IsSystem: true);
 
     /// <summary>Reviews every new profile's system prompt for completeness and inclusion of the severity taxonomy.</summary>
@@ -172,7 +172,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.CrewComposerPromptQuality,
         Provider: "openrouter",
         Model: "google/gemini-2.5-flash",
-        MaxTokens: 4096,
+        MaxTokens: 64000,
         IsSystem: true);
 
     /// <summary>Checks whether the crew fits the task: domain, models, grounding, and complexity.</summary>
@@ -183,7 +183,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.CrewComposerFit,
         Provider: "codex-cli",
         Model: "gpt-5.5",
-        MaxTokens: 4096,
+        MaxTokens: 64000,
         IsSystem: true);
 
     /// <summary>Checks that reuse references are correct and the right composition mode was chosen.</summary>
@@ -194,7 +194,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.CrewComposerReuseCorrectness,
         Provider: "claude-cli",
         Model: "claude-opus-4-8",
-        MaxTokens: 4096,
+        MaxTokens: 64000,
         IsSystem: true);
 
     // ── Auto-Crew: crew-design-advisor ─────────────────────────────────────────
@@ -207,7 +207,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.CrewDesignAdvisor,
         Provider: "claude-cli",
         Model: "claude-opus-4-8",
-        MaxTokens: 4096,
+        MaxTokens: 64000,
         Mode: AdvisorMode.Strategic,
         Trigger: AdvisorTrigger.BeforeFirstExecution,
         IsSystem: true);
@@ -520,7 +520,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.LegalDomainExpert,
         Provider: "claude-cli",
         Model: "claude-opus-4-8",
-        MaxTokens: null,
+        MaxTokens: 64000,
         Mode: AdvisorMode.DomainExpert,
         Trigger: AdvisorTrigger.BeforeFirstExecution,
         IsSystem: true);
@@ -533,7 +533,7 @@ public static class SystemCrew
         SystemPrompt: SystemPrompts.AcademicRigorAdvisor,
         Provider: "claude-cli",
         Model: "claude-opus-4-8",
-        MaxTokens: null,
+        MaxTokens: 64000,
         Mode: AdvisorMode.Critical,
         Trigger: AdvisorTrigger.BeforeEveryExecution,
         IsSystem: true);
@@ -546,7 +546,7 @@ public static class SystemCrew
         SystemPrompt: "You are a strategic consultant reviewing a text briefing before an AI executor processes it. Identify up to 5 key strategic observations: unclear constraints, missing context, unrealistic scope, or conflicting requirements. Be concise (2-3 sentences per point). Do NOT write the text yourself — advise the executor.",
         Provider: "claude-cli",
         Model: "claude-opus-4-8",
-        MaxTokens: null,
+        MaxTokens: 64000,
         Mode: AdvisorMode.Strategic,
         Trigger: AdvisorTrigger.BeforeFirstExecution,
         IsSystem: true);
@@ -559,7 +559,7 @@ public static class SystemCrew
         SystemPrompt: "You are a critical reviewer tasked with challenging an AI-generated text artifact. In 2-4 sentences, identify the weakest assumptions or most contestable claims. Be constructive — aim to strengthen the final text, not tear it down. Do NOT rewrite the text.",
         Provider: "claude-cli",
         Model: "claude-opus-4-8",
-        MaxTokens: null,
+        MaxTokens: 64000,
         Mode: AdvisorMode.DevilsAdvocate,
         Trigger: AdvisorTrigger.BeforeEveryExecution,
         IsSystem: true);
