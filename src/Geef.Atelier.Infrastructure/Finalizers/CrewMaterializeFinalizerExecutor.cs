@@ -103,9 +103,13 @@ internal sealed class CrewMaterializeFinalizerExecutor(
                 }
                 catch (Exception ex)
                 {
-                    // A submit failure must not fail the composition run — the crew was created successfully.
+                    // A submit failure must not fail the composition run — the crew was created
+                    // successfully — but it MUST be visible: surface it as a Status artifact so the
+                    // user sees why no follow-up task run started instead of a silent "Completed".
                     logger.LogError(ex,
                         "CrewMaterialize: failed to submit chained task run for composition run {RunId}", context.RunId);
+                    return Error(context.RunId, profile.Name,
+                        $"Crew '{result.TemplateName}' was created, but the chained task run could not be started: {ex.Message}");
                 }
             }
             else if (!chainToTaskRun)

@@ -226,8 +226,7 @@ internal sealed class CrewMaterializer(
             var evaluationStrategy = ParseEvaluationStrategy(spec.EvaluationStrategy);
 
             // 5i. Build and create crew template
-            var domainSlug = spec.Domain.ToLowerInvariant().Replace(" ", "-");
-            var templateHint = $"{domainSlug}-auto-{DateTimeOffset.UtcNow:yyyyMMddHHmm}";
+            var templateHint = CrewTemplateNaming.BuildAutoTemplateName(spec.Domain);
             var template = new CrewTemplate(
                 Name:                   templateHint,
                 DisplayName:            $"Auto-composed: {spec.Domain}",

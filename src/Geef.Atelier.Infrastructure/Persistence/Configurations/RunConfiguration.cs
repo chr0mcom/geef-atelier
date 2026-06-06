@@ -30,8 +30,11 @@ internal sealed class RunConfiguration : IEntityTypeConfiguration<RunEntity>
             .IsRequired()
             .HasDefaultValue(false);
 
+        // Must match CrewTemplates.Name (200): a run stores the template name it references, and an
+        // auto-composed template name can be up to that length. A narrower column silently broke
+        // auto-crew chaining (varchar(100) overflow on the chained run insert).
         builder.Property(r => r.CrewTemplateName)
-            .HasMaxLength(100)
+            .HasMaxLength(200)
             .IsRequired(false);
 
         builder.Property(r => r.CrewSnapshot)

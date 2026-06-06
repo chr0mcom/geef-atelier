@@ -512,8 +512,8 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
                         .HasColumnType("jsonb");
 
                     b.Property<string>("CrewTemplateName")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("ErrorMessage")
                         .HasColumnType("text");
