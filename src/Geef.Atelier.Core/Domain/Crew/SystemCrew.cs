@@ -304,7 +304,7 @@ public static class SystemCrew
             MaxIterations: 6,
             AbortOnCritical: false,
             DetectRegression: true,
-            StagnationThreshold: 3),
+            StagnationThreshold: 6), // same as MaxIterations → stagnation never fires before budget is exhausted
         AdvisorProfileNames: new[] { CrewDesignAdvisorProfile.Name },
         GroundingProviderNames: new[] { CrewCatalogDefaultProfile.Name, CrewDesignRulesProfile.Name },
         FinalizerProfileNames: new[] { CrewMaterializerProfile.Name },

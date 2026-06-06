@@ -513,7 +513,11 @@ public static class SystemPrompts
         - `reviewers`: array of { "reuse": "<name>" } OR { name, provider, model, max_tokens, system_prompt }
         - `advisors`: array of { "reuse": "<name>" } OR { name, advisor_mode, advisor_trigger, provider, model, max_tokens, system_prompt }
         - `grounding_providers`: array of { "reuse": "<name>" } OR { name, provider_type, settings }
-        - `finalizers`: array of { "reuse": "learning-extractor" } OR { name, finalizer_type } (NO provider/model for deterministic types)
+          GROUNDING PROVIDERS: use ONLY `name` + `provider_type` + `settings`. NO system_prompt, NO provider, NO model.
+        - `finalizers`: array of { "reuse": "learning-extractor" } OR { name, finalizer_type }
+          DETERMINISTIC FINALIZERS (file-export, metadata-enrich, external-sink, crew-materialize, learning-extractor, learning-publisher):
+          use ONLY `name` + `finalizer_type`. NO system_prompt, NO provider, NO model.
+          TRANSFORM FINALIZER only: add provider + model (LLM-based).
         - `domain`, `rationale`
         """;
 
@@ -564,15 +568,21 @@ public static class SystemPrompts
         - Do NOT flag missing taxonomy on advisor/finalizer/grounding/executor prompts -- this is not a violation.
         - Do NOT flag model names or provider names -- that is handled by the deterministic crew-spec-validator.
         - The "iterative revision" instruction is ONLY required for new, inline EXECUTOR prompts (not reviewers, not advisors).
+        - REUSED profiles (those with a "reuse" field) have NO structural requirements -- never flag them for
+          missing taxonomy, revision instructions, or any other structural element.
+        - ENGLISH prompts are ALWAYS correct and REQUIRED. Never flag a prompt for being in English.
+          The artifact output language is irrelevant to the prompt language -- prompts must always be English.
+          Rule 5 means prompts must BE in English -- flagging English prompts for rule 5 is WRONG.
 
         Rules:
         1. Every new (non-reused) REVIEWER prompt MUST contain the verbatim severity taxonomy block
            (critical/major/minor/info lines + anti-pattern line). If absent -> major.
         2. Generic stub prompts ("You are a reviewer. Review the text.") without task-specific guidance -> major.
-        3. New EXECUTOR prompts must include instructions for iterative revision on reviewer findings -> major if absent.
-           Reused executors (e.g. "default-executor") are already correct -- do not flag them.
+        3. New inline EXECUTOR prompts must include instructions for iterative revision on reviewer findings -> major if absent.
+           Reused executors (e.g. "default-executor") are already complete -- NEVER flag them for this.
         4. New ADVISOR prompts should delimit the advisor role ("do NOT write the text") -> minor if absent.
         5. All new prompts must be in English -> major if in another language.
+           ENGLISH IS CORRECT. Do not flag English-language prompts under this rule.
 
         Required severity taxonomy block for reviewer prompts (check for this pattern):
         - critical: substantial factual or logical error; the reader is actively misinformed.

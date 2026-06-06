@@ -129,7 +129,8 @@ internal sealed class CrewSpecValidator(
                     name => crewService.GetFinalizerProfileAsync(name, cancellationToken),
                     issues, cancellationToken,
                     skipModelCheck: !isLlmFinalizer,
-                    skipProviderModelRequired: !isLlmFinalizer);
+                    skipProviderModelRequired: !isLlmFinalizer,
+                    skipSystemPromptRequired: !isLlmFinalizer);
             }
         }
 
@@ -145,11 +146,15 @@ internal sealed class CrewSpecValidator(
         // Step 7 – grounding providers (optional, but reuse references must resolve)
         for (var i = 0; i < spec.GroundingProviders.Count; i++)
         {
+            // Grounding providers are config-driven (provider_type + settings), not LLM-based.
+            // They never need system_prompt, provider, or model fields.
             await ValidateProfileRefAsync(
                 spec.GroundingProviders[i], $"grounding_providers[{i}]",
                 name => crewService.GetGroundingProviderProfileAsync(name, cancellationToken),
                 issues, cancellationToken,
-                skipModelCheck: true); // grounding providers use non-LLM backends
+                skipModelCheck: true,
+                skipProviderModelRequired: true,
+                skipSystemPromptRequired: true);
         }
 
         return issues;
@@ -170,7 +175,8 @@ internal sealed class CrewSpecValidator(
         List<CrewSpecValidationIssue> issues,
         CancellationToken cancellationToken,
         bool skipModelCheck = false,
-        bool skipProviderModelRequired = false)
+        bool skipProviderModelRequired = false,
+        bool skipSystemPromptRequired = false)
         where TProfile : class
     {
         if (!string.IsNullOrWhiteSpace(profileRef.Reuse))
@@ -192,7 +198,7 @@ internal sealed class CrewSpecValidator(
                 Message:    "Inline profile is missing a required 'name' field.",
                 IsCritical: false));
 
-        if (string.IsNullOrWhiteSpace(profileRef.SystemPrompt))
+        if (!skipSystemPromptRequired && string.IsNullOrWhiteSpace(profileRef.SystemPrompt))
             issues.Add(new CrewSpecValidationIssue(
                 Field:      $"{fieldPath}.system_prompt",
                 Message:    "Inline profile is missing a required 'system_prompt' field.",
