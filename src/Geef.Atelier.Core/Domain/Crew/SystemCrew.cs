@@ -171,7 +171,7 @@ public static class SystemCrew
         Description: "Audits system prompts in the proposed crew for completeness, task-specificity, and the mandatory severity taxonomy block in reviewer prompts.",
         SystemPrompt: SystemPrompts.CrewComposerPromptQuality,
         Provider: "openrouter",
-        Model: "google/gemini-2.5-flash",
+        Model: "google/gemini-3.5-flash",
         MaxTokens: 64000,
         IsSystem: true);
 
