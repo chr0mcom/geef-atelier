@@ -162,6 +162,23 @@
                 @(co?.StagnationThreshold ?? d.StagnationThreshold)
                 @if (co?.StagnationThreshold is null) { <span class="text-muted">(default)</span> }
             </dd>
+
+            <dt>Max Elapsed Minutes</dt>
+            <dd data-testid="detail-max-elapsed-minutes">
+                @{
+                    var effElapsed = co?.MaxElapsedMinutes ?? d.MaxElapsedMinutes;
+                }
+                @if (effElapsed.HasValue)
+                {
+                    @effElapsed
+                    @if (co?.MaxElapsedMinutes is null) { <span class="text-muted">(default)</span> }
+                }
+                else
+                {
+                    <span>@((co?.MaxIterations ?? d.MaxIterations) * d.MinutesPerIterationBudget)</span>
+                    <span class="text-muted">(auto: @((co?.MaxIterations ?? d.MaxIterations)) × @(d.MinutesPerIterationBudget) min)</span>
+                }
+            </dd>
         </dl>
 
         <div class="editor-actions">

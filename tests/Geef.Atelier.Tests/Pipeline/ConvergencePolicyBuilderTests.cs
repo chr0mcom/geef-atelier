@@ -52,4 +52,43 @@ public sealed class ConvergencePolicyBuilderTests
         Assert.False(policy.DetectRegression);
         Assert.Equal(1, policy.StagnationThreshold);
     }
+
+    // ── MaxElapsedTime (wall-clock budget) ──────────────────────────────────
+
+    [Fact]
+    public void Build_WithNullMaxElapsed_AutoScalesWithIterations()
+    {
+        // 16 iterations × 15 min/iteration = 240 min, so the iteration count is the binding limit
+        // instead of the SDK's hidden 30-minute default.
+        var defaults = new ConvergenceOptions { MaxElapsedMinutes = null, MinutesPerIterationBudget = 15 };
+        var overridePolicy = new ConvergencePolicyOverride(
+            MaxIterations: 16, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null);
+
+        var policy = ConvergencePolicyBuilder.Build(defaults, overridePolicy);
+
+        Assert.Equal(TimeSpan.FromMinutes(240), policy.MaxElapsedTime);
+    }
+
+    [Fact]
+    public void Build_WithExplicitDefaultMaxElapsed_UsesIt()
+    {
+        var defaults = new ConvergenceOptions { MaxIterations = 16, MaxElapsedMinutes = 60 };
+
+        var policy = ConvergencePolicyBuilder.Build(defaults, null);
+
+        Assert.Equal(TimeSpan.FromMinutes(60), policy.MaxElapsedTime);
+    }
+
+    [Fact]
+    public void Build_WithOverrideMaxElapsed_WinsOverDefaultAndAutoScale()
+    {
+        var defaults = new ConvergenceOptions { MaxElapsedMinutes = null, MinutesPerIterationBudget = 15 };
+        var overridePolicy = new ConvergencePolicyOverride(
+            MaxIterations: 16, AbortOnCritical: null, DetectRegression: null,
+            StagnationThreshold: null, MaxElapsedMinutes: 90);
+
+        var policy = ConvergencePolicyBuilder.Build(defaults, overridePolicy);
+
+        Assert.Equal(TimeSpan.FromMinutes(90), policy.MaxElapsedTime);
+    }
 }

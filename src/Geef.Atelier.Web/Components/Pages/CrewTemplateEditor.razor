@@ -155,6 +155,11 @@
                         <label>Stagnation Threshold</label>
                         <InputNumber @bind-Value="_form.StagnationThreshold" data-testid="advanced-stagnation-threshold" />
                     </div>
+                    <div class="field">
+                        <label>Max Elapsed Minutes (Zeitbudget)</label>
+                        <InputNumber @bind-Value="_form.MaxElapsedMinutes" data-testid="advanced-max-elapsed-minutes" />
+                        <p class="field-hint">Wall-Clock-Limit des gesamten Runs. Wird es überschritten, stoppt der Run (auch wenn die Iterationszahl noch nicht erreicht ist). Für sehr lange Runs erhöhen.</p>
+                    </div>
                 </div>
             </details>
 
@@ -325,6 +330,7 @@
         public bool AbortOnCritical { get; set; }
         public bool DetectRegression { get; set; }
         public int? StagnationThreshold { get; set; }
+        public int? MaxElapsedMinutes { get; set; }
 
         public static TemplateFormModel FromTemplate(CrewTemplate t, ConvergenceOptions d) => new()
         {
@@ -342,6 +348,7 @@
             AbortOnCritical = t.ConvergenceOverride?.AbortOnCritical ?? d.AbortOnCritical,
             DetectRegression = t.ConvergenceOverride?.DetectRegression ?? d.DetectRegression,
             StagnationThreshold = t.ConvergenceOverride?.StagnationThreshold ?? d.StagnationThreshold,
+            MaxElapsedMinutes = t.ConvergenceOverride?.MaxElapsedMinutes ?? d.MaxElapsedMinutes,
         };
 
         public void ApplyConvergenceDefaults(ConvergenceOptions d)
@@ -350,6 +357,7 @@
             AbortOnCritical = d.AbortOnCritical;
             DetectRegression = d.DetectRegression;
             StagnationThreshold = d.StagnationThreshold;
+            MaxElapsedMinutes = d.MaxElapsedMinutes;
         }
 
         public CrewTemplate ToTemplate(ConvergenceOptions d)
@@ -361,11 +369,12 @@
             bool? ac = AbortOnCritical == d.AbortOnCritical ? null : AbortOnCritical;
             bool? dr = DetectRegression == d.DetectRegression ? null : DetectRegression;
             int? st = StagnationThreshold == d.StagnationThreshold ? null : StagnationThreshold;
+            int? me = MaxElapsedMinutes == d.MaxElapsedMinutes ? null : MaxElapsedMinutes;
 
             ConvergencePolicyOverride? overr =
-                mi is null && ac is null && dr is null && st is null
+                mi is null && ac is null && dr is null && st is null && me is null
                     ? null
-                    : new ConvergencePolicyOverride(mi, ac, dr, st);
+                    : new ConvergencePolicyOverride(mi, ac, dr, st, me);
 
             return new CrewTemplate(
                 Name: SystemCrew.EnsureCustomPrefix(Name),
