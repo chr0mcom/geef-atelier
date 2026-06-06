@@ -17,7 +17,6 @@ public static class CompositionServiceExtensions
         services.AddScoped<ICrewSpecValidator, CrewSpecValidator>();
         services.AddScoped<ICrewTemplateEmbeddingRepository, CrewTemplateEmbeddingRepository>();
         services.AddScoped<ICrewMaterializer, CrewMaterializer>();
-        services.AddScoped<CrewComposerExecutor>();
         return services;
     }
 }

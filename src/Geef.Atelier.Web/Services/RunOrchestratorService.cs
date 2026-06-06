@@ -21,6 +21,7 @@ using Geef.Atelier.Infrastructure.Pricing;
 using Geef.Sdk;
 using Geef.Sdk.Exceptions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Web.Services;
@@ -180,7 +181,8 @@ internal sealed class RunOrchestratorService(
             {
                 var crewSpecValidator = scope.ServiceProvider.GetRequiredService<ICrewSpecValidator>();
                 var validatorReviewer = new CrewSpecValidatorReviewer(crewSpecValidator);
-                var composerExecutor  = scope.ServiceProvider.GetRequiredService<CrewComposerExecutor>();
+                var composerExecutor  = ActivatorUtilities.CreateInstance<CrewComposerExecutor>(
+                    scope.ServiceProvider, snapshot.Executor);
 
                 runner = AtelierPipelineFactory.Build(
                     snapshot, llmClientResolver, convergenceOptions,

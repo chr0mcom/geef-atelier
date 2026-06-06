@@ -1,5 +1,6 @@
 using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Sdk;
@@ -15,18 +16,14 @@ namespace Geef.Atelier.Infrastructure.Composition;
 /// <c>submit_crew_spec</c> tool. The resulting tool-call arguments JSON is the pipeline artifact.
 /// </summary>
 /// <remarks>
-/// <para>
 /// This executor is the analog of <c>ProfileBasedExecutor</c> but for the Auto-Crew composition
 /// pipeline. Instead of generating free-form text, it forces a structured tool call so the output
 /// can be deterministically parsed and validated by the downstream reviewer step.
-/// </para>
-/// <para>
-/// The <see cref="Core.Domain.Crew.Profiles.ExecutorProfile"/> is read from the run context via
-/// <see cref="AtelierContextKeys.CompositionExecutorProfile"/>; the composition pipeline factory
-/// sets this key before the pipeline runs.
-/// </para>
+/// The <see cref="ExecutorProfile"/> is supplied at construction time by the orchestrator
+/// (via <c>ActivatorUtilities.CreateInstance</c>) so each run gets the correct profile.
 /// </remarks>
 internal sealed class CrewComposerExecutor(
+    ExecutorProfile profile,
     ILlmClientResolver llmClientResolver,
     ILogger<CrewComposerExecutor> logger,
     IPricingCatalog? pricingCatalog = null,
@@ -49,8 +46,7 @@ internal sealed class CrewComposerExecutor(
     /// <inheritdoc />
     public async Task<ExecutionResult> RunAsync(IRunContext context, CancellationToken cancellationToken)
     {
-        var profile = context.GetRequired(AtelierContextKeys.CompositionExecutorProfile);
-        var brief   = context.GetRequired(AtelierContextKeys.GroundedBrief);
+        var brief = context.GetRequired(AtelierContextKeys.GroundedBrief);
         var iter    = context.GetRequired(GeefKeys.CurrentIteration);
 
         // Build the grounded context block (crew catalog + design rules injected by grounding step).
