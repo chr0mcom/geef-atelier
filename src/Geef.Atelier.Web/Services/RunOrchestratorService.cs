@@ -177,7 +177,9 @@ internal sealed class RunOrchestratorService(
             var groundingConsultationRepo = scope.ServiceProvider.GetService<IGroundingConsultationRepository>();
 
             GeefPipelineRunner<FinalizedDocument> runner;
-            if (run.Kind == RunKind.CrewComposition)
+            var isCompositionRun = run.Kind == RunKind.CrewComposition
+                || snapshot.TemplateName == SystemCrew.CrewComposerTemplateName;
+            if (isCompositionRun)
             {
                 var crewSpecValidator = scope.ServiceProvider.GetRequiredService<ICrewSpecValidator>();
                 var validatorReviewer = new CrewSpecValidatorReviewer(crewSpecValidator);

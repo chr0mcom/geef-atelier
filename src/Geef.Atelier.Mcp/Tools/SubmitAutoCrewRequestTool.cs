@@ -1,9 +1,7 @@
 using System.ComponentModel;
 using System.Text.Json;
 using Geef.Atelier.Application.Auth;
-using Geef.Atelier.Application.Crew.TemplateStudio;
 using Geef.Atelier.Application.Runs;
-using Geef.Atelier.Core.Domain.Crew.TemplateStudio;
 using Geef.Atelier.Mcp.Models;
 using ModelContextProtocol.Server;
 
@@ -24,46 +22,20 @@ public static class SubmitAutoCrewRequestTool
         };
 
     [McpServerTool, Description(
-        "Automatically selects the best crew for a task and immediately submits the run — all in one step. " +
-        "Uses the Template Studio meta-LLM to analyse the briefing and pick the optimal crew configuration. " +
-        "If an existing template matches well, it is used directly. " +
-        "If no good match exists, a new template is created and persisted before the run is started. " +
-        "Returns the run ID, the crew that was selected, and the reasoning behind the choice. " +
-        "Use this whenever the user asks for 'Auto' crew selection or when you are unsure which crew template to pick.")]
+        "Automatically composes the best crew for a task and then executes the task — all in one step. " +
+        "Internally this triggers two pipeline runs: (1) a Crew-Composition run that analyses the task and " +
+        "produces a validated crew specification, then (2) a normal run that executes the task with the composed crew. " +
+        "Use this whenever the user asks for 'Auto' crew selection or when you are unsure which crew template to pick. " +
+        "The tool returns immediately after the composition run is queued; both runs are visible in /runs.")]
     public static async Task<AutoCrewRunStatusDto> SubmitAutoCrewRequest(
-        ITemplateStudioService studioService,
         IRunService runService,
         ICurrentUserService currentUser,
         [Description("The briefing text describing the task for the AI crew.")] string briefingText,
         [Description("Optional JSON configuration object. Defaults to '{}'.")] string? configJson = null,
+        [Description("When true (default), the system automatically starts the task run once crew composition is complete. Set to false to only compose the crew without executing.")] bool chainToTaskRun = true,
         [Description("Optional attachments as a JSON array: [{\"filename\":\"report.md\",\"contentType\":\"text/plain\",\"contentBase64\":\"...\"}]. Supported content types: text/markdown, text/plain, application/pdf.")] string? attachments = null,
         CancellationToken cancellationToken = default)
     {
-        // Step 1 — meta-LLM analysis to find the best crew.
-        var analysis = await studioService.AnalyzeAsync(briefingText, cancellationToken);
-
-        string? templateName = null;
-        bool newTemplateCreated = false;
-
-        if (analysis.Recommendation == StudioRecommendation.UseExistingTemplate
-            && analysis.MatchedExistingTemplates.Count > 0)
-        {
-            templateName = analysis.MatchedExistingTemplates[0].TemplateName;
-        }
-        else if (analysis.ProposedTemplate is not null)
-        {
-            // Step 2 — materialize the proposed template so submit_request can reference it by name.
-            var result = await studioService.MaterializeAsync(
-                analysis.Id,
-                new MaterializationRequest(analysis.ProposedTemplate, analysis.ProposedNewProfiles),
-                cancellationToken);
-
-            templateName = result.CreatedTemplateName;
-            newTemplateCreated = true;
-        }
-        // If neither path applies, templateName stays null → system default is used.
-
-        // Step 3 — parse optional attachments.
         IReadOnlyList<RunAttachmentInput>? attachmentInputs = null;
         if (attachments is not null)
         {
@@ -105,25 +77,22 @@ public static class SubmitAutoCrewRequestTool
             }
         }
 
-        // Step 4 — submit the run.
         var runId = await runService.SubmitRunAsync(
             new SubmitRunRequest(
                 BriefingText: briefingText,
                 ConfigJson: configJson ?? "{}",
                 CreatedByUser: currentUser.Username,
-                CrewTemplateName: templateName,
+                CrewTemplateName: null,
                 CustomCrew: null,
-                Attachments: attachmentInputs),
+                Attachments: attachmentInputs,
+                AutoCompose: true,
+                ChainToTaskRun: chainToTaskRun),
             cancellationToken);
 
         return new AutoCrewRunStatusDto(
             RunId: runId.ToString(),
             Status: "Pending",
-            SelectedTemplate: templateName ?? "(system default)",
-            NewTemplateCreated: newTemplateCreated,
-            Recommendation: analysis.Recommendation.ToString(),
-            ReasoningSummary: analysis.ReasoningSummary,
-            AnalysisCostEur: analysis.CostEur);
+            ChainToTaskRun: chainToTaskRun);
     }
 
     internal sealed record AttachmentDto(
@@ -135,8 +104,4 @@ public static class SubmitAutoCrewRequestTool
 public sealed record AutoCrewRunStatusDto(
     string RunId,
     string Status,
-    string SelectedTemplate,
-    bool NewTemplateCreated,
-    string Recommendation,
-    string ReasoningSummary,
-    decimal? AnalysisCostEur);
+    bool ChainToTaskRun);
