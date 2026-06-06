@@ -90,13 +90,30 @@ internal sealed class CrewMaterializer(
                 topK: 3,
                 ct: cancellationToken);
 
-            if (similar.Count > 0 && similar[0].Similarity >= DedupThreshold)
+            // Walk candidates (highest similarity first). Only reuse a candidate whose template
+            // still EXISTS — embeddings can outlive their template (deleted template ⇒ orphan
+            // embedding), and reusing a dead name makes the chained task run fail with "not found".
+            foreach (var (entry, similarity) in similar)
             {
-                var dupName = similar[0].Entry.TemplateName;
+                if (similarity < DedupThreshold) break; // ordered by similarity desc
+
+                var dupName = entry.TemplateName;
+                var dupTemplate = await crewService.GetCrewTemplateAsync(dupName, cancellationToken);
+                if (dupTemplate is null)
+                {
+                    // Orphaned embedding — clean it up and try the next candidate.
+                    logger.LogWarning(
+                        "CrewMaterializer: run {RunId} — dedup candidate '{Template}' has no template (orphaned embedding); deleting and skipping.",
+                        sourceRunId, dupName);
+                    try { await embeddingRepo.DeleteAsync(dupName, cancellationToken); }
+                    catch (Exception delEx) { logger.LogWarning(delEx, "CrewMaterializer: failed to delete orphaned embedding '{Template}'.", dupName); }
+                    continue;
+                }
+
                 logger.LogInformation(
                     "CrewMaterializer: run {RunId} — dedup hit; reusing existing template '{Template}' (similarity={Sim:F3})",
-                    sourceRunId, dupName, similar[0].Similarity);
-                warnings.Add($"Dedup: existing template '{dupName}' is similar ({similar[0].Similarity:F3}); reused instead of creating new.");
+                    sourceRunId, dupName, similarity);
+                warnings.Add($"Dedup: existing template '{dupName}' is similar ({similarity:F3}); reused instead of creating new.");
                 return new MaterializeCrewResult(dupName, WasDuplicate: true, warnings);
             }
         }
@@ -229,7 +246,7 @@ internal sealed class CrewMaterializer(
             var templateHint = CrewTemplateNaming.BuildAutoTemplateName(spec.Domain);
             var template = new CrewTemplate(
                 Name:                   templateHint,
-                DisplayName:            $"Auto-composed: {spec.Domain}",
+                DisplayName:            Truncate($"Auto-composed: {spec.Domain}", 199),
                 Description:            Truncate(spec.Rationale, 200),
                 ExecutorProfileName:    executorName,
                 ReviewerProfileNames:   reviewerNames,
@@ -295,7 +312,7 @@ internal sealed class CrewMaterializer(
     private static ExecutorProfile BuildExecutorProfile(Core.Domain.Crew.Composition.CrewPartSpec part) =>
         new(
             Name:        part.Name!,
-            DisplayName: part.DisplayName ?? part.Name!,
+            DisplayName: Truncate(part.DisplayName ?? part.Name!, 199),
             Description: "Auto-composed executor",
             SystemPrompt: part.SystemPrompt ?? string.Empty,
             Provider:    part.Provider ?? "claude-cli",
@@ -306,7 +323,7 @@ internal sealed class CrewMaterializer(
     private static ReviewerProfile BuildReviewerProfile(Core.Domain.Crew.Composition.CrewPartSpec part) =>
         new(
             Name:        part.Name!,
-            DisplayName: part.DisplayName ?? part.Name!,
+            DisplayName: Truncate(part.DisplayName ?? part.Name!, 199),
             Description: "Auto-composed reviewer",
             SystemPrompt: part.SystemPrompt ?? string.Empty,
             Provider:    part.Provider ?? "claude-cli",
@@ -317,7 +334,7 @@ internal sealed class CrewMaterializer(
     private static AdvisorProfile BuildAdvisorProfile(Core.Domain.Crew.Composition.CrewPartSpec part) =>
         new(
             Name:        part.Name!,
-            DisplayName: part.DisplayName ?? part.Name!,
+            DisplayName: Truncate(part.DisplayName ?? part.Name!, 199),
             Description: "Auto-composed advisor",
             SystemPrompt: part.SystemPrompt ?? string.Empty,
             Provider:    part.Provider ?? "claude-cli",

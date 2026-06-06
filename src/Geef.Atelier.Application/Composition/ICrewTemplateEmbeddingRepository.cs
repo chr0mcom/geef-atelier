@@ -14,6 +14,10 @@ public interface ICrewTemplateEmbeddingRepository
     /// </summary>
     Task UpsertAsync(CrewTemplateEmbedding embedding, CancellationToken ct = default);
 
+    /// <summary>Deletes the embedding for the given template name (no-op if absent).
+    /// Used to clean up orphaned embeddings whose template was deleted.</summary>
+    Task DeleteAsync(string templateName, CancellationToken ct = default);
+
     /// <summary>
     /// Searches for the most similar crew-template embeddings using cosine similarity,
     /// applying a <paramref name="sameDomainBoost"/> multiplier to results whose

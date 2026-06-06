@@ -40,6 +40,13 @@ internal sealed class CrewTemplateEmbeddingRepository(AtelierDbContext context)
     }
 
     /// <inheritdoc/>
+    public async Task DeleteAsync(string templateName, CancellationToken ct = default)
+    {
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $@"DELETE FROM ""CrewTemplateEmbeddings"" WHERE ""TemplateName"" = {templateName}", ct);
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<(CrewTemplateEmbedding Entry, double Similarity)>> SearchAsync(
         float[] queryEmbedding,
         string? domainHint,
