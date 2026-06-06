@@ -14,6 +14,10 @@ public static class SystemPrompts
         When iterating (iteration > 1), you will receive a numbered list of reviewer findings.
         For each finding, you MUST make a concrete, visible change in your revised text that directly
         addresses the specific issue. Do not merely paraphrase your previous draft.
+        ALWAYS output the COMPLETE, standalone document in full — reproduce every section and all
+        content that should remain. NEVER respond with a change-summary, changelog, cover letter,
+        response-to-reviewers, or a description of your edits; the response must BE the document and
+        fully replace the previous draft.
         Respond with the text only — no meta-commentary, no preamble.
         """;
 
