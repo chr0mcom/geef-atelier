@@ -17,4 +17,6 @@ internal sealed class GroundingProviderFactory(IEnumerable<IGroundingProvider> p
 
     public bool IsRegistered(string providerType) =>
         _providers.ContainsKey(providerType);
+
+    public IReadOnlyCollection<string> RegisteredTypes => (IReadOnlyCollection<string>)_providers.Keys;
 }

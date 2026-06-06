@@ -1,5 +1,6 @@
 using Geef.Atelier.Application.Composition;
 using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Composition;
 
 namespace Geef.Atelier.Infrastructure.Composition;
@@ -16,7 +17,8 @@ namespace Geef.Atelier.Infrastructure.Composition;
 /// </summary>
 internal sealed class CrewSpecValidator(
     ICrewService crewService,
-    IModelCatalog modelCatalog) : ICrewSpecValidator
+    IModelCatalog modelCatalog,
+    IGroundingProviderFactory groundingProviderFactory) : ICrewSpecValidator
 {
     /// <inheritdoc/>
     public async Task<IReadOnlyList<CrewSpecValidationIssue>> ValidateAsync(
@@ -146,15 +148,39 @@ internal sealed class CrewSpecValidator(
         // Step 7 – grounding providers (optional, but reuse references must resolve)
         for (var i = 0; i < spec.GroundingProviders.Count; i++)
         {
+            var groundingRef = spec.GroundingProviders[i];
+
             // Grounding providers are config-driven (provider_type + settings), not LLM-based.
             // They never need system_prompt, provider, or model fields.
             await ValidateProfileRefAsync(
-                spec.GroundingProviders[i], $"grounding_providers[{i}]",
+                groundingRef, $"grounding_providers[{i}]",
                 name => crewService.GetGroundingProviderProfileAsync(name, cancellationToken),
                 issues, cancellationToken,
                 skipModelCheck: true,
                 skipProviderModelRequired: true,
                 skipSystemPromptRequired: true);
+
+            // For inline definitions the provider_type must be a registered discriminator; otherwise
+            // the materialized crew fails at its Grounding phase ("No grounding provider is registered
+            // for type ..."). Reuse references are skipped — they resolve to an existing valid profile.
+            if (string.IsNullOrWhiteSpace(groundingRef.Reuse))
+            {
+                if (string.IsNullOrWhiteSpace(groundingRef.ProviderType))
+                {
+                    issues.Add(new CrewSpecValidationIssue(
+                        Field:      $"grounding_providers[{i}].provider_type",
+                        Message:    "Inline grounding provider is missing a required 'provider_type' field.",
+                        IsCritical: true));
+                }
+                else if (!groundingProviderFactory.IsRegistered(groundingRef.ProviderType))
+                {
+                    issues.Add(new CrewSpecValidationIssue(
+                        Field:      $"grounding_providers[{i}].provider_type",
+                        Message:    $"Grounding provider_type '{groundingRef.ProviderType}' is not registered. " +
+                                    $"Valid types: {string.Join(", ", groundingProviderFactory.RegisteredTypes.OrderBy(t => t))}.",
+                        IsCritical: true));
+                }
+            }
         }
 
         return issues;

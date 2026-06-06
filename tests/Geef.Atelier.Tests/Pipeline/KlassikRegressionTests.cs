@@ -298,5 +298,6 @@ public sealed class KlassikRegressionTests
         }
 
         public bool IsRegistered(string providerType) => providerType == provider.ProviderType;
+        public IReadOnlyCollection<string> RegisteredTypes => new[] { provider.ProviderType };
     }
 }

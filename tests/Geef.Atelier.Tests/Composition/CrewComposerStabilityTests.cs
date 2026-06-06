@@ -1,5 +1,6 @@
 using Geef.Atelier.Application.Composition;
 using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
@@ -20,11 +21,13 @@ public sealed class CrewComposerStabilityTests
 
     private static CrewSpecValidator MakeValidator(
         ICrewService? crewService = null,
-        IModelCatalog? modelCatalog = null)
+        IModelCatalog? modelCatalog = null,
+        IGroundingProviderFactory? groundingFactory = null)
     {
         crewService  ??= new EmptyCrewService();
         modelCatalog ??= new EmptyModelCatalog();
-        return new CrewSpecValidator(crewService, modelCatalog);
+        groundingFactory ??= new StubGroundingFactory("tavily", "academic-search", "vector-store");
+        return new CrewSpecValidator(crewService, modelCatalog, groundingFactory);
     }
 
     private static CrewSpecValidator MakeValidatorWithKnownModel(string provider, string model) =>
@@ -193,6 +196,14 @@ public sealed class CrewComposerStabilityTests
         public Task<IReadOnlyList<ModelInfo>> ListModelsAsync(string p, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<ModelInfo>>([]);
         public Task<IReadOnlyList<ModelInfo>> RefreshAsync(string p, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<ModelInfo>>([]);
         public bool IsUsingFallback(string p) => false;
+    }
+
+    private sealed class StubGroundingFactory(params string[] types) : IGroundingProviderFactory
+    {
+        private readonly HashSet<string> _types = new(types, StringComparer.OrdinalIgnoreCase);
+        public IGroundingProvider Create(string providerType) => throw new NotSupportedException();
+        public bool IsRegistered(string providerType) => _types.Contains(providerType);
+        public IReadOnlyCollection<string> RegisteredTypes => _types;
     }
 
     private sealed class SingleModelCatalog(string provider, string model) : IModelCatalog

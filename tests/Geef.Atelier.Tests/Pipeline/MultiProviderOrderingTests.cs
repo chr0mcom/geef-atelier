@@ -226,5 +226,6 @@ public sealed class MultiProviderOrderingTests
         }
 
         public bool IsRegistered(string providerType) => providerType == provider.ProviderType;
+        public IReadOnlyCollection<string> RegisteredTypes => new[] { provider.ProviderType };
     }
 }

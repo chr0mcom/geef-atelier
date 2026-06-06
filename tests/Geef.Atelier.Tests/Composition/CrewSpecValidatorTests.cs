@@ -1,5 +1,6 @@
 using Geef.Atelier.Application.Composition;
 using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
@@ -18,11 +19,13 @@ public sealed class CrewSpecValidatorTests
 
     private static CrewSpecValidator MakeValidator(
         ICrewService? crewService = null,
-        IModelCatalog? modelCatalog = null)
+        IModelCatalog? modelCatalog = null,
+        IGroundingProviderFactory? groundingFactory = null)
     {
         crewService ??= new EmptyCrewService();
         modelCatalog ??= new EmptyModelCatalog();
-        return new CrewSpecValidator(crewService, modelCatalog);
+        groundingFactory ??= new StubGroundingFactory("tavily", "academic-search", "vector-store");
+        return new CrewSpecValidator(crewService, modelCatalog, groundingFactory);
     }
 
     /// <summary>A valid existing-template spec JSON.</summary>
@@ -39,6 +42,44 @@ public sealed class CrewSpecValidatorTests
             "finalizers": [{"reuse": "{{finalizerReuse ?? "file-export"}}"}]
         }
         """;
+
+    /// <summary>A composed spec with one inline grounding provider of the given provider_type.</summary>
+    private static string ComposedSpecWithInlineGrounding(string providerType) =>
+        $$"""
+        {
+            "mode": "composed",
+            "executor": {"reuse": "default-executor"},
+            "reviewers": [{"reuse": "briefing-fidelity"}],
+            "finalizers": [{"reuse": "file-export"}],
+            "grounding_providers": [{"name": "lit-search", "provider_type": "{{providerType}}"}]
+        }
+        """;
+
+    // ── Tests: inline grounding provider_type validation ──────────────────
+
+    [Fact]
+    public async Task ValidateAsync_FlagsCritical_ForUnregisteredGroundingProviderType()
+    {
+        var validator = MakeValidator(
+            groundingFactory: new StubGroundingFactory("tavily", "academic-search"));
+
+        var issues = await validator.ValidateAsync(ComposedSpecWithInlineGrounding("web"));
+
+        var typeIssue = Assert.Single(issues, i => i.Field == "grounding_providers[0].provider_type");
+        Assert.True(typeIssue.IsCritical);
+        Assert.Contains("not registered", typeIssue.Message);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_NoGroundingTypeIssue_ForRegisteredType()
+    {
+        var validator = MakeValidator(
+            groundingFactory: new StubGroundingFactory("tavily", "academic-search"));
+
+        var issues = await validator.ValidateAsync(ComposedSpecWithInlineGrounding("tavily"));
+
+        Assert.DoesNotContain(issues, i => i.Field == "grounding_providers[0].provider_type");
+    }
 
     // ── Tests: ExistingTemplate mode ──────────────────────────────────────
 
@@ -355,5 +396,14 @@ public sealed class CrewSpecValidatorTests
         public Task<IReadOnlyList<ModelInfo>> RefreshAsync(string providerName, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<ModelInfo>>([]);
         public bool IsUsingFallback(string providerName) => false;
+    }
+
+    /// <summary>Grounding factory stub with a fixed set of registered provider types.</summary>
+    private sealed class StubGroundingFactory(params string[] types) : IGroundingProviderFactory
+    {
+        private readonly HashSet<string> _types = new(types, StringComparer.OrdinalIgnoreCase);
+        public IGroundingProvider Create(string providerType) => throw new NotSupportedException();
+        public bool IsRegistered(string providerType) => _types.Contains(providerType);
+        public IReadOnlyCollection<string> RegisteredTypes => _types;
     }
 }

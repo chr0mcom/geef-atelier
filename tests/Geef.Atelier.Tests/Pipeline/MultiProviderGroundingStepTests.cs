@@ -139,5 +139,6 @@ public sealed class MultiProviderGroundingStepTests
                : throw new InvalidOperationException($"No provider for type '{providerType}'");
 
         public bool IsRegistered(string providerType) => _map.ContainsKey(providerType);
+        public IReadOnlyCollection<string> RegisteredTypes => (IReadOnlyCollection<string>)_map.Keys;
     }
 }

@@ -1,5 +1,6 @@
 using System.Text;
 using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
@@ -31,6 +32,7 @@ internal sealed class CrewComposerExecutor(
     ExecutorProfile profile,
     ILlmClientResolver llmClientResolver,
     IModelCatalog modelCatalog,
+    IGroundingProviderFactory groundingProviderFactory,
     ILogger<CrewComposerExecutor> logger,
     IPricingCatalog? pricingCatalog = null,
     ICostAccumulator? costAccumulator = null) : IExecutionStep
@@ -239,6 +241,19 @@ internal sealed class CrewComposerExecutor(
 
         sb.AppendLine();
         sb.AppendLine("**IMPORTANT:** Never use provider names like `openai`, `google`, `anthropic`, `x-ai` — these are not valid Geef providers. Use only the exact names above.");
+
+        // Section 3: Valid grounding provider_type discriminators (config-driven, not LLM models).
+        var groundingTypes = groundingProviderFactory.RegisteredTypes.OrderBy(t => t).ToList();
+        if (groundingTypes.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("## Valid grounding provider_type values (ONLY use these for grounding_providers)");
+            sb.AppendLine();
+            sb.AppendLine(string.Join(", ", groundingTypes.Select(t => $"`{t}`")));
+            sb.AppendLine();
+            sb.AppendLine("For web/literature search use `tavily` (general web), `academic-search` (papers/arXiv/Semantic Scholar) or `news-search` — there is NO `web` type. " +
+                          "`provider_type` is REQUIRED on every inline grounding provider and must be one of the exact values above.");
+        }
 
         return sb.ToString();
     }
