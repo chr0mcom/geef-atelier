@@ -11,6 +11,14 @@ internal static class AtelierContextKeys
     public static readonly ContextKey<LlmTokenUsage>  TokenUsage    = new("geef:atelier:token-usage");
 
     /// <summary>
+    /// The most complete draft produced so far across all iterations (the high-water mark by length).
+    /// <c>ProfileBasedExecutor</c> uses it as the yardstick for detecting a draft collapse (changelog /
+    /// partial document) and as the fallback when the executor repeatedly fails to re-emit the full text,
+    /// guaranteeing the working draft never regresses below the most complete version seen.
+    /// </summary>
+    public static readonly ContextKey<string>         BestDraft     = new("geef:atelier:best-draft");
+
+    /// <summary>
     /// The executor profile to use for LLM calls. Set by the composition pipeline factory so that
     /// <see cref="Geef.Atelier.Infrastructure.Composition.CrewComposerExecutor"/> can resolve the
     /// correct provider/model without requiring it as a constructor argument.

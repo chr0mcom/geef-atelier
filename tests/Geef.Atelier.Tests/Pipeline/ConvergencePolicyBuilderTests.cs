@@ -70,21 +70,38 @@ public sealed class ConvergencePolicyBuilderTests
     }
 
     [Fact]
-    public void Build_WithExplicitDefaultMaxElapsed_UsesIt()
+    public void Build_WithExplicitMaxElapsedAboveFloor_UsesIt()
     {
-        var defaults = new ConvergenceOptions { MaxIterations = 16, MaxElapsedMinutes = 60 };
+        // 4 iterations → floor = max(30, 4×15) = 60; explicit 120 is above the floor → honored.
+        var defaults = new ConvergenceOptions { MaxIterations = 4, MinutesPerIterationBudget = 15, MaxElapsedMinutes = 120 };
 
         var policy = ConvergencePolicyBuilder.Build(defaults, null);
 
-        Assert.Equal(TimeSpan.FromMinutes(60), policy.MaxElapsedTime);
+        Assert.Equal(TimeSpan.FromMinutes(120), policy.MaxElapsedTime);
     }
 
     [Fact]
-    public void Build_WithOverrideMaxElapsed_WinsOverDefaultAndAutoScale()
+    public void Build_WithExplicitMaxElapsedBelowIterationFloor_IsRaisedToFloor()
     {
-        var defaults = new ConvergenceOptions { MaxElapsedMinutes = null, MinutesPerIterationBudget = 15 };
+        // The iteration count governs: an explicit 120 with 16 iterations (floor 240) is lifted to 240,
+        // so a too-low time cap can never cut a run off below its iteration budget.
+        var defaults = new ConvergenceOptions { MinutesPerIterationBudget = 15 };
         var overridePolicy = new ConvergencePolicyOverride(
             MaxIterations: 16, AbortOnCritical: null, DetectRegression: null,
+            StagnationThreshold: null, MaxElapsedMinutes: 120);
+
+        var policy = ConvergencePolicyBuilder.Build(defaults, overridePolicy);
+
+        Assert.Equal(TimeSpan.FromMinutes(240), policy.MaxElapsedTime);
+    }
+
+    [Fact]
+    public void Build_WithOverrideMaxElapsedAboveFloor_IsHonored()
+    {
+        // 4 iterations → floor 60; override 90 is above the floor → honored as-is.
+        var defaults = new ConvergenceOptions { MaxElapsedMinutes = null, MinutesPerIterationBudget = 15 };
+        var overridePolicy = new ConvergencePolicyOverride(
+            MaxIterations: 4, AbortOnCritical: null, DetectRegression: null,
             StagnationThreshold: null, MaxElapsedMinutes: 90);
 
         var policy = ConvergencePolicyBuilder.Build(defaults, overridePolicy);

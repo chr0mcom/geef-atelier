@@ -267,16 +267,31 @@ internal sealed class RunOrchestratorService(
                         await ExecuteFinalizationOnMaxAttemptsAsync(run, snapshot, cts.Token);
                         try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
                     }
-                    else if (!retried)
-                    {
-                        // No retry, no max-attempts finalizer — propagate so outer handler marks Failed.
-                        throw;
-                    }
                     else
                     {
-                        // Retry also failed, no finalizers — outer catch (Exception) will mark Failed.
-                        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(convergenceEx).Throw();
-                        throw; // unreachable; satisfies compiler
+                        // No max-attempts finalizer configured. Do not discard the work: surface the most
+                        // complete iteration draft as the run result so the user gets a usable document
+                        // instead of a Failed run with no output. Only when no draft exists at all do we
+                        // fall back to propagating the failure.
+                        if (accumulator is not null)
+                            await FinalizeRunCostsAsync(run.Id, accumulator, cts.Token);
+
+                        var surfaced = await CompleteWithBestDraftOnMaxAttemptsAsync(run.Id, cts.Token);
+                        if (surfaced)
+                        {
+                            try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
+                        }
+                        else if (!retried)
+                        {
+                            // No retry, no draft to surface — propagate so outer handler marks Failed.
+                            throw;
+                        }
+                        else
+                        {
+                            // Retry also failed, no draft — outer catch (Exception) will mark Failed.
+                            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(convergenceEx).Throw();
+                            throw; // unreachable; satisfies compiler
+                        }
                     }
                 }
                 else
@@ -820,5 +835,41 @@ internal sealed class RunOrchestratorService(
 
         // Now run the normal finalization chain using the last text as both FinalText and CurrentText
         await ExecuteFinalizationAsync(run.Id, snapshot, ct);
+    }
+
+    /// <summary>
+    /// Called when MaxAttempts was reached (ConvergenceFailedException) but no max-attempts finalizer
+    /// is configured. Surfaces the most complete iteration draft as the run's <c>FinalText</c> and
+    /// marks the run Completed (with a non-fatal convergence note) so a run that produced a usable
+    /// document never ends as Failed with no output. Returns <c>false</c> when no draft exists.
+    /// </summary>
+    private async Task<bool> CompleteWithBestDraftOnMaxAttemptsAsync(Guid runId, CancellationToken ct)
+    {
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
+
+        // Pick the longest (most complete) iteration draft rather than simply the last, so an
+        // abbreviated final iteration can never hide a more complete earlier draft.
+        var bestText = await db.Iterations
+            .Where(i => i.RunId == runId)
+            .OrderByDescending(i => i.ArtifactText.Length)
+            .Select(i => i.ArtifactText)
+            .FirstOrDefaultAsync(ct);
+
+        if (string.IsNullOrWhiteSpace(bestText))
+            return false;
+
+        var affected = await db.Runs
+            .Where(r => r.Id == runId && r.Status == RunStatus.Running)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.Status,                RunStatus.Completed)
+                .SetProperty(r => r.FinalText,             bestText)
+                .SetProperty(r => r.FinalizerErrorMessage,
+                    "Max-Iterationen bzw. Zeitbudget erreicht, ohne dass alle Reviewer-Befunde "
+                    + "aufgelöst wurden. Zurückgegeben wird der vollständigste erzeugte Entwurf.")
+                .SetProperty(r => r.CompletedAt,           DateTimeOffset.UtcNow),
+                ct);
+
+        return affected > 0;
     }
 }

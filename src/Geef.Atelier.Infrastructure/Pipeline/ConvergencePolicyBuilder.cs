@@ -13,13 +13,17 @@ internal static class ConvergencePolicyBuilder
         // The SDK's DefaultConvergencePolicy enforces a wall-clock limit (MaxElapsedTime, SDK default
         // 30 min) that — when exceeded — stops the run with the SAME StopMaxAttemptsReached reason as
         // the iteration cap. If left at the default, heavy crews hit 30 min after only 3–4 iterations,
-        // so a configured MaxIterations of e.g. 16 never takes effect. We therefore set the budget
-        // explicitly: an explicit override/default wins, otherwise it auto-scales with MaxIterations so
-        // the iteration count is the binding constraint.
-        var maxElapsedMinutes =
-            overridePolicy?.MaxElapsedMinutes
-            ?? defaults.MaxElapsedMinutes
-            ?? Math.Max(30, maxIterations * Math.Max(1, defaults.MinutesPerIterationBudget));
+        // so a configured MaxIterations of e.g. 16 never takes effect.
+        //
+        // Policy: the iteration count governs. The budget auto-scales with MaxIterations (the floor),
+        // and an explicit override/default can only ever RAISE it above that floor — never cut a run
+        // off below its iteration budget. So an explicit 120 min with 16 iterations is lifted to the
+        // 240 min the iterations need, while an explicit 300 min is honored as-is.
+        var autoScaleFloor = Math.Max(30, maxIterations * Math.Max(1, defaults.MinutesPerIterationBudget));
+        var configuredMinutes = overridePolicy?.MaxElapsedMinutes ?? defaults.MaxElapsedMinutes;
+        var maxElapsedMinutes = configuredMinutes.HasValue
+            ? Math.Max(configuredMinutes.Value, autoScaleFloor)
+            : autoScaleFloor;
 
         return new()
         {

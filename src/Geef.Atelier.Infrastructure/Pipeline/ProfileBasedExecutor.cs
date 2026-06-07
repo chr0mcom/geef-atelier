@@ -16,10 +16,13 @@ internal sealed class ProfileBasedExecutor(
     ICostAccumulator? costAccumulator = null) : IExecutionStep
 {
     // Revision iterations must re-emit the whole artifact. If the executor instead returns a
-    // change-summary / cover letter (a known LLM failure mode), the resulting text collapses to a
-    // fraction of the previous draft. These thresholds detect that collapse so it can be retried.
+    // change-summary / cover letter or an abbreviated partial (known LLM failure modes on long
+    // documents), the result collapses well below the most complete draft seen so far. These
+    // thresholds detect that collapse so it can be retried and, failing that, prevented from
+    // becoming the working draft. Compared against the running high-water mark, not just the
+    // immediately previous draft, so an accepted partial can never lower the bar.
     private const int    MinComparableDraftLength = 2000;
-    private const double RegressionRatio          = 0.5;
+    private const double RegressionRatio          = 0.7;
 
     public async Task<ExecutionResult> RunAsync(IRunContext context, CancellationToken cancellationToken)
     {
@@ -69,33 +72,43 @@ internal sealed class ProfileBasedExecutor(
 
         var response = await CompleteAndRecordAsync(client, model, userPrompt, iter, cancellationToken);
 
-        // Safety net: never let a change-summary / cover-letter response (a collapse far below the
-        // previous draft) become the new state. Retry once forcefully; if it still collapses, keep
-        // whichever text preserves the most content so the run never regresses below its best draft.
-        var resultText  = response.Text;
-        var tokenUsage  = response.TokenUsage;
-        if (prevDraft is not null && IsRegression(resultText, prevDraft))
+        // Safety net: never let a change-summary / cover-letter / abbreviated partial (a collapse far
+        // below the most complete draft seen so far) become the new state. Retry once forcefully; if it
+        // still collapses, keep whichever text preserves the most content so the run never regresses
+        // below its best draft. The yardstick is the running high-water mark, so an accepted partial in
+        // an earlier iteration cannot lower the bar for later ones.
+        var resultText = response.Text;
+        var tokenUsage = response.TokenUsage;
+        if (prevDraft is not null)
         {
-            var retryPrompt = PrependContextBlocks(
-                context, BuildRevisionPrompt(brief, prevDraft, findingList, forceful: true));
-            var retry = await CompleteAndRecordAsync(client, model, retryPrompt, iter, cancellationToken);
+            var bestDraft = context.TryGet(AtelierContextKeys.BestDraft, out var best) && best is not null
+                ? best
+                : prevDraft;
 
-            if (!IsRegression(retry.Text, prevDraft))
+            if (IsRegression(resultText, bestDraft))
             {
-                resultText = retry.Text;
-                tokenUsage = retry.TokenUsage;
-            }
-            else
-            {
-                // Both attempts collapsed — keep the longest available text (the prior full draft
-                // wins over two short changelogs), guaranteeing no regression in document state.
-                resultText = new[] { resultText, retry.Text, prevDraft }.MaxBy(t => t.Length)!;
-                tokenUsage = retry.TokenUsage;
+                var retryPrompt = PrependContextBlocks(
+                    context, BuildRevisionPrompt(brief, prevDraft, findingList, forceful: true));
+                var retry = await CompleteAndRecordAsync(client, model, retryPrompt, iter, cancellationToken);
+
+                if (!IsRegression(retry.Text, bestDraft))
+                {
+                    resultText = retry.Text;
+                    tokenUsage = retry.TokenUsage;
+                }
+                else
+                {
+                    // Both attempts collapsed — keep the longest available text (the prior full draft
+                    // wins over two short changelogs), guaranteeing no regression in document state.
+                    resultText = new[] { resultText, retry.Text, bestDraft }.MaxBy(t => t.Length)!;
+                    tokenUsage = retry.TokenUsage;
+                }
             }
         }
 
         var updated = context
             .Set(AtelierContextKeys.CurrentDraft, resultText)
+            .Set(AtelierContextKeys.BestDraft, LongestOf(resultText, prevDraft, context))
             .Set(AtelierContextKeys.TokenUsage, tokenUsage);
         return new ExecutionResult
         {
@@ -167,9 +180,22 @@ internal sealed class ProfileBasedExecutor(
             """;
     }
 
-    private static bool IsRegression(string newText, string prevDraft)
-        => prevDraft.Length >= MinComparableDraftLength
-           && newText.Length < prevDraft.Length * RegressionRatio;
+    private static bool IsRegression(string newText, string baseline)
+        => baseline.Length >= MinComparableDraftLength
+           && newText.Length < baseline.Length * RegressionRatio;
+
+    // The new high-water mark: the longest of the freshly chosen draft, the previous draft, and the
+    // best draft tracked so far. Keeps the yardstick monotonic across iterations.
+    private static string LongestOf(string resultText, string? prevDraft, IRunContext context)
+    {
+        var best = resultText;
+        if (prevDraft is not null && prevDraft.Length > best.Length)
+            best = prevDraft;
+        if (context.TryGet(AtelierContextKeys.BestDraft, out var tracked) && tracked is not null
+            && tracked.Length > best.Length)
+            best = tracked;
+        return best;
+    }
 
     private static IReadOnlyList<Finding> ExtractPreviousFindings(IRunContext ctx)
     {
