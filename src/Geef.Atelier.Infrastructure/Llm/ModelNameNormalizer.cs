@@ -37,6 +37,14 @@ public static class ModelNameNormalizer
         ["anthropic/", "openai/", "google/"];
 
     /// <summary>
+    /// Returns true when the given provider routes through a local CLI agent
+    /// (claude-cli, codex-cli, gemini-cli) rather than a direct HTTP API.
+    /// Used by the executor to decide whether to enable document-mode editing.
+    /// </summary>
+    public static bool IsCliProvider(string providerName)
+        => CliProviders.Contains(providerName);
+
+    /// <summary>
     /// Returns the canonical model name for the given provider.
     /// Idempotent: already-normalised names are returned as-is.
     /// </summary>

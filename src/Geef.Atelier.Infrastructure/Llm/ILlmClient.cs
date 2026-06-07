@@ -19,6 +19,19 @@ public sealed record LlmRequest
     /// Null = no tool_choice. "function:&lt;name&gt;" = force specific tool. "auto" = model decides.
     /// </summary>
     public string? ToolChoice { get; init; }
+
+    /// <summary>
+    /// When true, the CLI proxy writes the document to draft.md in an ephemeral workspace and
+    /// runs the CLI agent in file-edit mode instead of text-completion mode. Only set for
+    /// CLI-provider executor calls (claude-cli, codex-cli). API providers ignore these fields.
+    /// </summary>
+    public bool DocumentMode { get; init; }
+
+    /// <summary>
+    /// The current document content to place in draft.md before the CLI runs.
+    /// Empty string on iteration 1 (no prior draft). Only meaningful when DocumentMode=true.
+    /// </summary>
+    public string? Document { get; init; }
 }
 
 public sealed record LlmResponse

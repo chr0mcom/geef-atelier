@@ -3,7 +3,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
+from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 MAX_CONCURRENT = int(os.getenv("CLAUDE_MAX_CONCURRENT", "2"))
 _semaphore = asyncio.Semaphore(MAX_CONCURRENT)
@@ -29,6 +33,28 @@ def list_models() -> list[str]:
     return list(STATIC_MODELS)
 
 
+async def complete_document(
+    system_prompt: str,
+    user_instruction: str,
+    document: str,
+    workspace_path: Path,
+    model: str | None,
+    max_tokens: int | None,
+) -> str:
+    """
+    Calls the claude CLI in document-edit mode: the CLI reads draft.md in the given
+    workspace, applies the instruction, and writes the revised document back.
+    Returns the content of draft.md after the CLI exits.
+
+    Uses --allowedTools Read,Edit,Write with --permission-mode acceptEdits so the
+    agent can edit files without interactive confirmation prompts.
+    """
+    async with _semaphore:
+        return await _run_claude_document(
+            system_prompt, user_instruction, document, workspace_path, model, max_tokens
+        )
+
+
 async def complete(prompt: str, model: str | None, max_tokens: int | None) -> str:
     """
     Calls the claude CLI in print mode and returns the raw text output.
@@ -37,6 +63,78 @@ async def complete(prompt: str, model: str | None, max_tokens: int | None) -> st
     """
     async with _semaphore:
         return await _run_claude(prompt, model, max_tokens)
+
+
+async def _run_claude_document(
+    system_prompt: str,
+    user_instruction: str,
+    document: str,
+    workspace_path: Path,
+    model: str | None,
+    max_tokens: int | None,
+) -> str:
+    # Prefix the instruction with the file-contract so the agent knows to edit draft.md.
+    instruction = (
+        "The document you are editing is located at draft.md in the current directory. "
+        "Read it, apply the revisions described below, then write the complete updated "
+        "document back to draft.md. Do NOT output the document content to stdout — "
+        "only edit the file.\n\n"
+        + user_instruction
+    )
+
+    # --allowedTools Read,Edit,Write: restrict agent to file operations only (no web, no bash).
+    # --permission-mode acceptEdits: auto-approve file edits without interactive prompts.
+    # --append-system-prompt: injects the writer persona system prompt.
+    # No --output-format json: stdout is ignored; we read draft.md directly.
+    args = [
+        "claude", "-p",
+        "--allowedTools", "Read,Edit,Write",
+        "--permission-mode", "acceptEdits",
+        "--append-system-prompt", system_prompt,
+    ]
+
+    if model:
+        bare_model = model.split("/")[-1] if "/" in model else model
+        bare_model = bare_model.replace(".", "-")
+        args += ["--model", bare_model]
+
+    args.append(instruction)
+
+    env = {**os.environ, "HOME": CLAUDE_HOME}
+
+    proc = await asyncio.create_subprocess_exec(
+        *args,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        cwd=str(workspace_path),
+        env=env,
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
+    except asyncio.TimeoutError:
+        proc.kill()
+        raise RuntimeError(f"claude CLI (document mode) timed out after {CLI_TIMEOUT_SECONDS}s")
+
+    if proc.returncode != 0:
+        stderr_msg = stderr.decode(errors="replace").strip()
+        raise RuntimeError(
+            f"claude CLI (document mode) exited with code {proc.returncode}: "
+            f"{stderr_msg or stdout.decode(errors='replace')[:200]}"
+        )
+
+    draft_path = workspace_path / "draft.md"
+    try:
+        result = draft_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        raise RuntimeError(
+            "claude document mode: draft.md not found after CLI exit — "
+            "the agent may have deleted or moved the file"
+        )
+
+    if result == document:
+        log.warning("claude document mode: draft.md unchanged after CLI run — no edits applied")
+
+    return result
 
 
 async def _run_claude(prompt: str, model: str | None, max_tokens: int | None) -> str:

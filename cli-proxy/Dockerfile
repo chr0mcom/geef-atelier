@@ -22,6 +22,9 @@ COPY src/ ./src/
 # Auth directories — expected to be volume-mounted in production.
 RUN mkdir -p /auth/claude /auth/codex /auth/gemini
 
+# Workspace root for document-mode ephemeral workspaces.
+RUN mkdir -p /work
+
 EXPOSE 8090
 
 ENV PYTHONPATH=/app/src

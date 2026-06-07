@@ -43,11 +43,14 @@ internal static class OpenAiMessageFormat
 
         var body = new RequestBodyDto
         {
-            Model     = request.Model,
-            Messages  = messages,
-            MaxTokens = request.MaxTokens,
-            Tools     = tools,
-            ToolChoice = toolChoice
+            Model        = request.Model,
+            Messages     = messages,
+            MaxTokens    = request.MaxTokens,
+            Tools        = tools,
+            ToolChoice   = toolChoice,
+            // bool? null → omitted by WhenWritingNull so real OpenAI/Anthropic APIs never see these fields.
+            DocumentMode = request.DocumentMode ? true : null,
+            Document     = request.DocumentMode ? request.Document : null,
         };
 
         return JsonSerializer.Serialize(body, WriteOptions);
@@ -106,11 +109,14 @@ internal static class OpenAiMessageFormat
 
     private sealed class RequestBodyDto
     {
-        [JsonPropertyName("model")]      public string Model { get; set; } = "";
-        [JsonPropertyName("messages")]   public MessageDto[] Messages { get; set; } = [];
-        [JsonPropertyName("max_tokens")] public int MaxTokens { get; set; }
-        [JsonPropertyName("tools")]      public ToolDto[]? Tools { get; set; }
-        [JsonPropertyName("tool_choice")] public object? ToolChoice { get; set; }
+        [JsonPropertyName("model")]         public string Model { get; set; } = "";
+        [JsonPropertyName("messages")]      public MessageDto[] Messages { get; set; } = [];
+        [JsonPropertyName("max_tokens")]    public int MaxTokens { get; set; }
+        [JsonPropertyName("tools")]         public ToolDto[]? Tools { get; set; }
+        [JsonPropertyName("tool_choice")]   public object? ToolChoice { get; set; }
+        // Document-mode fields — null (omitted) for non-CLI / non-document-mode requests.
+        [JsonPropertyName("document_mode")] public bool? DocumentMode { get; set; }
+        [JsonPropertyName("document")]      public string? Document { get; set; }
     }
 
     private sealed class MessageDto

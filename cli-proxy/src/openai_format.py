@@ -43,6 +43,11 @@ class ChatCompletionRequest(BaseModel):
     max_tokens: int | None = None
     temperature: float | None = None
     stream: bool = False
+    # Document-Mode — opt-in, set only for CLI-provider executor calls.
+    # The CLI agent receives the document as draft.md in an ephemeral workspace
+    # and edits it in place instead of re-emitting the full text on stdout.
+    document_mode: bool = False
+    document: str | None = None
 
 
 class FunctionCall(BaseModel):

@@ -20,6 +20,7 @@ from openai_format import (
 )
 from provider_sync import ProviderConfigSync
 from tool_use_parser import build_tool_system_prompt, extract_json
+from workspace import ephemeral_workspace
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -89,6 +90,18 @@ def _build_prompt(req: ChatCompletionRequest) -> str:
     return prompt
 
 
+def _extract_parts(req: ChatCompletionRequest) -> tuple[str, str]:
+    """Extracts (system_prompt, user_instruction) from the message list."""
+    system_parts: list[str] = []
+    user_parts: list[str] = []
+    for msg in req.messages:
+        if msg.role == "system":
+            system_parts.append(msg.content or "")
+        elif msg.role in ("user", "assistant"):
+            user_parts.append(f"[{msg.role.upper()}]\n{msg.content or ''}")
+    return "\n\n".join(system_parts), "\n\n".join(user_parts)
+
+
 def _extract_tool_name(req: ChatCompletionRequest) -> str | None:
     """Returns the requested tool function name, if any."""
     if not req.tool_choice or not req.tools:
@@ -143,6 +156,15 @@ def _needs_json_retry(resp: ChatCompletionResponse, req: ChatCompletionRequest) 
 # ---------------------------------------------------------------------------
 
 async def _call_claude(req: ChatCompletionRequest) -> ChatCompletionResponse:
+    if req.document_mode:
+        system_prompt, user_instruction = _extract_parts(req)
+        log.info("Dispatching to claude (document mode) | model=%s", req.model)
+        async with ephemeral_workspace(req.document or "") as ws:
+            raw = await claude_adapter.complete_document(
+                system_prompt, user_instruction, req.document or "", ws, req.model, req.max_tokens
+            )
+        return make_text_response(req.model, raw)
+
     prompt = _build_prompt(req)
     log.info("Dispatching to claude | model=%s | tool=%s", req.model, _extract_tool_name(req))
     raw = await claude_adapter.complete(prompt, req.model, req.max_tokens)
@@ -155,6 +177,15 @@ async def _call_claude(req: ChatCompletionRequest) -> ChatCompletionResponse:
 
 
 async def _call_codex(req: ChatCompletionRequest) -> ChatCompletionResponse:
+    if req.document_mode:
+        system_prompt, user_instruction = _extract_parts(req)
+        log.info("Dispatching to codex (document mode) | model=%s", req.model)
+        async with ephemeral_workspace(req.document or "") as ws:
+            raw = await codex_adapter.complete_document(
+                system_prompt, user_instruction, req.document or "", ws, req.model, req.max_tokens
+            )
+        return make_text_response(req.model, raw)
+
     prompt = _build_prompt(req)
     log.info("Dispatching to codex | model=%s | tool=%s", req.model, _extract_tool_name(req))
     raw = await codex_adapter.complete(prompt, req.model, req.max_tokens)
@@ -175,6 +206,14 @@ async def cli_chat_completions(provider_name: str, req: ChatCompletionRequest) -
     """Generic endpoint: routes to the CLI adapter configured for provider_name."""
     if req.stream:
         raise HTTPException(status_code=400, detail="Streaming is not supported by the CLI proxy.")
+    if req.document_mode:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "document_mode is not supported on the generic /v1/cli/{provider_name}/chat/completions "
+                "endpoint. Use /v1/claude/chat/completions or /v1/codex/chat/completions instead."
+            ),
+        )
 
     config = provider_sync.get_provider_config(provider_name)
     if config is None:
@@ -258,6 +297,14 @@ async def chat_completions(req: ChatCompletionRequest) -> ChatCompletionResponse
     )
     if req.stream:
         raise HTTPException(status_code=400, detail="Streaming is not supported by the CLI proxy.")
+    if req.document_mode:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "document_mode is not supported on the legacy /v1/chat/completions endpoint. "
+                "Use /v1/claude/chat/completions or /v1/codex/chat/completions instead."
+            ),
+        )
     try:
         raw = await _dispatch(req)
         return _build_response(req, raw)

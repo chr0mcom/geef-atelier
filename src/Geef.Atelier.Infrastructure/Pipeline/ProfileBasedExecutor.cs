@@ -31,28 +31,57 @@ internal sealed class ProfileBasedExecutor(
 
         var (client, model, maxTokens) = resolver.ForProfile(profile.Provider, profile.Model, profile.MaxTokens);
 
+        var isCliProvider = ModelNameNormalizer.IsCliProvider(profile.Provider);
+
         string? prevDraft = null;
         string  findingList = "";
         string  userPrompt;
+        string? currentDocument = null;  // null = API-provider (no document mode)
+
         if (iter == 1)
         {
             if (context.TryGet(AtelierContextKeys.SeedDraft, out var seedDraft) && seedDraft is not null)
             {
-                userPrompt = $"""
-                    Briefing:
-                    {brief}
+                if (isCliProvider)
+                {
+                    // Document mode: draft.md already contains the seed draft; instruction only needs context.
+                    userPrompt = $"""
+                        Briefing:
+                        {brief}
 
-                    Previous draft (from an interrupted run — revise and improve it):
-                    {seedDraft}
+                        Revise the draft (already in draft.md) to better fulfill the briefing. Improve quality,
+                        address any weaknesses you can identify, and make the text more polished.
+                        Write the COMPLETE revised document back to draft.md.
+                        """;
+                    currentDocument = seedDraft;
+                }
+                else
+                {
+                    userPrompt = $"""
+                        Briefing:
+                        {brief}
 
-                    Revise the draft to better fulfill the briefing. Improve quality, address any
-                    weaknesses you can identify, and make the text more polished. Output the COMPLETE
-                    revised document in full — only the document itself, no commentary.
-                    """;
+                        Previous draft (from an interrupted run — revise and improve it):
+                        {seedDraft}
+
+                        Revise the draft to better fulfill the briefing. Improve quality, address any
+                        weaknesses you can identify, and make the text more polished. Output the COMPLETE
+                        revised document in full — only the document itself, no commentary.
+                        """;
+                }
             }
             else
             {
-                userPrompt = $"Briefing:\n{brief}\n\nWrite a text according to the briefing.";
+                if (isCliProvider)
+                {
+                    // Document mode: draft.md is empty; instruction writes the initial document.
+                    userPrompt = $"Briefing:\n{brief}\n\nWrite the complete document into draft.md according to the briefing.";
+                    currentDocument = "";
+                }
+                else
+                {
+                    userPrompt = $"Briefing:\n{brief}\n\nWrite a text according to the briefing.";
+                }
             }
         }
         else
@@ -65,12 +94,13 @@ internal sealed class ProfileBasedExecutor(
             findingList = findingLines.Count > 0
                 ? string.Join("\n", findingLines)
                 : "(no findings — improve general quality)";
-            userPrompt = BuildRevisionPrompt(brief, prevDraft, findingList, forceful: false);
+            userPrompt = BuildRevisionPrompt(brief, prevDraft, findingList, forceful: false, documentMode: isCliProvider);
+            if (isCliProvider) currentDocument = prevDraft;
         }
 
         userPrompt = PrependContextBlocks(context, userPrompt);
 
-        var response = await CompleteAndRecordAsync(client, model, userPrompt, iter, cancellationToken);
+        var response = await CompleteAndRecordAsync(client, model, userPrompt, iter, currentDocument, maxTokens, cancellationToken);
 
         // Safety net: never let a change-summary / cover-letter / abbreviated partial (a collapse far
         // below the most complete draft seen so far) become the new state. Retry once forcefully; if it
@@ -88,8 +118,8 @@ internal sealed class ProfileBasedExecutor(
             if (IsRegression(resultText, bestDraft))
             {
                 var retryPrompt = PrependContextBlocks(
-                    context, BuildRevisionPrompt(brief, prevDraft, findingList, forceful: true));
-                var retry = await CompleteAndRecordAsync(client, model, retryPrompt, iter, cancellationToken);
+                    context, BuildRevisionPrompt(brief, prevDraft, findingList, forceful: true, documentMode: isCliProvider));
+                var retry = await CompleteAndRecordAsync(client, model, retryPrompt, iter, currentDocument, maxTokens, cancellationToken);
 
                 if (!IsRegression(retry.Text, bestDraft))
                 {
@@ -131,14 +161,18 @@ internal sealed class ProfileBasedExecutor(
     }
 
     private async Task<LlmResponse> CompleteAndRecordAsync(
-        ILlmClient client, string model, string userPrompt, int iter, CancellationToken cancellationToken)
+        ILlmClient client, string model, string userPrompt, int iter,
+        string? currentDocument, int maxTokens, CancellationToken cancellationToken)
     {
+        var isDocumentMode = currentDocument is not null;
         var response = await client.CompleteAsync(new LlmRequest
         {
             Model        = model,
             SystemPrompt = profile.SystemPrompt,
             UserPrompt   = userPrompt,
-            MaxTokens    = resolver.ForProfile(profile.Provider, profile.Model, profile.MaxTokens).MaxTokens
+            MaxTokens    = maxTokens,
+            DocumentMode = isDocumentMode,
+            Document     = isDocumentMode ? currentDocument : null,
         }, cancellationToken);
 
         if (costAccumulator is not null)
@@ -154,13 +188,41 @@ internal sealed class ProfileBasedExecutor(
         return response;
     }
 
-    private static string BuildRevisionPrompt(string brief, string prevDraft, string findingList, bool forceful)
+    private static string BuildRevisionPrompt(
+        string brief, string prevDraft, string findingList, bool forceful, bool documentMode = false)
     {
-        var emphasis = forceful
-            ? "\n\nIMPORTANT: Your previous response was REJECTED because it was a change-summary / "
-              + "cover letter / list of edits instead of the document itself. Output the ENTIRE document "
-              + "in full this time — every section, in final form — and NOTHING else."
-            : "";
+        string emphasis;
+        if (!forceful)
+            emphasis = "";
+        else if (documentMode)
+            // File-edit-specific retry emphasis: the previous run wrote a change-summary or partial
+            // result to draft.md instead of the complete document. Stdout-mode language ("Output the
+            // ENTIRE document… NOTHING else") would contradict the file-edit contract and silently
+            // no-op the retry because the proxy reads draft.md, not stdout.
+            emphasis = "\n\nIMPORTANT: The previous run produced a change-summary or partially "
+                + "edited file instead of a complete document. Write the COMPLETE updated document "
+                + "to draft.md this time — every section intact, all findings addressed, nothing omitted.";
+        else
+            emphasis = "\n\nIMPORTANT: Your previous response was REJECTED because it was a change-summary / "
+                + "cover letter / list of edits instead of the document itself. Output the ENTIRE document "
+                + "in full this time — every section, in final form — and NOTHING else.";
+
+        if (documentMode)
+        {
+            // In document mode the current draft is already in draft.md — do not embed it in the
+            // prompt to avoid doubling the context (and potentially exhausting the token budget for
+            // very long documents). The CLI agent reads and writes the file directly.
+            return $$"""
+                Briefing:
+                {{brief}}
+
+                Reviewer findings — resolve each one with a concrete, visible change in the document:
+                {{findingList}}
+
+                The document is in draft.md. Read it, apply the revisions, and write the complete
+                updated document back to draft.md. Make every change visible and specific.{{emphasis}}
+                """;
+        }
 
         return $$"""
             Briefing:

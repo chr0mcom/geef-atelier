@@ -6,6 +6,7 @@ import logging
 import os
 import tempfile
 import time
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -86,6 +87,28 @@ async def list_models_async() -> list[str]:
     return await _get_cached_models()
 
 
+async def complete_document(
+    system_prompt: str,
+    user_instruction: str,
+    document: str,
+    workspace_path: Path,
+    model: str | None,
+    max_tokens: int | None,
+) -> str:
+    """
+    Calls the codex CLI in document-edit mode: the CLI reads draft.md in the given
+    workspace, applies the instruction, and writes the revised document back.
+    Returns the content of draft.md after the CLI exits.
+
+    Uses --sandbox workspace-write so the agent can only write within the workspace.
+    System prompt is embedded in the instruction preamble (codex has no --append-system-prompt).
+    """
+    async with _semaphore:
+        return await _run_codex_document(
+            system_prompt, user_instruction, document, workspace_path, model, max_tokens
+        )
+
+
 async def complete(prompt: str, model: str | None, max_tokens: int | None) -> str:
     """
     Calls the codex CLI in non-interactive mode and returns the raw text output.
@@ -94,6 +117,75 @@ async def complete(prompt: str, model: str | None, max_tokens: int | None) -> st
     """
     async with _semaphore:
         return await _run_codex(prompt, model, max_tokens)
+
+
+async def _run_codex_document(
+    system_prompt: str,
+    user_instruction: str,
+    document: str,
+    workspace_path: Path,
+    model: str | None,
+    max_tokens: int | None,
+) -> str:
+    # Codex has no --append-system-prompt flag — embed system prompt as a [SYSTEM] preamble.
+    instruction = (
+        f"[SYSTEM]\n{system_prompt}\n\n"
+        "The document you are editing is located at draft.md in the current directory. "
+        "Read it, apply the revisions described below, then write the complete updated "
+        "document back to draft.md.\n\n"
+        + user_instruction
+    )
+
+    # --sandbox workspace-write: restricts writes to the workspace directory.
+    # -C <workspace>: sets the agent's workspace root (not just subprocess cwd).
+    # --skip-git-repo-check: the proxy container is not a git repo.
+    # --search is a GLOBAL flag and must precede the `exec` subcommand.
+    # No --output-last-message: we read draft.md directly, not the last chat turn.
+    args = [
+        "codex", "--search", "exec",
+        "--skip-git-repo-check",
+        "--sandbox", "workspace-write",
+        "-C", str(workspace_path),
+    ]
+
+    if model:
+        bare_model = model.split("/")[-1] if "/" in model else model
+        args += ["-m", bare_model]
+
+    args.append(instruction)
+
+    env = {**os.environ, "HOME": CODEX_HOME}
+
+    proc = await asyncio.create_subprocess_exec(
+        *args,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        cwd=str(workspace_path),
+        env=env,
+    )
+    try:
+        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
+    except asyncio.TimeoutError:
+        proc.kill()
+        raise RuntimeError(f"codex CLI (document mode) timed out after {CLI_TIMEOUT_SECONDS}s")
+
+    if proc.returncode != 0:
+        err = stderr.decode(errors="replace").strip()
+        raise RuntimeError(f"codex CLI (document mode) exited with code {proc.returncode}: {err}")
+
+    draft_path = workspace_path / "draft.md"
+    try:
+        result = draft_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        raise RuntimeError(
+            "codex document mode: draft.md not found after CLI exit — "
+            "the agent may have deleted or moved the file"
+        )
+
+    if result == document:
+        log.warning("codex document mode: draft.md unchanged after CLI run — no edits applied")
+
+    return result
 
 
 async def _run_codex(prompt: str, model: str | None, max_tokens: int | None) -> str:
