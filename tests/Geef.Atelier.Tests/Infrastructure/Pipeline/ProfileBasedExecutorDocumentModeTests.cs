@@ -177,6 +177,38 @@ public sealed class ProfileBasedExecutorDocumentModeTests
     }
 
     [Fact]
+    public async Task RunAsync_WithCliProvider_NoContextBlocks_LeavesContextDocumentNull()
+    {
+        // No grounding/advisor present → ContextDocument must be null (not an empty string).
+        var captured = new CapturingLlmClient("first draft");
+        var executor = MakeExecutor(captured, provider: "claude-cli");
+        var context  = new RunContext()
+            .Set(AtelierContextKeys.GroundedBrief, "the brief")
+            .Set(GeefKeys.CurrentIteration, 1);
+
+        await executor.RunAsync(context, CancellationToken.None);
+
+        Assert.Null(captured.Requests[0].ContextDocument);
+    }
+
+    [Fact]
+    public async Task RunAsync_WithCliProvider_WhitespaceContextBlocks_LeavesContextDocumentNull()
+    {
+        // Whitespace-only blocks must not produce a near-empty ContextDocument.
+        var captured = new CapturingLlmClient("first draft");
+        var executor = MakeExecutor(captured, provider: "claude-cli");
+        var context  = new RunContext()
+            .Set(AtelierContextKeys.GroundedBrief, "the brief")
+            .Set(AtelierContextKeys.GroundingContext, "   ")
+            .Set(AtelierContextKeys.AdvisorBlock, "\n\t ")
+            .Set(GeefKeys.CurrentIteration, 1);
+
+        await executor.RunAsync(context, CancellationToken.None);
+
+        Assert.Null(captured.Requests[0].ContextDocument);
+    }
+
+    [Fact]
     public async Task RunAsync_WithApiProvider_KeepsContextInlineAndContextDocumentNull()
     {
         // API providers keep the old inline behaviour: grounding/advisor in the prompt, no ContextDocument.

@@ -70,6 +70,7 @@ services:
       - CODEX_MAX_CONCURRENT=2
       - WORKSPACE_ROOT=/work
       - CONTEXT_FILE_THRESHOLD=50000
+      - INSTRUCTION_ARG_LIMIT=100000
       - CLAUDE_HOME=/auth/claude
       - CODEX_HOME=/auth/codex
       - GEMINI_HOME=/auth/gemini

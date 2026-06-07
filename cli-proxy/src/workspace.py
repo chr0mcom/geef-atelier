@@ -28,11 +28,18 @@ if not Path(WORKSPACE_ROOT).is_absolute():
         "Set WORKSPACE_ROOT in the environment (default: /work)."
     )
 
-# Background context larger than this (characters) is offloaded to context.md instead of
-# being inlined into the argv instruction. Kept well below the Linux per-argument limit
+# Background context whose UTF-8 byte length exceeds this is offloaded to context.md instead
+# of being inlined into the argv instruction. Kept well below the Linux per-argument limit
 # (MAX_ARG_STRLEN = 128 KB) to leave headroom for the file-contract preamble, briefing and
 # findings that always stay in the prompt, plus UTF-8 multi-byte expansion.
 CONTEXT_FILE_THRESHOLD: int = int(os.getenv("CONTEXT_FILE_THRESHOLD", "50000"))
+
+# Hard safety net: a single execve argument may not exceed MAX_ARG_STRLEN (128 KB on Linux).
+# The whole instruction (file-contract + findings + any inlined context) is one argv element,
+# so if it gets close to that limit it is offloaded to instruction.md and replaced by a short
+# pointer — otherwise the spawn fails with OSError "Argument list too long" (E2BIG). Normal
+# instructions stay in argv so the findings remain prominent; only pathological inputs offload.
+INSTRUCTION_ARG_LIMIT: int = int(os.getenv("INSTRUCTION_ARG_LIMIT", "100000"))
 
 
 def materialize_context(workspace_path: Path, context_document: str | None) -> str:
@@ -55,6 +62,22 @@ def materialize_context(workspace_path: Path, context_document: str | None) -> s
     return (
         "Background research and advisor notes for this task are in context.md in the "
         "current directory. Read context.md first, then proceed.\n\n"
+    )
+
+
+def finalize_instruction(workspace_path: Path, instruction: str) -> str:
+    """
+    Returns the string to pass as the trailing CLI argument. If the instruction's UTF-8 byte
+    length exceeds the safe per-argument size it is written to instruction.md and a short
+    pointer is returned instead, preventing E2BIG (OSError "Argument list too long").
+    """
+    if len(instruction.encode("utf-8")) <= INSTRUCTION_ARG_LIMIT:
+        return instruction
+    (workspace_path / "instruction.md").write_text(instruction, encoding="utf-8")
+    return (
+        "Your task is described in instruction.md in the current directory. Read "
+        "instruction.md first, then edit draft.md exactly as instructed and write the "
+        "complete updated document back to draft.md. Do NOT output the document to stdout."
     )
 
 

@@ -11,7 +11,7 @@ from typing import Any
 
 import httpx
 
-from workspace import materialize_context
+from workspace import finalize_instruction, materialize_context
 
 log = logging.getLogger(__name__)
 
@@ -164,7 +164,8 @@ async def _run_codex_document(
         bare_model = model.split("/")[-1] if "/" in model else model
         args += ["-m", bare_model]
 
-    args.append(instruction)
+    # Offload to instruction.md if the instruction would exceed the per-argument OS limit.
+    args.append(finalize_instruction(workspace_path, instruction))
 
     env = {**os.environ, "HOME": CODEX_HOME}
 
@@ -179,6 +180,7 @@ async def _run_codex_document(
         _, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
         proc.kill()
+        await proc.wait()  # reap the killed process so it does not linger as a zombie
         raise RuntimeError(f"codex CLI (document mode) timed out after {CLI_TIMEOUT_SECONDS}s")
 
     if proc.returncode != 0:
@@ -231,6 +233,7 @@ async def _run_codex(prompt: str, model: str | None, max_tokens: int | None) -> 
             _, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
         except asyncio.TimeoutError:
             proc.kill()
+            await proc.wait()  # reap the killed process so it does not linger as a zombie
             raise RuntimeError(f"codex CLI timed out after {CLI_TIMEOUT_SECONDS} seconds")
 
         if proc.returncode != 0:

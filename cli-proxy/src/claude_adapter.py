@@ -7,7 +7,7 @@ import logging
 import os
 from pathlib import Path
 
-from workspace import materialize_context
+from workspace import finalize_instruction, materialize_context
 
 log = logging.getLogger(__name__)
 
@@ -95,7 +95,10 @@ async def _run_claude_document(
 
     # --allowedTools Read,Edit,Write: restrict agent to file operations only (no web, no bash).
     # --permission-mode acceptEdits: auto-approve file edits without interactive prompts.
-    # --append-system-prompt: injects the writer persona system prompt.
+    # --append-system-prompt: injects the writer persona system prompt. Note: this is the one
+    # remaining argv value not offloaded to a file; system prompts are operator-defined profiles
+    # (a few KB), so they stay well under MAX_ARG_STRLEN. The user-driven variable content
+    # (document, context, findings) is all file-backed via draft.md/context.md/instruction.md.
     # No --output-format json: stdout is ignored; we read draft.md directly.
     args = [
         "claude", "-p",
@@ -109,7 +112,8 @@ async def _run_claude_document(
         bare_model = bare_model.replace(".", "-")
         args += ["--model", bare_model]
 
-    args.append(instruction)
+    # Offload to instruction.md if the instruction would exceed the per-argument OS limit.
+    args.append(finalize_instruction(workspace_path, instruction))
 
     env = {**os.environ, "HOME": CLAUDE_HOME}
 
@@ -124,6 +128,7 @@ async def _run_claude_document(
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
         proc.kill()
+        await proc.wait()  # reap the killed process so it does not linger as a zombie
         raise RuntimeError(f"claude CLI (document mode) timed out after {CLI_TIMEOUT_SECONDS}s")
 
     if proc.returncode != 0:
@@ -175,6 +180,7 @@ async def _run_claude(prompt: str, model: str | None, max_tokens: int | None) ->
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
         proc.kill()
+        await proc.wait()  # reap the killed process so it does not linger as a zombie
         raise RuntimeError(f"claude CLI timed out after {CLI_TIMEOUT_SECONDS} seconds")
 
     raw = stdout.decode(errors="replace").strip()

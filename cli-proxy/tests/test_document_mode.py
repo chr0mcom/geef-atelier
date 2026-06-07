@@ -14,7 +14,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import workspace as workspace_module
-from workspace import ephemeral_workspace, materialize_context
+from workspace import ephemeral_workspace, finalize_instruction, materialize_context
 
 
 # ---------------------------------------------------------------------------
@@ -124,6 +124,44 @@ def test_materialize_context_measures_utf8_bytes_not_chars(tmp_path):
     assert "context.md" in result
     assert multibyte not in result
     assert (tmp_path / "context.md").read_text(encoding="utf-8") == multibyte
+
+
+# ---------------------------------------------------------------------------
+# finalize_instruction — the E2BIG safety net
+# ---------------------------------------------------------------------------
+
+def test_finalize_instruction_small_passes_through(tmp_path):
+    """A small instruction is returned verbatim; no instruction.md is written."""
+    instr = "Edit draft.md to fix the introduction."
+    assert finalize_instruction(tmp_path, instr) == instr
+    assert not (tmp_path / "instruction.md").exists()
+
+
+def test_finalize_instruction_oversized_offloads_to_file(tmp_path):
+    """An instruction above the limit is written to instruction.md and replaced by a pointer."""
+    big = "FINDINGS: " + "y" * (workspace_module.INSTRUCTION_ARG_LIMIT + 1)
+    result = finalize_instruction(tmp_path, big)
+    assert "instruction.md" in result
+    assert big not in result
+    assert "draft.md" in result, "pointer must still steer the agent to edit draft.md"
+    assert (tmp_path / "instruction.md").read_text(encoding="utf-8") == big
+
+
+def test_finalize_instruction_measures_utf8_bytes(tmp_path):
+    """Limit is measured in UTF-8 bytes, not characters (multi-byte safety)."""
+    multibyte = "あ" * ((workspace_module.INSTRUCTION_ARG_LIMIT // 3) + 1)  # 3 bytes each
+    assert len(multibyte) <= workspace_module.INSTRUCTION_ARG_LIMIT  # inline if counted by chars
+    assert len(multibyte.encode("utf-8")) > workspace_module.INSTRUCTION_ARG_LIMIT
+    result = finalize_instruction(tmp_path, multibyte)
+    assert "instruction.md" in result
+    assert (tmp_path / "instruction.md").read_text(encoding="utf-8") == multibyte
+
+
+def test_finalize_instruction_boundary_inclusive(tmp_path):
+    """Exactly at the byte limit the instruction is still passed inline."""
+    exact = "y" * workspace_module.INSTRUCTION_ARG_LIMIT  # ASCII 1 byte/char
+    assert finalize_instruction(tmp_path, exact) == exact
+    assert not (tmp_path / "instruction.md").exists()
 
 
 # ---------------------------------------------------------------------------

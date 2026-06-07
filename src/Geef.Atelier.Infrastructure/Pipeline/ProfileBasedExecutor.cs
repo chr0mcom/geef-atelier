@@ -177,9 +177,9 @@ internal sealed class ProfileBasedExecutor(
     private static string? CollectContextBlocks(IRunContext context)
     {
         var parts = new List<string>(2);
-        if (context.TryGet(AtelierContextKeys.AdvisorBlock, out var advisorBlock) && advisorBlock is not null)
+        if (context.TryGet(AtelierContextKeys.AdvisorBlock, out var advisorBlock) && !string.IsNullOrWhiteSpace(advisorBlock))
             parts.Add(advisorBlock);
-        if (context.TryGet(AtelierContextKeys.GroundingContext, out var groundingCtx) && groundingCtx is not null)
+        if (context.TryGet(AtelierContextKeys.GroundingContext, out var groundingCtx) && !string.IsNullOrWhiteSpace(groundingCtx))
             parts.Add(groundingCtx);
         return parts.Count > 0 ? string.Join("\n\n", parts) : null;
     }
