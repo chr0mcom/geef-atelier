@@ -122,6 +122,7 @@ public sealed class ProfileBasedExecutorDocumentModeTests
         // When the regression guard fires in document mode, the retry prompt must use file-edit
         // language (write to draft.md) and must NOT use stdout-mode language
         // ("Output the ENTIRE document … NOTHING else"), which would make the retry a no-op.
+        const string grounding = "GROUNDING: research for retry";
         var prevDraft = new string('p', 3000); // >= 2000 chars → regression guard active
         var captured  = new CapturingLlmClient(
             "short",               // first response: too short (<70% baseline) → triggers retry
@@ -129,6 +130,7 @@ public sealed class ProfileBasedExecutorDocumentModeTests
         var executor = MakeExecutor(captured, provider: "claude-cli");
         var context  = new RunContext()
             .Set(AtelierContextKeys.GroundedBrief, "the brief")
+            .Set(AtelierContextKeys.GroundingContext, grounding)
             .Set(AtelierContextKeys.CurrentDraft, prevDraft)
             .Set(GeefKeys.CurrentIteration, 2);
 
@@ -139,6 +141,61 @@ public sealed class ProfileBasedExecutorDocumentModeTests
         Assert.Contains("draft.md", retryPrompt);
         Assert.DoesNotContain("Output the ENTIRE document", retryPrompt);
         Assert.DoesNotContain("NOTHING else", retryPrompt);
+        // The retry must still carry the context out-of-band (not inlined into the prompt).
+        Assert.Contains(grounding, captured.Requests[1].ContextDocument!);
+        Assert.DoesNotContain(grounding, retryPrompt);
+    }
+
+    [Fact]
+    public async Task RunAsync_WithCliProvider_SendsGroundingAndAdvisorAsContextDocument()
+    {
+        // In document mode grounding + advisor blocks must travel in ContextDocument, not the prompt,
+        // so the proxy can offload them to context.md while findings stay in the argv prompt.
+        const string grounding = "GROUNDING: web research results";
+        const string advisor   = "ADVISOR: critical consultation";
+        var captured = new CapturingLlmClient("first draft");
+        var executor = MakeExecutor(captured, provider: "claude-cli");
+        var context  = new RunContext()
+            .Set(AtelierContextKeys.GroundedBrief, "the brief")
+            .Set(AtelierContextKeys.GroundingContext, grounding)
+            .Set(AtelierContextKeys.AdvisorBlock, advisor)
+            .Set(GeefKeys.CurrentIteration, 1);
+
+        await executor.RunAsync(context, CancellationToken.None);
+
+        var req = captured.Requests[0];
+        Assert.NotNull(req.ContextDocument);
+        Assert.Contains(grounding, req.ContextDocument!);
+        Assert.Contains(advisor, req.ContextDocument!);
+        // Order must match the old inline PrependContextBlocks: advisor before grounding.
+        Assert.True(
+            req.ContextDocument!.IndexOf(advisor, StringComparison.Ordinal)
+            < req.ContextDocument!.IndexOf(grounding, StringComparison.Ordinal),
+            "advisor block must precede grounding block");
+        Assert.DoesNotContain(grounding, req.UserPrompt);
+        Assert.DoesNotContain(advisor, req.UserPrompt);
+    }
+
+    [Fact]
+    public async Task RunAsync_WithApiProvider_KeepsContextInlineAndContextDocumentNull()
+    {
+        // API providers keep the old inline behaviour: grounding/advisor in the prompt, no ContextDocument.
+        const string grounding = "GROUNDING: web research results";
+        const string advisor   = "ADVISOR: critical consultation";
+        var captured = new CapturingLlmClient("api response");
+        var executor = MakeExecutor(captured, provider: "openrouter");
+        var context  = new RunContext()
+            .Set(AtelierContextKeys.GroundedBrief, "the brief")
+            .Set(AtelierContextKeys.GroundingContext, grounding)
+            .Set(AtelierContextKeys.AdvisorBlock, advisor)
+            .Set(GeefKeys.CurrentIteration, 1);
+
+        await executor.RunAsync(context, CancellationToken.None);
+
+        var req = captured.Requests[0];
+        Assert.Null(req.ContextDocument);
+        Assert.Contains(grounding, req.UserPrompt);
+        Assert.Contains(advisor, req.UserPrompt);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────

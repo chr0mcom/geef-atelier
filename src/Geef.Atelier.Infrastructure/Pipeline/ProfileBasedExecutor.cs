@@ -98,9 +98,18 @@ internal sealed class ProfileBasedExecutor(
             if (isCliProvider) currentDocument = prevDraft;
         }
 
-        userPrompt = PrependContextBlocks(context, userPrompt);
+        // In document mode the grounding/advisor context is kept separate from the steering
+        // instruction so the proxy can offload it to context.md (avoids the per-argument argv
+        // limit) while findings + "edit draft.md" stay prominent in the prompt. In text mode the
+        // context is prepended inline as before.
+        string? contextDocument = null;
+        if (isCliProvider)
+            contextDocument = CollectContextBlocks(context);
+        else
+            userPrompt = PrependContextBlocks(context, userPrompt);
 
-        var response = await CompleteAndRecordAsync(client, model, userPrompt, iter, currentDocument, maxTokens, cancellationToken);
+        var response = await CompleteAndRecordAsync(
+            client, model, userPrompt, iter, currentDocument, contextDocument, maxTokens, cancellationToken);
 
         // Safety net: never let a change-summary / cover-letter / abbreviated partial (a collapse far
         // below the most complete draft seen so far) become the new state. Retry once forcefully; if it
@@ -117,9 +126,10 @@ internal sealed class ProfileBasedExecutor(
 
             if (IsRegression(resultText, bestDraft))
             {
-                var retryPrompt = PrependContextBlocks(
-                    context, BuildRevisionPrompt(brief, prevDraft, findingList, forceful: true, documentMode: isCliProvider));
-                var retry = await CompleteAndRecordAsync(client, model, retryPrompt, iter, currentDocument, maxTokens, cancellationToken);
+                var retryBase = BuildRevisionPrompt(brief, prevDraft, findingList, forceful: true, documentMode: isCliProvider);
+                var retryPrompt = isCliProvider ? retryBase : PrependContextBlocks(context, retryBase);
+                var retry = await CompleteAndRecordAsync(
+                    client, model, retryPrompt, iter, currentDocument, contextDocument, maxTokens, cancellationToken);
 
                 if (!IsRegression(retry.Text, bestDraft))
                 {
@@ -160,19 +170,34 @@ internal sealed class ProfileBasedExecutor(
         return userPrompt;
     }
 
+    // Document-mode counterpart to PrependContextBlocks: returns the combined grounding/advisor
+    // context as a standalone string (advisor first, then grounding — matching the inline order),
+    // or null when neither is present. The proxy decides whether to inline it or offload to
+    // context.md based on size.
+    private static string? CollectContextBlocks(IRunContext context)
+    {
+        var parts = new List<string>(2);
+        if (context.TryGet(AtelierContextKeys.AdvisorBlock, out var advisorBlock) && advisorBlock is not null)
+            parts.Add(advisorBlock);
+        if (context.TryGet(AtelierContextKeys.GroundingContext, out var groundingCtx) && groundingCtx is not null)
+            parts.Add(groundingCtx);
+        return parts.Count > 0 ? string.Join("\n\n", parts) : null;
+    }
+
     private async Task<LlmResponse> CompleteAndRecordAsync(
         ILlmClient client, string model, string userPrompt, int iter,
-        string? currentDocument, int maxTokens, CancellationToken cancellationToken)
+        string? currentDocument, string? contextDocument, int maxTokens, CancellationToken cancellationToken)
     {
         var isDocumentMode = currentDocument is not null;
         var response = await client.CompleteAsync(new LlmRequest
         {
-            Model        = model,
-            SystemPrompt = profile.SystemPrompt,
-            UserPrompt   = userPrompt,
-            MaxTokens    = maxTokens,
-            DocumentMode = isDocumentMode,
-            Document     = isDocumentMode ? currentDocument : null,
+            Model           = model,
+            SystemPrompt    = profile.SystemPrompt,
+            UserPrompt      = userPrompt,
+            MaxTokens       = maxTokens,
+            DocumentMode    = isDocumentMode,
+            Document        = isDocumentMode ? currentDocument : null,
+            ContextDocument = isDocumentMode ? contextDocument : null,
         }, cancellationToken);
 
         if (costAccumulator is not null)

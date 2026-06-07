@@ -161,7 +161,8 @@ async def _call_claude(req: ChatCompletionRequest) -> ChatCompletionResponse:
         log.info("Dispatching to claude (document mode) | model=%s", req.model)
         async with ephemeral_workspace(req.document or "") as ws:
             raw = await claude_adapter.complete_document(
-                system_prompt, user_instruction, req.document or "", ws, req.model, req.max_tokens
+                system_prompt, user_instruction, req.document or "", ws, req.model, req.max_tokens,
+                req.context_document,
             )
         return make_text_response(req.model, raw)
 
@@ -182,7 +183,8 @@ async def _call_codex(req: ChatCompletionRequest) -> ChatCompletionResponse:
         log.info("Dispatching to codex (document mode) | model=%s", req.model)
         async with ephemeral_workspace(req.document or "") as ws:
             raw = await codex_adapter.complete_document(
-                system_prompt, user_instruction, req.document or "", ws, req.model, req.max_tokens
+                system_prompt, user_instruction, req.document or "", ws, req.model, req.max_tokens,
+                req.context_document,
             )
         return make_text_response(req.model, raw)
 

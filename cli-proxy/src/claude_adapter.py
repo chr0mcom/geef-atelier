@@ -7,6 +7,8 @@ import logging
 import os
 from pathlib import Path
 
+from workspace import materialize_context
+
 log = logging.getLogger(__name__)
 
 MAX_CONCURRENT = int(os.getenv("CLAUDE_MAX_CONCURRENT", "2"))
@@ -40,6 +42,7 @@ async def complete_document(
     workspace_path: Path,
     model: str | None,
     max_tokens: int | None,
+    context_document: str | None = None,
 ) -> str:
     """
     Calls the claude CLI in document-edit mode: the CLI reads draft.md in the given
@@ -48,10 +51,14 @@ async def complete_document(
 
     Uses --allowedTools Read,Edit,Write with --permission-mode acceptEdits so the
     agent can edit files without interactive confirmation prompts.
+
+    context_document holds large background context (grounding + advisor notes); it is
+    offloaded to context.md when oversized (see workspace.materialize_context).
     """
     async with _semaphore:
         return await _run_claude_document(
-            system_prompt, user_instruction, document, workspace_path, model, max_tokens
+            system_prompt, user_instruction, document, workspace_path, model, max_tokens,
+            context_document,
         )
 
 
@@ -72,10 +79,14 @@ async def _run_claude_document(
     workspace_path: Path,
     model: str | None,
     max_tokens: int | None,
+    context_document: str | None = None,
 ) -> str:
-    # Prefix the instruction with the file-contract so the agent knows to edit draft.md.
+    # Large background context goes to context.md (pointer) or inline if small; the file-contract
+    # and user instruction always stay in the prompt.
+    context_preamble = materialize_context(workspace_path, context_document)
     instruction = (
-        "The document you are editing is located at draft.md in the current directory. "
+        context_preamble
+        + "The document you are editing is located at draft.md in the current directory. "
         "Read it, apply the revisions described below, then write the complete updated "
         "document back to draft.md. Do NOT output the document content to stdout — "
         "only edit the file.\n\n"

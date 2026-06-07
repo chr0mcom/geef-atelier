@@ -28,6 +28,35 @@ if not Path(WORKSPACE_ROOT).is_absolute():
         "Set WORKSPACE_ROOT in the environment (default: /work)."
     )
 
+# Background context larger than this (characters) is offloaded to context.md instead of
+# being inlined into the argv instruction. Kept well below the Linux per-argument limit
+# (MAX_ARG_STRLEN = 128 KB) to leave headroom for the file-contract preamble, briefing and
+# findings that always stay in the prompt, plus UTF-8 multi-byte expansion.
+CONTEXT_FILE_THRESHOLD: int = int(os.getenv("CONTEXT_FILE_THRESHOLD", "50000"))
+
+
+def materialize_context(workspace_path: Path, context_document: str | None) -> str:
+    """
+    Decides how background context (grounding + advisor notes) reaches the CLI agent and
+    returns the text to prepend to the instruction:
+
+    - None / empty  → "" (no context).
+    - <= threshold  → the context itself (inlined into the prompt, as before).
+    - >  threshold  → writes context.md into the workspace and returns a short pointer line,
+                      keeping the argv instruction small (avoids MAX_ARG_STRLEN).
+    """
+    if not context_document:
+        return ""
+    # Measure in UTF-8 bytes, not characters: execve enforces MAX_ARG_STRLEN on the encoded
+    # argument, so multi-byte text (CJK, emoji) must be weighed by its byte length.
+    if len(context_document.encode("utf-8")) <= CONTEXT_FILE_THRESHOLD:
+        return context_document + "\n\n"
+    (workspace_path / "context.md").write_text(context_document, encoding="utf-8")
+    return (
+        "Background research and advisor notes for this task are in context.md in the "
+        "current directory. Read context.md first, then proceed.\n\n"
+    )
+
 
 @asynccontextmanager
 async def ephemeral_workspace(document: str) -> AsyncIterator[Path]:

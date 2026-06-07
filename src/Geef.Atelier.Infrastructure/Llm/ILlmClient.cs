@@ -32,6 +32,15 @@ public sealed record LlmRequest
     /// Empty string on iteration 1 (no prior draft). Only meaningful when DocumentMode=true.
     /// </summary>
     public string? Document { get; init; }
+
+    /// <summary>
+    /// Large, static background context (web-research grounding + advisor consultations) kept
+    /// separate from the steering instruction. In document mode the proxy materialises this as
+    /// context.md in the workspace when it exceeds a size threshold (and references it from the
+    /// prompt), otherwise it is prepended inline. Keeping it out of the argv prompt avoids the
+    /// per-argument OS limit (MAX_ARG_STRLEN, 128 KB). Only meaningful when DocumentMode=true.
+    /// </summary>
+    public string? ContextDocument { get; init; }
 }
 
 public sealed record LlmResponse

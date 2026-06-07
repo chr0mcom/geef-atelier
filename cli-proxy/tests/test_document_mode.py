@@ -14,7 +14,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import workspace as workspace_module
-from workspace import ephemeral_workspace
+from workspace import ephemeral_workspace, materialize_context
 
 
 # ---------------------------------------------------------------------------
@@ -76,6 +76,54 @@ async def test_workspace_unique_per_call(tmp_path):
                 paths.append(ws2)
 
     assert paths[0] != paths[1]
+
+
+# ---------------------------------------------------------------------------
+# materialize_context — inline vs context.md offloading
+# ---------------------------------------------------------------------------
+
+def test_materialize_context_none_returns_empty(tmp_path):
+    """No context document → empty preamble, no file written."""
+    assert materialize_context(tmp_path, None) == ""
+    assert materialize_context(tmp_path, "") == ""
+    assert not (tmp_path / "context.md").exists()
+
+
+def test_materialize_context_small_inlines(tmp_path):
+    """Context at or below the threshold is returned inline, not written to a file."""
+    ctx = "short background notes"
+    result = materialize_context(tmp_path, ctx)
+    assert result == ctx + "\n\n"
+    assert not (tmp_path / "context.md").exists()
+
+
+def test_materialize_context_large_writes_file_and_returns_pointer(tmp_path):
+    """Context above the threshold is written to context.md; a pointer line is returned."""
+    big = "x" * (workspace_module.CONTEXT_FILE_THRESHOLD + 1)
+    result = materialize_context(tmp_path, big)
+    assert "context.md" in result
+    assert big not in result, "oversized context must not be inlined into the prompt"
+    assert (tmp_path / "context.md").read_text(encoding="utf-8") == big
+
+
+def test_materialize_context_threshold_boundary_inlines(tmp_path):
+    """Exactly at the threshold (in bytes) the context is still inlined (boundary is inclusive)."""
+    exact = "y" * workspace_module.CONTEXT_FILE_THRESHOLD  # ASCII: 1 byte/char
+    result = materialize_context(tmp_path, exact)
+    assert result == exact + "\n\n"
+    assert not (tmp_path / "context.md").exists()
+
+
+def test_materialize_context_measures_utf8_bytes_not_chars(tmp_path):
+    """Multi-byte context under the char threshold but over the byte limit is offloaded (M-1)."""
+    # Each "中" is 3 UTF-8 bytes: char count is half the threshold, byte count well above it.
+    multibyte = "中" * (workspace_module.CONTEXT_FILE_THRESHOLD // 2)
+    assert len(multibyte) <= workspace_module.CONTEXT_FILE_THRESHOLD  # would inline if counted by chars
+    assert len(multibyte.encode("utf-8")) > workspace_module.CONTEXT_FILE_THRESHOLD
+    result = materialize_context(tmp_path, multibyte)
+    assert "context.md" in result
+    assert multibyte not in result
+    assert (tmp_path / "context.md").read_text(encoding="utf-8") == multibyte
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +219,84 @@ async def test_claude_complete_document_uses_workspace_cwd(tmp_path):
     assert captured_kwargs.get("cwd") == str(ws)
 
 
+@pytest.mark.asyncio
+async def test_claude_document_offloads_large_context_keeps_findings_in_prompt(tmp_path):
+    """Oversized context goes to context.md; the findings instruction stays in the argv prompt."""
+    import claude_adapter
+
+    captured_args: list[str] = []
+    big_context = "CONTEXT-" + "c" * workspace_module.CONTEXT_FILE_THRESHOLD
+    findings = "Reviewer finding: fix the introduction."
+
+    async def fake_exec(*args, **kwargs):
+        captured_args.extend(args)
+        cwd = kwargs.get("cwd")
+        if cwd:
+            (Path(cwd) / "draft.md").write_text("# Edited", encoding="utf-8")
+        proc = MagicMock()
+        proc.returncode = 0
+        async def communicate():
+            return b"", b""
+        proc.communicate = communicate
+        return proc
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "draft.md").write_text("original", encoding="utf-8")
+
+    with patch("asyncio.create_subprocess_exec", side_effect=fake_exec), \
+         patch("asyncio.wait_for", side_effect=_passthrough_wait_for):
+        await claude_adapter._run_claude_document(
+            system_prompt="sys", user_instruction=findings,
+            document="original", workspace_path=ws,
+            model=None, max_tokens=None, context_document=big_context,
+        )
+
+    instruction = captured_args[-1]  # the prompt is the trailing positional arg
+    assert (ws / "context.md").read_text(encoding="utf-8") == big_context
+    assert big_context not in instruction, "oversized context must not be in the argv prompt"
+    assert "context.md" in instruction, "prompt must point to context.md"
+    assert findings in instruction, "findings must stay in the argv prompt"
+    assert "draft.md" in instruction
+
+
+@pytest.mark.asyncio
+async def test_claude_document_inlines_small_context(tmp_path):
+    """Small context is inlined into the prompt; no context.md is written."""
+    import claude_adapter
+
+    captured_args: list[str] = []
+    small_context = "Background: prior research summary."
+
+    async def fake_exec(*args, **kwargs):
+        captured_args.extend(args)
+        cwd = kwargs.get("cwd")
+        if cwd:
+            (Path(cwd) / "draft.md").write_text("# Edited", encoding="utf-8")
+        proc = MagicMock()
+        proc.returncode = 0
+        async def communicate():
+            return b"", b""
+        proc.communicate = communicate
+        return proc
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "draft.md").write_text("original", encoding="utf-8")
+
+    with patch("asyncio.create_subprocess_exec", side_effect=fake_exec), \
+         patch("asyncio.wait_for", side_effect=_passthrough_wait_for):
+        await claude_adapter._run_claude_document(
+            system_prompt="sys", user_instruction="do it",
+            document="original", workspace_path=ws,
+            model=None, max_tokens=None, context_document=small_context,
+        )
+
+    instruction = captured_args[-1]
+    assert small_context in instruction
+    assert not (ws / "context.md").exists()
+
+
 # ---------------------------------------------------------------------------
 # codex_adapter.complete_document — subprocess args
 # ---------------------------------------------------------------------------
@@ -258,6 +384,48 @@ async def test_codex_complete_document_uses_workspace_cwd(tmp_path):
     assert captured_kwargs.get("cwd") == str(ws)
 
 
+@pytest.mark.asyncio
+async def test_codex_document_offloads_large_context_keeps_findings_in_prompt(tmp_path):
+    """Codex path: oversized context goes to context.md; findings stay in the argv prompt."""
+    import codex_adapter
+
+    captured_args: list[str] = []
+    big_context = "CTX-" + "c" * workspace_module.CONTEXT_FILE_THRESHOLD
+    findings = "Reviewer finding: tighten the abstract."
+
+    async def fake_exec(*args, **kwargs):
+        captured_args.extend(args)
+        try:
+            c_idx = list(args).index("-C")
+            (Path(args[c_idx + 1]) / "draft.md").write_text("# Edited", encoding="utf-8")
+        except ValueError:
+            pass
+        proc = MagicMock()
+        proc.returncode = 0
+        async def communicate():
+            return b"", b""
+        proc.communicate = communicate
+        return proc
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "draft.md").write_text("original", encoding="utf-8")
+
+    with patch("asyncio.create_subprocess_exec", side_effect=fake_exec), \
+         patch("asyncio.wait_for", side_effect=_passthrough_wait_for):
+        await codex_adapter._run_codex_document(
+            system_prompt="sys", user_instruction=findings,
+            document="original", workspace_path=ws,
+            model=None, max_tokens=None, context_document=big_context,
+        )
+
+    instruction = captured_args[-1]
+    assert (ws / "context.md").read_text(encoding="utf-8") == big_context
+    assert big_context not in instruction
+    assert "context.md" in instruction
+    assert findings in instruction
+
+
 # ---------------------------------------------------------------------------
 # Error handling — FileNotFoundError → RuntimeError
 # ---------------------------------------------------------------------------
@@ -330,7 +498,7 @@ async def test_main_routes_document_mode_to_complete_document(tmp_path):
 
     document_call_args: list = []
 
-    async def mock_complete_document(system_prompt, user_instruction, document, workspace_path, model, max_tokens):
+    async def mock_complete_document(system_prompt, user_instruction, document, workspace_path, model, max_tokens, context_document=None):
         document_call_args.append((system_prompt, user_instruction, document))
         return "# Edited document"
 
@@ -376,7 +544,7 @@ async def test_main_routes_codex_document_mode_to_complete_document(tmp_path):
 
     document_call_args: list = []
 
-    async def mock_complete_document(system_prompt, user_instruction, document, workspace_path, model, max_tokens):
+    async def mock_complete_document(system_prompt, user_instruction, document, workspace_path, model, max_tokens, context_document=None):
         document_call_args.append((system_prompt, user_instruction, document))
         return "# Codex-edited document"
 

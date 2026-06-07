@@ -49,8 +49,9 @@ internal static class OpenAiMessageFormat
             Tools        = tools,
             ToolChoice   = toolChoice,
             // bool? null → omitted by WhenWritingNull so real OpenAI/Anthropic APIs never see these fields.
-            DocumentMode = request.DocumentMode ? true : null,
-            Document     = request.DocumentMode ? request.Document : null,
+            DocumentMode    = request.DocumentMode ? true : null,
+            Document        = request.DocumentMode ? request.Document : null,
+            ContextDocument = request.DocumentMode ? request.ContextDocument : null,
         };
 
         return JsonSerializer.Serialize(body, WriteOptions);
@@ -115,8 +116,9 @@ internal static class OpenAiMessageFormat
         [JsonPropertyName("tools")]         public ToolDto[]? Tools { get; set; }
         [JsonPropertyName("tool_choice")]   public object? ToolChoice { get; set; }
         // Document-mode fields — null (omitted) for non-CLI / non-document-mode requests.
-        [JsonPropertyName("document_mode")] public bool? DocumentMode { get; set; }
-        [JsonPropertyName("document")]      public string? Document { get; set; }
+        [JsonPropertyName("document_mode")]    public bool? DocumentMode { get; set; }
+        [JsonPropertyName("document")]         public string? Document { get; set; }
+        [JsonPropertyName("context_document")] public string? ContextDocument { get; set; }
     }
 
     private sealed class MessageDto

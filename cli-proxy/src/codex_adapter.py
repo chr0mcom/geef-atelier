@@ -11,6 +11,8 @@ from typing import Any
 
 import httpx
 
+from workspace import materialize_context
+
 log = logging.getLogger(__name__)
 
 MAX_CONCURRENT = int(os.getenv("CODEX_MAX_CONCURRENT", "2"))
@@ -94,6 +96,7 @@ async def complete_document(
     workspace_path: Path,
     model: str | None,
     max_tokens: int | None,
+    context_document: str | None = None,
 ) -> str:
     """
     Calls the codex CLI in document-edit mode: the CLI reads draft.md in the given
@@ -102,10 +105,14 @@ async def complete_document(
 
     Uses --sandbox workspace-write so the agent can only write within the workspace.
     System prompt is embedded in the instruction preamble (codex has no --append-system-prompt).
+
+    context_document holds large background context (grounding + advisor notes); it is
+    offloaded to context.md when oversized (see workspace.materialize_context).
     """
     async with _semaphore:
         return await _run_codex_document(
-            system_prompt, user_instruction, document, workspace_path, model, max_tokens
+            system_prompt, user_instruction, document, workspace_path, model, max_tokens,
+            context_document,
         )
 
 
@@ -126,11 +133,16 @@ async def _run_codex_document(
     workspace_path: Path,
     model: str | None,
     max_tokens: int | None,
+    context_document: str | None = None,
 ) -> str:
     # Codex has no --append-system-prompt flag — embed system prompt as a [SYSTEM] preamble.
+    # Large background context goes to context.md (pointer) or inline if small; the file-contract
+    # and user instruction always stay in the prompt.
+    context_preamble = materialize_context(workspace_path, context_document)
     instruction = (
         f"[SYSTEM]\n{system_prompt}\n\n"
-        "The document you are editing is located at draft.md in the current directory. "
+        + context_preamble
+        + "The document you are editing is located at draft.md in the current directory. "
         "Read it, apply the revisions described below, then write the complete updated "
         "document back to draft.md.\n\n"
         + user_instruction

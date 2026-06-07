@@ -48,6 +48,10 @@ class ChatCompletionRequest(BaseModel):
     # and edits it in place instead of re-emitting the full text on stdout.
     document_mode: bool = False
     document: str | None = None
+    # Large, static background context (grounding + advisor notes) kept separate from the
+    # steering instruction. Offloaded to context.md when it exceeds CONTEXT_FILE_THRESHOLD,
+    # otherwise prepended inline. Avoids the per-argument argv limit (MAX_ARG_STRLEN, 128 KB).
+    context_document: str | None = None
 
 
 class FunctionCall(BaseModel):
