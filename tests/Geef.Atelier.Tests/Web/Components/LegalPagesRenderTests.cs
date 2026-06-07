@@ -8,6 +8,13 @@ namespace Geef.Atelier.Tests.Web.Components;
 
 public sealed class LegalPagesRenderTests : TestContext
 {
+    public LegalPagesRenderTests()
+    {
+        // EmailObfuscated calls JS.InvokeVoidAsync("deobfuscateEmail", _ref) in OnAfterRenderAsync;
+        // loose mode lets the page render in bUnit without an explicit JS setup.
+        JSInterop.Mode = JSRuntimeMode.Loose;
+    }
+
     private sealed class StubSiteSettingsService(DomainSiteSettings settings) : ISiteSettingsService
     {
         public Task<DomainSiteSettings> GetAsync(CancellationToken ct = default)
@@ -102,8 +109,8 @@ public sealed class LegalPagesRenderTests : TestContext
 
         // Full address must not appear as a mailto: URI in static HTML
         Assert.DoesNotContain("mailto:secret@legal.test", cut.Markup);
-        // But the obfuscation anchor must be present
-        cut.Find("a.obf-email");
+        // But the obfuscation span must be present (filled client-side by email-deobfuscate.js)
+        cut.Find("span.obf-email");
     }
 
     // ── Privacy ───────────────────────────────────────────────────────────
@@ -195,6 +202,6 @@ public sealed class LegalPagesRenderTests : TestContext
         var cut = RenderComponent<Contact>();
 
         Assert.DoesNotContain("mailto:reach@contact.test", cut.Markup);
-        cut.Find("a.obf-email");
+        cut.Find("span.obf-email");
     }
 }
