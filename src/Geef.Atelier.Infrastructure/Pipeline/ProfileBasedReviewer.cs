@@ -39,75 +39,122 @@ internal sealed class ProfileBasedReviewer(
 
         var (client, model, maxTokens) = resolver.ForProfile(profile.Provider, profile.Model, profile.MaxTokens);
 
-        var response = await client.CompleteAsync(new LlmRequest
+        try
         {
-            Model        = model,
-            SystemPrompt = profile.SystemPrompt,
-            UserPrompt   = userPrompt,
-            MaxTokens    = maxTokens,
-            Tools        = [ReviewerToolDefinition.SubmitReview],
-            ToolChoice   = "function:submit_review"
-        }, cancellationToken);
-
-        if (costAccumulator is not null)
-        {
-            var costEur = pricingCatalog?.CalculateCostEur(
-                model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, profile.Provider);
-            costAccumulator.RecordActorCost(
-                iter, ActorType.Reviewer, profile.Name, model,
-                response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur,
-                providerName: profile.Provider);
-        }
-
-        if (response.FinishReason != "tool_calls" || response.ToolArgumentsJson is null)
-        {
-            return new ReviewResult
-            {
-                ReviewerName       = profile.Name,
-                Decision           = ReviewDecision.Failed,
-                Findings           = [],
-                Duration           = TimeSpan.Zero,
-                SuggestedRetryHint = $"Reviewer did not call submit_review (finish_reason='{response.FinishReason}')."
-            };
-        }
-
-        var result = ParseToolInput(response.ToolArgumentsJson);
-
-        // Enforce mandatory findings: approved with zero findings is a shallow review.
-        // Retry once with an explicit reminder before accepting the empty-findings result.
-        if (result.Decision == ReviewDecision.Approved && result.Findings.Count == 0)
-        {
-            const string mandatoryFindingsReminder =
-                "\n\nIMPORTANT: You submitted approved=true with zero findings. Every review MUST include " +
-                "at least one finding. Use 'info' severity for minor observations or suggestions. " +
-                "Re-submit using the submit_review tool now.";
-
-            var retryResponse = await client.CompleteAsync(new LlmRequest
-            {
-                Model        = model,
-                SystemPrompt = profile.SystemPrompt,
-                UserPrompt   = userPrompt + mandatoryFindingsReminder,
-                MaxTokens    = maxTokens,
-                Tools        = [ReviewerToolDefinition.SubmitReview],
-                ToolChoice   = "function:submit_review"
-            }, cancellationToken);
+            var response = await LlmResilience.ExecuteAsync(
+                ct => client.CompleteAsync(new LlmRequest
+                {
+                    Model        = model,
+                    SystemPrompt = profile.SystemPrompt,
+                    UserPrompt   = userPrompt,
+                    MaxTokens    = maxTokens,
+                    Tools        = [ReviewerToolDefinition.SubmitReview],
+                    ToolChoice   = "function:submit_review"
+                }, ct),
+                cancellationToken);
 
             if (costAccumulator is not null)
             {
-                var retryCostEur = pricingCatalog?.CalculateCostEur(
-                    model, retryResponse.TokenUsage.InputTokens, retryResponse.TokenUsage.OutputTokens, profile.Provider);
+                var costEur = pricingCatalog?.CalculateCostEur(
+                    model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, profile.Provider);
                 costAccumulator.RecordActorCost(
                     iter, ActorType.Reviewer, profile.Name, model,
-                    retryResponse.TokenUsage.InputTokens, retryResponse.TokenUsage.OutputTokens, retryCostEur,
+                    response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur,
                     providerName: profile.Provider);
             }
 
-            if (retryResponse.FinishReason == "tool_calls" && retryResponse.ToolArgumentsJson is not null)
-                result = ParseToolInput(retryResponse.ToolArgumentsJson);
-        }
+            if (response.FinishReason != "tool_calls" || response.ToolArgumentsJson is null)
+            {
+                return new ReviewResult
+                {
+                    ReviewerName       = profile.Name,
+                    Decision           = ReviewDecision.Failed,
+                    Findings           = [],
+                    Duration           = TimeSpan.Zero,
+                    SuggestedRetryHint = $"Reviewer did not call submit_review (finish_reason='{response.FinishReason}')."
+                };
+            }
 
-        return result;
+            var result = ParseToolInput(response.ToolArgumentsJson);
+
+            // Enforce mandatory findings: approved with zero findings is a shallow review.
+            // Retry once with an explicit reminder before accepting the empty-findings result.
+            if (result.Decision == ReviewDecision.Approved && result.Findings.Count == 0)
+            {
+                const string mandatoryFindingsReminder =
+                    "\n\nIMPORTANT: You submitted approved=true with zero findings. Every review MUST include " +
+                    "at least one finding. Use 'info' severity for minor observations or suggestions. " +
+                    "Re-submit using the submit_review tool now.";
+
+                var retryResponse = await LlmResilience.ExecuteAsync(
+                    ct => client.CompleteAsync(new LlmRequest
+                    {
+                        Model        = model,
+                        SystemPrompt = profile.SystemPrompt,
+                        UserPrompt   = userPrompt + mandatoryFindingsReminder,
+                        MaxTokens    = maxTokens,
+                        Tools        = [ReviewerToolDefinition.SubmitReview],
+                        ToolChoice   = "function:submit_review"
+                    }, ct),
+                    cancellationToken);
+
+                if (costAccumulator is not null)
+                {
+                    var retryCostEur = pricingCatalog?.CalculateCostEur(
+                        model, retryResponse.TokenUsage.InputTokens, retryResponse.TokenUsage.OutputTokens, profile.Provider);
+                    costAccumulator.RecordActorCost(
+                        iter, ActorType.Reviewer, profile.Name, model,
+                        retryResponse.TokenUsage.InputTokens, retryResponse.TokenUsage.OutputTokens, retryCostEur,
+                        providerName: profile.Provider);
+                }
+
+                if (retryResponse.FinishReason == "tool_calls" && retryResponse.ToolArgumentsJson is not null)
+                    result = ParseToolInput(retryResponse.ToolArgumentsJson);
+            }
+
+            return result;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Genuine run cancellation / shutdown — must propagate, not be masked as a skip.
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // The reviewer's provider was unavailable even after retries (or returned a permanent
+            // error such as auth / bad request). A single reviewer failure must NEVER abort a
+            // multi-iteration run: skip this reviewer for this round with one non-blocking info
+            // finding. It is attempted again on the next iteration and may well succeed then.
+            return SkippedDueToUnavailability(LlmResilience.Describe(ex));
+        }
     }
+
+    /// <summary>
+    /// Builds a non-blocking review result for a reviewer that could not be reached this round.
+    /// Carries a single <see cref="SdkSeverity.Info"/> finding so the outage is recorded and visible
+    /// without ever blocking convergence.
+    /// </summary>
+    private ReviewResult SkippedDueToUnavailability(string reason) => new()
+    {
+        ReviewerName = profile.Name,
+        Decision     = ReviewDecision.ApprovedWithWarnings,
+        Findings     =
+        [
+            new Finding
+            {
+                ReviewerName      = profile.Name,
+                Fingerprint       = ComputeFingerprint($"__reviewer_skipped__:{reason}"),
+                Message           = $"Reviewer '{profile.DisplayName}' was temporarily unavailable and was "
+                                    + $"skipped this round ({reason}). This is non-blocking — the reviewer "
+                                    + "runs again on the next iteration.",
+                Severity          = SdkSeverity.Info,
+                Category          = "reviewer-availability",
+                ArtifactReference = "draft",
+                Metadata          = new Dictionary<string, object> { ["skipped"] = true, ["reason"] = reason }
+            }
+        ],
+        Duration     = TimeSpan.Zero
+    };
 
     private ReviewResult ParseToolInput(string toolArgumentsJson)
     {

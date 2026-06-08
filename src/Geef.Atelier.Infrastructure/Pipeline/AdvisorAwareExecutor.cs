@@ -46,19 +46,38 @@ internal sealed class AdvisorAwareExecutor : IExecutionStep
 
             foreach (var advisor in activeAdvisors)
             {
-                var consultation = await advisor.ConsultAsync(
-                    _runId, _iterationCounter, briefingText, cancellationToken);
+                try
+                {
+                    var consultation = await advisor.ConsultAsync(
+                        _runId, _iterationCounter, briefingText, cancellationToken);
 
-                consultationOutputs.Add(
-                    $"## {advisor.Profile.DisplayName} ({advisor.Profile.Mode})\n{consultation.Output}");
+                    consultationOutputs.Add(
+                        $"## {advisor.Profile.DisplayName} ({advisor.Profile.Mode})\n{consultation.Output}");
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // Genuine run cancellation / shutdown — propagate.
+                    throw;
+                }
+                catch (Exception)
+                {
+                    // An advisor supplies optional pre-execution context. If it is unavailable even
+                    // after retries, proceed without its input rather than aborting the run — the
+                    // executor still runs with the briefing, grounding, and any other advisors.
+                }
             }
 
-            var advisorBlock =
-                $"[Advisor consultations for this iteration]\n\n" +
-                $"{string.Join("\n\n", consultationOutputs)}\n\n" +
-                $"[End of advisor consultations]";
+            // Only inject the advisor block when at least one advisor actually produced output;
+            // otherwise the executor proceeds with no advisor context at all.
+            if (consultationOutputs.Count > 0)
+            {
+                var advisorBlock =
+                    $"[Advisor consultations for this iteration]\n\n" +
+                    $"{string.Join("\n\n", consultationOutputs)}\n\n" +
+                    $"[End of advisor consultations]";
 
-            context = context.Set(AtelierContextKeys.AdvisorBlock, advisorBlock);
+                context = context.Set(AtelierContextKeys.AdvisorBlock, advisorBlock);
+            }
         }
 
         return await _inner.RunAsync(context, cancellationToken);

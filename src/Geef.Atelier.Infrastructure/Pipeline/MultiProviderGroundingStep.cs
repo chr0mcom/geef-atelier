@@ -2,6 +2,7 @@ using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Persistence.Crew;
+using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk.Providers;
 using Microsoft.Extensions.Logging;
 using SdkGroundingResult = Geef.Sdk.Results.GroundingResult;
@@ -33,38 +34,56 @@ internal sealed class MultiProviderGroundingStep(
             logger.LogInformation("MultiProviderGroundingStep: run={RunId} calling provider={Provider}",
                 runId, profile.Name);
             var provider = factory.Create(profile.ProviderType);
-            var result = await provider.EnrichAsync(input, profile, runId, cancellationToken);
 
-            var finalResult = result;
-            RefinementOutcome? refinementOutcome = null;
-
-            if (profile.RefinementBinding is { } binding && refiner is not null)
+            try
             {
-                var config = new GroundingRefinementConfig(
-                    binding, profile.RefinementMode, profile.RefinementInstructions);
-                var (refined, outcome) = await refiner.RefineAsync(
-                    result, input, config, profile.Name, runId, cancellationToken);
-                finalResult = refined;
-                refinementOutcome = outcome;
-            }
+                var result = await LlmResilience.ExecuteAsync(
+                    ct => provider.EnrichAsync(input, profile, runId, ct), cancellationToken);
 
-            if (finalResult.ConsultationId.HasValue && refinementOutcome is not null && consultationRepository is not null)
+                var finalResult = result;
+                RefinementOutcome? refinementOutcome = null;
+
+                if (profile.RefinementBinding is { } binding && refiner is not null)
+                {
+                    var config = new GroundingRefinementConfig(
+                        binding, profile.RefinementMode, profile.RefinementInstructions);
+                    var (refined, outcome) = await LlmResilience.ExecuteAsync(
+                        ct => refiner.RefineAsync(result, input, config, profile.Name, runId, ct), cancellationToken);
+                    finalResult = refined;
+                    refinementOutcome = outcome;
+                }
+
+                if (finalResult.ConsultationId.HasValue && refinementOutcome is not null && consultationRepository is not null)
+                {
+                    try
+                    {
+                        await consultationRepository.UpdateRefinementOutcomeAsync(
+                            finalResult.ConsultationId.Value, refinementOutcome, cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex,
+                            "Failed to persist refinement outcome for consultation {Id}",
+                            finalResult.ConsultationId.Value);
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(finalResult.EnrichedContext))
+                    enrichedBlocks.Add(finalResult.EnrichedContext);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                try
-                {
-                    await consultationRepository.UpdateRefinementOutcomeAsync(
-                        finalResult.ConsultationId.Value, refinementOutcome, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex,
-                        "Failed to persist refinement outcome for consultation {Id}",
-                        finalResult.ConsultationId.Value);
-                }
+                // Genuine run cancellation / shutdown — propagate.
+                throw;
             }
-
-            if (!string.IsNullOrWhiteSpace(finalResult.EnrichedContext))
-                enrichedBlocks.Add(finalResult.EnrichedContext);
+            catch (Exception ex)
+            {
+                // Grounding enrichment is optional. If a provider is unavailable even after retries,
+                // skip it and continue with the remaining providers rather than aborting the run.
+                logger.LogWarning(ex,
+                    "MultiProviderGroundingStep: run={RunId} provider={Provider} failed and was skipped.",
+                    runId, profile.Name);
+            }
         }
 
         if (enrichedBlocks.Count == 0)

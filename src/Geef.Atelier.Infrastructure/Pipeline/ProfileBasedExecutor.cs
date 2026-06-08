@@ -189,16 +189,22 @@ internal sealed class ProfileBasedExecutor(
         string? currentDocument, string? contextDocument, int maxTokens, CancellationToken cancellationToken)
     {
         var isDocumentMode = currentDocument is not null;
-        var response = await client.CompleteAsync(new LlmRequest
-        {
-            Model           = model,
-            SystemPrompt    = profile.SystemPrompt,
-            UserPrompt      = userPrompt,
-            MaxTokens       = maxTokens,
-            DocumentMode    = isDocumentMode,
-            Document        = isDocumentMode ? currentDocument : null,
-            ContextDocument = isDocumentMode ? contextDocument : null,
-        }, cancellationToken);
+        // The executor is the critical path: a brief provider blip is retried patiently here so it
+        // does not abort the run. If every attempt fails the exception still propagates — without a
+        // draft there is nothing to review — and the orchestrator marks the run Failed with a
+        // classified message, exactly as before.
+        var response = await LlmResilience.ExecuteAsync(
+            ct => client.CompleteAsync(new LlmRequest
+            {
+                Model           = model,
+                SystemPrompt    = profile.SystemPrompt,
+                UserPrompt      = userPrompt,
+                MaxTokens       = maxTokens,
+                DocumentMode    = isDocumentMode,
+                Document        = isDocumentMode ? currentDocument : null,
+                ContextDocument = isDocumentMode ? contextDocument : null,
+            }, ct),
+            cancellationToken);
 
         if (costAccumulator is not null)
         {

@@ -39,13 +39,15 @@ internal sealed class ProfileBasedAdvisor(
     {
         var (client, model, maxTokens) = resolver.ForProfile(profile.Provider, profile.Model, profile.MaxTokens);
 
-        var response = await client.CompleteAsync(new LlmRequest
-        {
-            Model        = model,
-            SystemPrompt = profile.SystemPrompt,
-            UserPrompt   = briefingText,
-            MaxTokens    = maxTokens
-        }, ct);
+        var response = await LlmResilience.ExecuteAsync(
+            token => client.CompleteAsync(new LlmRequest
+            {
+                Model        = model,
+                SystemPrompt = profile.SystemPrompt,
+                UserPrompt   = briefingText,
+                MaxTokens    = maxTokens
+            }, token),
+            ct);
 
         if (costAccumulator is not null && iterationNumber >= 0)
         {
