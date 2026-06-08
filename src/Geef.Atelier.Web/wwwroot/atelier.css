@@ -2562,7 +2562,8 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
 }
 /* …unless the editor already groups its content into .edit-section cards,
    in which case the form is transparent and the sections are the cards. */
-.crew-editor form:has(.edit-section) {
+.crew-editor form:has(.edit-section),
+.crew-editor form:has(.template-meta-section) {
     background: transparent;
     border: none;
     padding: 0;
@@ -2853,6 +2854,80 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
 
 /* Fields inside pipeline stage sections have no bottom margin (card padding is enough) */
 .pipeline-stage-section > .field:last-child { margin-bottom: 0; }
+
+/* ── Provider-Type Selector (GroundingProviderEditor) ─────── */
+.provider-type-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.provider-type-card {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--hairline);
+    border-radius: 8px;
+    background: var(--surface-2);
+    cursor: pointer;
+    text-align: left;
+    font-size: 0.82rem;
+    color: var(--ink-2);
+    line-height: 1.35;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.provider-type-card:hover:not([disabled]) {
+    border-color: var(--hero);
+    background: var(--hero-soft);
+}
+
+.provider-type-card.active {
+    border-color: var(--hero);
+    background: var(--hero-soft);
+    color: var(--hero);
+}
+
+.provider-type-card[disabled] { opacity: 0.7; cursor: default; }
+
+.provider-type-card .ptc-label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.provider-type-card .ptc-desc {
+    display: block;
+    font-size: 0.73rem;
+    color: var(--ink-3);
+    margin-top: 0.15rem;
+}
+
+.provider-type-card.active .ptc-desc {
+    color: color-mix(in oklch, var(--hero) 65%, var(--ink-3));
+}
+
+.provider-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+    background: var(--hero-soft);
+    border: 1px solid color-mix(in oklch, var(--hero) 28%, transparent);
+    color: var(--hero);
+    font-size: 0.82rem;
+    font-weight: 700;
+    margin-top: 0.25rem;
+}
+
+.provider-type-hidden-select {
+    position: absolute;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    white-space: nowrap;
+}
 
 .crew-index h1 {
     margin-bottom: 1.5rem;

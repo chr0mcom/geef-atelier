@@ -16,21 +16,21 @@
 @inject NavigationManager Nav
 @inject IOptions<TavilyOptions> TavilyOpts
 
-<PageTitle>@(IsNew ? "New Grounding Provider" : "Edit Grounding Provider") — Atelier</PageTitle>
+<PageTitle>@(IsNew ? "Grounding-Provider erstellen" : "Grounding-Provider bearbeiten") — Atelier</PageTitle>
 
 <div class="crew-editor" data-testid="grounding-provider-editor">
     <div class="page-header">
-        <h1>@(IsNew ? "New Grounding Provider" : $"Edit: {_displayName}")</h1>
-        <a href="/crew/profiles/grounding-providers" class="btn ghost">← Back</a>
+        <h1>@(IsNew ? "Neuer Grounding-Provider" : $"Bearbeiten: {_displayName}")</h1>
+        <a href="/crew/profiles/grounding-providers" class="btn ghost">← Zurück</a>
     </div>
 
     @if (_loading)
     {
-        <p>Loading…</p>
+        <p>Wird geladen…</p>
     }
     else
     {
-        <EditForm Model="_form" OnValidSubmit="SaveAsync" class="crew-form">
+        <EditForm Model="_form" OnValidSubmit="SaveAsync">
             <DataAnnotationsValidator />
 
             @if (!string.IsNullOrEmpty(_error))
@@ -38,428 +38,477 @@
                 <div class="error-banner" data-testid="editor-error">@_error</div>
             }
 
-            <div class="form-row">
-                <label>Name (slug)</label>
-                <InputText @bind-Value="_form.Name" class="form-input" placeholder="legal-docs-search" data-testid="input-name" />
-                <ValidationMessage For="() => _form.Name" />
-                <small class="form-hint">Saved as <code>custom-…</code>. Lowercase letters, numbers, and hyphens only.</small>
+            @* ── §0 Grunddaten ── *@
+            <div class="template-meta-section">
+                <h3>Grunddaten</h3>
+
+                <div class="field">
+                    <label>Name (Slug)</label>
+                    <InputText @bind-Value="_form.Name" placeholder="legal-docs-search" data-testid="input-name" />
+                    <ValidationMessage For="() => _form.Name" />
+                    <small class="form-hint">Wird gespeichert als <code>custom-…</code>. Nur Kleinbuchstaben, Ziffern und Bindestriche.</small>
+                </div>
+
+                <div class="field">
+                    <label>Anzeigename</label>
+                    <InputText @bind-Value="_form.DisplayName" placeholder="Tavily Basic" data-testid="input-display-name" />
+                    <ValidationMessage For="() => _form.DisplayName" />
+                </div>
+
+                <div class="field">
+                    <label>Beschreibung</label>
+                    <InputTextArea @bind-Value="_form.Description" rows="2" data-testid="input-description" />
+                </div>
             </div>
 
-            <div class="form-row">
-                <label>Display Name</label>
-                <InputText @bind-Value="_form.DisplayName" class="form-input" placeholder="Tavily Basic" data-testid="input-display-name" />
-                <ValidationMessage For="() => _form.DisplayName" />
-            </div>
+            @* ── §1 Provider-Typ ── *@
+            <div class="template-meta-section">
+                <h3>Provider-Typ</h3>
 
-            <div class="form-row">
-                <label>Description</label>
-                <InputTextArea @bind-Value="_form.Description" class="form-input" rows="2" data-testid="input-description" />
-            </div>
+                @* Hidden select — bUnit test compatibility + form binding *@
+                <div class="provider-type-hidden-select">
+                    <InputSelect @bind-Value="_form.ProviderType" disabled="@(!IsNew)" data-testid="input-provider-type">
+                        <option value="tavily">Tavily Web Search</option>
+                        <option value="vector-store">Vector Store</option>
+                        <option value="static-context">Statischer Kontext</option>
+                        <option value="url-fetch">URL Fetch</option>
+                        <option value="news-search">News Search</option>
+                        <option value="academic-search">Academic Search</option>
+                        <option value="rest-api">REST API</option>
+                    </InputSelect>
+                </div>
 
-            <div class="form-row">
-                <label>Provider Type</label>
-                <InputSelect @bind-Value="_form.ProviderType" disabled="@(!IsNew)" class="form-input" data-testid="input-provider-type">
-                    <option value="tavily">Tavily Web Search</option>
-                    <option value="vector-store">Vector Store (Knowledge Base)</option>
-                    <option value="static-context">Static Context (kuratierter Text)</option>
-                    <option value="url-fetch">URL Fetch (konkrete URLs)</option>
-                    <option value="news-search">News Search (Tavily News + Datum)</option>
-                    <option value="academic-search">Academic Search (arXiv / Semantic Scholar / OpenAlex)</option>
-                    <option value="rest-api">REST-API (beliebiger HTTP-Endpunkt, JSON)</option>
-                </InputSelect>
-            </div>
-
-            @if (_form.ProviderType == "tavily")
-            {
-                @if (string.IsNullOrWhiteSpace(TavilyOpts.Value.ApiKey))
+                @if (IsNew)
                 {
-                    <div class="warning-banner" data-testid="tavily-key-warning">
-                        ⚠ TAVILY_API_KEY is not configured in .env. Profile can be created but won't function until the key is added.
+                    <p class="pipeline-stage-desc" style="margin: 0 0 0.75rem;">
+                        Wähle den Typ. Der Typ kann nach dem Erstellen nicht geändert werden.
+                    </p>
+                    <div class="provider-type-grid">
+                        @foreach (var pt in _providerTypes)
+                        {
+                            var captured = pt.Type;
+                            <button type="button"
+                                    class="provider-type-card @(_form.ProviderType == captured ? "active" : "")"
+                                    @onclick="() => SetProviderType(captured)">
+                                <span class="ptc-label">@pt.Label</span>
+                                <span class="ptc-desc">@pt.Desc</span>
+                            </button>
+                        }
                     </div>
                 }
+                else
+                {
+                    <span class="provider-type-badge">@GetProviderTypeName()</span>
+                    <p class="pipeline-stage-desc" style="margin: 0.5rem 0 0;">
+                        Der Provider-Typ kann nach dem Erstellen nicht geändert werden.
+                    </p>
+                }
+            </div>
 
-                <div class="form-row">
-                    <label>Search Tier</label>
-                    <InputSelect @bind-Value="_form.Tier" class="form-input" data-testid="input-tier">
-                        <option value="basic">Basic (~$0.001/search)</option>
-                        <option value="advanced">Advanced (~$0.002/search)</option>
-                    </InputSelect>
+            @* ── §2 Typ-Einstellungen ── *@
+            <div class="pipeline-stage-section">
+                <div class="pipeline-stage-header">
+                    <div class="pipeline-stage-header-text">
+                        <h3>@GetProviderTypeName() — Einstellungen</h3>
+                        <p class="pipeline-stage-desc">@GetProviderTypeDesc()</p>
+                    </div>
                 </div>
 
-                <div class="form-row">
-                    <label>Max Results</label>
-                    <InputNumber @bind-Value="_form.MaxResults" class="form-input" min="1" max="20" data-testid="input-max-results" />
-                </div>
-
-                <div class="form-row">
-                    <label>
-                        <InputCheckbox @bind-Value="_form.IncludeAnswer" data-testid="input-include-answer" />
-                        Include synthesized answer
-                    </label>
-                </div>
-            }
-
-            @if (_form.ProviderType == "vector-store")
-            {
-                <div class="form-row">
-                    <label>Top K Results</label>
-                    <InputNumber @bind-Value="_form.TopK" class="form-input" min="1" max="20" data-testid="input-top-k" />
-                    <small class="form-hint">Number of chunks to retrieve per query (1–20).</small>
-                </div>
-
-                <div class="form-row">
-                    <label>Tag Filter (optional, comma-separated)</label>
-                    <InputText @bind-Value="_form.TagFilter" class="form-input" placeholder="policy, hr" data-testid="input-tag-filter" />
-                    <small class="form-hint">Leave empty to search all documents.</small>
-                </div>
-
-                <div class="form-row">
-                    <label>Scope</label>
-                    <InputSelect @bind-Value="_form.Scope" class="form-input" data-testid="input-scope">
-                        <option value="global">Global knowledge base only</option>
-                        <option value="run-local">Run-attached documents only</option>
-                        <option value="both">Both global and run-attached</option>
-                    </InputSelect>
-                    <small class="form-hint">
-                        <strong>Global:</strong> Persistent knowledge base. <strong>Run-local:</strong> Documents attached to this run only. <strong>Both:</strong> Combined search (no scope filter).
-                    </small>
-                </div>
-
-                <div class="form-row">
-                    <label>Embedding Model</label>
-                    <p class="form-hint" data-testid="embedding-model-info">openai/text-embedding-3-small (1536 dimensions)</p>
-                </div>
-            }
-
-            @if (_form.ProviderType == "static-context")
-            {
-                <div class="form-row">
-                    <label>Quellenname (Label)</label>
-                    <InputText @bind-Value="_form.StaticLabel" class="form-input"
-                               placeholder="z. B. Markenstimme, Style Guide Q2 2026"
-                               disabled="@_isReadOnly"
-                               data-testid="input-static-label" />
-                    <FieldHelp Text="@GroundingFieldHelps.StaticContextLabel" />
-                </div>
-
-                <div class="form-row">
-                    <label>Inhalt</label>
-                    <InputTextArea @bind-Value="_form.StaticContent" rows="10" class="form-input"
-                                   disabled="@_isReadOnly"
-                                   placeholder="Füge hier deinen kuratierten Text ein (Glossar, Style Guide, Markenstimme …)"
-                                   data-testid="input-static-content" />
-                    @if ((_form.StaticContent ?? "").Length > 50_000)
+                @if (_form.ProviderType == "tavily")
+                {
+                    @if (string.IsNullOrWhiteSpace(TavilyOpts.Value.ApiKey))
                     {
-                        <small class="form-hint form-hint--warn">
-                            ⚠ Inhalt ist länger als 50.000 Zeichen. Sehr große Texte gehören besser in die Knowledge-Base (Vector-Store-Provider).
-                        </small>
+                        <div class="warning-banner" data-testid="tavily-key-warning">
+                            ⚠ TAVILY_API_KEY ist nicht konfiguriert. Das Profil kann erstellt werden, funktioniert aber erst nach Setzen des API-Keys.
+                        </div>
                     }
-                    <FieldHelp Text="@GroundingFieldHelps.StaticContextContent" />
-                </div>
-            }
 
-            @if (_form.ProviderType == "url-fetch")
-            {
-                <div class="form-row">
-                    <label>URLs (eine pro Zeile)</label>
-                    <InputTextArea @bind-Value="_form.Urls" rows="5" class="form-input"
-                                   disabled="@_isReadOnly"
-                                   placeholder="https://example.com/article&#10;https://docs.example.org/api"
-                                   data-testid="input-urls" />
-                    <FieldHelp Text="@GroundingFieldHelps.UrlFetchUrls" />
-                </div>
+                    <div class="field">
+                        <label>Suchstufe</label>
+                        <InputSelect @bind-Value="_form.Tier" data-testid="input-tier">
+                            <option value="basic">Basic (~$0,001/Suche)</option>
+                            <option value="advanced">Advanced (~$0,002/Suche)</option>
+                        </InputSelect>
+                    </div>
 
-                <div class="form-row">
-                    <label>Max. Zeichen pro URL</label>
-                    <InputNumber @bind-Value="_form.MaxContentPerUrl" class="form-input" min="500" max="100000"
-                                 disabled="@_isReadOnly"
-                                 data-testid="input-max-content-per-url" />
-                    <FieldHelp Text="@GroundingFieldHelps.UrlFetchMaxContent" />
-                </div>
+                    <div class="field">
+                        <label>Max. Ergebnisse</label>
+                        <InputNumber @bind-Value="_form.MaxResults" min="1" max="20" data-testid="input-max-results" />
+                    </div>
 
-                <div class="form-row">
-                    <label class="form-check-label">
-                        <InputCheckbox @bind-Value="_form.StripBoilerplate" disabled="@_isReadOnly" data-testid="input-strip-boilerplate" />
-                        Boilerplate entfernen (Navigation, Werbung, Cookie-Banner)
-                    </label>
-                    <FieldHelp Text="@GroundingFieldHelps.UrlFetchStripBoilerplate" />
-                </div>
-            }
+                    <div class="field">
+                        <label class="form-checkbox-label">
+                            <InputCheckbox @bind-Value="_form.IncludeAnswer" data-testid="input-include-answer" />
+                            Synthetisierte Antwort einbeziehen
+                        </label>
+                    </div>
+                }
 
-            @if (_form.ProviderType == "news-search")
-            {
-                <div class="form-row">
-                    <label>Aktualität (Tage)</label>
-                    <InputNumber @bind-Value="_form.RecencyDays" class="form-input" min="1" max="365"
-                                 disabled="@_isReadOnly"
-                                 data-testid="input-recency-days" />
-                    <FieldHelp Text="@GroundingFieldHelps.NewsSearchRecencyDays" />
-                </div>
-
-                <div class="form-row">
-                    <label>Max. Treffer</label>
-                    <InputNumber @bind-Value="_form.NewsMaxResults" class="form-input" min="1" max="20"
-                                 disabled="@_isReadOnly"
-                                 data-testid="input-news-max-results" />
-                    <FieldHelp Text="@GroundingFieldHelps.NewsSearchMaxResults" />
-                </div>
-
-                <div class="form-row">
-                    <label>Suchtiefe</label>
-                    <InputSelect @bind-Value="_form.NewsSearchDepth" class="form-input"
-                                 disabled="@_isReadOnly"
-                                 data-testid="input-news-search-depth">
-                        <option value="basic">Basic (schneller, günstiger)</option>
-                        <option value="advanced">Advanced (gründlicher, mehr Credits)</option>
-                    </InputSelect>
-                    <FieldHelp Text="@GroundingFieldHelps.NewsSearchDepth" />
-                </div>
-            }
-
-            @if (_form.ProviderType == "academic-search")
-            {
-                <div class="form-row">
-                    <label>Quelle</label>
-                    <InputSelect @bind-Value="_form.AcademicSource" class="form-input"
-                                 disabled="@_isReadOnly"
-                                 data-testid="input-academic-source">
-                        <option value="semantic-scholar">Semantic Scholar (breit, optionaler Key)</option>
-                        <option value="arxiv">arXiv (Preprints CS/Physik/Math, kein Key)</option>
-                        <option value="openalex">OpenAlex (sehr breit, modern)</option>
-                    </InputSelect>
-                    <FieldHelp Text="@GroundingFieldHelps.AcademicSource" />
-                </div>
-
-                <div class="form-row">
-                    <label>Max. Paper</label>
-                    <InputNumber @bind-Value="_form.AcademicMaxPapers" class="form-input" min="1" max="20"
-                                 disabled="@_isReadOnly"
-                                 data-testid="input-academic-max-papers" />
-                    <FieldHelp Text="@GroundingFieldHelps.AcademicMaxPapers" />
-                </div>
-
-                <div class="form-row">
-                    <label>Datum ab (optional)</label>
-                    <InputText @bind-Value="_form.AcademicDateFrom" class="form-input"
-                               placeholder="z. B. 2024 oder 2024-01-01"
-                               disabled="@_isReadOnly"
-                               data-testid="input-academic-date-from" />
-                    <FieldHelp Text="@GroundingFieldHelps.AcademicDateFrom" />
-                </div>
-
-                <div class="form-row">
-                    <label>Suchfeld-Einschränkung (optional)</label>
-                    <InputText @bind-Value="_form.AcademicFields" class="form-input"
-                               placeholder="leer = alle Felder"
-                               disabled="@_isReadOnly"
-                               data-testid="input-academic-fields" />
-                    <FieldHelp Text="@GroundingFieldHelps.AcademicFields" />
-                </div>
-
-                <div class="form-row">
-                    <label>API-Key-ENV-Variable (optional)</label>
-                    <InputText @bind-Value="_form.AcademicApiKeyEnv" class="form-input"
-                               placeholder="z. B. SEMANTIC_SCHOLAR_API_KEY"
-                               disabled="@_isReadOnly"
-                               data-testid="input-academic-api-key-env" />
-                    <FieldHelp Text="@GroundingFieldHelps.AcademicApiKeyEnv" />
-                </div>
-            }
-
-            @if (_form.ProviderType == "rest-api")
-            {
-                <div class="form-row">
-                    <label>URL</label>
-                    <InputText @bind-Value="_form.RestApiUrl" class="form-input"
-                               placeholder="https://api.example.com/search?q={briefing}"
-                               disabled="@_isReadOnly"
-                               data-testid="input-rest-api-url" />
-                    <FieldHelp Text="@GroundingFieldHelps.RestApiUrl" />
-                </div>
-
-                <div class="form-row">
-                    <label>Methode</label>
-                    <InputSelect @bind-Value="_form.RestApiMethod" class="form-input"
-                                 disabled="@_isReadOnly"
-                                 data-testid="input-rest-api-method">
-                        <option value="GET">GET</option>
-                        <option value="POST">POST</option>
-                    </InputSelect>
-                    <FieldHelp Text="@GroundingFieldHelps.RestApiMethod" />
-                </div>
-
-                @if (_form.RestApiMethod == "POST")
+                @if (_form.ProviderType == "vector-store")
                 {
-                    <div class="form-row">
-                        <label>Body-Template (POST)</label>
-                        <InputTextArea @bind-Value="_form.RestApiBodyTemplate" rows="4" class="form-input"
-                                       placeholder="{\"query\": \"{briefing}\", \"limit\": 10}"
+                    <div class="field">
+                        <label>Top-K Treffer</label>
+                        <InputNumber @bind-Value="_form.TopK" min="1" max="20" data-testid="input-top-k" />
+                        <small class="form-hint">Anzahl der abgerufenen Chunks pro Anfrage (1–20).</small>
+                    </div>
+
+                    <div class="field">
+                        <label>Tag-Filter (optional, kommagetrennt)</label>
+                        <InputText @bind-Value="_form.TagFilter" placeholder="policy, hr" data-testid="input-tag-filter" />
+                        <small class="form-hint">Leer lassen, um alle Dokumente zu durchsuchen.</small>
+                    </div>
+
+                    <div class="field">
+                        <label>Scope</label>
+                        <InputSelect @bind-Value="_form.Scope" data-testid="input-scope">
+                            <option value="global">Nur globale Wissensbasis</option>
+                            <option value="run-local">Nur Run-gebundene Dokumente</option>
+                            <option value="both">Beides kombiniert</option>
+                        </InputSelect>
+                        <small class="form-hint">
+                            <strong>Global:</strong> Persistente Wissensbasis. <strong>Run-lokal:</strong> An diesen Run geheftete Dokumente. <strong>Beides:</strong> Kombinierte Suche.
+                        </small>
+                    </div>
+
+                    <div class="field">
+                        <label>Embedding-Modell</label>
+                        <p class="form-hint" data-testid="embedding-model-info">openai/text-embedding-3-small (1536 Dimensionen)</p>
+                    </div>
+                }
+
+                @if (_form.ProviderType == "static-context")
+                {
+                    <div class="field">
+                        <label>Quellenname (Label)</label>
+                        <InputText @bind-Value="_form.StaticLabel"
+                                   placeholder="z. B. Markenstimme, Style Guide Q2 2026"
+                                   disabled="@_isReadOnly"
+                                   data-testid="input-static-label" />
+                        <FieldHelp Text="@GroundingFieldHelps.StaticContextLabel" />
+                    </div>
+
+                    <div class="field">
+                        <label>Inhalt</label>
+                        <InputTextArea @bind-Value="_form.StaticContent" rows="10"
                                        disabled="@_isReadOnly"
-                                       data-testid="input-rest-api-body-template" />
-                        <FieldHelp Text="@GroundingFieldHelps.RestApiBodyTemplate" />
+                                       placeholder="Füge hier deinen kuratierten Text ein (Glossar, Style Guide, Markenstimme …)"
+                                       data-testid="input-static-content" />
+                        @if ((_form.StaticContent ?? "").Length > 50_000)
+                        {
+                            <small class="form-hint form-hint--warn">
+                                ⚠ Inhalt ist länger als 50.000 Zeichen. Sehr große Texte gehören besser in die Knowledge-Base (Vector-Store-Provider).
+                            </small>
+                        }
+                        <FieldHelp Text="@GroundingFieldHelps.StaticContextContent" />
                     </div>
                 }
 
-                <div class="form-row">
-                    <label>JSONPath (Antwort-Pfad, optional)</label>
-                    <InputText @bind-Value="_form.RestApiResponsePath" class="form-input"
-                               placeholder="$.results oder $.data[*].content"
-                               disabled="@_isReadOnly"
-                               data-testid="input-rest-api-response-path" />
-                    <FieldHelp Text="@GroundingFieldHelps.RestApiResponsePath" />
-                </div>
-
-                <div class="form-row">
-                    <label>Max. Items</label>
-                    <InputNumber @bind-Value="_form.RestApiMaxItems" class="form-input" min="1" max="50"
-                                 disabled="@_isReadOnly"
-                                 data-testid="input-rest-api-max-items" />
-                    <FieldHelp Text="@GroundingFieldHelps.RestApiMaxItems" />
-                </div>
-
-                <div class="form-row">
-                    <label>Auth-Header-ENV-Variable (optional)</label>
-                    <InputText @bind-Value="_form.RestApiAuthHeaderEnv" class="form-input"
-                               placeholder="z. B. MY_API_TOKEN"
-                               disabled="@_isReadOnly"
-                               data-testid="input-rest-api-auth-header-env" />
-                    <FieldHelp Text="@GroundingFieldHelps.RestApiAuthHeaderEnv" />
-                </div>
-
-                @if (!string.IsNullOrWhiteSpace(_form.RestApiAuthHeaderEnv))
+                @if (_form.ProviderType == "url-fetch")
                 {
-                    <div class="form-row">
-                        <label>Auth-Header-Name</label>
-                        <InputText @bind-Value="_form.RestApiAuthHeaderName" class="form-input"
-                                   placeholder="Authorization"
-                                   disabled="@_isReadOnly"
-                                   data-testid="input-rest-api-auth-header-name" />
-                        <FieldHelp Text="@GroundingFieldHelps.RestApiAuthHeaderName" />
+                    <div class="field">
+                        <label>URLs (eine pro Zeile)</label>
+                        <InputTextArea @bind-Value="_form.Urls" rows="5"
+                                       disabled="@_isReadOnly"
+                                       placeholder="https://example.com/article&#10;https://docs.example.org/api"
+                                       data-testid="input-urls" />
+                        <FieldHelp Text="@GroundingFieldHelps.UrlFetchUrls" />
                     </div>
 
-                    <div class="form-row">
-                        <label>Auth-Header-Format</label>
-                        <InputText @bind-Value="_form.RestApiAuthHeaderFormat" class="form-input"
-                                   placeholder="Bearer {token}"
-                                   disabled="@_isReadOnly"
-                                   data-testid="input-rest-api-auth-header-format" />
-                        <FieldHelp Text="@GroundingFieldHelps.RestApiAuthHeaderFormat" />
+                    <div class="field">
+                        <label>Max. Zeichen pro URL</label>
+                        <InputNumber @bind-Value="_form.MaxContentPerUrl" min="500" max="100000"
+                                     disabled="@_isReadOnly"
+                                     data-testid="input-max-content-per-url" />
+                        <FieldHelp Text="@GroundingFieldHelps.UrlFetchMaxContent" />
+                    </div>
+
+                    <div class="field">
+                        <label class="form-checkbox-label">
+                            <InputCheckbox @bind-Value="_form.StripBoilerplate" disabled="@_isReadOnly" data-testid="input-strip-boilerplate" />
+                            Boilerplate entfernen (Navigation, Werbung, Cookie-Banner)
+                        </label>
+                        <FieldHelp Text="@GroundingFieldHelps.UrlFetchStripBoilerplate" />
                     </div>
                 }
 
-                <div class="form-row">
-                    <label>Zusatz-Header (JSON, optional)</label>
-                    <InputTextArea @bind-Value="_form.RestApiHeaders" rows="3" class="form-input"
-                                   placeholder="{\"Accept\": \"application/json\"}"
-                                   disabled="@_isReadOnly"
-                                   data-testid="input-rest-api-headers" />
-                    <FieldHelp Text="@GroundingFieldHelps.RestApiHeaders" />
-                </div>
-            }
-
-            @if (_form.ProviderType != "static-context")
-            {
-                <div class="form-row">
-                    <label>Max Queries per Run</label>
-                    <InputNumber @bind-Value="_form.MaxQueriesPerRun" class="form-input" data-testid="input-max-queries" />
-                    <small class="form-hint">1–5, default 1. Leave empty for no limit.</small>
-                </div>
-            }
-
-            <div class="form-section">
-                <h3>KI-Refinement</h3>
-
-                <div class="form-row">
-                    <label class="form-check-label">
-                        <InputCheckbox @bind-Value="_form.RefinementEnabled" disabled="@_isReadOnly" />
-                        KI-Refinement aktivieren
-                    </label>
-                    <FieldHelp Text="@GroundingFieldHelps.RefinementEnabled" />
-                </div>
-
-                @if (_form.RefinementEnabled)
+                @if (_form.ProviderType == "news-search")
                 {
-                    <div class="form-row">
-                        <label>Refinement-Anbieter</label>
-                        <select @bind="_form.RefinementProvider" @bind:after="OnRefinementProviderChanged" disabled="@_isReadOnly"
-                                data-testid="refinement-provider-select">
-                            <option value="">-- Anbieter wählen --</option>
-                            <optgroup label="HTTP">
-                                @foreach (var p in _providers.Where(x => x.IsActive && x.Type == ProviderType.Http))
-                                {
-                                    <option value="@p.Name">@p.DisplayName</option>
-                                }
-                            </optgroup>
-                            <optgroup label="CLI">
-                                @foreach (var p in _providers.Where(x => x.IsActive && x.Type == ProviderType.Cli))
-                                {
-                                    <option value="@p.Name">@p.DisplayName</option>
-                                }
-                            </optgroup>
-                        </select>
-                        <FieldHelp Text="@GroundingFieldHelps.RefinementProvider" />
+                    <div class="field">
+                        <label>Aktualität (Tage)</label>
+                        <InputNumber @bind-Value="_form.RecencyDays" min="1" max="365"
+                                     disabled="@_isReadOnly"
+                                     data-testid="input-recency-days" />
+                        <FieldHelp Text="@GroundingFieldHelps.NewsSearchRecencyDays" />
                     </div>
 
-                    <div class="form-row">
-                        <label>Refinement-Modell</label>
-                        <ModelSelector Provider="@_form.RefinementProvider"
-                                       @bind-Value="_form.RefinementModel"
-                                       Disabled="@_isReadOnly"
-                                       DataTestId="refinement-model-selector" />
-                        <FieldHelp Text="@GroundingFieldHelps.RefinementModel" />
+                    <div class="field">
+                        <label>Max. Treffer</label>
+                        <InputNumber @bind-Value="_form.NewsMaxResults" min="1" max="20"
+                                     disabled="@_isReadOnly"
+                                     data-testid="input-news-max-results" />
+                        <FieldHelp Text="@GroundingFieldHelps.NewsSearchMaxResults" />
                     </div>
 
-                    <div class="form-row">
-                        <label>Max. Token</label>
-                        <InputNumber @bind-Value="_form.RefinementMaxTokens" min="256" class="form-input" data-testid="refinement-max-tokens-input" />
-                        <FieldHelp Text="@GroundingFieldHelps.RefinementMaxTokens" />
+                    <div class="field">
+                        <label>Suchtiefe</label>
+                        <InputSelect @bind-Value="_form.NewsSearchDepth"
+                                     disabled="@_isReadOnly"
+                                     data-testid="input-news-search-depth">
+                            <option value="basic">Basic (schneller, günstiger)</option>
+                            <option value="advanced">Advanced (gründlicher, mehr Credits)</option>
+                        </InputSelect>
+                        <FieldHelp Text="@GroundingFieldHelps.NewsSearchDepth" />
+                    </div>
+                }
+
+                @if (_form.ProviderType == "academic-search")
+                {
+                    <div class="field">
+                        <label>Quelle</label>
+                        <InputSelect @bind-Value="_form.AcademicSource"
+                                     disabled="@_isReadOnly"
+                                     data-testid="input-academic-source">
+                            <option value="semantic-scholar">Semantic Scholar (breit, optionaler Key)</option>
+                            <option value="arxiv">arXiv (Preprints CS/Physik/Math, kein Key)</option>
+                            <option value="openalex">OpenAlex (sehr breit, modern)</option>
+                        </InputSelect>
+                        <FieldHelp Text="@GroundingFieldHelps.AcademicSource" />
                     </div>
 
-                    <div class="form-row">
-                        <label>Temperature (optional)</label>
-                        <input type="number" step="0.1" min="0" max="2"
-                               value="@(_form.RefinementTemperature?.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) ?? "")"
-                               @onchange="OnRefinementTemperatureChanged"
-                               disabled="@_isReadOnly"
-                               placeholder="leer = Anbieter-Standard"
-                               class="form-input"
-                               data-testid="refinement-temperature-input" />
-                        <FieldHelp Text="@GroundingFieldHelps.RefinementTemperature" />
+                    <div class="field">
+                        <label>Max. Paper</label>
+                        <InputNumber @bind-Value="_form.AcademicMaxPapers" min="1" max="20"
+                                     disabled="@_isReadOnly"
+                                     data-testid="input-academic-max-papers" />
+                        <FieldHelp Text="@GroundingFieldHelps.AcademicMaxPapers" />
                     </div>
 
-                    <div class="form-row">
-                        <label>Refinement-Modus</label>
-                        <select @bind="_form.RefinementMode" disabled="@_isReadOnly" class="form-input" data-testid="refinement-mode-select">
-                            <option value="0">Filter — irrelevante Quellen verwerfen</option>
-                            <option value="1">Synthesize — Quellen zu einem Text zusammenfassen</option>
-                        </select>
-                        <FieldHelp Text="@GroundingFieldHelps.RefinementMode" />
+                    <div class="field">
+                        <label>Datum ab (optional)</label>
+                        <InputText @bind-Value="_form.AcademicDateFrom"
+                                   placeholder="z. B. 2024 oder 2024-01-01"
+                                   disabled="@_isReadOnly"
+                                   data-testid="input-academic-date-from" />
+                        <FieldHelp Text="@GroundingFieldHelps.AcademicDateFrom" />
                     </div>
 
-                    <div class="form-row">
-                        <label>Zusatz-Anweisungen (optional)</label>
-                        <InputTextArea @bind-Value="_form.RefinementInstructions" rows="3" disabled="@_isReadOnly" class="form-input"
-                                       placeholder="z. B. Verwirf alle Quellen ohne Jahreszahl 2025/2026"
-                                       data-testid="refinement-instructions-input" />
-                        <FieldHelp Text="@GroundingFieldHelps.RefinementInstructions" />
+                    <div class="field">
+                        <label>Suchfeld-Einschränkung (optional)</label>
+                        <InputText @bind-Value="_form.AcademicFields"
+                                   placeholder="leer = alle Felder"
+                                   disabled="@_isReadOnly"
+                                   data-testid="input-academic-fields" />
+                        <FieldHelp Text="@GroundingFieldHelps.AcademicFields" />
+                    </div>
+
+                    <div class="field">
+                        <label>API-Key-ENV-Variable (optional)</label>
+                        <InputText @bind-Value="_form.AcademicApiKeyEnv"
+                                   placeholder="z. B. SEMANTIC_SCHOLAR_API_KEY"
+                                   disabled="@_isReadOnly"
+                                   data-testid="input-academic-api-key-env" />
+                        <FieldHelp Text="@GroundingFieldHelps.AcademicApiKeyEnv" />
+                    </div>
+                }
+
+                @if (_form.ProviderType == "rest-api")
+                {
+                    <div class="field">
+                        <label>URL</label>
+                        <InputText @bind-Value="_form.RestApiUrl"
+                                   placeholder="https://api.example.com/search?q={briefing}"
+                                   disabled="@_isReadOnly"
+                                   data-testid="input-rest-api-url" />
+                        <FieldHelp Text="@GroundingFieldHelps.RestApiUrl" />
+                    </div>
+
+                    <div class="field">
+                        <label>Methode</label>
+                        <InputSelect @bind-Value="_form.RestApiMethod"
+                                     disabled="@_isReadOnly"
+                                     data-testid="input-rest-api-method">
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                        </InputSelect>
+                        <FieldHelp Text="@GroundingFieldHelps.RestApiMethod" />
+                    </div>
+
+                    @if (_form.RestApiMethod == "POST")
+                    {
+                        <div class="field">
+                            <label>Body-Template (POST)</label>
+                            <InputTextArea @bind-Value="_form.RestApiBodyTemplate" rows="4"
+                                           placeholder="{\"query\": \"{briefing}\", \"limit\": 10}"
+                                           disabled="@_isReadOnly"
+                                           data-testid="input-rest-api-body-template" />
+                            <FieldHelp Text="@GroundingFieldHelps.RestApiBodyTemplate" />
+                        </div>
+                    }
+
+                    <div class="field">
+                        <label>JSONPath (Antwort-Pfad, optional)</label>
+                        <InputText @bind-Value="_form.RestApiResponsePath"
+                                   placeholder="$.results oder $.data[*].content"
+                                   disabled="@_isReadOnly"
+                                   data-testid="input-rest-api-response-path" />
+                        <FieldHelp Text="@GroundingFieldHelps.RestApiResponsePath" />
+                    </div>
+
+                    <div class="field">
+                        <label>Max. Items</label>
+                        <InputNumber @bind-Value="_form.RestApiMaxItems" min="1" max="50"
+                                     disabled="@_isReadOnly"
+                                     data-testid="input-rest-api-max-items" />
+                        <FieldHelp Text="@GroundingFieldHelps.RestApiMaxItems" />
+                    </div>
+
+                    <div class="field">
+                        <label>Auth-Header-ENV-Variable (optional)</label>
+                        <InputText @bind-Value="_form.RestApiAuthHeaderEnv"
+                                   placeholder="z. B. MY_API_TOKEN"
+                                   disabled="@_isReadOnly"
+                                   data-testid="input-rest-api-auth-header-env" />
+                        <FieldHelp Text="@GroundingFieldHelps.RestApiAuthHeaderEnv" />
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(_form.RestApiAuthHeaderEnv))
+                    {
+                        <div class="field">
+                            <label>Auth-Header-Name</label>
+                            <InputText @bind-Value="_form.RestApiAuthHeaderName"
+                                       placeholder="Authorization"
+                                       disabled="@_isReadOnly"
+                                       data-testid="input-rest-api-auth-header-name" />
+                            <FieldHelp Text="@GroundingFieldHelps.RestApiAuthHeaderName" />
+                        </div>
+
+                        <div class="field">
+                            <label>Auth-Header-Format</label>
+                            <InputText @bind-Value="_form.RestApiAuthHeaderFormat"
+                                       placeholder="Bearer {token}"
+                                       disabled="@_isReadOnly"
+                                       data-testid="input-rest-api-auth-header-format" />
+                            <FieldHelp Text="@GroundingFieldHelps.RestApiAuthHeaderFormat" />
+                        </div>
+                    }
+
+                    <div class="field">
+                        <label>Zusatz-Header (JSON, optional)</label>
+                        <InputTextArea @bind-Value="_form.RestApiHeaders" rows="3"
+                                       placeholder="{\"Accept\": \"application/json\"}"
+                                       disabled="@_isReadOnly"
+                                       data-testid="input-rest-api-headers" />
+                        <FieldHelp Text="@GroundingFieldHelps.RestApiHeaders" />
+                    </div>
+                }
+
+                @if (_form.ProviderType != "static-context")
+                {
+                    <div class="field">
+                        <label>Max. Anfragen pro Run</label>
+                        <InputNumber @bind-Value="_form.MaxQueriesPerRun" data-testid="input-max-queries" />
+                        <small class="form-hint">1–5, Standard 1.</small>
                     </div>
                 }
             </div>
 
+            @* ── §3 KI-Refinement (optional, collapsible) ── *@
+            <details class="collapsible-section">
+                <summary class="collapsible-header">KI-Refinement</summary>
+                <div class="collapsible-body">
+                    <p class="pipeline-stage-desc" style="margin: 0.5rem 0 1rem;">
+                        Optionale KI-Nachbearbeitung der abgerufenen Quellen — irrelevante Ergebnisse filtern oder zu einem kohärenten Text zusammenfassen.
+                    </p>
+
+                    <div class="field">
+                        <label class="form-checkbox-label">
+                            <InputCheckbox @bind-Value="_form.RefinementEnabled" disabled="@_isReadOnly" />
+                            KI-Refinement aktivieren
+                        </label>
+                        <FieldHelp Text="@GroundingFieldHelps.RefinementEnabled" />
+                    </div>
+
+                    @if (_form.RefinementEnabled)
+                    {
+                        <div class="field">
+                            <label>Refinement-Anbieter</label>
+                            <select @bind="_form.RefinementProvider" @bind:after="OnRefinementProviderChanged" disabled="@_isReadOnly"
+                                    data-testid="refinement-provider-select">
+                                <option value="">-- Anbieter wählen --</option>
+                                <optgroup label="HTTP">
+                                    @foreach (var p in _providers.Where(x => x.IsActive && x.Type == ProviderType.Http))
+                                    {
+                                        <option value="@p.Name">@p.DisplayName</option>
+                                    }
+                                </optgroup>
+                                <optgroup label="CLI">
+                                    @foreach (var p in _providers.Where(x => x.IsActive && x.Type == ProviderType.Cli))
+                                    {
+                                        <option value="@p.Name">@p.DisplayName</option>
+                                    }
+                                </optgroup>
+                            </select>
+                            <FieldHelp Text="@GroundingFieldHelps.RefinementProvider" />
+                        </div>
+
+                        <div class="field">
+                            <label>Refinement-Modell</label>
+                            <ModelSelector Provider="@_form.RefinementProvider"
+                                           @bind-Value="_form.RefinementModel"
+                                           Disabled="@_isReadOnly"
+                                           DataTestId="refinement-model-selector" />
+                            <FieldHelp Text="@GroundingFieldHelps.RefinementModel" />
+                        </div>
+
+                        <div class="field">
+                            <label>Max. Token</label>
+                            <InputNumber @bind-Value="_form.RefinementMaxTokens" min="256" data-testid="refinement-max-tokens-input" />
+                            <FieldHelp Text="@GroundingFieldHelps.RefinementMaxTokens" />
+                        </div>
+
+                        <div class="field">
+                            <label>Temperature (optional)</label>
+                            <input type="number" step="0.1" min="0" max="2"
+                                   value="@(_form.RefinementTemperature?.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) ?? "")"
+                                   @onchange="OnRefinementTemperatureChanged"
+                                   disabled="@_isReadOnly"
+                                   placeholder="leer = Anbieter-Standard"
+                                   data-testid="refinement-temperature-input" />
+                            <FieldHelp Text="@GroundingFieldHelps.RefinementTemperature" />
+                        </div>
+
+                        <div class="field">
+                            <label>Refinement-Modus</label>
+                            <select @bind="_form.RefinementMode" disabled="@_isReadOnly" data-testid="refinement-mode-select">
+                                <option value="0">Filter — irrelevante Quellen verwerfen</option>
+                                <option value="1">Synthesize — Quellen zu einem Text zusammenfassen</option>
+                            </select>
+                            <FieldHelp Text="@GroundingFieldHelps.RefinementMode" />
+                        </div>
+
+                        <div class="field">
+                            <label>Zusatz-Anweisungen (optional)</label>
+                            <InputTextArea @bind-Value="_form.RefinementInstructions" rows="3" disabled="@_isReadOnly"
+                                           placeholder="z. B. Verwirf alle Quellen ohne Jahreszahl 2025/2026"
+                                           data-testid="refinement-instructions-input" />
+                            <FieldHelp Text="@GroundingFieldHelps.RefinementInstructions" />
+                        </div>
+                    }
+                </div>
+            </details>
+
+            @* ── Aktionsleiste ── *@
             <div class="form-actions">
                 <button type="submit" class="btn primary" disabled="@_saving" data-testid="btn-save">
-                    @(_saving ? "Saving…" : IsNew ? "Create" : "Save")
+                    @(_saving ? "Speichern…" : IsNew ? "Erstellen" : "Speichern")
                 </button>
-                <button type="button" class="btn ghost" @onclick="NavigateBack">Cancel</button>
+                <button type="button" class="btn ghost" @onclick="NavigateBack">Abbrechen</button>
+                @if (!IsNew)
+                {
+                    <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true" data-testid="btn-delete">Löschen</button>
+                }
             </div>
         </EditForm>
-
-        @if (!IsNew)
-        {
-            <div style="margin-top: 1rem;">
-                <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true" data-testid="btn-delete">Delete</button>
-            </div>
-        }
     }
 </div>
 
@@ -483,6 +532,46 @@
 
     private GroundingFormModel _form = new();
     private IReadOnlyList<Provider> _providers = [];
+
+    private static readonly (string Type, string Label, string Desc)[] _providerTypes =
+    [
+        ("tavily",           "Tavily Web Search",  "Websuche mit optionaler Antwort-Synthese"),
+        ("vector-store",     "Vector Store",       "Wissensbasis / RAG — eingebettete Dokumente"),
+        ("static-context",   "Statischer Kontext", "Kuratierter Text — Glossar, Style Guide"),
+        ("url-fetch",        "URL Fetch",          "Konkrete URLs abrufen und extrahieren"),
+        ("news-search",      "News Search",        "Aktuelle Nachrichten via Tavily News-API"),
+        ("academic-search",  "Academic Search",    "arXiv, Semantic Scholar, OpenAlex"),
+        ("rest-api",         "REST API",           "HTTP-Endpunkt mit JSON-Antwort"),
+    ];
+
+    private string GetProviderTypeName() => _form.ProviderType switch
+    {
+        "tavily"          => "Tavily Web Search",
+        "vector-store"    => "Vector Store",
+        "static-context"  => "Statischer Kontext",
+        "url-fetch"       => "URL Fetch",
+        "news-search"     => "News Search",
+        "academic-search" => "Academic Search",
+        "rest-api"        => "REST API",
+        _                 => _form.ProviderType
+    };
+
+    private string GetProviderTypeDesc() => _form.ProviderType switch
+    {
+        "tavily"          => "Tavily API — Websuche mit optionaler Antwort-Synthese",
+        "vector-store"    => "Wissensbasis / RAG — Abruf aus eingebetteten Dokumenten",
+        "static-context"  => "Fester kuratierter Text — Glossar, Style Guide, Markenstimme",
+        "url-fetch"       => "Konkrete URLs abrufen und Text extrahieren",
+        "news-search"     => "Aktuelle Nachrichten via Tavily News-API",
+        "academic-search" => "Wissenschaftliche Paper — arXiv, Semantic Scholar, OpenAlex",
+        "rest-api"        => "Beliebiger HTTP-Endpunkt mit JSON-Antwort",
+        _                 => ""
+    };
+
+    private void SetProviderType(string type)
+    {
+        _form.ProviderType = type;
+    }
 
     protected override async Task OnInitializedAsync()
     {
