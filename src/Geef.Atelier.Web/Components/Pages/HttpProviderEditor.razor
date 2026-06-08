@@ -10,21 +10,21 @@
 @inject IProviderService ProviderService
 @inject NavigationManager Nav
 
-<PageTitle>@(IsNew ? "New HTTP Provider" : "Edit Provider") — Atelier</PageTitle>
+<PageTitle>@(IsNew ? "HTTP-Anbieter erstellen" : "HTTP-Anbieter bearbeiten") — Atelier</PageTitle>
 
 <div class="crew-editor" data-testid="http-provider-editor">
     <div class="page-header">
-        <h1>@(IsNew ? "New HTTP Provider" : $"Edit: {_displayName}")</h1>
-        <a href="/crew/providers" class="btn ghost">← Back</a>
+        <h1>@(IsNew ? "Neuer HTTP-Anbieter" : $"Bearbeiten: {_displayName}")</h1>
+        <a href="/crew/providers" class="btn ghost">← Zurück</a>
     </div>
 
     @if (_loading)
     {
-        <p>Loading…</p>
+        <p>Wird geladen…</p>
     }
     else
     {
-        <EditForm Model="_form" OnValidSubmit="SaveAsync" class="crew-form">
+        <EditForm Model="_form" OnValidSubmit="SaveAsync">
             <DataAnnotationsValidator />
 
             @if (!string.IsNullOrEmpty(_error))
@@ -32,136 +32,186 @@
                 <div class="error-banner" data-testid="editor-error">@_error</div>
             }
 
-            <div class="form-row">
-                <label>Name (Slug)</label>
-                <InputText @bind-Value="_form.Name" class="form-input" placeholder="my-http-provider" data-testid="input-name" />
-                <ValidationMessage For="() => _form.Name" />
-                <FieldHelp Text="@ProviderFieldHelps.Name" DataTestId="help-name" />
+            @* ── §0 Grunddaten ── *@
+            <div class="template-meta-section">
+                <h3>Grunddaten</h3>
+
+                <div class="field">
+                    <label>Name (Slug)</label>
+                    <InputText @bind-Value="_form.Name" placeholder="my-http-provider" data-testid="input-name" />
+                    <ValidationMessage For="() => _form.Name" />
+                    <FieldHelp Text="@ProviderFieldHelps.Name" DataTestId="help-name" />
+                </div>
+
+                <div class="field">
+                    <label>Anzeigename</label>
+                    <InputText @bind-Value="_form.DisplayName" placeholder="Mein HTTP-Anbieter" data-testid="input-display-name" />
+                    <ValidationMessage For="() => _form.DisplayName" />
+                    <FieldHelp Text="@ProviderFieldHelps.DisplayName" DataTestId="help-display-name" />
+                </div>
+
+                <div class="field">
+                    <label>Beschreibung</label>
+                    <InputTextArea @bind-Value="_form.Description" rows="2" data-testid="input-description" />
+                    <FieldHelp Text="@ProviderFieldHelps.Description" DataTestId="help-description" />
+                </div>
+
+                <div class="field">
+                    <label class="form-checkbox-label">
+                        <InputCheckbox @bind-Value="_form.IsActive" data-testid="input-is-active" />
+                        Aktiv (in Profilen und Modell-Selektoren verfügbar)
+                    </label>
+                    <FieldHelp Text="@ProviderFieldHelps.IsActive" DataTestId="help-is-active" />
+                </div>
             </div>
 
-            <div class="form-row">
-                <label>Display Name</label>
-                <InputText @bind-Value="_form.DisplayName" class="form-input" placeholder="My HTTP Provider" data-testid="input-display-name" />
-                <ValidationMessage For="() => _form.DisplayName" />
-                <FieldHelp Text="@ProviderFieldHelps.DisplayName" DataTestId="help-display-name" />
+            @* ── §1 Endpunkt ── *@
+            <div class="pipeline-stage-section">
+                <div class="pipeline-stage-header">
+                    <div class="pipeline-stage-header-text">
+                        <h3>Endpunkt</h3>
+                        <p class="pipeline-stage-desc">OpenAI-kompatible Basis-URL und API-Key-Konfiguration.</p>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label>Basis-URL</label>
+                    <InputText @bind-Value="_form.Endpoint" placeholder="https://api.example.com/v1" data-testid="input-endpoint" />
+                    <ValidationMessage For="() => _form.Endpoint" />
+                    <FieldHelp Text="@ProviderFieldHelps.HttpEndpoint" DataTestId="help-endpoint" />
+                </div>
+
+                <div class="field">
+                    <label>API-Key-ENV-Variable</label>
+                    <InputText @bind-Value="_form.ApiKeyEnv" placeholder="MY_PROVIDER_API_KEY" data-testid="input-api-key-env" />
+                    <FieldHelp Text="@ProviderFieldHelps.HttpApiKeyEnv" DataTestId="help-api-key-env" />
+                </div>
+
+                <div class="field">
+                    <label>Endpunkt-Override-ENV (optional)</label>
+                    <InputText @bind-Value="_form.EndpointEnvOverride" placeholder="MY_PROVIDER_ENDPOINT" data-testid="input-endpoint-env-override" />
+                    <FieldHelp Text="@ProviderFieldHelps.HttpEndpointEnvOverride" DataTestId="help-endpoint-env-override" />
+                </div>
             </div>
 
-            <div class="form-row">
-                <label>Description</label>
-                <InputTextArea @bind-Value="_form.Description" class="form-input" rows="2" data-testid="input-description" />
-                <FieldHelp Text="@ProviderFieldHelps.Description" DataTestId="help-description" />
+            @* ── §2 Authentifizierung ── *@
+            <div class="pipeline-stage-section">
+                <div class="pipeline-stage-header">
+                    <div class="pipeline-stage-header-text">
+                        <h3>Authentifizierung</h3>
+                        <p class="pipeline-stage-desc">HTTP-Header-Format für die API-Key-Übertragung.</p>
+                    </div>
+                </div>
+
+                <div class="field-grid">
+                    <div class="field">
+                        <label>Auth-Header-Name</label>
+                        <InputText @bind-Value="_form.AuthHeaderName" placeholder="Authorization" data-testid="input-auth-header-name" />
+                        <FieldHelp Text="@ProviderFieldHelps.HttpAuthHeaderName" DataTestId="help-auth-header-name" />
+                    </div>
+
+                    <div class="field">
+                        <label>Auth-Header-Format</label>
+                        <InputText @bind-Value="_form.AuthHeaderFormat" placeholder="Bearer {key}" data-testid="input-auth-header-format" />
+                        <FieldHelp Text="@ProviderFieldHelps.HttpAuthHeaderFormat" DataTestId="help-auth-header-format" />
+                    </div>
+                </div>
             </div>
 
-            <div class="form-section-header">Endpoint</div>
+            @* ── §3 Modelle ── *@
+            <div class="pipeline-stage-section">
+                <div class="pipeline-stage-header">
+                    <div class="pipeline-stage-header-text">
+                        <h3>Modelle</h3>
+                        <p class="pipeline-stage-desc">Modell-Katalog — automatisch via API oder manuell gepflegt.</p>
+                    </div>
+                </div>
 
-            <div class="form-row">
-                <label>Base URL</label>
-                <InputText @bind-Value="_form.Endpoint" class="form-input" placeholder="https://api.example.com/v1" data-testid="input-endpoint" />
-                <ValidationMessage For="() => _form.Endpoint" />
-                <FieldHelp Text="@ProviderFieldHelps.HttpEndpoint" DataTestId="help-endpoint" />
+                <div class="field">
+                    <label>Modell-Endpunkt (optional)</label>
+                    <InputText @bind-Value="_form.ModelsEndpoint" placeholder="/models" data-testid="input-models-endpoint" />
+                    <FieldHelp Text="@ProviderFieldHelps.HttpModelsEndpoint" DataTestId="help-models-endpoint" />
+                </div>
+
+                <div class="field">
+                    <label>Manuelle Modell-Liste (optional, ein Modell pro Zeile)</label>
+                    <InputTextArea @bind-Value="_form.ManualModelList" rows="4"
+                                   placeholder="gpt-4o&#10;gpt-4o-mini&#10;o1" data-testid="input-manual-models" />
+                    <FieldHelp Text="@ProviderFieldHelps.HttpManualModelList" DataTestId="help-manual-models" />
+                </div>
             </div>
 
-            <div class="form-row">
-                <label>API Key Environment Variable</label>
-                <InputText @bind-Value="_form.ApiKeyEnv" class="form-input" placeholder="MY_PROVIDER_API_KEY" data-testid="input-api-key-env" />
-                <FieldHelp Text="@ProviderFieldHelps.HttpApiKeyEnv" DataTestId="help-api-key-env" />
-            </div>
+            @* ── §4 Erweitert (collapsible) ── *@
+            <details class="collapsible-section">
+                <summary class="collapsible-header">Erweitert</summary>
+                <div class="collapsible-body">
+                    <p class="pipeline-stage-desc" style="margin: 0.5rem 0 1rem;">
+                        Standard-Header für jeden Request und optionale Token-Kosten für die Kostenverfolgung.
+                    </p>
 
-            <div class="form-row">
-                <label>Endpoint Override Env Var (optional)</label>
-                <InputText @bind-Value="_form.EndpointEnvOverride" class="form-input" placeholder="MY_PROVIDER_ENDPOINT" data-testid="input-endpoint-env-override" />
-                <FieldHelp Text="@ProviderFieldHelps.HttpEndpointEnvOverride" DataTestId="help-endpoint-env-override" />
-            </div>
+                    <div class="field">
+                        <label>Standard-Header (optional, ein Header pro Zeile)</label>
+                        <InputTextArea @bind-Value="_form.DefaultHeaders" rows="3"
+                                       placeholder="HTTP-Referer: https://example.com&#10;X-Title: My App" data-testid="input-default-headers" />
+                        <FieldHelp Text="@ProviderFieldHelps.HttpDefaultHeaders" DataTestId="help-default-headers" />
+                    </div>
 
-            <div class="form-section-header">Authentication</div>
+                    <div class="field-grid">
+                        <div class="field">
+                            <label>Kosten / Input-Token (EUR, optional)</label>
+                            <InputText @bind-Value="_form.CostPerInputToken" placeholder="0.000003" data-testid="input-cost-input" />
+                            <FieldHelp Text="@ProviderFieldHelps.HttpCostPerInputToken" DataTestId="help-cost-input" />
+                        </div>
 
-            <div class="form-row">
-                <label>Auth Header Name</label>
-                <InputText @bind-Value="_form.AuthHeaderName" class="form-input" placeholder="Authorization" data-testid="input-auth-header-name" />
-                <FieldHelp Text="@ProviderFieldHelps.HttpAuthHeaderName" DataTestId="help-auth-header-name" />
-            </div>
+                        <div class="field">
+                            <label>Kosten / Output-Token (EUR, optional)</label>
+                            <InputText @bind-Value="_form.CostPerOutputToken" placeholder="0.000015" data-testid="input-cost-output" />
+                            <FieldHelp Text="@ProviderFieldHelps.HttpCostPerOutputToken" DataTestId="help-cost-output" />
+                        </div>
+                    </div>
+                </div>
+            </details>
 
-            <div class="form-row">
-                <label>Auth Header Format</label>
-                <InputText @bind-Value="_form.AuthHeaderFormat" class="form-input" placeholder="Bearer {key}" data-testid="input-auth-header-format" />
-                <FieldHelp Text="@ProviderFieldHelps.HttpAuthHeaderFormat" DataTestId="help-auth-header-format" />
-            </div>
-
-            <div class="form-section-header">Models</div>
-
-            <div class="form-row">
-                <label>Models Endpoint (optional)</label>
-                <InputText @bind-Value="_form.ModelsEndpoint" class="form-input" placeholder="/models" data-testid="input-models-endpoint" />
-                <FieldHelp Text="@ProviderFieldHelps.HttpModelsEndpoint" DataTestId="help-models-endpoint" />
-            </div>
-
-            <div class="form-row">
-                <label>Manual Model List (optional)</label>
-                <InputTextArea @bind-Value="_form.ManualModelList" class="form-input" rows="4"
-                    placeholder="gpt-4o&#10;gpt-4o-mini&#10;o1" data-testid="input-manual-models" />
-                <FieldHelp Text="@ProviderFieldHelps.HttpManualModelList" DataTestId="help-manual-models" />
-            </div>
-
-            <div class="form-section-header">Advanced</div>
-
-            <div class="form-row">
-                <label>Default Headers (optional)</label>
-                <InputTextArea @bind-Value="_form.DefaultHeaders" class="form-input" rows="3"
-                    placeholder="HTTP-Referer: https://example.com&#10;X-Title: My App" data-testid="input-default-headers" />
-                <FieldHelp Text="@ProviderFieldHelps.HttpDefaultHeaders" DataTestId="help-default-headers" />
-            </div>
-
-            <div class="form-row">
-                <label>Cost per Input Token (EUR, optional)</label>
-                <InputText @bind-Value="_form.CostPerInputToken" class="form-input" placeholder="0.000003" data-testid="input-cost-input" />
-                <FieldHelp Text="@ProviderFieldHelps.HttpCostPerInputToken" DataTestId="help-cost-input" />
-            </div>
-
-            <div class="form-row">
-                <label>Cost per Output Token (EUR, optional)</label>
-                <InputText @bind-Value="_form.CostPerOutputToken" class="form-input" placeholder="0.000015" data-testid="input-cost-output" />
-                <FieldHelp Text="@ProviderFieldHelps.HttpCostPerOutputToken" DataTestId="help-cost-output" />
-            </div>
-
-            <div class="form-row">
-                <label class="form-checkbox-label">
-                    <InputCheckbox @bind-Value="_form.IsActive" data-testid="input-is-active" />
-                    Active
-                </label>
-                <FieldHelp Text="@ProviderFieldHelps.IsActive" DataTestId="help-is-active" />
-            </div>
-
+            @* ── Aktionsleiste ── *@
             <div class="form-actions">
                 <button type="submit" class="btn primary" disabled="@_saving" data-testid="btn-save">
-                    @(_saving ? "Saving…" : IsNew ? "Create" : "Save")
+                    @(_saving ? "Speichern…" : IsNew ? "Erstellen" : "Speichern")
                 </button>
-                <a href="/crew/providers" class="btn ghost">Cancel</a>
+                <a href="/crew/providers" class="btn ghost">Abbrechen</a>
             </div>
         </EditForm>
 
+        @* ── Verbindungstest (nur im Bearbeiten-Modus) ── *@
         @if (!IsNew)
         {
-            <div class="form-section-header" style="margin-top: 2rem;">Connection Test</div>
-            <div class="form-row">
+            <div class="pipeline-stage-section" style="margin-top: 1.5rem;">
+                <div class="pipeline-stage-header">
+                    <div class="pipeline-stage-header-text">
+                        <h3>Verbindungstest</h3>
+                        <p class="pipeline-stage-desc">Prüft Erreichbarkeit und API-Key mit einem minimalen Test-Request.</p>
+                    </div>
+                </div>
+
                 <button type="button" class="btn primary" @onclick="TestConnectionAsync" disabled="@_testing" data-testid="btn-test-connection">
-                    @(_testing ? "Testing…" : "Test Connection")
+                    @(_testing ? "Teste…" : "Verbindung testen")
                 </button>
+
                 @if (_testResult is not null)
                 {
                     @if (_testResult.Success)
                     {
-                        <div class="info-banner" data-testid="test-result-success">
-                            Connection successful — @_testResult.LatencyMs ms
+                        <div class="info-banner" style="margin-top: 0.75rem;" data-testid="test-result-success">
+                            Verbindung erfolgreich — @_testResult.LatencyMs ms
                             @if (!string.IsNullOrEmpty(_testResult.ResponseSample))
                             {
-                                <pre class="system-prompt-view">@_testResult.ResponseSample</pre>
+                                <pre class="system-prompt-view" style="margin-top: 0.5rem;">@_testResult.ResponseSample</pre>
                             }
                         </div>
                     }
                     else
                     {
-                        <div class="error-banner" data-testid="test-result-error">
-                            Connection failed: @_testResult.ErrorMessage
+                        <div class="error-banner" style="margin-top: 0.75rem;" data-testid="test-result-error">
+                            Verbindung fehlgeschlagen: @_testResult.ErrorMessage
                         </div>
                     }
                 }
@@ -243,18 +293,18 @@
 
     private sealed class HttpFormModel
     {
-        [Required(ErrorMessage = "Name is required.")]
-        [RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Only lowercase letters, numbers, and hyphens.")]
+        [Required(ErrorMessage = "Name ist erforderlich.")]
+        [RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Nur Kleinbuchstaben, Ziffern und Bindestriche.")]
         [MaxLength(64)]
         public string Name { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Display name is required.")]
+        [Required(ErrorMessage = "Anzeigename ist erforderlich.")]
         [MaxLength(200)]
         public string DisplayName { get; set; } = string.Empty;
 
         public string Description { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Endpoint is required.")]
+        [Required(ErrorMessage = "Endpunkt ist erforderlich.")]
         public string Endpoint { get; set; } = string.Empty;
 
         public string ApiKeyEnv { get; set; } = string.Empty;
@@ -316,7 +366,6 @@
             AddNullableStr("cost_per_input_token_eur", CostPerInputToken);
             AddNullableStr("cost_per_output_token_eur", CostPerOutputToken);
 
-            // Default headers: parse "Key: Value" lines
             var headers = new Dictionary<string, string>();
             foreach (var line in DefaultHeaders.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
@@ -327,7 +376,6 @@
             if (headers.Count > 0)
                 settings["default_headers"] = JsonDocument.Parse(JsonSerializer.Serialize(headers)).RootElement.Clone();
 
-            // Manual model list: one per line
             var models = ManualModelList
                 .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Where(m => m.Length > 0)
