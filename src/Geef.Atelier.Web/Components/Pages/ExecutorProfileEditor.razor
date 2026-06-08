@@ -8,17 +8,17 @@
 @inject ICrewService CrewService
 @inject NavigationManager Nav
 
-<PageTitle>@(IsNew ? "New Executor Profile" : "Edit Executor Profile") — Atelier</PageTitle>
+<PageTitle>@(IsNew ? "Executor-Profil erstellen" : "Executor-Profil bearbeiten") — Atelier</PageTitle>
 
 <div class="crew-editor" data-testid="executor-profile-editor">
     <div class="page-header">
-        <h1>@(IsNew ? "New Executor Profile" : _isSystem ? _displayName : $"Edit: {_displayName}")</h1>
-        <a href="/crew/profiles/executors" class="btn ghost">← Back</a>
+        <h1>@(IsNew ? "Neues Executor-Profil" : _isSystem ? _displayName : $"Bearbeiten: {_displayName}")</h1>
+        <a href="/crew/profiles/executors" class="btn ghost">← Zurück</a>
     </div>
 
     @if (_loading)
     {
-        <p>Loading…</p>
+        <p>Wird geladen…</p>
     }
     else
     {
@@ -34,14 +34,8 @@
                            Error="@_error"
                            OnSave="SaveAsync"
                            OnCancel="NavigateBack"
-                           OnDuplicate="DuplicateAsCustom" />
-
-        @if (!IsNew && !_isSystem)
-        {
-            <div style="margin-top: 1rem;">
-                <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true">Delete</button>
-            </div>
-        }
+                           OnDuplicate="DuplicateAsCustom"
+                           OnDeleteRequested="() => _showDeleteModal = true" />
     }
 </div>
 

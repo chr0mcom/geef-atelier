@@ -5,7 +5,7 @@
 @using Geef.Atelier.Core.Domain.Providers
 @inject IProviderService ProviderService
 
-<div class="profile-editor-form" data-testid="profile-editor">
+<div data-testid="profile-editor">
     @if (!string.IsNullOrEmpty(Error))
     {
         <div class="error-banner">@Error</div>
@@ -15,142 +15,184 @@
         <DataAnnotationsValidator />
         <ValidationSummary />
 
-        <div class="field-grid">
+        @* ── §0 Grunddaten ── *@
+        <div class="template-meta-section">
+            <h3>Grunddaten</h3>
 
-        <div class="field">
-            <label>Name</label>
-            <InputText @bind-Value="_form.Name" disabled="@IsSystem" placeholder="my-profile" />
-            @if (!IsSystem && !string.IsNullOrEmpty(_form.Name))
-            {
-                <small>Will be saved as: custom-@_form.Name.TrimStart("custom-".ToCharArray())</small>
-            }
+            <div class="field">
+                <label>Name</label>
+                <InputText @bind-Value="_form.Name" disabled="@IsSystem" placeholder="mein-profil" />
+                @if (!IsSystem && !string.IsNullOrEmpty(_form.Name))
+                {
+                    <small class="form-hint">Wird gespeichert als: custom-@_form.Name.TrimStart("custom-".ToCharArray())</small>
+                }
+                <ValidationMessage For="() => _form.Name" />
+            </div>
+
+            <div class="field">
+                <label>Anzeigename</label>
+                <InputText @bind-Value="_form.DisplayName" disabled="@IsSystem" />
+                <ValidationMessage For="() => _form.DisplayName" />
+            </div>
+
+            <div class="field">
+                <label>Beschreibung</label>
+                <InputTextArea @bind-Value="_form.Description" rows="2" disabled="@IsSystem" />
+                <ValidationMessage For="() => _form.Description" />
+            </div>
         </div>
 
-        <div class="field">
-            <label>Display Name</label>
-            <InputText @bind-Value="_form.DisplayName" disabled="@IsSystem" />
-            <ValidationMessage For="() => _form.DisplayName" />
-        </div>
-
-        <div class="field field--full">
-            <label>Description</label>
-            <InputTextArea @bind-Value="_form.Description" rows="3" disabled="@IsSystem" />
-            <ValidationMessage For="() => _form.Description" />
-        </div>
-
-        <div class="field field--full">
-            <label>System Prompt (@(_form.SystemPrompt?.Length ?? 0)/8000)</label>
-            <InputTextArea @bind-Value="_form.SystemPrompt" rows="15"
-                           style="font-family: var(--font-mono, monospace)"
-                           disabled="@IsSystem" data-testid="profile-systemprompt" />
-            <ValidationMessage For="() => _form.SystemPrompt" />
-        </div>
-
-        <div class="field">
-            <label>Provider</label>
-            <InputSelect @bind-Value="_form.Provider" disabled="@IsSystem">
-                <optgroup label="HTTP Providers">
-                    @foreach (var p in _providers.Where(p => p.Type == ProviderType.Http && p.IsActive))
-                    {
-                        <option value="@p.Name">@p.DisplayName</option>
-                    }
-                </optgroup>
-                <optgroup label="CLI Providers">
-                    @foreach (var p in _providers.Where(p => p.Type == ProviderType.Cli && p.IsActive))
-                    {
-                        <option value="@p.Name">@p.DisplayName</option>
-                    }
-                </optgroup>
-            </InputSelect>
-            <small class="field-hint">OpenRouter is billed per token. Claude-CLI and Codex-CLI use a local subscription.</small>
-            <ValidationMessage For="() => _form.Provider" />
-        </div>
-
-        <div class="field">
-            <label>Model</label>
-            <ModelSelector @ref="_modelSelector"
-                           Provider="@_form.Provider"
-                           @bind-Value="_form.Model"
-                           Disabled="@IsSystem"
-                           DataTestId="model-selector" />
-            <ValidationMessage For="() => _form.Model" />
-        </div>
-
-        <div class="field">
-            <label>Max Tokens (optional)</label>
-            <InputNumber @bind-Value="_form.MaxTokens" disabled="@IsSystem" />
-        </div>
-
-        @if (ShowAdvisorFields)
-        {
-            <div class="field field--full">
-                <label>Mode</label>
-                <div class="radio-group" data-testid="advisor-mode-group">
-                    @foreach (var mode in Enum.GetValues<AdvisorMode>())
-                    {
-                        <label class="radio-option">
-                            <input type="radio"
-                                   name="advisor-mode"
-                                   value="@mode"
-                                   checked="@(SelectedMode == mode)"
-                                   disabled="@IsSystem"
-                                   @onchange="() => SelectedModeChanged.InvokeAsync(mode)" />
-                            <strong>@mode.ToString()</strong>
-                            <span class="radio-description">@GetAdvisorModeDescription(mode)</span>
-                        </label>
-                    }
+        @* ── §1 Modell-Konfiguration ── *@
+        <div class="pipeline-stage-section">
+            <div class="pipeline-stage-header">
+                <div class="pipeline-stage-header-text">
+                    <h3>Modell-Konfiguration</h3>
+                    <p class="pipeline-stage-desc">LLM-Anbieter, Modell und maximale Ausgabelänge für dieses Profil.</p>
                 </div>
             </div>
 
-            <div class="field field--full">
-                <label>Trigger</label>
-                <div class="radio-group" data-testid="advisor-trigger-group">
-                    @foreach (var trigger in Enum.GetValues<AdvisorTrigger>())
-                    {
-                        <label class="radio-option">
-                            <input type="radio"
-                                   name="advisor-trigger"
-                                   value="@trigger"
-                                   checked="@(SelectedTrigger == trigger)"
-                                   disabled="@IsSystem"
-                                   @onchange="() => SelectedTriggerChanged.InvokeAsync(trigger)" />
-                            <strong>@trigger.ToString()</strong>
-                            <span class="radio-description">@GetAdvisorTriggerDescription(trigger)</span>
-                        </label>
-                    }
+            <div class="field-grid">
+                <div class="field">
+                    <label>Anbieter</label>
+                    <InputSelect @bind-Value="_form.Provider" disabled="@IsSystem">
+                        <optgroup label="HTTP">
+                            @foreach (var p in _providers.Where(p => p.Type == ProviderType.Http && p.IsActive))
+                            {
+                                <option value="@p.Name">@p.DisplayName</option>
+                            }
+                        </optgroup>
+                        <optgroup label="CLI">
+                            @foreach (var p in _providers.Where(p => p.Type == ProviderType.Cli && p.IsActive))
+                            {
+                                <option value="@p.Name">@p.DisplayName</option>
+                            }
+                        </optgroup>
+                    </InputSelect>
+                    <small class="form-hint">OpenRouter wird pro Token abgerechnet. CLI-Anbieter nutzen ein lokales Abonnement.</small>
+                    <ValidationMessage For="() => _form.Provider" />
+                </div>
+
+                <div class="field">
+                    <label>Modell</label>
+                    <ModelSelector @ref="_modelSelector"
+                                   Provider="@_form.Provider"
+                                   @bind-Value="_form.Model"
+                                   Disabled="@IsSystem"
+                                   DataTestId="model-selector" />
+                    <ValidationMessage For="() => _form.Model" />
+                </div>
+
+                <div class="field">
+                    <label>Max. Token (optional)</label>
+                    <InputNumber @bind-Value="_form.MaxTokens" disabled="@IsSystem" />
+                </div>
+            </div>
+        </div>
+
+        @* ── §2 System-Prompt ── *@
+        <div class="pipeline-stage-section">
+            <div class="pipeline-stage-header">
+                <div class="pipeline-stage-header-text">
+                    <h3>System-Prompt</h3>
+                    <p class="pipeline-stage-desc">Rolle und Verhalten des Profils. @(_form.SystemPrompt?.Length ?? 0)/8000 Zeichen.</p>
+                </div>
+            </div>
+
+            <div class="field">
+                <InputTextArea @bind-Value="_form.SystemPrompt" rows="15"
+                               style="font-family: var(--font-mono, monospace); font-size: 0.82rem;"
+                               disabled="@IsSystem" data-testid="profile-systemprompt" />
+                <ValidationMessage For="() => _form.SystemPrompt" />
+            </div>
+        </div>
+
+        @* ── §3 Advisor-Einstellungen (optional) ── *@
+        @if (ShowAdvisorFields)
+        {
+            <div class="pipeline-stage-section">
+                <div class="pipeline-stage-header">
+                    <div class="pipeline-stage-header-text">
+                        <h3>Advisor-Einstellungen</h3>
+                        <p class="pipeline-stage-desc">Wie und wann der Advisor in den Pipeline-Ablauf eingreift.</p>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label>Modus</label>
+                    <div class="radio-group" data-testid="advisor-mode-group">
+                        @foreach (var mode in Enum.GetValues<AdvisorMode>())
+                        {
+                            <label class="radio-option">
+                                <input type="radio"
+                                       name="advisor-mode"
+                                       value="@mode"
+                                       checked="@(SelectedMode == mode)"
+                                       disabled="@IsSystem"
+                                       @onchange="() => SelectedModeChanged.InvokeAsync(mode)" />
+                                <span>
+                                    <strong>@GetAdvisorModeLabel(mode)</strong>
+                                    <span class="radio-description">@GetAdvisorModeDescription(mode)</span>
+                                </span>
+                            </label>
+                        }
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label>Auslöser</label>
+                    <div class="radio-group" data-testid="advisor-trigger-group">
+                        @foreach (var trigger in Enum.GetValues<AdvisorTrigger>())
+                        {
+                            <label class="radio-option">
+                                <input type="radio"
+                                       name="advisor-trigger"
+                                       value="@trigger"
+                                       checked="@(SelectedTrigger == trigger)"
+                                       disabled="@IsSystem"
+                                       @onchange="() => SelectedTriggerChanged.InvokeAsync(trigger)" />
+                                <span>
+                                    <strong>@GetAdvisorTriggerLabel(trigger)</strong>
+                                    <span class="radio-description">@GetAdvisorTriggerDescription(trigger)</span>
+                                </span>
+                            </label>
+                        }
+                    </div>
                 </div>
             </div>
         }
 
-        </div>
-
+        @* ── Aktionsleiste ── *@
         <div class="editor-actions">
             @if (!IsSystem)
             {
                 <button type="submit" class="btn primary" data-testid="save-profile" disabled="@IsSaving">
-                    @(IsSaving ? "Saving…" : "Save")
+                    @(IsSaving ? "Speichern…" : IsNew ? "Erstellen" : "Speichern")
                 </button>
             }
             else
             {
                 <button type="button" class="btn primary" @onclick="() => OnDuplicate.InvokeAsync()">
-                    Duplicate as custom
+                    Als Kopie anlegen
                 </button>
             }
-            <button type="button" class="btn ghost" @onclick="() => OnCancel.InvokeAsync()">Cancel</button>
+            <button type="button" class="btn ghost" @onclick="() => OnCancel.InvokeAsync()">Abbrechen</button>
+            @if (!IsNew && !IsSystem && OnDeleteRequested.HasDelegate)
+            {
+                <button type="button" class="btn danger" @onclick="() => OnDeleteRequested.InvokeAsync()">Löschen</button>
+            }
         </div>
     </EditForm>
 </div>
 
 <Modal Show="_showCustomModelWarning" OnClose="CancelCustomModelSave" DataTestId="custom-model-warning-modal">
-    <Title>Unknown model</Title>
+    <Title>Unbekanntes Modell</Title>
     <ChildContent>
-        <p>Model <strong>@_form.Model</strong> is not in the catalog for this provider.</p>
-        <p>Are you sure you want to save this profile with a custom model name?</p>
+        <p>Modell <strong>@_form.Model</strong> ist nicht im Katalog für diesen Anbieter.</p>
+        <p>Profil trotzdem mit diesem Modellnamen speichern?</p>
     </ChildContent>
     <Actions>
-        <button type="button" class="btn primary" @onclick="ConfirmCustomModelSave" data-testid="custom-model-confirm">Save anyway</button>
-        <button type="button" class="btn ghost"   @onclick="CancelCustomModelSave">Cancel</button>
+        <button type="button" class="btn primary" @onclick="ConfirmCustomModelSave" data-testid="custom-model-confirm">Trotzdem speichern</button>
+        <button type="button" class="btn ghost"   @onclick="CancelCustomModelSave">Abbrechen</button>
     </Actions>
 </Modal>
 
@@ -173,6 +215,7 @@
     [Parameter] public EventCallback<ProfileFormValues> OnSave { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
     [Parameter] public EventCallback OnDuplicate { get; set; }
+    [Parameter] public EventCallback OnDeleteRequested { get; set; }
 
     private bool IsNew => ProfileName == null;
     private IReadOnlyList<Provider> _providers = [];
@@ -183,7 +226,6 @@
     protected override async Task OnInitializedAsync()
     {
         _providers = await ProviderService.ListAsync(includeInactive: false);
-        // For new profiles, fall back to the first available provider so ModelSelector loads immediately.
         var effectiveProvider = !string.IsNullOrEmpty(Provider) ? Provider
             : _providers.Count > 0 ? _providers[0].Name : "";
         _form = new ProfileFormModel
@@ -230,26 +272,43 @@
             SelectedTrigger));
     }
 
+    private static string GetAdvisorModeLabel(AdvisorMode m) => m switch
+    {
+        AdvisorMode.Strategic      => "Strategisch",
+        AdvisorMode.Critical       => "Kritisch",
+        AdvisorMode.DevilsAdvocate => "Advocatus Diaboli",
+        AdvisorMode.DomainExpert   => "Domänen-Experte",
+        _                          => m.ToString()
+    };
+
     private static string GetAdvisorModeDescription(AdvisorMode m) => m switch
     {
-        AdvisorMode.Strategic      => "Provides strategic consultation before the executor begins",
-        AdvisorMode.Critical       => "Critical analysis of the artifact's assumptions",
-        AdvisorMode.DevilsAdvocate => "Challenges the strongest claims to surface weak assumptions",
-        AdvisorMode.DomainExpert   => "Brings domain-specific knowledge to the consultation",
+        AdvisorMode.Strategic      => "Liefert strategische Beratung vor dem ersten Executor-Durchlauf",
+        AdvisorMode.Critical       => "Kritische Analyse der Annahmen und Schwachstellen im Artefakt",
+        AdvisorMode.DevilsAdvocate => "Hinterfragt die stärksten Thesen, um verborgene Schwächen aufzudecken",
+        AdvisorMode.DomainExpert   => "Bringt domänenspezifisches Fachwissen in die Beratung ein",
         _                          => m.ToString()
+    };
+
+    private static string GetAdvisorTriggerLabel(AdvisorTrigger t) => t switch
+    {
+        AdvisorTrigger.BeforeFirstExecution => "Vor dem ersten Durchlauf",
+        AdvisorTrigger.BeforeEveryExecution => "Vor jedem Durchlauf",
+        AdvisorTrigger.OnConvergenceFailure => "Bei Konvergenz-Fehlschlag",
+        _                                   => t.ToString()
     };
 
     private static string GetAdvisorTriggerDescription(AdvisorTrigger t) => t switch
     {
-        AdvisorTrigger.BeforeFirstExecution => "Consulted only before the first iteration",
-        AdvisorTrigger.BeforeEveryExecution => "Consulted before every iteration",
-        AdvisorTrigger.OnConvergenceFailure => "Consulted when convergence fails (retry mode)",
+        AdvisorTrigger.BeforeFirstExecution => "Wird nur vor der ersten Iteration konsultiert",
+        AdvisorTrigger.BeforeEveryExecution => "Wird vor jeder Iteration konsultiert",
+        AdvisorTrigger.OnConvergenceFailure => "Wird konsultiert, wenn die Konvergenz scheitert (Retry-Modus)",
         _                                   => t.ToString()
     };
 
     private sealed class ProfileFormModel
     {
-        [Required, RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Only lowercase letters, numbers, hyphens")]
+        [Required, RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Nur Kleinbuchstaben, Ziffern und Bindestriche")]
         [MaxLength(64)]
         public string Name { get; set; } = "";
 

@@ -8,17 +8,17 @@
 @inject ICrewService CrewService
 @inject NavigationManager Nav
 
-<PageTitle>@(IsNew ? "New Advisor Profile" : "Edit Advisor Profile") — Atelier</PageTitle>
+<PageTitle>@(IsNew ? "Advisor-Profil erstellen" : "Advisor-Profil bearbeiten") — Atelier</PageTitle>
 
 <div class="crew-editor" data-testid="advisor-profile-editor">
     <div class="page-header">
-        <h1>@(IsNew ? "New Advisor Profile" : _isSystem ? _displayName : $"Edit: {_displayName}")</h1>
-        <a href="/crew/profiles/advisors" class="btn ghost">← Back</a>
+        <h1>@(IsNew ? "Neues Advisor-Profil" : _isSystem ? _displayName : $"Bearbeiten: {_displayName}")</h1>
+        <a href="/crew/profiles/advisors" class="btn ghost">← Zurück</a>
     </div>
 
     @if (_loading)
     {
-        <p>Loading…</p>
+        <p>Wird geladen…</p>
     }
     else
     {
@@ -39,14 +39,8 @@
                            SelectedTriggerChanged="trigger => _advisorTrigger = trigger"
                            OnSave="SaveAsync"
                            OnCancel="NavigateBack"
-                           OnDuplicate="DuplicateAsCustom" />
-
-        @if (!IsNew && !_isSystem)
-        {
-            <div style="margin-top: 1rem;">
-                <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true">Delete</button>
-            </div>
-        }
+                           OnDuplicate="DuplicateAsCustom"
+                           OnDeleteRequested="() => _showDeleteModal = true" />
     }
 </div>
 
