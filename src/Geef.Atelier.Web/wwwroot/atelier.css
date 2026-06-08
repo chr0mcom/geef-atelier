@@ -2690,6 +2690,170 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
 }
 .crew-editor .btn.danger:hover { background: color-mix(in oklch, var(--sv-critical) 12%, transparent); }
 
+/* ── Pipeline-Stage Sections (CrewTemplateEditor) ───────────── */
+
+/* Shared card base for both meta and pipeline sections — same as .edit-section */
+.template-meta-section,
+.pipeline-stage-section {
+    border: 1px solid var(--hairline);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 1.25rem 1.5rem 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.template-meta-section h3 {
+    margin: 0 0 1rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+
+/* Pipeline stage: numbered header row */
+.pipeline-stage-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.875rem;
+    margin-bottom: 1.1rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--hairline-soft);
+}
+
+.stage-num-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    background: var(--hero-soft);
+    color: var(--hero);
+    font-weight: 700;
+    font-size: 0.78rem;
+    margin-top: 0.05rem;
+}
+
+.pipeline-stage-header-text h3 {
+    margin: 0 0 0.15rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: none;
+    color: var(--ink);
+}
+
+.pipeline-stage-desc {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--ink-3);
+    line-height: 1.4;
+}
+
+/* ── Unified Profile Picker ───────────────────────────────── */
+.profile-picker-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+}
+
+.picker-col-label {
+    margin: 0 0 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+/* Pool (available) column */
+.picker-pool-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    text-align: left;
+    padding: 0.45rem 0.7rem;
+    margin-bottom: 0.3rem;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline-soft);
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 0.83rem;
+    color: var(--ink-2);
+    transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+
+.picker-pool-item:hover {
+    border-color: var(--hero);
+    color: var(--ink);
+    background: var(--hero-soft);
+}
+
+.picker-add-icon {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--hero);
+    opacity: 0.65;
+    flex-shrink: 0;
+    line-height: 1;
+    transition: opacity 0.12s;
+}
+
+.picker-pool-item:hover .picker-add-icon { opacity: 1; }
+
+/* Active (selected) column */
+.picker-active-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.625rem;
+    margin-bottom: 0.3rem;
+    background: var(--hero-soft);
+    border: 1px solid color-mix(in oklch, var(--hero) 28%, transparent);
+    border-radius: 7px;
+    font-size: 0.83rem;
+}
+
+.picker-item-rank {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--hero);
+    min-width: 1.1rem;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.picker-item-name {
+    flex: 1;
+    color: var(--ink);
+    font-size: 0.83rem;
+    line-height: 1.3;
+}
+
+.picker-item-meta {
+    font-size: 0.75rem;
+    color: var(--ink-3);
+}
+
+.picker-item-controls {
+    display: flex;
+    gap: 0.2rem;
+    flex-shrink: 0;
+}
+
+.picker-empty-state {
+    font-size: 0.8rem;
+    color: var(--ink-4);
+    margin: 0.5rem 0 0;
+    font-style: italic;
+}
+
+/* Fields inside pipeline stage sections have no bottom margin (card padding is enough) */
+.pipeline-stage-section > .field:last-child { margin-bottom: 0; }
+
 .crew-index h1 {
     margin-bottom: 1.5rem;
 }

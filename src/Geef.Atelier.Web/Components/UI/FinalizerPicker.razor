@@ -1,29 +1,46 @@
 @using Geef.Atelier.Core.Domain.Crew.Finalizers
 
-<div class="finalizer-picker" data-testid="finalizer-picker">
-    <div class="grounding-provider-picker-columns">
-        <div class="grounding-provider-picker-available">
-            <h4>Verfügbar</h4>
+<div class="profile-picker" data-testid="finalizer-picker">
+    <div class="profile-picker-grid">
+        <div>
+            <p class="picker-col-label">Verfügbar</p>
             @foreach (var p in AvailableNotSelected)
             {
-                <button type="button" class="grounding-provider-picker-item"
+                <button type="button" class="picker-pool-item"
                         data-testid="finalizer-picker-available-@p.Name"
                         @onclick="() => Add(p.Name)">
-                    @p.DisplayName — @GetTypeLabel(p.FinalizerType)
+                    <span class="picker-add-icon">＋</span>
+                    <span class="picker-item-name">@p.DisplayName</span>
+                    <span class="picker-item-meta">@GetTypeLabel(p.FinalizerType)</span>
                     @if (p.IsSystem) { <span class="crew-badge">System</span> }
                 </button>
             }
+            @if (!AvailableNotSelected.Any())
+            {
+                <p class="picker-empty-state">Alle ausgewählt</p>
+            }
         </div>
-        <div class="grounding-provider-picker-selected">
-            <h4>Ausgewählt (Reihenfolge zählt)</h4>
+        <div>
+            <p class="picker-col-label">Ausgewählt (Reihenfolge zählt)</p>
             @for (int i = 0; i < Selected.Count; i++)
             {
                 var idx = i;
                 var name = Selected[idx];
                 var profile = FindProfile(name);
-                <div class="grounding-provider-picker-selected-item" data-testid="finalizer-picker-selected-@name">
-                    <span>@(profile != null ? $"{profile.DisplayName} — {GetTypeLabel(profile.FinalizerType)}" : name)</span>
-                    <div class="grounding-provider-picker-actions">
+                <div class="picker-active-item" data-testid="finalizer-picker-selected-@name">
+                    <span class="picker-item-rank">@(idx + 1).</span>
+                    <span class="picker-item-name">
+                        @if (profile != null)
+                        {
+                            @profile.DisplayName
+                            <span class="picker-item-meta"> · @GetTypeLabel(profile.FinalizerType)</span>
+                        }
+                        else
+                        {
+                            @name
+                        }
+                    </span>
+                    <div class="picker-item-controls">
                         <button type="button" class="btn small ghost" disabled="@(idx == 0)"
                                 data-testid="finalizer-picker-up-@name"
                                 @onclick="() => MoveUp(idx)">↑</button>
@@ -38,7 +55,7 @@
             }
             @if (Selected.Count == 0)
             {
-                <p class="text-muted">Kein Finalizer ausgewählt.</p>
+                <p class="picker-empty-state">Kein Finalizer ausgewählt.</p>
             }
         </div>
     </div>

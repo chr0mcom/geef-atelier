@@ -15,12 +15,12 @@
 @inject IOptions<ConvergenceOptions> ConvergenceOpts
 @inject NavigationManager Nav
 
-<PageTitle>@(IsNew ? "New Template" : "Edit Template") — Atelier</PageTitle>
+<PageTitle>@(IsNew ? "Neues Template" : "Template bearbeiten") — Atelier</PageTitle>
 
 <div class="crew-editor" data-testid="template-editor">
     <div class="page-header">
-        <h1>@(IsNew ? "New Template" : _isSystem ? _displayName : $"Edit: {_displayName}")</h1>
-        <a href="/crew/templates" class="btn ghost">← Back</a>
+        <h1>@(IsNew ? "Neues Template" : _isSystem ? _displayName : $"Bearbeiten: {_displayName}")</h1>
+        <a href="/crew/templates" class="btn ghost">← Zurück</a>
     </div>
 
     @if (!string.IsNullOrEmpty(_error))
@@ -30,7 +30,7 @@
 
     @if (_loading)
     {
-        <p>Loading…</p>
+        <p>Wird geladen…</p>
     }
     else
     {
@@ -38,127 +38,157 @@
             <DataAnnotationsValidator />
             <ValidationSummary />
 
-            <div class="edit-section">
-            <h3>Grunddaten</h3>
+            @* §0 Grunddaten *@
+            <div class="template-meta-section">
+                <h3>Grunddaten</h3>
 
-            <div class="field">
-                <label>Name</label>
-                <InputText @bind-Value="_form.Name" disabled="@_isSystem" placeholder="my-template" />
-                @if (!_isSystem && !string.IsNullOrEmpty(_form.Name))
-                {
-                    <small>Will be saved as: custom-@_form.Name.TrimStart("custom-".ToCharArray())</small>
-                }
-            </div>
-
-            <div class="field">
-                <label>Display Name</label>
-                <InputText @bind-Value="_form.DisplayName" />
-            </div>
-
-            <div class="field">
-                <label>Description</label>
-                <InputTextArea @bind-Value="_form.Description" rows="3" />
-            </div>
-            </div>
-
-            <div class="edit-section">
-            <h3>Crew-Zusammenstellung</h3>
-
-            <div class="field">
-                <label>Executor Profile</label>
-                <InputSelect @bind-Value="_form.ExecutorProfileName" disabled="@_isSystem">
-                    @foreach (var e in _executors)
+                <div class="field">
+                    <label>Name</label>
+                    <InputText @bind-Value="_form.Name" disabled="@_isSystem" placeholder="mein-template" />
+                    @if (!_isSystem && !string.IsNullOrEmpty(_form.Name))
                     {
-                        <option value="@e.Name">@e.DisplayName @(e.IsSystem ? "(System)" : "")</option>
+                        <small>Wird gespeichert als: custom-@_form.Name.TrimStart("custom-".ToCharArray())</small>
                     }
-                </InputSelect>
+                </div>
+
+                <div class="field">
+                    <label>Anzeigename</label>
+                    <InputText @bind-Value="_form.DisplayName" />
+                </div>
+
+                <div class="field">
+                    <label>Beschreibung</label>
+                    <InputTextArea @bind-Value="_form.Description" rows="3" />
+                </div>
             </div>
 
-            <div class="field">
-                <label>Grounding Providers</label>
+            @* §1 Grounding *@
+            <div class="pipeline-stage-section">
+                <div class="pipeline-stage-header">
+                    <span class="stage-num-badge">1</span>
+                    <div class="pipeline-stage-header-text">
+                        <h3>Grounding</h3>
+                        <p class="pipeline-stage-desc">Recherche-Basis, die vor jeder Ausführung automatisch gesammelt wird</p>
+                    </div>
+                </div>
                 <GroundingProviderPicker AllProfiles="_groundingProviderProfiles"
                                         Selected="_form.GroundingProviderNames"
                                         SelectedChanged="names => _form.GroundingProviderNames = names" />
             </div>
 
-            <div class="field">
-                <label>Finalizer (optionale Pipeline nach dem Run)</label>
-                <FinalizerPicker AllProfiles="_finalizerProfiles"
-                                 Selected="_form.FinalizerProfileNames"
-                                 SelectedChanged="names => _form.FinalizerProfileNames = names" />
-            </div>
-
-            @if (_form.FinalizerProfileNames.Count > 0)
-            {
-                <div class="field">
-                    <label class="form-checkbox-label">
-                        <InputCheckbox @bind-Value="_form.RunFinalizersOnMaxAttempts" data-testid="run-finalizers-on-max-attempts" />
-                        Finalizer auch bei MaxIterations ausführen
-                    </label>
-                    <small class="form-hint">Wenn aktiviert, werden Finalizer auch dann ausgeführt, wenn die Pipeline nicht konvergiert. Der Run wird als abgeschlossen markiert, nicht als fehlgeschlagen.</small>
+            @* §2 Advisor *@
+            <div class="pipeline-stage-section">
+                <div class="pipeline-stage-header">
+                    <span class="stage-num-badge">2</span>
+                    <div class="pipeline-stage-header-text">
+                        <h3>Advisor</h3>
+                        <p class="pipeline-stage-desc">Strategische Beratung vor oder während der Ausführung — empfiehlt, entscheidet nicht</p>
+                    </div>
                 </div>
-            }
-
-            <div class="field">
-                <label>Advisors</label>
                 <AdvisorPicker AllProfiles="_advisorProfiles"
                                Selected="_form.AdvisorProfileNames"
                                SelectedChanged="names => _form.AdvisorProfileNames = names" />
             </div>
 
-            <div class="field">
-                <label>Reviewers</label>
+            @* §3 Executor *@
+            <div class="pipeline-stage-section">
+                <div class="pipeline-stage-header">
+                    <span class="stage-num-badge">3</span>
+                    <div class="pipeline-stage-header-text">
+                        <h3>Executor</h3>
+                        <p class="pipeline-stage-desc">Erstellt und überarbeitet das Dokument iterativ bis zur Konvergenz</p>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Profil</label>
+                    <InputSelect @bind-Value="_form.ExecutorProfileName" disabled="@_isSystem">
+                        @foreach (var e in _executors)
+                        {
+                            <option value="@e.Name">@e.DisplayName @(e.IsSystem ? "(System)" : "")</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+
+            @* §4 Reviewer + Auswertung *@
+            <div class="pipeline-stage-section">
+                <div class="pipeline-stage-header">
+                    <span class="stage-num-badge">4</span>
+                    <div class="pipeline-stage-header-text">
+                        <h3>Reviewer &amp; Auswertung</h3>
+                        <p class="pipeline-stage-desc">Bewertet jede Iteration und entscheidet über weitere Überarbeitungsrunden</p>
+                    </div>
+                </div>
                 <ReviewerPicker AllProfiles="_reviewers"
                                 Selected="_form.ReviewerProfileNames"
                                 SelectedChanged="names => _form.ReviewerProfileNames = names" />
-            </div>
-            </div>
-
-            <div class="edit-section">
-            <h3>Auswertung</h3>
-
-            <div class="field">
-                <label>Evaluation Strategy</label>
-                <div class="radio-group">
-                    @foreach (var strategy in Enum.GetValues<EvaluationStrategy>())
-                    {
-                        <label class="radio-option">
-                            <input type="radio" name="strategy"
-                                   value="@strategy"
-                                   checked="@(_form.EvaluationStrategy == strategy)"
-                                   @onchange="() => _form.EvaluationStrategy = strategy"
-                                   disabled="@_isSystem" />
-                            @strategy.ToString()
-                        </label>
-                    }
+                <div class="field" style="margin-top: 1.25rem;">
+                    <label>Auswertungsstrategie</label>
+                    <div class="radio-group">
+                        @foreach (var strategy in Enum.GetValues<EvaluationStrategy>())
+                        {
+                            <label class="radio-option">
+                                <input type="radio" name="strategy"
+                                       value="@strategy"
+                                       checked="@(_form.EvaluationStrategy == strategy)"
+                                       @onchange="() => _form.EvaluationStrategy = strategy"
+                                       disabled="@_isSystem" />
+                                @strategy.ToString()
+                            </label>
+                        }
+                    </div>
                 </div>
             </div>
+
+            @* §5 Finalizer *@
+            <div class="pipeline-stage-section">
+                <div class="pipeline-stage-header">
+                    <span class="stage-num-badge">5</span>
+                    <div class="pipeline-stage-header-text">
+                        <h3>Finalizer <span class="optional-label">optional</span></h3>
+                        <p class="pipeline-stage-desc">Nachgelagerte Pipeline nach Abschluss des Runs — Export, Anreicherung oder externe Weiterleitung</p>
+                    </div>
+                </div>
+                <FinalizerPicker AllProfiles="_finalizerProfiles"
+                                 Selected="_form.FinalizerProfileNames"
+                                 SelectedChanged="names => _form.FinalizerProfileNames = names" />
+                @if (_form.FinalizerProfileNames.Count > 0)
+                {
+                    <div class="field" style="margin-top: 1.25rem;">
+                        <label class="form-checkbox-label">
+                            <InputCheckbox @bind-Value="_form.RunFinalizersOnMaxAttempts" data-testid="run-finalizers-on-max-attempts" />
+                            Finalizer auch bei MaxIterationen ausführen
+                        </label>
+                        <small class="form-hint">Wenn aktiviert, werden Finalizer auch dann ausgeführt, wenn die Pipeline nicht konvergiert. Der Run wird als abgeschlossen markiert, nicht als fehlgeschlagen.</small>
+                    </div>
+                }
             </div>
 
+            @* Advanced *@
             <details class="collapsible-section">
-                <summary class="collapsible-header">Advanced (Convergence Override)</summary>
+                <summary class="collapsible-header">Erweitert (Konvergenz-Override)</summary>
                 <div class="collapsible-body">
-                    <p class="field-hint">Pre-filled with the global defaults. A value is only stored as a per-template override when you change it away from the default.</p>
+                    <p class="field-hint">Vorbelegt mit den globalen Standardwerten. Ein Wert wird nur als Template-Override gespeichert, wenn er vom Standard abweicht.</p>
                     <div class="field">
-                        <label>Max Iterations</label>
+                        <label>Max. Iterationen</label>
                         <InputNumber @bind-Value="_form.MaxIterations" data-testid="advanced-max-iterations" />
                     </div>
                     <div class="field">
-                        <label>Abort on Critical</label>
+                        <label>Abbruch bei Critical</label>
                         <InputCheckbox @bind-Value="_form.AbortOnCritical" data-testid="advanced-abort-on-critical" />
                     </div>
                     <div class="field">
-                        <label>Detect Regression</label>
+                        <label>Regression erkennen</label>
                         <InputCheckbox @bind-Value="_form.DetectRegression" data-testid="advanced-detect-regression" />
                     </div>
                     <div class="field">
-                        <label>Stagnation Threshold</label>
+                        <label>Stagnations-Schwelle</label>
                         <InputNumber @bind-Value="_form.StagnationThreshold" data-testid="advanced-stagnation-threshold" />
                     </div>
                     <div class="field">
-                        <label>Max Elapsed Minutes (Zeitbudget)</label>
+                        <label>Max. Laufzeit (Minuten)</label>
                         <InputNumber @bind-Value="_form.MaxElapsedMinutes" data-testid="advanced-max-elapsed-minutes" />
-                        <p class="field-hint">Wall-Clock-Limit des gesamten Runs. Wird es überschritten, stoppt der Run (auch wenn die Iterationszahl noch nicht erreicht ist). Für sehr lange Runs erhöhen.</p>
+                        <p class="field-hint">Wall-Clock-Limit des gesamten Runs. Wird es überschritten, stoppt der Run. Für sehr lange Runs erhöhen.</p>
                     </div>
                 </div>
             </details>
@@ -167,20 +197,20 @@
             {
                 <div class="editor-actions">
                     <button type="submit" class="btn primary" data-testid="save-template" disabled="@_saving">
-                        @(_saving ? "Saving…" : "Save")
+                        @(_saving ? "Wird gespeichert…" : "Speichern")
                     </button>
-                    <a href="/crew/templates" class="btn ghost">Cancel</a>
+                    <a href="/crew/templates" class="btn ghost">Abbrechen</a>
                     @if (!IsNew)
                     {
-                        <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true">Delete</button>
+                        <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true">Löschen</button>
                     }
                 </div>
             }
             else
             {
                 <div class="editor-actions">
-                    <button type="button" class="btn primary" @onclick="DuplicateAsCustom">Duplicate as custom</button>
-                    <a href="/crew/templates" class="btn ghost">Cancel</a>
+                    <button type="button" class="btn primary" @onclick="DuplicateAsCustom">Als Kopie duplizieren</button>
+                    <a href="/crew/templates" class="btn ghost">Abbrechen</a>
                 </div>
             }
         </EditForm>
@@ -191,7 +221,7 @@
     Show="_showDeleteModal"
     ItemName="@(Name ?? "")"
     ItemKind="Template"
-    ExtraWarning="Templates are preserved in historical runs as a snapshot — this delete only affects future submits."
+    ExtraWarning="Templates bleiben in historischen Runs als Snapshot erhalten — dieses Löschen betrifft nur zukünftige Ausführungen."
     OnConfirm="ExecuteDeleteAsync"
     OnCancel="() => _showDeleteModal = false" />
 
@@ -279,7 +309,7 @@
             var copy = original with
             {
                 Name = original.Name + "-copy",
-                DisplayName = original.DisplayName + " (Copy)",
+                DisplayName = original.DisplayName + " (Kopie)",
                 IsSystem = false
             };
             await CrewService.CreateCustomCrewTemplateAsync(copy);
@@ -302,7 +332,7 @@
 
     private sealed class TemplateFormModel
     {
-        [Required, RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Only lowercase letters, numbers, and hyphens")]
+        [Required, RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Nur Kleinbuchstaben, Ziffern und Bindestriche")]
         [MaxLength(64)]
         public string Name { get; set; } = "";
 
