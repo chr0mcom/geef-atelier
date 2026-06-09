@@ -4,7 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Geef SDK — stable release, consumed from local feed until nuget.org publish is set up -->
-    <PackageVersion Include="Geef.Sdk" Version="1.1.0" />
+    <PackageVersion Include="Geef.Sdk" Version="1.2.0" />
     <!-- HTML parsing for url-fetch provider (bUnit already brings AngleSharp transitively; use HAP to avoid conflicts) -->
     <PackageVersion Include="HtmlAgilityPack" Version="1.12.4" />
     <!-- Official OpenAI SDK — used for the Responses API path (pro/reasoning models on openai-direct) -->

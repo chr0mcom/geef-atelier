@@ -8,6 +8,7 @@ using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk;
+using Geef.Sdk.Runtime;
 using Geef.Sdk.Context;
 using Geef.Sdk.Events;
 using Geef.Sdk.Middleware;
@@ -270,6 +271,7 @@ internal static class AtelierPipelineFactory
         if (profiles.Count == 0)
             return [new AutoApproveReviewer()];
 
+        var classifier = new HttpTransientFaultClassifier();
         return profiles.Select(r =>
         {
             if (specialReviewerResolver is not null)
@@ -279,7 +281,11 @@ internal static class AtelierPipelineFactory
                     return special;
             }
 
-            return (IReviewer)new ProfileBasedReviewer(r, resolver, pricingCatalog, costAccumulator);
+            return (IReviewer)new ResilientReviewer(
+                new ProfileBasedReviewer(r, resolver, pricingCatalog, costAccumulator),
+                classifier,
+                maxAttempts: LlmResilience.ReviewerMaxAttempts,
+                maxDelay: LlmResilience.ReviewerMaxDelay);
         });
     }
 }

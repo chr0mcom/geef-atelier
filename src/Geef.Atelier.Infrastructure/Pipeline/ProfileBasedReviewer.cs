@@ -39,19 +39,15 @@ internal sealed class ProfileBasedReviewer(
 
         var (client, model, maxTokens) = resolver.ForProfile(profile.Provider, profile.Model, profile.MaxTokens);
 
-        var response = await LlmResilience.ExecuteAsync(
-            ct => client.CompleteAsync(new LlmRequest
-            {
-                Model        = model,
-                SystemPrompt = profile.SystemPrompt,
-                UserPrompt   = userPrompt,
-                MaxTokens    = maxTokens,
-                Tools        = [ReviewerToolDefinition.SubmitReview],
-                ToolChoice   = "function:submit_review"
-            }, ct),
-            cancellationToken,
-            maxAttempts: LlmResilience.ReviewerMaxAttempts,
-            maxDelay: LlmResilience.ReviewerMaxDelay);
+        var response = await client.CompleteAsync(new LlmRequest
+        {
+            Model        = model,
+            SystemPrompt = profile.SystemPrompt,
+            UserPrompt   = userPrompt,
+            MaxTokens    = maxTokens,
+            Tools        = [ReviewerToolDefinition.SubmitReview],
+            ToolChoice   = "function:submit_review"
+        }, cancellationToken);
 
         if (costAccumulator is not null)
         {
@@ -86,19 +82,15 @@ internal sealed class ProfileBasedReviewer(
                 "at least one finding. Use 'info' severity for minor observations or suggestions. " +
                 "Re-submit using the submit_review tool now.";
 
-            var retryResponse = await LlmResilience.ExecuteAsync(
-                ct => client.CompleteAsync(new LlmRequest
-                {
-                    Model        = model,
-                    SystemPrompt = profile.SystemPrompt,
-                    UserPrompt   = userPrompt + mandatoryFindingsReminder,
-                    MaxTokens    = maxTokens,
-                    Tools        = [ReviewerToolDefinition.SubmitReview],
-                    ToolChoice   = "function:submit_review"
-                }, ct),
-                cancellationToken,
-                maxAttempts: LlmResilience.ReviewerMaxAttempts,
-                maxDelay: LlmResilience.ReviewerMaxDelay);
+            var retryResponse = await client.CompleteAsync(new LlmRequest
+            {
+                Model        = model,
+                SystemPrompt = profile.SystemPrompt,
+                UserPrompt   = userPrompt + mandatoryFindingsReminder,
+                MaxTokens    = maxTokens,
+                Tools        = [ReviewerToolDefinition.SubmitReview],
+                ToolChoice   = "function:submit_review"
+            }, cancellationToken);
 
             if (costAccumulator is not null)
             {
