@@ -237,67 +237,32 @@ internal sealed class RunOrchestratorService(
             }
             catch (ConvergenceFailedException convergenceEx)
             {
-                logger.LogWarning(convergenceEx,
-                    "Run {RunId} failed to converge; checking for OnConvergenceFailure advisors.", run.Id);
-
-                bool retried;
-                bool retryAlsoFailed = false;
-                try
-                {
-                    retried = await TryConvergenceFailureRetryAsync(run, snapshot, cts.Token);
-                }
-                catch (ConvergenceFailedException retryEx)
-                {
-                    // The OnConvergenceFailure advisor retry also failed — treat as max-attempts path.
-                    logger.LogWarning(retryEx,
-                        "Run {RunId} advisor-retry also failed to converge.", run.Id);
-                    retried = true;
-                    retryAlsoFailed = true;
-                }
+                // The SDK already attempted one recovery pass (via OnConvergenceFailure advisors, if any).
+                // At this point the run did not converge; apply max-attempts handling.
+                logger.LogWarning(convergenceEx, "Run {RunId} failed to converge.", run.Id);
 
                 bool shouldRunFinalizers = finalizerExecutorFactory is not null &&
                     snapshot.RunFinalizersOnMaxAttempts &&
                     snapshot.Finalizers?.Count > 0;
 
-                if (!retried || retryAlsoFailed)
+                if (shouldRunFinalizers)
                 {
-                    if (shouldRunFinalizers)
-                    {
-                        // Run finalizers on max-attempts: use last iteration text, mark as Completed.
-                        await ExecuteFinalizationOnMaxAttemptsAsync(run, snapshot, cts.Token);
-                        try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
-                    }
-                    else
-                    {
-                        // No max-attempts finalizer configured. Do not discard the work: surface the most
-                        // complete iteration draft as the run result so the user gets a usable document
-                        // instead of a Failed run with no output. Only when no draft exists at all do we
-                        // fall back to propagating the failure.
-                        if (accumulator is not null)
-                            await FinalizeRunCostsAsync(run.Id, accumulator, cts.Token);
-
-                        var surfaced = await CompleteWithBestDraftOnMaxAttemptsAsync(run.Id, cts.Token);
-                        if (surfaced)
-                        {
-                            try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
-                        }
-                        else if (!retried)
-                        {
-                            // No retry, no draft to surface — propagate so outer handler marks Failed.
-                            throw;
-                        }
-                        else
-                        {
-                            // Retry also failed, no draft — outer catch (Exception) will mark Failed.
-                            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(convergenceEx).Throw();
-                            throw; // unreachable; satisfies compiler
-                        }
-                    }
+                    // Run finalizers on max-attempts: use last iteration text, mark as Completed.
+                    await ExecuteFinalizationOnMaxAttemptsAsync(run, snapshot, cts.Token);
+                    try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
                 }
                 else
                 {
-                    // Retry ran and succeeded: status was written inside TryConvergenceFailureRetryAsync.
-                    try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
+                    // No max-attempts finalizer configured. Surface the most complete draft seen so
+                    // the user gets a usable document instead of a Failed run with no output.
+                    if (accumulator is not null)
+                        await FinalizeRunCostsAsync(run.Id, accumulator, cts.Token);
+
+                    var surfaced = await CompleteWithBestDraftOnMaxAttemptsAsync(run.Id, cts.Token);
+                    if (surfaced)
+                        try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
+                    else
+                        throw; // No draft to surface — propagate so outer handler marks Failed.
                 }
             }
         }
@@ -375,121 +340,6 @@ internal sealed class RunOrchestratorService(
                 logger.LogWarning(ex, "Cancellation watcher for run {RunId} encountered an error; will retry.", runId);
             }
         }
-    }
-
-    /// <summary>
-    /// Attempts a convergence-failure recovery pass if the run has
-    /// <see cref="AdvisorTrigger.OnConvergenceFailure"/> advisors and has not already retried.
-    /// Consults each advisor, assembles their outputs into an advisor-context block, rebuilds the
-    /// pipeline via <see cref="AtelierPipelineFactory.BuildWithAdvisorContext"/>, and runs it.
-    /// </summary>
-    /// <returns>
-    /// <see langword="true"/> if a recovery pass was started (regardless of whether it converges);
-    /// <see langword="false"/> if no retry is possible (no advisors or single-retry cap exhausted).
-    /// </returns>
-    private async Task<bool> TryConvergenceFailureRetryAsync(
-        RunEntity         run,
-        CrewSnapshot      snapshot,
-        CancellationToken ct)
-    {
-        // 1. Check for OnConvergenceFailure advisors.
-        var convergenceAdvisors = snapshot.Advisors
-            .Where(a => a.Trigger == AdvisorTrigger.OnConvergenceFailure)
-            .ToList();
-
-        if (convergenceAdvisors.Count == 0)
-        {
-            logger.LogDebug("Run {RunId}: no OnConvergenceFailure advisors; skipping retry.", run.Id);
-            return false;
-        }
-
-        // 2. Enforce single-retry cap: load AdvisorRetryAttempted from DB.
-        bool alreadyRetried;
-        await using (var capScope = scopeFactory.CreateAsyncScope())
-        {
-            var capDb = capScope.ServiceProvider.GetRequiredService<AtelierDbContext>();
-            alreadyRetried = await capDb.Runs
-                .Where(r => r.Id == run.Id)
-                .Select(r => r.AdvisorRetryAttempted)
-                .FirstOrDefaultAsync(ct);
-        }
-
-        if (alreadyRetried)
-        {
-            logger.LogWarning(
-                "Run {RunId}: convergence-failure retry already attempted; not retrying again.", run.Id);
-            return false;
-        }
-
-        // 3. Mark retry as attempted — prevents a second retry on a subsequent convergence failure.
-        await using (var markScope = scopeFactory.CreateAsyncScope())
-        {
-            var markDb = markScope.ServiceProvider.GetRequiredService<AtelierDbContext>();
-            await markDb.Runs
-                .Where(r => r.Id == run.Id)
-                .ExecuteUpdateAsync(s => s.SetProperty(r => r.AdvisorRetryAttempted, true), ct);
-        }
-
-        logger.LogInformation(
-            "Run {RunId}: starting convergence-failure recovery pass with {Count} advisor(s).",
-            run.Id, convergenceAdvisors.Count);
-
-        // 4. Consult each OnConvergenceFailure advisor and collect their outputs.
-        var advisorOutputs = new List<string>(convergenceAdvisors.Count);
-        await using (var advisorScope = scopeFactory.CreateAsyncScope())
-        {
-            var consultationRepo = advisorScope.ServiceProvider
-                .GetRequiredService<IAdvisorConsultationRepository>();
-
-            foreach (var profile in convergenceAdvisors)
-            {
-                var advisor      = new ProfileBasedAdvisor(profile, llmClientResolver, consultationRepo);
-                var consultation = await advisor.ConsultAsync(run.Id, -1, run.BriefingText, ct);
-                advisorOutputs.Add(
-                    $"## {profile.DisplayName} ({profile.Mode})\n{consultation.Output}");
-            }
-        }
-
-        var advisorBlock =
-            $"[Convergence failure recovery — advisor consultations]\n\n" +
-            $"{string.Join("\n\n", advisorOutputs)}\n\n" +
-            $"[End of advisor consultations]";
-
-        // 5. Build and run a new pipeline with the advisor context injected.
-        var retrySinkLogger = loggerFactory.CreateLogger($"PostgresEventSink[{run.Id}]#retry");
-        var retrySink       = new PostgresEventSink(run.Id, scopeFactory, runNotifier, retrySinkLogger);
-
-        await using var retryScope = scopeFactory.CreateAsyncScope();
-        var retryConsultations        = retryScope.ServiceProvider.GetRequiredService<IAdvisorConsultationRepository>();
-        var retryGroundingRefiner     = retryScope.ServiceProvider.GetService<IGroundingRefiner>();
-        var retryGroundingConsultRepo = retryScope.ServiceProvider.GetService<IGroundingConsultationRepository>();
-
-        var costTrackingEnabled = costTrackingOptions?.Value.Enabled ?? false;
-        var retryAccumulator = costTrackingEnabled ? new RunCostAccumulator() : null;
-
-        var retryRunner = AtelierPipelineFactory.BuildWithAdvisorContext(
-            snapshot,
-            llmClientResolver,
-            convergenceOptions,
-            advisorBlock,
-            consultationRepository: retryConsultations,
-            runId: run.Id,
-            loggerFactory: loggerFactory,
-            additionalSinks: [retrySink],
-            groundingProviderFactory: groundingProviderFactory,
-            pricingCatalog: pricingCatalog,
-            costAccumulator: retryAccumulator,
-            groundingRefiner: retryGroundingRefiner,
-            groundingConsultationRepository: retryGroundingConsultRepo);
-
-        // The retry pipeline writes its own status via PostgresEventSink just like the main run.
-        // ConvergenceFailedException from the retry is intentionally not caught here — it propagates
-        // to the outer ProcessRunAsync handler which will mark the run as Failed.
-        await retryRunner.RunAsync(run.BriefingText, ct);
-        if (retryAccumulator is not null)
-            await FinalizeRunCostsAsync(run.Id, retryAccumulator, ct);
-
-        return true;
     }
 
     private static CrewSnapshot ResolveSnapshot(RunEntity run)

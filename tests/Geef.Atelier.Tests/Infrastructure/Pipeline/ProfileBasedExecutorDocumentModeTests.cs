@@ -158,7 +158,7 @@ public sealed class ProfileBasedExecutorDocumentModeTests
         var context  = new RunContext()
             .Set(AtelierContextKeys.GroundedBrief, "the brief")
             .Set(AtelierContextKeys.GroundingContext, grounding)
-            .Set(AtelierContextKeys.AdvisorBlock, advisor)
+            .Set(GeefKeys.AdvisorContext, advisor)
             .Set(GeefKeys.CurrentIteration, 1);
 
         await executor.RunAsync(context, CancellationToken.None);
@@ -200,7 +200,7 @@ public sealed class ProfileBasedExecutorDocumentModeTests
         var context  = new RunContext()
             .Set(AtelierContextKeys.GroundedBrief, "the brief")
             .Set(AtelierContextKeys.GroundingContext, "   ")
-            .Set(AtelierContextKeys.AdvisorBlock, "\n\t ")
+            .Set(GeefKeys.AdvisorContext, "\n\t ")
             .Set(GeefKeys.CurrentIteration, 1);
 
         await executor.RunAsync(context, CancellationToken.None);
@@ -219,7 +219,7 @@ public sealed class ProfileBasedExecutorDocumentModeTests
         var context  = new RunContext()
             .Set(AtelierContextKeys.GroundedBrief, "the brief")
             .Set(AtelierContextKeys.GroundingContext, grounding)
-            .Set(AtelierContextKeys.AdvisorBlock, advisor)
+            .Set(GeefKeys.AdvisorContext, advisor)
             .Set(GeefKeys.CurrentIteration, 1);
 
         await executor.RunAsync(context, CancellationToken.None);

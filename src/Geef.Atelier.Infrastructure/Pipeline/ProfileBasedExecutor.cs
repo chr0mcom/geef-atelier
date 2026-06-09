@@ -164,7 +164,7 @@ internal sealed class ProfileBasedExecutor(
             userPrompt = $"{groundingCtx}\n\n{userPrompt}";
 
         // Prepend advisor consultation outputs to the user prompt when present.
-        if (context.TryGet(AtelierContextKeys.AdvisorBlock, out var advisorBlock) && advisorBlock is not null)
+        if (context.TryGet(GeefKeys.AdvisorContext, out var advisorBlock) && advisorBlock is not null)
             userPrompt = $"{advisorBlock}\n\n{userPrompt}";
 
         return userPrompt;
@@ -177,7 +177,7 @@ internal sealed class ProfileBasedExecutor(
     private static string? CollectContextBlocks(IRunContext context)
     {
         var parts = new List<string>(2);
-        if (context.TryGet(AtelierContextKeys.AdvisorBlock, out var advisorBlock) && !string.IsNullOrWhiteSpace(advisorBlock))
+        if (context.TryGet(GeefKeys.AdvisorContext, out var advisorBlock) && !string.IsNullOrWhiteSpace(advisorBlock))
             parts.Add(advisorBlock);
         if (context.TryGet(AtelierContextKeys.GroundingContext, out var groundingCtx) && !string.IsNullOrWhiteSpace(groundingCtx))
             parts.Add(groundingCtx);

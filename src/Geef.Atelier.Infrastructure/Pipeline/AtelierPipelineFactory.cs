@@ -16,6 +16,7 @@ using Geef.Sdk.Providers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SdkGeef = Geef.Sdk.Geef;
+using SdkAdvisorTrigger = Geef.Sdk.Advisors.AdvisorTrigger;
 
 namespace Geef.Atelier.Infrastructure.Pipeline;
 
@@ -23,31 +24,11 @@ internal static class AtelierPipelineFactory
 {
     /// <summary>
     /// Builds the pipeline dynamically from a fully-dereferenced <see cref="CrewSnapshot"/>.
-    /// When the snapshot contains pre-execution advisors (<see cref="AdvisorTrigger.BeforeFirstExecution"/>
-    /// or <see cref="AdvisorTrigger.BeforeEveryExecution"/>), the executor is wrapped with an
-    /// <see cref="AdvisorAwareExecutor"/> decorator that consults them before each iteration.
+    /// Pre-execution advisors (<see cref="AdvisorTrigger.BeforeFirstExecution"/> /
+    /// <see cref="AdvisorTrigger.BeforeEveryExecution"/>) and convergence-failure recovery
+    /// advisors (<see cref="AdvisorTrigger.OnConvergenceFailure"/>) are registered directly
+    /// with the SDK builder and consulted by the runner at the appropriate lifecycle points.
     /// </summary>
-    /// <param name="snapshot">Fully-dereferenced crew configuration for the run.</param>
-    /// <param name="resolver">LLM client resolver used to create profile-based actors.</param>
-    /// <param name="convergenceOptions">Convergence policy configuration.</param>
-    /// <param name="consultationRepository">Repository for advisor consultation records.</param>
-    /// <param name="runId">Identifier of the run being executed (used for tracing).</param>
-    /// <param name="loggerFactory">Optional logger factory for pipeline event sinks.</param>
-    /// <param name="additionalSinks">Additional event sinks to attach to the pipeline.</param>
-    /// <param name="groundingProviderFactory">Optional factory for grounding providers.</param>
-    /// <param name="pricingCatalog">Optional pricing catalog for cost tracking.</param>
-    /// <param name="costAccumulator">Optional cost accumulator for recording actor costs.</param>
-    /// <param name="groundingRefiner">Optional grounding refiner for provider-backed refinement.</param>
-    /// <param name="groundingConsultationRepository">Optional repository for grounding consultation records.</param>
-    /// <param name="customExecutionStep">
-    /// When non-null, this step is used instead of the default <see cref="ProfileBasedExecutor"/>.
-    /// Advisor wrapping is skipped when a custom execution step is supplied.
-    /// </param>
-    /// <param name="specialReviewerResolver">
-    /// Optional factory called for each <see cref="Geef.Atelier.Core.Domain.Crew.Profiles.ReviewerProfile"/>
-    /// before falling back to <see cref="ProfileBasedReviewer"/>. Return a non-null <see cref="IReviewer"/>
-    /// to substitute the profile-based instance; return <see langword="null"/> to use the default.
-    /// </param>
     public static GeefPipelineRunner<FinalizedDocument> Build(
         CrewSnapshot snapshot,
         ILlmClientResolver resolver,
@@ -75,88 +56,20 @@ internal static class AtelierPipelineFactory
                 groundingConsultationRepository);
         }
 
-        IExecutionStep execution;
-        if (customExecutionStep is not null)
-        {
-            execution = customExecutionStep;
-        }
-        else
-        {
-            execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);
-
-            var preExecutionAdvisors = snapshot.Advisors
-                .Where(a => a.Trigger != AdvisorTrigger.OnConvergenceFailure)
-                .ToList();
-
-            if (preExecutionAdvisors.Count > 0 && consultationRepository is not null)
-            {
-                var advisorInstances = preExecutionAdvisors
-                    .Select(a => new ProfileBasedAdvisor(a, resolver, consultationRepository, pricingCatalog, costAccumulator))
-                    .ToList();
-                execution = new AdvisorAwareExecutor(execution, advisorInstances, runId);
-            }
-        }
+        IExecutionStep execution = customExecutionStep
+            ?? new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);
 
         var reviewers = ResolveReviewers(snapshot.Reviewers, resolver, pricingCatalog, costAccumulator, specialReviewerResolver);
         var finalizer = new MarkdownFinalizer();
 
-        return BuildWithProviders(grounding, execution, reviewers, finalizer,
+        var builder = CreateBuilder(grounding, execution, reviewers, finalizer,
             convergenceOptions, snapshot.ConvergenceOverride,
             snapshot.EvaluationStrategy, loggerFactory, additionalSinks);
-    }
 
-    /// <summary>
-    /// Builds the pipeline like <see cref="Build"/>, but also injects a pre-formed advisor context
-    /// block directly into the initial run context. Used by the orchestrator for convergence-failure
-    /// recovery passes where <see cref="AdvisorTrigger.OnConvergenceFailure"/> advisors have already
-    /// been consulted and their outputs assembled into <paramref name="advisorContextBlock"/>.
-    /// </summary>
-    public static GeefPipelineRunner<FinalizedDocument> BuildWithAdvisorContext(
-        CrewSnapshot snapshot,
-        ILlmClientResolver resolver,
-        IOptions<ConvergenceOptions> convergenceOptions,
-        string advisorContextBlock,
-        IAdvisorConsultationRepository? consultationRepository = null,
-        Guid runId = default,
-        ILoggerFactory? loggerFactory = null,
-        IEnumerable<IGeefEventSink>? additionalSinks = null,
-        IGroundingProviderFactory? groundingProviderFactory = null,
-        IPricingCatalog? pricingCatalog = null,
-        ICostAccumulator? costAccumulator = null,
-        IGroundingRefiner? groundingRefiner = null,
-        IGroundingConsultationRepository? groundingConsultationRepository = null)
-    {
-        IGroundingStep grounding = new AdvisorContextGroundingStep(advisorContextBlock);
-        if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
-        {
-            grounding = new MultiProviderGroundingStep(
-                grounding, snapshot.GroundingProviders, groundingProviderFactory, runId,
-                loggerFactory?.CreateLogger<MultiProviderGroundingStep>()
-                    ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance,
-                groundingRefiner,
-                groundingConsultationRepository);
-        }
+        if (consultationRepository is not null && customExecutionStep is null)
+            RegisterAdvisors(builder, snapshot.Advisors, resolver, consultationRepository, runId, pricingCatalog, costAccumulator);
 
-        IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);
-
-        var preExecutionAdvisors = snapshot.Advisors
-            .Where(a => a.Trigger != AdvisorTrigger.OnConvergenceFailure)
-            .ToList();
-
-        if (preExecutionAdvisors.Count > 0 && consultationRepository is not null)
-        {
-            var advisorInstances = preExecutionAdvisors
-                .Select(a => new ProfileBasedAdvisor(a, resolver, consultationRepository, pricingCatalog, costAccumulator))
-                .ToList();
-            execution = new AdvisorAwareExecutor(execution, advisorInstances, runId);
-        }
-
-        var reviewers = ResolveReviewers(snapshot.Reviewers, resolver, pricingCatalog, costAccumulator);
-        var finalizer = new MarkdownFinalizer();
-
-        return BuildWithProviders(grounding, execution, reviewers, finalizer,
-            convergenceOptions, snapshot.ConvergenceOverride,
-            snapshot.EvaluationStrategy, loggerFactory, additionalSinks);
+        return builder.Build();
     }
 
     /// <summary>
@@ -191,29 +104,22 @@ internal static class AtelierPipelineFactory
         }
 
         IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);
-
-        var preExecutionAdvisors = snapshot.Advisors
-            .Where(a => a.Trigger != AdvisorTrigger.OnConvergenceFailure)
-            .ToList();
-
-        if (preExecutionAdvisors.Count > 0 && consultationRepository is not null)
-        {
-            var advisorInstances = preExecutionAdvisors
-                .Select(a => new ProfileBasedAdvisor(a, resolver, consultationRepository, pricingCatalog, costAccumulator))
-                .ToList();
-            execution = new AdvisorAwareExecutor(execution, advisorInstances, runId);
-        }
-
         var reviewers = ResolveReviewers(snapshot.Reviewers, resolver, pricingCatalog, costAccumulator);
         var finalizer = new MarkdownFinalizer();
 
-        return BuildWithProviders(grounding, execution, reviewers, finalizer,
+        var builder = CreateBuilder(grounding, execution, reviewers, finalizer,
             convergenceOptions, snapshot.ConvergenceOverride,
             snapshot.EvaluationStrategy, loggerFactory, additionalSinks);
+
+        if (consultationRepository is not null)
+            RegisterAdvisors(builder, snapshot.Advisors, resolver, consultationRepository, runId, pricingCatalog, costAccumulator);
+
+        return builder.Build();
     }
 
     /// <summary>
     /// Builds the pipeline with explicitly supplied providers. Used in tests to inject stubs or fakes.
+    /// Advisor registration is skipped (no advisor profiles available in this code path).
     /// </summary>
     public static GeefPipelineRunner<FinalizedDocument> BuildWithProviders(
         IGroundingStep grounding,
@@ -225,6 +131,22 @@ internal static class AtelierPipelineFactory
         EvaluationStrategy evaluationStrategy = EvaluationStrategy.Parallel,
         ILoggerFactory? loggerFactory = null,
         IEnumerable<IGeefEventSink>? additionalSinks = null)
+    {
+        return CreateBuilder(grounding, execution, reviewers, finalizer,
+            convergenceOptions, convergenceOverride,
+            evaluationStrategy, loggerFactory, additionalSinks).Build();
+    }
+
+    private static GeefPipelineBuilder<FinalizedDocument> CreateBuilder(
+        IGroundingStep grounding,
+        IExecutionStep execution,
+        IEnumerable<IReviewer> reviewers,
+        IFinalizer<FinalizedDocument> finalizer,
+        IOptions<ConvergenceOptions> convergenceOptions,
+        ConvergencePolicyOverride? convergenceOverride,
+        EvaluationStrategy evaluationStrategy,
+        ILoggerFactory? loggerFactory,
+        IEnumerable<IGeefEventSink>? additionalSinks)
     {
         var builder = SdkGeef.CreatePipeline<FinalizedDocument>()
             .UseGrounding(grounding)
@@ -252,8 +174,33 @@ internal static class AtelierPipelineFactory
                 builder = builder.AddEventSink(sink);
         }
 
-        return builder.Build();
+        return builder;
     }
+
+    private static void RegisterAdvisors(
+        GeefPipelineBuilder<FinalizedDocument> builder,
+        IReadOnlyList<AdvisorProfile> profiles,
+        ILlmClientResolver resolver,
+        IAdvisorConsultationRepository consultationRepository,
+        Guid runId,
+        IPricingCatalog? pricingCatalog,
+        ICostAccumulator? costAccumulator)
+    {
+        foreach (var profile in profiles)
+        {
+            var advisor = new ProfileBasedAdvisor(
+                profile, resolver, consultationRepository, runId, pricingCatalog, costAccumulator);
+            builder.AddAdvisor(advisor, MapTrigger(profile.Trigger));
+        }
+    }
+
+    private static SdkAdvisorTrigger MapTrigger(AdvisorTrigger atelierTrigger) => atelierTrigger switch
+    {
+        AdvisorTrigger.BeforeFirstExecution => SdkAdvisorTrigger.BeforeFirstExecution,
+        AdvisorTrigger.BeforeEveryExecution => SdkAdvisorTrigger.BeforeEveryExecution,
+        AdvisorTrigger.OnConvergenceFailure => SdkAdvisorTrigger.OnConvergenceFailure,
+        _ => SdkAdvisorTrigger.BeforeFirstExecution
+    };
 
     /// <summary>
     /// Returns reviewers for the given profiles, falling back to <see cref="AutoApproveReviewer"/> when

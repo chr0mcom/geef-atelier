@@ -26,12 +26,6 @@ internal static class AtelierContextKeys
     public static readonly ContextKey<ExecutorProfile> CompositionExecutorProfile = new("geef:atelier:composition-executor-profile");
 
     /// <summary>
-    /// Injected by <c>AdvisorAwareExecutor</c> (or directly by the orchestrator for convergence-failure retries).
-    /// Contains a formatted block of advisor consultation outputs that <c>ProfileBasedExecutor</c> prepends to its prompt.
-    /// </summary>
-    public static readonly ContextKey<string>         AdvisorBlock     = new("geef:atelier:advisor-block");
-
-    /// <summary>
     /// Injected by <c>MultiProviderGroundingStep</c> when one or more grounding providers are configured.
     /// Contains concatenated formatted web-research blocks that <c>ProfileBasedExecutor</c> prepends before
     /// the advisor block and user prompt.
