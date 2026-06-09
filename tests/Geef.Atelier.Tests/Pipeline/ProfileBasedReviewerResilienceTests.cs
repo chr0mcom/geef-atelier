@@ -4,13 +4,17 @@ using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Tests.Llm;
 using Geef.Sdk.Context;
-using Geef.Sdk.Results;
 
 namespace Geef.Atelier.Tests.Pipeline;
 
 /// <summary>
-/// Verifies that a reviewer whose LLM provider is unavailable never aborts the run: it is skipped
-/// for the round and reports a single non-blocking <see cref="FindingSeverity.Info"/> finding.
+/// Verifies ProfileBasedReviewer's behavior around provider failures.
+///
+/// Since SDK v1.1.0 reviewer fault isolation lives in the SDK's InstrumentedReviewer:
+/// a provider exception propagates out of ProfileBasedReviewer and is caught by
+/// InstrumentedReviewer, which converts it to ReviewDecision.Failed (non-blocking when
+/// FailedReviewerHandling=TreatAsNonBlocking, set by ConvergencePolicyBuilder).
+/// ProfileBasedReviewer no longer silently swallows provider errors.
 /// </summary>
 public sealed class ProfileBasedReviewerResilienceTests
 {
@@ -31,30 +35,15 @@ public sealed class ProfileBasedReviewerResilienceTests
             .Set(GeefKeys.CurrentIteration,        1);
 
     [Fact]
-    public async Task ProviderUnavailable_SkipsReviewer_WithNonBlockingInfoFinding()
+    public async Task PermanentProviderError_PropagatesAsHttpRequestException()
     {
-        // 401 is a permanent error → no retries → the skip path runs instantly.
+        // 401 is a permanent error — LlmResilience does not retry it.
+        // The exception propagates; SDK InstrumentedReviewer converts it to Failed.
         var resolver = new TestLlmClientResolver(ThrowingLlmClient.HttpError(HttpStatusCode.Unauthorized));
         var reviewer = new ProfileBasedReviewer(TestProfile(), resolver);
 
-        var result = await reviewer.ReviewAsync(BuildContext(), CancellationToken.None);
-
-        // Non-blocking: the run keeps converging on the remaining reviewers.
-        Assert.Equal(ReviewDecision.ApprovedWithWarnings, result.Decision);
-        var finding = Assert.Single(result.Findings);
-        Assert.Equal(FindingSeverity.Info, finding.Severity);
-        Assert.Contains("unavailable", finding.Message, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task ProviderUnavailable_DoesNotThrow()
-    {
-        var resolver = new TestLlmClientResolver(ThrowingLlmClient.HttpError(HttpStatusCode.Unauthorized));
-        var reviewer = new ProfileBasedReviewer(TestProfile(), resolver);
-
-        // Must complete normally rather than propagating the provider exception.
-        var result = await reviewer.ReviewAsync(BuildContext(), CancellationToken.None);
-        Assert.NotNull(result);
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => reviewer.ReviewAsync(BuildContext(), CancellationToken.None));
     }
 
     [Fact]

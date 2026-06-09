@@ -27,11 +27,15 @@ internal static class ConvergencePolicyBuilder
 
         return new()
         {
-            MaxIterations       = maxIterations,
-            MaxElapsedTime      = TimeSpan.FromMinutes(maxElapsedMinutes),
-            AbortOnCritical     = overridePolicy?.AbortOnCritical     ?? defaults.AbortOnCritical,
-            DetectRegression    = overridePolicy?.DetectRegression    ?? defaults.DetectRegression,
-            StagnationThreshold = overridePolicy?.StagnationThreshold ?? defaults.StagnationThreshold
+            MaxIterations          = maxIterations,
+            MaxElapsedTime         = TimeSpan.FromMinutes(maxElapsedMinutes),
+            AbortOnCritical        = overridePolicy?.AbortOnCritical     ?? defaults.AbortOnCritical,
+            DetectRegression       = overridePolicy?.DetectRegression    ?? defaults.DetectRegression,
+            StagnationThreshold    = overridePolicy?.StagnationThreshold ?? defaults.StagnationThreshold,
+            // Reviewer infrastructure failures are isolated by the SDK's InstrumentedReviewer.
+            // Treat them as non-blocking so brief provider outages do not prevent convergence;
+            // the failure is still recorded and visible in the run result.
+            FailedReviewerHandling = FailedReviewerHandling.TreatAsNonBlocking
         };
     }
 }
