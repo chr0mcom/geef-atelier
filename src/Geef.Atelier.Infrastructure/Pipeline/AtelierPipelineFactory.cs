@@ -69,6 +69,8 @@ internal static class AtelierPipelineFactory
         if (consultationRepository is not null && customExecutionStep is null)
             RegisterAdvisors(builder, snapshot.Advisors, resolver, consultationRepository, runId, pricingCatalog, costAccumulator);
 
+        builder.EnableBestEffortOnNonConvergence();
+
         return builder.Build();
     }
 
@@ -113,6 +115,8 @@ internal static class AtelierPipelineFactory
 
         if (consultationRepository is not null)
             RegisterAdvisors(builder, snapshot.Advisors, resolver, consultationRepository, runId, pricingCatalog, costAccumulator);
+
+        builder.EnableBestEffortOnNonConvergence();
 
         return builder.Build();
     }

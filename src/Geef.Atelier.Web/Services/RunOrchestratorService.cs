@@ -19,7 +19,6 @@ using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Infrastructure.Pricing;
 using Geef.Sdk;
-using Geef.Sdk.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -228,42 +227,37 @@ internal sealed class RunOrchestratorService(
                         groundingConsultationRepository: groundingConsultationRepo);
             }
 
-            try
+            var result = await runner.RunAsync(run.BriefingText, cts.Token);
+
+            if (result.Success)
             {
-                await runner.RunAsync(run.BriefingText, cts.Token);
                 if (accumulator is not null)
                     await FinalizeRunCostsAsync(run.Id, accumulator, cts.Token);
                 await ExecuteFinalizationAsync(run.Id, snapshot, cts.Token);
             }
-            catch (ConvergenceFailedException convergenceEx)
+            else
             {
-                // The SDK already attempted one recovery pass (via OnConvergenceFailure advisors, if any).
-                // At this point the run did not converge; apply max-attempts handling.
-                logger.LogWarning(convergenceEx, "Run {RunId} failed to converge.", run.Id);
+                // Non-convergence best-effort path (standard and seed-draft runs only).
+                // The SDK already finalized the iteration with the fewest blocking findings and
+                // published PipelineCompletedEvent; result.Output.Markdown is the best-effort text.
+                logger.LogWarning(
+                    "Run {RunId} did not converge (stop: {Reason}, degraded iterations: {Degraded}). Surfacing best-effort draft.",
+                    run.Id, result.StopReason, result.DegradedIterations);
 
-                bool shouldRunFinalizers = finalizerExecutorFactory is not null &&
-                    snapshot.RunFinalizersOnMaxAttempts &&
-                    snapshot.Finalizers?.Count > 0;
+                if (accumulator is not null)
+                    await FinalizeRunCostsAsync(run.Id, accumulator, cts.Token);
+
+                var shouldRunFinalizers = finalizerExecutorFactory is not null
+                    && snapshot.RunFinalizersOnMaxAttempts
+                    && snapshot.Finalizers?.Count > 0;
+
+                await SurfaceBestEffortDraftAsync(run.Id, result.Output.Markdown, result.StopReason,
+                    setNote: !shouldRunFinalizers, cts.Token);
 
                 if (shouldRunFinalizers)
-                {
-                    // Run finalizers on max-attempts: use last iteration text, mark as Completed.
-                    await ExecuteFinalizationOnMaxAttemptsAsync(run, snapshot, cts.Token);
-                    try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
-                }
-                else
-                {
-                    // No max-attempts finalizer configured. Surface the most complete draft seen so
-                    // the user gets a usable document instead of a Failed run with no output.
-                    if (accumulator is not null)
-                        await FinalizeRunCostsAsync(run.Id, accumulator, cts.Token);
+                    await ExecuteFinalizationAsync(run.Id, snapshot, cts.Token);
 
-                    var surfaced = await CompleteWithBestDraftOnMaxAttemptsAsync(run.Id, cts.Token);
-                    if (surfaced)
-                        try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
-                    else
-                        throw; // No draft to surface — propagate so outer handler marks Failed.
-                }
+                try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -655,71 +649,42 @@ internal sealed class RunOrchestratorService(
     }
 
     /// <summary>
-    /// Runs the finalizer chain when MaxAttempts was reached (ConvergenceFailedException) and
-    /// <c>RunFinalizersOnMaxAttempts=true</c>. Uses the last iteration's <c>ArtifactText</c> as input,
-    /// then marks the run as Completed so it does not end up as Failed.
+    /// Overrides the run's <c>FinalText</c> with the best-effort draft returned by the SDK
+    /// (<see cref="GeefPipelineResult{TOutput}.Output"/> after a non-converging run).
+    /// The run status has already been set to Completed by <c>PostgresEventSink</c> via the
+    /// <c>PipelineCompletedEvent</c>; this method fixes up the text and optionally adds a
+    /// convergence note.
     /// </summary>
-    private async Task ExecuteFinalizationOnMaxAttemptsAsync(
-        RunEntity run,
-        CrewSnapshot snapshot,
-        CancellationToken ct)
+    private async Task SurfaceBestEffortDraftAsync(
+        Guid runId, string bestDraft, Geef.Sdk.Policies.ConvergenceDecision? stopReason,
+        bool setNote, CancellationToken ct)
     {
-        await using var scope = scopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
+        try
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
 
-        // Get the last iteration's ArtifactText (the best text produced before convergence failed)
-        var lastText = await db.Iterations
-            .Where(i => i.RunId == run.Id)
-            .OrderByDescending(i => i.IterationNumber)
-            .Select(i => i.ArtifactText)
-            .FirstOrDefaultAsync(ct) ?? run.BriefingText;
+            var note = setNote
+                ? stopReason switch
+                {
+                    Geef.Sdk.Policies.ConvergenceDecision.StopMaxAttemptsReached =>
+                        "Max iterations reached without full convergence. Best available draft returned.",
+                    Geef.Sdk.Policies.ConvergenceDecision.StopTimeBudgetReached =>
+                        "Time budget exceeded without full convergence. Best available draft returned.",
+                    _ => "Pipeline stopped without full convergence. Best available draft returned."
+                }
+                : null;
 
-        // Mark run as Completed with the last known text so finalizers can proceed
-        await db.Runs
-            .Where(r => r.Id == run.Id)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(r => r.Status,    RunStatus.Completed)
-                .SetProperty(r => r.FinalText, lastText)
-                .SetProperty(r => r.CompletedAt, DateTimeOffset.UtcNow),
+            var updater = db.Runs.Where(r => r.Id == runId);
+            await updater.ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.FinalText,  bestDraft)
+                .SetProperty(r => r.WordCount,  Core.Domain.Dashboard.WordCounter.Count(bestDraft))
+                .SetProperty(r => r.FinalizerErrorMessage, note),
                 ct);
-
-        // Now run the normal finalization chain using the last text as both FinalText and CurrentText
-        await ExecuteFinalizationAsync(run.Id, snapshot, ct);
-    }
-
-    /// <summary>
-    /// Called when MaxAttempts was reached (ConvergenceFailedException) but no max-attempts finalizer
-    /// is configured. Surfaces the most complete iteration draft as the run's <c>FinalText</c> and
-    /// marks the run Completed (with a non-fatal convergence note) so a run that produced a usable
-    /// document never ends as Failed with no output. Returns <c>false</c> when no draft exists.
-    /// </summary>
-    private async Task<bool> CompleteWithBestDraftOnMaxAttemptsAsync(Guid runId, CancellationToken ct)
-    {
-        await using var scope = scopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
-
-        // Pick the longest (most complete) iteration draft rather than simply the last, so an
-        // abbreviated final iteration can never hide a more complete earlier draft.
-        var bestText = await db.Iterations
-            .Where(i => i.RunId == runId)
-            .OrderByDescending(i => i.ArtifactText.Length)
-            .Select(i => i.ArtifactText)
-            .FirstOrDefaultAsync(ct);
-
-        if (string.IsNullOrWhiteSpace(bestText))
-            return false;
-
-        var affected = await db.Runs
-            .Where(r => r.Id == runId && r.Status == RunStatus.Running)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(r => r.Status,                RunStatus.Completed)
-                .SetProperty(r => r.FinalText,             bestText)
-                .SetProperty(r => r.FinalizerErrorMessage,
-                    "Max-Iterationen bzw. Zeitbudget erreicht, ohne dass alle Reviewer-Befunde "
-                    + "aufgelöst wurden. Zurückgegeben wird der vollständigste erzeugte Entwurf.")
-                .SetProperty(r => r.CompletedAt,           DateTimeOffset.UtcNow),
-                ct);
-
-        return affected > 0;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to surface best-effort draft for run {RunId}.", runId);
+        }
     }
 }
