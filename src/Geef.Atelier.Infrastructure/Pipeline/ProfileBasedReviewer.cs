@@ -147,20 +147,11 @@ internal sealed class ProfileBasedReviewer(
             });
         }
 
-        // Severity is the single source of truth for convergence — it matches the documented taxonomy
-        // (critical/major block; minor/info do not) and avoids the self-contradictory "approve only when
-        // findings is empty" trap, which combined with the mandatory-findings rule made convergence
-        // impossible (every reviewer always has ≥1 finding ⇒ always Rejected ⇒ StopMaxAttemptsReached
-        // at any iteration budget). The model's raw `approved` flag is intentionally ignored.
-        // SDK severities: Info, Warning (=minor), Error (=major), Critical. Only Error/Critical block.
-        var hasBlocking = findings.Any(f =>
-            f.Severity == SdkSeverity.Critical || f.Severity == SdkSeverity.Error);
-
-        var decision = hasBlocking
-            ? ReviewDecision.Rejected
-            : findings.Count == 0
-                ? ReviewDecision.Approved
-                : ReviewDecision.ApprovedWithWarnings;
+        // The model's raw `approved` flag is intentionally ignored — blocking is determined by
+        // DefaultConvergencePolicy.BlockingSeverity (default Error), not by the reviewer's own decision.
+        var decision = findings.Count == 0
+            ? ReviewDecision.Approved
+            : ReviewDecision.ApprovedWithWarnings;
 
         return new ReviewResult
         {

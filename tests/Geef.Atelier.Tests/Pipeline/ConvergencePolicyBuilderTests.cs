@@ -56,17 +56,19 @@ public sealed class ConvergencePolicyBuilderTests
     // ── MaxElapsedTime (wall-clock budget) ──────────────────────────────────
 
     [Fact]
-    public void Build_WithNullMaxElapsed_AutoScalesWithIterations()
+    public void Build_WithNullMaxElapsed_SetsMinutesPerIterationForSdkAutoScale()
     {
-        // 16 iterations × 15 min/iteration = 240 min, so the iteration count is the binding limit
-        // instead of the SDK's hidden 30-minute default.
+        // Auto-scale (16 iter × 15 min = 240 min effective budget) now happens inside the SDK's
+        // DefaultConvergencePolicy.Evaluate via MinutesPerIteration; the builder stores the base
+        // MaxElapsedTime (SDK default 30 min) and the per-iteration value.
         var defaults = new ConvergenceOptions { MaxElapsedMinutes = null, MinutesPerIterationBudget = 15 };
         var overridePolicy = new ConvergencePolicyOverride(
             MaxIterations: 16, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null);
 
         var policy = ConvergencePolicyBuilder.Build(defaults, overridePolicy);
 
-        Assert.Equal(TimeSpan.FromMinutes(240), policy.MaxElapsedTime);
+        Assert.Equal(TimeSpan.FromMinutes(30), policy.MaxElapsedTime); // base value; SDK raises to 240 at runtime
+        Assert.Equal(15, policy.MinutesPerIteration);
     }
 
     [Fact]
@@ -81,10 +83,11 @@ public sealed class ConvergencePolicyBuilderTests
     }
 
     [Fact]
-    public void Build_WithExplicitMaxElapsedBelowIterationFloor_IsRaisedToFloor()
+    public void Build_WithExplicitMaxElapsedBelowIterationFloor_StoresItAsIsForSdkToRaise()
     {
-        // The iteration count governs: an explicit 120 with 16 iterations (floor 240) is lifted to 240,
-        // so a too-low time cap can never cut a run off below its iteration budget.
+        // Raising the floor (explicit 120 min < 16 iter × 15 min/iter = 240 min) now happens in the SDK's
+        // DefaultConvergencePolicy.Evaluate. The builder stores the explicit value as-is; the SDK uses
+        // max(MaxElapsedTime, MaxIterations * MinutesPerIteration) at evaluation time.
         var defaults = new ConvergenceOptions { MinutesPerIterationBudget = 15 };
         var overridePolicy = new ConvergencePolicyOverride(
             MaxIterations: 16, AbortOnCritical: null, DetectRegression: null,
@@ -92,7 +95,8 @@ public sealed class ConvergencePolicyBuilderTests
 
         var policy = ConvergencePolicyBuilder.Build(defaults, overridePolicy);
 
-        Assert.Equal(TimeSpan.FromMinutes(240), policy.MaxElapsedTime);
+        Assert.Equal(TimeSpan.FromMinutes(120), policy.MaxElapsedTime); // stored as configured; SDK raises to 240 at runtime
+        Assert.Equal(15, policy.MinutesPerIteration);
     }
 
     [Fact]

@@ -60,17 +60,19 @@ public sealed class ProfileBasedReviewerMandatoryFindingsTests
     }
 
     [Fact]
-    public async Task MajorFinding_IsRejected_RegardlessOfApprovedFlag()
+    public async Task MajorFinding_IsApprovedWithWarnings_PolicyDecidesBocking()
     {
-        // Even if the model sets approved=true, a major finding blocks the loop.
+        // Reviewer emits findings with severity; blocking is decided by DefaultConvergencePolicy.BlockingSeverity,
+        // not by the reviewer. The reviewer always returns Approved/ApprovedWithWarnings.
         var client   = new SequencedLlmClient(ApprovedTrueWithMajorFinding);
         var resolver = new TestLlmClientResolver(client);
         var reviewer = new ProfileBasedReviewer(TestProfile(), resolver);
 
         var result = await reviewer.ReviewAsync(BuildContext(), CancellationToken.None);
 
-        Assert.Equal(ReviewDecision.Rejected, result.Decision);
+        Assert.Equal(ReviewDecision.ApprovedWithWarnings, result.Decision);
         Assert.Single(result.Findings);
+        Assert.Equal(FindingSeverity.Error, result.Findings[0].Severity); // major → Error severity
         Assert.Equal(1, client.CallCount);
     }
 

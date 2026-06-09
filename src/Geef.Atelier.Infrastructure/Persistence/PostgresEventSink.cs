@@ -103,9 +103,13 @@ internal sealed class PostgresEventSink(
             case PipelineFailedEvent failed:
                 var isAbort    = failed.Reason == ConvergenceDecision.AbortCriticalBlocker;
                 var failStatus = isAbort ? RunStatus.Aborted : RunStatus.Failed;
-                var errorMsg   = isAbort
-                    ? "Aborted due to critical reviewer finding"
-                    : $"Pipeline failed: {failed.Reason}";
+                var errorMsg   = failed.Reason switch
+                {
+                    ConvergenceDecision.AbortCriticalBlocker   => "Aborted due to critical reviewer finding",
+                    ConvergenceDecision.StopTimeBudgetReached  => "Pipeline stopped: time budget exceeded",
+                    ConvergenceDecision.StopMaxAttemptsReached => "Pipeline stopped: maximum iterations reached",
+                    _                                          => $"Pipeline failed: {failed.Reason}"
+                };
                 await db.Runs
                     .Where(r => r.Id == atelierRunId)
                     .ExecuteUpdateAsync(s => s
