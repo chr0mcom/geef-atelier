@@ -219,18 +219,25 @@ async def _run_codex(prompt: str, model: str | None, max_tokens: int | None) -> 
             bare_model = model.split("/")[-1] if "/" in model else model
             args += ["-m", bare_model]
 
-        args += ["--output-last-message", output_file, prompt]
+        # Pass the prompt through stdin ("-"), never as an argv element. A single execve
+        # argument may not exceed MAX_ARG_STRLEN (128 KB on Linux); reviewer/advisor prompts
+        # embed the full draft (often >128 KB by later iterations), so an argv prompt fails
+        # the spawn with OSError "Argument list too long" (E2BIG) and the proxy returns HTTP
+        # 500. codex reads instructions from stdin when the prompt positional is "-".
+        args += ["--output-last-message", output_file, "-"]
 
         env = {**os.environ, "HOME": CODEX_HOME}
 
         proc = await asyncio.create_subprocess_exec(
             *args,
+            stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
         )
         try:
-            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
+            _, stderr = await asyncio.wait_for(
+                proc.communicate(input=prompt.encode("utf-8")), timeout=CLI_TIMEOUT_SECONDS)
         except asyncio.TimeoutError:
             proc.kill()
             await proc.wait()  # reap the killed process so it does not linger as a zombie

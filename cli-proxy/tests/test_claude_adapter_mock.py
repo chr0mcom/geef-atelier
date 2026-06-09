@@ -82,6 +82,36 @@ async def test_complete_allowlists_only_web_tools():
 
 
 @pytest.mark.asyncio
+async def test_complete_passes_prompt_via_stdin_not_argv():
+    """Large reviewer/advisor prompts must go through stdin, never argv.
+
+    A single execve argument is capped at MAX_ARG_STRLEN (128 KB on Linux); reviewer
+    prompts embed the full draft (often >128 KB), so an argv prompt would fail the spawn
+    with E2BIG ("Argument list too long") and the proxy would return HTTP 500.
+    """
+    output = json.dumps({"result": "ok"})
+    proc = _make_proc(output)
+    captured_args: list[list] = []
+    captured_kwargs: list[dict] = []
+
+    async def fake_exec(*args, **kwargs):
+        captured_args.append(list(args))
+        captured_kwargs.append(kwargs)
+        return proc
+
+    big_prompt = "Ω" * 200_000  # ~400 KB UTF-8 — well past MAX_ARG_STRLEN
+
+    with patch("asyncio.create_subprocess_exec", fake_exec):
+        await claude_adapter.complete(big_prompt, None, None)
+
+    args = captured_args[0]
+    assert big_prompt not in args, "prompt must not be passed as an argv element"
+    assert captured_kwargs[0].get("stdin") is not None, "stdin pipe must be opened"
+    proc.communicate.assert_awaited_once()
+    assert proc.communicate.call_args.kwargs["input"] == big_prompt.encode("utf-8")
+
+
+@pytest.mark.asyncio
 async def test_complete_raises_on_nonzero_exit():
     proc = _make_proc("", returncode=1, stderr="auth error")
 

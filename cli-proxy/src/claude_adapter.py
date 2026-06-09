@@ -166,18 +166,23 @@ async def _run_claude(prompt: str, model: str | None, max_tokens: int | None) ->
         bare_model = bare_model.replace(".", "-")
         args += ["--model", bare_model]
 
-    args.append(prompt)
-
+    # Pass the prompt through stdin, never as an argv element. A single execve argument may
+    # not exceed MAX_ARG_STRLEN (128 KB on Linux); reviewer/advisor prompts embed the full
+    # draft (often >128 KB by later iterations), so an argv prompt fails the spawn with
+    # OSError "Argument list too long" (E2BIG) and the proxy returns HTTP 500. claude -p
+    # reads the prompt from stdin when no prompt positional is given.
     env = {**os.environ, "HOME": CLAUDE_HOME}
 
     proc = await asyncio.create_subprocess_exec(
         *args,
+        stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env=env,
     )
     try:
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
+        stdout, stderr = await asyncio.wait_for(
+            proc.communicate(input=prompt.encode("utf-8")), timeout=CLI_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
         proc.kill()
         await proc.wait()  # reap the killed process so it does not linger as a zombie
