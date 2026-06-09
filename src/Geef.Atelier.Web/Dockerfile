@@ -3,6 +3,8 @@ WORKDIR /src
 
 # Copy central build config first (layer caching)
 COPY Directory.Build.props Directory.Packages.props nuget.config ./
+# Vendored NuGet packages (Geef.Sdk — until published to nuget.org stable)
+COPY packages/ packages/
 
 # Copy project files and restore
 COPY src/Geef.Atelier.Core/Geef.Atelier.Core.csproj src/Geef.Atelier.Core/
