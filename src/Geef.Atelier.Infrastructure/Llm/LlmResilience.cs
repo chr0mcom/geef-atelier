@@ -16,6 +16,17 @@ internal static class LlmResilience
     /// <summary>Total attempts (initial call + retries) before a transient failure is surfaced.</summary>
     public const int DefaultMaxAttempts = 4;
 
+    /// <summary>
+    /// Patient budget for convergence-critical actors (reviewers, advisors). A reviewer that is
+    /// skipped silently leaves the iteration's draft under-reviewed, so it is worth waiting out a
+    /// brief provider outage (~1 min total backoff across the attempts) rather than giving up after
+    /// a few seconds. Used by ProfileBasedReviewer / ProfileBasedAdvisor.
+    /// </summary>
+    public const int ReviewerMaxAttempts = 6;
+
+    /// <summary>Longer cap so the patient reviewer budget actually spreads its waits out.</summary>
+    public static readonly TimeSpan ReviewerMaxDelay = TimeSpan.FromSeconds(20);
+
     private static readonly TimeSpan DefaultBaseDelay = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan DefaultMaxDelay  = TimeSpan.FromSeconds(8);
     private const double DefaultBackoffFactor = 2.0;
@@ -32,14 +43,17 @@ internal static class LlmResilience
     /// <param name="maxAttempts">Maximum number of attempts including the first.</param>
     /// <param name="baseDelay">Backoff base; <see cref="TimeSpan.Zero"/> disables waiting (tests).</param>
     /// <param name="onRetry">Optional callback invoked before each backoff wait (attempt, error, delay).</param>
+    /// <param name="maxDelay">Upper bound on a single backoff wait; defaults to the standard 8 s cap.</param>
     public static async Task<T> ExecuteAsync<T>(
         Func<CancellationToken, Task<T>> action,
         CancellationToken cancellationToken,
         int maxAttempts = DefaultMaxAttempts,
         TimeSpan? baseDelay = null,
-        Action<int, Exception, TimeSpan>? onRetry = null)
+        Action<int, Exception, TimeSpan>? onRetry = null,
+        TimeSpan? maxDelay = null)
     {
         var delayBase = baseDelay ?? DefaultBaseDelay;
+        var delayCap  = maxDelay ?? DefaultMaxDelay;
         for (var attempt = 1; ; attempt++)
         {
             try
@@ -50,7 +64,7 @@ internal static class LlmResilience
                                        && !cancellationToken.IsCancellationRequested
                                        && IsTransient(ex))
             {
-                var delay = BackoffDelay(attempt, delayBase);
+                var delay = BackoffDelay(attempt, delayBase, delayCap);
                 onRetry?.Invoke(attempt, ex, delay);
                 if (delay > TimeSpan.Zero)
                     await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
@@ -108,11 +122,11 @@ internal static class LlmResilience
         return "provider error";
     }
 
-    private static TimeSpan BackoffDelay(int attempt, TimeSpan baseDelay)
+    private static TimeSpan BackoffDelay(int attempt, TimeSpan baseDelay, TimeSpan maxDelay)
     {
         if (baseDelay <= TimeSpan.Zero) return TimeSpan.Zero;
         var scaled = baseDelay.TotalMilliseconds * Math.Pow(DefaultBackoffFactor, attempt - 1);
-        var capped = Math.Min(scaled, DefaultMaxDelay.TotalMilliseconds);
+        var capped = Math.Min(scaled, maxDelay.TotalMilliseconds);
         var jitter = Random.Shared.Next(0, 250);
         return TimeSpan.FromMilliseconds(capped + jitter);
     }

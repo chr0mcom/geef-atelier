@@ -51,7 +51,9 @@ internal sealed class ProfileBasedReviewer(
                     Tools        = [ReviewerToolDefinition.SubmitReview],
                     ToolChoice   = "function:submit_review"
                 }, ct),
-                cancellationToken);
+                cancellationToken,
+                maxAttempts: LlmResilience.ReviewerMaxAttempts,
+                maxDelay: LlmResilience.ReviewerMaxDelay);
 
             if (costAccumulator is not null)
             {
@@ -96,7 +98,9 @@ internal sealed class ProfileBasedReviewer(
                         Tools        = [ReviewerToolDefinition.SubmitReview],
                         ToolChoice   = "function:submit_review"
                     }, ct),
-                    cancellationToken);
+                    cancellationToken,
+                    maxAttempts: LlmResilience.ReviewerMaxAttempts,
+                    maxDelay: LlmResilience.ReviewerMaxDelay);
 
                 if (costAccumulator is not null)
                 {

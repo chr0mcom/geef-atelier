@@ -145,6 +145,27 @@ public sealed class LlmResilienceTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_ReviewerBudget_AllowsSixAttempts()
+    {
+        // Convergence-critical actors use the patient budget so a brief provider outage does not
+        // leave the iteration's draft silently under-reviewed.
+        Assert.Equal(6, LlmResilience.ReviewerMaxAttempts);
+
+        var calls = 0;
+        await Assert.ThrowsAsync<HttpRequestException>(() =>
+            LlmResilience.ExecuteAsync<int>(
+                _ =>
+                {
+                    calls++;
+                    throw new HttpRequestException("down", null, HttpStatusCode.InternalServerError);
+                },
+                CancellationToken.None,
+                maxAttempts: LlmResilience.ReviewerMaxAttempts, baseDelay: NoDelay));
+
+        Assert.Equal(6, calls);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_InvokesOnRetryCallback_PerRetry()
     {
         var retries = 0;

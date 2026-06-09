@@ -47,7 +47,9 @@ internal sealed class ProfileBasedAdvisor(
                 UserPrompt   = briefingText,
                 MaxTokens    = maxTokens
             }, token),
-            ct);
+            ct,
+            maxAttempts: LlmResilience.ReviewerMaxAttempts,
+            maxDelay: LlmResilience.ReviewerMaxDelay);
 
         if (costAccumulator is not null && iterationNumber >= 0)
         {
