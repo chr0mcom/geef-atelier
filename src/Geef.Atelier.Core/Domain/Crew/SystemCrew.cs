@@ -197,6 +197,17 @@ public static class SystemCrew
         MaxTokens: 64000,
         IsSystem: true);
 
+    /// <summary>Reviews tool-binding decisions in the proposed crew spec.</summary>
+    public static readonly ReviewerProfile CrewComposerToolBindingProfile = new(
+        Name: "crew-composer-tool-binding",
+        DisplayName: "Tool Binding Review",
+        Description: "Audits tool_names bindings in actor profiles: checks necessity, access-class compliance (ReadOnly only in Phase B), role fit, and catalog membership.",
+        SystemPrompt: SystemPrompts.CrewComposerToolBinding,
+        Provider: "openrouter",
+        Model: "google/gemini-3.5-flash",
+        MaxTokens: 64000,
+        IsSystem: true);
+
     // ── Auto-Crew: crew-design-advisor ─────────────────────────────────────────
 
     /// <summary>Strategic advisor consulted once before the first composition draft; orients the executor on domain, risks, and crew archetypes.</summary>
@@ -309,6 +320,7 @@ public static class SystemCrew
             CrewComposerPromptQualityProfile.Name,
             CrewComposerFitProfile.Name,
             CrewComposerReuseCorrectnessProfile.Name,
+            CrewComposerToolBindingProfile.Name,
         },
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: new ConvergencePolicyOverride(
@@ -516,6 +528,7 @@ public static class SystemCrew
             [CrewComposerPromptQualityProfile.Name]         = CrewComposerPromptQualityProfile,
             [CrewComposerFitProfile.Name]                   = CrewComposerFitProfile,
             [CrewComposerReuseCorrectnessProfile.Name]      = CrewComposerReuseCorrectnessProfile,
+            [CrewComposerToolBindingProfile.Name]           = CrewComposerToolBindingProfile,
         };
 
     /// <summary>All system executor profiles, indexed by name.</summary>
