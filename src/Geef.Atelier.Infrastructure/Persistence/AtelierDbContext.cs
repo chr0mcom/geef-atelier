@@ -6,8 +6,10 @@ using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.OAuth;
+using Geef.Atelier.Core.Domain.Tools;
 using Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge;
 using Geef.Atelier.Infrastructure.Persistence.Crew.Learning;
+using Geef.Atelier.Infrastructure.Persistence.Entities;
 using Geef.Atelier.Infrastructure.Persistence.Providers;
 using Geef.Atelier.Infrastructure.Persistence.SiteSettings;
 using Geef.Atelier.Infrastructure.Persistence.StudioSettings;
@@ -62,6 +64,9 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     internal DbSet<OAuthAccessToken> OAuthAccessTokens => Set<OAuthAccessToken>();
     internal DbSet<OAuthRefreshToken> OAuthRefreshTokens => Set<OAuthRefreshToken>();
     internal DbSet<OAuthAuditLogEntry> OAuthAuditLog => Set<OAuthAuditLogEntry>();
+
+    internal DbSet<ToolDefinitionEntity> ToolDefinitions => Set<ToolDefinitionEntity>();
+    internal DbSet<ToolInvocation> ToolInvocations => Set<ToolInvocation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
         => modelBuilder.ApplyConfigurationsFromAssembly(typeof(AtelierDbContext).Assembly);
