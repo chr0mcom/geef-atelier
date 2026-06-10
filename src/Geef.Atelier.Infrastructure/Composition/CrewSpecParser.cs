@@ -55,6 +55,10 @@ public static class CrewSpecParser
             (aocEl.ValueKind == JsonValueKind.True || aocEl.ValueKind == JsonValueKind.False))
             abortOnCritical = aocEl.GetBoolean();
 
+        var allowMutatingTools = root.TryGetProperty("allow_mutating_tools", out var amtEl) &&
+            (amtEl.ValueKind == JsonValueKind.True || amtEl.ValueKind == JsonValueKind.False) &&
+            amtEl.GetBoolean();
+
         return new CrewSpecArtifact
         {
             Mode               = mode,
@@ -69,6 +73,7 @@ public static class CrewSpecParser
             EvaluationStrategy = evaluationStrategy,
             MaxIterations      = maxIterations,
             AbortOnCritical    = abortOnCritical,
+            AllowMutatingTools = allowMutatingTools,
         };
     }
 

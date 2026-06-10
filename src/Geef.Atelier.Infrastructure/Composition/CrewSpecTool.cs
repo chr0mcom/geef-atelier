@@ -191,6 +191,10 @@ internal static class CrewSpecTool
                 },
                 "abort_on_critical": {
                     "type": "boolean"
+                },
+                "allow_mutating_tools": {
+                    "type": "boolean",
+                    "description": "When true, actors in this spec may bind Mutating-access tools. Must be explicitly set by the operator. Defaults to false."
                 }
             }
         }

@@ -111,4 +111,11 @@ public sealed record CrewSpecArtifact
 
     /// <summary>Whether to abort the run immediately when a critical finding is raised.</summary>
     public bool? AbortOnCritical { get; init; }
+
+    /// <summary>
+    /// When <see langword="true"/>, actors in this spec may bind tools with
+    /// <see cref="Geef.Atelier.Core.Domain.Tools.ToolAccessClass.Mutating"/> access.
+    /// Disabled by default; must be explicitly set by the operator.
+    /// </summary>
+    public bool AllowMutatingTools { get; init; }
 }

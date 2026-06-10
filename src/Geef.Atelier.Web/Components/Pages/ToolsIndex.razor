@@ -39,6 +39,10 @@
                             {
                                 <span class="crew-badge">System</span>
                             }
+                            @if (tool.AccessClass == ToolAccessClass.Mutating)
+                            {
+                                <span class="crew-badge crew-badge--danger">Mutating</span>
+                            }
                         </td>
                         <td>@GetTypeLabel(tool.ToolType)</td>
                         <td>@GetAccessLabel(tool.AccessClass)</td>

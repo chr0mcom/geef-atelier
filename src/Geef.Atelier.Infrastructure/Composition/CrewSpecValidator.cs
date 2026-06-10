@@ -275,13 +275,13 @@ internal sealed class CrewSpecValidator(
                     continue;
                 }
 
-                // Check 8c – Mutating tools blocked in Phase B
-                if (tool.AccessClass == ToolAccessClass.Mutating)
+                // Check 8c – Mutating tools require explicit opt-in
+                if (tool.AccessClass == ToolAccessClass.Mutating && !spec.AllowMutatingTools)
                 {
                     issues.Add(new CrewSpecValidationIssue(
                         Field:      $"{path}.tool_names",
-                        Message:    $"Tool '{toolName}' has AccessClass=Mutating. Mutating tools are not permitted in Phase B. " +
-                                    "Use only ReadOnly tools, or enable Mutating access via the Phase C opt-in.",
+                        Message:    $"Tool '{toolName}' has AccessClass=Mutating. Mutating tools require explicit opt-in. " +
+                                    "Set 'allow_mutating_tools: true' in the crew spec to enable Mutating tool access.",
                         IsCritical: true));
                 }
             }

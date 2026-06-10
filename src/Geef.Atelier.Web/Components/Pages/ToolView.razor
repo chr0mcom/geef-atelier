@@ -51,6 +51,16 @@
             <dt>Zugriffsklasse</dt>
             <dd data-testid="detail-access-class">@GetAccessLabel(_tool.AccessClass)</dd>
 
+            @if (_tool.AccessClass == ToolAccessClass.Mutating)
+            {
+                <dd colspan="2" data-testid="mutating-warning">
+                    <div class="alert alert-danger d-flex align-items-center gap-2 mt-2">
+                        <span>&#9888;</span>
+                        <span><strong>Mutating-Tool:</strong> Dieses Tool kann Daten schreiben oder verändern. Es wird nur ausgeführt, wenn in der Crew-Spec explizit <code>allow_mutating_tools</code> aktiviert wurde.</span>
+                    </div>
+                </dd>
+            }
+
             <dt>Secret-Referenz</dt>
             <dd data-testid="detail-secret-ref">
                 @(string.IsNullOrEmpty(_tool.SecretRef) ? "—" : _tool.SecretRef)

@@ -125,6 +125,14 @@
                     </div>
                 </div>
 
+                @if (_form.AccessClass == ToolAccessClass.Mutating)
+                {
+                    <div class="alert alert-danger d-flex align-items-center gap-2 mt-2" data-testid="mutating-warning">
+                        <span>&#9888;</span>
+                        <span><strong>Mutating-Tool:</strong> Dieses Tool kann Daten schreiben oder verändern. Es wird nur ausgeführt, wenn in der Crew-Spec explizit <code>allow_mutating_tools</code> aktiviert wurde.</span>
+                    </div>
+                }
+
                 <div class="field">
                     <label>Secret-Referenz (optional)</label>
                     <InputText @bind-Value="_form.SecretRef"

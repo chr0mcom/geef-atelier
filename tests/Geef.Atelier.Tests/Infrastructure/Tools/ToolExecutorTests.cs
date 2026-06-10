@@ -1,9 +1,13 @@
 using System.Text.Json;
 using Geef.Atelier.Application.Tools;
+using Geef.Atelier.Core.Domain.Mcp;
 using Geef.Atelier.Core.Domain.Tools;
+using Geef.Atelier.Core.Persistence.Mcp;
 using Geef.Atelier.Core.Persistence.Tools;
+using Geef.Atelier.Infrastructure.Mcp;
 using Geef.Atelier.Infrastructure.Tools;
 using Microsoft.Extensions.Logging.Abstractions;
+using ModelContextProtocol.Client;
 
 namespace Geef.Atelier.Tests.Infrastructure.Tools;
 
@@ -36,7 +40,7 @@ public sealed class ToolExecutorTests
             Sequence: 1);
 
     private static ToolExecutor BuildExecutor(InMemoryToolInvocationRepository repo) =>
-        new(repo, new NoOpHttpClientFactory(), NullLogger<ToolExecutor>.Instance);
+        new(repo, new NoOpHttpClientFactory(), new NullMcpServerConfigRepository(), new NullMcpClientFactory(), NullLogger<ToolExecutor>.Instance);
 
     // -------------------------------------------------------------------------
     // Tests
@@ -115,10 +119,74 @@ public sealed class ToolExecutorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_McpTool_WithoutServerId_ReturnsError()
+    {
+        // mcp-tool without mcpServerId setting → descriptive error result, no throw
+        var tool = MakeTool(ToolType.McpTool);
+        var repo = new InMemoryToolInvocationRepository();
+        var executor = BuildExecutor(repo);
+
+        var result = await executor.ExecuteAsync(tool, "{}", MakeContext());
+
+        Assert.NotNull(result.Error);
+        Assert.Contains("mcpServerId", result.Error);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_McpTool_ServerNotFound_ReturnsError()
+    {
+        // mcp-tool with valid serverId but server not found in repository
+        var serverId = Guid.NewGuid();
+        var tool = MakeTool(ToolType.McpTool, new Dictionary<string, string>
+        {
+            [ToolDefinitionSettingsKeys.McpServerId]     = serverId.ToString(),
+            [ToolDefinitionSettingsKeys.McpOriginalName] = "some-tool",
+        });
+        var repo = new InMemoryToolInvocationRepository();
+        var executor = BuildExecutor(repo);
+
+        var result = await executor.ExecuteAsync(tool, "{}", MakeContext());
+
+        Assert.NotNull(result.Error);
+        Assert.Contains("not found", result.Error);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_McpTool_InactiveServer_ReturnsError()
+    {
+        // mcp-tool with valid serverId, but server is inactive
+        var serverId = Guid.NewGuid();
+        var inactiveConfig = new McpServerConfig
+        {
+            Id       = serverId,
+            Name     = "inactive-server",
+            Url      = "http://localhost:9999",
+            IsActive = false,
+        };
+        var tool = MakeTool(ToolType.McpTool, new Dictionary<string, string>
+        {
+            [ToolDefinitionSettingsKeys.McpServerId]     = serverId.ToString(),
+            [ToolDefinitionSettingsKeys.McpOriginalName] = "some-tool",
+        });
+        var repo = new InMemoryToolInvocationRepository();
+        var executor = new ToolExecutor(
+            repo,
+            new NoOpHttpClientFactory(),
+            new FixedMcpServerConfigRepository(inactiveConfig),
+            new NullMcpClientFactory(),
+            NullLogger<ToolExecutor>.Instance);
+
+        var result = await executor.ExecuteAsync(tool, "{}", MakeContext());
+
+        Assert.NotNull(result.Error);
+        Assert.Contains("inactive", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_NotYetWiredType_ReturnsNotYetWiredResult()
     {
-        // MCP tool type is not wired yet
-        var tool = MakeTool(ToolType.McpTool);
+        // knowledge-base type is not wired yet in ToolExecutor
+        var tool = MakeTool(ToolType.KnowledgeBase);
         var repo = new InMemoryToolInvocationRepository();
         var executor = BuildExecutor(repo);
 
@@ -172,4 +240,37 @@ internal sealed class InMemoryToolInvocationRepository : IToolInvocationReposito
             .ToList();
         return Task.FromResult(result);
     }
+}
+
+/// <summary>Returns null for every GetByIdAsync call (simulates missing server config).</summary>
+internal sealed class NullMcpServerConfigRepository : IMcpServerConfigRepository
+{
+    public Task<IReadOnlyList<McpServerConfig>> GetAllAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<McpServerConfig>>([]);
+    public Task<IReadOnlyList<McpServerConfig>> GetActiveAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<McpServerConfig>>([]);
+    public Task<McpServerConfig?> GetByIdAsync(Guid id, CancellationToken ct = default)
+        => Task.FromResult<McpServerConfig?>(null);
+    public Task UpsertAsync(McpServerConfig config, CancellationToken ct = default) => Task.CompletedTask;
+    public Task DeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;
+}
+
+/// <summary>Should never be called in unit tests that don't reach connection logic.</summary>
+internal sealed class NullMcpClientFactory : IAtelierMcpClientFactory
+{
+    public Task<McpClient> ConnectAsync(McpServerConfig config, CancellationToken ct = default)
+        => throw new NotSupportedException("NullMcpClientFactory should not be called in unit tests.");
+}
+
+/// <summary>Returns a fixed <see cref="McpServerConfig"/> when queried by its ID; null for all others.</summary>
+internal sealed class FixedMcpServerConfigRepository(McpServerConfig config) : IMcpServerConfigRepository
+{
+    public Task<IReadOnlyList<McpServerConfig>> GetAllAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<McpServerConfig>>([config]);
+    public Task<IReadOnlyList<McpServerConfig>> GetActiveAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<McpServerConfig>>(config.IsActive ? [config] : []);
+    public Task<McpServerConfig?> GetByIdAsync(Guid id, CancellationToken ct = default)
+        => Task.FromResult<McpServerConfig?>(config.Id == id ? config : null);
+    public Task UpsertAsync(McpServerConfig c, CancellationToken ct = default) => Task.CompletedTask;
+    public Task DeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;
 }

@@ -2,9 +2,13 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Geef.Atelier.Application.Tools;
+using Geef.Atelier.Core.Domain.Mcp;
 using Geef.Atelier.Core.Domain.Tools;
+using Geef.Atelier.Core.Persistence.Mcp;
 using Geef.Atelier.Core.Persistence.Tools;
+using Geef.Atelier.Infrastructure.Mcp;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Protocol;
 
 namespace Geef.Atelier.Infrastructure.Tools;
 
@@ -14,12 +18,15 @@ namespace Geef.Atelier.Infrastructure.Tools;
 /// <list type="bullet">
 ///   <item><see cref="ToolType.StaticContext"/> — returns configured static text (fully wired).</item>
 ///   <item><see cref="ToolType.WebSearch"/> — calls Tavily API (wired in A-T9).</item>
+///   <item><see cref="ToolType.McpTool"/> — connects to the configured MCP server and calls the tool by its original name.</item>
 ///   <item>All other types — return a "not yet wired" notice result (not an error; grounding-provider path is used).</item>
 /// </list>
 /// </summary>
 internal sealed class ToolExecutor(
     IToolInvocationRepository invocationRepository,
     IHttpClientFactory httpClientFactory,
+    IMcpServerConfigRepository mcpServerConfigRepository,
+    IAtelierMcpClientFactory mcpClientFactory,
     ILogger<ToolExecutor> logger) : IToolExecutor
 {
     /// <inheritdoc/>
@@ -38,6 +45,7 @@ internal sealed class ToolExecutor(
             {
                 ToolType.StaticContext => ExecuteStaticContext(tool),
                 ToolType.WebSearch     => await ExecuteWebSearchAsync(tool, inputJson, ct),
+                ToolType.McpTool       => await ExecuteMcpToolAsync(tool, inputJson, ct),
                 _ => new ToolExecutionResult(
                     $"Tool type '{tool.ToolType}' not yet wired in ToolExecutor. Use GroundingProvider path.",
                     null,
@@ -93,6 +101,66 @@ internal sealed class ToolExecutor(
             ? v
             : "";
         return new ToolExecutionResult(content, null, null);
+    }
+
+    private async Task<ToolExecutionResult> ExecuteMcpToolAsync(
+        ToolDefinition tool,
+        string inputJson,
+        CancellationToken ct)
+    {
+        if (!tool.Settings.TryGetValue(ToolDefinitionSettingsKeys.McpServerId, out var serverIdStr)
+            || !Guid.TryParse(serverIdStr, out var serverId))
+            return new ToolExecutionResult("", null, "mcp-tool is missing a valid 'mcpServerId' setting.");
+
+        if (!tool.Settings.TryGetValue(ToolDefinitionSettingsKeys.McpOriginalName, out var originalName)
+            || string.IsNullOrWhiteSpace(originalName))
+            return new ToolExecutionResult("", null, "mcp-tool is missing a valid 'mcpOriginalName' setting.");
+
+        var serverConfig = await mcpServerConfigRepository.GetByIdAsync(serverId, ct);
+        if (serverConfig is null)
+            return new ToolExecutionResult("", null, $"MCP server '{serverId}' not found in configuration.");
+
+        if (!serverConfig.IsActive)
+            return new ToolExecutionResult("", null, $"MCP server '{serverConfig.Name}' is inactive.");
+
+        // Parse input JSON to arguments dictionary
+        IReadOnlyDictionary<string, object?>? arguments = null;
+        try
+        {
+            using var doc = JsonDocument.Parse(inputJson);
+            if (doc.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                var dict = new Dictionary<string, object?>(StringComparer.Ordinal);
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                    dict[prop.Name] = prop.Value.Clone();
+                arguments = dict;
+            }
+        }
+        catch
+        {
+            // If parsing fails, pass no arguments
+        }
+
+        try
+        {
+            await using var client = await mcpClientFactory.ConnectAsync(serverConfig, ct);
+            var response = await client.CallToolAsync(originalName, arguments, cancellationToken: ct);
+
+            var sb = new System.Text.StringBuilder();
+            foreach (var content in response.Content)
+            {
+                if (content is TextContentBlock textBlock && !string.IsNullOrEmpty(textBlock.Text))
+                    sb.AppendLine(textBlock.Text);
+            }
+
+            var output = sb.ToString().Trim();
+            return new ToolExecutionResult(output, null, response.IsError == true ? "MCP tool returned an error" : null);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "ToolExecutor: mcp-tool call failed for tool={ToolName}", tool.Name);
+            return new ToolExecutionResult("", null, $"MCP tool call failed: {ex.Message}");
+        }
     }
 
     // -------------------------------------------------------------------------

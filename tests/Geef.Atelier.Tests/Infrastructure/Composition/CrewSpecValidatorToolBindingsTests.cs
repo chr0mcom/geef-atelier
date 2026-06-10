@@ -128,9 +128,9 @@ public sealed class CrewSpecValidatorToolBindingsTests
     // ── Tests: 8c – Mutating tool blocked ─────────────────────────────────────
 
     [Fact]
-    public async Task ValidateAsync_FlagsCritical_WhenMutatingToolBound()
+    public async Task ValidateAsync_FlagsCritical_WhenMutatingToolBoundWithoutOptIn()
     {
-        // Arrange: catalogue has "delete-file" as Mutating
+        // Arrange: catalogue has "delete-file" as Mutating; spec has no allow_mutating_tools
         var mutatingTool = MakeTool("delete-file", ToolAccessClass.Mutating);
         var toolRepo     = new FixedToolRepository([mutatingTool]);
         var llmResolver  = new AgenticCapableResolver();
@@ -142,7 +142,41 @@ public sealed class CrewSpecValidatorToolBindingsTests
         // Assert
         var issue = Assert.Single(issues, i => i.Field == "executor.tool_names" && i.IsCritical);
         Assert.Contains("Mutating", issue.Message);
-        Assert.Contains("Phase B", issue.Message);
+        Assert.Contains("allow_mutating_tools", issue.Message);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_NoIssues_WhenMutatingToolBoundWithOptIn()
+    {
+        // Arrange: catalogue has "delete-file" as Mutating; spec sets allow_mutating_tools: true
+        var mutatingTool = MakeTool("delete-file", ToolAccessClass.Mutating);
+        var toolRepo     = new FixedToolRepository([mutatingTool]);
+        var llmResolver  = new AgenticCapableResolver();
+        var validator    = MakeValidator(toolRepo, llmResolver);
+
+        const string spec = """
+            {
+                "mode": "composed",
+                "allow_mutating_tools": true,
+                "executor": {
+                    "name": "task-executor",
+                    "provider": "claude-cli",
+                    "model": "claude-opus-4-8",
+                    "max_tokens": 32000,
+                    "system_prompt": "You are a specialist writer.",
+                    "tool_names": ["delete-file"]
+                },
+                "reviewers": [{"reuse": "briefing-fidelity"}],
+                "finalizers": [{"reuse": "file-export"}]
+            }
+            """;
+
+        // Act
+        var issues = await validator.ValidateAsync(spec);
+
+        // Assert: no Mutating-block issue when opt-in is set
+        Assert.DoesNotContain(issues, i => i.Field == "executor.tool_names" && i.IsCritical
+            && i.Message.Contains("Mutating"));
     }
 
     // ── Tests: 8a – non-agentic provider ──────────────────────────────────────

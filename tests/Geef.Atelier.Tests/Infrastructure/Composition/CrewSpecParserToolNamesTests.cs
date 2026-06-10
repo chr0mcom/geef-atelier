@@ -192,6 +192,41 @@ public sealed class CrewSpecParserToolNamesTests
         Assert.Null(finalizer.ToolNames);
     }
 
+    // ── allow_mutating_tools flag ─────────────────────────────────────────────
+
+    [Fact]
+    public void Parse_WithAllowMutatingToolsTrue_SetsFlag()
+    {
+        const string json = """
+            {
+                "mode": "new",
+                "domain": "general",
+                "rationale": "test",
+                "allow_mutating_tools": true
+            }
+            """;
+
+        var artifact = CrewSpecParser.Parse(json);
+
+        Assert.True(artifact.AllowMutatingTools);
+    }
+
+    [Fact]
+    public void Parse_WithoutAllowMutatingTools_DefaultsFalse()
+    {
+        const string json = """
+            {
+                "mode": "new",
+                "domain": "general",
+                "rationale": "test"
+            }
+            """;
+
+        var artifact = CrewSpecParser.Parse(json);
+
+        Assert.False(artifact.AllowMutatingTools);
+    }
+
     // ── Round-trip: JSON → artifact (demonstrates full parse path) ────────────
 
     [Fact]
