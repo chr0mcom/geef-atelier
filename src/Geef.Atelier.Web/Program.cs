@@ -16,6 +16,7 @@ using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Finalizers;
 using Geef.Atelier.Infrastructure.TemplateStudio;
+using Geef.Atelier.Infrastructure.Tools;
 using Geef.Atelier.Mcp;
 using Geef.Atelier.Web.Auth;
 using Geef.Atelier.Web.Components;
@@ -67,6 +68,9 @@ builder.Services.AddCrewComposition();
 
 // Grounding providers — ApiKey intentionally not logged; missing key fails at run time, not at startup.
 builder.Services.AddGroundingProviders(builder.Configuration);
+
+// Tool execution infrastructure (IToolExecutor + IToolSchemaProvider)
+builder.Services.AddToolExecutor();
 
 builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection("Pricing"));
 builder.Services.Configure<CostTrackingOptions>(builder.Configuration.GetSection("CostTracking"));
