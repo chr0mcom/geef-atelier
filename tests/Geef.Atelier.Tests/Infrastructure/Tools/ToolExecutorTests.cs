@@ -36,7 +36,7 @@ public sealed class ToolExecutorTests
             Sequence: 1);
 
     private static ToolExecutor BuildExecutor(InMemoryToolInvocationRepository repo) =>
-        new(repo, NullLogger<ToolExecutor>.Instance);
+        new(repo, new NoOpHttpClientFactory(), NullLogger<ToolExecutor>.Instance);
 
     // -------------------------------------------------------------------------
     // Tests
@@ -93,25 +93,46 @@ public sealed class ToolExecutorTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_NotImplementedType_ReturnsErrorResult()
+    public async Task ExecuteAsync_WebSearch_WithoutApiKey_ReturnsErrorResult()
     {
-        var tool = MakeTool(ToolType.WebSearch);
+        // No TAVILY_API_KEY env var set in unit test environment — executor returns a
+        // descriptive error result rather than throwing.
+        var tool = MakeTool(ToolType.WebSearch, new Dictionary<string, string>
+        {
+            [ToolDefinitionSettingsKeys.MaxResults] = "5"
+        });
+        // Override SecretRef to ensure env var lookup is exercised
+        var toolWithSecretRef = tool with { SecretRef = "TAVILY_API_KEY_UNIT_TEST_ABSENT" };
+
         var repo = new InMemoryToolInvocationRepository();
         var executor = BuildExecutor(repo);
 
-        var result = await executor.ExecuteAsync(tool, """{"query":"test"}""", MakeContext());
+        var result = await executor.ExecuteAsync(toolWithSecretRef, """{"query":"test"}""", MakeContext());
 
         // Must not throw — returns an error result instead
         Assert.NotNull(result.Error);
-        Assert.Equal("NotImplemented", result.Error);
-        // Output is a descriptive message, not empty
-        Assert.Contains("web-search", result.Output);
+        Assert.Contains("TAVILY_API_KEY", result.Error);
     }
 
     [Fact]
-    public async Task ExecuteAsync_NotImplementedType_StillPersistsInvocation()
+    public async Task ExecuteAsync_NotYetWiredType_ReturnsNotYetWiredResult()
     {
-        var tool = MakeTool(ToolType.WebSearch);
+        // MCP tool type is not wired yet
+        var tool = MakeTool(ToolType.McpTool);
+        var repo = new InMemoryToolInvocationRepository();
+        var executor = BuildExecutor(repo);
+
+        var result = await executor.ExecuteAsync(tool, "{}", MakeContext());
+
+        // Must not throw — returns a not-yet-wired notice
+        Assert.Equal("NotYetWired", result.Error);
+        Assert.Contains("GroundingProvider path", result.Output);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WebSearch_WithoutApiKey_StillPersistsInvocation()
+    {
+        var tool = MakeTool(ToolType.WebSearch) with { SecretRef = "TAVILY_API_KEY_UNIT_TEST_ABSENT" };
         var repo = new InMemoryToolInvocationRepository();
         var executor = BuildExecutor(repo);
         var ctx = MakeContext();
@@ -125,8 +146,13 @@ public sealed class ToolExecutorTests
 }
 
 // ---------------------------------------------------------------------------
-// In-memory fake
+// In-memory fakes
 // ---------------------------------------------------------------------------
+
+internal sealed class NoOpHttpClientFactory : IHttpClientFactory
+{
+    public HttpClient CreateClient(string name) => new();
+}
 
 internal sealed class InMemoryToolInvocationRepository : IToolInvocationRepository
 {

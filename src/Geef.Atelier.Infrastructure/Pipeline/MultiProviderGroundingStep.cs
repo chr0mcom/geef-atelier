@@ -2,6 +2,7 @@ using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Persistence.Crew;
+using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk.Providers;
 using Microsoft.Extensions.Logging;
@@ -14,6 +15,8 @@ namespace Geef.Atelier.Infrastructure.Pipeline;
 /// sequentially and appends the combined enriched context to the run context.
 /// When a profile has a refinement binding configured, the raw provider output is passed
 /// through <see cref="IGroundingRefiner"/> before being included in the final context.
+/// When a profile has a non-null <see cref="GroundingProviderProfile.ToolName"/>, execution
+/// is delegated to <see cref="ToolBackedGroundingProvider"/> instead of the legacy factory path.
 /// </summary>
 internal sealed class MultiProviderGroundingStep(
     IGroundingStep inner,
@@ -22,7 +25,8 @@ internal sealed class MultiProviderGroundingStep(
     Guid runId,
     ILogger<MultiProviderGroundingStep> logger,
     IGroundingRefiner? refiner = null,
-    IGroundingConsultationRepository? consultationRepository = null) : IGroundingStep
+    IGroundingConsultationRepository? consultationRepository = null,
+    ToolBackedGroundingProvider? toolBackedProvider = null) : IGroundingStep
 {
     public async Task<SdkGroundingResult> RunAsync(string input, CancellationToken cancellationToken)
     {
@@ -33,7 +37,18 @@ internal sealed class MultiProviderGroundingStep(
         {
             logger.LogInformation("MultiProviderGroundingStep: run={RunId} calling provider={Provider}",
                 runId, profile.Name);
-            var provider = factory.Create(profile.ProviderType);
+
+            // New path: if the profile references a ToolDefinition by name, delegate to ToolBackedGroundingProvider.
+            // Legacy path: use the ProviderType-based factory (unchanged behaviour for all existing profiles).
+            IGroundingProvider provider;
+            if (profile.ToolName is { Length: > 0 } && toolBackedProvider is not null)
+            {
+                provider = toolBackedProvider;
+            }
+            else
+            {
+                provider = factory.Create(profile.ProviderType);
+            }
 
             try
             {

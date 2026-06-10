@@ -267,7 +267,8 @@ public static class SystemCrew
             [GroundingProviderProfile.KeyStaticLabel] = "Crew Design Rules",
         },
         MaxQueriesPerRun: 1,
-        IsSystem: true);
+        IsSystem: true,
+        ToolName: "static-context");
 
     // ── Auto-Crew: materializer finalizer ──────────────────────────────────────
 
@@ -384,7 +385,8 @@ public static class SystemCrew
             ["ExtractQuery"] = "true",
         },
         MaxQueriesPerRun: 1,
-        IsSystem: true);
+        IsSystem: true,
+        ToolName: "web-search");
 
     /// <summary>System grounding-provider profile for Tavily Advanced web-search with LLM-based citation filtering (1 credit/search, ~10 sources).</summary>
     public static readonly GroundingProviderProfile TavilyRefinedProfile = new(
@@ -405,7 +407,8 @@ public static class SystemCrew
             [GroundingProviderProfile.KeyRefinementMode]        = "0",
         },
         MaxQueriesPerRun: 1,
-        IsSystem: true);
+        IsSystem: true,
+        ToolName: "web-search");
 
     /// <summary>System grounding-provider profile for the full knowledge base (vector-store, Top-5 results, no tag filter).</summary>
     public static readonly GroundingProviderProfile KnowledgeBaseDefaultProfile = new(
@@ -415,7 +418,8 @@ public static class SystemCrew
         ProviderType: "vector-store",
         ProviderSettings: new Dictionary<string, string> { ["TopK"] = "5", ["Scope"] = "global" },
         MaxQueriesPerRun: 1,
-        IsSystem: true);
+        IsSystem: true,
+        ToolName: "knowledge-base");
 
     /// <summary>System grounding-provider profile for run-local attachments uploaded with the briefing.</summary>
     public static readonly GroundingProviderProfile RunAttachmentsProfile = new(
@@ -425,7 +429,8 @@ public static class SystemCrew
         ProviderType: "vector-store",
         ProviderSettings: new Dictionary<string, string> { ["TopK"] = "5", ["Scope"] = "run-local" },
         MaxQueriesPerRun: 1,
-        IsSystem: true);
+        IsSystem: true,
+        ToolName: "knowledge-base");
 
     /// <summary>System grounding-provider profile for scientific papers via Semantic Scholar with LLM-based relevance filtering.</summary>
     public static readonly GroundingProviderProfile AcademicDefaultProfile = new(
@@ -443,7 +448,8 @@ public static class SystemCrew
             [GroundingProviderProfile.KeyRefinementMode]             = "0",
         },
         MaxQueriesPerRun: 1,
-        IsSystem: true);
+        IsSystem: true,
+        ToolName: "academic-search");
 
     /// <summary>System grounding-provider profile for recent news via Tavily news topic with LLM-based noise filtering.</summary>
     public static readonly GroundingProviderProfile TavilyNewsProfile = new(

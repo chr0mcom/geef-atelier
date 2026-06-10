@@ -19,6 +19,12 @@ namespace Geef.Atelier.Core.Domain.Crew.Grounding;
 /// </param>
 /// <param name="MaxQueriesPerRun">Safety cap on provider calls per run. <c>null</c> means 1 (default).</param>
 /// <param name="IsSystem">True for code-constant profiles defined in <see cref="SystemCrew"/>.</param>
+/// <param name="ToolName">
+/// Optional reference to a <c>ToolDefinition.Name</c> that backs this provider.
+/// When set, <c>MultiProviderGroundingStep</c> uses <c>ToolBackedGroundingProvider</c> instead of
+/// the legacy <c>ProviderType</c>-based factory path.  Backward-compatible: existing profiles
+/// without a <c>ToolName</c> continue to use the factory path unchanged.
+/// </param>
 public sealed record GroundingProviderProfile(
     string Name,
     string DisplayName,
@@ -26,7 +32,8 @@ public sealed record GroundingProviderProfile(
     string ProviderType,
     Dictionary<string, string> ProviderSettings,
     int? MaxQueriesPerRun,
-    bool IsSystem)
+    bool IsSystem,
+    string? ToolName = null)
 {
     public const string KeyRefinementProvider     = "refinementProvider";
     public const string KeyRefinementModel        = "refinementModel";

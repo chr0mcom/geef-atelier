@@ -1,3 +1,6 @@
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Geef.Atelier.Application.Tools;
 using Geef.Atelier.Core.Domain.Tools;
 using Geef.Atelier.Core.Persistence.Tools;
@@ -7,11 +10,16 @@ namespace Geef.Atelier.Infrastructure.Tools;
 
 /// <summary>
 /// Dispatches tool invocations to the appropriate executor and persists an audit record for
-/// each call.  Currently, only <see cref="ToolType.StaticContext"/> is fully wired; all other
-/// types return a "not yet implemented" error result (stub behaviour, to be replaced in A-T9).
+/// each call.
+/// <list type="bullet">
+///   <item><see cref="ToolType.StaticContext"/> — returns configured static text (fully wired).</item>
+///   <item><see cref="ToolType.WebSearch"/> — calls Tavily API (wired in A-T9).</item>
+///   <item>All other types — return a "not yet wired" notice result (not an error; grounding-provider path is used).</item>
+/// </list>
 /// </summary>
 internal sealed class ToolExecutor(
     IToolInvocationRepository invocationRepository,
+    IHttpClientFactory httpClientFactory,
     ILogger<ToolExecutor> logger) : IToolExecutor
 {
     /// <inheritdoc/>
@@ -29,10 +37,11 @@ internal sealed class ToolExecutor(
             result = tool.ToolType switch
             {
                 ToolType.StaticContext => ExecuteStaticContext(tool),
+                ToolType.WebSearch     => await ExecuteWebSearchAsync(tool, inputJson, ct),
                 _ => new ToolExecutionResult(
-                    $"Tool type '{tool.ToolType}' execution not yet implemented.",
+                    $"Tool type '{tool.ToolType}' not yet wired in ToolExecutor. Use GroundingProvider path.",
                     null,
-                    "NotImplemented")
+                    "NotYetWired")
             };
         }
         catch (Exception ex)
@@ -87,7 +96,7 @@ internal sealed class ToolExecutor(
     }
 
     // -------------------------------------------------------------------------
-    // Helpers for future concrete executors (A-T9)
+    // Helpers
     // -------------------------------------------------------------------------
 
     /// <summary>
@@ -95,12 +104,127 @@ internal sealed class ToolExecutor(
     /// the process environment.  Returns <see langword="null"/> when no reference is set or
     /// the variable is not present.
     /// </summary>
-    /// <remarks>
-    /// Not called by any current stub executor.  Provided here so A-T9 implementors can
-    /// access it without re-discovering the pattern.
-    /// </remarks>
     private static string? ResolveSecret(ToolDefinition tool) =>
         tool.SecretRef is { Length: > 0 } secretRef
             ? Environment.GetEnvironmentVariable(secretRef)
             : null;
+
+    // -------------------------------------------------------------------------
+    // Concrete executors (A-T9)
+    // -------------------------------------------------------------------------
+
+    private async Task<ToolExecutionResult> ExecuteWebSearchAsync(
+        ToolDefinition tool,
+        string inputJson,
+        CancellationToken ct)
+    {
+        var apiKey = ResolveSecret(tool);
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return new ToolExecutionResult("", null, "TAVILY_API_KEY environment variable is not set.");
+
+        string query;
+        try
+        {
+            using var doc = JsonDocument.Parse(inputJson);
+            query = doc.RootElement.TryGetProperty("query", out var qElem)
+                ? qElem.GetString() ?? string.Empty
+                : string.Empty;
+        }
+        catch
+        {
+            query = inputJson;
+        }
+
+        if (string.IsNullOrWhiteSpace(query))
+            return new ToolExecutionResult("", null, "web-search requires a non-empty 'query' input.");
+
+        var maxResults = tool.Settings.TryGetValue(ToolDefinitionSettingsKeys.MaxResults, out var mrStr)
+            && int.TryParse(mrStr, out var mr) ? mr : 5;
+
+        var requestBody = new TavilySearchRequest(
+            ApiKey: apiKey,
+            Query: query,
+            SearchDepth: "basic",
+            IncludeAnswer: true,
+            MaxResults: maxResults);
+
+        try
+        {
+            var httpClient = httpClientFactory.CreateClient("tavily");
+            var response = await httpClient.PostAsJsonAsync("search", requestBody, TavilyJsonOpts, ct);
+            response.EnsureSuccessStatusCode();
+
+            var result = await response.Content.ReadFromJsonAsync<TavilySearchResponse>(TavilyJsonOpts, ct);
+            if (result is null)
+                return new ToolExecutionResult("", null, "Tavily returned an empty response body.");
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("[Web Search Results]");
+            if (!string.IsNullOrWhiteSpace(result.Answer))
+            {
+                sb.AppendLine("Summary:");
+                sb.AppendLine(result.Answer);
+                sb.AppendLine();
+            }
+            if (result.Results.Count > 0)
+            {
+                sb.AppendLine("Sources:");
+                for (var i = 0; i < result.Results.Count; i++)
+                {
+                    var r = result.Results[i];
+                    sb.AppendLine($"{i + 1}. {r.Title ?? string.Empty} ({r.Url ?? string.Empty})");
+                    if (!string.IsNullOrWhiteSpace(r.Content))
+                        sb.AppendLine($"   {(r.Content.Length > 300 ? r.Content[..300] + "…" : r.Content)}");
+                }
+            }
+            sb.Append("[End of web search results]");
+
+            // Tavily basic search costs approximately €0.004 per call (1 credit @ ~0.4 ct)
+            const decimal CostEur = 0.004m;
+            return new ToolExecutionResult(sb.ToString(), CostEur, null);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "ToolExecutor: web-search call failed for tool={ToolName}", tool.Name);
+            return new ToolExecutionResult("", null, $"Tavily web-search failed: {ex.Message}");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Tavily DTOs
+    // -------------------------------------------------------------------------
+
+    private static readonly JsonSerializerOptions TavilyJsonOpts = new(JsonSerializerDefaults.Web);
+
+    private sealed record TavilySearchRequest(
+        [property: JsonPropertyName("api_key")]      string ApiKey,
+        [property: JsonPropertyName("query")]        string Query,
+        [property: JsonPropertyName("search_depth")] string SearchDepth,
+        [property: JsonPropertyName("include_answer")] bool IncludeAnswer,
+        [property: JsonPropertyName("max_results")]  int MaxResults);
+
+    private sealed class TavilySearchResponse
+    {
+        [JsonPropertyName("answer")]
+        public string? Answer { get; set; }
+
+        [JsonPropertyName("results")]
+        public List<TavilyResult> Results { get; set; } = [];
+    }
+
+    private sealed class TavilyResult
+    {
+        [JsonPropertyName("title")]
+        public string? Title { get; set; }
+
+        [JsonPropertyName("url")]
+        public string? Url { get; set; }
+
+        [JsonPropertyName("content")]
+        public string? Content { get; set; }
+
+        [JsonPropertyName("score")]
+        public double? Score { get; set; }
+    }
 }
