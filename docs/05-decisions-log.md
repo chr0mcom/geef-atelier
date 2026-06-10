@@ -1262,3 +1262,43 @@ Das bisherige Template-Studio (D-038) delegierte die Crew-Komposition an einen e
 - `LearningExtractFinalizerExecutor`: `if (run.Kind == RunKind.CrewComposition) return Ok;` — verhindert, dass ein Kompositions-Run Learnings extrahiert.
 - `CrewComposerExecutor`: lehnt Runs mit `Kind != CrewComposition` ab.
 - Kein verschachteltes Auto-Compose: `CrewMaterializeFinalizerExecutor` startet niemals einen weiteren Kompositions-Run (guard: `ChainToTaskRun` darf nur einen `RunKind.Standard`-Run starten).
+
+---
+
+## 10. Juni 2026 — Tool System: Central ToolDefinition, Agentic Loop, Auto-Crew Integration, MCP Client (D-060)
+
+### D-060: Tool System — complete implementation across Phases A, B, C
+
+*Branch: `feat/tool-system` → merged to main 2026-06-10*
+
+Atelier actors previously operated exclusively from model knowledge. A reviewer could not verify a factual claim, an executor could not fetch live data. External context entered only via Grounding (Push, eager, once). This feature introduces **agentic tool use (Pull)**: an actor calls tools *during its own turn*, decides when and how often, and uses the results directly in its output.
+
+**D-060/1 — `ToolDefinition` as single source of truth.** A new Core domain record `ToolDefinition` (Name, DisplayName, Description, ToolType, Settings `Dictionary<string,string>`, SecretRef, LlmSchema `JsonElement`, AccessClass, IsSystem) is the sole definition for any tool capability. The same record drives both Pull (agentic LLM tool use) and Push (grounding context injection). Nine type constants cover all existing capability categories plus the new `mcp-tool` type. Two access classes: `ReadOnly = 0` (default), `Mutating = 1` (operator opt-in required).
+
+**D-060/2 — Secret isolation.** `SecretRef` stores only the ENV-var key name; the value is resolved at execution time via `Environment.GetEnvironmentVariable`. It is never stored in the database, logs, `CrewSnapshot`, `ToolInvocation`, or any UI field.
+
+**D-060/3 — `IToolExecutor` — unified execution layer.** A single `ExecuteAsync(ToolDefinition, inputJson, ctx, ct)` dispatches to the appropriate executor for all 9 tool types. Every call appends a `ToolInvocation` audit record (RunId, IterationNumber, ActorType, ActorName, ToolName, InputJson, OutputExcerpt ≤500 chars, CostEur, DurationMs, Sequence, Outcome). This is the single execution point for both Pull (called from `IToolUseRunner`) and Push (called from `ToolBackedGroundingProvider`).
+
+**D-060/4 — Multi-turn LLM client.** `LlmRequest` gained an optional `Messages` list (replaces system+user when set). `LlmResponse` now carries all `ToolCalls`. `OpenAiMessageFormat` serialises full message history including `assistant tool_calls` and `tool` result messages. Existing single-shot paths are unchanged.
+
+**D-060/5 — `IToolUseRunner` — the agentic loop.** The loop (build history → LLM call with tools → execute tool calls → append results → repeat) is provider-agnostic. Per-turn cap default: **5 tool calls**. Per-tool timeout default: **30 s**. Loop ends on plain-text response, on receiving the mandatory final tool (`submit_review`), or on cap. Cap-reached state is audited as `ToolInvocationOutcome.CapReached`.
+
+**D-060/6 — CLI proxy agentic extension.** When the .NET loop sends a call with tools but without forced `tool_choice`, the proxy injects an agentic protocol addendum (respond with exactly one `{"tool_call": …}` JSON or plain final text). The forced single-tool path (`submit_review`) is unchanged.
+
+**D-060/7 — Provider capability detection.** `SupportsAgenticTools(providerName)` returns `true` for HTTP providers, `false` for `generic`/disabled. Graceful degradation: when a tool-bound profile runs on a non-capable provider, both the run log and a UI badge make this visible — no silent failure.
+
+**D-060/8 — Tool binding on all actor types.** `ExecutorProfile`, `ReviewerProfile`, `AdvisorProfile`, `FinalizerProfile` (Transform only) each gained `IReadOnlyList<string> ToolNames`. If non-empty and provider supports agentic tools, the actor uses the loop. Migrations Step38 (profile ToolNames columns) and Step39 (grounding profile ToolName column).
+
+**D-060/9 — Grounding rebuild on central tools.** All grounding providers now reference a `ToolDefinition` by name. The 8 type-specific provider classes were refactored: raw capability logic moved into reusable executors. A `ToolBackedGroundingProvider` wraps any tool type for eager Push. System tools and grounding profiles are defined as code constants in `SystemTools` / `SystemCrew`; Migration Step40 seeds them idempotently on startup.
+
+**D-060/10 — `CrewSnapshot` v2 + `ToolInvocationsBlock`.** Schema version incremented. Each actor profile in the snapshot now embeds its bound `ToolDefinition`s (fully dereferenced, no secrets). New UI component `ToolInvocationsBlock.razor` on the run detail page: shows per-iteration, per-actor tool calls with input, output, cost, duration — providing provenance for reviewer findings.
+
+**D-060/11 — `/tools` CRUD UI + `ToolPicker`.** New pages for listing, creating, editing, and viewing tool definitions. Danger badge for `Mutating` tools. `ToolPicker.razor` is reused across all actor editors and grounding provider editors. Capability warning shown for non-capable providers.
+
+**D-060/12 — Phase B: Auto-Crew tool binding.** `CrewPartSpec.ToolNames` added. `ToolCatalogGroundingProvider` (type `"tool-catalog"`) injects all tools as a Markdown table into composition runs, preventing name hallucination. `CrewComposerToolBindingProfile` (6th composer reviewer) evaluates tool binding decisions (necessity, access class, role fit, count, catalog membership). `CrewSpecValidator` Step 8 deterministically checks: provider capability (8a), tool existence (8b), Mutating blocked without opt-in (8c).
+
+**D-060/13 — Phase C: MCP Client.** `McpServerConfig` domain record + persistence (Migration Step41). `AtelierMcpClientFactory`: SSRF check via `IUrlSafetyValidator`, optional AUTH from ENV var, `HttpClientTransport` → `McpClient.CreateAsync`. `IMcpToolDiscoveryService` calls `tools/list` and maps `McpClientTool` to `ToolDefinition` candidates (type=mcp-tool, `mcpServerId`/`mcpOriginalName` settings, `JsonSchema` as LlmSchema, ReadOnly default). `/mcp-servers` CRUD UI with discovery + import flow. `ToolExecutor` mcp-tool dispatch: look up `McpServerConfig` by `ServerId`, connect, `CallToolAsync` with parsed JSON arguments.
+
+**D-060/14 — Mutating opt-in.** `CrewSpecArtifact.AllowMutatingTools` (`bool`, default `false`). The validator blocks any Mutating tool unless this flag is explicitly set in the spec. The UI marks Mutating tools with a red danger badge in both editor and detail view.
+
+**Tests:** 1788 passing, 0 regressions. 5 DB migrations (Step37–Step41), all additive (no data loss on forward migration).

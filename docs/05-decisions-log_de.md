@@ -1183,3 +1183,43 @@ Drei unabhängige Stabilitätsfixes nach Analyse zweier produktiver Runs, die al
 **Schlüssel-Invariante:** `approved=true` mit `info`-Findings ist weiterhin eine normale Freigabe, die zur Konvergenz beiträgt. Pflicht-Findings garantiert nur, dass die MARGIN NOTES immer befüllt sind; Ablehnungen werden nicht erzwungen.
 
 **Tests:** 1555 grün (+23 neue; 7 pre-existing Failures unverändert). Deploy: 24. Mai 2026.
+
+---
+
+## 10. Juni 2026 — Tool-System: Zentrale ToolDefinition, Agentic Loop, Auto-Crew-Integration, MCP-Client (D-060)
+
+### D-060: Tool-System — vollständige Implementierung über Phasen A, B, C
+
+*Branch: `feat/tool-system` → merge auf main 10. Juni 2026*
+
+Atelier-Akteure arbeiteten bislang ausschließlich aus dem Modellwissen heraus: ein Reviewer konnte eine Tatsachenbehauptung nicht nachschlagen, ein Executor keinen Fakt live holen. Externer Kontext gelangte ausschließlich über Grounding (Push, eager, einmalig) in die Pipeline. Dieses Feature führt **agentic Tool-Use (Pull)** ein: ein Akteur ruft Werkzeuge *während seines eigenen Turns* auf, entscheidet selbst wann und wie oft, und nutzt die Ergebnisse direkt in seiner Ausgabe.
+
+**D-060/1 — `ToolDefinition` als einzige Quelle der Wahrheit.** Ein neuer Core-Domain-Record `ToolDefinition` (Name, DisplayName, Description, ToolType, Settings `Dictionary<string,string>`, SecretRef, LlmSchema `JsonElement`, AccessClass, IsSystem) ist die alleinige Definition jeder Werkzeug-Fähigkeit. Dieselbe Definition treibt sowohl Pull (agentic LLM Tool-Use) als auch Push (Grounding-Kontexteinspeisung). Neun Typ-Konstanten decken alle bestehenden Fähigkeits-Kategorien plus den neuen Typ `mcp-tool` ab. Zwei Zugriffsklassen: `ReadOnly = 0` (Standard), `Mutating = 1` (expliziter Betreiber-Opt-in erforderlich).
+
+**D-060/2 — Secret-Isolation.** `SecretRef` enthält ausschließlich den ENV-Variablen-Namen; der tatsächliche Wert wird erst zur Ausführungszeit per `Environment.GetEnvironmentVariable` aufgelöst. Niemals in DB, Logs, `CrewSnapshot`, `ToolInvocation` oder einem UI-Feld gespeichert.
+
+**D-060/3 — `IToolExecutor` — einheitliche Ausführungsschicht.** Ein einziges `ExecuteAsync(ToolDefinition, inputJson, ctx, ct)` dispatcht für alle 9 Tool-Typen. Jeder Aufruf schreibt automatisch einen `ToolInvocation`-Audit-Record (RunId, IterationNumber, ActorType, ActorName, ToolName, InputJson, OutputExcerpt ≤500 Zeichen, CostEur, DurationMs, Sequence, Outcome). Dies ist der einzige Ausführungspunkt für sowohl Pull (aus `IToolUseRunner`) als auch Push (aus `ToolBackedGroundingProvider`).
+
+**D-060/4 — Mehrfach-Turn-LLM-Client.** `LlmRequest` hat eine optionale `Messages`-Liste erhalten (ersetzt System+User wenn gesetzt). `LlmResponse` trägt jetzt alle `ToolCalls`. `OpenAiMessageFormat` serialisiert die vollständige Message-History inklusive `assistant tool_calls` und `tool`-Ergebnismeldungen. Bestehende Single-Shot-Pfade sind unverändert.
+
+**D-060/5 — `IToolUseRunner` — der agentic Loop.** Der Loop (History aufbauen → LLM-Aufruf mit Tools → Tool-Calls ausführen → Ergebnisse anhängen → wiederholen) läuft vollständig provider-agnostisch. Per-Turn-Cap (Standard): **5 Tool-Aufrufe**. Per-Tool-Timeout (Standard): **30 s**. Loop endet bei reiner Text-Antwort, beim Empfang des Pflicht-End-Tools (`submit_review`) oder bei Cap. Cap-Erreicht-Status wird als `ToolInvocationOutcome.CapReached` auditiert.
+
+**D-060/6 — CLI-Proxy agentic-Erweiterung.** Wenn der .NET-Loop einen Aufruf mit Tools, aber ohne erzwungenes `tool_choice` schickt, injiziert der Proxy einen agentic-Protokoll-Addendum (genau ein `{"tool_call": …}`-JSON oder reiner Abschlusstext antworten). Der erzwungene Einzeltool-Pfad (`submit_review`) bleibt unverändert.
+
+**D-060/7 — Provider-Capability-Detection.** `SupportsAgenticTools(providerName)` gibt `true` für HTTP-Provider, `false` für `generic`/deaktiviert zurück. Graceful Degradation: läuft ein Tool-gebundenes Profil auf einem nicht-fähigen Provider, wird dies sowohl im Run-Log als auch per UI-Badge sichtbar gemacht — kein stilles Versagen.
+
+**D-060/8 — Tool-Binding in alle Akteur-Typen.** `ExecutorProfile`, `ReviewerProfile`, `AdvisorProfile`, `FinalizerProfile` (nur Transform) haben jeweils `IReadOnlyList<string> ToolNames` erhalten. Bei nicht-leerer Liste und fähigem Provider nutzt der Akteur den Loop. Migrationen Step38 (ToolNames-Spalten in Profil-Tabellen) und Step39 (ToolName-Spalte in GroundingProviderProfiles).
+
+**D-060/9 — Grounding-Neuaufbau auf zentrale Tools.** Alle Grounding-Provider referenzieren jetzt eine `ToolDefinition` über `ToolName`. Die 8 typ-spezifischen Provider-Klassen wurden refaktoriert; die rohe Fähigkeitslogik wanderte in wiederverwendbare Executors. Ein `ToolBackedGroundingProvider` kapselt jeden Typ für eager Push. System-Tools und -Grounding-Profile sind als Code-Konstanten definiert (`SystemTools` / `SystemCrew`); Migration Step40 seedet sie idempotent beim Start.
+
+**D-060/10 — `CrewSnapshot` v2 + `ToolInvocationsBlock`.** Schema-Version erhöht. Jedes Akteur-Profil im Snapshot enthält jetzt seine gebundenen `ToolDefinition`s (vollständig dereferenziert, keine Secrets). Neue UI-Komponente `ToolInvocationsBlock.razor` auf der Run-Detailseite: zeigt pro Iteration und Akteur die Tool-Aufrufe mit Eingabe, Ausgabe, Kosten, Dauer — liefert Provenienz für Reviewer-Findings.
+
+**D-060/11 — `/tools` CRUD-UI + `ToolPicker`.** Neue Seiten für Auflisten, Anlegen, Bearbeiten und Anzeigen von Tool-Definitionen. Roter Gefahren-Badge für `Mutating`-Tools. `ToolPicker.razor` ist in allen Akteur-Editoren und Grounding-Provider-Editoren wiederverwendbar. Capability-Warnung bei nicht-fähigen Providern.
+
+**D-060/12 — Phase B: Auto-Crew Tool-Binding.** `CrewPartSpec.ToolNames` ergänzt. `ToolCatalogGroundingProvider` (Typ `"tool-catalog"`) speist alle Tools als Markdown-Tabelle in Kompositions-Runs ein und verhindert so Namens-Halluzinierungen. `CrewComposerToolBindingProfile` (6. Composer-Reviewer) bewertet Tool-Binding-Entscheidungen (Notwendigkeit, Zugriffsklasse, Rollen-Fit, Anzahl, Katalog-Mitgliedschaft). `CrewSpecValidator` Step 8 prüft deterministisch: Provider-Capability (8a), Tool-Existenz (8b), Mutating ohne Opt-in gesperrt (8c).
+
+**D-060/13 — Phase C: MCP-Client.** `McpServerConfig`-Domain-Record + Persistenz (Migration Step41). `AtelierMcpClientFactory`: SSRF-Check via `IUrlSafetyValidator`, optionaler AUTH aus ENV-Variable, `HttpClientTransport` → `McpClient.CreateAsync`. `IMcpToolDiscoveryService` ruft `tools/list` ab und mappt `McpClientTool` auf `ToolDefinition`-Kandidaten (Typ=mcp-tool, Settings `mcpServerId`/`mcpOriginalName`, `JsonSchema` als LlmSchema, ReadOnly-Standard). `/mcp-servers`-CRUD-UI mit Discovery- und Import-Workflow. `ToolExecutor` mcp-tool-Dispatch: `McpServerConfig` über `ServerId` laden, verbinden, `CallToolAsync` mit geparsten JSON-Argumenten.
+
+**D-060/14 — Mutating-Opt-in.** `CrewSpecArtifact.AllowMutatingTools` (`bool`, Standard `false`). Der Validator blockiert jedes Mutating-Tool ohne explizit gesetztes Flag in der Spec. Die UI markiert Mutating-Tools mit einem roten Gefahren-Badge in Editor und Detailansicht.
+
+**Tests:** 1788 grün, 0 Regressions. 5 DB-Migrationen (Step37–Step41), alle additiv (kein Datenverlust beim Forward-Deploy).
