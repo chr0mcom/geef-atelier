@@ -6,7 +6,10 @@ using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Core.Domain.Tools;
+using Geef.Atelier.Core.Persistence.Tools;
 using Geef.Atelier.Infrastructure.Composition;
+using Geef.Atelier.Infrastructure.Llm;
 
 namespace Geef.Atelier.Tests.Composition;
 
@@ -27,7 +30,8 @@ public sealed class CrewComposerStabilityTests
         crewService  ??= new EmptyCrewService();
         modelCatalog ??= new EmptyModelCatalog();
         groundingFactory ??= new StubGroundingFactory("tavily", "academic-search", "vector-store");
-        return new CrewSpecValidator(crewService, modelCatalog, groundingFactory);
+        return new CrewSpecValidator(crewService, modelCatalog, groundingFactory,
+            new EmptyToolRepository(), new AgenticCapableResolver());
     }
 
     private static CrewSpecValidator MakeValidatorWithKnownModel(string provider, string model) =>
@@ -308,5 +312,30 @@ public sealed class CrewComposerStabilityTests
         public Task<string> RenameCustomCrewTemplateAsync(string o, string n, CancellationToken ct = default) => Task.FromResult(n);
         public Task<CrewSnapshot> ResolveSnapshotAsync(string? crewTemplateName, CrewSpec? customCrew, CancellationToken ct = default)
             => Task.FromResult(new CrewSnapshot(1, crewTemplateName, null!, [], EvaluationStrategy.Parallel, null, []));
+    }
+
+    /// <summary>Returns null for every tool name lookup.</summary>
+    private sealed class EmptyToolRepository : IToolDefinitionRepository
+    {
+        public Task<ToolDefinition?> GetByNameAsync(string name, CancellationToken ct = default)
+            => Task.FromResult<ToolDefinition?>(null);
+        public Task<IReadOnlyList<ToolDefinition>> GetAllAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ToolDefinition>>([]);
+        public Task<IReadOnlyList<ToolDefinition>> GetSystemToolsAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ToolDefinition>>([]);
+        public Task<IReadOnlyList<ToolDefinition>> GetCustomToolsAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ToolDefinition>>([]);
+        public Task UpsertAsync(ToolDefinition tool, CancellationToken ct = default) => Task.CompletedTask;
+        public Task DeleteAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    /// <summary>Reports every provider as supporting agentic tools.</summary>
+    private sealed class AgenticCapableResolver : ILlmClientResolver
+    {
+        public (ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName)
+            => throw new NotSupportedException();
+        public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
+            => throw new NotSupportedException();
+        public bool SupportsAgenticTools(string providerName) => true;
     }
 }
