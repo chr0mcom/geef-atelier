@@ -1,0 +1,152 @@
+@page "/tools"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Core.Domain.Tools
+@using Geef.Atelier.Web.Services
+@inject IToolDefinitionService ToolService
+@inject NavigationManager Nav
+
+<PageTitle>Werkzeuge — Atelier</PageTitle>
+
+<div class="crew-profiles-index">
+    <div class="page-header">
+        <h1>Werkzeuge</h1>
+        <a href="/tools/create" class="btn primary">+ Neues Werkzeug</a>
+    </div>
+
+    @if (_tools.Count == 0)
+    {
+        <p class="text-muted">Noch keine Werkzeuge konfiguriert.</p>
+    }
+    else
+    {
+        <table class="crew-table" data-testid="tool-list">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Typ</th>
+                    <th>Zugriff</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var tool in _tools)
+                {
+                    <tr data-testid="tool-row-@tool.Name">
+                        <td>
+                            @tool.DisplayName
+                            @if (tool.IsSystem)
+                            {
+                                <span class="crew-badge">System</span>
+                            }
+                            @if (tool.AccessClass == ToolAccessClass.Mutating)
+                            {
+                                <span class="crew-badge crew-badge--danger">Mutating</span>
+                            }
+                        </td>
+                        <td>@GetTypeLabel(tool.ToolType)</td>
+                        <td>@GetAccessLabel(tool.AccessClass)</td>
+                        <td class="crew-table-actions">
+                            <a href="/tools/view/@tool.Name" class="btn small">Ansehen</a>
+                            @if (tool.IsSystem)
+                            {
+                                <button class="btn small primary" @onclick="() => DuplicateTool(tool)">Als Custom duplizieren</button>
+                            }
+                            else
+                            {
+                                <a href="/tools/edit/@tool.Name" class="btn small">Bearbeiten</a>
+                                <button class="btn small danger" @onclick="() => _toolToDelete = tool">Löschen</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="error-banner">@_error</div>
+    }
+</div>
+
+<DeleteConfirmationModal
+    Show="_toolToDelete != null"
+    ItemName="@(_toolToDelete?.Name ?? "")"
+    ItemKind="Werkzeug"
+    OnConfirm="ExecuteDeleteAsync"
+    OnCancel="() => _toolToDelete = null" />
+
+@code {
+    private IReadOnlyList<ToolDefinition> _tools = [];
+    private ToolDefinition? _toolToDelete;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _tools = await ToolService.GetAllAsync();
+    }
+
+    private async Task DuplicateTool(ToolDefinition original)
+    {
+        _error = null;
+        try
+        {
+            var copyName = "custom-" + original.Name.TrimStart("custom-".ToCharArray()) + "-kopie";
+            var copy = original with
+            {
+                Name = copyName,
+                DisplayName = original.DisplayName + " (Kopie)",
+                IsSystem = false
+            };
+            await ToolService.SaveAsync(copy);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task ExecuteDeleteAsync()
+    {
+        if (_toolToDelete == null) return;
+        var name = _toolToDelete.Name;
+        _toolToDelete = null;
+        try
+        {
+            await ToolService.DeleteAsync(name);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private static string GetTypeLabel(string toolType) => toolType switch
+    {
+        "web-search"        => "Websuche",
+        "knowledge-base"    => "Wissensdatenbank",
+        "url-fetch"         => "URL-Abruf",
+        "news-search"       => "Nachrichtensuche",
+        "academic-search"   => "Akademische Suche",
+        "rest-api"          => "REST-API",
+        "static-context"    => "Statischer Kontext",
+        "learning-retrieval" => "Lerneinträge",
+        "mcp-tool"          => "MCP-Tool",
+        _                   => toolType
+    };
+
+    private static string GetAccessLabel(ToolAccessClass access) => access switch
+    {
+        ToolAccessClass.ReadOnly  => "Lesend",
+        ToolAccessClass.Mutating  => "Schreibend",
+        _                         => access.ToString()
+    };
+}

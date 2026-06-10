@@ -16,4 +16,6 @@ internal sealed class TestLlmClientResolver(
 
     public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string profileModel, int? profileMaxTokens) =>
         (client, profileModel, profileMaxTokens ?? maxTokens);
+
+    public bool SupportsAgenticTools(string providerName) => true;
 }

@@ -1,6 +1,9 @@
 using Geef.Atelier.Application.Pricing;
+using Geef.Atelier.Application.Tools;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Core.Domain.Tools;
+using Geef.Atelier.Core.Persistence.Tools;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk;
 using Geef.Sdk.Context;
@@ -13,7 +16,9 @@ internal sealed class ProfileBasedExecutor(
     ExecutorProfile profile,
     ILlmClientResolver resolver,
     IPricingCatalog? pricingCatalog = null,
-    ICostAccumulator? costAccumulator = null) : IExecutionStep
+    ICostAccumulator? costAccumulator = null,
+    IToolUseRunner? toolUseRunner = null,
+    IToolDefinitionRepository? toolDefinitionRepository = null) : IExecutionStep
 {
     // Revision iterations must re-emit the whole artifact. If the executor instead returns a
     // change-summary / cover letter or an abbreviated partial (known LLM failure modes on long
@@ -107,6 +112,51 @@ internal sealed class ProfileBasedExecutor(
             contextDocument = CollectContextBlocks(context);
         else
             userPrompt = PrependContextBlocks(context, userPrompt);
+
+        // Agentic tool-use loop path: when the profile has bound tools and the provider supports it.
+        if (profile.ToolNames is { Count: > 0 } toolNames
+            && toolUseRunner is not null
+            && toolDefinitionRepository is not null
+            && resolver.SupportsAgenticTools(profile.Provider))
+        {
+            var boundTools = await ResolveToolsAsync(toolNames, toolDefinitionRepository, cancellationToken);
+
+            Guid.TryParse(
+                context.TryGet(GeefKeys.RunId, out var ridStr) ? ridStr : null,
+                out var runGuid);
+
+            var loopCtx = new ToolInvocationContext(
+                RunId: runGuid,
+                IterationNumber: iter,
+                ActorType: "executor",
+                ActorName: profile.Name,
+                Sequence: 0);
+
+            var loopResult = await toolUseRunner.RunAsync(
+                client, model,
+                profile.SystemPrompt,
+                userPrompt,
+                boundTools,
+                requiredFinalTool: null,
+                new ToolLoopOptions { MaxToolCalls = toolNames.Count * 3 },
+                loopCtx,
+                cancellationToken);
+
+            var loopText = string.IsNullOrWhiteSpace(loopResult.FinalText) && prevDraft is not null
+                ? prevDraft
+                : loopResult.FinalText;
+
+            var loopUsage = loopResult.TotalTokenUsage;
+            var loopUpdated = context
+                .Set(AtelierContextKeys.CurrentDraft, loopText)
+                .Set(AtelierContextKeys.BestDraft, LongestOf(loopText, prevDraft, context))
+                .Set(AtelierContextKeys.TokenUsage, loopUsage);
+            return new ExecutionResult
+            {
+                UpdatedContext = loopUpdated,
+                Notes = [$"tool-loop tool_calls={loopResult.ToolCallCount} tokens_in={loopUsage.InputTokens} tokens_out={loopUsage.OutputTokens}"]
+            };
+        }
 
         var response = await CompleteAndRecordAsync(
             client, model, userPrompt, iter, currentDocument, contextDocument, maxTokens, cancellationToken);
@@ -288,6 +338,21 @@ internal sealed class ProfileBasedExecutor(
             && tracked.Length > best.Length)
             best = tracked;
         return best;
+    }
+
+    private static async Task<IReadOnlyList<ToolDefinition>> ResolveToolsAsync(
+        IReadOnlyList<string> toolNames,
+        IToolDefinitionRepository repository,
+        CancellationToken ct)
+    {
+        var tools = new List<ToolDefinition>(toolNames.Count);
+        foreach (var name in toolNames)
+        {
+            var tool = await repository.GetByNameAsync(name, ct);
+            if (tool is not null)
+                tools.Add(tool);
+        }
+        return tools;
     }
 
     private static IReadOnlyList<Finding> ExtractPreviousFindings(IRunContext ctx)

@@ -63,6 +63,12 @@ public sealed record CrewPartSpec
 
     /// <summary>Finalizer execution type (e.g. "FileExport", "Transform"). Finalizer-only.</summary>
     public string? FinalizerType { get; init; }
+
+    /// <summary>
+    /// Optional list of tool names (from the tool catalogue) to bind to this actor's profile.
+    /// Applies to executor, reviewer, advisor, and Transform-type finalizer parts.
+    /// </summary>
+    public IReadOnlyList<string>? ToolNames { get; init; }
 }
 
 /// <summary>
@@ -105,4 +111,11 @@ public sealed record CrewSpecArtifact
 
     /// <summary>Whether to abort the run immediately when a critical finding is raised.</summary>
     public bool? AbortOnCritical { get; init; }
+
+    /// <summary>
+    /// When <see langword="true"/>, actors in this spec may bind tools with
+    /// <see cref="Geef.Atelier.Core.Domain.Tools.ToolAccessClass.Mutating"/> access.
+    /// Disabled by default; must be explicitly set by the operator.
+    /// </summary>
+    public bool AllowMutatingTools { get; init; }
 }

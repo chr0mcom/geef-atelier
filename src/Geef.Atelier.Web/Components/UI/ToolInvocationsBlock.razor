@@ -1,0 +1,67 @@
+@* Collapsible block showing tool invocations for a single run / iteration *@
+@using Geef.Atelier.Core.Domain.Tools
+
+<div class="tool-invocations-block" data-testid="tool-invocations">
+    <button class="collapsible-header" @onclick="Toggle" type="button"
+            aria-expanded="@_expanded">
+        <span>Werkzeug-Aufrufe: @Invocations.Count Aufruf@(Invocations.Count != 1 ? "e" : "")</span>
+        <span class="chevron @(_expanded ? "up" : "down")">▾</span>
+    </button>
+
+    @if (_expanded)
+    {
+        <div class="collapsible-body">
+            @foreach (var inv in Invocations)
+            {
+                <div class="tool-invocation" data-testid="tool-invocation-@inv.ToolName">
+                    <div class="tool-invocation-header">
+                        <strong>@inv.ToolName</strong>
+                        <span class="tool-invocation-actor">@inv.ActorType: @inv.ActorName</span>
+                        <span class="tool-invocation-outcome @GetOutcomeClass(inv.Outcome)">@GetOutcomeLabel(inv.Outcome)</span>
+                        <span class="tool-invocation-meta">@inv.DurationMs ms@(inv.CostEur.HasValue ? $" · {inv.CostEur:F4} €" : "")</span>
+                    </div>
+                    <div class="tool-invocation-input">
+                        <em>Eingabe:</em>
+                        <code>@TruncateJson(inv.InputJson, 200)</code>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(inv.OutputExcerpt))
+                    {
+                        <div class="tool-invocation-output">
+                            <em>Ergebnis:</em>
+                            <span>@inv.OutputExcerpt</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ToolInvocation> Invocations { get; set; } = [];
+
+    private bool _expanded;
+
+    private void Toggle() => _expanded = !_expanded;
+
+    private static string GetOutcomeClass(ToolInvocationOutcome outcome) => outcome switch
+    {
+        ToolInvocationOutcome.Success => "outcome-success",
+        ToolInvocationOutcome.Failed => "outcome-failed",
+        ToolInvocationOutcome.CapReached => "outcome-cap",
+        ToolInvocationOutcome.Blocked => "outcome-blocked",
+        _ => ""
+    };
+
+    private static string GetOutcomeLabel(ToolInvocationOutcome outcome) => outcome switch
+    {
+        ToolInvocationOutcome.Success => "✓",
+        ToolInvocationOutcome.Failed => "✗",
+        ToolInvocationOutcome.CapReached => "CAP",
+        ToolInvocationOutcome.Blocked => "⊘",
+        _ => "?"
+    };
+
+    private static string TruncateJson(string json, int maxLen) =>
+        json.Length <= maxLen ? json : json[..maxLen] + "…";
+}

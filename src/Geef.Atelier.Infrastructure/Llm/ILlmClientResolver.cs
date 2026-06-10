@@ -15,4 +15,11 @@ public interface ILlmClientResolver
     /// Throws <see cref="InvalidOperationException"/> when the provider is not configured.
     /// </summary>
     (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens);
+
+    /// <summary>
+    /// Returns <see langword="true"/> when the named provider supports agentic tool use
+    /// (multi-turn tool calls / function calling).  Returns <see langword="false"/> when the
+    /// provider is unknown or not yet loaded.
+    /// </summary>
+    bool SupportsAgenticTools(string providerName);
 }

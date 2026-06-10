@@ -7,6 +7,34 @@ public interface ILlmClient
     Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken);
 }
 
+/// <summary>
+/// A single turn in a multi-turn conversation (system / user / assistant / tool).
+/// </summary>
+public sealed record LlmMessage
+{
+    public required string Role { get; init; }                           // "system" | "user" | "assistant" | "tool"
+    public string? Content { get; init; }                                // null for assistant messages that only contain tool_calls
+    public IReadOnlyList<LlmToolCall>? ToolCalls { get; init; }         // set on assistant messages
+    public string? ToolCallId { get; init; }                             // set on tool-result messages (role="tool")
+    public string? Name { get; init; }                                   // tool name on role="tool" messages
+
+    // Factory helpers
+    public static LlmMessage System(string content) => new() { Role = "system", Content = content };
+    public static LlmMessage User(string content) => new() { Role = "user", Content = content };
+    public static LlmMessage AssistantText(string content) => new() { Role = "assistant", Content = content };
+    public static LlmMessage AssistantToolCalls(IReadOnlyList<LlmToolCall> calls) => new() { Role = "assistant", ToolCalls = calls };
+    public static LlmMessage ToolResult(string toolCallId, string toolName, string content) => new()
+        { Role = "tool", Content = content, ToolCallId = toolCallId, Name = toolName };
+}
+
+/// <summary>A single tool call emitted by the LLM in an assistant message.</summary>
+public sealed record LlmToolCall
+{
+    public required string Id { get; init; }              // tool_call_id from the API
+    public required string Name { get; init; }            // function name
+    public required string ArgumentsJson { get; init; }   // raw JSON string of arguments
+}
+
 public sealed record LlmRequest
 {
     public required string Model { get; init; }
@@ -19,6 +47,13 @@ public sealed record LlmRequest
     /// Null = no tool_choice. "function:&lt;name&gt;" = force specific tool. "auto" = model decides.
     /// </summary>
     public string? ToolChoice { get; init; }
+
+    /// <summary>
+    /// Full message history for multi-turn agentic loops.
+    /// When set, this takes precedence over <see cref="SystemPrompt"/> / <see cref="UserPrompt"/>
+    /// (which are still required for non-loop callers).
+    /// </summary>
+    public IReadOnlyList<LlmMessage>? Messages { get; init; }
 
     /// <summary>
     /// When true, the CLI proxy writes the document to draft.md in an ephemeral workspace and
@@ -52,6 +87,9 @@ public sealed record LlmResponse
 
     /// <summary>Raw JSON string of the tool arguments; null when no tool was called.</summary>
     public string? ToolArgumentsJson { get; init; }
+
+    /// <summary>All tool calls in the response (may be empty). Use instead of ToolName/ToolArgumentsJson for multi-turn loops.</summary>
+    public IReadOnlyList<LlmToolCall> AllToolCalls { get; init; } = [];
 
     public required LlmTokenUsage TokenUsage { get; init; }
     public required string FinishReason { get; init; }

@@ -1,0 +1,46 @@
+.tool-invocations-block {
+    margin-top: 0.5rem;
+}
+
+.tool-invocation {
+    border-left: 3px solid var(--color-border, #ddd);
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.tool-invocation-header {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 0.25rem;
+}
+
+.tool-invocation-actor {
+    color: var(--color-muted, #888);
+    font-size: 0.8rem;
+}
+
+.tool-invocation-meta {
+    margin-left: auto;
+    color: var(--color-muted, #888);
+    font-size: 0.8rem;
+}
+
+.outcome-success { color: var(--color-success, #28a745); }
+.outcome-failed  { color: var(--color-danger, #dc3545); }
+.outcome-cap     { color: var(--color-warning, #ffc107); }
+.outcome-blocked { color: var(--color-muted, #888); }
+
+.tool-invocation-input code {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--color-muted, #888);
+    word-break: break-all;
+}
+
+.tool-invocation-output {
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+}

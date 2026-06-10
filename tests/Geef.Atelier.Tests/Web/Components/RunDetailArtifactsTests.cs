@@ -149,7 +149,8 @@ public sealed class RunDetailArtifactsTests : TestContext
                 GroundingAdvisors: [],
                 RecoveryAdvisors: [],
                 AdvisorsByIteration: Enumerable.Empty<AdvisorConsultation>().ToLookup(x => x.IterationNumber),
-                GroundingConsultations: Array.Empty<GroundingConsultation>()));
+                GroundingConsultations: Array.Empty<GroundingConsultation>(),
+                ToolInvocations: []));
         public Task<WelcomeStats> GetWelcomeStatsAsync(string? user, CancellationToken ct = default) =>
             Task.FromResult(new WelcomeStats(0, 0, 0, 0, 0, 0));
         public Task<Guid> ResumeRunAsync(ResumeOptions options, string? user, CancellationToken ct = default) =>

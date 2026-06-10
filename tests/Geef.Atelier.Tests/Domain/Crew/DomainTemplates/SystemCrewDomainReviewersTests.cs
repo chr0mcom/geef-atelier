@@ -110,8 +110,8 @@ public sealed class SystemCrewDomainReviewersTests
     [Fact]
     public void ReviewerProfiles_HasEightTotalEntries()
     {
-        // 2 original (briefing-fidelity, clarity) + 6 domain-specific + 5 auto-crew composition reviewers
-        Assert.Equal(13, SystemCrew.ReviewerProfiles.Count);
+        // 2 original (briefing-fidelity, clarity) + 6 domain-specific + 6 auto-crew composition reviewers
+        Assert.Equal(14, SystemCrew.ReviewerProfiles.Count);
     }
 
     // ── System-prompt content smoke tests ────────────────────────────────────────

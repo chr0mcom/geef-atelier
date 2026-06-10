@@ -18,6 +18,10 @@ namespace Geef.Atelier.Core.Domain.Crew.Profiles;
 /// True for profiles defined as code constants in <see cref="SystemCrew"/>; false for user-created
 /// profiles persisted in the database. System profiles are read-only at runtime.
 /// </param>
+/// <param name="ToolNames">
+/// Optional list of tool names (from the tool catalogue) that this executor may call during an
+/// agentic tool-use loop. When empty the executor uses the standard single-shot completion path.
+/// </param>
 public sealed record ExecutorProfile(
     string Name,
     string DisplayName,
@@ -26,4 +30,5 @@ public sealed record ExecutorProfile(
     string Provider,
     string Model,
     int? MaxTokens,
-    bool IsSystem);
+    bool IsSystem,
+    IReadOnlyList<string>? ToolNames = null);

@@ -1,4 +1,5 @@
 using Geef.Atelier.Application.Runs;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Orchestrator;
@@ -16,7 +17,7 @@ public sealed class RunServiceCancelsRunningRunTests(PostgresFixture fixture)
         var gate = new SemaphoreSlim(0, int.MaxValue);
         var client = new GatedFakeLlmClient(gate);
 
-        await using var host = new OrchestratorTestHost(fixture, client, new Core.Configuration.OrchestratorOptions
+        await using var host = new OrchestratorTestHost(fixture, client, new OrchestratorOptions
         {
             PollingInterval            = TimeSpan.FromMilliseconds(100),
             MaxConcurrentRuns          = 5,

@@ -197,6 +197,17 @@ public static class SystemCrew
         MaxTokens: 64000,
         IsSystem: true);
 
+    /// <summary>Reviews tool-binding decisions in the proposed crew spec.</summary>
+    public static readonly ReviewerProfile CrewComposerToolBindingProfile = new(
+        Name: "crew-composer-tool-binding",
+        DisplayName: "Tool Binding Review",
+        Description: "Audits tool_names bindings in actor profiles: checks necessity, access-class compliance (ReadOnly only in Phase B), role fit, and catalog membership.",
+        SystemPrompt: SystemPrompts.CrewComposerToolBinding,
+        Provider: "openrouter",
+        Model: "google/gemini-3.5-flash",
+        MaxTokens: 64000,
+        IsSystem: true);
+
     // ── Auto-Crew: crew-design-advisor ─────────────────────────────────────────
 
     /// <summary>Strategic advisor consulted once before the first composition draft; orients the executor on domain, risks, and crew archetypes.</summary>
@@ -220,6 +231,16 @@ public static class SystemCrew
         DisplayName: "Crew Catalog",
         Description: "Returns the current catalog of system and custom crew profiles and templates. Used by the crew-composer executor to apply Reuse-First before composing new profiles.",
         ProviderType: GroundingProviderTypes.CrewCatalog,
+        ProviderSettings: new Dictionary<string, string>(),
+        MaxQueriesPerRun: 1,
+        IsSystem: true);
+
+    /// <summary>Tool catalog grounding provider — lists all registered tools for tool-binding awareness in auto-crew composition.</summary>
+    public static readonly GroundingProviderProfile ToolCatalogDefaultProfile = new(
+        Name: "tool-catalog-default",
+        DisplayName: "Tool Catalog",
+        Description: "Lists all registered tools in the central tool catalogue. Used by the crew-composer executor so it can bind tools to actor profiles by name.",
+        ProviderType: GroundingProviderTypes.ToolCatalog,
         ProviderSettings: new Dictionary<string, string>(),
         MaxQueriesPerRun: 1,
         IsSystem: true);
@@ -267,7 +288,8 @@ public static class SystemCrew
             [GroundingProviderProfile.KeyStaticLabel] = "Crew Design Rules",
         },
         MaxQueriesPerRun: 1,
-        IsSystem: true);
+        IsSystem: true,
+        ToolName: "static-context");
 
     // ── Auto-Crew: materializer finalizer ──────────────────────────────────────
 
@@ -298,6 +320,7 @@ public static class SystemCrew
             CrewComposerPromptQualityProfile.Name,
             CrewComposerFitProfile.Name,
             CrewComposerReuseCorrectnessProfile.Name,
+            CrewComposerToolBindingProfile.Name,
         },
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: new ConvergencePolicyOverride(
@@ -306,7 +329,7 @@ public static class SystemCrew
             DetectRegression: true,
             StagnationThreshold: 6), // same as MaxIterations → stagnation never fires before budget is exhausted
         AdvisorProfileNames: new[] { CrewDesignAdvisorProfile.Name },
-        GroundingProviderNames: new[] { CrewCatalogDefaultProfile.Name, CrewDesignRulesProfile.Name },
+        GroundingProviderNames: new[] { CrewCatalogDefaultProfile.Name, CrewDesignRulesProfile.Name, ToolCatalogDefaultProfile.Name },
         FinalizerProfileNames: new[] { CrewMaterializerProfile.Name },
         RunFinalizersOnMaxAttempts: false,
         IsSystem: true);
@@ -384,7 +407,8 @@ public static class SystemCrew
             ["ExtractQuery"] = "true",
         },
         MaxQueriesPerRun: 1,
-        IsSystem: true);
+        IsSystem: true,
+        ToolName: "web-search");
 
     /// <summary>System grounding-provider profile for Tavily Advanced web-search with LLM-based citation filtering (1 credit/search, ~10 sources).</summary>
     public static readonly GroundingProviderProfile TavilyRefinedProfile = new(
@@ -405,7 +429,8 @@ public static class SystemCrew
             [GroundingProviderProfile.KeyRefinementMode]        = "0",
         },
         MaxQueriesPerRun: 1,
-        IsSystem: true);
+        IsSystem: true,
+        ToolName: "web-search");
 
     /// <summary>System grounding-provider profile for the full knowledge base (vector-store, Top-5 results, no tag filter).</summary>
     public static readonly GroundingProviderProfile KnowledgeBaseDefaultProfile = new(
@@ -415,7 +440,8 @@ public static class SystemCrew
         ProviderType: "vector-store",
         ProviderSettings: new Dictionary<string, string> { ["TopK"] = "5", ["Scope"] = "global" },
         MaxQueriesPerRun: 1,
-        IsSystem: true);
+        IsSystem: true,
+        ToolName: "knowledge-base");
 
     /// <summary>System grounding-provider profile for run-local attachments uploaded with the briefing.</summary>
     public static readonly GroundingProviderProfile RunAttachmentsProfile = new(
@@ -425,7 +451,8 @@ public static class SystemCrew
         ProviderType: "vector-store",
         ProviderSettings: new Dictionary<string, string> { ["TopK"] = "5", ["Scope"] = "run-local" },
         MaxQueriesPerRun: 1,
-        IsSystem: true);
+        IsSystem: true,
+        ToolName: "knowledge-base");
 
     /// <summary>System grounding-provider profile for scientific papers via Semantic Scholar with LLM-based relevance filtering.</summary>
     public static readonly GroundingProviderProfile AcademicDefaultProfile = new(
@@ -443,7 +470,8 @@ public static class SystemCrew
             [GroundingProviderProfile.KeyRefinementMode]             = "0",
         },
         MaxQueriesPerRun: 1,
-        IsSystem: true);
+        IsSystem: true,
+        ToolName: "academic-search");
 
     /// <summary>System grounding-provider profile for recent news via Tavily news topic with LLM-based noise filtering.</summary>
     public static readonly GroundingProviderProfile TavilyNewsProfile = new(
@@ -500,6 +528,7 @@ public static class SystemCrew
             [CrewComposerPromptQualityProfile.Name]         = CrewComposerPromptQualityProfile,
             [CrewComposerFitProfile.Name]                   = CrewComposerFitProfile,
             [CrewComposerReuseCorrectnessProfile.Name]      = CrewComposerReuseCorrectnessProfile,
+            [CrewComposerToolBindingProfile.Name]           = CrewComposerToolBindingProfile,
         };
 
     /// <summary>All system executor profiles, indexed by name.</summary>
@@ -589,6 +618,7 @@ public static class SystemCrew
             // Auto-Crew grounding providers
             [CrewCatalogDefaultProfile.Name]         = CrewCatalogDefaultProfile,
             [CrewDesignRulesProfile.Name]            = CrewDesignRulesProfile,
+            [ToolCatalogDefaultProfile.Name]         = ToolCatalogDefaultProfile,
         };
 
     /// <summary>All system crew templates, indexed by name.</summary>

@@ -16,6 +16,8 @@ using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Finalizers;
 using Geef.Atelier.Infrastructure.TemplateStudio;
+using Geef.Atelier.Infrastructure.Mcp;
+using Geef.Atelier.Infrastructure.Tools;
 using Geef.Atelier.Mcp;
 using Geef.Atelier.Web.Auth;
 using Geef.Atelier.Web.Components;
@@ -67,6 +69,12 @@ builder.Services.AddCrewComposition();
 
 // Grounding providers — ApiKey intentionally not logged; missing key fails at run time, not at startup.
 builder.Services.AddGroundingProviders(builder.Configuration);
+
+// Tool execution infrastructure (IToolExecutor + IToolSchemaProvider)
+builder.Services.AddToolExecutor();
+
+// MCP client infrastructure (outbound connections to remote MCP servers)
+builder.Services.AddAtelierMcpClient();
 
 builder.Services.Configure<PricingOptions>(builder.Configuration.GetSection("Pricing"));
 builder.Services.Configure<CostTrackingOptions>(builder.Configuration.GetSection("CostTracking"));
@@ -136,6 +144,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, HttpContextCurrentUserService>();
+builder.Services.AddScoped<IToolDefinitionService, ToolDefinitionService>();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

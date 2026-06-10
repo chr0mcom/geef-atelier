@@ -2,6 +2,7 @@ using System.Text.Json;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Core.Domain.Tools;
 
 namespace Geef.Atelier.Core.Domain.Crew;
 
@@ -36,6 +37,13 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// When <c>true</c>, finalizers also execute if the run exhausts max iterations without converging.
 /// Trailing-optional; defaults to <c>false</c> for backward compatibility.
 /// </param>
+/// <param name="ToolBindings">
+/// Fully-dereferenced tool definitions keyed by actor profile name (e.g. <c>"briefing-fidelity"</c>).
+/// Populated at snapshot-build time for every actor that declares <c>ToolNames</c>, so that tool
+/// semantics remain reproducible even after the catalogue is updated.
+/// <c>null</c> when no actor in this snapshot uses tools (schema v1 snapshots also read as null).
+/// Trailing-optional for backward compatibility with v1 snapshots.
+/// </param>
 public sealed record CrewSnapshot(
     int SchemaVersion,
     string? TemplateName,
@@ -46,10 +54,11 @@ public sealed record CrewSnapshot(
     IReadOnlyList<Advisors.AdvisorProfile> Advisors,
     IReadOnlyList<GroundingProviderProfile>? GroundingProviders = null,
     IReadOnlyList<FinalizerProfile>? Finalizers = null,
-    bool RunFinalizersOnMaxAttempts = false)
+    bool RunFinalizersOnMaxAttempts = false,
+    IReadOnlyDictionary<string, IReadOnlyList<ToolDefinition>>? ToolBindings = null)
 {
     /// <summary>Current snapshot schema version. Bump when the format changes incompatibly.</summary>
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     private static readonly JsonSerializerOptions DeserializeOpts =
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };

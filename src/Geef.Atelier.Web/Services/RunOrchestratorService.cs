@@ -171,9 +171,10 @@ internal sealed class RunOrchestratorService(
             var accumulator = costTrackingEnabled ? new RunCostAccumulator() : null;
 
             await using var scope = scopeFactory.CreateAsyncScope();
-            var consultations            = scope.ServiceProvider.GetRequiredService<IAdvisorConsultationRepository>();
-            var groundingRefiner         = scope.ServiceProvider.GetService<IGroundingRefiner>();
-            var groundingConsultationRepo = scope.ServiceProvider.GetService<IGroundingConsultationRepository>();
+            var consultations              = scope.ServiceProvider.GetRequiredService<IAdvisorConsultationRepository>();
+            var groundingRefiner           = scope.ServiceProvider.GetService<IGroundingRefiner>();
+            var groundingConsultationRepo  = scope.ServiceProvider.GetService<IGroundingConsultationRepository>();
+            var toolBackedGroundingProvider = scope.ServiceProvider.GetService<Geef.Atelier.Infrastructure.Grounding.ToolBackedGroundingProvider>();
 
             GeefPipelineRunner<FinalizedDocument> runner;
             var isCompositionRun = run.Kind == RunKind.CrewComposition
@@ -198,7 +199,8 @@ internal sealed class RunOrchestratorService(
                     groundingConsultationRepository: groundingConsultationRepo,
                     customExecutionStep: composerExecutor,
                     specialReviewerResolver: profile =>
-                        profile.Name == "crew-spec-validator" ? validatorReviewer : null);
+                        profile.Name == "crew-spec-validator" ? validatorReviewer : null,
+                    toolBackedGroundingProvider: toolBackedGroundingProvider);
             }
             else
             {
@@ -213,7 +215,8 @@ internal sealed class RunOrchestratorService(
                         pricingCatalog: pricingCatalog,
                         costAccumulator: accumulator,
                         groundingRefiner: groundingRefiner,
-                        groundingConsultationRepository: groundingConsultationRepo)
+                        groundingConsultationRepository: groundingConsultationRepo,
+                        toolBackedGroundingProvider: toolBackedGroundingProvider)
                     : AtelierPipelineFactory.Build(
                         snapshot, llmClientResolver, convergenceOptions,
                         consultationRepository: consultations,
@@ -224,7 +227,8 @@ internal sealed class RunOrchestratorService(
                         pricingCatalog: pricingCatalog,
                         costAccumulator: accumulator,
                         groundingRefiner: groundingRefiner,
-                        groundingConsultationRepository: groundingConsultationRepo);
+                        groundingConsultationRepository: groundingConsultationRepo,
+                        toolBackedGroundingProvider: toolBackedGroundingProvider);
             }
 
             var result = await runner.RunAsync(run.BriefingText, cts.Token);

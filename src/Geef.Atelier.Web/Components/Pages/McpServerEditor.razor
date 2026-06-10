@@ -1,0 +1,158 @@
+@page "/mcp-servers/create"
+@page "/mcp-servers/edit/{Id:guid}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Geef.Atelier.Core.Domain.Mcp
+@using Geef.Atelier.Core.Persistence.Mcp
+@inject IMcpServerConfigRepository McpRepo
+@inject NavigationManager Nav
+
+<PageTitle>@(IsNew ? "MCP-Server hinzufügen" : $"Bearbeiten: {_form.Name}") — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="mcp-server-editor">
+    <div class="page-header">
+        <h1>@(IsNew ? "Neuen MCP-Server hinzufügen" : $"Bearbeiten: {_form.Name}")</h1>
+        <a href="/mcp-servers" class="btn ghost">← Zurück</a>
+    </div>
+
+    @if (_loading)
+    {
+        <p>Wird geladen…</p>
+    }
+    else
+    {
+        <EditForm Model="_form" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="error-banner" data-testid="editor-error">@_error</div>
+            }
+
+            <div class="template-meta-section">
+                <h3>Grunddaten</h3>
+
+                <div class="field">
+                    <label>Name</label>
+                    <InputText @bind-Value="_form.Name"
+                               placeholder="Mein MCP-Server"
+                               data-testid="input-name" />
+                    <ValidationMessage For="() => _form.Name" />
+                </div>
+
+                <div class="field">
+                    <label>URL</label>
+                    <InputText @bind-Value="_form.Url"
+                               placeholder="https://mcp.example.com"
+                               data-testid="input-url" />
+                    <small class="form-hint">Vollständige URL des MCP-Server-Endpunkts (SSE oder Streamable HTTP).</small>
+                    <ValidationMessage For="() => _form.Url" />
+                </div>
+
+                <div class="field">
+                    <label>Auth-Header ENV-Variable (optional)</label>
+                    <InputText @bind-Value="_form.AuthHeaderEnv"
+                               placeholder="MCP_SERVER_TOKEN"
+                               data-testid="input-auth-header-env" />
+                    <small class="form-hint">
+                        Name einer Umgebungsvariablen, deren Wert als <code>Bearer</code>-Token gesendet wird.
+                        Leer lassen, falls keine Authentifizierung benötigt wird.
+                    </small>
+                </div>
+
+                <div class="field">
+                    <label class="checkbox-label">
+                        <InputCheckbox @bind-Value="_form.IsActive" data-testid="input-is-active" />
+                        Aktiv (für Discovery und Tool-Ausführung freigegeben)
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn primary" disabled="@_saving" data-testid="btn-save">
+                    @(_saving ? "Speichern…" : IsNew ? "Hinzufügen" : "Speichern")
+                </button>
+                <button type="button" class="btn ghost" @onclick="NavigateBack">Abbrechen</button>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+
+    private bool IsNew => Id == null;
+    private bool _loading = true;
+    private bool _saving;
+    private string? _error;
+
+    private ServerFormModel _form = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!IsNew)
+        {
+            var config = await McpRepo.GetByIdAsync(Id!.Value);
+            if (config == null) { Nav.NavigateTo("/mcp-servers"); return; }
+            _form = ServerFormModel.From(config);
+        }
+        _loading = false;
+    }
+
+    private void NavigateBack() => Nav.NavigateTo("/mcp-servers");
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            var config = _form.ToConfig(IsNew ? Guid.NewGuid() : Id!.Value);
+            await McpRepo.UpsertAsync(config);
+            Nav.NavigateTo("/mcp-servers");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private sealed class ServerFormModel
+    {
+        [Required(ErrorMessage = "Name ist erforderlich.")]
+        [MaxLength(200)]
+        public string Name { get; set; } = "";
+
+        [Required(ErrorMessage = "URL ist erforderlich.")]
+        [MaxLength(2000)]
+        public string Url { get; set; } = "";
+
+        [MaxLength(200)]
+        public string AuthHeaderEnv { get; set; } = "";
+
+        public bool IsActive { get; set; } = true;
+
+        public static ServerFormModel From(McpServerConfig c) => new()
+        {
+            Name          = c.Name,
+            Url           = c.Url,
+            AuthHeaderEnv = c.AuthHeaderEnv ?? "",
+            IsActive      = c.IsActive,
+        };
+
+        public McpServerConfig ToConfig(Guid id) => new()
+        {
+            Id            = id,
+            Name          = Name.Trim(),
+            Url           = Url.Trim(),
+            AuthHeaderEnv = string.IsNullOrWhiteSpace(AuthHeaderEnv) ? null : AuthHeaderEnv.Trim(),
+            IsActive      = IsActive,
+            UpdatedAt     = DateTimeOffset.UtcNow,
+        };
+    }
+}

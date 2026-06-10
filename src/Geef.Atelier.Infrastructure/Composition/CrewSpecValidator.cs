@@ -2,6 +2,9 @@ using Geef.Atelier.Application.Composition;
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Composition;
+using Geef.Atelier.Core.Domain.Tools;
+using Geef.Atelier.Core.Persistence.Tools;
+using Geef.Atelier.Infrastructure.Llm;
 
 namespace Geef.Atelier.Infrastructure.Composition;
 
@@ -18,7 +21,9 @@ namespace Geef.Atelier.Infrastructure.Composition;
 internal sealed class CrewSpecValidator(
     ICrewService crewService,
     IModelCatalog modelCatalog,
-    IGroundingProviderFactory groundingProviderFactory) : ICrewSpecValidator
+    IGroundingProviderFactory groundingProviderFactory,
+    IToolDefinitionRepository toolRepository,
+    ILlmClientResolver llmClientResolver) : ICrewSpecValidator
 {
     /// <inheritdoc/>
     public async Task<IReadOnlyList<CrewSpecValidationIssue>> ValidateAsync(
@@ -194,12 +199,94 @@ internal sealed class CrewSpecValidator(
             }
         }
 
+        // Step 8 – tool bindings
+        await ValidateToolBindingsAsync(spec, issues, cancellationToken);
+
         return issues;
     }
 
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Validates all <c>tool_names</c> bindings across every actor in the spec:
+    /// <list type="bullet">
+    ///   <item>8a — provider supports agentic tool use,</item>
+    ///   <item>8b — tool name exists in the tool catalogue,</item>
+    ///   <item>8c — tool is ReadOnly (Mutating tools blocked in Phase B).</item>
+    /// </list>
+    /// </summary>
+    private async Task ValidateToolBindingsAsync(
+        CrewSpecArtifact spec,
+        List<CrewSpecValidationIssue> issues,
+        CancellationToken cancellationToken)
+    {
+        // Collect all (actorPath, providerName, toolNames) tuples from the spec.
+        // Grounding providers are Push-only; they never call an LLM with agentic tools.
+        var actorBindings = new List<(string Path, string? Provider, IReadOnlyList<string>? ToolNames)>();
+
+        if (spec.Executor is not null)
+            actorBindings.Add(("executor", spec.Executor.Provider, spec.Executor.ToolNames));
+
+        for (var i = 0; i < spec.Reviewers.Count; i++)
+            actorBindings.Add(($"reviewers[{i}]", spec.Reviewers[i].Provider, spec.Reviewers[i].ToolNames));
+
+        for (var i = 0; i < spec.Advisors.Count; i++)
+            actorBindings.Add(($"advisors[{i}]", spec.Advisors[i].Provider, spec.Advisors[i].ToolNames));
+
+        for (var i = 0; i < spec.Finalizers.Count; i++)
+            actorBindings.Add(($"finalizers[{i}]", spec.Finalizers[i].Provider, spec.Finalizers[i].ToolNames));
+
+        // Cache all tool lookups in one batch to avoid N+1.
+        var allNames = actorBindings
+            .Where(a => a.ToolNames is { Count: > 0 })
+            .SelectMany(a => a.ToolNames!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var toolCache = new Dictionary<string, ToolDefinition?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var name in allNames)
+            toolCache[name] = await toolRepository.GetByNameAsync(name, cancellationToken);
+
+        foreach (var (path, provider, toolNames) in actorBindings)
+        {
+            if (toolNames is not { Count: > 0 }) continue;
+
+            // Check 8a – provider capability (skip if provider is unknown/empty — other steps cover that)
+            if (!string.IsNullOrWhiteSpace(provider) && !llmClientResolver.SupportsAgenticTools(provider))
+            {
+                issues.Add(new CrewSpecValidationIssue(
+                    Field:      $"{path}.provider",
+                    Message:    $"Provider '{provider}' does not support agentic tool-use but this actor has tool_names bound. " +
+                                "Remove the tool bindings or choose a provider that supports agentic tools.",
+                    IsCritical: true));
+            }
+
+            foreach (var toolName in toolNames)
+            {
+                // Check 8b – tool exists in catalog
+                if (!toolCache.TryGetValue(toolName, out var tool) || tool is null)
+                {
+                    issues.Add(new CrewSpecValidationIssue(
+                        Field:      $"{path}.tool_names",
+                        Message:    $"Tool '{toolName}' is not registered in the tool catalogue.",
+                        IsCritical: true));
+                    continue;
+                }
+
+                // Check 8c – Mutating tools require explicit opt-in
+                if (tool.AccessClass == ToolAccessClass.Mutating && !spec.AllowMutatingTools)
+                {
+                    issues.Add(new CrewSpecValidationIssue(
+                        Field:      $"{path}.tool_names",
+                        Message:    $"Tool '{toolName}' has AccessClass=Mutating. Mutating tools require explicit opt-in. " +
+                                    "Set 'allow_mutating_tools: true' in the crew spec to enable Mutating tool access.",
+                        IsCritical: true));
+                }
+            }
+        }
+    }
 
     /// <summary>
     /// Validates a single profile reference: resolves <c>reuse</c> names against the catalog, or

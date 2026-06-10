@@ -106,7 +106,27 @@
             </div>
         </div>
 
-        @* ── §3 Advisor-Einstellungen (optional) ── *@
+        @* ── §3 Werkzeuge (optional) ── *@
+        @if (ShowToolPicker)
+        {
+            <div class="pipeline-stage-section">
+                <div class="pipeline-stage-header">
+                    <div class="pipeline-stage-header-text">
+                        <h3>Werkzeuge</h3>
+                        <p class="pipeline-stage-desc">
+                            Werkzeuge aus dem Katalog, die dieses Profil im agentic Tool-Use-Loop aufrufen darf.
+                            Leer = Standard-Single-Shot-Completion.
+                        </p>
+                    </div>
+                </div>
+
+                <ToolPicker SelectedToolNames="_selectedToolNames"
+                            SelectedToolNamesChanged="OnToolNamesChanged"
+                            CanSelectProvider="@_providerSupportsAgenticTools" />
+            </div>
+        }
+
+        @* ── §4 Advisor-Einstellungen (optional) ── *@
         @if (ShowAdvisorFields)
         {
             <div class="pipeline-stage-section">
@@ -207,6 +227,8 @@
     [Parameter] public bool IsSystem { get; set; }
     [Parameter] public bool IsSaving { get; set; }
     [Parameter] public string? Error { get; set; }
+    [Parameter] public bool ShowToolPicker { get; set; }
+    [Parameter] public IReadOnlyList<string>? InitialToolNames { get; set; }
     [Parameter] public bool ShowAdvisorFields { get; set; }
     [Parameter] public AdvisorMode? SelectedMode { get; set; }
     [Parameter] public EventCallback<AdvisorMode?> SelectedModeChanged { get; set; }
@@ -222,6 +244,8 @@
     private ProfileFormModel _form = new();
     private ModelSelector? _modelSelector;
     private bool _showCustomModelWarning = false;
+    private List<string> _selectedToolNames = [];
+    private bool _providerSupportsAgenticTools = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -238,6 +262,25 @@
             Model = Model,
             MaxTokens = MaxTokens,
         };
+
+        _selectedToolNames = InitialToolNames?.ToList() ?? [];
+        await UpdateAgenticToolsSupportAsync(effectiveProvider);
+    }
+
+    private async Task UpdateAgenticToolsSupportAsync(string providerName)
+    {
+        if (!ShowToolPicker || string.IsNullOrEmpty(providerName))
+        {
+            _providerSupportsAgenticTools = true;
+            return;
+        }
+        var provider = await ProviderService.GetByNameAsync(providerName);
+        _providerSupportsAgenticTools = provider?.SupportsAgenticTools() ?? true;
+    }
+
+    private void OnToolNamesChanged(List<string> names)
+    {
+        _selectedToolNames = names;
     }
 
     private async Task HandleSave()
@@ -269,7 +312,8 @@
             _form.Model ?? "",
             _form.MaxTokens,
             SelectedMode,
-            SelectedTrigger));
+            SelectedTrigger,
+            _selectedToolNames.Count > 0 ? _selectedToolNames : null));
     }
 
     private static string GetAdvisorModeLabel(AdvisorMode m) => m switch
@@ -339,5 +383,6 @@
         string Model,
         int? MaxTokens,
         AdvisorMode? Mode = null,
-        AdvisorTrigger? Trigger = null);
+        AdvisorTrigger? Trigger = null,
+        IReadOnlyList<string>? ToolNames = null);
 }

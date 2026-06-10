@@ -7,9 +7,9 @@ namespace Geef.Atelier.Tests.Domain.Crew;
 public sealed class CrewSnapshotTests
 {
     [Fact]
-    public void CurrentSchemaVersion_IsOne()
+    public void CurrentSchemaVersion_IsTwo()
     {
-        Assert.Equal(1, CrewSnapshot.CurrentSchemaVersion);
+        Assert.Equal(2, CrewSnapshot.CurrentSchemaVersion);
     }
 
     [Fact]

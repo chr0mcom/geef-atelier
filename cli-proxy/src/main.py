@@ -15,11 +15,17 @@ from fastapi.responses import JSONResponse
 from openai_format import (
     ChatCompletionRequest,
     ChatCompletionResponse,
+    ToolChoiceObject,
     make_text_response,
     make_tool_response,
 )
 from provider_sync import ProviderConfigSync
-from tool_use_parser import build_tool_system_prompt, extract_json
+from tool_use_parser import (
+    build_agentic_tool_system_prompt,
+    build_tool_system_prompt,
+    extract_json,
+    parse_agentic_response,
+)
 from workspace import ephemeral_workspace
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -71,21 +77,43 @@ def _route_model(model: str) -> str:
 # Request processing
 # ---------------------------------------------------------------------------
 
+def _is_forced_tool_choice(req: ChatCompletionRequest) -> bool:
+    """Returns True if a specific tool is forced via tool_choice."""
+    if not req.tool_choice:
+        return False
+    if isinstance(req.tool_choice, str):
+        return req.tool_choice not in ("auto", "none")
+    # ToolChoiceObject means a specific function is forced
+    return isinstance(req.tool_choice, ToolChoiceObject)
+
+
 def _build_prompt(req: ChatCompletionRequest) -> str:
     """Concatenates messages into a plain-text prompt for the CLI."""
     parts: list[str] = []
 
     for msg in req.messages:
         role = msg.role.upper()
-        content = msg.content or ""
-        parts.append(f"[{role}]\n{content}")
+        if msg.role == "tool":
+            # Tool result — render with tool name and call ID context
+            tool_name = msg.name or "tool"
+            parts.append(f"[TOOL RESULT: {tool_name}]\n{msg.content or ''}")
+        elif msg.role == "assistant" and msg.content is None:
+            # Assistant message that only had tool calls — skip (already in context)
+            continue
+        else:
+            content = msg.content or ""
+            parts.append(f"[{role}]\n{content}")
 
     prompt = "\n\n".join(parts)
 
-    # Append tool-use schema as additional system instruction if needed.
-    if req.tools:
+    # Tool-use: forced single tool (existing behaviour)
+    if req.tools and _is_forced_tool_choice(req):
         tools_dicts = [t.model_dump() for t in req.tools]
         prompt += build_tool_system_prompt(tools_dicts)
+    # Agentic tool use: model decides
+    elif req.tools and not _is_forced_tool_choice(req):
+        tools_dicts = [t.model_dump() for t in req.tools]
+        prompt += build_agentic_tool_system_prompt(tools_dicts)
 
     return prompt
 
@@ -136,12 +164,20 @@ def _build_response(req: ChatCompletionRequest, raw_text: str) -> ChatCompletion
     """Converts raw CLI output into an OpenAI-compatible response."""
     tool_name = _extract_tool_name(req)
 
+    # Forced single-tool path (existing behaviour)
     if tool_name:
         json_str = extract_json(raw_text)
         if json_str:
             return make_tool_response(req.model, tool_name, json_str)
         log.warning("Tool-use requested but JSON extraction failed; raw=%r", raw_text[:200])
         return make_text_response(req.model, raw_text)
+
+    # Agentic tool path: model may or may not call a tool
+    if req.tools and not _is_forced_tool_choice(req):
+        detected_tool, args_json = parse_agentic_response(raw_text)
+        if detected_tool is not None:
+            log.info("Agentic tool call detected: %s", detected_tool)
+            return make_tool_response(req.model, detected_tool, args_json or "{}")
 
     return make_text_response(req.model, raw_text)
 

@@ -6,7 +6,10 @@ using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Core.Domain.Tools;
+using Geef.Atelier.Core.Persistence.Tools;
 using Geef.Atelier.Infrastructure.Composition;
+using Geef.Atelier.Infrastructure.Llm;
 
 namespace Geef.Atelier.Tests.Composition;
 
@@ -20,13 +23,17 @@ public sealed class CrewSpecValidatorTests
     private static CrewSpecValidator MakeValidator(
         ICrewService? crewService = null,
         IModelCatalog? modelCatalog = null,
-        IGroundingProviderFactory? groundingFactory = null)
+        IGroundingProviderFactory? groundingFactory = null,
+        IToolDefinitionRepository? toolRepository = null,
+        ILlmClientResolver? llmClientResolver = null)
     {
         crewService ??= new EmptyCrewService();
         // Default catalog knows the inline executor's model so InlineExecutor validates cleanly.
         modelCatalog ??= new KnownModelCatalog("claude-cli", "claude-opus-4-8");
         groundingFactory ??= new StubGroundingFactory("tavily", "academic-search", "vector-store");
-        return new CrewSpecValidator(crewService, modelCatalog, groundingFactory);
+        toolRepository ??= new EmptyToolRepository();
+        llmClientResolver ??= new AgenticCapableResolver();
+        return new CrewSpecValidator(crewService, modelCatalog, groundingFactory, toolRepository, llmClientResolver);
     }
 
     /// <summary>A valid inline, task-specialized executor (the executor must never be reused).</summary>
@@ -446,5 +453,30 @@ public sealed class CrewSpecValidatorTests
         public Task<IReadOnlyList<ModelInfo>> RefreshAsync(string providerName, CancellationToken ct = default)
             => ListModelsAsync(providerName, ct);
         public bool IsUsingFallback(string providerName) => false;
+    }
+
+    /// <summary>Returns null for every tool name lookup.</summary>
+    private sealed class EmptyToolRepository : IToolDefinitionRepository
+    {
+        public Task<ToolDefinition?> GetByNameAsync(string name, CancellationToken ct = default)
+            => Task.FromResult<ToolDefinition?>(null);
+        public Task<IReadOnlyList<ToolDefinition>> GetAllAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ToolDefinition>>([]);
+        public Task<IReadOnlyList<ToolDefinition>> GetSystemToolsAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ToolDefinition>>([]);
+        public Task<IReadOnlyList<ToolDefinition>> GetCustomToolsAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ToolDefinition>>([]);
+        public Task UpsertAsync(ToolDefinition tool, CancellationToken ct = default) => Task.CompletedTask;
+        public Task DeleteAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    /// <summary>Reports every provider as supporting agentic tools.</summary>
+    private sealed class AgenticCapableResolver : ILlmClientResolver
+    {
+        public (ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName)
+            => throw new NotSupportedException();
+        public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
+            => throw new NotSupportedException();
+        public bool SupportsAgenticTools(string providerName) => true;
     }
 }
