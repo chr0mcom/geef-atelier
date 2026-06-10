@@ -84,7 +84,7 @@ public sealed class FinalizerProfileRepositoryTests(PostgresFixture db)
         var tplRepo = new CrewTemplateRepository(ctx);
 
         await repo.CreateAsync(Custom("custom-fin-rename-a"), default);
-        var template = new Core.Domain.Crew.CrewTemplate(
+        var template = new CrewTemplate(
             Name: "custom-fin-rename-tpl",
             DisplayName: "Rename Test",
             Description: "desc",
