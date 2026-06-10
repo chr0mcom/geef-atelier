@@ -101,5 +101,7 @@ public sealed class ProfileBasedExecutorSeedDraftTests
 
         public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
             => (client, model, maxTokens ?? 1000);
+
+        public bool SupportsAgenticTools(string providerName) => true;
     }
 }

@@ -166,5 +166,7 @@ public sealed class ProfileBasedExecutorRegressionGuardTests
 
         public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
             => (client, model, maxTokens ?? 64000);
+
+        public bool SupportsAgenticTools(string providerName) => true;
     }
 }

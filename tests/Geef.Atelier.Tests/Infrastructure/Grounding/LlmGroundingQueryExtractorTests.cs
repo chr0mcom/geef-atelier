@@ -85,6 +85,8 @@ public sealed class LlmGroundingQueryExtractorTests
 
         public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens) =>
             throw new NotSupportedException();
+
+        public bool SupportsAgenticTools(string providerName) => true;
     }
 
     private sealed class ThrowingResolver : ILlmClientResolver
@@ -94,5 +96,7 @@ public sealed class LlmGroundingQueryExtractorTests
 
         public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens) =>
             throw new NotSupportedException();
+
+        public bool SupportsAgenticTools(string providerName) => false;
     }
 }

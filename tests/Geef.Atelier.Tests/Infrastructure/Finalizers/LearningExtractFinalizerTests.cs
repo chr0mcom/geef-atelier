@@ -410,5 +410,7 @@ public sealed class LearningExtractFinalizerTests
 
         public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
             => (new StubLlmClient(response), model, maxTokens ?? 2048);
+
+        public bool SupportsAgenticTools(string providerName) => true;
     }
 }

@@ -46,6 +46,13 @@ internal sealed class LlmClientResolver(
     /// <summary>Clears the provider lookup cache so the next call re-fetches from the service.</summary>
     public void InvalidateCache() => _providerCache.Clear();
 
+    /// <inheritdoc/>
+    public bool SupportsAgenticTools(string providerName)
+    {
+        var provider = LoadProvider(providerName);
+        return provider?.SupportsAgenticTools() ?? false;
+    }
+
 
     // ── Private helpers ───────────────────────────────────────────────────────────────
 
