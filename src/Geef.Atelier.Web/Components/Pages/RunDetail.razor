@@ -16,6 +16,7 @@
 @using Geef.Atelier.Core.Domain.Crew.Advisors
 @using Geef.Atelier.Core.Domain.Crew.Finalizers
 @using Geef.Atelier.Core.Domain.Crew.Knowledge
+@using Geef.Atelier.Core.Domain.Tools
 @using Geef.Atelier.Core.Persistence
 @using Geef.Atelier.Web.Display
 @using Geef.Atelier.Web.Components.UI
@@ -183,6 +184,14 @@
                 @if (iterConsultations.Count > 0)
                 {
                     <AdvisorConsultationsBlock Consultations="iterConsultations" />
+                }
+                var iterToolInvocations = _viewModel?.ToolInvocations
+                    .Where(t => t.IterationNumber == iwf.Iteration.IterationNumber)
+                    .OrderBy(t => t.Sequence)
+                    .ToList() ?? [];
+                @if (iterToolInvocations.Count > 0)
+                {
+                    <ToolInvocationsBlock Invocations="iterToolInvocations" />
                 }
                 <IterationPanel
                     Iteration="iwf.Iteration"

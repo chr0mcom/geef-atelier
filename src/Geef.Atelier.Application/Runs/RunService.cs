@@ -5,8 +5,10 @@ using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
+using Geef.Atelier.Core.Domain.Tools;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
+using Geef.Atelier.Core.Persistence.Tools;
 using Microsoft.Extensions.Logging;
 
 namespace Geef.Atelier.Application.Runs;
@@ -18,7 +20,8 @@ internal sealed class RunService(
     IAdvisorConsultationRepository        consultationRepository,
     IKnowledgeService                     knowledgeService,
     ILogger<RunService>                   logger,
-    IGroundingConsultationRepository?     groundingConsultationRepository = null) : IRunService
+    IGroundingConsultationRepository?     groundingConsultationRepository = null,
+    IToolInvocationRepository?            toolInvocationRepository = null) : IRunService
 {
     private static readonly JsonSerializerOptions SnapshotJsonOpts =
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
@@ -265,6 +268,10 @@ internal sealed class RunService(
             ? await groundingConsultationRepository.GetByRunIdAsync(runId, cancellationToken)
             : [];
 
+        IReadOnlyList<ToolInvocation> toolInvocations = toolInvocationRepository is not null
+            ? await toolInvocationRepository.GetByRunIdAsync(runId, cancellationToken)
+            : [];
+
         return new RunWithGroundingViewModel(
             details,
             snapshot,
@@ -272,7 +279,8 @@ internal sealed class RunService(
             groundingAdvisors,
             recoveryAdvisors,
             advisorsByIteration,
-            groundingConsultations);
+            groundingConsultations,
+            toolInvocations);
     }
 
     /// <inheritdoc/>

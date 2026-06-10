@@ -108,6 +108,7 @@ public sealed class RunWithGroundingViewModelTests
             groundingAdvisors,
             recoveryAdvisors,
             advisorsByIteration,
+            [],
             []);
     }
 
