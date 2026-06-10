@@ -1,0 +1,257 @@
+@page "/mcp-servers"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Core.Domain.Mcp
+@using Geef.Atelier.Core.Domain.Tools
+@using Geef.Atelier.Infrastructure.Mcp
+@using Geef.Atelier.Web.Services
+@using Geef.Atelier.Core.Persistence.Mcp
+@inject IMcpServerConfigRepository McpRepo
+@inject IMcpToolDiscoveryService DiscoveryService
+@inject IToolDefinitionService ToolService
+@inject NavigationManager Nav
+
+<PageTitle>MCP-Server — Atelier</PageTitle>
+
+<div class="crew-profiles-index">
+    <div class="page-header">
+        <h1>MCP-Server</h1>
+        <a href="/mcp-servers/create" class="btn primary">+ Neuen Server hinzufügen</a>
+    </div>
+
+    @if (_servers.Count == 0)
+    {
+        <p class="text-muted">Noch keine MCP-Server konfiguriert.</p>
+    }
+    else
+    {
+        <table class="crew-table" data-testid="mcp-server-list">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>URL</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var server in _servers)
+                {
+                    <tr data-testid="mcp-server-row-@server.Id">
+                        <td>@server.Name</td>
+                        <td>
+                            <code>@TruncateUrl(server.Url)</code>
+                        </td>
+                        <td>
+                            @if (server.IsActive)
+                            {
+                                <span class="crew-badge">Aktiv</span>
+                            }
+                            else
+                            {
+                                <span class="crew-badge" style="background: var(--color-muted, #888);">Inaktiv</span>
+                            }
+                        </td>
+                        <td class="crew-table-actions">
+                            <a href="/mcp-servers/edit/@server.Id" class="btn small">Bearbeiten</a>
+                            <button class="btn small primary"
+                                    @onclick="() => StartDiscoveryAsync(server)"
+                                    disabled="@(_discovering)">
+                                Tools entdecken
+                            </button>
+                            <button class="btn small danger"
+                                    @onclick="() => _serverToDelete = server">
+                                Löschen
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="error-banner" data-testid="mcp-error">@_error</div>
+    }
+    @if (!string.IsNullOrEmpty(_statusMessage))
+    {
+        <div class="info-banner" data-testid="mcp-status">@_statusMessage</div>
+    }
+
+    @* ── Discovery results ── *@
+    @if (_discoveringServer != null && _discoveredTools != null)
+    {
+        <div class="template-meta-section" data-testid="discovery-results">
+            <h3>Entdeckte Tools von »@_discoveringServer.Name«</h3>
+
+            @if (_discoveredTools.Count == 0)
+            {
+                <p class="text-muted">Dieser Server hat keine Tools angekündigt.</p>
+            }
+            else
+            {
+                <table class="crew-table">
+                    <thead>
+                        <tr>
+                            <th>Tool-Name</th>
+                            <th>Typ</th>
+                            <th>Beschreibung</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var tool in _discoveredTools)
+                        {
+                            <tr data-testid="discovered-tool-@tool.Name">
+                                <td>
+                                    <strong>@tool.DisplayName</strong>
+                                    <br /><small class="text-muted">@tool.Name</small>
+                                </td>
+                                <td><span class="crew-badge">mcp-tool</span></td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(tool.Description))
+                                    {
+                                        <span title="@tool.Description">
+                                            @(tool.Description.Length > 80 ? tool.Description[..80] + "…" : tool.Description)
+                                        </span>
+                                    }
+                                </td>
+                                <td class="crew-table-actions">
+                                    @if (_importedNames.Contains(tool.Name))
+                                    {
+                                        <span class="crew-badge" style="background: var(--color-success, #2d7a4f);">Importiert</span>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn small primary"
+                                                @onclick="() => ImportToolAsync(tool)"
+                                                disabled="@(_importing)">
+                                            Importieren
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            <div class="form-actions" style="margin-top: 1rem;">
+                <button class="btn ghost" @onclick="ClearDiscovery">Schließen</button>
+            </div>
+        </div>
+    }
+</div>
+
+<DeleteConfirmationModal
+    Show="_serverToDelete != null"
+    ItemName="@(_serverToDelete?.Name ?? "")"
+    ItemKind="MCP-Server"
+    OnConfirm="ExecuteDeleteAsync"
+    OnCancel="() => _serverToDelete = null" />
+
+@code {
+    private IReadOnlyList<McpServerConfig> _servers = [];
+    private McpServerConfig? _serverToDelete;
+    private McpServerConfig? _discoveringServer;
+    private List<ToolDefinition>? _discoveredTools;
+    private HashSet<string> _importedNames = [];
+    private bool _discovering;
+    private bool _importing;
+    private string? _error;
+    private string? _statusMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _servers = await McpRepo.GetAllAsync();
+    }
+
+    private async Task StartDiscoveryAsync(McpServerConfig server)
+    {
+        _error = null;
+        _statusMessage = null;
+        _discovering = true;
+        _discoveringServer = server;
+        _discoveredTools = null;
+        _importedNames = [];
+
+        try
+        {
+            var results = await DiscoveryService.DiscoverAsync(server);
+            _discoveredTools = [..results];
+            _statusMessage = $"{results.Count} Tool(s) von »{server.Name}« entdeckt.";
+
+            // Mark tools that are already imported
+            var existing = await ToolService.GetAllAsync();
+            var existingNames = existing.Select(t => t.Name).ToHashSet();
+            foreach (var tool in _discoveredTools)
+            {
+                if (existingNames.Contains(tool.Name))
+                    _importedNames.Add(tool.Name);
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Discovery fehlgeschlagen: {ex.Message}";
+            _discoveringServer = null;
+        }
+        finally
+        {
+            _discovering = false;
+        }
+    }
+
+    private async Task ImportToolAsync(ToolDefinition tool)
+    {
+        _error = null;
+        _importing = true;
+        try
+        {
+            await ToolService.SaveAsync(tool);
+            _importedNames.Add(tool.Name);
+            _statusMessage = $"Werkzeug »{tool.DisplayName}« wurde importiert.";
+        }
+        catch (Exception ex)
+        {
+            _error = $"Import fehlgeschlagen: {ex.Message}";
+        }
+        finally
+        {
+            _importing = false;
+        }
+    }
+
+    private void ClearDiscovery()
+    {
+        _discoveringServer = null;
+        _discoveredTools = null;
+        _importedNames = [];
+        _statusMessage = null;
+    }
+
+    private async Task ExecuteDeleteAsync()
+    {
+        if (_serverToDelete == null) return;
+        var id = _serverToDelete.Id;
+        _serverToDelete = null;
+        _error = null;
+        try
+        {
+            await McpRepo.DeleteAsync(id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private static string TruncateUrl(string url) =>
+        url.Length > 60 ? url[..60] + "…" : url;
+}

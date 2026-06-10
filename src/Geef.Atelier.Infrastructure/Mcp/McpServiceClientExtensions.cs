@@ -8,6 +8,7 @@ public static class McpServiceClientExtensions
     {
         services.AddHttpClient("mcp-client");
         services.AddSingleton<IAtelierMcpClientFactory, AtelierMcpClientFactory>();
+        services.AddScoped<IMcpToolDiscoveryService, McpToolDiscoveryService>();
         return services;
     }
 }

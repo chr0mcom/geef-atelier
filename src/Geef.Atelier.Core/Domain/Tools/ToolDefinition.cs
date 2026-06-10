@@ -101,4 +101,10 @@ public static class ToolDefinitionSettingsKeys
     /// Numeric string; higher values prioritise matches from the current run domain.
     /// </summary>
     public const string DomainBoost = "domainBoost";
+
+    /// <summary>ID (GUID string) of the <c>McpServerConfig</c> this tool was discovered from.</summary>
+    public const string McpServerId = "mcpServerId";
+
+    /// <summary>Original tool name as advertised by the MCP server (before sanitization).</summary>
+    public const string McpOriginalName = "mcpOriginalName";
 }
