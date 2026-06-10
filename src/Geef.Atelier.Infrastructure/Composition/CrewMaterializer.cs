@@ -318,7 +318,8 @@ internal sealed class CrewMaterializer(
             Provider:    part.Provider ?? "claude-cli",
             Model:       part.Model ?? "claude-opus-4-8",
             MaxTokens:   ClampMaxTokens(part.MaxTokens, ExecutorMaxTokensFloor),
-            IsSystem:    false);
+            IsSystem:    false,
+            ToolNames:   part.ToolNames);
 
     private static ReviewerProfile BuildReviewerProfile(Core.Domain.Crew.Composition.CrewPartSpec part) =>
         new(
@@ -329,7 +330,8 @@ internal sealed class CrewMaterializer(
             Provider:    part.Provider ?? "claude-cli",
             Model:       part.Model ?? "claude-sonnet-4-6",
             MaxTokens:   ClampMaxTokens(part.MaxTokens, ReviewerMaxTokensFloor),
-            IsSystem:    false);
+            IsSystem:    false,
+            ToolNames:   part.ToolNames);
 
     private static AdvisorProfile BuildAdvisorProfile(Core.Domain.Crew.Composition.CrewPartSpec part) =>
         new(
@@ -342,7 +344,8 @@ internal sealed class CrewMaterializer(
             MaxTokens:   ClampMaxTokens(part.MaxTokens, AdvisorMaxTokensFloor),
             Mode:        ParseAdvisorMode(part.AdvisorMode),
             Trigger:     ParseAdvisorTrigger(part.AdvisorTrigger),
-            IsSystem:    false);
+            IsSystem:    false,
+            ToolNames:   part.ToolNames);
 
     private static GroundingProviderProfile BuildGroundingProviderProfile(Core.Domain.Crew.Composition.CrewPartSpec part) =>
         new(
@@ -361,7 +364,8 @@ internal sealed class CrewMaterializer(
             Description:   "Auto-composed finalizer",
             FinalizerType: ParseFinalizerType(part.FinalizerType),
             Settings:      [],
-            IsSystem:      false);
+            IsSystem:      false,
+            ToolNames:     part.ToolNames);
 
     private static EvaluationStrategy ParseEvaluationStrategy(string? raw) =>
         raw?.ToLowerInvariant() switch

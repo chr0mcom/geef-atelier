@@ -63,6 +63,12 @@ public sealed record CrewPartSpec
 
     /// <summary>Finalizer execution type (e.g. "FileExport", "Transform"). Finalizer-only.</summary>
     public string? FinalizerType { get; init; }
+
+    /// <summary>
+    /// Optional list of tool names (from the tool catalogue) to bind to this actor's profile.
+    /// Applies to executor, reviewer, advisor, and Transform-type finalizer parts.
+    /// </summary>
+    public IReadOnlyList<string>? ToolNames { get; init; }
 }
 
 /// <summary>

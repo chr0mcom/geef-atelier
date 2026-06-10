@@ -113,6 +113,12 @@ public static class CrewSpecParser
             AdvisorTrigger = el.TryGetProperty("advisor_trigger", out var atEl)     ? atEl.GetString()          : null,
             ProviderType   = el.TryGetProperty("provider_type",   out var ptEl)     ? ptEl.GetString()          : null,
             FinalizerType  = el.TryGetProperty("finalizer_type",  out var ftEl)     ? ftEl.GetString()          : null,
+            ToolNames      = el.TryGetProperty("tool_names", out var tnEl) && tnEl.ValueKind == JsonValueKind.Array
+                                 ? tnEl.EnumerateArray()
+                                       .Where(x => x.ValueKind == JsonValueKind.String)
+                                       .Select(x => x.GetString()!)
+                                       .ToList()
+                                 : null,
         };
     }
 }

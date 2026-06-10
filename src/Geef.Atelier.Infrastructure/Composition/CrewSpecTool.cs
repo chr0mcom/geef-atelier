@@ -50,7 +50,12 @@ internal static class CrewSpecTool
                             "enum": ["BeforeFirstExecution", "BeforeEveryExecution", "OnConvergenceFailure"]
                         },
                         "provider_type": { "type": "string" },
-                        "finalizer_type": { "type": "string" }
+                        "finalizer_type": { "type": "string" },
+                        "tool_names": {
+                            "type": "array",
+                            "items": { "type": "string" },
+                            "description": "Optional tool names from the tool catalogue to bind to this actor."
+                        }
                     }
                 },
                 "reviewers": {
@@ -75,7 +80,12 @@ internal static class CrewSpecTool
                                 "enum": ["BeforeFirstExecution", "BeforeEveryExecution", "OnConvergenceFailure"]
                             },
                             "provider_type": { "type": "string" },
-                            "finalizer_type": { "type": "string" }
+                            "finalizer_type": { "type": "string" },
+                            "tool_names": {
+                                "type": "array",
+                                "items": { "type": "string" },
+                                "description": "Optional tool names from the tool catalogue to bind to this actor."
+                            }
                         }
                     }
                 },
@@ -101,7 +111,12 @@ internal static class CrewSpecTool
                                 "enum": ["BeforeFirstExecution", "BeforeEveryExecution", "OnConvergenceFailure"]
                             },
                             "provider_type": { "type": "string" },
-                            "finalizer_type": { "type": "string" }
+                            "finalizer_type": { "type": "string" },
+                            "tool_names": {
+                                "type": "array",
+                                "items": { "type": "string" },
+                                "description": "Optional tool names from the tool catalogue to bind to this actor."
+                            }
                         }
                     }
                 },
@@ -127,7 +142,12 @@ internal static class CrewSpecTool
                                 "enum": ["BeforeFirstExecution", "BeforeEveryExecution", "OnConvergenceFailure"]
                             },
                             "provider_type": { "type": "string" },
-                            "finalizer_type": { "type": "string" }
+                            "finalizer_type": { "type": "string" },
+                            "tool_names": {
+                                "type": "array",
+                                "items": { "type": "string" },
+                                "description": "Optional tool names from the tool catalogue to bind to this actor."
+                            }
                         }
                     }
                 },
@@ -153,7 +173,12 @@ internal static class CrewSpecTool
                                 "enum": ["BeforeFirstExecution", "BeforeEveryExecution", "OnConvergenceFailure"]
                             },
                             "provider_type": { "type": "string" },
-                            "finalizer_type": { "type": "string" }
+                            "finalizer_type": { "type": "string" },
+                            "tool_names": {
+                                "type": "array",
+                                "items": { "type": "string" },
+                                "description": "Optional tool names from the tool catalogue to bind to this actor."
+                            }
                         }
                     }
                 },
