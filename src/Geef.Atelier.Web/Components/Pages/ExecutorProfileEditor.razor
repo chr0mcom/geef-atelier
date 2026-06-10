@@ -32,6 +32,8 @@
                            IsSystem="@_isSystem"
                            IsSaving="@_saving"
                            Error="@_error"
+                           ShowToolPicker="true"
+                           InitialToolNames="@_profile?.ToolNames"
                            OnSave="SaveAsync"
                            OnCancel="NavigateBack"
                            OnDuplicate="DuplicateAsCustom"
@@ -94,7 +96,8 @@
                 Provider: values.Provider,
                 Model: values.Model,
                 MaxTokens: values.MaxTokens,
-                IsSystem: false);
+                IsSystem: false,
+                ToolNames: values.ToolNames);
 
             if (IsNew)
             {

@@ -1,0 +1,148 @@
+@* Wiederverwendbarer Picker zum Zuweisen von Werkzeugen zu einem Akteur-Profil. *@
+@using Geef.Atelier.Core.Domain.Tools
+@using Geef.Atelier.Web.Services
+@inject IToolDefinitionService ToolService
+
+<div class="profile-picker" data-testid="tool-picker">
+    @if (!CanSelectProvider)
+    {
+        <div class="warning-banner" data-testid="tool-picker-warning">
+            ⚠ Der gewählte Anbieter unterstützt kein agentic Tool-Use. Werkzeuge können nicht zugewiesen werden.
+        </div>
+    }
+
+    <div class="profile-picker-grid">
+        <div>
+            <p class="picker-col-label">Verfügbare Werkzeuge</p>
+            @foreach (var tool in _available)
+            {
+                <button type="button" class="picker-pool-item"
+                        data-testid="tool-available-@tool.Name"
+                        disabled="@(!CanSelectProvider)"
+                        @onclick="() => AddTool(tool)">
+                    <span class="picker-add-icon">＋</span>
+                    <span class="picker-item-name">@tool.DisplayName</span>
+                    <span class="picker-item-meta">@GetTypeLabel(tool.ToolType)</span>
+                    @if (tool.IsSystem) { <span class="crew-badge">System</span> }
+                </button>
+            }
+            @if (!_available.Any())
+            {
+                <p class="picker-empty-state">Alle Werkzeuge zugewiesen</p>
+            }
+        </div>
+        <div>
+            <p class="picker-col-label">Zugewiesen (@SelectedToolNames.Count)</p>
+            @for (int i = 0; i < SelectedToolNames.Count; i++)
+            {
+                var idx = i;
+                var name = SelectedToolNames[idx];
+                var tool = _allTools.FirstOrDefault(t => t.Name == name);
+                <div class="picker-active-item" data-testid="tool-selected-@name">
+                    <span class="picker-item-rank">@(idx + 1).</span>
+                    <span class="picker-item-name">
+                        @if (tool != null)
+                        {
+                            @tool.DisplayName
+                            <span class="picker-item-meta"> · @GetTypeLabel(tool.ToolType)</span>
+                        }
+                        else
+                        {
+                            @name
+                        }
+                    </span>
+                    <div class="picker-item-controls">
+                        <button type="button" class="btn small ghost"
+                                disabled="@(idx == 0)"
+                                data-testid="tool-picker-up-@name"
+                                @onclick="() => MoveUp(idx)">↑</button>
+                        <button type="button" class="btn small ghost"
+                                disabled="@(idx == SelectedToolNames.Count - 1)"
+                                data-testid="tool-picker-down-@name"
+                                @onclick="() => MoveDown(idx)">↓</button>
+                        <button type="button" class="btn small danger"
+                                data-testid="tool-picker-remove-@name"
+                                @onclick="() => RemoveTool(idx)">×</button>
+                    </div>
+                </div>
+            }
+            @if (SelectedToolNames.Count == 0)
+            {
+                <p class="picker-empty-state">Keine Werkzeuge zugewiesen.</p>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>Currently selected tool names (two-way binding).</summary>
+    [Parameter, EditorRequired] public List<string> SelectedToolNames { get; set; } = [];
+
+    /// <summary>Raised when the selection changes.</summary>
+    [Parameter] public EventCallback<List<string>> SelectedToolNamesChanged { get; set; }
+
+    /// <summary>
+    /// When <see langword="false"/> the provider does not support agentic tool-use
+    /// and all add-buttons are disabled. Defaults to <see langword="true"/>.
+    /// </summary>
+    [Parameter] public bool CanSelectProvider { get; set; } = true;
+
+    private List<ToolDefinition> _allTools = [];
+
+    private IEnumerable<ToolDefinition> _available =>
+        _allTools.Where(t => !SelectedToolNames.Contains(t.Name));
+
+    protected override async Task OnInitializedAsync()
+    {
+        _allTools = (await ToolService.GetAllAsync()).ToList();
+    }
+
+    private async Task AddTool(ToolDefinition tool)
+    {
+        if (!SelectedToolNames.Contains(tool.Name))
+        {
+            SelectedToolNames = [.. SelectedToolNames, tool.Name];
+            await SelectedToolNamesChanged.InvokeAsync(SelectedToolNames);
+        }
+    }
+
+    private async Task RemoveTool(int idx)
+    {
+        var newList = SelectedToolNames.ToList();
+        newList.RemoveAt(idx);
+        SelectedToolNames = newList;
+        await SelectedToolNamesChanged.InvokeAsync(SelectedToolNames);
+    }
+
+    private async Task MoveUp(int idx)
+    {
+        if (idx <= 0) return;
+        var newList = SelectedToolNames.ToList();
+        (newList[idx - 1], newList[idx]) = (newList[idx], newList[idx - 1]);
+        SelectedToolNames = newList;
+        await SelectedToolNamesChanged.InvokeAsync(SelectedToolNames);
+    }
+
+    private async Task MoveDown(int idx)
+    {
+        if (idx >= SelectedToolNames.Count - 1) return;
+        var newList = SelectedToolNames.ToList();
+        (newList[idx + 1], newList[idx]) = (newList[idx], newList[idx + 1]);
+        SelectedToolNames = newList;
+        await SelectedToolNamesChanged.InvokeAsync(SelectedToolNames);
+    }
+
+    private static string GetTypeLabel(string toolType) => toolType switch
+    {
+        "web-search"         => "Websuche",
+        "knowledge-base"     => "Wissensdatenbank",
+        "url-fetch"          => "URL-Abruf",
+        "news-search"        => "Nachrichtensuche",
+        "academic-search"    => "Akademische Suche",
+        "rest-api"           => "REST-API",
+        "static-context"     => "Statischer Kontext",
+        "learning-retrieval" => "Lerneinträge",
+        "mcp-tool"           => "MCP-Tool",
+        _                    => toolType
+    };
+}

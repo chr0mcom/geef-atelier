@@ -140,6 +140,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(o =>
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, HttpContextCurrentUserService>();
+builder.Services.AddScoped<IToolDefinitionService, ToolDefinitionService>();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

@@ -1,0 +1,127 @@
+@page "/tools/view/{Name}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.Text.Json
+@using Geef.Atelier.Core.Domain.Tools
+@using Geef.Atelier.Web.Services
+@inject IToolDefinitionService ToolService
+@inject NavigationManager Nav
+
+<PageTitle>@(_tool?.DisplayName ?? "Werkzeug") — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="tool-view">
+    <div class="page-header">
+        <h1>@(_tool?.DisplayName ?? "")</h1>
+        <a href="/tools" class="btn ghost">← Zurück</a>
+    </div>
+
+    @if (_loading)
+    {
+        <p>Wird geladen…</p>
+    }
+    else if (_tool == null)
+    {
+        <p>Werkzeug nicht gefunden.</p>
+    }
+    else
+    {
+        @if (_tool.IsSystem)
+        {
+            <div class="info-banner">
+                Dies ist ein System-Werkzeug und kann nicht bearbeitet werden.
+                Verwende <strong>Als Custom duplizieren</strong> in der Liste.
+            </div>
+        }
+
+        <dl class="profile-detail" data-testid="tool-detail">
+            <dt>Name</dt>
+            <dd data-testid="detail-name">@_tool.Name</dd>
+
+            <dt>Anzeigename</dt>
+            <dd data-testid="detail-display-name">@_tool.DisplayName</dd>
+
+            <dt>Beschreibung</dt>
+            <dd data-testid="detail-description">
+                @(string.IsNullOrEmpty(_tool.Description) ? "—" : _tool.Description)
+            </dd>
+
+            <dt>Typ</dt>
+            <dd data-testid="detail-tool-type">@GetTypeLabel(_tool.ToolType)</dd>
+
+            <dt>Zugriffsklasse</dt>
+            <dd data-testid="detail-access-class">@GetAccessLabel(_tool.AccessClass)</dd>
+
+            <dt>Secret-Referenz</dt>
+            <dd data-testid="detail-secret-ref">
+                @(string.IsNullOrEmpty(_tool.SecretRef) ? "—" : _tool.SecretRef)
+            </dd>
+
+            <dt>System-Werkzeug</dt>
+            <dd data-testid="detail-is-system">@(_tool.IsSystem ? "Ja" : "Nein")</dd>
+        </dl>
+
+        <div class="template-meta-section" style="margin-top: 1.5rem;">
+            <h3>LLM-Schema</h3>
+            <pre style="font-family: var(--font-mono, monospace); font-size: 0.82rem;
+                        background: var(--color-surface-raised, #f5f5f5);
+                        padding: 1rem; border-radius: 4px; overflow-x: auto;"
+                 data-testid="detail-llm-schema">@FormatSchema(_tool.LlmSchema)</pre>
+        </div>
+
+        @if (!_tool.IsSystem)
+        {
+            <div class="form-actions">
+                <a href="/tools/edit/@_tool.Name" class="btn primary">Bearbeiten</a>
+                <a href="/tools" class="btn ghost">Zurück</a>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public string? Name { get; set; }
+
+    private ToolDefinition? _tool;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Name is null) { Nav.NavigateTo("/tools"); return; }
+        _tool = await ToolService.GetByNameAsync(Name);
+        if (_tool == null) { Nav.NavigateTo("/tools"); return; }
+        _loading = false;
+    }
+
+    private static string GetTypeLabel(string toolType) => toolType switch
+    {
+        "web-search"         => "Websuche",
+        "knowledge-base"     => "Wissensdatenbank",
+        "url-fetch"          => "URL-Abruf",
+        "news-search"        => "Nachrichtensuche",
+        "academic-search"    => "Akademische Suche",
+        "rest-api"           => "REST-API",
+        "static-context"     => "Statischer Kontext",
+        "learning-retrieval" => "Lerneinträge",
+        "mcp-tool"           => "MCP-Tool",
+        _                    => toolType
+    };
+
+    private static string GetAccessLabel(ToolAccessClass access) => access switch
+    {
+        ToolAccessClass.ReadOnly => "Lesend (ReadOnly)",
+        ToolAccessClass.Mutating => "Schreibend (Mutating)",
+        _                        => access.ToString()
+    };
+
+    private static string FormatSchema(JsonElement schema)
+    {
+        try
+        {
+            return JsonSerializer.Serialize(schema, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch
+        {
+            return "{}";
+        }
+    }
+}

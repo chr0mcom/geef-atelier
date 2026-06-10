@@ -1,0 +1,334 @@
+@page "/tools/create"
+@page "/tools/edit/{Name}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using System.Text.Json
+@using Geef.Atelier.Core.Domain.Tools
+@using Geef.Atelier.Web.Services
+@inject IToolDefinitionService ToolService
+@inject NavigationManager Nav
+
+<PageTitle>@(IsNew ? "Neues Werkzeug" : $"Bearbeiten: {_form.DisplayName}") — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="tool-editor">
+    <div class="page-header">
+        <h1>@(IsNew ? "Neues Werkzeug" : _isSystem ? _form.DisplayName : $"Bearbeiten: {_form.DisplayName}")</h1>
+        <a href="/tools" class="btn ghost">← Zurück</a>
+    </div>
+
+    @if (_loading)
+    {
+        <p>Wird geladen…</p>
+    }
+    else
+    {
+        @if (_isSystem)
+        {
+            <div class="info-banner">
+                Dies ist ein System-Werkzeug und kann nicht bearbeitet werden. Verwende <strong>Als Custom duplizieren</strong> in der Liste.
+            </div>
+        }
+
+        <EditForm Model="_form" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="error-banner" data-testid="editor-error">@_error</div>
+            }
+
+            @* ── §0 Grunddaten ── *@
+            <div class="template-meta-section">
+                <h3>Grunddaten</h3>
+
+                <div class="field">
+                    <label>Name (Slug)</label>
+                    <InputText @bind-Value="_form.Name" placeholder="mein-werkzeug"
+                               disabled="@(!IsNew || _isSystem)"
+                               data-testid="input-name" />
+                    @if (IsNew)
+                    {
+                        <small class="form-hint">Nur Kleinbuchstaben, Ziffern und Bindestriche. Kein führender oder abschließender Bindestrich.</small>
+                    }
+                    <ValidationMessage For="() => _form.Name" />
+                </div>
+
+                <div class="field">
+                    <label>Anzeigename</label>
+                    <InputText @bind-Value="_form.DisplayName" disabled="@_isSystem"
+                               data-testid="input-display-name" />
+                    <ValidationMessage For="() => _form.DisplayName" />
+                </div>
+
+                <div class="field">
+                    <label>Beschreibung</label>
+                    <InputTextArea @bind-Value="_form.Description" rows="3"
+                                   disabled="@_isSystem"
+                                   data-testid="input-description" />
+                    <ValidationMessage For="() => _form.Description" />
+                </div>
+            </div>
+
+            @* ── §1 Werkzeug-Typ ── *@
+            <div class="template-meta-section">
+                <h3>Werkzeug-Typ</h3>
+
+                <div class="field">
+                    <label>Typ</label>
+                    <InputSelect @bind-Value="_form.ToolType" disabled="@_isSystem"
+                                 data-testid="input-tool-type">
+                        <option value="web-search">Websuche</option>
+                        <option value="knowledge-base">Wissensdatenbank</option>
+                        <option value="url-fetch">URL-Abruf</option>
+                        <option value="news-search">Nachrichtensuche</option>
+                        <option value="academic-search">Akademische Suche</option>
+                        <option value="rest-api">REST-API</option>
+                        <option value="static-context">Statischer Kontext</option>
+                        <option value="learning-retrieval">Lerneinträge</option>
+                        <option value="mcp-tool">MCP-Tool</option>
+                    </InputSelect>
+                    <ValidationMessage For="() => _form.ToolType" />
+                </div>
+            </div>
+
+            @* ── §2 Zugriff & Secret ── *@
+            <div class="template-meta-section">
+                <h3>Zugriff &amp; Authentifizierung</h3>
+
+                <div class="field">
+                    <label>Zugriffsklasse</label>
+                    <div class="radio-group" data-testid="access-class-group">
+                        <label class="radio-option">
+                            <input type="radio" name="access-class" value="ReadOnly"
+                                   checked="@(_form.AccessClass == ToolAccessClass.ReadOnly)"
+                                   disabled="@_isSystem"
+                                   @onchange="() => _form.AccessClass = ToolAccessClass.ReadOnly" />
+                            <span>
+                                <strong>Lesend (ReadOnly)</strong>
+                                <span class="radio-description">Das Werkzeug liest nur Daten und verändert keinen externen Zustand.</span>
+                            </span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="access-class" value="Mutating"
+                                   checked="@(_form.AccessClass == ToolAccessClass.Mutating)"
+                                   disabled="@_isSystem"
+                                   @onchange="() => _form.AccessClass = ToolAccessClass.Mutating" />
+                            <span>
+                                <strong>Schreibend (Mutating)</strong>
+                                <span class="radio-description">
+                                    Das Werkzeug schreibt oder verändert externen Zustand.
+                                    <strong class="form-hint--warn"> Für Phase C reserviert — aktuell nicht ausführbar.</strong>
+                                </span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label>Secret-Referenz (optional)</label>
+                    <InputText @bind-Value="_form.SecretRef"
+                               placeholder="z. B. MY_API_KEY"
+                               disabled="@_isSystem"
+                               data-testid="input-secret-ref" />
+                    <small class="form-hint">Name einer ENV-Variablen, die den API-Schlüssel enthält. Niemals den Klartext-Schlüssel hier eingeben.</small>
+                </div>
+            </div>
+
+            @* ── §3 LLM-Schema ── *@
+            <div class="template-meta-section">
+                <h3>LLM-Schema</h3>
+                <p class="pipeline-stage-desc">JSON Schema, das das Eingabeobjekt beschreibt, das das LLM beim Aufruf dieses Werkzeugs übergeben muss.</p>
+
+                <div class="field">
+                    <textarea rows="10"
+                              style="font-family: var(--font-mono, monospace); font-size: 0.82rem; width: 100%;"
+                              disabled="@_isSystem"
+                              value="@_schemaText"
+                              @onchange="OnSchemaChanged"
+                              data-testid="input-llm-schema">@_schemaText</textarea>
+                    @if (!string.IsNullOrEmpty(_schemaError))
+                    {
+                        <small class="form-hint form-hint--warn">@_schemaError</small>
+                    }
+                </div>
+            </div>
+
+            @* ── Aktionsleiste ── *@
+            @if (!_isSystem)
+            {
+                <div class="form-actions">
+                    <button type="submit" class="btn primary" disabled="@_saving" data-testid="btn-save">
+                        @(_saving ? "Speichern…" : IsNew ? "Erstellen" : "Speichern")
+                    </button>
+                    <button type="button" class="btn ghost" @onclick="NavigateBack">Abbrechen</button>
+                    @if (!IsNew)
+                    {
+                        <button type="button" class="btn danger"
+                                @onclick="() => _showDeleteModal = true"
+                                data-testid="btn-delete">Löschen</button>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="form-actions">
+                    <button type="button" class="btn ghost" @onclick="NavigateBack">Zurück</button>
+                </div>
+            }
+        </EditForm>
+    }
+</div>
+
+<DeleteConfirmationModal
+    Show="_showDeleteModal"
+    ItemName="@(Name ?? "")"
+    ItemKind="Werkzeug"
+    OnConfirm="ExecuteDeleteAsync"
+    OnCancel="() => _showDeleteModal = false" />
+
+@code {
+    [Parameter] public string? Name { get; set; }
+
+    private bool IsNew => Name == null;
+    private bool _isSystem;
+    private bool _loading = true;
+    private bool _saving;
+    private bool _showDeleteModal;
+    private string? _error;
+    private string _schemaText = "{}";
+    private string? _schemaError;
+
+    private ToolFormModel _form = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!IsNew)
+        {
+            var tool = await ToolService.GetByNameAsync(Name!);
+            if (tool == null) { Nav.NavigateTo("/tools"); return; }
+            _isSystem = tool.IsSystem;
+            _form = ToolFormModel.From(tool);
+            _schemaText = FormatSchema(tool.LlmSchema);
+        }
+        _loading = false;
+    }
+
+    private void OnSchemaChanged(ChangeEventArgs e)
+    {
+        _schemaText = e.Value?.ToString() ?? "{}";
+        _schemaError = null;
+        try
+        {
+            JsonDocument.Parse(_schemaText);
+        }
+        catch (JsonException ex)
+        {
+            _schemaError = $"Ungültiges JSON: {ex.Message}";
+        }
+    }
+
+    private void NavigateBack() => Nav.NavigateTo("/tools");
+
+    private async Task SaveAsync()
+    {
+        if (!string.IsNullOrEmpty(_schemaError)) return;
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            JsonElement schema;
+            try
+            {
+                schema = JsonDocument.Parse(_schemaText).RootElement;
+            }
+            catch (JsonException ex)
+            {
+                _schemaError = $"Ungültiges JSON: {ex.Message}";
+                return;
+            }
+
+            var tool = _form.ToToolDefinition(schema);
+            await ToolService.SaveAsync(tool);
+            Nav.NavigateTo("/tools");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ExecuteDeleteAsync()
+    {
+        _showDeleteModal = false;
+        _error = null;
+        try
+        {
+            await ToolService.DeleteAsync(Name!);
+            Nav.NavigateTo("/tools");
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private static string FormatSchema(JsonElement schema)
+    {
+        try
+        {
+            return JsonSerializer.Serialize(schema, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch
+        {
+            return "{}";
+        }
+    }
+
+    private sealed class ToolFormModel
+    {
+        [Required(ErrorMessage = "Name ist erforderlich.")]
+        [RegularExpression(@"^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$",
+            ErrorMessage = "Nur Kleinbuchstaben, Ziffern und Bindestriche. Kein führender oder abschließender Bindestrich.")]
+        [MaxLength(64)]
+        public string Name { get; set; } = "";
+
+        [Required(ErrorMessage = "Anzeigename ist erforderlich.")]
+        [MaxLength(200)]
+        public string DisplayName { get; set; } = "";
+
+        [MaxLength(1000)]
+        public string Description { get; set; } = "";
+
+        [Required(ErrorMessage = "Typ ist erforderlich.")]
+        public string ToolType { get; set; } = "web-search";
+
+        public ToolAccessClass AccessClass { get; set; } = ToolAccessClass.ReadOnly;
+
+        [MaxLength(200)]
+        public string SecretRef { get; set; } = "";
+
+        public static ToolFormModel From(ToolDefinition t) => new()
+        {
+            Name        = t.Name,
+            DisplayName = t.DisplayName,
+            Description = t.Description,
+            ToolType    = t.ToolType,
+            AccessClass = t.AccessClass,
+            SecretRef   = t.SecretRef ?? "",
+        };
+
+        public ToolDefinition ToToolDefinition(JsonElement schema) => new(
+            Name:        Name,
+            DisplayName: DisplayName,
+            Description: Description,
+            ToolType:    ToolType,
+            Settings:    new Dictionary<string, string>(),
+            SecretRef:   string.IsNullOrWhiteSpace(SecretRef) ? null : SecretRef.Trim(),
+            LlmSchema:   schema,
+            AccessClass: AccessClass,
+            IsSystem:    false);
+    }
+}
