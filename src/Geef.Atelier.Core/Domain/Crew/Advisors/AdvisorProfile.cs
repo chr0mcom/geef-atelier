@@ -15,6 +15,11 @@ namespace Geef.Atelier.Core.Domain.Crew.Advisors;
 /// <param name="Mode">Behavioural archetype that determines how the response is integrated.</param>
 /// <param name="Trigger">When during the pipeline run the advisor is consulted.</param>
 /// <param name="IsSystem">True for profiles defined as code constants; false for user-created profiles.</param>
+/// <param name="ToolNames">
+/// Optional list of tool names (from the tool catalogue) that this advisor may call during an
+/// agentic tool-use loop before providing its final advice. When empty the advisor uses the
+/// standard single-shot completion path.
+/// </param>
 public sealed record AdvisorProfile(
     string Name,
     string DisplayName,
@@ -25,4 +30,5 @@ public sealed record AdvisorProfile(
     int? MaxTokens,
     AdvisorMode Mode,
     AdvisorTrigger Trigger,
-    bool IsSystem);
+    bool IsSystem,
+    IReadOnlyList<string>? ToolNames = null);

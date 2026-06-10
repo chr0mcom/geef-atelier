@@ -1,7 +1,10 @@
 using Geef.Atelier.Application.Pricing;
+using Geef.Atelier.Application.Tools;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.Tools;
 using Geef.Atelier.Core.Persistence.Crew;
+using Geef.Atelier.Core.Persistence.Tools;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk.Advisors;
 using Geef.Sdk.Context;
@@ -15,6 +18,8 @@ namespace Geef.Atelier.Infrastructure.Pipeline;
 /// SDK <see cref="IAdvisor"/> backed by an <see cref="AdvisorProfile"/>. Calls the LLM
 /// with the profile's system prompt and the run context's grounded brief, persists the
 /// result as an <see cref="AdvisorConsultation"/>, and returns an <see cref="SdkAdvisorResponse"/>.
+/// When <see cref="AdvisorProfile.ToolNames"/> is non-empty and the provider supports agentic
+/// tool use, the advisor runs a multi-turn tool-use loop before returning its final advice text.
 /// </summary>
 internal sealed class ProfileBasedAdvisor(
     AdvisorProfile profile,
@@ -22,7 +27,9 @@ internal sealed class ProfileBasedAdvisor(
     IAdvisorConsultationRepository consultations,
     Guid runId,
     IPricingCatalog? pricingCatalog = null,
-    ICostAccumulator? costAccumulator = null) : IAdvisor
+    ICostAccumulator? costAccumulator = null,
+    IToolUseRunner? toolUseRunner = null,
+    IToolDefinitionRepository? toolDefinitionRepository = null) : IAdvisor
 {
     public string Name => profile.Name;
     public SdkAdvisorKind Kind => MapKind(profile.Mode);
@@ -37,26 +44,67 @@ internal sealed class ProfileBasedAdvisor(
 
         var (client, model, maxTokens) = resolver.ForProfile(profile.Provider, profile.Model, profile.MaxTokens);
 
-        var response = await LlmResilience.ExecuteAsync(
-            token => client.CompleteAsync(new LlmRequest
-            {
-                Model        = model,
-                SystemPrompt = profile.SystemPrompt,
-                UserPrompt   = briefing,
-                MaxTokens    = maxTokens
-            }, token),
-            cancellationToken,
-            maxAttempts: LlmResilience.ReviewerMaxAttempts,
-            maxDelay: LlmResilience.ReviewerMaxDelay);
+        string adviceText;
+        int inputTokens;
+        int outputTokens;
 
-        if (costAccumulator is not null)
+        // Agentic tool-use loop path: when the profile has bound tools and the provider supports it.
+        if (profile.ToolNames is { Count: > 0 } toolNames
+            && toolUseRunner is not null
+            && toolDefinitionRepository is not null
+            && resolver.SupportsAgenticTools(profile.Provider))
         {
-            var costEur = pricingCatalog?.CalculateCostEur(
-                model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, profile.Provider);
-            costAccumulator.RecordActorCost(
-                iteration, ActorType.Advisor, profile.Name, model,
-                response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur,
-                providerName: profile.Provider);
+            var boundTools = await ResolveToolsAsync(toolNames, toolDefinitionRepository, cancellationToken);
+
+            var loopCtx = new ToolInvocationContext(
+                RunId: runId,
+                IterationNumber: iteration,
+                ActorType: "advisor",
+                ActorName: profile.Name,
+                Sequence: 0);
+
+            var loopResult = await toolUseRunner.RunAsync(
+                client, model,
+                profile.SystemPrompt,
+                briefing,
+                boundTools,
+                requiredFinalTool: null,
+                new ToolLoopOptions { MaxToolCalls = toolNames.Count * 3 },
+                loopCtx,
+                cancellationToken);
+
+            adviceText   = loopResult.FinalText;
+            inputTokens  = loopResult.TotalTokenUsage.InputTokens;
+            outputTokens = loopResult.TotalTokenUsage.OutputTokens;
+        }
+        else
+        {
+            // Standard single-shot path.
+            var response = await LlmResilience.ExecuteAsync(
+                token => client.CompleteAsync(new LlmRequest
+                {
+                    Model        = model,
+                    SystemPrompt = profile.SystemPrompt,
+                    UserPrompt   = briefing,
+                    MaxTokens    = maxTokens
+                }, token),
+                cancellationToken,
+                maxAttempts: LlmResilience.ReviewerMaxAttempts,
+                maxDelay: LlmResilience.ReviewerMaxDelay);
+
+            adviceText   = response.Text;
+            inputTokens  = response.TokenUsage.InputTokens;
+            outputTokens = response.TokenUsage.OutputTokens;
+
+            if (costAccumulator is not null)
+            {
+                var costEur = pricingCatalog?.CalculateCostEur(
+                    model, inputTokens, outputTokens, profile.Provider);
+                costAccumulator.RecordActorCost(
+                    iteration, ActorType.Advisor, profile.Name, model,
+                    inputTokens, outputTokens, costEur,
+                    providerName: profile.Provider);
+            }
         }
 
         await consultations.CreateAsync(new AdvisorConsultation(
@@ -64,16 +112,35 @@ internal sealed class ProfileBasedAdvisor(
             RunId:              runId,
             IterationNumber:    iteration,
             AdvisorProfileName: profile.Name,
-            Output:             response.Text,
+            Output:             adviceText,
             CreatedAt:          DateTimeOffset.UtcNow), cancellationToken);
 
         return new SdkAdvisorResponse
         {
-            AdviceText            = response.Text,
+            AdviceText            = adviceText,
             Confidence            = AdvisorConfidence.Medium,
             Outcome               = AdvisorOutcome.Success,
-            ApproximateTokenCount = response.TokenUsage.InputTokens + response.TokenUsage.OutputTokens
+            ApproximateTokenCount = inputTokens + outputTokens
         };
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private static async Task<IReadOnlyList<ToolDefinition>> ResolveToolsAsync(
+        IReadOnlyList<string> toolNames,
+        IToolDefinitionRepository repository,
+        CancellationToken ct)
+    {
+        var tools = new List<ToolDefinition>(toolNames.Count);
+        foreach (var name in toolNames)
+        {
+            var tool = await repository.GetByNameAsync(name, ct);
+            if (tool is not null)
+                tools.Add(tool);
+        }
+        return tools;
     }
 
     private static SdkAdvisorKind MapKind(AdvisorMode mode) => mode switch

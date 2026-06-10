@@ -2,8 +2,11 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Geef.Atelier.Application.Pricing;
+using Geef.Atelier.Application.Tools;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Core.Domain.Tools;
+using Geef.Atelier.Core.Persistence.Tools;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk.Context;
 using Geef.Sdk.Providers;
@@ -16,7 +19,9 @@ internal sealed class ProfileBasedReviewer(
     ReviewerProfile profile,
     ILlmClientResolver resolver,
     IPricingCatalog? pricingCatalog = null,
-    ICostAccumulator? costAccumulator = null) : IReviewer
+    ICostAccumulator? costAccumulator = null,
+    IToolUseRunner? toolUseRunner = null,
+    IToolDefinitionRepository? toolDefinitionRepository = null) : IReviewer
 {
     public string Name => profile.Name;
     public int Priority => 0;
@@ -39,6 +44,44 @@ internal sealed class ProfileBasedReviewer(
 
         var (client, model, maxTokens) = resolver.ForProfile(profile.Provider, profile.Model, profile.MaxTokens);
 
+        // Agentic tool-use loop path: when the profile has bound tools and the provider supports it.
+        if (profile.ToolNames is { Count: > 0 } toolNames
+            && toolUseRunner is not null
+            && toolDefinitionRepository is not null
+            && resolver.SupportsAgenticTools(profile.Provider))
+        {
+            var boundTools = await ResolveToolsAsync(toolNames, toolDefinitionRepository, cancellationToken);
+
+            Guid.TryParse(
+                context.TryGet(GeefKeys.RunId, out var ridStr) ? ridStr : null,
+                out var runGuid);
+
+            var loopCtx = new ToolInvocationContext(
+                RunId: runGuid,
+                IterationNumber: iter,
+                ActorType: "reviewer",
+                ActorName: profile.Name,
+                Sequence: 0);
+
+            var loopResult = await toolUseRunner.RunAsync(
+                client, model,
+                profile.SystemPrompt,
+                userPrompt,
+                boundTools,
+                requiredFinalTool: "submit_review",
+                new ToolLoopOptions { MaxToolCalls = toolNames.Count * 3 },
+                loopCtx,
+                cancellationToken);
+
+            // When the required tool was called, FinalText contains the ArgumentsJson.
+            var argsJson = loopResult.EndReason == ToolLoopEndReason.RequiredToolCalled
+                ? loopResult.FinalText
+                : null;
+
+            return ParseToolInput(argsJson ?? "{}");
+        }
+
+        // Standard single-shot path.
         var response = await client.CompleteAsync(new LlmRequest
         {
             Model        = model,
@@ -107,6 +150,25 @@ internal sealed class ProfileBasedReviewer(
         }
 
         return result;
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private static async Task<IReadOnlyList<ToolDefinition>> ResolveToolsAsync(
+        IReadOnlyList<string> toolNames,
+        IToolDefinitionRepository repository,
+        CancellationToken ct)
+    {
+        var tools = new List<ToolDefinition>(toolNames.Count);
+        foreach (var name in toolNames)
+        {
+            var tool = await repository.GetByNameAsync(name, ct);
+            if (tool is not null)
+                tools.Add(tool);
+        }
+        return tools;
     }
 
     private ReviewResult ParseToolInput(string toolArgumentsJson)

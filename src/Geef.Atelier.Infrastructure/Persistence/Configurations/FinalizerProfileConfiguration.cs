@@ -15,6 +15,11 @@ internal sealed class FinalizerProfileConfiguration : IEntityTypeConfiguration<F
         v => v.Aggregate(0, (h, kv) => HashCode.Combine(h, kv.Key.GetHashCode(), kv.Value.GetHashCode())),
         v => new Dictionary<string, string>(v));
 
+    private static readonly ValueComparer<IReadOnlyList<string>> ListComparer = new(
+        (a, b) => (a == null && b == null) || (a != null && b != null && a.SequenceEqual(b)),
+        v => v == null ? 0 : v.Aggregate(0, (h, s) => HashCode.Combine(h, s.GetHashCode())),
+        v => v == null ? (IReadOnlyList<string>)Array.Empty<string>() : (IReadOnlyList<string>)v.ToList());
+
     public void Configure(EntityTypeBuilder<FinalizerProfile> builder)
     {
         builder.ToTable("FinalizerProfiles");
@@ -39,5 +44,13 @@ internal sealed class FinalizerProfileConfiguration : IEntityTypeConfiguration<F
                 DictComparer)
             .IsRequired()
             .HasDefaultValueSql("'{}'::jsonb");
+
+        builder.Property(p => p.ToolNames)
+            .HasColumnType("jsonb")
+            .HasConversion(
+                v => JsonSerializer.Serialize(v ?? (IReadOnlyList<string>)Array.Empty<string>(), JsonOpts),
+                v => (IReadOnlyList<string>)(JsonSerializer.Deserialize<List<string>>(v, JsonOpts) ?? new List<string>()),
+                ListComparer)
+            .HasDefaultValueSql("'[]'::jsonb");
     }
 }

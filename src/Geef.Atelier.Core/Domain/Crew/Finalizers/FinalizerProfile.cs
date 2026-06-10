@@ -16,6 +16,10 @@ namespace Geef.Atelier.Core.Domain.Crew.Finalizers;
 /// <param name="IsSystem">True for code-constant profiles defined in <see cref="SystemCrew"/>.</param>
 /// <param name="CreatedAt">UTC timestamp of when the profile was first persisted. Null for system profiles.</param>
 /// <param name="UpdatedAt">UTC timestamp of the last update. Null for system profiles.</param>
+/// <param name="ToolNames">
+/// Optional list of tool names (from the tool catalogue) that a <see cref="FinalizerType.Transform"/>
+/// finalizer may call during an agentic tool-use loop. Ignored for all other finalizer types.
+/// </param>
 public sealed record FinalizerProfile(
     string Name,
     string DisplayName,
@@ -24,4 +28,5 @@ public sealed record FinalizerProfile(
     Dictionary<string, string> Settings,
     bool IsSystem,
     DateTimeOffset? CreatedAt = null,
-    DateTimeOffset? UpdatedAt = null);
+    DateTimeOffset? UpdatedAt = null,
+    IReadOnlyList<string>? ToolNames = null);
