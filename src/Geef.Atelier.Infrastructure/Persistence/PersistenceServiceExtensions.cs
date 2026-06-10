@@ -2,6 +2,7 @@ using Geef.Atelier.Application.Dashboard;
 using Geef.Atelier.Application.SiteSettings;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
+using Geef.Atelier.Core.Persistence.Mcp;
 using Geef.Atelier.Core.Persistence.OAuth;
 using Geef.Atelier.Core.Persistence.Providers;
 using Geef.Atelier.Core.Persistence.TemplateStudio;
@@ -53,6 +54,7 @@ public static class PersistenceServiceExtensions
         services.AddScoped<IStudioSettingsRepository, StudioSettingsRepository>();
         services.AddScoped<IToolDefinitionRepository, ToolDefinitionRepository>();
         services.AddScoped<IToolInvocationRepository, ToolInvocationRepository>();
+        services.AddScoped<IMcpServerConfigRepository, McpServerConfigRepository>();
         services.AddMemoryCache();
         services.AddSingleton<IDashboardService, DashboardService>();
         return services;

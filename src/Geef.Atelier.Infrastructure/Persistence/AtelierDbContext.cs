@@ -68,6 +68,8 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     internal DbSet<ToolDefinitionEntity> ToolDefinitions => Set<ToolDefinitionEntity>();
     internal DbSet<ToolInvocation> ToolInvocations => Set<ToolInvocation>();
 
+    internal DbSet<McpServerConfigEntity> McpServerConfigs => Set<McpServerConfigEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
         => modelBuilder.ApplyConfigurationsFromAssembly(typeof(AtelierDbContext).Assembly);
 }
