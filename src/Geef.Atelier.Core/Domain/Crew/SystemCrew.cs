@@ -224,6 +224,16 @@ public static class SystemCrew
         MaxQueriesPerRun: 1,
         IsSystem: true);
 
+    /// <summary>Tool catalog grounding provider — lists all registered tools for tool-binding awareness in auto-crew composition.</summary>
+    public static readonly GroundingProviderProfile ToolCatalogDefaultProfile = new(
+        Name: "tool-catalog-default",
+        DisplayName: "Tool Catalog",
+        Description: "Lists all registered tools in the central tool catalogue. Used by the crew-composer executor so it can bind tools to actor profiles by name.",
+        ProviderType: GroundingProviderTypes.ToolCatalog,
+        ProviderSettings: new Dictionary<string, string>(),
+        MaxQueriesPerRun: 1,
+        IsSystem: true);
+
     /// <summary>Static-context grounding provider embedding the binding crew design rules.</summary>
     public static readonly GroundingProviderProfile CrewDesignRulesProfile = new(
         Name: "crew-design-rules",
@@ -307,7 +317,7 @@ public static class SystemCrew
             DetectRegression: true,
             StagnationThreshold: 6), // same as MaxIterations → stagnation never fires before budget is exhausted
         AdvisorProfileNames: new[] { CrewDesignAdvisorProfile.Name },
-        GroundingProviderNames: new[] { CrewCatalogDefaultProfile.Name, CrewDesignRulesProfile.Name },
+        GroundingProviderNames: new[] { CrewCatalogDefaultProfile.Name, CrewDesignRulesProfile.Name, ToolCatalogDefaultProfile.Name },
         FinalizerProfileNames: new[] { CrewMaterializerProfile.Name },
         RunFinalizersOnMaxAttempts: false,
         IsSystem: true);
@@ -595,6 +605,7 @@ public static class SystemCrew
             // Auto-Crew grounding providers
             [CrewCatalogDefaultProfile.Name]         = CrewCatalogDefaultProfile,
             [CrewDesignRulesProfile.Name]            = CrewDesignRulesProfile,
+            [ToolCatalogDefaultProfile.Name]         = ToolCatalogDefaultProfile,
         };
 
     /// <summary>All system crew templates, indexed by name.</summary>
