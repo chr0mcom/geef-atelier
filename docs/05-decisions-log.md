@@ -1302,3 +1302,31 @@ Atelier actors previously operated exclusively from model knowledge. A reviewer 
 **D-060/14 — Mutating opt-in.** `CrewSpecArtifact.AllowMutatingTools` (`bool`, default `false`). The validator blocks any Mutating tool unless this flag is explicitly set in the spec. The UI marks Mutating tools with a red danger badge in both editor and detail view.
 
 **Tests:** 1788 passing, 0 regressions. 5 DB migrations (Step37–Step41), all additive (no data loss on forward migration).
+
+---
+
+## D-061 — Specialization Packs: generic actors + reusable scoped specialization layers
+
+**Context:** Actors with task-baked system prompts leak their old task when reused in another crew
+(silent reviewer corruption). Full concept: [`prompts/konzept-spezialisierungs-packs.md`](prompts/konzept-spezialisierungs-packs.md),
+implementation guide: [`11-specialization-packs.md`](11-specialization-packs.md).
+
+**D-061/1 — Generic role + `{specialization}` slot.** Actors carry only a generic role prompt with a `{specialization}` slot. `PromptComposer.Compose` (pure) replaces the slot with the ordered, `\n\n`-joined pack texts (fallback: append under `## Specialization`); precedence is last-in-sequence-wins.
+
+**D-061/2 — `SpecializationPack` entity.** New scoped entity (`Scope` General/DomainScoped/TaskBound, `ApplicableActorTypes`, `OwningCrewId`, `Archived`, `LastUsedAt`). System packs are code constants (`SystemPacks`) concatenated ahead of custom DB rows (`specialization_packs`, Migration Step42) — mirroring the actor-profile pattern.
+
+**D-061/3 — System-actor rebuild.** The six domain-specialized system reviewers (legal/academic/marketing) were replaced by two generic reviewer roles (`domain-terminology-reviewer`, `substantive-rigor-reviewer`, each carrying the shared severity taxonomy + slot). Domain deltas moved into six DomainScoped system packs + two General example packs; the `juristisch`/`akademisch`/`marketing` templates bind them so the composed prompt stays behaviour-equivalent.
+
+**D-061/4 — Per-crew binding + composition at snapshot-build time.** `CrewTemplate`/`CrewSpec` gained `ActorPackBindings` (jsonb, keyed `"<actorType>:<profileName>"`). `CrewSnapshotBuilder.ApplyPacksAsync` composes each actor's effective prompt into the embedded profile's `SystemPrompt` (factory + `ProfileBased*` unchanged) and records provenance in `CrewSnapshot` v3 `PromptCompositions`. Composition applies to executor/reviewer/advisor (the actors with a prompt).
+
+**D-061/5 — Scope enforcement.** `ListForBindingAsync` excludes foreign TaskBound + archived packs; the crew-coherence check hard-blocks a custom template binding a foreign TaskBound pack; `CrewSpecValidator` Step 9 + the pack-catalog grounding + the prompt-quality/reuse-correctness composer reviewers enforce scope in the composer.
+
+**D-061/6 — Composer two-level composition.** `CrewPartSpec.PackNames` + `CrewSpecArtifact.NewPacks`; `submit_crew_spec` schema gained `pack_names` per actor + top-level `packs`. **The parser keeps `tool_names`/`pack_names` on `reuse` references** — binding packs to reused generic reviewers is the primary use case. `CrewMaterializer` creates new packs (TaskBound → owned by the new crew) and materializes the bindings.
+
+**D-061/7 — Lifecycle.** TaskBound packs cascade-delete with their crew. Promote/Clone-to-Generalize are gated by an LLM generality review (`IPackGeneralityReviewer`, fail-closed). `PackArchivalBackgroundService` auto-archives unused, unreferenced custom General/DomainScoped packs after `PackGc.RetentionDays` (default 90).
+
+**D-061/8 — Audit UI.** `ActorPromptCompositionBlock.razor` on the run-detail page shows the role prompt, bound packs (with scope + order), and the composed effective prompt per actor.
+
+**D-061/9 — Clean reseed without system-data loss.** Migration Step42 wipes custom crews/profiles/templates and run history, but its profile/template deletes are scoped to `WHERE "IsSystem" = false`, preserving the DB-seeded system finalizers (Step22/Step30) and grounding providers (Step15). `pg_dump` backup before deploy.
+
+**Tests:** specialization/composition/parser/validator/lifecycle units added; no new regressions (pre-existing DB/E2E/contention failures unchanged). Migration Step42 (additive schema + scoped custom-data reseed).
