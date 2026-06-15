@@ -39,6 +39,12 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// When <c>true</c>, finalizers also execute if the run exhausts max iterations without converging,
 /// using the last iteration's artifact text as input. Defaults to <c>false</c>.
 /// </param>
+/// <param name="ActorPackBindings">
+/// Ordered specialization-pack bindings per actor in this crew. Keyed by <c>"&lt;actorType&gt;:&lt;profileName&gt;"</c>
+/// (e.g. <c>"reviewer:substantive-rigor-reviewer"</c>); the value is the ordered list of
+/// <c>SpecializationPack.Name</c>s composed into that actor's effective prompt at snapshot-build time.
+/// The same generic actor can carry different packs in different crews. Empty when no packs are bound.
+/// </param>
 public sealed record CrewTemplate(
     string Name,
     string DisplayName,
@@ -51,8 +57,13 @@ public sealed record CrewTemplate(
     IReadOnlyList<string> GroundingProviderNames,
     bool IsSystem,
     IReadOnlyList<string>? FinalizerProfileNames = null,
-    bool RunFinalizersOnMaxAttempts = false)
+    bool RunFinalizersOnMaxAttempts = false,
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? ActorPackBindings = null)
 {
     /// <summary>Resolved finalizer profile names; never null after construction.</summary>
     public IReadOnlyList<string> FinalizerProfileNames { get; init; } = FinalizerProfileNames ?? Array.Empty<string>();
+
+    /// <summary>Resolved actor pack bindings; never null after construction.</summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> ActorPackBindings { get; init; } =
+        ActorPackBindings ?? new Dictionary<string, IReadOnlyList<string>>();
 }

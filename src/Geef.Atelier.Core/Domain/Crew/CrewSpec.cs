@@ -21,6 +21,10 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// Names of finalizer profiles to run after the crew converges, in execution order.
 /// Defaults to an empty list when the field is absent from the JSON payload.
 /// </param>
+/// <param name="ActorPackBindings">
+/// Ordered specialization-pack bindings per actor, keyed by <c>"&lt;actorType&gt;:&lt;profileName&gt;"</c>.
+/// Defaults to empty when absent.
+/// </param>
 public sealed record CrewSpec(
     string ExecutorProfileName,
     IReadOnlyList<string> ReviewerProfileNames,
@@ -28,7 +32,8 @@ public sealed record CrewSpec(
     ConvergencePolicyOverride? ConvergenceOverride,
     IReadOnlyList<string>? AdvisorProfileNames = null,
     IReadOnlyList<string>? GroundingProviderNames = null,
-    IReadOnlyList<string>? FinalizerProfileNames = null)
+    IReadOnlyList<string>? FinalizerProfileNames = null,
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? ActorPackBindings = null)
 {
     /// <summary>Resolved advisor profile names; never null after construction.</summary>
     public IReadOnlyList<string> AdvisorProfileNames { get; init; } = AdvisorProfileNames ?? Array.Empty<string>();
@@ -38,4 +43,11 @@ public sealed record CrewSpec(
 
     /// <summary>Resolved finalizer profile names; never null after construction.</summary>
     public IReadOnlyList<string> FinalizerProfileNames { get; init; } = FinalizerProfileNames ?? Array.Empty<string>();
+
+    /// <summary>
+    /// Ordered specialization-pack bindings per actor, keyed by <c>"&lt;actorType&gt;:&lt;profileName&gt;"</c>.
+    /// Never null after construction.
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> ActorPackBindings { get; init; } =
+        ActorPackBindings ?? new Dictionary<string, IReadOnlyList<string>>();
 }

@@ -1,0 +1,88 @@
+@page "/packs/view/{Name}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Core.Domain.Crew.Specialization
+@using Geef.Atelier.Web.Services
+@inject ISpecializationPackService PackService
+@inject NavigationManager Nav
+
+<PageTitle>@(_pack?.DisplayName ?? "Pack") — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="pack-view">
+    <div class="page-header">
+        <h1>@(_pack?.DisplayName ?? "Pack")</h1>
+        <a href="/packs" class="btn ghost">← Zurück</a>
+    </div>
+
+    @if (_pack is null)
+    {
+        <p>Wird geladen…</p>
+    }
+    else
+    {
+        <div class="template-meta-section">
+            <dl class="detail-grid">
+                <dt>Name</dt><dd><code>@_pack.Name</code></dd>
+                <dt>Scope</dt><dd>@GetScopeLabel(_pack.Scope)</dd>
+                @if (_pack.Domain is not null)
+                {
+                    <dt>Domäne</dt><dd>@_pack.Domain</dd>
+                }
+                <dt>Akteur-Typen</dt><dd>@string.Join(", ", _pack.ApplicableActorTypes.Select(GetActorLabel))</dd>
+                @if (_pack.OwningCrewId is not null)
+                {
+                    <dt>Crew</dt><dd><code>@_pack.OwningCrewId</code></dd>
+                }
+                <dt>System</dt><dd>@(_pack.IsSystem ? "Ja" : "Nein")</dd>
+                @if (_pack.Archived)
+                {
+                    <dt>Status</dt><dd><span class="crew-badge crew-badge--danger">Archiviert</span></dd>
+                }
+            </dl>
+            <p>@_pack.Description</p>
+        </div>
+
+        <div class="template-meta-section">
+            <h3>Spezialisierungstext</h3>
+            <pre style="white-space: pre-wrap; font-family: var(--font-mono, monospace); font-size: 0.85rem;">@_pack.SpecializationText</pre>
+        </div>
+
+        @if (!_pack.IsSystem && _pack.Scope != PackScope.TaskBound)
+        {
+            <div class="form-actions">
+                <a href="/packs/edit/@_pack.Name" class="btn primary">Bearbeiten</a>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public string? Name { get; set; }
+
+    private SpecializationPack? _pack;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _pack = await PackService.GetByNameAsync(Name!);
+        if (_pack is null) Nav.NavigateTo("/packs");
+    }
+
+    private static string GetScopeLabel(PackScope s) => s switch
+    {
+        PackScope.General      => "Allgemein",
+        PackScope.DomainScoped => "Domäne",
+        PackScope.TaskBound    => "Crew-gebunden",
+        _                      => s.ToString()
+    };
+
+    private static string GetActorLabel(PackActorType t) => t switch
+    {
+        PackActorType.Any        => "Alle",
+        PackActorType.Executor   => "Executor",
+        PackActorType.Reviewer   => "Reviewer",
+        PackActorType.Advisor    => "Advisor",
+        PackActorType.Grounding  => "Grounding",
+        PackActorType.Finalizer  => "Finalizer",
+        _                        => t.ToString()
+    };
+}

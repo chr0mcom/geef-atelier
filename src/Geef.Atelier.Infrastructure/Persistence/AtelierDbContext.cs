@@ -70,6 +70,8 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
 
     internal DbSet<McpServerConfigEntity> McpServerConfigs => Set<McpServerConfigEntity>();
 
+    internal DbSet<SpecializationPackEntity> SpecializationPacks => Set<SpecializationPackEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
         => modelBuilder.ApplyConfigurationsFromAssembly(typeof(AtelierDbContext).Assembly);
 }

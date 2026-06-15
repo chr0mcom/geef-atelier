@@ -1,0 +1,293 @@
+@page "/packs/create"
+@page "/packs/edit/{Name}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Geef.Atelier.Core.Domain.Crew
+@using Geef.Atelier.Core.Domain.Crew.Specialization
+@using Geef.Atelier.Web.Services
+@inject ISpecializationPackService PackService
+@inject NavigationManager Nav
+
+<PageTitle>@(IsNew ? "Neues Pack" : $"Bearbeiten: {_form.DisplayName}") — Atelier</PageTitle>
+
+<div class="crew-editor" data-testid="pack-editor">
+    <div class="page-header">
+        <h1>@(IsNew ? "Neues Pack" : _readOnly ? _form.DisplayName : $"Bearbeiten: {_form.DisplayName}")</h1>
+        <a href="/packs" class="btn ghost">← Zurück</a>
+    </div>
+
+    @if (_loading)
+    {
+        <p>Wird geladen…</p>
+    }
+    else
+    {
+        @if (_readOnly)
+        {
+            <div class="info-banner">
+                @(_isSystem
+                    ? "Dies ist ein System-Pack und kann nicht bearbeitet werden. Verwende \"Als Custom duplizieren\" in der Liste."
+                    : "Dieses Pack ist crew-gebunden (TaskBound) und wird über seine Crew verwaltet.")
+            </div>
+        }
+
+        <EditForm Model="_form" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="error-banner" data-testid="editor-error">@_error</div>
+            }
+
+            <div class="template-meta-section">
+                <h3>Grunddaten</h3>
+
+                <div class="field">
+                    <label>Name (Slug)</label>
+                    <InputText @bind-Value="_form.Name" placeholder="mein-pack"
+                               disabled="@(!IsNew || _readOnly)" data-testid="input-name" />
+                    @if (IsNew)
+                    {
+                        <small class="form-hint">Nur Kleinbuchstaben, Ziffern und Bindestriche. Wird als <code>custom-…</code> gespeichert.</small>
+                    }
+                    <ValidationMessage For="() => _form.Name" />
+                </div>
+
+                <div class="field">
+                    <label>Anzeigename</label>
+                    <InputText @bind-Value="_form.DisplayName" disabled="@_readOnly" data-testid="input-display-name" />
+                    <ValidationMessage For="() => _form.DisplayName" />
+                </div>
+
+                <div class="field">
+                    <label>Beschreibung</label>
+                    <InputTextArea @bind-Value="_form.Description" rows="2" disabled="@_readOnly" data-testid="input-description" />
+                </div>
+            </div>
+
+            <div class="template-meta-section">
+                <h3>Spezialisierung</h3>
+                <p class="pipeline-stage-desc">Das aufgabenspezifische Delta, das in den <code>{specialization}</code>-Slot des generischen Akteur-Prompts komponiert wird.</p>
+                <div class="field">
+                    <InputTextArea @bind-Value="_form.SpecializationText" rows="10"
+                                   disabled="@_readOnly"
+                                   style="font-family: var(--font-mono, monospace); font-size: 0.85rem;"
+                                   data-testid="input-specialization-text" />
+                    <ValidationMessage For="() => _form.SpecializationText" />
+                </div>
+            </div>
+
+            <div class="template-meta-section">
+                <h3>Scope &amp; Bindung</h3>
+
+                <div class="field">
+                    <label>Scope</label>
+                    <InputSelect @bind-Value="_form.Scope" disabled="@_readOnly" data-testid="input-scope">
+                        <option value="@PackScope.General">Allgemein — in jeder Crew nutzbar</option>
+                        <option value="@PackScope.DomainScoped">Domäne — nur in Crews derselben Domäne</option>
+                    </InputSelect>
+                </div>
+
+                @if (_form.Scope == PackScope.DomainScoped)
+                {
+                    <div class="field">
+                        <label>Domäne</label>
+                        <InputText @bind-Value="_form.Domain" placeholder="z. B. legal, academic, marketing"
+                                   disabled="@_readOnly" data-testid="input-domain" />
+                        <ValidationMessage For="() => _form.Domain" />
+                    </div>
+                }
+
+                <div class="field">
+                    <label>Anwendbare Akteur-Typen</label>
+                    <div class="checkbox-group" data-testid="actor-types-group">
+                        @foreach (var t in _selectableActorTypes)
+                        {
+                            var type = t;
+                            <label class="form-checkbox-label">
+                                <input type="checkbox"
+                                       checked="@_form.ActorTypes.Contains(type)"
+                                       disabled="@_readOnly"
+                                       @onchange="e => ToggleActorType(type, (bool)e.Value!)" />
+                                @GetActorLabel(type)
+                            </label>
+                        }
+                    </div>
+                    <small class="form-hint">Leer oder „Alle" = passt zu jedem Akteur-Typ.</small>
+                </div>
+            </div>
+
+            @if (!_readOnly)
+            {
+                <div class="form-actions">
+                    <button type="submit" class="btn primary" disabled="@_saving" data-testid="btn-save">
+                        @(_saving ? "Speichern…" : IsNew ? "Erstellen" : "Speichern")
+                    </button>
+                    <button type="button" class="btn ghost" @onclick="NavigateBack">Abbrechen</button>
+                    @if (!IsNew)
+                    {
+                        <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true" data-testid="btn-delete">Löschen</button>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="form-actions">
+                    <button type="button" class="btn ghost" @onclick="NavigateBack">Zurück</button>
+                </div>
+            }
+        </EditForm>
+    }
+</div>
+
+<DeleteConfirmationModal
+    Show="_showDeleteModal"
+    ItemName="@(Name ?? "")"
+    ItemKind="Pack"
+    OnConfirm="ExecuteDeleteAsync"
+    OnCancel="() => _showDeleteModal = false" />
+
+@code {
+    [Parameter] public string? Name { get; set; }
+
+    private bool IsNew => Name == null;
+    private bool _isSystem;
+    private bool _readOnly;
+    private bool _loading = true;
+    private bool _saving;
+    private bool _showDeleteModal;
+    private string? _error;
+
+    private readonly PackActorType[] _selectableActorTypes =
+    [
+        PackActorType.Any, PackActorType.Executor, PackActorType.Reviewer,
+        PackActorType.Advisor, PackActorType.Grounding, PackActorType.Finalizer
+    ];
+
+    private PackFormModel _form = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!IsNew)
+        {
+            var pack = await PackService.GetByNameAsync(Name!);
+            if (pack == null) { Nav.NavigateTo("/packs"); return; }
+            _isSystem = pack.IsSystem;
+            _readOnly = pack.IsSystem || pack.Scope == PackScope.TaskBound;
+            _form = PackFormModel.From(pack);
+        }
+        _loading = false;
+    }
+
+    private void ToggleActorType(PackActorType type, bool on)
+    {
+        if (on) { if (!_form.ActorTypes.Contains(type)) _form.ActorTypes.Add(type); }
+        else _form.ActorTypes.Remove(type);
+    }
+
+    private void NavigateBack() => Nav.NavigateTo("/packs");
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _error = null;
+        try
+        {
+            await PackService.SaveAsync(_form.ToPack());
+            Nav.NavigateTo("/packs");
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _saving = false; }
+    }
+
+    private async Task ExecuteDeleteAsync()
+    {
+        _showDeleteModal = false;
+        _error = null;
+        try
+        {
+            await PackService.DeleteAsync(Name!);
+            Nav.NavigateTo("/packs");
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private static string GetActorLabel(PackActorType t) => t switch
+    {
+        PackActorType.Any        => "Alle",
+        PackActorType.Executor   => "Executor",
+        PackActorType.Reviewer   => "Reviewer",
+        PackActorType.Advisor    => "Advisor",
+        PackActorType.Grounding  => "Grounding",
+        PackActorType.Finalizer  => "Finalizer",
+        _                        => t.ToString()
+    };
+
+    private sealed class PackFormModel
+    {
+        [Required(ErrorMessage = "Name ist erforderlich.")]
+        [RegularExpression(@"^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$",
+            ErrorMessage = "Nur Kleinbuchstaben, Ziffern und Bindestriche.")]
+        [MaxLength(64)]
+        public string Name { get; set; } = "";
+
+        [Required(ErrorMessage = "Anzeigename ist erforderlich.")]
+        [MaxLength(200)]
+        public string DisplayName { get; set; } = "";
+
+        [MaxLength(1000)]
+        public string Description { get; set; } = "";
+
+        [Required(ErrorMessage = "Spezialisierungstext ist erforderlich.")]
+        public string SpecializationText { get; set; } = "";
+
+        public PackScope Scope { get; set; } = PackScope.General;
+
+        [MaxLength(100)]
+        public string? Domain { get; set; }
+
+        public List<PackActorType> ActorTypes { get; set; } = [PackActorType.Any];
+
+        // For round-tripping TaskBound metadata that the form does not edit.
+        private string? _owningCrewId;
+        private bool _archived;
+        private DateTimeOffset? _createdAt;
+        private DateTimeOffset? _lastUsedAt;
+
+        public static PackFormModel From(SpecializationPack p) => new()
+        {
+            Name = p.Name,
+            DisplayName = p.DisplayName,
+            Description = p.Description,
+            SpecializationText = p.SpecializationText,
+            Scope = p.Scope,
+            Domain = p.Domain,
+            ActorTypes = p.ApplicableActorTypes.Count > 0 ? p.ApplicableActorTypes.ToList() : [PackActorType.Any],
+            _owningCrewId = p.OwningCrewId,
+            _archived = p.Archived,
+            _createdAt = p.CreatedAt,
+            _lastUsedAt = p.LastUsedAt,
+        };
+
+        public SpecializationPack ToPack()
+        {
+            var now = DateTimeOffset.UtcNow;
+            var actorTypes = ActorTypes.Count > 0 ? ActorTypes : [PackActorType.Any];
+            return new SpecializationPack(
+                Name: SystemCrew.EnsureCustomPrefix(Name),
+                DisplayName: DisplayName,
+                Description: Description,
+                SpecializationText: SpecializationText,
+                Scope: Scope,
+                Domain: Scope == PackScope.DomainScoped ? Domain : null,
+                ApplicableActorTypes: actorTypes,
+                OwningCrewId: Scope == PackScope.TaskBound ? _owningCrewId : null,
+                IsSystem: false,
+                Archived: _archived,
+                CreatedAt: _createdAt ?? now,
+                UpdatedAt: now,
+                LastUsedAt: _lastUsedAt);
+        }
+    }
+}
