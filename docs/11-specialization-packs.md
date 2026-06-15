@@ -125,6 +125,95 @@ else** so the platform starts fresh with the improved generic actors + packs.
 Take a full `pg_dump` backup before deploy (safety net; user/auth data is preserved in place, so no
 separate save/restore is required).
 
+## System-actor → generic-role + pack mapping
+
+The six former domain-specialized system reviewers were replaced by two generic reviewer roles plus
+six DomainScoped packs. The composed prompt is behaviour-equivalent to the old specialized prompt.
+
+| Former reviewer (removed) | Generic role (now) | Bound DomainScoped pack | Domain |
+|---|---|---|---|
+| `legal-jargon-precision` | `domain-terminology-reviewer` | `legal-terminology` | legal |
+| `academic-citation-readiness` | `domain-terminology-reviewer` | `academic-citation` | academic |
+| `marketing-audience-clarity` | `domain-terminology-reviewer` | `marketing-voice` | marketing |
+| `legal-clause-risk` | `substantive-rigor-reviewer` | `legal-clause-risk` | legal |
+| `academic-argumentation-rigor` | `substantive-rigor-reviewer` | `academic-argumentation` | academic |
+| `marketing-conversion-strength` | `substantive-rigor-reviewer` | `marketing-conversion` | marketing |
+
+General example packs (`concise-output`, `executive-tone`) apply to Executor/Finalizer. System
+templates bind these packs:
+
+| Template | Reviewers | `ActorPackBindings` |
+|---|---|---|
+| `klassik` | briefing-fidelity, clarity | — (no packs) |
+| `juristisch` | briefing-fidelity, domain-terminology-reviewer, substantive-rigor-reviewer | `reviewer:domain-terminology-reviewer → [legal-terminology]`, `reviewer:substantive-rigor-reviewer → [legal-clause-risk]` |
+| `akademisch` | (same generic reviewers) | `… → [academic-citation]`, `… → [academic-argumentation]` |
+| `marketing` | (same generic reviewers) | `… → [marketing-voice]`, `… → [marketing-conversion]` |
+
+## Composition example
+
+Generic role prompt (`domain-terminology-reviewer`):
+
+```
+You are a terminology and convention specialist reviewing a text for precise, consistent use of
+domain terminology … Severity taxonomy (Atelier standard …) … {specialization} … Respond in the
+language of the user briefing.
+```
+
+Bound pack `legal-terminology` (`SpecializationText`):
+
+```
+Domain focus — German legal terminology. … Key distinctions to verify: Anfechtung/Widerruf
+(§119 ff. vs. §355 BGB), Kündigung/Rücktritt (§346 BGB), …
+```
+
+Effective prompt composed at snapshot-build time (the `{specialization}` slot is replaced; the result
+is frozen in the snapshot and shown in the run-detail audit UI under *Effektive Prompts*):
+
+```
+You are a terminology and convention specialist … Severity taxonomy … 
+Domain focus — German legal terminology. … Anfechtung/Widerruf (§119 ff. vs. §355 BGB) … 
+Respond in the language of the user briefing.
+```
+
+With several packs the texts are concatenated in binding order (`\n\n`-joined); when the role prompt
+has no `{specialization}` slot they are appended under a `## Specialization` heading. Precedence on
+conflict: **last-in-sequence wins**.
+
+## Usage guide
+
+**Authoring a pack** (`/packs` → *Neues Pack*): set name, the specialization text, the scope
+(General or DomainScoped — TaskBound packs are created by the composer/crew, not here), the domain
+(for DomainScoped), and the applicable actor types. System packs are read-only; *Als Custom
+duplizieren* clones them.
+
+**Binding packs to a crew** (`/crew/templates` editor → *Spezialisierungs-Packs*): each chosen actor
+(executor, every reviewer, every advisor) gets an ordered pack picker. The picker only offers
+type-compatible, in-scope packs (General + own TaskBound; DomainScoped requires a crew domain).
+Foreign TaskBound packs are never offered and are hard-blocked on save.
+
+**Inspecting a run** (`/runs/<id>`): the *Effektive Prompts* block shows, per actor, the role prompt,
+the bound packs (with scope badge + order), and the composed effective prompt actually used.
+
+**Lifecycle on `/packs/edit/<name>`:** *Promote* (TaskBound → DomainScoped/General) and *Clone &
+generalize* run an LLM generality review first and only persist when it approves (concerns are shown
+otherwise). *Demote* narrows a General pack to a domain. Referencing templates are listed for
+awareness.
+
+**Auto-crew composer:** in `submit_crew_spec`, an actor may carry `pack_names` (reuse existing or
+reference a new pack), and the top-level `packs` array defines new packs (default TaskBound, bound to
+the new crew). The composer is grounded on the reusable pack catalogue (`pack-catalog`) and prefers
+reuse over new packs.
+
+## Configuration
+
+`PackGc` (auto-archival background service), bound from configuration:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `PackGc:Enabled` | `true` | Whether the archival sweep runs. |
+| `PackGc:IntervalHours` | `24` | Sweep interval. |
+| `PackGc:RetentionDays` | `90` | Custom General/DomainScoped packs unused this long and unreferenced are archived. |
+
 ## Key files
 
 - **Core:** `Domain/Crew/Specialization/{SpecializationPack,PackScope,PackActorType,PromptComposition,

@@ -38,7 +38,11 @@ Text-generation pipeline platform built on the [Geef SDK](https://github.com/chr
 
 **Grounding Types ✅** Three new grounding-provider types alongside the existing `tavily` and `vector-store` providers: `static-context` (curated fixed text — style guides, glossaries, brand voice), `url-fetch` (fetch specific URLs with SSRF guard blocking all private/cloud-metadata IPs), and `news-search` (Tavily news topic with date filter). New system profile `tavily-news`. Dashboard cost aggregation now includes Grounding Refiner costs (D-051, PR #23, 2026-05-20).
 
-Currently: **over 1200 tests** (green; 4 known Testcontainers flakes).
+**Tool System ✅** Central `ToolDefinition` catalogue + agentic tool-use (Pull, `IToolUseRunner`) for executor/reviewer/advisor, grounding rebuilt on the same tools (Push), provider capability detection, `/tools` CRUD + `ToolPicker`, `ToolInvocationsBlock` audit, Auto-Crew tool binding, and an MCP client (`/mcp-servers` discovery/import). See [docs/10-tool-system.md](docs/10-tool-system.md) (D-060).
+
+**Specialization Packs ✅** Generic actors (role prompt + `{specialization}` slot) + reusable scoped `SpecializationPack`s bound per crew. Effective prompt composed at snapshot-build time (CrewSnapshot v3 + provenance), audit UI shows it. The six domain-specialized system reviewers became two generic roles + six DomainScoped packs. `/packs` CRUD, scope enforcement, composer integration (`pack_names`/`packs` + pack-catalog grounding), lifecycle (cascade-delete, promote/demote/clone with LLM generality review, auto-GC). See [docs/11-specialization-packs.md](docs/11-specialization-packs.md) (D-061).
+
+Currently: **over 1800 tests** (green; pre-existing Testcontainers/E2E env flakes excluded).
 
 Full scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope.md)
 

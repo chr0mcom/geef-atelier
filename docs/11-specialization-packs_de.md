@@ -130,6 +130,94 @@ Packs startet.
 Vor dem Deploy ein vollständiges `pg_dump`-Backup ziehen (Sicherheitsnetz; Benutzer-/Auth-Daten bleiben
 ohnehin in-place erhalten, daher kein separates Speichern/Wiederherstellen nötig).
 
+## System-Akteur → generische Rolle + Pack (Mapping)
+
+Die sechs früheren domänen-spezialisierten System-Reviewer wurden durch zwei generische Reviewer-Rollen
+plus sechs DomainScoped-Packs ersetzt. Der komponierte Prompt ist verhaltensgleich zum alten Spezial-Prompt.
+
+| Früherer Reviewer (entfernt) | Generische Rolle (jetzt) | Gebundenes DomainScoped-Pack | Domäne |
+|---|---|---|---|
+| `legal-jargon-precision` | `domain-terminology-reviewer` | `legal-terminology` | legal |
+| `academic-citation-readiness` | `domain-terminology-reviewer` | `academic-citation` | academic |
+| `marketing-audience-clarity` | `domain-terminology-reviewer` | `marketing-voice` | marketing |
+| `legal-clause-risk` | `substantive-rigor-reviewer` | `legal-clause-risk` | legal |
+| `academic-argumentation-rigor` | `substantive-rigor-reviewer` | `academic-argumentation` | academic |
+| `marketing-conversion-strength` | `substantive-rigor-reviewer` | `marketing-conversion` | marketing |
+
+General-Beispiel-Packs (`concise-output`, `executive-tone`) gelten für Executor/Finalizer. System-
+Templates binden die Packs:
+
+| Template | Reviewer | `ActorPackBindings` |
+|---|---|---|
+| `klassik` | briefing-fidelity, clarity | — (keine Packs) |
+| `juristisch` | briefing-fidelity, domain-terminology-reviewer, substantive-rigor-reviewer | `reviewer:domain-terminology-reviewer → [legal-terminology]`, `reviewer:substantive-rigor-reviewer → [legal-clause-risk]` |
+| `akademisch` | (dieselben generischen Reviewer) | `… → [academic-citation]`, `… → [academic-argumentation]` |
+| `marketing` | (dieselben generischen Reviewer) | `… → [marketing-voice]`, `… → [marketing-conversion]` |
+
+## Kompositions-Beispiel
+
+Generischer Rollen-Prompt (`domain-terminology-reviewer`):
+
+```
+You are a terminology and convention specialist reviewing a text for precise, consistent use of
+domain terminology … Severity taxonomy (Atelier standard …) … {specialization} … Respond in the
+language of the user briefing.
+```
+
+Gebundenes Pack `legal-terminology` (`SpecializationText`):
+
+```
+Domain focus — German legal terminology. … Key distinctions to verify: Anfechtung/Widerruf
+(§119 ff. vs. §355 BGB), Kündigung/Rücktritt (§346 BGB), …
+```
+
+Effektiver Prompt, zur Snapshot-Bauzeit komponiert (der `{specialization}`-Slot wird ersetzt; das
+Ergebnis ist im Snapshot eingefroren und in der Run-Detail-Audit-UI unter *Effektive Prompts* sichtbar):
+
+```
+You are a terminology and convention specialist … Severity taxonomy … 
+Domain focus — German legal terminology. … Anfechtung/Widerruf (§119 ff. vs. §355 BGB) … 
+Respond in the language of the user briefing.
+```
+
+Bei mehreren Packs werden die Texte in Bindungsreihenfolge konkateniert (mit `\n\n` verbunden); fehlt
+im Rollen-Prompt der `{specialization}`-Slot, werden sie unter einer `## Specialization`-Überschrift
+angehängt. Präzedenz bei Widerspruch: **last-in-sequence wins**.
+
+## Bedienungsanleitung
+
+**Pack anlegen** (`/packs` → *Neues Pack*): Name, Spezialisierungstext, Scope (General oder
+DomainScoped — TaskBound-Packs erzeugt der Composer/die Crew, nicht hier), Domäne (bei DomainScoped)
+und anwendbare Akteur-Typen setzen. System-Packs sind read-only; *Als Custom duplizieren* klont sie.
+
+**Packs an eine Crew binden** (`/crew/templates`-Editor → *Spezialisierungs-Packs*): jeder gewählte
+Akteur (Executor, jeder Reviewer, jeder Advisor) erhält einen geordneten Pack-Picker. Der Picker bietet
+nur typ-kompatible, scope-zulässige Packs an (General + eigene TaskBound; DomainScoped erfordert eine
+Crew-Domäne). Fremde TaskBound-Packs werden nie angeboten und beim Speichern hart blockiert.
+
+**Run inspizieren** (`/runs/<id>`): der Block *Effektive Prompts* zeigt je Akteur den Rollen-Prompt,
+die gebundenen Packs (mit Scope-Badge + Reihenfolge) und den tatsächlich genutzten komponierten Prompt.
+
+**Lebenszyklus auf `/packs/edit/<name>`:** *Promote* (TaskBound → DomainScoped/General) und *Klonen &
+generalisieren* führen zuerst ein LLM-Generalitäts-Review aus und speichern nur bei Freigabe (sonst
+werden die Concerns angezeigt). *Demote* verengt ein General-Pack auf eine Domäne. Referenzierende
+Templates werden zur Übersicht aufgelistet.
+
+**Auto-Crew-Composer:** in `submit_crew_spec` kann ein Akteur `pack_names` tragen (vorhandene
+wiederverwenden oder auf ein neues Pack verweisen); das top-level `packs`-Array definiert neue Packs
+(default TaskBound, an die neue Crew gebunden). Der Composer ist auf den wiederverwendbaren
+Pack-Katalog (`pack-catalog`) gegroundet und bevorzugt Wiederverwendung.
+
+## Konfiguration
+
+`PackGc` (Auto-Archivierungs-Background-Service), aus der Konfiguration gebunden:
+
+| Schlüssel | Standard | Bedeutung |
+|---|---|---|
+| `PackGc:Enabled` | `true` | Ob der Archivierungs-Sweep läuft. |
+| `PackGc:IntervalHours` | `24` | Sweep-Intervall. |
+| `PackGc:RetentionDays` | `90` | Custom-General/DomainScoped-Packs, die so lange ungenutzt und unreferenziert sind, werden archiviert. |
+
 ## Wichtige Dateien
 
 - **Core:** `Domain/Crew/Specialization/{SpecializationPack,PackScope,PackActorType,PromptComposition,

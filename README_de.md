@@ -38,7 +38,11 @@ Text-Generations-Pipeline-Plattform auf Basis des [Geef SDK](https://github.com/
 
 **Grounding-Typen ✅** Drei neue Grounding-Provider-Typen neben den bestehenden `tavily` und `vector-store`: `static-context` (kuratierter Fixtext — Style-Guides, Glossare, Markenstimme), `url-fetch` (gezieltes URL-Fetching mit SSRF-Guard, der alle privaten/Cloud-Metadata-IPs blockiert) und `news-search` (Tavily-Newssuche mit Datumsfilter). Neues System-Profil `tavily-news`. Dashboard-Cost-Aggregation umfasst jetzt auch Grounding-Refiner-Kosten (D-051, PR #23, 20. Mai 2026).
 
-Aktuell: **über 1200 Tests** (grün; 4 bekannte Testcontainers-Flakes).
+**Tool-System ✅** Zentraler `ToolDefinition`-Katalog + agentic Tool-Use (Pull, `IToolUseRunner`) für Executor/Reviewer/Advisor, Grounding auf dieselben Tools neu aufgebaut (Push), Provider-Capability-Detection, `/tools`-CRUD + `ToolPicker`, `ToolInvocationsBlock`-Audit, Auto-Crew-Tool-Binding und ein MCP-Client (`/mcp-servers` Discovery/Import). Siehe [docs/10-tool-system_de.md](docs/10-tool-system_de.md) (D-060).
+
+**Spezialisierungs-Packs ✅** Generische Akteure (Rollen-Prompt + `{specialization}`-Slot) + wiederverwendbare gescopte `SpecializationPack`s, pro Crew gebunden. Effektiver Prompt zur Snapshot-Bauzeit komponiert (CrewSnapshot v3 + Provenienz), in der Audit-UI sichtbar. Die sechs domänen-spezialisierten System-Reviewer wurden zu zwei generischen Rollen + sechs DomainScoped-Packs. `/packs`-CRUD, Scope-Durchsetzung, Composer-Integration (`pack_names`/`packs` + Pack-Katalog-Grounding), Lebenszyklus (Cascade-Delete, Promote/Demote/Clone mit LLM-Generalitäts-Review, Auto-GC). Siehe [docs/11-specialization-packs_de.md](docs/11-specialization-packs_de.md) (D-061).
+
+Aktuell: **über 1800 Tests** (grün; vorbestehende Testcontainers-/E2E-Umgebungs-Flakes ausgenommen).
 
 Vollständiger Scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope_de.md)
 
