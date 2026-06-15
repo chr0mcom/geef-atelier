@@ -52,7 +52,10 @@ ALTER TABLE ""CrewTemplates""
             // ── 2. Clean reseed (concept §12): clear custom crews/profiles/runs ─────
             // Ordered DELETEs (child → parent) so existing foreign keys are respected. Run-local
             // knowledge attachments are removed (they belong to deleted runs); global knowledge and
-            // learnings are preserved.
+            // learnings are preserved. IMPORTANT: profile/template tables only drop CUSTOM rows
+            // ("IsSystem" = false). System finalizers and grounding providers are DB-seeded by earlier
+            // migrations (Step15/Step22/Step30) and must survive — deleting them would orphan the
+            // system catalogue permanently (no reseed path).
             migrationBuilder.Sql(@"
 DELETE FROM ""FinalizationActorCosts"";
 DELETE FROM ""GroundingActorCosts"";
@@ -69,12 +72,12 @@ DELETE FROM ""Runs"";
 
 DELETE FROM ""CrewTemplateEmbeddings"";
 DELETE FROM ""TemplateStudioAnalyses"";
-DELETE FROM ""ReviewerProfiles"";
-DELETE FROM ""ExecutorProfiles"";
-DELETE FROM ""AdvisorProfiles"";
-DELETE FROM ""GroundingProviderProfiles"";
-DELETE FROM ""FinalizerProfiles"";
-DELETE FROM ""CrewTemplates"";
+DELETE FROM ""ReviewerProfiles""          WHERE ""IsSystem"" = false;
+DELETE FROM ""ExecutorProfiles""          WHERE ""IsSystem"" = false;
+DELETE FROM ""AdvisorProfiles""           WHERE ""IsSystem"" = false;
+DELETE FROM ""GroundingProviderProfiles"" WHERE ""IsSystem"" = false;
+DELETE FROM ""FinalizerProfiles""         WHERE ""IsSystem"" = false;
+DELETE FROM ""CrewTemplates""             WHERE ""IsSystem"" = false;
 ");
         }
 

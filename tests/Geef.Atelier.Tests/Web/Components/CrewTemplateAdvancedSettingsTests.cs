@@ -7,7 +7,9 @@ using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Configuration;
+using Geef.Atelier.Core.Domain.Crew.Specialization;
 using Geef.Atelier.Web.Components.Pages;
+using Geef.Atelier.Web.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -44,7 +46,28 @@ public sealed class CrewTemplateAdvancedSettingsTests : TestContext
     {
         Services.AddSingleton<ICrewService>(stub);
         Services.AddSingleton<IOptions<ConvergenceOptions>>(Options.Create(Defaults));
+        Services.AddSingleton<ISpecializationPackService>(new EmptyPackService());
         this.AddTestAuthorization().SetAuthorized("test-user");
+    }
+
+    private sealed class EmptyPackService : ISpecializationPackService
+    {
+        public Task<IReadOnlyList<SpecializationPack>> GetAllAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<SpecializationPack>>([]);
+        public Task<SpecializationPack?> GetByNameAsync(string name, CancellationToken ct = default)
+            => Task.FromResult<SpecializationPack?>(null);
+        public Task<IReadOnlyList<SpecializationPack>> ListForBindingAsync(
+            PackActorType actorType, string? crewDomain, string? owningCrewId, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<SpecializationPack>>([]);
+        public Task SaveAsync(SpecializationPack pack, CancellationToken ct = default) => Task.CompletedTask;
+        public Task DeleteAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<IReadOnlyList<string>> FindReferencingTemplatesAsync(string packName, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<string>>([]);
+        public Task<GeneralityReviewResult> PromoteAsync(string name, PackScope targetScope, string? targetDomain, CancellationToken ct = default)
+            => Task.FromResult(new GeneralityReviewResult(true, []));
+        public Task DemoteAsync(string name, string targetDomain, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<GeneralityReviewResult> CloneToGeneralizeAsync(string sourceName, string newName, PackScope targetScope, string? targetDomain, CancellationToken ct = default)
+            => Task.FromResult(new GeneralityReviewResult(true, []));
     }
 
     [Fact]
