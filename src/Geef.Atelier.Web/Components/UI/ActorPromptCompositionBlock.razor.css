@@ -1,0 +1,39 @@
+.actor-prompt-compositions {
+    margin: 0.5rem 0 1rem;
+}
+
+.prompt-composition {
+    padding: 0.5rem 0;
+    border-top: 1px solid var(--border, #e5e7eb);
+}
+
+.prompt-composition-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.35rem;
+}
+
+.prompt-composition-packs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.prompt-composition-details summary {
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-muted, #6b7280);
+}
+
+.prompt-composition-text {
+    white-space: pre-wrap;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.8rem;
+    background: var(--surface-2, #f9fafb);
+    padding: 0.6rem;
+    border-radius: 6px;
+    margin: 0.4rem 0;
+}

@@ -2,6 +2,7 @@ using System.Text.Json;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Core.Domain.Crew.Specialization;
 using Geef.Atelier.Core.Domain.Tools;
 
 namespace Geef.Atelier.Core.Domain.Crew;
@@ -44,6 +45,13 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// <c>null</c> when no actor in this snapshot uses tools (schema v1 snapshots also read as null).
 /// Trailing-optional for backward compatibility with v1 snapshots.
 /// </param>
+/// <param name="PromptCompositions">
+/// Per-actor record of how each generic role prompt was composed with its bound specialization packs
+/// (role prompt + composed effective prompt + pack provenance). Populated at snapshot-build time for
+/// every actor that has bound packs. <c>null</c> when no actor uses packs (v1/v2 snapshots read as null).
+/// The embedded actor profiles already carry the composed prompt in their <c>SystemPrompt</c>; this
+/// field preserves the role prompt and provenance for the audit UI. Trailing-optional.
+/// </param>
 public sealed record CrewSnapshot(
     int SchemaVersion,
     string? TemplateName,
@@ -55,10 +63,11 @@ public sealed record CrewSnapshot(
     IReadOnlyList<GroundingProviderProfile>? GroundingProviders = null,
     IReadOnlyList<FinalizerProfile>? Finalizers = null,
     bool RunFinalizersOnMaxAttempts = false,
-    IReadOnlyDictionary<string, IReadOnlyList<ToolDefinition>>? ToolBindings = null)
+    IReadOnlyDictionary<string, IReadOnlyList<ToolDefinition>>? ToolBindings = null,
+    IReadOnlyList<ActorPromptComposition>? PromptCompositions = null)
 {
     /// <summary>Current snapshot schema version. Bump when the format changes incompatibly.</summary>
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 
     private static readonly JsonSerializerOptions DeserializeOpts =
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };

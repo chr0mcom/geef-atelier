@@ -15,6 +15,7 @@ internal sealed class CrewService(
     IGroundingProviderProfileRepository groundingRepo,
     IFinalizerProfileRepository finalizerRepo,
     ICrewTemplateRepository templateRepo,
+    ISpecializationPackRepository packRepo,
     ILogger<CrewService> logger) : ICrewService
 {
     private const string ReadOnlyMessage = "System profile is read-only — copy it as a custom variant.";
@@ -350,7 +351,8 @@ internal sealed class CrewService(
         string? crewTemplateName, CrewSpec? customCrew, CancellationToken cancellationToken = default)
     {
         if (customCrew is not null)
-            return await CrewSnapshotBuilder.BuildAsync(
+        {
+            var customSnapshot = await CrewSnapshotBuilder.BuildAsync(
                 customCrew,
                 (name, ct) => executorRepo.GetByNameAsync(name, ct),
                 (name, ct) => reviewerRepo.GetByNameAsync(name, ct),
@@ -359,11 +361,14 @@ internal sealed class CrewService(
                 (name, ct) => GetFinalizerProfileAsync(name, ct),
                 cancellationToken);
 
+            return await ApplyPacksAsync(customSnapshot, customCrew.ActorPackBindings, cancellationToken);
+        }
+
         var templateName = crewTemplateName ?? SystemCrew.KlassikTemplateName;
         var template = await templateRepo.GetByNameAsync(templateName, cancellationToken)
             ?? throw new InvalidOperationException($"Crew template '{templateName}' not found.");
 
-        return await CrewSnapshotBuilder.BuildAsync(
+        var snapshot = await CrewSnapshotBuilder.BuildAsync(
             template,
             (name, ct) => executorRepo.GetByNameAsync(name, ct),
             (name, ct) => reviewerRepo.GetByNameAsync(name, ct),
@@ -371,5 +376,26 @@ internal sealed class CrewService(
             (name, ct) => GetGroundingProviderProfileAsync(name, ct),
             (name, ct) => GetFinalizerProfileAsync(name, ct),
             cancellationToken);
+
+        return await ApplyPacksAsync(snapshot, template.ActorPackBindings, cancellationToken);
+    }
+
+    private async Task<CrewSnapshot> ApplyPacksAsync(
+        CrewSnapshot snapshot,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> bindings,
+        CancellationToken cancellationToken)
+    {
+        var composed = await CrewSnapshotBuilder.ApplyPacksAsync(
+            snapshot, bindings, (name, ct) => packRepo.GetByNameAsync(name, ct), logger, cancellationToken);
+
+        // Best-effort: mark composed packs as recently used (drives the auto-GC freshness window).
+        if (composed.PromptCompositions is { Count: > 0 } comps)
+        {
+            var usedNames = comps.SelectMany(c => c.Packs.Select(p => p.Name)).Distinct().ToList();
+            try { await packRepo.TouchLastUsedAsync(usedNames, DateTimeOffset.UtcNow, cancellationToken); }
+            catch (Exception ex) { logger.LogWarning(ex, "Failed to update LastUsedAt for {Count} packs.", usedNames.Count); }
+        }
+
+        return composed;
     }
 }

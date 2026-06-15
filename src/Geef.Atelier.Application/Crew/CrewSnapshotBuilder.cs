@@ -3,6 +3,7 @@ using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Core.Domain.Crew.Specialization;
 using Geef.Atelier.Core.Domain.Tools;
 using Microsoft.Extensions.Logging;
 
@@ -123,6 +124,112 @@ public static class CrewSnapshotBuilder
 
         var toolBindings = await ResolveToolBindingsAsync(base_, toolLookup, logger, cancellationToken);
         return base_ with { ToolBindings = toolBindings };
+    }
+
+    /// <summary>
+    /// Composes each actor's generic role prompt with its bound specialization packs (in order),
+    /// writing the composed prompt into the embedded profile's <c>SystemPrompt</c> so the pipeline
+    /// factory and actors need no changes, and recording the composition (role + composed + provenance)
+    /// in <see cref="CrewSnapshot.PromptCompositions"/> for reproducibility and the audit UI.
+    /// Packs whose <c>ApplicableActorTypes</c> do not match the actor are skipped (logged). Returns the
+    /// snapshot unchanged when <paramref name="actorPackBindings"/> is empty.
+    /// </summary>
+    public static async Task<CrewSnapshot> ApplyPacksAsync(
+        CrewSnapshot snapshot,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> actorPackBindings,
+        Func<string, CancellationToken, Task<SpecializationPack?>> packLookup,
+        ILogger? logger = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (actorPackBindings.Count == 0)
+            return snapshot;
+
+        var compositions = new List<ActorPromptComposition>();
+
+        // Executor
+        var (composedExec, execComp) = await ComposeActorAsync(
+            ActorTypeKeys.Executor, snapshot.Executor.Name, snapshot.Executor.SystemPrompt,
+            PackActorType.Executor, actorPackBindings, packLookup, logger, cancellationToken);
+        var executor = execComp is null ? snapshot.Executor : snapshot.Executor with { SystemPrompt = composedExec };
+        if (execComp is not null) compositions.Add(execComp);
+
+        // Reviewers
+        var reviewers = new List<ReviewerProfile>(snapshot.Reviewers.Count);
+        foreach (var r in snapshot.Reviewers)
+        {
+            var (composed, comp) = await ComposeActorAsync(
+                ActorTypeKeys.Reviewer, r.Name, r.SystemPrompt,
+                PackActorType.Reviewer, actorPackBindings, packLookup, logger, cancellationToken);
+            reviewers.Add(comp is null ? r : r with { SystemPrompt = composed });
+            if (comp is not null) compositions.Add(comp);
+        }
+
+        // Advisors
+        var advisors = new List<AdvisorProfile>(snapshot.Advisors.Count);
+        foreach (var a in snapshot.Advisors)
+        {
+            var (composed, comp) = await ComposeActorAsync(
+                ActorTypeKeys.Advisor, a.Name, a.SystemPrompt,
+                PackActorType.Advisor, actorPackBindings, packLookup, logger, cancellationToken);
+            advisors.Add(comp is null ? a : a with { SystemPrompt = composed });
+            if (comp is not null) compositions.Add(comp);
+        }
+
+        return snapshot with
+        {
+            Executor = executor,
+            Reviewers = reviewers,
+            Advisors = advisors,
+            PromptCompositions = compositions.Count > 0 ? compositions : null
+        };
+    }
+
+    /// <summary>
+    /// Resolves the ordered packs bound to one actor, composes them onto the role prompt, and returns
+    /// the composed prompt plus its provenance record. Returns <c>(rolePrompt, null)</c> when the actor
+    /// has no (effective) bound packs.
+    /// </summary>
+    private static async Task<(string Composed, ActorPromptComposition? Comp)> ComposeActorAsync(
+        string actorTypeKey,
+        string actorName,
+        string rolePrompt,
+        PackActorType actorType,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> bindings,
+        Func<string, CancellationToken, Task<SpecializationPack?>> packLookup,
+        ILogger? logger,
+        CancellationToken ct)
+    {
+        if (!bindings.TryGetValue(ActorTypeKeys.BindingKey(actorTypeKey, actorName), out var packNames)
+            || packNames.Count == 0)
+            return (rolePrompt, null);
+
+        var packs = new List<SpecializationPack>(packNames.Count);
+        foreach (var name in packNames)
+        {
+            var pack = await packLookup(name, ct);
+            if (pack is null)
+            {
+                logger?.LogWarning("Pack '{Pack}' bound to actor '{Actor}' not found — skipped.", name, actorName);
+                continue;
+            }
+            if (!pack.ApplicableActorTypes.AppliesTo(actorType))
+            {
+                logger?.LogWarning(
+                    "Pack '{Pack}' is not applicable to actor type {Type} (actor '{Actor}') — skipped.",
+                    name, actorType, actorName);
+                continue;
+            }
+            packs.Add(pack);
+        }
+
+        if (packs.Count == 0)
+            return (rolePrompt, null);
+
+        var composed = PromptComposer.Compose(rolePrompt, packs);
+        var provenance = packs
+            .Select((p, i) => new PackProvenance(p.Name, p.DisplayName, p.Scope, i))
+            .ToList();
+        return (composed, new ActorPromptComposition(actorTypeKey, actorName, rolePrompt, composed, provenance));
     }
 
     private static async Task<IReadOnlyList<ReviewerProfile>> ResolveReviewersAsync(
