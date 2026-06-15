@@ -7,6 +7,7 @@ using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Composition;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Core.Domain.Crew.Specialization;
 using Geef.Atelier.Infrastructure.TemplateStudio;
 using Microsoft.Extensions.Logging;
 
@@ -263,6 +264,40 @@ internal sealed class CrewMaterializer(
                 "CrewMaterializer: run {RunId} — created crew template '{Template}'",
                 sourceRunId, finalTemplateName);
 
+            // 5j. Specialization packs: create new ones (TaskBound → owned by this crew) and bind packs
+            // to actors. Done after template creation so TaskBound packs can reference the final name.
+            var packNameMapping = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var packSpec in spec.NewPacks)
+            {
+                if (string.IsNullOrWhiteSpace(packSpec.Name) || string.IsNullOrWhiteSpace(packSpec.SpecializationText))
+                    continue;
+
+                var scope = ParsePackScope(packSpec.Scope);
+                var created = await crewService.CreateCustomSpecializationPackAsync(new SpecializationPack(
+                    Name:               packSpec.Name!,
+                    DisplayName:        packSpec.DisplayName ?? packSpec.Name!,
+                    Description:        "Auto-composed pack",
+                    SpecializationText: packSpec.SpecializationText!,
+                    Scope:              scope,
+                    Domain:             scope == PackScope.DomainScoped ? (packSpec.Domain ?? spec.Domain) : null,
+                    ApplicableActorTypes: ParseActorTypes(packSpec.ApplicableActorTypes),
+                    OwningCrewId:       scope == PackScope.TaskBound ? finalTemplateName : null,
+                    IsSystem:           false), cancellationToken);
+                packNameMapping[packSpec.Name!] = created.Name;
+                logger.LogDebug("CrewMaterializer: created pack '{Name}' (scope={Scope})", created.Name, scope);
+            }
+
+            var bindings = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+            AddPackBinding(bindings, ActorTypeKeys.Executor, executorName, spec.Executor?.PackNames, packNameMapping);
+            for (var i = 0; i < reviewerNames.Count && i < spec.Reviewers.Count; i++)
+                AddPackBinding(bindings, ActorTypeKeys.Reviewer, reviewerNames[i], spec.Reviewers[i].PackNames, packNameMapping);
+            for (var i = 0; i < advisorNames.Count && i < spec.Advisors.Count; i++)
+                AddPackBinding(bindings, ActorTypeKeys.Advisor, advisorNames[i], spec.Advisors[i].PackNames, packNameMapping);
+
+            if (bindings.Count > 0)
+                await crewService.UpdateCustomCrewTemplateAsync(
+                    createdTemplate with { ActorPackBindings = bindings }, cancellationToken);
+
             await transaction.CommitAsync(cancellationToken);
         }
         catch
@@ -392,6 +427,48 @@ internal sealed class CrewMaterializer(
             "onconvergencefailure"  => AdvisorTrigger.OnConvergenceFailure,
             _                      => AdvisorTrigger.BeforeFirstExecution,
         };
+
+    private static void AddPackBinding(
+        Dictionary<string, IReadOnlyList<string>> bindings,
+        string actorType,
+        string actorName,
+        IReadOnlyList<string>? packNames,
+        IReadOnlyDictionary<string, string> packNameMapping)
+    {
+        if (packNames is not { Count: > 0 }) return;
+        var resolved = packNames
+            .Select(n => packNameMapping.GetValueOrDefault(n, n))
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .ToList();
+        if (resolved.Count > 0)
+            bindings[ActorTypeKeys.BindingKey(actorType, actorName)] = resolved;
+    }
+
+    private static PackScope ParsePackScope(string? raw) =>
+        raw?.ToLowerInvariant() switch
+        {
+            "general"      => PackScope.General,
+            "domainscoped" => PackScope.DomainScoped,
+            _              => PackScope.TaskBound,   // composer default
+        };
+
+    private static IReadOnlyList<PackActorType> ParseActorTypes(IReadOnlyList<string>? raw)
+    {
+        if (raw is not { Count: > 0 }) return [PackActorType.Any];
+        var types = raw
+            .Select(s => s?.ToLowerInvariant() switch
+            {
+                "executor"  => PackActorType.Executor,
+                "reviewer"  => PackActorType.Reviewer,
+                "advisor"   => PackActorType.Advisor,
+                "grounding" => PackActorType.Grounding,
+                "finalizer" => PackActorType.Finalizer,
+                _           => PackActorType.Any,
+            })
+            .Distinct()
+            .ToList();
+        return types.Count > 0 ? types : [PackActorType.Any];
+    }
 
     private static FinalizerType ParseFinalizerType(string? raw) =>
         raw?.ToLowerInvariant() switch

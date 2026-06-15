@@ -332,6 +332,25 @@ internal sealed class CrewService(
         };
     }
 
+    public Task<SpecializationPack?> GetSpecializationPackAsync(string name, CancellationToken cancellationToken = default)
+        => packRepo.GetByNameAsync(name, cancellationToken);
+
+    public async Task<SpecializationPack> CreateCustomSpecializationPackAsync(SpecializationPack pack, CancellationToken cancellationToken = default)
+    {
+        var baseName = SystemCrew.EnsureCustomPrefix(pack.Name);
+        var uniqueName = await UniqueNameAsync(baseName, n => packRepo.GetByNameAsync(n, cancellationToken));
+        var now = DateTimeOffset.UtcNow;
+        var normalized = pack with
+        {
+            Name = uniqueName,
+            IsSystem = false,
+            CreatedAt = pack.CreatedAt ?? now,
+            UpdatedAt = now
+        };
+        await packRepo.UpsertAsync(normalized, cancellationToken);
+        return normalized;
+    }
+
     public Task DeleteCustomCrewTemplateAsync(string name, CancellationToken cancellationToken = default)
     {
         if (SystemCrew.IsSystemName(name))

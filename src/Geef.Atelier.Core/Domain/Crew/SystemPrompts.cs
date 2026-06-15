@@ -532,6 +532,12 @@ public static class SystemPrompts
         1. Every new (non-reused) REVIEWER prompt MUST contain the verbatim severity taxonomy block
            (critical/major/minor/info lines + anti-pattern line). If absent -> major.
         2. Generic stub prompts ("You are a reviewer. Review the text.") without task-specific guidance -> major.
+           EXCEPTION (specialization packs): a REVIEWER may legitimately carry a GENERIC ROLE prompt
+           (role, not task — e.g. the reused "domain-terminology-reviewer") when one or more specialization
+           packs are bound to it via `pack_names`. A generic role prompt WITH bound packs is correct and
+           must NOT be flagged as a stub. Task/domain specifics belong in the packs, not in the role prompt.
+        2b. Reviewer-role leakage: a reused generic reviewer's role prompt must stay generic. If the spec
+           tries to make a generic reviewer task-specific by other means than packs, prefer binding a pack.
         3. The inline EXECUTOR prompt must include instructions for iterative revision on reviewer findings -> major if absent.
         4. New ADVISOR prompts should delimit the advisor role ("do NOT write the text") -> minor if absent.
         5. All new prompts must be in English -> major if in another language.
@@ -623,6 +629,15 @@ public static class SystemPrompts
              (The executor being inline is correct and expected, never a reason to prefer another mode.)
         4. Profile naming: names must be kebab-case, <=64 chars, ^[a-z0-9\-]+$ -> major if violated.
         5. No reused profile should be duplicated as a new profile under a different name -> major.
+
+        SPECIALIZATION PACKS (pack_names + new packs):
+        6. Prefer binding a GENERIC reviewer (e.g. reused "domain-terminology-reviewer") + a pack over
+           writing a fresh task-specialized reviewer prompt -> suggest as minor/info when a fitting pack exists.
+        7. New packs must be correctly scoped: default TaskBound (bound to this crew). A pack that is broadly
+           reusable should be DomainScoped (with a domain) or General -> minor if mis-scoped.
+        8. A bound pack must fit the actor's role and the task -> major if a pack is unrelated to the actor/task.
+        9. Do NOT reuse a foreign TaskBound pack (it belongs to another crew) — the deterministic validator
+           blocks this; only flag it here if you notice it -> major.
 
         Severity taxonomy (Atelier standard):
         - critical: substantial factual or logical error; the reader is actively misinformed.

@@ -204,6 +204,16 @@ public static class SystemCrew
         MaxQueriesPerRun: 1,
         IsSystem: true);
 
+    /// <summary>Pack catalog grounding provider — lists reusable specialization packs for pack-binding awareness in auto-crew composition.</summary>
+    public static readonly GroundingProviderProfile PackCatalogDefaultProfile = new(
+        Name: "pack-catalog-default",
+        DisplayName: "Pack Catalog",
+        Description: "Lists the reusable specialization packs (General + DomainScoped). Used by the crew-composer executor so it can reuse existing packs by name instead of inventing new ones.",
+        ProviderType: GroundingProviderTypes.PackCatalog,
+        ProviderSettings: new Dictionary<string, string>(),
+        MaxQueriesPerRun: 1,
+        IsSystem: true);
+
     /// <summary>Static-context grounding provider embedding the binding crew design rules.</summary>
     public static readonly GroundingProviderProfile CrewDesignRulesProfile = new(
         Name: "crew-design-rules",
@@ -288,7 +298,7 @@ public static class SystemCrew
             DetectRegression: true,
             StagnationThreshold: 6), // same as MaxIterations → stagnation never fires before budget is exhausted
         AdvisorProfileNames: new[] { CrewDesignAdvisorProfile.Name },
-        GroundingProviderNames: new[] { CrewCatalogDefaultProfile.Name, CrewDesignRulesProfile.Name, ToolCatalogDefaultProfile.Name },
+        GroundingProviderNames: new[] { CrewCatalogDefaultProfile.Name, CrewDesignRulesProfile.Name, ToolCatalogDefaultProfile.Name, PackCatalogDefaultProfile.Name },
         FinalizerProfileNames: new[] { CrewMaterializerProfile.Name },
         RunFinalizersOnMaxAttempts: false,
         IsSystem: true);
@@ -589,6 +599,7 @@ public static class SystemCrew
             [CrewCatalogDefaultProfile.Name]         = CrewCatalogDefaultProfile,
             [CrewDesignRulesProfile.Name]            = CrewDesignRulesProfile,
             [ToolCatalogDefaultProfile.Name]         = ToolCatalogDefaultProfile,
+            [PackCatalogDefaultProfile.Name]         = PackCatalogDefaultProfile,
         };
 
     /// <summary>All system crew templates, indexed by name.</summary>

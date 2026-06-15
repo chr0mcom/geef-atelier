@@ -55,6 +55,11 @@ internal static class CrewSpecTool
                             "type": "array",
                             "items": { "type": "string" },
                             "description": "Optional tool names from the tool catalogue to bind to this actor."
+                        },
+                        "pack_names": {
+                            "type": "array",
+                            "items": { "type": "string" },
+                            "description": "Optional ordered specialization-pack names to bind to this actor (reused packs or names defined in top-level 'packs')."
                         }
                     }
                 },
@@ -195,6 +200,25 @@ internal static class CrewSpecTool
                 "allow_mutating_tools": {
                     "type": "boolean",
                     "description": "When true, actors in this spec may bind Mutating-access tools. Must be explicitly set by the operator. Defaults to false."
+                },
+                "packs": {
+                    "type": "array",
+                    "description": "New specialization packs to create for this crew. Default scope is TaskBound (bound to this crew). Reference them from an actor's pack_names. Prefer reusing existing packs from the pack catalogue over creating new ones.",
+                    "items": {
+                        "type": "object",
+                        "required": ["name", "specialization_text"],
+                        "properties": {
+                            "name": { "type": "string" },
+                            "display_name": { "type": "string" },
+                            "specialization_text": { "type": "string", "description": "The task/domain-specific prompt fragment." },
+                            "scope": { "type": "string", "enum": ["General", "DomainScoped", "TaskBound"] },
+                            "domain": { "type": "string", "description": "Required when scope is DomainScoped." },
+                            "applicable_actor_types": {
+                                "type": "array",
+                                "items": { "type": "string", "enum": ["Executor", "Reviewer", "Advisor", "Any"] }
+                            }
+                        }
+                    }
                 }
             }
         }
