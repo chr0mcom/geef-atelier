@@ -11,6 +11,32 @@ namespace Geef.Atelier.Tests.Application.Crew;
 
 public sealed class CrewServiceAdvisorCrudTests
 {
+    // ── TaskBound cascade-delete (PS-E1) ──────────────────────────────────────
+
+    [Fact]
+    public async Task DeleteCustomCrewTemplate_CascadeDeletesOwnedTaskBoundPacks()
+    {
+        var packRepo = new InMemorySpecializationPackRepository();
+        var svc = BuildService(packRepo: packRepo);
+
+        var template = new CrewTemplate(
+            "mine", "Mine", "", "default-executor", ["r"],
+            EvaluationStrategy.Parallel, null, [], [], false);
+        var created = await svc.CreateCustomCrewTemplateAsync(template);
+
+        await packRepo.UpsertAsync(new SpecializationPack(
+            "owned-tb", "Owned", "", "delta", PackScope.TaskBound, null,
+            [PackActorType.Reviewer], OwningCrewId: created.Name, IsSystem: false));
+        await packRepo.UpsertAsync(new SpecializationPack(
+            "free-general", "Free", "", "delta", PackScope.General, null,
+            [PackActorType.Reviewer], OwningCrewId: null, IsSystem: false));
+
+        await svc.DeleteCustomCrewTemplateAsync(created.Name);
+
+        Assert.Null(await packRepo.GetByNameAsync("owned-tb"));
+        Assert.NotNull(await packRepo.GetByNameAsync("free-general"));
+    }
+
     // ── Pack-coherence (PS-C1) ────────────────────────────────────────────────
 
     [Fact]

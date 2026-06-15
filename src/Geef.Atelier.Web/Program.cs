@@ -88,6 +88,9 @@ builder.Services.Configure<OrchestratorOptions>(builder.Configuration.GetSection
 builder.Services.Configure<ConvergenceOptions>(builder.Configuration.GetSection("Convergence"));
 builder.Services.AddHostedService<RunOrchestratorService>();
 builder.Services.AddHostedService<OAuthCleanupBackgroundService>();
+builder.Services.Configure<Geef.Atelier.Core.Configuration.PackGcOptions>(
+    builder.Configuration.GetSection(Geef.Atelier.Core.Configuration.PackGcOptions.SectionName));
+builder.Services.AddHostedService<PackArchivalBackgroundService>();
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AtelierDbContext>();

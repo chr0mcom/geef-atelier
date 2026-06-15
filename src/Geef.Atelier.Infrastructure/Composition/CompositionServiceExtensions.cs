@@ -1,4 +1,5 @@
 using Geef.Atelier.Application.Composition;
+using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,6 +18,7 @@ public static class CompositionServiceExtensions
         services.AddScoped<ICrewSpecValidator, CrewSpecValidator>();
         services.AddScoped<ICrewTemplateEmbeddingRepository, CrewTemplateEmbeddingRepository>();
         services.AddScoped<ICrewMaterializer, CrewMaterializer>();
+        services.AddScoped<IPackGeneralityReviewer, PackGeneralityReviewer>();
         return services;
     }
 }

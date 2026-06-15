@@ -138,6 +138,56 @@
                 </div>
             }
         </EditForm>
+
+        @if (!IsNew && !_isSystem)
+        {
+            <div class="template-meta-section" data-testid="pack-lifecycle">
+                <h3>Lebenszyklus</h3>
+
+                @if (_referencingTemplates.Count > 0)
+                {
+                    <p class="form-hint">Referenziert von: @string.Join(", ", _referencingTemplates)</p>
+                }
+
+                @if (_lifecycleConcerns is { Count: > 0 })
+                {
+                    <div class="alert alert-danger" data-testid="generality-concerns">
+                        <strong>Generalitäts-Review nicht bestanden:</strong>
+                        <ul>@foreach (var c in _lifecycleConcerns) { <li>@c</li> }</ul>
+                    </div>
+                }
+                @if (_lifecycleInfo is not null)
+                {
+                    <div class="info-banner" data-testid="lifecycle-info">@_lifecycleInfo</div>
+                }
+
+                <div class="field">
+                    <label>Ziel-Scope für Promote/Clone</label>
+                    <InputSelect @bind-Value="_targetScope">
+                        <option value="@PackScope.General">Allgemein</option>
+                        <option value="@PackScope.DomainScoped">Domäne</option>
+                    </InputSelect>
+                    @if (_targetScope == PackScope.DomainScoped)
+                    {
+                        <InputText @bind-Value="_targetDomain" placeholder="Ziel-Domäne" />
+                    }
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn" disabled="@_lifecycleBusy"
+                            data-testid="btn-promote" @onclick="PromoteAsync">Promote (mit Generalitäts-Review)</button>
+                    <button type="button" class="btn" disabled="@_lifecycleBusy"
+                            data-testid="btn-demote" @onclick="DemoteAsync">Demote zu Domäne</button>
+                </div>
+
+                <div class="field" style="margin-top:0.75rem;">
+                    <label>Clone-to-Generalize — neuer Name</label>
+                    <InputText @bind-Value="_cloneName" placeholder="generalisiertes-pack" />
+                    <button type="button" class="btn" style="margin-top:0.4rem;" disabled="@_lifecycleBusy"
+                            data-testid="btn-clone-generalize" @onclick="CloneToGeneralizeAsync">Klonen &amp; generalisieren</button>
+                </div>
+            </div>
+        }
     }
 </div>
 
@@ -167,6 +217,15 @@
 
     private PackFormModel _form = new();
 
+    // Lifecycle (promote/demote/clone)
+    private IReadOnlyList<string> _referencingTemplates = [];
+    private IReadOnlyList<string>? _lifecycleConcerns;
+    private string? _lifecycleInfo;
+    private bool _lifecycleBusy;
+    private PackScope _targetScope = PackScope.General;
+    private string? _targetDomain;
+    private string _cloneName = "";
+
     protected override async Task OnInitializedAsync()
     {
         if (!IsNew)
@@ -176,8 +235,48 @@
             _isSystem = pack.IsSystem;
             _readOnly = pack.IsSystem || pack.Scope == PackScope.TaskBound;
             _form = PackFormModel.From(pack);
+            if (!_isSystem)
+                _referencingTemplates = await PackService.FindReferencingTemplatesAsync(pack.Name);
         }
         _loading = false;
+    }
+
+    private async Task PromoteAsync()
+    {
+        _lifecycleBusy = true; _lifecycleConcerns = null; _lifecycleInfo = null; _error = null;
+        try
+        {
+            var review = await PackService.PromoteAsync(Name!, _targetScope, _targetDomain);
+            if (review.Approved) Nav.NavigateTo("/packs");
+            else _lifecycleConcerns = review.Concerns;
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _lifecycleBusy = false; }
+    }
+
+    private async Task DemoteAsync()
+    {
+        _lifecycleBusy = true; _lifecycleConcerns = null; _lifecycleInfo = null; _error = null;
+        try
+        {
+            await PackService.DemoteAsync(Name!, _targetDomain ?? "");
+            Nav.NavigateTo("/packs");
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _lifecycleBusy = false; }
+    }
+
+    private async Task CloneToGeneralizeAsync()
+    {
+        _lifecycleBusy = true; _lifecycleConcerns = null; _lifecycleInfo = null; _error = null;
+        try
+        {
+            var review = await PackService.CloneToGeneralizeAsync(Name!, _cloneName, _targetScope, _targetDomain);
+            if (review.Approved) Nav.NavigateTo("/packs");
+            else _lifecycleConcerns = review.Concerns;
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _lifecycleBusy = false; }
     }
 
     private void ToggleActorType(PackActorType type, bool on)

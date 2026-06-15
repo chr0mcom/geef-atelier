@@ -351,11 +351,17 @@ internal sealed class CrewService(
         return normalized;
     }
 
-    public Task DeleteCustomCrewTemplateAsync(string name, CancellationToken cancellationToken = default)
+    public async Task DeleteCustomCrewTemplateAsync(string name, CancellationToken cancellationToken = default)
     {
         if (SystemCrew.IsSystemName(name))
             throw new InvalidOperationException(ReadOnlyTemplateMessage);
-        return templateRepo.DeleteAsync(name, cancellationToken);
+
+        // Cascade: TaskBound packs are owned by this crew and have no purpose without it.
+        var removed = await packRepo.DeleteByOwningCrewAsync(name, cancellationToken);
+        if (removed > 0)
+            logger.LogInformation("Deleted {Count} TaskBound pack(s) owned by crew template '{Template}'.", removed, name);
+
+        await templateRepo.DeleteAsync(name, cancellationToken);
     }
 
     public Task<string> RenameCustomCrewTemplateAsync(string oldName, string newName, CancellationToken cancellationToken = default)

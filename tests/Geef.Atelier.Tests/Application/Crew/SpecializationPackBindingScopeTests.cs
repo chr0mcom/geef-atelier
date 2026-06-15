@@ -48,4 +48,27 @@ public sealed class SpecializationPackBindingScopeTests
         Assert.DoesNotContain(forReviewer, p => p.Name == "exec-pack");
         Assert.Contains(forExecutor, p => p.Name == "exec-pack");
     }
+
+    // ── PS-E3: auto-archival ──────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ArchiveUnused_ArchivesStaleUnreferenced_KeepsReferencedAndRecent()
+    {
+        var repo = new InMemorySpecializationPackRepository();
+        await repo.UpsertAsync(Pack("stale", PackScope.General, null, null, PackActorType.Reviewer)
+            with { LastUsedAt = DateTimeOffset.UtcNow.AddDays(-200) });
+        await repo.UpsertAsync(Pack("referenced", PackScope.General, null, null, PackActorType.Reviewer)
+            with { LastUsedAt = DateTimeOffset.UtcNow.AddDays(-200) });
+        await repo.UpsertAsync(Pack("recent", PackScope.General, null, null, PackActorType.Reviewer)
+            with { LastUsedAt = DateTimeOffset.UtcNow.AddDays(-1) });
+
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-90);
+        var archived = await repo.ArchiveUnusedAsync(cutoff, new[] { "referenced" });
+
+        Assert.Contains("stale", archived);
+        Assert.DoesNotContain("referenced", archived);
+        Assert.DoesNotContain("recent", archived);
+        Assert.True((await repo.GetByNameAsync("stale"))!.Archived);
+        Assert.False((await repo.GetByNameAsync("referenced"))!.Archived);
+    }
 }
