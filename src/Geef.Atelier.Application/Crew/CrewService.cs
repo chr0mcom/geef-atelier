@@ -3,6 +3,7 @@ using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Core.Domain.Crew.Specialization;
 using Geef.Atelier.Core.Persistence.Crew;
 using Microsoft.Extensions.Logging;
 
@@ -277,6 +278,7 @@ internal sealed class CrewService(
         var baseName = SystemCrew.EnsureCustomPrefix(template.Name);
         var uniqueName = await UniqueNameAsync(baseName, n => templateRepo.GetByNameAsync(n, cancellationToken));
         var normalized = template with { Name = uniqueName, IsSystem = false };
+        await ValidatePackCoherenceAsync(normalized, cancellationToken);
         await templateRepo.CreateAsync(normalized, cancellationToken);
         return normalized;
     }
@@ -285,8 +287,49 @@ internal sealed class CrewService(
     {
         if (SystemCrew.IsSystemName(template.Name))
             throw new InvalidOperationException(ReadOnlyTemplateMessage);
+        await ValidatePackCoherenceAsync(template, cancellationToken);
         await templateRepo.UpdateAsync(template, cancellationToken);
         return template;
+    }
+
+    /// <summary>
+    /// Crew-coherence check: a template may only bind packs that exist, are type-compatible with the
+    /// actor, and — for TaskBound packs — are owned by this very crew. Foreign TaskBound packs are a
+    /// hard block (they would leak another crew's task-specific specialization).
+    /// </summary>
+    private async Task ValidatePackCoherenceAsync(CrewTemplate template, CancellationToken ct)
+    {
+        foreach (var (key, packNames) in template.ActorPackBindings)
+        {
+            var actorType = ParseActorType(key);
+            foreach (var packName in packNames)
+            {
+                var pack = await packRepo.GetByNameAsync(packName, ct);
+                if (pack is null)
+                    throw new InvalidOperationException($"Pack '{packName}' (bound at '{key}') was not found.");
+
+                if (!pack.ApplicableActorTypes.AppliesTo(actorType))
+                    throw new InvalidOperationException(
+                        $"Pack '{packName}' is not applicable to actor type '{actorType}' (binding '{key}').");
+
+                if (pack.Scope == PackScope.TaskBound &&
+                    !string.Equals(pack.OwningCrewId, template.Name, StringComparison.Ordinal))
+                    throw new InvalidOperationException(
+                        $"Pack '{packName}' is TaskBound to another crew ('{pack.OwningCrewId}') and cannot be bound in template '{template.Name}'.");
+            }
+        }
+    }
+
+    private static PackActorType ParseActorType(string bindingKey)
+    {
+        var prefix = bindingKey.Split(':', 2)[0];
+        return prefix switch
+        {
+            ActorTypeKeys.Executor => PackActorType.Executor,
+            ActorTypeKeys.Reviewer => PackActorType.Reviewer,
+            ActorTypeKeys.Advisor  => PackActorType.Advisor,
+            _                      => PackActorType.Any
+        };
     }
 
     public Task DeleteCustomCrewTemplateAsync(string name, CancellationToken cancellationToken = default)

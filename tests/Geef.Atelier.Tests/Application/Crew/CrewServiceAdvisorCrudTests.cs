@@ -4,12 +4,57 @@ using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Core.Domain.Crew.Specialization;
 using Geef.Atelier.Core.Persistence.Crew;
 
 namespace Geef.Atelier.Tests.Application.Crew;
 
 public sealed class CrewServiceAdvisorCrudTests
 {
+    // ── Pack-coherence (PS-C1) ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CreateCustomCrewTemplate_BlocksForeignTaskBoundPack()
+    {
+        var packRepo = new InMemorySpecializationPackRepository();
+        await packRepo.UpsertAsync(new SpecializationPack(
+            "foreign-tb", "Foreign", "", "delta", PackScope.TaskBound, null,
+            [PackActorType.Reviewer], OwningCrewId: "custom-other", IsSystem: false));
+        var svc = BuildService(packRepo: packRepo);
+
+        var template = new CrewTemplate(
+            "mine", "Mine", "", "default-executor", ["r"],
+            EvaluationStrategy.Parallel, null, [], [], false,
+            ActorPackBindings: new Dictionary<string, IReadOnlyList<string>>
+            {
+                ["reviewer:r"] = new[] { "foreign-tb" }
+            });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.CreateCustomCrewTemplateAsync(template));
+    }
+
+    [Fact]
+    public async Task CreateCustomCrewTemplate_AllowsGeneralPack()
+    {
+        var packRepo = new InMemorySpecializationPackRepository();
+        await packRepo.UpsertAsync(new SpecializationPack(
+            "general-tone", "Tone", "", "delta", PackScope.General, null,
+            [PackActorType.Reviewer], OwningCrewId: null, IsSystem: false));
+        var svc = BuildService(packRepo: packRepo);
+
+        var template = new CrewTemplate(
+            "mine", "Mine", "", "default-executor", ["r"],
+            EvaluationStrategy.Parallel, null, [], [], false,
+            ActorPackBindings: new Dictionary<string, IReadOnlyList<string>>
+            {
+                ["reviewer:r"] = new[] { "general-tone" }
+            });
+
+        var created = await svc.CreateCustomCrewTemplateAsync(template);
+        Assert.Equal(new[] { "general-tone" }, created.ActorPackBindings["reviewer:r"]);
+    }
+
     [Fact]
     public async Task CreateCustomAdvisorProfileAsync_AddsCustomPrefix()
     {
@@ -65,7 +110,8 @@ public sealed class CrewServiceAdvisorCrudTests
         InMemoryExecutorProfileRepository?          executorRepo  = null,
         InMemoryAdvisorProfileRepository?           advisorRepo   = null,
         InMemoryGroundingProviderProfileRepository? groundingRepo = null,
-        InMemoryCrewTemplateRepository?             templateRepo  = null)
+        InMemoryCrewTemplateRepository?             templateRepo  = null,
+        Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository? packRepo = null)
         => new CrewService(
             reviewerRepo  ?? new InMemoryReviewerProfileRepository(),
             executorRepo  ?? new InMemoryExecutorProfileRepository(),
@@ -73,7 +119,7 @@ public sealed class CrewServiceAdvisorCrudTests
             groundingRepo ?? new InMemoryGroundingProviderProfileRepository(),
             new InMemoryFinalizerProfileRepository(),
             templateRepo  ?? new InMemoryCrewTemplateRepository(),
-            new Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository(),
+            packRepo      ?? new Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CrewService>.Instance);
 
     private static AdvisorProfile BuildAdvisorProfile(string name) => new(
