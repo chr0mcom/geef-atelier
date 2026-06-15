@@ -155,6 +155,7 @@ public sealed class CrewRenameCascadeTests : IAsyncLifetime
             new GroundingProviderProfileRepository(ctx),
             new FinalizerProfileRepository(ctx),
             new CrewTemplateRepository(ctx),
+            new SpecializationPackRepository(ctx),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CrewService>.Instance);
 
         await svc.CreateCustomExecutorProfileAsync(Exec("svc-exec"));     // -> custom-svc-exec
@@ -182,6 +183,7 @@ public sealed class CrewRenameCascadeTests : IAsyncLifetime
             new GroundingProviderProfileRepository(ctx),
             new FinalizerProfileRepository(ctx),
             new CrewTemplateRepository(ctx),
+            new SpecializationPackRepository(ctx),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CrewService>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
@@ -199,6 +201,7 @@ public sealed class CrewRenameCascadeTests : IAsyncLifetime
             new GroundingProviderProfileRepository(ctx),
             new FinalizerProfileRepository(ctx),
             new CrewTemplateRepository(ctx),
+            new SpecializationPackRepository(ctx),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CrewService>.Instance);
 
         await svc.CreateCustomExecutorProfileAsync(Exec("dup-one"));   // custom-dup-one

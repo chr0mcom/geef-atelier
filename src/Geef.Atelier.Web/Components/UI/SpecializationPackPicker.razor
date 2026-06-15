@@ -1,0 +1,133 @@
+@* Wiederverwendbarer Picker zum Binden von Spezialisierungs-Packs an einen Akteur in einer Crew. *@
+@using Geef.Atelier.Core.Domain.Crew.Specialization
+@using Geef.Atelier.Web.Services
+@inject ISpecializationPackService PackService
+
+<div class="profile-picker" data-testid="pack-picker">
+    <div class="profile-picker-grid">
+        <div>
+            <p class="picker-col-label">Verfügbare Packs</p>
+            @foreach (var pack in _available)
+            {
+                <button type="button" class="picker-pool-item"
+                        data-testid="pack-available-@pack.Name"
+                        @onclick="() => AddPack(pack)">
+                    <span class="picker-add-icon">＋</span>
+                    <span class="picker-item-name">@pack.DisplayName</span>
+                    <span class="picker-item-meta">@GetScopeLabel(pack.Scope)</span>
+                    @if (pack.IsSystem) { <span class="crew-badge">System</span> }
+                </button>
+            }
+            @if (!_available.Any())
+            {
+                <p class="picker-empty-state">Keine passenden Packs verfügbar.</p>
+            }
+        </div>
+        <div>
+            <p class="picker-col-label">Gebunden (@SelectedPackNames.Count)</p>
+            @for (int i = 0; i < SelectedPackNames.Count; i++)
+            {
+                var idx = i;
+                var name = SelectedPackNames[idx];
+                var pack = _allBindable.FirstOrDefault(p => p.Name == name);
+                <div class="picker-active-item" data-testid="pack-selected-@name">
+                    <span class="picker-item-rank">@(idx + 1).</span>
+                    <span class="picker-item-name">
+                        @if (pack != null)
+                        {
+                            @pack.DisplayName
+                            <span class="picker-item-meta"> · @GetScopeLabel(pack.Scope)</span>
+                        }
+                        else
+                        {
+                            @name
+                        }
+                    </span>
+                    <div class="picker-item-controls">
+                        <button type="button" class="btn small ghost" disabled="@(idx == 0)"
+                                @onclick="() => MoveUp(idx)">↑</button>
+                        <button type="button" class="btn small ghost" disabled="@(idx == SelectedPackNames.Count - 1)"
+                                @onclick="() => MoveDown(idx)">↓</button>
+                        <button type="button" class="btn small danger"
+                                data-testid="pack-picker-remove-@name"
+                                @onclick="() => RemovePack(idx)">×</button>
+                    </div>
+                </div>
+            }
+            @if (SelectedPackNames.Count == 0)
+            {
+                <p class="picker-empty-state">Keine Packs gebunden.</p>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>Currently bound pack names (two-way binding).</summary>
+    [Parameter, EditorRequired] public List<string> SelectedPackNames { get; set; } = [];
+
+    /// <summary>Raised when the binding changes.</summary>
+    [Parameter] public EventCallback<List<string>> SelectedPackNamesChanged { get; set; }
+
+    /// <summary>Actor type the packs are bound to (for type-compatibility filtering).</summary>
+    [Parameter, EditorRequired] public PackActorType ActorType { get; set; }
+
+    /// <summary>Crew domain for DomainScoped pack filtering; null shows General + own TaskBound only.</summary>
+    [Parameter] public string? CrewDomain { get; set; }
+
+    /// <summary>Owning crew name for own-TaskBound visibility; null hides all TaskBound packs.</summary>
+    [Parameter] public string? OwningCrewId { get; set; }
+
+    private List<SpecializationPack> _allBindable = [];
+
+    private IEnumerable<SpecializationPack> _available =>
+        _allBindable.Where(p => !SelectedPackNames.Contains(p.Name));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _allBindable = (await PackService.ListForBindingAsync(ActorType, CrewDomain, OwningCrewId)).ToList();
+    }
+
+    private async Task AddPack(SpecializationPack pack)
+    {
+        if (!SelectedPackNames.Contains(pack.Name))
+        {
+            SelectedPackNames = [.. SelectedPackNames, pack.Name];
+            await SelectedPackNamesChanged.InvokeAsync(SelectedPackNames);
+        }
+    }
+
+    private async Task RemovePack(int idx)
+    {
+        var newList = SelectedPackNames.ToList();
+        newList.RemoveAt(idx);
+        SelectedPackNames = newList;
+        await SelectedPackNamesChanged.InvokeAsync(SelectedPackNames);
+    }
+
+    private async Task MoveUp(int idx)
+    {
+        if (idx <= 0) return;
+        var newList = SelectedPackNames.ToList();
+        (newList[idx - 1], newList[idx]) = (newList[idx], newList[idx - 1]);
+        SelectedPackNames = newList;
+        await SelectedPackNamesChanged.InvokeAsync(SelectedPackNames);
+    }
+
+    private async Task MoveDown(int idx)
+    {
+        if (idx >= SelectedPackNames.Count - 1) return;
+        var newList = SelectedPackNames.ToList();
+        (newList[idx + 1], newList[idx]) = (newList[idx], newList[idx + 1]);
+        SelectedPackNames = newList;
+        await SelectedPackNamesChanged.InvokeAsync(SelectedPackNames);
+    }
+
+    private static string GetScopeLabel(PackScope s) => s switch
+    {
+        PackScope.General      => "Allgemein",
+        PackScope.DomainScoped => "Domäne",
+        PackScope.TaskBound    => "Crew-gebunden",
+        _                      => s.ToString()
+    };
+}

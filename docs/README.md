@@ -19,6 +19,8 @@ The documentation evolves alongside the brainstorming and is updated after every
 | [07-design-system.md](07-design-system.md) | Theme system, typography, component inventory (as of design translation PS-3) | Living |
 | [08-crew-system.md](08-crew-system.md) | Crew/profile/template system, system profiles, advisor passes | Living |
 | [09-endpoint-reference.md](09-endpoint-reference.md) | Reference of all externally reachable HTTP endpoints (MCP, OAuth, Web/Account) | Living |
+| [10-tool-system.md](10-tool-system.md) | Central tool catalogue + agentic tool-use (Pull) + grounding (Push) + MCP client (D-060) | Living |
+| [11-specialization-packs.md](11-specialization-packs.md) | Generic actors + reusable scoped specialization packs (D-061) | Living |
 
 > **Internal working directories (not in the public repository):**
 > `docs/prompts/` (step-specific build prompts) and `docs/reports/` (persistent

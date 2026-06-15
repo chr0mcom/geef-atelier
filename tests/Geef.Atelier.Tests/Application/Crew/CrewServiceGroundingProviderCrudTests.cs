@@ -91,6 +91,7 @@ public sealed class CrewServiceGroundingProviderCrudTests
             groundingRepo ?? new InMemoryGroundingProviderProfileRepository(),
             new InMemoryFinalizerProfileRepository(),
             new InMemoryCrewTemplateRepository(),
+            new Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CrewService>.Instance);
 
     private static GroundingProviderProfile BuildProfile(string name) => new(

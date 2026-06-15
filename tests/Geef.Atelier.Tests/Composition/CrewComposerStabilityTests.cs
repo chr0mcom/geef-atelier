@@ -31,7 +31,8 @@ public sealed class CrewComposerStabilityTests
         modelCatalog ??= new EmptyModelCatalog();
         groundingFactory ??= new StubGroundingFactory("tavily", "academic-search", "vector-store");
         return new CrewSpecValidator(crewService, modelCatalog, groundingFactory,
-            new EmptyToolRepository(), new AgenticCapableResolver());
+            new EmptyToolRepository(), new Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository(),
+            new AgenticCapableResolver());
     }
 
     private static CrewSpecValidator MakeValidatorWithKnownModel(string provider, string model) =>

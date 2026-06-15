@@ -55,6 +55,7 @@ public static class PersistenceServiceExtensions
         services.AddScoped<IToolDefinitionRepository, ToolDefinitionRepository>();
         services.AddScoped<IToolInvocationRepository, ToolInvocationRepository>();
         services.AddScoped<IMcpServerConfigRepository, McpServerConfigRepository>();
+        services.AddScoped<ISpecializationPackRepository, SpecializationPackRepository>();
         services.AddMemoryCache();
         services.AddSingleton<IDashboardService, DashboardService>();
         return services;

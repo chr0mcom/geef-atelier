@@ -59,71 +59,30 @@ public static class SystemCrew
         MaxTokens: 64000,
         IsSystem: true);
 
-    // ── Domain reviewer profiles ────────────────────────────────────────────────────
+    // ── Generic domain reviewer profiles ────────────────────────────────────────────
+    // Both carry a generic role prompt with a {specialization} slot. Domain specifics are supplied
+    // per crew via bound SpecializationPacks (see SystemPacks + the domain templates below), so the
+    // same generic reviewer is safely reusable across legal / academic / marketing crews.
 
-    /// <summary>Legal jargon precision reviewer — checks German legal texts for terminological exactness.</summary>
-    public static readonly ReviewerProfile LegalJargonPrecisionProfile = new(
-        Name: "legal-jargon-precision",
-        DisplayName: "Legal Jargon Precision",
-        Description: "Checks German legal texts for precise use of legal terminology. Identifies colloquial substitutes where statutory terms are required (e.g., Anfechtung vs. Widerruf, Kündigung vs. Rücktritt).",
-        SystemPrompt: SystemPrompts.LegalJargonPrecision,
+    /// <summary>Generic terminology/convention reviewer — specialised per crew via a bound pack.</summary>
+    public static readonly ReviewerProfile DomainTerminologyReviewerProfile = new(
+        Name: "domain-terminology-reviewer",
+        DisplayName: "Domain Terminology Reviewer",
+        Description: "Generic reviewer for precise, consistent domain terminology and field conventions. Specialised per crew via a bound specialization pack (e.g. legal-terminology, academic-citation, marketing-voice).",
+        SystemPrompt: SystemPrompts.DomainTerminologyReviewer,
         Provider: "codex-cli",
         Model: "gpt-5.5",
         MaxTokens: 64000,
         IsSystem: true);
 
-    /// <summary>Legal clause risk reviewer — identifies problematic or unenforceable contract clauses.</summary>
-    public static readonly ReviewerProfile LegalClauseRiskProfile = new(
-        Name: "legal-clause-risk",
-        DisplayName: "Legal Clause Risk",
-        Description: "Identifies problematic or void contract clauses. Checks AGB conformity (§307 BGB), consumer protection compliance (§§312ff./474ff. BGB), and penalty clause proportionality.",
-        SystemPrompt: SystemPrompts.LegalClauseRisk,
-        Provider: "codex-cli",
-        Model: "gpt-5.5",
-        MaxTokens: 64000,
-        IsSystem: true);
-
-    /// <summary>Academic citation readiness reviewer — marks uncited claims that require sources.</summary>
-    public static readonly ReviewerProfile AcademicCitationReadinessProfile = new(
-        Name: "academic-citation-readiness",
-        DisplayName: "Academic Citation Readiness",
-        Description: "Checks scholarly texts for citation adequacy. Distinguishes common knowledge from claims requiring attribution; marks uncited empirical findings and contested theoretical positions.",
-        SystemPrompt: SystemPrompts.AcademicCitationReadiness,
-        Provider: "codex-cli",
-        Model: "gpt-5.5",
-        MaxTokens: 64000,
-        IsSystem: true);
-
-    /// <summary>Academic argumentation rigor reviewer — checks logical structure and identifies fallacies.</summary>
-    public static readonly ReviewerProfile AcademicArgumentationRigorProfile = new(
-        Name: "academic-argumentation-rigor",
-        DisplayName: "Academic Argumentation Rigor",
-        Description: "Checks academic argumentation for logical soundness. Maps Claim→Premise→Warrant→Conclusion and identifies non sequiturs, false dichotomies, hasty generalisations, and other formal fallacies.",
-        SystemPrompt: SystemPrompts.AcademicArgumentationRigor,
+    /// <summary>Generic substantive-rigor reviewer — specialised per crew via a bound pack.</summary>
+    public static readonly ReviewerProfile SubstantiveRigorReviewerProfile = new(
+        Name: "substantive-rigor-reviewer",
+        DisplayName: "Substantive Rigor Reviewer",
+        Description: "Generic reviewer for substantive soundness: logical validity, claim safety, and adequacy of support. Specialised per crew via a bound specialization pack (e.g. legal-clause-risk, academic-argumentation, marketing-conversion).",
+        SystemPrompt: SystemPrompts.SubstantiveRigorReviewer,
         Provider: "claude-cli",
         Model: "claude-opus-4-8",
-        MaxTokens: 64000,
-        IsSystem: true);
-
-    /// <summary>Marketing audience clarity reviewer — checks if copy matches the defined target audience.</summary>
-    public static readonly ReviewerProfile MarketingAudienceClarityProfile = new(
-        Name: "marketing-audience-clarity",
-        DisplayName: "Marketing Audience Clarity",
-        Description: "Checks marketing texts for target-audience alignment. Evaluates reading level, tone, jargon-accessibility balance, and cultural resonance against the stated audience persona.",
-        SystemPrompt: SystemPrompts.MarketingAudienceClarity,
-        Provider: "codex-cli",
-        Model: "gpt-5.5",
-        MaxTokens: 64000,
-        IsSystem: true);
-
-    /// <summary>Marketing conversion strength reviewer — checks CTAs, value propositions, and urgency signals.</summary>
-    public static readonly ReviewerProfile MarketingConversionStrengthProfile = new(
-        Name: "marketing-conversion-strength",
-        DisplayName: "Marketing Conversion Strength",
-        Description: "Checks marketing copy for conversion effectiveness. Verifies CTA clarity (action verb + outcome), USP visibility, urgency signals, and social proof integration.",
-        SystemPrompt: SystemPrompts.MarketingConversionStrength,
-        Provider: "codex-cli",
-        Model: "gpt-5.5",
         MaxTokens: 64000,
         IsSystem: true);
 
@@ -245,6 +204,16 @@ public static class SystemCrew
         MaxQueriesPerRun: 1,
         IsSystem: true);
 
+    /// <summary>Pack catalog grounding provider — lists reusable specialization packs for pack-binding awareness in auto-crew composition.</summary>
+    public static readonly GroundingProviderProfile PackCatalogDefaultProfile = new(
+        Name: "pack-catalog-default",
+        DisplayName: "Pack Catalog",
+        Description: "Lists the reusable specialization packs (General + DomainScoped). Used by the crew-composer executor so it can reuse existing packs by name instead of inventing new ones.",
+        ProviderType: GroundingProviderTypes.PackCatalog,
+        ProviderSettings: new Dictionary<string, string>(),
+        MaxQueriesPerRun: 1,
+        IsSystem: true);
+
     /// <summary>Static-context grounding provider embedding the binding crew design rules.</summary>
     public static readonly GroundingProviderProfile CrewDesignRulesProfile = new(
         Name: "crew-design-rules",
@@ -329,7 +298,7 @@ public static class SystemCrew
             DetectRegression: true,
             StagnationThreshold: 6), // same as MaxIterations → stagnation never fires before budget is exhausted
         AdvisorProfileNames: new[] { CrewDesignAdvisorProfile.Name },
-        GroundingProviderNames: new[] { CrewCatalogDefaultProfile.Name, CrewDesignRulesProfile.Name, ToolCatalogDefaultProfile.Name },
+        GroundingProviderNames: new[] { CrewCatalogDefaultProfile.Name, CrewDesignRulesProfile.Name, ToolCatalogDefaultProfile.Name, PackCatalogDefaultProfile.Name },
         FinalizerProfileNames: new[] { CrewMaterializerProfile.Name },
         RunFinalizersOnMaxAttempts: false,
         IsSystem: true);
@@ -356,13 +325,18 @@ public static class SystemCrew
         DisplayName: "Juristisch",
         Description: "Für juristische Texte: Vertragsentwürfe, Klausel-Analysen, rechtliche Stellungnahmen. Mit Fachterminologie-Review und Klausel-Risiko-Check. Reviewers laufen sequenziell, da Klausel-Risk auf dem Jargon-Output aufbaut.",
         ExecutorProfileName: DefaultExecutorProfile.Name,
-        ReviewerProfileNames: new[] { BriefingFidelityProfile.Name, LegalJargonPrecisionProfile.Name, LegalClauseRiskProfile.Name },
+        ReviewerProfileNames: new[] { BriefingFidelityProfile.Name, DomainTerminologyReviewerProfile.Name, SubstantiveRigorReviewerProfile.Name },
         EvaluationStrategy: EvaluationStrategy.Sequential,
         ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 12, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
         AdvisorProfileNames: new[] { "legal-domain-expert" },
         GroundingProviderNames: new[] { "tavily-refined", "run-attachments", "learning-retriever-default" },
         FinalizerProfileNames: new[] { "learning-extractor" },
-        IsSystem: true);
+        IsSystem: true,
+        ActorPackBindings: new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["reviewer:domain-terminology-reviewer"] = new[] { Specialization.SystemPacks.LegalTerminology.Name },
+            ["reviewer:substantive-rigor-reviewer"]  = new[] { Specialization.SystemPacks.LegalClauseRisk.Name },
+        });
 
     /// <summary>Akademisch template — for scientific texts: papers, argumentation essays, research texts.</summary>
     public static readonly CrewTemplate AkademischTemplate = new(
@@ -370,13 +344,18 @@ public static class SystemCrew
         DisplayName: "Akademisch",
         Description: "Für wissenschaftliche Texte: Papers, Argumentations-Aufsätze, Forschungstexte. Mit Zitierfähigkeits-Check und Argumentations-Stringenz-Review. Reviewers laufen sequenziell.",
         ExecutorProfileName: DefaultExecutorProfile.Name,
-        ReviewerProfileNames: new[] { BriefingFidelityProfile.Name, AcademicCitationReadinessProfile.Name, AcademicArgumentationRigorProfile.Name },
+        ReviewerProfileNames: new[] { BriefingFidelityProfile.Name, DomainTerminologyReviewerProfile.Name, SubstantiveRigorReviewerProfile.Name },
         EvaluationStrategy: EvaluationStrategy.Sequential,
         ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 8, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
         AdvisorProfileNames: new[] { "academic-rigor-advisor" },
         GroundingProviderNames: new[] { "tavily-refined", "run-attachments", "learning-retriever-default" },
         FinalizerProfileNames: new[] { "learning-extractor" },
-        IsSystem: true);
+        IsSystem: true,
+        ActorPackBindings: new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["reviewer:domain-terminology-reviewer"] = new[] { Specialization.SystemPacks.AcademicCitation.Name },
+            ["reviewer:substantive-rigor-reviewer"]  = new[] { Specialization.SystemPacks.AcademicArgumentation.Name },
+        });
 
     /// <summary>Marketing template — for marketing copy: landing pages, emails, ad copy.</summary>
     public static readonly CrewTemplate MarketingTemplate = new(
@@ -384,13 +363,18 @@ public static class SystemCrew
         DisplayName: "Marketing",
         Description: "Für Marketing-Texte: Landing-Pages, Mails, Werbe-Copy. Mit Audience-Klarheits-Check und Conversion-Stärke-Review. Reviewers laufen parallel (unabhängige Perspektiven).",
         ExecutorProfileName: DefaultExecutorProfile.Name,
-        ReviewerProfileNames: new[] { BriefingFidelityProfile.Name, MarketingAudienceClarityProfile.Name, MarketingConversionStrengthProfile.Name },
+        ReviewerProfileNames: new[] { BriefingFidelityProfile.Name, DomainTerminologyReviewerProfile.Name, SubstantiveRigorReviewerProfile.Name },
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
         AdvisorProfileNames: Array.Empty<string>(),
         GroundingProviderNames: new[] { "tavily-refined", "run-attachments", "learning-retriever-default" },
         FinalizerProfileNames: new[] { "learning-extractor" },
-        IsSystem: true);
+        IsSystem: true,
+        ActorPackBindings: new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["reviewer:domain-terminology-reviewer"] = new[] { Specialization.SystemPacks.MarketingVoice.Name },
+            ["reviewer:substantive-rigor-reviewer"]  = new[] { Specialization.SystemPacks.MarketingConversion.Name },
+        });
 
     /// <summary>System grounding-provider profile for Tavily Basic web-search (1 credit/search, ~5 sources).</summary>
     public static readonly GroundingProviderProfile TavilyBasicProfile = new(
@@ -516,12 +500,8 @@ public static class SystemCrew
         {
             [BriefingFidelityProfile.Name]                  = BriefingFidelityProfile,
             [ClarityProfile.Name]                           = ClarityProfile,
-            [LegalJargonPrecisionProfile.Name]              = LegalJargonPrecisionProfile,
-            [LegalClauseRiskProfile.Name]                   = LegalClauseRiskProfile,
-            [AcademicCitationReadinessProfile.Name]         = AcademicCitationReadinessProfile,
-            [AcademicArgumentationRigorProfile.Name]        = AcademicArgumentationRigorProfile,
-            [MarketingAudienceClarityProfile.Name]          = MarketingAudienceClarityProfile,
-            [MarketingConversionStrengthProfile.Name]       = MarketingConversionStrengthProfile,
+            [DomainTerminologyReviewerProfile.Name]         = DomainTerminologyReviewerProfile,
+            [SubstantiveRigorReviewerProfile.Name]          = SubstantiveRigorReviewerProfile,
             // Auto-Crew composition reviewers
             [CrewSpecValidatorProfile.Name]                 = CrewSpecValidatorProfile,
             [CrewComposerCompletenessProfile.Name]          = CrewComposerCompletenessProfile,
@@ -619,6 +599,7 @@ public static class SystemCrew
             [CrewCatalogDefaultProfile.Name]         = CrewCatalogDefaultProfile,
             [CrewDesignRulesProfile.Name]            = CrewDesignRulesProfile,
             [ToolCatalogDefaultProfile.Name]         = ToolCatalogDefaultProfile,
+            [PackCatalogDefaultProfile.Name]         = PackCatalogDefaultProfile,
         };
 
     /// <summary>All system crew templates, indexed by name.</summary>

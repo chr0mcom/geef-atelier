@@ -99,6 +99,7 @@ public sealed class LearningRetrievalProviderListingTests
             groundingRepo ?? new InMemoryGroundingProviderProfileRepository([]),
             new InMemoryFinalizerProfileRepository(),
             new InMemoryCrewTemplateRepository(),
+            new Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository(),
             logger ?? NullLogger<CrewService>.Instance);
 
     // ── In-memory fakes ───────────────────────────────────────────────────────

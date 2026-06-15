@@ -1,0 +1,141 @@
+@page "/packs"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Geef.Atelier.Core.Domain.Crew.Specialization
+@using Geef.Atelier.Web.Services
+@inject ISpecializationPackService PackService
+@inject NavigationManager Nav
+
+<PageTitle>Packs — Atelier</PageTitle>
+
+<div class="crew-profiles-index">
+    <div class="page-header">
+        <h1>Spezialisierungs-Packs</h1>
+        <a href="/packs/create" class="btn primary">+ Neues Pack</a>
+    </div>
+
+    <p class="text-muted">
+        Packs tragen die aufgabenspezifische Spezialisierung. Generische Akteure bleiben dadurch sicher
+        wiederverwendbar; mehrere Packs lassen sich pro Crew an einen Akteur binden.
+    </p>
+
+    @if (_packs.Count == 0)
+    {
+        <p class="text-muted">Noch keine Packs konfiguriert.</p>
+    }
+    else
+    {
+        <table class="crew-table" data-testid="pack-list">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Scope</th>
+                    <th>Domäne</th>
+                    <th>Akteur-Typen</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var pack in _packs)
+                {
+                    <tr data-testid="pack-row-@pack.Name">
+                        <td>
+                            @pack.DisplayName
+                            @if (pack.IsSystem) { <span class="crew-badge">System</span> }
+                            @if (pack.Archived) { <span class="crew-badge crew-badge--danger">Archiviert</span> }
+                        </td>
+                        <td><span class="crew-badge">@GetScopeLabel(pack.Scope)</span></td>
+                        <td>@(pack.Domain ?? "—")</td>
+                        <td>@string.Join(", ", pack.ApplicableActorTypes.Select(GetActorLabel))</td>
+                        <td class="crew-table-actions">
+                            <a href="/packs/view/@pack.Name" class="btn small">Ansehen</a>
+                            @if (pack.IsSystem)
+                            {
+                                <button class="btn small primary" @onclick="() => DuplicatePack(pack)">Als Custom duplizieren</button>
+                            }
+                            else
+                            {
+                                <a href="/packs/edit/@pack.Name" class="btn small">Bearbeiten</a>
+                                <button class="btn small danger" @onclick="() => _packToDelete = pack">Löschen</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="error-banner">@_error</div>
+    }
+</div>
+
+<DeleteConfirmationModal
+    Show="_packToDelete != null"
+    ItemName="@(_packToDelete?.Name ?? "")"
+    ItemKind="Pack"
+    OnConfirm="ExecuteDeleteAsync"
+    OnCancel="() => _packToDelete = null" />
+
+@code {
+    private IReadOnlyList<SpecializationPack> _packs = [];
+    private SpecializationPack? _packToDelete;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => _packs = await PackService.GetAllAsync();
+
+    private async Task DuplicatePack(SpecializationPack original)
+    {
+        _error = null;
+        try
+        {
+            var copyName = "custom-" + original.Name.TrimStart("custom-".ToCharArray()) + "-kopie";
+            var copy = original with
+            {
+                Name = copyName,
+                DisplayName = original.DisplayName + " (Kopie)",
+                IsSystem = false,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            await PackService.SaveAsync(copy);
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private async Task ExecuteDeleteAsync()
+    {
+        if (_packToDelete == null) return;
+        var name = _packToDelete.Name;
+        _packToDelete = null;
+        try
+        {
+            await PackService.DeleteAsync(name);
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+
+    private static string GetScopeLabel(PackScope s) => s switch
+    {
+        PackScope.General      => "Allgemein",
+        PackScope.DomainScoped => "Domäne",
+        PackScope.TaskBound    => "Crew-gebunden",
+        _                      => s.ToString()
+    };
+
+    private static string GetActorLabel(PackActorType t) => t switch
+    {
+        PackActorType.Any        => "Alle",
+        PackActorType.Executor   => "Executor",
+        PackActorType.Reviewer   => "Reviewer",
+        PackActorType.Advisor    => "Advisor",
+        PackActorType.Grounding  => "Grounding",
+        PackActorType.Finalizer  => "Finalizer",
+        _                        => t.ToString()
+    };
+}

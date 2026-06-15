@@ -9,6 +9,7 @@
 @using Geef.Atelier.Core.Domain.Crew.Finalizers
 @using Geef.Atelier.Core.Domain.Crew.Grounding
 @using Geef.Atelier.Core.Domain.Crew.Profiles
+@using Geef.Atelier.Core.Domain.Crew.Specialization
 @using Geef.Atelier.Infrastructure.Configuration
 @using Microsoft.Extensions.Options
 @inject ICrewService CrewService
@@ -140,6 +141,52 @@
                 </div>
             </div>
 
+            @* §4b Spezialisierungs-Packs *@
+            @if (!_isSystem)
+            {
+                <div class="pipeline-stage-section">
+                    <div class="pipeline-stage-header">
+                        <span class="stage-num-badge">4b</span>
+                        <div class="pipeline-stage-header-text">
+                            <h3>Spezialisierungs-Packs <span class="optional-label">optional</span></h3>
+                            <p class="pipeline-stage-desc">Bindet pro Akteur geordnete Packs, die in den <code>{specialization}</code>-Slot des generischen Rollen-Prompts komponiert werden.</p>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label>Executor: @_form.ExecutorProfileName</label>
+                        <SpecializationPackPicker ActorType="PackActorType.Executor"
+                                                  OwningCrewId="@_owningCrewId"
+                                                  SelectedPackNames="GetBinding(ActorTypeKeys.Executor, _form.ExecutorProfileName)"
+                                                  SelectedPackNamesChanged="names => SetBinding(ActorTypeKeys.Executor, _form.ExecutorProfileName, names)" />
+                    </div>
+
+                    @foreach (var reviewerName in _form.ReviewerProfileNames)
+                    {
+                        var rn = reviewerName;
+                        <div class="field">
+                            <label>Reviewer: @rn</label>
+                            <SpecializationPackPicker ActorType="PackActorType.Reviewer"
+                                                      OwningCrewId="@_owningCrewId"
+                                                      SelectedPackNames="GetBinding(ActorTypeKeys.Reviewer, rn)"
+                                                      SelectedPackNamesChanged="names => SetBinding(ActorTypeKeys.Reviewer, rn, names)" />
+                        </div>
+                    }
+
+                    @foreach (var advisorName in _form.AdvisorProfileNames)
+                    {
+                        var an = advisorName;
+                        <div class="field">
+                            <label>Advisor: @an</label>
+                            <SpecializationPackPicker ActorType="PackActorType.Advisor"
+                                                      OwningCrewId="@_owningCrewId"
+                                                      SelectedPackNames="GetBinding(ActorTypeKeys.Advisor, an)"
+                                                      SelectedPackNamesChanged="names => SetBinding(ActorTypeKeys.Advisor, an, names)" />
+                        </div>
+                    }
+                </div>
+            }
+
             @* §5 Finalizer *@
             <div class="pipeline-stage-section">
                 <div class="pipeline-stage-header">
@@ -235,6 +282,7 @@
     private bool _showDeleteModal;
     private string? _error;
     private string _displayName = "";
+    private string? _owningCrewId;
 
     private IReadOnlyList<ReviewerProfile> _reviewers = [];
     private IReadOnlyList<ExecutorProfile> _executors = [];
@@ -259,6 +307,7 @@
             if (template == null) { Nav.NavigateTo("/crew/templates"); return; }
             _isSystem = template.IsSystem;
             _displayName = template.DisplayName;
+            _owningCrewId = template.Name;
             _form = TemplateFormModel.FromTemplate(template, defaults);
         }
         else
@@ -330,6 +379,26 @@
         catch (Exception ex) { _error = ex.Message; }
     }
 
+    private List<string> GetBinding(string actorType, string profileName)
+    {
+        var key = ActorTypeKeys.BindingKey(actorType, profileName);
+        if (!_form.ActorPackBindings.TryGetValue(key, out var list))
+        {
+            list = [];
+            _form.ActorPackBindings[key] = list;
+        }
+        return list;
+    }
+
+    private void SetBinding(string actorType, string profileName, List<string> names)
+    {
+        var key = ActorTypeKeys.BindingKey(actorType, profileName);
+        if (names.Count == 0)
+            _form.ActorPackBindings.Remove(key);
+        else
+            _form.ActorPackBindings[key] = names;
+    }
+
     private sealed class TemplateFormModel
     {
         [Required, RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Nur Kleinbuchstaben, Ziffern und Bindestriche")]
@@ -354,6 +423,8 @@
         public List<string> FinalizerProfileNames { get; set; } = [];
         public bool RunFinalizersOnMaxAttempts { get; set; } = false;
 
+        public Dictionary<string, List<string>> ActorPackBindings { get; set; } = new();
+
         public EvaluationStrategy EvaluationStrategy { get; set; } = EvaluationStrategy.Parallel;
 
         public int? MaxIterations { get; set; }
@@ -373,6 +444,7 @@
             GroundingProviderNames = t.GroundingProviderNames.ToList(),
             FinalizerProfileNames = (t.FinalizerProfileNames ?? []).ToList(),
             RunFinalizersOnMaxAttempts = t.RunFinalizersOnMaxAttempts,
+            ActorPackBindings = t.ActorPackBindings.ToDictionary(kv => kv.Key, kv => kv.Value.ToList()),
             EvaluationStrategy = t.EvaluationStrategy,
             MaxIterations = t.ConvergenceOverride?.MaxIterations ?? d.MaxIterations,
             AbortOnCritical = t.ConvergenceOverride?.AbortOnCritical ?? d.AbortOnCritical,
@@ -418,7 +490,10 @@
                 GroundingProviderNames: GroundingProviderNames,
                 IsSystem: false,
                 FinalizerProfileNames: FinalizerProfileNames,
-                RunFinalizersOnMaxAttempts: RunFinalizersOnMaxAttempts);
+                RunFinalizersOnMaxAttempts: RunFinalizersOnMaxAttempts,
+                ActorPackBindings: ActorPackBindings
+                    .Where(kv => kv.Value.Count > 0)
+                    .ToDictionary(kv => kv.Key, kv => (IReadOnlyList<string>)kv.Value));
         }
     }
 }

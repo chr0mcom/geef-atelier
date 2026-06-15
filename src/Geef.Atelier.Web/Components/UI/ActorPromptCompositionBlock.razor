@@ -1,0 +1,63 @@
+@* Aufklappbarer Block: zeigt den effektiv komponierten Prompt je Akteur (Rolle + Packs + Ergebnis). *@
+@using Geef.Atelier.Core.Domain.Crew.Specialization
+
+@if (Compositions is { Count: > 0 })
+{
+    <div class="actor-prompt-compositions" data-testid="prompt-compositions">
+        <button class="collapsible-header" @onclick="Toggle" type="button" aria-expanded="@_expanded">
+            <span>Effektive Prompts (@Compositions.Count Akteur@(Compositions.Count != 1 ? "e" : "") mit Packs)</span>
+            <span class="chevron @(_expanded ? "up" : "down")">▾</span>
+        </button>
+
+        @if (_expanded)
+        {
+            <div class="collapsible-body">
+                @foreach (var c in Compositions)
+                {
+                    <div class="prompt-composition" data-testid="prompt-composition-@c.ActorName">
+                        <div class="prompt-composition-header">
+                            <strong>@GetActorTypeLabel(c.ActorType): @c.ActorName</strong>
+                            <span class="prompt-composition-packs">
+                                @foreach (var p in c.Packs)
+                                {
+                                    <span class="crew-badge">@(p.Order + 1). @p.DisplayName (@GetScopeLabel(p.Scope))</span>
+                                }
+                            </span>
+                        </div>
+                        <details class="prompt-composition-details">
+                            <summary>Komponierten Prompt anzeigen</summary>
+                            <pre class="prompt-composition-text">@c.ComposedPrompt</pre>
+                        </details>
+                        <details class="prompt-composition-details">
+                            <summary>Rollen-Prompt (vor Komposition)</summary>
+                            <pre class="prompt-composition-text">@c.RolePrompt</pre>
+                        </details>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<ActorPromptComposition>? Compositions { get; set; }
+
+    private bool _expanded;
+    private void Toggle() => _expanded = !_expanded;
+
+    private static string GetActorTypeLabel(string actorType) => actorType switch
+    {
+        "executor" => "Executor",
+        "reviewer" => "Reviewer",
+        "advisor"  => "Advisor",
+        _          => actorType
+    };
+
+    private static string GetScopeLabel(PackScope s) => s switch
+    {
+        PackScope.General      => "Allgemein",
+        PackScope.DomainScoped => "Domäne",
+        PackScope.TaskBound    => "Crew-gebunden",
+        _                      => s.ToString()
+    };
+}

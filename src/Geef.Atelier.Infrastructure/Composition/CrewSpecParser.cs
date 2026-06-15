@@ -59,8 +59,11 @@ public static class CrewSpecParser
             (amtEl.ValueKind == JsonValueKind.True || amtEl.ValueKind == JsonValueKind.False) &&
             amtEl.GetBoolean();
 
+        var newPacks = ParsePackSpecArray(root, "packs");
+
         return new CrewSpecArtifact
         {
+            NewPacks           = newPacks,
             Mode               = mode,
             Domain             = domain,
             Rationale          = rationale,
@@ -97,10 +100,14 @@ public static class CrewSpecParser
 
     private static CrewPartSpec ParsePartSpec(JsonElement el)
     {
-        // If "reuse" is present, treat the entire element as a reuse-reference; ignore inline fields.
+        var toolNames = ParseStringArray(el, "tool_names");
+        var packNames = ParseStringArray(el, "pack_names");
+
+        // If "reuse" is present, treat the element as a reuse-reference for the actor itself, but still
+        // carry tool/pack bindings — a reused generic actor is specialized per crew via bound packs.
         if (el.TryGetProperty("reuse", out var reuseEl) && reuseEl.ValueKind == JsonValueKind.String)
         {
-            return new CrewPartSpec { Reuse = reuseEl.GetString() };
+            return new CrewPartSpec { Reuse = reuseEl.GetString(), ToolNames = toolNames, PackNames = packNames };
         }
 
         return new CrewPartSpec
@@ -118,12 +125,36 @@ public static class CrewSpecParser
             AdvisorTrigger = el.TryGetProperty("advisor_trigger", out var atEl)     ? atEl.GetString()          : null,
             ProviderType   = el.TryGetProperty("provider_type",   out var ptEl)     ? ptEl.GetString()          : null,
             FinalizerType  = el.TryGetProperty("finalizer_type",  out var ftEl)     ? ftEl.GetString()          : null,
-            ToolNames      = el.TryGetProperty("tool_names", out var tnEl) && tnEl.ValueKind == JsonValueKind.Array
-                                 ? tnEl.EnumerateArray()
-                                       .Where(x => x.ValueKind == JsonValueKind.String)
-                                       .Select(x => x.GetString()!)
-                                       .ToList()
-                                 : null,
+            ToolNames      = toolNames,
+            PackNames      = packNames,
         };
     }
+
+    private static IReadOnlyList<string>? ParseStringArray(JsonElement el, string propertyName) =>
+        el.TryGetProperty(propertyName, out var arr) && arr.ValueKind == JsonValueKind.Array
+            ? arr.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()!).ToList()
+            : null;
+
+    private static IReadOnlyList<PackSpec> ParsePackSpecArray(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var arrEl) || arrEl.ValueKind != JsonValueKind.Array)
+            return [];
+
+        return arrEl.EnumerateArray()
+            .Where(e => e.ValueKind == JsonValueKind.Object)
+            .Select(ParsePackSpec)
+            .ToList();
+    }
+
+    private static PackSpec ParsePackSpec(JsonElement el) => new()
+    {
+        Name               = el.TryGetProperty("name",                out var n)  ? n.GetString()  : null,
+        DisplayName        = el.TryGetProperty("display_name",        out var dn) ? dn.GetString() : null,
+        SpecializationText = el.TryGetProperty("specialization_text", out var st) ? st.GetString() : null,
+        Scope              = el.TryGetProperty("scope",               out var sc) ? sc.GetString() : null,
+        Domain             = el.TryGetProperty("domain",              out var dm) ? dm.GetString() : null,
+        ApplicableActorTypes = el.TryGetProperty("applicable_actor_types", out var aatEl) && aatEl.ValueKind == JsonValueKind.Array
+            ? aatEl.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()!).ToList()
+            : null,
+    };
 }

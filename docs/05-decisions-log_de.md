@@ -1223,3 +1223,32 @@ Atelier-Akteure arbeiteten bislang ausschließlich aus dem Modellwissen heraus: 
 **D-060/14 — Mutating-Opt-in.** `CrewSpecArtifact.AllowMutatingTools` (`bool`, Standard `false`). Der Validator blockiert jedes Mutating-Tool ohne explizit gesetztes Flag in der Spec. Die UI markiert Mutating-Tools mit einem roten Gefahren-Badge in Editor und Detailansicht.
 
 **Tests:** 1788 grün, 0 Regressions. 5 DB-Migrationen (Step37–Step41), alle additiv (kein Datenverlust beim Forward-Deploy).
+
+---
+
+## D-061 — Spezialisierungs-Packs: generische Akteure + wiederverwendbare gescopte Spezialisierungs-Schichten
+
+**Kontext:** Akteure mit aufgabengebackenen System-Prompts lecken beim Wiederverwenden in einer anderen
+Crew ihre alte Aufgabe (stille Reviewer-Korruption). Vollständiges Konzept:
+[`prompts/konzept-spezialisierungs-packs.md`](prompts/konzept-spezialisierungs-packs.md),
+Umsetzungsleitfaden: [`11-specialization-packs_de.md`](11-specialization-packs_de.md).
+
+**D-061/1 — Generische Rolle + `{specialization}`-Slot.** Akteure tragen nur einen generischen Rollen-Prompt mit `{specialization}`-Slot. `PromptComposer.Compose` (rein) ersetzt den Slot durch die geordneten, mit `\n\n` verbundenen Pack-Texte (Fallback: anhängen unter `## Specialization`); Präzedenz last-in-sequence-wins.
+
+**D-061/2 — `SpecializationPack`-Entität.** Neue gescopte Entität (`Scope` General/DomainScoped/TaskBound, `ApplicableActorTypes`, `OwningCrewId`, `Archived`, `LastUsedAt`). System-Packs sind Code-Konstanten (`SystemPacks`), den Custom-DB-Rows vorangestellt (`specialization_packs`, Migration Step42) — analog zum Akteur-Profil-Muster.
+
+**D-061/3 — System-Akteur-Umbau.** Die sechs domänen-spezialisierten System-Reviewer (legal/academic/marketing) wurden durch zwei generische Reviewer-Rollen ersetzt (`domain-terminology-reviewer`, `substantive-rigor-reviewer`, je mit gemeinsamer Severity-Taxonomie + Slot). Domänen-Deltas wanderten in sechs DomainScoped-System-Packs + zwei General-Beispiel-Packs; die Templates `juristisch`/`akademisch`/`marketing` binden sie, sodass der komponierte Prompt verhaltensgleich bleibt.
+
+**D-061/4 — Pro-Crew-Bindung + Komposition zur Snapshot-Bauzeit.** `CrewTemplate`/`CrewSpec` erhielten `ActorPackBindings` (jsonb, Key `"<actorType>:<profileName>"`). `CrewSnapshotBuilder.ApplyPacksAsync` komponiert den effektiven Prompt je Akteur in den `SystemPrompt` des eingebetteten Profils (Factory + `ProfileBased*` unverändert) und protokolliert die Provenienz in `CrewSnapshot` v3 `PromptCompositions`. Komposition gilt für Executor/Reviewer/Advisor (die Akteure mit Prompt).
+
+**D-061/5 — Scope-Durchsetzung.** `ListForBindingAsync` schließt fremde TaskBound + archivierte Packs aus; der Crew-Kohärenz-Check blockiert hart ein Custom-Template, das ein fremdes TaskBound-Pack bindet; `CrewSpecValidator` Schritt 9 + das Pack-Katalog-Grounding + die Composer-Reviewer prompt-quality/reuse-correctness setzen den Scope im Composer durch.
+
+**D-061/6 — Composer-Zwei-Ebenen-Komposition.** `CrewPartSpec.PackNames` + `CrewSpecArtifact.NewPacks`; `submit_crew_spec`-Schema erhielt `pack_names` je Akteur + top-level `packs`. **Der Parser behält `tool_names`/`pack_names` auf `reuse`-Referenzen** — das Binden von Packs an wiederverwendete generische Reviewer ist der Hauptanwendungsfall. `CrewMaterializer` legt neue Packs an (TaskBound → an die erzeugte Crew gebunden) und materialisiert die Bindungen.
+
+**D-061/7 — Lebenszyklus.** TaskBound-Packs cascade-löschen mit ihrer Crew. Promote/Clone-to-Generalize sind durch ein LLM-Generalitäts-Review (`IPackGeneralityReviewer`, fail-closed) gated. `PackArchivalBackgroundService` auto-archiviert ungenutzte, unreferenzierte Custom-General/DomainScoped-Packs nach `PackGc.RetentionDays` (default 90).
+
+**D-061/8 — Audit-UI.** `ActorPromptCompositionBlock.razor` auf der Run-Detailseite zeigt je Akteur den Rollen-Prompt, die gebundenen Packs (mit Scope + Reihenfolge) und den komponierten effektiven Prompt.
+
+**D-061/9 — Saubere Neuaufsetzung, Konten + Auth bleiben (Betreiber-Policy).** Migration Step42 behält nur Benutzerkonten und Auth/Credentials/Config (`Users`, OAuth, `mcp_server_configs`, `Providers`, Settings) sowie den DB-geseedeten System-Katalog (System-Tools/-Finalizer/-Grounding, geschützt über `WHERE "IsSystem" = false`-DELETEs) und leert alles andere für einen Frischstart: Run-Historie, Custom-Profile/-Templates/-Packs, Embeddings, Studio-Analysen, Knowledge-Base, Learnings und Custom-Tools. Verbesserte Prompts kommen aus Code-Konstanten (kein DB-Reseed). `pg_dump`-Backup vor dem Deploy.
+
+**Tests:** Specialization-/Composition-/Parser-/Validator-/Lebenszyklus-Units ergänzt; keine neuen Regressionen (vorbestehende DB-/E2E-/Contention-Fehler unverändert). Migration Step42 (additives Schema + gescopte Custom-Daten-Neuaufsetzung).

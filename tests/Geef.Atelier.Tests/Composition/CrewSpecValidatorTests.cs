@@ -25,7 +25,8 @@ public sealed class CrewSpecValidatorTests
         IModelCatalog? modelCatalog = null,
         IGroundingProviderFactory? groundingFactory = null,
         IToolDefinitionRepository? toolRepository = null,
-        ILlmClientResolver? llmClientResolver = null)
+        ILlmClientResolver? llmClientResolver = null,
+        Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository? packRepository = null)
     {
         crewService ??= new EmptyCrewService();
         // Default catalog knows the inline executor's model so InlineExecutor validates cleanly.
@@ -33,7 +34,8 @@ public sealed class CrewSpecValidatorTests
         groundingFactory ??= new StubGroundingFactory("tavily", "academic-search", "vector-store");
         toolRepository ??= new EmptyToolRepository();
         llmClientResolver ??= new AgenticCapableResolver();
-        return new CrewSpecValidator(crewService, modelCatalog, groundingFactory, toolRepository, llmClientResolver);
+        return new CrewSpecValidator(crewService, modelCatalog, groundingFactory, toolRepository,
+            packRepository ?? new Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository(), llmClientResolver);
     }
 
     /// <summary>A valid inline, task-specialized executor (the executor must never be reused).</summary>
@@ -66,6 +68,63 @@ public sealed class CrewSpecValidatorTests
             "grounding_providers": [{"name": "lit-search", "provider_type": "{{providerType}}"}]
         }
         """;
+
+    /// <summary>A composed spec whose reviewer binds the given pack names, optionally defining new packs.</summary>
+    private static string ComposedSpecWithReviewerPacks(string packNamesJson, string newPacksJson = "[]") =>
+        $$"""
+        {
+            "mode": "composed",
+            "executor": {{InlineExecutor}},
+            "reviewers": [{"reuse": "briefing-fidelity", "pack_names": {{packNamesJson}}}],
+            "finalizers": [{"reuse": "file-export"}],
+            "packs": {{newPacksJson}}
+        }
+        """;
+
+    // ── Tests: specialization-pack bindings (PS-D4) ────────────────────────
+
+    [Fact]
+    public async Task ValidateAsync_FlagsCritical_WhenPackUnknownAndNotDefined()
+    {
+        var crewService = new PreconfiguredCrewService(
+            executorName: "task-executor", reviewerName: "briefing-fidelity", finalizerName: "file-export");
+        var validator = MakeValidator(crewService);
+
+        var issues = await validator.ValidateAsync(ComposedSpecWithReviewerPacks("""["ghost-pack"]"""));
+
+        Assert.Contains(issues, i => i.IsCritical && i.Message.Contains("ghost-pack"));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_AcceptsPack_WhenDefinedInNewPacks()
+    {
+        var crewService = new PreconfiguredCrewService(
+            executorName: "task-executor", reviewerName: "briefing-fidelity", finalizerName: "file-export");
+        var validator = MakeValidator(crewService);
+
+        var newPacks = """[{"name":"fresh-pack","specialization_text":"delta","scope":"TaskBound","applicable_actor_types":["Reviewer"]}]""";
+        var issues = await validator.ValidateAsync(ComposedSpecWithReviewerPacks("""["fresh-pack"]""", newPacks));
+
+        Assert.DoesNotContain(issues, i => i.Message.Contains("fresh-pack"));
+    }
+
+    [Fact]
+    public async Task ValidateAsync_FlagsCritical_WhenReusingForeignTaskBoundPack()
+    {
+        var packRepo = new Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository();
+        await packRepo.UpsertAsync(new Geef.Atelier.Core.Domain.Crew.Specialization.SpecializationPack(
+            "foreign-tb", "Foreign", "", "delta",
+            Geef.Atelier.Core.Domain.Crew.Specialization.PackScope.TaskBound, null,
+            [Geef.Atelier.Core.Domain.Crew.Specialization.PackActorType.Reviewer],
+            OwningCrewId: "custom-other", IsSystem: false));
+        var crewService = new PreconfiguredCrewService(
+            executorName: "task-executor", reviewerName: "briefing-fidelity", finalizerName: "file-export");
+        var validator = MakeValidator(crewService, packRepository: packRepo);
+
+        var issues = await validator.ValidateAsync(ComposedSpecWithReviewerPacks("""["foreign-tb"]"""));
+
+        Assert.Contains(issues, i => i.IsCritical && i.Message.Contains("foreign-tb"));
+    }
 
     // ── Tests: executor must be inline/specialized (never reused) ──────────
 

@@ -3,6 +3,7 @@ using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Core.Domain.Crew.Specialization;
 
 namespace Geef.Atelier.Application.Crew;
 
@@ -131,6 +132,18 @@ public interface ICrewService
     /// or when the target name is already taken.
     /// </summary>
     Task<string> RenameCustomFinalizerProfileAsync(string oldName, string newName, CancellationToken cancellationToken = default);
+
+    // --- Specialization packs ---
+
+    /// <summary>Returns the specialization pack (system or custom) with the exact <paramref name="name"/>, or null.</summary>
+    /// <remarks>Default-implemented so existing test stubs need not change; the production service overrides it.</remarks>
+    Task<SpecializationPack?> GetSpecializationPackAsync(string name, CancellationToken cancellationToken = default)
+        => Task.FromResult<SpecializationPack?>(null);
+
+    /// <summary>Creates a custom specialization pack. The name is auto-prefixed with <c>"custom-"</c> and uniquified.</summary>
+    /// <remarks>Default-implemented so existing test stubs need not change; the production service overrides it.</remarks>
+    Task<SpecializationPack> CreateCustomSpecializationPackAsync(SpecializationPack pack, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("CreateCustomSpecializationPackAsync is not implemented by this service.");
 
     // --- Crew templates ---
 

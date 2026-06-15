@@ -1,150 +1,115 @@
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Specialization;
 
 namespace Geef.Atelier.Tests.Domain.Crew.DomainTemplates;
 
+/// <summary>
+/// The former domain-specialized system reviewers (legal/academic/marketing) were replaced by two
+/// generic reviewer roles plus reusable system specialization packs. These tests assert the new model:
+/// generic role prompts carry the shared severity taxonomy and a {specialization} slot; the domain
+/// deltas live in the packs.
+/// </summary>
 public sealed class SystemCrewDomainReviewersTests
 {
-    // ── Legal reviewers ──────────────────────────────────────────────────────────
+    // ── Generic reviewer profiles ────────────────────────────────────────────────
 
     [Fact]
-    public void LegalJargonPrecision_HasCorrectName()
+    public void DomainTerminologyReviewer_HasCorrectIdentity()
     {
-        Assert.Equal("legal-jargon-precision", SystemCrew.LegalJargonPrecisionProfile.Name);
+        var p = SystemCrew.DomainTerminologyReviewerProfile;
+        Assert.Equal("domain-terminology-reviewer", p.Name);
+        Assert.True(p.IsSystem);
+        Assert.Contains(PromptComposition.SpecializationSlot, p.SystemPrompt);
     }
 
     [Fact]
-    public void LegalJargonPrecision_IsSystem_UsesCodexCli_Gpt55()
+    public void SubstantiveRigorReviewer_HasCorrectIdentity()
     {
-        Assert.True(SystemCrew.LegalJargonPrecisionProfile.IsSystem);
-        Assert.Equal("codex-cli", SystemCrew.LegalJargonPrecisionProfile.Provider);
-        Assert.Equal("gpt-5.5", SystemCrew.LegalJargonPrecisionProfile.Model);
+        var p = SystemCrew.SubstantiveRigorReviewerProfile;
+        Assert.Equal("substantive-rigor-reviewer", p.Name);
+        Assert.True(p.IsSystem);
+        Assert.Contains(PromptComposition.SpecializationSlot, p.SystemPrompt);
     }
 
     [Fact]
-    public void LegalClauseRisk_HasCorrectName()
+    public void GenericReviewers_RolePrompts_AreTaskAgnostic()
     {
-        Assert.Equal("legal-clause-risk", SystemCrew.LegalClauseRiskProfile.Name);
+        // The role prompt must not carry domain specifics — those belong in packs.
+        Assert.DoesNotContain("BGB", SystemCrew.DomainTerminologyReviewerProfile.SystemPrompt);
+        Assert.DoesNotContain("§307", SystemCrew.SubstantiveRigorReviewerProfile.SystemPrompt);
     }
 
     [Fact]
-    public void LegalClauseRisk_IsSystem_UsesCodexCli_Gpt55()
+    public void ReviewerProfiles_ContainGenericReviewers()
     {
-        Assert.True(SystemCrew.LegalClauseRiskProfile.IsSystem);
-        Assert.Equal("codex-cli", SystemCrew.LegalClauseRiskProfile.Provider);
-        Assert.Equal("gpt-5.5", SystemCrew.LegalClauseRiskProfile.Model);
-    }
-
-    // ── Academic reviewers ───────────────────────────────────────────────────────
-
-    [Fact]
-    public void AcademicCitationReadiness_HasCorrectName()
-    {
-        Assert.Equal("academic-citation-readiness", SystemCrew.AcademicCitationReadinessProfile.Name);
+        Assert.True(SystemCrew.ReviewerProfiles.ContainsKey("domain-terminology-reviewer"));
+        Assert.True(SystemCrew.ReviewerProfiles.ContainsKey("substantive-rigor-reviewer"));
     }
 
     [Fact]
-    public void AcademicCitationReadiness_IsSystem_UsesCodexCli_Gpt55()
+    public void ReviewerProfiles_NoLongerContainSpecializedReviewers()
     {
-        Assert.True(SystemCrew.AcademicCitationReadinessProfile.IsSystem);
-        Assert.Equal("codex-cli", SystemCrew.AcademicCitationReadinessProfile.Provider);
-        Assert.Equal("gpt-5.5", SystemCrew.AcademicCitationReadinessProfile.Model);
+        Assert.False(SystemCrew.ReviewerProfiles.ContainsKey("legal-jargon-precision"));
+        Assert.False(SystemCrew.ReviewerProfiles.ContainsKey("marketing-conversion-strength"));
+    }
+
+    // ── System packs carry the domain deltas ─────────────────────────────────────
+
+    [Fact]
+    public void SystemPacks_ContainAllSixDomainPacks()
+    {
+        foreach (var name in new[]
+        {
+            "legal-terminology", "legal-clause-risk",
+            "academic-citation", "academic-argumentation",
+            "marketing-voice", "marketing-conversion"
+        })
+        {
+            Assert.True(SystemPacks.ByName.ContainsKey(name), $"missing pack {name}");
+        }
     }
 
     [Fact]
-    public void AcademicArgumentationRigor_HasCorrectName()
+    public void LegalTerminologyPack_IsDomainScopedReviewerPack_WithBgbContent()
     {
-        Assert.Equal("academic-argumentation-rigor", SystemCrew.AcademicArgumentationRigorProfile.Name);
+        var p = SystemPacks.LegalTerminology;
+        Assert.Equal(PackScope.DomainScoped, p.Scope);
+        Assert.Equal("legal", p.Domain);
+        Assert.Contains(PackActorType.Reviewer, p.ApplicableActorTypes);
+        Assert.Contains("BGB", p.SpecializationText);
     }
 
     [Fact]
-    public void AcademicArgumentationRigor_IsSystem_UsesClaudioCli_Opus47()
+    public void LegalClauseRiskPack_ContainsParagraph307()
     {
-        Assert.True(SystemCrew.AcademicArgumentationRigorProfile.IsSystem);
-        Assert.Equal("claude-cli", SystemCrew.AcademicArgumentationRigorProfile.Provider);
-        Assert.Equal("claude-opus-4-8", SystemCrew.AcademicArgumentationRigorProfile.Model);
-    }
-
-    // ── Marketing reviewers ──────────────────────────────────────────────────────
-
-    [Fact]
-    public void MarketingAudienceClarity_HasCorrectName()
-    {
-        Assert.Equal("marketing-audience-clarity", SystemCrew.MarketingAudienceClarityProfile.Name);
+        Assert.Contains("§307", SystemPacks.LegalClauseRisk.SpecializationText);
     }
 
     [Fact]
-    public void MarketingAudienceClarity_IsSystem_UsesCodexCli_Gpt55()
+    public void AcademicCitationPack_ContainsCommonKnowledge()
     {
-        Assert.True(SystemCrew.MarketingAudienceClarityProfile.IsSystem);
-        Assert.Equal("codex-cli", SystemCrew.MarketingAudienceClarityProfile.Provider);
-        Assert.Equal("gpt-5.5", SystemCrew.MarketingAudienceClarityProfile.Model);
+        Assert.Contains("common-knowledge", SystemPacks.AcademicCitation.SpecializationText,
+            System.StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void MarketingConversionStrength_HasCorrectName()
+    public void AcademicArgumentationPack_ContainsFallacyCheck()
     {
-        Assert.Equal("marketing-conversion-strength", SystemCrew.MarketingConversionStrengthProfile.Name);
+        Assert.Contains("non sequitur", SystemPacks.AcademicArgumentation.SpecializationText,
+            System.StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void MarketingConversionStrength_IsSystem_UsesCodexCli_Gpt55()
+    public void MarketingConversionPack_ContainsCtaCheck()
     {
-        Assert.True(SystemCrew.MarketingConversionStrengthProfile.IsSystem);
-        Assert.Equal("codex-cli", SystemCrew.MarketingConversionStrengthProfile.Provider);
-        Assert.Equal("gpt-5.5", SystemCrew.MarketingConversionStrengthProfile.Model);
-    }
-
-    // ── Dictionary completeness ──────────────────────────────────────────────────
-
-    [Fact]
-    public void ReviewerProfiles_ContainsAllSixDomainReviewers()
-    {
-        Assert.True(SystemCrew.ReviewerProfiles.ContainsKey("legal-jargon-precision"));
-        Assert.True(SystemCrew.ReviewerProfiles.ContainsKey("legal-clause-risk"));
-        Assert.True(SystemCrew.ReviewerProfiles.ContainsKey("academic-citation-readiness"));
-        Assert.True(SystemCrew.ReviewerProfiles.ContainsKey("academic-argumentation-rigor"));
-        Assert.True(SystemCrew.ReviewerProfiles.ContainsKey("marketing-audience-clarity"));
-        Assert.True(SystemCrew.ReviewerProfiles.ContainsKey("marketing-conversion-strength"));
+        Assert.Contains("CTA", SystemPacks.MarketingConversion.SpecializationText);
     }
 
     [Fact]
-    public void ReviewerProfiles_HasEightTotalEntries()
+    public void GeneralPacks_AreReusableAnywhere()
     {
-        // 2 original (briefing-fidelity, clarity) + 6 domain-specific + 6 auto-crew composition reviewers
-        Assert.Equal(14, SystemCrew.ReviewerProfiles.Count);
-    }
-
-    // ── System-prompt content smoke tests ────────────────────────────────────────
-
-    [Fact]
-    public void LegalJargonPrecision_SystemPrompt_ContainsBgbReference()
-    {
-        Assert.Contains("BGB", SystemCrew.LegalJargonPrecisionProfile.SystemPrompt);
-    }
-
-    [Fact]
-    public void LegalClauseRisk_SystemPrompt_ContainsParagraph307()
-    {
-        Assert.Contains("§307", SystemCrew.LegalClauseRiskProfile.SystemPrompt);
-    }
-
-    [Fact]
-    public void AcademicCitationReadiness_SystemPrompt_ContainsCommonKnowledge()
-    {
-        Assert.Contains("common knowledge", SystemCrew.AcademicCitationReadinessProfile.SystemPrompt,
-            StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void AcademicArgumentationRigor_SystemPrompt_ContainsFallacyCheck()
-    {
-        Assert.Contains("non sequitur", SystemCrew.AcademicArgumentationRigorProfile.SystemPrompt,
-            StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void MarketingConversionStrength_SystemPrompt_ContainsCtaCheck()
-    {
-        Assert.Contains("CTA", SystemCrew.MarketingConversionStrengthProfile.SystemPrompt);
+        Assert.Equal(PackScope.General, SystemPacks.ConciseOutput.Scope);
+        Assert.Null(SystemPacks.ConciseOutput.Domain);
+        Assert.Contains(PackActorType.Executor, SystemPacks.ConciseOutput.ApplicableActorTypes);
     }
 }

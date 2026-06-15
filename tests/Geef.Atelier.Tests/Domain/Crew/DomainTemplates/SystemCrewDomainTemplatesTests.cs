@@ -20,13 +20,21 @@ public sealed class SystemCrewDomainTemplatesTests
     }
 
     [Fact]
-    public void JuristischTemplate_HasThreeReviewers_WithBriefingFidelityFirst()
+    public void JuristischTemplate_HasThreeReviewers_WithGenericReviewers()
     {
         var reviewers = SystemCrew.JuristischTemplate.ReviewerProfileNames;
         Assert.Equal(3, reviewers.Count);
         Assert.Equal("briefing-fidelity", reviewers[0]);
-        Assert.Equal("legal-jargon-precision", reviewers[1]);
-        Assert.Equal("legal-clause-risk", reviewers[2]);
+        Assert.Equal("domain-terminology-reviewer", reviewers[1]);
+        Assert.Equal("substantive-rigor-reviewer", reviewers[2]);
+    }
+
+    [Fact]
+    public void JuristischTemplate_BindsLegalPacksToGenericReviewers()
+    {
+        var b = SystemCrew.JuristischTemplate.ActorPackBindings;
+        Assert.Equal(new[] { "legal-terminology" }, b["reviewer:domain-terminology-reviewer"]);
+        Assert.Equal(new[] { "legal-clause-risk" }, b["reviewer:substantive-rigor-reviewer"]);
     }
 
     [Fact]
@@ -67,13 +75,21 @@ public sealed class SystemCrewDomainTemplatesTests
     }
 
     [Fact]
-    public void AkademischTemplate_HasThreeReviewers_WithBriefingFidelityFirst()
+    public void AkademischTemplate_HasThreeReviewers_WithGenericReviewers()
     {
         var reviewers = SystemCrew.AkademischTemplate.ReviewerProfileNames;
         Assert.Equal(3, reviewers.Count);
         Assert.Equal("briefing-fidelity", reviewers[0]);
-        Assert.Equal("academic-citation-readiness", reviewers[1]);
-        Assert.Equal("academic-argumentation-rigor", reviewers[2]);
+        Assert.Equal("domain-terminology-reviewer", reviewers[1]);
+        Assert.Equal("substantive-rigor-reviewer", reviewers[2]);
+    }
+
+    [Fact]
+    public void AkademischTemplate_BindsAcademicPacksToGenericReviewers()
+    {
+        var b = SystemCrew.AkademischTemplate.ActorPackBindings;
+        Assert.Equal(new[] { "academic-citation" }, b["reviewer:domain-terminology-reviewer"]);
+        Assert.Equal(new[] { "academic-argumentation" }, b["reviewer:substantive-rigor-reviewer"]);
     }
 
     [Fact]
@@ -114,13 +130,21 @@ public sealed class SystemCrewDomainTemplatesTests
     }
 
     [Fact]
-    public void MarketingTemplate_HasThreeReviewers_WithBriefingFidelityFirst()
+    public void MarketingTemplate_HasThreeReviewers_WithGenericReviewers()
     {
         var reviewers = SystemCrew.MarketingTemplate.ReviewerProfileNames;
         Assert.Equal(3, reviewers.Count);
         Assert.Equal("briefing-fidelity", reviewers[0]);
-        Assert.Equal("marketing-audience-clarity", reviewers[1]);
-        Assert.Equal("marketing-conversion-strength", reviewers[2]);
+        Assert.Equal("domain-terminology-reviewer", reviewers[1]);
+        Assert.Equal("substantive-rigor-reviewer", reviewers[2]);
+    }
+
+    [Fact]
+    public void MarketingTemplate_BindsMarketingPacksToGenericReviewers()
+    {
+        var b = SystemCrew.MarketingTemplate.ActorPackBindings;
+        Assert.Equal(new[] { "marketing-voice" }, b["reviewer:domain-terminology-reviewer"]);
+        Assert.Equal(new[] { "marketing-conversion" }, b["reviewer:substantive-rigor-reviewer"]);
     }
 
     [Fact]
@@ -172,13 +196,9 @@ public sealed class SystemCrewDomainTemplatesTests
     }
 
     [Fact]
-    public void IsSystemName_RecognizesAllDomainReviewers()
+    public void IsSystemName_RecognizesGenericDomainReviewers()
     {
-        Assert.True(SystemCrew.IsSystemName("legal-jargon-precision"));
-        Assert.True(SystemCrew.IsSystemName("legal-clause-risk"));
-        Assert.True(SystemCrew.IsSystemName("academic-citation-readiness"));
-        Assert.True(SystemCrew.IsSystemName("academic-argumentation-rigor"));
-        Assert.True(SystemCrew.IsSystemName("marketing-audience-clarity"));
-        Assert.True(SystemCrew.IsSystemName("marketing-conversion-strength"));
+        Assert.True(SystemCrew.IsSystemName("domain-terminology-reviewer"));
+        Assert.True(SystemCrew.IsSystemName("substantive-rigor-reviewer"));
     }
 }

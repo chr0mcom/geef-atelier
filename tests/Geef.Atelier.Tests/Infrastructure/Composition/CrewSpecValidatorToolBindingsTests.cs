@@ -31,7 +31,8 @@ public sealed class CrewSpecValidatorToolBindingsTests
         crewService    ??= new AlwaysResolvedCrewService();
         modelCatalog   ??= new KnownModelCatalog("claude-cli", "claude-opus-4-8");
         var groundingFactory = new StubGroundingFactory("tavily");
-        return new CrewSpecValidator(crewService, modelCatalog, groundingFactory, toolRepository, llmClientResolver);
+        return new CrewSpecValidator(crewService, modelCatalog, groundingFactory, toolRepository,
+            new Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository(), llmClientResolver);
     }
 
     /// <summary>

@@ -69,6 +69,38 @@ public sealed record CrewPartSpec
     /// Applies to executor, reviewer, advisor, and Transform-type finalizer parts.
     /// </summary>
     public IReadOnlyList<string>? ToolNames { get; init; }
+
+    /// <summary>
+    /// Optional ordered list of specialization-pack names to bind to this actor (existing packs reused
+    /// or new packs defined in <see cref="CrewSpecArtifact.NewPacks"/>). Applies to executor, reviewer
+    /// and advisor parts.
+    /// </summary>
+    public IReadOnlyList<string>? PackNames { get; init; }
+}
+
+/// <summary>
+/// Inline definition of a new specialization pack proposed by the composer. New composer packs default
+/// to <c>TaskBound</c> and are bound to the crew being created (cascade-deleted with it).
+/// </summary>
+public sealed record PackSpec
+{
+    /// <summary>Machine-readable pack name.</summary>
+    public string? Name { get; init; }
+
+    /// <summary>Human-readable display name.</summary>
+    public string? DisplayName { get; init; }
+
+    /// <summary>The task/domain-specific prompt fragment.</summary>
+    public string? SpecializationText { get; init; }
+
+    /// <summary>Scope: "General", "DomainScoped" or "TaskBound" (default).</summary>
+    public string? Scope { get; init; }
+
+    /// <summary>Domain (required when DomainScoped).</summary>
+    public string? Domain { get; init; }
+
+    /// <summary>Applicable actor types: "Executor", "Reviewer", "Advisor", "Any". Empty = Any.</summary>
+    public IReadOnlyList<string>? ApplicableActorTypes { get; init; }
 }
 
 /// <summary>
@@ -118,4 +150,10 @@ public sealed record CrewSpecArtifact
     /// Disabled by default; must be explicitly set by the operator.
     /// </summary>
     public bool AllowMutatingTools { get; init; }
+
+    /// <summary>
+    /// New specialization packs defined inline by the composer (default TaskBound, bound to the new crew).
+    /// Referenced from actor parts via <see cref="CrewPartSpec.PackNames"/>.
+    /// </summary>
+    public IReadOnlyList<PackSpec> NewPacks { get; init; } = [];
 }

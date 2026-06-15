@@ -132,6 +132,8 @@
 
         <CrewSummary Snapshot="_snapshot" FallbackTemplateName="@_details.Run.CrewTemplateName" />
 
+        <ActorPromptCompositionBlock Compositions="_snapshot?.PromptCompositions" />
+
         <Press Status="_details.Run.Status" />
 
         @if (_promoteError is not null)

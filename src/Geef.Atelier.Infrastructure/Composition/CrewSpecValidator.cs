@@ -2,7 +2,9 @@ using Geef.Atelier.Application.Composition;
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Composition;
+using Geef.Atelier.Core.Domain.Crew.Specialization;
 using Geef.Atelier.Core.Domain.Tools;
+using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Core.Persistence.Tools;
 using Geef.Atelier.Infrastructure.Llm;
 
@@ -23,6 +25,7 @@ internal sealed class CrewSpecValidator(
     IModelCatalog modelCatalog,
     IGroundingProviderFactory groundingProviderFactory,
     IToolDefinitionRepository toolRepository,
+    ISpecializationPackRepository packRepository,
     ILlmClientResolver llmClientResolver) : ICrewSpecValidator
 {
     /// <inheritdoc/>
@@ -202,7 +205,91 @@ internal sealed class CrewSpecValidator(
         // Step 8 – tool bindings
         await ValidateToolBindingsAsync(spec, issues, cancellationToken);
 
+        // Step 9 – specialization-pack bindings
+        await ValidatePackBindingsAsync(spec, issues, cancellationToken);
+
         return issues;
+    }
+
+    /// <summary>
+    /// Validates pack bindings on every actor: referenced packs either exist (reuse) or are defined in
+    /// <c>spec.NewPacks</c>; reused packs are type-compatible and never foreign TaskBound; new packs are
+    /// correctly scoped (DomainScoped requires a domain, valid name).
+    /// </summary>
+    private async Task ValidatePackBindingsAsync(
+        CrewSpecArtifact spec,
+        List<CrewSpecValidationIssue> issues,
+        CancellationToken cancellationToken)
+    {
+        // Validate new pack definitions first, and index them by name.
+        var newPackTypes = new Dictionary<string, IReadOnlyList<PackActorType>>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < spec.NewPacks.Count; i++)
+        {
+            var np = spec.NewPacks[i];
+            if (string.IsNullOrWhiteSpace(np.Name) || !SpecializationPack.IsValidName(np.Name))
+                issues.Add(new CrewSpecValidationIssue($"packs[{i}].name",
+                    "New pack is missing a valid name (lowercase letters, digits, hyphens).", true));
+            if (string.IsNullOrWhiteSpace(np.SpecializationText))
+                issues.Add(new CrewSpecValidationIssue($"packs[{i}].specialization_text",
+                    "New pack is missing required 'specialization_text'.", true));
+            if (string.Equals(np.Scope, "DomainScoped", StringComparison.OrdinalIgnoreCase) &&
+                string.IsNullOrWhiteSpace(np.Domain) && string.IsNullOrWhiteSpace(spec.Domain))
+                issues.Add(new CrewSpecValidationIssue($"packs[{i}].domain",
+                    "DomainScoped pack requires a 'domain'.", true));
+            if (np.Name is not null)
+                newPackTypes[np.Name] = ParseNewPackActorTypes(np.ApplicableActorTypes);
+        }
+
+        var actorBindings = new List<(string Path, PackActorType Type, IReadOnlyList<string>? Packs)>();
+        if (spec.Executor is not null)
+            actorBindings.Add(("executor", PackActorType.Executor, spec.Executor.PackNames));
+        for (var i = 0; i < spec.Reviewers.Count; i++)
+            actorBindings.Add(($"reviewers[{i}]", PackActorType.Reviewer, spec.Reviewers[i].PackNames));
+        for (var i = 0; i < spec.Advisors.Count; i++)
+            actorBindings.Add(($"advisors[{i}]", PackActorType.Advisor, spec.Advisors[i].PackNames));
+
+        foreach (var (path, actorType, packNames) in actorBindings)
+        {
+            if (packNames is not { Count: > 0 }) continue;
+            foreach (var packName in packNames)
+            {
+                // New pack defined in this spec?
+                if (newPackTypes.TryGetValue(packName, out var newTypes))
+                {
+                    if (!newTypes.AppliesTo(actorType))
+                        issues.Add(new CrewSpecValidationIssue($"{path}.pack_names",
+                            $"New pack '{packName}' does not declare actor type '{actorType}'.", true));
+                    continue;
+                }
+
+                // Otherwise must resolve to an existing reusable pack.
+                var pack = await packRepository.GetByNameAsync(packName, cancellationToken);
+                if (pack is null)
+                {
+                    issues.Add(new CrewSpecValidationIssue($"{path}.pack_names",
+                        $"Pack '{packName}' is not in the catalogue and is not defined in 'packs'.", true));
+                    continue;
+                }
+                if (pack.Scope == PackScope.TaskBound)
+                    issues.Add(new CrewSpecValidationIssue($"{path}.pack_names",
+                        $"Pack '{packName}' is TaskBound to another crew and cannot be reused here.", true));
+                else if (!pack.ApplicableActorTypes.AppliesTo(actorType))
+                    issues.Add(new CrewSpecValidationIssue($"{path}.pack_names",
+                        $"Pack '{packName}' is not applicable to actor type '{actorType}'.", true));
+            }
+        }
+    }
+
+    private static IReadOnlyList<PackActorType> ParseNewPackActorTypes(IReadOnlyList<string>? raw)
+    {
+        if (raw is not { Count: > 0 }) return [PackActorType.Any];
+        return raw.Select(s => s?.ToLowerInvariant() switch
+        {
+            "executor" => PackActorType.Executor,
+            "reviewer" => PackActorType.Reviewer,
+            "advisor"  => PackActorType.Advisor,
+            _          => PackActorType.Any,
+        }).Distinct().ToList();
     }
 
     // -------------------------------------------------------------------------

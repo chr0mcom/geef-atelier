@@ -13,4 +13,5 @@ public static class GroundingProviderTypes
     public const string LearningRetrieval = "learning-retrieval";
     public const string CrewCatalog = "crew-catalog";
     public const string ToolCatalog = "tool-catalog";
+    public const string PackCatalog = "pack-catalog";
 }
