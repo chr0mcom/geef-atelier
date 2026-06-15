@@ -8,12 +8,20 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
 {
     /// <summary>
     /// Adds the <c>specialization_packs</c> table and the <c>ActorPackBindings</c> column on
-    /// <c>CrewTemplates</c> for the generic-actors + specialization-packs feature, and performs the
-    /// clean reseed mandated by the concept (§12): custom profiles, crews, snapshots and run history
-    /// are cleared so the new generic system actors + packs become the baseline. No backwards-compat
-    /// read path. System actors, packs and templates are code constants (reseeded from code).
-    /// Kept: users, providers, settings, OAuth, system tools, the knowledge base (global documents),
-    /// approved learnings and MCP servers. This data wipe is irreversible (Down only drops the schema).
+    /// <c>CrewTemplates</c> for the generic-actors + specialization-packs feature, and performs a clean
+    /// reset (operator request): keep ONLY user accounts and auth/credentials/config; wipe everything
+    /// else so the platform starts fresh with the improved generic system actors + packs.
+    /// <para>
+    /// KEEP: <c>Users</c>, all OAuth tables, <c>mcp_server_configs</c>, <c>Providers</c> (LLM
+    /// credentials), <c>SiteSettings</c>, <c>StudioSettings</c>, and the DB-seeded SYSTEM catalogue
+    /// (system tools, system finalizers, system grounding providers — they have no reseed path).
+    /// </para>
+    /// <para>
+    /// WIPE: run history, custom profiles/templates/packs, crew embeddings, studio analyses, the
+    /// knowledge base (all documents + chunks), approved learnings, and custom tools. Improved
+    /// reviewer/executor/advisor prompts come from code constants (no DB reseed needed).
+    /// </para>
+    /// This data wipe is irreversible (Down only drops the schema). Take a full pg_dump before deploy.
     /// </summary>
     [DbContext(typeof(AtelierDbContext))]
     [Migration("20260615120000_Step42SpecializationPacks")]
@@ -49,13 +57,13 @@ ALTER TABLE ""CrewTemplates""
     ADD COLUMN ""ActorPackBindings"" jsonb NOT NULL DEFAULT '{}'::jsonb;
 ");
 
-            // ── 2. Clean reseed (concept §12): clear custom crews/profiles/runs ─────
-            // Ordered DELETEs (child → parent) so existing foreign keys are respected. Run-local
-            // knowledge attachments are removed (they belong to deleted runs); global knowledge and
-            // learnings are preserved. IMPORTANT: profile/template tables only drop CUSTOM rows
-            // ("IsSystem" = false). System finalizers and grounding providers are DB-seeded by earlier
-            // migrations (Step15/Step22/Step30) and must survive — deleting them would orphan the
-            // system catalogue permanently (no reseed path).
+            // ── 2. Clean reset (operator request): keep only accounts + auth/credentials/config ─────
+            // Ordered DELETEs (child → parent) so existing foreign keys are respected.
+            // Profile/template tables only drop CUSTOM rows ("IsSystem" = false): the system
+            // finalizers and grounding providers are DB-seeded by earlier migrations (Step15/22/30)
+            // and must survive — deleting them would orphan the system catalogue permanently.
+            // The knowledge base, learnings and custom tools are wiped for a fresh start; users,
+            // OAuth, MCP servers, providers and settings are NOT touched here (kept in place).
             migrationBuilder.Sql(@"
 DELETE FROM ""FinalizationActorCosts"";
 DELETE FROM ""GroundingActorCosts"";
@@ -66,7 +74,8 @@ DELETE FROM tool_invocations;
 DELETE FROM ""RunArtifacts"";
 DELETE FROM ""Events"";
 DELETE FROM ""Findings"";
-DELETE FROM ""KnowledgeDocuments"" WHERE ""RunId"" IS NOT NULL;
+DELETE FROM ""KnowledgeDocuments"";
+DELETE FROM ""LearningEntries"";
 DELETE FROM ""Iterations"";
 DELETE FROM ""Runs"";
 
@@ -78,6 +87,7 @@ DELETE FROM ""AdvisorProfiles""           WHERE ""IsSystem"" = false;
 DELETE FROM ""GroundingProviderProfiles"" WHERE ""IsSystem"" = false;
 DELETE FROM ""FinalizerProfiles""         WHERE ""IsSystem"" = false;
 DELETE FROM ""CrewTemplates""             WHERE ""IsSystem"" = false;
+DELETE FROM tool_definitions             WHERE ""IsSystem"" = false;
 ");
         }
 

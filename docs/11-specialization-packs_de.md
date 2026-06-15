@@ -112,14 +112,23 @@ Genutzte Packs erhalten ein aktualisiertes `LastUsedAt` (steuert Auto-GC).
   als `PackGc.RetentionDays` (default 90) ungenutzt und von keinem Template referenziert sind. System-
   und TaskBound-Packs werden nie auto-archiviert. Archivierte Packs verschwinden aus Picker/Composer.
 
-## Datenbank-Upgrade (kein System-Datenverlust)
+## Datenbank-Upgrade (saubere Neuaufsetzung, Konten + Auth bleiben)
 
-Migration **Step42** legt `specialization_packs` und die `ActorPackBindings`-Spalte an und führt die
-saubere Neuaufsetzung des Konzepts durch: sie leert **Custom**-Crews/-Profile/-Templates und die
-Run-Historie. Entscheidend: die Profil-/Template-DELETEs sind auf `WHERE "IsSystem" = false` beschränkt,
-sodass die **DB-geseedeten** System-Finalizer (Step22/Step30) und System-Grounding-Provider (Step15)
-erhalten bleiben — sie zu löschen würde den System-Katalog dauerhaft verwaisen. Vor dem Deploy ein
-`pg_dump`-Backup ziehen.
+Migration **Step42** legt `specialization_packs` und die `ActorPackBindings`-Spalte an und führt eine
+saubere Neuaufsetzung durch (Betreiber-Policy): **nur Benutzerkonten und Auth/Credentials/Config
+behalten, alles andere leeren**, damit die Plattform frisch mit den verbesserten generischen Akteuren +
+Packs startet.
+
+- **Behalten:** `Users`, alle OAuth-Tabellen, `mcp_server_configs`, `Providers` (LLM-Credentials),
+  `SiteSettings`, `StudioSettings` sowie der DB-geseedete **System-Katalog** (System-Tools, -Finalizer,
+  -Grounding-Provider — über `WHERE "IsSystem" = false`-DELETEs geschützt; sie haben keinen Reseed-Pfad).
+- **Geleert:** Run-Historie, Custom-Profile/-Templates/-Packs, Crew-Embeddings, Studio-Analysen, die
+  Knowledge-Base (alle Dokumente + Chunks), freigegebene Learnings und Custom-Tools.
+- Die verbesserten Reviewer-/Executor-/Advisor-Prompts kommen aus **Code-Konstanten** und greifen
+  automatisch — kein DB-Reseed nötig.
+
+Vor dem Deploy ein vollständiges `pg_dump`-Backup ziehen (Sicherheitsnetz; Benutzer-/Auth-Daten bleiben
+ohnehin in-place erhalten, daher kein separates Speichern/Wiederherstellen nötig).
 
 ## Wichtige Dateien
 

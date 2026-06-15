@@ -1249,6 +1249,6 @@ Umsetzungsleitfaden: [`11-specialization-packs_de.md`](11-specialization-packs_d
 
 **D-061/8 — Audit-UI.** `ActorPromptCompositionBlock.razor` auf der Run-Detailseite zeigt je Akteur den Rollen-Prompt, die gebundenen Packs (mit Scope + Reihenfolge) und den komponierten effektiven Prompt.
 
-**D-061/9 — Saubere Neuaufsetzung ohne System-Datenverlust.** Migration Step42 leert Custom-Crews/-Profile/-Templates und die Run-Historie, aber ihre Profil-/Template-DELETEs sind auf `WHERE "IsSystem" = false` beschränkt und erhalten die DB-geseedeten System-Finalizer (Step22/Step30) und Grounding-Provider (Step15). `pg_dump`-Backup vor dem Deploy.
+**D-061/9 — Saubere Neuaufsetzung, Konten + Auth bleiben (Betreiber-Policy).** Migration Step42 behält nur Benutzerkonten und Auth/Credentials/Config (`Users`, OAuth, `mcp_server_configs`, `Providers`, Settings) sowie den DB-geseedeten System-Katalog (System-Tools/-Finalizer/-Grounding, geschützt über `WHERE "IsSystem" = false`-DELETEs) und leert alles andere für einen Frischstart: Run-Historie, Custom-Profile/-Templates/-Packs, Embeddings, Studio-Analysen, Knowledge-Base, Learnings und Custom-Tools. Verbesserte Prompts kommen aus Code-Konstanten (kein DB-Reseed). `pg_dump`-Backup vor dem Deploy.
 
 **Tests:** Specialization-/Composition-/Parser-/Validator-/Lebenszyklus-Units ergänzt; keine neuen Regressionen (vorbestehende DB-/E2E-/Contention-Fehler unverändert). Migration Step42 (additives Schema + gescopte Custom-Daten-Neuaufsetzung).

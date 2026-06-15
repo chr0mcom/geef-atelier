@@ -108,13 +108,22 @@ get `LastUsedAt` touched (drives auto-GC).
   longer than `PackGc.RetentionDays` (default 90) and unreferenced by any template. System and
   TaskBound packs are never auto-archived. Archived packs disappear from pickers/composer.
 
-## Database upgrade (no system-data loss)
+## Database upgrade (clean reset, keep accounts + auth)
 
-Migration **Step42** adds `specialization_packs` and the `ActorPackBindings` column, then performs the
-concept's clean reseed: it clears **custom** crews/profiles/templates and run history. Crucially, the
-profile/template deletes are scoped to `WHERE "IsSystem" = false`, so the **DB-seeded** system
-finalizers (Step22/Step30) and system grounding providers (Step15) survive — deleting them would orphan
-the system catalogue permanently. Take a `pg_dump` backup before deploy.
+Migration **Step42** adds `specialization_packs` and the `ActorPackBindings` column, then performs a
+clean reset (operator policy): **keep only user accounts and auth/credentials/config, wipe everything
+else** so the platform starts fresh with the improved generic actors + packs.
+
+- **Kept:** `Users`, all OAuth tables, `mcp_server_configs`, `Providers` (LLM credentials),
+  `SiteSettings`, `StudioSettings`, and the DB-seeded **system catalogue** (system tools, finalizers,
+  grounding providers — scoped via `WHERE "IsSystem" = false` deletes; they have no reseed path).
+- **Wiped:** run history, custom profiles/templates/packs, crew embeddings, studio analyses, the
+  knowledge base (all documents + chunks), approved learnings, and custom tools.
+- The improved reviewer/executor/advisor prompts come from **code constants** and apply automatically
+  — no DB reseed needed.
+
+Take a full `pg_dump` backup before deploy (safety net; user/auth data is preserved in place, so no
+separate save/restore is required).
 
 ## Key files
 

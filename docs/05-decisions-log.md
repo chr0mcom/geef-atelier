@@ -1327,6 +1327,6 @@ implementation guide: [`11-specialization-packs.md`](11-specialization-packs.md)
 
 **D-061/8 — Audit UI.** `ActorPromptCompositionBlock.razor` on the run-detail page shows the role prompt, bound packs (with scope + order), and the composed effective prompt per actor.
 
-**D-061/9 — Clean reseed without system-data loss.** Migration Step42 wipes custom crews/profiles/templates and run history, but its profile/template deletes are scoped to `WHERE "IsSystem" = false`, preserving the DB-seeded system finalizers (Step22/Step30) and grounding providers (Step15). `pg_dump` backup before deploy.
+**D-061/9 — Clean reset, keep accounts + auth (operator policy).** Migration Step42 keeps only user accounts and auth/credentials/config (`Users`, OAuth, `mcp_server_configs`, `Providers`, settings) plus the DB-seeded system catalogue (system tools/finalizers/grounding, preserved via `WHERE "IsSystem" = false` deletes), and wipes everything else for a fresh start: run history, custom profiles/templates/packs, embeddings, studio analyses, the knowledge base, learnings, and custom tools. Improved prompts come from code constants (no DB reseed). `pg_dump` backup before deploy.
 
 **Tests:** specialization/composition/parser/validator/lifecycle units added; no new regressions (pre-existing DB/E2E/contention failures unchanged). Migration Step42 (additive schema + scoped custom-data reseed).
