@@ -11,8 +11,10 @@
 @using Geef.Atelier.Core.Domain.Crew.Profiles
 @using Geef.Atelier.Core.Domain.Crew.Specialization
 @using Geef.Atelier.Infrastructure.Configuration
+@using Geef.Atelier.Web.Services
 @using Microsoft.Extensions.Options
 @inject ICrewService CrewService
+@inject ISpecializationPackService PackService
 @inject IOptions<ConvergenceOptions> ConvergenceOpts
 @inject NavigationManager Nav
 
@@ -156,7 +158,7 @@
                     <div class="field">
                         <label>Executor: @_form.ExecutorProfileName</label>
                         <SpecializationPackPicker ActorType="PackActorType.Executor"
-                                                  OwningCrewId="@_owningCrewId"
+                                                  AvailablePacks="_executorPacks"
                                                   SelectedPackNames="GetBinding(ActorTypeKeys.Executor, _form.ExecutorProfileName)"
                                                   SelectedPackNamesChanged="names => SetBinding(ActorTypeKeys.Executor, _form.ExecutorProfileName, names)" />
                     </div>
@@ -167,7 +169,7 @@
                         <div class="field">
                             <label>Reviewer: @rn</label>
                             <SpecializationPackPicker ActorType="PackActorType.Reviewer"
-                                                      OwningCrewId="@_owningCrewId"
+                                                      AvailablePacks="_reviewerPacks"
                                                       SelectedPackNames="GetBinding(ActorTypeKeys.Reviewer, rn)"
                                                       SelectedPackNamesChanged="names => SetBinding(ActorTypeKeys.Reviewer, rn, names)" />
                         </div>
@@ -179,7 +181,7 @@
                         <div class="field">
                             <label>Advisor: @an</label>
                             <SpecializationPackPicker ActorType="PackActorType.Advisor"
-                                                      OwningCrewId="@_owningCrewId"
+                                                      AvailablePacks="_advisorPacks"
                                                       SelectedPackNames="GetBinding(ActorTypeKeys.Advisor, an)"
                                                       SelectedPackNamesChanged="names => SetBinding(ActorTypeKeys.Advisor, an, names)" />
                         </div>
@@ -290,6 +292,10 @@
     private IReadOnlyList<GroundingProviderProfile> _groundingProviderProfiles = [];
     private IReadOnlyList<FinalizerProfile> _finalizerProfiles = [];
 
+    private IReadOnlyList<SpecializationPack> _executorPacks = [];
+    private IReadOnlyList<SpecializationPack> _reviewerPacks = [];
+    private IReadOnlyList<SpecializationPack> _advisorPacks = [];
+
     private TemplateFormModel _form = new();
 
     protected override async Task OnInitializedAsync()
@@ -314,6 +320,16 @@
         {
             _form.ExecutorProfileName = _executors.FirstOrDefault()?.Name ?? "";
             _form.ApplyConvergenceDefaults(defaults);
+        }
+
+        // Pack pickers are only rendered for custom templates. Load the bindable packs here, sequentially,
+        // and pass them down so the many sibling pickers never query the shared circuit-scoped DbContext
+        // concurrently (which would throw "A second operation was started on this context instance").
+        if (!_isSystem)
+        {
+            _executorPacks = await PackService.ListForBindingAsync(PackActorType.Executor, null, _owningCrewId);
+            _reviewerPacks = await PackService.ListForBindingAsync(PackActorType.Reviewer, null, _owningCrewId);
+            _advisorPacks  = await PackService.ListForBindingAsync(PackActorType.Advisor, null, _owningCrewId);
         }
 
         _loading = false;

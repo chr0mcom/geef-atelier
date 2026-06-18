@@ -1,7 +1,5 @@
 @* Reusable picker for binding specialization packs to an actor within a crew. *@
 @using Geef.Atelier.Core.Domain.Crew.Specialization
-@using Geef.Atelier.Web.Services
-@inject ISpecializationPackService PackService
 
 <div class="profile-picker" data-testid="pack-picker">
     <div class="profile-picker-grid">
@@ -29,7 +27,7 @@
             {
                 var idx = i;
                 var name = SelectedPackNames[idx];
-                var pack = _allBindable.FirstOrDefault(p => p.Name == name);
+                var pack = AvailablePacks.FirstOrDefault(p => p.Name == name);
                 <div class="picker-active-item" data-testid="pack-selected-@name">
                     <span class="picker-item-rank">@(idx + 1).</span>
                     <span class="picker-item-name">
@@ -69,24 +67,17 @@
     /// <summary>Raised when the binding changes.</summary>
     [Parameter] public EventCallback<List<string>> SelectedPackNamesChanged { get; set; }
 
-    /// <summary>Actor type the packs are bound to (for type-compatibility filtering).</summary>
+    /// <summary>Actor type the packs are bound to (display only; the bindable list is supplied by the parent).</summary>
     [Parameter, EditorRequired] public PackActorType ActorType { get; set; }
 
-    /// <summary>Crew domain for DomainScoped pack filtering; null shows General + own TaskBound only.</summary>
-    [Parameter] public string? CrewDomain { get; set; }
-
-    /// <summary>Owning crew name for own-TaskBound visibility; null hides all TaskBound packs.</summary>
-    [Parameter] public string? OwningCrewId { get; set; }
-
-    private List<SpecializationPack> _allBindable = [];
+    /// <summary>
+    /// Bindable packs for this actor type, pre-loaded by the parent. Loading is hoisted to the parent so
+    /// the many sibling pickers do not issue concurrent queries against the shared circuit-scoped DbContext.
+    /// </summary>
+    [Parameter, EditorRequired] public IReadOnlyList<SpecializationPack> AvailablePacks { get; set; } = [];
 
     private IEnumerable<SpecializationPack> _available =>
-        _allBindable.Where(p => !SelectedPackNames.Contains(p.Name));
-
-    protected override async Task OnParametersSetAsync()
-    {
-        _allBindable = (await PackService.ListForBindingAsync(ActorType, CrewDomain, OwningCrewId)).ToList();
-    }
+        AvailablePacks.Where(p => !SelectedPackNames.Contains(p.Name));
 
     private async Task AddPack(SpecializationPack pack)
     {
