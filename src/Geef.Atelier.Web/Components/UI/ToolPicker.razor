@@ -1,7 +1,5 @@
 @* Reusable picker for assigning tools to an actor profile. *@
 @using Geef.Atelier.Core.Domain.Tools
-@using Geef.Atelier.Web.Services
-@inject IToolDefinitionService ToolService
 
 <div class="profile-picker" data-testid="tool-picker">
     @if (!CanSelectProvider)
@@ -37,7 +35,7 @@
             {
                 var idx = i;
                 var name = SelectedToolNames[idx];
-                var tool = _allTools.FirstOrDefault(t => t.Name == name);
+                var tool = AllTools.FirstOrDefault(t => t.Name == name);
                 <div class="picker-active-item" data-testid="tool-selected-@name">
                     <span class="picker-item-rank">@(idx + 1).</span>
                     <span class="picker-item-name">
@@ -87,15 +85,14 @@
     /// </summary>
     [Parameter] public bool CanSelectProvider { get; set; } = true;
 
-    private List<ToolDefinition> _allTools = [];
+    /// <summary>
+    /// The full tool catalogue, pre-loaded by the parent. Loading is hoisted to the parent so this picker
+    /// and its sibling components do not issue concurrent queries against the shared circuit-scoped DbContext.
+    /// </summary>
+    [Parameter, EditorRequired] public IReadOnlyList<ToolDefinition> AllTools { get; set; } = [];
 
     private IEnumerable<ToolDefinition> _available =>
-        _allTools.Where(t => !SelectedToolNames.Contains(t.Name));
-
-    protected override async Task OnInitializedAsync()
-    {
-        _allTools = (await ToolService.GetAllAsync()).ToList();
-    }
+        AllTools.Where(t => !SelectedToolNames.Contains(t.Name));
 
     private async Task AddTool(ToolDefinition tool)
     {

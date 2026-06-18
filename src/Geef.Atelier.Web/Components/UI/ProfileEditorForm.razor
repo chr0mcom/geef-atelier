@@ -3,7 +3,10 @@
 @using Geef.Atelier.Application.Providers
 @using Geef.Atelier.Core.Domain.Crew.Advisors
 @using Geef.Atelier.Core.Domain.Providers
+@using Geef.Atelier.Core.Domain.Tools
+@using Geef.Atelier.Web.Services
 @inject IProviderService ProviderService
+@inject IToolDefinitionService ToolService
 
 <div data-testid="profile-editor">
     @if (!string.IsNullOrEmpty(Error))
@@ -122,6 +125,7 @@
 
                 <ToolPicker SelectedToolNames="_selectedToolNames"
                             SelectedToolNamesChanged="OnToolNamesChanged"
+                            AllTools="_allTools"
                             CanSelectProvider="@_providerSupportsAgenticTools" />
             </div>
         }
@@ -241,6 +245,7 @@
 
     private bool IsNew => ProfileName == null;
     private IReadOnlyList<Provider> _providers = [];
+    private IReadOnlyList<ToolDefinition> _allTools = [];
     private ProfileFormModel _form = new();
     private ModelSelector? _modelSelector;
     private bool _showCustomModelWarning = false;
@@ -250,6 +255,10 @@
     protected override async Task OnInitializedAsync()
     {
         _providers = await ProviderService.ListAsync(includeInactive: false);
+        // Load the tool catalogue here (sequentially) and pass it to the child ToolPicker, so the picker
+        // does not query concurrently with this component on the shared circuit-scoped DbContext.
+        if (ShowToolPicker)
+            _allTools = await ToolService.GetAllAsync();
         var effectiveProvider = !string.IsNullOrEmpty(Provider) ? Provider
             : _providers.Count > 0 ? _providers[0].Name : "";
         _form = new ProfileFormModel
