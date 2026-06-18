@@ -162,11 +162,11 @@
                         <label>System Prompt</label>
                         <InputTextArea @bind-Value="_form.SystemPrompt" class="form-input" rows="6"
                             placeholder="Instructions for the AI transform…" data-testid="input-system-prompt" />
-                        <small class="form-hint">Tipp: Endet mit „Respond in the language of the input text."</small>
+                        <small class="form-hint">Tip: end with "Respond in the language of the input text."</small>
                         <FieldHelp Text="@StudioFieldHelps.FinalizerTransformSystemPrompt" DataTestId="field-help-transform-system-prompt" />
                     </div>
                     <div class="field">
-                        <label>Anbieter</label>
+                        <label>Provider</label>
                         <select class="form-input"
                                 value="@_form.TransformProvider"
                                 @onchange="OnTransformProviderChanged"
@@ -188,7 +188,7 @@
                         <FieldHelp Text="@FinalizerFieldHelps.TransformProvider" DataTestId="field-help-transform-provider" />
                     </div>
                     <div class="field">
-                        <label>Modell</label>
+                        <label>Model</label>
                         <ModelSelector Provider="@_form.TransformProvider"
                                        @bind-Value="_form.TransformModel"
                                        Disabled="@(!CanEdit)"
@@ -208,7 +208,7 @@
                                @onchange="OnTemperatureChanged"
                                disabled="@(!CanEdit)"
                                data-testid="input-transform-temperature"
-                               placeholder="leer = Anbieter-Standard" />
+                               placeholder="empty = provider default" />
                         <FieldHelp Text="@FinalizerFieldHelps.TransformTemperature" DataTestId="field-help-transform-temperature" />
                     </div>
                     break;

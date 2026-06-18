@@ -4,7 +4,7 @@
 <div class="profile-picker" data-testid="advisor-picker">
     <div class="profile-picker-grid">
         <div>
-            <p class="picker-col-label">Verfügbar</p>
+            <p class="picker-col-label">Available</p>
             @foreach (var profile in AvailableNotSelected)
             {
                 <button type="button" class="picker-pool-item"
@@ -18,11 +18,11 @@
             }
             @if (!AvailableNotSelected.Any())
             {
-                <p class="picker-empty-state">Alle ausgewählt</p>
+                <p class="picker-empty-state">All selected</p>
             }
         </div>
         <div>
-            <p class="picker-col-label">Ausgewählt</p>
+            <p class="picker-col-label">Selected</p>
             @for (int i = 0; i < Selected.Count; i++)
             {
                 var idx = i;

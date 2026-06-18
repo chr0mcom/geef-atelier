@@ -16,17 +16,17 @@
 @inject NavigationManager Nav
 @inject IOptions<TavilyOptions> TavilyOpts
 
-<PageTitle>@(IsNew ? "Grounding-Provider erstellen" : "Grounding-Provider bearbeiten") — Atelier</PageTitle>
+<PageTitle>@(IsNew ? "Create grounding provider" : "Edit grounding provider") — Atelier</PageTitle>
 
 <div class="crew-editor" data-testid="grounding-provider-editor">
     <div class="page-header">
-        <h1>@(IsNew ? "Neuer Grounding-Provider" : $"Bearbeiten: {_displayName}")</h1>
-        <a href="/crew/profiles/grounding-providers" class="btn ghost">← Zurück</a>
+        <h1>@(IsNew ? "New grounding provider" : $"Edit: {_displayName}")</h1>
+        <a href="/crew/profiles/grounding-providers" class="btn ghost">← Back</a>
     </div>
 
     @if (_loading)
     {
-        <p>Wird geladen…</p>
+        <p>Loading…</p>
     }
     else
     {
@@ -38,39 +38,39 @@
                 <div class="error-banner" data-testid="editor-error">@_error</div>
             }
 
-            @* ── §0 Grunddaten ── *@
+            @* ── §0 Basics ── *@
             <div class="template-meta-section">
-                <h3>Grunddaten</h3>
+                <h3>Basics</h3>
 
                 <div class="field">
-                    <label>Name (Slug)</label>
+                    <label>Name (slug)</label>
                     <InputText @bind-Value="_form.Name" placeholder="legal-docs-search" data-testid="input-name" />
                     <ValidationMessage For="() => _form.Name" />
-                    <small class="form-hint">Wird gespeichert als <code>custom-…</code>. Nur Kleinbuchstaben, Ziffern und Bindestriche.</small>
+                    <small class="form-hint">Saved as <code>custom-…</code>. Lowercase letters, digits and hyphens only.</small>
                 </div>
 
                 <div class="field">
-                    <label>Anzeigename</label>
+                    <label>Display name</label>
                     <InputText @bind-Value="_form.DisplayName" placeholder="Tavily Basic" data-testid="input-display-name" />
                     <ValidationMessage For="() => _form.DisplayName" />
                 </div>
 
                 <div class="field">
-                    <label>Beschreibung</label>
+                    <label>Description</label>
                     <InputTextArea @bind-Value="_form.Description" rows="2" data-testid="input-description" />
                 </div>
             </div>
 
-            @* ── §1 Provider-Typ ── *@
+            @* ── §1 Provider type ── *@
             <div class="template-meta-section">
-                <h3>Provider-Typ</h3>
+                <h3>Provider type</h3>
 
                 @* Hidden select — bUnit test compatibility + form binding *@
                 <div class="provider-type-hidden-select">
                     <InputSelect @bind-Value="_form.ProviderType" disabled="@(!IsNew)" data-testid="input-provider-type">
                         <option value="tavily">Tavily Web Search</option>
                         <option value="vector-store">Vector Store</option>
-                        <option value="static-context">Statischer Kontext</option>
+                        <option value="static-context">Static context</option>
                         <option value="url-fetch">URL Fetch</option>
                         <option value="news-search">News Search</option>
                         <option value="academic-search">Academic Search</option>
@@ -81,7 +81,7 @@
                 @if (IsNew)
                 {
                     <p class="pipeline-stage-desc" style="margin: 0 0 0.75rem;">
-                        Wähle den Typ. Der Typ kann nach dem Erstellen nicht geändert werden.
+                        Choose the type. The type cannot be changed after creation.
                     </p>
                     <div class="provider-type-grid">
                         @foreach (var pt in _providerTypes)
@@ -100,16 +100,16 @@
                 {
                     <span class="provider-type-badge">@GetProviderTypeName()</span>
                     <p class="pipeline-stage-desc" style="margin: 0.5rem 0 0;">
-                        Der Provider-Typ kann nach dem Erstellen nicht geändert werden.
+                        The provider type cannot be changed after creation.
                     </p>
                 }
             </div>
 
-            @* ── §2 Typ-Einstellungen ── *@
+            @* ── §2 Type settings ── *@
             <div class="pipeline-stage-section">
                 <div class="pipeline-stage-header">
                     <div class="pipeline-stage-header-text">
-                        <h3>@GetProviderTypeName() — Einstellungen</h3>
+                        <h3>@GetProviderTypeName() — settings</h3>
                         <p class="pipeline-stage-desc">@GetProviderTypeDesc()</p>
                     </div>
                 </div>
@@ -119,27 +119,27 @@
                     @if (string.IsNullOrWhiteSpace(TavilyOpts.Value.ApiKey))
                     {
                         <div class="warning-banner" data-testid="tavily-key-warning">
-                            ⚠ TAVILY_API_KEY ist nicht konfiguriert. Das Profil kann erstellt werden, funktioniert aber erst nach Setzen des API-Keys.
+                            ⚠ TAVILY_API_KEY is not configured. The profile can be created but only works once the API key is set.
                         </div>
                     }
 
                     <div class="field">
-                        <label>Suchstufe</label>
+                        <label>Search tier</label>
                         <InputSelect @bind-Value="_form.Tier" data-testid="input-tier">
-                            <option value="basic">Basic (~$0,001/Suche)</option>
-                            <option value="advanced">Advanced (~$0,002/Suche)</option>
+                            <option value="basic">Basic (~$0.001/search)</option>
+                            <option value="advanced">Advanced (~$0.002/search)</option>
                         </InputSelect>
                     </div>
 
                     <div class="field">
-                        <label>Max. Ergebnisse</label>
+                        <label>Max results</label>
                         <InputNumber @bind-Value="_form.MaxResults" min="1" max="20" data-testid="input-max-results" />
                     </div>
 
                     <div class="field">
                         <label class="form-checkbox-label">
                             <InputCheckbox @bind-Value="_form.IncludeAnswer" data-testid="input-include-answer" />
-                            Synthetisierte Antwort einbeziehen
+                            Include synthesized answer
                         </label>
                     </div>
                 }
@@ -147,56 +147,56 @@
                 @if (_form.ProviderType == "vector-store")
                 {
                     <div class="field">
-                        <label>Top-K Treffer</label>
+                        <label>Top-K hits</label>
                         <InputNumber @bind-Value="_form.TopK" min="1" max="20" data-testid="input-top-k" />
-                        <small class="form-hint">Anzahl der abgerufenen Chunks pro Anfrage (1–20).</small>
+                        <small class="form-hint">Number of chunks retrieved per query (1–20).</small>
                     </div>
 
                     <div class="field">
-                        <label>Tag-Filter (optional, kommagetrennt)</label>
+                        <label>Tag filter (optional, comma-separated)</label>
                         <InputText @bind-Value="_form.TagFilter" placeholder="policy, hr" data-testid="input-tag-filter" />
-                        <small class="form-hint">Leer lassen, um alle Dokumente zu durchsuchen.</small>
+                        <small class="form-hint">Leave empty to search all documents.</small>
                     </div>
 
                     <div class="field">
                         <label>Scope</label>
                         <InputSelect @bind-Value="_form.Scope" data-testid="input-scope">
-                            <option value="global">Nur globale Wissensbasis</option>
-                            <option value="run-local">Nur Run-gebundene Dokumente</option>
-                            <option value="both">Beides kombiniert</option>
+                            <option value="global">Global knowledge base only</option>
+                            <option value="run-local">Run-local documents only</option>
+                            <option value="both">Both combined</option>
                         </InputSelect>
                         <small class="form-hint">
-                            <strong>Global:</strong> Persistente Wissensbasis. <strong>Run-lokal:</strong> An diesen Run geheftete Dokumente. <strong>Beides:</strong> Kombinierte Suche.
+                            <strong>Global:</strong> persistent knowledge base. <strong>Run-local:</strong> documents attached to this run. <strong>Both:</strong> combined search.
                         </small>
                     </div>
 
                     <div class="field">
-                        <label>Embedding-Modell</label>
-                        <p class="form-hint" data-testid="embedding-model-info">openai/text-embedding-3-small (1536 Dimensionen)</p>
+                        <label>Embedding model</label>
+                        <p class="form-hint" data-testid="embedding-model-info">openai/text-embedding-3-small (1536 dimensions)</p>
                     </div>
                 }
 
                 @if (_form.ProviderType == "static-context")
                 {
                     <div class="field">
-                        <label>Quellenname (Label)</label>
+                        <label>Source name (label)</label>
                         <InputText @bind-Value="_form.StaticLabel"
-                                   placeholder="z. B. Markenstimme, Style Guide Q2 2026"
+                                   placeholder="e.g. brand voice, style guide Q2 2026"
                                    disabled="@_isReadOnly"
                                    data-testid="input-static-label" />
                         <FieldHelp Text="@GroundingFieldHelps.StaticContextLabel" />
                     </div>
 
                     <div class="field">
-                        <label>Inhalt</label>
+                        <label>Content</label>
                         <InputTextArea @bind-Value="_form.StaticContent" rows="10"
                                        disabled="@_isReadOnly"
-                                       placeholder="Füge hier deinen kuratierten Text ein (Glossar, Style Guide, Markenstimme …)"
+                                       placeholder="Paste your curated text here (glossary, style guide, brand voice …)"
                                        data-testid="input-static-content" />
                         @if ((_form.StaticContent ?? "").Length > 50_000)
                         {
                             <small class="form-hint form-hint--warn">
-                                ⚠ Inhalt ist länger als 50.000 Zeichen. Sehr große Texte gehören besser in die Knowledge-Base (Vector-Store-Provider).
+                                ⚠ Content is longer than 50,000 characters. Very large texts are better placed in the knowledge base (vector-store provider).
                             </small>
                         }
                         <FieldHelp Text="@GroundingFieldHelps.StaticContextContent" />
@@ -206,7 +206,7 @@
                 @if (_form.ProviderType == "url-fetch")
                 {
                     <div class="field">
-                        <label>URLs (eine pro Zeile)</label>
+                        <label>URLs (one per line)</label>
                         <InputTextArea @bind-Value="_form.Urls" rows="5"
                                        disabled="@_isReadOnly"
                                        placeholder="https://example.com/article&#10;https://docs.example.org/api"
@@ -215,7 +215,7 @@
                     </div>
 
                     <div class="field">
-                        <label>Max. Zeichen pro URL</label>
+                        <label>Max characters per URL</label>
                         <InputNumber @bind-Value="_form.MaxContentPerUrl" min="500" max="100000"
                                      disabled="@_isReadOnly"
                                      data-testid="input-max-content-per-url" />
@@ -225,7 +225,7 @@
                     <div class="field">
                         <label class="form-checkbox-label">
                             <InputCheckbox @bind-Value="_form.StripBoilerplate" disabled="@_isReadOnly" data-testid="input-strip-boilerplate" />
-                            Boilerplate entfernen (Navigation, Werbung, Cookie-Banner)
+                            Remove boilerplate (navigation, ads, cookie banners)
                         </label>
                         <FieldHelp Text="@GroundingFieldHelps.UrlFetchStripBoilerplate" />
                     </div>
@@ -234,7 +234,7 @@
                 @if (_form.ProviderType == "news-search")
                 {
                     <div class="field">
-                        <label>Aktualität (Tage)</label>
+                        <label>Recency (days)</label>
                         <InputNumber @bind-Value="_form.RecencyDays" min="1" max="365"
                                      disabled="@_isReadOnly"
                                      data-testid="input-recency-days" />
@@ -242,7 +242,7 @@
                     </div>
 
                     <div class="field">
-                        <label>Max. Treffer</label>
+                        <label>Max hits</label>
                         <InputNumber @bind-Value="_form.NewsMaxResults" min="1" max="20"
                                      disabled="@_isReadOnly"
                                      data-testid="input-news-max-results" />
@@ -250,12 +250,12 @@
                     </div>
 
                     <div class="field">
-                        <label>Suchtiefe</label>
+                        <label>Search depth</label>
                         <InputSelect @bind-Value="_form.NewsSearchDepth"
                                      disabled="@_isReadOnly"
                                      data-testid="input-news-search-depth">
-                            <option value="basic">Basic (schneller, günstiger)</option>
-                            <option value="advanced">Advanced (gründlicher, mehr Credits)</option>
+                            <option value="basic">Basic (faster, cheaper)</option>
+                            <option value="advanced">Advanced (more thorough, more credits)</option>
                         </InputSelect>
                         <FieldHelp Text="@GroundingFieldHelps.NewsSearchDepth" />
                     </div>
@@ -264,19 +264,19 @@
                 @if (_form.ProviderType == "academic-search")
                 {
                     <div class="field">
-                        <label>Quelle</label>
+                        <label>Source</label>
                         <InputSelect @bind-Value="_form.AcademicSource"
                                      disabled="@_isReadOnly"
                                      data-testid="input-academic-source">
-                            <option value="semantic-scholar">Semantic Scholar (breit, optionaler Key)</option>
-                            <option value="arxiv">arXiv (Preprints CS/Physik/Math, kein Key)</option>
-                            <option value="openalex">OpenAlex (sehr breit, modern)</option>
+                            <option value="semantic-scholar">Semantic Scholar (broad, optional key)</option>
+                            <option value="arxiv">arXiv (preprints CS/physics/math, no key)</option>
+                            <option value="openalex">OpenAlex (very broad, modern)</option>
                         </InputSelect>
                         <FieldHelp Text="@GroundingFieldHelps.AcademicSource" />
                     </div>
 
                     <div class="field">
-                        <label>Max. Paper</label>
+                        <label>Max papers</label>
                         <InputNumber @bind-Value="_form.AcademicMaxPapers" min="1" max="20"
                                      disabled="@_isReadOnly"
                                      data-testid="input-academic-max-papers" />
@@ -284,27 +284,27 @@
                     </div>
 
                     <div class="field">
-                        <label>Datum ab (optional)</label>
+                        <label>Date from (optional)</label>
                         <InputText @bind-Value="_form.AcademicDateFrom"
-                                   placeholder="z. B. 2024 oder 2024-01-01"
+                                   placeholder="e.g. 2024 or 2024-01-01"
                                    disabled="@_isReadOnly"
                                    data-testid="input-academic-date-from" />
                         <FieldHelp Text="@GroundingFieldHelps.AcademicDateFrom" />
                     </div>
 
                     <div class="field">
-                        <label>Suchfeld-Einschränkung (optional)</label>
+                        <label>Field restriction (optional)</label>
                         <InputText @bind-Value="_form.AcademicFields"
-                                   placeholder="leer = alle Felder"
+                                   placeholder="empty = all fields"
                                    disabled="@_isReadOnly"
                                    data-testid="input-academic-fields" />
                         <FieldHelp Text="@GroundingFieldHelps.AcademicFields" />
                     </div>
 
                     <div class="field">
-                        <label>API-Key-ENV-Variable (optional)</label>
+                        <label>API key ENV variable (optional)</label>
                         <InputText @bind-Value="_form.AcademicApiKeyEnv"
-                                   placeholder="z. B. SEMANTIC_SCHOLAR_API_KEY"
+                                   placeholder="e.g. SEMANTIC_SCHOLAR_API_KEY"
                                    disabled="@_isReadOnly"
                                    data-testid="input-academic-api-key-env" />
                         <FieldHelp Text="@GroundingFieldHelps.AcademicApiKeyEnv" />
@@ -323,7 +323,7 @@
                     </div>
 
                     <div class="field">
-                        <label>Methode</label>
+                        <label>Method</label>
                         <InputSelect @bind-Value="_form.RestApiMethod"
                                      disabled="@_isReadOnly"
                                      data-testid="input-rest-api-method">
@@ -336,7 +336,7 @@
                     @if (_form.RestApiMethod == "POST")
                     {
                         <div class="field">
-                            <label>Body-Template (POST)</label>
+                            <label>Body template (POST)</label>
                             <InputTextArea @bind-Value="_form.RestApiBodyTemplate" rows="4"
                                            placeholder="{\"query\": \"{briefing}\", \"limit\": 10}"
                                            disabled="@_isReadOnly"
@@ -346,16 +346,16 @@
                     }
 
                     <div class="field">
-                        <label>JSONPath (Antwort-Pfad, optional)</label>
+                        <label>JSONPath (response path, optional)</label>
                         <InputText @bind-Value="_form.RestApiResponsePath"
-                                   placeholder="$.results oder $.data[*].content"
+                                   placeholder="$.results or $.data[*].content"
                                    disabled="@_isReadOnly"
                                    data-testid="input-rest-api-response-path" />
                         <FieldHelp Text="@GroundingFieldHelps.RestApiResponsePath" />
                     </div>
 
                     <div class="field">
-                        <label>Max. Items</label>
+                        <label>Max items</label>
                         <InputNumber @bind-Value="_form.RestApiMaxItems" min="1" max="50"
                                      disabled="@_isReadOnly"
                                      data-testid="input-rest-api-max-items" />
@@ -363,9 +363,9 @@
                     </div>
 
                     <div class="field">
-                        <label>Auth-Header-ENV-Variable (optional)</label>
+                        <label>Auth header ENV variable (optional)</label>
                         <InputText @bind-Value="_form.RestApiAuthHeaderEnv"
-                                   placeholder="z. B. MY_API_TOKEN"
+                                   placeholder="e.g. MY_API_TOKEN"
                                    disabled="@_isReadOnly"
                                    data-testid="input-rest-api-auth-header-env" />
                         <FieldHelp Text="@GroundingFieldHelps.RestApiAuthHeaderEnv" />
@@ -374,7 +374,7 @@
                     @if (!string.IsNullOrWhiteSpace(_form.RestApiAuthHeaderEnv))
                     {
                         <div class="field">
-                            <label>Auth-Header-Name</label>
+                            <label>Auth header name</label>
                             <InputText @bind-Value="_form.RestApiAuthHeaderName"
                                        placeholder="Authorization"
                                        disabled="@_isReadOnly"
@@ -383,7 +383,7 @@
                         </div>
 
                         <div class="field">
-                            <label>Auth-Header-Format</label>
+                            <label>Auth header format</label>
                             <InputText @bind-Value="_form.RestApiAuthHeaderFormat"
                                        placeholder="Bearer {token}"
                                        disabled="@_isReadOnly"
@@ -393,7 +393,7 @@
                     }
 
                     <div class="field">
-                        <label>Zusatz-Header (JSON, optional)</label>
+                        <label>Extra headers (JSON, optional)</label>
                         <InputTextArea @bind-Value="_form.RestApiHeaders" rows="3"
                                        placeholder="{\"Accept\": \"application/json\"}"
                                        disabled="@_isReadOnly"
@@ -405,25 +405,25 @@
                 @if (_form.ProviderType != "static-context")
                 {
                     <div class="field">
-                        <label>Max. Anfragen pro Run</label>
+                        <label>Max queries per run</label>
                         <InputNumber @bind-Value="_form.MaxQueriesPerRun" data-testid="input-max-queries" />
-                        <small class="form-hint">1–5, Standard 1.</small>
+                        <small class="form-hint">1–5, default 1.</small>
                     </div>
                 }
             </div>
 
-            @* ── §3 KI-Refinement (optional, collapsible) ── *@
+            @* ── §3 AI refinement (optional, collapsible) ── *@
             <details class="collapsible-section">
-                <summary class="collapsible-header">KI-Refinement</summary>
+                <summary class="collapsible-header">AI refinement</summary>
                 <div class="collapsible-body">
                     <p class="pipeline-stage-desc" style="margin: 0.5rem 0 1rem;">
-                        Optionale KI-Nachbearbeitung der abgerufenen Quellen — irrelevante Ergebnisse filtern oder zu einem kohärenten Text zusammenfassen.
+                        Optional AI post-processing of the fetched sources — filter out irrelevant results or synthesize them into a coherent text.
                     </p>
 
                     <div class="field">
                         <label class="form-checkbox-label">
                             <InputCheckbox @bind-Value="_form.RefinementEnabled" disabled="@_isReadOnly" />
-                            KI-Refinement aktivieren
+                            Enable AI refinement
                         </label>
                         <FieldHelp Text="@GroundingFieldHelps.RefinementEnabled" />
                     </div>
@@ -431,10 +431,10 @@
                     @if (_form.RefinementEnabled)
                     {
                         <div class="field">
-                            <label>Refinement-Anbieter</label>
+                            <label>Refinement provider</label>
                             <select @bind="_form.RefinementProvider" @bind:after="OnRefinementProviderChanged" disabled="@_isReadOnly"
                                     data-testid="refinement-provider-select">
-                                <option value="">-- Anbieter wählen --</option>
+                                <option value="">-- select provider --</option>
                                 <optgroup label="HTTP">
                                     @foreach (var p in _providers.Where(x => x.IsActive && x.Type == ProviderType.Http))
                                     {
@@ -452,7 +452,7 @@
                         </div>
 
                         <div class="field">
-                            <label>Refinement-Modell</label>
+                            <label>Refinement model</label>
                             <ModelSelector Provider="@_form.RefinementProvider"
                                            @bind-Value="_form.RefinementModel"
                                            Disabled="@_isReadOnly"
@@ -461,7 +461,7 @@
                         </div>
 
                         <div class="field">
-                            <label>Max. Token</label>
+                            <label>Max tokens</label>
                             <InputNumber @bind-Value="_form.RefinementMaxTokens" min="256" data-testid="refinement-max-tokens-input" />
                             <FieldHelp Text="@GroundingFieldHelps.RefinementMaxTokens" />
                         </div>
@@ -472,24 +472,24 @@
                                    value="@(_form.RefinementTemperature?.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) ?? "")"
                                    @onchange="OnRefinementTemperatureChanged"
                                    disabled="@_isReadOnly"
-                                   placeholder="leer = Anbieter-Standard"
+                                   placeholder="empty = provider default"
                                    data-testid="refinement-temperature-input" />
                             <FieldHelp Text="@GroundingFieldHelps.RefinementTemperature" />
                         </div>
 
                         <div class="field">
-                            <label>Refinement-Modus</label>
+                            <label>Refinement mode</label>
                             <select @bind="_form.RefinementMode" disabled="@_isReadOnly" data-testid="refinement-mode-select">
-                                <option value="0">Filter — irrelevante Quellen verwerfen</option>
-                                <option value="1">Synthesize — Quellen zu einem Text zusammenfassen</option>
+                                <option value="0">Filter — discard irrelevant sources</option>
+                                <option value="1">Synthesize — merge sources into one text</option>
                             </select>
                             <FieldHelp Text="@GroundingFieldHelps.RefinementMode" />
                         </div>
 
                         <div class="field">
-                            <label>Zusatz-Anweisungen (optional)</label>
+                            <label>Extra instructions (optional)</label>
                             <InputTextArea @bind-Value="_form.RefinementInstructions" rows="3" disabled="@_isReadOnly"
-                                           placeholder="z. B. Verwirf alle Quellen ohne Jahreszahl 2025/2026"
+                                           placeholder="e.g. discard all sources without a 2025/2026 date"
                                            data-testid="refinement-instructions-input" />
                             <FieldHelp Text="@GroundingFieldHelps.RefinementInstructions" />
                         </div>
@@ -500,12 +500,12 @@
             @* ── Aktionsleiste ── *@
             <div class="form-actions">
                 <button type="submit" class="btn primary" disabled="@_saving" data-testid="btn-save">
-                    @(_saving ? "Speichern…" : IsNew ? "Erstellen" : "Speichern")
+                    @(_saving ? "Saving…" : IsNew ? "Create" : "Save")
                 </button>
-                <button type="button" class="btn ghost" @onclick="NavigateBack">Abbrechen</button>
+                <button type="button" class="btn ghost" @onclick="NavigateBack">Cancel</button>
                 @if (!IsNew)
                 {
-                    <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true" data-testid="btn-delete">Löschen</button>
+                    <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true" data-testid="btn-delete">Delete</button>
                 }
             </div>
         </EditForm>
@@ -535,20 +535,20 @@
 
     private static readonly (string Type, string Label, string Desc)[] _providerTypes =
     [
-        ("tavily",           "Tavily Web Search",  "Websuche mit optionaler Antwort-Synthese"),
-        ("vector-store",     "Vector Store",       "Wissensbasis / RAG — eingebettete Dokumente"),
-        ("static-context",   "Statischer Kontext", "Kuratierter Text — Glossar, Style Guide"),
-        ("url-fetch",        "URL Fetch",          "Konkrete URLs abrufen und extrahieren"),
-        ("news-search",      "News Search",        "Aktuelle Nachrichten via Tavily News-API"),
+        ("tavily",           "Tavily Web Search",  "Web search with optional answer synthesis"),
+        ("vector-store",     "Vector Store",       "Knowledge base / RAG — embedded documents"),
+        ("static-context",   "Static context",     "Curated text — glossary, style guide"),
+        ("url-fetch",        "URL Fetch",          "Fetch and extract specific URLs"),
+        ("news-search",      "News Search",        "Recent news via the Tavily news API"),
         ("academic-search",  "Academic Search",    "arXiv, Semantic Scholar, OpenAlex"),
-        ("rest-api",         "REST API",           "HTTP-Endpunkt mit JSON-Antwort"),
+        ("rest-api",         "REST API",           "HTTP endpoint with a JSON response"),
     ];
 
     private string GetProviderTypeName() => _form.ProviderType switch
     {
         "tavily"          => "Tavily Web Search",
         "vector-store"    => "Vector Store",
-        "static-context"  => "Statischer Kontext",
+        "static-context"  => "Static context",
         "url-fetch"       => "URL Fetch",
         "news-search"     => "News Search",
         "academic-search" => "Academic Search",
@@ -558,13 +558,13 @@
 
     private string GetProviderTypeDesc() => _form.ProviderType switch
     {
-        "tavily"          => "Tavily API — Websuche mit optionaler Antwort-Synthese",
-        "vector-store"    => "Wissensbasis / RAG — Abruf aus eingebetteten Dokumenten",
-        "static-context"  => "Fester kuratierter Text — Glossar, Style Guide, Markenstimme",
-        "url-fetch"       => "Konkrete URLs abrufen und Text extrahieren",
-        "news-search"     => "Aktuelle Nachrichten via Tavily News-API",
-        "academic-search" => "Wissenschaftliche Paper — arXiv, Semantic Scholar, OpenAlex",
-        "rest-api"        => "Beliebiger HTTP-Endpunkt mit JSON-Antwort",
+        "tavily"          => "Tavily API — web search with optional answer synthesis",
+        "vector-store"    => "Knowledge base / RAG — retrieval from embedded documents",
+        "static-context"  => "Fixed curated text — glossary, style guide, brand voice",
+        "url-fetch"       => "Fetch specific URLs and extract text",
+        "news-search"     => "Recent news via the Tavily news API",
+        "academic-search" => "Scientific papers — arXiv, Semantic Scholar, OpenAlex",
+        "rest-api"        => "Any HTTP endpoint with a JSON response",
         _                 => ""
     };
 

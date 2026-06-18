@@ -1,7 +1,7 @@
 @inject IJSRuntime JS
 
 <span @ref="_ref" class="obf-email" data-u="@_user" data-d="@_domain"
-      aria-label="E-Mail-Adresse (wird per JavaScript eingeblendet)"></span>
+      aria-label="Email address (revealed via JavaScript)"></span>
 
 @code {
     [Parameter, EditorRequired] public string Email { get; set; } = "";

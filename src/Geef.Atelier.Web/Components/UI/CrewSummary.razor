@@ -66,7 +66,7 @@
 
     private string _headerLabel => Snapshot != null
         ? $"{ReviewerDisplay.GetTemplateDisplay(Snapshot.TemplateName ?? FallbackTemplateName ?? "custom")} · 1 Executor + {Snapshot.Reviewers.Count} Reviewer{(Snapshot.Reviewers.Count != 1 ? "s" : "")}"
-        : $"{FallbackTemplateName ?? "Klassik"} (system default)";
+        : $"{FallbackTemplateName ?? "Classic"} (system default)";
 
     private void Toggle() => _expanded = !_expanded;
 

@@ -5,7 +5,7 @@
 @using Geef.Atelier.Application.SiteSettings
 @inject ISiteSettingsService SiteSettingsService
 
-<PageTitle>Impressum — Geef.Atelier</PageTitle>
+<PageTitle>Imprint — Geef.Atelier</PageTitle>
 
 @if (_settings is not null)
 {
@@ -13,16 +13,16 @@
         <LandingNav />
         <div class="lp-container">
             <div class="legal-content">
-                <h1>Impressum</h1>
+                <h1>Imprint</h1>
                 @if (!_settings.LegalBoilerplateAccepted)
                 {
                     <p class="legal-disclaimer">
-                        ⚠️ <em>Dieses Impressum enthält Platzhalter. Der Betreiber muss die Angaben vor dem Live-Gang vervollständigen und rechtlich prüfen lassen (§ 5 DDG).</em>
+                        ⚠️ <em>This imprint contains placeholders. The operator must complete the details and have them reviewed legally before going live (§ 5 DDG).</em>
                     </p>
                 }
 
                 <section>
-                    <h2>Angaben gemäß § 5 DDG</h2>
+                    <h2>Information pursuant to § 5 DDG</h2>
                     <address>
                         <strong>@_settings.OperatorName</strong><br />
                         @_settings.AddressStreet<br />
@@ -32,28 +32,28 @@
                 </section>
 
                 <section>
-                    <h2>Kontakt</h2>
+                    <h2>Contact</h2>
                     <p>
-                        E-Mail: <EmailObfuscated Email="@_settings.ContactEmail" />
+                        Email: <EmailObfuscated Email="@_settings.ContactEmail" />
                     </p>
                     @if (!string.IsNullOrWhiteSpace(_settings.ContactPhone))
                     {
-                        <p>Telefon: @_settings.ContactPhone</p>
+                        <p>Phone: @_settings.ContactPhone</p>
                     }
                 </section>
 
                 @if (!string.IsNullOrWhiteSpace(_settings.VatId))
                 {
                     <section>
-                        <h2>Umsatzsteuer-Identifikationsnummer</h2>
-                        <p>Gemäß § 27a Umsatzsteuergesetz: @_settings.VatId</p>
+                        <h2>VAT identification number</h2>
+                        <p>Pursuant to § 27a of the German VAT Act (UStG): @_settings.VatId</p>
                     </section>
                 }
 
                 @if (!string.IsNullOrWhiteSpace(_settings.RegisterInfo))
                 {
                     <section>
-                        <h2>Registereintrag</h2>
+                        <h2>Register entry</h2>
                         <p>@_settings.RegisterInfo</p>
                     </section>
                 }
@@ -61,7 +61,7 @@
                 @if (!string.IsNullOrWhiteSpace(_settings.ResponsiblePerson))
                 {
                     <section>
-                        <h2>Verantwortlich für den Inhalt (V.i.S.d.P.)</h2>
+                        <h2>Responsible for the content (V.i.S.d.P.)</h2>
                         <p>@_settings.ResponsiblePerson</p>
                     </section>
                 }
@@ -69,31 +69,31 @@
                 @if (!string.IsNullOrWhiteSpace(_settings.SupervisoryAuthority))
                 {
                     <section>
-                        <h2>Aufsichtsbehörde</h2>
+                        <h2>Supervisory authority</h2>
                         <p>@_settings.SupervisoryAuthority</p>
                     </section>
                 }
 
                 <section>
-                    <h2>Haftungsausschluss</h2>
-                    <h3>Haftung für Inhalte</h3>
+                    <h2>Disclaimer</h2>
+                    <h3>Liability for content</h3>
                     <p>
-                        Als Diensteanbieter sind wir gemäß § 7 Abs. 1 TMG für eigene Inhalte auf diesen Seiten nach den
-                        allgemeinen Gesetzen verantwortlich. Nach §§ 8 bis 10 TMG sind wir als Diensteanbieter jedoch nicht
-                        verpflichtet, übermittelte oder gespeicherte fremde Informationen zu überwachen oder nach Umständen zu
-                        forschen, die auf eine rechtswidrige Tätigkeit hinweisen.
+                        As a service provider we are responsible for our own content on these pages under the general laws
+                        pursuant to § 7 (1) TMG. According to §§ 8 to 10 TMG, however, we as a service provider are not obliged
+                        to monitor transmitted or stored third-party information or to investigate circumstances that indicate
+                        unlawful activity.
                     </p>
-                    <h3>Haftung für Links</h3>
+                    <h3>Liability for links</h3>
                     <p>
-                        Unser Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte wir keinen Einfluss haben.
-                        Deshalb können wir für diese fremden Inhalte auch keine Gewähr übernehmen. Für die Inhalte der
-                        verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber der Seiten verantwortlich.
+                        Our offering contains links to external third-party websites over whose content we have no influence.
+                        We therefore cannot accept any liability for this third-party content. The respective provider or
+                        operator of the linked pages is always responsible for their content.
                     </p>
-                    <h3>Urheberrecht</h3>
+                    <h3>Copyright</h3>
                     <p>
-                        Die durch die Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen
-                        Urheberrecht. Die Vervielfältigung, Bearbeitung, Verbreitung und jede Art der Verwertung außerhalb der
-                        Grenzen des Urheberrechtes bedürfen der schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers.
+                        The content and works created by the site operators on these pages are subject to German copyright law.
+                        Reproduction, editing, distribution and any kind of use outside the limits of copyright require the
+                        written consent of the respective author or creator.
                     </p>
                 </section>
             </div>

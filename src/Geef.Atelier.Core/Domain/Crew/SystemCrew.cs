@@ -306,7 +306,7 @@ public static class SystemCrew
     /// <summary>The only system template in PS-5: the Klassik crew that reproduces the PS-2 hardcoded behaviour.</summary>
     public static readonly CrewTemplate KlassikTemplate = new(
         Name: KlassikTemplateName,
-        DisplayName: "Klassik",
+        DisplayName: "Classic",
         Description: "The default Atelier crew: one drafting executor plus briefing-fidelity and clarity reviewers running in parallel. Reproduces the pre-PS-5 hardcoded pipeline.",
         ExecutorProfileName: DefaultExecutorProfile.Name,
         ReviewerProfileNames: new[] { BriefingFidelityProfile.Name, ClarityProfile.Name },
@@ -322,8 +322,8 @@ public static class SystemCrew
     /// <summary>Juristisch template — for German legal texts: contract drafting, clause analysis, legal opinions.</summary>
     public static readonly CrewTemplate JuristischTemplate = new(
         Name: "juristisch",
-        DisplayName: "Juristisch",
-        Description: "Für juristische Texte: Vertragsentwürfe, Klausel-Analysen, rechtliche Stellungnahmen. Mit Fachterminologie-Review und Klausel-Risiko-Check. Reviewers laufen sequenziell, da Klausel-Risk auf dem Jargon-Output aufbaut.",
+        DisplayName: "Legal",
+        Description: "For legal texts: contract drafts, clause analyses, legal opinions. With a domain-terminology review and a clause-risk check. Reviewers run sequentially, since the clause-risk check builds on the terminology output.",
         ExecutorProfileName: DefaultExecutorProfile.Name,
         ReviewerProfileNames: new[] { BriefingFidelityProfile.Name, DomainTerminologyReviewerProfile.Name, SubstantiveRigorReviewerProfile.Name },
         EvaluationStrategy: EvaluationStrategy.Sequential,
@@ -341,8 +341,8 @@ public static class SystemCrew
     /// <summary>Akademisch template — for scientific texts: papers, argumentation essays, research texts.</summary>
     public static readonly CrewTemplate AkademischTemplate = new(
         Name: "akademisch",
-        DisplayName: "Akademisch",
-        Description: "Für wissenschaftliche Texte: Papers, Argumentations-Aufsätze, Forschungstexte. Mit Zitierfähigkeits-Check und Argumentations-Stringenz-Review. Reviewers laufen sequenziell.",
+        DisplayName: "Academic",
+        Description: "For academic texts: papers, argumentation essays, research texts. With a citation-readiness check and an argumentation-rigor review. Reviewers run sequentially.",
         ExecutorProfileName: DefaultExecutorProfile.Name,
         ReviewerProfileNames: new[] { BriefingFidelityProfile.Name, DomainTerminologyReviewerProfile.Name, SubstantiveRigorReviewerProfile.Name },
         EvaluationStrategy: EvaluationStrategy.Sequential,
@@ -361,7 +361,7 @@ public static class SystemCrew
     public static readonly CrewTemplate MarketingTemplate = new(
         Name: "marketing",
         DisplayName: "Marketing",
-        Description: "Für Marketing-Texte: Landing-Pages, Mails, Werbe-Copy. Mit Audience-Klarheits-Check und Conversion-Stärke-Review. Reviewers laufen parallel (unabhängige Perspektiven).",
+        Description: "For marketing copy: landing pages, emails, ad copy. With an audience-clarity check and a conversion-strength review. Reviewers run in parallel (independent perspectives).",
         ExecutorProfileName: DefaultExecutorProfile.Name,
         ReviewerProfileNames: new[] { BriefingFidelityProfile.Name, DomainTerminologyReviewerProfile.Name, SubstantiveRigorReviewerProfile.Name },
         EvaluationStrategy: EvaluationStrategy.Parallel,

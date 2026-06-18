@@ -31,14 +31,14 @@
         <label>
             Status
             <select @bind="_statusFilter" @bind:after="LoadAsync" class="form-control" data-testid="status-filter">
-                <option value="">Alle</option>
-                <option value="0">Vorgeschlagen</option>
-                <option value="1">Genehmigt</option>
-                <option value="2">Abgelehnt</option>
+                <option value="">All</option>
+                <option value="0">Proposed</option>
+                <option value="1">Approved</option>
+                <option value="2">Rejected</option>
             </select>
         </label>
         <label>
-            Domäne
+            Domain
             <input type="text" class="form-control" placeholder="Filter…"
                    @bind="_domainFilter" @bind:event="oninput" @bind:after="LoadAsync"
                    data-testid="domain-filter" />
@@ -47,11 +47,11 @@
 
     @if (_loading)
     {
-        <p>Lade…</p>
+        <p>Loading…</p>
     }
     else if (_entries.Count == 0)
     {
-        <p class="text-muted" data-testid="empty-state">Keine Learnings gefunden.</p>
+        <p class="text-muted" data-testid="empty-state">No learnings found.</p>
     }
     else
     {
@@ -74,19 +74,19 @@
                             {
                                 <button class="btn ghost sm" data-testid="btn-approve"
                                         @onclick="() => ApproveAsync(entry)">
-                                    Genehmigen
+                                    Approve
                                 </button>
                             }
                             @if (entry.Status != LearningStatus.Rejected)
                             {
                                 <button class="btn ghost sm" data-testid="btn-reject"
                                         @onclick="() => RejectAsync(entry)">
-                                    Ablehnen
+                                    Reject
                                 </button>
                             }
                             <button class="btn ghost sm danger" data-testid="btn-delete"
                                     @onclick="() => StartDelete(entry)">
-                                Löschen
+                                Delete
                             </button>
                         </div>
                     </div>
@@ -94,28 +94,28 @@
                     {
                         <div class="learning-card-detail" data-testid="learning-detail">
                             <div class="learning-text" data-testid="learning-text">
-                                <strong>Learning-Text</strong>
+                                <strong>Learning text</strong>
                                 <pre>@entry.Text</pre>
                             </div>
                             <div class="learning-meta">
-                                <span><strong>Quell-Run:</strong>
+                                <span><strong>Source run:</strong>
                                     <a href="/runs/@entry.SourceRunId" data-testid="source-run-link">@entry.SourceRunId.ToString()[..8]…</a>
                                 </span>
                                 @if (entry.LearningRunId.HasValue)
                                 {
-                                    <span><strong>Learning-Run:</strong>
+                                    <span><strong>Learning run:</strong>
                                         <a href="/runs/@entry.LearningRunId.Value" data-testid="learning-run-link">@entry.LearningRunId.Value.ToString()[..8]…</a>
                                     </span>
                                 }
                                 @if (entry.ApprovedAt.HasValue)
                                 {
-                                    <span><strong>Genehmigt:</strong> @entry.ApprovedAt.Value.ToString("yyyy-MM-dd HH:mm")</span>
+                                    <span><strong>Approved:</strong> @entry.ApprovedAt.Value.ToString("yyyy-MM-dd HH:mm")</span>
                                 }
                             </div>
                             @if (!string.IsNullOrWhiteSpace(entry.StructuredFactsJson))
                             {
                                 <details data-testid="structured-facts">
-                                    <summary>Strukturierte Fakten (JSON)</summary>
+                                    <summary>Structured facts (JSON)</summary>
                                     <pre>@entry.StructuredFactsJson</pre>
                                 </details>
                             }
@@ -165,7 +165,7 @@
         }
         catch (Exception ex)
         {
-            _error = $"Fehler beim Laden: {ex.Message}";
+            _error = $"Error loading: {ex.Message}";
         }
         finally
         {
@@ -180,7 +180,7 @@
         try
         {
             await LearningService.ApproveAsync(entry.Id, _username ?? "");
-            _success = "Learning genehmigt.";
+            _success = "Learning approved.";
             await LoadAsync();
         }
         catch (Exception ex) { _error = ex.Message; }
@@ -193,7 +193,7 @@
         try
         {
             await LearningService.RejectAsync(entry.Id, _username ?? "");
-            _success = "Learning abgelehnt.";
+            _success = "Learning rejected.";
             await LoadAsync();
         }
         catch (Exception ex) { _error = ex.Message; }
@@ -208,7 +208,7 @@
         try
         {
             await LearningService.DeleteAsync(_deleteTarget.Id, _username ?? "");
-            _success = "Learning gelöscht.";
+            _success = "Learning deleted.";
             _deleteTarget = null;
             await LoadAsync();
         }
@@ -219,9 +219,9 @@
 
     private static string StatusLabel(LearningStatus s) => s switch
     {
-        LearningStatus.Proposed => "Vorgeschlagen",
-        LearningStatus.Approved => "Genehmigt",
-        LearningStatus.Rejected => "Abgelehnt",
+        LearningStatus.Proposed => "Proposed",
+        LearningStatus.Approved => "Approved",
+        LearningStatus.Rejected => "Rejected",
         _ => s.ToString()
     };
 

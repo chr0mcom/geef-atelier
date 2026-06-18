@@ -18,7 +18,7 @@
 <div class="studio-page" data-testid="studio-page">
     <div class="page-header">
         <h1>Crew Studio</h1>
-        <p class="studio-subtitle">Beschreibe eine Aufgabe und lass die KI eine Crew-Konfiguration vorschlagen.</p>
+        <p class="studio-subtitle">Describe a task and let the AI propose a crew configuration.</p>
     </div>
 
     @if (!_loaded)
@@ -42,11 +42,11 @@
                     OnAnalyze="StartAnalysisAsync" />
                 <hr class="section-divider" style="margin: 2rem 0;" />
                 <div class="studio-compose-section" data-testid="studio-compose-section">
-                    <h3>Kompositions-Run starten</h3>
+                    <h3>Start composition run</h3>
                     <p class="studio-compose-hint">
-                        Alternativ zum Analyse-Wizard: Starte einen <strong>Kompositions-Run</strong>, der die KI eine passende Crew
-                        für dein Briefing direkt im Hintergrund komponieren lässt — ohne anschließenden Task-Run.
-                        Das Ergebnis erscheint in der Run-Liste.
+                        As an alternative to the analysis wizard: start a <strong>composition run</strong> that lets the AI compose a
+                        matching crew for your briefing directly in the background — without a subsequent task run.
+                        The result appears in the run list.
                     </p>
                     @if (_composeError is not null)
                     {
@@ -58,11 +58,11 @@
                             data-testid="start-composition-run-button">
                         @if (_composing)
                         {
-                            <text>Starte Kompositions-Run…</text>
+                            <text>Starting composition run…</text>
                         }
                         else
                         {
-                            <text>⚡ Kompositions-Run starten</text>
+                            <text>⚡ Start composition run</text>
                         }
                     </button>
                 </div>
@@ -146,7 +146,7 @@
         _error = null;
         _provider = choice.Provider;
         _model = choice.Model;
-        _analyzeStatus = "Analyse wird gestartet…";
+        _analyzeStatus = "Starting analysis…";
         _step = StudioStep.Analyzing;
         StateHasChanged();
         try
@@ -166,7 +166,7 @@
         }
         catch (Exception ex)
         {
-            _error = $"Analyse fehlgeschlagen: {ex.Message}";
+            _error = $"Analysis failed: {ex.Message}";
             _step = StudioStep.TaskInput;
         }
     }
@@ -205,7 +205,7 @@
         }
         catch (Exception ex)
         {
-            _error = $"Speichern fehlgeschlagen: {ex.Message}";
+            _error = $"Save failed: {ex.Message}";
         }
     }
 
@@ -242,7 +242,7 @@
         }
         catch (Exception ex)
         {
-            _composeError = $"Kompositions-Run konnte nicht gestartet werden: {ex.Message}";
+            _composeError = $"Composition run could not be started: {ex.Message}";
             _composing = false;
         }
     }

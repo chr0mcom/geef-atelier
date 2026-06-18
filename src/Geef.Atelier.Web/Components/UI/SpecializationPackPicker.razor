@@ -1,4 +1,4 @@
-@* Wiederverwendbarer Picker zum Binden von Spezialisierungs-Packs an einen Akteur in einer Crew. *@
+@* Reusable picker for binding specialization packs to an actor within a crew. *@
 @using Geef.Atelier.Core.Domain.Crew.Specialization
 @using Geef.Atelier.Web.Services
 @inject ISpecializationPackService PackService
@@ -6,7 +6,7 @@
 <div class="profile-picker" data-testid="pack-picker">
     <div class="profile-picker-grid">
         <div>
-            <p class="picker-col-label">Verfügbare Packs</p>
+            <p class="picker-col-label">Available packs</p>
             @foreach (var pack in _available)
             {
                 <button type="button" class="picker-pool-item"
@@ -20,11 +20,11 @@
             }
             @if (!_available.Any())
             {
-                <p class="picker-empty-state">Keine passenden Packs verfügbar.</p>
+                <p class="picker-empty-state">No matching packs available.</p>
             }
         </div>
         <div>
-            <p class="picker-col-label">Gebunden (@SelectedPackNames.Count)</p>
+            <p class="picker-col-label">Bound (@SelectedPackNames.Count)</p>
             @for (int i = 0; i < SelectedPackNames.Count; i++)
             {
                 var idx = i;
@@ -56,7 +56,7 @@
             }
             @if (SelectedPackNames.Count == 0)
             {
-                <p class="picker-empty-state">Keine Packs gebunden.</p>
+                <p class="picker-empty-state">No packs bound.</p>
             }
         </div>
     </div>
@@ -125,9 +125,9 @@
 
     private static string GetScopeLabel(PackScope s) => s switch
     {
-        PackScope.General      => "Allgemein",
-        PackScope.DomainScoped => "Domäne",
-        PackScope.TaskBound    => "Crew-gebunden",
+        PackScope.General      => "General",
+        PackScope.DomainScoped => "Domain",
+        PackScope.TaskBound    => "Crew-bound",
         _                      => s.ToString()
     };
 }

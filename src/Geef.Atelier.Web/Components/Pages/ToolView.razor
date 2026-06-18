@@ -7,29 +7,29 @@
 @inject IToolDefinitionService ToolService
 @inject NavigationManager Nav
 
-<PageTitle>@(_tool?.DisplayName ?? "Werkzeug") — Atelier</PageTitle>
+<PageTitle>@(_tool?.DisplayName ?? "Tool") — Atelier</PageTitle>
 
 <div class="crew-editor" data-testid="tool-view">
     <div class="page-header">
         <h1>@(_tool?.DisplayName ?? "")</h1>
-        <a href="/tools" class="btn ghost">← Zurück</a>
+        <a href="/tools" class="btn ghost">← Back</a>
     </div>
 
     @if (_loading)
     {
-        <p>Wird geladen…</p>
+        <p>Loading…</p>
     }
     else if (_tool == null)
     {
-        <p>Werkzeug nicht gefunden.</p>
+        <p>Tool not found.</p>
     }
     else
     {
         @if (_tool.IsSystem)
         {
             <div class="info-banner">
-                Dies ist ein System-Werkzeug und kann nicht bearbeitet werden.
-                Verwende <strong>Als Custom duplizieren</strong> in der Liste.
+                This is a system tool and cannot be edited.
+                Use <strong>Duplicate as custom</strong> in the list.
             </div>
         }
 
@@ -37,18 +37,18 @@
             <dt>Name</dt>
             <dd data-testid="detail-name">@_tool.Name</dd>
 
-            <dt>Anzeigename</dt>
+            <dt>Display name</dt>
             <dd data-testid="detail-display-name">@_tool.DisplayName</dd>
 
-            <dt>Beschreibung</dt>
+            <dt>Description</dt>
             <dd data-testid="detail-description">
                 @(string.IsNullOrEmpty(_tool.Description) ? "—" : _tool.Description)
             </dd>
 
-            <dt>Typ</dt>
+            <dt>Type</dt>
             <dd data-testid="detail-tool-type">@GetTypeLabel(_tool.ToolType)</dd>
 
-            <dt>Zugriffsklasse</dt>
+            <dt>Access class</dt>
             <dd data-testid="detail-access-class">@GetAccessLabel(_tool.AccessClass)</dd>
 
             @if (_tool.AccessClass == ToolAccessClass.Mutating)
@@ -56,22 +56,22 @@
                 <dd colspan="2" data-testid="mutating-warning">
                     <div class="alert alert-danger d-flex align-items-center gap-2 mt-2">
                         <span>&#9888;</span>
-                        <span><strong>Mutating-Tool:</strong> Dieses Tool kann Daten schreiben oder verändern. Es wird nur ausgeführt, wenn in der Crew-Spec explizit <code>allow_mutating_tools</code> aktiviert wurde.</span>
+                        <span><strong>Mutating tool:</strong> This tool can write or change data. It only runs when <code>allow_mutating_tools</code> is explicitly enabled in the crew spec.</span>
                     </div>
                 </dd>
             }
 
-            <dt>Secret-Referenz</dt>
+            <dt>Secret reference</dt>
             <dd data-testid="detail-secret-ref">
                 @(string.IsNullOrEmpty(_tool.SecretRef) ? "—" : _tool.SecretRef)
             </dd>
 
-            <dt>System-Werkzeug</dt>
-            <dd data-testid="detail-is-system">@(_tool.IsSystem ? "Ja" : "Nein")</dd>
+            <dt>System tool</dt>
+            <dd data-testid="detail-is-system">@(_tool.IsSystem ? "Yes" : "No")</dd>
         </dl>
 
         <div class="template-meta-section" style="margin-top: 1.5rem;">
-            <h3>LLM-Schema</h3>
+            <h3>LLM schema</h3>
             <pre style="font-family: var(--font-mono, monospace); font-size: 0.82rem;
                         background: var(--color-surface-raised, #f5f5f5);
                         padding: 1rem; border-radius: 4px; overflow-x: auto;"
@@ -81,8 +81,8 @@
         @if (!_tool.IsSystem)
         {
             <div class="form-actions">
-                <a href="/tools/edit/@_tool.Name" class="btn primary">Bearbeiten</a>
-                <a href="/tools" class="btn ghost">Zurück</a>
+                <a href="/tools/edit/@_tool.Name" class="btn primary">Edit</a>
+                <a href="/tools" class="btn ghost">Back</a>
             </div>
         }
     }
@@ -104,22 +104,22 @@
 
     private static string GetTypeLabel(string toolType) => toolType switch
     {
-        "web-search"         => "Websuche",
-        "knowledge-base"     => "Wissensdatenbank",
-        "url-fetch"          => "URL-Abruf",
-        "news-search"        => "Nachrichtensuche",
-        "academic-search"    => "Akademische Suche",
-        "rest-api"           => "REST-API",
-        "static-context"     => "Statischer Kontext",
-        "learning-retrieval" => "Lerneinträge",
-        "mcp-tool"           => "MCP-Tool",
+        "web-search"         => "Web search",
+        "knowledge-base"     => "Knowledge base",
+        "url-fetch"          => "URL fetch",
+        "news-search"        => "News search",
+        "academic-search"    => "Academic search",
+        "rest-api"           => "REST API",
+        "static-context"     => "Static context",
+        "learning-retrieval" => "Learning retrieval",
+        "mcp-tool"           => "MCP tool",
         _                    => toolType
     };
 
     private static string GetAccessLabel(ToolAccessClass access) => access switch
     {
-        ToolAccessClass.ReadOnly => "Lesend (ReadOnly)",
-        ToolAccessClass.Mutating => "Schreibend (Mutating)",
+        ToolAccessClass.ReadOnly => "Read-only",
+        ToolAccessClass.Mutating => "Mutating",
         _                        => access.ToString()
     };
 

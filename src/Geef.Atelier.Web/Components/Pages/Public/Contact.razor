@@ -5,7 +5,7 @@
 @using Geef.Atelier.Application.SiteSettings
 @inject ISiteSettingsService SiteSettingsService
 
-<PageTitle>Kontakt — Geef.Atelier</PageTitle>
+<PageTitle>Contact — Geef.Atelier</PageTitle>
 
 @if (_settings is not null)
 {
@@ -13,7 +13,7 @@
         <LandingNav />
         <div class="lp-container">
             <div class="legal-content contact-page">
-                <h1>Kontakt</h1>
+                <h1>Contact</h1>
 
                 <section class="contact-card">
                     <h2>@_settings.OperatorName</h2>
@@ -23,20 +23,20 @@
                         @_settings.AddressCountry
                     </address>
                     <p class="contact-email-row">
-                        <span class="contact-label">E-Mail</span>
+                        <span class="contact-label">Email</span>
                         <EmailObfuscated Email="@_settings.ContactEmail" />
                     </p>
                     @if (!string.IsNullOrWhiteSpace(_settings.ContactPhone))
                     {
                         <p class="contact-email-row">
-                            <span class="contact-label">Telefon</span>
+                            <span class="contact-label">Phone</span>
                             <span>@_settings.ContactPhone</span>
                         </p>
                     }
                 </section>
 
                 <p class="contact-note">
-                    Kein Kontaktformular — E-Mail ist der direkteste Weg.
+                    No contact form — email is the most direct way.
                 </p>
             </div>
         </div>

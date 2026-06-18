@@ -1,4 +1,4 @@
-@* Wiederverwendbarer Picker zum Zuweisen von Werkzeugen zu einem Akteur-Profil. *@
+@* Reusable picker for assigning tools to an actor profile. *@
 @using Geef.Atelier.Core.Domain.Tools
 @using Geef.Atelier.Web.Services
 @inject IToolDefinitionService ToolService
@@ -7,13 +7,13 @@
     @if (!CanSelectProvider)
     {
         <div class="warning-banner" data-testid="tool-picker-warning">
-            ⚠ Der gewählte Anbieter unterstützt kein agentic Tool-Use. Werkzeuge können nicht zugewiesen werden.
+            ⚠ The selected provider does not support agentic tool use. Tools cannot be assigned.
         </div>
     }
 
     <div class="profile-picker-grid">
         <div>
-            <p class="picker-col-label">Verfügbare Werkzeuge</p>
+            <p class="picker-col-label">Available tools</p>
             @foreach (var tool in _available)
             {
                 <button type="button" class="picker-pool-item"
@@ -28,11 +28,11 @@
             }
             @if (!_available.Any())
             {
-                <p class="picker-empty-state">Alle Werkzeuge zugewiesen</p>
+                <p class="picker-empty-state">All tools assigned</p>
             }
         </div>
         <div>
-            <p class="picker-col-label">Zugewiesen (@SelectedToolNames.Count)</p>
+            <p class="picker-col-label">Assigned (@SelectedToolNames.Count)</p>
             @for (int i = 0; i < SelectedToolNames.Count; i++)
             {
                 var idx = i;
@@ -68,7 +68,7 @@
             }
             @if (SelectedToolNames.Count == 0)
             {
-                <p class="picker-empty-state">Keine Werkzeuge zugewiesen.</p>
+                <p class="picker-empty-state">No tools assigned.</p>
             }
         </div>
     </div>
@@ -134,15 +134,15 @@
 
     private static string GetTypeLabel(string toolType) => toolType switch
     {
-        "web-search"         => "Websuche",
-        "knowledge-base"     => "Wissensdatenbank",
-        "url-fetch"          => "URL-Abruf",
-        "news-search"        => "Nachrichtensuche",
-        "academic-search"    => "Akademische Suche",
-        "rest-api"           => "REST-API",
-        "static-context"     => "Statischer Kontext",
-        "learning-retrieval" => "Lerneinträge",
-        "mcp-tool"           => "MCP-Tool",
+        "web-search"         => "Web search",
+        "knowledge-base"     => "Knowledge base",
+        "url-fetch"          => "URL fetch",
+        "news-search"        => "News search",
+        "academic-search"    => "Academic search",
+        "rest-api"           => "REST API",
+        "static-context"     => "Static context",
+        "learning-retrieval" => "Learning retrieval",
+        "mcp-tool"           => "MCP tool",
         _                    => toolType
     };
 }

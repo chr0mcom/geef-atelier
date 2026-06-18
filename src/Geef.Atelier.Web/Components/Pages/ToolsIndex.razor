@@ -6,17 +6,17 @@
 @inject IToolDefinitionService ToolService
 @inject NavigationManager Nav
 
-<PageTitle>Werkzeuge — Atelier</PageTitle>
+<PageTitle>Tools — Atelier</PageTitle>
 
 <div class="crew-profiles-index">
     <div class="page-header">
-        <h1>Werkzeuge</h1>
-        <a href="/tools/create" class="btn primary">+ Neues Werkzeug</a>
+        <h1>Tools</h1>
+        <a href="/tools/create" class="btn primary">+ New tool</a>
     </div>
 
     @if (_tools.Count == 0)
     {
-        <p class="text-muted">Noch keine Werkzeuge konfiguriert.</p>
+        <p class="text-muted">No tools configured yet.</p>
     }
     else
     {
@@ -24,8 +24,8 @@
             <thead>
                 <tr>
                     <th>Name</th>
-                    <th>Typ</th>
-                    <th>Zugriff</th>
+                    <th>Type</th>
+                    <th>Access</th>
                     <th></th>
                 </tr>
             </thead>
@@ -47,15 +47,15 @@
                         <td>@GetTypeLabel(tool.ToolType)</td>
                         <td>@GetAccessLabel(tool.AccessClass)</td>
                         <td class="crew-table-actions">
-                            <a href="/tools/view/@tool.Name" class="btn small">Ansehen</a>
+                            <a href="/tools/view/@tool.Name" class="btn small">View</a>
                             @if (tool.IsSystem)
                             {
-                                <button class="btn small primary" @onclick="() => DuplicateTool(tool)">Als Custom duplizieren</button>
+                                <button class="btn small primary" @onclick="() => DuplicateTool(tool)">Duplicate as custom</button>
                             }
                             else
                             {
-                                <a href="/tools/edit/@tool.Name" class="btn small">Bearbeiten</a>
-                                <button class="btn small danger" @onclick="() => _toolToDelete = tool">Löschen</button>
+                                <a href="/tools/edit/@tool.Name" class="btn small">Edit</a>
+                                <button class="btn small danger" @onclick="() => _toolToDelete = tool">Delete</button>
                             }
                         </td>
                     </tr>
@@ -73,7 +73,7 @@
 <DeleteConfirmationModal
     Show="_toolToDelete != null"
     ItemName="@(_toolToDelete?.Name ?? "")"
-    ItemKind="Werkzeug"
+    ItemKind="Tool"
     OnConfirm="ExecuteDeleteAsync"
     OnCancel="() => _toolToDelete = null" />
 
@@ -97,11 +97,11 @@
         _error = null;
         try
         {
-            var copyName = "custom-" + original.Name.TrimStart("custom-".ToCharArray()) + "-kopie";
+            var copyName = "custom-" + original.Name.TrimStart("custom-".ToCharArray()) + "-copy";
             var copy = original with
             {
                 Name = copyName,
-                DisplayName = original.DisplayName + " (Kopie)",
+                DisplayName = original.DisplayName + " (copy)",
                 IsSystem = false
             };
             await ToolService.SaveAsync(copy);
@@ -131,22 +131,22 @@
 
     private static string GetTypeLabel(string toolType) => toolType switch
     {
-        "web-search"        => "Websuche",
-        "knowledge-base"    => "Wissensdatenbank",
-        "url-fetch"         => "URL-Abruf",
-        "news-search"       => "Nachrichtensuche",
-        "academic-search"   => "Akademische Suche",
-        "rest-api"          => "REST-API",
-        "static-context"    => "Statischer Kontext",
-        "learning-retrieval" => "Lerneinträge",
-        "mcp-tool"          => "MCP-Tool",
+        "web-search"        => "Web search",
+        "knowledge-base"    => "Knowledge base",
+        "url-fetch"         => "URL fetch",
+        "news-search"       => "News search",
+        "academic-search"   => "Academic search",
+        "rest-api"          => "REST API",
+        "static-context"    => "Static context",
+        "learning-retrieval" => "Learning retrieval",
+        "mcp-tool"          => "MCP tool",
         _                   => toolType
     };
 
     private static string GetAccessLabel(ToolAccessClass access) => access switch
     {
-        ToolAccessClass.ReadOnly  => "Lesend",
-        ToolAccessClass.Mutating  => "Schreibend",
+        ToolAccessClass.ReadOnly  => "Read-only",
+        ToolAccessClass.Mutating  => "Mutating",
         _                         => access.ToString()
     };
 }

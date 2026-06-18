@@ -15,45 +15,45 @@
         <DataAnnotationsValidator />
         <ValidationSummary />
 
-        @* ── §0 Grunddaten ── *@
+        @* ── §0 Basics ── *@
         <div class="template-meta-section">
-            <h3>Grunddaten</h3>
+            <h3>Basics</h3>
 
             <div class="field">
                 <label>Name</label>
-                <InputText @bind-Value="_form.Name" disabled="@IsSystem" placeholder="mein-profil" />
+                <InputText @bind-Value="_form.Name" disabled="@IsSystem" placeholder="my-profile" />
                 @if (!IsSystem && !string.IsNullOrEmpty(_form.Name))
                 {
-                    <small class="form-hint">Wird gespeichert als: custom-@_form.Name.TrimStart("custom-".ToCharArray())</small>
+                    <small class="form-hint">Saved as: custom-@_form.Name.TrimStart("custom-".ToCharArray())</small>
                 }
                 <ValidationMessage For="() => _form.Name" />
             </div>
 
             <div class="field">
-                <label>Anzeigename</label>
+                <label>Display name</label>
                 <InputText @bind-Value="_form.DisplayName" disabled="@IsSystem" />
                 <ValidationMessage For="() => _form.DisplayName" />
             </div>
 
             <div class="field">
-                <label>Beschreibung</label>
+                <label>Description</label>
                 <InputTextArea @bind-Value="_form.Description" rows="2" disabled="@IsSystem" />
                 <ValidationMessage For="() => _form.Description" />
             </div>
         </div>
 
-        @* ── §1 Modell-Konfiguration ── *@
+        @* ── §1 Model configuration ── *@
         <div class="pipeline-stage-section">
             <div class="pipeline-stage-header">
                 <div class="pipeline-stage-header-text">
-                    <h3>Modell-Konfiguration</h3>
-                    <p class="pipeline-stage-desc">LLM-Anbieter, Modell und maximale Ausgabelänge für dieses Profil.</p>
+                    <h3>Model configuration</h3>
+                    <p class="pipeline-stage-desc">LLM provider, model and maximum output length for this profile.</p>
                 </div>
             </div>
 
             <div class="field-grid">
                 <div class="field">
-                    <label>Anbieter</label>
+                    <label>Provider</label>
                     <InputSelect @bind-Value="_form.Provider" disabled="@IsSystem">
                         <optgroup label="HTTP">
                             @foreach (var p in _providers.Where(p => p.Type == ProviderType.Http && p.IsActive))
@@ -68,12 +68,12 @@
                             }
                         </optgroup>
                     </InputSelect>
-                    <small class="form-hint">OpenRouter wird pro Token abgerechnet. CLI-Anbieter nutzen ein lokales Abonnement.</small>
+                    <small class="form-hint">OpenRouter is billed per token. CLI providers use a local subscription.</small>
                     <ValidationMessage For="() => _form.Provider" />
                 </div>
 
                 <div class="field">
-                    <label>Modell</label>
+                    <label>Model</label>
                     <ModelSelector @ref="_modelSelector"
                                    Provider="@_form.Provider"
                                    @bind-Value="_form.Model"
@@ -83,18 +83,18 @@
                 </div>
 
                 <div class="field">
-                    <label>Max. Token (optional)</label>
+                    <label>Max tokens (optional)</label>
                     <InputNumber @bind-Value="_form.MaxTokens" disabled="@IsSystem" />
                 </div>
             </div>
         </div>
 
-        @* ── §2 System-Prompt ── *@
+        @* ── §2 System prompt ── *@
         <div class="pipeline-stage-section">
             <div class="pipeline-stage-header">
                 <div class="pipeline-stage-header-text">
-                    <h3>System-Prompt</h3>
-                    <p class="pipeline-stage-desc">Rolle und Verhalten des Profils. @(_form.SystemPrompt?.Length ?? 0)/8000 Zeichen.</p>
+                    <h3>System prompt</h3>
+                    <p class="pipeline-stage-desc">The profile's role and behaviour. @(_form.SystemPrompt?.Length ?? 0)/8000 characters.</p>
                 </div>
             </div>
 
@@ -106,16 +106,16 @@
             </div>
         </div>
 
-        @* ── §3 Werkzeuge (optional) ── *@
+        @* ── §3 Tools (optional) ── *@
         @if (ShowToolPicker)
         {
             <div class="pipeline-stage-section">
                 <div class="pipeline-stage-header">
                     <div class="pipeline-stage-header-text">
-                        <h3>Werkzeuge</h3>
+                        <h3>Tools</h3>
                         <p class="pipeline-stage-desc">
-                            Werkzeuge aus dem Katalog, die dieses Profil im agentic Tool-Use-Loop aufrufen darf.
-                            Leer = Standard-Single-Shot-Completion.
+                            Tools from the catalogue this profile may call in the agentic tool-use loop.
+                            Empty = standard single-shot completion.
                         </p>
                     </div>
                 </div>
@@ -126,19 +126,19 @@
             </div>
         }
 
-        @* ── §4 Advisor-Einstellungen (optional) ── *@
+        @* ── §4 Advisor settings (optional) ── *@
         @if (ShowAdvisorFields)
         {
             <div class="pipeline-stage-section">
                 <div class="pipeline-stage-header">
                     <div class="pipeline-stage-header-text">
-                        <h3>Advisor-Einstellungen</h3>
-                        <p class="pipeline-stage-desc">Wie und wann der Advisor in den Pipeline-Ablauf eingreift.</p>
+                        <h3>Advisor settings</h3>
+                        <p class="pipeline-stage-desc">How and when the advisor intervenes in the pipeline.</p>
                     </div>
                 </div>
 
                 <div class="field">
-                    <label>Modus</label>
+                    <label>Mode</label>
                     <div class="radio-group" data-testid="advisor-mode-group">
                         @foreach (var mode in Enum.GetValues<AdvisorMode>())
                         {
@@ -159,7 +159,7 @@
                 </div>
 
                 <div class="field">
-                    <label>Auslöser</label>
+                    <label>Trigger</label>
                     <div class="radio-group" data-testid="advisor-trigger-group">
                         @foreach (var trigger in Enum.GetValues<AdvisorTrigger>())
                         {
@@ -181,38 +181,38 @@
             </div>
         }
 
-        @* ── Aktionsleiste ── *@
+        @* ── Action bar ── *@
         <div class="editor-actions">
             @if (!IsSystem)
             {
                 <button type="submit" class="btn primary" data-testid="save-profile" disabled="@IsSaving">
-                    @(IsSaving ? "Speichern…" : IsNew ? "Erstellen" : "Speichern")
+                    @(IsSaving ? "Saving…" : IsNew ? "Create" : "Save")
                 </button>
             }
             else
             {
                 <button type="button" class="btn primary" @onclick="() => OnDuplicate.InvokeAsync()">
-                    Als Kopie anlegen
+                    Duplicate as custom
                 </button>
             }
-            <button type="button" class="btn ghost" @onclick="() => OnCancel.InvokeAsync()">Abbrechen</button>
+            <button type="button" class="btn ghost" @onclick="() => OnCancel.InvokeAsync()">Cancel</button>
             @if (!IsNew && !IsSystem && OnDeleteRequested.HasDelegate)
             {
-                <button type="button" class="btn danger" @onclick="() => OnDeleteRequested.InvokeAsync()">Löschen</button>
+                <button type="button" class="btn danger" @onclick="() => OnDeleteRequested.InvokeAsync()">Delete</button>
             }
         </div>
     </EditForm>
 </div>
 
 <Modal Show="_showCustomModelWarning" OnClose="CancelCustomModelSave" DataTestId="custom-model-warning-modal">
-    <Title>Unbekanntes Modell</Title>
+    <Title>Unknown model</Title>
     <ChildContent>
-        <p>Modell <strong>@_form.Model</strong> ist nicht im Katalog für diesen Anbieter.</p>
-        <p>Profil trotzdem mit diesem Modellnamen speichern?</p>
+        <p>Model <strong>@_form.Model</strong> is not in the catalogue for this provider.</p>
+        <p>Save the profile with this model name anyway?</p>
     </ChildContent>
     <Actions>
-        <button type="button" class="btn primary" @onclick="ConfirmCustomModelSave" data-testid="custom-model-confirm">Trotzdem speichern</button>
-        <button type="button" class="btn ghost"   @onclick="CancelCustomModelSave">Abbrechen</button>
+        <button type="button" class="btn primary" @onclick="ConfirmCustomModelSave" data-testid="custom-model-confirm">Save anyway</button>
+        <button type="button" class="btn ghost"   @onclick="CancelCustomModelSave">Cancel</button>
     </Actions>
 </Modal>
 
@@ -318,41 +318,41 @@
 
     private static string GetAdvisorModeLabel(AdvisorMode m) => m switch
     {
-        AdvisorMode.Strategic      => "Strategisch",
-        AdvisorMode.Critical       => "Kritisch",
-        AdvisorMode.DevilsAdvocate => "Advocatus Diaboli",
-        AdvisorMode.DomainExpert   => "Domänen-Experte",
+        AdvisorMode.Strategic      => "Strategic",
+        AdvisorMode.Critical       => "Critical",
+        AdvisorMode.DevilsAdvocate => "Devil's advocate",
+        AdvisorMode.DomainExpert   => "Domain expert",
         _                          => m.ToString()
     };
 
     private static string GetAdvisorModeDescription(AdvisorMode m) => m switch
     {
-        AdvisorMode.Strategic      => "Liefert strategische Beratung vor dem ersten Executor-Durchlauf",
-        AdvisorMode.Critical       => "Kritische Analyse der Annahmen und Schwachstellen im Artefakt",
-        AdvisorMode.DevilsAdvocate => "Hinterfragt die stärksten Thesen, um verborgene Schwächen aufzudecken",
-        AdvisorMode.DomainExpert   => "Bringt domänenspezifisches Fachwissen in die Beratung ein",
+        AdvisorMode.Strategic      => "Provides strategic advice before the first executor run",
+        AdvisorMode.Critical       => "Critical analysis of the assumptions and weaknesses in the artifact",
+        AdvisorMode.DevilsAdvocate => "Challenges the strongest claims to surface hidden weaknesses",
+        AdvisorMode.DomainExpert   => "Brings domain-specific expertise into the advice",
         _                          => m.ToString()
     };
 
     private static string GetAdvisorTriggerLabel(AdvisorTrigger t) => t switch
     {
-        AdvisorTrigger.BeforeFirstExecution => "Vor dem ersten Durchlauf",
-        AdvisorTrigger.BeforeEveryExecution => "Vor jedem Durchlauf",
-        AdvisorTrigger.OnConvergenceFailure => "Bei Konvergenz-Fehlschlag",
+        AdvisorTrigger.BeforeFirstExecution => "Before the first run",
+        AdvisorTrigger.BeforeEveryExecution => "Before every run",
+        AdvisorTrigger.OnConvergenceFailure => "On convergence failure",
         _                                   => t.ToString()
     };
 
     private static string GetAdvisorTriggerDescription(AdvisorTrigger t) => t switch
     {
-        AdvisorTrigger.BeforeFirstExecution => "Wird nur vor der ersten Iteration konsultiert",
-        AdvisorTrigger.BeforeEveryExecution => "Wird vor jeder Iteration konsultiert",
-        AdvisorTrigger.OnConvergenceFailure => "Wird konsultiert, wenn die Konvergenz scheitert (Retry-Modus)",
+        AdvisorTrigger.BeforeFirstExecution => "Consulted only before the first iteration",
+        AdvisorTrigger.BeforeEveryExecution => "Consulted before every iteration",
+        AdvisorTrigger.OnConvergenceFailure => "Consulted when convergence fails (retry mode)",
         _                                   => t.ToString()
     };
 
     private sealed class ProfileFormModel
     {
-        [Required, RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Nur Kleinbuchstaben, Ziffern und Bindestriche")]
+        [Required, RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Lowercase letters, digits and hyphens only")]
         [MaxLength(64)]
         public string Name { get; set; } = "";
 

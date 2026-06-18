@@ -9,24 +9,24 @@
 @inject IToolDefinitionService ToolService
 @inject NavigationManager Nav
 
-<PageTitle>@(IsNew ? "Neues Werkzeug" : $"Bearbeiten: {_form.DisplayName}") — Atelier</PageTitle>
+<PageTitle>@(IsNew ? "New tool" : $"Edit: {_form.DisplayName}") — Atelier</PageTitle>
 
 <div class="crew-editor" data-testid="tool-editor">
     <div class="page-header">
-        <h1>@(IsNew ? "Neues Werkzeug" : _isSystem ? _form.DisplayName : $"Bearbeiten: {_form.DisplayName}")</h1>
-        <a href="/tools" class="btn ghost">← Zurück</a>
+        <h1>@(IsNew ? "New tool" : _isSystem ? _form.DisplayName : $"Edit: {_form.DisplayName}")</h1>
+        <a href="/tools" class="btn ghost">← Back</a>
     </div>
 
     @if (_loading)
     {
-        <p>Wird geladen…</p>
+        <p>Loading…</p>
     }
     else
     {
         @if (_isSystem)
         {
             <div class="info-banner">
-                Dies ist ein System-Werkzeug und kann nicht bearbeitet werden. Verwende <strong>Als Custom duplizieren</strong> in der Liste.
+                This is a system tool and cannot be edited. Use <strong>Duplicate as custom</strong> in the list.
             </div>
         }
 
@@ -38,31 +38,31 @@
                 <div class="error-banner" data-testid="editor-error">@_error</div>
             }
 
-            @* ── §0 Grunddaten ── *@
+            @* ── §0 Basics ── *@
             <div class="template-meta-section">
-                <h3>Grunddaten</h3>
+                <h3>Basics</h3>
 
                 <div class="field">
-                    <label>Name (Slug)</label>
-                    <InputText @bind-Value="_form.Name" placeholder="mein-werkzeug"
+                    <label>Name (slug)</label>
+                    <InputText @bind-Value="_form.Name" placeholder="my-tool"
                                disabled="@(!IsNew || _isSystem)"
                                data-testid="input-name" />
                     @if (IsNew)
                     {
-                        <small class="form-hint">Nur Kleinbuchstaben, Ziffern und Bindestriche. Kein führender oder abschließender Bindestrich.</small>
+                        <small class="form-hint">Lowercase letters, digits and hyphens only. No leading or trailing hyphen.</small>
                     }
                     <ValidationMessage For="() => _form.Name" />
                 </div>
 
                 <div class="field">
-                    <label>Anzeigename</label>
+                    <label>Display name</label>
                     <InputText @bind-Value="_form.DisplayName" disabled="@_isSystem"
                                data-testid="input-display-name" />
                     <ValidationMessage For="() => _form.DisplayName" />
                 </div>
 
                 <div class="field">
-                    <label>Beschreibung</label>
+                    <label>Description</label>
                     <InputTextArea @bind-Value="_form.Description" rows="3"
                                    disabled="@_isSystem"
                                    data-testid="input-description" />
@@ -70,34 +70,34 @@
                 </div>
             </div>
 
-            @* ── §1 Werkzeug-Typ ── *@
+            @* ── §1 Tool type ── *@
             <div class="template-meta-section">
-                <h3>Werkzeug-Typ</h3>
+                <h3>Tool type</h3>
 
                 <div class="field">
-                    <label>Typ</label>
+                    <label>Type</label>
                     <InputSelect @bind-Value="_form.ToolType" disabled="@_isSystem"
                                  data-testid="input-tool-type">
-                        <option value="web-search">Websuche</option>
-                        <option value="knowledge-base">Wissensdatenbank</option>
-                        <option value="url-fetch">URL-Abruf</option>
-                        <option value="news-search">Nachrichtensuche</option>
-                        <option value="academic-search">Akademische Suche</option>
-                        <option value="rest-api">REST-API</option>
-                        <option value="static-context">Statischer Kontext</option>
-                        <option value="learning-retrieval">Lerneinträge</option>
-                        <option value="mcp-tool">MCP-Tool</option>
+                        <option value="web-search">Web search</option>
+                        <option value="knowledge-base">Knowledge base</option>
+                        <option value="url-fetch">URL fetch</option>
+                        <option value="news-search">News search</option>
+                        <option value="academic-search">Academic search</option>
+                        <option value="rest-api">REST API</option>
+                        <option value="static-context">Static context</option>
+                        <option value="learning-retrieval">Learning retrieval</option>
+                        <option value="mcp-tool">MCP tool</option>
                     </InputSelect>
                     <ValidationMessage For="() => _form.ToolType" />
                 </div>
             </div>
 
-            @* ── §2 Zugriff & Secret ── *@
+            @* ── §2 Access & secret ── *@
             <div class="template-meta-section">
-                <h3>Zugriff &amp; Authentifizierung</h3>
+                <h3>Access &amp; authentication</h3>
 
                 <div class="field">
-                    <label>Zugriffsklasse</label>
+                    <label>Access class</label>
                     <div class="radio-group" data-testid="access-class-group">
                         <label class="radio-option">
                             <input type="radio" name="access-class" value="ReadOnly"
@@ -105,8 +105,8 @@
                                    disabled="@_isSystem"
                                    @onchange="() => _form.AccessClass = ToolAccessClass.ReadOnly" />
                             <span>
-                                <strong>Lesend (ReadOnly)</strong>
-                                <span class="radio-description">Das Werkzeug liest nur Daten und verändert keinen externen Zustand.</span>
+                                <strong>Read-only</strong>
+                                <span class="radio-description">The tool only reads data and changes no external state.</span>
                             </span>
                         </label>
                         <label class="radio-option">
@@ -115,10 +115,10 @@
                                    disabled="@_isSystem"
                                    @onchange="() => _form.AccessClass = ToolAccessClass.Mutating" />
                             <span>
-                                <strong>Schreibend (Mutating)</strong>
+                                <strong>Mutating</strong>
                                 <span class="radio-description">
-                                    Das Werkzeug schreibt oder verändert externen Zustand.
-                                    <strong class="form-hint--warn"> Für Phase C reserviert — aktuell nicht ausführbar.</strong>
+                                    The tool writes or changes external state.
+                                    <strong class="form-hint--warn"> Requires explicit opt-in per crew spec.</strong>
                                 </span>
                             </span>
                         </label>
@@ -129,24 +129,24 @@
                 {
                     <div class="alert alert-danger d-flex align-items-center gap-2 mt-2" data-testid="mutating-warning">
                         <span>&#9888;</span>
-                        <span><strong>Mutating-Tool:</strong> Dieses Tool kann Daten schreiben oder verändern. Es wird nur ausgeführt, wenn in der Crew-Spec explizit <code>allow_mutating_tools</code> aktiviert wurde.</span>
+                        <span><strong>Mutating tool:</strong> This tool can write or change data. It only runs when <code>allow_mutating_tools</code> is explicitly enabled in the crew spec.</span>
                     </div>
                 }
 
                 <div class="field">
-                    <label>Secret-Referenz (optional)</label>
+                    <label>Secret reference (optional)</label>
                     <InputText @bind-Value="_form.SecretRef"
-                               placeholder="z. B. MY_API_KEY"
+                               placeholder="e.g. MY_API_KEY"
                                disabled="@_isSystem"
                                data-testid="input-secret-ref" />
-                    <small class="form-hint">Name einer ENV-Variablen, die den API-Schlüssel enthält. Niemals den Klartext-Schlüssel hier eingeben.</small>
+                    <small class="form-hint">Name of an ENV variable holding the API key. Never enter the plaintext key here.</small>
                 </div>
             </div>
 
-            @* ── §3 LLM-Schema ── *@
+            @* ── §3 LLM schema ── *@
             <div class="template-meta-section">
-                <h3>LLM-Schema</h3>
-                <p class="pipeline-stage-desc">JSON Schema, das das Eingabeobjekt beschreibt, das das LLM beim Aufruf dieses Werkzeugs übergeben muss.</p>
+                <h3>LLM schema</h3>
+                <p class="pipeline-stage-desc">JSON Schema describing the input object the LLM must supply when calling this tool.</p>
 
                 <div class="field">
                     <textarea rows="10"
@@ -162,26 +162,26 @@
                 </div>
             </div>
 
-            @* ── Aktionsleiste ── *@
+            @* ── Actions ── *@
             @if (!_isSystem)
             {
                 <div class="form-actions">
                     <button type="submit" class="btn primary" disabled="@_saving" data-testid="btn-save">
-                        @(_saving ? "Speichern…" : IsNew ? "Erstellen" : "Speichern")
+                        @(_saving ? "Saving…" : IsNew ? "Create" : "Save")
                     </button>
-                    <button type="button" class="btn ghost" @onclick="NavigateBack">Abbrechen</button>
+                    <button type="button" class="btn ghost" @onclick="NavigateBack">Cancel</button>
                     @if (!IsNew)
                     {
                         <button type="button" class="btn danger"
                                 @onclick="() => _showDeleteModal = true"
-                                data-testid="btn-delete">Löschen</button>
+                                data-testid="btn-delete">Delete</button>
                     }
                 </div>
             }
             else
             {
                 <div class="form-actions">
-                    <button type="button" class="btn ghost" @onclick="NavigateBack">Zurück</button>
+                    <button type="button" class="btn ghost" @onclick="NavigateBack">Back</button>
                 </div>
             }
         </EditForm>
@@ -191,7 +191,7 @@
 <DeleteConfirmationModal
     Show="_showDeleteModal"
     ItemName="@(Name ?? "")"
-    ItemKind="Werkzeug"
+    ItemKind="Tool"
     OnConfirm="ExecuteDeleteAsync"
     OnCancel="() => _showDeleteModal = false" />
 
@@ -232,7 +232,7 @@
         }
         catch (JsonException ex)
         {
-            _schemaError = $"Ungültiges JSON: {ex.Message}";
+            _schemaError = $"Invalid JSON: {ex.Message}";
         }
     }
 
@@ -253,7 +253,7 @@
             }
             catch (JsonException ex)
             {
-                _schemaError = $"Ungültiges JSON: {ex.Message}";
+                _schemaError = $"Invalid JSON: {ex.Message}";
                 return;
             }
 
@@ -297,20 +297,20 @@
 
     private sealed class ToolFormModel
     {
-        [Required(ErrorMessage = "Name ist erforderlich.")]
+        [Required(ErrorMessage = "Name is required.")]
         [RegularExpression(@"^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$",
-            ErrorMessage = "Nur Kleinbuchstaben, Ziffern und Bindestriche. Kein führender oder abschließender Bindestrich.")]
+            ErrorMessage = "Lowercase letters, digits and hyphens only. No leading or trailing hyphen.")]
         [MaxLength(64)]
         public string Name { get; set; } = "";
 
-        [Required(ErrorMessage = "Anzeigename ist erforderlich.")]
+        [Required(ErrorMessage = "Display name is required.")]
         [MaxLength(200)]
         public string DisplayName { get; set; } = "";
 
         [MaxLength(1000)]
         public string Description { get; set; } = "";
 
-        [Required(ErrorMessage = "Typ ist erforderlich.")]
+        [Required(ErrorMessage = "Type is required.")]
         public string ToolType { get; set; } = "web-search";
 
         public ToolAccessClass AccessClass { get; set; } = ToolAccessClass.ReadOnly;

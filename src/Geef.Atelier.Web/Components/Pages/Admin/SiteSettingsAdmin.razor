@@ -14,10 +14,10 @@
     </div>
 
     <div class="settings-notice">
-        ⚠️ <strong>Hinweis:</strong> Die hier gespeicherten Angaben erscheinen auf den öffentlichen Rechtsseiten
-        (Impressum, Datenschutz, AGB). Die vorausgefüllten Rechtstexte sind <strong>Vorlagen — kein Rechtsrat</strong>.
-        Bitte lassen Sie die Texte vor dem Live-Gang rechtlich prüfen und an Ihre tatsächlichen
-        Datenverarbeitungen anpassen.
+        ⚠️ <strong>Note:</strong> The details saved here appear on the public legal pages
+        (imprint, privacy, terms). The prefilled legal texts are <strong>templates — not legal advice</strong>.
+        Please have the texts reviewed by a lawyer before going live and adapt them to your actual
+        data processing.
     </div>
 
     @if (!string.IsNullOrEmpty(_error))
@@ -38,123 +38,123 @@
         <form class="settings-form" @onsubmit="SaveAsync" data-testid="settings-form">
 
             <fieldset>
-                <legend>Betreiber</legend>
+                <legend>Operator</legend>
 
                 <div class="form-group">
-                    <label for="operator-name">Betreibername <span class="required">*</span></label>
+                    <label for="operator-name">Operator name <span class="required">*</span></label>
                     <input id="operator-name" type="text" @bind="_operatorName" required maxlength="200"
                            data-testid="input-operator-name"
-                           placeholder="Max Mustermann oder Mustermann GmbH" />
-                    <span class="field-help">Vollständiger Name oder Firma (Impressum § 5 DDG).</span>
+                           placeholder="Jane Doe or Doe Ltd." />
+                    <span class="field-help">Full name or company (imprint, § 5 DDG).</span>
                 </div>
 
                 <div class="form-group">
-                    <label for="address-street">Straße und Hausnummer <span class="required">*</span></label>
+                    <label for="address-street">Street and number <span class="required">*</span></label>
                     <input id="address-street" type="text" @bind="_addressStreet" required maxlength="300"
-                           data-testid="input-address-street" placeholder="Musterstraße 1" />
+                           data-testid="input-address-street" placeholder="1 Example Street" />
                 </div>
 
                 <div class="form-row">
                     <div class="form-group" style="max-width:140px;">
-                        <label for="address-zip">PLZ <span class="required">*</span></label>
+                        <label for="address-zip">Postal code <span class="required">*</span></label>
                         <input id="address-zip" type="text" @bind="_addressZip" required maxlength="20"
                                data-testid="input-address-zip" placeholder="12345" />
                     </div>
                     <div class="form-group">
-                        <label for="address-city">Stadt <span class="required">*</span></label>
+                        <label for="address-city">City <span class="required">*</span></label>
                         <input id="address-city" type="text" @bind="_addressCity" required maxlength="100"
-                               data-testid="input-address-city" placeholder="Musterstadt" />
+                               data-testid="input-address-city" placeholder="Anytown" />
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="address-country">Land <span class="required">*</span></label>
+                    <label for="address-country">Country <span class="required">*</span></label>
                     <input id="address-country" type="text" @bind="_addressCountry" required maxlength="100"
-                           data-testid="input-address-country" placeholder="Deutschland" />
+                           data-testid="input-address-country" placeholder="Germany" />
                 </div>
             </fieldset>
 
             <fieldset>
-                <legend>Kontakt</legend>
+                <legend>Contact</legend>
 
                 <div class="form-group">
-                    <label for="contact-email">E-Mail <span class="required">*</span></label>
+                    <label for="contact-email">Email <span class="required">*</span></label>
                     <input id="contact-email" type="email" @bind="_contactEmail" required maxlength="300"
-                           data-testid="input-contact-email" placeholder="kontakt@example.com" />
-                    <span class="field-help">Wird auf Impressum und Datenschutz obfuskiert angezeigt (kein Klartext im HTML).</span>
+                           data-testid="input-contact-email" placeholder="contact@example.com" />
+                    <span class="field-help">Shown obfuscated on the imprint and privacy pages (no plaintext in the HTML).</span>
                 </div>
 
                 <div class="form-group">
-                    <label for="contact-phone">Telefon (optional)</label>
+                    <label for="contact-phone">Phone (optional)</label>
                     <input id="contact-phone" type="tel" @bind="_contactPhone" maxlength="100"
                            data-testid="input-contact-phone" placeholder="+49 123 456789" />
                 </div>
             </fieldset>
 
             <fieldset>
-                <legend>Weitere Angaben (optional)</legend>
+                <legend>Additional details (optional)</legend>
 
                 <div class="form-group">
-                    <label for="responsible-person">Verantwortlich i. S. d. P.</label>
+                    <label for="responsible-person">Person responsible (V.i.S.d.P.)</label>
                     <input id="responsible-person" type="text" @bind="_responsiblePerson" maxlength="300"
                            data-testid="input-responsible-person"
-                           placeholder="Name der redaktionell verantwortlichen Person" />
-                    <span class="field-help">Person, die journalistisch-redaktionelle Inhalte verantwortet (V.i.S.d.P.).</span>
+                           placeholder="Name of the editorially responsible person" />
+                    <span class="field-help">Person responsible for journalistic/editorial content (V.i.S.d.P.).</span>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="vat-id">USt-ID</label>
+                        <label for="vat-id">VAT ID</label>
                         <input id="vat-id" type="text" @bind="_vatId" maxlength="50"
                                data-testid="input-vat-id" placeholder="DE123456789" />
                     </div>
                     <div class="form-group">
-                        <label for="jurisdiction">Gerichtsstand</label>
+                        <label for="jurisdiction">Jurisdiction</label>
                         <input id="jurisdiction" type="text" @bind="_jurisdiction" maxlength="100"
-                               data-testid="input-jurisdiction" placeholder="Musterstadt" />
+                               data-testid="input-jurisdiction" placeholder="Anytown" />
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="register-info">Registereintrag</label>
+                    <label for="register-info">Register entry</label>
                     <input id="register-info" type="text" @bind="_registerInfo" maxlength="300"
-                           data-testid="input-register-info" placeholder="HRB 12345, Amtsgericht Musterstadt" />
+                           data-testid="input-register-info" placeholder="HRB 12345, Anytown district court" />
                 </div>
 
                 <div class="form-group">
-                    <label for="supervisory-authority">Aufsichtsbehörde</label>
+                    <label for="supervisory-authority">Supervisory authority</label>
                     <input id="supervisory-authority" type="text" @bind="_supervisoryAuthority" maxlength="300"
                            data-testid="input-supervisory-authority"
-                           placeholder="Landesbeauftragter für Datenschutz, Musterstadt" />
+                           placeholder="State data protection commissioner, Anytown" />
                 </div>
             </fieldset>
 
             <fieldset>
-                <legend>Individuelle Ergänzungen (Markdown)</legend>
+                <legend>Custom additions (Markdown)</legend>
 
                 <div class="form-group">
-                    <label for="privacy-append">Datenschutz-Anhang (optional)</label>
+                    <label for="privacy-append">Privacy appendix (optional)</label>
                     <textarea id="privacy-append" @bind="_privacyAppendMarkdown" rows="5"
                               data-testid="input-privacy-append"
-                              placeholder="Zusätzliche betreiberspezifische Abschnitte für die Datenschutzerklärung (Markdown)."></textarea>
-                    <span class="field-help">Wird nach dem Boilerplate-Text der Datenschutzerklärung angehängt.</span>
+                              placeholder="Additional operator-specific sections for the privacy policy (Markdown)."></textarea>
+                    <span class="field-help">Appended after the boilerplate text of the privacy policy.</span>
                 </div>
 
                 <div class="form-group">
-                    <label for="terms-append">AGB-Anhang (optional)</label>
+                    <label for="terms-append">Terms appendix (optional)</label>
                     <textarea id="terms-append" @bind="_termsAppendMarkdown" rows="5"
                               data-testid="input-terms-append"
-                              placeholder="Zusätzliche betreiberspezifische Abschnitte für die Nutzungsbedingungen (Markdown)."></textarea>
-                    <span class="field-help">Wird nach dem Boilerplate-Text der AGB angehängt.</span>
+                              placeholder="Additional operator-specific sections for the terms of use (Markdown)."></textarea>
+                    <span class="field-help">Appended after the boilerplate text of the terms.</span>
                 </div>
             </fieldset>
 
             <label class="settings-legal-accept" data-testid="legal-accept-label">
                 <input type="checkbox" @bind="_legalBoilerplateAccepted" data-testid="input-legal-accepted" />
                 <span class="settings-legal-accept-label">
-                    <strong>Ich bestätige</strong>, dass ich die Vorlagen-Rechtstexte (Datenschutzerklärung, AGB, Impressum)
-                    rechtlich prüfen lassen habe bzw. bewusst entscheide, sie in dieser Form zu verwenden.
-                    Der Hinweis-Banner auf den öffentlichen Rechtsseiten wird damit ausgeblendet.
+                    <strong>I confirm</strong> that I have had the template legal texts (privacy policy, terms, imprint)
+                    reviewed legally, or that I consciously choose to use them in this form.
+                    This hides the notice banner on the public legal pages.
                 </span>
             </label>
 
@@ -165,7 +165,7 @@
 
             <div class="form-actions">
                 <button type="submit" class="btn primary" disabled="@_saving" data-testid="btn-save">
-                    @(_saving ? "Wird gespeichert…" : "Speichern")
+                    @(_saving ? "Saving…" : "Save")
                 </button>
             </div>
         </form>
@@ -183,7 +183,7 @@
     private string _addressStreet = "";
     private string _addressZip = "";
     private string _addressCity = "";
-    private string _addressCountry = "Deutschland";
+    private string _addressCountry = "Germany";
     private string _contactEmail = "";
     private string? _contactPhone;
     private string? _responsiblePerson;
@@ -218,7 +218,7 @@
         }
         catch (Exception ex)
         {
-            _error = $"Fehler beim Laden der Einstellungen: {ex.Message}";
+            _error = $"Error loading settings: {ex.Message}";
         }
         finally
         {
@@ -233,13 +233,13 @@
 
         if (string.IsNullOrWhiteSpace(_operatorName))
         {
-            _validationError = "Betreibername ist erforderlich.";
+            _validationError = "Operator name is required.";
             return;
         }
 
         if (string.IsNullOrWhiteSpace(_contactEmail) || !_contactEmail.Contains('@'))
         {
-            _validationError = "Eine gültige E-Mail-Adresse ist erforderlich.";
+            _validationError = "A valid email address is required.";
             return;
         }
 
@@ -267,11 +267,11 @@
             };
 
             await SiteSettingsService.UpdateAsync(settings);
-            _success = "Einstellungen erfolgreich gespeichert.";
+            _success = "Settings saved successfully.";
         }
         catch (Exception ex)
         {
-            _error = $"Fehler beim Speichern: {ex.Message}";
+            _error = $"Error saving: {ex.Message}";
         }
         finally
         {

@@ -10,17 +10,17 @@
 @inject IProviderService ProviderService
 @inject NavigationManager Nav
 
-<PageTitle>@(IsNew ? "CLI-Anbieter erstellen" : "CLI-Anbieter bearbeiten") — Atelier</PageTitle>
+<PageTitle>@(IsNew ? "Create CLI provider" : "Edit CLI provider") — Atelier</PageTitle>
 
 <div class="crew-editor" data-testid="cli-provider-editor">
     <div class="page-header">
-        <h1>@(IsNew ? "Neuer CLI-Anbieter" : $"Bearbeiten: {_displayName}")</h1>
-        <a href="/crew/providers" class="btn ghost">← Zurück</a>
+        <h1>@(IsNew ? "New CLI provider" : $"Edit: {_displayName}")</h1>
+        <a href="/crew/providers" class="btn ghost">← Back</a>
     </div>
 
     @if (_loading)
     {
-        <p>Wird geladen…</p>
+        <p>Loading…</p>
     }
     else
     {
@@ -34,24 +34,24 @@
 
             @* ── §0 Grunddaten ── *@
             <div class="template-meta-section">
-                <h3>Grunddaten</h3>
+                <h3>Basics</h3>
 
                 <div class="field">
-                    <label>Name (Slug)</label>
+                    <label>Name (slug)</label>
                     <InputText @bind-Value="_form.Name" placeholder="my-cli-provider" data-testid="input-name" />
                     <ValidationMessage For="() => _form.Name" />
                     <FieldHelp Text="@ProviderFieldHelps.Name" DataTestId="help-name" />
                 </div>
 
                 <div class="field">
-                    <label>Anzeigename</label>
-                    <InputText @bind-Value="_form.DisplayName" placeholder="Mein CLI-Anbieter" data-testid="input-display-name" />
+                    <label>Display name</label>
+                    <InputText @bind-Value="_form.DisplayName" placeholder="My CLI provider" data-testid="input-display-name" />
                     <ValidationMessage For="() => _form.DisplayName" />
                     <FieldHelp Text="@ProviderFieldHelps.DisplayName" DataTestId="help-display-name" />
                 </div>
 
                 <div class="field">
-                    <label>Beschreibung</label>
+                    <label>Description</label>
                     <InputTextArea @bind-Value="_form.Description" rows="2" data-testid="input-description" />
                     <FieldHelp Text="@ProviderFieldHelps.Description" DataTestId="help-description" />
                 </div>
@@ -59,15 +59,15 @@
                 <div class="field">
                     <label class="form-checkbox-label">
                         <InputCheckbox @bind-Value="_form.IsActive" data-testid="input-is-active" />
-                        Aktiv (in Profilen und Modell-Selektoren verfügbar)
+                        Active (available in profiles and model selectors)
                     </label>
                     <FieldHelp Text="@ProviderFieldHelps.IsActive" DataTestId="help-is-active" />
                 </div>
             </div>
 
-            @* ── §1 CLI-Typ ── *@
+            @* ── §1 CLI type ── *@
             <div class="template-meta-section">
-                <h3>CLI-Typ</h3>
+                <h3>CLI type</h3>
 
                 @* Hidden select for form binding *@
                 <div class="provider-type-hidden-select">
@@ -80,7 +80,7 @@
                 </div>
 
                 <p class="pipeline-stage-desc" style="margin: 0 0 0.75rem;">
-                    Wähle das CLI-Tool. Integrierte Typen sind voreingestellt — nur Parallelität und Modelle können angepasst werden.
+                    Choose the CLI tool. Built-in types are preconfigured — only concurrency and models can be adjusted.
                 </p>
                 <div class="provider-type-grid">
                     @foreach (var ct in _cliTypes)
@@ -98,7 +98,7 @@
                 @if (_form.CliKind != "generic")
                 {
                     <div class="info-banner" style="margin-top: 0.75rem;" data-testid="builtin-info">
-                        Integrierter CLI-Typ — Binary und Auth sind vorkonfiguriert. Nur <strong>Max. Gleichzeitig</strong> und <strong>Modelle</strong> können angepasst werden.
+                        Built-in CLI type — binary and auth are preconfigured. Only <strong>Max concurrent</strong> and <strong>Models</strong> can be adjusted.
                     </div>
                 }
             </div>
@@ -107,19 +107,19 @@
             <div class="pipeline-stage-section">
                 <div class="pipeline-stage-header">
                     <div class="pipeline-stage-header-text">
-                        <h3>Allgemein</h3>
-                        <p class="pipeline-stage-desc">Parallelität und verfügbare Modelle für diesen Anbieter.</p>
+                        <h3>General</h3>
+                        <p class="pipeline-stage-desc">Concurrency and available models for this provider.</p>
                     </div>
                 </div>
 
                 <div class="field">
-                    <label>Max. Gleichzeitig</label>
+                    <label>Max concurrent</label>
                     <InputNumber @bind-Value="_form.MaxConcurrent" min="1" max="10" data-testid="input-max-concurrent" />
                     <FieldHelp Text="@ProviderFieldHelps.CliMaxConcurrent" DataTestId="help-max-concurrent" />
                 </div>
 
                 <div class="field">
-                    <label>Modelle (ein Modell pro Zeile)</label>
+                    <label>Models (one model per line)</label>
                     <InputTextArea @bind-Value="_form.Models" rows="4"
                                    placeholder="google/gemini-2.5-pro&#10;google/gemini-2.5-flash" data-testid="input-models" />
                     <FieldHelp Text="@ProviderFieldHelps.CliModels" DataTestId="help-models" />
@@ -132,8 +132,8 @@
                 <div class="pipeline-stage-section">
                     <div class="pipeline-stage-header">
                         <div class="pipeline-stage-header-text">
-                            <h3>Binary &amp; Aufruf</h3>
-                            <p class="pipeline-stage-desc">Pfad, Argumente und Ausgabeformat des generischen CLI-Tools.</p>
+                            <h3>Binary &amp; invocation</h3>
+                            <p class="pipeline-stage-desc">Path, arguments and output format of the generic CLI tool.</p>
                         </div>
                     </div>
 
@@ -147,7 +147,7 @@
                     <div class="field">
                         <label class="form-checkbox-label">
                             <InputCheckbox @bind-Value="_form.StdinMode" data-testid="input-stdin-mode" />
-                            Stdin-Modus (Prompt via stdin statt Argument übergeben)
+                            Stdin mode (pass the prompt via stdin instead of an argument)
                         </label>
                         <FieldHelp Text="@ProviderFieldHelps.CliStdinMode" DataTestId="help-stdin-mode" />
                     </div>
@@ -155,7 +155,7 @@
                     @if (!_form.StdinMode)
                     {
                         <div class="field">
-                            <label>Prompt-Args-Template (ein Argument pro Zeile)</label>
+                            <label>Prompt args template (one argument per line)</label>
                             <InputTextArea @bind-Value="_form.PromptArgsTemplate" rows="4"
                                            placeholder="-p&#10;{prompt}&#10;--model&#10;{model}" data-testid="input-prompt-args" />
                             <FieldHelp Text="@ProviderFieldHelps.CliPromptArgsTemplate" DataTestId="help-prompt-args" />
@@ -163,11 +163,11 @@
                     }
 
                     <div class="field">
-                        <label>Ausgabe-Format</label>
+                        <label>Output format</label>
                         <InputSelect @bind-Value="_form.OutputFormat" data-testid="input-output-format">
-                            <option value="text">text (Klartext)</option>
-                            <option value="openai-json">openai-json (OpenAI-kompatibles JSON)</option>
-                            <option value="jsonl">jsonl (Streaming-JSON, letztes Event)</option>
+                            <option value="text">text (plain text)</option>
+                            <option value="openai-json">openai-json (OpenAI-compatible JSON)</option>
+                            <option value="jsonl">jsonl (streaming JSON, last event)</option>
                         </InputSelect>
                         <FieldHelp Text="@ProviderFieldHelps.CliOutputFormat" DataTestId="help-output-format" />
                     </div>
@@ -175,7 +175,7 @@
                     @if (_form.OutputFormat != "text")
                     {
                         <div class="field">
-                            <label>Ausgabe-JSON-Pfad (optional)</label>
+                            <label>Output JSON path (optional)</label>
                             <InputText @bind-Value="_form.OutputJsonPath" placeholder="response" data-testid="input-output-json-path" />
                             <FieldHelp Text="@ProviderFieldHelps.CliOutputJsonPath" DataTestId="help-output-json-path" />
                         </div>
@@ -186,9 +186,9 @@
             @* ── Aktionsleiste ── *@
             <div class="form-actions">
                 <button type="submit" class="btn primary" disabled="@_saving" data-testid="btn-save">
-                    @(_saving ? "Speichern…" : IsNew ? "Erstellen" : "Speichern")
+                    @(_saving ? "Saving…" : IsNew ? "Create" : "Save")
                 </button>
-                <a href="/crew/providers" class="btn ghost">Abbrechen</a>
+                <a href="/crew/providers" class="btn ghost">Cancel</a>
             </div>
         </EditForm>
     }
@@ -206,10 +206,10 @@
 
     private static readonly (string Kind, string Label, string Desc)[] _cliTypes =
     [
-        ("claude",  "Claude Code",  "Anthropic Claude Code — lokal authentifiziert"),
-        ("codex",   "Codex CLI",    "OpenAI Codex — lokal authentifiziert"),
-        ("gemini",  "Gemini CLI",   "Google Gemini — lokal authentifiziert"),
-        ("generic", "Generic CLI",  "Eigenes CLI-Tool mit individuellem Aufruf"),
+        ("claude",  "Claude Code",  "Anthropic Claude Code — locally authenticated"),
+        ("codex",   "Codex CLI",    "OpenAI Codex — locally authenticated"),
+        ("gemini",  "Gemini CLI",   "Google Gemini — locally authenticated"),
+        ("generic", "Generic CLI",  "Custom CLI tool with a bespoke invocation"),
     ];
 
     protected override async Task OnInitializedAsync()
@@ -254,12 +254,12 @@
 
     private sealed class CliFormModel
     {
-        [Required(ErrorMessage = "Name ist erforderlich.")]
-        [RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Nur Kleinbuchstaben, Ziffern und Bindestriche.")]
+        [Required(ErrorMessage = "Name is required.")]
+        [RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Lowercase letters, digits and hyphens only.")]
         [MaxLength(64)]
         public string Name { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Anzeigename ist erforderlich.")]
+        [Required(ErrorMessage = "Display name is required.")]
         [MaxLength(200)]
         public string DisplayName { get; set; } = string.Empty;
 
@@ -268,7 +268,7 @@
         public int MaxConcurrent { get; set; } = 2;
         public string Models { get; set; } = string.Empty;
 
-        [RequiredIf(nameof(CliKind), "generic", ErrorMessage = "Binary ist für Generic-CLI-Anbieter erforderlich.")]
+        [RequiredIf(nameof(CliKind), "generic", ErrorMessage = "Binary is required for generic CLI providers.")]
         public string Binary { get; set; } = string.Empty;
 
         public bool StdinMode { get; set; } = false;
@@ -385,7 +385,7 @@
             if (value is not null and not string)
                 return ValidationResult.Success;
 
-            return new ValidationResult(_customErrorMessage ?? $"{context.DisplayName} ist erforderlich.", [context.MemberName!]);
+            return new ValidationResult(_customErrorMessage ?? $"{context.DisplayName} is required.", [context.MemberName!]);
         }
     }
 }

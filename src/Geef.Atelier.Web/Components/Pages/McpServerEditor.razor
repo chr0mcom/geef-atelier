@@ -8,17 +8,17 @@
 @inject IMcpServerConfigRepository McpRepo
 @inject NavigationManager Nav
 
-<PageTitle>@(IsNew ? "MCP-Server hinzufügen" : $"Bearbeiten: {_form.Name}") — Atelier</PageTitle>
+<PageTitle>@(IsNew ? "Add MCP server" : $"Edit: {_form.Name}") — Atelier</PageTitle>
 
 <div class="crew-editor" data-testid="mcp-server-editor">
     <div class="page-header">
-        <h1>@(IsNew ? "Neuen MCP-Server hinzufügen" : $"Bearbeiten: {_form.Name}")</h1>
-        <a href="/mcp-servers" class="btn ghost">← Zurück</a>
+        <h1>@(IsNew ? "Add MCP server" : $"Edit: {_form.Name}")</h1>
+        <a href="/mcp-servers" class="btn ghost">← Back</a>
     </div>
 
     @if (_loading)
     {
-        <p>Wird geladen…</p>
+        <p>Loading…</p>
     }
     else
     {
@@ -31,12 +31,12 @@
             }
 
             <div class="template-meta-section">
-                <h3>Grunddaten</h3>
+                <h3>Basics</h3>
 
                 <div class="field">
                     <label>Name</label>
                     <InputText @bind-Value="_form.Name"
-                               placeholder="Mein MCP-Server"
+                               placeholder="My MCP server"
                                data-testid="input-name" />
                     <ValidationMessage For="() => _form.Name" />
                 </div>
@@ -46,34 +46,34 @@
                     <InputText @bind-Value="_form.Url"
                                placeholder="https://mcp.example.com"
                                data-testid="input-url" />
-                    <small class="form-hint">Vollständige URL des MCP-Server-Endpunkts (SSE oder Streamable HTTP).</small>
+                    <small class="form-hint">Full URL of the MCP server endpoint (SSE or Streamable HTTP).</small>
                     <ValidationMessage For="() => _form.Url" />
                 </div>
 
                 <div class="field">
-                    <label>Auth-Header ENV-Variable (optional)</label>
+                    <label>Auth header ENV variable (optional)</label>
                     <InputText @bind-Value="_form.AuthHeaderEnv"
                                placeholder="MCP_SERVER_TOKEN"
                                data-testid="input-auth-header-env" />
                     <small class="form-hint">
-                        Name einer Umgebungsvariablen, deren Wert als <code>Bearer</code>-Token gesendet wird.
-                        Leer lassen, falls keine Authentifizierung benötigt wird.
+                        Name of an environment variable whose value is sent as a <code>Bearer</code> token.
+                        Leave empty if no authentication is required.
                     </small>
                 </div>
 
                 <div class="field">
                     <label class="checkbox-label">
                         <InputCheckbox @bind-Value="_form.IsActive" data-testid="input-is-active" />
-                        Aktiv (für Discovery und Tool-Ausführung freigegeben)
+                        Active (enabled for discovery and tool execution)
                     </label>
                 </div>
             </div>
 
             <div class="form-actions">
                 <button type="submit" class="btn primary" disabled="@_saving" data-testid="btn-save">
-                    @(_saving ? "Speichern…" : IsNew ? "Hinzufügen" : "Speichern")
+                    @(_saving ? "Saving…" : IsNew ? "Add" : "Save")
                 </button>
-                <button type="button" class="btn ghost" @onclick="NavigateBack">Abbrechen</button>
+                <button type="button" class="btn ghost" @onclick="NavigateBack">Cancel</button>
             </div>
         </EditForm>
     }
@@ -124,11 +124,11 @@
 
     private sealed class ServerFormModel
     {
-        [Required(ErrorMessage = "Name ist erforderlich.")]
+        [Required(ErrorMessage = "Name is required.")]
         [MaxLength(200)]
         public string Name { get; set; } = "";
 
-        [Required(ErrorMessage = "URL ist erforderlich.")]
+        [Required(ErrorMessage = "URL is required.")]
         [MaxLength(2000)]
         public string Url { get; set; } = "";
 

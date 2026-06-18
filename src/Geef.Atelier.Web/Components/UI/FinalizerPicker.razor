@@ -3,7 +3,7 @@
 <div class="profile-picker" data-testid="finalizer-picker">
     <div class="profile-picker-grid">
         <div>
-            <p class="picker-col-label">Verfügbar</p>
+            <p class="picker-col-label">Available</p>
             @foreach (var p in AvailableNotSelected)
             {
                 <button type="button" class="picker-pool-item"
@@ -17,11 +17,11 @@
             }
             @if (!AvailableNotSelected.Any())
             {
-                <p class="picker-empty-state">Alle ausgewählt</p>
+                <p class="picker-empty-state">All selected</p>
             }
         </div>
         <div>
-            <p class="picker-col-label">Ausgewählt (Reihenfolge zählt)</p>
+            <p class="picker-col-label">Selected (order matters)</p>
             @for (int i = 0; i < Selected.Count; i++)
             {
                 var idx = i;
@@ -55,7 +55,7 @@
             }
             @if (Selected.Count == 0)
             {
-                <p class="picker-empty-state">Kein Finalizer ausgewählt.</p>
+                <p class="picker-empty-state">No finalizers selected.</p>
             }
         </div>
     </div>
@@ -109,10 +109,10 @@
 
     private static string GetTypeLabel(FinalizerType t) => t switch
     {
-        FinalizerType.FileExport     => "Datei-Export",
-        FinalizerType.MetadataEnrich => "Metadaten-Anreicherung",
-        FinalizerType.ExternalSink   => "Externer Empfänger",
-        FinalizerType.Transform      => "KI-Transformation",
+        FinalizerType.FileExport     => "File export",
+        FinalizerType.MetadataEnrich => "Metadata enrichment",
+        FinalizerType.ExternalSink   => "External sink",
+        FinalizerType.Transform      => "AI transformation",
         _                            => t.ToString(),
     };
 }

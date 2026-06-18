@@ -6,7 +6,7 @@
 @using Geef.Atelier.Core.Domain.OAuth
 @inject IOAuthService OAuthService
 
-<PageTitle>Zugriff gewähren — Geef.Atelier</PageTitle>
+<PageTitle>Grant access — Geef.Atelier</PageTitle>
 
 <div class="auth-card">
     <div class="auth-card-brand">
@@ -20,7 +20,7 @@
         @if (!string.IsNullOrEmpty(ClientId) || !string.IsNullOrEmpty(RedirectUri))
         {
             <div class="auth-card-meta" style="margin-top:1rem;font-size:.85em;" data-testid="oauth-error-details">
-                <p style="margin:.25rem 0;"><strong>Angaben aus der Anfrage:</strong></p>
+                <p style="margin:.25rem 0;"><strong>Details from the request:</strong></p>
                 @if (!string.IsNullOrEmpty(ClientId))
                 {
                     <p style="margin:.25rem 0;">
@@ -34,7 +34,7 @@
                     </p>
                 }
                 <p style="margin:.75rem 0 0;">
-                    <a href="/admin/oauth-clients" class="btn ghost" style="font-size:.9em;">→ OAuth-Client anlegen</a>
+                    <a href="/admin/oauth-clients" class="btn ghost" style="font-size:.9em;">→ Create OAuth client</a>
                 </p>
             </div>
         }
@@ -42,10 +42,10 @@
 
     @if (_valid && _client is not null)
     {
-        <h1 class="auth-card-heading">Zugriff gewähren</h1>
+        <h1 class="auth-card-heading">Grant access</h1>
 
         <p class="auth-card-body">
-            <strong>@_client.ClientName</strong> möchte auf Ihr Geef.Atelier zugreifen.
+            <strong>@_client.ClientName</strong> wants to access your Geef.Atelier.
         </p>
 
         @if (_client.ClientUri is not null)
@@ -58,11 +58,11 @@
         }
 
         <p class="auth-card-meta">
-            Berechtigung: <strong>MCP (Vollzugriff)</strong>
+            Permission: <strong>MCP (full access)</strong>
         </p>
 
         <p class="auth-card-meta auth-signed-in">
-            Sie sind angemeldet als <strong>@HttpContext!.User.Identity?.Name</strong>.
+            You are signed in as <strong>@HttpContext!.User.Identity?.Name</strong>.
         </p>
 
         <form method="post" action="/oauth/consent" class="auth-consent-form" data-enhance="false">
@@ -77,11 +77,11 @@
             <div class="auth-consent-actions">
                 <button name="action" value="approve" type="submit"
                         class="btn hero" data-testid="btn-approve">
-                    Zugriff gewähren
+                    Grant access
                 </button>
                 <button name="action" value="deny" type="submit"
                         class="btn ghost" data-testid="btn-deny">
-                    Ablehnen
+                    Deny
                 </button>
             </div>
         </form>
@@ -113,7 +113,7 @@
             || string.IsNullOrEmpty(CodeChallenge)
             || string.IsNullOrEmpty(CodeChallengeMethod))
         {
-            _error = "Ungültige Anfrage: Pflichtparameter fehlen.";
+            _error = "Invalid request: required parameters are missing.";
             return;
         }
 
@@ -130,7 +130,7 @@
 
         if (!result.IsValid)
         {
-            _error = result.ErrorDescription ?? result.ErrorCode ?? "Ungültige Anfrage.";
+            _error = result.ErrorDescription ?? result.ErrorCode ?? "Invalid request.";
             return;
         }
 

@@ -52,12 +52,12 @@ internal sealed class SiteSettingsRepository(AtelierDbContext db) : ISiteSetting
     private static SiteSettingsEntity CreateDefault() => new()
     {
         Id = SingletonId,
-        OperatorName = "[Bitte ausfüllen]",
-        AddressStreet = "[Straße und Hausnummer]",
-        AddressZip = "[PLZ]",
-        AddressCity = "[Stadt]",
-        AddressCountry = "Deutschland",
-        ContactEmail = "kontakt@example.com",
+        OperatorName = "[Please fill in]",
+        AddressStreet = "[Street and number]",
+        AddressZip = "[Postal code]",
+        AddressCity = "[City]",
+        AddressCountry = "Germany",
+        ContactEmail = "contact@example.com",
         UpdatedAt = DateTimeOffset.UtcNow,
     };
 

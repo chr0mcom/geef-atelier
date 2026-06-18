@@ -62,8 +62,8 @@ public sealed class CrewSummaryTests : TestContext
             p.Add(c => c.FallbackTemplateName, (string?)null);
         });
 
-        // Default fallback is "Klassik"
-        Assert.Contains("Klassik", cut.Markup);
+        // Default fallback is "Classic"
+        Assert.Contains("Classic", cut.Markup);
         Assert.Contains("system default", cut.Markup, StringComparison.OrdinalIgnoreCase);
     }
 

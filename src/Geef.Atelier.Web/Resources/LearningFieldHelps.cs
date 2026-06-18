@@ -1,17 +1,17 @@
 namespace Geef.Atelier.Web.Resources;
 
-/// <summary>German-language field help texts for the Learnings management UI.</summary>
+/// <summary>Field help texts for the Learnings management UI.</summary>
 public static class LearningFieldHelps
 {
-    public const string StatusFilter = "Filter nach Status: Alle, Vorgeschlagen (noch im Gate), Genehmigt (im Retriever aktiv) oder Abgelehnt.";
-    public const string DomainFilter = "Filter nach Domäne — entspricht dem Crew-Template-Namen des Ursprungs-Runs (z. B. 'juristisch', 'akademisch').";
-    public const string Status = "Aktueller Status des Learnings: Vorgeschlagen = wartet auf Gate, Genehmigt = wird beim Retrieval genutzt, Abgelehnt = inaktiv.";
-    public const string Domain = "Domäne des Learnings — abgeleitet aus dem Template des Ursprungs-Runs. Beeinflusst domänen-bewusstes Retrieval (Boost bei gleicher Domäne).";
-    public const string SourceRun = "Der Run, aus dem dieses Learning extrahiert wurde.";
-    public const string LearningRun = "Der Learning-Evaluation-Run, der als Qualitäts-Gate für dieses Learning diente.";
-    public const string ApprovedAt = "Zeitpunkt der Genehmigung — entweder automatisch durch das Gate oder manuell durch einen Admin.";
-    public const string StructuredFacts = "Strukturierte Fakten, die der Extraktor aus dem Ursprungs-Run gewonnen hat (Rohbasis für den Learning-Text).";
-    public const string ApproveAction = "Manuell genehmigen: Das Learning wird sofort für das Retrieval aktiviert. Das Embedding wird neu berechnet.";
-    public const string RejectAction = "Ablehnen: Das Learning wird deaktiviert und beim Retrieval ignoriert.";
-    public const string DeleteAction = "Permanent löschen — kann nicht rückgängig gemacht werden.";
+    public const string StatusFilter = "Filter by status: All, Proposed (still in the gate), Approved (active in the retriever) or Rejected.";
+    public const string DomainFilter = "Filter by domain — matches the crew-template name of the source run (e.g. 'juristisch', 'akademisch').";
+    public const string Status = "Current status of the learning: Proposed = waiting for the gate, Approved = used during retrieval, Rejected = inactive.";
+    public const string Domain = "Domain of the learning — derived from the template of the source run. Influences domain-aware retrieval (boost for the same domain).";
+    public const string SourceRun = "The run this learning was extracted from.";
+    public const string LearningRun = "The learning-evaluation run that served as the quality gate for this learning.";
+    public const string ApprovedAt = "Time of approval — either automatically by the gate or manually by an admin.";
+    public const string StructuredFacts = "Structured facts the extractor obtained from the source run (raw basis for the learning text).";
+    public const string ApproveAction = "Approve manually: the learning is activated for retrieval immediately. The embedding is recomputed.";
+    public const string RejectAction = "Reject: the learning is deactivated and ignored during retrieval.";
+    public const string DeleteAction = "Delete permanently — cannot be undone.";
 }

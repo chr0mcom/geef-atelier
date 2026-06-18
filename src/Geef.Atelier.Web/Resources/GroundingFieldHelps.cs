@@ -1,101 +1,101 @@
 namespace Geef.Atelier.Web.Resources;
 
-/// <summary>German-language field help texts displayed below each field in the Grounding Provider Editor.</summary>
+/// <summary>Field help texts displayed below each field in the Grounding Provider Editor.</summary>
 public static class GroundingFieldHelps
 {
-    public const string RefinementEnabled = "KI-Refinement aktivieren: Der Refiner filtert Rohergebnisse, bevor sie ans Briefing angehängt werden.";
-    public const string RefinementProvider = "Der LLM-Anbieter für das Refinement. Günstige Modelle sind oft ausreichend (z. B. Gemini Flash).";
-    public const string RefinementModel = "Das Modell für das Refinement. Für Filteraufgaben reichen schnelle, kostengünstige Modelle.";
-    public const string RefinementMaxTokens = "Maximale Token-Anzahl für die Refinement-Antwort. Mindestens 256.";
-    public const string RefinementTemperature = "Kreativitätsstufe: leer = Anbieter-Standard, 0.0 = deterministisch, 2.0 = sehr kreativ. Für Filter empfohlen: 0.0.";
-    public const string RefinementMode = "Filter: Quellen werden behalten oder verworfen. Synthesize: alle Quellen werden zu einem kohärenten Text zusammengefasst.";
-    public const string RefinementInstructions = "Optionale Zusatz-Anweisungen für den Refiner (z. B. 'Verwirf alle Quellen ohne Datum 2025/2026').";
+    public const string RefinementEnabled = "Enable AI refinement: the refiner filters raw results before they are appended to the briefing.";
+    public const string RefinementProvider = "The LLM provider for the refinement. Cheap models are often sufficient (e.g. Gemini Flash).";
+    public const string RefinementModel = "The model for the refinement. Fast, low-cost models are sufficient for filtering tasks.";
+    public const string RefinementMaxTokens = "Maximum number of tokens for the refinement response. At least 256.";
+    public const string RefinementTemperature = "Creativity level: empty = provider default, 0.0 = deterministic, 2.0 = very creative. Recommended for filtering: 0.0.";
+    public const string RefinementMode = "Filter: sources are kept or discarded. Synthesize: all sources are merged into one coherent text.";
+    public const string RefinementInstructions = "Optional additional instructions for the refiner (e.g. 'Discard all sources without a 2025/2026 date').";
 
     // Static-context
     public const string StaticContextLabel =
-        "Quellenname für die Attribution (z. B. „Markenstimme“, „Glossar Q2 2026“). Erscheint in der Grounding-Visualisierung.";
+        "Source name for attribution (e.g. \"Brand voice\", \"Glossary Q2 2026\"). Appears in the grounding visualization.";
 
     public const string StaticContextContent =
-        "Der kuratierte Text, der bei jedem Run unverändert in den Kontext eingefügt wird. " +
-        "Soft-Limit 50.000 Zeichen — sehr große Texte (>50k) gehören besser in die Knowledge-Base " +
-        "(nutze stattdessen einen Vector-Store-Provider).";
+        "The curated text that is inserted unchanged into the context on every run. " +
+        "Soft limit 50,000 characters — very large texts (>50k) belong in the knowledge base " +
+        "(use a vector-store provider instead).";
 
     // URL-fetch
     public const string UrlFetchUrls =
-        "Eine URL pro Zeile, nur https:// oder http://. " +
-        "Wichtig: Nur öffentlich erreichbare URLs — interne Adressen " +
-        "(localhost, 127.0.0.1, 10.x, 192.168.x, Cloud-Metadata) werden aus Sicherheitsgründen blockiert. " +
-        "JavaScript-intensive Seiten liefern möglicherweise wenig Inhalt (kein Browser-Rendering).";
+        "One URL per line, https:// or http:// only. " +
+        "Important: only publicly reachable URLs — internal addresses " +
+        "(localhost, 127.0.0.1, 10.x, 192.168.x, cloud metadata) are blocked for security reasons. " +
+        "JavaScript-heavy pages may return little content (no browser rendering).";
 
     public const string UrlFetchMaxContent =
-        "Maximale Zeichenanzahl pro URL nach HTML-Bereinigung. Default 8.000. " +
-        "Höhere Werte erhöhen den Kontext-Verbrauch.";
+        "Maximum number of characters per URL after HTML cleanup. Default 8,000. " +
+        "Higher values increase context consumption.";
 
     public const string UrlFetchStripBoilerplate =
-        "Entfernt Navigation, Werbung, Cookie-Banner und ähnliche Boilerplate-Elemente beim Parsen. " +
-        "Empfohlen: aktiviert. Der KI-Refiner kann zusätzlich Restmüll filtern.";
+        "Removes navigation, ads, cookie banners and similar boilerplate elements during parsing. " +
+        "Recommended: enabled. The AI refiner can additionally filter out residual clutter.";
 
     // News-search
     public const string NewsSearchRecencyDays =
-        "Nur News aus den letzten N Tagen. Default 7, Maximum 365.";
+        "Only news from the last N days. Default 7, maximum 365.";
 
     public const string NewsSearchMaxResults =
-        "Maximale Anzahl News-Treffer pro Anfrage. Default 5, Maximum 20.";
+        "Maximum number of news hits per request. Default 5, maximum 20.";
 
     public const string NewsSearchDepth =
-        "Tavily-Suchtiefe: basic (schneller, günstiger) oder advanced (gründlicher, höhere Credit-Kosten).";
+        "Tavily search depth: basic (faster, cheaper) or advanced (more thorough, higher credit cost).";
 
     // Academic-search
     public const string AcademicSource =
-        "Wissenschafts-API: arXiv (Preprints CS/Physik/Math, kein Key), " +
-        "Semantic Scholar (breite Abdeckung, optionaler Key für höhere Rate-Limits), " +
-        "OpenAlex (sehr breit, modern, kostenlos).";
+        "Academic API: arXiv (preprints CS/physics/math, no key), " +
+        "Semantic Scholar (broad coverage, optional key for higher rate limits), " +
+        "OpenAlex (very broad, modern, free).";
 
     public const string AcademicMaxPapers =
-        "Maximale Anzahl Paper pro Anfrage. Default 5, empfohlen 3–10.";
+        "Maximum number of papers per request. Default 5, recommended 3–10.";
 
     public const string AcademicDateFrom =
-        "Nur Paper ab diesem Datum (ISO-Format: YYYY oder YYYY-MM-DD). Leer = kein Datumsfilter.";
+        "Only papers from this date onwards (ISO format: YYYY or YYYY-MM-DD). Empty = no date filter.";
 
     public const string AcademicFields =
-        "Optionale Suchfeld-Einschränkung (z. B. 'ti' für Titel bei arXiv). Leer = alle Felder.";
+        "Optional search-field restriction (e.g. 'ti' for title on arXiv). Empty = all fields.";
 
     public const string AcademicApiKeyEnv =
-        "ENV-Variablen-Name für den Semantic-Scholar-API-Key (z. B. SEMANTIC_SCHOLAR_API_KEY). " +
-        "Wichtig: Hier den Variablennamen eintragen, nicht den Key selbst! Leer = kein Key (niedrigere Rate-Limits).";
+        "ENV variable name for the Semantic Scholar API key (e.g. SEMANTIC_SCHOLAR_API_KEY). " +
+        "Important: enter the variable name here, not the key itself! Empty = no key (lower rate limits).";
 
     // REST-API
     public const string RestApiUrl =
-        "Vollständige URL des Endpunkts (https://…). Platzhalter {briefing} wird durch das URL-kodierte Briefing ersetzt. " +
-        "Sicherheitshinweis: Interne Adressen (localhost, 10.x, 192.168.x, 172.16–31.x, 169.254.x) werden aus " +
-        "Sicherheitsgründen blockiert (SSRF-Schutz). Nur JSON-Antworten werden unterstützt.";
+        "Full URL of the endpoint (https://…). The placeholder {briefing} is replaced by the URL-encoded briefing. " +
+        "Security note: internal addresses (localhost, 10.x, 192.168.x, 172.16–31.x, 169.254.x) are blocked for " +
+        "security reasons (SSRF protection). Only JSON responses are supported.";
 
     public const string RestApiMethod =
-        "HTTP-Methode: GET (Standard, Parameter via URL) oder POST (Daten im Body).";
+        "HTTP method: GET (default, parameters via URL) or POST (data in the body).";
 
     public const string RestApiHeaders =
-        "Zusätzliche HTTP-Header als JSON-Objekt, z. B. {\"Accept\": \"application/json\"}. " +
-        "Keine Secrets hier hinterlegen — dafür Authentifizierungs-ENV-Variable verwenden.";
+        "Additional HTTP headers as a JSON object, e.g. {\"Accept\": \"application/json\"}. " +
+        "Do not store secrets here — use the authentication ENV variable instead.";
 
     public const string RestApiBodyTemplate =
-        "Request-Body-Template für POST-Anfragen. {briefing} wird durch das JSON-escaped Briefing ersetzt. " +
-        "Beispiel: {\"query\": \"{briefing}\", \"limit\": 10}";
+        "Request body template for POST requests. {briefing} is replaced by the JSON-escaped briefing. " +
+        "Example: {\"query\": \"{briefing}\", \"limit\": 10}";
 
     public const string RestApiResponsePath =
-        "JSONPath zum relevanten Teil der Antwort, z. B. $.results oder $.data[*].content. " +
-        "Leer = gesamte Antwort verwenden.";
+        "JSONPath to the relevant part of the response, e.g. $.results or $.data[*].content. " +
+        "Empty = use the entire response.";
 
     public const string RestApiMaxItems =
-        "Maximale Anzahl extrahierter Array-Items. Default 10.";
+        "Maximum number of extracted array items. Default 10.";
 
     public const string RestApiAuthHeaderEnv =
-        "ENV-Variablen-Name für den Auth-Token (z. B. MY_API_TOKEN). " +
-        "Wichtig: Hier den Variablennamen eintragen, nicht den Token selbst! " +
-        "Der Token wird zur Laufzeit aus der Umgebungsvariable gelesen und taucht niemals in der Datenbank auf.";
+        "ENV variable name for the auth token (e.g. MY_API_TOKEN). " +
+        "Important: enter the variable name here, not the token itself! " +
+        "The token is read from the environment variable at runtime and never appears in the database.";
 
     public const string RestApiAuthHeaderName =
-        "Name des Auth-Headers. Standard: Authorization. Andere Beispiele: X-Api-Key, Token.";
+        "Name of the auth header. Default: Authorization. Other examples: X-Api-Key, Token.";
 
     public const string RestApiAuthHeaderFormat =
-        "Format des Header-Werts; {token} wird durch den aufgelösten Token ersetzt. Standard: Bearer {token}.";
+        "Format of the header value; {token} is replaced by the resolved token. Default: Bearer {token}.";
 }

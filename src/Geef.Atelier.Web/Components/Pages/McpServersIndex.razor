@@ -11,17 +11,17 @@
 @inject IToolDefinitionService ToolService
 @inject NavigationManager Nav
 
-<PageTitle>MCP-Server — Atelier</PageTitle>
+<PageTitle>MCP servers — Atelier</PageTitle>
 
 <div class="crew-profiles-index">
     <div class="page-header">
-        <h1>MCP-Server</h1>
-        <a href="/mcp-servers/create" class="btn primary">+ Neuen Server hinzufügen</a>
+        <h1>MCP servers</h1>
+        <a href="/mcp-servers/create" class="btn primary">+ Add server</a>
     </div>
 
     @if (_servers.Count == 0)
     {
-        <p class="text-muted">Noch keine MCP-Server konfiguriert.</p>
+        <p class="text-muted">No MCP servers configured yet.</p>
     }
     else
     {
@@ -45,23 +45,23 @@
                         <td>
                             @if (server.IsActive)
                             {
-                                <span class="crew-badge">Aktiv</span>
+                                <span class="crew-badge">Active</span>
                             }
                             else
                             {
-                                <span class="crew-badge" style="background: var(--color-muted, #888);">Inaktiv</span>
+                                <span class="crew-badge" style="background: var(--color-muted, #888);">Inactive</span>
                             }
                         </td>
                         <td class="crew-table-actions">
-                            <a href="/mcp-servers/edit/@server.Id" class="btn small">Bearbeiten</a>
+                            <a href="/mcp-servers/edit/@server.Id" class="btn small">Edit</a>
                             <button class="btn small primary"
                                     @onclick="() => StartDiscoveryAsync(server)"
                                     disabled="@(_discovering)">
-                                Tools entdecken
+                                Discover tools
                             </button>
                             <button class="btn small danger"
                                     @onclick="() => _serverToDelete = server">
-                                Löschen
+                                Delete
                             </button>
                         </td>
                     </tr>
@@ -83,20 +83,20 @@
     @if (_discoveringServer != null && _discoveredTools != null)
     {
         <div class="template-meta-section" data-testid="discovery-results">
-            <h3>Entdeckte Tools von »@_discoveringServer.Name«</h3>
+            <h3>Discovered tools from "@_discoveringServer.Name"</h3>
 
             @if (_discoveredTools.Count == 0)
             {
-                <p class="text-muted">Dieser Server hat keine Tools angekündigt.</p>
+                <p class="text-muted">This server advertised no tools.</p>
             }
             else
             {
                 <table class="crew-table">
                     <thead>
                         <tr>
-                            <th>Tool-Name</th>
-                            <th>Typ</th>
-                            <th>Beschreibung</th>
+                            <th>Tool name</th>
+                            <th>Type</th>
+                            <th>Description</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -120,14 +120,14 @@
                                 <td class="crew-table-actions">
                                     @if (_importedNames.Contains(tool.Name))
                                     {
-                                        <span class="crew-badge" style="background: var(--color-success, #2d7a4f);">Importiert</span>
+                                        <span class="crew-badge" style="background: var(--color-success, #2d7a4f);">Imported</span>
                                     }
                                     else
                                     {
                                         <button class="btn small primary"
                                                 @onclick="() => ImportToolAsync(tool)"
                                                 disabled="@(_importing)">
-                                            Importieren
+                                            Import
                                         </button>
                                     }
                                 </td>
@@ -138,7 +138,7 @@
             }
 
             <div class="form-actions" style="margin-top: 1rem;">
-                <button class="btn ghost" @onclick="ClearDiscovery">Schließen</button>
+                <button class="btn ghost" @onclick="ClearDiscovery">Close</button>
             </div>
         </div>
     }
@@ -147,7 +147,7 @@
 <DeleteConfirmationModal
     Show="_serverToDelete != null"
     ItemName="@(_serverToDelete?.Name ?? "")"
-    ItemKind="MCP-Server"
+    ItemKind="MCP server"
     OnConfirm="ExecuteDeleteAsync"
     OnCancel="() => _serverToDelete = null" />
 
@@ -185,7 +185,7 @@
         {
             var results = await DiscoveryService.DiscoverAsync(server);
             _discoveredTools = [..results];
-            _statusMessage = $"{results.Count} Tool(s) von »{server.Name}« entdeckt.";
+            _statusMessage = $"Discovered {results.Count} tool(s) from \"{server.Name}\".";
 
             // Mark tools that are already imported
             var existing = await ToolService.GetAllAsync();
@@ -198,7 +198,7 @@
         }
         catch (Exception ex)
         {
-            _error = $"Discovery fehlgeschlagen: {ex.Message}";
+            _error = $"Discovery failed: {ex.Message}";
             _discoveringServer = null;
         }
         finally
@@ -215,11 +215,11 @@
         {
             await ToolService.SaveAsync(tool);
             _importedNames.Add(tool.Name);
-            _statusMessage = $"Werkzeug »{tool.DisplayName}« wurde importiert.";
+            _statusMessage = $"Tool \"{tool.DisplayName}\" was imported.";
         }
         catch (Exception ex)
         {
-            _error = $"Import fehlgeschlagen: {ex.Message}";
+            _error = $"Import failed: {ex.Message}";
         }
         finally
         {

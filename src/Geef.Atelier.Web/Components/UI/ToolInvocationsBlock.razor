@@ -4,7 +4,7 @@
 <div class="tool-invocations-block" data-testid="tool-invocations">
     <button class="collapsible-header" @onclick="Toggle" type="button"
             aria-expanded="@_expanded">
-        <span>Werkzeug-Aufrufe: @Invocations.Count Aufruf@(Invocations.Count != 1 ? "e" : "")</span>
+        <span>Tool calls: @Invocations.Count call@(Invocations.Count != 1 ? "s" : "")</span>
         <span class="chevron @(_expanded ? "up" : "down")">▾</span>
     </button>
 

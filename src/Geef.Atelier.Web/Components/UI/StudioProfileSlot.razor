@@ -16,11 +16,11 @@
         <span class="studio-slot-label">@SlotLabel</span>
         <span class="slot-summary">@SummaryText</span>
         <span class="slot-mode-pill @(Mode == StudioSlotMode.UseExisting ? "is-existing" : "is-new")">
-            @(Mode == StudioSlotMode.UseExisting ? "Vorhanden" : "Neu")
+            @(Mode == StudioSlotMode.UseExisting ? "Existing" : "New")
         </span>
         @if (ShowValidation && !IsValid)
         {
-            <span class="slot-invalid-dot" title="Unvollständig" data-testid="@($"slot-invalid-{SlotTestSuffix}")">!</span>
+            <span class="slot-invalid-dot" title="Incomplete" data-testid="@($"slot-invalid-{SlotTestSuffix}")">!</span>
         }
     </button>
 
@@ -29,18 +29,18 @@
     <div class="studio-slot-body">
         @if (CanSwitchMode)
         {
-            <div class="studio-slot-toggle" role="group" aria-label="Modus wählen">
+            <div class="studio-slot-toggle" role="group" aria-label="Choose mode">
                 <button type="button"
                         class="toggle-btn @(Mode == StudioSlotMode.UseExisting ? "active" : "")"
                         @onclick="() => SetMode(StudioSlotMode.UseExisting)"
                         data-testid="@($"slot-toggle-use-existing-{SlotTestSuffix}")">
-                    Vorhanden nutzen
+                    Use existing
                 </button>
                 <button type="button"
                         class="toggle-btn @(Mode == StudioSlotMode.CreateNew ? "active" : "")"
                         @onclick="() => SetMode(StudioSlotMode.CreateNew)"
                         data-testid="@($"slot-toggle-create-new-{SlotTestSuffix}")">
-                    Neu erstellen
+                    Create new
                 </button>
             </div>
         }
@@ -48,11 +48,11 @@
     @if (Mode == StudioSlotMode.UseExisting)
     {
         <div class="field">
-            <label>Profil auswählen</label>
+            <label>Select profile</label>
             <select value="@ExistingProfileName"
                     @onchange="OnExistingProfileChange"
                     data-testid="@($"slot-existing-select-{SlotTestSuffix}")">
-                <option value="">— bitte wählen —</option>
+                <option value="">— please select —</option>
                 @foreach (var p in _availableProfiles)
                 {
                     <option value="@p.Name">@p.DisplayName @(p.IsSystem ? "(System)" : string.Empty)</option>
@@ -60,7 +60,7 @@
             </select>
             @if (ShowValidation && string.IsNullOrEmpty(ExistingProfileName))
             {
-                <span class="validation-error" data-testid="slot-validation-error">Bitte ein Profil auswählen.</span>
+                <span class="validation-error" data-testid="slot-validation-error">Please select a profile.</span>
             }
         </div>
     }
@@ -70,7 +70,7 @@
         {
             <div class="slot-fields">
             <div class="field">
-                <label>Name (intern, kebab-case)</label>
+                <label>Name (internal, kebab-case)</label>
                 <input type="text"
                        value="@Draft.Name"
                        @oninput="OnNameInput"
@@ -78,12 +78,12 @@
                 <FieldHelp Text="@StudioFieldHelps.ProfileName" DataTestId="field-help-profilename" />
                 @if (ShowValidation && string.IsNullOrWhiteSpace(Draft.Name))
                 {
-                    <span class="validation-error">Name ist erforderlich.</span>
+                    <span class="validation-error">Name is required.</span>
                 }
             </div>
 
             <div class="field">
-                <label>Anzeigename</label>
+                <label>Display name</label>
                 <input type="text"
                        value="@Draft.DisplayName"
                        @oninput="OnDisplayNameInput"
@@ -91,12 +91,12 @@
                 <FieldHelp Text="@StudioFieldHelps.ProfileDisplayName" DataTestId="field-help-profiledisplayname" />
                 @if (ShowValidation && string.IsNullOrWhiteSpace(Draft.DisplayName))
                 {
-                    <span class="validation-error">Anzeigename ist erforderlich.</span>
+                    <span class="validation-error">Display name is required.</span>
                 }
             </div>
 
             <div class="field field--full">
-                <label>Beschreibung</label>
+                <label>Description</label>
                 <input type="text"
                        value="@Draft.Description"
                        @oninput="OnDescriptionInput"
@@ -111,7 +111,7 @@
                     <select value="@Draft.Provider"
                             @onchange="OnProviderChange"
                             data-testid="@($"slot-provider-{SlotTestSuffix}")">
-                        <option value="">— bitte wählen —</option>
+                        <option value="">— please select —</option>
                         @foreach (var p in _providers)
                         {
                             <option value="@p.Name">@p.DisplayName</option>
@@ -120,12 +120,12 @@
                     <FieldHelp Text="@StudioFieldHelps.Provider" DataTestId="field-help-provider" />
                     @if (ShowValidation && string.IsNullOrEmpty(Draft.Provider))
                     {
-                        <span class="validation-error">Provider ist erforderlich.</span>
+                        <span class="validation-error">Provider is required.</span>
                     }
                 </div>
 
                 <div class="field">
-                    <label>Modell</label>
+                    <label>Model</label>
                     <ModelSelector Provider="@Draft.Provider"
                                    Value="@Draft.Model"
                                    ValueChanged="@(v => UpdateDraft(d => d with { Model = v }))"
@@ -138,7 +138,7 @@
                 </div>
 
                 <div class="field">
-                    <label>Max. Tokens</label>
+                    <label>Max tokens</label>
                     <input type="number" min="256" max="32768"
                            value="@(Draft.MaxTokens?.ToString() ?? string.Empty)"
                            @oninput="OnMaxTokensInput"
@@ -147,7 +147,7 @@
                 </div>
 
                 <div class="field field--full">
-                    <label>System-Prompt</label>
+                    <label>System prompt</label>
                     <textarea rows="5"
                               value="@Draft.SystemPrompt"
                               @oninput="OnSystemPromptInput"
@@ -161,7 +161,7 @@
                     }
                     @if (ShowValidation && string.IsNullOrWhiteSpace(Draft.SystemPrompt))
                     {
-                        <span class="validation-error">System-Prompt ist erforderlich.</span>
+                        <span class="validation-error">System prompt is required.</span>
                     }
                 </div>
             }
@@ -169,7 +169,7 @@
             @if (Draft.ProfileType == ProposedProfileType.Reviewer)
             {
                 <div class="field">
-                    <label>Reviewer-Fokus (optional)</label>
+                    <label>Reviewer focus (optional)</label>
                     <input type="text"
                            value="@(Draft.ReviewerFocus ?? string.Empty)"
                            @oninput="OnReviewerFocusInput"
@@ -181,7 +181,7 @@
             @if (Draft.ProfileType == ProposedProfileType.Advisor)
             {
                 <div class="field">
-                    <label>Advisor-Modus</label>
+                    <label>Advisor mode</label>
                     <select value="@(Draft.AdvisorMode ?? "Strategic")"
                             @onchange="OnAdvisorModeChange"
                             data-testid="slot-advisormode">
@@ -198,7 +198,7 @@
                 </div>
 
                 <div class="field">
-                    <label>Advisor-Trigger</label>
+                    <label>Advisor trigger</label>
                     <select value="@(Draft.AdvisorTrigger ?? "BeforeFirstExecution")"
                             @onchange="OnAdvisorTriggerChange"
                             data-testid="slot-advisortrigger">
@@ -218,24 +218,24 @@
             @if (Draft.ProfileType == ProposedProfileType.GroundingProvider)
             {
                 <div class="field">
-                    <label>Grounding-Typ</label>
+                    <label>Grounding type</label>
                     <select value="@(Draft.GroundingProviderType ?? "tavily")"
                             @onchange="OnGroundingTypeChange"
                             data-testid="slot-groundingtype">
-                        <option value="tavily">Tavily (Web-Suche)</option>
-                        <option value="vector_store">VectorStore (eigene Dokumente)</option>
+                        <option value="tavily">Tavily (web search)</option>
+                        <option value="vector_store">VectorStore (your documents)</option>
                     </select>
                     <FieldHelp Text="@StudioFieldHelps.GroundingProviderType" DataTestId="field-help-groundingtype" />
                 </div>
 
                 <div class="field">
-                    <label>Einstellungen</label>
+                    <label>Settings</label>
                     @if (Draft.GroundingProviderType == "vector_store")
                     {
                         <input type="text"
                                value="@GetCollectionName()"
                                @oninput="OnCollectionNameInput"
-                               placeholder="Collection-Name"
+                               placeholder="Collection name"
                                data-testid="slot-grounding-collectionname" />
                     }
                     else
@@ -243,7 +243,7 @@
                         <input type="text"
                                value="@GetApiKey()"
                                @oninput="OnApiKeyInput"
-                               placeholder="API-Key"
+                               placeholder="API key"
                                data-testid="slot-grounding-apikey" />
                     }
                     <FieldHelp Text="@StudioFieldHelps.GroundingProviderSettings" DataTestId="field-help-groundingsettings" />
@@ -253,14 +253,14 @@
             @if (Draft.ProfileType == ProposedProfileType.Finalizer)
             {
                 <div class="field">
-                    <label>Finalizer-Typ</label>
+                    <label>Finalizer type</label>
                     <select value="@(Draft.FinalizerType ?? "FileExport")"
                             @onchange="OnFinalizerTypeChange"
                             data-testid="slot-finalizertype">
-                        <option value="FileExport">FileExport – Datei exportieren</option>
-                        <option value="MetadataEnrich">MetadataEnrich – Metadaten anreichern</option>
-                        <option value="ExternalSink">ExternalSink – Webhook oder E-Mail</option>
-                        <option value="Transform">Transform – KI-Transformation</option>
+                        <option value="FileExport">FileExport – export a file</option>
+                        <option value="MetadataEnrich">MetadataEnrich – enrich metadata</option>
+                        <option value="ExternalSink">ExternalSink – webhook or email</option>
+                        <option value="Transform">Transform – AI transformation</option>
                     </select>
                     <FieldHelp Text="@StudioFieldHelps.FinalizerType" DataTestId="field-help-finalizertype" />
                     @if (!string.IsNullOrEmpty(Draft.FinalizerReasoning))
@@ -272,14 +272,14 @@
                 @if (Draft.FinalizerType == "FileExport" || string.IsNullOrEmpty(Draft.FinalizerType))
                 {
                     <div class="field">
-                        <label>Dateiformat</label>
+                        <label>File format</label>
                         <select value="@GetFinalizerSetting("format", "markdown")"
                                 @onchange="OnFinalizerFormatChange"
                                 data-testid="slot-finalizer-format">
                             <option value="markdown">Markdown (.md)</option>
                             <option value="html">HTML (.html)</option>
                             <option value="pdf">PDF (.pdf)</option>
-                            <option value="docx">Word-Dokument (.docx)</option>
+                            <option value="docx">Word document (.docx)</option>
                             <option value="txt">Plaintext (.txt)</option>
                         </select>
                         <FieldHelp Text="@StudioFieldHelps.FinalizerFileFormat" DataTestId="field-help-finalizerformat" />
@@ -289,13 +289,13 @@
                 @if (Draft.FinalizerType == "MetadataEnrich")
                 {
                     <div class="field">
-                        <label>Anreicherungstyp</label>
+                        <label>Enrichment type</label>
                         <select value="@GetFinalizerSetting("enricher", "front-matter")"
                                 @onchange="OnFinalizerEnricherChange"
                                 data-testid="slot-finalizer-enricher">
-                            <option value="front-matter">Front-Matter (YAML-Header)</option>
-                            <option value="word-count-footer">Wortzahl-Fußzeile</option>
-                            <option value="reading-level">Leseniveau (Flesch-Kincaid)</option>
+                            <option value="front-matter">Front matter (YAML header)</option>
+                            <option value="word-count-footer">Word-count footer</option>
+                            <option value="reading-level">Reading level (Flesch-Kincaid)</option>
                         </select>
                         <FieldHelp Text="@StudioFieldHelps.FinalizerEnricherType" DataTestId="field-help-finalizerenricher" />
                     </div>
@@ -304,12 +304,12 @@
                 @if (Draft.FinalizerType == "ExternalSink")
                 {
                     <div class="field">
-                        <label>Kanal</label>
+                        <label>Channel</label>
                         <select value="@GetFinalizerSetting("sink", "webhook")"
                                 @onchange="OnFinalizerSinkChange"
                                 data-testid="slot-finalizer-sink">
-                            <option value="webhook">Webhook (HTTP-POST)</option>
-                            <option value="email">E-Mail (SMTP)</option>
+                            <option value="webhook">Webhook (HTTP POST)</option>
+                            <option value="email">Email (SMTP)</option>
                         </select>
                         <FieldHelp Text="@StudioFieldHelps.FinalizerSinkType" DataTestId="field-help-finalizersink" />
                     </div>
@@ -325,7 +325,7 @@
                             <FieldHelp Text="@StudioFieldHelps.FinalizerWebhookUrl" DataTestId="field-help-finalizerwebhookurl" />
                         </div>
                         <div class="field">
-                            <label>Auth-Header (optional)</label>
+                            <label>Auth header (optional)</label>
                             <input type="password"
                                    value="@GetFinalizerSetting("auth_header", string.Empty)"
                                    @oninput="OnFinalizerAuthHeaderInput"
@@ -337,20 +337,20 @@
                     else
                     {
                         <div class="field">
-                            <label>Empfänger</label>
+                            <label>Recipient</label>
                             <input type="email"
                                    value="@GetFinalizerSetting("to", string.Empty)"
                                    @oninput="OnFinalizerEmailToInput"
-                                   placeholder="empfaenger@example.com"
+                                   placeholder="recipient@example.com"
                                    data-testid="slot-finalizer-emailto" />
                             <FieldHelp Text="@StudioFieldHelps.FinalizerEmailTo" DataTestId="field-help-finalizeremailtto" />
                         </div>
                         <div class="field">
-                            <label>Betreff</label>
+                            <label>Subject</label>
                             <input type="text"
                                    value="@GetFinalizerSetting("subject", string.Empty)"
                                    @oninput="OnFinalizerSubjectInput"
-                                   placeholder="Ergebnis von {template}"
+                                   placeholder="Result of {template}"
                                    data-testid="slot-finalizer-emailsubject" />
                             <FieldHelp Text="@StudioFieldHelps.FinalizerEmailSubject" DataTestId="field-help-finalizersubject" />
                         </div>
@@ -361,7 +361,7 @@
             @if (!string.IsNullOrEmpty(Draft.OverallReasoning))
             {
                 <div class="field-reasoning overall-reasoning field--full" data-testid="slot-overall-reasoning">
-                    <strong>KI-Begründung:</strong> @Draft.OverallReasoning
+                    <strong>AI rationale:</strong> @Draft.OverallReasoning
                 </div>
             }
             </div>
@@ -402,14 +402,14 @@
         {
             if (Mode == StudioSlotMode.UseExisting)
             {
-                if (string.IsNullOrEmpty(ExistingProfileName)) return "— kein Profil gewählt —";
+                if (string.IsNullOrEmpty(ExistingProfileName)) return "— no profile selected —";
                 var match = _availableProfiles.FirstOrDefault(p => p.Name == ExistingProfileName);
                 return match?.DisplayName ?? ExistingProfileName;
             }
-            if (Draft is null) return "Neues Profil";
+            if (Draft is null) return "New profile";
             if (!string.IsNullOrWhiteSpace(Draft.DisplayName)) return Draft.DisplayName;
             if (!string.IsNullOrWhiteSpace(Draft.Name)) return Draft.Name;
-            return "Neues Profil (unbenannt)";
+            return "New profile (unnamed)";
         }
     }
 

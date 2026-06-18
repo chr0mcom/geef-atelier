@@ -6,7 +6,7 @@
 @using Geef.Atelier.Web.Services
 @inject ISiteSettingsService SiteSettingsService
 
-<PageTitle>Nutzungsbedingungen — Geef.Atelier</PageTitle>
+<PageTitle>Terms of use — Geef.Atelier</PageTitle>
 
 @if (_settings is not null)
 {
@@ -14,66 +14,65 @@
         <LandingNav />
         <div class="lp-container">
             <div class="legal-content">
-                <h1>Nutzungsbedingungen (AGB)</h1>
+                <h1>Terms of use</h1>
                 @if (!_settings.LegalBoilerplateAccepted)
                 {
                     <p class="legal-disclaimer">
-                        ⚠️ <em>Vorlagen-Gerüst — kein Rechtsrat. Der Betreiber muss diese AGB vor dem Live-Gang von einem Rechtsanwalt prüfen und auf die konkreten Nutzungsmodalitäten anpassen lassen.</em>
+                        ⚠️ <em>Template scaffold — not legal advice. The operator must have these terms reviewed by a lawyer and adapted to the specific terms of use before going live.</em>
                     </p>
                 }
 
                 <section>
-                    <h2>§ 1 Geltungsbereich</h2>
+                    <h2>§ 1 Scope</h2>
                     <p>
-                        Diese Nutzungsbedingungen gelten für die Nutzung der Plattform Geef.Atelier, betrieben von
+                        These terms of use apply to the use of the Geef.Atelier platform, operated by
                         @_settings.OperatorName, @_settings.AddressStreet, @_settings.AddressZip @_settings.AddressCity
-                        (nachfolgend „Betreiber"). Mit der Nutzung der Plattform erkennt der Nutzer diese Bedingungen an.
+                        (hereinafter the "operator"). By using the platform, the user accepts these terms.
                     </p>
                 </section>
 
                 <section>
-                    <h2>§ 2 Leistungsumfang</h2>
+                    <h2>§ 2 Scope of services</h2>
                     <p>
-                        Geef.Atelier ist eine experimentelle Schreibwerkzeug-Plattform (Beta-Phase), die KI-gestützte
-                        Text-Iteration bereitstellt. Der Betreiber behält sich vor, den Dienst jederzeit zu ändern,
-                        einzuschränken oder einzustellen.
+                        Geef.Atelier is an experimental writing-tool platform (beta phase) that provides AI-assisted text
+                        iteration. The operator reserves the right to change, restrict or discontinue the service at any time.
                     </p>
                 </section>
 
                 <section>
-                    <h2>§ 3 Nutzungsbedingungen und Pflichten</h2>
+                    <h2>§ 3 Terms of use and obligations</h2>
                     <p>
-                        Der Nutzer verpflichtet sich, die Plattform nicht für rechtswidrige Zwecke zu verwenden, keine
-                        Schadsoftware zu übertragen, keine Inhalte zu verarbeiten, die Rechte Dritter verletzen, und keine
-                        automatisierten Zugriffe ohne ausdrückliche Genehmigung durchzuführen.
+                        The user undertakes not to use the platform for unlawful purposes, not to transmit malware, not to
+                        process content that infringes the rights of third parties, and not to carry out automated access
+                        without express authorisation.
                     </p>
                 </section>
 
                 <section>
-                    <h2>§ 4 Haftungsbeschränkung</h2>
+                    <h2>§ 4 Limitation of liability</h2>
                     <p>
-                        Die Plattform befindet sich in der Beta-Phase. Der Betreiber haftet nicht für Schäden, die durch
-                        KI-generierte Inhalte, Ausfälle externer Anbieter oder die Beta-Natur des Dienstes entstehen, sofern
-                        diese nicht auf grober Fahrlässigkeit oder Vorsatz des Betreibers beruhen.
+                        The platform is in the beta phase. The operator is not liable for damages arising from AI-generated
+                        content, outages of external providers or the beta nature of the service, unless such damages are based
+                        on gross negligence or intent on the part of the operator.
                     </p>
                 </section>
 
                 <section>
-                    <h2>§ 5 KI-generierte Inhalte</h2>
+                    <h2>§ 5 AI-generated content</h2>
                     <p>
-                        Die Plattform nutzt Drittanbieter-KI-Dienste. Der Betreiber übernimmt keine Gewähr für Korrektheit,
-                        Vollständigkeit oder rechtliche Unbedenklichkeit der generierten Texte. Nutzer sind selbst für die
-                        Prüfung und den Einsatz der Ergebnisse verantwortlich.
+                        The platform uses third-party AI services. The operator gives no warranty as to the correctness,
+                        completeness or legal admissibility of the generated texts. Users are themselves responsible for
+                        reviewing and using the results.
                     </p>
                 </section>
 
                 <section>
-                    <h2>§ 6 Gerichtsstand und anwendbares Recht</h2>
+                    <h2>§ 6 Place of jurisdiction and applicable law</h2>
                     <p>
-                        Es gilt deutsches Recht.
+                        German law applies.
                         @if (!string.IsNullOrWhiteSpace(_settings.Jurisdiction))
                         {
-                            <span>Gerichtsstand ist @_settings.Jurisdiction.</span>
+                            <span>The place of jurisdiction is @_settings.Jurisdiction.</span>
                         }
                     </p>
                 </section>

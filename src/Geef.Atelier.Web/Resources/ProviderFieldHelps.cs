@@ -1,73 +1,73 @@
 namespace Geef.Atelier.Web.Resources;
 
-/// <summary>German-language field help texts displayed below each field in the Provider editor forms.</summary>
+/// <summary>Field help texts displayed below each field in the Provider editor forms.</summary>
 public static class ProviderFieldHelps
 {
     public const string Name =
-        "Eindeutiger Bezeichner für diesen Provider. Wird intern und in Profile-Formularen als Referenz verwendet. Nur Kleinbuchstaben, Zahlen und Bindestriche. Wird automatisch mit 'custom-' präfixiert.";
+        "Unique identifier for this provider. Used internally and as a reference in profile forms. Lowercase letters, digits and hyphens only. Automatically prefixed with 'custom-'.";
 
     public const string DisplayName =
-        "Anzeigename in der UI, z.B. im Provider-Dropdown bei Profile-Erstellung.";
+        "Display name in the UI, e.g. in the provider dropdown during profile creation.";
 
     public const string Description =
-        "Beschreibung wofür dieser Provider geeignet ist — wird in der Provider-Liste angezeigt.";
+        "Description of what this provider is suited for — shown in the provider list.";
 
     public const string IsActive =
-        "Inaktive Provider werden in neuen Profil-Formularen nicht angezeigt. Bestehende Profile, die diesen Provider referenzieren, funktionieren weiterhin.";
+        "Inactive providers are not shown in new profile forms. Existing profiles that reference this provider continue to work.";
 
-    // HTTP-spezifisch
+    // HTTP-specific
     public const string HttpEndpoint =
-        "Basis-URL des OpenAI-kompatiblen Endpoints, z.B. 'https://api.openai.com/v1'. Kein Trailing-Slash.";
+        "Base URL of the OpenAI-compatible endpoint, e.g. 'https://api.openai.com/v1'. No trailing slash.";
 
     public const string HttpApiKeyEnv =
-        "Name der Umgebungsvariable die den API-Key enthält, z.B. 'OPENAI_API_KEY'. Der Wert wird zur Laufzeit aus dem Server-Environment gelesen — niemals in der Datenbank gespeichert.";
+        "Name of the environment variable that contains the API key, e.g. 'OPENAI_API_KEY'. The value is read from the server environment at runtime — never stored in the database.";
 
     public const string HttpEndpointEnvOverride =
-        "Optionale Umgebungsvariable die die Endpoint-URL überschreibt. Nützlich für lokale Instanzen wie Ollama.";
+        "Optional environment variable that overrides the endpoint URL. Useful for local instances like Ollama.";
 
     public const string HttpAuthHeaderName =
-        "Name des Auth-Headers. Standard: 'Authorization'. Für Azure OpenAI: 'api-key'.";
+        "Name of the auth header. Default: 'Authorization'. For Azure OpenAI: 'api-key'.";
 
     public const string HttpAuthHeaderFormat =
-        "Format des Auth-Header-Werts mit '{key}' als Platzhalter. Standard: 'Bearer {key}'. Für api-key-Auth: '{key}'.";
+        "Format of the auth header value with '{key}' as placeholder. Default: 'Bearer {key}'. For api-key auth: '{key}'.";
 
     public const string HttpModelsEndpoint =
-        "Pfad zum Models-Discovery-Endpoint relativ zur Basis-URL, z.B. '/models'. Leer lassen wenn der Provider keinen Models-Endpoint hat — dann manuelle Modell-Liste verwenden.";
+        "Path to the models discovery endpoint relative to the base URL, e.g. '/models'. Leave empty if the provider has no models endpoint — then use a manual model list.";
 
     public const string HttpDefaultHeaders =
-        "Optionale zusätzliche HTTP-Header die bei jedem Request mitgesendet werden, z.B. HTTP-Referer oder API-Version-Header. Format: ein Header pro Zeile als 'Key: Value'.";
+        "Optional additional HTTP headers sent with every request, e.g. HTTP-Referer or API version headers. Format: one header per line as 'Key: Value'.";
 
     public const string HttpManualModelList =
-        "Manuelle Modell-Liste, wenn kein Models-Endpoint verfügbar ist. Ein Modell pro Zeile.";
+        "Manual model list when no models endpoint is available. One model per line.";
 
     public const string HttpCostPerInputToken =
-        "Optionaler Preis pro Input-Token in EUR für Cost-Tracking. Leer lassen wenn unbekannt oder nicht relevant.";
+        "Optional price per input token in EUR for cost tracking. Leave empty if unknown or not relevant.";
 
     public const string HttpCostPerOutputToken =
-        "Optionaler Preis pro Output-Token in EUR für Cost-Tracking. Leer lassen wenn unbekannt oder nicht relevant.";
+        "Optional price per output token in EUR for cost tracking. Leave empty if unknown or not relevant.";
 
-    // CLI-spezifisch
+    // CLI-specific
     public const string CliKind =
-        "CLI-Typ. Bei Built-in-CLIs (Claude, Codex, Gemini) sind die meisten Felder vorausgefüllt und schreibgeschützt. Bei 'Generic' sind alle Felder editierbar.";
+        "CLI type. For built-in CLIs (Claude, Codex, Gemini) most fields are pre-filled and read-only. For 'Generic' all fields are editable.";
 
     public const string CliMaxConcurrent =
-        "Maximale Anzahl gleichzeitiger CLI-Aufrufe für diesen Provider. Verhindert Rate-Limiting bei Subscription-basierten CLIs.";
+        "Maximum number of concurrent CLI calls for this provider. Prevents rate limiting on subscription-based CLIs.";
 
     public const string CliBinary =
-        "Pfad oder Name des CLI-Binaries, z.B. 'gemini' oder '/usr/local/bin/mycli'.";
+        "Path or name of the CLI binary, e.g. 'gemini' or '/usr/local/bin/mycli'.";
 
     public const string CliPromptArgsTemplate =
-        "Argument-Template für den CLI-Aufruf. '{prompt}' und '{model}' werden ersetzt. Beispiel: -p {prompt} --model {model} (ein Argument pro Zeile).";
+        "Argument template for the CLI call. '{prompt}' and '{model}' are replaced. Example: -p {prompt} --model {model} (one argument per line).";
 
     public const string CliStdinMode =
-        "Wenn aktiviert, wird der Prompt per stdin übergeben statt als Argument.";
+        "When enabled, the prompt is passed via stdin instead of as an argument.";
 
     public const string CliOutputFormat =
-        "Format der CLI-Ausgabe: text (Freitext), openai-json (OpenAI-kompatibles JSON), jsonl (Streaming-JSON, letztes Event).";
+        "Format of the CLI output: text (free text), openai-json (OpenAI-compatible JSON), jsonl (streaming JSON, last event).";
 
     public const string CliOutputJsonPath =
-        "JSON-Pfad zum Antwort-Feld in der Ausgabe, z.B. 'response'. Nur für json/jsonl relevant.";
+        "JSON path to the response field in the output, e.g. 'response'. Only relevant for json/jsonl.";
 
     public const string CliModels =
-        "Verfügbare Modelle für diesen CLI-Provider. Eines pro Zeile, z.B. 'google/gemini-2.5-pro'.";
+        "Available models for this CLI provider. One per line, e.g. 'google/gemini-2.5-pro'.";
 }

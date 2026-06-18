@@ -9,17 +9,17 @@
 @inject ISpecializationPackService PackService
 @inject NavigationManager Nav
 
-<PageTitle>@(IsNew ? "Neues Pack" : $"Bearbeiten: {_form.DisplayName}") — Atelier</PageTitle>
+<PageTitle>@(IsNew ? "New pack" : $"Edit: {_form.DisplayName}") — Atelier</PageTitle>
 
 <div class="crew-editor" data-testid="pack-editor">
     <div class="page-header">
-        <h1>@(IsNew ? "Neues Pack" : _readOnly ? _form.DisplayName : $"Bearbeiten: {_form.DisplayName}")</h1>
-        <a href="/packs" class="btn ghost">← Zurück</a>
+        <h1>@(IsNew ? "New pack" : _readOnly ? _form.DisplayName : $"Edit: {_form.DisplayName}")</h1>
+        <a href="/packs" class="btn ghost">← Back</a>
     </div>
 
     @if (_loading)
     {
-        <p>Wird geladen…</p>
+        <p>Loading…</p>
     }
     else
     {
@@ -27,8 +27,8 @@
         {
             <div class="info-banner">
                 @(_isSystem
-                    ? "Dies ist ein System-Pack und kann nicht bearbeitet werden. Verwende \"Als Custom duplizieren\" in der Liste."
-                    : "Dieses Pack ist crew-gebunden (TaskBound) und wird über seine Crew verwaltet.")
+                    ? "This is a system pack and cannot be edited. Use \"Duplicate as custom\" in the list."
+                    : "This pack is crew-bound (TaskBound) and is managed through its crew.")
             </div>
         }
 
@@ -41,34 +41,34 @@
             }
 
             <div class="template-meta-section">
-                <h3>Grunddaten</h3>
+                <h3>Basics</h3>
 
                 <div class="field">
-                    <label>Name (Slug)</label>
-                    <InputText @bind-Value="_form.Name" placeholder="mein-pack"
+                    <label>Name (slug)</label>
+                    <InputText @bind-Value="_form.Name" placeholder="my-pack"
                                disabled="@(!IsNew || _readOnly)" data-testid="input-name" />
                     @if (IsNew)
                     {
-                        <small class="form-hint">Nur Kleinbuchstaben, Ziffern und Bindestriche. Wird als <code>custom-…</code> gespeichert.</small>
+                        <small class="form-hint">Lowercase letters, digits and hyphens only. Saved as <code>custom-…</code>.</small>
                     }
                     <ValidationMessage For="() => _form.Name" />
                 </div>
 
                 <div class="field">
-                    <label>Anzeigename</label>
+                    <label>Display name</label>
                     <InputText @bind-Value="_form.DisplayName" disabled="@_readOnly" data-testid="input-display-name" />
                     <ValidationMessage For="() => _form.DisplayName" />
                 </div>
 
                 <div class="field">
-                    <label>Beschreibung</label>
+                    <label>Description</label>
                     <InputTextArea @bind-Value="_form.Description" rows="2" disabled="@_readOnly" data-testid="input-description" />
                 </div>
             </div>
 
             <div class="template-meta-section">
-                <h3>Spezialisierung</h3>
-                <p class="pipeline-stage-desc">Das aufgabenspezifische Delta, das in den <code>{specialization}</code>-Slot des generischen Akteur-Prompts komponiert wird.</p>
+                <h3>Specialization</h3>
+                <p class="pipeline-stage-desc">The task-specific delta composed into the <code>{specialization}</code> slot of the generic actor prompt.</p>
                 <div class="field">
                     <InputTextArea @bind-Value="_form.SpecializationText" rows="10"
                                    disabled="@_readOnly"
@@ -79,28 +79,28 @@
             </div>
 
             <div class="template-meta-section">
-                <h3>Scope &amp; Bindung</h3>
+                <h3>Scope &amp; binding</h3>
 
                 <div class="field">
                     <label>Scope</label>
                     <InputSelect @bind-Value="_form.Scope" disabled="@_readOnly" data-testid="input-scope">
-                        <option value="@PackScope.General">Allgemein — in jeder Crew nutzbar</option>
-                        <option value="@PackScope.DomainScoped">Domäne — nur in Crews derselben Domäne</option>
+                        <option value="@PackScope.General">General — usable in any crew</option>
+                        <option value="@PackScope.DomainScoped">Domain — only in crews of the same domain</option>
                     </InputSelect>
                 </div>
 
                 @if (_form.Scope == PackScope.DomainScoped)
                 {
                     <div class="field">
-                        <label>Domäne</label>
-                        <InputText @bind-Value="_form.Domain" placeholder="z. B. legal, academic, marketing"
+                        <label>Domain</label>
+                        <InputText @bind-Value="_form.Domain" placeholder="e.g. legal, academic, marketing"
                                    disabled="@_readOnly" data-testid="input-domain" />
                         <ValidationMessage For="() => _form.Domain" />
                     </div>
                 }
 
                 <div class="field">
-                    <label>Anwendbare Akteur-Typen</label>
+                    <label>Applicable actor types</label>
                     <div class="checkbox-group" data-testid="actor-types-group">
                         @foreach (var t in _selectableActorTypes)
                         {
@@ -114,7 +114,7 @@
                             </label>
                         }
                     </div>
-                    <small class="form-hint">Leer oder „Alle" = passt zu jedem Akteur-Typ.</small>
+                    <small class="form-hint">Empty or "All" = applies to every actor type.</small>
                 </div>
             </div>
 
@@ -122,19 +122,19 @@
             {
                 <div class="form-actions">
                     <button type="submit" class="btn primary" disabled="@_saving" data-testid="btn-save">
-                        @(_saving ? "Speichern…" : IsNew ? "Erstellen" : "Speichern")
+                        @(_saving ? "Saving…" : IsNew ? "Create" : "Save")
                     </button>
-                    <button type="button" class="btn ghost" @onclick="NavigateBack">Abbrechen</button>
+                    <button type="button" class="btn ghost" @onclick="NavigateBack">Cancel</button>
                     @if (!IsNew)
                     {
-                        <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true" data-testid="btn-delete">Löschen</button>
+                        <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true" data-testid="btn-delete">Delete</button>
                     }
                 </div>
             }
             else
             {
                 <div class="form-actions">
-                    <button type="button" class="btn ghost" @onclick="NavigateBack">Zurück</button>
+                    <button type="button" class="btn ghost" @onclick="NavigateBack">Back</button>
                 </div>
             }
         </EditForm>
@@ -142,17 +142,17 @@
         @if (!IsNew && !_isSystem)
         {
             <div class="template-meta-section" data-testid="pack-lifecycle">
-                <h3>Lebenszyklus</h3>
+                <h3>Lifecycle</h3>
 
                 @if (_referencingTemplates.Count > 0)
                 {
-                    <p class="form-hint">Referenziert von: @string.Join(", ", _referencingTemplates)</p>
+                    <p class="form-hint">Referenced by: @string.Join(", ", _referencingTemplates)</p>
                 }
 
                 @if (_lifecycleConcerns is { Count: > 0 })
                 {
                     <div class="alert alert-danger" data-testid="generality-concerns">
-                        <strong>Generalitäts-Review nicht bestanden:</strong>
+                        <strong>Generality review failed:</strong>
                         <ul>@foreach (var c in _lifecycleConcerns) { <li>@c</li> }</ul>
                     </div>
                 }
@@ -162,29 +162,29 @@
                 }
 
                 <div class="field">
-                    <label>Ziel-Scope für Promote/Clone</label>
+                    <label>Target scope for promote/clone</label>
                     <InputSelect @bind-Value="_targetScope">
-                        <option value="@PackScope.General">Allgemein</option>
-                        <option value="@PackScope.DomainScoped">Domäne</option>
+                        <option value="@PackScope.General">General</option>
+                        <option value="@PackScope.DomainScoped">Domain</option>
                     </InputSelect>
                     @if (_targetScope == PackScope.DomainScoped)
                     {
-                        <InputText @bind-Value="_targetDomain" placeholder="Ziel-Domäne" />
+                        <InputText @bind-Value="_targetDomain" placeholder="Target domain" />
                     }
                 </div>
 
                 <div class="form-actions">
                     <button type="button" class="btn" disabled="@_lifecycleBusy"
-                            data-testid="btn-promote" @onclick="PromoteAsync">Promote (mit Generalitäts-Review)</button>
+                            data-testid="btn-promote" @onclick="PromoteAsync">Promote (with generality review)</button>
                     <button type="button" class="btn" disabled="@_lifecycleBusy"
-                            data-testid="btn-demote" @onclick="DemoteAsync">Demote zu Domäne</button>
+                            data-testid="btn-demote" @onclick="DemoteAsync">Demote to domain</button>
                 </div>
 
                 <div class="field" style="margin-top:0.75rem;">
-                    <label>Clone-to-Generalize — neuer Name</label>
-                    <InputText @bind-Value="_cloneName" placeholder="generalisiertes-pack" />
+                    <label>Clone-to-generalize — new name</label>
+                    <InputText @bind-Value="_cloneName" placeholder="generalized-pack" />
                     <button type="button" class="btn" style="margin-top:0.4rem;" disabled="@_lifecycleBusy"
-                            data-testid="btn-clone-generalize" @onclick="CloneToGeneralizeAsync">Klonen &amp; generalisieren</button>
+                            data-testid="btn-clone-generalize" @onclick="CloneToGeneralizeAsync">Clone &amp; generalize</button>
                 </div>
             </div>
         }
@@ -314,7 +314,7 @@
 
     private static string GetActorLabel(PackActorType t) => t switch
     {
-        PackActorType.Any        => "Alle",
+        PackActorType.Any        => "All",
         PackActorType.Executor   => "Executor",
         PackActorType.Reviewer   => "Reviewer",
         PackActorType.Advisor    => "Advisor",
@@ -325,20 +325,20 @@
 
     private sealed class PackFormModel
     {
-        [Required(ErrorMessage = "Name ist erforderlich.")]
+        [Required(ErrorMessage = "Name is required.")]
         [RegularExpression(@"^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$",
-            ErrorMessage = "Nur Kleinbuchstaben, Ziffern und Bindestriche.")]
+            ErrorMessage = "Lowercase letters, digits and hyphens only.")]
         [MaxLength(64)]
         public string Name { get; set; } = "";
 
-        [Required(ErrorMessage = "Anzeigename ist erforderlich.")]
+        [Required(ErrorMessage = "Display name is required.")]
         [MaxLength(200)]
         public string DisplayName { get; set; } = "";
 
         [MaxLength(1000)]
         public string Description { get; set; } = "";
 
-        [Required(ErrorMessage = "Spezialisierungstext ist erforderlich.")]
+        [Required(ErrorMessage = "Specialization text is required.")]
         public string SpecializationText { get; set; } = "";
 
         public PackScope Scope { get; set; } = PackScope.General;

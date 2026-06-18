@@ -10,18 +10,18 @@
 
 <div class="crew-profiles-index">
     <div class="page-header">
-        <h1>Spezialisierungs-Packs</h1>
-        <a href="/packs/create" class="btn primary">+ Neues Pack</a>
+        <h1>Specialization Packs</h1>
+        <a href="/packs/create" class="btn primary">+ New pack</a>
     </div>
 
     <p class="text-muted">
-        Packs tragen die aufgabenspezifische Spezialisierung. Generische Akteure bleiben dadurch sicher
-        wiederverwendbar; mehrere Packs lassen sich pro Crew an einen Akteur binden.
+        Packs carry the task-specific specialization. Generic actors stay safely reusable; several
+        packs can be bound per actor in a crew.
     </p>
 
     @if (_packs.Count == 0)
     {
-        <p class="text-muted">Noch keine Packs konfiguriert.</p>
+        <p class="text-muted">No packs configured yet.</p>
     }
     else
     {
@@ -30,8 +30,8 @@
                 <tr>
                     <th>Name</th>
                     <th>Scope</th>
-                    <th>Domäne</th>
-                    <th>Akteur-Typen</th>
+                    <th>Domain</th>
+                    <th>Actor types</th>
                     <th></th>
                 </tr>
             </thead>
@@ -42,21 +42,21 @@
                         <td>
                             @pack.DisplayName
                             @if (pack.IsSystem) { <span class="crew-badge">System</span> }
-                            @if (pack.Archived) { <span class="crew-badge crew-badge--danger">Archiviert</span> }
+                            @if (pack.Archived) { <span class="crew-badge crew-badge--danger">Archived</span> }
                         </td>
                         <td><span class="crew-badge">@GetScopeLabel(pack.Scope)</span></td>
                         <td>@(pack.Domain ?? "—")</td>
                         <td>@string.Join(", ", pack.ApplicableActorTypes.Select(GetActorLabel))</td>
                         <td class="crew-table-actions">
-                            <a href="/packs/view/@pack.Name" class="btn small">Ansehen</a>
+                            <a href="/packs/view/@pack.Name" class="btn small">View</a>
                             @if (pack.IsSystem)
                             {
-                                <button class="btn small primary" @onclick="() => DuplicatePack(pack)">Als Custom duplizieren</button>
+                                <button class="btn small primary" @onclick="() => DuplicatePack(pack)">Duplicate as custom</button>
                             }
                             else
                             {
-                                <a href="/packs/edit/@pack.Name" class="btn small">Bearbeiten</a>
-                                <button class="btn small danger" @onclick="() => _packToDelete = pack">Löschen</button>
+                                <a href="/packs/edit/@pack.Name" class="btn small">Edit</a>
+                                <button class="btn small danger" @onclick="() => _packToDelete = pack">Delete</button>
                             }
                         </td>
                     </tr>
@@ -92,11 +92,11 @@
         _error = null;
         try
         {
-            var copyName = "custom-" + original.Name.TrimStart("custom-".ToCharArray()) + "-kopie";
+            var copyName = "custom-" + original.Name.TrimStart("custom-".ToCharArray()) + "-copy";
             var copy = original with
             {
                 Name = copyName,
-                DisplayName = original.DisplayName + " (Kopie)",
+                DisplayName = original.DisplayName + " (copy)",
                 IsSystem = false,
                 CreatedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow
@@ -122,15 +122,15 @@
 
     private static string GetScopeLabel(PackScope s) => s switch
     {
-        PackScope.General      => "Allgemein",
-        PackScope.DomainScoped => "Domäne",
-        PackScope.TaskBound    => "Crew-gebunden",
+        PackScope.General      => "General",
+        PackScope.DomainScoped => "Domain",
+        PackScope.TaskBound    => "Crew-bound",
         _                      => s.ToString()
     };
 
     private static string GetActorLabel(PackActorType t) => t switch
     {
-        PackActorType.Any        => "Alle",
+        PackActorType.Any        => "All",
         PackActorType.Executor   => "Executor",
         PackActorType.Reviewer   => "Reviewer",
         PackActorType.Advisor    => "Advisor",

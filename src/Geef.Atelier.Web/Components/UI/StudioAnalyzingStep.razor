@@ -4,7 +4,7 @@
 <div class="studio-analyzing" data-testid="studio-analyzing-step">
     <div class="analyzing-spinner" aria-label="Analyzing"></div>
     <p class="analyzing-status" data-testid="studio-analyzing-status">
-        @(string.IsNullOrWhiteSpace(Status) ? "Analyse wird vorbereitet…" : Status)
+        @(string.IsNullOrWhiteSpace(Status) ? "Preparing analysis…" : Status)
     </p>
     <p class="analyzing-meta">
         @if (!string.IsNullOrWhiteSpace(Provider) || !string.IsNullOrWhiteSpace(Model))
@@ -13,7 +13,7 @@
         }
         <span class="analyzing-elapsed" data-testid="studio-analyzing-elapsed">@_elapsed s</span>
     </p>
-    <small>Modell-Katalog wird gesammelt, dann antwortet die Meta-KI (i. d. R. 10–40 s).</small>
+    <small>Collecting the model catalogue, then the meta-AI responds (usually 10–40 s).</small>
 </div>
 
 @code {

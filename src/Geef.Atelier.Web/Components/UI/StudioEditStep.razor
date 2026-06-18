@@ -8,8 +8,8 @@
 @inject IOptions<TemplateStudioOptions> Options
 
 <div class="studio-edit" data-testid="studio-edit-step">
-    <h2>Konfiguration bearbeiten</h2>
-    <p class="edit-hint">Überprüfe die KI-Empfehlung und passe die Felder nach Bedarf an.</p>
+    <h2>Edit configuration</h2>
+    <p class="edit-hint">Review the AI recommendation and adjust the fields as needed.</p>
 
     @if (_template is not null)
     {
@@ -17,7 +17,7 @@
             <h3>Template</h3>
 
             <div class="field">
-                <label>Anzeigename</label>
+                <label>Display name</label>
                 <input type="text"
                        value="@_template.DisplayName"
                        @oninput="OnDisplayNameInput"
@@ -26,7 +26,7 @@
             </div>
 
             <div class="field">
-                <label>Beschreibung</label>
+                <label>Description</label>
                 <textarea rows="2"
                           value="@_template.Description"
                           @oninput="OnDescriptionInput"
@@ -35,14 +35,14 @@
             </div>
 
             <div class="field">
-                <label>Evaluierungsstrategie</label>
+                <label>Evaluation strategy</label>
                 <select value="@_template.EvaluationStrategy"
                         @onchange="OnStrategyChange"
                         data-testid="template-strategy">
-                    <option value="Sequential">Sequential – Reviewer nacheinander</option>
-                    <option value="Parallel">Parallel – alle gleichzeitig</option>
-                    <option value="FailFast">FailFast – Stopp beim ersten Fund</option>
-                    <option value="Priority">Priority – nach Priorität gewichtet</option>
+                    <option value="Sequential">Sequential – reviewers one after another</option>
+                    <option value="Parallel">Parallel – all at once</option>
+                    <option value="FailFast">FailFast – stop at the first finding</option>
+                    <option value="Priority">Priority – weighted by priority</option>
                 </select>
                 <FieldHelp Text="@StudioFieldHelps.EvaluationStrategy" DataTestId="field-help-strategy" />
                 @if (!string.IsNullOrEmpty(_template.EvaluationStrategyReasoning))
@@ -61,7 +61,7 @@
                                checked="@_template.RunFinalizersOnMaxAttempts"
                                @onchange="OnRunFinalizersOnMaxAttemptsChange"
                                data-testid="run-finalizers-on-max-attempts" />
-                        Finalizer auch bei maximalen Iterationen ausführen
+                        Run finalizers even at max iterations
                     </label>
                     <FieldHelp Text="@StudioFieldHelps.RunFinalizersOnMaxAttempts" DataTestId="field-help-run-finalizers-on-max" />
                 </div>
@@ -115,18 +115,18 @@
                                 data-testid="@($"reviewer-down-{index}")">▼</button>
                         <button type="button" class="btn ghost btn-sm danger"
                                 @onclick="() => RemoveReviewer(index)"
-                                data-testid="@($"reviewer-remove-{index}")">Entfernen</button>
+                                data-testid="@($"reviewer-remove-{index}")">Remove</button>
                     </div>
                 </div>
             }
             <div class="slot-add-actions">
                 <button type="button" class="btn ghost btn-sm"
                         @onclick="AddReviewerSlot"
-                        data-testid="add-reviewer-btn">+ Reviewer hinzufügen</button>
+                        data-testid="add-reviewer-btn">+ Add reviewer</button>
             </div>
             @if (_showValidation && _reviewerSlots.Count == 0)
             {
-                <span class="validation-error" data-testid="reviewer-empty-error">Mindestens ein Reviewer ist erforderlich.</span>
+                <span class="validation-error" data-testid="reviewer-empty-error">At least one reviewer is required.</span>
             }
         </div>
 
@@ -151,19 +151,19 @@
                     <div class="slot-actions">
                         <button type="button" class="btn ghost btn-sm danger"
                                 @onclick="() => RemoveAdvisor(index)"
-                                data-testid="@($"advisor-remove-{index}")">Entfernen</button>
+                                data-testid="@($"advisor-remove-{index}")">Remove</button>
                     </div>
                 </div>
             }
             <div class="slot-add-actions">
                 <button type="button" class="btn ghost btn-sm"
                         @onclick="AddAdvisorSlot"
-                        data-testid="add-advisor-btn">+ Advisor hinzufügen</button>
+                        data-testid="add-advisor-btn">+ Add advisor</button>
             </div>
         </div>
 
         <div class="edit-section">
-            <h3>Grounding-Provider <span class="optional-label">(optional)</span></h3>
+            <h3>Grounding provider <span class="optional-label">(optional)</span></h3>
             @for (var i = 0; i < _groundingSlots.Count; i++)
             {
                 var slot = _groundingSlots[i];
@@ -183,14 +183,14 @@
                     <div class="slot-actions">
                         <button type="button" class="btn ghost btn-sm danger"
                                 @onclick="() => RemoveGrounding(index)"
-                                data-testid="@($"grounding-remove-{index}")">Entfernen</button>
+                                data-testid="@($"grounding-remove-{index}")">Remove</button>
                     </div>
                 </div>
             }
             <div class="slot-add-actions">
                 <button type="button" class="btn ghost btn-sm"
                         @onclick="AddGroundingSlot"
-                        data-testid="add-grounding-btn">+ Grounding-Provider hinzufügen</button>
+                        data-testid="add-grounding-btn">+ Add grounding provider</button>
             </div>
         </div>
 
@@ -224,21 +224,21 @@
                                 data-testid="@($"finalizer-down-{index}")">▼</button>
                         <button type="button" class="btn ghost btn-sm danger"
                                 @onclick="() => RemoveFinalizer(index)"
-                                data-testid="@($"finalizer-remove-{index}")">Entfernen</button>
+                                data-testid="@($"finalizer-remove-{index}")">Remove</button>
                     </div>
                 </div>
             }
             <div class="slot-add-actions">
                 <button type="button" class="btn ghost btn-sm"
                         @onclick="AddFinalizerSlot"
-                        data-testid="add-finalizer-btn">+ Finalizer hinzufügen</button>
+                        data-testid="add-finalizer-btn">+ Add finalizer</button>
             </div>
         </div>
 
         @if (_showValidation && !AreAllSlotsValid())
         {
             <div class="validation-panel" role="alert" data-testid="validation-panel">
-                Bitte fülle alle Pflichtfelder aus, bevor du speicherst.
+                Please fill in all required fields before saving.
             </div>
         }
 
@@ -249,18 +249,18 @@
                     data-testid="save-button">
                 @if (_materializing)
                 {
-                    <span>Speichern…</span>
+                    <span>Saving…</span>
                 }
                 else
                 {
-                    <span>Speichern und materialisieren</span>
+                    <span>Save and materialize</span>
                 }
             </button>
             <button type="button" class="btn ghost"
                     disabled="@_materializing"
                     @onclick="OnBack"
                     data-testid="back-button">
-                ← Zurück
+                ← Back
             </button>
         </div>
     }

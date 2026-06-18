@@ -6,12 +6,12 @@
 @inject IOAuthService OAuthService
 @inject AuthenticationStateProvider AuthStateProvider
 
-<PageTitle>Verbundene Clients — Geef.Atelier</PageTitle>
+<PageTitle>Connected clients — Geef.Atelier</PageTitle>
 
 <div class="connected-clients" data-testid="connected-clients-page">
     <div class="page-header">
-        <h1>Verbundene Clients</h1>
-        <a href="/workshop" class="btn ghost" data-testid="btn-back">← Zurück</a>
+        <h1>Connected clients</h1>
+        <a href="/workshop" class="btn ghost" data-testid="btn-back">← Back</a>
     </div>
 
     @if (!string.IsNullOrEmpty(_error))
@@ -21,12 +21,12 @@
 
     @if (_loading)
     {
-        <p>Laden…</p>
+        <p>Loading…</p>
     }
     else if (_clients.Count == 0)
     {
         <div class="empty-state" data-testid="empty-state">
-            Keine verbundenen Clients.
+            No connected clients.
         </div>
     }
     else
@@ -37,27 +37,27 @@
                 <div class="client-row" data-testid="client-row-@client.ClientId">
                     <div class="client-info">
                         <span class="client-name">@client.ClientName</span>
-                        <span class="client-meta">Verbunden seit @client.IssuedAt.ToString("yyyy-MM-dd HH:mm") UTC</span>
-                        <span class="client-scope">Berechtigung: @client.Scope</span>
+                        <span class="client-meta">Connected since @client.IssuedAt.ToString("yyyy-MM-dd HH:mm") UTC</span>
+                        <span class="client-scope">Permission: @client.Scope</span>
                     </div>
                     <div class="client-actions">
                         @if (_confirmRevokeClientId == client.ClientId)
                         {
-                            <span class="revoke-confirm-text">Wirklich widerrufen?</span>
+                            <span class="revoke-confirm-text">Really revoke?</span>
                             <button class="btn danger small" @onclick="() => RevokeClientAsync(client.ClientId)"
                                     data-testid="btn-confirm-revoke-@client.ClientId">
-                                Ja
+                                Yes
                             </button>
                             <button class="btn ghost small" @onclick="CancelRevoke"
                                     data-testid="btn-cancel-revoke-@client.ClientId">
-                                Nein
+                                No
                             </button>
                         }
                         else
                         {
                             <button class="btn ghost small" @onclick="() => ConfirmRevoke(client.ClientId)"
                                     data-testid="btn-revoke-@client.ClientId">
-                                Widerrufen
+                                Revoke
                             </button>
                         }
                     </div>
@@ -68,14 +68,14 @@
         <div class="clients-footer">
             @if (_confirmRevokeAll)
             {
-                <span class="revoke-confirm-text">Wirklich alle widerrufen?</span>
-                <button class="btn danger" @onclick="RevokeAllAsync" data-testid="btn-confirm-revoke-all">Ja</button>
-                <button class="btn ghost" @onclick="() => _confirmRevokeAll = false" data-testid="btn-cancel-revoke-all">Nein</button>
+                <span class="revoke-confirm-text">Really revoke all?</span>
+                <button class="btn danger" @onclick="RevokeAllAsync" data-testid="btn-confirm-revoke-all">Yes</button>
+                <button class="btn ghost" @onclick="() => _confirmRevokeAll = false" data-testid="btn-cancel-revoke-all">No</button>
             }
             else
             {
                 <button class="btn danger" @onclick="() => _confirmRevokeAll = true" data-testid="btn-revoke-all">
-                    Alle widerrufen
+                    Revoke all
                 </button>
             }
         </div>

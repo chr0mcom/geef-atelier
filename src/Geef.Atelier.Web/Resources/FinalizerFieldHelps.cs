@@ -1,18 +1,18 @@
 namespace Geef.Atelier.Web.Resources;
 
-/// <summary>German-language field help texts displayed below each field in the Finalizer Editor.</summary>
+/// <summary>Field help texts displayed below each field in the Finalizer Editor.</summary>
 public static class FinalizerFieldHelps
 {
     public const string TransformProvider =
-        "Der LLM-Anbieter für die Text-Transformation. Nur aktive Anbieter stehen zur Auswahl.";
+        "The LLM provider for the text transformation. Only active providers are available for selection.";
 
     public const string TransformModel =
-        "Das Modell für die Text-Transformation. Für Tone-Changes und Stil-Anpassungen reichen meist günstige Modelle.";
+        "The model for the text transformation. For tone changes and style adjustments, cheap models are usually sufficient.";
 
     public const string TransformMaxTokens =
-        "Maximale Anzahl Token für die Ausgabe der Transformation. Mindestens 1024.";
+        "Maximum number of tokens for the transformation output. At least 1024.";
 
     public const string TransformTemperature =
-        "Kreativitätsstufe der KI: leer = Anbieter-Standard, 0.0 = deterministisch, 2.0 = sehr kreativ. " +
-        "Für Text-Transformationen empfohlen: 0.3–0.7.";
+        "Creativity level of the AI: empty = provider default, 0.0 = deterministic, 2.0 = very creative. " +
+        "Recommended for text transformations: 0.3–0.7.";
 }

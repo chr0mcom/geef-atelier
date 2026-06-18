@@ -1,120 +1,120 @@
 namespace Geef.Atelier.Web.Resources;
 
-/// <summary>German-language field help texts displayed below each field in the Studio Edit-Step.</summary>
+/// <summary>Field help texts displayed below each field in the Studio Edit-Step.</summary>
 public static class StudioFieldHelps
 {
     // --- Template fields ---
     public const string DisplayName =
-        "Anzeigename des Templates in der Auswahlliste. Kurz und prägnant, z. B. \"Juristischer Vertragsprüfer\".";
+        "Display name of the template in the selection list. Short and concise, e.g. \"Legal contract reviewer\".";
 
     public const string Description =
-        "Kurze Beschreibung, was dieses Crew-Template tut und für welche Aufgaben es geeignet ist.";
+        "Short description of what this crew template does and which tasks it is suited for.";
 
     public const string EvaluationStrategy =
-        "Wie die Reviewer-Ergebnisse zusammengeführt werden. " +
-        "Sequential: Reviewer nacheinander, jeder kann ein Veto einlegen. " +
-        "Parallel: alle gleichzeitig, Mehrheit entscheidet. " +
-        "FailFast: Ausführung stoppt beim ersten kritischen Fund. " +
-        "Priority: Reviewer nach Priorität gewichtet.";
+        "How the reviewer results are combined. " +
+        "Sequential: reviewers one after another, each can veto. " +
+        "Parallel: all at once, the majority decides. " +
+        "FailFast: execution stops at the first critical finding. " +
+        "Priority: reviewers weighted by priority.";
 
     // --- Profile fields (all types) ---
     public const string ProfileName =
-        "Interner Bezeichner, eindeutig im System, nur Kleinbuchstaben und Bindestriche (kebab-case), z. B. \"quality-reviewer\".";
+        "Internal identifier, unique in the system, lowercase letters and hyphens only (kebab-case), e.g. \"quality-reviewer\".";
 
     public const string ProfileDisplayName =
-        "Anzeigename des Profils in der Auswahlliste, kurz und prägnant.";
+        "Display name of the profile in the selection list, short and concise.";
 
     public const string ProfileDescription =
-        "Kurze Beschreibung, welche Rolle dieses Profil übernimmt und für welche Aufgaben es geeignet ist.";
+        "Short description of the role this profile takes on and which tasks it is suited for.";
 
     public const string Provider =
-        "Der LLM-Anbieter, über den dieses Profil angebunden wird (z. B. OpenRouter, Anthropic, OpenAI).";
+        "The LLM provider this profile is connected through (e.g. OpenRouter, Anthropic, OpenAI).";
 
     public const string Model =
-        "Das KI-Modell für dieses Profil. Wähle erst den Provider, dann das passende Modell.";
+        "The AI model for this profile. Pick the provider first, then the matching model.";
 
     public const string MaxTokens =
-        "Maximale Antwortlänge in Tokens. Reviewer: 2 048 sind ein guter Standard. " +
-        "Executor: 4 096 oder mehr für längere Texte.";
+        "Maximum response length in tokens. Reviewer: 2,048 is a good default. " +
+        "Executor: 4,096 or more for longer texts.";
 
     public const string SystemPrompt =
-        "Der System-Prompt, der das Verhalten dieses Profils steuert. " +
-        "Je konkreter und fokussierter, desto besser die Ergebnisse. Maximal 8 000 Zeichen.";
+        "The system prompt that controls this profile's behaviour. " +
+        "The more concrete and focused, the better the results. Maximum 8,000 characters.";
 
-    // --- Reviewer-spezifisch ---
+    // --- Reviewer-specific ---
     public const string ReviewerFocus =
-        "Optionaler Fokus-Hinweis, auf was der Reviewer besonders achten soll (z. B. \"Stilsicherheit\" oder \"Faktengenauigkeit\").";
+        "Optional focus hint on what the reviewer should pay particular attention to (e.g. \"stylistic confidence\" or \"factual accuracy\").";
 
-    // --- Advisor-spezifisch ---
+    // --- Advisor-specific ---
     public const string AdvisorMode =
-        "Die strategische Rolle des Advisors: " +
-        "Strategic – Gesamtbild und Risiken. " +
-        "Critical – Schwächen und Gegenargumente. " +
-        "DevilsAdvocate – Argumentiert aktiv gegen den Plan.";
+        "The strategic role of the advisor: " +
+        "Strategic – big picture and risks. " +
+        "Critical – weaknesses and counter-arguments. " +
+        "DevilsAdvocate – actively argues against the plan.";
 
     public const string AdvisorTrigger =
-        "Wann der Advisor eingesetzt wird: " +
-        "BeforeFirstExecution – einmalig vor dem ersten Executor-Lauf. " +
-        "BeforeEveryExecution – vor jedem Executor-Lauf. " +
-        "OnConvergenceFailure – nur wenn die Konvergenz scheitert.";
+        "When the advisor is used: " +
+        "BeforeFirstExecution – once before the first executor run. " +
+        "BeforeEveryExecution – before every executor run. " +
+        "OnConvergenceFailure – only when convergence fails.";
 
-    // --- Grounding-Provider-spezifisch ---
+    // --- Grounding-provider-specific ---
     public const string GroundingProviderType =
-        "Art der Wissensquelle: Tavily für Web-Suche, VectorStore für eigene Dokumente.";
+        "Type of knowledge source: Tavily for web search, VectorStore for your own documents.";
 
     public const string GroundingProviderSettings =
-        "Typ-spezifische Einstellungen. Tavily: api_key erforderlich. VectorStore: collection_name erforderlich.";
+        "Type-specific settings. Tavily: api_key required. VectorStore: collection_name required.";
 
     public const string MaxQueriesPerRun =
-        "Wie viele Suchanfragen pro Ausführung maximal gestellt werden dürfen (1–5).";
+        "How many search queries may be made per run at most (1–5).";
 
-    // --- Finalizer-spezifisch ---
+    // --- Finalizer-specific ---
     public const string FinalizerType =
-        "Art des Finalizers: " +
-        "FileExport – exportiert den Text in eine Datei (Markdown, HTML, PDF, DOCX, TXT). " +
-        "MetadataEnrich – reichert den Text mit Metadaten an (Front-Matter, Wortzahl, Lesbarkeit). " +
-        "ExternalSink – sendet den Text an einen Webhook oder per E-Mail. " +
-        "Transform – verändert den Text durch ein KI-Modell (z. B. Anti-AI-Stimme).";
+        "Type of finalizer: " +
+        "FileExport – exports the text to a file (Markdown, HTML, PDF, DOCX, TXT). " +
+        "MetadataEnrich – enriches the text with metadata (front-matter, word count, readability). " +
+        "ExternalSink – sends the text to a webhook or via email. " +
+        "Transform – modifies the text through an AI model (e.g. anti-AI voice).";
 
     public const string FinalizerFileFormat =
-        "Zieldateiformat: markdown, html, pdf, docx, txt. PDF und DOCX werden serverseitig generiert.";
+        "Target file format: markdown, html, pdf, docx, txt. PDF and DOCX are generated server-side.";
 
     public const string FinalizerEnricherType =
-        "Art der Metadaten-Anreicherung: " +
-        "front-matter – YAML-Header mit Titel, Erstellungszeit und Wortzahl. " +
-        "word-count-footer – Wortzahl und Lesezeit als Fußzeile. " +
-        "reading-level – Flesch-Kincaid-Leseniveau als Hinweis im Text.";
+        "Type of metadata enrichment: " +
+        "front-matter – YAML header with title, creation time and word count. " +
+        "word-count-footer – word count and reading time as a footer. " +
+        "reading-level – Flesch-Kincaid reading level as a note in the text.";
 
     public const string FinalizerSinkType =
-        "Zielkanal: webhook – HTTP-POST an eine URL. email – E-Mail-Versand via SMTP.";
+        "Target channel: webhook – HTTP POST to a URL. email – send via SMTP.";
 
     public const string FinalizerWebhookUrl =
-        "Ziel-URL für den Webhook-POST. Die URL wird nicht in Logs gespeichert.";
+        "Target URL for the webhook POST. The URL is not stored in logs.";
 
     public const string FinalizerWebhookAuthHeader =
-        "Optionaler HTTP-Autorisierungs-Header (z. B. \"Bearer my-token\"). " +
-        "Wird nicht angezeigt und nicht geloggt.";
+        "Optional HTTP authorization header (e.g. \"Bearer my-token\"). " +
+        "Is not displayed and not logged.";
 
     public const string FinalizerEmailTo =
-        "Empfänger-E-Mail-Adresse. SMTP muss serverseitig konfiguriert sein (Umgebungsvariablen).";
+        "Recipient email address. SMTP must be configured server-side (environment variables).";
 
     public const string FinalizerEmailSubject =
-        "Betreffzeile der E-Mail. Unterstützt Platzhalter: {run-id}, {template}, {timestamp}.";
+        "Subject line of the email. Supports placeholders: {run-id}, {template}, {timestamp}.";
 
     public const string FinalizerEmailAttach =
-        "Wenn aktiviert, wird der Text als Dateianhang mitgeschickt (Dateiname aus Profil-Name).";
+        "When enabled, the text is sent along as a file attachment (file name from the profile name).";
 
     public const string FinalizerTransformSystemPrompt =
-        "Anweisung für die KI-Transformation. Sei konkret: was soll geändert werden und was nicht. " +
-        "Beispiel: \"Schreibe den Text in einer natürlichen, menschlichen Stimme um. Vermeide KI-typische Satzkonstruktionen.\" " +
-        "Endet immer mit: 'Respond in the language of the input text.'";
+        "Instruction for the AI transformation. Be concrete: what should be changed and what not. " +
+        "Example: \"Rewrite the text in a natural, human voice. Avoid AI-typical sentence constructions.\" " +
+        "Always ends with: 'Respond in the language of the input text.'";
 
     public const string FinalizerProfiles =
-        "Finalizer werden nach dem Konvergenz-Schritt in der angegebenen Reihenfolge ausgeführt. " +
-        "Transform-Finalizer ändern den Text; Export- und Sink-Finalizer erzeugen Artefakte. " +
-        "Reihenfolge: erst transformieren, dann exportieren.";
+        "Finalizers run after the convergence step in the specified order. " +
+        "Transform finalizers change the text; export and sink finalizers produce artifacts. " +
+        "Order: transform first, then export.";
 
     public const string RunFinalizersOnMaxAttempts =
-        "Wenn aktiviert, laufen die Finalizer auch wenn die Konvergenz nach maximalen Iterationen scheitert — " +
-        "der letzte Executor-Entwurf wird dann als Ergebnis verwendet.";
+        "When enabled, the finalizers also run if convergence fails after the maximum iterations — " +
+        "the last executor draft is then used as the result.";
 }

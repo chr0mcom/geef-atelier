@@ -16,12 +16,12 @@
 @inject IOptions<ConvergenceOptions> ConvergenceOpts
 @inject NavigationManager Nav
 
-<PageTitle>@(IsNew ? "Neues Template" : "Template bearbeiten") — Atelier</PageTitle>
+<PageTitle>@(IsNew ? "New template" : "Edit template") — Atelier</PageTitle>
 
 <div class="crew-editor" data-testid="template-editor">
     <div class="page-header">
-        <h1>@(IsNew ? "Neues Template" : _isSystem ? _displayName : $"Bearbeiten: {_displayName}")</h1>
-        <a href="/crew/templates" class="btn ghost">← Zurück</a>
+        <h1>@(IsNew ? "New template" : _isSystem ? _displayName : $"Edit: {_displayName}")</h1>
+        <a href="/crew/templates" class="btn ghost">← Back</a>
     </div>
 
     @if (!string.IsNullOrEmpty(_error))
@@ -31,7 +31,7 @@
 
     @if (_loading)
     {
-        <p>Wird geladen…</p>
+        <p>Loading…</p>
     }
     else
     {
@@ -39,26 +39,26 @@
             <DataAnnotationsValidator />
             <ValidationSummary />
 
-            @* §0 Grunddaten *@
+            @* §0 Basics *@
             <div class="template-meta-section">
-                <h3>Grunddaten</h3>
+                <h3>Basics</h3>
 
                 <div class="field">
                     <label>Name</label>
                     <InputText @bind-Value="_form.Name" disabled="@_isSystem" placeholder="mein-template" />
                     @if (!_isSystem && !string.IsNullOrEmpty(_form.Name))
                     {
-                        <small>Wird gespeichert als: custom-@_form.Name.TrimStart("custom-".ToCharArray())</small>
+                        <small>Saved as: custom-@_form.Name.TrimStart("custom-".ToCharArray())</small>
                     }
                 </div>
 
                 <div class="field">
-                    <label>Anzeigename</label>
+                    <label>Display name</label>
                     <InputText @bind-Value="_form.DisplayName" />
                 </div>
 
                 <div class="field">
-                    <label>Beschreibung</label>
+                    <label>Description</label>
                     <InputTextArea @bind-Value="_form.Description" rows="3" />
                 </div>
             </div>
@@ -69,7 +69,7 @@
                     <span class="stage-num-badge">1</span>
                     <div class="pipeline-stage-header-text">
                         <h3>Grounding</h3>
-                        <p class="pipeline-stage-desc">Recherche-Basis, die vor jeder Ausführung automatisch gesammelt wird</p>
+                        <p class="pipeline-stage-desc">Research base gathered automatically before every run</p>
                     </div>
                 </div>
                 <GroundingProviderPicker AllProfiles="_groundingProviderProfiles"
@@ -83,7 +83,7 @@
                     <span class="stage-num-badge">2</span>
                     <div class="pipeline-stage-header-text">
                         <h3>Advisor</h3>
-                        <p class="pipeline-stage-desc">Strategische Beratung vor oder während der Ausführung — empfiehlt, entscheidet nicht</p>
+                        <p class="pipeline-stage-desc">Strategic advice before or during the run — advises, does not decide</p>
                     </div>
                 </div>
                 <AdvisorPicker AllProfiles="_advisorProfiles"
@@ -97,7 +97,7 @@
                     <span class="stage-num-badge">3</span>
                     <div class="pipeline-stage-header-text">
                         <h3>Executor</h3>
-                        <p class="pipeline-stage-desc">Erstellt und überarbeitet das Dokument iterativ bis zur Konvergenz</p>
+                        <p class="pipeline-stage-desc">Creates and revises the document iteratively until convergence</p>
                     </div>
                 </div>
                 <div class="field">
@@ -111,20 +111,20 @@
                 </div>
             </div>
 
-            @* §4 Reviewer + Auswertung *@
+            @* §4 Reviewer + evaluation *@
             <div class="pipeline-stage-section">
                 <div class="pipeline-stage-header">
                     <span class="stage-num-badge">4</span>
                     <div class="pipeline-stage-header-text">
-                        <h3>Reviewer &amp; Auswertung</h3>
-                        <p class="pipeline-stage-desc">Bewertet jede Iteration und entscheidet über weitere Überarbeitungsrunden</p>
+                        <h3>Reviewer &amp; evaluation</h3>
+                        <p class="pipeline-stage-desc">Evaluates each iteration and decides on further revision rounds</p>
                     </div>
                 </div>
                 <ReviewerPicker AllProfiles="_reviewers"
                                 Selected="_form.ReviewerProfileNames"
                                 SelectedChanged="names => _form.ReviewerProfileNames = names" />
                 <div class="field" style="margin-top: 1.25rem;">
-                    <label>Auswertungsstrategie</label>
+                    <label>Evaluation strategy</label>
                     <div class="radio-group">
                         @foreach (var strategy in Enum.GetValues<EvaluationStrategy>())
                         {
@@ -148,8 +148,8 @@
                     <div class="pipeline-stage-header">
                         <span class="stage-num-badge">4b</span>
                         <div class="pipeline-stage-header-text">
-                            <h3>Spezialisierungs-Packs <span class="optional-label">optional</span></h3>
-                            <p class="pipeline-stage-desc">Bindet pro Akteur geordnete Packs, die in den <code>{specialization}</code>-Slot des generischen Rollen-Prompts komponiert werden.</p>
+                            <h3>Specialization packs <span class="optional-label">optional</span></h3>
+                            <p class="pipeline-stage-desc">Binds ordered packs per actor, composed into the <code>{specialization}</code> slot of the generic role prompt.</p>
                         </div>
                     </div>
 
@@ -193,7 +193,7 @@
                     <span class="stage-num-badge">5</span>
                     <div class="pipeline-stage-header-text">
                         <h3>Finalizer <span class="optional-label">optional</span></h3>
-                        <p class="pipeline-stage-desc">Nachgelagerte Pipeline nach Abschluss des Runs — Export, Anreicherung oder externe Weiterleitung</p>
+                        <p class="pipeline-stage-desc">Post-processing pipeline after the run completes — export, enrichment or external forwarding</p>
                     </div>
                 </div>
                 <FinalizerPicker AllProfiles="_finalizerProfiles"
@@ -204,38 +204,38 @@
                     <div class="field" style="margin-top: 1.25rem;">
                         <label class="form-checkbox-label">
                             <InputCheckbox @bind-Value="_form.RunFinalizersOnMaxAttempts" data-testid="run-finalizers-on-max-attempts" />
-                            Finalizer auch bei MaxIterationen ausführen
+                            Run finalizers even at max iterations
                         </label>
-                        <small class="form-hint">Wenn aktiviert, werden Finalizer auch dann ausgeführt, wenn die Pipeline nicht konvergiert. Der Run wird als abgeschlossen markiert, nicht als fehlgeschlagen.</small>
+                        <small class="form-hint">When enabled, finalizers also run if the pipeline does not converge. The run is marked completed, not failed.</small>
                     </div>
                 }
             </div>
 
             @* Advanced *@
             <details class="collapsible-section">
-                <summary class="collapsible-header">Erweitert (Konvergenz-Override)</summary>
+                <summary class="collapsible-header">Advanced (convergence override)</summary>
                 <div class="collapsible-body">
-                    <p class="field-hint">Vorbelegt mit den globalen Standardwerten. Ein Wert wird nur als Template-Override gespeichert, wenn er vom Standard abweicht.</p>
+                    <p class="field-hint">Prefilled with the global defaults. A value is stored as a template override only when it differs from the default.</p>
                     <div class="field">
-                        <label>Max. Iterationen</label>
+                        <label>Max iterations</label>
                         <InputNumber @bind-Value="_form.MaxIterations" data-testid="advanced-max-iterations" />
                     </div>
                     <div class="field">
-                        <label>Abbruch bei Critical</label>
+                        <label>Abort on critical</label>
                         <InputCheckbox @bind-Value="_form.AbortOnCritical" data-testid="advanced-abort-on-critical" />
                     </div>
                     <div class="field">
-                        <label>Regression erkennen</label>
+                        <label>Detect regression</label>
                         <InputCheckbox @bind-Value="_form.DetectRegression" data-testid="advanced-detect-regression" />
                     </div>
                     <div class="field">
-                        <label>Stagnations-Schwelle</label>
+                        <label>Stagnation threshold</label>
                         <InputNumber @bind-Value="_form.StagnationThreshold" data-testid="advanced-stagnation-threshold" />
                     </div>
                     <div class="field">
-                        <label>Max. Laufzeit (Minuten)</label>
+                        <label>Max runtime (minutes)</label>
                         <InputNumber @bind-Value="_form.MaxElapsedMinutes" data-testid="advanced-max-elapsed-minutes" />
-                        <p class="field-hint">Wall-Clock-Limit des gesamten Runs. Wird es überschritten, stoppt der Run. Für sehr lange Runs erhöhen.</p>
+                        <p class="field-hint">Wall-clock limit for the whole run. If exceeded, the run stops. Increase for very long runs.</p>
                     </div>
                 </div>
             </details>
@@ -244,20 +244,20 @@
             {
                 <div class="editor-actions">
                     <button type="submit" class="btn primary" data-testid="save-template" disabled="@_saving">
-                        @(_saving ? "Wird gespeichert…" : "Speichern")
+                        @(_saving ? "Saving…" : "Save")
                     </button>
-                    <a href="/crew/templates" class="btn ghost">Abbrechen</a>
+                    <a href="/crew/templates" class="btn ghost">Cancel</a>
                     @if (!IsNew)
                     {
-                        <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true">Löschen</button>
+                        <button type="button" class="btn danger" @onclick="() => _showDeleteModal = true">Delete</button>
                     }
                 </div>
             }
             else
             {
                 <div class="editor-actions">
-                    <button type="button" class="btn primary" @onclick="DuplicateAsCustom">Als Kopie duplizieren</button>
-                    <a href="/crew/templates" class="btn ghost">Abbrechen</a>
+                    <button type="button" class="btn primary" @onclick="DuplicateAsCustom">Duplicate as custom</button>
+                    <a href="/crew/templates" class="btn ghost">Cancel</a>
                 </div>
             }
         </EditForm>
@@ -268,7 +268,7 @@
     Show="_showDeleteModal"
     ItemName="@(Name ?? "")"
     ItemKind="Template"
-    ExtraWarning="Templates bleiben in historischen Runs als Snapshot erhalten — dieses Löschen betrifft nur zukünftige Ausführungen."
+    ExtraWarning="Templates are preserved as a snapshot in historical runs — this deletion only affects future runs."
     OnConfirm="ExecuteDeleteAsync"
     OnCancel="() => _showDeleteModal = false" />
 
@@ -358,7 +358,7 @@
             var copy = original with
             {
                 Name = original.Name + "-copy",
-                DisplayName = original.DisplayName + " (Kopie)",
+                DisplayName = original.DisplayName + " (copy)",
                 IsSystem = false
             };
             await CrewService.CreateCustomCrewTemplateAsync(copy);
@@ -401,7 +401,7 @@
 
     private sealed class TemplateFormModel
     {
-        [Required, RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Nur Kleinbuchstaben, Ziffern und Bindestriche")]
+        [Required, RegularExpression(@"^[a-z0-9\-]+$", ErrorMessage = "Only lowercase letters, digits and hyphens")]
         [MaxLength(64)]
         public string Name { get; set; } = "";
 

@@ -90,7 +90,7 @@
                             {
                                 <div class="refinement-skip-banner">
                                     <span class="icon">⚠</span>
-                                    Refinement übersprungen — Rohergebnisse werden verwendet.
+                                    Refinement skipped — raw results are used.
                                     @if (!string.IsNullOrWhiteSpace(skipped.SkipReason))
                                     {
                                         <span class="reason"> (@skipped.SkipReason)</span>
@@ -100,18 +100,18 @@
                             else if (consultation.RefinementOutcome is { WasSkipped: false } outcome)
                             {
                                 <div class="refinement-outcome">
-                                    <span class="badge badge-refinement">@consultation.Citations.Count Quellen → @outcome.RefinedCitations.Count behalten</span>
+                                    <span class="badge badge-refinement">@consultation.Citations.Count sources → @outcome.RefinedCitations.Count kept</span>
                                     @if (outcome.SynthesizedText is not null)
                                     {
                                         <div class="refinement-synthesis">
-                                            <h4>Synthesisierter Kontext</h4>
+                                            <h4>Synthesized context</h4>
                                             <p>@outcome.SynthesizedText</p>
                                         </div>
                                     }
                                     @if (outcome.DroppedCitations.Count > 0)
                                     {
                                         <details class="refinement-dropped">
-                                            <summary>@outcome.DroppedCitations.Count verworfene Quelle(n)</summary>
+                                            <summary>@outcome.DroppedCitations.Count dropped source(s)</summary>
                                             <ul>
                                                 @foreach (var dropped in outcome.DroppedCitations)
                                                 {
@@ -125,7 +125,7 @@
                                                         {
                                                             <span> — @dropped.Original.DocumentReference</span>
                                                         }
-                                                        <br /><em>Grund: @dropped.Reason</em>
+                                                        <br /><em>Reason: @dropped.Reason</em>
                                                     </li>
                                                 }
                                             </ul>

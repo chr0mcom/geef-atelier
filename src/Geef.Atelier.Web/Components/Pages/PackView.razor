@@ -11,12 +11,12 @@
 <div class="crew-editor" data-testid="pack-view">
     <div class="page-header">
         <h1>@(_pack?.DisplayName ?? "Pack")</h1>
-        <a href="/packs" class="btn ghost">← Zurück</a>
+        <a href="/packs" class="btn ghost">← Back</a>
     </div>
 
     @if (_pack is null)
     {
-        <p>Wird geladen…</p>
+        <p>Loading…</p>
     }
     else
     {
@@ -26,31 +26,31 @@
                 <dt>Scope</dt><dd>@GetScopeLabel(_pack.Scope)</dd>
                 @if (_pack.Domain is not null)
                 {
-                    <dt>Domäne</dt><dd>@_pack.Domain</dd>
+                    <dt>Domain</dt><dd>@_pack.Domain</dd>
                 }
-                <dt>Akteur-Typen</dt><dd>@string.Join(", ", _pack.ApplicableActorTypes.Select(GetActorLabel))</dd>
+                <dt>Actor types</dt><dd>@string.Join(", ", _pack.ApplicableActorTypes.Select(GetActorLabel))</dd>
                 @if (_pack.OwningCrewId is not null)
                 {
                     <dt>Crew</dt><dd><code>@_pack.OwningCrewId</code></dd>
                 }
-                <dt>System</dt><dd>@(_pack.IsSystem ? "Ja" : "Nein")</dd>
+                <dt>System</dt><dd>@(_pack.IsSystem ? "Yes" : "No")</dd>
                 @if (_pack.Archived)
                 {
-                    <dt>Status</dt><dd><span class="crew-badge crew-badge--danger">Archiviert</span></dd>
+                    <dt>Status</dt><dd><span class="crew-badge crew-badge--danger">Archived</span></dd>
                 }
             </dl>
             <p>@_pack.Description</p>
         </div>
 
         <div class="template-meta-section">
-            <h3>Spezialisierungstext</h3>
+            <h3>Specialization text</h3>
             <pre style="white-space: pre-wrap; font-family: var(--font-mono, monospace); font-size: 0.85rem;">@_pack.SpecializationText</pre>
         </div>
 
         @if (!_pack.IsSystem && _pack.Scope != PackScope.TaskBound)
         {
             <div class="form-actions">
-                <a href="/packs/edit/@_pack.Name" class="btn primary">Bearbeiten</a>
+                <a href="/packs/edit/@_pack.Name" class="btn primary">Edit</a>
             </div>
         }
     }
@@ -69,15 +69,15 @@
 
     private static string GetScopeLabel(PackScope s) => s switch
     {
-        PackScope.General      => "Allgemein",
-        PackScope.DomainScoped => "Domäne",
-        PackScope.TaskBound    => "Crew-gebunden",
+        PackScope.General      => "General",
+        PackScope.DomainScoped => "Domain",
+        PackScope.TaskBound    => "Crew-bound",
         _                      => s.ToString()
     };
 
     private static string GetActorLabel(PackActorType t) => t switch
     {
-        PackActorType.Any        => "Alle",
+        PackActorType.Any        => "All",
         PackActorType.Executor   => "Executor",
         PackActorType.Reviewer   => "Reviewer",
         PackActorType.Advisor    => "Advisor",

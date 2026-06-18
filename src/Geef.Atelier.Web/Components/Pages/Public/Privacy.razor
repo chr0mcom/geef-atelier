@@ -6,7 +6,7 @@
 @using Geef.Atelier.Web.Services
 @inject ISiteSettingsService SiteSettingsService
 
-<PageTitle>Datenschutzerklärung — Geef.Atelier</PageTitle>
+<PageTitle>Privacy policy — Geef.Atelier</PageTitle>
 
 @if (_settings is not null)
 {
@@ -14,65 +14,65 @@
         <LandingNav />
         <div class="lp-container">
             <div class="legal-content">
-                <h1>Datenschutzerklärung</h1>
+                <h1>Privacy policy</h1>
                 @if (!_settings.LegalBoilerplateAccepted)
                 {
                     <p class="legal-disclaimer">
-                        ⚠️ <em>Vorlagen-Gerüst — kein Rechtsrat. Der Betreiber muss diese Datenschutzerklärung an die tatsächlichen Datenverarbeitungen (Auth-Cookies, LLM-Provider, Tavily/Grounding-Dienste, Hosting) anpassen und vor dem Live-Gang rechtlich prüfen lassen.</em>
+                        ⚠️ <em>Template scaffold — not legal advice. The operator must adapt this privacy policy to the actual data processing (auth cookies, LLM providers, Tavily/grounding services, hosting) and have it reviewed legally before going live.</em>
                     </p>
                 }
 
                 <section>
-                    <h2>1. Verantwortlicher</h2>
+                    <h2>1. Controller</h2>
                     <address>
                         <strong>@_settings.OperatorName</strong><br />
                         @_settings.AddressStreet<br />
                         @_settings.AddressZip @_settings.AddressCity<br />
                         @_settings.AddressCountry
                     </address>
-                    <p>E-Mail: <EmailObfuscated Email="@_settings.ContactEmail" /></p>
+                    <p>Email: <EmailObfuscated Email="@_settings.ContactEmail" /></p>
                 </section>
 
                 <section>
-                    <h2>2. Erhebung und Verarbeitung personenbezogener Daten</h2>
+                    <h2>2. Collection and processing of personal data</h2>
                     <p>
-                        Beim Besuch dieser Website werden automatisch Daten erhoben, die Ihr Browser an unseren Server übermittelt
-                        (sog. Server-Log-Dateien). Dies sind u. a. IP-Adresse, Datum und Uhrzeit des Abrufs, übertragene Datenmenge
-                        sowie der anfragende Provider. Diese Daten werden für Zwecke der Sicherheit, der Fehleranalyse und der
-                        statistischen Auswertung verarbeitet und nach kurzer Zeit gelöscht.
+                        When you visit this website, data that your browser transmits to our server is collected automatically
+                        (so-called server log files). These include, among other things, the IP address, the date and time of the
+                        request, the amount of data transferred and the requesting provider. This data is processed for the
+                        purposes of security, error analysis and statistical evaluation, and is deleted after a short time.
                     </p>
                 </section>
 
                 <section>
-                    <h2>3. Cookies und Authentifizierung</h2>
+                    <h2>3. Cookies and authentication</h2>
                     <p>
-                        Diese Anwendung setzt Cookies für die Authentifizierung (Cookie-basiertes Session-Management). Das
-                        Authentifizierungs-Cookie ist technisch notwendig für den Betrieb der Anwendung und kann nicht deaktiviert
-                        werden. Weitere Cookies können für Darstellungseinstellungen (z. B. Farbthema) gesetzt werden.
+                        This application sets cookies for authentication (cookie-based session management). The authentication
+                        cookie is technically necessary for the operation of the application and cannot be disabled. Additional
+                        cookies may be set for display preferences (e.g. colour theme).
                     </p>
-                    <p>Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse am sicheren Betrieb).</p>
+                    <p>Legal basis: Art. 6 (1) (f) GDPR (legitimate interest in secure operation).</p>
                 </section>
 
                 <section>
-                    <h2>4. Externe Dienstleister / Drittanbieter</h2>
+                    <h2>4. External service providers / third parties</h2>
                     <p>
-                        <strong>[Bitte anpassen:]</strong> Diese Anwendung nutzt externe KI-Anbieter (z. B. OpenRouter, OpenAI, Anthropic,
-                        Google, Groq, DeepSeek) sowie Such- und Grounding-Dienste (z. B. Tavily). Bei jeder Anfrage werden
-                        Textinhalte an diese Anbieter übertragen. Es gelten die jeweiligen Datenschutzrichtlinien dieser Anbieter.
-                        Der Betreiber muss die tatsächlich genutzten Dienste vollständig auflisten und die entsprechenden
-                        Verarbeitungsverträge (AVV) abschließen.
+                        <strong>[Please adapt:]</strong> This application uses external AI providers (e.g. OpenRouter, OpenAI, Anthropic,
+                        Google, Groq, DeepSeek) as well as search and grounding services (e.g. Tavily). With every request,
+                        text content is transmitted to these providers. The respective privacy policies of these providers apply.
+                        The operator must list the services actually used in full and conclude the corresponding data processing
+                        agreements (DPAs).
                     </p>
                 </section>
 
                 <section>
-                    <h2>5. Ihre Rechte</h2>
+                    <h2>5. Your rights</h2>
                     <p>
-                        Sie haben das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung
-                        der Verarbeitung (Art. 18), Datenübertragbarkeit (Art. 20) sowie Widerspruch (Art. 21). Wenden Sie sich
-                        dazu an: <EmailObfuscated Email="@_settings.ContactEmail" />
+                        You have the right to access (Art. 15 GDPR), rectification (Art. 16), erasure (Art. 17), restriction of
+                        processing (Art. 18), data portability (Art. 20) and objection (Art. 21). To exercise these rights,
+                        please contact: <EmailObfuscated Email="@_settings.ContactEmail" />
                     </p>
                     <p>
-                        Sie haben zudem das Recht auf Beschwerde bei der zuständigen Datenschutz-Aufsichtsbehörde
+                        You also have the right to lodge a complaint with the competent data protection supervisory authority
                         @if (!string.IsNullOrWhiteSpace(_settings.SupervisoryAuthority))
                         {
                             <span>(@_settings.SupervisoryAuthority)</span>
@@ -81,11 +81,11 @@
                 </section>
 
                 <section>
-                    <h2>6. Datenübermittlung in Drittländer</h2>
+                    <h2>6. Transfer of data to third countries</h2>
                     <p>
-                        <strong>[Bitte anpassen:]</strong> Bei der Nutzung von KI-Anbietern außerhalb der EU/des EWR erfolgt eine
-                        Übermittlung personenbezogener Daten in Drittländer. Der Betreiber stellt sicher, dass für diese
-                        Übermittlungen geeignete Garantien nach Art. 46 DSGVO vorliegen (z. B. Standardvertragsklauseln).
+                        <strong>[Please adapt:]</strong> When using AI providers outside the EU/EEA, personal data is transferred to
+                        third countries. The operator ensures that appropriate safeguards pursuant to Art. 46 GDPR are in place
+                        for these transfers (e.g. standard contractual clauses).
                     </p>
                 </section>
 

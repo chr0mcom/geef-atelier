@@ -8,17 +8,17 @@
 @inject ICrewService CrewService
 @inject NavigationManager Nav
 
-<PageTitle>@(IsNew ? "Executor-Profil erstellen" : "Executor-Profil bearbeiten") — Atelier</PageTitle>
+<PageTitle>@(IsNew ? "Create executor profile" : "Edit executor profile") — Atelier</PageTitle>
 
 <div class="crew-editor" data-testid="executor-profile-editor">
     <div class="page-header">
-        <h1>@(IsNew ? "Neues Executor-Profil" : _isSystem ? _displayName : $"Bearbeiten: {_displayName}")</h1>
-        <a href="/crew/profiles/executors" class="btn ghost">← Zurück</a>
+        <h1>@(IsNew ? "New executor profile" : _isSystem ? _displayName : $"Edit: {_displayName}")</h1>
+        <a href="/crew/profiles/executors" class="btn ghost">← Back</a>
     </div>
 
     @if (_loading)
     {
-        <p>Wird geladen…</p>
+        <p>Loading…</p>
     }
     else
     {

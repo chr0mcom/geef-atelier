@@ -1,11 +1,11 @@
-@* Aufklappbarer Block: zeigt den effektiv komponierten Prompt je Akteur (Rolle + Packs + Ergebnis). *@
+@* Collapsible block: shows the effective composed prompt per actor (role + packs + result). *@
 @using Geef.Atelier.Core.Domain.Crew.Specialization
 
 @if (Compositions is { Count: > 0 })
 {
     <div class="actor-prompt-compositions" data-testid="prompt-compositions">
         <button class="collapsible-header" @onclick="Toggle" type="button" aria-expanded="@_expanded">
-            <span>Effektive Prompts (@Compositions.Count Akteur@(Compositions.Count != 1 ? "e" : "") mit Packs)</span>
+            <span>Effective prompts (@Compositions.Count actor@(Compositions.Count != 1 ? "s" : "") with packs)</span>
             <span class="chevron @(_expanded ? "up" : "down")">▾</span>
         </button>
 
@@ -25,11 +25,11 @@
                             </span>
                         </div>
                         <details class="prompt-composition-details">
-                            <summary>Komponierten Prompt anzeigen</summary>
+                            <summary>Show composed prompt</summary>
                             <pre class="prompt-composition-text">@c.ComposedPrompt</pre>
                         </details>
                         <details class="prompt-composition-details">
-                            <summary>Rollen-Prompt (vor Komposition)</summary>
+                            <summary>Role prompt (before composition)</summary>
                             <pre class="prompt-composition-text">@c.RolePrompt</pre>
                         </details>
                     </div>
@@ -55,9 +55,9 @@
 
     private static string GetScopeLabel(PackScope s) => s switch
     {
-        PackScope.General      => "Allgemein",
-        PackScope.DomainScoped => "Domäne",
-        PackScope.TaskBound    => "Crew-gebunden",
+        PackScope.General      => "General",
+        PackScope.DomainScoped => "Domain",
+        PackScope.TaskBound    => "Crew-bound",
         _                      => s.ToString()
     };
 }
