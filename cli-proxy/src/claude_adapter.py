@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 from pathlib import Path
 
 from usage import UsageParts
@@ -22,18 +23,111 @@ CLAUDE_HOME = os.getenv("CLAUDE_HOME", "/auth/claude")
 # Increase for workloads that produce very long outputs (e.g. 30-page documents).
 CLI_TIMEOUT_SECONDS = int(os.getenv("CLI_TIMEOUT_SECONDS", "1800"))
 
-# Static model list — the claude CLI has no model-listing command.
-# Update this list when new Claude models become available.
+# The claude CLI resolves the family aliases opus/sonnet/haiku to the NEWEST model of each
+# family automatically. We surface them as `claude-<family>-latest` entries that never go
+# stale, and map them back to the bare CLI alias on invocation (see _normalize_model).
+LATEST_ALIAS_MODELS = ["claude-opus-latest", "claude-sonnet-latest", "claude-haiku-latest"]
+
+_ALIAS_TO_CLI = {
+    "claude-opus-latest": "opus",
+    "claude-sonnet-latest": "sonnet",
+    "claude-haiku-latest": "haiku",
+    "opus": "opus",
+    "sonnet": "sonnet",
+    "haiku": "haiku",
+}
+
+# Offline fallback when alias resolution is unavailable. Kept reasonably current, but the
+# dynamic resolver (list_models_async) supersedes it and the *-latest aliases never go stale.
 STATIC_MODELS = [
-    "claude-opus-4-7",
+    "claude-opus-4-8",
     "claude-sonnet-4-6",
     "claude-haiku-4-5",
 ]
 
+_MODEL_CACHE_TTL = 86400  # 24 hours
+# In-memory cache of concrete latest model ids: (model_ids, fetched_at)
+_model_cache: tuple[list[str], float] | None = None
+_model_cache_lock = asyncio.Lock()
+
+
+def _normalize_model(model: str | None) -> str | None:
+    """Map a requested model to a name the claude CLI accepts.
+
+    Strips any provider prefix and normalises dots to dashes (e.g.
+    "anthropic/claude-opus-4.8" -> "claude-opus-4-8"). Family aliases
+    (opus/sonnet/haiku and claude-<family>-latest) are passed through as the CLI's
+    built-in aliases, which always resolve to the newest model of that family.
+    """
+    if not model:
+        return None
+    bare = model.split("/")[-1] if "/" in model else model
+    bare = bare.replace(".", "-")
+    return _ALIAS_TO_CLI.get(bare.lower(), bare)
+
+
+async def _probe_alias(alias: str) -> str | None:
+    """Ask the claude CLI which concrete model the family alias currently resolves to."""
+    args = ["claude", "-p", "--model", alias, "--output-format", "json"]
+    env = {**os.environ, "HOME": CLAUDE_HOME}
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(input=b"hi"), timeout=60)
+        data = json.loads(stdout.decode(errors="replace"))
+        keys = list((data.get("modelUsage") or {}).keys())
+        if keys:
+            return keys[0]
+    except Exception as exc:  # noqa: BLE001 — best-effort discovery, never fatal
+        log.warning("claude model alias probe failed for %s: %s", alias, exc)
+    return None
+
+
+async def _resolve_concrete_models() -> list[str]:
+    """Resolve the current concrete model id for each family via the CLI's alias resolution.
+
+    Probes run concurrently so a cache refresh costs one round-trip, not three.
+    """
+    results = await asyncio.gather(*(_probe_alias(a) for a in ("opus", "sonnet", "haiku")))
+    concrete: list[str] = []
+    for resolved in results:
+        if resolved and resolved not in concrete:
+            concrete.append(resolved)
+    return concrete or list(STATIC_MODELS)
+
+
+def _compose_model_list(concrete: list[str]) -> list[str]:
+    """Always-latest aliases first, then the concrete current model ids (deduped)."""
+    out = list(LATEST_ALIAS_MODELS)
+    for m in concrete:
+        if m not in out:
+            out.append(m)
+    return out
+
+
+async def list_models_async() -> list[str]:
+    """Always-current model list: always-latest aliases + the concrete newest model ids
+    (resolved via the CLI's own alias resolution, cached 24h). Falls back to STATIC_MODELS
+    when probing is unavailable, so the list is never stale and needs no manual updates."""
+    global _model_cache
+    async with _model_cache_lock:
+        if _model_cache is not None and time.time() - _model_cache[1] < _MODEL_CACHE_TTL:
+            concrete = _model_cache[0]
+        else:
+            concrete = await _resolve_concrete_models()
+            _model_cache = (concrete, time.time())
+    return _compose_model_list(concrete)
+
 
 def list_models() -> list[str]:
-    """Returns the static list of supported Claude models."""
-    return list(STATIC_MODELS)
+    """Synchronous shim (startup / fallback): always-latest aliases + cached-or-static concrete ids."""
+    concrete = _model_cache[0] if _model_cache else list(STATIC_MODELS)
+    return _compose_model_list(concrete)
 
 
 async def complete_document(
@@ -101,9 +195,7 @@ async def _stream_claude(prompt: str, model: str | None, max_tokens: int | None)
         "--allowedTools", "WebSearch,WebFetch",
     ]
     if model:
-        bare_model = model.split("/")[-1] if "/" in model else model
-        bare_model = bare_model.replace(".", "-")
-        args += ["--model", bare_model]
+        args += ["--model", _normalize_model(model)]
 
     env = {**os.environ, "HOME": CLAUDE_HOME}
     proc = await asyncio.create_subprocess_exec(
@@ -208,9 +300,7 @@ async def _run_claude_document(
     ]
 
     if model:
-        bare_model = model.split("/")[-1] if "/" in model else model
-        bare_model = bare_model.replace(".", "-")
-        args += ["--model", bare_model]
+        args += ["--model", _normalize_model(model)]
 
     # Offload to instruction.md if the instruction would exceed the per-argument OS limit.
     args.append(finalize_instruction(workspace_path, instruction))
@@ -271,11 +361,7 @@ async def _run_claude(
     args = ["claude", "-p", "--output-format", "json", "--allowedTools", "WebSearch,WebFetch"]
 
     if model:
-        # Strip provider prefix and normalize dots to dashes
-        # (e.g. "anthropic/claude-opus-4.7" → "claude-opus-4-7").
-        bare_model = model.split("/")[-1] if "/" in model else model
-        bare_model = bare_model.replace(".", "-")
-        args += ["--model", bare_model]
+        args += ["--model", _normalize_model(model)]
 
     # Pass the prompt through stdin, never as an argv element. A single execve argument may
     # not exceed MAX_ARG_STRLEN (128 KB on Linux); reviewer/advisor prompts embed the full

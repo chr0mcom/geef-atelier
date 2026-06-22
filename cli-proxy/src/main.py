@@ -556,8 +556,10 @@ async def chat_completions(req: ChatCompletionRequest, http_request: Request):
 
 @app.get("/v1/claude/models")
 async def claude_models() -> JSONResponse:
-    """Lists available Claude CLI models (static list — CLI has no model-listing command)."""
-    data = [{"id": m, "object": "model", "owned_by": "anthropic"} for m in claude_adapter.list_models()]
+    """Lists Claude models: always-latest aliases + the concrete newest model ids, resolved via
+    the CLI's own alias resolution (24 h cache). Auto-updates as new models ship — never stale."""
+    models = await claude_adapter.list_models_async()
+    data = [{"id": m, "object": "model", "owned_by": "anthropic"} for m in models]
     return JSONResponse({"object": "list", "data": data})
 
 
@@ -572,7 +574,8 @@ async def codex_models() -> JSONResponse:
 @app.get("/v1/models")
 async def list_models() -> JSONResponse:
     """Legacy combined model list. Use /v1/claude/models or /v1/codex/models instead."""
-    claude_data = [{"id": m, "object": "model", "owned_by": "anthropic"} for m in claude_adapter.list_models()]
+    claude_model_list = await claude_adapter.list_models_async()
+    claude_data = [{"id": m, "object": "model", "owned_by": "anthropic"} for m in claude_model_list]
     codex_model_list = await codex_adapter.list_models_async()
     codex_data = [{"id": m, "object": "model", "owned_by": "openai"} for m in codex_model_list]
     return JSONResponse({"object": "list", "data": claude_data + codex_data})
