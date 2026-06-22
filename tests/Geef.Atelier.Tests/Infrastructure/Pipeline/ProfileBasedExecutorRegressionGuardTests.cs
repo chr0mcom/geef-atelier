@@ -168,5 +168,6 @@ public sealed class ProfileBasedExecutorRegressionGuardTests
             => (client, model, maxTokens ?? 64000);
 
         public bool SupportsAgenticTools(string providerName) => true;
+        public bool SupportsStructuredOutputs(string providerName) => true;
     }
 }

@@ -87,6 +87,7 @@ public sealed class LlmGroundingQueryExtractorTests
             throw new NotSupportedException();
 
         public bool SupportsAgenticTools(string providerName) => true;
+        public bool SupportsStructuredOutputs(string providerName) => true;
     }
 
     private sealed class ThrowingResolver : ILlmClientResolver
@@ -98,5 +99,6 @@ public sealed class LlmGroundingQueryExtractorTests
             throw new NotSupportedException();
 
         public bool SupportsAgenticTools(string providerName) => false;
+        public bool SupportsStructuredOutputs(string providerName) => false;
     }
 }

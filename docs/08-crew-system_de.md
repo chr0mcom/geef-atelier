@@ -475,7 +475,7 @@ Der Edit-Step exponiert das vollständige Feld-Set für das Template und jeden P
 - **GroundingProvider-spezifisch:** GroundingProviderType (Tavily / VectorStore), Typ-spezifische Einstellungen (API-Key oder Collection-Name)
 - **Finalizer-spezifisch:** FinalizerType (FileExport / MetadataEnrich / ExternalSink / Transform), Typ-spezifische Einstellungen
 - **Reasoning-Anzeige:** LLM-Begründungen pro Feld, read-only (aus `analyze_template_proposal`)
-- **Field-Helps:** Deutsche Inline-Hinweise für jedes Feld (`StudioFieldHelps.cs`)
+- **Field-Helps:** Englische Inline-Hinweise für jedes Feld (`StudioFieldHelps.cs`)
 
 ### Schlüssel-Komponenten
 
@@ -483,7 +483,7 @@ Der Edit-Step exponiert das vollständige Feld-Set für das Template und jeden P
 |---|---|
 | `StudioProfileSlot.razor` | UseExisting/CreateNew-Toggle + vollständiges Inline-Profil-Form; bettet `ModelSelector` ein |
 | `FieldHelp.razor` | Inline-Hinweis unterhalb jedes Feldes |
-| `StudioFieldHelps.cs` | Zentrale deutsche Field-Help-Text-Konstanten |
+| `StudioFieldHelps.cs` | Zentrale englische Field-Help-Text-Konstanten |
 
 ### Materialisierung (atomar, D-043/7)
 

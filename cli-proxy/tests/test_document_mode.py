@@ -14,6 +14,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import workspace as workspace_module
+from usage import UsageParts
 from workspace import ephemeral_workspace, finalize_instruction, materialize_context
 
 
@@ -211,14 +212,16 @@ async def test_claude_complete_document_passes_correct_args(tmp_path):
             max_tokens=None,
         )
 
-    assert result == revised_content
+    assert result[0] == revised_content
     assert "claude" in captured_args
     assert "--allowedTools" in captured_args
     assert captured_args[captured_args.index("--allowedTools") + 1] == "Read,Edit,Write"
     assert "--permission-mode" in captured_args
     assert captured_args[captured_args.index("--permission-mode") + 1] == "acceptEdits"
     assert "--append-system-prompt" in captured_args
-    assert "--output-format" not in captured_args
+    # document mode now requests JSON output to capture token usage (text still read from draft.md)
+    assert "--output-format" in captured_args
+    assert captured_args[captured_args.index("--output-format") + 1] == "json"
     assert "--model" in captured_args
     assert captured_args[captured_args.index("--model") + 1] == "claude-opus-4-8"
 
@@ -376,7 +379,7 @@ async def test_codex_complete_document_passes_correct_args(tmp_path):
             max_tokens=None,
         )
 
-    assert result == revised_content
+    assert result[0] == revised_content
     assert "codex" in captured_args
     assert "--sandbox" in captured_args
     assert captured_args[captured_args.index("--sandbox") + 1] == "workspace-write"
@@ -538,13 +541,13 @@ async def test_main_routes_document_mode_to_complete_document(tmp_path):
 
     async def mock_complete_document(system_prompt, user_instruction, document, workspace_path, model, max_tokens, context_document=None):
         document_call_args.append((system_prompt, user_instruction, document))
-        return "# Edited document"
+        return "# Edited document", UsageParts()
 
     complete_call_count = [0]
 
     async def mock_complete(prompt, model, max_tokens):
         complete_call_count[0] += 1
-        return "should not be called"
+        return "should not be called", UsageParts()
 
     dummy_ws = tmp_path / "dummy-ws"
     dummy_ws.mkdir()
@@ -584,13 +587,13 @@ async def test_main_routes_codex_document_mode_to_complete_document(tmp_path):
 
     async def mock_complete_document(system_prompt, user_instruction, document, workspace_path, model, max_tokens, context_document=None):
         document_call_args.append((system_prompt, user_instruction, document))
-        return "# Codex-edited document"
+        return "# Codex-edited document", UsageParts()
 
     complete_call_count = [0]
 
     async def mock_complete(prompt, model, max_tokens):
         complete_call_count[0] += 1
-        return "should not be called"
+        return "should not be called", UsageParts()
 
     dummy_ws = tmp_path / "dummy-ws"
     dummy_ws.mkdir()
@@ -630,14 +633,14 @@ async def test_main_uses_text_mode_without_document_mode_flag():
 
     async def mock_complete_document(*args, **kwargs):
         document_call_count[0] += 1
-        return "should not be called"
+        return "should not be called", UsageParts()
 
     async def mock_complete(prompt, model, max_tokens):
         complete_call_count[0] += 1
-        return "text response"
+        return "text response", UsageParts()
 
     with patch("claude_adapter.complete_document", side_effect=mock_complete_document), \
-         patch("claude_adapter.complete", side_effect=mock_complete):
+         patch("claude_adapter.complete_with_usage", side_effect=mock_complete):
         import main as main_module
         transport = ASGITransport(app=main_module.app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

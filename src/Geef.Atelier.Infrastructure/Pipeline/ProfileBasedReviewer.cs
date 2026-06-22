@@ -95,7 +95,8 @@ internal sealed class ProfileBasedReviewer(
         if (costAccumulator is not null)
         {
             var costEur = pricingCatalog?.CalculateCostEur(
-                model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, profile.Provider);
+                model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, profile.Provider,
+                cachedInputTokens: response.TokenUsage.CachedInputTokens ?? 0);
             costAccumulator.RecordActorCost(
                 iter, ActorType.Reviewer, profile.Name, model,
                 response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur,
@@ -138,7 +139,8 @@ internal sealed class ProfileBasedReviewer(
             if (costAccumulator is not null)
             {
                 var retryCostEur = pricingCatalog?.CalculateCostEur(
-                    model, retryResponse.TokenUsage.InputTokens, retryResponse.TokenUsage.OutputTokens, profile.Provider);
+                    model, retryResponse.TokenUsage.InputTokens, retryResponse.TokenUsage.OutputTokens, profile.Provider,
+                    cachedInputTokens: retryResponse.TokenUsage.CachedInputTokens ?? 0);
                 costAccumulator.RecordActorCost(
                     iter, ActorType.Reviewer, profile.Name, model,
                     retryResponse.TokenUsage.InputTokens, retryResponse.TokenUsage.OutputTokens, retryCostEur,

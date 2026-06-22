@@ -15,8 +15,11 @@ class ClaudeAdapter(CliAdapter):
         max_tokens = request.get("max_tokens")
         prompt = _format_messages(request.get("messages", []))
 
-        raw = await _cli.complete(prompt, model, max_tokens)
-        return _build_openai_response_from_parts(request, raw, 0, 0)
+        raw, usage = await _cli.complete_with_usage(prompt, model, max_tokens)
+        return _build_openai_response_from_parts(
+            request, raw, usage.input_tokens, usage.output_tokens,
+            cached_tokens=usage.cached_tokens, reasoning_tokens=usage.reasoning_tokens,
+        )
 
     async def list_models(self, config: dict[str, Any]) -> list[str]:
         settings = config.get("settings", {})

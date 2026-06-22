@@ -330,6 +330,6 @@ public sealed class GroundingRefinerTests
 
     private sealed class ZeroPricingCatalog : IPricingCatalog
     {
-        public decimal? CalculateCostEur(string modelName, int inputTokens, int outputTokens, string? providerName = null) => 0m;
+        public decimal? CalculateCostEur(string modelName, int inputTokens, int outputTokens, string? providerName = null, int cachedInputTokens = 0) => 0m;
     }
 }

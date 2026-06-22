@@ -259,7 +259,8 @@ internal sealed class ProfileBasedExecutor(
         if (costAccumulator is not null)
         {
             var costEur = pricingCatalog?.CalculateCostEur(
-                model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, profile.Provider);
+                model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, profile.Provider,
+                cachedInputTokens: response.TokenUsage.CachedInputTokens ?? 0);
             costAccumulator.RecordActorCost(
                 iter, ActorType.Executor, profile.Name, model,
                 response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur,

@@ -249,5 +249,6 @@ public sealed class LearningExtractFinalizerRecursionGuardTests
             => (new StubLlmClient(response), model, maxTokens ?? 2048);
 
         public bool SupportsAgenticTools(string providerName) => true;
+        public bool SupportsStructuredOutputs(string providerName) => true;
     }
 }

@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-06-04 (D-059 added: Auto-Crew — Crew-Komposition als GEEF-Run)*
+*Last updated: 2026-06-18 (D-062 added: single-language UI — English-only until real i18n)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -802,7 +802,7 @@ Full field parity in the Studio Edit-Step so the Studio workflow requires no pos
 
 **D-043/3 — UseExisting vs. CreateNew = UI-State only.** `StudioSlotMode` enum (`UseExisting`/`CreateNew`) lives in `StudioEditStep.razor` as `SlotState` private class. CreateNew → Draft lands in `FinalNewProfiles` + name in `FinalTemplate.*Names`. UseExisting → name points to existing, no entry in `FinalNewProfiles`. Domain API (`MaterializationRequest`) unchanged.
 
-**D-043/4 — Field-Help resource: central, German, spec-verbatim.** `StudioFieldHelps.cs` (static constants) holds all Field-Help texts in German. `FieldHelp.razor` renders inline hints below each field. Every Studio edit field (template and all profile types) has a FieldHelp. No inline help strings inside components.
+**D-043/4 — Field-Help resource: central, German, spec-verbatim.** *(Language superseded by D-062 — field-helps are now English.)* `StudioFieldHelps.cs` (static constants) holds all Field-Help texts. `FieldHelp.razor` renders inline hints below each field. Every Studio edit field (template and all profile types) has a FieldHelp. No inline help strings inside components.
 
 **D-043/5 — Defaults in appsettings.json `TemplateStudio:Defaults`.** New `StudioDefaults` subclass of `TemplateStudioOptions` (Reviewer/Executor/Advisor/GroundingProvider/EvaluationStrategy defaults). Values calibrated against existing System profiles. LLM-null fields filled from defaults in `TemplateStudioService.ApplyDefaults`.
 
@@ -1330,3 +1330,23 @@ implementation guide: [`11-specialization-packs.md`](11-specialization-packs.md)
 **D-061/9 — Clean reset, keep accounts + auth (operator policy).** Migration Step42 keeps only user accounts and auth/credentials/config (`Users`, OAuth, `mcp_server_configs`, `Providers`, settings) plus the DB-seeded system catalogue (system tools/finalizers/grounding, preserved via `WHERE "IsSystem" = false` deletes), and wipes everything else for a fresh start: run history, custom profiles/templates/packs, embeddings, studio analyses, the knowledge base, learnings, and custom tools. Improved prompts come from code constants (no DB reseed). `pg_dump` backup before deploy.
 
 **Tests:** specialization/composition/parser/validator/lifecycle units added; no new regressions (pre-existing DB/E2E/contention failures unchanged). Migration Step42 (additive schema + scoped custom-data reseed).
+
+## D-062 — Single-language UI: English-only until real i18n
+
+**Context:** The web UI had drifted into a German/English mix (page text English, field-helps and some labels German). Mixing languages in a single-language product is a defect, not a feature.
+
+**Decision.** Until the Atelier is genuinely multilingual, the **entire web UI is English-only — no language mixing**. This reverses the earlier "Atelier UI = German" / "field-helps = German" convention (D-043/4 and the per-feature build-prompt notes). Converted: public legal pages (imprint/privacy/terms), all field-help resource files (`LearningFieldHelps`, `StudioFieldHelps`, `ProviderFieldHelps`, `FinalizerFieldHelps`, `GroundingFieldHelps`), nav/menu labels, validation/toast strings, the system-crew template DisplayNames (`Classic`/`Legal`/`Academic` — internal names `klassik`/`juristisch`/`akademisch` unchanged) and descriptions, and the `SiteSettings` default placeholders. Code/XML-doc stays English; docs/reports/commits stay German (unchanged).
+
+**Scope note:** Historical build-prompts under `docs/prompts/` and completion reports under `docs/reports/` keep their original "UI-Strings = Deutsch" wording — they are a record of what was decided then, not living guidance.
+
+## D-063 — Better use of the now-OpenAI-conform cli-proxy (structured outputs, token breakdown, gateway auth)
+
+**Context.** The `cli-proxy` was upgraded to be broadly OpenAI-conform (streaming, real token usage incl. cached/reasoning, OpenAI error envelope, server-validated `response_format`, parallel tool calls, opt-in Bearer auth) and made reachable portfolio-wide on the shared `proxy` network (see [`docs/cli-proxy-openai-gateway.md`](../../../docs/cli-proxy-openai-gateway.md)). Geef.Atelier only consumed the old subset (non-streaming, tool-hack JSON, zero usage). This decision adopts the high-value, low-risk parts. Streaming was deliberately **not** adopted: the executor runs in document_mode (the proxy buffers — no token deltas) and reviewers/composers emit JSON (not streamed to UIs), so the UX gain does not justify the interface churn.
+
+**D-063/1 — Real token usage + cache-aware cost.** `LlmTokenUsage` gained `CachedInputTokens`/`ReasoningTokens`, parsed from `prompt_tokens_details`/`completion_tokens_details` in `OpenAiMessageFormat`. `IPricingCatalog.CalculateCostEur` gained an optional `cachedInputTokens` param; `PricingCatalog` bills the cached subset at `PricingOptions.CachedInputDiscountFactor` (default 0.1). Cached tokens are threaded through all actor cost sites (executor, reviewer, advisor, composer, grounding-refiner, transform-finalizer, studio). The proxy already returns real counts since the gateway deploy, so per-run `TotalCostEur` is now real (was 0) and cache-discounted. *(Per-actor cached/reasoning persistence + RunDetail breakdown display deferred — needs a DB migration; not worth blocking this batch.)*
+
+**D-063/2 — Structured outputs via `response_format` (capability-gated, tool-hack fallback).** New `LlmResponseFormat` on `LlmRequest` (json_object / json_schema), serialized by `OpenAiCompatibleClient`. New provider capability `SupportsStructuredOutputs` (`ProviderExtensions` + `ProviderSettingsKeys`, default true for Http/Cli) and `ILlmClientResolver.SupportsStructuredOutputs(provider)` — returns **false** for the OpenAI **Responses** path (that client cannot send `response_format`) so it keeps tool-calling. New `StructuredOutput` helper builds either path and extracts JSON uniformly (`ToolArgumentsJson ?? Text`). Adopted at **CrewComposerExecutor** and **TemplateStudioService** (clean pass-through sites). **ProfileBasedReviewer** (agentic tool-loop path) and **GroundingRefiner** (two-mode) deliberately stay on tool-calling — `response_format` does not fit a multi-turn loop and the benefit there is marginal. Non-CLI providers and OpenAI-Responses transparently fall back to the proven forced-tool JSON.
+
+**D-063/3 — Gateway Bearer auth.** The cli-proxy is now shared, so opt-in auth (`CLI_PROXY_API_KEYS`) is enabled via a shared secret. `LlmClientResolver` overrides the `claude-cli`/`codex-cli` ApiKey with the `CLI_PROXY_API_KEY` env var when set (no hardcoded secret in appsettings; the .NET client already sends `Authorization: Bearer`). Wired through committed `docker-compose.yml` + gitignored `.env`/override; empty → open (back-compat).
+
+**Tests:** Pricing/ProviderExtensions/CrewComposer/TemplateStudio units green (93/93 in the targeted run); test fakes updated for the new interface members. The TemplateStudio "no structured output" contract is preserved via an `IsJsonObject` pre-check (clean `InvalidOperationException` instead of a raw `JsonReaderException`). No schema/DB migration.

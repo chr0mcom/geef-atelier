@@ -12,4 +12,11 @@ public static class ProviderSettingsKeys
     /// When absent the default is derived from <see cref="Provider.Type"/>.
     /// </summary>
     public const string SupportsAgenticTools = "supportsAgenticTools";
+
+    /// <summary>
+    /// Boolean flag overriding whether a provider supports OpenAI <c>response_format</c> structured
+    /// outputs (json_object / json_schema). When absent the default is derived from
+    /// <see cref="Provider.Type"/> (Http/Cli → true).
+    /// </summary>
+    public const string SupportsStructuredOutputs = "supportsStructuredOutputs";
 }

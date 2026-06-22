@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-24 (D-058 ergänzt: CLI-Modellnamen-Normalisierung + Pflicht-Findings + cli-proxy JSON-Retry)*
+*Letzte Aktualisierung: 2026-06-18 (D-062 ergänzt: einsprachige UI — durchgängig Englisch bis echte i18n)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -802,7 +802,7 @@ Das Template Studio (`/crew/studio`) hatte bisher nur minimale Edit-Felder im `S
 
 **D-043/3 — UseExisting vs. CreateNew = UI-State only.** `StudioSlotMode`-Enum (`UseExisting`/`CreateNew`) lebt in `StudioEditStep.razor` als private `SlotState`-Klasse. CreateNew → Draft landet in `FinalNewProfiles` + Name in `FinalTemplate.*Names`. UseExisting → Name zeigt auf existierendes Profil, kein Eintrag in `FinalNewProfiles`. Domain-API (`MaterializationRequest`) unverändert.
 
-**D-043/4 — Field-Help-Resource: zentral, Deutsch, Spec-verbatim.** `StudioFieldHelps.cs` (statische Konstanten) hält alle Field-Help-Texte auf Deutsch. `FieldHelp.razor` rendert Inline-Hinweise unterhalb jedes Feldes. Jedes Studio-Edit-Feld (Template und alle Profil-Typen) hat einen FieldHelp. Keine Inline-Help-Strings in Komponenten.
+**D-043/4 — Field-Help-Resource: zentral, Deutsch, Spec-verbatim.** *(Sprache überholt durch D-062 — Field-Helps sind jetzt englisch.)* `StudioFieldHelps.cs` (statische Konstanten) hält alle Field-Help-Texte. `FieldHelp.razor` rendert Inline-Hinweise unterhalb jedes Feldes. Jedes Studio-Edit-Feld (Template und alle Profil-Typen) hat einen FieldHelp. Keine Inline-Help-Strings in Komponenten.
 
 **D-043/5 — Defaults in `appsettings.json TemplateStudio:Defaults`.** Neue `StudioDefaults`-Unterklasse von `TemplateStudioOptions` (Reviewer/Executor/Advisor/GroundingProvider/EvaluationStrategy-Defaults). Werte gegen existierende System-Profile kalibriert. LLM-null-Felder werden in `TemplateStudioService.ApplyDefaults` aus Defaults befüllt.
 
@@ -1252,3 +1252,11 @@ Umsetzungsleitfaden: [`11-specialization-packs_de.md`](11-specialization-packs_d
 **D-061/9 — Saubere Neuaufsetzung, Konten + Auth bleiben (Betreiber-Policy).** Migration Step42 behält nur Benutzerkonten und Auth/Credentials/Config (`Users`, OAuth, `mcp_server_configs`, `Providers`, Settings) sowie den DB-geseedeten System-Katalog (System-Tools/-Finalizer/-Grounding, geschützt über `WHERE "IsSystem" = false`-DELETEs) und leert alles andere für einen Frischstart: Run-Historie, Custom-Profile/-Templates/-Packs, Embeddings, Studio-Analysen, Knowledge-Base, Learnings und Custom-Tools. Verbesserte Prompts kommen aus Code-Konstanten (kein DB-Reseed). `pg_dump`-Backup vor dem Deploy.
 
 **Tests:** Specialization-/Composition-/Parser-/Validator-/Lebenszyklus-Units ergänzt; keine neuen Regressionen (vorbestehende DB-/E2E-/Contention-Fehler unverändert). Migration Step42 (additives Schema + gescopte Custom-Daten-Neuaufsetzung).
+
+## D-062 — Einsprachige UI: durchgängig Englisch bis echte i18n
+
+**Kontext:** Die Web-UI war in einen Deutsch/Englisch-Mix abgedriftet (Seitentexte englisch, Field-Helps und einige Labels deutsch). Sprachmischung in einem einsprachigen Produkt ist ein Defekt, kein Feature.
+
+**Entscheidung.** Solange das Atelier nicht echt mehrsprachig ist, ist die **gesamte Web-UI durchgängig englisch — keine Sprachmischung**. Dies kehrt die frühere Konvention „Atelier-UI = Deutsch" / „Field-Helps = Deutsch" um (D-043/4 sowie die Notizen in den Feature-Bau-Prompts). Übersetzt: öffentliche Rechtsseiten (Impressum/Datenschutz/Nutzungsbedingungen), alle Field-Help-Resource-Dateien (`LearningFieldHelps`, `StudioFieldHelps`, `ProviderFieldHelps`, `FinalizerFieldHelps`, `GroundingFieldHelps`), Navigations-/Menü-Labels, Validierungs-/Toast-Strings, die System-Crew-Template-DisplayNames (`Classic`/`Legal`/`Academic` — interne Namen `klassik`/`juristisch`/`akademisch` unverändert) und ihre Beschreibungen sowie die `SiteSettings`-Default-Platzhalter. Code/XML-Doc bleibt englisch; Doku/Berichte/Commits bleiben deutsch (unverändert).
+
+**Scope-Hinweis:** Die historischen Bau-Prompts unter `docs/prompts/` und Abschlussberichte unter `docs/reports/` behalten ihre ursprüngliche Formulierung „UI-Strings = Deutsch" — sie sind ein Protokoll dessen, was damals entschieden wurde, keine lebende Richtlinie.

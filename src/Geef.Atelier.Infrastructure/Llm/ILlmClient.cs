@@ -49,6 +49,13 @@ public sealed record LlmRequest
     public string? ToolChoice { get; init; }
 
     /// <summary>
+    /// Optional OpenAI response_format for structured outputs. The CLI proxy constrains the model
+    /// to JSON and validates it server-side (json_schema is validated against the supplied schema).
+    /// Null = free-form text. Mutually meaningful with <see cref="Tools"/> but takes precedence on the proxy.
+    /// </summary>
+    public LlmResponseFormat? ResponseFormat { get; init; }
+
+    /// <summary>
     /// Full message history for multi-turn agentic loops.
     /// When set, this takes precedence over <see cref="SystemPrompt"/> / <see cref="UserPrompt"/>
     /// (which are still required for non-loop callers).
@@ -78,6 +85,22 @@ public sealed record LlmRequest
     public string? ContextDocument { get; init; }
 }
 
+/// <summary>
+/// OpenAI response_format for structured outputs.
+/// Type is "json_object" (any valid JSON object) or "json_schema" (validated against <see cref="Schema"/>).
+/// </summary>
+public sealed record LlmResponseFormat
+{
+    public required string Type { get; init; }       // "json_object" | "json_schema"
+    public string? SchemaName { get; init; }         // logical name for json_schema
+    public JsonElement? Schema { get; init; }        // JSON Schema; required for json_schema
+    public bool Strict { get; init; } = true;
+
+    public static LlmResponseFormat JsonObject() => new() { Type = "json_object" };
+    public static LlmResponseFormat JsonSchema(string name, JsonElement schema, bool strict = true)
+        => new() { Type = "json_schema", SchemaName = name, Schema = schema, Strict = strict };
+}
+
 public sealed record LlmResponse
 {
     public required string Text { get; init; }
@@ -99,6 +122,12 @@ public sealed record LlmTokenUsage
 {
     public required int InputTokens { get; init; }
     public required int OutputTokens { get; init; }
+
+    /// <summary>Subset of <see cref="InputTokens"/> served from prompt cache (cheaper). Null = not reported.</summary>
+    public int? CachedInputTokens { get; init; }
+
+    /// <summary>Subset of <see cref="OutputTokens"/> spent on reasoning. Null = not reported.</summary>
+    public int? ReasoningTokens { get; init; }
 }
 
 public sealed record LlmTool

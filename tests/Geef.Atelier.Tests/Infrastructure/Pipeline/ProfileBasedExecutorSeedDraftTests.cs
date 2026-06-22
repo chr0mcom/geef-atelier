@@ -103,5 +103,6 @@ public sealed class ProfileBasedExecutorSeedDraftTests
             => (client, model, maxTokens ?? 1000);
 
         public bool SupportsAgenticTools(string providerName) => true;
+        public bool SupportsStructuredOutputs(string providerName) => true;
     }
 }

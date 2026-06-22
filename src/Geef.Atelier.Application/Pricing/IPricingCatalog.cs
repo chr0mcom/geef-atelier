@@ -12,7 +12,17 @@ public interface IPricingCatalog
     /// When <paramref name="providerName"/> is supplied and the model is not found, the catalog
     /// falls back to the provider-level default pricing (if configured).
     /// </summary>
-    decimal? CalculateCostEur(string modelName, int inputTokens, int outputTokens, string? providerName = null);
+    /// <param name="modelName">The model identifier used to look up pricing.</param>
+    /// <param name="inputTokens">Total prompt tokens (including any cached subset).</param>
+    /// <param name="outputTokens">Total completion tokens.</param>
+    /// <param name="providerName">Optional provider name for provider-level fallback pricing.</param>
+    /// <param name="cachedInputTokens">
+    /// Subset of <paramref name="inputTokens"/> served from prompt cache; billed at a reduced rate
+    /// (see PricingOptions.CachedInputDiscountFactor). 0 = no cached tokens / not reported.
+    /// </param>
+    decimal? CalculateCostEur(
+        string modelName, int inputTokens, int outputTokens,
+        string? providerName = null, int cachedInputTokens = 0);
 }
 
 public sealed record ModelPricing(

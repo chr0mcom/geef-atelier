@@ -487,7 +487,7 @@ The Edit step exposes the full field set for the template and every profile slot
 - **GroundingProvider-specific:** GroundingProviderType (Tavily / VectorStore), type-specific settings (API key or collection name)
 - **Finalizer-specific:** FinalizerType (FileExport / MetadataEnrich / ExternalSink / Transform), type-specific settings
 - **Reasoning display:** LLM reasoning per field, read-only (from `analyze_template_proposal`)
-- **Field-Helps:** inline German help texts for every field (`StudioFieldHelps.cs`)
+- **Field-Helps:** inline English help texts for every field (`StudioFieldHelps.cs`)
 
 ### Key components
 
@@ -495,7 +495,7 @@ The Edit step exposes the full field set for the template and every profile slot
 |---|---|
 | `StudioProfileSlot.razor` | UseExisting/CreateNew toggle + full inline profile form; embeds `ModelSelector` |
 | `FieldHelp.razor` | Inline hint rendered below every field |
-| `StudioFieldHelps.cs` | Central German-language help-text constants |
+| `StudioFieldHelps.cs` | Central English help-text constants |
 
 ### Materialization (atomic, D-043/7)
 

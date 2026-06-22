@@ -278,6 +278,7 @@ public sealed class CrewSpecValidatorToolBindingsTests
         public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
             => throw new NotSupportedException();
         public bool SupportsAgenticTools(string providerName) => true;
+        public bool SupportsStructuredOutputs(string providerName) => true;
     }
 
     /// <summary>Reports every provider as NOT supporting agentic tools.</summary>
@@ -288,6 +289,7 @@ public sealed class CrewSpecValidatorToolBindingsTests
         public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
             => throw new NotSupportedException();
         public bool SupportsAgenticTools(string providerName) => false;
+        public bool SupportsStructuredOutputs(string providerName) => false;
     }
 
     /// <summary>

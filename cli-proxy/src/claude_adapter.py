@@ -7,6 +7,7 @@ import logging
 import os
 from pathlib import Path
 
+from usage import UsageParts
 from workspace import finalize_instruction, materialize_context
 
 log = logging.getLogger(__name__)
@@ -43,11 +44,11 @@ async def complete_document(
     model: str | None,
     max_tokens: int | None,
     context_document: str | None = None,
-) -> str:
+) -> tuple[str, UsageParts]:
     """
     Calls the claude CLI in document-edit mode: the CLI reads draft.md in the given
     workspace, applies the instruction, and writes the revised document back.
-    Returns the content of draft.md after the CLI exits.
+    Returns (content of draft.md after the CLI exits, token usage).
 
     Uses --allowedTools Read,Edit,Write with --permission-mode acceptEdits so the
     agent can edit files without interactive confirmation prompts.
@@ -68,8 +69,105 @@ async def complete(prompt: str, model: str | None, max_tokens: int | None) -> st
 
     The semaphore limits concurrent calls to respect subscription rate limits.
     """
+    text, _ = await complete_with_usage(prompt, model, max_tokens)
+    return text
+
+
+async def complete_with_usage(
+    prompt: str, model: str | None, max_tokens: int | None
+) -> tuple[str, UsageParts]:
+    """Like complete(), but also returns the real token usage reported by the CLI."""
     async with _semaphore:
         return await _run_claude(prompt, model, max_tokens)
+
+
+async def stream(prompt: str, model: str | None, max_tokens: int | None):
+    """Stream the claude CLI output as (kind, payload) events.
+
+    Yields ("delta", text) for each token chunk and finally ("usage", UsageParts).
+    The semaphore is held for the whole stream to respect subscription rate limits.
+    """
+    async with _semaphore:
+        async for event in _stream_claude(prompt, model, max_tokens):
+            yield event
+
+
+async def _stream_claude(prompt: str, model: str | None, max_tokens: int | None):
+    args = [
+        "claude", "-p",
+        "--output-format", "stream-json",
+        "--verbose",
+        "--include-partial-messages",
+        "--allowedTools", "WebSearch,WebFetch",
+    ]
+    if model:
+        bare_model = model.split("/")[-1] if "/" in model else model
+        bare_model = bare_model.replace(".", "-")
+        args += ["--model", bare_model]
+
+    env = {**os.environ, "HOME": CLAUDE_HOME}
+    proc = await asyncio.create_subprocess_exec(
+        *args,
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=env,
+    )
+
+    async def _feed() -> None:
+        try:
+            proc.stdin.write(prompt.encode("utf-8"))
+            await proc.stdin.drain()
+        finally:
+            proc.stdin.close()
+
+    feeder = asyncio.create_task(_feed())
+    emitted = False
+    final_text = ""
+    usage = UsageParts()
+    try:
+        async with asyncio.timeout(CLI_TIMEOUT_SECONDS):
+            async for raw_line in proc.stdout:
+                line = raw_line.decode(errors="replace").strip()
+                if not line:
+                    continue
+                try:
+                    ev = json.loads(line)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                if not isinstance(ev, dict):
+                    continue
+                etype = ev.get("type")
+                if etype == "stream_event":
+                    inner = ev.get("event", {})
+                    if isinstance(inner, dict) and inner.get("type") == "content_block_delta":
+                        delta = inner.get("delta", {})
+                        if isinstance(delta, dict) and delta.get("type") == "text_delta" and delta.get("text"):
+                            emitted = True
+                            yield ("delta", str(delta["text"]))
+                elif etype == "result":
+                    if ev.get("is_error"):
+                        status = ev.get("api_error_status")
+                        raise RuntimeError(
+                            f"claude CLI API error (status={status}): {ev.get('result', '')[:300]}"
+                        )
+                    final_text, usage = _extract_result_and_usage(ev, "")
+        await feeder
+        await proc.wait()
+        if proc.returncode not in (0, None):
+            err = (await proc.stderr.read()).decode(errors="replace").strip()
+            raise RuntimeError(f"claude CLI (stream) exited with code {proc.returncode}: {err[:200]}")
+        # No partial deltas were emitted (older CLI / no partial support) — emit the final text once.
+        if not emitted and final_text:
+            yield ("delta", final_text)
+        yield ("usage", usage)
+    except TimeoutError:
+        raise RuntimeError(f"claude CLI (stream) timed out after {CLI_TIMEOUT_SECONDS} seconds")
+    finally:
+        feeder.cancel()
+        if proc.returncode is None:
+            proc.kill()
+            await proc.wait()
 
 
 async def _run_claude_document(
@@ -80,7 +178,7 @@ async def _run_claude_document(
     model: str | None,
     max_tokens: int | None,
     context_document: str | None = None,
-) -> str:
+) -> tuple[str, UsageParts]:
     # Large background context goes to context.md (pointer) or inline if small; the file-contract
     # and user instruction always stay in the prompt.
     context_preamble = materialize_context(workspace_path, context_document)
@@ -99,9 +197,11 @@ async def _run_claude_document(
     # remaining argv value not offloaded to a file; system prompts are operator-defined profiles
     # (a few KB), so they stay well under MAX_ARG_STRLEN. The user-driven variable content
     # (document, context, findings) is all file-backed via draft.md/context.md/instruction.md.
-    # No --output-format json: stdout is ignored; we read draft.md directly.
+    # --output-format json: the document text is read from draft.md, but stdout still
+    # carries the usage block + total_cost_usd, which we parse for faithful token accounting.
     args = [
         "claude", "-p",
+        "--output-format", "json",
         "--allowedTools", "Read,Edit,Write",
         "--permission-mode", "acceptEdits",
         "--append-system-prompt", system_prompt,
@@ -150,10 +250,21 @@ async def _run_claude_document(
     if result == document:
         log.warning("claude document mode: draft.md unchanged after CLI run — no edits applied")
 
-    return result
+    # The document text comes from draft.md; stdout JSON only contributes the usage block.
+    usage = UsageParts()
+    try:
+        data = json.loads(stdout.decode(errors="replace").strip())
+        if isinstance(data, dict):
+            _, usage = _extract_result_and_usage(data, "")
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    return result, usage
 
 
-async def _run_claude(prompt: str, model: str | None, max_tokens: int | None) -> str:
+async def _run_claude(
+    prompt: str, model: str | None, max_tokens: int | None
+) -> tuple[str, UsageParts]:
     # Allowlist ONLY web tools — no Bash/Edit/Write, so no full permission bypass.
     # Comma-separated single token: a space-separated variadic would greedily
     # consume the trailing prompt positional.
@@ -190,29 +301,59 @@ async def _run_claude(prompt: str, model: str | None, max_tokens: int | None) ->
 
     raw = stdout.decode(errors="replace").strip()
 
+    data: dict | None = None
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict):
+            data = parsed
+    except (json.JSONDecodeError, ValueError):
+        pass
+
     if proc.returncode != 0:
         # Errors may appear in stdout JSON (is_error: true) rather than stderr.
         stderr_msg = stderr.decode(errors="replace").strip()
-        try:
-            data = json.loads(raw)
-            if isinstance(data, dict) and data.get("is_error"):
-                raise RuntimeError(f"claude CLI error: {data.get('result', stderr_msg)}")
-        except (json.JSONDecodeError, ValueError):
-            pass
+        if data and data.get("is_error"):
+            raise RuntimeError(f"claude CLI error: {data.get('result', stderr_msg)}")
         raise RuntimeError(f"claude CLI exited with code {proc.returncode}: {stderr_msg or raw[:200]}")
 
-    return _extract_result(raw)
+    # claude often exits 0 even when the upstream API failed (auth 401, server 500, …);
+    # the failure surfaces as is_error:true in the JSON. Treat it as an error so it maps
+    # to an OpenAI error envelope instead of being returned as a "successful" result.
+    if data and data.get("is_error"):
+        status = data.get("api_error_status")
+        raise RuntimeError(
+            f"claude CLI API error (status={status}): {data.get('result', '')[:300]}"
+        )
+
+    return _extract_result_and_usage(data, raw)
 
 
-def _extract_result(raw: str) -> str:
+def _extract_result_and_usage(data: dict | None, raw: str) -> tuple[str, UsageParts]:
     """
-    claude -p --output-format json outputs a JSON object with a "result" field.
-    Falls back to returning the raw string if parsing fails.
+    claude -p --output-format json outputs a JSON object with a "result" field plus a
+    "usage" block and "total_cost_usd". Maps the usage to OpenAI accounting:
+    prompt_tokens counts all input (fresh + cache read + cache creation); cached_tokens is
+    the cache-read subset. Falls back to the raw string with empty usage if parsing failed.
     """
+    if data is None:
+        return raw, UsageParts()
+
+    u = data.get("usage") or {}
+    fresh = _int(u, "input_tokens")
+    cache_read = _int(u, "cache_read_input_tokens")
+    cache_creation = _int(u, "cache_creation_input_tokens")
+    usage = UsageParts(
+        input_tokens=fresh + cache_read + cache_creation,
+        output_tokens=_int(u, "output_tokens"),
+        cached_tokens=cache_read,
+        cost_usd=data.get("total_cost_usd"),
+    )
+    text = str(data["result"]) if "result" in data else raw
+    return text, usage
+
+
+def _int(d: dict, key: str) -> int:
     try:
-        data = json.loads(raw)
-        if isinstance(data, dict) and "result" in data:
-            return str(data["result"])
-    except (json.JSONDecodeError, ValueError):
-        pass
-    return raw
+        return int(d.get(key, 0) or 0)
+    except (TypeError, ValueError):
+        return 0

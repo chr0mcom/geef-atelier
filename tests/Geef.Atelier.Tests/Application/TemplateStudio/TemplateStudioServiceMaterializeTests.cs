@@ -152,7 +152,7 @@ public sealed class TemplateStudioServiceMaterializeTests
 
     private sealed class NoopPricingCatalog : IPricingCatalog
     {
-        public decimal? CalculateCostEur(string modelName, int inputTokens, int outputTokens, string? providerName = null) => null;
+        public decimal? CalculateCostEur(string modelName, int inputTokens, int outputTokens, string? providerName = null, int cachedInputTokens = 0) => null;
     }
 
     private sealed class NoopEmbeddingProvider : IEmbeddingProvider

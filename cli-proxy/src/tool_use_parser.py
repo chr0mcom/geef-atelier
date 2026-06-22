@@ -80,11 +80,23 @@ def build_agentic_tool_system_prompt(tools: list[dict]) -> str:
         f"\n\n## Available Tools\n"
         f"You have access to the following tools:\n{tool_list}\n\n"
         f"## Tool Use Protocol\n"
-        f"If you need to call a tool, respond with EXACTLY this JSON and nothing else:\n"
+        f"If you need to call ONE tool, respond with EXACTLY this JSON and nothing else:\n"
         f'{{"tool_call": {{"name": "<tool_name>", "arguments": {{...}}}}}}\n\n'
+        f"If you need to call SEVERAL tools at once, respond with EXACTLY:\n"
+        f'{{"tool_calls": [{{"name": "<tool_name>", "arguments": {{...}}}}, ...]}}\n\n'
         f"If you have all the information you need, respond with your final answer as plain text.\n"
         f"Do NOT mix tool calls with text in the same response.\n\n"
         f"## Tool Schemas\n{tool_schemas}"
+    )
+
+
+def build_required_tool_system_prompt(tools: list[dict]) -> str:
+    """Like the agentic prompt, but the model MUST call at least one tool (tool_choice=required)."""
+    base = build_agentic_tool_system_prompt(tools)
+    if not base:
+        return ""
+    return base + (
+        "\n\n## REQUIRED\nYou MUST call at least one tool. Do not respond with plain text."
     )
 
 
@@ -120,6 +132,41 @@ def parse_agentic_response(text: str) -> tuple[str | None, str | None]:
         return None, None
 
     return tool_name, json.dumps(arguments, ensure_ascii=False)
+
+
+def parse_agentic_responses(text: str) -> list[tuple[str, str]]:
+    """
+    Parses a CLI response in agentic mode, supporting BOTH single ({"tool_call": ...})
+    and parallel ({"tool_calls": [...]}) tool calls.
+
+    Returns a list of (tool_name, arguments_json); empty if the response is final text.
+    """
+    json_str = extract_json(text)
+    if json_str is None:
+        return []
+    try:
+        parsed = json.loads(json_str)
+    except (json.JSONDecodeError, ValueError):
+        return []
+    if not isinstance(parsed, dict):
+        return []
+
+    raw_calls: list = []
+    if isinstance(parsed.get("tool_calls"), list):
+        raw_calls = parsed["tool_calls"]
+    elif isinstance(parsed.get("tool_call"), dict):
+        raw_calls = [parsed["tool_call"]]
+
+    calls: list[tuple[str, str]] = []
+    for call in raw_calls:
+        if not isinstance(call, dict):
+            continue
+        name = call.get("name")
+        if not name:
+            continue
+        args = call.get("arguments", {})
+        calls.append((str(name), json.dumps(args, ensure_ascii=False)))
+    return calls
 
 
 # ---------------------------------------------------------------------------

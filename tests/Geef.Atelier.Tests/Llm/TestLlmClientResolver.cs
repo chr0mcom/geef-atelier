@@ -18,4 +18,5 @@ internal sealed class TestLlmClientResolver(
         (client, profileModel, profileMaxTokens ?? maxTokens);
 
     public bool SupportsAgenticTools(string providerName) => true;
+        public bool SupportsStructuredOutputs(string providerName) => true;
 }

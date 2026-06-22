@@ -124,7 +124,7 @@ async def test_claude_real_subprocess_edits_draft(stub_cli, tmp_path):
         model="claude-opus-4-8", max_tokens=None,
     )
 
-    assert result == "original document\n[EDITED]"
+    assert result[0] == "original document\n[EDITED]"
     received = (ws / "received_instruction.txt").read_text(encoding="utf-8")
     assert "Improve it." in received
     assert "draft.md" in received
@@ -142,7 +142,7 @@ async def test_codex_real_subprocess_edits_draft(stub_cli, tmp_path):
         model=None, max_tokens=None,
     )
 
-    assert result == "codex original\n[EDITED]"
+    assert result[0] == "codex original\n[EDITED]"
     received = (ws / "received_instruction.txt").read_text(encoding="utf-8")
     assert "[SYSTEM]" in received  # codex embeds the system prompt in the preamble
 
@@ -158,7 +158,7 @@ async def test_real_subprocess_empty_document_first_iteration(stub_cli, tmp_path
         document="", workspace_path=ws, model=None, max_tokens=None,
     )
 
-    assert result == "\n[EDITED]"
+    assert result[0] == "\n[EDITED]"
 
 
 # ---------------------------------------------------------------------------
@@ -200,7 +200,7 @@ async def test_real_subprocess_large_context_offloaded_and_seen(stub_cli, tmp_pa
     assert big not in received, "huge context must not be inlined into argv"
     assert "Findings: fix X." in received, "findings must stay in the prompt"
     assert (ws / "context.md").read_text(encoding="utf-8") == big
-    assert "[CONTEXT_SEEN]" in result, "agent must be able to read the offloaded context"
+    assert "[CONTEXT_SEEN]" in result[0], "agent must be able to read the offloaded context"
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +220,7 @@ async def test_real_subprocess_unicode_document_and_context(stub_cli, tmp_path):
         context_document="Kontext mit Umlauten: ä ö ü ß",
     )
 
-    assert result == doc + "\n[EDITED]"
+    assert result[0] == doc + "\n[EDITED]"
     received = (ws / "received_instruction.txt").read_text(encoding="utf-8")
     assert "Füge ä, ö, ü hinzu." in received
     assert "Kontext mit Umlauten: ä ö ü ß" in received
@@ -292,7 +292,7 @@ async def test_real_subprocess_huge_instruction_does_not_raise_e2big(stub_cli, t
         document="doc", workspace_path=ws, model=None, max_tokens=None,
     )
 
-    assert result == "doc\n[EDITED]"
+    assert result[0] == "doc\n[EDITED]"
     assert (ws / "instruction.md").exists(), "oversized instruction must be offloaded"
     assert huge in (ws / "instruction.md").read_text(encoding="utf-8")
     # The argv must carry only the short pointer, not the huge instruction.
@@ -314,7 +314,7 @@ async def test_real_subprocess_huge_instruction_codex(stub_cli, tmp_path):
         document="doc", workspace_path=ws, model=None, max_tokens=None,
     )
 
-    assert result == "doc\n[EDITED]"
+    assert result[0] == "doc\n[EDITED]"
     assert (ws / "instruction.md").exists()
 
 
@@ -333,7 +333,7 @@ async def test_real_subprocess_huge_context_and_instruction_combined(stub_cli, t
         context_document=big_ctx,
     )
 
-    assert result == "doc\n[EDITED]\n[CONTEXT_SEEN]"
+    assert result[0] == "doc\n[EDITED]\n[CONTEXT_SEEN]"
     assert (ws / "context.md").exists()
     assert (ws / "instruction.md").exists()
 
@@ -350,11 +350,12 @@ async def test_real_concurrent_calls_isolated(stub_cli, tmp_path, monkeypatch):
 
     async def one_call(n: int) -> str:
         async with ephemeral_workspace(f"document-{n}") as ws:
-            return await claude_adapter._run_claude_document(
+            text, _ = await claude_adapter._run_claude_document(
                 system_prompt="sys", user_instruction=f"edit {n}",
                 document=f"document-{n}", workspace_path=ws,
                 model=None, max_tokens=None,
             )
+            return text
 
     results = await asyncio.gather(*[one_call(i) for i in range(12)])
 

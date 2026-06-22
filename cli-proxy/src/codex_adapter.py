@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import tempfile
@@ -11,6 +12,7 @@ from typing import Any
 
 import httpx
 
+from usage import UsageParts
 from workspace import finalize_instruction, materialize_context
 
 log = logging.getLogger(__name__)
@@ -97,11 +99,11 @@ async def complete_document(
     model: str | None,
     max_tokens: int | None,
     context_document: str | None = None,
-) -> str:
+) -> tuple[str, UsageParts]:
     """
     Calls the codex CLI in document-edit mode: the CLI reads draft.md in the given
     workspace, applies the instruction, and writes the revised document back.
-    Returns the content of draft.md after the CLI exits.
+    Returns (content of draft.md after the CLI exits, token usage).
 
     Uses --sandbox workspace-write so the agent can only write within the workspace.
     System prompt is embedded in the instruction preamble (codex has no --append-system-prompt).
@@ -122,8 +124,103 @@ async def complete(prompt: str, model: str | None, max_tokens: int | None) -> st
 
     The semaphore limits concurrent calls to respect subscription rate limits.
     """
+    text, _ = await complete_with_usage(prompt, model, max_tokens)
+    return text
+
+
+async def complete_with_usage(
+    prompt: str, model: str | None, max_tokens: int | None
+) -> tuple[str, UsageParts]:
+    """Like complete(), but also returns the real token usage reported by the CLI."""
     async with _semaphore:
         return await _run_codex(prompt, model, max_tokens)
+
+
+async def stream(prompt: str, model: str | None, max_tokens: int | None):
+    """Stream the codex CLI output as (kind, payload) events.
+
+    Yields ("delta", text) for agent message text and finally ("usage", UsageParts).
+    codex exec --json emits the agent message as a completed item rather than token-level
+    deltas, so output is emitted as one (or few) delta chunks; usage comes from turn.completed.
+    """
+    async with _semaphore:
+        async for event in _stream_codex(prompt, model, max_tokens):
+            yield event
+
+
+async def _stream_codex(prompt: str, model: str | None, max_tokens: int | None):
+    args = ["codex", "--search", "exec", "--json", "--skip-git-repo-check"]
+    if model:
+        bare_model = model.split("/")[-1] if "/" in model else model
+        args += ["-m", bare_model]
+    args.append("-")
+
+    env = {**os.environ, "HOME": CODEX_HOME}
+    proc = await asyncio.create_subprocess_exec(
+        *args,
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=env,
+    )
+
+    async def _feed() -> None:
+        try:
+            proc.stdin.write(prompt.encode("utf-8"))
+            await proc.stdin.drain()
+        finally:
+            proc.stdin.close()
+
+    feeder = asyncio.create_task(_feed())
+    usage = UsageParts()
+    emitted_text = ""
+    try:
+        async with asyncio.timeout(CLI_TIMEOUT_SECONDS):
+            async for raw_line in proc.stdout:
+                line = raw_line.decode(errors="replace").strip()
+                if not line:
+                    continue
+                try:
+                    ev = json.loads(line)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                if not isinstance(ev, dict):
+                    continue
+                # Final agent message arrives as a completed item; emit the new suffix as a delta.
+                item = ev.get("item")
+                if isinstance(item, dict) and item.get("type") == "agent_message" and item.get("text"):
+                    text = str(item["text"])
+                    if text.startswith(emitted_text):
+                        delta = text[len(emitted_text):]
+                    else:
+                        delta = text
+                    if delta:
+                        emitted_text = text
+                        yield ("delta", delta)
+                # Usage on turn.completed (last one wins).
+                u = ev.get("usage")
+                if isinstance(u, dict):
+                    cached = _cint(u, "cached_input_tokens")
+                    reasoning = _cint(u, "reasoning_output_tokens")
+                    usage = UsageParts(
+                        input_tokens=_cint(u, "input_tokens"),
+                        output_tokens=_cint(u, "output_tokens") + reasoning,
+                        cached_tokens=cached,
+                        reasoning_tokens=reasoning,
+                    )
+        await feeder
+        await proc.wait()
+        if proc.returncode not in (0, None):
+            err = (await proc.stderr.read()).decode(errors="replace").strip()
+            raise RuntimeError(f"codex CLI (stream) exited with code {proc.returncode}: {err[:200]}")
+        yield ("usage", usage)
+    except TimeoutError:
+        raise RuntimeError(f"codex CLI (stream) timed out after {CLI_TIMEOUT_SECONDS} seconds")
+    finally:
+        feeder.cancel()
+        if proc.returncode is None:
+            proc.kill()
+            await proc.wait()
 
 
 async def _run_codex_document(
@@ -134,7 +231,7 @@ async def _run_codex_document(
     model: str | None,
     max_tokens: int | None,
     context_document: str | None = None,
-) -> str:
+) -> tuple[str, UsageParts]:
     # Codex has no --append-system-prompt flag — embed system prompt as a [SYSTEM] preamble.
     # Large background context goes to context.md (pointer) or inline if small; the file-contract
     # and user instruction always stay in the prompt.
@@ -152,9 +249,10 @@ async def _run_codex_document(
     # -C <workspace>: sets the agent's workspace root (not just subprocess cwd).
     # --skip-git-repo-check: the proxy container is not a git repo.
     # --search is a GLOBAL flag and must precede the `exec` subcommand.
-    # No --output-last-message: we read draft.md directly, not the last chat turn.
+    # --json: emit the JSONL event stream so we can read real token usage; the document
+    # text itself is read from draft.md, not from stdout.
     args = [
-        "codex", "--search", "exec",
+        "codex", "--search", "exec", "--json",
         "--skip-git-repo-check",
         "--sandbox", "workspace-write",
         "-C", str(workspace_path),
@@ -177,7 +275,7 @@ async def _run_codex_document(
         env=env,
     )
     try:
-        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
         proc.kill()
         await proc.wait()  # reap the killed process so it does not linger as a zombie
@@ -199,10 +297,13 @@ async def _run_codex_document(
     if result == document:
         log.warning("codex document mode: draft.md unchanged after CLI run — no edits applied")
 
-    return result
+    usage = _parse_codex_usage(stdout.decode(errors="replace"))
+    return result, usage
 
 
-async def _run_codex(prompt: str, model: str | None, max_tokens: int | None) -> str:
+async def _run_codex(
+    prompt: str, model: str | None, max_tokens: int | None
+) -> tuple[str, UsageParts]:
     # codex exec writes the last message to a file; use a temp file to capture it.
     with tempfile.NamedTemporaryFile(mode="r", suffix=".txt", delete=False) as tmp:
         output_file = tmp.name
@@ -213,7 +314,10 @@ async def _run_codex(prompt: str, model: str | None, max_tokens: int | None) -> 
         # --search is a GLOBAL flag and must precede the `exec` subcommand
         # (codex exec rejects it). It enables the native Responses web_search
         # tool with no per-call approval.
-        args = ["codex", "--search", "exec", "--skip-git-repo-check"]
+        # --json: emit the JSONL event stream on stdout so we can read the real token
+        # usage from the final turn.completed event. The final message text is still
+        # captured reliably via --output-last-message (independent of stdout format).
+        args = ["codex", "--search", "exec", "--json", "--skip-git-repo-check"]
 
         if model:
             bare_model = model.split("/")[-1] if "/" in model else model
@@ -236,7 +340,7 @@ async def _run_codex(prompt: str, model: str | None, max_tokens: int | None) -> 
             env=env,
         )
         try:
-            _, stderr = await asyncio.wait_for(
+            stdout, stderr = await asyncio.wait_for(
                 proc.communicate(input=prompt.encode("utf-8")), timeout=CLI_TIMEOUT_SECONDS)
         except asyncio.TimeoutError:
             proc.kill()
@@ -247,13 +351,78 @@ async def _run_codex(prompt: str, model: str | None, max_tokens: int | None) -> 
             err = stderr.decode(errors="replace").strip()
             raise RuntimeError(f"codex CLI exited with code {proc.returncode}: {err}")
 
+        usage = _parse_codex_usage(stdout.decode(errors="replace"))
+
         try:
             with open(output_file) as f:
-                return f.read().strip()
+                text = f.read().strip()
         except FileNotFoundError:
-            return ""
+            text = ""
+
+        # Fallback: if --output-last-message produced nothing, recover the final
+        # agent_message text from the JSONL event stream.
+        if not text:
+            text = _parse_codex_text(stdout.decode(errors="replace"))
+
+        return text, usage
     finally:
         try:
             os.unlink(output_file)
         except OSError:
             pass
+
+
+def _parse_codex_usage(stdout: str) -> UsageParts:
+    """
+    Reads token usage from the codex exec --json event stream. The final
+    `turn.completed` event carries a `usage` block:
+    {"input_tokens", "cached_input_tokens", "output_tokens", "reasoning_output_tokens"}.
+    The last such event wins (a turn may be retried). Returns empty usage if absent.
+    """
+    usage = UsageParts()
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line or '"usage"' not in line:
+            continue
+        try:
+            event = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        u = event.get("usage")
+        if not isinstance(u, dict):
+            continue
+        cached = _cint(u, "cached_input_tokens")
+        reasoning = _cint(u, "reasoning_output_tokens")
+        usage = UsageParts(
+            # codex input_tokens already includes the cached subset.
+            input_tokens=_cint(u, "input_tokens"),
+            # OpenAI completion_tokens includes reasoning tokens; codex reports them separately.
+            output_tokens=_cint(u, "output_tokens") + reasoning,
+            cached_tokens=cached,
+            reasoning_tokens=reasoning,
+        )
+    return usage
+
+
+def _parse_codex_text(stdout: str) -> str:
+    """Recover the last agent_message text from the codex exec --json event stream."""
+    text = ""
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line or "agent_message" not in line:
+            continue
+        try:
+            event = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        item = event.get("item")
+        if isinstance(item, dict) and item.get("type") == "agent_message" and item.get("text"):
+            text = str(item["text"])
+    return text.strip()
+
+
+def _cint(d: dict, key: str) -> int:
+    try:
+        return int(d.get(key, 0) or 0)
+    except (TypeError, ValueError):
+        return 0

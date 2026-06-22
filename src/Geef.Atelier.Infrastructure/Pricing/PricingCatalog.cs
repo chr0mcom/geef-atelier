@@ -10,7 +10,9 @@ internal sealed class PricingCatalog(
 {
     private readonly PricingOptions _options = options.Value;
 
-    public decimal? CalculateCostEur(string modelName, int inputTokens, int outputTokens, string? providerName = null)
+    public decimal? CalculateCostEur(
+        string modelName, int inputTokens, int outputTokens,
+        string? providerName = null, int cachedInputTokens = 0)
     {
         if (!_options.Models.TryGetValue(modelName, out var pricing))
         {
@@ -30,7 +32,14 @@ internal sealed class PricingCatalog(
             }
         }
 
-        var inputCostUsd  = (decimal)inputTokens  / 1_000_000m * pricing.InputCostPerMillionTokensUsd;
+        // Cached input tokens are billed at a reduced rate by most providers. Split the input
+        // into fresh + cached and apply the discount factor to the cached portion.
+        var cached = Math.Clamp(cachedInputTokens, 0, inputTokens);
+        var freshInput = inputTokens - cached;
+        var inputCostUsd =
+            ((decimal)freshInput / 1_000_000m * pricing.InputCostPerMillionTokensUsd)
+            + ((decimal)cached / 1_000_000m * pricing.InputCostPerMillionTokensUsd
+               * (decimal)_options.CachedInputDiscountFactor);
         var outputCostUsd = (decimal)outputTokens / 1_000_000m * pricing.OutputCostPerMillionTokensUsd;
         var totalUsd      = inputCostUsd + outputCostUsd;
 

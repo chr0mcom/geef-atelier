@@ -78,7 +78,8 @@ internal sealed class TransformFinalizerExecutor(
 
             inputTokens = response.TokenUsage.InputTokens;
             outputTokens = response.TokenUsage.OutputTokens;
-            costEur = pricingCatalog.CalculateCostEur(model, inputTokens, outputTokens, settings.Provider);
+            costEur = pricingCatalog.CalculateCostEur(model, inputTokens, outputTokens, settings.Provider,
+                cachedInputTokens: response.TokenUsage.CachedInputTokens ?? 0);
 
             if (string.IsNullOrWhiteSpace(response.Text))
             {

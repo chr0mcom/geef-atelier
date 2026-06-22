@@ -99,7 +99,8 @@ internal sealed class ProfileBasedAdvisor(
             if (costAccumulator is not null)
             {
                 var costEur = pricingCatalog?.CalculateCostEur(
-                    model, inputTokens, outputTokens, profile.Provider);
+                    model, inputTokens, outputTokens, profile.Provider,
+                    cachedInputTokens: response.TokenUsage.CachedInputTokens ?? 0);
                 costAccumulator.RecordActorCost(
                     iteration, ActorType.Advisor, profile.Name, model,
                     inputTokens, outputTokens, costEur,

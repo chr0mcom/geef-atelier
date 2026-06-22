@@ -152,7 +152,8 @@ internal sealed class GroundingRefiner(
             // Attempt to record cost regardless of parse outcome.
             var inputTokens = response.TokenUsage.InputTokens;
             var outputTokens = response.TokenUsage.OutputTokens;
-            var costEur = pricingCatalog.CalculateCostEur(model, inputTokens, outputTokens, config.Binding.Provider);
+            var costEur = pricingCatalog.CalculateCostEur(model, inputTokens, outputTokens, config.Binding.Provider,
+                cachedInputTokens: response.TokenUsage.CachedInputTokens ?? 0);
 
             await costRepository.AddAsync(new GroundingActorCost
             {

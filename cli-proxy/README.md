@@ -11,7 +11,31 @@ Geef.Atelier Web ──► POST /v1/claude/chat/completions ──► CLI proxy 
                  ──► POST /v1/codex/chat/completions  ──► CLI proxy ──► codex CLI
 ```
 
-The proxy is reachable internally on the Docker network (`http://cli-proxy:8090`) and has no Traefik routing to the outside.
+The proxy is reachable on the internal `geef-atelier-network` AND on the shared portfolio `proxy` network, so **any** app can use it as an OpenAI-compatible gateway at `http://cli-proxy:8090`. It has no Traefik routing and is not exposed publicly.
+
+## Use from other apps (portfolio-wide gateway)
+
+Any container on the shared `proxy` Docker network can call this proxy as a drop-in OpenAI endpoint — subscription-covered, no per-token billing. Point an OpenAI SDK at `http://cli-proxy:8090/v1/claude` or `http://cli-proxy:8090/v1/codex` (any `api_key` value unless `CLI_PROXY_API_KEYS` is set):
+
+```python
+from openai import OpenAI
+client = OpenAI(base_url="http://cli-proxy:8090/v1/codex", api_key="unused")
+print(client.chat.completions.create(
+    model="gpt-5.5", messages=[{"role": "user", "content": "ping"}]).choices[0].message.content)
+```
+
+If an app is not yet on the `proxy` network, add it:
+
+```yaml
+services:
+  my-app:
+    networks: [proxy]
+networks:
+  proxy:
+    external: true
+```
+
+Full cross-app guide: [`/srv/docker/docs/cli-proxy-openai-gateway.md`](../../../docs/cli-proxy-openai-gateway.md).
 
 ## Endpoints
 
@@ -38,6 +62,25 @@ The newer endpoints `/v1/claude/chat/completions` and `/v1/codex/chat/completion
 - Unknown models → claude CLI (fallback)
 
 Every call to this endpoint logs a DEPRECATED warning. Planned removal after 2 Atelier versions.
+
+## OpenAI compatibility
+
+The proxy targets practical drop-in compatibility with the OpenAI Chat Completions API. What is supported, and what the CLI backends physically cannot do:
+
+| Feature | Status |
+|---------|--------|
+| **Streaming** (`stream: true`) | ✅ SSE `chat.completion.chunk` stream, terminating `data: [DONE]`. `stream_options.include_usage` adds a final usage chunk. claude streams token deltas; codex emits the agent message as a (buffered) delta. Requests with `tools`/`response_format` buffer the full text, then emit. |
+| **Real token usage** | ✅ `usage` is parsed from the CLI output (claude `--output-format json`, codex `exec --json`), incl. `prompt_tokens_details.cached_tokens` and `completion_tokens_details.reasoning_tokens`. |
+| **Error envelope** | ✅ `{"error": {"message","type","param","code"}}` with faithful status codes (422→400, 401, 404, 429, 5xx). |
+| **`response_format`** | ✅ `json_object` and `json_schema` (validated server-side against the schema, with one retry, then a `refusal`). |
+| **Tool calling** | ✅ `tool_choice` `auto`/`required`/`none`/specific, parallel tool calls, multi-turn replay (emulated via prompt + JSON extraction). |
+| **Multimodal** | ⚠️ best-effort: http(s) `image_url` parts are passed as references (claude can WebFetch them); inline `data:` images are dropped with a warning. |
+| **Auth** | ✅ opt-in Bearer (`CLI_PROXY_API_KEYS`); unset = open (back-compat). |
+| **`logprobs` / `n>1`** | ❌ rejected with `400` — the CLI cannot produce token probabilities, and `n>1` would multiply subscription cost. |
+| **`temperature` / `top_p` / `seed` / penalties** | ⚠️ accepted and **ignored** (headless CLIs expose no sampling control). |
+| **`system_fingerprint`** | omitted (no stable fingerprint to report). |
+
+Models: `GET /v1/{claude,codex}/models` (list) and `GET /v1/{claude,codex}/models/{id}` (retrieve). Every response carries `x-request-id`, `openai-processing-ms` and informational `x-ratelimit-*` headers. Optional overload protection: set `CLI_PROXY_MAX_INFLIGHT` to return `429` once that many requests are concurrently in flight (default `0` = disabled, requests queue on the per-CLI semaphores).
 
 ## Tool use
 

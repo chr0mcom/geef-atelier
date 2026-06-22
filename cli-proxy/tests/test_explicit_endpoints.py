@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import sys
 import os
-import json
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +11,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import main  # noqa: E402  (must import after path setup)
+from usage import UsageParts  # noqa: E402
 
 
 @pytest.fixture()
@@ -20,11 +20,11 @@ def client() -> TestClient:
 
 
 def _claude_ok(text: str = "Claude response") -> AsyncMock:
-    return AsyncMock(return_value=text)
+    return AsyncMock(return_value=(text, UsageParts(input_tokens=7, output_tokens=3)))
 
 
 def _codex_ok(text: str = "Codex response") -> AsyncMock:
-    return AsyncMock(return_value=text)
+    return AsyncMock(return_value=(text, UsageParts(input_tokens=7, output_tokens=3)))
 
 
 _CHAT_BODY = {
@@ -37,28 +37,29 @@ class TestClaudeEndpoint:
     def test_routes_to_claude_adapter_regardless_of_model_name(self, client: TestClient) -> None:
         """POST /v1/claude/chat/completions always calls claude_adapter, ignoring model name."""
         with (
-            patch.object(main.claude_adapter, "complete", _claude_ok("hi from claude")),
-            patch.object(main.codex_adapter, "complete", AsyncMock(side_effect=AssertionError("codex must not be called"))),
+            patch.object(main.claude_adapter, "complete_with_usage", _claude_ok("hi from claude")),
+            patch.object(main.codex_adapter, "complete_with_usage", AsyncMock(side_effect=AssertionError("codex must not be called"))),
         ):
             resp = client.post("/v1/claude/chat/completions", json=_CHAT_BODY)
 
         assert resp.status_code == 200
         data = resp.json()
         assert data["choices"][0]["message"]["content"] == "hi from claude"
+        assert data["usage"]["total_tokens"] == 10
 
     def test_claude_endpoint_ignores_openai_model_prefix(self, client: TestClient) -> None:
         """Even with an OpenAI model name, /v1/claude routes to claude CLI."""
         body = {**_CHAT_BODY, "model": "gpt-4o"}
         with (
-            patch.object(main.claude_adapter, "complete", _claude_ok("claude handled openai model")),
-            patch.object(main.codex_adapter, "complete", AsyncMock(side_effect=AssertionError("codex must not be called"))),
+            patch.object(main.claude_adapter, "complete_with_usage", _claude_ok("claude handled openai model")),
+            patch.object(main.codex_adapter, "complete_with_usage", AsyncMock(side_effect=AssertionError("codex must not be called"))),
         ):
             resp = client.post("/v1/claude/chat/completions", json=body)
 
         assert resp.status_code == 200
 
     def test_claude_endpoint_returns_502_on_cli_failure(self, client: TestClient) -> None:
-        with patch.object(main.claude_adapter, "complete", AsyncMock(side_effect=RuntimeError("auth error"))):
+        with patch.object(main.claude_adapter, "complete_with_usage", AsyncMock(side_effect=RuntimeError("auth error"))):
             resp = client.post("/v1/claude/chat/completions", json=_CHAT_BODY)
 
         assert resp.status_code == 502
@@ -69,8 +70,8 @@ class TestCodexEndpoint:
         """POST /v1/codex/chat/completions always calls codex_adapter, ignoring model name."""
         claude_body = {**_CHAT_BODY, "model": "claude-opus-4-5"}  # would normally route to claude
         with (
-            patch.object(main.codex_adapter, "complete", _codex_ok("hi from codex")),
-            patch.object(main.claude_adapter, "complete", AsyncMock(side_effect=AssertionError("claude must not be called"))),
+            patch.object(main.codex_adapter, "complete_with_usage", _codex_ok("hi from codex")),
+            patch.object(main.claude_adapter, "complete_with_usage", AsyncMock(side_effect=AssertionError("claude must not be called"))),
         ):
             resp = client.post("/v1/codex/chat/completions", json=claude_body)
 
@@ -82,15 +83,15 @@ class TestCodexEndpoint:
         """Even with a Claude model name, /v1/codex routes to codex CLI."""
         body = {**_CHAT_BODY, "model": "claude-sonnet-4-5"}
         with (
-            patch.object(main.codex_adapter, "complete", _codex_ok("codex handled claude model")),
-            patch.object(main.claude_adapter, "complete", AsyncMock(side_effect=AssertionError("claude must not be called"))),
+            patch.object(main.codex_adapter, "complete_with_usage", _codex_ok("codex handled claude model")),
+            patch.object(main.claude_adapter, "complete_with_usage", AsyncMock(side_effect=AssertionError("claude must not be called"))),
         ):
             resp = client.post("/v1/codex/chat/completions", json=body)
 
         assert resp.status_code == 200
 
     def test_codex_endpoint_returns_502_on_cli_failure(self, client: TestClient) -> None:
-        with patch.object(main.codex_adapter, "complete", AsyncMock(side_effect=RuntimeError("codex crashed"))):
+        with patch.object(main.codex_adapter, "complete_with_usage", AsyncMock(side_effect=RuntimeError("codex crashed"))):
             resp = client.post("/v1/codex/chat/completions", json=_CHAT_BODY)
 
         assert resp.status_code == 502
@@ -99,7 +100,7 @@ class TestCodexEndpoint:
 class TestLegacyEndpoint:
     def test_legacy_endpoint_still_works_with_claude_model(self, client: TestClient) -> None:
         body = {**_CHAT_BODY, "model": "claude-opus-4-5"}
-        with patch.object(main.claude_adapter, "complete", _claude_ok("legacy claude")):
+        with patch.object(main.claude_adapter, "complete_with_usage", _claude_ok("legacy claude")):
             resp = client.post("/v1/chat/completions", json=body)
 
         assert resp.status_code == 200
@@ -107,7 +108,7 @@ class TestLegacyEndpoint:
 
     def test_legacy_endpoint_still_works_with_codex_model(self, client: TestClient) -> None:
         body = {**_CHAT_BODY, "model": "gpt-4o"}
-        with patch.object(main.codex_adapter, "complete", _codex_ok("legacy codex")):
+        with patch.object(main.codex_adapter, "complete_with_usage", _codex_ok("legacy codex")):
             resp = client.post("/v1/chat/completions", json=body)
 
         assert resp.status_code == 200
@@ -116,7 +117,7 @@ class TestLegacyEndpoint:
     def test_legacy_endpoint_logs_deprecation_warning(self, client: TestClient, caplog: pytest.LogCaptureFixture) -> None:
         import logging
         with (
-            patch.object(main.claude_adapter, "complete", _claude_ok()),
+            patch.object(main.claude_adapter, "complete_with_usage", _claude_ok()),
             caplog.at_level(logging.WARNING, logger="main"),
         ):
             client.post("/v1/chat/completions", json={**_CHAT_BODY, "model": "claude-opus-4-5"})

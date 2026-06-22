@@ -338,5 +338,6 @@ public sealed class CrewComposerStabilityTests
         public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
             => throw new NotSupportedException();
         public bool SupportsAgenticTools(string providerName) => true;
+        public bool SupportsStructuredOutputs(string providerName) => true;
     }
 }

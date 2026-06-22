@@ -22,4 +22,12 @@ public interface ILlmClientResolver
     /// provider is unknown or not yet loaded.
     /// </summary>
     bool SupportsAgenticTools(string providerName);
+
+    /// <summary>
+    /// Returns <see langword="true"/> when the named provider supports OpenAI <c>response_format</c>
+    /// structured outputs (json_object / json_schema). Returns <see langword="false"/> for the
+    /// OpenAI Responses path (which does not accept response_format here) and unknown providers,
+    /// so callers can fall back to forced tool-calling.
+    /// </summary>
+    bool SupportsStructuredOutputs(string providerName);
 }

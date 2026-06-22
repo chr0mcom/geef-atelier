@@ -264,4 +264,5 @@ internal sealed class NonAgenticTestLlmClientResolver(
         (client, profileModel, profileMaxTokens ?? maxTokens);
 
     public bool SupportsAgenticTools(string providerName) => false;
+        public bool SupportsStructuredOutputs(string providerName) => false;
 }

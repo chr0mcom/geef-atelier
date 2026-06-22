@@ -270,5 +270,6 @@ public sealed class ProfileBasedExecutorDocumentModeTests
             => (client, model, maxTokens ?? 64000);
 
         public bool SupportsAgenticTools(string providerName) => true;
+        public bool SupportsStructuredOutputs(string providerName) => true;
     }
 }

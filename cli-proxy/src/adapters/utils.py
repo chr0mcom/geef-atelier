@@ -26,9 +26,29 @@ def build_openai_response(request: dict, text: str) -> dict:
 
 
 def build_openai_response_from_parts(
-    request: dict, content: str, input_tokens: int, output_tokens: int
+    request: dict,
+    content: str,
+    input_tokens: int,
+    output_tokens: int,
+    *,
+    cached_tokens: int = 0,
+    reasoning_tokens: int = 0,
 ) -> dict:
-    """Build OpenAI-format chat completion response with token usage."""
+    """Build OpenAI-format chat completion response with token usage.
+
+    cached_tokens/reasoning_tokens, when non-zero, are surfaced as the OpenAI
+    prompt_tokens_details.cached_tokens / completion_tokens_details.reasoning_tokens fields.
+    """
+    usage: dict = {
+        "prompt_tokens": input_tokens,
+        "completion_tokens": output_tokens,
+        "total_tokens": input_tokens + output_tokens,
+    }
+    if cached_tokens:
+        usage["prompt_tokens_details"] = {"cached_tokens": cached_tokens}
+    if reasoning_tokens:
+        usage["completion_tokens_details"] = {"reasoning_tokens": reasoning_tokens}
+
     return {
         "id": f"chatcmpl-{uuid.uuid4().hex[:12]}",
         "object": "chat.completion",
@@ -39,9 +59,5 @@ def build_openai_response_from_parts(
             "message": {"role": "assistant", "content": content},
             "finish_reason": "stop",
         }],
-        "usage": {
-            "prompt_tokens": input_tokens,
-            "completion_tokens": output_tokens,
-            "total_tokens": input_tokens + output_tokens,
-        },
+        "usage": usage,
     }

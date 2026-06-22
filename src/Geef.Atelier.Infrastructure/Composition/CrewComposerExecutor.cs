@@ -62,42 +62,50 @@ internal sealed class CrewComposerExecutor(
             "CrewComposerExecutor: calling {Provider}/{Model} iter={Iter} maxTokens={MaxTokens}",
             profile.Provider, model, iter, maxTokens);
 
+        // Prefer server-validated response_format json_schema when the provider supports it
+        // (cli-proxy / OpenRouter); otherwise fall back to the forced-tool JSON hack.
+        var supportsStructured = llmClientResolver.SupportsStructuredOutputs(profile.Provider);
+        var (tools, toolChoice, responseFormat) = StructuredOutput.Build(CrewSpecTool.Schema, supportsStructured);
+
         var response = await client.CompleteAsync(new LlmRequest
         {
-            Model        = model,
-            SystemPrompt = systemPrompt,
-            UserPrompt   = userPrompt,
-            MaxTokens    = maxTokens,
-            Tools        = [CrewSpecTool.Schema],
-            ToolChoice   = $"function:{CrewSpecTool.ToolName}"
+            Model          = model,
+            SystemPrompt   = systemPrompt,
+            UserPrompt     = userPrompt,
+            MaxTokens      = maxTokens,
+            Tools          = tools,
+            ToolChoice     = toolChoice,
+            ResponseFormat = responseFormat
         }, cancellationToken);
 
         if (costAccumulator is not null)
         {
             var costEur = pricingCatalog?.CalculateCostEur(
-                model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, profile.Provider);
+                model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, profile.Provider,
+                cachedInputTokens: response.TokenUsage.CachedInputTokens ?? 0);
             costAccumulator.RecordActorCost(
                 iter, ActorType.Executor, profile.Name, model,
                 response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur,
                 providerName: profile.Provider);
         }
 
+        var crewJson = StructuredOutput.ExtractJson(response);
         string artifact;
-        if (response.FinishReason != "tool_calls" || response.ToolArgumentsJson is null)
+        if (crewJson is null)
         {
             logger.LogWarning(
-                "CrewComposerExecutor: LLM did not call {Tool} (finish_reason='{FinishReason}'). Producing error artifact.",
-                CrewSpecTool.ToolName, response.FinishReason);
+                "CrewComposerExecutor: LLM produced no structured output (finish_reason='{FinishReason}'). Producing error artifact.",
+                response.FinishReason);
 
-            artifact = $"{{\"_error\": \"LLM did not call {CrewSpecTool.ToolName} (finish_reason='{response.FinishReason}'). Raw response: {EscapeForJson(response.Text)}\"}}";
+            artifact = $"{{\"_error\": \"LLM did not produce a {CrewSpecTool.ToolName} object (finish_reason='{response.FinishReason}'). Raw response: {EscapeForJson(response.Text)}\"}}";
         }
         else
         {
             logger.LogInformation(
-                "CrewComposerExecutor: tool call received, tokens_in={In} tokens_out={Out}",
+                "CrewComposerExecutor: structured output received, tokens_in={In} tokens_out={Out}",
                 response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens);
 
-            artifact = response.ToolArgumentsJson;
+            artifact = crewJson;
         }
 
         var updated = context
@@ -110,7 +118,7 @@ internal sealed class CrewComposerExecutor(
             Notes =
             [
                 $"tokens_in={response.TokenUsage.InputTokens} tokens_out={response.TokenUsage.OutputTokens}",
-                $"tool_called={response.FinishReason == "tool_calls"}"
+                $"structured_ok={crewJson is not null}"
             ]
         };
     }

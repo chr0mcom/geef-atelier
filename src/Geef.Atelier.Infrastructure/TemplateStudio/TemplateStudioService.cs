@@ -58,17 +58,21 @@ internal sealed class TemplateStudioService(
         using var llmCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         llmCts.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
 
+        var supportsStructured = resolver.SupportsStructuredOutputs(choice.Provider);
+        var (tools, toolChoice, responseFormat) = StructuredOutput.Build(TemplateProposalTool.Schema, supportsStructured);
+
         LlmResponse response;
         try
         {
             response = await client.CompleteAsync(new LlmRequest
             {
-                Model        = model,
-                SystemPrompt = systemPrompt,
-                UserPrompt   = $"Task description: {taskDescription}\n\nAnalyse this task and call submit_template_proposal.",
-                MaxTokens    = maxTokens,
-                Tools        = [TemplateProposalTool.Schema],
-                ToolChoice   = $"function:{TemplateProposalTool.ToolName}"
+                Model          = model,
+                SystemPrompt   = systemPrompt,
+                UserPrompt     = $"Task description: {taskDescription}\n\nAnalyse this task and return the submit_template_proposal object.",
+                MaxTokens      = maxTokens,
+                Tools          = tools,
+                ToolChoice     = toolChoice,
+                ResponseFormat = responseFormat
             }, llmCts.Token);
         }
         catch (OperationCanceledException) when (llmCts.IsCancellationRequested && !ct.IsCancellationRequested)
@@ -78,19 +82,23 @@ internal sealed class TemplateStudioService(
                 "Bitte erneut versuchen oder einen anderen Provider/Modell wählen.");
         }
 
-        logger.LogInformation("Studio.AnalyzeAsync: meta-LLM responded finish={Finish} hasTool={HasTool}",
-            response.FinishReason, response.ToolArgumentsJson is not null);
+        var proposalJson = StructuredOutput.ExtractJson(response);
+        logger.LogInformation("Studio.AnalyzeAsync: meta-LLM responded finish={Finish} hasJson={HasJson}",
+            response.FinishReason, proposalJson is not null);
         progress?.Report("Verarbeite Vorschlag…");
 
-        if (response.FinishReason != "tool_calls" || response.ToolArgumentsJson is null)
+        // Fail cleanly when the model produced no extractable JSON object (e.g. ignored the
+        // structured-output instruction and replied with free-form prose).
+        if (proposalJson is null || !IsJsonObject(proposalJson))
             throw new InvalidOperationException(
-                $"Template Studio meta-LLM did not call the required tool (finish_reason='{response.FinishReason}').");
+                $"Template Studio meta-LLM did not produce a structured proposal (finish_reason='{response.FinishReason}').");
 
-        var proposal = ParseProposal(response.ToolArgumentsJson);
+        var proposal = ParseProposal(proposalJson);
         var withDefaults = proposal.ProposedNewProfiles.Select(p => ApplyDefaults(p, opts.Defaults)).ToList();
         var deduplicated = await DeduplicateProfilesAsync(withDefaults, opts.SimilarityThreshold, ct);
 
-        var cost = pricingCatalog.CalculateCostEur(model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, choice.Provider);
+        var cost = pricingCatalog.CalculateCostEur(model, response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, choice.Provider,
+            cachedInputTokens: response.TokenUsage.CachedInputTokens ?? 0);
 
         var analysis = new TemplateStudioAnalysis(
             Id:                     Guid.NewGuid(),
@@ -261,6 +269,19 @@ internal sealed class TemplateStudioService(
             Available providers and their current models (use ONLY these exact IDs):
             {modelsBlock}
             """;
+    }
+
+    private static bool IsJsonObject(string text)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(text);
+            return doc.RootElement.ValueKind == JsonValueKind.Object;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     private (IReadOnlyList<TemplateMatch> MatchedExistingTemplates, StudioRecommendation Recommendation,

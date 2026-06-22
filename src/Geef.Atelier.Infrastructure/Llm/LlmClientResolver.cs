@@ -53,6 +53,29 @@ internal sealed class LlmClientResolver(
         return provider?.SupportsAgenticTools() ?? false;
     }
 
+    /// <inheritdoc/>
+    public bool SupportsStructuredOutputs(string providerName)
+    {
+        string endpoint;
+        try
+        {
+            (endpoint, _) = ResolveProviderConnection(providerName);
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+
+        // The OpenAI Responses client does not serialise response_format — keep those on tool-calling.
+        if (TargetsOpenAi(endpoint))
+            return false;
+
+        var provider = LoadProvider(providerName);
+        // DB provider → honour its capability flag; appsettings-fallback providers
+        // (cli-proxy, openrouter) default to true (response_format supported).
+        return provider?.SupportsStructuredOutputs() ?? true;
+    }
+
 
     // ── Private helpers ───────────────────────────────────────────────────────────────
 
@@ -74,6 +97,11 @@ internal sealed class LlmClientResolver(
     private static bool TargetsOpenAi(string endpoint) =>
         Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) &&
         uri.Host.Equals("api.openai.com", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsCliProxyProvider(string endpoint) =>
+        Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) &&
+        (uri.Host.Equals("cli-proxy", StringComparison.OrdinalIgnoreCase)
+         || uri.Host.Equals("geef-atelier-cli-proxy", StringComparison.OrdinalIgnoreCase));
 
     private (string Endpoint, string? ApiKey) ResolveProviderConnection(string providerName)
     {
@@ -101,7 +129,16 @@ internal sealed class LlmClientResolver(
         // 2. Fall back to ProvidersFallback (appsettings) for legacy/CLI-proxy entries.
         // CLI providers route through the cli-proxy; their endpoint is already in ProvidersFallback.
         if (options.Value.ProvidersFallback.TryGetValue(providerName, out var fallback))
-            return (fallback.Endpoint, fallback.ApiKey);
+        {
+            var apiKey = fallback.ApiKey;
+            // The cli-proxy is now a shared gateway with opt-in Bearer auth (CLI_PROXY_API_KEYS).
+            // Allow a strong shared secret via the CLI_PROXY_API_KEY env var instead of hardcoding
+            // it in appsettings; falls back to the configured value when the env var is unset.
+            if (IsCliProxyProvider(fallback.Endpoint)
+                && Environment.GetEnvironmentVariable("CLI_PROXY_API_KEY") is { Length: > 0 } sharedKey)
+                apiKey = sharedKey;
+            return (fallback.Endpoint, apiKey);
+        }
 
         throw new InvalidOperationException(
             $"Provider '{providerName}' is not configured in IProviderService or Llm:ProvidersFallback.");

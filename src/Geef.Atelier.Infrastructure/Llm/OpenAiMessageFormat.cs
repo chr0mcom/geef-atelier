@@ -69,14 +69,16 @@ internal static class OpenAiMessageFormat
         }
 
         object? toolChoice = BuildToolChoice(request.ToolChoice);
+        object? responseFormat = BuildResponseFormat(request.ResponseFormat);
 
         var body = new RequestBodyDto
         {
-            Model        = request.Model,
-            Messages     = messages,
-            MaxTokens    = request.MaxTokens,
-            Tools        = tools,
-            ToolChoice   = toolChoice,
+            Model          = request.Model,
+            Messages       = messages,
+            MaxTokens      = request.MaxTokens,
+            Tools          = tools,
+            ToolChoice     = toolChoice,
+            ResponseFormat = responseFormat,
             // bool? null → omitted by WhenWritingNull so real OpenAI/Anthropic APIs never see these fields.
             DocumentMode    = request.DocumentMode ? true : null,
             Document        = request.DocumentMode ? request.Document : null,
@@ -132,8 +134,10 @@ internal static class OpenAiMessageFormat
             FinishReason      = choice.FinishReason ?? string.Empty,
             TokenUsage        = new LlmTokenUsage
             {
-                InputTokens  = usage?.PromptTokens     ?? 0,
-                OutputTokens = usage?.CompletionTokens ?? 0
+                InputTokens       = usage?.PromptTokens     ?? 0,
+                OutputTokens      = usage?.CompletionTokens ?? 0,
+                CachedInputTokens = usage?.PromptTokensDetails?.CachedTokens,
+                ReasoningTokens   = usage?.CompletionTokensDetails?.ReasoningTokens
             }
         };
     }
@@ -147,6 +151,26 @@ internal static class OpenAiMessageFormat
         _                     => null
     };
 
+    private static object? BuildResponseFormat(LlmResponseFormat? rf)
+    {
+        if (rf is null) return null;
+        if (rf.Type == "json_object") return new { type = "json_object" };
+        if (rf.Type == "json_schema" && rf.Schema is { } schema)
+        {
+            return new
+            {
+                type = "json_schema",
+                json_schema = new
+                {
+                    name   = rf.SchemaName ?? "response",
+                    schema,
+                    strict = rf.Strict
+                }
+            };
+        }
+        return null;
+    }
+
     // --- DTOs ---
 
     private sealed class RequestBodyDto
@@ -156,6 +180,7 @@ internal static class OpenAiMessageFormat
         [JsonPropertyName("max_tokens")]    public int MaxTokens { get; set; }
         [JsonPropertyName("tools")]         public ToolDto[]? Tools { get; set; }
         [JsonPropertyName("tool_choice")]   public object? ToolChoice { get; set; }
+        [JsonPropertyName("response_format")] public object? ResponseFormat { get; set; }
         // Document-mode fields — null (omitted) for non-CLI / non-document-mode requests.
         [JsonPropertyName("document_mode")]    public bool? DocumentMode { get; set; }
         [JsonPropertyName("document")]         public string? Document { get; set; }
@@ -232,5 +257,13 @@ internal static class OpenAiMessageFormat
     {
         [JsonPropertyName("prompt_tokens")]     public int PromptTokens { get; init; }
         [JsonPropertyName("completion_tokens")] public int CompletionTokens { get; init; }
+        [JsonPropertyName("prompt_tokens_details")]     public TokenDetailsDto? PromptTokensDetails { get; init; }
+        [JsonPropertyName("completion_tokens_details")] public TokenDetailsDto? CompletionTokensDetails { get; init; }
+    }
+
+    private sealed class TokenDetailsDto
+    {
+        [JsonPropertyName("cached_tokens")]    public int? CachedTokens { get; init; }
+        [JsonPropertyName("reasoning_tokens")] public int? ReasoningTokens { get; init; }
     }
 }
