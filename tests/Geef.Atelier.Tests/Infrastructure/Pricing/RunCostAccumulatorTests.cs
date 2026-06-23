@@ -23,6 +23,23 @@ public sealed class RunCostAccumulatorTests
         Assert.Equal(100, item.InputTokens);
         Assert.Equal(50, item.OutputTokens);
         Assert.Equal(0.01m, item.CostEur);
+        // Token breakdown defaults to 0 when not supplied.
+        Assert.Equal(0, item.CachedInputTokens);
+        Assert.Equal(0, item.ReasoningTokens);
+    }
+
+    [Fact]
+    public void RecordActorCost_TokenBreakdown_IsPreserved()
+    {
+        var acc = new RunCostAccumulator();
+
+        acc.RecordActorCost(2, ActorType.Reviewer, "rev", "model", 1000, 200, 0.02m,
+            providerName: "codex-cli", cachedInputTokens: 800, reasoningTokens: 64);
+
+        var item = acc.Flush()[0];
+        Assert.Equal("codex-cli", item.ProviderName);
+        Assert.Equal(800, item.CachedInputTokens);
+        Assert.Equal(64, item.ReasoningTokens);
     }
 
     [Fact]

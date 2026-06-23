@@ -46,6 +46,11 @@ public sealed class RunEntity
     public decimal? LlmCostEur { get; set; }
     public decimal? GroundingCostEur { get; set; }
 
+    // Token breakdown (Step43) — run-level sums of the cached-input / reasoning token subsets
+    // across all actor calls. Null when none were reported (e.g. pre-Step43 runs).
+    public int? CachedInputTokens { get; set; }
+    public int? ReasoningTokens { get; set; }
+
     // Finalizer tracking — null when no finalizers ran or when the run predates Step22.
     public decimal? FinalizerCostEur { get; set; }
 

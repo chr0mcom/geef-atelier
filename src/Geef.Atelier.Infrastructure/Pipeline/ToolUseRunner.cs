@@ -94,7 +94,9 @@ internal sealed class ToolUseRunner(
                     model,
                     response.TokenUsage.InputTokens,
                     response.TokenUsage.OutputTokens,
-                    costEur: null);
+                    costEur: null,
+                    cachedInputTokens: response.TokenUsage.CachedInputTokens ?? 0,
+                    reasoningTokens: response.TokenUsage.ReasoningTokens ?? 0);
             }
 
             var calls = response.AllToolCalls;

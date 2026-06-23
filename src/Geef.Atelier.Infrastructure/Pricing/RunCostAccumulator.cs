@@ -16,8 +16,12 @@ internal sealed class RunCostAccumulator : ICostAccumulator
         int inputTokens,
         int outputTokens,
         decimal? costEur,
-        string? providerName = null)
-        => _pending.Add(new PendingActorCost(iterationNumber, actorType, actorName, modelName, inputTokens, outputTokens, costEur, providerName));
+        string? providerName = null,
+        int cachedInputTokens = 0,
+        int reasoningTokens = 0)
+        => _pending.Add(new PendingActorCost(
+            iterationNumber, actorType, actorName, modelName, inputTokens, outputTokens, costEur,
+            providerName, cachedInputTokens, reasoningTokens));
 
     public IReadOnlyList<PendingActorCost> Flush()
     {

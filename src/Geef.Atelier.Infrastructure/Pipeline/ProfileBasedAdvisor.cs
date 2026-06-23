@@ -104,7 +104,9 @@ internal sealed class ProfileBasedAdvisor(
                 costAccumulator.RecordActorCost(
                     iteration, ActorType.Advisor, profile.Name, model,
                     inputTokens, outputTokens, costEur,
-                    providerName: profile.Provider);
+                    providerName: profile.Provider,
+                    cachedInputTokens: response.TokenUsage.CachedInputTokens ?? 0,
+                    reasoningTokens: response.TokenUsage.ReasoningTokens ?? 0);
             }
         }
 

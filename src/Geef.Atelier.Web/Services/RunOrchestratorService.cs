@@ -473,16 +473,18 @@ internal sealed class RunOrchestratorService(
 
                 costEntities.Add(new IterationActorCostEntity
                 {
-                    Id           = Guid.NewGuid(),
-                    IterationId  = iter.Id,
-                    ActorType    = cost.ActorType,
-                    ActorName    = cost.ActorName,
-                    ModelName    = cost.ModelName,
-                    InputTokens  = cost.InputTokens,
-                    OutputTokens = cost.OutputTokens,
-                    CostEur      = cost.CostEur,
-                    ProviderName = cost.ProviderName,
-                    CreatedAt    = DateTimeOffset.UtcNow
+                    Id                = Guid.NewGuid(),
+                    IterationId       = iter.Id,
+                    ActorType         = cost.ActorType,
+                    ActorName         = cost.ActorName,
+                    ModelName         = cost.ModelName,
+                    InputTokens       = cost.InputTokens,
+                    OutputTokens      = cost.OutputTokens,
+                    CachedInputTokens = cost.CachedInputTokens > 0 ? cost.CachedInputTokens : null,
+                    ReasoningTokens   = cost.ReasoningTokens > 0 ? cost.ReasoningTokens : null,
+                    CostEur           = cost.CostEur,
+                    ProviderName      = cost.ProviderName,
+                    CreatedAt         = DateTimeOffset.UtcNow
                 });
             }
 
@@ -524,12 +526,18 @@ internal sealed class RunOrchestratorService(
             var totalCostEur = (llmCostEur ?? 0m) + (groundingCostNullable ?? 0m);
             var totalNullable = totalCostEur > 0 ? totalCostEur : (decimal?)null;
 
+            // Token breakdown (Step43): run-level sums of cached-input / reasoning subsets.
+            var cachedSum = costEntities.Sum(c => c.CachedInputTokens ?? 0);
+            var reasoningSum = costEntities.Sum(c => c.ReasoningTokens ?? 0);
+
             await db.Runs
                 .Where(r => r.Id == runId)
                 .ExecuteUpdateAsync(s => s
-                    .SetProperty(r => r.LlmCostEur,      llmCostEur)
-                    .SetProperty(r => r.GroundingCostEur, groundingCostNullable)
-                    .SetProperty(r => r.TotalCostEur,     totalNullable),
+                    .SetProperty(r => r.LlmCostEur,        llmCostEur)
+                    .SetProperty(r => r.GroundingCostEur,  groundingCostNullable)
+                    .SetProperty(r => r.TotalCostEur,      totalNullable)
+                    .SetProperty(r => r.CachedInputTokens, cachedSum > 0 ? cachedSum : (int?)null)
+                    .SetProperty(r => r.ReasoningTokens,   reasoningSum > 0 ? reasoningSum : (int?)null),
                     ct);
         }
         catch (Exception ex)

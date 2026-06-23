@@ -84,6 +84,8 @@ services:
       - CLI_PROXY_API_KEYS=${CLI_PROXY_API_KEY:-}
       - ATELIER_BACKEND_URL=http://web:8080
       - ATELIER_INTERNAL_API_TOKEN=${ATELIER_INTERNAL_API_TOKEN:-}
+    ports:
+      - "127.0.0.1:8090:8090"
     volumes:
       - geef-atelier-cli-auth:/auth
     networks:

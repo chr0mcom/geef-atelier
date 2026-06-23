@@ -100,7 +100,9 @@ internal sealed class ProfileBasedReviewer(
             costAccumulator.RecordActorCost(
                 iter, ActorType.Reviewer, profile.Name, model,
                 response.TokenUsage.InputTokens, response.TokenUsage.OutputTokens, costEur,
-                providerName: profile.Provider);
+                providerName: profile.Provider,
+                cachedInputTokens: response.TokenUsage.CachedInputTokens ?? 0,
+                reasoningTokens: response.TokenUsage.ReasoningTokens ?? 0);
         }
 
         if (response.FinishReason != "tool_calls" || response.ToolArgumentsJson is null)
@@ -144,7 +146,9 @@ internal sealed class ProfileBasedReviewer(
                 costAccumulator.RecordActorCost(
                     iter, ActorType.Reviewer, profile.Name, model,
                     retryResponse.TokenUsage.InputTokens, retryResponse.TokenUsage.OutputTokens, retryCostEur,
-                    providerName: profile.Provider);
+                    providerName: profile.Provider,
+                    cachedInputTokens: retryResponse.TokenUsage.CachedInputTokens ?? 0,
+                    reasoningTokens: retryResponse.TokenUsage.ReasoningTokens ?? 0);
             }
 
             if (retryResponse.FinishReason == "tool_calls" && retryResponse.ToolArgumentsJson is not null)
