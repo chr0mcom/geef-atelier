@@ -75,7 +75,15 @@
             </div>
             <div class="run-meta">
                 <div class="row"><span class="label">Submitted</span><span class="val">@_details.Run.CreatedAt.LocalDateTime.ToString("HH:mm")</span></div>
-                <div class="row"><span class="label">Tokens</span><span class="val">@FormatRunTokens(_details.Run)</span></div>
+                <div class="row"><span class="label">Tokens</span><span class="val">@(_details.Run.TokensTotal > 0 ? _details.Run.TokensTotal.ToString("N0") : "—")</span></div>
+                @if (_details.Run.CachedInputTokens is int cachedTok && cachedTok > 0)
+                {
+                    <div class="row"><span class="label">Cached input</span><span class="val" title="Sum of prompt-cache hits across all actor calls (billed at a reduced rate)">@cachedTok.ToString("N0")</span></div>
+                }
+                @if (_details.Run.ReasoningTokens is int reasoningTok && reasoningTok > 0)
+                {
+                    <div class="row"><span class="label">Reasoning</span><span class="val" title="Reasoning tokens across all actor calls">@reasoningTok.ToString("N0")</span></div>
+                }
                 <div class="row"><span class="label">Cost</span><span class="val" data-testid="run-cost">@FormatRunCost(_details.Run)</span></div>
                 @if (_details.Run.ParentRunId.HasValue)
                 {
@@ -446,20 +454,6 @@
     {
         if (eur < 0.01m) return $"~€{eur:F4}";
         return $"€{eur:F2}";
-    }
-
-    static string FormatRunTokens(RunEntity run)
-    {
-        if (run.TokensTotal <= 0)
-            return "—";
-
-        var text = run.TokensTotal.ToString("N0");
-        var parts = new List<string>();
-        if (run.CachedInputTokens is int cached && cached > 0)
-            parts.Add($"cached {cached:N0}");
-        if (run.ReasoningTokens is int reasoning && reasoning > 0)
-            parts.Add($"reasoning {reasoning:N0}");
-        return parts.Count > 0 ? $"{text} ({string.Join(" · ", parts)})" : text;
     }
 
     static string FormatRunCost(RunEntity run)
