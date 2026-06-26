@@ -81,6 +81,38 @@ def finalize_instruction(workspace_path: Path, instruction: str) -> str:
     )
 
 
+def finalize_decision_instruction(workspace_path: Path, instruction: str) -> str:
+    """
+    Like finalize_instruction, but for the agentic decision-file mode: when the instruction
+    (rendered conversation + tool schemas) exceeds the safe per-argument size it is written to
+    instruction.md and a short pointer is returned, preventing E2BIG. The pointer keeps the
+    decision.json contract (it must NOT mention draft.md, which does not exist in this mode).
+    """
+    if len(instruction.encode("utf-8")) <= INSTRUCTION_ARG_LIMIT:
+        return instruction
+    (workspace_path / "instruction.md").write_text(instruction, encoding="utf-8")
+    return (
+        "Your task is described in instruction.md in the current directory. Read instruction.md "
+        "first, then follow it exactly — it asks you to write a single decision.json file. Write "
+        "nothing except decision.json."
+    )
+
+
+@asynccontextmanager
+async def ephemeral_dir() -> AsyncIterator[Path]:
+    """
+    Creates an empty temporary workspace directory, yields its path, then removes it
+    unconditionally. Unlike ephemeral_workspace it writes no draft.md — used by the agentic
+    decision-file mode, where the CLI agent authors decision.json from scratch.
+    """
+    workspace = Path(WORKSPACE_ROOT) / str(uuid.uuid4())
+    workspace.mkdir(parents=True, exist_ok=True)
+    try:
+        yield workspace
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
 @asynccontextmanager
 async def ephemeral_workspace(document: str) -> AsyncIterator[Path]:
     """

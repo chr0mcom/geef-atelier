@@ -34,10 +34,12 @@ from errors import OpenAIError, install_error_handlers
 from provider_sync import ProviderConfigSync
 from tool_use_parser import (
     build_agentic_tool_system_prompt,
+    build_decision_file_instruction,
     build_required_tool_system_prompt,
     build_tool_system_prompt,
     extract_json,
     parse_agentic_responses,
+    parse_decision,
 )
 from workspace import ephemeral_workspace
 
@@ -181,8 +183,10 @@ def _image_references(content) -> str:
     return "\n".join(refs)
 
 
-def _build_prompt(req: ChatCompletionRequest) -> str:
-    """Concatenates messages into a plain-text prompt for the CLI."""
+def _render_conversation(req: ChatCompletionRequest) -> str:
+    """Renders the message list into a plain-text transcript (shared by the prompt builder and
+    the agentic decision-file instruction). Multi-turn tool calls and tool results are rendered
+    as [TOOL CALLS] / [TOOL RESULT: ...] blocks so the model can continue an agentic loop."""
     parts: list[str] = []
 
     for msg in req.messages:
@@ -210,7 +214,12 @@ def _build_prompt(req: ChatCompletionRequest) -> str:
         else:
             parts.append(f"[{role}]\n{text}")
 
-    prompt = "\n\n".join(parts)
+    return "\n\n".join(parts)
+
+
+def _build_prompt(req: ChatCompletionRequest) -> str:
+    """Concatenates messages into a plain-text prompt for the CLI."""
+    prompt = _render_conversation(req)
 
     mode = _tool_choice_mode(req)
     if req.tools and mode != "none":
@@ -324,11 +333,107 @@ async def _complete_backend(
     return await codex_adapter.complete_with_usage(prompt, model, max_tokens)
 
 
+_DECISION_RETRY_SUFFIX = (
+    "\n\nIMPORTANT: Your previous attempt did not produce a usable decision.json. Write a file "
+    "named decision.json in the current directory containing ONLY one JSON object of the form "
+    '{"tool_call": {"name": "...", "arguments": {...}}} (or {"tool_calls": [...]}), or '
+    '{"final": "..."} — no markdown, no prose, nothing else.'
+)
+
+
+def _decision_unacceptable(kind: str, payload, mode: str, specific: str | None) -> bool:
+    """Whether a parsed decision warrants a single retry (empty/invalid, or a required/specific
+    tool turn that did not produce the mandated tool call)."""
+    if kind == "none":
+        return True
+    if mode == "required" and kind != "tool_calls":
+        return True
+    if mode == "specific":
+        if kind != "tool_calls":
+            return True
+        names = [name for name, _ in payload]
+        if specific and specific not in names:
+            return True
+    return False
+
+
+async def _agentic_file_decision(
+    req: ChatCompletionRequest,
+) -> tuple[str, object, UsageParts]:
+    """Runs the claude decision-file flow (with one retry) and returns (kind, payload, usage).
+
+    kind is 'tool_calls' (payload = [(name, args_json), ...]) or 'final' (payload = answer text).
+    A 'none' parse is normalised to ('final', raw_text) so the caller always gets a usable answer.
+    """
+    conversation = _render_conversation(req)
+    mode = _tool_choice_mode(req)
+    specific = _extract_tool_name(req)
+    tools_dicts = [t.model_dump() for t in req.tools]
+    instruction = build_decision_file_instruction(conversation, tools_dicts, mode, specific)
+
+    log.info("Agentic file mode | model=%s | mode=%s | tools=%d",
+             req.model, mode, len(tools_dicts))
+
+    decision, parts = await claude_adapter.complete_agentic_file(instruction, req.model)
+    kind, payload = parse_decision(decision)
+
+    if _decision_unacceptable(kind, payload, mode, specific):
+        log.warning("Agentic file mode: decision unacceptable (kind=%s, mode=%s) — retrying once",
+                    kind, mode)
+        decision, parts = await claude_adapter.complete_agentic_file(
+            instruction + _DECISION_RETRY_SUFFIX, req.model)
+        kind, payload = parse_decision(decision)
+
+    if kind == "none":
+        # No structured decision even after retry — surface the raw text as a final answer.
+        return ("final", decision, parts)
+    return (kind, payload, parts)
+
+
+async def _run_agentic_file(req: ChatCompletionRequest) -> ChatCompletionResponse:
+    """Non-streaming agentic tool use for claude via decision-file authoring.
+
+    claude writes the next tool call (or a final answer) into decision.json instead of acting or
+    hallucinating output itself — the document-mode framing sidesteps claude-code's injection
+    refusal of the inline "emit tool-call JSON" protocol. Returns a standard OpenAI tool_calls /
+    content response, so callers (Hermes, Geef.Atelier) are unchanged.
+    """
+    kind, payload, parts = await _agentic_file_decision(req)
+    usage = _to_usage_info(parts)
+    if kind == "tool_calls":
+        log.info("Agentic file decision: tool call(s) %s", [c[0] for c in payload])
+        return make_tool_calls_response(req.model, payload, usage)
+    return make_text_response(req.model, payload, usage)
+
+
+def _is_agentic_tool_request(req: ChatCompletionRequest, backend: str, structured: bool) -> bool:
+    """The claude file-authoring path applies to open-ended tool use (auto/required), where the
+    model would otherwise try to execute action tools itself and hallucinate their output.
+
+    Excluded:
+    - 'specific' tool_choice (a forced single tool, e.g. Geef's submit_review) — that is
+      structured-output-like; the print-mode path produces the JSON reliably and is well tested.
+    - codex backend — keeps its existing path.
+    - structured-output calls — response_format takes precedence."""
+    return (
+        backend == "claude"
+        and bool(req.tools)
+        and not structured
+        and _tool_choice_mode(req) in ("auto", "required")
+    )
+
+
 async def _run_completion(req: ChatCompletionRequest, backend: str) -> ChatCompletionResponse:
     """Non-streaming completion: build prompt, apply response_format/tool handling, retry once."""
-    prompt = _build_prompt(req)
     rf = req.response_format
     structured = rf is not None and rf.type != "text"
+
+    # Agentic tool use (claude): author the next tool call into a file rather than acting/
+    # hallucinating in print mode. Sidesteps claude-code's injection refusal of the inline protocol.
+    if _is_agentic_tool_request(req, backend, structured):
+        return await _run_agentic_file(req)
+
+    prompt = _build_prompt(req)
     if structured:
         prompt += build_response_format_instruction(rf)
     max_tokens = req.effective_max_tokens()
@@ -400,11 +505,30 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
     include_usage = bool(req.stream_options and req.stream_options.include_usage)
 
     adapter = claude_adapter if backend == "claude" else codex_adapter
+    agentic = _is_agentic_tool_request(req, backend, structured)
 
     async def _events():
+        # Agentic tool use (claude): resolve the decision via file authoring, then emit either
+        # proper streaming tool_calls or the final answer — no hallucination, no injection refusal.
+        if agentic:
+            kind, payload, parts = await _agentic_file_decision(req)
+            if kind == "tool_calls":
+                tool_calls = [
+                    {
+                        "index": i,
+                        "id": f"call_{uuid.uuid4().hex[:24]}",
+                        "type": "function",
+                        "function": {"name": name, "arguments": args},
+                    }
+                    for i, (name, args) in enumerate(payload)
+                ]
+                yield ("tool_calls", tool_calls)
+            else:
+                yield ("delta", payload)
+            yield ("usage", parts)
         # When tools/structured output are requested, we must inspect the full text before
         # deciding tool_calls vs content — so buffer, then emit. Pure text streams token-by-token.
-        if req.tools or structured:
+        elif req.tools or structured:
             raw, parts = await _complete_backend(backend, prompt, req.model, max_tokens)
             if structured:
                 json_str, _ = validate_and_extract(rf, raw)

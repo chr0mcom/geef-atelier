@@ -47,10 +47,15 @@ async def sse_response(
     yield _sse(_chunk(chunk_id, created, model, {"role": "assistant"}))
 
     usage_parts = UsageParts()
+    emitted_tool_calls = False
     try:
         async for kind, payload in event_iter:
             if kind == "delta" and payload:
                 yield _sse(_chunk(chunk_id, created, model, {"content": payload}))
+            elif kind == "tool_calls" and payload:
+                # Agentic tool use: emit the tool calls as a delta (OpenAI streaming shape).
+                emitted_tool_calls = True
+                yield _sse(_chunk(chunk_id, created, model, {"tool_calls": payload}))
             elif kind == "usage" and isinstance(payload, UsageParts):
                 usage_parts = payload
     except Exception as exc:  # noqa: BLE001 — surface mid-stream failures to the client
@@ -60,8 +65,9 @@ async def sse_response(
         yield b"data: [DONE]\n\n"
         return
 
-    # Final content-less chunk carries the finish reason.
-    yield _sse(_chunk(chunk_id, created, model, {}, finish_reason=finish_reason))
+    # Final content-less chunk carries the finish reason (tool_calls overrides when emitted).
+    final_finish = "tool_calls" if emitted_tool_calls else finish_reason
+    yield _sse(_chunk(chunk_id, created, model, {}, finish_reason=final_finish))
 
     if include_usage:
         ui = usage_info(
