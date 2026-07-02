@@ -514,14 +514,24 @@ def _extract_result_and_usage(data: dict | None, raw: str) -> tuple[str, UsagePa
     "usage" block and "total_cost_usd". Maps the usage to OpenAI accounting:
     prompt_tokens counts all input (fresh + cache read + cache creation); cached_tokens is
     the cache-read subset. Falls back to the raw string with empty usage if parsing failed.
+
+    The CLI's top-level usage fields are SUMMED over all internal agentic turns of the
+    run (usage.iterations), so on multi-turn runs they overstate the context size by an
+    order of magnitude (a 30K-token conversation reports 600K+ prompt tokens). OpenAI
+    prompt_tokens semantically describe the prompt of THIS completion, and consumers
+    (e.g. Hermes' context compressor) treat them as the live context size — so the
+    input side is taken from the LAST iteration when the breakdown is available.
+    output_tokens stay cumulative: every generated token belongs to this completion.
     """
     if data is None:
         return raw, UsageParts()
 
     u = data.get("usage") or {}
-    fresh = _int(u, "input_tokens")
-    cache_read = _int(u, "cache_read_input_tokens")
-    cache_creation = _int(u, "cache_creation_input_tokens")
+    iterations = u.get("iterations")
+    last_iter = iterations[-1] if isinstance(iterations, list) and iterations and isinstance(iterations[-1], dict) else u
+    fresh = _int(last_iter, "input_tokens")
+    cache_read = _int(last_iter, "cache_read_input_tokens")
+    cache_creation = _int(last_iter, "cache_creation_input_tokens")
     usage = UsageParts(
         input_tokens=fresh + cache_read + cache_creation,
         output_tokens=_int(u, "output_tokens"),

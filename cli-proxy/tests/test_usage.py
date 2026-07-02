@@ -32,6 +32,32 @@ class TestClaudeUsage:
         assert usage.cost_usd == 0.0123
         assert usage.total_tokens == 175
 
+    def test_multi_turn_run_reports_last_iteration_context_not_cumulative_sum(self) -> None:
+        # Agentic runs sum input tokens over all internal turns in the top-level
+        # fields; prompt_tokens must reflect the final context, not the billing sum.
+        data = {
+            "result": "done",
+            "total_cost_usd": 1.5,
+            "usage": {
+                "input_tokens": 5000,
+                "cache_read_input_tokens": 600_000,
+                "cache_creation_input_tokens": 20_000,
+                "output_tokens": 900,
+                "iterations": [
+                    {"input_tokens": 2000, "cache_read_input_tokens": 250_000,
+                     "cache_creation_input_tokens": 15_000, "output_tokens": 400},
+                    {"input_tokens": 3000, "cache_read_input_tokens": 28_000,
+                     "cache_creation_input_tokens": 5_000, "output_tokens": 500},
+                ],
+            },
+        }
+        _, usage = claude_adapter._extract_result_and_usage(data, "")
+        assert usage.input_tokens == 3000 + 28_000 + 5_000
+        assert usage.cached_tokens == 28_000
+        # output stays cumulative: every generated token belongs to this completion
+        assert usage.output_tokens == 900
+        assert usage.cost_usd == 1.5
+
     def test_missing_usage_is_zero(self) -> None:
         text, usage = claude_adapter._extract_result_and_usage({"result": "x"}, "")
         assert text == "x"
