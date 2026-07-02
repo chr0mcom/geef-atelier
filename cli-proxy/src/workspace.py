@@ -84,11 +84,17 @@ def finalize_instruction(workspace_path: Path, instruction: str) -> str:
 def finalize_decision_instruction(workspace_path: Path, instruction: str) -> str:
     """
     Like finalize_instruction, but for the agentic decision-file mode: when the instruction
-    (rendered conversation + tool schemas) exceeds the safe per-argument size it is written to
-    instruction.md and a short pointer is returned, preventing E2BIG. The pointer keeps the
-    decision.json contract (it must NOT mention draft.md, which does not exist in this mode).
+    (rendered conversation + tool schemas) exceeds the offload threshold it is written to
+    instruction.md and a short pointer is returned. The pointer keeps the decision.json
+    contract (it must NOT mention draft.md, which does not exist in this mode).
+
+    Offloads at CONTEXT_FILE_THRESHOLD, not INSTRUCTION_ARG_LIMIT: with instructions in the
+    50-100 KB argv range the claude CLI flakily flips into a review register — it narrates
+    that decision.json "is already in place" instead of authoring it (observed 2026-07-02 on
+    Hermes case-writer turn-2 conversations; the identical instruction via instruction.md
+    authored the file reliably). E2BIG protection is the smaller side effect here.
     """
-    if len(instruction.encode("utf-8")) <= INSTRUCTION_ARG_LIMIT:
+    if len(instruction.encode("utf-8")) <= CONTEXT_FILE_THRESHOLD:
         return instruction
     (workspace_path / "instruction.md").write_text(instruction, encoding="utf-8")
     return (

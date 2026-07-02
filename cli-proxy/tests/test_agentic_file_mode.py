@@ -201,3 +201,18 @@ def test_streaming_emits_tool_calls(client: TestClient):
     assert resp.status_code == 200
     assert "terminal" in resp.text
     assert "tool_calls" in resp.text
+
+
+def test_decision_instruction_offloads_at_context_file_threshold(tmp_path):
+    # 50-100 KB argv instructions flakily flip the CLI into a review register ("decision.json
+    # is already in place") instead of authoring the file — offload must kick in early.
+    import workspace as workspace_module
+
+    big = "x" * (workspace_module.CONTEXT_FILE_THRESHOLD + 1)
+    pointer = workspace_module.finalize_decision_instruction(tmp_path, big)
+    assert "instruction.md" in pointer
+    assert "draft.md" not in pointer
+    assert (tmp_path / "instruction.md").read_text(encoding="utf-8") == big
+
+    small = "y" * 1000
+    assert workspace_module.finalize_decision_instruction(tmp_path, small) == small
