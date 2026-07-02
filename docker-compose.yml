@@ -69,7 +69,10 @@ services:
     container_name: geef-atelier-cli-proxy
     restart: unless-stopped
     environment:
-      - CLAUDE_MAX_CONCURRENT=2
+      # 6 statt 2 (2026-07-02): cli-proxy wird inzwischen von Geef + Hermes + DMS-Worker +
+      # Wartungsläufen geteilt; bei 2 halten lange Hermes-Agent-Turns (Slot = gesamte
+      # Call-Dauer) beide Slots und kleine DMS-Klassifikations-Calls laufen in den Timeout.
+      - CLAUDE_MAX_CONCURRENT=6
       - CODEX_MAX_CONCURRENT=2
       - WORKSPACE_ROOT=/work
       - CONTEXT_FILE_THRESHOLD=50000
