@@ -11,7 +11,7 @@ from .utils import format_messages as _format_messages, build_openai_response_fr
 
 class CodexAdapter(CliAdapter):
     async def execute(self, config: dict[str, Any], request: dict[str, Any]) -> dict[str, Any]:
-        model = request.get("model", "openai/gpt-5.5")
+        model = request.get("model", "openai/gpt-5.6-sol")
         max_tokens = request.get("max_tokens")
         prompt = _format_messages(request.get("messages", []))
 
@@ -24,8 +24,9 @@ class CodexAdapter(CliAdapter):
     async def list_models(self, config: dict[str, Any]) -> list[str]:
         settings = config.get("settings", {})
         return settings.get("models", [
-            "openai/gpt-5.5",
-            "openai/gpt-4o",
+            "openai/gpt-5.6-sol",
+            "openai/gpt-5.6-terra",
+            "openai/gpt-5.6-luna",
         ])
 
     async def health_check(self, config: dict[str, Any]) -> bool:

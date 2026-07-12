@@ -40,15 +40,15 @@ Reviewer über `codex-cli`. Modell-Pluralismus bleibt gewahrt (Reviewer ≠ Exec
 
 | Name | Typ | Provider / Modell |
 |---|---|---|
-| `default-executor` | ExecutorProfile | `claude-cli` / `claude-opus-4-7` |
-| `briefing-fidelity` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
-| `clarity` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
-| `legal-jargon-precision` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
-| `legal-clause-risk` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
-| `academic-citation-readiness` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
-| `academic-argumentation-rigor` | ReviewerProfile | `claude-cli` / `claude-opus-4-7` |
-| `marketing-audience-clarity` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
-| `marketing-conversion-strength` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
+| `default-executor` | ExecutorProfile | `claude-cli` / `claude-opus-4-8` |
+| `briefing-fidelity` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
+| `clarity` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
+| `legal-jargon-precision` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
+| `legal-clause-risk` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
+| `academic-citation-readiness` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
+| `academic-argumentation-rigor` | ReviewerProfile | `claude-cli` / `claude-opus-4-8` |
+| `marketing-audience-clarity` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
+| `marketing-conversion-strength` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
 
 **System-Templates** (vier): `klassik` (Evaluation `Parallel`, keine Advisors —
 reproduziert das ursprüngliche PS-2-Verhalten) sowie die Domain-Templates
@@ -81,13 +81,13 @@ Alle vier Standard-Templates liefern drei Standard-Grounding-Provider (`tavily-b
     "displayName": "Default Executor",
     "systemPrompt": "...",
     "provider": "openrouter",
-    "model": "anthropic/claude-opus-4.7",
+    "model": "anthropic/claude-opus-4.8",
     "maxTokens": null,
     "isSystem": true
   },
   "reviewers": [
-    { "name": "briefing-fidelity", "provider": "openrouter", "model": "google/gemini-2.5-flash", ... },
-    { "name": "clarity",           "provider": "openrouter", "model": "openai/gpt-5.5-mini",    ... }
+    { "name": "briefing-fidelity", "provider": "openrouter", "model": "google/gemini-3.5-flash", ... },
+    { "name": "clarity",           "provider": "openrouter", "model": "openai/gpt-5.6-luna",    ... }
   ],
   "evaluationStrategy": "Parallel",
   "convergenceOverride": null,
@@ -124,7 +124,7 @@ public enum AdvisorTrigger { BeforeFirstExecution, BeforeEveryExecution, OnConve
 ### System-Advisors
 
 Provider/Modell Stand Mai 2026: alle System-Advisors laufen über
-`claude-cli` / `claude-opus-4-7`.
+`claude-cli` / `claude-opus-4-8`.
 
 | Name | Mode | Trigger | Zweck |
 |---|---|---|---|
@@ -542,9 +542,9 @@ SPÄTERER RUN  →  Grounding „learning-retrieval"
 | `learning-publisher` | Finalizer (LearningPublish) | Teil der `learning-evaluation`-Crew |
 | `learning-evaluation` | CrewTemplate | AbortOnCritical=true, MaxIterations=2 |
 | `learning-retriever-default` | GroundingProvider (LearningRetrieval) | sameDomainBoost=1.0, crossDomainPenalty=0.5 |
-| `learning-factual-grounding` | Reviewer | openrouter/gpt-4.1 |
-| `learning-value` | Reviewer | openrouter/gemini-2.5-pro |
-| `learning-generalizability` | Reviewer | claude-cli/claude-opus-4.7 |
+| `learning-factual-grounding` | Reviewer | codex-cli/gpt-5.6-sol |
+| `learning-value` | Reviewer | openrouter/gemini-3.1-pro-preview |
+| `learning-generalizability` | Reviewer | claude-cli/claude-opus-4.8 |
 
 ## Auto-Crew: Kompositions-Run
 
@@ -561,10 +561,10 @@ Einstiegspunkt: `/crew/studio` (eigenständige Komposition, `ChainToTaskRun = fa
 | Name | Typ | Provider / Modell | Rolle |
 |---|---|---|---|
 | `crew-spec-validator` | **Deterministisch** (kein LLM) | — | Prüft das `CrewSpecArtifact`-JSON-Schema in der Schleife; fehlende Pflichtfelder oder ungültige Struktur → Critical-Finding, kein LLM-Aufruf nötig |
-| `crew-diversity-reviewer` | LLM | codex-cli / gpt-5.5 | Prüft Modell-Pluralismus: Executor und Reviewer müssen ≥ 2 verschiedene Provider abdecken |
-| `crew-prompt-quality-reviewer` | LLM | claude-cli / claude-opus-4-7 | Bewertet Qualität, Spezifität und Rollenklarheit jedes System-Prompts |
-| `crew-grounding-fit-reviewer` | LLM | codex-cli / gpt-5.5 | Beurteilt, ob die gewählten Grounding-Provider zur Aufgabendomäne passen |
-| `crew-finalizer-fit-reviewer` | LLM | codex-cli / gpt-5.5 | Prüft, ob die gewählten Finalizer zu den Output-Anforderungen der Aufgabe passen |
+| `crew-diversity-reviewer` | LLM | codex-cli / gpt-5.6-sol | Prüft Modell-Pluralismus: Executor und Reviewer müssen ≥ 2 verschiedene Provider abdecken |
+| `crew-prompt-quality-reviewer` | LLM | claude-cli / claude-opus-4-8 | Bewertet Qualität, Spezifität und Rollenklarheit jedes System-Prompts |
+| `crew-grounding-fit-reviewer` | LLM | codex-cli / gpt-5.6-sol | Beurteilt, ob die gewählten Grounding-Provider zur Aufgabendomäne passen |
+| `crew-finalizer-fit-reviewer` | LLM | codex-cli / gpt-5.6-sol | Prüft, ob die gewählten Finalizer zu den Output-Anforderungen der Aufgabe passen |
 
 Der deterministische `CrewSpecValidatorReviewer` erzeugt Findings ohne LLM-Call und ist das primäre strukturelle Gate. Die vier LLM-Reviewer laufen in der `Parallel`-Strategie.
 

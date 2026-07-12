@@ -363,7 +363,7 @@ internal sealed class CrewMaterializer(
             Description: "Auto-composed reviewer",
             SystemPrompt: part.SystemPrompt ?? string.Empty,
             Provider:    part.Provider ?? "claude-cli",
-            Model:       part.Model ?? "claude-sonnet-4-6",
+            Model:       part.Model ?? "claude-sonnet-5",
             MaxTokens:   ClampMaxTokens(part.MaxTokens, ReviewerMaxTokensFloor),
             IsSystem:    false,
             ToolNames:   part.ToolNames);
@@ -375,7 +375,7 @@ internal sealed class CrewMaterializer(
             Description: "Auto-composed advisor",
             SystemPrompt: part.SystemPrompt ?? string.Empty,
             Provider:    part.Provider ?? "claude-cli",
-            Model:       part.Model ?? "claude-sonnet-4-6",
+            Model:       part.Model ?? "claude-sonnet-5",
             MaxTokens:   ClampMaxTokens(part.MaxTokens, AdvisorMaxTokensFloor),
             Mode:        ParseAdvisorMode(part.AdvisorMode),
             Trigger:     ParseAdvisorTrigger(part.AdvisorTrigger),

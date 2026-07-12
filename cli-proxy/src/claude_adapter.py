@@ -46,7 +46,7 @@ _ALIAS_TO_CLI = {
 # dynamic resolver (list_models_async) supersedes it and the *-latest aliases never go stale.
 STATIC_MODELS = [
     "claude-opus-4-8",
-    "claude-sonnet-4-6",
+    "claude-sonnet-5",
     "claude-haiku-4-5",
 ]
 

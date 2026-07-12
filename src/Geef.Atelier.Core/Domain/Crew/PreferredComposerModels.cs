@@ -25,8 +25,8 @@ public static class PreferredComposerModels
     /// </summary>
     public static readonly (string Provider, string Model)[] Reviewers =
     [
-        ("codex-cli",    "gpt-5.5"),                             // OpenAI top via subscription CLI
-        ("openrouter",   "x-ai/grok-4.3"),                      // xAI top via OpenRouter
+        ("codex-cli",    "gpt-5.6-sol"),                         // OpenAI top via subscription CLI
+        ("openrouter",   "x-ai/grok-4.5"),                       // xAI top via OpenRouter
         ("openrouter",   "google/gemini-3.1-pro-preview"),       // Google top via OpenRouter
         ("openrouter",   "deepseek/deepseek-v4-pro"),            // DeepSeek top via OpenRouter
         ("openrouter",   "anthropic/claude-opus-4.8"),           // Anthropic top via OpenRouter (fallback)

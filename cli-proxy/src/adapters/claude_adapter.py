@@ -11,7 +11,7 @@ from .utils import format_messages as _format_messages, build_openai_response_fr
 
 class ClaudeAdapter(CliAdapter):
     async def execute(self, config: dict[str, Any], request: dict[str, Any]) -> dict[str, Any]:
-        model = request.get("model", "anthropic/claude-opus-4-7")
+        model = request.get("model", "anthropic/claude-opus-4-8")
         max_tokens = request.get("max_tokens")
         prompt = _format_messages(request.get("messages", []))
 
@@ -24,8 +24,8 @@ class ClaudeAdapter(CliAdapter):
     async def list_models(self, config: dict[str, Any]) -> list[str]:
         settings = config.get("settings", {})
         return settings.get("models", [
-            "anthropic/claude-opus-4-7",
-            "anthropic/claude-sonnet-4-6",
+            "anthropic/claude-opus-4-8",
+            "anthropic/claude-sonnet-5",
             "anthropic/claude-haiku-4-5",
         ])
 

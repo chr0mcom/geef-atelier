@@ -34,7 +34,7 @@ public sealed class StudioDefaults
     public const int MinMaxTokens = 10000;
 
     // Reviewer defaults
-    public string ReviewerModel { get; set; } = "openai/gpt-4o-mini";
+    public string ReviewerModel { get; set; } = "openai/gpt-5.6-sol";
     public string ReviewerProvider { get; set; } = "openrouter";
     public int ReviewerMaxTokens { get; set; } = 16384;
 
@@ -44,7 +44,7 @@ public sealed class StudioDefaults
     public int ExecutorMaxTokens { get; set; } = 60000;
 
     // Advisor defaults
-    public string AdvisorModel { get; set; } = "openai/gpt-4o-mini";
+    public string AdvisorModel { get; set; } = "openai/gpt-5.6-sol";
     public string AdvisorProvider { get; set; } = "openrouter";
     public int AdvisorMaxTokens { get; set; } = 16384;
     public string AdvisorMode { get; set; } = "Strategic";

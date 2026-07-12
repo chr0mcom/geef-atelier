@@ -219,10 +219,10 @@ internal sealed class CrewComposerExecutor(
             // Known-good top models ordered newest first; supplement with any preferred that made it through.
             var topOpenRouter = new[]
             {
-                "x-ai/grok-4.3", "x-ai/grok-4.20",
-                "google/gemini-3.1-pro-preview", "google/gemini-3.5-flash", "google/gemini-3.1-flash-lite",
-                "openai/gpt-5.5", "openai/gpt-5.5-pro", "openai/gpt-5.4", "openai/gpt-5.4-pro",
-                "anthropic/claude-opus-4.8", "anthropic/claude-sonnet-4.5",
+                "x-ai/grok-4.5", "x-ai/grok-4.3",
+                "google/gemini-3.5-flash", "google/gemini-3.1-pro-preview", "google/gemini-3.1-flash-lite",
+                "openai/gpt-5.6-sol", "openai/gpt-5.6-terra", "openai/gpt-5.6-luna", "openai/gpt-5.5",
+                "anthropic/claude-opus-4.8", "anthropic/claude-sonnet-5",
                 "deepseek/deepseek-v4-pro", "deepseek/deepseek-v3.2", "deepseek/deepseek-r1-0528",
                 "mistralai/mistral-large-2512", "meta-llama/llama-4-maverick",
             };

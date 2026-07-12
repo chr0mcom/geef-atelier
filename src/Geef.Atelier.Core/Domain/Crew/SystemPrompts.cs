@@ -710,7 +710,7 @@ public static class SystemPrompts
            What drives the choice?
 
         When recommending models, refer only to the newest top-tier options per provider
-        (e.g. claude-opus-4-8 via claude-cli, gpt-5.5 via codex-cli, grok-4.3 via openrouter).
+        (e.g. claude-opus-4-8 via claude-cli, gpt-5.6-sol via codex-cli, grok-4.5 via openrouter).
         Do not recommend legacy or outdated models. The executor will validate against the live catalog.
 
         Be concise: 2-3 sentences per point. Skip any point where you have no useful observation.

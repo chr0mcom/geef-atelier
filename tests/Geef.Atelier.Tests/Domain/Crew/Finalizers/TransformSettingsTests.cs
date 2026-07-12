@@ -66,7 +66,7 @@ public sealed class TransformSettingsTests
         var settings = TransformSettings.From([]);
 
         Assert.Equal("codex-cli", settings.Provider);
-        Assert.Equal("gpt-5.5", settings.Model);
+        Assert.Equal("gpt-5.6-sol", settings.Model);
         Assert.Equal(60000, settings.MaxTokens);
     }
 

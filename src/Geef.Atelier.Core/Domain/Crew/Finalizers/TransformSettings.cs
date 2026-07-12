@@ -22,7 +22,7 @@ public sealed record TransformSettings(
     public static TransformSettings From(Dictionary<string, string> settings) => new(
         SystemPrompt: settings.GetValueOrDefault(KeySystemPrompt, string.Empty),
         Provider: settings.GetValueOrDefault(KeyProvider, "codex-cli"),
-        Model: settings.GetValueOrDefault(KeyModel, "gpt-5.5"),
+        Model: settings.GetValueOrDefault(KeyModel, "gpt-5.6-sol"),
         MaxTokens: int.TryParse(settings.GetValueOrDefault(KeyMaxTokens), out var m) ? m : 60000,
         Temperature: double.TryParse(settings.GetValueOrDefault(KeyTemperature), out var t) ? t : null);
 

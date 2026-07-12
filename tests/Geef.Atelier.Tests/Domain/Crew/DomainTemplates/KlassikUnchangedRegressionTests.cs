@@ -57,17 +57,17 @@ public sealed class KlassikUnchangedRegressionTests
     }
 
     [Fact]
-    public void BriefingFidelityProfile_UsesCodexCli_Gpt55()
+    public void BriefingFidelityProfile_UsesCodexCli_Gpt56Sol()
     {
         Assert.Equal("codex-cli", SystemCrew.BriefingFidelityProfile.Provider);
-        Assert.Equal("gpt-5.5", SystemCrew.BriefingFidelityProfile.Model);
+        Assert.Equal("gpt-5.6-sol", SystemCrew.BriefingFidelityProfile.Model);
     }
 
     [Fact]
-    public void ClarityProfile_UsesCodexCli_Gpt55()
+    public void ClarityProfile_UsesCodexCli_Gpt56Sol()
     {
         Assert.Equal("codex-cli", SystemCrew.ClarityProfile.Provider);
-        Assert.Equal("gpt-5.5", SystemCrew.ClarityProfile.Model);
+        Assert.Equal("gpt-5.6-sol", SystemCrew.ClarityProfile.Model);
     }
 
     [Fact]

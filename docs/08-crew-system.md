@@ -40,15 +40,15 @@ reviewers via `codex-cli`. Model pluralism is preserved (reviewer ≠ executor m
 
 | Name | Type | Provider / Model |
 |---|---|---|
-| `default-executor` | ExecutorProfile | `claude-cli` / `claude-opus-4-7` |
-| `briefing-fidelity` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
-| `clarity` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
-| `legal-jargon-precision` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
-| `legal-clause-risk` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
-| `academic-citation-readiness` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
-| `academic-argumentation-rigor` | ReviewerProfile | `claude-cli` / `claude-opus-4-7` |
-| `marketing-audience-clarity` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
-| `marketing-conversion-strength` | ReviewerProfile | `codex-cli` / `gpt-5.5` |
+| `default-executor` | ExecutorProfile | `claude-cli` / `claude-opus-4-8` |
+| `briefing-fidelity` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
+| `clarity` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
+| `legal-jargon-precision` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
+| `legal-clause-risk` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
+| `academic-citation-readiness` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
+| `academic-argumentation-rigor` | ReviewerProfile | `claude-cli` / `claude-opus-4-8` |
+| `marketing-audience-clarity` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
+| `marketing-conversion-strength` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
 
 **System templates** (four): `klassik` (evaluation `Parallel`, no advisors —
 reproduces the original PS-2 behaviour) plus the domain templates
@@ -80,13 +80,13 @@ All four standard templates ship with three default grounding providers (`tavily
     "displayName": "Default Executor",
     "systemPrompt": "...",
     "provider": "openrouter",
-    "model": "anthropic/claude-opus-4.7",
+    "model": "anthropic/claude-opus-4.8",
     "maxTokens": null,
     "isSystem": true
   },
   "reviewers": [
-    { "name": "briefing-fidelity", "provider": "openrouter", "model": "google/gemini-2.5-flash", ... },
-    { "name": "clarity",           "provider": "openrouter", "model": "openai/gpt-5.5-mini",    ... }
+    { "name": "briefing-fidelity", "provider": "openrouter", "model": "google/gemini-3.5-flash", ... },
+    { "name": "clarity",           "provider": "openrouter", "model": "openai/gpt-5.6-luna",    ... }
   ],
   "evaluationStrategy": "Parallel",
   "convergenceOverride": null,
@@ -123,7 +123,7 @@ public enum AdvisorTrigger { BeforeFirstExecution, BeforeEveryExecution, OnConve
 ### System advisors
 
 Provider/model as of May 2026: all system advisors run via
-`claude-cli` / `claude-opus-4-7`.
+`claude-cli` / `claude-opus-4-8`.
 
 | Name | Mode | Trigger | Purpose |
 |---|---|---|---|
@@ -260,7 +260,7 @@ Each finalizer execution records its output as a `RunArtifact`:
 Transform-Finalizer führen einen LLM-Call aus, um den finalen Draft zu transformieren. Das gebundene Modell kann pro Profil konfiguriert werden:
 
 - **Anbieter:** Jeder aktive Custom- oder System-Provider (HTTP oder CLI)
-- **Modell:** Frei wählbar; für Tone-Transformationen reichen günstige Modelle (z.B. `gpt-4o-mini`)
+- **Modell:** Frei wählbar; für Tone-Transformationen reichen günstige Modelle (z.B. `gpt-5.6-luna`)
 - **MaxTokens:** Maximale Ausgabelänge (Mindest-Floor von 10000 gilt)
 - **Temperature** (optional): leer = Anbieter-Standard, 0.0 = deterministisch, 2.0 = sehr kreativ
 
@@ -554,9 +554,9 @@ LATER RUN  →  Grounding "learning-retrieval"
 | `learning-publisher` | Finalizer (LearningPublish) | Attached to `learning-evaluation` crew |
 | `learning-evaluation` | CrewTemplate | AbortOnCritical=true, MaxIterations=2, 3 strict reviewers |
 | `learning-retriever-default` | GroundingProvider (LearningRetrieval) | sameDomainBoost=1.0, crossDomainPenalty=0.5, maxLearnings=4 |
-| `learning-factual-grounding` | Reviewer | openrouter/gpt-4.1 |
-| `learning-value` | Reviewer | openrouter/gemini-2.5-pro |
-| `learning-generalizability` | Reviewer | claude-cli/claude-opus-4.7 |
+| `learning-factual-grounding` | Reviewer | codex-cli/gpt-5.6-sol |
+| `learning-value` | Reviewer | openrouter/gemini-3.1-pro-preview |
+| `learning-generalizability` | Reviewer | claude-cli/claude-opus-4.8 |
 
 ## Auto-Crew: Composition-Run
 
@@ -573,10 +573,10 @@ Entry point: `/crew/studio` (standalone composition, `ChainToTaskRun = false` by
 | Name | Type | Provider / Model | Role |
 |---|---|---|---|
 | `crew-spec-validator` | **Deterministic** (no LLM) | — | Validates the `CrewSpecArtifact` JSON schema in-loop; missing required fields or invalid structure → Critical finding, no LLM call needed |
-| `crew-diversity-reviewer` | LLM | codex-cli / gpt-5.5 | Checks model pluralism: executor and reviewers must span ≥ 2 different providers |
-| `crew-prompt-quality-reviewer` | LLM | claude-cli / claude-opus-4-7 | Evaluates the quality, specificity and role-clarity of every system prompt |
-| `crew-grounding-fit-reviewer` | LLM | codex-cli / gpt-5.5 | Assesses whether the chosen grounding providers match the task domain |
-| `crew-finalizer-fit-reviewer` | LLM | codex-cli / gpt-5.5 | Checks whether the selected finalizers suit the task's output requirements |
+| `crew-diversity-reviewer` | LLM | codex-cli / gpt-5.6-sol | Checks model pluralism: executor and reviewers must span ≥ 2 different providers |
+| `crew-prompt-quality-reviewer` | LLM | claude-cli / claude-opus-4-8 | Evaluates the quality, specificity and role-clarity of every system prompt |
+| `crew-grounding-fit-reviewer` | LLM | codex-cli / gpt-5.6-sol | Assesses whether the chosen grounding providers match the task domain |
+| `crew-finalizer-fit-reviewer` | LLM | codex-cli / gpt-5.6-sol | Checks whether the selected finalizers suit the task's output requirements |
 
 The deterministic `CrewSpecValidatorReviewer` produces findings without any LLM call and is the primary structural gate. The four LLM reviewers run in `Parallel` strategy.
 

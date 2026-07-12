@@ -44,7 +44,7 @@ public static class SystemCrew
         Description: "Verifies that the draft fully addresses every briefing requirement. Outside-model perspective for genuine independence from the executor.",
         SystemPrompt: SystemPrompts.BriefingFidelity,
         Provider: "codex-cli",
-        Model: "gpt-5.5",
+        Model: "gpt-5.6-sol",
         MaxTokens: 64000,
         IsSystem: true);
 
@@ -55,7 +55,7 @@ public static class SystemCrew
         Description: "Audits clarity, argumentation, structure, and style. Outside-model perspective; complements the briefing-fidelity reviewer with a different model family.",
         SystemPrompt: SystemPrompts.Clarity,
         Provider: "codex-cli",
-        Model: "gpt-5.5",
+        Model: "gpt-5.6-sol",
         MaxTokens: 64000,
         IsSystem: true);
 
@@ -71,7 +71,7 @@ public static class SystemCrew
         Description: "Generic reviewer for precise, consistent domain terminology and field conventions. Specialised per crew via a bound specialization pack (e.g. legal-terminology, academic-citation, marketing-voice).",
         SystemPrompt: SystemPrompts.DomainTerminologyReviewer,
         Provider: "codex-cli",
-        Model: "gpt-5.5",
+        Model: "gpt-5.6-sol",
         MaxTokens: 64000,
         IsSystem: true);
 
@@ -119,7 +119,7 @@ public static class SystemCrew
         Description: "Verifies that the proposed crew spec contains all mandatory roles: executor, at least one reviewer, and at least one finalizer. Flags missing domain-specific roles for domain tasks.",
         SystemPrompt: SystemPrompts.CrewComposerCompleteness,
         Provider: "codex-cli",
-        Model: "gpt-5.5",
+        Model: "gpt-5.6-sol",
         MaxTokens: 64000,
         IsSystem: true);
 
@@ -141,7 +141,7 @@ public static class SystemCrew
         Description: "Evaluates whether the proposed crew is appropriate for the task: domain relevance, model choices, grounding configuration, and overall complexity balance.",
         SystemPrompt: SystemPrompts.CrewComposerFit,
         Provider: "codex-cli",
-        Model: "gpt-5.5",
+        Model: "gpt-5.6-sol",
         MaxTokens: 64000,
         IsSystem: true);
 
@@ -230,7 +230,7 @@ public static class SystemCrew
                 "- Valid providers: claude-cli, codex-cli, openrouter, openai-direct, google-ai-studio, deepseek, xai, ollama-local.\n" +
                 "- NEVER use openai, google, anthropic, x-ai, or any other invented provider name.\n" +
                 "- Prefer NEWEST top-tier models. Do not use legacy models (gemini-2.5, gpt-4o, claude-opus-4-7, etc.).\n" +
-                "- Recommended defaults: claude-cli/claude-opus-4-8 (executor), codex-cli/gpt-5.5, openrouter/x-ai/grok-4.3 (reviewers).\n" +
+                "- Recommended defaults: claude-cli/claude-opus-4-8 (executor), codex-cli/gpt-5.6-sol, openrouter/x-ai/grok-4.5 (reviewers).\n" +
                 "\n" +
                 "REUSE-FIRST (reduces validation risk to zero):\n" +
                 "- Default executor: { \"reuse\": \"default-executor\" } — never needs provider/model.\n" +
@@ -751,7 +751,7 @@ public static class SystemCrew
         {
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformAntiAiVoice,
             [TransformSettings.KeyProvider] = "codex-cli",
-            [TransformSettings.KeyModel] = "gpt-5.5",
+            [TransformSettings.KeyModel] = "gpt-5.6-sol",
             [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);
@@ -765,7 +765,7 @@ public static class SystemCrew
         {
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformToneFormalization,
             [TransformSettings.KeyProvider] = "codex-cli",
-            [TransformSettings.KeyModel] = "gpt-5.5",
+            [TransformSettings.KeyModel] = "gpt-5.6-sol",
             [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);
@@ -779,7 +779,7 @@ public static class SystemCrew
         {
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformToneCasual,
             [TransformSettings.KeyProvider] = "codex-cli",
-            [TransformSettings.KeyModel] = "gpt-5.5",
+            [TransformSettings.KeyModel] = "gpt-5.6-sol",
             [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);
@@ -793,7 +793,7 @@ public static class SystemCrew
         {
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformExecutiveSummary,
             [TransformSettings.KeyProvider] = "codex-cli",
-            [TransformSettings.KeyModel] = "gpt-5.5",
+            [TransformSettings.KeyModel] = "gpt-5.6-sol",
             [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);
@@ -807,7 +807,7 @@ public static class SystemCrew
         {
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformKeyTakeaways,
             [TransformSettings.KeyProvider] = "codex-cli",
-            [TransformSettings.KeyModel] = "gpt-5.5",
+            [TransformSettings.KeyModel] = "gpt-5.6-sol",
             [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);
@@ -821,7 +821,7 @@ public static class SystemCrew
         {
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformGlossary,
             [TransformSettings.KeyProvider] = "codex-cli",
-            [TransformSettings.KeyModel] = "gpt-5.5",
+            [TransformSettings.KeyModel] = "gpt-5.6-sol",
             [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);

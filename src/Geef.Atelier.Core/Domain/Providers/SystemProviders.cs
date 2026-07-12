@@ -120,7 +120,7 @@ public static class SystemProviders
         binary: "claude",
         authVolume: "/auth/claude",
         authCommand: "claude auth login",
-        models: ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"]
+        models: ["claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5"]
     );
 
     /// <summary>OpenAI via the official Codex CLI subscription.</summary>
@@ -132,7 +132,7 @@ public static class SystemProviders
         binary: "codex",
         authVolume: "/auth/codex",
         authCommand: "codex auth login",
-        models: ["gpt-5.5", "gpt-5.5-mini", "gpt-4o", "o1", "o3-mini"]
+        models: ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4"]
     );
 
     /// <summary>Google Gemini via the official Gemini CLI with free-tier quota.</summary>
