@@ -66,6 +66,26 @@ internal sealed class FakeLlmClient : ILlmClient
 }
 
 /// <summary>
+/// Always returns a blocking Major finding regardless of iteration — the pipeline never converges.
+/// Used for best-effort non-convergence tests (max iterations reached without approval).
+/// </summary>
+internal sealed class RejectingFakeLlmClient : ILlmClient
+{
+    private int _executorCallCount;
+
+    public Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken ct)
+    {
+        if (request.Tools is null || request.Tools.Count == 0)
+        {
+            var iter = Interlocked.Increment(ref _executorCallCount);
+            return Task.FromResult(FakeLlmClient.MakeTextResponse($"Revised draft (iteration {iter})."));
+        }
+
+        return Task.FromResult(FakeLlmClient.MakeRejectResponse("Fake finding: still not good enough."));
+    }
+}
+
+/// <summary>
 /// Always returns a Critical finding regardless of iteration — used for AbortOnCritical tests.
 /// </summary>
 internal sealed class CriticalFakeLlmClient : ILlmClient

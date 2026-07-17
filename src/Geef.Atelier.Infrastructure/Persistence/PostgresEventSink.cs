@@ -45,7 +45,18 @@ internal sealed class PostgresEventSink(
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
 
-        await PersistRawEventAsync(db, geefEvent, ct);
+        try
+        {
+            await PersistRawEventAsync(db, geefEvent, ct);
+        }
+        catch (Exception ex)
+        {
+            // The audit journal must never suppress run-state handling; clear the tracker so the
+            // poisoned EventEntity cannot resurface in a later SaveChanges of this handler.
+            db.ChangeTracker.Clear();
+            logger.LogWarning(ex, "Raw event persistence failed for {EventType} on run {RunId}; continuing with state handling.",
+                geefEvent.GetType().Name, atelierRunId);
+        }
 
         switch (geefEvent)
         {
@@ -89,15 +100,42 @@ internal sealed class PostgresEventSink(
                 await PersistFindingsAsync(db, rejected.Aggregate.AllFindings, rejected.Iteration, ct);
                 break;
 
-            case PipelineCompletedEvent:
+            case PipelineCompletedEvent completed:
                 var finalText = _lastExecutionContext?.TryGet(AtelierContextKeys.CurrentDraft, out var ft) == true ? ft : null;
-                await db.Runs
-                    .Where(r => r.Id == atelierRunId)
-                    .ExecuteUpdateAsync(s => s
-                        .SetProperty(r => r.Status,      RunStatus.Completed)
-                        .SetProperty(r => r.CompletedAt, geefEvent.Timestamp)
-                        .SetProperty(r => r.FinalText,   finalText)
-                        .SetProperty(r => r.WordCount,   WordCounter.Count(finalText)), ct);
+                if (completed.Success)
+                {
+                    await db.Runs
+                        .Where(r => r.Id == atelierRunId)
+                        .ExecuteUpdateAsync(s => s
+                            .SetProperty(r => r.Status,      RunStatus.Completed)
+                            .SetProperty(r => r.CompletedAt, geefEvent.Timestamp)
+                            .SetProperty(r => r.FinalText,   finalText)
+                            .SetProperty(r => r.WordCount,   WordCounter.Count(finalText)), ct);
+                }
+                else
+                {
+                    // Terminal-state fallback FIRST: PublishAsync swallows per-event persistence
+                    // errors, so a transiently lost PipelineFailedEvent write would otherwise
+                    // strand the run in Running until the next service restart. Guarded on
+                    // Running, this is idempotent and never overwrites an already persisted
+                    // Failed/Aborted status; running it before the draft update ensures a later
+                    // draft-write failure cannot suppress the terminal transition.
+                    await db.Runs
+                        .Where(r => r.Id == atelierRunId && r.Status == RunStatus.Running)
+                        .ExecuteUpdateAsync(s => s
+                            .SetProperty(r => r.Status,       RunStatus.Failed)
+                            .SetProperty(r => r.CompletedAt,  geefEvent.Timestamp)
+                            .SetProperty(r => r.ErrorMessage, "Pipeline stopped without full convergence"), ct);
+
+                    // Best-effort completion after non-convergence: the PipelineFailedEvent
+                    // handler (or the fallback above) owns Status/CompletedAt/ErrorMessage —
+                    // only surface the best-effort draft, never touch the failure status.
+                    await db.Runs
+                        .Where(r => r.Id == atelierRunId)
+                        .ExecuteUpdateAsync(s => s
+                            .SetProperty(r => r.FinalText, finalText)
+                            .SetProperty(r => r.WordCount, WordCounter.Count(finalText)), ct);
+                }
                 break;
 
             case PipelineFailedEvent failed:

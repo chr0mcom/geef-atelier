@@ -264,7 +264,8 @@
             </div>
         }
 
-        @if (_details.Run.Status == RunStatus.Completed && !string.IsNullOrEmpty(_details.Run.FinalText))
+        @if ((_details.Run.Status is RunStatus.Completed or RunStatus.Failed or RunStatus.Aborted)
+             && !string.IsNullOrEmpty(_details.Run.FinalText))
         {
             <Manuscript Run="_details.Run" IterationCount="@_details.Iterations.Count" />
         }

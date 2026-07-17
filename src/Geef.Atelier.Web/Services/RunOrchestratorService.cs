@@ -663,9 +663,10 @@ internal sealed class RunOrchestratorService(
     /// <summary>
     /// Overrides the run's <c>FinalText</c> with the best-effort draft returned by the SDK
     /// (<see cref="GeefPipelineResult{TOutput}.Output"/> after a non-converging run).
-    /// The run status has already been set to Completed by <c>PostgresEventSink</c> via the
-    /// <c>PipelineCompletedEvent</c>; this method fixes up the text and optionally adds a
-    /// convergence note.
+    /// The run status has already been set to Failed/Aborted by <c>PostgresEventSink</c> via the
+    /// <c>PipelineFailedEvent</c> (the trailing <c>PipelineCompletedEvent</c> with
+    /// <c>Success: false</c> leaves it untouched); this method replaces the last-iteration
+    /// fallback text with the SDK-selected best draft and optionally adds a convergence note.
     /// </summary>
     private async Task SurfaceBestEffortDraftAsync(
         Guid runId, string bestDraft, Geef.Sdk.Policies.ConvergenceDecision? stopReason,
