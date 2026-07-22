@@ -11,8 +11,9 @@ from contextlib import asynccontextmanager
 
 import claude_adapter
 import codex_adapter
+import failover
 from adapters import get_adapter
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from openai_format import (
     ChatCompletionRequest,
@@ -493,9 +494,71 @@ async def _call_codex(req: ChatCompletionRequest) -> ChatCompletionResponse:
     return await _run_completion(req, "codex")
 
 
+async def _call_backend(req: ChatCompletionRequest, backend: str) -> ChatCompletionResponse:
+    return await (_call_claude(req) if backend == "claude" else _call_codex(req))
+
+
+def _retarget(req: ChatCompletionRequest, primary: str, target: str) -> ChatCompletionRequest:
+    """Adapt the request for a backend the caller did not ask for.
+
+    The model name must NOT travel across the backend boundary: handing
+    `claude-haiku-latest` to `codex -m` is a guaranteed failure. Both adapters skip the
+    model flag on a falsy name, so an empty model means "use that CLI's own default" --
+    which for codex is the newest top model configured in ~/.codex/config.toml.
+    """
+    if target == primary:
+        return req
+    return req.model_copy(update={"model": ""})
+
+
+async def _complete_with_failover(
+    req: ChatCompletionRequest, backend: str, response: Response
+) -> ChatCompletionResponse:
+    """Serve the completion, handing over to the partner CLI when this one is faulted.
+
+    Only auth/limit/transport faults trigger the handover; a client-side fault would
+    fail identically on the partner and retrying it would just hide the bug.
+    """
+    order = failover.attempt_order(backend)
+    for index, target in enumerate(order):
+        is_last = index == len(order) - 1
+        try:
+            resp = await _call_backend(_retarget(req, backend, target), target)
+        except (RuntimeError, OSError) as exc:
+            reason = failover.classify(exc)
+            failover.record_failure(target, reason, str(exc))
+            log.error("%s CLI call failed (%s): %s", target, reason, exc)
+            if is_last or not failover.should_failover(reason):
+                raise HTTPException(status_code=502, detail=str(exc)) from exc
+            continue
+        failover.record_success(target)
+        response.headers["x-cli-proxy-provider"] = target
+        if target != backend:
+            failover.record_failover(backend, target)
+            response.headers["x-cli-proxy-failover"] = f"{backend}->{target}"
+            # Echo the model the caller asked for -- OpenAI clients key off this field.
+            resp.model = req.model
+        return resp
+    raise HTTPException(status_code=502, detail="no backend available")  # pragma: no cover
+
+
 def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingResponse:
     """Streaming (SSE) completion. Tool/structured extraction needs the full text, so when
-    those are requested we fall back to a single buffered delta; otherwise we stream tokens."""
+    those are requested we fall back to a single buffered delta; otherwise we stream tokens.
+
+    Failover here can only be pre-emptive: once the first SSE bytes are on the wire the
+    request cannot be re-routed. So an already-open breaker steers the stream to the
+    partner up front; a fault that appears mid-stream still surfaces to the client.
+    """
+    primary = backend
+    backend = failover.attempt_order(primary)[0]
+    # The model name may not cross the backend boundary (see _retarget); the SSE frames
+    # still echo the model the caller asked for.
+    cli_model = req.model
+    if backend != primary:
+        cli_model = ""
+        failover.record_failover(primary, backend)
+
     prompt = _build_prompt(req)
     rf = req.response_format
     structured = rf is not None and rf.type != "text"
@@ -529,20 +592,25 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
         # When tools/structured output are requested, we must inspect the full text before
         # deciding tool_calls vs content — so buffer, then emit. Pure text streams token-by-token.
         elif req.tools or structured:
-            raw, parts = await _complete_backend(backend, prompt, req.model, max_tokens)
+            raw, parts = await _complete_backend(backend, prompt, cli_model, max_tokens)
             if structured:
                 json_str, _ = validate_and_extract(rf, raw)
                 raw = json_str if json_str is not None else raw
             yield ("delta", raw)
             yield ("usage", parts)
         else:
-            async for ev in adapter.stream(prompt, req.model, max_tokens):
+            async for ev in adapter.stream(prompt, cli_model, max_tokens):
                 yield ev
 
     return StreamingResponse(
         sse_response(req.model, _events(), include_usage=include_usage),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "x-cli-proxy-provider": backend,
+            **({"x-cli-proxy-failover": f"{primary}->{backend}"} if backend != primary else {}),
+        },
     )
 
 
@@ -621,37 +689,31 @@ async def cli_list_models(provider_name: str) -> JSONResponse:
 # ---------------------------------------------------------------------------
 
 @app.post("/v1/claude/chat/completions", response_model=ChatCompletionResponse)
-async def claude_completions(req: ChatCompletionRequest, http_request: Request):
-    """Routes directly to the claude CLI — no model-name heuristic."""
+async def claude_completions(req: ChatCompletionRequest, http_request: Request, response: Response):
+    """Routes to the claude CLI — no model-name heuristic. Falls over to codex when
+    claude is faulted (auth/limit/transport); see failover.py."""
     _check_auth(http_request)
     _validate_policy(req)
     if req.stream:
         return _stream_completion(req, "claude")
-    try:
-        async with _inflight_guard():
-            return await _call_claude(req)
-    except RuntimeError as exc:
-        log.error("claude CLI call failed: %s", exc)
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    async with _inflight_guard():
+        return await _complete_with_failover(req, "claude", response)
 
 
 @app.post("/v1/codex/chat/completions", response_model=ChatCompletionResponse)
-async def codex_completions(req: ChatCompletionRequest, http_request: Request):
-    """Routes directly to the codex CLI — no model-name heuristic."""
+async def codex_completions(req: ChatCompletionRequest, http_request: Request, response: Response):
+    """Routes to the codex CLI — no model-name heuristic. Falls over to claude when
+    codex is faulted (auth/limit/transport); see failover.py."""
     _check_auth(http_request)
     _validate_policy(req)
     if req.stream:
         return _stream_completion(req, "codex")
-    try:
-        async with _inflight_guard():
-            return await _call_codex(req)
-    except RuntimeError as exc:
-        log.error("codex CLI call failed: %s", exc)
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    async with _inflight_guard():
+        return await _complete_with_failover(req, "codex", response)
 
 
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
-async def chat_completions(req: ChatCompletionRequest, http_request: Request):
+async def chat_completions(req: ChatCompletionRequest, http_request: Request, response: Response):
     """Legacy endpoint with model-name routing. Use /v1/claude/... or /v1/codex/... instead."""
     log.warning(
         "DEPRECATED: /v1/chat/completions endpoint with model-name routing. "
@@ -670,12 +732,8 @@ async def chat_completions(req: ChatCompletionRequest, http_request: Request):
         )
     if req.stream:
         return _stream_completion(req, backend)
-    try:
-        async with _inflight_guard():
-            return await (_call_claude(req) if backend == "claude" else _call_codex(req))
-    except RuntimeError as exc:
-        log.error("CLI call failed: %s", exc)
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    async with _inflight_guard():
+        return await _complete_with_failover(req, backend, response)
 
 
 @app.get("/v1/claude/models")
@@ -733,6 +791,10 @@ async def health() -> JSONResponse:
     claude_ok = shutil.which("claude") is not None
     codex_ok = shutil.which("codex") is not None
     gemini_ok = shutil.which("gemini") is not None
+    # `status` stays "ok" even while degraded: existing consumers (dms-ai-router,
+    # Geef.Atelier) treat a 200 as "gateway reachable", which is still true when one
+    # backend has failed over. Degradation is reported additively instead.
+    snapshot = failover.snapshot()
     return JSONResponse({
         "status": "ok",
         "cli_status": {
@@ -741,4 +803,6 @@ async def health() -> JSONResponse:
             "gemini": "ready" if gemini_ok else "not_found",
         },
         "synced_providers": provider_sync.all_provider_names(),
+        "degraded": snapshot["degraded"],
+        "failover": snapshot,
     })
