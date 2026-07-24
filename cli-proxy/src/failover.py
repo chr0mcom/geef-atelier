@@ -63,6 +63,10 @@ _PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("limit", (
         "rate limit", "rate_limit", "usage limit", "quota", "429",
         "too many requests", "overloaded", "capacity",
+        # claude-CLI wording for subscription windows ("You've hit your session limit -
+        # resets 4:20pm"): observed 2026-07-23/24 slipping through as "unknown", leaving
+        # the healthy codex next to it unused.
+        "session limit", "weekly limit", "hit your", "limit resets", "limit will reset",
     )),
     ("transport", (
         "timed out", "timeout", "exited with code", "connection", "broken pipe",

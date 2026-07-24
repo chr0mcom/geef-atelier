@@ -14,6 +14,7 @@ from workspace import (
     finalize_decision_instruction,
     finalize_instruction,
     materialize_context,
+    read_decision_file,
 )
 
 log = logging.getLogger(__name__)
@@ -230,9 +231,19 @@ async def _run_claude_decision(
 
     if proc.returncode != 0:
         stderr_msg = stderr.decode(errors="replace").strip()
+        stdout_txt = stdout.decode(errors="replace")
+        # The CLI reports the human-readable cause in the JSON "result" field. Since CLI
+        # 2.1.219 the (long) usage object precedes it, so a naive prefix truncation cut the
+        # cause off and failover.classify() saw only "exited with code" — a session-limit
+        # outage was raised as "transport" instead of "limit" (incident 2026-07-24).
+        cause = ""
+        try:
+            cause = str(json.loads(stdout_txt).get("result") or "")[:300]
+        except ValueError:
+            pass
         raise RuntimeError(
             f"claude CLI (agentic file mode) exited with code {proc.returncode}: "
-            f"{stderr_msg or stdout.decode(errors='replace')[:200]}"
+            f"{cause or stderr_msg or stdout_txt[:200]}"
         )
 
     # Usage (and a fallback answer) come from the stdout JSON; the decision itself is the file.
@@ -245,28 +256,12 @@ async def _run_claude_decision(
     except (json.JSONDecodeError, ValueError):
         pass
 
-    decision = _read_decision_file(workspace_path)
+    decision = read_decision_file(workspace_path)
     if not decision:
         # The agent answered to stdout instead of writing the file — use that as the decision text
         # (parse_decision will treat non-JSON as a final answer).
         decision = fallback_text
     return decision, usage
-
-
-def _read_decision_file(workspace_path: Path) -> str:
-    """Reads decision.json from the workspace; falls back to any other *.json the agent created."""
-    primary = workspace_path / "decision.json"
-    if primary.exists():
-        try:
-            return primary.read_text(encoding="utf-8").strip()
-        except OSError:
-            pass
-    for candidate in sorted(workspace_path.glob("*.json")):
-        try:
-            return candidate.read_text(encoding="utf-8").strip()
-        except OSError:
-            continue
-    return ""
 
 
 async def stream(prompt: str, model: str | None, max_tokens: int | None):

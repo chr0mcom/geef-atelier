@@ -39,6 +39,12 @@ class TestClassify:
         "codex CLI exited with code 1: 429 Too Many Requests",
         "quota exceeded for this organization",
         "API is temporarily overloaded",
+        # Verbatim from the 2026-07-23/24 incidents: subscription-window wording that
+        # used to classify as "unknown" and therefore never failed over.
+        "claude CLI error: You've hit your session limit · resets 11am (UTC)",
+        "claude CLI (agentic file mode) exited with code 1: "
+        '{"api_error_status":429,"result":"You\'ve hit your session limit · resets 4:20pm (UTC)"}',
+        "You've hit your weekly limit · resets Thursday",
     ])
     def test_limit_failures(self, message: str) -> None:
         assert failover.classify(RuntimeError(message)) == "limit"

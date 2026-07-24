@@ -334,6 +334,20 @@ async def _complete_backend(
     return await codex_adapter.complete_with_usage(prompt, model, max_tokens)
 
 
+def _sum_usage(a: UsageParts, b: UsageParts) -> UsageParts:
+    """Combined accounting for a retried call: both CLI runs happened and were billed."""
+    cost = None
+    if a.cost_usd is not None or b.cost_usd is not None:
+        cost = (a.cost_usd or 0.0) + (b.cost_usd or 0.0)
+    return UsageParts(
+        input_tokens=a.input_tokens + b.input_tokens,
+        output_tokens=a.output_tokens + b.output_tokens,
+        cached_tokens=a.cached_tokens + b.cached_tokens,
+        reasoning_tokens=a.reasoning_tokens + b.reasoning_tokens,
+        cost_usd=cost,
+    )
+
+
 _DECISION_RETRY_SUFFIX = (
     "\n\nIMPORTANT: Your previous attempt did not produce a usable decision.json. Write a file "
     "named decision.json in the current directory containing ONLY one JSON object of the form "
@@ -359,30 +373,35 @@ def _decision_unacceptable(kind: str, payload, mode: str, specific: str | None) 
 
 
 async def _agentic_file_decision(
-    req: ChatCompletionRequest,
+    req: ChatCompletionRequest, backend: str,
 ) -> tuple[str, object, UsageParts]:
-    """Runs the claude decision-file flow (with one retry) and returns (kind, payload, usage).
+    """Runs the decision-file flow of `backend` (with one retry) and returns
+    (kind, payload, usage).
 
     kind is 'tool_calls' (payload = [(name, args_json), ...]) or 'final' (payload = answer text).
     A 'none' parse is normalised to ('final', raw_text) so the caller always gets a usable answer.
     """
+    adapter = claude_adapter if backend == "claude" else codex_adapter
     conversation = _render_conversation(req)
     mode = _tool_choice_mode(req)
     specific = _extract_tool_name(req)
     tools_dicts = [t.model_dump() for t in req.tools]
     instruction = build_decision_file_instruction(conversation, tools_dicts, mode, specific)
 
-    log.info("Agentic file mode | model=%s | mode=%s | tools=%d",
-             req.model, mode, len(tools_dicts))
+    log.info("Agentic file mode | backend=%s | model=%s | mode=%s | tools=%d",
+             backend, req.model, mode, len(tools_dicts))
 
-    decision, parts = await claude_adapter.complete_agentic_file(instruction, req.model)
+    decision, parts = await adapter.complete_agentic_file(instruction, req.model)
     kind, payload = parse_decision(decision)
 
     if _decision_unacceptable(kind, payload, mode, specific):
-        log.warning("Agentic file mode: decision unacceptable (kind=%s, mode=%s) — retrying once",
-                    kind, mode)
-        decision, parts = await claude_adapter.complete_agentic_file(
+        log.warning("Agentic file mode (%s): decision unacceptable (kind=%s, mode=%s) — retrying once",
+                    backend, kind, mode)
+        decision, retry_parts = await adapter.complete_agentic_file(
             instruction + _DECISION_RETRY_SUFFIX, req.model)
+        # Both runs were billed — the usage block must count them both (review 2026-07-24:
+        # overwriting `parts` under-reported every retried request by a full CLI run).
+        parts = _sum_usage(parts, retry_parts)
         kind, payload = parse_decision(decision)
 
     if kind == "none":
@@ -391,34 +410,36 @@ async def _agentic_file_decision(
     return (kind, payload, parts)
 
 
-async def _run_agentic_file(req: ChatCompletionRequest) -> ChatCompletionResponse:
-    """Non-streaming agentic tool use for claude via decision-file authoring.
+async def _run_agentic_file(req: ChatCompletionRequest, backend: str) -> ChatCompletionResponse:
+    """Non-streaming agentic tool use via decision-file authoring (both backends).
 
-    claude writes the next tool call (or a final answer) into decision.json instead of acting or
-    hallucinating output itself — the document-mode framing sidesteps claude-code's injection
-    refusal of the inline "emit tool-call JSON" protocol. Returns a standard OpenAI tool_calls /
-    content response, so callers (Hermes, Geef.Atelier) are unchanged.
+    The CLI writes the next tool call (or a final answer) into decision.json instead of acting
+    or hallucinating output itself — the document-mode framing sidesteps claude-code's injection
+    refusal of the inline "emit tool-call JSON" protocol, and codex's "these tools are not
+    connected" persona objection (incident 2026-07-24: the claude→codex failover left every
+    agentic consumer without tools). Returns a standard OpenAI tool_calls / content response,
+    so callers (Hermes, Geef.Atelier) are unchanged.
     """
-    kind, payload, parts = await _agentic_file_decision(req)
+    kind, payload, parts = await _agentic_file_decision(req, backend)
     usage = _to_usage_info(parts)
     if kind == "tool_calls":
-        log.info("Agentic file decision: tool call(s) %s", [c[0] for c in payload])
+        log.info("Agentic file decision (%s): tool call(s) %s", backend, [c[0] for c in payload])
         return make_tool_calls_response(req.model, payload, usage)
     return make_text_response(req.model, payload, usage)
 
 
 def _is_agentic_tool_request(req: ChatCompletionRequest, backend: str, structured: bool) -> bool:
-    """The claude file-authoring path applies to open-ended tool use (auto/required), where the
-    model would otherwise try to execute action tools itself and hallucinate their output.
+    """The file-authoring path applies to open-ended tool use (auto/required), where the model
+    would otherwise try to execute action tools itself, hallucinate their output, or refuse
+    ("tools not connected"). Since 2026-07-24 it covers BOTH backends — the claude→codex
+    failover must keep agentic consumers (Hermes) working.
 
     Excluded:
     - 'specific' tool_choice (a forced single tool, e.g. Geef's submit_review) — that is
       structured-output-like; the print-mode path produces the JSON reliably and is well tested.
-    - codex backend — keeps its existing path.
     - structured-output calls — response_format takes precedence."""
     return (
-        backend == "claude"
-        and bool(req.tools)
+        bool(req.tools)
         and not structured
         and _tool_choice_mode(req) in ("auto", "required")
     )
@@ -429,10 +450,10 @@ async def _run_completion(req: ChatCompletionRequest, backend: str) -> ChatCompl
     rf = req.response_format
     structured = rf is not None and rf.type != "text"
 
-    # Agentic tool use (claude): author the next tool call into a file rather than acting/
-    # hallucinating in print mode. Sidesteps claude-code's injection refusal of the inline protocol.
+    # Agentic tool use (both backends): author the next tool call into a file rather than
+    # acting/hallucinating/refusing in print mode.
     if _is_agentic_tool_request(req, backend, structured):
-        return await _run_agentic_file(req)
+        return await _run_agentic_file(req, backend)
 
     prompt = _build_prompt(req)
     if structured:
@@ -546,18 +567,17 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
     """Streaming (SSE) completion. Tool/structured extraction needs the full text, so when
     those are requested we fall back to a single buffered delta; otherwise we stream tokens.
 
-    Failover here can only be pre-emptive: once the first SSE bytes are on the wire the
-    request cannot be re-routed. So an already-open breaker steers the stream to the
-    partner up front; a fault that appears mid-stream still surfaces to the client.
+    Failover lives INSIDE the event generator: the HTTP 200 goes out before the CLI even
+    runs, so an HTTP-level retry is impossible — but the agentic and buffered branches
+    complete their backend call before yielding anything, and until the first event is
+    yielded the stream can be handed to the partner seamlessly. Before 2026-07-24 stream
+    failures bypassed the breaker entirely (no record_failure, /health stayed green, no
+    watch alarm) while claude sat at its session limit — see docs/cli-proxy-failover.md.
+    A fault after the first yielded event still surfaces in-band to the client, but now
+    at least feeds the breaker so the NEXT request routes pre-emptively.
     """
     primary = backend
-    backend = failover.attempt_order(primary)[0]
-    # The model name may not cross the backend boundary (see _retarget); the SSE frames
-    # still echo the model the caller asked for.
-    cli_model = req.model
-    if backend != primary:
-        cli_model = ""
-        failover.record_failover(primary, backend)
+    order = failover.attempt_order(primary)
 
     prompt = _build_prompt(req)
     rf = req.response_format
@@ -567,14 +587,16 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
     max_tokens = req.effective_max_tokens()
     include_usage = bool(req.stream_options and req.stream_options.include_usage)
 
-    adapter = claude_adapter if backend == "claude" else codex_adapter
-    agentic = _is_agentic_tool_request(req, backend, structured)
-
-    async def _events():
-        # Agentic tool use (claude): resolve the decision via file authoring, then emit either
-        # proper streaming tool_calls or the final answer — no hallucination, no injection refusal.
-        if agentic:
-            kind, payload, parts = await _agentic_file_decision(req)
+    async def _serve(target: str, target_req: ChatCompletionRequest):
+        cli_model = target_req.model
+        # Agentic tool use (both backends): resolve the decision via file authoring, then emit
+        # either proper streaming tool_calls or the final answer — no hallucination, no
+        # injection refusal, no "tools not connected" persona objection. The claude→codex
+        # failover keeps the SAME decision-file contract (incident 2026-07-24: the buffered
+        # fallback yielded the tool prompt's answer as plain text deltas, so Hermes workers
+        # saw zero tool calls and crashed with protocol violations).
+        if _is_agentic_tool_request(target_req, target, structured):
+            kind, payload, parts = await _agentic_file_decision(target_req, target)
             if kind == "tool_calls":
                 tool_calls = [
                     {
@@ -591,16 +613,68 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
             yield ("usage", parts)
         # When tools/structured output are requested, we must inspect the full text before
         # deciding tool_calls vs content — so buffer, then emit. Pure text streams token-by-token.
-        elif req.tools or structured:
-            raw, parts = await _complete_backend(backend, prompt, cli_model, max_tokens)
+        elif target_req.tools or structured:
+            raw, parts = await _complete_backend(target, prompt, cli_model, max_tokens)
             if structured:
-                json_str, _ = validate_and_extract(rf, raw)
-                raw = json_str if json_str is not None else raw
-            yield ("delta", raw)
+                # Mirror the non-streaming contract: one retry on invalid structured output
+                # (review finding 2026-07-24 — the SSE path silently shipped the raw text).
+                json_str, err = validate_and_extract(rf, raw)
+                if err:
+                    log.warning("%s structured output invalid in stream (%s) — retrying", target, err)
+                    raw, parts = await _complete_backend(
+                        target, prompt + _JSON_RETRY_SUFFIX, cli_model, max_tokens)
+                    json_str, err = validate_and_extract(rf, raw)
+                yield ("delta", json_str if json_str is not None else raw)
+            elif _extract_tool_name(target_req):
+                # Forced single named tool (tool_choice=specific) — the SSE path must honour
+                # the tool contract like the non-streaming one (review finding 2026-07-24:
+                # it only ever yielded text deltas). One retry, mirroring _needs_json_retry.
+                tool_name = _extract_tool_name(target_req)
+                json_str = extract_json(raw)
+                if json_str is None:
+                    log.warning("%s specific-tool stream: JSON extraction failed — retrying", target)
+                    raw, parts = await _complete_backend(
+                        target, prompt + _JSON_RETRY_SUFFIX, cli_model, max_tokens)
+                    json_str = extract_json(raw)
+                if json_str is not None:
+                    yield ("tool_calls", [{
+                        "index": 0,
+                        "id": f"call_{uuid.uuid4().hex[:24]}",
+                        "type": "function",
+                        "function": {"name": tool_name, "arguments": json_str},
+                    }])
+                else:
+                    yield ("delta", raw)
+            else:
+                yield ("delta", raw)
             yield ("usage", parts)
         else:
+            adapter = claude_adapter if target == "claude" else codex_adapter
             async for ev in adapter.stream(prompt, cli_model, max_tokens):
                 yield ev
+
+    async def _events():
+        for index, target in enumerate(order):
+            # The model name may not cross the backend boundary (see _retarget); the SSE
+            # frames still echo the model the caller asked for.
+            target_req = _retarget(req, primary, target)
+            emitted = False
+            try:
+                async for ev in _serve(target, target_req):
+                    emitted = True
+                    yield ev
+            except (RuntimeError, OSError) as exc:
+                reason = failover.classify(exc)
+                failover.record_failure(target, reason, str(exc))
+                log.error("%s CLI stream failed (%s): %s", target, reason, exc)
+                is_last = index == len(order) - 1
+                if emitted or is_last or not failover.should_failover(reason):
+                    raise
+                continue
+            failover.record_success(target)
+            if target != primary:
+                failover.record_failover(primary, target)
+            return
 
     return StreamingResponse(
         sse_response(req.model, _events(), include_usage=include_usage),
@@ -608,8 +682,8 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "x-cli-proxy-provider": backend,
-            **({"x-cli-proxy-failover": f"{primary}->{backend}"} if backend != primary else {}),
+            "x-cli-proxy-provider": order[0],
+            **({"x-cli-proxy-failover": f"{primary}->{order[0]}"} if order[0] != primary else {}),
         },
     )
 

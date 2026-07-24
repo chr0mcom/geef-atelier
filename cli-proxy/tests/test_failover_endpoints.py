@@ -160,6 +160,100 @@ class TestBreakerRouting:
         assert "streamed by codex" in resp.text
 
 
+_SESSION_LIMIT_ERROR = RuntimeError(
+    'claude CLI (agentic file mode) exited with code 1: {"api_error_status":429,'
+    '"result":"You\'ve hit your session limit · resets 4:20pm (UTC)"}')
+
+_TOOL_BODY = {
+    **_BODY,
+    "stream": True,
+    "tools": [{"type": "function",
+               "function": {"name": "kanban_comment", "parameters": {"type": "object"}}}],
+}
+
+
+class TestStreamingFailover:
+    """Until 2026-07-24 a fault inside the SSE generator bypassed failover entirely:
+    the 429 of the 2026-07-23 session-limit outage surfaced as an in-band error to
+    Hermes while the breaker, /health and the watch cron all stayed green."""
+
+    def test_agentic_stream_hands_over_to_codex_before_first_byte(
+        self, client: TestClient
+    ) -> None:
+        # Since 2026-07-24 the handover keeps the decision-file contract: codex serves the
+        # agentic request via its OWN complete_agentic_file (previously it degraded to the
+        # buffered print path, whose tool prompt the codex CLI answered with "tools not
+        # connected" as plain text — zero tool calls for Hermes).
+        with patch.object(main.claude_adapter, "complete_agentic_file",
+                          _boom(_SESSION_LIMIT_ERROR)), \
+             patch.object(main.codex_adapter, "complete_agentic_file",
+                          _ok('{"final": "from codex"}')) as codex:
+            resp = client.post("/v1/claude/chat/completions", json=_TOOL_BODY)
+
+        assert resp.status_code == 200
+        assert "from codex" in resp.text
+        assert '"api_error"' not in resp.text, "the client must see content, not an error frame"
+        assert not codex.await_args.args[1], "model must not cross the backend boundary"
+        st = failover.snapshot()["backends"]["claude"]
+        assert st["last_reason"] == "limit"
+        assert st["failover_count"] == 1
+
+    def test_buffered_structured_stream_hands_over_to_codex(self, client: TestClient) -> None:
+        body = {**_BODY, "stream": True, "response_format": {"type": "json_object"}}
+        with patch.object(main.claude_adapter, "complete_with_usage",
+                          _boom(_SESSION_LIMIT_ERROR)), \
+             patch.object(main.codex_adapter, "complete_with_usage", _ok('{"ok": true}')):
+            resp = client.post("/v1/claude/chat/completions", json=body)
+
+        assert resp.status_code == 200
+        assert '\\"ok\\": true' in resp.text or '"ok": true' in resp.text
+        assert '"api_error"' not in resp.text
+
+    def test_stream_failure_after_first_token_feeds_the_breaker(
+        self, client: TestClient
+    ) -> None:
+        # Mid-stream bytes are already on the wire — the error must surface in-band,
+        # but the breaker has to learn about it so the NEXT request pre-routes.
+        async def _stream(prompt, model, max_tokens):
+            yield ("delta", "partial")
+            raise _SESSION_LIMIT_ERROR
+
+        with patch.object(main.claude_adapter, "stream", _stream):
+            resp = client.post("/v1/claude/chat/completions", json={**_BODY, "stream": True})
+
+        assert "partial" in resp.text
+        assert '"api_error"' in resp.text
+        st = failover.snapshot()["backends"]["claude"]
+        assert st["last_reason"] == "limit"
+        assert st["consecutive_failures"] == 1
+
+    def test_both_backends_down_surfaces_in_band_error(self, client: TestClient) -> None:
+        with patch.object(main.claude_adapter, "complete_agentic_file",
+                          _boom(_SESSION_LIMIT_ERROR)), \
+             patch.object(main.codex_adapter, "complete_agentic_file",
+                          _boom(RuntimeError("codex CLI error: 429 Too Many Requests"))):
+            resp = client.post("/v1/claude/chat/completions", json=_TOOL_BODY)
+
+        assert resp.status_code == 200, "headers were already sent — error must be in-band"
+        assert '"api_error"' in resp.text
+        assert failover.snapshot()["backends"]["codex"]["last_reason"] == "limit"
+
+    def test_unclassified_stream_fault_is_not_retried_elsewhere(
+        self, client: TestClient
+    ) -> None:
+        # The agentic request would reach codex via complete_agentic_file — patch THAT
+        # (review 2026-07-24: asserting on complete_with_usage was trivially true and
+        # a regression would have spawned the real codex CLI).
+        with patch.object(main.claude_adapter, "complete_agentic_file",
+                          _boom(RuntimeError("some hitherto unseen local defect"))), \
+             patch.object(main.codex_adapter, "complete_agentic_file",
+                          _ok('{"final": "x"}')) as codex:
+            resp = client.post("/v1/claude/chat/completions", json=_TOOL_BODY)
+
+        assert '"api_error"' in resp.text
+        assert codex.await_count == 0, "an unknown fault would fail identically on the partner"
+
+
 class TestHealth:
     def test_reports_healthy_state(self, client: TestClient) -> None:
         resp = client.get("/health")

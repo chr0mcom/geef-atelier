@@ -13,7 +13,13 @@ from typing import Any
 import httpx
 
 from usage import UsageParts
-from workspace import finalize_instruction, materialize_context
+from workspace import (
+    ephemeral_dir,
+    finalize_decision_instruction,
+    finalize_instruction,
+    materialize_context,
+    read_decision_file,
+)
 
 log = logging.getLogger(__name__)
 
@@ -134,6 +140,78 @@ async def complete_with_usage(
     """Like complete(), but also returns the real token usage reported by the CLI."""
     async with _semaphore:
         return await _run_codex(prompt, model, max_tokens)
+
+
+async def complete_agentic_file(
+    instruction: str, model: str | None
+) -> tuple[str, UsageParts]:
+    """Agentic tool use via file authoring — the codex counterpart of
+    claude_adapter.complete_agentic_file.
+
+    The codex CLI carries its own agent persona: asked inline to "reply with raw tool-call
+    JSON" for HOST-executed tools it does not know, it answers "these tools are not
+    connected in this session" instead of following the protocol (incident 2026-07-24,
+    Hermes case-writer via failover — zero tool calls, protocol violation, gave_up).
+    Authoring decision.json is a normal workspace-write action the CLI performs without
+    objection; the proxy reads the file back and returns standard OpenAI tool_calls.
+    Without this, the claude→codex failover is useless for every agentic consumer."""
+    async with _semaphore:
+        async with ephemeral_dir() as workspace:
+            return await _run_codex_decision(instruction, model, workspace)
+
+
+async def _run_codex_decision(
+    instruction: str, model: str | None, workspace_path: Path
+) -> tuple[str, UsageParts]:
+    # --sandbox workspace-write: decision.json is the only artifact we want; no host access.
+    # No --search: the decision turn plans the next HOST tool call — web research inside the
+    # planning step would only tempt the model to answer from its own findings instead of
+    # delegating to the host's tools.
+    args = [
+        "codex", "exec", "--json",
+        "--skip-git-repo-check",
+        "--sandbox", "workspace-write",
+        "-C", str(workspace_path),
+    ]
+    if model:
+        bare_model = model.split("/")[-1] if "/" in model else model
+        args += ["-m", bare_model]
+
+    # Offload to instruction.md if the instruction would exceed the safe argv size.
+    args.append(finalize_decision_instruction(workspace_path, instruction))
+
+    env = {**os.environ, "HOME": CODEX_HOME}
+
+    proc = await asyncio.create_subprocess_exec(
+        *args,
+        stdin=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        cwd=str(workspace_path),
+        env=env,
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
+        raise RuntimeError(f"codex CLI (agentic file mode) timed out after {CLI_TIMEOUT_SECONDS}s")
+
+    stdout_txt = stdout.decode(errors="replace")
+    if proc.returncode != 0:
+        err = stderr.decode(errors="replace").strip()
+        raise RuntimeError(
+            f"codex CLI (agentic file mode) exited with code {proc.returncode}: "
+            f"{err or stdout_txt[:200]}"
+        )
+
+    usage = _parse_codex_usage(stdout_txt)
+    decision = read_decision_file(workspace_path)
+    if not decision:
+        # The agent answered on the event stream instead of writing the file — use that text
+        # (parse_decision treats non-JSON as a final answer, and main retries once).
+        decision = _parse_codex_text(stdout_txt)
+    return decision, usage
 
 
 async def stream(prompt: str, model: str | None, max_tokens: int | None):

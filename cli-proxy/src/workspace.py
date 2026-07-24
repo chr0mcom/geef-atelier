@@ -104,6 +104,23 @@ def finalize_decision_instruction(workspace_path: Path, instruction: str) -> str
     )
 
 
+def read_decision_file(workspace_path: Path) -> str:
+    """Reads decision.json from the workspace; falls back to any other *.json the agent
+    created. Shared by the claude and codex agentic decision-file modes."""
+    primary = workspace_path / "decision.json"
+    if primary.exists():
+        try:
+            return primary.read_text(encoding="utf-8").strip()
+        except OSError:
+            pass
+    for candidate in sorted(workspace_path.glob("*.json")):
+        try:
+            return candidate.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+    return ""
+
+
 @asynccontextmanager
 async def ephemeral_dir() -> AsyncIterator[Path]:
     """

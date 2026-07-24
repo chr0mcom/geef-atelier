@@ -129,3 +129,31 @@ async def test_complete_falls_back_to_raw_when_no_result_field():
         result = await claude_adapter.complete("Hello", None, None)
 
     assert result == raw_text
+
+
+@pytest.mark.asyncio
+async def test_agentic_file_error_surfaces_the_result_cause():
+    """CLI 2.1.219 puts the long usage object BEFORE the result field. A prefix
+    truncation used to cut the cause off, so failover.classify() saw only
+    'exited with code' and raised a session-limit outage as 'transport'
+    (incident 2026-07-24). The adapter must extract the JSON result field."""
+    output = json.dumps({
+        "is_error": True, "duration_api_ms": 0, "num_turns": 1,
+        "usage": {"input_tokens": 0, "cache_creation_input_tokens": 0,
+                  "cache_read_input_tokens": 0, "output_tokens": 0,
+                  "server_tool_use": {"web_search_requests": 0, "web_fetch_requests": 0},
+                  "service_tier": "standard",
+                  "cache_creation": {"ephemeral_1h_input_tokens": 0,
+                                     "ephemeral_5m_input_tokens": 0}},
+        "result": "You've hit your session limit · resets 9pm (UTC)",
+    })
+    proc = _make_proc(output, returncode=1)
+
+    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=proc)):
+        with pytest.raises(RuntimeError) as exc:
+            await claude_adapter.complete_agentic_file("do something", "opus")
+
+    assert "session limit" in str(exc.value)
+
+    import failover
+    assert failover.classify(exc.value) == "limit"
