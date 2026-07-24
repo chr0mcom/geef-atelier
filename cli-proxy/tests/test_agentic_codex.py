@@ -235,3 +235,56 @@ def test_decision_retry_usage_counts_both_runs(client: TestClient):
     usage = resp.json()["usage"]
     assert usage["prompt_tokens"] == 220
     assert usage["completion_tokens"] == 25
+
+
+def test_streaming_structured_double_fail_emits_refusal(client: TestClient):
+    """Bleibt structured output auch nach dem Retry ungültig, kommt ein refusal-Frame —
+    nicht der Rohtext als Schein-Erfolg (review finding 2026-07-24, Runde 2)."""
+    body = {
+        "model": "claude-sonnet-latest",
+        "messages": [{"role": "user", "content": "gib json"}],
+        "response_format": {"type": "json_object"},
+        "stream": True,
+    }
+    mock = AsyncMock(side_effect=[_u("not json"), _u("still not json")])
+    with patch("main.claude_adapter.complete_with_usage", mock):
+        resp = client.post("/v1/claude/chat/completions", json=body)
+    assert resp.status_code == 200
+    assert mock.call_count == 2
+    assert '"refusal"' in resp.text
+    assert "still not json" not in resp.text
+
+
+def test_streaming_retry_usage_counts_both_runs(client: TestClient):
+    """Auch die SSE-Retries summieren beide abgerechneten Läufe (review Runde 2)."""
+    body = {
+        "model": "claude-sonnet-latest",
+        "messages": [{"role": "user", "content": "gib json"}],
+        "response_format": {"type": "json_object"},
+        "stream": True,
+        "stream_options": {"include_usage": True},
+    }
+    first = ("not json", UsageParts(input_tokens=100, output_tokens=10))
+    second = ('{"ok": true}', UsageParts(input_tokens=120, output_tokens=15))
+    with patch("main.claude_adapter.complete_with_usage", AsyncMock(side_effect=[first, second])):
+        resp = client.post("/v1/claude/chat/completions", json=body)
+    assert resp.status_code == 200
+    assert '"prompt_tokens": 220' in resp.text
+    assert '"completion_tokens": 25' in resp.text
+
+
+def test_nonstreaming_structured_retry_usage_counts_both_runs(client: TestClient):
+    """Das Summier-Prinzip gilt auch im Non-Streaming-Retry (Alt-Muster, review Runde 2)."""
+    body = {
+        "model": "claude-sonnet-latest",
+        "messages": [{"role": "user", "content": "gib json"}],
+        "response_format": {"type": "json_object"},
+    }
+    first = ("not json", UsageParts(input_tokens=100, output_tokens=10))
+    second = ('{"ok": true}', UsageParts(input_tokens=120, output_tokens=15))
+    with patch("main.claude_adapter.complete_with_usage", AsyncMock(side_effect=[first, second])):
+        resp = client.post("/v1/claude/chat/completions", json=body)
+    assert resp.status_code == 200
+    usage = resp.json()["usage"]
+    assert usage["prompt_tokens"] == 220
+    assert usage["completion_tokens"] == 25

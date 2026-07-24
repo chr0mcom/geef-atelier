@@ -471,8 +471,9 @@ async def _run_completion(req: ChatCompletionRequest, backend: str) -> ChatCompl
         json_str, err = validate_and_extract(rf, raw)
         if err:
             log.warning("%s structured output invalid (%s) — retrying", backend, err)
-            raw, parts = await _complete_backend(
+            raw, retry_parts = await _complete_backend(
                 backend, prompt + _JSON_RETRY_SUFFIX, req.model, max_tokens)
+            parts = _sum_usage(parts, retry_parts)  # both runs were billed
             usage = _to_usage_info(parts)
             json_str, err = validate_and_extract(rf, raw)
         if json_str is not None:
@@ -483,8 +484,9 @@ async def _run_completion(req: ChatCompletionRequest, backend: str) -> ChatCompl
     resp = _build_response(req, raw, usage)
     if _needs_json_retry(resp, req):
         log.warning("%s JSON extraction failed — retrying with explicit JSON reminder", backend)
-        raw, parts = await _complete_backend(
+        raw, retry_parts = await _complete_backend(
             backend, prompt + _JSON_RETRY_SUFFIX, req.model, max_tokens)
+        parts = _sum_usage(parts, retry_parts)  # both runs were billed
         resp = _build_response(req, raw, _to_usage_info(parts))
     return resp
 
@@ -616,15 +618,19 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
         elif target_req.tools or structured:
             raw, parts = await _complete_backend(target, prompt, cli_model, max_tokens)
             if structured:
-                # Mirror the non-streaming contract: one retry on invalid structured output
-                # (review finding 2026-07-24 — the SSE path silently shipped the raw text).
+                # Mirror the non-streaming contract: one retry on invalid structured output,
+                # then a refusal — not the raw text as a fake success (review 2026-07-24).
                 json_str, err = validate_and_extract(rf, raw)
                 if err:
                     log.warning("%s structured output invalid in stream (%s) — retrying", target, err)
-                    raw, parts = await _complete_backend(
+                    raw, retry_parts = await _complete_backend(
                         target, prompt + _JSON_RETRY_SUFFIX, cli_model, max_tokens)
+                    parts = _sum_usage(parts, retry_parts)  # both runs were billed
                     json_str, err = validate_and_extract(rf, raw)
-                yield ("delta", json_str if json_str is not None else raw)
+                if json_str is not None:
+                    yield ("delta", json_str)
+                else:
+                    yield ("refusal", f"Could not produce valid structured output: {err}")
             elif _extract_tool_name(target_req):
                 # Forced single named tool (tool_choice=specific) — the SSE path must honour
                 # the tool contract like the non-streaming one (review finding 2026-07-24:
@@ -633,8 +639,9 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
                 json_str = extract_json(raw)
                 if json_str is None:
                     log.warning("%s specific-tool stream: JSON extraction failed — retrying", target)
-                    raw, parts = await _complete_backend(
+                    raw, retry_parts = await _complete_backend(
                         target, prompt + _JSON_RETRY_SUFFIX, cli_model, max_tokens)
+                    parts = _sum_usage(parts, retry_parts)  # both runs were billed
                     json_str = extract_json(raw)
                 if json_str is not None:
                     yield ("tool_calls", [{

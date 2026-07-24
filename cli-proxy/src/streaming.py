@@ -56,6 +56,10 @@ async def sse_response(
                 # Agentic tool use: emit the tool calls as a delta (OpenAI streaming shape).
                 emitted_tool_calls = True
                 yield _sse(_chunk(chunk_id, created, model, {"tool_calls": payload}))
+            elif kind == "refusal" and payload:
+                # Structured-output failure after retry — the SSE counterpart of
+                # make_refusal_response (delta.refusal per OpenAI streaming shape).
+                yield _sse(_chunk(chunk_id, created, model, {"refusal": payload}))
             elif kind == "usage" and isinstance(payload, UsageParts):
                 usage_parts = payload
     except Exception as exc:  # noqa: BLE001 — surface mid-stream failures to the client
