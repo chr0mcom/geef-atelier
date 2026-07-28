@@ -82,6 +82,41 @@ public sealed class RunServiceResumeTests
         Assert.Equal(parentId, capturing.LastParentRunId);
     }
 
+    // ── RunKind inheritance ───────────────────────────────────────────────
+
+    [Fact]
+    public async Task ResumeRunAsync_InheritsParentRunKind_CrewComposition()
+    {
+        var parentId  = Guid.NewGuid();
+        var parent    = new RunEntity
+        {
+            Id = parentId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Aborted,
+            BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = "alice",
+            Kind = RunKind.CrewComposition,
+        };
+        var capturing = new CapturingPersistenceService();
+        var repo      = new SingleDetailsRepository(parent, []);
+        var svc       = MakeService(capturing, repo);
+
+        await svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: false, MaxIterationsOverride: null), "alice");
+
+        Assert.Equal(RunKind.CrewComposition, capturing.LastKind);
+    }
+
+    [Fact]
+    public async Task ResumeRunAsync_InheritsParentRunKind_Standard()
+    {
+        var parentId  = Guid.NewGuid();
+        var parent    = MakeRun(parentId, RunStatus.Failed, "alice");
+        var capturing = new CapturingPersistenceService();
+        var repo      = new SingleDetailsRepository(parent, []);
+        var svc       = MakeService(capturing, repo);
+
+        await svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: false, MaxIterationsOverride: null), "alice");
+
+        Assert.Equal(RunKind.Standard, capturing.LastKind);
+    }
+
     // ── MaxIterationsOverride ─────────────────────────────────────────────
 
     [Fact]
@@ -200,9 +235,10 @@ public sealed class RunServiceResumeTests
 
     private sealed class CapturingPersistenceService : IRunPersistenceService
     {
-        public Guid?   LastParentRunId   { get; private set; }
-        public string? LastSeedDraftText { get; private set; }
-        public string? LastSnapshotJson  { get; private set; }
+        public Guid?    LastParentRunId   { get; private set; }
+        public string?  LastSeedDraftText { get; private set; }
+        public string?  LastSnapshotJson  { get; private set; }
+        public RunKind? LastKind          { get; private set; }
 
         public Task<Guid> CreateRunAsync(string briefingText, string configJson,
             string? createdByUser = null, string? crewTemplateName = null,
@@ -213,11 +249,13 @@ public sealed class RunServiceResumeTests
 
         public Task<Guid> CreateResumedRunAsync(string briefingText, string configJson,
             string? createdByUser, string? crewTemplateName, string? crewSnapshotJson,
-            Guid parentRunId, string? seedDraftText, CancellationToken cancellationToken = default)
+            Guid parentRunId, string? seedDraftText, RunKind kind = RunKind.Standard,
+            CancellationToken cancellationToken = default)
         {
             LastParentRunId   = parentRunId;
             LastSeedDraftText = seedDraftText;
             LastSnapshotJson  = crewSnapshotJson;
+            LastKind          = kind;
             return Task.FromResult(Guid.NewGuid());
         }
 

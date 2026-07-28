@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Geef.Atelier.Core/Geef.Atelier.Core.csproj" />
+    <ProjectReference Include="../../src/Geef.Atelier.Application/Geef.Atelier.Application.csproj" />
+    <ProjectReference Include="../../src/Geef.Atelier.Infrastructure/Geef.Atelier.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+</Project>

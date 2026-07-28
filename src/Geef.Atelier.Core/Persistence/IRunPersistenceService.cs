@@ -29,7 +29,9 @@ public interface IRunPersistenceService
 
     /// <summary>
     /// Creates a new run that resumes a previously aborted or failed run.
-    /// Sets <c>ParentRunId</c> and optionally <c>SeedDraftText</c>.
+    /// Sets <c>ParentRunId</c> and optionally <c>SeedDraftText</c>. The parent's
+    /// <see cref="RunKind"/> must be carried over so that kind-gated behaviour
+    /// (e.g. crew materialization for composition runs) survives a resume.
     /// </summary>
     Task<Guid> CreateResumedRunAsync(
         string briefingText,
@@ -39,5 +41,6 @@ public interface IRunPersistenceService
         string? crewSnapshotJson,
         Guid parentRunId,
         string? seedDraftText,
+        RunKind kind = RunKind.Standard,
         CancellationToken cancellationToken = default);
 }

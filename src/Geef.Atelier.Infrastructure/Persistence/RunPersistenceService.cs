@@ -70,6 +70,7 @@ internal sealed class RunPersistenceService(AtelierDbContext db) : IRunPersisten
         string? crewSnapshotJson,
         Guid parentRunId,
         string? seedDraftText,
+        RunKind kind = RunKind.Standard,
         CancellationToken cancellationToken = default)
     {
         var run = new RunEntity
@@ -86,6 +87,7 @@ internal sealed class RunPersistenceService(AtelierDbContext db) : IRunPersisten
             CostTotal        = 0m,
             ParentRunId      = parentRunId,
             SeedDraftText    = seedDraftText,
+            Kind             = kind,
         };
 
         db.Runs.Add(run);

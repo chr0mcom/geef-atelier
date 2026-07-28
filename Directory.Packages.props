@@ -10,6 +10,7 @@
     <!-- Official OpenAI SDK — used for the Responses API path (pro/reasoning models on openai-direct) -->
     <PackageVersion Include="OpenAI" Version="2.8.0" />
     <!-- EF Core + Postgres -->
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
     <PackageVersion Include="Pgvector" Version="0.3.2" />

@@ -3,6 +3,7 @@ using Geef.Atelier.Application.Composition;
 using Geef.Atelier.Application.Crew.Finalizers;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Persistence;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,7 +14,9 @@ namespace Geef.Atelier.Infrastructure.Finalizers;
 /// <summary>
 /// Finalizer that materializes the Crew-Spec JSON produced by a composition run into real
 /// database entities (profiles + crew template), then optionally chains a follow-up task run.
-/// Only executes for <see cref="RunKind.CrewComposition"/> runs; returns immediately for all others.
+/// Only executes for crew-composition runs — <see cref="RunKind.CrewComposition"/> or, as a
+/// safety net for runs whose kind was lost, the <c>crew-composer</c> template; returns
+/// immediately for all others.
 /// </summary>
 internal sealed class CrewMaterializeFinalizerExecutor(
     IServiceScopeFactory scopeFactory,
@@ -44,11 +47,15 @@ internal sealed class CrewMaterializeFinalizerExecutor(
                 return Ok(profile.Name);
             }
 
-            if (run.Kind != RunKind.CrewComposition)
+            // Composition-run detection mirrors RunOrchestratorService: a run whose template is the
+            // crew-composer counts as a composition run even if its Kind was lost (e.g. legacy resumes).
+            var isCompositionRun = run.Kind == RunKind.CrewComposition
+                || run.CrewTemplateName == SystemCrew.CrewComposerTemplateName;
+            if (!isCompositionRun)
             {
                 logger.LogDebug(
-                    "CrewMaterialize: run {RunId} is kind {Kind}; only CrewComposition runs are processed.",
-                    context.RunId, run.Kind);
+                    "CrewMaterialize: run {RunId} is kind {Kind} with template '{Template}'; only crew-composition runs are processed.",
+                    context.RunId, run.Kind, run.CrewTemplateName);
                 return Ok(profile.Name);
             }
 

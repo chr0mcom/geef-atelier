@@ -223,6 +223,7 @@ internal sealed class RunService(
             snapshotJson,
             options.ParentRunId,
             seedDraftText,
+            details.Run.Kind,
             cancellationToken);
     }
 

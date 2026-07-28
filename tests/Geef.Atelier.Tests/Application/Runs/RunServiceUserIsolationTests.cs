@@ -277,7 +277,8 @@ public sealed class RunServiceUserIsolationTests
 
         public Task<Guid> CreateResumedRunAsync(string briefingText, string configJson,
             string? createdByUser, string? crewTemplateName, string? crewSnapshotJson,
-            Guid parentRunId, string? seedDraftText, CancellationToken cancellationToken = default)
+            Guid parentRunId, string? seedDraftText, RunKind kind = RunKind.Standard,
+            CancellationToken cancellationToken = default)
             => Task.FromResult(Guid.NewGuid());
     }
 
