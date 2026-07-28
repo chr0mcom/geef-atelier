@@ -1,5 +1,5 @@
 @page "/admin/oauth-clients"
-@attribute [Authorize(Policy = "AdminPolicy")]
+@attribute [Authorize]
 @rendermode InteractiveServer
 @using Geef.Atelier.Application.OAuth
 @using Geef.Atelier.Core.Domain.OAuth
@@ -114,27 +114,31 @@
                             }
                             <span class="user-meta">Created: @client.CreatedAt.ToString("yyyy-MM-dd HH:mm") UTC</span>
                         </div>
-                        <div class="user-actions">
-                            @if (_confirmDeleteClientId == client.ClientId)
-                            {
-                                <span class="delete-confirm-text">Really delete?</span>
-                                <button class="btn danger small" @onclick="() => DeleteClientAsync(client.ClientId)"
-                                        data-testid="btn-confirm-delete-@client.ClientId">
-                                    Yes
-                                </button>
-                                <button class="btn ghost small" @onclick="() => _confirmDeleteClientId = null"
-                                        data-testid="btn-cancel-delete-@client.ClientId">
-                                    No
-                                </button>
-                            }
-                            else
-                            {
-                                <button class="btn danger small" @onclick="() => _confirmDeleteClientId = client.ClientId"
-                                        data-testid="btn-delete-@client.ClientId">
-                                    Delete
-                                </button>
-                            }
-                        </div>
+                        <AuthorizeView Policy="AdminPolicy" Context="adminCtx">
+                            <Authorized>
+                                <div class="user-actions">
+                                    @if (_confirmDeleteClientId == client.ClientId)
+                                    {
+                                        <span class="delete-confirm-text">Really delete?</span>
+                                        <button class="btn danger small" @onclick="() => DeleteClientAsync(client.ClientId)"
+                                                data-testid="btn-confirm-delete-@client.ClientId">
+                                            Yes
+                                        </button>
+                                        <button class="btn ghost small" @onclick="() => _confirmDeleteClientId = null"
+                                                data-testid="btn-cancel-delete-@client.ClientId">
+                                            No
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn danger small" @onclick="() => _confirmDeleteClientId = client.ClientId"
+                                                data-testid="btn-delete-@client.ClientId">
+                                            Delete
+                                        </button>
+                                    }
+                                </div>
+                            </Authorized>
+                        </AuthorizeView>
                     </div>
                 }
             }
@@ -143,6 +147,8 @@
 </div>
 
 @code {
+    [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthState { get; set; }
+
     private IReadOnlyList<OAuthClient> _clients = [];
     private bool    _loading             = true;
     private bool    _saving;
@@ -248,6 +254,13 @@
         _error = null;
         try
         {
+            var authState = AuthState is null ? null : await AuthState;
+            if (authState?.User.IsInRole("admin") != true)
+            {
+                _error = "Only administrators can delete OAuth clients.";
+                return;
+            }
+
             await OAuthService.DeleteClientAsync(clientId, CancellationToken.None);
             _success = "Client deleted.";
             if (_newClientResult?.ClientId == clientId)
