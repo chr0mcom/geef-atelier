@@ -22,12 +22,15 @@ class ClaudeAdapter(CliAdapter):
         )
 
     async def list_models(self, config: dict[str, Any]) -> list[str]:
-        settings = config.get("settings", {})
-        return settings.get("models", [
-            "anthropic/claude-opus-4-8",
-            "anthropic/claude-sonnet-5",
-            "anthropic/claude-haiku-4-5",
-        ])
+        models, _source, _aliases = await self.list_models_with_source(config)
+        return models
+
+    async def list_models_with_source(
+        self, config: dict[str, Any], bypass_cache: bool = False
+    ) -> tuple[list[str], str, dict[str, str]]:
+        """Resolves the list from the claude CLI itself rather than echoing the synced
+        configuration, which would make this endpoint answer with what the caller pushed in."""
+        return await _cli.list_models_with_source_async(bypass_cache)
 
     async def health_check(self, config: dict[str, Any]) -> bool:
         import shutil

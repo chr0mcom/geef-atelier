@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-06-18 (D-062 added: single-language UI — English-only until real i18n)*
+*Last updated: 2026-08-04 (D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -1352,3 +1352,170 @@ implementation guide: [`11-specialization-packs.md`](11-specialization-packs.md)
 **D-063/4 — Token breakdown persistence + display (Step43).** The cached-input / reasoning token subsets are now persisted per actor on `IterationActorCosts` (nullable `CachedInputTokens`/`ReasoningTokens`) and aggregated per run on `Runs` (same two nullable columns), both added by migration **Step43TokenBreakdown** (additive, `ADD COLUMN IF NOT EXISTS`). `ICostAccumulator.RecordActorCost` / `PendingActorCost` carry the two values (optional, default 0); all six call sites (executor, reviewer ×2, advisor, composer, ToolUseRunner) pass `TokenUsage.CachedInputTokens/ReasoningTokens`. The orchestrator sums them onto the run (null when zero). RunDetail surfaces the run-level breakdown as dedicated "Cached input" / "Reasoning" meta rows, shown only when those values are present.
 
 **Tests:** Pricing/ProviderExtensions/CrewComposer/TemplateStudio units green (93/93 in the targeted run) + a new `RunCostAccumulator` token-breakdown unit; test fakes updated for the new interface members. The TemplateStudio "no structured output" contract is preserved via an `IsJsonObject` pre-check (clean `InvalidOperationException` instead of a raw `JsonReaderException`). Migration Step43 is additive.
+
+## D-064 — Dynamic model catalog for CLI providers (2026-08-04)
+
+**Context.** The model picker served CLI providers a list hardcoded in C#: `ModelCatalog` branched
+on `ProviderType.Cli` **before** the network path and returned `settings.models`. After Claude Opus 5
+shipped, the best available model was therefore missing from every picker — and the same staleness
+would have repeated on every future release. The `cli-proxy` could already answer the question; the
+Atelier simply never asked it.
+
+**D-064/1 — One provider-keyed endpoint instead of a `cli_kind` table in C#.** The Atelier calls only
+`GET /v1/cli/{providerName}/models`. Which CLI kind has a live source is a property of the gateway
+and is reported by it through `x_source` (`live` / `static` / `degraded`) rather than maintained as a
+constant list in C#, so custom CLI providers work automatically. The HTTP call lives solely in
+`CliProxyModelSource` behind `ICliModelSource`, on its own `HttpClient` **without** a resilience
+handler — a failing model lookup must not open the shared circuit breaker of real LLM traffic.
+
+**D-064/2 — The proxy reports provenance and never caches a failure.** Previously
+`return concrete or list(STATIC_MODELS)` turned a total probe failure — an expired claude OAuth
+session, which already happened on 2026-07-22 — into an **HTTP 200 carrying the frozen list**, cached
+for 24 h and indistinguishable from success. A failure is now reported as `degraded` and **not**
+cached; the alias probe runs under the shared semaphore and reaps its subprocess on timeout;
+`?refresh=1` forces a re-resolution, throttled to one real probe run per minute; and a background
+task warms both caches at start-up and re-resolves them every 12 h **with** a cache bust. Without
+that bust the 12 h sweep would have been talking to itself: it would read its own 24 h cache and
+never discover a new model.
+
+**D-064/3 — `*-latest` aliases as the binding, concrete id in the snapshot.** Profiles and system
+crews point at `claude-opus-latest` and therefore follow every release. The `CrewSnapshot` holds the
+**resolved concrete id**, resolved at the one place every run snapshot passes through
+(`CrewService.ApplyPacksAsync`). Without that resolution the change would have traded maintenance
+effort for an irreversible loss: a resumed run would silently execute on a different model than its
+parent, and cost rows would average model generations together. `ResolveModelAsync` deliberately
+**never** triggers a lookup — it runs on the run-start path — and trusts the mapping only until its
+**own expiry stamp**. The criterion "is a list cached?" would be wrong and has been removed outright;
+the reasoning is in `geef_architecture.md` section 9.3 and in the amendment below.
+
+**D-064/4 — Live and curated lists are merged, not replaced.** The composer filters
+`PreferredComposerModels` against the catalog. If the gateway's answer replaced the list, a curated
+model could silently drop out of the prompt and auto-composition would pick a weaker one — no error,
+no log line. Merging prevents that, keeps the recommended group non-empty, and stops existing
+profiles from falling back into the free-text field.
+
+**D-064/5 — Plurality check.** An alias and a concrete id name the same model. A crew with executor
+`claude-opus-latest` and reviewer `claude-opus-5` passed every check and was still a monoculture
+reviewing itself. Step 10 of `CrewSpecValidator` compares after resolution and reports the case as a
+**non-critical** issue — including for reused reviewers, which are the common and therefore likelier
+shape.
+
+**D-064/6 — Migration Step45.** Lifts only `IsSystem = true` profiles on `claude-cli` from frozen
+Claude ids onto the family aliases, family-preserving through explicit `IN` lists (including the
+dotted forms — Step30 seeds `claude-haiku-4.5`). User profiles and profiles on other providers are
+untouched: a system profile reaching Claude through OpenRouter must keep its OpenRouter id, for which
+no alias form exists. `Down()` is a documented no-op. **Accepted side effect:** `IsSystem = true`
+means "created by the system", not "never changed by the operator" — anyone who deliberately pinned a
+system profile to an older generation is lifted and can only undo that manually.
+
+**Deliberate deviations from `geef_architecture.md`.** `HasLiveEndpoint` is implemented as
+`HasLiveSource` (the provider-keyed endpoint no longer has an "endpoint" layer). `StaticByDesign` now
+also covers HTTP providers with a manual model list — factually right, but an extension beyond the
+original scope, visible as a quiet note where there previously was no marking at all. The note text
+therefore reads "this provider" rather than "this CLI".
+
+**Lesson for future amendments.** Amendment §8 was implemented as a diff rather than re-derived:
+each point was correct on its own, and every reviewer finding sat **between** the points — the cache
+bust against the timeout budget, the alias map without a lifecycle of its own, and test doubles whose
+pass-through behaviour is precisely the null effect of the newly introduced rules. An amendment
+should name the tensions between its own points explicitly.
+
+**Deploy order: `cli-proxy` first, then `web`.** Starting the Atelier against a proxy without
+D-064/2 makes every CLI provider falsely report "provider unreachable".
+
+**Open follow-ups.** (1) Read `x-cli-proxy-provider`/`x-cli-proxy-failover` so a run written by codex
+through failover is not booked as `claude-cli` (pre-dates this change). (2) A persisted "last known
+good list" as a fourth fallback layer. (3) The bUnit 2.x jump — bUnit 1.38.5 is binary-incompatible
+with AngleSharp >= 1.5, which is why `GHSA-pgww-w46g-26qg` is suppressed for the test project rather
+than fixed (AngleSharp is never in the production graph). (4) Mirror the OpenRouter entries of
+`PreferredComposerModels.Reviewers` into `StaticModelFallback`, so no preferred reviewer can silently
+drop out of the composer prompt there either.
+
+**Amendment after reviewer iteration 2 — the guard rule, and further deviations.**
+
+Iteration 2 produced four findings of the same shape: *every new guard keyed off evidence that only
+the success path produces.* The cause is that this system uses **four** encodings for "no real
+answer" — `null` from the transport, a success-shaped answer carrying a degradation marker (HTTP 200
+with `x_source: degraded`), the ordinary return of a constant instead of a fetch (missing API key),
+and the **absence** of state (no timestamp, no map) — and none of them was written down anywhere.
+The table is now **section 9 of `geef_architecture.md`**, together with the rule: *a guard must never
+rest on evidence only the success path produces* — check the **encoding**, not the **value shape**.
+
+Concretely changed as a result: the alias map carries its **own expiry stamp** instead of relying on
+"is a list cached?". That earlier criterion was wrong at its core: `IMemoryCache` is keyed per
+provider, not per generation, and the failure branch writes **its own** entry under the same key —
+the guard asked "is there *a* list?" where the contract needs "is *the* list still valid?". The two
+coincide on the success path and diverge exactly in the failure case. Anyone later tempted to
+"simplify" that guard has to refute this paragraph first. Likewise: the throttle for forced
+re-resolution keys off the **attempt**, not the success (otherwise it does not throttle at all during
+an outage), and the internal 12 h sweep is **exempt** from it — it is the only path that still
+discovers a new model while something is broken.
+
+A missing `OPENROUTER_API_KEY` reports `static`, **not** `degraded`: an absent capability is not an
+outage, and `degraded` would put a permanent red "provider unreachable" banner on every codex picker
+the moment the key is legitimately removed.
+
+Further recorded deviations from section 8: `WarmUpTimeoutSeconds` is 240 rather than the 60 named in
+8.4 (the reasoning there — "the proxy warms itself" — does not hold, because the nightly sweep sends
+`?refresh=1` and thereby bypasses exactly that self-warmed cache); newly added are
+`RefreshTimeoutSeconds`/`FetchBudget.Refresh` as a separate budget for the refresh button, and
+`PreferredComposerModels.SecondaryDefault` as a named binding for auto-composed reviewers and
+advisors. The `HttpClient` cap is derived from the budgets so that
+`Interactive < Refresh < WarmUp < cap` holds — a transport cap below a budget makes that budget
+ineffective without the configuration showing it.
+
+Deliberately not closed: `RunOrchestratorService.ResolveSnapshot` reconstructs a snapshot for
+pre-PS-5 runs directly from `SystemCrew` constants and therefore bypasses alias resolution. That
+snapshot is never persisted; touching a defensive legacy path is not worth the risk.
+
+**Amendment after reviewer iteration 3 — accepted trade-offs and follow-ups.**
+
+*Cold-start window.* For roughly 60 seconds between web start-up and the first warm-up the alias
+mapping is empty. A run starting inside that window writes the **unresolved alias** into its
+snapshot. That is the deliberate flip side of `ResolveModelAsync` not triggering a lookup — the
+alternative would be a network round-trip on the run-start path, before every run. The run itself is
+fine (the CLI resolves the alias anyway); only the provenance of that one snapshot is blurrier.
+Closing it needs the persisted "last known good list" from follow-up (2), not a lookup here.
+
+*Throttle.* Both adapters throttle under the same contract, each with its own per-provider
+timestamp: it applies only to **forced** re-resolutions, an ordinary call after a failure still
+probes, and the internal 12 h sweep is exempt. The timestamp records the **attempt**, not the
+success — a failed lookup writes no cache entry, so a success-based throttle would fail to throttle
+in exactly the outage it exists for. The reason for the strictness is the claude side: one probe
+spawns three real CLI subprocesses on a subscription shared with Hermes and the DMS worker. For
+codex it is a single HTTP request, so the throttle there is cheap — but above all symmetric.
+
+*Inline comments.* `geef_architecture.md` section 2.9 explicitly grants the existing comments in
+`ModelCatalog.cs` legacy status ("do not multiply; replace inside blocks you touch"). Touched blocks
+were lifted to XML doc; the remaining lines are untouched legacy. The section markers in the tests
+keep the four error encodings from section 9.1 visible next to the assertion and are left there on
+purpose.
+
+*Recorded as follow-ups, deliberately out of scope here:*
+1. `codex-cli`: the **recommended** flag stays curated while availability maintains itself, so a new
+   GPT generation appears in the list but not automatically as the preselection. Belongs with
+   follow-up (4) of the main entry.
+2. A failed refresh discards the last known good **list** (the alias mapping is protected, the list
+   is not). Impact is limited because `MergeWithKnownIds` keeps every curated id; the clean fix is
+   the persisted last-known-good from section 8.9.
+3. The refresh button can still report "provider unreachable" incorrectly when the gateway's CLI
+   slots are busy with real runs. Much less likely after the throttle and the separate refresh
+   budget, but not excluded.
+4. The alias expiry test only covers the side **before** the stamp. The negative half needs an
+   injectable clock in the `ModelCatalog` constructor; the value does not justify that contract
+   change before this deploy.
+
+*Post-deploy checklist (plan points 20-22), after `cli-proxy` then `web`:*
+- **20** Live UI through the Playwright MCP: open the model picker; `claude-opus-latest` and the
+  concrete Opus id must be visible, console clean.
+- **21** `get_provider_models("claude-cli")` through the MCP: contains the concrete current Opus id.
+- **22** `curl -s localhost:8090/v1/claude/models` — the answer must **not** be exactly
+  `STATIC_MODELS` and must report `x_source: "live"`. This is the only direct test against the
+  failure mode where a failed probe looks like a success.
+
+*Deviation from section 3.6 (model DTO).* The architecture calls for one shared internal DTO pair
+across both lookup paths. Two exist: `ModelCatalog` keeps `ModelListResponse`/`ModelEntry` for the
+HTTP path, and `CliProxyModelSource` has its own `CliModelsResponse`/`CliModelEntry`. Reason: the CLI
+answer carries `x_source` and `x_aliases`, two fields that have no place in the HTTP schema — real
+reuse would have meant a base type plus an extension, i.e. more parts for two deserialisation shapes
+that evolve independently. Kept deliberately and recorded here rather than left silent.

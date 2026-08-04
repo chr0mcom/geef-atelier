@@ -208,7 +208,93 @@ internal sealed class CrewSpecValidator(
         // Step 9 – specialization-pack bindings
         await ValidatePackBindingsAsync(spec, issues, cancellationToken);
 
+        await ValidateModelPluralityAsync(spec, issues, cancellationToken);
+
         return issues;
+    }
+
+    /// <summary>
+    /// Step 10 — flags reviewers that end up on the same model as the executor. Since always-latest aliases
+    /// and concrete ids can name the same model, both sides are resolved before comparing —
+    /// otherwise a crew whose executor names the always-latest alias and whose reviewer names the
+    /// concrete id it points at passes every check and is still a monoculture reviewing itself.
+    /// </summary>
+    private async Task ValidateModelPluralityAsync(
+        CrewSpecArtifact spec, List<CrewSpecValidationIssue> issues, CancellationToken cancellationToken)
+    {
+        if (spec.Executor is null)
+            return;
+
+        var executor = await EffectiveBindingAsync(spec.Executor, cancellationToken);
+        if (executor is null)
+            return;
+
+        for (var i = 0; i < spec.Reviewers.Count; i++)
+        {
+            var reviewer = await EffectiveBindingAsync(spec.Reviewers[i], cancellationToken);
+            if (reviewer is null)
+                continue;
+
+            if (!string.Equals(reviewer.Value.Provider, executor.Value.Provider, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (string.Equals(reviewer.Value.Model, executor.Value.Model, StringComparison.OrdinalIgnoreCase))
+            {
+                issues.Add(new CrewSpecValidationIssue(
+                    Field:      $"reviewers[{i}].model",
+                    Message:    $"Reviewer runs on the same model as the executor ('{reviewer.Value.Model}'), so the crew reviews itself. "
+                                + "Model plurality requires a different model, ideally from another vendor.",
+                    IsCritical: false));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns the provider and resolved model an actor will actually run on. Reused actors carry no
+    /// inline provider or model, so the referenced profile is looked up — reusing a system reviewer
+    /// is the common case, and skipping it would leave the likeliest monoculture unreported.
+    /// </summary>
+    private async Task<(string Provider, string Model)?> EffectiveBindingAsync(
+        CrewPartSpec part, CancellationToken cancellationToken)
+    {
+        var provider = part.Provider;
+        var model = part.Model;
+
+        if (!string.IsNullOrWhiteSpace(part.Reuse))
+        {
+            var reviewer = await crewService.GetReviewerProfileAsync(part.Reuse!, cancellationToken);
+            if (reviewer is not null)
+            {
+                provider = reviewer.Provider;
+                model = reviewer.Model;
+            }
+            else
+            {
+                var executorProfile = await crewService.GetExecutorProfileAsync(part.Reuse!, cancellationToken);
+                if (executorProfile is null)
+                    return null;
+
+                provider = executorProfile.Provider;
+                model = executorProfile.Model;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(model))
+            return null;
+
+        return (provider!, await ResolveModelSafeAsync(provider!, model!, cancellationToken));
+    }
+
+    private async Task<string> ResolveModelSafeAsync(string provider, string model, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await modelCatalog.ResolveModelAsync(provider, model, cancellationToken);
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            return model;
+        }
     }
 
     /// <summary>

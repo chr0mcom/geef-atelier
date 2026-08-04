@@ -9,11 +9,17 @@
     }
     else
     {
-        @if (_usingFallback)
+        @if (_source == ModelCatalogSource.Fallback)
         {
             <div class="model-selector-fallback-banner">
                 Showing fallback list — provider unreachable.
                 <button type="button" class="model-selector-refresh-inline" @onclick="HandleRefresh">Refresh</button>
+            </div>
+        }
+        else if (_source == ModelCatalogSource.StaticByDesign)
+        {
+            <div class="model-selector-static-note">
+                Static list — this provider has no live model endpoint.
             </div>
         }
 
@@ -86,8 +92,11 @@
                         </div>
                     }
                 </div>
-                <button type="button" class="model-selector-refresh" @onclick="HandleRefresh"
-                        title="Refresh model list" disabled="@_refreshing">⟳</button>
+                @if (_source != ModelCatalogSource.StaticByDesign)
+                {
+                    <button type="button" class="model-selector-refresh" @onclick="HandleRefresh"
+                            title="Ask the gateway to re-resolve the model list" disabled="@_refreshing">⟳</button>
+                }
             </div>
         }
     }
@@ -105,7 +114,7 @@
     private List<ModelInfo> _others      = [];
     private bool _loading       = false;
     private bool _refreshing    = false;
-    private bool _usingFallback = false;
+    private ModelCatalogSource _source = ModelCatalogSource.Unknown;
     private bool _showCustomInput = false;
     private bool _isOpen = false;
     private bool _prevIsOpen = false;
@@ -150,7 +159,7 @@
 
             _recommended = models.Where(m => m.IsRecommended).ToList();
             _others      = models.Where(m => !m.IsRecommended).ToList();
-            _usingFallback = ModelCatalog.IsUsingFallback(Provider);
+            _source = ModelCatalog.GetSource(Provider);
             _loadedForProvider = Provider;
 
             var allIds = models.Select(m => m.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);

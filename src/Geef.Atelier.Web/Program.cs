@@ -91,6 +91,7 @@ builder.Services.AddHostedService<OAuthCleanupBackgroundService>();
 builder.Services.Configure<Geef.Atelier.Core.Configuration.PackGcOptions>(
     builder.Configuration.GetSection(Geef.Atelier.Core.Configuration.PackGcOptions.SectionName));
 builder.Services.AddHostedService<PackArchivalBackgroundService>();
+builder.Services.AddHostedService<ModelCatalogWarmUpService>();
 
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AtelierDbContext>();

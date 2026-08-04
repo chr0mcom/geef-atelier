@@ -56,6 +56,42 @@ INTERNAL_TOKEN = os.getenv("ATELIER_INTERNAL_API_TOKEN", "")
 provider_sync = ProviderConfigSync(BACKEND_URL, INTERNAL_TOKEN)
 
 
+MODEL_WARMUP_INTERVAL_SECONDS = int(os.getenv("MODEL_WARMUP_INTERVAL", "43200"))
+
+
+async def warm_model_caches(bypass_cache: bool = False) -> None:
+    """Resolve both CLI model lists so callers hit a warm cache.
+
+    Without this the first `/v1/*/models` request after a restart pays for three cold CLI
+    probes, which no interactive caller can wait for. Failures are logged and swallowed:
+    a cold cache degrades the model picker, it must never keep the gateway from starting.
+
+    `bypass_cache` decides whether this is a warm-up or a re-resolution. The start-up call leaves
+    it False — the cache is empty anyway. The periodic call MUST set it True: the resolver caches
+    for 24 h, so a 12 h sweep that honours that cache would only re-read its own entry and could
+    never discover a newly released model. The sweep also passes `force`, because it is the only
+    remaining path that discovers a new model during an outage and the attempt throttle — which
+    exists to contain repeated clicks — must not swallow it.
+    """
+    for name, resolver in (
+        ("claude", claude_adapter.list_models_with_source_async),
+        ("codex", codex_adapter.list_models_with_source_async),
+    ):
+        try:
+            result = await resolver(bypass_cache, force=bypass_cache)
+            log.info("Model cache warm-up for %s: source=%s (bypass=%s)", name, result[1], bypass_cache)
+        except Exception as exc:  # noqa: BLE001 — warm-up is best-effort by design
+            log.warning("Model cache warm-up for %s failed: %s", name, exc)
+
+
+async def model_warmup_loop(interval: int = MODEL_WARMUP_INTERVAL_SECONDS) -> None:
+    """Re-resolve both model caches every `interval` seconds so a released model shows up
+    without anyone having to restart the gateway or click anything."""
+    while True:
+        await asyncio.sleep(interval)
+        await warm_model_caches(bypass_cache=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ANN001
     # Re-initialise semaphores after the event loop is running.
@@ -63,8 +99,20 @@ async def lifespan(app: FastAPI):  # noqa: ANN001
     codex_adapter._semaphore = asyncio.Semaphore(codex_adapter.MAX_CONCURRENT)
     # Sync provider configs from backend (best-effort; failure is non-fatal).
     await provider_sync.sync_now()
-    asyncio.create_task(provider_sync.background_sync_loop(interval=60))
-    yield
+    # Handles are retained: asyncio keeps only weak references to running tasks, so a bare
+    # create_task can be collected mid-flight and the loop silently stops.
+    background_tasks = {
+        asyncio.create_task(provider_sync.background_sync_loop(interval=60)),
+        # Warm the model caches in the background so start-up is not blocked by CLI probes.
+        asyncio.create_task(warm_model_caches()),
+        asyncio.create_task(model_warmup_loop()),
+    }
+    app.state.background_tasks = background_tasks
+    try:
+        yield
+    finally:
+        for task in background_tasks:
+            task.cancel()
 
 
 app = FastAPI(title="Atelier CLI Proxy", version="1.0.0", lifespan=lifespan)
@@ -744,8 +792,14 @@ async def cli_chat_completions(
 
 
 @app.get("/v1/cli/{provider_name}/models")
-async def cli_list_models(provider_name: str) -> JSONResponse:
-    """List models available for a configured CLI provider."""
+async def cli_list_models(provider_name: str, refresh: int = 0) -> JSONResponse:
+    """List models available for a configured CLI provider.
+
+    This is the single provider-name-keyed model endpoint; consumers do not need to know
+    which CLI kinds have a live source. `x_source` states where the list came from and
+    `x_aliases` maps always-latest alias ids to the concrete model they resolve to right now.
+    Pass `refresh=1` to bypass the proxy's own cache.
+    """
     config = provider_sync.get_provider_config(provider_name)
     if config is None:
         raise HTTPException(
@@ -761,8 +815,13 @@ async def cli_list_models(provider_name: str) -> JSONResponse:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    models = await adapter.list_models(config)
-    return JSONResponse({"object": "list", "data": [{"id": m, "object": "model"} for m in models]})
+    models, source, aliases = await adapter.list_models_with_source(config, bypass_cache=bool(refresh))
+    return JSONResponse({
+        "object": "list",
+        "data": [{"id": m, "object": "model"} for m in models],
+        "x_source": source,
+        "x_aliases": aliases,
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -818,20 +877,27 @@ async def chat_completions(req: ChatCompletionRequest, http_request: Request, re
 
 
 @app.get("/v1/claude/models")
-async def claude_models() -> JSONResponse:
+async def claude_models(refresh: int = 0) -> JSONResponse:
     """Lists Claude models: always-latest aliases + the concrete newest model ids, resolved via
-    the CLI's own alias resolution (24 h cache). Auto-updates as new models ship — never stale."""
-    models = await claude_adapter.list_models_async()
+    the CLI's own alias resolution (24 h cache). Auto-updates as new models ship — never stale.
+
+    `x_source` is "live" when the CLI answered the probe and "degraded" when every probe failed
+    and the ids below are the offline fallback — a distinction callers cannot make from the
+    status code alone. `refresh=1` bypasses the cache.
+    """
+    models, source, aliases = await claude_adapter.list_models_with_source_async(bool(refresh))
     data = [{"id": m, "object": "model", "owned_by": "anthropic"} for m in models]
-    return JSONResponse({"object": "list", "data": data})
+    return JSONResponse({"object": "list", "data": data, "x_source": source, "x_aliases": aliases})
 
 
 @app.get("/v1/codex/models")
-async def codex_models() -> JSONResponse:
-    """Lists the 10 newest OpenAI models, fetched live from OpenRouter (24 h cache)."""
-    models = await codex_adapter.list_models_async()
+async def codex_models(refresh: int = 0) -> JSONResponse:
+    """Lists the 10 newest OpenAI models, fetched live from OpenRouter (24 h cache).
+    `x_source` is "degraded" when the fetch failed and the ids are a cached or offline
+    substitute. `refresh=1` bypasses the cache."""
+    models, source = await codex_adapter.list_models_with_source_async(bool(refresh))
     data = [{"id": m, "object": "model", "owned_by": "openai"} for m in models]
-    return JSONResponse({"object": "list", "data": data})
+    return JSONResponse({"object": "list", "data": data, "x_source": source, "x_aliases": {}})
 
 
 @app.get("/v1/models")

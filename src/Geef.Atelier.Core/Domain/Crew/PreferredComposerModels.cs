@@ -16,7 +16,15 @@ public static class PreferredComposerModels
     /// Preferred executor model. Claude Opus via subscription CLI — best quality, zero token cost.
     /// </summary>
     public static readonly (string Provider, string Model) Executor =
-        ("claude-cli", "claude-opus-4-8");
+        ("claude-cli", "claude-opus-latest");
+
+    /// <summary>
+    /// Fallback binding for auto-composed reviewers and advisors that arrive without an explicit
+    /// model. Deliberately a different family than <see cref="Executor"/> so a composed crew does
+    /// not review itself.
+    /// </summary>
+    public static readonly (string Provider, string Model) SecondaryDefault =
+        ("claude-cli", "claude-sonnet-latest");
 
     /// <summary>
     /// Preferred reviewer models for model plurality.

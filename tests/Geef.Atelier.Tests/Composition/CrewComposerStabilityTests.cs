@@ -201,6 +201,9 @@ public sealed class CrewComposerStabilityTests
         public Task<IReadOnlyList<ModelInfo>> ListModelsAsync(string p, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<ModelInfo>>([]);
         public Task<IReadOnlyList<ModelInfo>> RefreshAsync(string p, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<ModelInfo>>([]);
         public bool IsUsingFallback(string p) => false;
+        public ModelCatalogSource GetSource(string p) => ModelCatalogSource.Unknown;
+        public Task<IReadOnlyList<ModelInfo>> WarmUpAsync(string p, CancellationToken ct = default) => RefreshAsync(p, ct);
+        public Task<string> ResolveModelAsync(string p, string modelId, CancellationToken ct = default) => Task.FromResult(modelId);
     }
 
     private sealed class StubGroundingFactory(params string[] types) : IGroundingProviderFactory
@@ -222,6 +225,9 @@ public sealed class CrewComposerStabilityTests
         }
         public Task<IReadOnlyList<ModelInfo>> RefreshAsync(string p, CancellationToken ct = default) => ListModelsAsync(p, ct);
         public bool IsUsingFallback(string p) => false;
+        public ModelCatalogSource GetSource(string p) => ModelCatalogSource.Unknown;
+        public Task<IReadOnlyList<ModelInfo>> WarmUpAsync(string p, CancellationToken ct = default) => RefreshAsync(p, ct);
+        public Task<string> ResolveModelAsync(string p, string modelId, CancellationToken ct = default) => Task.FromResult(modelId);
     }
 
     private sealed class EmptyCrewService : ICrewService

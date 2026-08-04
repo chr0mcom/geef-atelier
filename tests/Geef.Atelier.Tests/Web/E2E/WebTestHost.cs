@@ -90,6 +90,7 @@ internal sealed class WebTestHost : IAsyncDisposable
 
         builder.Services.AddAtelierPersistence();
         builder.Services.AddAtelierApplication();
+        builder.Services.AddSingleton<Geef.Atelier.Application.Crew.IModelCatalog, Geef.Atelier.Tests.Fakes.PassThroughModelCatalog>();
         builder.Services.AddScoped<IKnowledgeService, NoOpKnowledgeService>();
 
         // Orchestrator: fast polling for tests

@@ -146,6 +146,7 @@ public sealed class CrewServiceAdvisorCrudTests
             new InMemoryFinalizerProfileRepository(),
             templateRepo  ?? new InMemoryCrewTemplateRepository(),
             packRepo      ?? new Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository(),
+            new Geef.Atelier.Tests.Fakes.PassThroughModelCatalog(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CrewService>.Instance);
 
     private static AdvisorProfile BuildAdvisorProfile(string name) => new(

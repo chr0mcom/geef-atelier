@@ -183,5 +183,8 @@ public sealed class GroundingProviderEditorRefinementTests : TestContext
             => Task.FromResult<IReadOnlyList<ModelInfo>>([]);
 
         public bool IsUsingFallback(string providerName) => false;
+        public ModelCatalogSource GetSource(string p) => ModelCatalogSource.Unknown;
+        public Task<IReadOnlyList<ModelInfo>> WarmUpAsync(string p, CancellationToken ct = default) => RefreshAsync(p, ct);
+        public Task<string> ResolveModelAsync(string p, string modelId, CancellationToken ct = default) => Task.FromResult(modelId);
     }
 }

@@ -81,6 +81,9 @@ public sealed class TemplateStudioServiceDefaultsTests
         public Task<IReadOnlyList<ModelInfo>> RefreshAsync(string providerName, CancellationToken ct = default)
             => Task.FromResult((IReadOnlyList<ModelInfo>)[]);
         public bool IsUsingFallback(string providerName) => false;
+        public ModelCatalogSource GetSource(string p) => ModelCatalogSource.Unknown;
+        public Task<IReadOnlyList<ModelInfo>> WarmUpAsync(string p, CancellationToken ct = default) => RefreshAsync(p, ct);
+        public Task<string> ResolveModelAsync(string p, string modelId, CancellationToken ct = default) => Task.FromResult(modelId);
     }
 
     private sealed class NoopPricingCatalog : IPricingCatalog

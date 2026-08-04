@@ -156,6 +156,7 @@ public sealed class CrewRenameCascadeTests : IAsyncLifetime
             new FinalizerProfileRepository(ctx),
             new CrewTemplateRepository(ctx),
             new SpecializationPackRepository(ctx),
+            new Geef.Atelier.Tests.Fakes.PassThroughModelCatalog(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CrewService>.Instance);
 
         await svc.CreateCustomExecutorProfileAsync(Exec("svc-exec"));     // -> custom-svc-exec
@@ -184,6 +185,7 @@ public sealed class CrewRenameCascadeTests : IAsyncLifetime
             new FinalizerProfileRepository(ctx),
             new CrewTemplateRepository(ctx),
             new SpecializationPackRepository(ctx),
+            new Geef.Atelier.Tests.Fakes.PassThroughModelCatalog(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CrewService>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
@@ -202,6 +204,7 @@ public sealed class CrewRenameCascadeTests : IAsyncLifetime
             new FinalizerProfileRepository(ctx),
             new CrewTemplateRepository(ctx),
             new SpecializationPackRepository(ctx),
+            new Geef.Atelier.Tests.Fakes.PassThroughModelCatalog(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CrewService>.Instance);
 
         await svc.CreateCustomExecutorProfileAsync(Exec("dup-one"));   // custom-dup-one

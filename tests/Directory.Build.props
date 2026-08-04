@@ -1,0 +1,13 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <!--
+    Scoped to the test tree on purpose: AngleSharp reaches this repository only through bUnit and is
+    never in the production graph, so the audit gate must stay armed everywhere else. bUnit 1.38.5 is
+    compiled against the older IHtmlCollection<T> surface and throws MissingMethodException against
+    AngleSharp 1.5, so lifting this needs the bUnit 2.x migration tracked in D-064.
+  -->
+  <ItemGroup>
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-pgww-w46g-26qg" />
+  </ItemGroup>
+</Project>

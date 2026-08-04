@@ -193,12 +193,13 @@ internal sealed class CrewComposerExecutor(
         if (!executorListed)
         {
             // Static fallback if preferred executor not in live catalog.
-            sb.AppendLine($"| `claude-cli` | `claude-opus-4-8` | **Executor** (subscription) |");
+            var (fallbackProvider, fallbackModel) = PreferredComposerModels.Executor;
+            sb.AppendLine($"| `{fallbackProvider}` | `{fallbackModel}` | **Executor** (subscription) |");
         }
 
         sb.AppendLine();
         sb.AppendLine("**Model plurality rule:** reviewer `model` values MUST differ from the executor `model`.");
-        sb.AppendLine("**Executor rule:** the executor is ALWAYS a NEW inline, task-specialized profile (never reuse) with generous `max_tokens` (>= 32000). Prefer a top-tier model such as `claude-cli`/`claude-opus-4-8`.");
+        sb.AppendLine($"**Executor rule:** the executor is ALWAYS a NEW inline, task-specialized profile (never reuse) with generous `max_tokens` (>= 32000). Prefer a top-tier model such as `{PreferredComposerModels.Executor.Provider}`/`{PreferredComposerModels.Executor.Model}`.");
         sb.AppendLine("**Reuse rule:** use `reuse: \"learning-extractor\"` for the output finalizer; reuse existing reviewers/advisors/grounding only when they truly fit — these need no provider/model.");
         sb.AppendLine();
 

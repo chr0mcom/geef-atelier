@@ -17,6 +17,7 @@ internal sealed class CrewService(
     IFinalizerProfileRepository finalizerRepo,
     ICrewTemplateRepository templateRepo,
     ISpecializationPackRepository packRepo,
+    IModelCatalog modelCatalog,
     ILogger<CrewService> logger) : ICrewService
 {
     private const string ReadOnlyMessage = "System profile is read-only — copy it as a custom variant.";
@@ -464,6 +465,6 @@ internal sealed class CrewService(
             catch (Exception ex) { logger.LogWarning(ex, "Failed to update LastUsedAt for {Count} packs.", usedNames.Count); }
         }
 
-        return composed;
+        return await CrewSnapshotModelResolver.ResolveAsync(composed, modelCatalog, cancellationToken);
     }
 }

@@ -22,12 +22,16 @@ class CodexAdapter(CliAdapter):
         )
 
     async def list_models(self, config: dict[str, Any]) -> list[str]:
-        settings = config.get("settings", {})
-        return settings.get("models", [
-            "openai/gpt-5.6-sol",
-            "openai/gpt-5.6-terra",
-            "openai/gpt-5.6-luna",
-        ])
+        models, _source, _aliases = await self.list_models_with_source(config)
+        return models
+
+    async def list_models_with_source(
+        self, config: dict[str, Any], bypass_cache: bool = False
+    ) -> tuple[list[str], str, dict[str, str]]:
+        """Resolves the list live from OpenRouter rather than echoing the synced configuration.
+        Codex has no alias layer, so the alias map is always empty."""
+        models, source = await _cli.list_models_with_source_async(bypass_cache)
+        return models, source, {}
 
     async def health_check(self, config: dict[str, Any]) -> bool:
         import shutil

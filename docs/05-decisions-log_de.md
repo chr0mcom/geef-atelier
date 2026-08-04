@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-06-18 (D-062 ergänzt: einsprachige UI — durchgängig Englisch bis echte i18n)*
+*Letzte Aktualisierung: 2026-08-04 (D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -1260,3 +1260,178 @@ Umsetzungsleitfaden: [`11-specialization-packs_de.md`](11-specialization-packs_d
 **Entscheidung.** Solange das Atelier nicht echt mehrsprachig ist, ist die **gesamte Web-UI durchgängig englisch — keine Sprachmischung**. Dies kehrt die frühere Konvention „Atelier-UI = Deutsch" / „Field-Helps = Deutsch" um (D-043/4 sowie die Notizen in den Feature-Bau-Prompts). Übersetzt: öffentliche Rechtsseiten (Impressum/Datenschutz/Nutzungsbedingungen), alle Field-Help-Resource-Dateien (`LearningFieldHelps`, `StudioFieldHelps`, `ProviderFieldHelps`, `FinalizerFieldHelps`, `GroundingFieldHelps`), Navigations-/Menü-Labels, Validierungs-/Toast-Strings, die System-Crew-Template-DisplayNames (`Classic`/`Legal`/`Academic` — interne Namen `klassik`/`juristisch`/`akademisch` unverändert) und ihre Beschreibungen sowie die `SiteSettings`-Default-Platzhalter. Code/XML-Doc bleibt englisch; Doku/Berichte/Commits bleiben deutsch (unverändert).
 
 **Scope-Hinweis:** Die historischen Bau-Prompts unter `docs/prompts/` und Abschlussberichte unter `docs/reports/` behalten ihre ursprüngliche Formulierung „UI-Strings = Deutsch" — sie sind ein Protokoll dessen, was damals entschieden wurde, keine lebende Richtlinie.
+
+## D-064 — Dynamischer Modell-Katalog für CLI-Provider (2026-08-04)
+
+**Anlass.** Der Modell-Auswahldialog zeigte für CLI-Provider eine im C#-Quelltext einbetonierte
+Liste: `ModelCatalog` verzweigte bei `ProviderType.Cli` **vor** dem Netzwerk-Pfad auf
+`settings.models`. Nach dem Erscheinen von Claude Opus 5 fehlte damit das beste verfügbare Modell in
+jeder Auswahl — und dieselbe Veraltung hätte sich bei jedem künftigen Release wiederholt. Der
+`cli-proxy` konnte die Frage längst beantworten; das Atelier hat ihn nur nie gefragt.
+
+**D-064/1 — Ein provider-gekeyter Endpunkt statt einer `cli_kind`-Tabelle im C#.** Das Atelier ruft
+ausschließlich `GET /v1/cli/{providerName}/models`. Welche CLI-Art eine Live-Quelle hat, ist eine
+Eigenschaft des Gateways und wird von ihm über `x_source` (`live` / `static` / `degraded`)
+mitgeteilt, statt in C# als Konstantenliste gepflegt zu werden. Benutzerdefinierte CLI-Provider
+funktionieren damit automatisch mit. Der HTTP-Aufruf lebt allein in `CliProxyModelSource`, hinter
+`ICliModelSource`, mit eigenem `HttpClient` **ohne** Resilience-Handler — ein fehlschlagender
+Modell-Abruf darf den geteilten Circuit-Breaker des echten LLM-Verkehrs nicht öffnen.
+
+**D-064/2 — Der Proxy meldet Herkunft und cacht Fehlschläge nicht.** Zuvor verwandelte
+`return concrete or list(STATIC_MODELS)` einen vollständigen Probe-Fehlschlag — etwa eine abgelaufene
+claude-OAuth-Sitzung, am 2026-07-22 bereits eingetreten — in ein **HTTP 200 mit der eingefrorenen
+Liste**, 24 h gecacht und vom Erfolgsfall nicht unterscheidbar. Jetzt wird ein Fehlschlag als
+`degraded` ausgewiesen und **nicht** gecacht; die Alias-Probe läuft unter dem geteilten Semaphor und
+beendet ihren Subprozess bei Timeout; `?refresh=1` erzwingt eine Neuauflösung, gedrosselt auf einen
+echten Probe-Durchlauf pro Minute; ein Hintergrund-Task wärmt beide Caches beim Start und löst sie
+alle 12 h **mit** Cache-Bust neu auf. Ohne diesen Bust wäre der 12-h-Lauf ein Selbstgespräch gewesen:
+er hätte seinen eigenen 24-h-Cache gelesen und nie ein neues Modell entdeckt.
+
+**D-064/3 — `*-latest`-Aliase als Vorgabe, konkrete ID im Snapshot.** Profile und System-Crews
+zeigen auf `claude-opus-latest` und folgen damit automatisch jedem Release. Der `CrewSnapshot`
+dagegen hält die **aufgelöste konkrete ID**, aufgelöst an der einen Stelle, an der jeder Run-Snapshot
+entsteht (`CrewService.ApplyPacksAsync`). Ohne diese Auflösung hätte die Umstellung Wartungsaufwand
+gegen einen irreversiblen Verlust getauscht: ein fortgesetzter Lauf wäre unbemerkt auf einem anderen
+Modell gelaufen als sein Elternlauf, und die Kostenzeilen hätten Modellgenerationen zusammengemittelt.
+`ResolveModelAsync` stößt bewusst **nie** einen Abruf an — es läuft auf dem Run-Start-Pfad — und
+vertraut der Abbildung nur bis zu deren **eigenem Ablaufstempel**. Das Kriterium „liegt eine Liste im
+Cache?" wäre falsch und ist ersatzlos entfallen; die Begründung steht in `geef_architecture.md`
+Abschnitt 9.3 und im Nachtrag unten.
+
+**D-064/4 — Live-Liste und kuratierte Liste werden vereinigt, nicht ersetzt.** Der Composer filtert
+`PreferredComposerModels` gegen den Katalog. Ersetzte die Gateway-Antwort die Liste, könnte ein
+kuratiertes Modell lautlos aus dem Prompt fallen und die Auto-Komposition ein schwächeres Modell
+wählen — ohne Fehler, ohne Log. Die Vereinigung schließt das aus, hält die Empfehlungsgruppe
+nicht-leer und bewahrt Bestandsprofile davor, in den Freitext-Modus zu kippen.
+
+**D-064/5 — Pluralitätsprüfung.** Alias und konkrete ID benennen dasselbe Modell. Eine Crew mit
+Executor `claude-opus-latest` und Reviewer `claude-opus-5` bestand zuvor jede Prüfung und war doch
+eine Monokultur, die sich selbst reviewt. Schritt 10 des `CrewSpecValidator` vergleicht nach der
+Auflösung und meldet den Fall als **nicht-kritischen** Hinweis — auch für wiederverwendete Reviewer,
+die häufigere und damit wahrscheinlichere Konstellation.
+
+**D-064/6 — Migration Step45.** Hebt ausschließlich `IsSystem = true`-Profile auf `claude-cli` von
+eingefrorenen Claude-IDs auf die Familien-Aliase, familienerhaltend über explizite `IN`-Listen
+(inklusive der gepunkteten Formen — Step30 seedet `claude-haiku-4.5`). Benutzerprofile und Profile
+anderer Provider bleiben unangetastet: ein System-Profil, das Claude über OpenRouter erreicht, muss
+seine OpenRouter-ID behalten, für die es keine Alias-Form gibt. `Down()` ist ein dokumentierter
+No-op. **Nebenwirkung, bewusst in Kauf genommen:** `IsSystem = true` heißt „vom System angelegt",
+nicht „vom Betreiber nie geändert" — wer ein System-Profil absichtlich auf eine ältere Generation
+gesetzt hatte, wird angehoben und kann das nur manuell rückgängig machen.
+
+**Bewusste Abweichungen von `geef_architecture.md`.** `HasLiveEndpoint` heißt in der Umsetzung
+`HasLiveSource` (der provider-gekeyte Endpunkt hat keine „Endpoint"-Ebene mehr). `StaticByDesign`
+gilt jetzt auch für HTTP-Provider mit manueller Modell-Liste — sachlich richtig, aber eine Ausweitung
+über den ursprünglichen Scope hinaus, sichtbar als ruhiger Hinweis statt gar keiner Kennzeichnung.
+Der Hinweistext lautet entsprechend „this provider" statt „this CLI".
+
+**Erkenntnis für künftige Nachträge.** Der Nachtrag §8 wurde als Diff umgesetzt, nicht als
+Neuherleitung: jeder Punkt für sich war korrekt, sämtliche Reviewer-Befunde saßen **zwischen** den
+Punkten — der Cache-Bust gegen das Timeout-Budget, die Alias-Map ohne eigenen Lebenszyklus, und
+Test-Doubles, deren Pass-Through-Verhalten genau die Null-Wirkung der neu eingeführten Regeln ist.
+Ein Nachtrag sollte die Spannungen zwischen seinen eigenen Punkten ausdrücklich benennen.
+
+**Deploy-Reihenfolge: erst `cli-proxy`, dann `web`.** Startet das Atelier gegen einen Proxy ohne
+D-064/2, meldet jeder CLI-Provider fälschlich „provider unreachable".
+
+**Offene Folgeaufgaben.** (1) `x-cli-proxy-provider`/`x-cli-proxy-failover` auslesen, damit ein per
+Failover von codex geschriebener Lauf nicht als `claude-cli` verbucht wird (Bestand vor dieser
+Aufgabe). (2) Persistierte „letzte bekannte gute Liste" als vierte Fallback-Ebene. (3) Sprung auf
+bUnit 2.x — bUnit 1.38.5 ist binär inkompatibel zu AngleSharp ≥ 1.5, weshalb `GHSA-pgww-w46g-26qg`
+für das Testprojekt unterdrückt statt behoben ist (AngleSharp liegt nie im Produktionsgraphen).
+(4) OpenRouter-Einträge aus `PreferredComposerModels.Reviewers` in `StaticModelFallback` spiegeln,
+damit auch dort kein bevorzugter Reviewer lautlos aus dem Composer-Prompt fallen kann.
+
+**Nachtrag nach Reviewer-Iteration 2 — Wächter-Regel und weitere Abweichungen.**
+
+Iteration 2 brachte vier Befunde derselben Bauart: *jeder neue Wächter stützte sich auf ein Indiz,
+das ausschließlich der Erfolgspfad erzeugt.* Ursache ist, dass dieses System **vier** Kodierungen
+für „keine echte Antwort" benutzt — `null` vom Transport, eine erfolgsförmige Antwort mit
+Degradations-Marker (HTTP 200 + `x_source: degraded`), die normale Rückgabe einer Konstante statt
+eines Abrufs (fehlender API-Key), und die **Abwesenheit** eines Zustands (kein Zeitstempel, keine
+Map) — und keine davon irgendwo aufgeschrieben stand. Die Tabelle steht jetzt als **§9 in
+`geef_architecture.md`**, zusammen mit der Regel: *ein Wächter darf sich nie auf ein Indiz stützen,
+das nur der Erfolgspfad erzeugt* — also gegen die **Kodierung** prüfen, nicht gegen die **Wertform**.
+
+Konkret daraus geändert: Die Alias-Map trägt einen **eigenen Ablaufstempel** statt sich auf „liegt
+eine Liste im Cache?" zu verlassen. Das frühere Kriterium war falsch, und zwar im Kern: `IMemoryCache`
+speichert provider-gekeyt, nicht generationsgekeyt, und der Fehlschlagzweig legt **selbst** einen
+Eintrag unter denselben Schlüssel — der Wächter fragte „gibt es *eine* Liste?", während der Vertrag
+„ist *die* Liste noch gültig?" braucht. Beides fällt in der Erfolgsspur zusammen und divergiert
+exakt im Fehlerfall. Wer den Wächter später „vereinfachen" will, muss diesen Absatz widerlegen.
+Ebenso: die Drossel für erzwungene Neuauflösung hängt am **Versuch**, nicht am Erfolg (sonst drosselt
+sie in der Störung gar nicht), und der interne 12-h-Sweep ist von ihr **ausgenommen** — er ist der
+einzige Weg, auf dem während einer Störung noch ein neues Modell entdeckt wird.
+
+Ein fehlender `OPENROUTER_API_KEY` meldet `static`, **nicht** `degraded`: eine abwesende Fähigkeit
+ist keine Störung, und `degraded` würde jedem codex-Picker dauerhaft einen roten
+„provider unreachable"-Banner geben, sobald der Key legitim entfällt.
+
+Weitere festgehaltene Abweichungen von §8: `WarmUpTimeoutSeconds` steht auf 240 statt der in §8.4
+genannten 60 (die dortige Begründung „der Proxy wärmt sich selbst" trägt nicht, weil der Nachtlauf
+`?refresh=1` sendet und damit genau den selbstgewärmten Cache umgeht); neu hinzugekommen sind
+`RefreshTimeoutSeconds`/`FetchBudget.Refresh` als eigenes Budget für den ⟳-Knopf, und
+`PreferredComposerModels.SecondaryDefault` als benannte Vorgabe für auto-komponierte Reviewer und
+Advisors. Die Deckelung des `HttpClient` wird aus den Budgets berechnet, damit
+`Interactive < Refresh < WarmUp < Deckel` gilt — eine Deckelung unterhalb eines Budgets macht dieses
+Budget wirkungslos, ohne dass die Konfiguration das zeigt.
+
+Bewusst nicht geschlossen: `RunOrchestratorService.ResolveSnapshot` rekonstruiert für Prä-PS-5-Runs
+einen Snapshot direkt aus `SystemCrew`-Konstanten und umgeht damit die Alias-Auflösung. Der Snapshot
+wird nicht persistiert; der Aufwand lohnt den Eingriff in einen defensiven Altpfad nicht.
+
+**Nachtrag nach Reviewer-Iteration 3 — bewusst getragene Kehrseiten und Folgeaufgaben.**
+
+*Kaltstartfenster.* In den rund 60 Sekunden zwischen Web-Start und dem ersten Warmlauf ist die
+Alias-Abbildung leer. Ein Lauf, der genau in diesem Fenster startet, schreibt den **unaufgelösten
+Alias** in seinen Snapshot. Das ist die bewusste Kehrseite davon, dass `ResolveModelAsync` keinen
+Abruf auslöst (die Alternative wäre eine Netzwerk-Runde auf dem Run-Start-Pfad, vor jedem Lauf). Der
+Lauf selbst funktioniert — die CLI löst den Alias ohnehin auf —, nur die Provenienz dieses einen
+Snapshots ist unschärfer. Wer das schließen will, braucht die persistierte „letzte bekannte gute
+Liste" aus Folgeaufgabe (2), nicht einen Abruf an dieser Stelle.
+
+*Drossel.* Beide Adapter drosseln nach demselben Vertrag und mit eigenem Zeitstempel pro Provider:
+sie greift nur bei **erzwungenen** Neuauflösungen, ein gewöhnlicher Aufruf nach einem Fehlschlag
+probt weiterhin, und der interne 12-h-Sweep ist ausgenommen. Der Zeitstempel misst den **Versuch**,
+nicht den Erfolg — ein fehlgeschlagener Abruf schreibt keinen Cache-Eintrag, eine erfolgsbasierte
+Drossel würde also ausgerechnet in der Störung nicht drosseln. Anlass für die Härte ist die
+claude-Seite: eine Probe startet drei echte CLI-Subprozesse auf einem Abo, das Hermes und der
+DMS-Worker mitbenutzen. Für codex ist es ein HTTP-Request, die Drossel dort also günstig, aber vor
+allem symmetrisch.
+
+*Inline-Kommentare.* `geef_architecture.md` §2.9 gibt die vorhandenen Kommentare in
+`ModelCatalog.cs` ausdrücklich als Altbestand frei („nicht vermehren; in angefassten Blöcken
+ersetzen"). Angefasste Blöcke wurden auf XML-Doc gehoben; die verbliebenen Zeilen sind unveränderter
+Altbestand. Die Abschnittsmarken in den Tests halten die vier Fehler-Kodierungen aus §9.1 an der
+Assertion sichtbar und sind bewusst dort belassen.
+
+*Als Folgeaufgaben festgehalten, bewusst nicht in dieser Aufgabe:*
+1. `codex-cli`: die **Empfehlungs**-Markierung bleibt kuratiert, während die Verfügbarkeit sich
+   selbst pflegt. Eine neue GPT-Generation erscheint also in der Liste, aber nicht automatisch als
+   Vorauswahl. Gehört mit Folgeaufgabe (4) aus dem Haupteintrag zusammen.
+2. Ein fehlgeschlagener Refresh verwirft die letzte bekannte gute **Liste** (die Alias-Abbildung ist
+   geschützt, die Liste nicht). Wirkung begrenzt, weil `MergeWithKnownIds` alle kuratierten IDs
+   hält; die saubere Lösung ist die persistierte Last-known-good aus §8.9.
+3. Der ⟳-Knopf kann weiterhin fälschlich „provider unreachable" melden, wenn die CLI-Slots des
+   Gateways gerade von echten Läufen belegt sind. Durch Drossel und eigenes Refresh-Budget deutlich
+   unwahrscheinlicher als zuvor, aber nicht ausgeschlossen.
+4. Der Ablauftest der Alias-Abbildung prüft nur die Seite **vor** dem Stempel. Die negative Hälfte
+   verlangt eine injizierbare Uhr im `ModelCatalog`-Konstruktor; der Gegenwert rechtfertigt die
+   Vertragsänderung vor diesem Deploy nicht.
+
+*Post-Deploy-Checkliste (Plan-Punkte 20–22), nach `cli-proxy` → `web`:*
+- **20** Live-UI über den Playwright-MCP: Modell-Auswahl öffnen, `claude-opus-latest` und die
+  konkrete Opus-ID müssen sichtbar sein, Konsole fehlerfrei.
+- **21** `get_provider_models("claude-cli")` über den MCP: enthält die konkrete aktuelle Opus-ID.
+- **22** `curl -s localhost:8090/v1/claude/models` — die Antwort darf **nicht** exakt `STATIC_MODELS`
+  sein und muss `x_source: "live"` melden. Das ist der einzige Direkttest gegen den Fehlermodus,
+  bei dem eine gescheiterte Probe wie ein Erfolg aussieht.
+
+*Abweichung von Abschnitt 3.6 (Modell-DTO).* Der Architekturteil verlangt ein gemeinsames internes
+DTO-Paar für beide Abrufpfade. Umgesetzt sind zwei: `ModelCatalog` behält sein
+`ModelListResponse`/`ModelEntry` für den HTTP-Pfad, `CliProxyModelSource` hat mit
+`CliModelsResponse`/`CliModelEntry` ein eigenes. Grund: die CLI-Antwort trägt mit `x_source` und
+`x_aliases` zwei Felder, die im HTTP-Schema nichts zu suchen haben — eine echte Wiederverwendung
+wäre ein Basistyp plus Erweiterung gewesen, also mehr Bauteile für zwei Deserialisierungsformen, die
+sich unabhängig voneinander entwickeln. Bewusst so belassen und hier festgehalten, statt still zu
+bleiben.

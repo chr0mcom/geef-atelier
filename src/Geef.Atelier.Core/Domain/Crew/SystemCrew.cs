@@ -15,7 +15,7 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// CLAUDE.md "Reviewer-Modell außerhalb der Anthropic-Familie"): the executor stays on Anthropic
 /// (continuity with PS-2), reviewers use external models for genuine outside perspective.</para>
 /// <para>If a chosen reviewer model is unavailable on OpenRouter or regresses against the
-/// Hadwiger-Nelson replay (PS-5 AC 10), fall back to <c>claude-opus-4-8</c> for all
+/// Hadwiger-Nelson replay (PS-5 AC 10), fall back to <c>claude-opus-latest</c> for all
 /// reviewers and document the change in the PS-5 report.</para>
 /// </remarks>
 public static class SystemCrew
@@ -33,7 +33,7 @@ public static class SystemCrew
         Description: "Standard Atelier drafting executor: clear, concise, briefing-bound prose; revises iterations against reviewer findings.",
         SystemPrompt: SystemPrompts.Executor,
         Provider: "claude-cli",
-        Model: "claude-opus-4-8",
+        Model: "claude-opus-latest",
         MaxTokens: 256000,
         IsSystem: true);
 
@@ -82,7 +82,7 @@ public static class SystemCrew
         Description: "Generic reviewer for substantive soundness: logical validity, claim safety, and adequacy of support. Specialised per crew via a bound specialization pack (e.g. legal-clause-risk, academic-argumentation, marketing-conversion).",
         SystemPrompt: SystemPrompts.SubstantiveRigorReviewer,
         Provider: "claude-cli",
-        Model: "claude-opus-4-8",
+        Model: "claude-opus-latest",
         MaxTokens: 64000,
         IsSystem: true);
 
@@ -95,7 +95,7 @@ public static class SystemCrew
         Description: "Specialist executor for auto-crew composition runs. Analyzes task descriptions and calls submit_crew_spec with a complete crew configuration following Reuse-First and model-plurality rules.",
         SystemPrompt: SystemPrompts.CrewComposerExecutor,
         Provider: "claude-cli",
-        Model: "claude-opus-4-8",
+        Model: "claude-opus-latest",
         MaxTokens: 64000,
         IsSystem: true);
 
@@ -152,7 +152,7 @@ public static class SystemCrew
         Description: "Verifies that reused profiles fit the task, detects unnecessary duplicates, and checks that the correct composition mode (existing-template / composed / new) was selected.",
         SystemPrompt: SystemPrompts.CrewComposerReuseCorrectness,
         Provider: "claude-cli",
-        Model: "claude-opus-4-8",
+        Model: "claude-opus-latest",
         MaxTokens: 64000,
         IsSystem: true);
 
@@ -176,7 +176,7 @@ public static class SystemCrew
         Description: "Strategic pre-composition advisor. Analyzes the user's task for domain, quality risks, suitable crew archetypes, grounding needs, and complexity calibration before the executor begins.",
         SystemPrompt: SystemPrompts.CrewDesignAdvisor,
         Provider: "claude-cli",
-        Model: "claude-opus-4-8",
+        Model: "claude-opus-latest",
         MaxTokens: 64000,
         Mode: AdvisorMode.Strategic,
         Trigger: AdvisorTrigger.BeforeFirstExecution,
@@ -229,8 +229,8 @@ public static class SystemCrew
                 "- ONLY use provider names and model IDs from the 'Valid Provider/Model Pairs' catalog injected into the executor prompt.\n" +
                 "- Valid providers: claude-cli, codex-cli, openrouter, openai-direct, google-ai-studio, deepseek, xai, ollama-local.\n" +
                 "- NEVER use openai, google, anthropic, x-ai, or any other invented provider name.\n" +
-                "- Prefer NEWEST top-tier models. Do not use legacy models (gemini-2.5, gpt-4o, claude-opus-4-7, etc.).\n" +
-                "- Recommended defaults: claude-cli/claude-opus-4-8 (executor), codex-cli/gpt-5.6-sol, openrouter/x-ai/grok-4.5 (reviewers).\n" +
+                "- Prefer NEWEST top-tier models. Do not use legacy models (gemini-2.5, gpt-4o, superseded Claude Opus generations, etc.).\n" +
+                "- Recommended defaults: claude-cli/claude-opus-latest (executor), codex-cli/gpt-5.6-sol, openrouter/x-ai/grok-4.5 (reviewers).\n" +
                 "\n" +
                 "REUSE-FIRST (reduces validation risk to zero):\n" +
                 "- Default executor: { \"reuse\": \"default-executor\" } — never needs provider/model.\n" +
@@ -528,7 +528,7 @@ public static class SystemCrew
         Description: "Pre-checks briefings for legal practicability before drafting begins. Identifies constraints, terminological traps, regulatory context, missing information, and risk areas where qualifications are needed.",
         SystemPrompt: SystemPrompts.LegalDomainExpert,
         Provider: "claude-cli",
-        Model: "claude-opus-4-8",
+        Model: "claude-opus-latest",
         MaxTokens: 64000,
         Mode: AdvisorMode.DomainExpert,
         Trigger: AdvisorTrigger.BeforeFirstExecution,
@@ -541,7 +541,7 @@ public static class SystemCrew
         Description: "Challenges the weakest assumptions, contested claims, and methodological gaps in the current draft before each iteration. Rotates focus to prevent repetitive critique.",
         SystemPrompt: SystemPrompts.AcademicRigorAdvisor,
         Provider: "claude-cli",
-        Model: "claude-opus-4-8",
+        Model: "claude-opus-latest",
         MaxTokens: 64000,
         Mode: AdvisorMode.Critical,
         Trigger: AdvisorTrigger.BeforeEveryExecution,
@@ -554,7 +554,7 @@ public static class SystemCrew
         Description: "Strategic consultant. Analyzes briefings for unclear constraints, missing context, or unrealistic scope before the Executor begins.",
         SystemPrompt: "You are a strategic consultant reviewing a text briefing before an AI executor processes it. Identify up to 5 key strategic observations: unclear constraints, missing context, unrealistic scope, or conflicting requirements. Be concise (2-3 sentences per point). Do NOT write the text yourself — advise the executor.",
         Provider: "claude-cli",
-        Model: "claude-opus-4-8",
+        Model: "claude-opus-latest",
         MaxTokens: 64000,
         Mode: AdvisorMode.Strategic,
         Trigger: AdvisorTrigger.BeforeFirstExecution,
@@ -567,7 +567,7 @@ public static class SystemCrew
         Description: "Adversarial perspective. After each iteration, challenges the strongest claims of the artifact to surface weak assumptions.",
         SystemPrompt: "You are a critical reviewer tasked with challenging an AI-generated text artifact. In 2-4 sentences, identify the weakest assumptions or most contestable claims. Be constructive — aim to strengthen the final text, not tear it down. Do NOT rewrite the text.",
         Provider: "claude-cli",
-        Model: "claude-opus-4-8",
+        Model: "claude-opus-latest",
         MaxTokens: 64000,
         Mode: AdvisorMode.DevilsAdvocate,
         Trigger: AdvisorTrigger.BeforeEveryExecution,

@@ -96,6 +96,7 @@ public sealed class CrewServiceAutoPrexfixTests
             new InMemoryFinalizerProfileRepository(),
             templateRepo  ?? new InMemoryCrewTemplateRepository(),
             new Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository(),
+            new Geef.Atelier.Tests.Fakes.PassThroughModelCatalog(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CrewService>.Instance);
 
     private static ReviewerProfile BuildReviewerProfile(string name) => new(

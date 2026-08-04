@@ -49,6 +49,7 @@ internal sealed class OrchestratorTestHost : IAsyncDisposable
             .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
                 services.AddAtelierPersistence();
                 services.AddAtelierApplication();
+                services.AddSingleton<Geef.Atelier.Application.Crew.IModelCatalog, Geef.Atelier.Tests.Fakes.PassThroughModelCatalog>();
                 services.AddScoped<IKnowledgeService, NoOpKnowledgeService>();
 
                 services.AddSingleton<ILlmClientResolver>(new TestLlmClientResolver(llmClient));

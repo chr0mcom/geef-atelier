@@ -209,6 +209,16 @@
 
 /* ── Fallback banner ── */
 
+/* Deliberately quiet: a provider without a live endpoint is a fact, not a fault. */
+.model-selector-static-note {
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: color-mix(in oklch, var(--ink-1) 5%, transparent);
+    border: 1px solid color-mix(in oklch, var(--ink-1) 12%, transparent);
+    font-size: 12px;
+    color: color-mix(in oklch, var(--ink-1) 70%, transparent);
+}
+
 .model-selector-fallback-banner {
     padding: 6px 10px;
     border-radius: 6px;

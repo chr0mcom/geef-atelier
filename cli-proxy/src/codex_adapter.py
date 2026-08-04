@@ -42,6 +42,17 @@ _CACHE_TTL = 86400  # 24 hours
 _model_cache: tuple[list[str], float] | None = None
 _cache_lock = asyncio.Lock()
 
+# Minimum spacing between forced re-fetches, and the timestamp of the last ATTEMPT. Mirrors the
+# claude side so the throttle exists per provider, as the guard rule requires; a failed fetch writes
+# no cache entry, so a success-based throttle would not throttle during an outage.
+_MODEL_REFRESH_MIN_INTERVAL = int(os.getenv("CODEX_MODEL_REFRESH_MIN_INTERVAL", "60"))
+_last_attempt_at: float | None = None
+
+# Source markers reported alongside every model list, mirroring claude_adapter.
+SOURCE_LIVE = "live"
+SOURCE_DEGRADED = "degraded"
+SOURCE_STATIC = "static"
+
 # Fallback if OpenRouter is unreachable and cache is empty
 _FALLBACK_MODELS = [
     "gpt-5.6-sol",
@@ -51,11 +62,19 @@ _FALLBACK_MODELS = [
 ]
 
 
+class NoLiveSourceError(RuntimeError):
+    """Raised when there is no configured way to reach the live list at all.
+
+    Distinct from a failed fetch on purpose: an absent API key is a missing capability, not an
+    outage, and reporting it as "degraded" would put a permanent red "provider unreachable" banner
+    on every codex picker the moment the key is legitimately removed.
+    """
+
+
 async def _fetch_from_openrouter(top_n: int = 10) -> list[str]:
     """Fetches the top_n newest OpenAI models from OpenRouter, excluding image/audio/alias variants."""
     if not OPENROUTER_API_KEY:
-        log.warning("OPENROUTER_API_KEY not set — using fallback model list for codex")
-        return _FALLBACK_MODELS
+        raise NoLiveSourceError("OPENROUTER_API_KEY not set")
 
     headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}"}
     async with httpx.AsyncClient(timeout=10) as client:
@@ -72,19 +91,39 @@ async def _fetch_from_openrouter(top_n: int = 10) -> list[str]:
     return [m["id"].replace("openai/", "") for m in openai_models[:top_n]]
 
 
-async def _get_cached_models() -> list[str]:
-    global _model_cache
+async def _get_cached_models(bypass_cache: bool = False, force: bool = False) -> tuple[list[str], str]:
+    """Returns (model ids, source).
+
+    "live" for a fresh or cached OpenRouter answer, "degraded" when a reachable source failed, and
+    "static" when no live source is configured at all. Neither non-success case is cached.
+    """
+    global _model_cache, _last_attempt_at
     async with _cache_lock:
-        if _model_cache is not None and time.time() - _model_cache[1] < _CACHE_TTL:
-            return _model_cache[0]
+        cached_fresh = _model_cache is not None and time.time() - _model_cache[1] < _CACHE_TTL
+
+        if cached_fresh and not bypass_cache:
+            return _model_cache[0], SOURCE_LIVE  # type: ignore[index]
+
+        if bypass_cache and not force and _last_attempt_at is not None \
+                and time.time() - _last_attempt_at < _MODEL_REFRESH_MIN_INTERVAL:
+            # Freshness is re-checked here on purpose: reporting an EXPIRED entry as live would let
+            # the throttle revive stale data, and the caller caches a live answer for another day.
+            if cached_fresh:
+                return _model_cache[0], SOURCE_LIVE  # type: ignore[index]
+            return (_model_cache[0] if _model_cache else _FALLBACK_MODELS), SOURCE_DEGRADED
+
+        _last_attempt_at = time.time()
         try:
             models = await _fetch_from_openrouter()
             _model_cache = (models, time.time())
             log.info("Codex model list refreshed: %s", models)
-            return models
+            return models, SOURCE_LIVE
+        except NoLiveSourceError as exc:
+            log.warning("Codex model list has no live source: %s — serving the curated list", exc)
+            return (_model_cache[0] if _model_cache else _FALLBACK_MODELS), SOURCE_STATIC
         except Exception as exc:
             log.warning("Failed to fetch codex models from OpenRouter: %s — using cached/fallback", exc)
-            return _model_cache[0] if _model_cache else _FALLBACK_MODELS
+            return (_model_cache[0] if _model_cache else _FALLBACK_MODELS), SOURCE_DEGRADED
 
 
 def list_models() -> list[str]:
@@ -92,9 +131,17 @@ def list_models() -> list[str]:
     return _model_cache[0] if _model_cache else _FALLBACK_MODELS
 
 
-async def list_models_async() -> list[str]:
+async def list_models_with_source_async(bypass_cache: bool = False, force: bool = False) -> tuple[list[str], str]:
+    """Live model list plus its provenance, refreshed from OpenRouter every 24 hours.
+
+    `force` bypasses the attempt throttle and is reserved for the internal periodic sweep."""
+    return await _get_cached_models(bypass_cache, force)
+
+
+async def list_models_async(bypass_cache: bool = False, force: bool = False) -> list[str]:
     """Returns live model list, refreshed from OpenRouter every 24 hours."""
-    return await _get_cached_models()
+    models, _source = await _get_cached_models(bypass_cache, force)
+    return models
 
 
 async def complete_document(

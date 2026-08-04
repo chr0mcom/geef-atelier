@@ -71,10 +71,10 @@ public sealed class KlassikUnchangedRegressionTests
     }
 
     [Fact]
-    public void DefaultExecutorProfile_UsesClaudioCli_Opus47()
+    public void DefaultExecutorProfile_UsesClaudeCli_OpusAlias()
     {
         Assert.Equal("claude-cli", SystemCrew.DefaultExecutorProfile.Provider);
-        Assert.Equal("claude-opus-4-8", SystemCrew.DefaultExecutorProfile.Model);
+        Assert.Equal("claude-opus-latest", SystemCrew.DefaultExecutorProfile.Model);
     }
 
     [Fact]

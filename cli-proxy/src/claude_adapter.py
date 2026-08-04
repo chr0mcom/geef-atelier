@@ -46,15 +46,42 @@ _ALIAS_TO_CLI = {
 # Offline fallback when alias resolution is unavailable. Kept reasonably current, but the
 # dynamic resolver (list_models_async) supersedes it and the *-latest aliases never go stale.
 STATIC_MODELS = [
-    "claude-opus-4-8",
+    "claude-opus-5",
     "claude-sonnet-5",
     "claude-haiku-4-5",
 ]
 
+# CLI family alias -> the `claude-<family>-latest` id surfaced to callers.
+_CLI_TO_ALIAS = {
+    "opus": "claude-opus-latest",
+    "sonnet": "claude-sonnet-latest",
+    "haiku": "claude-haiku-latest",
+}
+
+# How long a probe may run before its subprocess is killed.
+_PROBE_TIMEOUT_SECONDS = int(os.getenv("CLAUDE_MODEL_PROBE_TIMEOUT", "60"))
+
+# Minimum spacing between forced re-resolutions. `?refresh=1` is unauthenticated and each honoured
+# call spends real CLI probes on a subscription shared with Hermes and the DMS worker, so a burst of
+# clicks must collapse into one probe.
+_MODEL_REFRESH_MIN_INTERVAL = int(os.getenv("CLAUDE_MODEL_REFRESH_MIN_INTERVAL", "60"))
+
+# Timestamp of the last resolution ATTEMPT, success or failure. The success timestamp cannot serve
+# as the throttle: a failed probe writes no cache entry, so every further forced call would probe
+# again — in exactly the outage the throttle exists to contain.
+_last_attempt_at: float | None = None
+
 _MODEL_CACHE_TTL = 86400  # 24 hours
-# In-memory cache of concrete latest model ids: (model_ids, fetched_at)
-_model_cache: tuple[list[str], float] | None = None
+# In-memory cache of a SUCCESSFUL probe: (alias -> concrete id, fetched_at).
+# A failed probe is never cached: caching it would serve STATIC_MODELS as if it were live
+# for a full day, which is exactly the staleness this resolver exists to prevent.
+_model_cache: tuple[dict[str, str], float] | None = None
 _model_cache_lock = asyncio.Lock()
+
+# Source markers reported alongside every model list.
+SOURCE_LIVE = "live"
+SOURCE_DEGRADED = "degraded"
+SOURCE_STATIC = "static"
 
 
 def _normalize_model(model: str | None) -> str | None:
@@ -73,38 +100,60 @@ def _normalize_model(model: str | None) -> str | None:
 
 
 async def _probe_alias(alias: str) -> str | None:
-    """Ask the claude CLI which concrete model the family alias currently resolves to."""
+    """Ask the claude CLI which concrete model the family alias currently resolves to.
+
+    Runs under the shared CLI semaphore so a model probe cannot outrank real completions,
+    and always reaps its subprocess: without the kill a timed-out probe would leave a
+    `claude` process running against the same subscription.
+    """
     args = ["claude", "-p", "--model", alias, "--output-format", "json"]
     env = {**os.environ, "HOME": CLAUDE_HOME}
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            *args,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=env,
-        )
-        stdout, _ = await asyncio.wait_for(proc.communicate(input=b"hi"), timeout=60)
-        data = json.loads(stdout.decode(errors="replace"))
-        keys = list((data.get("modelUsage") or {}).keys())
-        if keys:
-            return keys[0]
-    except Exception as exc:  # noqa: BLE001 — best-effort discovery, never fatal
-        log.warning("claude model alias probe failed for %s: %s", alias, exc)
+    async with _semaphore:
+        proc = None
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *args,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,
+            )
+            stdout, _ = await asyncio.wait_for(
+                proc.communicate(input=b"hi"), timeout=_PROBE_TIMEOUT_SECONDS
+            )
+            proc = None
+            data = json.loads(stdout.decode(errors="replace"))
+            keys = list((data.get("modelUsage") or {}).keys())
+            if keys:
+                return keys[0]
+            log.warning("claude model alias probe for %s returned no modelUsage entry", alias)
+        except Exception as exc:  # noqa: BLE001 — best-effort discovery, never fatal
+            log.warning("claude model alias probe failed for %s: %s", alias, exc)
+        finally:
+            if proc is not None and proc.returncode is None:
+                try:
+                    proc.kill()
+                    await proc.wait()
+                except ProcessLookupError:
+                    pass
     return None
 
 
-async def _resolve_concrete_models() -> list[str]:
-    """Resolve the current concrete model id for each family via the CLI's alias resolution.
+async def _resolve_alias_map() -> tuple[dict[str, str], bool]:
+    """Resolve each family alias to its current concrete model id via the CLI itself.
 
-    Probes run concurrently so a cache refresh costs one round-trip, not three.
+    Probes run concurrently so a cache refresh costs one round-trip, not three. The second
+    tuple element is False when not a single probe succeeded — the caller must not cache
+    that result and must report it as degraded rather than live.
     """
-    results = await asyncio.gather(*(_probe_alias(a) for a in ("opus", "sonnet", "haiku")))
-    concrete: list[str] = []
-    for resolved in results:
-        if resolved and resolved not in concrete:
-            concrete.append(resolved)
-    return concrete or list(STATIC_MODELS)
+    families = ("opus", "sonnet", "haiku")
+    results = await asyncio.gather(*(_probe_alias(a) for a in families))
+    alias_map = {
+        _CLI_TO_ALIAS[family]: resolved
+        for family, resolved in zip(families, results)
+        if resolved
+    }
+    return alias_map, bool(alias_map)
 
 
 def _compose_model_list(concrete: list[str]) -> list[str]:
@@ -116,23 +165,93 @@ def _compose_model_list(concrete: list[str]) -> list[str]:
     return out
 
 
-async def list_models_async() -> list[str]:
+def _concrete_from(alias_map: dict[str, str]) -> list[str]:
+    """Concrete ids of an alias map, deduped, in opus/sonnet/haiku order."""
+    concrete: list[str] = []
+    for alias in LATEST_ALIAS_MODELS:
+        resolved = alias_map.get(alias)
+        if resolved and resolved not in concrete:
+            concrete.append(resolved)
+    return concrete
+
+
+async def list_models_with_source_async(
+    bypass_cache: bool = False,
+    force: bool = False,
+) -> tuple[list[str], str, dict[str, str]]:
+    """Model list plus its provenance and the alias-to-concrete mapping.
+
+    Returns (model ids, source, alias map). The source is "live" when the CLI answered the
+    probe and "degraded" when every probe failed — in the degraded case the ids fall back to
+    STATIC_MODELS and the result is deliberately NOT cached, so an ordinary next call probes again
+    (a forced one waits out the throttle interval below). An expired OAuth session must not look
+    like a fresh answer for 24 hours.
+
+    `bypass_cache` requests a fresh resolution; it is throttled by ATTEMPT rather than by success,
+    because a failed probe writes no cache entry and a success-based throttle would therefore not
+    throttle at all in the outage it exists to contain. The throttle applies only to such forced
+    re-resolutions — an ordinary call after a failure still probes, as the no-caching promise above
+    states. `force` skips the throttle entirely and is reserved for the internal periodic sweep,
+    which is the only remaining path that discovers a new model during an outage.
+    """
+    global _model_cache, _last_attempt_at
+    async with _model_cache_lock:
+        age = time.time() - _model_cache[1] if _model_cache is not None else None
+        cached_fresh = age is not None and age < _MODEL_CACHE_TTL
+
+        if cached_fresh and not bypass_cache:
+            alias_map = _model_cache[0]  # type: ignore[index]
+            return _compose_model_list(_concrete_from(alias_map)), SOURCE_LIVE, dict(alias_map)
+
+        if bypass_cache and not force and _throttled(_last_attempt_at):
+            if cached_fresh:
+                alias_map = _model_cache[0]  # type: ignore[index]
+                return _compose_model_list(_concrete_from(alias_map)), SOURCE_LIVE, dict(alias_map)
+            log.warning("claude model probe throttled; serving static list as degraded")
+            return _compose_model_list(list(STATIC_MODELS)), SOURCE_DEGRADED, {}
+
+        _last_attempt_at = time.time()
+        alias_map, probed = await _resolve_alias_map()
+        if probed:
+            # Merge rather than replace: `probed` is true as soon as ONE family answered, so a
+            # partial run must not drop the families that answered on an earlier run.
+            if _model_cache is not None:
+                alias_map = {**_model_cache[0], **alias_map}
+            _model_cache = (alias_map, time.time())
+            return _compose_model_list(_concrete_from(alias_map)), SOURCE_LIVE, dict(alias_map)
+
+        if cached_fresh:
+            # A forced re-resolution that failed must not throw away a mapping that still holds.
+            alias_map = _model_cache[0]  # type: ignore[index]
+            log.warning("claude model re-resolution failed; keeping the cached mapping")
+            return _compose_model_list(_concrete_from(alias_map)), SOURCE_DEGRADED, dict(alias_map)
+
+    log.warning("claude model probe failed entirely; serving static list as degraded")
+    return _compose_model_list(list(STATIC_MODELS)), SOURCE_DEGRADED, {}
+
+
+def _throttled(last_attempt_at: float | None) -> bool:
+    """True when a resolution was already attempted inside the minimum interval."""
+    return last_attempt_at is not None and time.time() - last_attempt_at < _MODEL_REFRESH_MIN_INTERVAL
+
+
+async def list_models_async(bypass_cache: bool = False, force: bool = False) -> list[str]:
     """Always-current model list: always-latest aliases + the concrete newest model ids
     (resolved via the CLI's own alias resolution, cached 24h). Falls back to STATIC_MODELS
     when probing is unavailable, so the list is never stale and needs no manual updates."""
-    global _model_cache
-    async with _model_cache_lock:
-        if _model_cache is not None and time.time() - _model_cache[1] < _MODEL_CACHE_TTL:
-            concrete = _model_cache[0]
-        else:
-            concrete = await _resolve_concrete_models()
-            _model_cache = (concrete, time.time())
-    return _compose_model_list(concrete)
+    models, _source, _aliases = await list_models_with_source_async(bypass_cache, force)
+    return models
+
+
+async def resolve_alias_map_async() -> dict[str, str]:
+    """Current alias-to-concrete mapping, empty when no successful probe is available."""
+    _models, _source, alias_map = await list_models_with_source_async()
+    return alias_map
 
 
 def list_models() -> list[str]:
     """Synchronous shim (startup / fallback): always-latest aliases + cached-or-static concrete ids."""
-    concrete = _model_cache[0] if _model_cache else list(STATIC_MODELS)
+    concrete = _concrete_from(_model_cache[0]) if _model_cache else list(STATIC_MODELS)
     return _compose_model_list(concrete)
 
 

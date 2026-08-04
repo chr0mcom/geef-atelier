@@ -13,6 +13,13 @@ import main  # noqa: E402
 import claude_adapter  # noqa: E402
 
 
+SEEDED_ALIAS_MAP = {
+    "claude-opus-latest": "claude-opus-4-8",
+    "claude-sonnet-latest": "claude-sonnet-5",
+    "claude-haiku-latest": "claude-haiku-4-5",
+}
+
+
 @pytest.fixture(autouse=True)
 def _seed_claude_model_cache():
     """Pre-seed the claude model cache so /v1/claude/models does not spawn real CLI probes.
@@ -20,7 +27,7 @@ def _seed_claude_model_cache():
     Mirrors what a healthy cli-proxy resolves; keeps the endpoint tests fast and deterministic.
     """
     import time
-    claude_adapter._model_cache = (list(claude_adapter.STATIC_MODELS), time.time())
+    claude_adapter._model_cache = (dict(SEEDED_ALIAS_MAP), time.time())
     yield
     claude_adapter._model_cache = None
 
@@ -124,6 +131,12 @@ class TestModelNormalisationAndAliases:
             assert alias in models, f"{alias} missing from {models}"
 
     def test_static_fallback_is_current_opus(self) -> None:
-        # Guards against the list silently going stale (the original 4-7 bug).
-        assert "claude-opus-4-8" in claude_adapter.STATIC_MODELS
+        """Guards the OFFLINE list against silently rotting (the original 4-7 bug).
+
+        This is the only model list left that still needs a human on each release: it is what a
+        caller sees when every probe failed, so naming a superseded generation there would put a
+        stale answer behind a degraded marker. The live path maintains itself.
+        """
+        assert "claude-opus-5" in claude_adapter.STATIC_MODELS
+        assert "claude-opus-4-8" not in claude_adapter.STATIC_MODELS
         assert "claude-opus-4-7" not in claude_adapter.STATIC_MODELS

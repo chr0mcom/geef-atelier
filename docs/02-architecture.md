@@ -2,7 +2,7 @@
 
 *[Deutsch](02-architecture_de.md) · **English***
 
-*Last updated: 2026-06-04 (D-059: CrewComposition RunKind, crew-composer pipeline, CrewMaterialize finalizer type, CrewTemplateEmbeddings table, ParentCompositionRunId column)*
+*Last updated: 2026-08-04 (D-064: dynamic model catalog for CLI providers via the cli-proxy, three-state provenance, alias resolution at snapshot build time)*
 
 ## Layer diagram
 
@@ -721,6 +721,31 @@ The severity taxonomy, the anti-pattern rule and the convergence-policy strategy
 2. `docker build --no-cache -t geef-atelier .` in the `build/` directory.
 3. `docker compose -f docker-compose.prod.yml up -d` starts app + Postgres; auto-migration on startup (D-010) runs on first start.
 4. Traefik detects the container via Docker labels, issues the Let's Encrypt certificate.
+
+### Model catalog for CLI providers (D-064)
+
+CLI providers do not carry their model list in the Atelier. `ModelCatalog` reads it from the
+cli-proxy through `ICliModelSource` / `CliProxyModelSource`, which calls the single provider-keyed
+endpoint `GET /v1/cli/{providerName}/models`. The gateway reports where the list came from —
+`x_source` is `live`, `static` (no live source by design, e.g. gemini) or `degraded` (a live source
+exists but could not be reached) — and, for claude, an `x_aliases` map from `claude-<family>-latest`
+to the concrete model the alias currently resolves to.
+
+Three consequences shape the surrounding code:
+
+* **Provenance is three-state, not a boolean.** `ModelCatalogSource` distinguishes `Live`,
+  `StaticByDesign` and `Fallback`, so the picker can stay truthful for a provider that never had a
+  live source instead of permanently claiming it is unreachable.
+* **The live list is merged with the curated one**, never replaced, so a preferred composer model
+  cannot silently drop out of the catalog it is filtered against.
+* **Profiles hold `*-latest` aliases, run snapshots hold concrete ids.** The alias is resolved once
+  per snapshot in `CrewService.ApplyPacksAsync`, so new runs follow new releases while a resumed run
+  stays on the model its parent used.
+
+Caching: 24 h for a successful CLI lookup (matching the gateway's own cache), 1 h for HTTP providers,
+5 minutes for any failure. `ModelCatalogWarmUpService` warms every active CLI provider shortly after
+start-up and again nightly; `ModelCatalogOptions.CliLiveCatalogEnabled` is the kill switch back to
+configured lists without a redeploy.
 
 ## Observability
 

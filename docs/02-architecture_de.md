@@ -2,7 +2,7 @@
 
 *[English](02-architecture.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-22 (D-054: RunKind-Spalte auf Runs, LearningEntries-Tabelle, LearningExtract/LearningPublish-Finalizer-Typen, learning-retrieval-Grounding-Provider, /crew/learnings-UI-Page)*
+*Letzte Aktualisierung: 2026-08-04 (D-064: dynamischer Modell-Katalog für CLI-Provider über den cli-proxy, dreiwertige Herkunft, Alias-Auflösung zum Snapshot-Bauzeitpunkt)*
 
 ## Schichtenbild
 
@@ -674,6 +674,31 @@ Severity-Taxonomie, Anti-Pattern-Regel und Convergence-Policy-Strategie sind in 
 2. `docker build --no-cache -t geef-atelier .` im `build/`-Verzeichnis.
 3. `docker compose -f docker-compose.prod.yml up -d` startet App + Postgres; Auto-Migration on Startup (D-010) läuft beim ersten Start.
 4. Traefik erkennt den Container via Docker-Labels, stellt Let's-Encrypt-Zertifikat aus.
+
+### Modell-Katalog für CLI-Provider (D-064)
+
+CLI-Provider führen ihre Modell-Liste nicht im Atelier. `ModelCatalog` liest sie über
+`ICliModelSource` / `CliProxyModelSource` aus dem cli-proxy, und zwar über den einen
+provider-gekeyten Endpunkt `GET /v1/cli/{providerName}/models`. Das Gateway meldet die Herkunft —
+`x_source` ist `live`, `static` (keine Live-Quelle vorgesehen, z. B. gemini) oder `degraded`
+(Live-Quelle vorhanden, aber nicht erreichbar) — und für claude zusätzlich eine `x_aliases`-Abbildung
+von `claude-<familie>-latest` auf die konkrete ID, auf die der Alias gerade zeigt.
+
+Daraus folgen drei Eigenschaften des umgebenden Codes:
+
+* **Die Herkunft ist dreiwertig, kein Boolean.** `ModelCatalogSource` unterscheidet `Live`,
+  `StaticByDesign` und `Fallback`, damit die Auswahl bei einem Provider ohne Live-Quelle wahrhaftig
+  bleibt, statt dauerhaft „unerreichbar" zu behaupten.
+* **Die Live-Liste wird mit der kuratierten vereinigt**, nie ersetzt, damit ein bevorzugtes
+  Composer-Modell nicht lautlos aus genau dem Katalog fällt, gegen den es gefiltert wird.
+* **Profile halten `*-latest`-Aliase, Run-Snapshots halten konkrete IDs.** Der Alias wird einmal pro
+  Snapshot in `CrewService.ApplyPacksAsync` aufgelöst — neue Läufe folgen damit neuen Releases,
+  während ein fortgesetzter Lauf auf dem Modell seines Elternlaufs bleibt.
+
+Caching: 24 h nach einem erfolgreichen CLI-Abruf (deckungsgleich mit dem Cache des Gateways), 1 h für
+HTTP-Provider, 5 Minuten nach jedem Fehlschlag. `ModelCatalogWarmUpService` wärmt kurz nach dem Start
+und danach nächtlich jeden aktiven CLI-Provider; `ModelCatalogOptions.CliLiveCatalogEnabled` ist der
+Not-Aus zurück auf die konfigurierten Listen, ohne Redeploy.
 
 ## Observability
 

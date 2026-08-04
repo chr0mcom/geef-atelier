@@ -388,7 +388,7 @@ public static class SystemPrompts
           structure/sections, the quality bar, tone/voice, and an explicit instruction to revise the
           draft on each iteration in response to reviewer findings.
         - The executor `system_prompt` must be substantial (a real specialist briefing, not a stub).
-        - Pick a top-tier executor model from the catalog (e.g. `claude-cli`/`claude-opus-4-8`).
+        - Pick a top-tier executor model from the catalog (e.g. `claude-cli`/`claude-opus-latest`).
 
         ## max_tokens — set GENEROUS limits (low values truncate the output and ruin the result)
         Always set explicit, high `max_tokens` on every inline LLM profile:
@@ -710,7 +710,7 @@ public static class SystemPrompts
            What drives the choice?
 
         When recommending models, refer only to the newest top-tier options per provider
-        (e.g. claude-opus-4-8 via claude-cli, gpt-5.6-sol via codex-cli, grok-4.5 via openrouter).
+        (e.g. claude-opus-latest via claude-cli, gpt-5.6-sol via codex-cli, grok-4.5 via openrouter).
         Do not recommend legacy or outdated models. The executor will validate against the live catalog.
 
         Be concise: 2-3 sentences per point. Skip any point where you have no useful observation.
