@@ -120,8 +120,8 @@ public static class SystemProviders
         binary: "claude",
         authVolume: "/auth/claude",
         authCommand: "claude auth login",
-        models: ["claude-opus-latest", "claude-sonnet-latest", "claude-haiku-latest",
-                 "claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"]
+        models: ["claude-opus-latest", "claude-sonnet-latest", "claude-haiku-latest", "claude-fable-latest",
+                 "claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5", "claude-fable-5"]
     );
 
     /// <summary>OpenAI via the official Codex CLI subscription.</summary>

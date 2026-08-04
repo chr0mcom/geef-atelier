@@ -22,6 +22,16 @@ import main  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
+def _fixed_families_for_probe_counts():
+    """Pin the family set so probe-count assertions stay meaningful and no test shells out."""
+    original, discovered = claude_adapter._families, claude_adapter._families_discovered
+    claude_adapter._families = ("opus", "sonnet", "haiku")
+    claude_adapter._families_discovered = True
+    yield
+    claude_adapter._families, claude_adapter._families_discovered = original, discovered
+
+
+@pytest.fixture(autouse=True)
 def _clear_caches():
     claude_adapter._model_cache = None
     claude_adapter._last_attempt_at = None
@@ -119,6 +129,93 @@ class TestClaudeProvenance:
         assert body["x_source"] == "live"
         assert body["x_aliases"] == {"claude-opus-latest": "claude-opus-5"}
         assert {"id": "claude-opus-5", "object": "model", "owned_by": "anthropic"} in body["data"]
+
+
+class TestFamilyDiscovery:
+    """Families are discovered, not listed: pinning them moves the staleness one level up, which is
+    exactly how the fable family went missing while its generations updated themselves."""
+
+    @pytest.fixture(autouse=True)
+    def _allow_rediscovery(self):
+        original, discovered = claude_adapter._families, claude_adapter._families_discovered
+        claude_adapter._families_discovered = False
+        yield
+        claude_adapter._families, claude_adapter._families_discovered = original, discovered
+
+    @pytest.mark.asyncio
+    async def test_a_family_only_the_cli_knows_is_picked_up(self, monkeypatch) -> None:
+        help_text = (
+            b"  --model <model>   Provide an alias for the latest model (e.g. 'fable', 'opus',\n"
+            b"                    or 'sonnet') or a model's full name (e.g. 'claude-fable-5').\n"
+            b"  --name <name>     Set a display name\n"
+        )
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", _help_process(help_text))
+
+        families = await claude_adapter._discover_families()
+
+        assert "fable" in families
+        assert families[0] == "opus", "opus must stay first so it remains the default preselection"
+
+    @pytest.mark.asyncio
+    async def test_the_seed_survives_an_unreadable_help_text(self, monkeypatch) -> None:
+        async def _boom(*args, **kwargs):
+            raise OSError("claude not on PATH")
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", _boom)
+
+        families = await claude_adapter._discover_families()
+
+        for expected in ("opus", "sonnet", "haiku", "fable"):
+            assert expected in families
+
+    @pytest.mark.asyncio
+    async def test_concrete_model_names_are_not_mistaken_for_families(self, monkeypatch) -> None:
+        help_text = b"  --model <model>   e.g. 'opus' or a full name (e.g. 'claude-fable-5').\n"
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", _help_process(help_text))
+
+        families = await claude_adapter._discover_families()
+
+        assert "claude-fable-5" not in families
+
+    @pytest.mark.asyncio
+    async def test_every_discovered_family_is_probed_and_surfaced(self, monkeypatch) -> None:
+        async def _resolves(alias: str) -> str | None:
+            return {"opus": "claude-opus-5", "fable": "claude-fable-5"}[alias]
+
+        monkeypatch.setattr(claude_adapter, "_probe_alias", _resolves)
+        monkeypatch.setattr(claude_adapter, "_families", ("opus", "fable"))
+        monkeypatch.setattr(claude_adapter, "_families_discovered", True)
+
+        models, source, aliases = await claude_adapter.list_models_with_source_async()
+
+        assert source == claude_adapter.SOURCE_LIVE
+        assert aliases["claude-fable-latest"] == "claude-fable-5"
+        assert "claude-fable-latest" in models
+        assert "claude-fable-5" in models
+
+    def test_an_alias_of_any_family_normalises_to_the_bare_cli_alias(self) -> None:
+        assert claude_adapter._normalize_model("claude-fable-latest") == "fable"
+        assert claude_adapter._normalize_model("anthropic/claude-fable-latest") == "fable"
+        assert claude_adapter._normalize_model("claude-opus-latest") == "opus"
+        assert claude_adapter._normalize_model("claude-fable-5") == "claude-fable-5"
+
+
+def _help_process(stdout: bytes):
+    class _Proc:
+        async def communicate(self, input: bytes | None = None):
+            return stdout, b""
+
+    async def _spawn(*args, **kwargs):
+        return _Proc()
+
+    return _spawn
+
+
+def _fixed_families(families: tuple[str, ...]):
+    async def _discover():
+        return families
+
+    return _discover
 
 
 class TestPartialProbe:

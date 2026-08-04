@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 from pathlib import Path
 
@@ -29,19 +30,31 @@ CLAUDE_HOME = os.getenv("CLAUDE_HOME", "/auth/claude")
 # Increase for workloads that produce very long outputs (e.g. 30-page documents).
 CLI_TIMEOUT_SECONDS = int(os.getenv("CLI_TIMEOUT_SECONDS", "1800"))
 
-# The claude CLI resolves the family aliases opus/sonnet/haiku to the NEWEST model of each
-# family automatically. We surface them as `claude-<family>-latest` entries that never go
-# stale, and map them back to the bare CLI alias on invocation (see _normalize_model).
-LATEST_ALIAS_MODELS = ["claude-opus-latest", "claude-sonnet-latest", "claude-haiku-latest"]
+# The claude CLI resolves a family alias (opus, sonnet, haiku, fable, …) to the NEWEST model of
+# that family. We surface each as a `claude-<family>-latest` id that never goes stale and map it
+# back to the bare CLI alias on invocation (see _normalize_model).
+#
+# The families themselves are DISCOVERED, not listed: pinning them would move the staleness one
+# level up — a new family (as fable was) would need a code change even though the generations
+# inside each family update themselves. `claude --help` names the aliases it accepts; the seed
+# below only guarantees the long-standing ones if that text ever changes shape.
+_SEED_FAMILIES = ("opus", "sonnet", "haiku", "fable")
 
-_ALIAS_TO_CLI = {
-    "claude-opus-latest": "opus",
-    "claude-sonnet-latest": "sonnet",
-    "claude-haiku-latest": "haiku",
-    "opus": "opus",
-    "sonnet": "sonnet",
-    "haiku": "haiku",
-}
+_ALIAS_SUFFIX = "-latest"
+_ALIAS_PREFIX = "claude-"
+
+
+def _alias_for(family: str) -> str:
+    """The always-latest id surfaced to callers for a CLI family alias."""
+    return f"{_ALIAS_PREFIX}{family}{_ALIAS_SUFFIX}"
+
+
+def _family_of(model: str) -> str | None:
+    """The CLI family alias behind a `claude-<family>-latest` id, or None."""
+    if model.startswith(_ALIAS_PREFIX) and model.endswith(_ALIAS_SUFFIX):
+        family = model[len(_ALIAS_PREFIX):-len(_ALIAS_SUFFIX)]
+        return family or None
+    return None
 
 # Offline fallback when alias resolution is unavailable. Kept reasonably current, but the
 # dynamic resolver (list_models_async) supersedes it and the *-latest aliases never go stale.
@@ -49,14 +62,52 @@ STATIC_MODELS = [
     "claude-opus-5",
     "claude-sonnet-5",
     "claude-haiku-4-5",
+    "claude-fable-5",
 ]
 
-# CLI family alias -> the `claude-<family>-latest` id surfaced to callers.
-_CLI_TO_ALIAS = {
-    "opus": "claude-opus-latest",
-    "sonnet": "claude-sonnet-latest",
-    "haiku": "claude-haiku-latest",
-}
+# Families discovered from the CLI, cached for the process lifetime; the seed until then.
+_families: tuple[str, ...] = _SEED_FAMILIES
+_families_discovered = False
+_families_lock = asyncio.Lock()
+
+
+async def _discover_families() -> tuple[str, ...]:
+    """Read the family aliases the installed CLI advertises for --model.
+
+    Runs once per process — the installed CLI does not change under a running gateway. Falls back
+    to the seed when the help text cannot be read or parsed. Ordering matters: the picker
+    auto-selects the first recommended entry, so the seed order (opus first) wins and newly
+    discovered families are appended.
+    """
+    global _families, _families_discovered
+    async with _families_lock:
+        if _families_discovered:
+            return _families
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "claude", "--help",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env={**os.environ, "HOME": CLAUDE_HOME},
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=30)
+            help_text = stdout.decode(errors="replace")
+        except Exception as exc:  # noqa: BLE001 — discovery is best-effort, never fatal
+            log.warning("claude family discovery failed: %s; using the seed list", exc)
+            _families = tuple(dict.fromkeys(_SEED_FAMILIES + _families))
+            _families_discovered = True
+            return _families
+
+        section = help_text.split("--model", 1)[-1][:600]
+        found = [m for m in re.findall(r"'([a-z][a-z0-9-]{2,20})'", section)
+                 if not m.startswith("claude-")]
+
+        merged = list(_SEED_FAMILIES) + [f for f in found if f not in _SEED_FAMILIES]
+        if merged != list(_families):
+            log.info("claude model families: %s", merged)
+        _families = tuple(merged)
+        _families_discovered = True
+        return _families
 
 # How long a probe may run before its subprocess is killed.
 _PROBE_TIMEOUT_SECONDS = int(os.getenv("CLAUDE_MODEL_PROBE_TIMEOUT", "60"))
@@ -95,8 +146,10 @@ def _normalize_model(model: str | None) -> str | None:
     if not model:
         return None
     bare = model.split("/")[-1] if "/" in model else model
-    bare = bare.replace(".", "-")
-    return _ALIAS_TO_CLI.get(bare.lower(), bare)
+    bare = bare.replace(".", "-").lower()
+
+    family = _family_of(bare)
+    return family if family else bare
 
 
 async def _probe_alias(alias: str) -> str | None:
@@ -146,19 +199,24 @@ async def _resolve_alias_map() -> tuple[dict[str, str], bool]:
     tuple element is False when not a single probe succeeded — the caller must not cache
     that result and must report it as degraded rather than live.
     """
-    families = ("opus", "sonnet", "haiku")
+    families = await _discover_families()
     results = await asyncio.gather(*(_probe_alias(a) for a in families))
     alias_map = {
-        _CLI_TO_ALIAS[family]: resolved
+        _alias_for(family): resolved
         for family, resolved in zip(families, results)
         if resolved
     }
     return alias_map, bool(alias_map)
 
 
+def latest_alias_models() -> list[str]:
+    """The always-latest id of every known family, in family order."""
+    return [_alias_for(f) for f in _families]
+
+
 def _compose_model_list(concrete: list[str]) -> list[str]:
     """Always-latest aliases first, then the concrete current model ids (deduped)."""
-    out = list(LATEST_ALIAS_MODELS)
+    out = latest_alias_models()
     for m in concrete:
         if m not in out:
             out.append(m)
@@ -168,7 +226,7 @@ def _compose_model_list(concrete: list[str]) -> list[str]:
 def _concrete_from(alias_map: dict[str, str]) -> list[str]:
     """Concrete ids of an alias map, deduped, in opus/sonnet/haiku order."""
     concrete: list[str] = []
-    for alias in LATEST_ALIAS_MODELS:
+    for alias in list(alias_map) if alias_map else latest_alias_models():
         resolved = alias_map.get(alias)
         if resolved and resolved not in concrete:
             concrete.append(resolved)

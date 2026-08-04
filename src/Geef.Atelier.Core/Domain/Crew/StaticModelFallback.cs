@@ -26,9 +26,11 @@ public static class StaticModelFallback
         new("claude-opus-latest",   "Claude Opus (latest)",   "Best quality, always the newest Opus",   true),
         new("claude-sonnet-latest", "Claude Sonnet (latest)", "Fast and balanced, always the newest",   true),
         new("claude-haiku-latest",  "Claude Haiku (latest)",  "Cheapest, always the newest Haiku",      true),
+        new("claude-fable-latest",  "Claude Fable (latest)",  "Always the newest Fable",                true),
         new("claude-opus-5",        "Claude Opus 5",          "Pinned to this exact Opus generation",   false),
         new("claude-sonnet-5",      "Claude Sonnet 5",        "Pinned to this exact Sonnet generation", false),
         new("claude-haiku-4-5",     "Claude Haiku 4.5",       "Pinned to this exact Haiku generation",  false),
+        new("claude-fable-5",       "Claude Fable 5",         "Pinned to this exact Fable generation",  false),
         new("claude-opus-4-8",      "Claude Opus 4.8",        "Previous Opus generation",               false),
     };
 
