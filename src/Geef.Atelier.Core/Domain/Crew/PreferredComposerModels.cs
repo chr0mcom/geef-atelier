@@ -37,7 +37,7 @@ public static class PreferredComposerModels
         ("openrouter",   "x-ai/grok-4.5"),                       // xAI top via OpenRouter
         ("openrouter",   "google/gemini-3.1-pro-preview"),       // Google top via OpenRouter
         ("openrouter",   "deepseek/deepseek-v4-pro"),            // DeepSeek top via OpenRouter
-        ("openrouter",   "anthropic/claude-opus-4.8"),           // Anthropic top via OpenRouter (fallback)
+        ("openrouter",   "anthropic/claude-opus-5"),             // Anthropic top via OpenRouter (fallback)
     ];
 
     /// <summary>

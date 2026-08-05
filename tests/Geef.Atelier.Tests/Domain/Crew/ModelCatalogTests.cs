@@ -91,9 +91,10 @@ public sealed class ModelCatalogTests : IDisposable
     [Fact]
     public async Task ListModelsAsync_MarksRecommended_FromStaticFallback()
     {
-        var handler = FakeHttpHandler.Ok("""
+        var curated = StaticModelFallback.ForOpenRouter.First(m => m.IsRecommended).Id;
+        var handler = FakeHttpHandler.Ok($$"""
             {"object":"list","data":[
-                {"id":"anthropic/claude-opus-4.8","object":"model"},
+                {"id":"{{curated}}","object":"model"},
                 {"id":"some/unknown-model","object":"model"}
             ]}
             """);
@@ -101,7 +102,7 @@ public sealed class ModelCatalogTests : IDisposable
 
         var models = await catalog.ListModelsAsync("openrouter");
 
-        var opus = models.Single(m => m.Id == "anthropic/claude-opus-4.8");
+        var opus = models.Single(m => m.Id == curated);
         var unknown = models.Single(m => m.Id == "some/unknown-model");
         Assert.True(opus.IsRecommended);
         Assert.False(unknown.IsRecommended);

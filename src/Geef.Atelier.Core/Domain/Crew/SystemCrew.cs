@@ -130,7 +130,7 @@ public static class SystemCrew
         Description: "Audits system prompts in the proposed crew for completeness, task-specificity, and the mandatory severity taxonomy block in reviewer prompts.",
         SystemPrompt: SystemPrompts.CrewComposerPromptQuality,
         Provider: "openrouter",
-        Model: "google/gemini-3.5-flash",
+        Model: "google/gemini-3.6-flash",
         MaxTokens: 64000,
         IsSystem: true);
 
@@ -163,7 +163,7 @@ public static class SystemCrew
         Description: "Audits tool_names bindings in actor profiles: checks necessity, access-class compliance (ReadOnly only in Phase B), role fit, and catalog membership.",
         SystemPrompt: SystemPrompts.CrewComposerToolBinding,
         Provider: "openrouter",
-        Model: "google/gemini-3.5-flash",
+        Model: "google/gemini-3.6-flash",
         MaxTokens: 64000,
         IsSystem: true);
 
@@ -449,7 +449,7 @@ public static class SystemCrew
             [GroundingProviderProfile.KeyAcademicSource]             = "semantic-scholar",
             [GroundingProviderProfile.KeyAcademicMaxPapers]          = "5",
             [GroundingProviderProfile.KeyRefinementProvider]         = "google-ai-studio",
-            [GroundingProviderProfile.KeyRefinementModel]            = "gemini-3.5-flash",
+            [GroundingProviderProfile.KeyRefinementModel]            = "models/gemini-3.6-flash",
             [GroundingProviderProfile.KeyRefinementMaxTokens]        = "2048",
             [GroundingProviderProfile.KeyRefinementMode]             = "0",
         },

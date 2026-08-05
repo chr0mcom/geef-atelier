@@ -9,10 +9,10 @@ public static class StaticModelFallback
 {
     public static readonly IReadOnlyList<ModelInfo> ForOpenRouter = new ModelInfo[]
     {
-        new("anthropic/claude-opus-4.8",    "Claude Opus 4.8",       "Best quality, Anthropic via OpenRouter",          true),
+        new("anthropic/claude-opus-5",      "Claude Opus 5",         "Best quality, Anthropic via OpenRouter",          true),
         new("anthropic/claude-sonnet-5",    "Claude Sonnet 5",       "Fast, balanced, Anthropic via OpenRouter",        true),
         new("anthropic/claude-haiku-4.5",   "Claude Haiku 4.5",      "Cheapest Anthropic model via OpenRouter",         true),
-        new("google/gemini-3.5-flash",      "Gemini 3.5 Flash",      "Fast, cheap, Google via OpenRouter",              true),
+        new("google/gemini-3.6-flash",      "Gemini 3.6 Flash",      "Fast, cheap, Google via OpenRouter",              true),
         new("google/gemini-3.1-pro-preview","Gemini 3.1 Pro",        "High quality, Google via OpenRouter",             false),
         new("openai/gpt-5.6-sol",           "GPT-5.6 Sol",           "Flagship OpenAI model via OpenRouter",            true),
         new("openai/gpt-5.6-terra",         "GPT-5.6 Terra",         "Balanced OpenAI model via OpenRouter",            true),
