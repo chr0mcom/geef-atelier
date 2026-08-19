@@ -80,7 +80,7 @@ _FAILOVER_REASONS = frozenset({"auth", "limit", "transport"})
 
 class _BackendState:
     __slots__ = ("consecutive_failures", "open_until", "last_reason", "last_error",
-                 "last_failure_at", "failover_count")
+                 "last_failure_at", "failover_count", "tripped")
 
     def __init__(self) -> None:
         self.consecutive_failures = 0
@@ -89,6 +89,13 @@ class _BackendState:
         self.last_error: str | None = None
         self.last_failure_at: float | None = None
         self.failover_count = 0
+        # True from the moment the breaker trips until the next REAL success. Unlike
+        # `available` (which flips back to True when the open window merely elapses, so
+        # exactly one probe can pass), this is the honest health signal: a permanently
+        # broken backend stays unhealthy. Before 2026-08-19 /health keyed `degraded` off
+        # `available`, so a dead claude auth flapped healthy<->degraded every 300s and the
+        # cliproxy-watch cron spammed the operator with alarm/recovery pairs all afternoon.
+        self.tripped = False
 
 
 _STATE: dict[str, _BackendState] = {}
@@ -132,10 +139,11 @@ def available(backend: str) -> bool:
 
 def record_success(backend: str) -> None:
     st = _state(backend)
-    if st.consecutive_failures or st.open_until:
+    if st.consecutive_failures or st.open_until or st.tripped:
         log.info("Backend %s recovered -- breaker closed", backend)
     st.consecutive_failures = 0
     st.open_until = 0.0
+    st.tripped = False
 
 
 def record_failure(backend: str, reason: str, error: str) -> None:
@@ -150,6 +158,7 @@ def record_failure(backend: str, reason: str, error: str) -> None:
     st.consecutive_failures += 1
     if st.consecutive_failures >= FAILS:
         st.open_until = time.time() + OPEN_SECONDS
+        st.tripped = True
         log.warning("Breaker OPEN for %s (%ss) after %s failures | reason=%s | %s",
                     backend, OPEN_SECONDS, st.consecutive_failures, reason,
                     st.last_error)
@@ -181,7 +190,14 @@ def snapshot() -> dict:
     for backend in PARTNER:
         st = _state(backend)
         backends[backend] = {
+            # Routing view: False only while the open window is running (one probe may
+            # pass after it elapses). NOT a health statement -- see `healthy`.
             "available": available(backend),
+            # Honest health: False from breaker trip until the next real success. This is
+            # what `degraded` and the cliproxy-watch cron key off -- keying off `available`
+            # made a dead backend flap healthy<->degraded with every elapsed open window
+            # (operator alarm spam, 2026-08-19).
+            "healthy": not st.tripped,
             "consecutive_failures": st.consecutive_failures,
             "open_until": st.open_until or None,
             "last_reason": st.last_reason,
@@ -191,6 +207,6 @@ def snapshot() -> dict:
         }
     return {
         "enabled": ENABLED,
-        "degraded": any(not b["available"] for b in backends.values()),
+        "degraded": any(not b["healthy"] for b in backends.values()),
         "backends": backends,
     }

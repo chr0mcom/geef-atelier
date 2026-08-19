@@ -215,3 +215,58 @@ class TestOsErrors:
 
     def test_permission_error_is_a_transport_fault(self) -> None:
         assert failover.classify(PermissionError(13, "Permission denied")) == "transport"
+
+
+class TestHealthySemantics:
+    """`healthy`/`degraded` must reflect REAL health, not the breaker window (2026-08-19:
+    a dead claude auth flapped /health degraded<->ok every elapsed 300s window, and the
+    cliproxy-watch cron spammed the operator with alarm/recovery pairs)."""
+
+    def setup_method(self) -> None:
+        failover.reset()
+
+    def _trip(self, backend: str = "claude") -> None:
+        for _ in range(failover.FAILS):
+            failover.record_failure(backend, "auth", "OAuth session expired")
+
+    def test_elapsed_open_window_does_not_heal(self, monkeypatch) -> None:
+        now = [1000.0]
+        monkeypatch.setattr(failover.time, "time", lambda: now[0])
+        self._trip()
+        snap = failover.snapshot()
+        assert snap["backends"]["claude"]["healthy"] is False
+        assert snap["degraded"] is True
+        # Open window elapses: routing may probe again (available True), but the backend
+        # is NOT healthy and /health must stay degraded.
+        now[0] += failover.OPEN_SECONDS + 1
+        snap = failover.snapshot()
+        assert snap["backends"]["claude"]["available"] is True
+        assert snap["backends"]["claude"]["healthy"] is False
+        assert snap["degraded"] is True
+
+    def test_only_a_real_success_heals(self, monkeypatch) -> None:
+        now = [1000.0]
+        monkeypatch.setattr(failover.time, "time", lambda: now[0])
+        self._trip()
+        now[0] += failover.OPEN_SECONDS + 1
+        failover.record_success("claude")
+        snap = failover.snapshot()
+        assert snap["backends"]["claude"]["healthy"] is True
+        assert snap["degraded"] is False
+
+    def test_below_threshold_failures_do_not_mark_unhealthy(self) -> None:
+        failover.record_failure("claude", "auth", "one-off")
+        snap = failover.snapshot()
+        assert snap["backends"]["claude"]["healthy"] is True
+        assert snap["degraded"] is False
+
+    def test_failed_probe_keeps_backend_unhealthy(self, monkeypatch) -> None:
+        now = [1000.0]
+        monkeypatch.setattr(failover.time, "time", lambda: now[0])
+        self._trip()
+        now[0] += failover.OPEN_SECONDS + 1
+        failover.record_failure("claude", "auth", "probe failed")
+        snap = failover.snapshot()
+        assert snap["backends"]["claude"]["healthy"] is False
+        assert snap["backends"]["claude"]["available"] is False
+        assert snap["degraded"] is True
