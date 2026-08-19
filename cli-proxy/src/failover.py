@@ -80,7 +80,7 @@ _FAILOVER_REASONS = frozenset({"auth", "limit", "transport"})
 
 class _BackendState:
     __slots__ = ("consecutive_failures", "open_until", "last_reason", "last_error",
-                 "last_failure_at", "failover_count", "tripped")
+                 "last_failure_at", "failover_count", "tripped", "last_success_at")
 
     def __init__(self) -> None:
         self.consecutive_failures = 0
@@ -89,6 +89,7 @@ class _BackendState:
         self.last_error: str | None = None
         self.last_failure_at: float | None = None
         self.failover_count = 0
+        self.last_success_at: float | None = None
         # True from the moment the breaker trips until the next REAL success. Unlike
         # `available` (which flips back to True when the open window merely elapses, so
         # exactly one probe can pass), this is the honest health signal: a permanently
@@ -144,6 +145,7 @@ def record_success(backend: str) -> None:
     st.consecutive_failures = 0
     st.open_until = 0.0
     st.tripped = False
+    st.last_success_at = time.time()
 
 
 def record_failure(backend: str, reason: str, error: str) -> None:
@@ -203,6 +205,11 @@ def snapshot() -> dict:
             "last_reason": st.last_reason,
             "last_error": st.last_error,
             "last_failure_at": st.last_failure_at,
+            # Proof of life for external monitors: a process restart clears the breaker
+            # state (tripped=False) WITHOUT any real success -- the watch cron must not
+            # read that as recovery. It closes an alarm card only when a success is
+            # recorded AFTER the card was raised (review finding 2026-08-19).
+            "last_success_at": st.last_success_at,
             "failover_count": st.failover_count,
         }
     return {
