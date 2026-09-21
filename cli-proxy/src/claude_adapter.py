@@ -30,6 +30,16 @@ CLAUDE_HOME = os.getenv("CLAUDE_HOME", "/auth/claude")
 # Increase for workloads that produce very long outputs (e.g. 30-page documents).
 CLI_TIMEOUT_SECONDS = int(os.getenv("CLI_TIMEOUT_SECONDS", "1800"))
 
+
+def _effort_args(reasoning_effort: str | None) -> list[str]:
+    """Map a per-request reasoning_effort to the claude CLI's --effort flag.
+
+    Only a value the caller actually sent produces a flag; without one the argv stays exactly
+    as before, so the CLI keeps its own default effort (BF-WP-116). Validation of the value
+    happens once in main._validate_policy.
+    """
+    return ["--effort", reasoning_effort] if reasoning_effort else []
+
 # The claude CLI resolves a family alias (opus, sonnet, haiku, fable, …) to the NEWEST model of
 # that family. We surface each as a `claude-<family>-latest` id that never goes stale and map it
 # back to the bare CLI alias on invocation (see _normalize_model).
@@ -321,6 +331,8 @@ async def complete_document(
     model: str | None,
     max_tokens: int | None,
     context_document: str | None = None,
+    *,
+    reasoning_effort: str | None = None,
 ) -> tuple[str, UsageParts]:
     """
     Calls the claude CLI in document-edit mode: the CLI reads draft.md in the given
@@ -336,30 +348,32 @@ async def complete_document(
     async with _semaphore:
         return await _run_claude_document(
             system_prompt, user_instruction, document, workspace_path, model, max_tokens,
-            context_document,
+            context_document, reasoning_effort=reasoning_effort,
         )
 
 
-async def complete(prompt: str, model: str | None, max_tokens: int | None) -> str:
+async def complete(
+    prompt: str, model: str | None, max_tokens: int | None, *, reasoning_effort: str | None = None
+) -> str:
     """
     Calls the claude CLI in print mode and returns the raw text output.
 
     The semaphore limits concurrent calls to respect subscription rate limits.
     """
-    text, _ = await complete_with_usage(prompt, model, max_tokens)
+    text, _ = await complete_with_usage(prompt, model, max_tokens, reasoning_effort=reasoning_effort)
     return text
 
 
 async def complete_with_usage(
-    prompt: str, model: str | None, max_tokens: int | None
+    prompt: str, model: str | None, max_tokens: int | None, *, reasoning_effort: str | None = None
 ) -> tuple[str, UsageParts]:
     """Like complete(), but also returns the real token usage reported by the CLI."""
     async with _semaphore:
-        return await _run_claude(prompt, model, max_tokens)
+        return await _run_claude(prompt, model, max_tokens, reasoning_effort=reasoning_effort)
 
 
 async def complete_agentic_file(
-    instruction: str, model: str | None
+    instruction: str, model: str | None, *, reasoning_effort: str | None = None
 ) -> tuple[str, UsageParts]:
     """Agentic tool use via file authoring.
 
@@ -370,11 +384,13 @@ async def complete_agentic_file(
     """
     async with _semaphore:
         async with ephemeral_dir() as workspace:
-            return await _run_claude_decision(instruction, model, workspace)
+            return await _run_claude_decision(
+                instruction, model, workspace, reasoning_effort=reasoning_effort)
 
 
 async def _run_claude_decision(
-    instruction: str, model: str | None, workspace_path: Path
+    instruction: str, model: str | None, workspace_path: Path,
+    *, reasoning_effort: str | None = None,
 ) -> tuple[str, UsageParts]:
     # Read,Edit,Write only (no Bash/web) + acceptEdits so the agent writes decision.json without
     # prompts. --output-format json: the decision text comes from the file; stdout carries usage.
@@ -386,6 +402,7 @@ async def _run_claude_decision(
     ]
     if model:
         args += ["--model", _normalize_model(model)]
+    args += _effort_args(reasoning_effort)
 
     # Offload to instruction.md if the instruction would exceed the per-argument OS limit (E2BIG).
     args.append(finalize_decision_instruction(workspace_path, instruction))
@@ -441,18 +458,22 @@ async def _run_claude_decision(
     return decision, usage
 
 
-async def stream(prompt: str, model: str | None, max_tokens: int | None):
+async def stream(
+    prompt: str, model: str | None, max_tokens: int | None, *, reasoning_effort: str | None = None
+):
     """Stream the claude CLI output as (kind, payload) events.
 
     Yields ("delta", text) for each token chunk and finally ("usage", UsageParts).
     The semaphore is held for the whole stream to respect subscription rate limits.
     """
     async with _semaphore:
-        async for event in _stream_claude(prompt, model, max_tokens):
+        async for event in _stream_claude(prompt, model, max_tokens, reasoning_effort=reasoning_effort):
             yield event
 
 
-async def _stream_claude(prompt: str, model: str | None, max_tokens: int | None):
+async def _stream_claude(
+    prompt: str, model: str | None, max_tokens: int | None, *, reasoning_effort: str | None = None
+):
     args = [
         "claude", "-p",
         "--output-format", "stream-json",
@@ -462,6 +483,7 @@ async def _stream_claude(prompt: str, model: str | None, max_tokens: int | None)
     ]
     if model:
         args += ["--model", _normalize_model(model)]
+    args += _effort_args(reasoning_effort)
 
     env = {**os.environ, "HOME": CLAUDE_HOME}
     proc = await asyncio.create_subprocess_exec(
@@ -536,6 +558,8 @@ async def _run_claude_document(
     model: str | None,
     max_tokens: int | None,
     context_document: str | None = None,
+    *,
+    reasoning_effort: str | None = None,
 ) -> tuple[str, UsageParts]:
     # Large background context goes to context.md (pointer) or inline if small; the file-contract
     # and user instruction always stay in the prompt.
@@ -567,6 +591,7 @@ async def _run_claude_document(
 
     if model:
         args += ["--model", _normalize_model(model)]
+    args += _effort_args(reasoning_effort)
 
     # Offload to instruction.md if the instruction would exceed the per-argument OS limit.
     args.append(finalize_instruction(workspace_path, instruction))
@@ -619,7 +644,7 @@ async def _run_claude_document(
 
 
 async def _run_claude(
-    prompt: str, model: str | None, max_tokens: int | None
+    prompt: str, model: str | None, max_tokens: int | None, *, reasoning_effort: str | None = None
 ) -> tuple[str, UsageParts]:
     # Allowlist ONLY web tools — no Bash/Edit/Write, so no full permission bypass.
     # Comma-separated single token: a space-separated variadic would greedily
@@ -628,6 +653,7 @@ async def _run_claude(
 
     if model:
         args += ["--model", _normalize_model(model)]
+    args += _effort_args(reasoning_effort)
 
     # Pass the prompt through stdin, never as an argv element. A single execve argument may
     # not exceed MAX_ARG_STRLEN (128 KB on Linux); reviewer/advisor prompts embed the full

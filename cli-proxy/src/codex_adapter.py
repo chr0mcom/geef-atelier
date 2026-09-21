@@ -33,6 +33,17 @@ CODEX_HOME = os.getenv("CODEX_HOME", "/auth/codex")
 # Increase for workloads that produce very long outputs (e.g. 30-page documents).
 CLI_TIMEOUT_SECONDS = int(os.getenv("CLI_TIMEOUT_SECONDS", "1800"))
 
+
+def _effort_args(reasoning_effort: str | None) -> list[str]:
+    """Map a per-request reasoning_effort to a codex config override.
+
+    Only a value the caller actually sent produces the override; without one the argv stays
+    exactly as before, so codex keeps model_reasoning_effort from ~/.codex/config.toml
+    (BF-WP-116). The quoted form is parsed by codex as a TOML string. Validation of the value
+    happens once in main._validate_policy.
+    """
+    return ["-c", f'model_reasoning_effort="{reasoning_effort}"'] if reasoning_effort else []
+
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 _OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 _SKIP_KEYWORDS = ("image", "audio", "vision", "dall-e", "whisper", "tts", "chat-latest")
@@ -152,6 +163,8 @@ async def complete_document(
     model: str | None,
     max_tokens: int | None,
     context_document: str | None = None,
+    *,
+    reasoning_effort: str | None = None,
 ) -> tuple[str, UsageParts]:
     """
     Calls the codex CLI in document-edit mode: the CLI reads draft.md in the given
@@ -167,30 +180,32 @@ async def complete_document(
     async with _semaphore:
         return await _run_codex_document(
             system_prompt, user_instruction, document, workspace_path, model, max_tokens,
-            context_document,
+            context_document, reasoning_effort=reasoning_effort,
         )
 
 
-async def complete(prompt: str, model: str | None, max_tokens: int | None) -> str:
+async def complete(
+    prompt: str, model: str | None, max_tokens: int | None, *, reasoning_effort: str | None = None
+) -> str:
     """
     Calls the codex CLI in non-interactive mode and returns the raw text output.
 
     The semaphore limits concurrent calls to respect subscription rate limits.
     """
-    text, _ = await complete_with_usage(prompt, model, max_tokens)
+    text, _ = await complete_with_usage(prompt, model, max_tokens, reasoning_effort=reasoning_effort)
     return text
 
 
 async def complete_with_usage(
-    prompt: str, model: str | None, max_tokens: int | None
+    prompt: str, model: str | None, max_tokens: int | None, *, reasoning_effort: str | None = None
 ) -> tuple[str, UsageParts]:
     """Like complete(), but also returns the real token usage reported by the CLI."""
     async with _semaphore:
-        return await _run_codex(prompt, model, max_tokens)
+        return await _run_codex(prompt, model, max_tokens, reasoning_effort=reasoning_effort)
 
 
 async def complete_agentic_file(
-    instruction: str, model: str | None
+    instruction: str, model: str | None, *, reasoning_effort: str | None = None
 ) -> tuple[str, UsageParts]:
     """Agentic tool use via file authoring — the codex counterpart of
     claude_adapter.complete_agentic_file.
@@ -204,11 +219,13 @@ async def complete_agentic_file(
     Without this, the claude→codex failover is useless for every agentic consumer."""
     async with _semaphore:
         async with ephemeral_dir() as workspace:
-            return await _run_codex_decision(instruction, model, workspace)
+            return await _run_codex_decision(
+                instruction, model, workspace, reasoning_effort=reasoning_effort)
 
 
 async def _run_codex_decision(
-    instruction: str, model: str | None, workspace_path: Path
+    instruction: str, model: str | None, workspace_path: Path,
+    *, reasoning_effort: str | None = None,
 ) -> tuple[str, UsageParts]:
     # --sandbox workspace-write: decision.json is the only artifact we want; no host access.
     # No --search: the decision turn plans the next HOST tool call — web research inside the
@@ -223,6 +240,7 @@ async def _run_codex_decision(
     if model:
         bare_model = model.split("/")[-1] if "/" in model else model
         args += ["-m", bare_model]
+    args += _effort_args(reasoning_effort)
 
     # Offload to instruction.md if the instruction would exceed the safe argv size.
     args.append(finalize_decision_instruction(workspace_path, instruction))
@@ -261,7 +279,9 @@ async def _run_codex_decision(
     return decision, usage
 
 
-async def stream(prompt: str, model: str | None, max_tokens: int | None):
+async def stream(
+    prompt: str, model: str | None, max_tokens: int | None, *, reasoning_effort: str | None = None
+):
     """Stream the codex CLI output as (kind, payload) events.
 
     Yields ("delta", text) for agent message text and finally ("usage", UsageParts).
@@ -269,15 +289,18 @@ async def stream(prompt: str, model: str | None, max_tokens: int | None):
     deltas, so output is emitted as one (or few) delta chunks; usage comes from turn.completed.
     """
     async with _semaphore:
-        async for event in _stream_codex(prompt, model, max_tokens):
+        async for event in _stream_codex(prompt, model, max_tokens, reasoning_effort=reasoning_effort):
             yield event
 
 
-async def _stream_codex(prompt: str, model: str | None, max_tokens: int | None):
+async def _stream_codex(
+    prompt: str, model: str | None, max_tokens: int | None, *, reasoning_effort: str | None = None
+):
     args = ["codex", "--search", "exec", "--json", "--skip-git-repo-check"]
     if model:
         bare_model = model.split("/")[-1] if "/" in model else model
         args += ["-m", bare_model]
+    args += _effort_args(reasoning_effort)
     args.append("-")
 
     env = {**os.environ, "HOME": CODEX_HOME}
@@ -356,6 +379,8 @@ async def _run_codex_document(
     model: str | None,
     max_tokens: int | None,
     context_document: str | None = None,
+    *,
+    reasoning_effort: str | None = None,
 ) -> tuple[str, UsageParts]:
     # Codex has no --append-system-prompt flag — embed system prompt as a [SYSTEM] preamble.
     # Large background context goes to context.md (pointer) or inline if small; the file-contract
@@ -386,6 +411,7 @@ async def _run_codex_document(
     if model:
         bare_model = model.split("/")[-1] if "/" in model else model
         args += ["-m", bare_model]
+    args += _effort_args(reasoning_effort)
 
     # Offload to instruction.md if the instruction would exceed the per-argument OS limit.
     args.append(finalize_instruction(workspace_path, instruction))
@@ -427,7 +453,7 @@ async def _run_codex_document(
 
 
 async def _run_codex(
-    prompt: str, model: str | None, max_tokens: int | None
+    prompt: str, model: str | None, max_tokens: int | None, *, reasoning_effort: str | None = None
 ) -> tuple[str, UsageParts]:
     # codex exec writes the last message to a file; use a temp file to capture it.
     with tempfile.NamedTemporaryFile(mode="r", suffix=".txt", delete=False) as tmp:
@@ -447,6 +473,7 @@ async def _run_codex(
         if model:
             bare_model = model.split("/")[-1] if "/" in model else model
             args += ["-m", bare_model]
+        args += _effort_args(reasoning_effort)
 
         # Pass the prompt through stdin ("-"), never as an argv element. A single execve
         # argument may not exceed MAX_ARG_STRLEN (128 KB on Linux); reviewer/advisor prompts

@@ -207,6 +207,28 @@ def _validate_policy(req: ChatCompletionRequest) -> None:
             "CLI invocation).",
             status_code=400, code="unsupported_parameter", param="n",
         )
+    if req.reasoning_effort is not None and req.reasoning_effort not in REASONING_EFFORTS:
+        # Both CLIs verifiably understand only these three levels (claude --effort has no
+        # `minimal`, codex's acceptance of it is unproven). Silently dropping an unknown
+        # value would let the caller believe a level was applied that never was.
+        raise OpenAIError(
+            f"reasoning_effort {req.reasoning_effort!r} is not supported by the CLI backend; "
+            f"use one of: {', '.join(REASONING_EFFORTS)}.",
+            status_code=400, code="unsupported_value", param="reasoning_effort",
+        )
+
+
+REASONING_EFFORTS: tuple[str, ...] = ("low", "medium", "high")
+REASONING_EFFORT_HEADER = "x-cli-proxy-reasoning-effort"
+
+
+def _effort_kwargs(req: ChatCompletionRequest) -> dict[str, str]:
+    """Adapter kwargs for the per-request reasoning effort — empty when the caller sent none.
+
+    Passing nothing (rather than reasoning_effort=None) keeps every adapter call, and so every
+    CLI argv, byte-identical for callers that do not use the field (Geef.Atelier, DMS, Hermes).
+    """
+    return {"reasoning_effort": req.reasoning_effort} if req.reasoning_effort else {}
 
 
 # ---------------------------------------------------------------------------
@@ -375,11 +397,11 @@ def _needs_json_retry(resp: ChatCompletionResponse, req: ChatCompletionRequest) 
 # ---------------------------------------------------------------------------
 
 async def _complete_backend(
-    backend: str, prompt: str, model: str, max_tokens: int | None
+    backend: str, prompt: str, model: str, max_tokens: int | None,
+    effort: dict[str, str] | None = None,
 ) -> tuple[str, UsageParts]:
-    if backend == "claude":
-        return await claude_adapter.complete_with_usage(prompt, model, max_tokens)
-    return await codex_adapter.complete_with_usage(prompt, model, max_tokens)
+    adapter = claude_adapter if backend == "claude" else codex_adapter
+    return await adapter.complete_with_usage(prompt, model, max_tokens, **(effort or {}))
 
 
 def _sum_usage(a: UsageParts, b: UsageParts) -> UsageParts:
@@ -439,14 +461,15 @@ async def _agentic_file_decision(
     log.info("Agentic file mode | backend=%s | model=%s | mode=%s | tools=%d",
              backend, req.model, mode, len(tools_dicts))
 
-    decision, parts = await adapter.complete_agentic_file(instruction, req.model)
+    decision, parts = await adapter.complete_agentic_file(
+        instruction, req.model, **_effort_kwargs(req))
     kind, payload = parse_decision(decision)
 
     if _decision_unacceptable(kind, payload, mode, specific):
         log.warning("Agentic file mode (%s): decision unacceptable (kind=%s, mode=%s) — retrying once",
                     backend, kind, mode)
         decision, retry_parts = await adapter.complete_agentic_file(
-            instruction + _DECISION_RETRY_SUFFIX, req.model)
+            instruction + _DECISION_RETRY_SUFFIX, req.model, **_effort_kwargs(req))
         # Both runs were billed — the usage block must count them both (review 2026-07-24:
         # overwriting `parts` under-reported every retried request by a full CLI run).
         parts = _sum_usage(parts, retry_parts)
@@ -511,7 +534,8 @@ async def _run_completion(req: ChatCompletionRequest, backend: str) -> ChatCompl
     log.info("Dispatching to %s | model=%s | tool=%s | structured=%s",
              backend, req.model, _extract_tool_name(req), structured)
 
-    raw, parts = await _complete_backend(backend, prompt, req.model, max_tokens)
+    effort = _effort_kwargs(req)
+    raw, parts = await _complete_backend(backend, prompt, req.model, max_tokens, effort)
     usage = _to_usage_info(parts)
 
     # Structured outputs take precedence over tool extraction.
@@ -520,7 +544,7 @@ async def _run_completion(req: ChatCompletionRequest, backend: str) -> ChatCompl
         if err:
             log.warning("%s structured output invalid (%s) — retrying", backend, err)
             raw, retry_parts = await _complete_backend(
-                backend, prompt + _JSON_RETRY_SUFFIX, req.model, max_tokens)
+                backend, prompt + _JSON_RETRY_SUFFIX, req.model, max_tokens, effort)
             parts = _sum_usage(parts, retry_parts)  # both runs were billed
             usage = _to_usage_info(parts)
             json_str, err = validate_and_extract(rf, raw)
@@ -533,7 +557,7 @@ async def _run_completion(req: ChatCompletionRequest, backend: str) -> ChatCompl
     if _needs_json_retry(resp, req):
         log.warning("%s JSON extraction failed — retrying with explicit JSON reminder", backend)
         raw, retry_parts = await _complete_backend(
-            backend, prompt + _JSON_RETRY_SUFFIX, req.model, max_tokens)
+            backend, prompt + _JSON_RETRY_SUFFIX, req.model, max_tokens, effort)
         parts = _sum_usage(parts, retry_parts)  # both runs were billed
         resp = _build_response(req, raw, _to_usage_info(parts))
     return resp
@@ -546,7 +570,7 @@ async def _call_claude(req: ChatCompletionRequest) -> ChatCompletionResponse:
         async with ephemeral_workspace(req.document or "") as ws:
             raw, parts = await claude_adapter.complete_document(
                 system_prompt, user_instruction, req.document or "", ws, req.model,
-                req.effective_max_tokens(), req.context_document,
+                req.effective_max_tokens(), req.context_document, **_effort_kwargs(req),
             )
         return make_text_response(req.model, raw, _to_usage_info(parts))
     return await _run_completion(req, "claude")
@@ -559,7 +583,7 @@ async def _call_codex(req: ChatCompletionRequest) -> ChatCompletionResponse:
         async with ephemeral_workspace(req.document or "") as ws:
             raw, parts = await codex_adapter.complete_document(
                 system_prompt, user_instruction, req.document or "", ws, req.model,
-                req.effective_max_tokens(), req.context_document,
+                req.effective_max_tokens(), req.context_document, **_effort_kwargs(req),
             )
         return make_text_response(req.model, raw, _to_usage_info(parts))
     return await _run_completion(req, "codex")
@@ -604,6 +628,9 @@ async def _complete_with_failover(
             continue
         failover.record_success(target)
         response.headers["x-cli-proxy-provider"] = target
+        if req.reasoning_effort:
+            response.headers[REASONING_EFFORT_HEADER] = req.reasoning_effort
+            log.info("reasoning_effort=%s applied via %s", req.reasoning_effort, target)
         if target != backend:
             failover.record_failover(backend, target)
             response.headers["x-cli-proxy-failover"] = f"{backend}->{target}"
@@ -639,6 +666,7 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
 
     async def _serve(target: str, target_req: ChatCompletionRequest):
         cli_model = target_req.model
+        effort = _effort_kwargs(target_req)
         # Agentic tool use (both backends): resolve the decision via file authoring, then emit
         # either proper streaming tool_calls or the final answer — no hallucination, no
         # injection refusal, no "tools not connected" persona objection. The claude→codex
@@ -664,7 +692,7 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
         # When tools/structured output are requested, we must inspect the full text before
         # deciding tool_calls vs content — so buffer, then emit. Pure text streams token-by-token.
         elif target_req.tools or structured:
-            raw, parts = await _complete_backend(target, prompt, cli_model, max_tokens)
+            raw, parts = await _complete_backend(target, prompt, cli_model, max_tokens, effort)
             if structured:
                 # Mirror the non-streaming contract: one retry on invalid structured output,
                 # then a refusal — not the raw text as a fake success (review 2026-07-24).
@@ -672,7 +700,7 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
                 if err:
                     log.warning("%s structured output invalid in stream (%s) — retrying", target, err)
                     raw, retry_parts = await _complete_backend(
-                        target, prompt + _JSON_RETRY_SUFFIX, cli_model, max_tokens)
+                        target, prompt + _JSON_RETRY_SUFFIX, cli_model, max_tokens, effort)
                     parts = _sum_usage(parts, retry_parts)  # both runs were billed
                     json_str, err = validate_and_extract(rf, raw)
                 if json_str is not None:
@@ -688,7 +716,7 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
                 if json_str is None:
                     log.warning("%s specific-tool stream: JSON extraction failed — retrying", target)
                     raw, retry_parts = await _complete_backend(
-                        target, prompt + _JSON_RETRY_SUFFIX, cli_model, max_tokens)
+                        target, prompt + _JSON_RETRY_SUFFIX, cli_model, max_tokens, effort)
                     parts = _sum_usage(parts, retry_parts)  # both runs were billed
                     json_str = extract_json(raw)
                 if json_str is not None:
@@ -705,7 +733,7 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
             yield ("usage", parts)
         else:
             adapter = claude_adapter if target == "claude" else codex_adapter
-            async for ev in adapter.stream(prompt, cli_model, max_tokens):
+            async for ev in adapter.stream(prompt, cli_model, max_tokens, **effort):
                 yield ev
 
     async def _events():
@@ -727,6 +755,8 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
                     raise
                 continue
             failover.record_success(target)
+            if req.reasoning_effort:
+                log.info("reasoning_effort=%s applied via %s (stream)", req.reasoning_effort, target)
             if target != primary:
                 failover.record_failover(primary, target)
             return
@@ -739,6 +769,7 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
             "X-Accel-Buffering": "no",
             "x-cli-proxy-provider": order[0],
             **({"x-cli-proxy-failover": f"{primary}->{order[0]}"} if order[0] != primary else {}),
+            **({REASONING_EFFORT_HEADER: req.reasoning_effort} if req.reasoning_effort else {}),
         },
     )
 

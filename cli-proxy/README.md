@@ -78,6 +78,7 @@ The proxy targets practical drop-in compatibility with the OpenAI Chat Completio
 | **Auth** | ✅ opt-in Bearer (`CLI_PROXY_API_KEYS`); unset = open (back-compat). |
 | **`logprobs` / `n>1`** | ❌ rejected with `400` — the CLI cannot produce token probabilities, and `n>1` would multiply subscription cost. |
 | **`temperature` / `top_p` / `seed` / penalties** | ⚠️ accepted and **ignored** (headless CLIs expose no sampling control). |
+| **`reasoning_effort`** | ✅ applied **per request, only when sent**: `low`/`medium`/`high` → claude `--effort <level>`, codex `-c model_reasoning_effort="<level>"` (also on the failover target). Any other value (incl. `minimal`) → `400`. Applied level is echoed in `x-cli-proxy-reasoning-effort`. Without the field the CLI argv is unchanged, i.e. the CLI default applies. |
 | **`system_fingerprint`** | omitted (no stable fingerprint to report). |
 
 Models: `GET /v1/{claude,codex}/models` (list) and `GET /v1/{claude,codex}/models/{id}` (retrieve). Every response carries `x-request-id`, `openai-processing-ms` and informational `x-ratelimit-*` headers. Optional overload protection: set `CLI_PROXY_MAX_INFLIGHT` to return `429` once that many requests are concurrently in flight (default `0` = disabled, requests queue on the per-CLI semaphores).
