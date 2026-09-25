@@ -78,6 +78,9 @@ services:
       - CONTEXT_FILE_THRESHOLD=50000
       - INSTRUCTION_ARG_LIMIT=100000
       - CLAUDE_HOME=/auth/claude
+      # Zweites Claude-Abo als Ausweichstufe (claude -> claude-alt -> codex). Aktiv erst, wenn
+      # dort ein Login liegt (.claude/.credentials.json); Anmeldung siehe docs/cli-proxy-failover.md.
+      - CLAUDE_HOME_ALT=/auth/claude-alt
       - CODEX_HOME=/auth/codex
       - GEMINI_HOME=/auth/gemini
       - OPENCODE_HOME=/auth/opencode

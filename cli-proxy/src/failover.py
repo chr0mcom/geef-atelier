@@ -49,6 +49,14 @@ OPEN_SECONDS = _env_int("FAILOVER_OPEN_SECONDS", 300)
 #: as claude ones, and the caller should not have to care which one is degraded.
 PARTNER = {"claude": "codex", "codex": "claude"}
 
+#: Name of the alternative Claude subscription in the failover chain. It is the SAME CLI
+#: as "claude" run under a different HOME (= a different login), so it can take over when
+#: the primary account's session/weekly window is exhausted or its OAuth session died --
+#: before the request has to leave for codex.
+ALT = "claude-alt"
+ALT_HOME = os.getenv("CLAUDE_HOME_ALT", "/auth/claude-alt")
+ALT_ENABLED = _env_flag("CLAUDE_ALT_ENABLED", True)
+
 _MAX_ERROR_CHARS = 500
 
 # Ordered: the first matching group wins. `auth` deliberately precedes `transport`
@@ -127,6 +135,18 @@ def classify(exc: BaseException) -> str:
     return "unknown"
 
 
+def cli_of(backend: str) -> str:
+    """The CLI behind a chain member: both Claude accounts run the `claude` binary."""
+    return "claude" if backend == ALT else backend
+
+
+def alt_configured() -> bool:
+    """True once an alternative account is logged in. Judged by the credentials file on
+    every call, so the operator can park a second subscription (`claude` /login under
+    HOME=ALT_HOME) without restarting the proxy -- and removing the file retires it."""
+    return ALT_ENABLED and os.path.isfile(os.path.join(ALT_HOME, ".claude", ".credentials.json"))
+
+
 def should_failover(reason: str) -> bool:
     """True when `reason` describes a backend fault the partner might not share."""
     return reason in _FAILOVER_REASONS
@@ -174,22 +194,31 @@ def record_failover(primary: str, used: str) -> None:
 
 
 def attempt_order(backend: str) -> list[str]:
-    """Backends to try, in order. The partner leads only when the primary's breaker is
-    open AND the partner's is not -- with nothing healthy left we honour the caller's
-    choice rather than shuffling requests between two broken backends."""
+    """Backends to try, in order.
+
+    The chain is claude -> (alt Claude account, when configured) -> codex; a codex request
+    runs codex -> claude -> alt. Members whose breaker is open move behind the healthy ones
+    (stable, so the chain order still decides among equals) -- but with nothing healthy
+    left we honour the caller's choice rather than shuffling requests between broken
+    backends.
+    """
     partner = PARTNER.get(backend)
     if not ENABLED or partner is None:
         return [backend]
-    if not available(backend) and available(partner):
-        return [partner, backend]
-    return [backend, partner]
+    spare = [ALT] if alt_configured() else []
+    chain = [backend, *spare, partner] if backend == "claude" else [backend, partner, *spare]
+    ready = [b for b in chain if available(b)]
+    if not ready:
+        return chain
+    return ready + [b for b in chain if b not in ready]
 
 
 def snapshot() -> dict:
     """Machine-readable state for /health. Consumed by the dms-cliproxy-watch cron,
     which raises the operator ticket on the healthy->degraded edge."""
     backends = {}
-    for backend in PARTNER:
+    reserve = {ALT} if alt_configured() else set()
+    for backend in [*PARTNER, *reserve]:
         st = _state(backend)
         backends[backend] = {
             # Routing view: False only while the open window is running (one probe may
@@ -211,9 +240,12 @@ def snapshot() -> dict:
             # recorded AFTER the card was raised (review finding 2026-08-19).
             "last_success_at": st.last_success_at,
             "failover_count": st.failover_count,
+            # The spare account is reported, but never counted towards `degraded`: while
+            # the primary and codex serve, a dead reserve is not an incident.
+            "reserve": backend in reserve,
         }
     return {
         "enabled": ENABLED,
-        "degraded": any(not b["healthy"] for b in backends.values()),
+        "degraded": any(not b["healthy"] for name, b in backends.items() if name not in reserve),
         "backends": backends,
     }

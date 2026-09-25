@@ -589,8 +589,23 @@ async def _call_codex(req: ChatCompletionRequest) -> ChatCompletionResponse:
     return await _run_completion(req, "codex")
 
 
+def _bind_account(target: str) -> None:
+    """Select the Claude subscription (primary or alt) this attempt runs under. No-op for
+    codex. Must run for EVERY claude-family attempt so no earlier binding carries over."""
+    if failover.cli_of(target) == "claude":
+        claude_adapter.bind_account(target)
+
+
+def _more_targets(order: list[str], index: int, dead_cli: str | None) -> bool:
+    """Whether a later chain member can still be tried. After a transport-level fault
+    (hung or crashed CLI) the remaining accounts of the SAME CLI are not worth a try --
+    they share the fault, and retrying only delays the hand-over to the other CLI."""
+    return any(failover.cli_of(t) != dead_cli for t in order[index + 1:])
+
+
 async def _call_backend(req: ChatCompletionRequest, backend: str) -> ChatCompletionResponse:
-    return await (_call_claude(req) if backend == "claude" else _call_codex(req))
+    _bind_account(backend)
+    return await (_call_claude(req) if failover.cli_of(backend) == "claude" else _call_codex(req))
 
 
 def _retarget(req: ChatCompletionRequest, primary: str, target: str) -> ChatCompletionRequest:
@@ -601,8 +616,8 @@ def _retarget(req: ChatCompletionRequest, primary: str, target: str) -> ChatComp
     model flag on a falsy name, so an empty model means "use that CLI's own default" --
     which for codex is the newest top model configured in ~/.codex/config.toml.
     """
-    if target == primary:
-        return req
+    if failover.cli_of(target) == failover.cli_of(primary):
+        return req  # a second account of the same CLI speaks the same model names
     return req.model_copy(update={"model": ""})
 
 
@@ -615,15 +630,19 @@ async def _complete_with_failover(
     fail identically on the partner and retrying it would just hide the bug.
     """
     order = failover.attempt_order(backend)
+    dead_cli: str | None = None
     for index, target in enumerate(order):
-        is_last = index == len(order) - 1
+        if failover.cli_of(target) == dead_cli:
+            continue
         try:
             resp = await _call_backend(_retarget(req, backend, target), target)
         except (RuntimeError, OSError) as exc:
             reason = failover.classify(exc)
             failover.record_failure(target, reason, str(exc))
             log.error("%s CLI call failed (%s): %s", target, reason, exc)
-            if is_last or not failover.should_failover(reason):
+            if reason == "transport":
+                dead_cli = failover.cli_of(target)
+            if not failover.should_failover(reason) or not _more_targets(order, index, dead_cli):
                 raise HTTPException(status_code=502, detail=str(exc)) from exc
             continue
         failover.record_success(target)
@@ -666,6 +685,7 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
 
     async def _serve(target: str, target_req: ChatCompletionRequest):
         cli_model = target_req.model
+        cli = failover.cli_of(target)  # both Claude accounts run the same adapter
         effort = _effort_kwargs(target_req)
         # Agentic tool use (both backends): resolve the decision via file authoring, then emit
         # either proper streaming tool_calls or the final answer — no hallucination, no
@@ -673,8 +693,8 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
         # failover keeps the SAME decision-file contract (incident 2026-07-24: the buffered
         # fallback yielded the tool prompt's answer as plain text deltas, so Hermes workers
         # saw zero tool calls and crashed with protocol violations).
-        if _is_agentic_tool_request(target_req, target, structured):
-            kind, payload, parts = await _agentic_file_decision(target_req, target)
+        if _is_agentic_tool_request(target_req, cli, structured):
+            kind, payload, parts = await _agentic_file_decision(target_req, cli)
             if kind == "tool_calls":
                 tool_calls = [
                     {
@@ -692,7 +712,7 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
         # When tools/structured output are requested, we must inspect the full text before
         # deciding tool_calls vs content — so buffer, then emit. Pure text streams token-by-token.
         elif target_req.tools or structured:
-            raw, parts = await _complete_backend(target, prompt, cli_model, max_tokens, effort)
+            raw, parts = await _complete_backend(cli, prompt, cli_model, max_tokens, effort)
             if structured:
                 # Mirror the non-streaming contract: one retry on invalid structured output,
                 # then a refusal — not the raw text as a fake success (review 2026-07-24).
@@ -700,7 +720,7 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
                 if err:
                     log.warning("%s structured output invalid in stream (%s) — retrying", target, err)
                     raw, retry_parts = await _complete_backend(
-                        target, prompt + _JSON_RETRY_SUFFIX, cli_model, max_tokens, effort)
+                        cli, prompt + _JSON_RETRY_SUFFIX, cli_model, max_tokens, effort)
                     parts = _sum_usage(parts, retry_parts)  # both runs were billed
                     json_str, err = validate_and_extract(rf, raw)
                 if json_str is not None:
@@ -716,7 +736,7 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
                 if json_str is None:
                     log.warning("%s specific-tool stream: JSON extraction failed — retrying", target)
                     raw, retry_parts = await _complete_backend(
-                        target, prompt + _JSON_RETRY_SUFFIX, cli_model, max_tokens, effort)
+                        cli, prompt + _JSON_RETRY_SUFFIX, cli_model, max_tokens, effort)
                     parts = _sum_usage(parts, retry_parts)  # both runs were billed
                     json_str = extract_json(raw)
                 if json_str is not None:
@@ -732,15 +752,19 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
                 yield ("delta", raw)
             yield ("usage", parts)
         else:
-            adapter = claude_adapter if target == "claude" else codex_adapter
+            adapter = claude_adapter if cli == "claude" else codex_adapter
             async for ev in adapter.stream(prompt, cli_model, max_tokens, **effort):
                 yield ev
 
     async def _events():
+        dead_cli: str | None = None
         for index, target in enumerate(order):
+            if failover.cli_of(target) == dead_cli:
+                continue
             # The model name may not cross the backend boundary (see _retarget); the SSE
             # frames still echo the model the caller asked for.
             target_req = _retarget(req, primary, target)
+            _bind_account(target)
             emitted = False
             try:
                 async for ev in _serve(target, target_req):
@@ -750,8 +774,10 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
                 reason = failover.classify(exc)
                 failover.record_failure(target, reason, str(exc))
                 log.error("%s CLI stream failed (%s): %s", target, reason, exc)
-                is_last = index == len(order) - 1
-                if emitted or is_last or not failover.should_failover(reason):
+                if reason == "transport":
+                    dead_cli = failover.cli_of(target)
+                if emitted or not _more_targets(order, index, dead_cli) \
+                        or not failover.should_failover(reason):
                     raise
                 continue
             failover.record_success(target)

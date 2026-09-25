@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import json
 import logging
 import os
@@ -9,6 +10,7 @@ import re
 import time
 from pathlib import Path
 
+import failover
 from usage import UsageParts
 from workspace import (
     ephemeral_dir,
@@ -25,6 +27,28 @@ _semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 
 # Home directory for claude auth — mounted as a volume in the container.
 CLAUDE_HOME = os.getenv("CLAUDE_HOME", "/auth/claude")
+
+# Which Claude subscription the CLI calls of THIS request run under. A ContextVar, because
+# the proxy serves many requests concurrently in one process and each may sit on a
+# different stage of the failover chain (claude -> claude-alt); an argument would have to
+# be threaded through every adapter entry point. asyncio tasks copy their context at
+# creation, so a request's binding never leaks into another request.
+_account_home: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "claude_account_home", default=None)
+
+
+def bind_account(account: str) -> None:
+    """Point this request's claude CLI calls at `account` ('claude' or 'claude-alt').
+
+    Always called explicitly for every claude-family attempt -- including the primary --
+    so a previous stage's binding can never carry over to the next attempt.
+    """
+    _account_home.set(failover.ALT_HOME if account == failover.ALT else None)
+
+
+def current_home() -> str:
+    """HOME for the claude CLI: the alt account's directory when bound, else the primary."""
+    return _account_home.get() or CLAUDE_HOME
 
 # Hard cap on how long a single claude CLI call may run.
 # Increase for workloads that produce very long outputs (e.g. 30-page documents).
@@ -98,7 +122,7 @@ async def _discover_families() -> tuple[str, ...]:
                 "claude", "--help",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env={**os.environ, "HOME": CLAUDE_HOME},
+                env={**os.environ, "HOME": current_home()},
             )
             stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=30)
             help_text = stdout.decode(errors="replace")
@@ -170,7 +194,7 @@ async def _probe_alias(alias: str) -> str | None:
     `claude` process running against the same subscription.
     """
     args = ["claude", "-p", "--model", alias, "--output-format", "json"]
-    env = {**os.environ, "HOME": CLAUDE_HOME}
+    env = {**os.environ, "HOME": current_home()}
     async with _semaphore:
         proc = None
         try:
@@ -407,7 +431,7 @@ async def _run_claude_decision(
     # Offload to instruction.md if the instruction would exceed the per-argument OS limit (E2BIG).
     args.append(finalize_decision_instruction(workspace_path, instruction))
 
-    env = {**os.environ, "HOME": CLAUDE_HOME}
+    env = {**os.environ, "HOME": current_home()}
 
     proc = await asyncio.create_subprocess_exec(
         *args,
@@ -485,7 +509,7 @@ async def _stream_claude(
         args += ["--model", _normalize_model(model)]
     args += _effort_args(reasoning_effort)
 
-    env = {**os.environ, "HOME": CLAUDE_HOME}
+    env = {**os.environ, "HOME": current_home()}
     proc = await asyncio.create_subprocess_exec(
         *args,
         stdin=asyncio.subprocess.PIPE,
@@ -596,7 +620,7 @@ async def _run_claude_document(
     # Offload to instruction.md if the instruction would exceed the per-argument OS limit.
     args.append(finalize_instruction(workspace_path, instruction))
 
-    env = {**os.environ, "HOME": CLAUDE_HOME}
+    env = {**os.environ, "HOME": current_home()}
 
     proc = await asyncio.create_subprocess_exec(
         *args,
@@ -660,7 +684,7 @@ async def _run_claude(
     # draft (often >128 KB by later iterations), so an argv prompt fails the spawn with
     # OSError "Argument list too long" (E2BIG) and the proxy returns HTTP 500. claude -p
     # reads the prompt from stdin when no prompt positional is given.
-    env = {**os.environ, "HOME": CLAUDE_HOME}
+    env = {**os.environ, "HOME": current_home()}
 
     proc = await asyncio.create_subprocess_exec(
         *args,
