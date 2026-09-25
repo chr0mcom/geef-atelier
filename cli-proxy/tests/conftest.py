@@ -1,7 +1,13 @@
 import sys
 import os
+import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../src"))
+
+# workspace.py defaults to /work, which exists only inside the container. Without this a host
+# run fails every test that creates an ephemeral workspace with PermissionError. setdefault keeps
+# the container's real WORKSPACE_ROOT (nightly run) untouched.
+os.environ.setdefault("WORKSPACE_ROOT", tempfile.mkdtemp(prefix="cli-proxy-ws-"))
 
 import pytest
 
