@@ -389,10 +389,20 @@ async def complete(
 
 
 async def complete_with_usage(
-    prompt: str, model: str | None, max_tokens: int | None, *, reasoning_effort: str | None = None
+    prompt: str, model: str | None, max_tokens: int | None, *, reasoning_effort: str | None = None,
+    system_prompt: str | None = None, web_tools: bool = False,
 ) -> tuple[str, UsageParts]:
-    """Like complete(), but also returns the real token usage reported by the CLI."""
+    """Like complete(), but also returns the real token usage reported by the CLI.
+
+    With `system_prompt` set the call runs in lean mode (see _run_claude_lean): the caller's
+    system prompt REPLACES the Claude Code agent prompt. Without it the argv is unchanged.
+    """
     async with _semaphore:
+        if system_prompt is not None:
+            async with ephemeral_dir() as workspace:
+                return await _run_claude_lean(
+                    prompt, system_prompt, model, workspace,
+                    reasoning_effort=reasoning_effort, web_tools=web_tools)
         return await _run_claude(prompt, model, max_tokens, reasoning_effort=reasoning_effort)
 
 
@@ -684,6 +694,61 @@ async def _run_claude(
     # draft (often >128 KB by later iterations), so an argv prompt fails the spawn with
     # OSError "Argument list too long" (E2BIG) and the proxy returns HTTP 500. claude -p
     # reads the prompt from stdin when no prompt positional is given.
+    return await _exec_print(args, prompt)
+
+
+# Lean print mode. The default `claude -p` call is a full Claude Code agent session: the
+# agent system prompt, the built-in tool definitions, the synced skill list and the
+# auto-memory of the working directory (/app) all precede the caller's text, ~23k tokens in
+# total, and the caller's OpenAI system message arrives only as "[SYSTEM]" text inside the
+# user turn. For role-play or "answer from your own perspective" prompts the agent persona
+# then often declines in prose ("I haven't actually played this game"), which is the cause
+# of the empty structured outputs seen on 2026-11-07. Lean mode passes the caller's system
+# prompt as the real system prompt (replacing the agent prompt), disables the built-in tools
+# (web tools only when the request references images) and skills, ignores MCP configs,
+# runs in an empty per-call directory (no auto-memory) and writes no session transcript.
+LEAN_DEFAULT_SYSTEM_PROMPT = (
+    "You are a helpful assistant. Follow the user's instructions exactly."
+)
+_LEAN_WEB_TOOLS = "WebSearch,WebFetch"
+
+
+def lean_args(system_prompt_file: Path, model: str | None, *,
+              reasoning_effort: str | None = None, web_tools: bool = False) -> list[str]:
+    """argv of a lean print-mode call (prompt goes through stdin)."""
+    tools = _LEAN_WEB_TOOLS if web_tools else ""
+    args = [
+        "claude", "-p",
+        "--output-format", "json",
+        "--system-prompt-file", str(system_prompt_file),
+        "--tools", tools,
+        "--disable-slash-commands",
+        "--strict-mcp-config",
+        "--no-session-persistence",
+    ]
+    if web_tools:
+        args += ["--allowedTools", _LEAN_WEB_TOOLS]
+    if model:
+        args += ["--model", _normalize_model(model)]
+    args += _effort_args(reasoning_effort)
+    return args
+
+
+async def _run_claude_lean(
+    prompt: str, system_prompt: str, model: str | None, workspace_path: Path,
+    *, reasoning_effort: str | None = None, web_tools: bool = False,
+) -> tuple[str, UsageParts]:
+    # The system prompt goes through a file: no argv size limit, and it never shows up in ps.
+    sp_file = workspace_path / "system-prompt.md"
+    sp_file.write_text(system_prompt or LEAN_DEFAULT_SYSTEM_PROMPT, encoding="utf-8")
+    args = lean_args(sp_file, model, reasoning_effort=reasoning_effort, web_tools=web_tools)
+    return await _exec_print(args, prompt, cwd=workspace_path)
+
+
+async def _exec_print(
+    args: list[str], prompt: str, cwd: Path | None = None
+) -> tuple[str, UsageParts]:
+    """Run a `claude -p --output-format json` argv with the prompt on stdin."""
     env = {**os.environ, "HOME": current_home()}
 
     proc = await asyncio.create_subprocess_exec(
@@ -692,6 +757,7 @@ async def _run_claude(
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env=env,
+        **({"cwd": str(cwd)} if cwd is not None else {}),
     )
     try:
         stdout, stderr = await asyncio.wait_for(

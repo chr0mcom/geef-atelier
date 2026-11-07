@@ -72,7 +72,7 @@ The proxy targets practical drop-in compatibility with the OpenAI Chat Completio
 | **Streaming** (`stream: true`) | ✅ SSE `chat.completion.chunk` stream, terminating `data: [DONE]`. `stream_options.include_usage` adds a final usage chunk. claude streams token deltas; codex emits the agent message as a (buffered) delta. Requests with `tools`/`response_format` buffer the full text, then emit. |
 | **Real token usage** | ✅ `usage` is parsed from the CLI output (claude `--output-format json`, codex `exec --json`), incl. `prompt_tokens_details.cached_tokens` and `completion_tokens_details.reasoning_tokens`. |
 | **Error envelope** | ✅ `{"error": {"message","type","param","code"}}` with faithful status codes (422→400, 401, 404, 429, 5xx). |
-| **`response_format`** | ✅ `json_object` and `json_schema` (validated server-side against the schema, with one retry, then a `refusal`). |
+| **`response_format`** | ✅ `json_object` and `json_schema` (validated server-side against the schema, with one retry, then a `refusal`). Every JSON object in the answer is considered (fences, leading prose, stray braces, an echoed schema); the first one that satisfies the schema wins. claude retries in **lean mode** (see below). |
 | **Tool calling** | ✅ `tool_choice` `auto`/`required`/`none`/specific, parallel tool calls, multi-turn replay (emulated via prompt + JSON extraction). |
 | **Multimodal** | ⚠️ best-effort: http(s) `image_url` parts are passed as references (claude can WebFetch them); inline `data:` images are dropped with a warning. |
 | **Auth** | ✅ opt-in Bearer (`CLI_PROXY_API_KEYS`); unset = open (back-compat). |
@@ -82,6 +82,19 @@ The proxy targets practical drop-in compatibility with the OpenAI Chat Completio
 | **`system_fingerprint`** | omitted (no stable fingerprint to report). |
 
 Models: `GET /v1/{claude,codex}/models` (list) and `GET /v1/{claude,codex}/models/{id}` (retrieve). Every response carries `x-request-id`, `openai-processing-ms` and informational `x-ratelimit-*` headers. Optional overload protection: set `CLI_PROXY_MAX_INFLIGHT` to return `429` once that many requests are concurrently in flight (default `0` = disabled, requests queue on the per-CLI semaphores).
+
+## Lean mode (claude, since 2026-11-07)
+
+A default `claude -p` call is a full Claude Code agent session: agent system prompt, built-in tool definitions, the synced skill list and the auto-memory of the working directory precede the caller's text (~23k prompt tokens), and the caller's OpenAI system message only arrives as `[SYSTEM]` text inside the user turn. For role-play or "answer from your own perspective" prompts the agent persona then often declines in prose, so structured outputs came back as `refusal: "no JSON object found"` (2026-11-07, LLM Shootout debriefing: 4 of 6 replays).
+
+Lean mode runs `claude -p --output-format json --system-prompt-file <file> --tools "" --disable-slash-commands --strict-mcp-config --no-session-persistence` in an empty per-call directory: the caller's system/developer messages become the real system prompt (neutral default if there is none), no tools (WebSearch/WebFetch only when the request references http(s) images), no skills, no memory, no session transcript. Prompt size drops to ~2k tokens for a ~1.5k-token request.
+
+| Variable | Default | Effect |
+|----------|---------|--------|
+| `CLAUDE_STRUCTURED_LEAN_RETRY` | `1` | The single retry of an invalid claude structured output runs in lean mode (instead of repeating the agent-mode call with a "CRITICAL" reminder). `0` restores the old retry. |
+| `CLAUDE_LEAN_CHAT` | `0` | `1`: non-streaming plain chat (no `tools`, no document mode) and all `response_format` requests to claude use lean mode from the first attempt. Token-streamed chat, tool calling (incl. `tool_choice` specific), decision-file and document mode are never affected; codex is never affected. |
+
+Trade-off: lean mode has no web search for text-only requests, and the model no longer sees the Claude Code agent instructions (which plain chat/structured callers do not need).
 
 ## Tool use
 

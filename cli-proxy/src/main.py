@@ -404,6 +404,96 @@ async def _complete_backend(
     return await adapter.complete_with_usage(prompt, model, max_tokens, **(effort or {}))
 
 
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _structured_lean_retry_enabled() -> bool:
+    """CLAUDE_STRUCTURED_LEAN_RETRY (default on): the one retry of an invalid claude
+    structured output runs in lean mode instead of repeating the agent-mode call."""
+    return _env_flag("CLAUDE_STRUCTURED_LEAN_RETRY", True)
+
+
+def _lean_chat_enabled() -> bool:
+    """CLAUDE_LEAN_CHAT (default off = previous behaviour): plain chat (no tools, no document
+    mode, not token-streamed) and structured-output requests to claude run in lean mode
+    from the first attempt on."""
+    return _env_flag("CLAUDE_LEAN_CHAT", False)
+
+
+def _has_image_refs(req: ChatCompletionRequest) -> bool:
+    return any(message_images(m.content) for m in req.messages)
+
+
+def _lean_parts(req: ChatCompletionRequest) -> tuple[str, str]:
+    """(system prompt, prompt) for a lean claude call: system/developer messages become the
+    real system prompt, everything else is rendered exactly like the agent-mode prompt."""
+    system = "\n\n".join(
+        message_text(m.content) for m in req.messages if m.role in ("system", "developer")
+    ).strip()
+    rest = req.model_copy(update={
+        "messages": [m for m in req.messages if m.role not in ("system", "developer")]})
+    prompt = _build_prompt(rest)
+    if req.response_format is not None and req.response_format.type != "text":
+        prompt += build_response_format_instruction(req.response_format)
+    return system or claude_adapter.LEAN_DEFAULT_SYSTEM_PROMPT, prompt
+
+
+async def _complete_claude_lean(
+    req: ChatCompletionRequest, max_tokens: int | None, effort: dict[str, str] | None,
+    suffix: str = "",
+) -> tuple[str, UsageParts]:
+    system, prompt = _lean_parts(req)
+    return await claude_adapter.complete_with_usage(
+        prompt + suffix, req.model, max_tokens, **(effort or {}),
+        system_prompt=system, web_tools=_has_image_refs(req))
+
+
+_LEAN_JSON_RETRY_SUFFIX = (
+    "\n\nReply with the JSON object only: start with '{' and end with '}'."
+)
+
+
+async def _structured_completion(
+    req: ChatCompletionRequest, cli: str, prompt: str, max_tokens: int | None,
+    effort: dict[str, str] | None,
+) -> tuple[str | None, str | None, UsageParts]:
+    """Structured output with one retry. Returns (json_str, error, summed usage).
+
+    claude: an invalid first answer is retried in lean mode (CLAUDE_STRUCTURED_LEAN_RETRY),
+    because the typical failure is the agent persona declining in prose — repeating the
+    same agent-mode call with a louder "CRITICAL" reminder failed just as often (2026-11-07).
+    codex: unchanged (same call plus the JSON reminder).
+    """
+    rf = req.response_format
+    lean_first = cli == "claude" and _lean_chat_enabled()
+    if lean_first:
+        raw, parts = await _complete_claude_lean(req, max_tokens, effort)
+    else:
+        raw, parts = await _complete_backend(cli, prompt, req.model, max_tokens, effort)
+    json_str, err = validate_and_extract(rf, raw)
+    if err is None:
+        return json_str, None, parts
+
+    lean_retry = cli == "claude" and (lean_first or _structured_lean_retry_enabled())
+    log.warning("%s structured output invalid (%s) — retrying%s",
+                cli, err, " in lean mode" if lean_retry else "")
+    if lean_retry:
+        raw, retry_parts = await _complete_claude_lean(
+            req, max_tokens, effort, _LEAN_JSON_RETRY_SUFFIX if lean_first else "")
+    else:
+        raw, retry_parts = await _complete_backend(
+            cli, prompt + _JSON_RETRY_SUFFIX, req.model, max_tokens, effort)
+    parts = _sum_usage(parts, retry_parts)  # both runs were billed
+    json_str, err = validate_and_extract(rf, raw)
+    if err is not None:
+        log.warning("%s structured output still invalid after retry (%s)", cli, err)
+    return json_str, err, parts
+
+
 def _sum_usage(a: UsageParts, b: UsageParts) -> UsageParts:
     """Combined accounting for a retried call: both CLI runs happened and were billed."""
     cost = None
@@ -535,24 +625,22 @@ async def _run_completion(req: ChatCompletionRequest, backend: str) -> ChatCompl
              backend, req.model, _extract_tool_name(req), structured)
 
     effort = _effort_kwargs(req)
-    raw, parts = await _complete_backend(backend, prompt, req.model, max_tokens, effort)
-    usage = _to_usage_info(parts)
 
     # Structured outputs take precedence over tool extraction.
     if structured:
-        json_str, err = validate_and_extract(rf, raw)
-        if err:
-            log.warning("%s structured output invalid (%s) — retrying", backend, err)
-            raw, retry_parts = await _complete_backend(
-                backend, prompt + _JSON_RETRY_SUFFIX, req.model, max_tokens, effort)
-            parts = _sum_usage(parts, retry_parts)  # both runs were billed
-            usage = _to_usage_info(parts)
-            json_str, err = validate_and_extract(rf, raw)
+        json_str, err, parts = await _structured_completion(req, backend, prompt, max_tokens, effort)
+        usage = _to_usage_info(parts)
         if json_str is not None:
             return make_text_response(req.model, json_str, usage)
         return make_refusal_response(
             req.model, f"Could not produce valid structured output: {err}", usage)
 
+    if backend == "claude" and not req.tools and _lean_chat_enabled():
+        raw, parts = await _complete_claude_lean(req, max_tokens, effort)
+        return _build_response(req, raw, _to_usage_info(parts))
+
+    raw, parts = await _complete_backend(backend, prompt, req.model, max_tokens, effort)
+    usage = _to_usage_info(parts)
     resp = _build_response(req, raw, usage)
     if _needs_json_retry(resp, req):
         log.warning("%s JSON extraction failed — retrying with explicit JSON reminder", backend)
@@ -711,23 +799,19 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
             yield ("usage", parts)
         # When tools/structured output are requested, we must inspect the full text before
         # deciding tool_calls vs content — so buffer, then emit. Pure text streams token-by-token.
-        elif target_req.tools or structured:
+        elif structured:
+            # Mirror the non-streaming contract: one retry on invalid structured output,
+            # then a refusal — not the raw text as a fake success (review 2026-07-24).
+            json_str, err, parts = await _structured_completion(
+                target_req, cli, prompt, max_tokens, effort)
+            if json_str is not None:
+                yield ("delta", json_str)
+            else:
+                yield ("refusal", f"Could not produce valid structured output: {err}")
+            yield ("usage", parts)
+        elif target_req.tools:
             raw, parts = await _complete_backend(cli, prompt, cli_model, max_tokens, effort)
-            if structured:
-                # Mirror the non-streaming contract: one retry on invalid structured output,
-                # then a refusal — not the raw text as a fake success (review 2026-07-24).
-                json_str, err = validate_and_extract(rf, raw)
-                if err:
-                    log.warning("%s structured output invalid in stream (%s) — retrying", target, err)
-                    raw, retry_parts = await _complete_backend(
-                        cli, prompt + _JSON_RETRY_SUFFIX, cli_model, max_tokens, effort)
-                    parts = _sum_usage(parts, retry_parts)  # both runs were billed
-                    json_str, err = validate_and_extract(rf, raw)
-                if json_str is not None:
-                    yield ("delta", json_str)
-                else:
-                    yield ("refusal", f"Could not produce valid structured output: {err}")
-            elif _extract_tool_name(target_req):
+            if _extract_tool_name(target_req):
                 # Forced single named tool (tool_choice=specific) — the SSE path must honour
                 # the tool contract like the non-streaming one (review finding 2026-07-24:
                 # it only ever yielded text deltas). One retry, mirroring _needs_json_retry.
