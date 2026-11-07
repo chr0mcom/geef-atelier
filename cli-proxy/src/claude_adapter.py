@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 import failover
+import policy
 from usage import UsageParts
 from workspace import (
     ephemeral_dir,
@@ -122,7 +123,7 @@ async def _discover_families() -> tuple[str, ...]:
                 "claude", "--help",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env={**os.environ, "HOME": current_home()},
+                env=policy.agent_env(current_home()),
             )
             stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=30)
             help_text = stdout.decode(errors="replace")
@@ -193,8 +194,8 @@ async def _probe_alias(alias: str) -> str | None:
     and always reaps its subprocess: without the kill a timed-out probe would leave a
     `claude` process running against the same subscription.
     """
-    args = ["claude", "-p", "--model", alias, "--output-format", "json"]
-    env = {**os.environ, "HOME": current_home()}
+    args = ["claude", "-p", "--model", alias, "--output-format", "json", "--no-session-persistence"]
+    env = policy.agent_env(current_home())
     async with _semaphore:
         proc = None
         try:
@@ -390,7 +391,7 @@ async def complete(
 
 async def complete_with_usage(
     prompt: str, model: str | None, max_tokens: int | None, *, reasoning_effort: str | None = None,
-    system_prompt: str | None = None, web_tools: bool = False,
+    system_prompt: str | None = None, image_refs: bool = False,
 ) -> tuple[str, UsageParts]:
     """Like complete(), but also returns the real token usage reported by the CLI.
 
@@ -402,7 +403,7 @@ async def complete_with_usage(
             async with ephemeral_dir() as workspace:
                 return await _run_claude_lean(
                     prompt, system_prompt, model, workspace,
-                    reasoning_effort=reasoning_effort, web_tools=web_tools)
+                    reasoning_effort=reasoning_effort, image_refs=image_refs)
         return await _run_claude(prompt, model, max_tokens, reasoning_effort=reasoning_effort)
 
 
@@ -433,6 +434,7 @@ async def _run_claude_decision(
         "--output-format", "json",
         "--allowedTools", "Read,Edit,Write",
         "--permission-mode", "acceptEdits",
+        "--no-session-persistence",
     ]
     if model:
         args += ["--model", _normalize_model(model)]
@@ -441,7 +443,7 @@ async def _run_claude_decision(
     # Offload to instruction.md if the instruction would exceed the per-argument OS limit (E2BIG).
     args.append(finalize_decision_instruction(workspace_path, instruction))
 
-    env = {**os.environ, "HOME": current_home()}
+    env = policy.agent_env(current_home())
 
     proc = await asyncio.create_subprocess_exec(
         *args,
@@ -513,13 +515,14 @@ async def _stream_claude(
         "--output-format", "stream-json",
         "--verbose",
         "--include-partial-messages",
-        "--allowedTools", "WebSearch,WebFetch",
+        "--no-session-persistence",
+        *_web_tool_args(),
     ]
     if model:
         args += ["--model", _normalize_model(model)]
     args += _effort_args(reasoning_effort)
 
-    env = {**os.environ, "HOME": current_home()}
+    env = policy.agent_env(current_home())
     proc = await asyncio.create_subprocess_exec(
         *args,
         stdin=asyncio.subprocess.PIPE,
@@ -620,6 +623,7 @@ async def _run_claude_document(
         "--output-format", "json",
         "--allowedTools", "Read,Edit,Write",
         "--permission-mode", "acceptEdits",
+        "--no-session-persistence",
         "--append-system-prompt", system_prompt,
     ]
 
@@ -630,7 +634,7 @@ async def _run_claude_document(
     # Offload to instruction.md if the instruction would exceed the per-argument OS limit.
     args.append(finalize_instruction(workspace_path, instruction))
 
-    env = {**os.environ, "HOME": current_home()}
+    env = policy.agent_env(current_home())
 
     proc = await asyncio.create_subprocess_exec(
         *args,
@@ -680,10 +684,7 @@ async def _run_claude_document(
 async def _run_claude(
     prompt: str, model: str | None, max_tokens: int | None, *, reasoning_effort: str | None = None
 ) -> tuple[str, UsageParts]:
-    # Allowlist ONLY web tools — no Bash/Edit/Write, so no full permission bypass.
-    # Comma-separated single token: a space-separated variadic would greedily
-    # consume the trailing prompt positional.
-    args = ["claude", "-p", "--output-format", "json", "--allowedTools", "WebSearch,WebFetch"]
+    args = ["claude", "-p", "--output-format", "json", "--no-session-persistence", *_web_tool_args()]
 
     if model:
         args += ["--model", _normalize_model(model)]
@@ -710,13 +711,36 @@ async def _run_claude(
 LEAN_DEFAULT_SYSTEM_PROMPT = (
     "You are a helpful assistant. Follow the user's instructions exactly."
 )
-_LEAN_WEB_TOOLS = "WebSearch,WebFetch"
+_WEB_TOOLS = "WebSearch,WebFetch"
+_IMAGE_FETCH_TOOLS = "WebFetch"
+
+
+def _web_tool_args() -> list[str]:
+    """Tool arguments of an agent-mode print call.
+
+    Web search and fetch only when the request opted in (see policy.web_search_allowed).
+    Otherwise every built-in tool is switched off, so the call behaves like plain text
+    generation. Allowlist ONLY web tools, never Bash/Edit/Write, so there is no permission
+    bypass. The value is a comma-separated single token: a space-separated variadic would
+    greedily consume the trailing prompt positional.
+    """
+    if policy.web_search_allowed():
+        return ["--allowedTools", _WEB_TOOLS]
+    return ["--tools", ""]
+
+
+def _lean_tools(image_refs: bool) -> str:
+    """Tools of a lean call: web search and fetch on request, otherwise fetch only when the
+    prompt references http(s) images (the model has to download them), otherwise none."""
+    if policy.web_search_allowed():
+        return _WEB_TOOLS
+    return _IMAGE_FETCH_TOOLS if image_refs else ""
 
 
 def lean_args(system_prompt_file: Path, model: str | None, *,
-              reasoning_effort: str | None = None, web_tools: bool = False) -> list[str]:
+              reasoning_effort: str | None = None, image_refs: bool = False) -> list[str]:
     """argv of a lean print-mode call (prompt goes through stdin)."""
-    tools = _LEAN_WEB_TOOLS if web_tools else ""
+    tools = _lean_tools(image_refs)
     args = [
         "claude", "-p",
         "--output-format", "json",
@@ -726,8 +750,8 @@ def lean_args(system_prompt_file: Path, model: str | None, *,
         "--strict-mcp-config",
         "--no-session-persistence",
     ]
-    if web_tools:
-        args += ["--allowedTools", _LEAN_WEB_TOOLS]
+    if tools:
+        args += ["--allowedTools", tools]
     if model:
         args += ["--model", _normalize_model(model)]
     args += _effort_args(reasoning_effort)
@@ -736,12 +760,12 @@ def lean_args(system_prompt_file: Path, model: str | None, *,
 
 async def _run_claude_lean(
     prompt: str, system_prompt: str, model: str | None, workspace_path: Path,
-    *, reasoning_effort: str | None = None, web_tools: bool = False,
+    *, reasoning_effort: str | None = None, image_refs: bool = False,
 ) -> tuple[str, UsageParts]:
     # The system prompt goes through a file: no argv size limit, and it never shows up in ps.
     sp_file = workspace_path / "system-prompt.md"
     sp_file.write_text(system_prompt or LEAN_DEFAULT_SYSTEM_PROMPT, encoding="utf-8")
-    args = lean_args(sp_file, model, reasoning_effort=reasoning_effort, web_tools=web_tools)
+    args = lean_args(sp_file, model, reasoning_effort=reasoning_effort, image_refs=image_refs)
     return await _exec_print(args, prompt, cwd=workspace_path)
 
 
@@ -749,7 +773,7 @@ async def _exec_print(
     args: list[str], prompt: str, cwd: Path | None = None
 ) -> tuple[str, UsageParts]:
     """Run a `claude -p --output-format json` argv with the prompt on stdin."""
-    env = {**os.environ, "HOME": current_home()}
+    env = policy.agent_env(current_home())
 
     proc = await asyncio.create_subprocess_exec(
         *args,

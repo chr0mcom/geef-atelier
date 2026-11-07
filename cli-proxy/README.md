@@ -92,9 +92,11 @@ Lean mode runs `claude -p --output-format json --system-prompt-file <file> --too
 | Variable | Default | Effect |
 |----------|---------|--------|
 | `CLAUDE_STRUCTURED_LEAN_RETRY` | `1` | The single retry of an invalid claude structured output runs in lean mode (instead of repeating the agent-mode call with a "CRITICAL" reminder). `0` restores the old retry. |
-| `CLAUDE_LEAN_CHAT` | `0` | `1`: non-streaming plain chat (no `tools`, no document mode) and all `response_format` requests to claude use lean mode from the first attempt. Token-streamed chat, tool calling (incl. `tool_choice` specific), decision-file and document mode are never affected; codex is never affected. |
+| `CLAUDE_LEAN_CHAT` | `1` | Non-streaming plain chat (no `tools`, no document mode) and all `response_format` requests to claude use lean mode from the first attempt, so the gateway behaves like a plain OpenAI API. `0` restores the agent-session behaviour of before 2026-11-07. Token-streamed chat, tool calling (incl. `tool_choice` specific), decision-file and document mode are never affected; codex is never affected. |
 
-Trade-off: lean mode has no web search for text-only requests, and the model no longer sees the Claude Code agent instructions (which plain chat/structured callers do not need).
+Lean mode is the default since 2026-11-07. Trade-off: no web search unless requested (next section), and the model no longer sees the Claude Code agent instructions, which plain chat and structured callers do not need.
+
+Independent of the mode, **no CLI process leaves a trace or reads one**: every claude call runs with `--no-session-persistence` and `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` (the operator's memory notes never reach a prompt), every codex call with `--ephemeral`. See `src/policy.py`.
 
 ## Tool use
 
@@ -104,12 +106,16 @@ If the request contains `tools` + `tool_choice`, the schema is embedded as a pro
 
 The CLI output is then scanned for a JSON block (incl. Markdown-fence stripping) and returned as a `tool_calls` response.
 
-## Web search
+## Web search (opt-in since 2026-11-07)
 
-Both backends run with the model-driven web search tool enabled, so an actor can autonomously decide to fetch current information from the web during generation:
+Like any OpenAI-compatible API, the gateway does not browse unless asked. A caller opts in per request with the standard `web_search_options` parameter (any object, usually `{}`); the operator can switch the default for the whole deployment with `CLI_WEB_SEARCH=1` on the `cli-proxy` service (the behaviour before 2026-11-07). Without it, claude runs with `--tools ""` and codex without `--search`.
+
+With search enabled, the model decides itself whether to fetch current information:
 
 - **claude** — invoked with `--allowedTools "WebSearch,WebFetch"`. Only the web tools are allowlisted; Bash/Edit/Write are **not** enabled (no full permission bypass).
 - **codex** — invoked with the global `--search` flag, placed **before** the `exec` subcommand (codex rejects it as an `exec` argument). It enables the native Responses `web_search` tool with no per-call approval.
+
+A request that references http(s) images keeps `WebFetch` (claude must download them) but never gets search by that route.
 
 **Cost:** web search runs on the subscription (Claude / Codex), not metered per search — no Tavily-style per-request billing on the CLI path.
 

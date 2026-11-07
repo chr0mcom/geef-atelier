@@ -545,7 +545,7 @@ async def test_main_routes_document_mode_to_complete_document(tmp_path):
 
     complete_call_count = [0]
 
-    async def mock_complete(prompt, model, max_tokens):
+    async def mock_complete(prompt, model, max_tokens, **kwargs):
         complete_call_count[0] += 1
         return "should not be called", UsageParts()
 
@@ -591,7 +591,7 @@ async def test_main_routes_codex_document_mode_to_complete_document(tmp_path):
 
     complete_call_count = [0]
 
-    async def mock_complete(prompt, model, max_tokens):
+    async def mock_complete(prompt, model, max_tokens, **kwargs):
         complete_call_count[0] += 1
         return "should not be called", UsageParts()
 
@@ -635,7 +635,7 @@ async def test_main_uses_text_mode_without_document_mode_flag():
         document_call_count[0] += 1
         return "should not be called", UsageParts()
 
-    async def mock_complete(prompt, model, max_tokens):
+    async def mock_complete(prompt, model, max_tokens, **kwargs):
         complete_call_count[0] += 1
         return "text response", UsageParts()
 

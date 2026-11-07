@@ -64,7 +64,22 @@ async def test_complete_strips_provider_prefix():
 
 
 @pytest.mark.asyncio
-async def test_complete_enables_web_search():
+async def test_complete_has_no_web_search_by_default():
+    args = await _complete_args()
+    assert "--search" not in args
+    assert "--ephemeral" in args, "no session files are written"
+
+
+@pytest.mark.asyncio
+async def test_complete_enables_web_search_on_request(monkeypatch):
+    monkeypatch.setenv("CLI_WEB_SEARCH", "1")
+    args = await _complete_args()
+    # --search is a global flag and MUST precede the `exec` subcommand.
+    assert "--search" in args
+    assert args.index("--search") < args.index("exec")
+
+
+async def _complete_args() -> list:
     proc = _make_proc()
     captured: list[list] = []
 
@@ -81,10 +96,7 @@ async def test_complete_enables_web_search():
         mock_tmp.return_value.__enter__.return_value.name = "/tmp/fake.txt"
         await codex_adapter.complete("test", None, None)
 
-    args = captured[0]
-    # --search is a global flag and MUST precede the `exec` subcommand.
-    assert "--search" in args
-    assert args.index("--search") < args.index("exec")
+    return captured[0]
 
 
 @pytest.mark.asyncio

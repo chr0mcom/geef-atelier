@@ -148,6 +148,12 @@ class TestExtraction:
 # ---------------------------------------------------------------------------
 
 class TestLeanRetry:
+    """The retry as it works when the first attempt is an agent-mode call (CLAUDE_LEAN_CHAT=0)."""
+
+    @pytest.fixture(autouse=True)
+    def _agent_first(self, monkeypatch) -> None:
+        monkeypatch.setenv("CLAUDE_LEAN_CHAT", "0")
+
     def test_agent_refusal_then_lean_retry_succeeds(self, client: TestClient) -> None:
         mock = AsyncMock(side_effect=[_u(RECORDED_AGENT_REFUSAL, 100, 10), _u(_VALID, 20, 7)])
         with patch.object(main.claude_adapter, "complete_with_usage", mock):
@@ -162,7 +168,7 @@ class TestLeanRetry:
         assert "system_prompt" not in first.kwargs, "first attempt keeps the agent-mode argv"
         assert "[SYSTEM]" in first.args[0]
         assert second.kwargs["system_prompt"] == _SYSTEM
-        assert second.kwargs["web_tools"] is False
+        assert second.kwargs["image_refs"] is False
         lean_prompt = second.args[0]
         assert "[SYSTEM]" not in lean_prompt and _SYSTEM not in lean_prompt
         assert "[USER]\nBeantworte die Fragen." in lean_prompt
@@ -195,7 +201,7 @@ class TestLeanRetry:
             client.post("/v1/claude/chat/completions", json=body)
         assert mock.await_args_list[1].kwargs["system_prompt"] == claude_adapter.LEAN_DEFAULT_SYSTEM_PROMPT
 
-    def test_image_reference_keeps_web_tools(self, client: TestClient) -> None:
+    def test_image_reference_keeps_image_fetch(self, client: TestClient) -> None:
         mock = AsyncMock(side_effect=[_u("nope"), _u(_VALID)])
         body = _body(messages=[{"role": "user", "content": [
             {"type": "text", "text": "Beschreibe"},
@@ -203,7 +209,7 @@ class TestLeanRetry:
         ]}])
         with patch.object(main.claude_adapter, "complete_with_usage", mock):
             client.post("/v1/claude/chat/completions", json=body)
-        assert mock.await_args_list[1].kwargs["web_tools"] is True
+        assert mock.await_args_list[1].kwargs["image_refs"] is True
 
     def test_reasoning_effort_travels_into_the_lean_retry(self, client: TestClient) -> None:
         mock = AsyncMock(side_effect=[_u("nope"), _u(_VALID)])
@@ -241,22 +247,21 @@ class TestLeanRetry:
 
 
 class TestLeanChatSwitch:
-    def test_default_plain_chat_is_agent_mode(self, client: TestClient) -> None:
-        mock = AsyncMock(return_value=_u("Hallo"))
-        with patch.object(main.claude_adapter, "complete_with_usage", mock):
-            client.post("/v1/claude/chat/completions", json=_body(response_format=None))
-        assert mock.await_args.kwargs == {}
-
-    def test_switch_on_plain_chat_runs_lean(self, client: TestClient, monkeypatch) -> None:
-        monkeypatch.setenv("CLAUDE_LEAN_CHAT", "1")
+    def test_default_plain_chat_runs_lean(self, client: TestClient) -> None:
         mock = AsyncMock(return_value=_u("Hallo"))
         with patch.object(main.claude_adapter, "complete_with_usage", mock):
             resp = client.post("/v1/claude/chat/completions", json=_body(response_format=None))
         assert resp.json()["choices"][0]["message"]["content"] == "Hallo"
         assert mock.await_args.kwargs["system_prompt"] == _SYSTEM
 
-    def test_switch_on_structured_first_attempt_runs_lean(self, client: TestClient, monkeypatch) -> None:
-        monkeypatch.setenv("CLAUDE_LEAN_CHAT", "1")
+    def test_switch_off_plain_chat_is_agent_mode(self, client: TestClient, monkeypatch) -> None:
+        monkeypatch.setenv("CLAUDE_LEAN_CHAT", "0")
+        mock = AsyncMock(return_value=_u("Hallo"))
+        with patch.object(main.claude_adapter, "complete_with_usage", mock):
+            client.post("/v1/claude/chat/completions", json=_body(response_format=None))
+        assert mock.await_args.kwargs == {}
+
+    def test_default_structured_first_attempt_runs_lean(self, client: TestClient) -> None:
         mock = AsyncMock(side_effect=[_u("nope"), _u(_VALID)])
         with patch.object(main.claude_adapter, "complete_with_usage", mock):
             resp = client.post("/v1/claude/chat/completions", json=_body())
@@ -266,8 +271,7 @@ class TestLeanChatSwitch:
         assert second.kwargs["system_prompt"] == _SYSTEM
         assert second.args[0].endswith("start with '{' and end with '}'.")
 
-    def test_switch_on_never_touches_specific_tool_calls(self, client: TestClient, monkeypatch) -> None:
-        monkeypatch.setenv("CLAUDE_LEAN_CHAT", "1")
+    def test_specific_tool_calls_stay_in_print_mode(self, client: TestClient) -> None:
         tool = {"type": "function", "function": {"name": "submit_review", "parameters": {
             "type": "object", "properties": {"ok": {"type": "boolean"}}}}}
         mock = AsyncMock(return_value=_u('{"ok": true}'))
@@ -278,8 +282,7 @@ class TestLeanChatSwitch:
         assert resp.json()["choices"][0]["finish_reason"] == "tool_calls"
         assert mock.await_args.kwargs == {}
 
-    def test_switch_on_never_touches_codex(self, client: TestClient, monkeypatch) -> None:
-        monkeypatch.setenv("CLAUDE_LEAN_CHAT", "1")
+    def test_codex_is_never_lean(self, client: TestClient) -> None:
         mock = AsyncMock(return_value=_u("Hallo"))
         with patch.object(main.codex_adapter, "complete_with_usage", mock):
             client.post("/v1/codex/chat/completions", json=_body(model="gpt-5.6-sol", response_format=None))
@@ -336,7 +339,7 @@ class TestLeanAdapter:
         assert proc.communicate.call_args.kwargs["input"] == "Frage".encode("utf-8")
         assert not Path(sp_path).exists(), "the per-call directory is removed afterwards"
 
-    async def test_lean_with_web_tools(self) -> None:
+    async def test_lean_with_image_references_may_fetch_but_not_search(self) -> None:
         seen: list = []
 
         async def fake_exec(*args, **kwargs):
@@ -345,12 +348,13 @@ class TestLeanAdapter:
 
         with patch("asyncio.create_subprocess_exec", fake_exec):
             await claude_adapter.complete_with_usage(
-                "x", None, None, system_prompt="s", web_tools=True)
-        assert seen[seen.index("--tools") + 1] == "WebSearch,WebFetch"
-        assert seen[seen.index("--allowedTools") + 1] == "WebSearch,WebFetch"
+                "x", None, None, system_prompt="s", image_refs=True)
+        assert seen[seen.index("--tools") + 1] == "WebFetch"
+        assert seen[seen.index("--allowedTools") + 1] == "WebFetch"
+        assert "WebSearch" not in seen
         assert "--model" not in seen
 
-    async def test_agent_mode_argv_unchanged(self) -> None:
+    async def test_agent_mode_argv_has_no_tools_and_no_transcript(self) -> None:
         seen: dict = {}
 
         async def fake_exec(*args, **kwargs):
@@ -361,7 +365,7 @@ class TestLeanAdapter:
         with patch("asyncio.create_subprocess_exec", fake_exec):
             await claude_adapter.complete_with_usage("x", "claude-haiku-latest", None)
         assert seen["args"] == ["claude", "-p", "--output-format", "json",
-                                "--allowedTools", "WebSearch,WebFetch", "--model", "haiku"]
+                                "--no-session-persistence", "--tools", "", "--model", "haiku"]
         assert "cwd" not in seen["kwargs"]
 
     async def test_lean_is_error_still_raises(self) -> None:

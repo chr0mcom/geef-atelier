@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 import claude_adapter
 import codex_adapter
 import failover
+import policy
 from adapters import get_adapter
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -189,6 +190,12 @@ def _check_auth(request: Request) -> None:
             "Invalid API key provided.",
             status_code=401, type="authentication_error", code="invalid_api_key",
         )
+
+
+def _begin_request(req: ChatCompletionRequest) -> None:
+    """Validate the request and record what it may use. Runs first in every entry point."""
+    _validate_policy(req)
+    policy.set_web_search(req.web_search_options is not None)
 
 
 def _validate_policy(req: ChatCompletionRequest) -> None:
@@ -418,10 +425,11 @@ def _structured_lean_retry_enabled() -> bool:
 
 
 def _lean_chat_enabled() -> bool:
-    """CLAUDE_LEAN_CHAT (default off = previous behaviour): plain chat (no tools, no document
-    mode, not token-streamed) and structured-output requests to claude run in lean mode
-    from the first attempt on."""
-    return _env_flag("CLAUDE_LEAN_CHAT", False)
+    """CLAUDE_LEAN_CHAT (default on; 0 restores the agent-session behaviour of before
+    2026-11-07): plain chat (no tools, no document mode, not token-streamed) and
+    structured-output requests to claude run in lean mode from the first attempt on, so the
+    gateway acts like a plain OpenAI API and not like a Claude Code agent."""
+    return _env_flag("CLAUDE_LEAN_CHAT", True)
 
 
 def _has_image_refs(req: ChatCompletionRequest) -> bool:
@@ -449,7 +457,7 @@ async def _complete_claude_lean(
     system, prompt = _lean_parts(req)
     return await claude_adapter.complete_with_usage(
         prompt + suffix, req.model, max_tokens, **(effort or {}),
-        system_prompt=system, web_tools=_has_image_refs(req))
+        system_prompt=system, image_refs=_has_image_refs(req))
 
 
 _LEAN_JSON_RETRY_SUFFIX = (
@@ -894,7 +902,7 @@ async def cli_chat_completions(
 ) -> JSONResponse:
     """Generic endpoint: routes to the CLI adapter configured for provider_name."""
     _check_auth(http_request)
-    _validate_policy(req)
+    _begin_request(req)
     if req.stream:
         raise HTTPException(
             status_code=400,
@@ -974,7 +982,7 @@ async def claude_completions(req: ChatCompletionRequest, http_request: Request, 
     """Routes to the claude CLI — no model-name heuristic. Falls over to codex when
     claude is faulted (auth/limit/transport); see failover.py."""
     _check_auth(http_request)
-    _validate_policy(req)
+    _begin_request(req)
     if req.stream:
         return _stream_completion(req, "claude")
     async with _inflight_guard():
@@ -986,7 +994,7 @@ async def codex_completions(req: ChatCompletionRequest, http_request: Request, r
     """Routes to the codex CLI — no model-name heuristic. Falls over to claude when
     codex is faulted (auth/limit/transport); see failover.py."""
     _check_auth(http_request)
-    _validate_policy(req)
+    _begin_request(req)
     if req.stream:
         return _stream_completion(req, "codex")
     async with _inflight_guard():
@@ -1001,7 +1009,7 @@ async def chat_completions(req: ChatCompletionRequest, http_request: Request, re
         "Use /v1/claude/chat/completions or /v1/codex/chat/completions instead."
     )
     _check_auth(http_request)
-    _validate_policy(req)
+    _begin_request(req)
     backend = _route_model(req.model)
     if req.document_mode:
         raise HTTPException(

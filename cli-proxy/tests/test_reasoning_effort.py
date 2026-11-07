@@ -2,7 +2,7 @@
 
 The proxy maps `reasoning_effort` onto the CLIs only when the caller sends it:
 claude -> `--effort <level>`, codex -> `-c model_reasoning_effort="<level>"`. Without the field
-every CLI invocation must stay byte-identical to the pre-116 argv, because Geef.Atelier, DMS and
+every CLI invocation must stay byte-identical to the default argv, because Geef.Atelier, DMS and
 Hermes never send it and must not notice any change.
 """
 from __future__ import annotations
@@ -94,14 +94,14 @@ def _paths(tmp_path: Path, **effort):
     doc_ws.mkdir(exist_ok=True)
     (doc_ws / "draft.md").write_text("draft", encoding="utf-8")
     return [
-        ("claude.print+websearch", lambda: claude_adapter.complete_with_usage(
+        ("claude.print", lambda: claude_adapter.complete_with_usage(
             "hello", CLAUDE_MODEL, None, **effort)),
         ("claude.stream", lambda: claude_adapter.stream("hello", CLAUDE_MODEL, None, **effort)),
         ("claude.document", lambda: claude_adapter.complete_document(
             SYSTEM, "tighten it", "draft", doc_ws, CLAUDE_MODEL, None, None, **effort)),
         ("claude.decision-file", lambda: claude_adapter.complete_agentic_file(
             "pick a tool", CLAUDE_MODEL, **effort)),
-        ("codex.print+websearch", lambda: codex_adapter.complete_with_usage(
+        ("codex.print", lambda: codex_adapter.complete_with_usage(
             "hello", CODEX_MODEL, None, **effort)),
         ("codex.stream", lambda: codex_adapter.stream("hello", CODEX_MODEL, None, **effort)),
         ("codex.document", lambda: codex_adapter.complete_document(
@@ -111,40 +111,41 @@ def _paths(tmp_path: Path, **effort):
     ]
 
 
-# The argv every path produced before BF-WP-116 (the trailing instruction positional of the
+# The argv of every path without reasoning_effort (the trailing instruction positional of the
 # document and decision paths is compared separately, since its text is built elsewhere).
 _GOLDEN_PREFIX = {
-    "claude.print+websearch": [
-        "claude", "-p", "--output-format", "json", "--allowedTools", "WebSearch,WebFetch",
+    "claude.print": [
+        "claude", "-p", "--output-format", "json", "--no-session-persistence", "--tools", "",
         "--model", CLAUDE_MODEL,
     ],
     "claude.stream": [
         "claude", "-p", "--output-format", "stream-json", "--verbose",
-        "--include-partial-messages", "--allowedTools", "WebSearch,WebFetch",
+        "--include-partial-messages", "--no-session-persistence", "--tools", "",
         "--model", CLAUDE_MODEL,
     ],
     "claude.document": [
         "claude", "-p", "--output-format", "json", "--allowedTools", "Read,Edit,Write",
-        "--permission-mode", "acceptEdits", "--append-system-prompt", SYSTEM,
+        "--permission-mode", "acceptEdits", "--no-session-persistence",
+        "--append-system-prompt", SYSTEM,
         "--model", CLAUDE_MODEL,
     ],
     "claude.decision-file": [
         "claude", "-p", "--output-format", "json", "--allowedTools", "Read,Edit,Write",
-        "--permission-mode", "acceptEdits", "--model", CLAUDE_MODEL,
+        "--permission-mode", "acceptEdits", "--no-session-persistence", "--model", CLAUDE_MODEL,
     ],
-    "codex.print+websearch": [
-        "codex", "--search", "exec", "--json", "--skip-git-repo-check", "-m", CODEX_MODEL,
+    "codex.print": [
+        "codex", "exec", "--json", "--ephemeral", "--skip-git-repo-check", "-m", CODEX_MODEL,
         "--output-last-message", "<OUT>", "-",
     ],
     "codex.stream": [
-        "codex", "--search", "exec", "--json", "--skip-git-repo-check", "-m", CODEX_MODEL, "-",
+        "codex", "exec", "--json", "--ephemeral", "--skip-git-repo-check", "-m", CODEX_MODEL, "-",
     ],
     "codex.document": [
-        "codex", "--search", "exec", "--json", "--skip-git-repo-check",
+        "codex", "exec", "--json", "--ephemeral", "--skip-git-repo-check",
         "--sandbox", "workspace-write", "-C", "<WS>", "-m", CODEX_MODEL,
     ],
     "codex.decision-file": [
-        "codex", "exec", "--json", "--skip-git-repo-check",
+        "codex", "exec", "--json", "--ephemeral", "--skip-git-repo-check",
         "--sandbox", "workspace-write", "-C", "<WS>", "-m", CODEX_MODEL,
     ],
 }
@@ -256,7 +257,7 @@ def test_supported_reasoning_effort_values_reach_the_adapter(client, value):
     with patch.object(main.claude_adapter, "complete_with_usage", _ok()) as claude:
         resp = client.post("/v1/claude/chat/completions", json=_body(reasoning_effort=value))
     assert resp.status_code == 200
-    assert claude.await_args.kwargs == {"reasoning_effort": value}
+    assert claude.await_args.kwargs["reasoning_effort"] == value
 
 
 def test_failover_maps_reasoning_effort_for_the_target_backend(client):
@@ -266,7 +267,7 @@ def test_failover_maps_reasoning_effort_for_the_target_backend(client):
 
     assert resp.status_code == 200
     assert resp.headers["x-cli-proxy-failover"] == "claude->codex"
-    assert claude.await_args.kwargs == {"reasoning_effort": "low"}
+    assert claude.await_args.kwargs["reasoning_effort"] == "low"
     assert codex.await_args.kwargs == {"reasoning_effort": "low"}
     assert not codex.await_args.args[1], "model name must still not cross the backend boundary"
     assert resp.headers[HEADER] == "low"

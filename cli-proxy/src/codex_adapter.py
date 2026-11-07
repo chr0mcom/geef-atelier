@@ -12,6 +12,7 @@ from typing import Any
 
 import httpx
 
+import policy
 from usage import UsageParts
 from workspace import (
     ephemeral_dir,
@@ -223,6 +224,14 @@ async def complete_agentic_file(
                 instruction, model, workspace, reasoning_effort=reasoning_effort)
 
 
+def _search_args() -> list[str]:
+    """`--search` (native web search, no per-call approval) only when the request opted in.
+
+    It is a GLOBAL flag and must precede the `exec` subcommand; `codex exec` rejects it.
+    """
+    return ["--search"] if policy.web_search_allowed() else []
+
+
 async def _run_codex_decision(
     instruction: str, model: str | None, workspace_path: Path,
     *, reasoning_effort: str | None = None,
@@ -232,7 +241,7 @@ async def _run_codex_decision(
     # planning step would only tempt the model to answer from its own findings instead of
     # delegating to the host's tools.
     args = [
-        "codex", "exec", "--json",
+        "codex", "exec", "--json", "--ephemeral",
         "--skip-git-repo-check",
         "--sandbox", "workspace-write",
         "-C", str(workspace_path),
@@ -296,7 +305,7 @@ async def stream(
 async def _stream_codex(
     prompt: str, model: str | None, max_tokens: int | None, *, reasoning_effort: str | None = None
 ):
-    args = ["codex", "--search", "exec", "--json", "--skip-git-repo-check"]
+    args = ["codex", *_search_args(), "exec", "--json", "--ephemeral", "--skip-git-repo-check"]
     if model:
         bare_model = model.split("/")[-1] if "/" in model else model
         args += ["-m", bare_model]
@@ -402,7 +411,7 @@ async def _run_codex_document(
     # --json: emit the JSONL event stream so we can read real token usage; the document
     # text itself is read from draft.md, not from stdout.
     args = [
-        "codex", "--search", "exec", "--json",
+        "codex", *_search_args(), "exec", "--json", "--ephemeral",
         "--skip-git-repo-check",
         "--sandbox", "workspace-write",
         "-C", str(workspace_path),
@@ -468,7 +477,7 @@ async def _run_codex(
         # --json: emit the JSONL event stream on stdout so we can read the real token
         # usage from the final turn.completed event. The final message text is still
         # captured reliably via --output-last-message (independent of stdout format).
-        args = ["codex", "--search", "exec", "--json", "--skip-git-repo-check"]
+        args = ["codex", *_search_args(), "exec", "--json", "--ephemeral", "--skip-git-repo-check"]
 
         if model:
             bare_model = model.split("/")[-1] if "/" in model else model

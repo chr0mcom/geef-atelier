@@ -72,7 +72,7 @@ Der Proxy zielt auf praktische Drop-in-Kompatibilität mit der OpenAI-Chat-Compl
 | **Streaming** (`stream: true`) | ✅ SSE-`chat.completion.chunk`-Stream, abschließendes `data: [DONE]`. `stream_options.include_usage` ergänzt einen finalen Usage-Chunk. claude streamt Token-Deltas; codex liefert die Agent-Nachricht als (gepufferten) Delta. Anfragen mit `tools`/`response_format` puffern den vollen Text und emittieren ihn dann. |
 | **Echte Token-Usage** | ✅ `usage` wird aus dem CLI-Output geparst (claude `--output-format json`, codex `exec --json`), inkl. `prompt_tokens_details.cached_tokens` und `completion_tokens_details.reasoning_tokens`. |
 | **Error-Envelope** | ✅ `{"error": {"message","type","param","code"}}` mit korrekten Status-Codes (422→400, 401, 404, 429, 5xx). |
-| **`response_format`** | ✅ `json_object` und `json_schema` (serverseitig gegen das Schema validiert, mit einem Retry, sonst `refusal`). Geprüft wird jedes JSON-Objekt der Antwort (Fences, vorangestellte Prosa, verirrte Klammern, wiederholtes Schema); das erste schemakonforme gewinnt. claude wiederholt im **Lean-Modus** (siehe `README.md`, Abschnitt „Lean mode“; Schalter `CLAUDE_STRUCTURED_LEAN_RETRY`, Standard an, und `CLAUDE_LEAN_CHAT`, Standard aus). |
+| **`response_format`** | ✅ `json_object` und `json_schema` (serverseitig gegen das Schema validiert, mit einem Retry, sonst `refusal`). Geprüft wird jedes JSON-Objekt der Antwort (Fences, vorangestellte Prosa, verirrte Klammern, wiederholtes Schema); das erste schemakonforme gewinnt. claude wiederholt im **Lean-Modus** (siehe `README.md`, Abschnitt „Lean mode“; Schalter `CLAUDE_STRUCTURED_LEAN_RETRY`, Standard an, und `CLAUDE_LEAN_CHAT`, Standard an). |
 | **Tool-Calling** | ✅ `tool_choice` `auto`/`required`/`none`/spezifisch, parallele Tool-Calls, Multi-Turn-Replay (emuliert via Prompt + JSON-Extraktion). |
 | **Multimodal** | ⚠️ Best-Effort: http(s)-`image_url`-Parts werden als Referenzen durchgereicht (claude kann sie per WebFetch laden); inline `data:`-Bilder werden mit Warnung verworfen. |
 | **Auth** | ✅ Opt-in Bearer (`CLI_PROXY_API_KEYS`); ungesetzt = offen (rückwärtskompatibel). |
@@ -91,9 +91,11 @@ Wenn der Request `tools` + `tool_choice` enthält, wird das Schema als Prompt-Ad
 
 Der CLI-Output wird dann auf einen JSON-Block gescannt (inkl. Markdown-Fence-Stripping) und als `tool_calls`-Response zurückgegeben.
 
-## Websuche
+## Websuche (opt-in seit 2026-11-07)
 
-Beide Backends laufen mit aktiviertem modell-gesteuertem Web-Search-Tool — ein Akteur kann während der Generierung selbst entscheiden, aktuelle Informationen aus dem Web zu holen:
+Wie jede OpenAI-kompatible API surft das Gateway nur, wenn der Aufrufer es verlangt. Pro Anfrage schaltet der Standardparameter `web_search_options` (beliebiges Objekt, meist `{}`) die Suche ein; der Betreiber kann den Standard für den ganzen Dienst mit `CLI_WEB_SEARCH=1` beim Service `cli-proxy` umstellen (Verhalten vor dem 2026-11-07). Ohne beides läuft claude mit `--tools ""` und codex ohne `--search`.
+
+Bei eingeschalteter Suche entscheidet das Modell selbst, ob es aktuelle Informationen aus dem Web holt:
 
 - **claude** — Aufruf mit `--allowedTools "WebSearch,WebFetch"`. Nur die Web-Tools sind allowlisted; Bash/Edit/Write sind **nicht** aktiviert (kein voller Permission-Bypass).
 - **codex** — Aufruf mit dem globalen `--search`-Flag, platziert **vor** dem `exec`-Subcommand (codex lehnt es als `exec`-Argument ab). Es aktiviert das native Responses-`web_search`-Tool ohne Per-Call-Approval.

@@ -85,6 +85,9 @@ class ChatCompletionRequest(BaseModel):
     metadata: dict[str, Any] | None = None
     store: bool | None = None
     reasoning_effort: str | None = None
+    # Opt-in to web search (OpenAI's chat-completions parameter). Off unless present; the
+    # content (location, context size) is not interpreted. See policy.py.
+    web_search_options: dict[str, Any] | None = None
     # --- Output features the CLI backend cannot satisfy; rejected in validation (see main._validate_policy).
     n: int | None = None
     logprobs: bool | None = None

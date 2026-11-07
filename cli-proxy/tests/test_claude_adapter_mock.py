@@ -60,7 +60,25 @@ async def test_complete_strips_provider_prefix():
 
 
 @pytest.mark.asyncio
-async def test_complete_allowlists_only_web_tools():
+async def test_complete_has_no_tools_and_no_transcript_by_default():
+    args = await _complete_args()
+    assert args[args.index("--tools") + 1] == ""
+    assert "--allowedTools" not in args
+    assert "--no-session-persistence" in args
+
+
+@pytest.mark.asyncio
+async def test_complete_allowlists_only_web_tools_on_request(monkeypatch):
+    monkeypatch.setenv("CLI_WEB_SEARCH", "1")
+    args = await _complete_args()
+    tools_index = args.index("--allowedTools")
+    assert args[tools_index + 1] == "WebSearch,WebFetch"
+    # No full bypass / no shell or edit tools leaked in.
+    assert "--dangerously-skip-permissions" not in args
+    assert "Bash" not in args[tools_index + 1]
+
+
+async def _complete_args() -> list:
     output = json.dumps({"result": "ok"})
     proc = _make_proc(output)
 
@@ -73,12 +91,7 @@ async def test_complete_allowlists_only_web_tools():
     with patch("asyncio.create_subprocess_exec", fake_exec):
         await claude_adapter.complete("test", None, None)
 
-    args = captured[0]
-    tools_index = args.index("--allowedTools")
-    assert args[tools_index + 1] == "WebSearch,WebFetch"
-    # No full bypass / no shell or edit tools leaked in.
-    assert "--dangerously-skip-permissions" not in args
-    assert "Bash" not in args[tools_index + 1]
+    return captured[0]
 
 
 @pytest.mark.asyncio
