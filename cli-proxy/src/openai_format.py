@@ -247,3 +247,28 @@ def make_tool_calls_response(
         ],
         usage=usage or UsageInfo(),
     )
+
+
+# ---------------------------------------------------------------------------
+# Images (POST /v1/codex/images/generations)
+# ---------------------------------------------------------------------------
+
+class ImageGenerationRequest(BaseModel):
+    """OpenAI Images API request. Unknown fields are ignored (pydantic default), so SDKs that
+    send newer parameters keep working; what matters is validated in main."""
+    prompt: str = Field(min_length=1, max_length=32000)
+    model: str | None = None
+    n: int | None = None
+    size: str | None = None
+    response_format: str | None = None
+    output_format: str | None = None
+    quality: str | None = None
+    background: str | None = None
+    user: str | None = None
+
+
+def png_dimensions(data: bytes) -> tuple[int, int] | None:
+    """(width, height) from the IHDR chunk of a PNG, or None if `data` is not a PNG."""
+    if len(data) < 24 or not data.startswith(b"\x89PNG\r\n\x1a\n") or data[12:16] != b"IHDR":
+        return None
+    return int.from_bytes(data[16:20], "big"), int.from_bytes(data[20:24], "big")

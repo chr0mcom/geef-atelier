@@ -74,6 +74,12 @@ services:
       # Call-Dauer) beide Slots und kleine DMS-Klassifikations-Calls laufen in den Timeout.
       - CLAUDE_MAX_CONCURRENT=6
       - CODEX_MAX_CONCURRENT=2
+      # Bilderzeugung (POST /v1/codex/images/generations, nur codex): höchstens so viele Bildläufe
+      # gleichzeitig (jeder belegt zusätzlich einen CODEX_MAX_CONCURRENT-Platz), Zeitlimit je
+      # Bild in Sekunden, Tagesdeckel (UTC, 0 = aus) zum Schutz des geteilten ChatGPT-Kontingents.
+      - CODEX_IMAGE_MAX_CONCURRENT=1
+      - IMAGE_TIMEOUT_SECONDS=300
+      - IMAGE_DAILY_MAX=50
       - WORKSPACE_ROOT=/work
       - CONTEXT_FILE_THRESHOLD=50000
       - INSTRUCTION_ARG_LIMIT=100000
