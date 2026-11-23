@@ -67,7 +67,10 @@ internal sealed class ModelCatalog(
         WarmUp,
     }
 
-    private sealed record CatalogResult(IReadOnlyList<ModelInfo> Models, ModelCatalogSource Source);
+    /// <summary>Ids the backend actually reported per provider; null when the last answer was not authoritative.</summary>
+    private readonly ConcurrentDictionary<string, IReadOnlyList<string>?> _reported = new();
+
+    private sealed record CatalogResult(IReadOnlyList<ModelInfo> Models, ModelCatalogSource Source, IReadOnlyList<string>? Reported = null);
 
     private static string CacheKey(string providerName) => $"model-catalog:{providerName}";
 
@@ -91,6 +94,36 @@ internal sealed class ModelCatalog(
     /// <inheritdoc />
     public ModelCatalogSource GetSource(string providerName) =>
         _sources.TryGetValue(providerName, out var source) ? source : ModelCatalogSource.Unknown;
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// A missing API key makes the provider unusable whatever the list lookup did: an interactive budget can run out
+    /// before the catalog ever reaches its own key check, and "unknown" would then count as available (D-066/12, I3).
+    /// </remarks>
+    public async Task<IReadOnlyList<string>?> ListReportedModelIdsAsync(string providerName, CancellationToken ct = default)
+    {
+        await ListModelsAsync(providerName, ct);
+        var reported = _reported.TryGetValue(providerName, out var ids) ? ids : null;
+        if (reported is { Count: 0 })
+            return reported;
+        return await CredentialsMissingAsync(providerName, ct) ? [] : reported;
+    }
+
+    private async Task<bool> CredentialsMissingAsync(string providerName, CancellationToken ct)
+    {
+        try
+        {
+            var provider = await LoadProviderAsync(providerName, ct);
+            if (provider is null || provider.Type == ProviderType.Cli)
+                return false;
+            var settings = HttpProviderSettings.FromSettings(provider.Settings);
+            return settings.ApiKeyEnv is { Length: > 0 } keyEnv && string.IsNullOrEmpty(Environment.GetEnvironmentVariable(keyEnv));
+        }
+        catch (Exception) when (!ct.IsCancellationRequested)
+        {
+            return false;
+        }
+    }
 
     /// <inheritdoc />
     public bool IsUsingFallback(string providerName) =>
@@ -178,6 +211,7 @@ internal sealed class ModelCatalog(
             }
 
             _sources[providerName] = result.Source;
+            _reported[providerName] = result.Reported;
             cache.Set(CacheKey(providerName), result.Models, TtlFor(provider, result.Source));
             return result.Models;
         }
@@ -250,7 +284,18 @@ internal sealed class ModelCatalog(
         RecordNoAliasLayer(providerName);
 
         var settings = HttpProviderSettings.FromSettings(provider.Settings);
+        var result = await BuildHttpCatalogAsync(settings, providerName, ct);
+        var credentialsMissing = settings.ApiKeyEnv is { Length: > 0 } keyEnv
+                                 && string.IsNullOrEmpty(Environment.GetEnvironmentVariable(keyEnv));
+        return credentialsMissing ? result with { Reported = [] } : result;
+    }
 
+    /// <summary>
+    /// Fetches the model list of an HTTP provider. A provider whose configured API-key variable is empty still lists
+    /// models for the picker, but reports none as usable (see <see cref="ListReportedModelIdsAsync"/>).
+    /// </summary>
+    private async Task<CatalogResult> BuildHttpCatalogAsync(HttpProviderSettings settings, string providerName, CancellationToken ct)
+    {
         if (settings.ModelsEndpoint is not { Length: > 0 } modelsPath)
         {
             if (settings.ManualModelList is { Count: > 0 } manual)
@@ -272,8 +317,10 @@ internal sealed class ModelCatalog(
         var modelsUrl = endpoint.TrimEnd('/') + modelsPath;
         var ids = await FetchFromUrlAsync(modelsUrl, settings, providerName, ct);
 
-        if (ids is not { Count: > 0 })
+        if (ids is null)
             return new CatalogResult(StaticModelFallback.For(providerName), ModelCatalogSource.Fallback);
+        if (ids.Count == 0)
+            return new CatalogResult(StaticModelFallback.For(providerName), ModelCatalogSource.Fallback, Reported: []);
 
         var models = BuildModels(ids, providerName)
             .OrderByDescending(m => m.IsRecommended)
@@ -281,7 +328,7 @@ internal sealed class ModelCatalog(
             .ToList();
 
         logger.LogInformation("ModelCatalog: fetched {Count} models for '{Provider}'.", models.Count, providerName);
-        return new CatalogResult(models, ModelCatalogSource.Live);
+        return new CatalogResult(models, ModelCatalogSource.Live, ids);
     }
 
     /// <summary>
@@ -314,7 +361,9 @@ internal sealed class ModelCatalog(
                 ModelCatalogSource.Fallback);
         }
 
-        if (live.IsLive)
+        if (live.AliasesComplete && (live.IsLive || !live.HasLiveSource))
+            RecordCompleteAliases(providerName, live.AliasMap);
+        else if (live.IsLive)
             RecordResolvedAliases(providerName, live.AliasMap);
         else if (!live.HasLiveSource)
             RecordNoAliasLayer(providerName);
@@ -329,7 +378,10 @@ internal sealed class ModelCatalog(
         logger.LogInformation("ModelCatalog: '{Provider}' reported {Count} models ({Source}).",
             providerName, models.Count, source);
 
-        return new CatalogResult(models, source);
+        var reported = live.IsLive
+            ? live.ModelIds.Concat(live.AliasMap.Keys).Distinct(StringComparer.OrdinalIgnoreCase).ToList()
+            : null;
+        return new CatalogResult(models, source, reported);
     }
 
     /// <summary>
@@ -337,6 +389,16 @@ internal sealed class ModelCatalog(
     /// </summary>
     private void RecordNoAliasLayer(string providerName) =>
         _aliasMaps[providerName] = new AliasMapEntry(EmptyAliasMap, DateTimeOffset.MaxValue);
+
+    /// <summary>
+    /// Replaces the mapping with one the gateway reports as complete (codex aliases, live or static): the gateway calls
+    /// exactly this mapping, so a removed alias must disappear and a static start must still resolve (D-066/10, §8.1).
+    /// A degraded answer never reaches this path and leaves the previous mapping standing.
+    /// </summary>
+    private void RecordCompleteAliases(string providerName, IReadOnlyDictionary<string, string> aliases) =>
+        _aliasMaps[providerName] = new AliasMapEntry(
+            aliases.Count > 0 ? new Dictionary<string, string>(aliases, StringComparer.OrdinalIgnoreCase) : EmptyAliasMap,
+            timeProvider.GetUtcNow().AddHours(Math.Max(1, options.Value.CliTtlHours)));
 
     /// <summary>
     /// Records a mapping the gateway actually resolved, valid for as long as a successful list is.
@@ -428,7 +490,7 @@ internal sealed class ModelCatalog(
                 .Select(id => id!)
                 .ToList();
 
-            return ids is { Count: > 0 } ? ids : null;
+            return ids;
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {

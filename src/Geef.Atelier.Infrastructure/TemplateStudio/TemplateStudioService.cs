@@ -6,6 +6,7 @@ using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
+using Geef.Atelier.Core.Domain.Crew.Models;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.Crew.TemplateStudio;
 using Geef.Atelier.Core.Persistence.TemplateStudio;
@@ -123,10 +124,13 @@ internal sealed class TemplateStudioService(
     public async Task SaveDefaultAsync(StudioModelChoice choice, CancellationToken ct = default)
     {
         var opts = options.Value;
+        var binding = CliRoute.Normalize(
+            string.IsNullOrWhiteSpace(choice.Provider) ? opts.Provider : choice.Provider,
+            string.IsNullOrWhiteSpace(choice.Model) ? opts.Model : choice.Model);
         await studioSettings.UpdateAsync(new Core.Domain.StudioSettings
         {
-            Provider  = string.IsNullOrWhiteSpace(choice.Provider) ? opts.Provider : choice.Provider.Trim(),
-            Model     = string.IsNullOrWhiteSpace(choice.Model)    ? opts.Model    : choice.Model.Trim(),
+            Provider  = binding.Provider,
+            Model     = binding.Model,
             MaxTokens = choice.MaxTokens > 0 ? choice.MaxTokens : opts.MaxTokens,
         }, ct);
     }
@@ -370,7 +374,9 @@ internal sealed class TemplateStudioService(
             Description:               el.GetProperty("description").GetString()!,
             Model:                     el.TryGetProperty("model", out var mEl)    ? mEl.GetString() ?? "" : "",
             Provider:                  el.TryGetProperty("provider", out var pEl) ? pEl.GetString() ?? "" : "",
-            SystemPrompt:              el.TryGetProperty("system_prompt", out var spEl) ? spEl.GetString() ?? "" : "",
+            SystemPrompt:              el.TryGetProperty("system_prompt", out var spEl) && !string.IsNullOrWhiteSpace(spEl.GetString())
+                                           ? spEl.GetString()!
+                                           : finalizerSettings?.GetValueOrDefault(TransformSettings.KeySystemPrompt) ?? "",
             MaxTokens:                 el.TryGetProperty("max_tokens", out var mtEl) && mtEl.ValueKind == JsonValueKind.Number ? mtEl.GetInt32() : null,
             ReviewerFocus:             el.TryGetProperty("reviewer_focus", out var rfEl)  ? rfEl.GetString()  : null,
             AdvisorMode:               el.TryGetProperty("advisor_mode", out var amEl)    ? amEl.GetString()  : null,
@@ -525,7 +531,19 @@ internal sealed class TemplateStudioService(
             {
                 var finalizerType = Enum.TryParse<FinalizerType>(profile.FinalizerType ?? "FileExport", out var ft)
                     ? ft : FinalizerType.FileExport;
-                var settings = profile.FinalizerSettings ?? new Dictionary<string, string>();
+                var settings = new Dictionary<string, string>(profile.FinalizerSettings ?? new Dictionary<string, string>());
+                if (finalizerType == FinalizerType.Transform)
+                {
+                    if (!string.IsNullOrWhiteSpace(profile.SystemPrompt))
+                        settings[TransformSettings.KeySystemPrompt] = profile.SystemPrompt;
+                    if (!string.IsNullOrWhiteSpace(profile.Provider) && !string.IsNullOrWhiteSpace(profile.Model))
+                    {
+                        settings[TransformSettings.KeyProvider] = profile.Provider;
+                        settings[TransformSettings.KeyModel] = profile.Model;
+                        settings.Remove(TransformSettings.KeyModelSlot);
+                    }
+                }
+
                 var created = await crewService.CreateCustomFinalizerProfileAsync(new FinalizerProfile(
                     Name:          profile.Name,
                     DisplayName:   profile.DisplayName,

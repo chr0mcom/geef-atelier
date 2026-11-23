@@ -51,7 +51,7 @@ public sealed class LoginFlowTests(PlaywrightFixture pw, PostgresFixture pg) : I
             var errorEl = page.Locator(".login-error");
             await errorEl.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
             var errorText = await errorEl.TextContentAsync();
-            Assert.Contains("Ungültige Anmeldedaten", errorText);
+            Assert.Contains("Invalid credentials", errorText);
         }
         finally
         {
@@ -72,9 +72,9 @@ public sealed class LoginFlowTests(PlaywrightFixture pw, PostgresFixture pg) : I
             await page.FillAsync("input#password", "test-password");
             await page.ClickAsync("button.btn-login");
 
-            await page.WaitForURLAsync(new Regex(@"/runs"), new PageWaitForURLOptions { Timeout = 15_000 });
+            await page.WaitForURLAsync(new Regex(@"/workshop"), new PageWaitForURLOptions { Timeout = 15_000 });
 
-            Assert.Contains("/runs", page.Url);
+            Assert.Contains("/workshop", page.Url);
 
             var userNameEl = page.Locator(".user-name");
             await userNameEl.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });

@@ -36,6 +36,7 @@ def _clear_caches():
     claude_adapter._model_cache = None
     claude_adapter._last_attempt_at = None
     codex_adapter._model_cache = None
+    codex_adapter._cache_mtime = None
     codex_adapter._last_attempt_at = None
     yield
     claude_adapter._model_cache = None
@@ -295,10 +296,10 @@ class TestProbeIsolation:
 class TestCodexProvenance:
     @pytest.mark.asyncio
     async def test_fetch_failure_reports_degraded(self, monkeypatch) -> None:
-        async def _boom(top_n: int = 10):
-            raise RuntimeError("openrouter down")
+        def _boom():
+            raise ValueError("models_cache.json unusable")
 
-        monkeypatch.setattr(codex_adapter, "_fetch_from_openrouter", _boom)
+        monkeypatch.setattr(codex_adapter, "_read_models_cache", _boom)
 
         models, source = await codex_adapter.list_models_with_source_async()
 
@@ -307,10 +308,10 @@ class TestCodexProvenance:
 
     @pytest.mark.asyncio
     async def test_fetch_success_reports_live(self, monkeypatch) -> None:
-        async def _ok(top_n: int = 10):
+        def _ok():
             return ["gpt-9-nova"]
 
-        monkeypatch.setattr(codex_adapter, "_fetch_from_openrouter", _ok)
+        monkeypatch.setattr(codex_adapter, "_read_models_cache", _ok)
 
         models, source = await codex_adapter.list_models_with_source_async()
 
@@ -496,11 +497,11 @@ class TestCodexThrottle:
     async def test_forced_refetches_are_throttled_per_provider(self, monkeypatch) -> None:
         fetches: list[int] = []
 
-        async def _boom(top_n: int = 10):
+        def _boom():
             fetches.append(1)
-            raise RuntimeError("openrouter down")
+            raise ValueError("models_cache.json unusable")
 
-        monkeypatch.setattr(codex_adapter, "_fetch_from_openrouter", _boom)
+        monkeypatch.setattr(codex_adapter, "_read_models_cache", _boom)
         monkeypatch.setattr(codex_adapter, "_MODEL_REFRESH_MIN_INTERVAL", 3600)
         monkeypatch.setattr(codex_adapter, "_last_attempt_at", None)
 
@@ -513,11 +514,11 @@ class TestCodexThrottle:
     async def test_the_sweep_is_exempt_for_codex_too(self, monkeypatch) -> None:
         fetches: list[int] = []
 
-        async def _boom(top_n: int = 10):
+        def _boom():
             fetches.append(1)
-            raise RuntimeError("openrouter down")
+            raise ValueError("models_cache.json unusable")
 
-        monkeypatch.setattr(codex_adapter, "_fetch_from_openrouter", _boom)
+        monkeypatch.setattr(codex_adapter, "_read_models_cache", _boom)
         monkeypatch.setattr(codex_adapter, "_MODEL_REFRESH_MIN_INTERVAL", 3600)
         monkeypatch.setattr(codex_adapter, "_last_attempt_at", None)
 
@@ -543,10 +544,10 @@ class TestCodexThrottle:
 
 class TestCodexNoLiveSource:
     @pytest.mark.asyncio
-    async def test_a_missing_api_key_is_static_not_degraded(self, monkeypatch) -> None:
-        # An absent key is a missing capability, not an outage. Reporting "degraded" would put a
-        # permanent red "provider unreachable" banner on every codex picker.
-        monkeypatch.setattr(codex_adapter, "OPENROUTER_API_KEY", "")
+    async def test_a_missing_cache_file_is_static_not_degraded(self, monkeypatch, tmp_path) -> None:
+        # A cache file the CLI has not written yet is a missing capability, not an outage. Reporting
+        # "degraded" would put a permanent red "provider unreachable" banner on every codex picker.
+        monkeypatch.setattr(codex_adapter, "_MODELS_CACHE_PATH", tmp_path / "missing.json")
 
         models, source = await codex_adapter.list_models_with_source_async()
 
@@ -603,11 +604,11 @@ class TestStartupWarmUp:
         async def _resolves(alias: str) -> str | None:
             return f"claude-{alias}-5"
 
-        async def _ok(top_n: int = 10):
+        def _ok():
             return ["gpt-9-nova"]
 
         monkeypatch.setattr(claude_adapter, "_probe_alias", _resolves)
-        monkeypatch.setattr(codex_adapter, "_fetch_from_openrouter", _ok)
+        monkeypatch.setattr(codex_adapter, "_read_models_cache", _ok)
 
         await main.warm_model_caches()
 

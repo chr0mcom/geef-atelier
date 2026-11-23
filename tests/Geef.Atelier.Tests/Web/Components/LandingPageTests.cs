@@ -247,11 +247,11 @@ public sealed class LandingPageTests : TestContext
     }
 
     [Fact]
-    public void Landing_Authenticated_RedirectsToWorkshop()
+    public void Landing_Authenticated_StaysReachableWithoutRedirect()
     {
         SetupAuthenticated();
         var nav = Services.GetRequiredService<FakeNavigationManager>();
         RenderComponent<Landing>();
-        Assert.EndsWith("/workshop", nav.Uri);
+        Assert.Equal("http://localhost/", nav.Uri);
     }
 }

@@ -87,8 +87,8 @@ public sealed class SettingsRecordTests
     {
         var settings = TransformSettings.From([]);
         Assert.Equal(string.Empty, settings.SystemPrompt);
-        Assert.Equal("codex-cli", settings.Provider);
-        Assert.Equal("gpt-5.6-sol", settings.Model);
+        Assert.Equal("claude-cli", settings.Provider);
+        Assert.Equal("claude-sonnet-latest", settings.Model);
         Assert.Equal(60000, settings.MaxTokens);
     }
 

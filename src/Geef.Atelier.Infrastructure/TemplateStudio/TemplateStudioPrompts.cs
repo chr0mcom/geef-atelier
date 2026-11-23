@@ -72,17 +72,17 @@ internal static class TemplateStudioPrompts
         11. evaluation_strategy must be exactly one of: Sequential, Parallel, FailFast, Priority
         12. For FINALIZER profiles, set "finalizer_type" to one of: "FileExport", "MetadataEnrich",
             "ExternalSink", "Transform". Set "finalizer_settings" as a flat string-to-string dict.
-            Finalizer profiles do not need model/provider/system_prompt unless they are Transform type.
-            Transform finalizers DO need model, provider, and system_prompt (a concise rewriting
+            Finalizer profiles do not need system_prompt unless they are Transform type, and never
+            model/provider. Transform finalizers DO need a system_prompt (a concise rewriting
             instruction + "Respond in the language of the input text.").
-            For finalizer profiles of type "Transform": include "Provider", "Model", and "MaxTokens"
-            as keys inside the "finalizer_settings" dictionary. Choose a cost-effective model since
-            transforms (tone changes, summaries, voice rewrites) do not require top-tier models.
+            For finalizer profiles of type "Transform": do NOT set "Provider" or "Model" — the model is
+            assigned automatically from the model matrix. Set "ModelSlot" to "TransformRewrite" for
+            voice/tone rewrites or "TransformCondense" for summaries, takeaways and glossaries, plus
+            "MaxTokens" and "SystemPrompt".
             Example finalizer_settings for a Transform finalizer:
               "finalizer_type": "Transform",
               "finalizer_settings": {
-                "Provider": "openrouter",
-                "Model": "openai/gpt-4o-mini",
+                "ModelSlot": "TransformCondense",
                 "MaxTokens": "8192",
                 "SystemPrompt": "..."
               }

@@ -164,6 +164,149 @@ public sealed class ModelCatalogTests : IDisposable
 
 
     [Fact]
+    public async Task ReportedIds_ExcludeTheCuratedIdsMergedIntoThePickerList()
+    {
+        var source = new FakeCliModelSource(new CliModelCatalog(
+            ["gpt-6.2-sol"], IsLive: true, HasLiveSource: true,
+            new Dictionary<string, string> { ["gpt-sol-latest"] = "gpt-6.2-sol" }));
+        var catalog = BuildCatalog(FakeHttpHandler.Fail(HttpStatusCode.NotFound), SystemProviders.CodexCli, source);
+
+        var models = await catalog.ListModelsAsync("codex-cli");
+        var reported = await catalog.ListReportedModelIdsAsync("codex-cli");
+
+        Assert.Contains(models, m => m.Id == "gpt-astra-latest");
+        Assert.NotNull(reported);
+        Assert.Equal(new[] { "gpt-6.2-sol", "gpt-sol-latest" }, reported!.Order(StringComparer.Ordinal).ToArray());
+    }
+
+    [Fact]
+    public async Task CompleteCodexAliasMap_ReplacesTheKnownMapping()
+    {
+        var source = new SwitchableCliModelSource(new CliModelCatalog(
+            ["gpt-6.2-sol", "gpt-6.2-astra"], IsLive: true, HasLiveSource: true,
+            new Dictionary<string, string> { ["gpt-sol-latest"] = "gpt-6.2-sol", ["gpt-astra-latest"] = "gpt-6.2-astra" },
+            AliasesComplete: true));
+        var catalog = BuildCatalog(FakeHttpHandler.Fail(HttpStatusCode.NotFound), SystemProviders.CodexCli, source);
+        await catalog.RefreshAsync("codex-cli");
+        Assert.Equal("gpt-6.2-astra", await catalog.ResolveModelAsync("codex-cli", "gpt-astra-latest"));
+
+        source.Result = new CliModelCatalog(
+            ["gpt-6.3-sol"], IsLive: true, HasLiveSource: true,
+            new Dictionary<string, string> { ["gpt-sol-latest"] = "gpt-6.3-sol" },
+            AliasesComplete: true);
+        await catalog.RefreshAsync("codex-cli");
+
+        Assert.Equal("gpt-6.3-sol", await catalog.ResolveModelAsync("codex-cli", "gpt-sol-latest"));
+        Assert.Equal("gpt-astra-latest", await catalog.ResolveModelAsync("codex-cli", "gpt-astra-latest"));
+    }
+
+    [Fact]
+    public async Task CompleteCodexAliasMap_ResolvesOnAStaticStart()
+    {
+        var source = new FakeCliModelSource(new CliModelCatalog(
+            ["gpt-6.2-sol"], IsLive: false, HasLiveSource: false,
+            new Dictionary<string, string> { ["gpt-sol-latest"] = "gpt-6.2-sol" },
+            AliasesComplete: true));
+        var catalog = BuildCatalog(FakeHttpHandler.Fail(HttpStatusCode.NotFound), SystemProviders.CodexCli, source);
+
+        await catalog.ListModelsAsync("codex-cli");
+
+        Assert.Equal("gpt-6.2-sol", await catalog.ResolveModelAsync("codex-cli", "gpt-sol-latest"));
+    }
+
+    [Fact]
+    public async Task DegradedCodexAnswer_KeepsThePreviousMapping()
+    {
+        var source = new SwitchableCliModelSource(new CliModelCatalog(
+            ["gpt-6.2-sol"], IsLive: true, HasLiveSource: true,
+            new Dictionary<string, string> { ["gpt-sol-latest"] = "gpt-6.2-sol" },
+            AliasesComplete: true));
+        var catalog = BuildCatalog(FakeHttpHandler.Fail(HttpStatusCode.NotFound), SystemProviders.CodexCli, source);
+        await catalog.RefreshAsync("codex-cli");
+
+        source.Result = new CliModelCatalog(
+            ["gpt-6.1-sol"], IsLive: false, HasLiveSource: true,
+            new Dictionary<string, string> { ["gpt-sol-latest"] = "gpt-6.1-sol" },
+            AliasesComplete: true);
+        await catalog.RefreshAsync("codex-cli");
+
+        Assert.Equal("gpt-6.2-sol", await catalog.ResolveModelAsync("codex-cli", "gpt-sol-latest"));
+    }
+
+    [Fact]
+    public async Task ReportedIds_AreUnknownWhenTheLiveSourceFailed()
+    {
+        var catalog = BuildCatalog(FakeHttpHandler.Fail(HttpStatusCode.NotFound), SystemProviders.CodexCli, new FakeCliModelSource(null));
+
+        Assert.Null(await catalog.ListReportedModelIdsAsync("codex-cli"));
+    }
+
+    private static Provider KeylessOpenRouter()
+    {
+        var settings = new Dictionary<string, System.Text.Json.JsonElement>(SystemProviders.OpenRouter.Settings);
+        settings.Remove("api_key_env");
+        return SystemProviders.OpenRouter with { Settings = settings };
+    }
+
+    [Fact]
+    public async Task ReportedIds_AreEmptyWhenTheHttpProviderListsNoModels()
+    {
+        var catalog = BuildCatalog(FakeHttpHandler.Ok("""{"object":"list","data":[]}"""), KeylessOpenRouter());
+
+        var models = await catalog.ListModelsAsync("openrouter");
+        var reported = await catalog.ListReportedModelIdsAsync("openrouter");
+
+        Assert.NotEmpty(models);
+        Assert.NotNull(reported);
+        Assert.Empty(reported!);
+    }
+
+    [Fact]
+    public async Task ReportedIds_AreUnknownWhenTheHttpProviderFails()
+    {
+        var catalog = BuildCatalog(FakeHttpHandler.Fail(HttpStatusCode.InternalServerError), KeylessOpenRouter());
+
+        await catalog.ListModelsAsync("openrouter");
+
+        Assert.Null(await catalog.ListReportedModelIdsAsync("openrouter"));
+    }
+
+    [Fact]
+    public async Task ReportedIds_AreEmptyWithoutApiKeyEvenWhenTheLookupRunsOutOfBudget()
+    {
+        var settings = new Dictionary<string, System.Text.Json.JsonElement>(SystemProviders.OpenRouter.Settings)
+        {
+            ["api_key_env"] = System.Text.Json.JsonSerializer.SerializeToElement("GEEF_TEST_UNSET_KEY_D066"),
+        };
+        var provider = SystemProviders.OpenRouter with { Settings = settings };
+        var catalog = BuildCatalog(new HangingHttpHandler(), provider, options: new ModelCatalogOptions { InteractiveTimeoutSeconds = 1 });
+
+        var reported = await catalog.ListReportedModelIdsAsync("openrouter");
+
+        Assert.NotNull(reported);
+        Assert.Empty(reported!);
+    }
+
+    [Fact]
+    public async Task ReportedIds_AreEmptyForAnHttpProviderWithoutItsApiKey()
+    {
+        var settings = new Dictionary<string, System.Text.Json.JsonElement>(SystemProviders.OpenRouter.Settings)
+        {
+            ["api_key_env"] = System.Text.Json.JsonSerializer.SerializeToElement("GEEF_TEST_UNSET_KEY_D066"),
+        };
+        var provider = SystemProviders.OpenRouter with { Settings = settings };
+        var handler = FakeHttpHandler.Ok("""{"object":"list","data":[{"id":"google/gemini-4-neon","object":"model"}]}""");
+        var catalog = BuildCatalog(handler, provider);
+
+        var models = await catalog.ListModelsAsync("openrouter");
+        var reported = await catalog.ListReportedModelIdsAsync("openrouter");
+
+        Assert.Contains(models, m => m.Id == "google/gemini-4-neon");
+        Assert.NotNull(reported);
+        Assert.Empty(reported!);
+    }
+
+    [Fact]
     public async Task CliProvider_ServesTheLiveListAndReportsLive()
     {
         var source = new FakeCliModelSource(new CliModelCatalog(
@@ -295,7 +438,7 @@ public sealed class ModelCatalogTests : IDisposable
         var ids = (await catalog.ListModelsAsync("codex-cli")).Select(m => m.Id).ToList();
 
         Assert.Contains("gpt-9-nova", ids);
-        Assert.Contains(PreferredComposerModels.Reviewers.First(r => r.Provider == "codex-cli").Model, ids);
+        Assert.Contains(Geef.Atelier.Core.Domain.Crew.Models.ModelMatrix.Primary(Geef.Atelier.Core.Domain.Crew.Models.ModelSlot.FactReviewer).Model, ids);
     }
 
     [Fact]
@@ -823,6 +966,15 @@ internal sealed class FakeHttpHandler(HttpStatusCode statusCode, string? body) :
         if (body is not null)
             resp.Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
         return Task.FromResult(resp);
+    }
+}
+
+internal sealed class HangingHttpHandler : HttpMessageHandler
+{
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        await Task.Delay(Timeout.Infinite, cancellationToken);
+        return new HttpResponseMessage(HttpStatusCode.OK);
     }
 }
 

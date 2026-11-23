@@ -14,6 +14,9 @@ namespace Geef.Atelier.Tests.Fakes;
 /// </remarks>
 internal sealed class PassThroughModelCatalog : IModelCatalog
 {
+    public Task<IReadOnlyList<string>?> ListReportedModelIdsAsync(string providerName, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<string>?>(null);
+
     public Task<IReadOnlyList<ModelInfo>> ListModelsAsync(string providerName, CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<ModelInfo>>([]);
 
@@ -39,6 +42,9 @@ internal sealed class ResolvingModelCatalog(
     IReadOnlyDictionary<string, string>? aliases = null,
     IReadOnlyList<ModelInfo>? models = null) : IModelCatalog
 {
+    public Task<IReadOnlyList<string>?> ListReportedModelIdsAsync(string providerName, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<string>?>(null);
+
     private readonly IReadOnlyDictionary<string, string> _aliases =
         aliases ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 

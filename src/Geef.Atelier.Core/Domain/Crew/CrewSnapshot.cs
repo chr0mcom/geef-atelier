@@ -52,6 +52,10 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// The embedded actor profiles already carry the composed prompt in their <c>SystemPrompt</c>; this
 /// field preserves the role prompt and provenance for the audit UI. Trailing-optional.
 /// </param>
+/// <param name="CrewDomain">
+/// Domain the crew ran in, used for model-matrix assignment (D-066). Audit field; additive without a schema
+/// version bump — snapshots created before D-066 read as <c>null</c>.
+/// </param>
 public sealed record CrewSnapshot(
     int SchemaVersion,
     string? TemplateName,
@@ -64,7 +68,8 @@ public sealed record CrewSnapshot(
     IReadOnlyList<FinalizerProfile>? Finalizers = null,
     bool RunFinalizersOnMaxAttempts = false,
     IReadOnlyDictionary<string, IReadOnlyList<ToolDefinition>>? ToolBindings = null,
-    IReadOnlyList<ActorPromptComposition>? PromptCompositions = null)
+    IReadOnlyList<ActorPromptComposition>? PromptCompositions = null,
+    Models.ModelDomain? CrewDomain = null)
 {
     /// <summary>Current snapshot schema version. Bump when the format changes incompatibly.</summary>
     public const int CurrentSchemaVersion = 3;

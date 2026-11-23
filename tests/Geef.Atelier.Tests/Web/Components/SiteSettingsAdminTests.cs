@@ -103,7 +103,7 @@ public sealed class SiteSettingsAdminTests : TestContext
         var cut = RenderComponent<SiteSettingsAdmin>();
 
         var btn = cut.Find("[data-testid='btn-save']");
-        Assert.Equal("Speichern", btn.TextContent.Trim());
+        Assert.Equal("Save", btn.TextContent.Trim());
     }
 
     [Fact]

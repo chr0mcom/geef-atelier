@@ -1,13 +1,18 @@
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace Geef.Atelier.Infrastructure.Llm;
 
 internal sealed class OpenAiCompatibleClient(
     HttpClient httpClient,
     string endpoint,
-    string? apiKey) : ILlmClient
+    string? apiKey,
+    ILogger? logger = null) : ILlmClient
 {
+    /// <summary>Header the cli-proxy sets when another CLI served the request (e.g. <c>codex->claude</c>).</summary>
+    internal const string FailoverHeader = "x-cli-proxy-failover";
+
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken)
     {
         // null  → keyless provider (e.g. Ollama): skip auth header entirely
@@ -35,7 +40,46 @@ internal sealed class OpenAiCompatibleClient(
                 inner: null,
                 statusCode: response.StatusCode);
 
+        WarnOnFailover(response, request.Model);
+
         return OpenAiMessageFormat.DeserializeResponse(json);
+    }
+
+    /// <summary>
+    /// A cli-proxy failover silently runs the request on the partner CLI's default model, which can put a
+    /// reviewer onto the executor's model family (D-066). The response still names the requested model, so the
+    /// header is the only trace — surface it.
+    /// </summary>
+    private void WarnOnFailover(HttpResponseMessage response, string requestedModel)
+    {
+        if (logger is null || !response.Headers.TryGetValues(FailoverHeader, out var values))
+            return;
+
+        var hops = values.ToList();
+        if (hops.Count > 0 && hops.All(IsSameCliHop))
+            return;
+
+        logger.LogWarning(
+            "cli-proxy failover {Failover}: request for model '{Model}' was served by another CLI with its default model; model plurality may not hold for this call.",
+            string.Join(",", hops), requestedModel);
+    }
+
+    /// <summary>
+    /// True for a hop such as <c>claude->claude-alt</c>: a second account of the same CLI keeps the model name, so model
+    /// plurality is unaffected. Unknown formats count as a CLI change and still warn.
+    /// </summary>
+    private static bool IsSameCliHop(string hop)
+    {
+        var parts = hop.Split("->", StringSplitOptions.TrimEntries);
+        if (parts.Length != 2 || parts[0].Length == 0 || parts[1].Length == 0)
+            return false;
+        return string.Equals(CliFamily(parts[0]), CliFamily(parts[1]), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string CliFamily(string backend)
+    {
+        var dash = backend.IndexOf('-');
+        return dash > 0 ? backend[..dash] : backend;
     }
 
     // Surfaces the provider's actual error text (OpenAI-shaped { "error": { "message": ... } })

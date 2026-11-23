@@ -269,7 +269,7 @@ def test_failover_maps_reasoning_effort_for_the_target_backend(client):
     assert resp.headers["x-cli-proxy-failover"] == "claude->codex"
     assert claude.await_args.kwargs["reasoning_effort"] == "low"
     assert codex.await_args.kwargs == {"reasoning_effort": "low"}
-    assert not codex.await_args.args[1], "model name must still not cross the backend boundary"
+    assert codex.await_args.args[1] == main.FAILOVER_CODEX_MODEL, "model name must still not cross the backend boundary"
     assert resp.headers[HEADER] == "low"
 
 

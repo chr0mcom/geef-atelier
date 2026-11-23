@@ -118,7 +118,12 @@
                         }
                     </select>
                     <FieldHelp Text="@StudioFieldHelps.Provider" DataTestId="field-help-provider" />
-                    @if (ShowValidation && string.IsNullOrEmpty(Draft.Provider))
+                    @if (Draft.ProfileType == ProposedProfileType.Finalizer)
+                    {
+                        <FieldHelp Text="Leave provider and model empty to have the model assigned automatically from the model matrix; choosing both makes this Transform finalizer's binding manual."
+                                   DataTestId="field-help-transform-binding" />
+                    }
+                    else if (ShowValidation && string.IsNullOrEmpty(Draft.Provider))
                     {
                         <span class="validation-error">Provider is required.</span>
                     }

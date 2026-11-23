@@ -21,7 +21,8 @@ public static class ListCrewTemplatesTool
                 t.ExecutorProfileName,
                 t.ReviewerProfileNames,
                 t.EvaluationStrategy.ToString(),
-                t.IsSystem))
+                t.IsSystem,
+                t.Domain?.ToString()))
             .ToList();
     }
 }

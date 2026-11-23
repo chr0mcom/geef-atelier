@@ -40,11 +40,13 @@ public sealed class SystemCrewDomainAdvisorsTests
     }
 
     [Fact]
-    public void AcademicRigorAdvisor_IsSystem_UsesClaudeCli_OpusAlias()
+    public void AcademicRigorAdvisor_IsSystem_AcademicDomainExpert_OnCodexAstra()
     {
         Assert.True(SystemCrew.AcademicRigorAdvisorProfile.IsSystem);
-        Assert.Equal("claude-cli", SystemCrew.AcademicRigorAdvisorProfile.Provider);
-        Assert.Equal("claude-opus-latest", SystemCrew.AcademicRigorAdvisorProfile.Model);
+        Assert.Equal("codex-cli", SystemCrew.AcademicRigorAdvisorProfile.Provider);
+        Assert.Equal("gpt-astra-latest", SystemCrew.AcademicRigorAdvisorProfile.Model);
+        Assert.Equal(Geef.Atelier.Core.Domain.Crew.Models.ModelSlot.DomainExpertAdvisor, SystemCrew.AcademicRigorAdvisorProfile.ModelSlot);
+        Assert.Equal(Geef.Atelier.Core.Domain.Crew.Models.ModelDomain.Academic, SystemCrew.AcademicRigorAdvisorProfile.ModelDomain);
     }
 
     [Fact]

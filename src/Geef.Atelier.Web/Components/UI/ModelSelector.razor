@@ -30,9 +30,10 @@
                        class="model-selector-custom-input"
                        value="@Value"
                        @oninput="OnCustomInput"
+                       disabled="@Disabled"
                        placeholder="Enter custom model ID…"
                        data-testid="model-selector-custom-input" />
-                <button type="button" class="model-selector-back" @onclick="SwitchToDropdown"
+                <button type="button" class="model-selector-back" @onclick="SwitchToDropdown" disabled="@Disabled"
                         title="Back to list">↩</button>
             </div>
         }
@@ -131,7 +132,7 @@
             // When switching providers (not the initial load), clear the stale model ID
             // so LoadModelsAsync selects the first recommended model of the new provider
             // instead of treating the previous provider's ID as a custom entry.
-            if (!string.IsNullOrEmpty(_loadedForProvider))
+            if (!string.IsNullOrEmpty(_loadedForProvider) && !Disabled)
                 await SetValue("");
             await LoadModelsAsync();
         }
@@ -170,7 +171,7 @@
             else
             {
                 _showCustomInput = false;
-                if (string.IsNullOrEmpty(Value) && _recommended.Count > 0)
+                if (string.IsNullOrEmpty(Value) && _recommended.Count > 0 && !Disabled)
                     await SetValue(_recommended[0].Id);
             }
         }

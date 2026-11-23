@@ -25,6 +25,10 @@ public static class CrewSpecParser
             ? domainEl.GetString() ?? "general"
             : "general";
 
+        var matrixDomain = root.TryGetProperty("model_domain", out var modelDomainEl)
+            ? modelDomainEl.ValueKind == JsonValueKind.String ? modelDomainEl.GetString() : modelDomainEl.GetRawText()
+            : null;
+
         var rationale = root.TryGetProperty("rationale", out var rationaleEl)
             ? rationaleEl.GetString() ?? string.Empty
             : string.Empty;
@@ -66,6 +70,7 @@ public static class CrewSpecParser
             NewPacks           = newPacks,
             Mode               = mode,
             Domain             = domain,
+            MatrixDomain       = matrixDomain,
             Rationale          = rationale,
             ExistingTemplateName = existingTemplateName,
             Executor           = executor,
@@ -127,7 +132,41 @@ public static class CrewSpecParser
             FinalizerType  = el.TryGetProperty("finalizer_type",  out var ftEl)     ? ftEl.GetString()          : null,
             ToolNames      = toolNames,
             PackNames      = packNames,
+            ModelSlot      = el.TryGetProperty("model_slot",      out var msEl) ? ParseModelSlotRaw(msEl) : null,
+            Settings       = ParseSettings(el),
         };
+    }
+
+    /// <summary>
+    /// Raw <c>model_slot</c> text: strings as-is, JSON null as absent, any other JSON type as its raw text so the
+    /// validator reports it as an invalid slot instead of treating it as missing.
+    /// </summary>
+    private static string? ParseModelSlotRaw(JsonElement el) => el.ValueKind switch
+    {
+        JsonValueKind.String => el.GetString(),
+        JsonValueKind.Null or JsonValueKind.Undefined => null,
+        _ => el.GetRawText(),
+    };
+
+    private static IReadOnlyDictionary<string, string>? ParseSettings(JsonElement el)
+    {
+        if (!el.TryGetProperty("settings", out var settingsEl) || settingsEl.ValueKind != JsonValueKind.Object)
+            return null;
+
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var property in settingsEl.EnumerateObject())
+        {
+            var value = property.Value.ValueKind switch
+            {
+                JsonValueKind.String => property.Value.GetString(),
+                JsonValueKind.Null or JsonValueKind.Undefined => null,
+                _ => property.Value.GetRawText(),
+            };
+            if (value is not null)
+                result[property.Name] = value;
+        }
+
+        return result.Count > 0 ? result : null;
     }
 
     private static IReadOnlyList<string>? ParseStringArray(JsonElement el, string propertyName) =>

@@ -8,6 +8,7 @@
 @using Geef.Atelier.Core.Domain.Crew.Advisors
 @using Geef.Atelier.Core.Domain.Crew.Finalizers
 @using Geef.Atelier.Core.Domain.Crew.Grounding
+@using Geef.Atelier.Core.Domain.Crew.Models
 @using Geef.Atelier.Core.Domain.Crew.Profiles
 @using Geef.Atelier.Core.Domain.Crew.Specialization
 @using Geef.Atelier.Infrastructure.Configuration
@@ -62,6 +63,18 @@
                 <div class="field">
                     <label>Description</label>
                     <InputTextArea @bind-Value="_form.Description" rows="3" />
+                </div>
+
+                <div class="field">
+                    <label>Domain</label>
+                    <InputSelect @bind-Value="_form.Domain" disabled="@_isSystem" data-testid="template-domain-select">
+                        @foreach (var domain in Enum.GetValues<ModelDomain>())
+                        {
+                            <option value="@domain">@domain</option>
+                        }
+                    </InputSelect>
+                    <FieldHelp Text="Subject area of the crew. Together with each profile's role it selects the model for automatically assigned profiles."
+                               DataTestId="template-domain-help" />
                 </div>
             </div>
 
@@ -443,6 +456,8 @@
 
         public EvaluationStrategy EvaluationStrategy { get; set; } = EvaluationStrategy.Parallel;
 
+        public ModelDomain Domain { get; set; } = ModelDomain.General;
+
         public int? MaxIterations { get; set; }
         public bool AbortOnCritical { get; set; }
         public bool DetectRegression { get; set; }
@@ -462,6 +477,7 @@
             RunFinalizersOnMaxAttempts = t.RunFinalizersOnMaxAttempts,
             ActorPackBindings = t.ActorPackBindings.ToDictionary(kv => kv.Key, kv => kv.Value.ToList()),
             EvaluationStrategy = t.EvaluationStrategy,
+            Domain = t.Domain ?? ModelDomain.General,
             MaxIterations = t.ConvergenceOverride?.MaxIterations ?? d.MaxIterations,
             AbortOnCritical = t.ConvergenceOverride?.AbortOnCritical ?? d.AbortOnCritical,
             DetectRegression = t.ConvergenceOverride?.DetectRegression ?? d.DetectRegression,
@@ -509,7 +525,8 @@
                 RunFinalizersOnMaxAttempts: RunFinalizersOnMaxAttempts,
                 ActorPackBindings: ActorPackBindings
                     .Where(kv => kv.Value.Count > 0)
-                    .ToDictionary(kv => kv.Key, kv => (IReadOnlyList<string>)kv.Value));
+                    .ToDictionary(kv => kv.Key, kv => (IReadOnlyList<string>)kv.Value),
+                Domain: Domain);
         }
     }
 }

@@ -6,6 +6,7 @@ using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Composition;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
+using Geef.Atelier.Core.Domain.Crew.Models;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.Crew.Specialization;
 using Geef.Atelier.Infrastructure.TemplateStudio;
@@ -80,6 +81,7 @@ internal sealed class CrewMaterializer(
         }
 
         // ── 4. Crew-level dedup (Composed / New) ─────────────────────────────────
+        var crewDomain = spec.EffectiveModelDomain();
         var summaryText = $"{spec.Domain}: {spec.Rationale}";
         try
         {
@@ -108,6 +110,12 @@ internal sealed class CrewMaterializer(
                         sourceRunId, dupName);
                     try { await embeddingRepo.DeleteAsync(dupName, cancellationToken); }
                     catch (Exception delEx) { logger.LogWarning(delEx, "CrewMaterializer: failed to delete orphaned embedding '{Template}'.", dupName); }
+                    continue;
+                }
+
+                if ((dupTemplate.Domain ?? ModelDomain.General) != crewDomain)
+                {
+                    warnings.Add($"Dedup: similar template '{dupName}' ({similarity:F3}) skipped — its model domain {dupTemplate.Domain ?? ModelDomain.General} differs from the requested {crewDomain}.");
                     continue;
                 }
 
@@ -141,7 +149,7 @@ internal sealed class CrewMaterializer(
             }
             else if (spec.Executor is { Reuse: null } inlineExec)
             {
-                var profile = BuildExecutorProfile(inlineExec);
+                var profile = BuildExecutorProfile(inlineExec, crewDomain, warnings);
                 var created = await crewService.CreateCustomExecutorProfileAsync(profile, cancellationToken);
                 nameMapping[inlineExec.Name!] = created.Name;
                 executorName = created.Name;
@@ -164,7 +172,7 @@ internal sealed class CrewMaterializer(
                 }
                 else
                 {
-                    var profile = BuildReviewerProfile(part);
+                    var profile = BuildReviewerProfile(part, crewDomain, warnings, $"reviewers[{reviewerNames.Count}]");
                     var created = await crewService.CreateCustomReviewerProfileAsync(profile, cancellationToken);
                     nameMapping[part.Name!] = created.Name;
                     reviewerNames.Add(created.Name);
@@ -182,7 +190,7 @@ internal sealed class CrewMaterializer(
                 }
                 else
                 {
-                    var profile = BuildAdvisorProfile(part);
+                    var profile = BuildAdvisorProfile(part, crewDomain, warnings, $"advisors[{advisorNames.Count}]");
                     var created = await crewService.CreateCustomAdvisorProfileAsync(profile, cancellationToken);
                     nameMapping[part.Name!] = created.Name;
                     advisorNames.Add(created.Name);
@@ -198,9 +206,13 @@ internal sealed class CrewMaterializer(
                 {
                     groundingNames.Add(part.Reuse);
                 }
+                else if (part.ProviderType is { } droppedType && CrewPartSettingsPolicy.DroppedInlineGroundingTypes.Contains(droppedType))
+                {
+                    warnings.Add($"[grounding_providers] inline '{droppedType}' provider '{part.Name}' dropped: its targets may only come from a reused, operator-made profile.");
+                }
                 else
                 {
-                    var profile = BuildGroundingProviderProfile(part);
+                    var profile = BuildGroundingProviderProfile(part, crewDomain);
                     var created = await crewService.CreateCustomGroundingProviderProfileAsync(profile, cancellationToken);
                     nameMapping[part.Name!] = created.Name;
                     groundingNames.Add(created.Name);
@@ -218,7 +230,7 @@ internal sealed class CrewMaterializer(
                 }
                 else
                 {
-                    var profile = BuildFinalizerProfile(part);
+                    var profile = BuildFinalizerProfile(part, crewDomain, warnings, $"finalizers[{finalizerNames.Count}]");
                     var created = await crewService.CreateCustomFinalizerProfileAsync(profile, cancellationToken);
                     nameMapping[part.Name!] = created.Name;
                     finalizerNames.Add(created.Name);
@@ -256,7 +268,8 @@ internal sealed class CrewMaterializer(
                 AdvisorProfileNames:    advisorNames,
                 GroundingProviderNames: groundingNames,
                 IsSystem:               false,
-                FinalizerProfileNames:  finalizerNames);
+                FinalizerProfileNames:  finalizerNames,
+                Domain:                 crewDomain);
 
             var createdTemplate = await crewService.CreateCustomCrewTemplateAsync(template, cancellationToken);
             finalTemplateName = createdTemplate.Name;
@@ -344,63 +357,111 @@ internal sealed class CrewMaterializer(
     private static int ClampMaxTokens(int? value, int floor) =>
         value is { } v && v > floor ? v : floor;
 
-    private static ExecutorProfile BuildExecutorProfile(Core.Domain.Crew.Composition.CrewPartSpec part) =>
-        new(
+    private static ExecutorProfile BuildExecutorProfile(
+        Core.Domain.Crew.Composition.CrewPartSpec part, ModelDomain crewDomain, List<string> warnings)
+    {
+        var (slot, binding) = part.AssignMatrixBinding(CrewPartKind.Executor, crewDomain, warnings, "executor");
+        return new(
             Name:        part.Name!,
             DisplayName: Truncate(part.DisplayName ?? part.Name!, 199),
             Description: "Auto-composed executor",
             SystemPrompt: part.SystemPrompt ?? string.Empty,
-            Provider:    part.Provider ?? PreferredComposerModels.Executor.Provider,
-            Model:       part.Model ?? PreferredComposerModels.Executor.Model,
+            Provider:    binding.Provider,
+            Model:       binding.Model,
             MaxTokens:   ClampMaxTokens(part.MaxTokens, ExecutorMaxTokensFloor),
             IsSystem:    false,
-            ToolNames:   part.ToolNames);
+            ToolNames:   part.ToolNames,
+            ModelSlot:   slot);
+    }
 
-    private static ReviewerProfile BuildReviewerProfile(Core.Domain.Crew.Composition.CrewPartSpec part) =>
-        new(
+    private static ReviewerProfile BuildReviewerProfile(
+        Core.Domain.Crew.Composition.CrewPartSpec part, ModelDomain crewDomain, List<string> warnings, string path)
+    {
+        var (slot, binding) = part.AssignMatrixBinding(CrewPartKind.Reviewer, crewDomain, warnings, path);
+        return new(
             Name:        part.Name!,
             DisplayName: Truncate(part.DisplayName ?? part.Name!, 199),
             Description: "Auto-composed reviewer",
             SystemPrompt: part.SystemPrompt ?? string.Empty,
-            Provider:    part.Provider ?? PreferredComposerModels.SecondaryDefault.Provider,
-            Model:       part.Model ?? PreferredComposerModels.SecondaryDefault.Model,
+            Provider:    binding.Provider,
+            Model:       binding.Model,
             MaxTokens:   ClampMaxTokens(part.MaxTokens, ReviewerMaxTokensFloor),
             IsSystem:    false,
-            ToolNames:   part.ToolNames);
+            ToolNames:   part.ToolNames,
+            ModelSlot:   slot);
+    }
 
-    private static AdvisorProfile BuildAdvisorProfile(Core.Domain.Crew.Composition.CrewPartSpec part) =>
-        new(
+    private static AdvisorProfile BuildAdvisorProfile(
+        Core.Domain.Crew.Composition.CrewPartSpec part, ModelDomain crewDomain, List<string> warnings, string path)
+    {
+        var (slot, binding) = part.AssignMatrixBinding(CrewPartKind.Advisor, crewDomain, warnings, path);
+        return new(
             Name:        part.Name!,
             DisplayName: Truncate(part.DisplayName ?? part.Name!, 199),
             Description: "Auto-composed advisor",
             SystemPrompt: part.SystemPrompt ?? string.Empty,
-            Provider:    part.Provider ?? PreferredComposerModels.SecondaryDefault.Provider,
-            Model:       part.Model ?? PreferredComposerModels.SecondaryDefault.Model,
+            Provider:    binding.Provider,
+            Model:       binding.Model,
             MaxTokens:   ClampMaxTokens(part.MaxTokens, AdvisorMaxTokensFloor),
-            Mode:        ParseAdvisorMode(part.AdvisorMode),
+            Mode:        part.ParsedAdvisorMode(),
             Trigger:     ParseAdvisorTrigger(part.AdvisorTrigger),
             IsSystem:    false,
-            ToolNames:   part.ToolNames);
+            ToolNames:   part.ToolNames,
+            ModelSlot:   slot);
+    }
 
-    private static GroundingProviderProfile BuildGroundingProviderProfile(Core.Domain.Crew.Composition.CrewPartSpec part) =>
-        new(
+    private static GroundingProviderProfile BuildGroundingProviderProfile(
+        Core.Domain.Crew.Composition.CrewPartSpec part, ModelDomain crewDomain)
+    {
+        var settings = part.AllowedGroundingSettings();
+        if (settings.ContainsKey(GroundingProviderProfile.KeyRefinementMode))
+        {
+            var refiner = ModelMatrix.Primary(ModelSlot.GroundingRefiner, crewDomain);
+            settings[GroundingProviderProfile.KeyRefinementProvider] = refiner.Provider;
+            settings[GroundingProviderProfile.KeyRefinementModel] = refiner.Model;
+            settings[GroundingProviderProfile.KeyModelSlot] = nameof(ModelSlot.GroundingRefiner);
+            settings.TryAdd(GroundingProviderProfile.KeyRefinementMaxTokens, "2048");
+        }
+
+        return new(
             Name:             part.Name!,
             DisplayName:      part.DisplayName ?? part.Name!,
             Description:      "Auto-composed grounding provider",
             ProviderType:     part.ProviderType ?? "tavily",
-            ProviderSettings: [],
+            ProviderSettings: settings,
             MaxQueriesPerRun: null,
             IsSystem:         false);
+    }
 
-    private static FinalizerProfile BuildFinalizerProfile(Core.Domain.Crew.Composition.CrewPartSpec part) =>
-        new(
+    private static FinalizerProfile BuildFinalizerProfile(
+        Core.Domain.Crew.Composition.CrewPartSpec part, ModelDomain crewDomain, List<string> warnings, string path)
+    {
+        var type = CrewPartSettingsPolicy.ParseFinalizerType(part.FinalizerType);
+        var settings = part.AllowedFinalizerSettings(type);
+
+        if (type == FinalizerType.Transform)
+        {
+            var (slot, binding) = part.AssignMatrixBinding(CrewPartKind.TransformFinalizer, crewDomain, warnings, path);
+            var transform = new TransformSettings(
+                SystemPrompt: part.SystemPrompt ?? settings.GetValueOrDefault(TransformSettings.KeySystemPrompt, string.Empty),
+                Provider:     binding.Provider,
+                Model:        binding.Model,
+                MaxTokens:    part.MaxTokens is > 0 ? part.MaxTokens.Value : 60000,
+                ModelSlot:    slot);
+            foreach (var (key, value) in transform.ToDict())
+                settings[key] = value;
+        }
+
+        return new(
             Name:          part.Name!,
             DisplayName:   part.DisplayName ?? part.Name!,
             Description:   "Auto-composed finalizer",
-            FinalizerType: ParseFinalizerType(part.FinalizerType),
-            Settings:      [],
+            FinalizerType: type,
+            Settings:      settings,
             IsSystem:      false,
             ToolNames:     part.ToolNames);
+    }
+
 
     private static EvaluationStrategy ParseEvaluationStrategy(string? raw) =>
         raw?.ToLowerInvariant() switch
@@ -409,15 +470,6 @@ internal sealed class CrewMaterializer(
             "failfast"   => EvaluationStrategy.FailFast,
             "priority"   => EvaluationStrategy.Priority,
             _            => EvaluationStrategy.Parallel,
-        };
-
-    private static AdvisorMode ParseAdvisorMode(string? raw) =>
-        raw?.ToLowerInvariant() switch
-        {
-            "critical"      => AdvisorMode.Critical,
-            "devilsadvocate" => AdvisorMode.DevilsAdvocate,
-            "domainexpert"  => AdvisorMode.DomainExpert,
-            _               => AdvisorMode.Strategic,
         };
 
     private static AdvisorTrigger ParseAdvisorTrigger(string? raw) =>
@@ -469,18 +521,6 @@ internal sealed class CrewMaterializer(
             .ToList();
         return types.Count > 0 ? types : [PackActorType.Any];
     }
-
-    private static FinalizerType ParseFinalizerType(string? raw) =>
-        raw?.ToLowerInvariant() switch
-        {
-            "metadataenrich" => FinalizerType.MetadataEnrich,
-            "externalsink"   => FinalizerType.ExternalSink,
-            "transform"      => FinalizerType.Transform,
-            "learningextract" => FinalizerType.LearningExtract,
-            "learningpublish" => FinalizerType.LearningPublish,
-            "crewmaterialize" => FinalizerType.CrewMaterialize,
-            _                => FinalizerType.FileExport,
-        };
 
     private static string Truncate(string s, int max) =>
         s.Length <= max ? s : s[..max] + "…";

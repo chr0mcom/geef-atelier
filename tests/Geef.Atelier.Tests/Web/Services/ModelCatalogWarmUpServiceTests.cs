@@ -85,6 +85,9 @@ public sealed class ModelCatalogWarmUpServiceTests
 
     private sealed class RecordingModelCatalog : IModelCatalog
     {
+        public Task<IReadOnlyList<string>?> ListReportedModelIdsAsync(string providerName, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<string>?>(null);
+
         public List<string> WarmedProviders { get; } = [];
         public string? FailFor { get; init; }
 

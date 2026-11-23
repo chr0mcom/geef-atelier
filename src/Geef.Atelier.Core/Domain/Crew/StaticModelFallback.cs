@@ -7,31 +7,30 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// </summary>
 public static class StaticModelFallback
 {
+    /// <summary>
+    /// OpenRouter fallback. Claude and OpenAI models are deliberately absent: they always run through the
+    /// subscription CLIs (D-066), so OpenRouter only serves other vendor families.
+    /// </summary>
     public static readonly IReadOnlyList<ModelInfo> ForOpenRouter = new ModelInfo[]
     {
-        new("anthropic/claude-opus-5",      "Claude Opus 5",         "Best quality, Anthropic via OpenRouter",          true),
-        new("anthropic/claude-sonnet-5",    "Claude Sonnet 5",       "Fast, balanced, Anthropic via OpenRouter",        true),
-        new("anthropic/claude-haiku-4.5",   "Claude Haiku 4.5",      "Cheapest Anthropic model via OpenRouter",         true),
-        new("google/gemini-3.6-flash",      "Gemini 3.6 Flash",      "Fast, cheap, Google via OpenRouter",              true),
-        new("google/gemini-3.1-pro-preview","Gemini 3.1 Pro",        "High quality, Google via OpenRouter",             false),
-        new("openai/gpt-5.6-sol",           "GPT-5.6 Sol",           "Flagship OpenAI model via OpenRouter",            true),
-        new("openai/gpt-5.6-terra",         "GPT-5.6 Terra",         "Balanced OpenAI model via OpenRouter",            true),
-        new("openai/gpt-5.6-luna",          "GPT-5.6 Luna",          "Cheap, fast, OpenAI via OpenRouter",              true),
-        new("x-ai/grok-4.5",                "Grok 4.5",              "xAI flagship via OpenRouter",                     false),
-        new("meta-llama/llama-4-maverick",  "Llama 4 Maverick",      "Open-weights, Meta via OpenRouter",               false),
+        new("google/gemini-4-neon",         "Gemini 4 Neon",         "Lowest hallucination rate, leads legal benchmarks (paid)", true),
+        new("google/gemini-4-argon",        "Gemini 4 Argon",        "High quality Google model (paid)",                         false),
+        new("google/gemini-4-hydrogen",     "Gemini 4 Hydrogen",     "Fast, cheaper Google model (paid)",                        false),
+        new("moonshotai/kimi-k3.1-pro",     "Kimi K3.1 Pro",         "Long-context reasoning (paid)",                            false),
+        new("mistralai/mistral-large-4-0",  "Mistral Large 4",       "European open-weights flagship (paid)",                    false),
+        new("qwen/qwen4-max",               "Qwen 4 Max",            "Alibaba flagship (paid)",                                  false),
     };
 
     public static readonly IReadOnlyList<ModelInfo> ForClaudeCli = new ModelInfo[]
     {
-        new("claude-opus-latest",   "Claude Opus (latest)",   "Best quality, always the newest Opus",   true),
-        new("claude-sonnet-latest", "Claude Sonnet (latest)", "Fast and balanced, always the newest",   true),
+        new("claude-opus-latest",   "Claude Opus (latest)",   "Best German prose, always the newest Opus",   true),
+        new("claude-sonnet-latest", "Claude Sonnet (latest)", "Fast and faithful, always the newest Sonnet",   true),
         new("claude-haiku-latest",  "Claude Haiku (latest)",  "Cheapest, always the newest Haiku",      true),
-        new("claude-fable-latest",  "Claude Fable (latest)",  "Always the newest Fable",                true),
-        new("claude-opus-5",        "Claude Opus 5",          "Pinned to this exact Opus generation",   false),
-        new("claude-sonnet-5",      "Claude Sonnet 5",        "Pinned to this exact Sonnet generation", false),
-        new("claude-haiku-4-5",     "Claude Haiku 4.5",       "Pinned to this exact Haiku generation",  false),
-        new("claude-fable-5",       "Claude Fable 5",         "Pinned to this exact Fable generation",  false),
-        new("claude-opus-4-8",      "Claude Opus 4.8",        "Previous Opus generation",               false),
+        new("claude-fable-latest",  "Claude Fable (latest)",  "Strongest analysis, always the newest Fable",                true),
+        new("claude-opus-5-5",      "Claude Opus 5.5",        "Pinned to this exact Opus generation",   false),
+        new("claude-sonnet-5-5",    "Claude Sonnet 5.5",      "Pinned to this exact Sonnet generation", false),
+        new("claude-haiku-5-5",     "Claude Haiku 5.5",       "Pinned to this exact Haiku generation",  false),
+        new("claude-fable-5-2",     "Claude Fable 5.2",       "Pinned to this exact Fable generation",  false),
     };
 
     /// <summary>
@@ -48,12 +47,15 @@ public static class StaticModelFallback
 
     public static readonly IReadOnlyList<ModelInfo> ForCodexCli = new ModelInfo[]
     {
-        new("gpt-5.6-sol",      "GPT-5.6 Sol",       "Flagship, latest generation",        true),
-        new("gpt-5.6-terra",    "GPT-5.6 Terra",     "Balanced mid-tier",                  true),
-        new("gpt-5.6-luna",     "GPT-5.6 Luna",      "Fastest and cheapest",               true),
-        new("gpt-5.5",          "GPT-5.5",           "Previous generation flagship",       false),
-        new("gpt-5.4",          "GPT-5.4",           "Legacy flagship",                    false),
-        new("gpt-5.4-mini",     "GPT-5.4 Mini",      "Legacy, balanced",                   false),
+        new("gpt-sol-latest",   "GPT Sol (latest)",  "Always the newest Sol: fast, source-faithful, large context", true),
+        new("gpt-astra-latest", "GPT Astra (latest)", "Always the newest Astra: most capable, facts and logic", true),
+        new("gpt-terra-latest", "GPT Terra (latest)", "Always the newest Terra: efficient",                    true),
+        new("gpt-6.2-sol",      "GPT-6.2 Sol",       "Go-to model: fast, source-faithful, 500k context", false),
+        new("gpt-6.2-astra",    "GPT-6.2 Astra",     "Most capable: facts and logic",                    false),
+        new("gpt-6.1-terra",    "GPT-6.1 Terra",     "Efficient previous generation",                    false),
+        new("gpt-6.1-sol",      "GPT-6.1 Sol",       "Previous generation go-to model",                  false),
+        new("gpt-6-astra",      "GPT-6 Astra",       "Older generation, most capable",                   false),
+        new("gpt-6-sol",        "GPT-6 Sol",         "Older generation go-to model",                     false),
     };
 
     /// <summary>Returns the fallback list for <paramref name="providerName"/>, or an empty list if unknown.</summary>

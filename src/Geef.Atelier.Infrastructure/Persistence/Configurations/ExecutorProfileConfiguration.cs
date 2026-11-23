@@ -28,6 +28,8 @@ internal sealed class ExecutorProfileConfiguration : IEntityTypeConfiguration<Ex
         builder.Property(e => e.Model).HasMaxLength(200).IsRequired();
         builder.Property(e => e.MaxTokens).IsRequired(false);
         builder.Property(e => e.IsSystem).IsRequired().HasDefaultValue(false);
+        builder.Property(e => e.ModelSlot).HasTolerantEnumConversion();
+        builder.Property(e => e.ModelDomain).HasTolerantEnumConversion();
 
         builder.Property(e => e.ToolNames)
             .HasColumnType("jsonb")

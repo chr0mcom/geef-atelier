@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Geef.Atelier.Application.Providers;
 using Geef.Atelier.Core.Domain.Providers;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Infrastructure.Llm;
@@ -9,7 +10,8 @@ namespace Geef.Atelier.Infrastructure.Llm;
 internal sealed class LlmClientResolver(
     IHttpClientFactory factory,
     IOptions<LlmOptions> options,
-    IServiceScopeFactory scopeFactory) : ILlmClientResolver
+    IServiceScopeFactory scopeFactory,
+    ILoggerFactory? loggerFactory = null) : ILlmClientResolver
 {
     // One OpenAiCompatibleClient per provider, shared and thread-safe.
     private readonly ConcurrentDictionary<string, ILlmClient> _clients = new(StringComparer.OrdinalIgnoreCase);
@@ -90,7 +92,7 @@ internal sealed class LlmClientResolver(
             // not /v1/chat/completions. Route any provider that targets api.openai.com accordingly.
             return TargetsOpenAi(endpoint)
                 ? new OpenAiResponsesClient(http, endpoint, apiKey)
-                : new OpenAiCompatibleClient(http, endpoint, apiKey);
+                : new OpenAiCompatibleClient(http, endpoint, apiKey, loggerFactory?.CreateLogger<OpenAiCompatibleClient>());
         });
     }
 

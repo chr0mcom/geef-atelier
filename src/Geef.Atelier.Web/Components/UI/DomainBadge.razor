@@ -1,13 +1,18 @@
+@using Geef.Atelier.Core.Domain.Crew.Models
 @using Geef.Atelier.Web.Display
-@if (_domain is not null)
+@if (_label is not null)
 {
-    <span class="domain-badge domain-badge--@_domain.ToLowerInvariant()" data-testid="domain-badge">
-        @_domain
+    <span class="domain-badge domain-badge--@_label.ToLowerInvariant()" data-testid="domain-badge">
+        @_label
     </span>
 }
 
 @code {
     [Parameter] public string? TemplateName { get; set; }
 
-    private string? _domain => ReviewerDisplay.GetTemplateDomain(TemplateName);
+    [Parameter] public ModelDomain? Domain { get; set; }
+
+    private string? _label => Domain is { } domain and not ModelDomain.General
+        ? domain.ToString()
+        : ReviewerDisplay.GetTemplateDomain(TemplateName);
 }

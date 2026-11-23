@@ -13,8 +13,9 @@ public sealed class SystemCrewToolBindingReviewerTests
     [Fact]
     public void CrewComposerToolBindingProfile_HasCorrectProviderAndModel()
     {
-        Assert.Equal("openrouter", SystemCrew.CrewComposerToolBindingProfile.Provider);
-        Assert.StartsWith("google/", SystemCrew.CrewComposerToolBindingProfile.Model);
+        Assert.Equal(Geef.Atelier.Core.Domain.Crew.Models.ModelSlot.FactReviewer, SystemCrew.CrewComposerToolBindingProfile.ModelSlot);
+        Assert.Equal("codex-cli", SystemCrew.CrewComposerToolBindingProfile.Provider);
+        Assert.Equal("gpt-astra-latest", SystemCrew.CrewComposerToolBindingProfile.Model);
     }
 
     [Fact]

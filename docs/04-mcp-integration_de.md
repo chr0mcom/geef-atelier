@@ -2,7 +2,7 @@
 
 *[English](04-mcp-integration.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-20 (D-051: neue providerType-Werte static-context, url-fetch, news-search in list_grounding_provider_profiles + materialize_template_proposal dokumentiert)*
+*Letzte Aktualisierung: 2026-11-22 (D-066: `ModelSlot`/`ModelDomain`/`Domain` in den Listen-Tools; zuvor 2026-05-20, D-051: neue providerType-Werte static-context, url-fetch, news-search in list_grounding_provider_profiles + materialize_template_proposal dokumentiert)*
 
 ## Warum MCP
 
@@ -123,9 +123,9 @@ Neben den sechs Run-Tools bietet der Server neun weitere — insgesamt **15 MCP-
 
 | Tool | Zweck |
 |---|---|
-| `list_crew_templates` | Crew-Templates auflisten (System + Custom) |
-| `list_reviewer_profiles` | Reviewer-Profile auflisten (System + Custom) |
-| `list_advisor_profiles` | Advisor-Profile auflisten (System + Custom) |
+| `list_crew_templates` | Crew-Templates auflisten (System + Custom); seit D-066 mit `Domain` (Crew-Gebiet der Modellmatrix, `null` = General) |
+| `list_reviewer_profiles` | Reviewer-Profile auflisten (System + Custom); seit D-066 mit `ModelSlot`/`ModelDomain` (`null` = manuell gewähltes Modell). Bei verwalteten Profilen ist `Provider`/`Model` nur das Matrix-Primärmodell, das echte Modell setzt der Run-Start. |
+| `list_advisor_profiles` | Advisor-Profile auflisten (System + Custom); seit D-066 mit `ModelSlot`/`ModelDomain` |
 | `list_grounding_provider_profiles` | Grounding-Provider-Profile auflisten |
 | `list_knowledge_documents` | Globale Wissensbasis-Dokumente auflisten |
 | `analyze_template_proposal` | Aufgabenbeschreibung analysieren, Template-Vorschlag erzeugen (persistiert) |

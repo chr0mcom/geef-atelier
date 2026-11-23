@@ -43,9 +43,10 @@ Vollständige Cross-App-Anleitung: [`/srv/docker/docs/cli-proxy-openai-gateway.m
 |---------|------|--------------|
 | `POST` | `/v1/claude/chat/completions` | Direkt zur claude CLI — kein Model-Name-Routing |
 | `POST` | `/v1/codex/chat/completions`  | Direkt zur codex CLI — kein Model-Name-Routing |
+| `POST` | `/v1/codex/images/generations` | Bilderzeugung (OpenAI Images API, nur codex, `b64_json`/PNG, ein Bild je Anfrage) |
 | `POST` | `/v1/chat/completions` | **DEPRECATED** Legacy-Endpoint mit Model-Name-Routing. Loggt WARNING. |
 | `GET`  | `/v1/claude/models` | Statische Modell-Liste der claude CLI |
-| `GET`  | `/v1/codex/models` | Statische Modell-Liste der codex CLI |
+| `GET`  | `/v1/codex/models` | Abo-Modell-Liste der codex CLI aus `$CODEX_HOME/models_cache.json` (nur `visibility: list`, nach `priority` sortiert, nie `-pro`/`:batch`), davor die Always-latest-Aliase `gpt-<Linie>-latest` (`x_aliases` bildet jeden auf die konkrete ID ab, `x_aliases_complete: true`); kuratierter Fallback `gpt-6.2-sol`, `gpt-6.2-astra`, `gpt-6.1-terra`, solange die CLI den Cache noch nicht geschrieben hat (`x_source: static`) |
 | `GET`  | `/v1/models` | **DEPRECATED** kombinierte Legacy-Modell-Liste |
 | `GET`  | `/health` | Health-Check mit CLI-Status |
 
@@ -82,6 +83,16 @@ Der Proxy zielt auf praktische Drop-in-Kompatibilität mit der OpenAI-Chat-Compl
 | **`system_fingerprint`** | weggelassen (kein stabiler Fingerprint verfügbar). |
 
 Modelle: `GET /v1/{claude,codex}/models` (Liste) und `GET /v1/{claude,codex}/models/{id}` (Einzelabruf). Jede Antwort trägt `x-request-id`, `openai-processing-ms` und informative `x-ratelimit-*`-Header. Optionaler Überlastschutz: `CLI_PROXY_MAX_INFLIGHT` setzen, um bei so vielen gleichzeitigen Anfragen `429` zu liefern (Default `0` = aus, Anfragen reihen sich an den Per-CLI-Semaphoren ein).
+
+### Codex-Always-latest-Aliase
+
+Wie `claude-opus-latest` gibt es für codex `gpt-<Linie>-latest`-Aliase, damit Konsumenten nie auf einem veralteten Modell hängen bleiben. Die Linie ist das letzte Namenssegment einer ID der Form `gpt-<Version>-<Linie>` (`sol`, `astra`, `terra`, `luna`, ...); sie wird aus den gelisteten IDs abgeleitet, eine neue Linie bekommt ihren Alias also automatisch. `gpt-sol-latest` löst auf das neueste gelistete `sol`-Modell auf.
+
+- **Neueste** heißt höchste numerische Version (`gpt-6.2` > `gpt-6.1` > `gpt-6` > `gpt-5.6`, als Zahlen verglichen, nicht als Text); bei gleicher Version entscheidet die Listenreihenfolge. `-pro`, `:batch` und versteckte Einträge zählen nicht mit.
+- **Quelle:** die Live-Liste aus `models_cache.json`; ohne sie (`x_source: static` oder `degraded`) lösen die Aliase gegen die kuratierte Fallback-Liste auf.
+- **Endpunkte:** `GET /v1/codex/models` und `GET /v1/cli/codex-cli/models` führen die Aliase zuerst in `data`, danach die konkreten IDs, und liefern die Abbildung in `x_aliases` (zum Beispiel `{"gpt-sol-latest": "gpt-6.2-sol", "gpt-astra-latest": "gpt-6.2-astra"}`) sowie `"x_aliases_complete": true`. Das Feld sagt: Die Abbildung ist vollständig und deterministisch aus der Modellliste abgeleitet und exakt die, die der Proxy beim Aufruf anwendet; ein Konsument darf seinen Alias-Stand durch sie ersetzen, statt zu mergen. Es gilt bei `x_source` `live`, `static` und `degraded`. Die claude-Endpunkte lassen das Feld weg (fehlt = `false`). Der Failover auf codex nutzt intern `gpt-sol-latest` (`DEFAULT_CODEX_MODEL`). Die HTTP-API verlangt `model` weiterhin; ein Request ohne das Feld wird mit 400 abgelehnt.
+- **Anfragen:** Ein Request mit `model: "gpt-sol-latest"` (ein Präfix wie `openai/gpt-sol-latest` wird ignoriert) ruft `codex -m <konkrete ID>` auf, und das `model` der Antwort trägt die konkrete ID. Ein Alias, den kein gelistetes Modell erfüllt, wird nicht ersetzt, sondern verhält sich wie jeder andere unbekannte Modellname.
+- **Reproduzierbarkeit:** Der Alias wandert mit jedem Release. Run-Snapshots und Konsumenten, die reproduzierbare Ergebnisse brauchen, speichern die konkrete ID aus `x_aliases`, nicht den Alias.
 
 ## Tool-Use
 

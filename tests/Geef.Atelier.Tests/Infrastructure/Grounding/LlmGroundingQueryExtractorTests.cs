@@ -67,6 +67,36 @@ public sealed class LlmGroundingQueryExtractorTests
     private static LlmGroundingQueryExtractor Build(string responseText) =>
         new(new StubResolver(responseText), NullLogger<LlmGroundingQueryExtractor>.Instance);
 
+    [Fact]
+    public async Task ExtractAsync_UsesTheMatrixHelperModel_WhenTheActorIsNotConfigured()
+    {
+        var resolver = new UnconfiguredActorResolver("climate policy 2026");
+        var extractor = new LlmGroundingQueryExtractor(resolver, NullLogger<LlmGroundingQueryExtractor>.Instance);
+
+        var result = await extractor.ExtractAsync("Write about climate policy.", CancellationToken.None);
+
+        Assert.Equal("climate policy 2026", result.Query);
+        var helper = Geef.Atelier.Core.Domain.Crew.Models.ModelMatrix.Primary(Geef.Atelier.Core.Domain.Crew.Models.ModelSlot.Helper);
+        Assert.Equal((helper.Provider, helper.Model, (int?)256), resolver.Requested);
+    }
+
+    private sealed class UnconfiguredActorResolver(string text) : ILlmClientResolver
+    {
+        public (string Provider, string Model, int? MaxTokens)? Requested { get; private set; }
+
+        public (ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName) =>
+            throw new InvalidOperationException("Actor 'GroundingQueryExtractor' is not configured in Llm:Actors.");
+
+        public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
+        {
+            Requested = (provider, model, maxTokens);
+            return (new StubClient(text), model, maxTokens ?? 256);
+        }
+
+        public bool SupportsAgenticTools(string providerName) => true;
+        public bool SupportsStructuredOutputs(string providerName) => true;
+    }
+
     private sealed class StubClient(string text) : ILlmClient
     {
         public Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken) =>

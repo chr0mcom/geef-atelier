@@ -42,6 +42,9 @@ public sealed record GroundingProviderProfile(
     public const string KeyRefinementMode         = "refinementMode";
     public const string KeyRefinementInstructions = "refinementInstructions";
 
+    /// <summary>Settings key marking the refiner binding as managed by the model matrix (value: a <see cref="Models.ModelSlot"/> name).</summary>
+    public const string KeyModelSlot = "modelSlot";
+
     public const string KeyStaticContent    = "content";
     public const string KeyStaticLabel      = "label";
 
@@ -52,6 +55,17 @@ public sealed record GroundingProviderProfile(
     public const string KeyRecencyDays       = "recencyDays";
     public const string KeyNewsMaxResults    = "newsMaxResults";
     public const string KeyNewsSearchDepth   = "newsSearchDepth";
+
+    /// <summary>
+    /// Model-matrix slot of the refiner when the binding is managed (<see cref="KeyModelSlot"/>); <c>null</c> when
+    /// the refiner was configured manually or no refinement is configured.
+    /// </summary>
+    public Models.ModelSlot? RefinementModelSlot =>
+        RefinementBinding is null
+            ? null
+            : Models.ModelSlotParser.ParseOrNull(ProviderSettings.GetValueOrDefault(KeyModelSlot)) is Models.ModelSlot.GroundingRefiner
+                ? Models.ModelSlot.GroundingRefiner
+                : null;
 
     /// <summary>
     /// Returns a configured <see cref="LlmBinding"/> when all mandatory refinement keys are present,

@@ -74,9 +74,8 @@ public sealed class CrewComposerStabilityTests
     }
 
     [Fact]
-    public async Task ValidateAsync_FlagsModelIssue_WhenTransformFinalizerHasInvalidModel()
+    public async Task ValidateAsync_FlagsCriticalSlotIssue_WhenTransformFinalizerHasAReviewerSlot()
     {
-        // Transform finalizers ARE LLM-based and must be validated.
         const string spec = """
             {
                 "mode": "composed",
@@ -85,8 +84,8 @@ public sealed class CrewComposerStabilityTests
                 "finalizers": [{
                     "name": "tone-shift",
                     "finalizer_type": "Transform",
-                    "provider": "claude-cli",
-                    "model": "nonexistent-model"
+                    "system_prompt": "Shift the tone.",
+                    "model_slot": "FactReviewer"
                 }]
             }
             """;
@@ -94,7 +93,8 @@ public sealed class CrewComposerStabilityTests
         var validator = MakeValidatorWithNoModels();
         var issues = await validator.ValidateAsync(spec);
 
-        Assert.Contains(issues, i => i.Field == "finalizers[0].model");
+        Assert.Contains(issues, i => i.Field == "finalizers[0].model_slot" && i.IsCritical);
+        Assert.DoesNotContain(issues, i => i.Field == "finalizers[0].model");
     }
 
     [Fact]
@@ -143,61 +143,13 @@ public sealed class CrewComposerStabilityTests
         Assert.Empty(finalizerIssues);
     }
 
-    // ── PreferredComposerModels ───────────────────────────────────────────
-
-    [Fact]
-    public void PreferredComposerModels_ExecutorModel_DiffersFromAllReviewerModels()
-    {
-        // The executor model must differ from all preferred reviewer models (model plurality).
-        var (execProvider, execModel) = PreferredComposerModels.Executor;
-
-        foreach (var (revProvider, revModel) in PreferredComposerModels.Reviewers)
-        {
-            // Different model OR different provider is acceptable for plurality;
-            // same provider+model combination is the violation.
-            var isSameCombo = string.Equals(execProvider, revProvider, StringComparison.OrdinalIgnoreCase)
-                           && string.Equals(execModel, revModel, StringComparison.OrdinalIgnoreCase);
-            Assert.False(isSameCombo,
-                $"Reviewer ({revProvider}/{revModel}) is the same as the executor ({execProvider}/{execModel}). Model plurality violated.");
-        }
-    }
-
-    [Fact]
-    public void PreferredComposerModels_HasAtLeastTwoReviewers()
-    {
-        Assert.True(PreferredComposerModels.Reviewers.Length >= 2,
-            "At least two preferred reviewer models are required for meaningful plurality.");
-    }
-
-    [Fact]
-    public void PreferredComposerModels_NoLegacyModelIds()
-    {
-        // These legacy model IDs must never appear in the curated shortlist.
-        string[] forbiddenFragments = ["4-7", "opus-4-7", "gemini-2.5", "gpt-4o", "claude-sonnet-4\"", "claude-opus-4\""];
-
-        foreach (var (provider, model) in PreferredComposerModels.All)
-        {
-            foreach (var fragment in forbiddenFragments)
-            {
-                Assert.DoesNotContain(fragment, model, StringComparison.OrdinalIgnoreCase);
-            }
-        }
-    }
-
-    [Fact]
-    public void PreferredComposerModels_AllHaveNonEmptyProviderAndModel()
-    {
-        foreach (var (provider, model) in PreferredComposerModels.All)
-        {
-            Assert.False(string.IsNullOrWhiteSpace(provider), "Provider must not be empty.");
-            Assert.False(string.IsNullOrWhiteSpace(model), "Model must not be empty.");
-        }
-    }
-
     // ── Stubs ─────────────────────────────────────────────────────────────
 
     private sealed class EmptyModelCatalog : IModelCatalog
     {
+        public Task<IReadOnlyList<string>?> ListReportedModelIdsAsync(string providerName, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<string>?>(null);
+
         public Task<IReadOnlyList<ModelInfo>> ListModelsAsync(string p, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<ModelInfo>>([]);
         public Task<IReadOnlyList<ModelInfo>> RefreshAsync(string p, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<ModelInfo>>([]);
         public bool IsUsingFallback(string p) => false;
@@ -216,6 +168,9 @@ public sealed class CrewComposerStabilityTests
 
     private sealed class SingleModelCatalog(string provider, string model) : IModelCatalog
     {
+        public Task<IReadOnlyList<string>?> ListReportedModelIdsAsync(string providerName, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<string>?>(null);
+
         public Task<IReadOnlyList<ModelInfo>> ListModelsAsync(string p, CancellationToken ct = default)
         {
             IReadOnlyList<ModelInfo> list = string.Equals(p, provider, StringComparison.OrdinalIgnoreCase)

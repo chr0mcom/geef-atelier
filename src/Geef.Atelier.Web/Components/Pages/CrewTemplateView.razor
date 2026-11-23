@@ -6,6 +6,7 @@
 @using Geef.Atelier.Core.Domain.Crew.Advisors
 @using Geef.Atelier.Core.Domain.Crew.Finalizers
 @using Geef.Atelier.Core.Domain.Crew.Grounding
+@using Geef.Atelier.Core.Domain.Crew.Models
 @using Geef.Atelier.Core.Domain.Crew.Profiles
 @using Geef.Atelier.Infrastructure.Configuration
 @using Geef.Atelier.Web.Display
@@ -45,6 +46,18 @@
 
             <dt>Description</dt>
             <dd data-testid="detail-description">@(string.IsNullOrEmpty(_template.Description) ? "—" : _template.Description)</dd>
+
+            <dt>Domain</dt>
+            <dd data-testid="detail-domain">
+                @if (_template.Domain is { } domain and not ModelDomain.General)
+                {
+                    <DomainBadge Domain="@domain" />
+                }
+                else
+                {
+                    @ModelDomain.General
+                }
+            </dd>
 
             <dt>Executor</dt>
             <dd data-testid="detail-executor">

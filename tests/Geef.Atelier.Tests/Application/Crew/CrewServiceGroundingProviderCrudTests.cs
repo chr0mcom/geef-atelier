@@ -93,6 +93,7 @@ public sealed class CrewServiceGroundingProviderCrudTests
             new InMemoryCrewTemplateRepository(),
             new Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository(),
             new Geef.Atelier.Tests.Fakes.PassThroughModelCatalog(),
+            new Geef.Atelier.Tests.Fakes.PassThroughModelAssignmentService(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CrewService>.Instance);
 
     private static GroundingProviderProfile BuildProfile(string name) => new(

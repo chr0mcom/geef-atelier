@@ -129,6 +129,38 @@ public sealed class CrewServiceAdvisorCrudTests
         Assert.Contains(all, p => p.Name == SystemCrew.DevilsAdvocateProfile.Name);
     }
 
+
+    [Fact]
+    public async Task ResolveSnapshot_AssignsMatrixModelsForTheCrewDomain()
+    {
+        var assignment = new Geef.Atelier.Application.Crew.Models.ModelAssignmentService(
+            new Geef.Atelier.Tests.Fakes.PassThroughModelCatalog(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<Geef.Atelier.Application.Crew.Models.ModelAssignmentService>.Instance);
+        var svc = BuildService(assignment: assignment);
+
+        var snapshot = await svc.ResolveSnapshotAsync("juristisch", null);
+
+        Assert.Equal(Geef.Atelier.Core.Domain.Crew.Models.ModelDomain.Legal, snapshot.CrewDomain);
+        Assert.Equal("claude-opus-latest", snapshot.Executor.Model);
+        Assert.Equal(new[] { "gpt-astra-latest", "gpt-sol-latest", "google/gemini-4-neon" }, snapshot.Reviewers.Select(r => r.Model));
+        Assert.Equal("gpt-astra-latest", Assert.Single(snapshot.Advisors).Model);
+        Assert.DoesNotContain(snapshot.Reviewers, r => r.Model == snapshot.Executor.Model);
+    }
+
+    [Fact]
+    public async Task CreateCustomReviewer_ReroutesPaidClaudeToTheCli()
+    {
+        var reviewerRepo = new InMemoryReviewerProfileRepository();
+        var svc = BuildService(reviewerRepo: reviewerRepo);
+
+        var created = await svc.CreateCustomReviewerProfileAsync(
+            new ReviewerProfile("r", "R", "d", "p", "openrouter", "anthropic/claude-opus-5", 8000, false));
+
+        Assert.Equal(("claude-cli", "claude-opus-latest"), (created.Provider, created.Model));
+        var stored = await reviewerRepo.GetByNameAsync(created.Name);
+        Assert.Equal("claude-cli", stored!.Provider);
+    }
+
     // --- Helpers ---
 
     private static ICrewService BuildService(
@@ -137,7 +169,8 @@ public sealed class CrewServiceAdvisorCrudTests
         InMemoryAdvisorProfileRepository?           advisorRepo   = null,
         InMemoryGroundingProviderProfileRepository? groundingRepo = null,
         InMemoryCrewTemplateRepository?             templateRepo  = null,
-        Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository? packRepo = null)
+        Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository? packRepo = null,
+        Geef.Atelier.Application.Crew.Models.IModelAssignmentService? assignment = null)
         => new CrewService(
             reviewerRepo  ?? new InMemoryReviewerProfileRepository(),
             executorRepo  ?? new InMemoryExecutorProfileRepository(),
@@ -147,6 +180,7 @@ public sealed class CrewServiceAdvisorCrudTests
             templateRepo  ?? new InMemoryCrewTemplateRepository(),
             packRepo      ?? new Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository(),
             new Geef.Atelier.Tests.Fakes.PassThroughModelCatalog(),
+            assignment ?? new Geef.Atelier.Tests.Fakes.PassThroughModelAssignmentService(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<CrewService>.Instance);
 
     private static AdvisorProfile BuildAdvisorProfile(string name) => new(

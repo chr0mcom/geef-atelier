@@ -1,4 +1,3 @@
-using System.Text;
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Pricing;
@@ -25,13 +24,12 @@ namespace Geef.Atelier.Infrastructure.Composition;
 /// can be deterministically parsed and validated by the downstream reviewer step.
 /// The <see cref="ExecutorProfile"/> is supplied at construction time by the orchestrator
 /// (via <c>ActivatorUtilities.CreateInstance</c>) so each run gets the correct profile.
-/// The live model catalog is injected via <see cref="IModelCatalog"/> (24h-cached, static fallback)
-/// so the LLM only ever sees currently valid provider/model combinations.
+/// The composer chooses roles (<c>model_slot</c>) instead of models; the model-assignment block comes from
+/// <see cref="ComposerModelCatalog"/> and models are assigned from the model matrix (D-066).
 /// </remarks>
 internal sealed class CrewComposerExecutor(
     ExecutorProfile profile,
     ILlmClientResolver llmClientResolver,
-    IModelCatalog modelCatalog,
     IGroundingProviderFactory groundingProviderFactory,
     ILogger<CrewComposerExecutor> logger,
     IPricingCatalog? pricingCatalog = null,
@@ -47,11 +45,8 @@ internal sealed class CrewComposerExecutor(
         if (context.TryGet(AtelierContextKeys.GroundingContext, out var groundingCtx) && groundingCtx is not null)
             groundedContext = groundingCtx;
 
-        // Inject live model catalog so the LLM never hallucinates provider/model names.
-        var modelCatalogBlock = await BuildModelCatalogBlockAsync(cancellationToken);
+        var modelCatalogBlock = ComposerModelCatalog.Build(groundingProviderFactory.RegisteredTypes);
 
-        // The system prompt comes entirely from the profile (SystemPrompts.CrewComposerExecutor).
-        // We append the live model catalog block and the crew catalog grounding.
         var systemPrompt = $"{profile.SystemPrompt}\n\n{modelCatalogBlock}\n\n{groundedContext}".TrimEnd();
 
         var userPrompt = BuildUserPrompt(context, brief, iter);
@@ -126,151 +121,6 @@ internal sealed class CrewComposerExecutor(
     }
 
     // ---------------------------------------------------------------------------
-    // Model catalog block
-    // ---------------------------------------------------------------------------
-
-    /// <summary>
-    /// Fetches the live provider and model lists and builds two Markdown sections:
-    /// (1) recommended models (curated shortlist filtered against live catalog),
-    /// (2) all valid (provider, model) pairs.
-    /// Falls back to <see cref="StaticModelFallback"/> when a provider is unreachable
-    /// (IModelCatalog handles this internally via its 24-hour cache).
-    /// </summary>
-    private async Task<string> BuildModelCatalogBlockAsync(CancellationToken ct)
-    {
-        var sb = new StringBuilder();
-        sb.AppendLine("## Valid Provider/Model Pairs (ONLY use these — never invent names)");
-        sb.AppendLine();
-        sb.AppendLine("Provider names and model IDs are exact strings — any deviation fails validation.");
-        sb.AppendLine();
-
-        // Providers relevant for LLM roles (grounding/deterministic finalizers need no model).
-        string[] llmProviders = ["claude-cli", "codex-cli", "openrouter", "openai-direct", "google-ai-studio", "deepseek", "xai"];
-
-        // Collect live models per provider.
-        var liveModels = new Dictionary<string, IReadOnlyList<ModelInfo>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var providerName in llmProviders)
-        {
-            try
-            {
-                var models = await modelCatalog.ListModelsAsync(providerName, ct);
-                if (models.Count > 0)
-                    liveModels[providerName] = models;
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "CrewComposerExecutor: could not fetch models for provider '{Provider}'", providerName);
-            }
-        }
-
-        // Section 1: Recommended shortlist (curated × live).
-        sb.AppendLine("### Recommended models (prefer these — newest top-tier, subscription where available)");
-        sb.AppendLine();
-        sb.AppendLine("| Provider | Model | Role hint |");
-        sb.AppendLine("|---|---|---|");
-
-        bool executorListed = false;
-        if (liveModels.TryGetValue(PreferredComposerModels.Executor.Provider, out var execModels)
-            && execModels.Any(m => string.Equals(m.Id, PreferredComposerModels.Executor.Model, StringComparison.OrdinalIgnoreCase)))
-        {
-            sb.AppendLine($"| `{PreferredComposerModels.Executor.Provider}` | `{PreferredComposerModels.Executor.Model}` | **Executor** (subscription, zero token cost) |");
-            executorListed = true;
-        }
-
-        int reviewerIdx = 0;
-        foreach (var (prov, mod) in PreferredComposerModels.Reviewers)
-        {
-            if (liveModels.TryGetValue(prov, out var provModels)
-                && provModels.Any(m => string.Equals(m.Id, mod, StringComparison.OrdinalIgnoreCase)))
-            {
-                var hint = reviewerIdx == 0 ? "**Reviewer** (subscription, zero token cost)"
-                         : "**Reviewer** (OpenRouter, pay-per-token)";
-                sb.AppendLine($"| `{prov}` | `{mod}` | {hint} |");
-                reviewerIdx++;
-            }
-        }
-
-        if (!executorListed)
-        {
-            // Static fallback if preferred executor not in live catalog.
-            var (fallbackProvider, fallbackModel) = PreferredComposerModels.Executor;
-            sb.AppendLine($"| `{fallbackProvider}` | `{fallbackModel}` | **Executor** (subscription) |");
-        }
-
-        sb.AppendLine();
-        sb.AppendLine("**Model plurality rule:** reviewer `model` values MUST differ from the executor `model`.");
-        sb.AppendLine($"**Executor rule:** the executor is ALWAYS a NEW inline, task-specialized profile (never reuse) with generous `max_tokens` (>= 32000). Prefer a top-tier model such as `{PreferredComposerModels.Executor.Provider}`/`{PreferredComposerModels.Executor.Model}`.");
-        sb.AppendLine("**Reuse rule:** use `reuse: \"learning-extractor\"` for the output finalizer; reuse existing reviewers/advisors/grounding only when they truly fit — these need no provider/model.");
-        sb.AppendLine();
-
-        // Section 2: Full valid catalog per provider (limited to avoid prompt bloat).
-        sb.AppendLine("### Full valid catalog (only use exact IDs listed here)");
-        sb.AppendLine();
-
-        // CLI providers: always show in full (small lists).
-        foreach (var prov in new[] { "claude-cli", "codex-cli" })
-        {
-            if (!liveModels.TryGetValue(prov, out var models)) continue;
-            sb.AppendLine($"**{prov}:** {string.Join(", ", models.Select(m => $"`{m.Id}`"))}");
-        }
-
-        // OpenRouter: too many models — show curated subset (preferred + top known ones).
-        if (liveModels.TryGetValue("openrouter", out var orModels))
-        {
-            // Known-good top models ordered newest first; supplement with any preferred that made it through.
-            var topOpenRouter = new[]
-            {
-                "x-ai/grok-4.5",
-                "google/gemini-3.6-flash", "google/gemini-3.1-pro-preview", "google/gemini-3.1-flash-lite",
-                "openai/gpt-5.6-sol", "openai/gpt-5.6-terra", "openai/gpt-5.6-luna", "openai/gpt-5.5",
-                "anthropic/claude-opus-5", "anthropic/claude-sonnet-5",
-                "deepseek/deepseek-v4-pro", "deepseek/deepseek-v3.2", "deepseek/deepseek-r1-0528",
-                "mistralai/mistral-large-2512", "meta-llama/llama-4-maverick",
-            };
-            var available = topOpenRouter
-                .Where(id => orModels.Any(m => string.Equals(m.Id, id, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
-
-            // Also include any preferred reviewer models not already in topOpenRouter.
-            foreach (var (_, mod) in PreferredComposerModels.Reviewers.Where(r => r.Provider == "openrouter"))
-            {
-                if (!available.Contains(mod, StringComparer.OrdinalIgnoreCase)
-                    && orModels.Any(m => string.Equals(m.Id, mod, StringComparison.OrdinalIgnoreCase)))
-                    available.Add(mod);
-            }
-
-            if (available.Count > 0)
-                sb.AppendLine($"**openrouter (selection):** {string.Join(", ", available.Select(id => $"`{id}`"))}");
-        }
-
-        // Other direct providers: show in full (usually small lists).
-        foreach (var prov in new[] { "openai-direct", "google-ai-studio", "deepseek", "xai" })
-        {
-            if (!liveModels.TryGetValue(prov, out var models) || models.Count == 0) continue;
-            var ids = models.Take(8).Select(m => $"`{m.Id}`");
-            sb.AppendLine($"**{prov}:** {string.Join(", ", ids)}");
-        }
-
-        sb.AppendLine();
-        sb.AppendLine("**IMPORTANT:** Never use provider names like `openai`, `google`, `anthropic`, `x-ai` — these are not valid Geef providers. Use only the exact names above.");
-
-        // Section 3: Valid grounding provider_type discriminators (config-driven, not LLM models).
-        var groundingTypes = groundingProviderFactory.RegisteredTypes.OrderBy(t => t).ToList();
-        if (groundingTypes.Count > 0)
-        {
-            sb.AppendLine();
-            sb.AppendLine("## Valid grounding provider_type values (ONLY use these for grounding_providers)");
-            sb.AppendLine();
-            sb.AppendLine(string.Join(", ", groundingTypes.Select(t => $"`{t}`")));
-            sb.AppendLine();
-            sb.AppendLine("For web/literature search use `tavily` (general web), `academic-search` (papers/arXiv/Semantic Scholar) or `news-search` — there is NO `web` type. " +
-                          "`provider_type` is REQUIRED on every inline grounding provider and must be one of the exact values above.");
-        }
-
-        return sb.ToString();
-    }
-
-    // ---------------------------------------------------------------------------
     // User prompt
     // ---------------------------------------------------------------------------
 
@@ -320,7 +170,7 @@ internal sealed class CrewComposerExecutor(
             {findingList}
 
             Revise the crew configuration and call {CrewSpecTool.ToolName} with the updated design.
-            Remember: use only provider/model pairs from the catalog in your system prompt.
+            Remember: set model_slot on every inline LLM part — never provider/model.
 
             {TaxonomyReminder}
             """;

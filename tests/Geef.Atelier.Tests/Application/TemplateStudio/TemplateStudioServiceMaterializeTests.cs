@@ -85,7 +85,13 @@ public sealed class TemplateStudioServiceMaterializeTests
         public Task<string> RenameCustomGroundingProviderProfileAsync(string oldName, string newName, CancellationToken ct = default) => Task.FromResult(newName);
         public Task<IReadOnlyList<FinalizerProfile>> ListFinalizerProfilesAsync(bool includeSystem = true, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<FinalizerProfile>>([]);
         public Task<FinalizerProfile?> GetFinalizerProfileAsync(string name, CancellationToken ct = default) => Task.FromResult<FinalizerProfile?>(null);
-        public Task<FinalizerProfile> CreateCustomFinalizerProfileAsync(FinalizerProfile profile, CancellationToken ct = default) => Task.FromResult(profile);
+        public readonly List<FinalizerProfile> CreatedFinalizers = [];
+
+        public Task<FinalizerProfile> CreateCustomFinalizerProfileAsync(FinalizerProfile profile, CancellationToken ct = default)
+        {
+            CreatedFinalizers.Add(profile);
+            return Task.FromResult(profile);
+        }
         public Task<FinalizerProfile> UpdateCustomFinalizerProfileAsync(FinalizerProfile profile, CancellationToken ct = default) => Task.FromResult(profile);
         public Task DeleteCustomFinalizerProfileAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
         public Task<string> RenameCustomFinalizerProfileAsync(string oldName, string newName, CancellationToken ct = default) => Task.FromResult(newName);
@@ -143,6 +149,9 @@ public sealed class TemplateStudioServiceMaterializeTests
 
     private sealed class NoopModelCatalog : IModelCatalog
     {
+        public Task<IReadOnlyList<string>?> ListReportedModelIdsAsync(string providerName, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<string>?>(null);
+
         public Task<IReadOnlyList<ModelInfo>> ListModelsAsync(string providerName, CancellationToken ct = default)
             => Task.FromResult((IReadOnlyList<ModelInfo>)[]);
         public Task<IReadOnlyList<ModelInfo>> RefreshAsync(string providerName, CancellationToken ct = default)
@@ -266,6 +275,42 @@ public sealed class TemplateStudioServiceMaterializeTests
 
         Assert.Single(crewService.CreatedReviewers);
         Assert.Single(result.CreatedProfileNames);
+    }
+
+    [Fact]
+    public async Task MaterializeAsync_TransformWithoutProviderKeepsItsPromptAndSlot()
+    {
+        var crewService = new CapturingCrewService();
+        var svc = CreateService(crewService, new InMemoryAnalysisRepository());
+        var transform = new ProposedProfile(
+            ProposedProfileType.Finalizer, "polish", "Polish", "Polishes.", "", "", "Polish the text.", null, null, null, null, null, null,
+            FinalizerType: "Transform",
+            FinalizerSettings: new Dictionary<string, string> { [TransformSettings.KeyModelSlot] = "TransformRewrite" });
+
+        await svc.MaterializeAsync(Guid.NewGuid(), new MaterializationRequest(MakeTemplate(), [transform]), CancellationToken.None);
+
+        var created = Assert.Single(crewService.CreatedFinalizers);
+        Assert.Equal("Polish the text.", created.Settings[TransformSettings.KeySystemPrompt]);
+        Assert.Equal("TransformRewrite", created.Settings[TransformSettings.KeyModelSlot]);
+        Assert.False(created.Settings.ContainsKey(TransformSettings.KeyProvider));
+    }
+
+    [Fact]
+    public async Task MaterializeAsync_TransformWithAVisibleModelChoiceBecomesManual()
+    {
+        var crewService = new CapturingCrewService();
+        var svc = CreateService(crewService, new InMemoryAnalysisRepository());
+        var transform = new ProposedProfile(
+            ProposedProfileType.Finalizer, "polish", "Polish", "Polishes.", "claude-sonnet-latest", "claude-cli", "Edited prompt.", null, null, null, null, null, null,
+            FinalizerType: "Transform",
+            FinalizerSettings: new Dictionary<string, string> { [TransformSettings.KeyModelSlot] = "TransformRewrite", [TransformSettings.KeySystemPrompt] = "Original prompt." });
+
+        await svc.MaterializeAsync(Guid.NewGuid(), new MaterializationRequest(MakeTemplate(), [transform]), CancellationToken.None);
+
+        var created = Assert.Single(crewService.CreatedFinalizers);
+        Assert.Equal("Edited prompt.", created.Settings[TransformSettings.KeySystemPrompt]);
+        Assert.Equal(("claude-cli", "claude-sonnet-latest"), (created.Settings[TransformSettings.KeyProvider], created.Settings[TransformSettings.KeyModel]));
+        Assert.False(created.Settings.ContainsKey(TransformSettings.KeyModelSlot));
     }
 
     [Fact]

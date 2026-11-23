@@ -4,6 +4,7 @@
 @rendermode InteractiveServer
 @using Geef.Atelier.Application.Crew
 @using Geef.Atelier.Core.Domain.Crew
+@using Geef.Atelier.Core.Domain.Crew.Models
 @using Geef.Atelier.Core.Domain.Crew.Profiles
 @inject ICrewService CrewService
 @inject NavigationManager Nav
@@ -29,6 +30,9 @@
                            Provider="@_profileProvider"
                            Model="@_profileModel"
                            MaxTokens="@_profile?.MaxTokens"
+                           ActorKind="ModelActorKind.Executor"
+                           ModelSlot="@_profile?.ModelSlot"
+                           ModelDomain="@_profile?.ModelDomain"
                            IsSystem="@_isSystem"
                            IsSaving="@_saving"
                            Error="@_error"
@@ -97,7 +101,9 @@
                 Model: values.Model,
                 MaxTokens: values.MaxTokens,
                 IsSystem: false,
-                ToolNames: values.ToolNames);
+                ToolNames: values.ToolNames,
+                ModelSlot: values.ModelSlot,
+                ModelDomain: values.ModelDomain);
 
             if (IsNew)
             {

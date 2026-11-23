@@ -6,6 +6,10 @@ from typing import Any
 
 
 class CliAdapter(ABC):
+    aliases_complete: bool = False
+    """Whether the alias map of `list_models_with_source` is a complete, deterministic derivation
+    from the model list (reported as `x_aliases_complete`). Only the codex adapter says so."""
+
     @abstractmethod
     async def execute(
         self, config: dict[str, Any], request: dict[str, Any]

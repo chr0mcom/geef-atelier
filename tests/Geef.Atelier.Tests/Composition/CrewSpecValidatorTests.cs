@@ -40,7 +40,7 @@ public sealed class CrewSpecValidatorTests
 
     /// <summary>A valid inline, task-specialized executor (the executor must never be reused).</summary>
     private const string InlineExecutor =
-        """{"name": "task-executor", "provider": "claude-cli", "model": "claude-opus-4-8", "max_tokens": 32000, "system_prompt": "You are a specialist writer. Revise the draft on each reviewer finding."}""";
+        """{"model_slot":"Executor","name": "task-executor", "provider": "claude-cli", "model": "claude-opus-4-8", "max_tokens": 32000, "system_prompt": "You are a specialist writer. Revise the draft on each reviewer finding."}""";
 
     /// <summary>A valid existing-template spec JSON.</summary>
     private static string ExistingTemplateSpec(string templateName) =>
@@ -51,6 +51,7 @@ public sealed class CrewSpecValidatorTests
         $$"""
         {
             "mode": "composed",
+            "model_domain": "General",
             "executor": {{InlineExecutor}},
             "reviewers": [{"reuse": "{{reviewerReuse ?? "briefing-fidelity"}}"}],
             "finalizers": [{"reuse": "{{finalizerReuse ?? "file-export"}}"}]
@@ -485,6 +486,9 @@ public sealed class CrewSpecValidatorTests
     /// <summary>Returns an empty model list for all providers.</summary>
     private sealed class EmptyModelCatalog : IModelCatalog
     {
+        public Task<IReadOnlyList<string>?> ListReportedModelIdsAsync(string providerName, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<string>?>(null);
+
         public Task<IReadOnlyList<ModelInfo>> ListModelsAsync(string providerName, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<ModelInfo>>([]);
         public Task<IReadOnlyList<ModelInfo>> RefreshAsync(string providerName, CancellationToken ct = default)
@@ -507,6 +511,9 @@ public sealed class CrewSpecValidatorTests
     /// <summary>Reports one known (provider, model) pair as available; everything else empty.</summary>
     private sealed class KnownModelCatalog(string provider, string model) : IModelCatalog
     {
+        public Task<IReadOnlyList<string>?> ListReportedModelIdsAsync(string providerName, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<string>?>(null);
+
         public Task<IReadOnlyList<ModelInfo>> ListModelsAsync(string providerName, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<ModelInfo>>(
                 string.Equals(providerName, provider, StringComparison.OrdinalIgnoreCase)

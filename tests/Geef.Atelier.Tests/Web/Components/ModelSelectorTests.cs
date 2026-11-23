@@ -98,6 +98,9 @@ public sealed class ModelSelectorTests : Bunit.TestContext
 
     private sealed class StubCatalog(ModelCatalogSource source, IReadOnlyList<ModelInfo> models) : IModelCatalog
     {
+        public Task<IReadOnlyList<string>?> ListReportedModelIdsAsync(string providerName, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<string>?>(null);
+
         public Task<IReadOnlyList<ModelInfo>> ListModelsAsync(string providerName, CancellationToken ct = default)
             => Task.FromResult(models);
         public Task<IReadOnlyList<ModelInfo>> RefreshAsync(string providerName, CancellationToken ct = default)

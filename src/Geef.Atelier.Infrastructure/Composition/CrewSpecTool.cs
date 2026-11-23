@@ -15,14 +15,20 @@ internal static class CrewSpecTool
     private const string SchemaJson = """
         {
             "type": "object",
-            "required": ["mode", "domain", "rationale"],
+            "required": ["mode", "domain", "model_domain", "rationale"],
             "properties": {
                 "mode": {
                     "type": "string",
                     "enum": ["existing-template", "composed", "new"]
                 },
                 "domain": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Short lowercase domain hint for naming, deduplication and the domain-scoped packs, e.g. general, correspondence, legal, academic, marketing, speech, technical."
+                },
+                "model_domain": {
+                    "type": "string",
+                    "enum": ["General", "Correspondence", "Legal", "Academic", "Marketing", "Speech", "Technical"],
+                    "description": "Model-matrix row for the crew. Legal and Academic allow paid domain reviewers: choose them only for real legal work (claims, contracts, litigation, statutes) or scholarly work (papers, grant proposals). Political speeches are Speech, spelling or editing is General, outreach to contractors is Correspondence."
                 },
                 "rationale": {
                     "type": "string"
@@ -37,8 +43,18 @@ internal static class CrewSpecTool
                         "name": { "type": "string" },
                         "display_name": { "type": "string" },
                         "system_prompt": { "type": "string" },
-                        "provider": { "type": "string" },
-                        "model": { "type": "string" },
+                        "provider": { "type": "string", "description": "Ignored for LLM roles: the model matrix assigns provider and model from model_slot." },
+                        "model": { "type": "string", "description": "Ignored for LLM roles: the model matrix assigns provider and model from model_slot." },
+                        "model_slot": {
+                            "type": "string",
+                            "enum": ["Executor", "FactReviewer", "StyleReviewer", "DomainReviewer", "StrategicAdvisor", "CriticalAdvisor", "DomainExpertAdvisor", "TransformRewrite", "TransformCondense", "Helper"],
+                            "description": "Role in the model matrix; the system assigns the model from it."
+                        },
+                        "settings": {
+                            "type": "object",
+                            "additionalProperties": { "type": "string" },
+                            "description": "Optional settings for grounding providers and finalizers, e.g. {\"refinementMode\": \"0\"} to filter grounding results with the matrix refiner."
+                        },
                         "max_tokens": { "type": "integer" },
                         "priority": { "type": "integer" },
                         "advisor_mode": {
@@ -72,8 +88,18 @@ internal static class CrewSpecTool
                             "name": { "type": "string" },
                             "display_name": { "type": "string" },
                             "system_prompt": { "type": "string" },
-                            "provider": { "type": "string" },
-                            "model": { "type": "string" },
+                            "provider": { "type": "string", "description": "Ignored for LLM roles: the model matrix assigns provider and model from model_slot." },
+                            "model": { "type": "string", "description": "Ignored for LLM roles: the model matrix assigns provider and model from model_slot." },
+                            "model_slot": {
+                                "type": "string",
+                                "enum": ["Executor", "FactReviewer", "StyleReviewer", "DomainReviewer", "StrategicAdvisor", "CriticalAdvisor", "DomainExpertAdvisor", "TransformRewrite", "TransformCondense", "Helper"],
+                                "description": "Role in the model matrix; the system assigns the model from it."
+                            },
+                            "settings": {
+                                "type": "object",
+                                "additionalProperties": { "type": "string" },
+                                "description": "Optional settings for grounding providers and finalizers, e.g. {\"refinementMode\": \"0\"} to filter grounding results with the matrix refiner."
+                            },
                             "max_tokens": { "type": "integer" },
                             "priority": { "type": "integer" },
                             "advisor_mode": {
@@ -103,8 +129,18 @@ internal static class CrewSpecTool
                             "name": { "type": "string" },
                             "display_name": { "type": "string" },
                             "system_prompt": { "type": "string" },
-                            "provider": { "type": "string" },
-                            "model": { "type": "string" },
+                            "provider": { "type": "string", "description": "Ignored for LLM roles: the model matrix assigns provider and model from model_slot." },
+                            "model": { "type": "string", "description": "Ignored for LLM roles: the model matrix assigns provider and model from model_slot." },
+                            "model_slot": {
+                                "type": "string",
+                                "enum": ["Executor", "FactReviewer", "StyleReviewer", "DomainReviewer", "StrategicAdvisor", "CriticalAdvisor", "DomainExpertAdvisor", "TransformRewrite", "TransformCondense", "Helper"],
+                                "description": "Role in the model matrix; the system assigns the model from it."
+                            },
+                            "settings": {
+                                "type": "object",
+                                "additionalProperties": { "type": "string" },
+                                "description": "Optional settings for grounding providers and finalizers, e.g. {\"refinementMode\": \"0\"} to filter grounding results with the matrix refiner."
+                            },
                             "max_tokens": { "type": "integer" },
                             "priority": { "type": "integer" },
                             "advisor_mode": {
@@ -134,8 +170,18 @@ internal static class CrewSpecTool
                             "name": { "type": "string" },
                             "display_name": { "type": "string" },
                             "system_prompt": { "type": "string" },
-                            "provider": { "type": "string" },
-                            "model": { "type": "string" },
+                            "provider": { "type": "string", "description": "Ignored for LLM roles: the model matrix assigns provider and model from model_slot." },
+                            "model": { "type": "string", "description": "Ignored for LLM roles: the model matrix assigns provider and model from model_slot." },
+                            "model_slot": {
+                                "type": "string",
+                                "enum": ["Executor", "FactReviewer", "StyleReviewer", "DomainReviewer", "StrategicAdvisor", "CriticalAdvisor", "DomainExpertAdvisor", "TransformRewrite", "TransformCondense", "Helper"],
+                                "description": "Role in the model matrix; the system assigns the model from it."
+                            },
+                            "settings": {
+                                "type": "object",
+                                "additionalProperties": { "type": "string" },
+                                "description": "Optional settings for grounding providers and finalizers, e.g. {\"refinementMode\": \"0\"} to filter grounding results with the matrix refiner."
+                            },
                             "max_tokens": { "type": "integer" },
                             "priority": { "type": "integer" },
                             "advisor_mode": {
@@ -165,8 +211,18 @@ internal static class CrewSpecTool
                             "name": { "type": "string" },
                             "display_name": { "type": "string" },
                             "system_prompt": { "type": "string" },
-                            "provider": { "type": "string" },
-                            "model": { "type": "string" },
+                            "provider": { "type": "string", "description": "Ignored for LLM roles: the model matrix assigns provider and model from model_slot." },
+                            "model": { "type": "string", "description": "Ignored for LLM roles: the model matrix assigns provider and model from model_slot." },
+                            "model_slot": {
+                                "type": "string",
+                                "enum": ["Executor", "FactReviewer", "StyleReviewer", "DomainReviewer", "StrategicAdvisor", "CriticalAdvisor", "DomainExpertAdvisor", "TransformRewrite", "TransformCondense", "Helper"],
+                                "description": "Role in the model matrix; the system assigns the model from it."
+                            },
+                            "settings": {
+                                "type": "object",
+                                "additionalProperties": { "type": "string" },
+                                "description": "Optional settings for grounding providers and finalizers, e.g. {\"refinementMode\": \"0\"} to filter grounding results with the matrix refiner."
+                            },
                             "max_tokens": { "type": "integer" },
                             "priority": { "type": "integer" },
                             "advisor_mode": {

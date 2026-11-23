@@ -22,6 +22,11 @@ namespace Geef.Atelier.Core.Domain.Crew.Profiles;
 /// Optional list of tool names (from the tool catalogue) that this executor may call during an
 /// agentic tool-use loop. When empty the executor uses the standard single-shot completion path.
 /// </param>
+/// <param name="ModelSlot">
+/// Role in the model matrix (D-066). When set, the model is assigned from <see cref="Models.ModelMatrix"/> at run
+/// start; <c>null</c> means the provider/model above were chosen manually and are used as-is.
+/// </param>
+/// <param name="ModelDomain">Optional profile-level domain; <c>null</c> inherits the crew's domain.</param>
 public sealed record ExecutorProfile(
     string Name,
     string DisplayName,
@@ -31,4 +36,6 @@ public sealed record ExecutorProfile(
     string Model,
     int? MaxTokens,
     bool IsSystem,
-    IReadOnlyList<string>? ToolNames = null);
+    IReadOnlyList<string>? ToolNames = null,
+    Models.ModelSlot? ModelSlot = null,
+    Models.ModelDomain? ModelDomain = null);

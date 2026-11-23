@@ -18,7 +18,8 @@ public static class ListReviewerProfilesTool
         return profiles
             .Select(p => new ReviewerProfileDto(
                 p.Name, p.DisplayName, p.Description,
-                p.Provider, p.Model, p.MaxTokens, p.IsSystem))
+                p.Provider, p.Model, p.MaxTokens, p.IsSystem,
+                p.ModelSlot?.ToString(), p.ModelDomain?.ToString()))
             .ToList();
     }
 }

@@ -1,5 +1,6 @@
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Application.Crew.Learning;
+using Geef.Atelier.Application.Crew.Models;
 using Geef.Atelier.Application.Providers;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,6 +16,7 @@ public static class ApplicationServiceExtensions
         // AddHttpClient() is idempotent and safe to call multiple times.
         services.AddHttpClient();
         services.AddScoped<IRunService, RunService>();
+        services.AddSingleton<IModelAssignmentService, ModelAssignmentService>();
         services.AddScoped<ICrewService, CrewService>();
         services.AddScoped<IProviderService, ProviderService>();
         services.AddScoped<ILearningService, LearningService>();

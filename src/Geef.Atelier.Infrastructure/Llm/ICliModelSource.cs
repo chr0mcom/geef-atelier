@@ -11,11 +11,16 @@ namespace Geef.Atelier.Infrastructure.Llm;
 /// Maps always-latest alias ids to the concrete model they currently resolve to. Empty when the
 /// backend reported none.
 /// </param>
+/// <param name="AliasesComplete">
+/// True when the gateway derives <paramref name="AliasMap"/> completely from the reported list and uses exactly this
+/// mapping for calls (codex, D-066/10), so it replaces the known mapping instead of being merged into it.
+/// </param>
 internal sealed record CliModelCatalog(
     IReadOnlyList<string> ModelIds,
     bool IsLive,
     bool HasLiveSource,
-    IReadOnlyDictionary<string, string> AliasMap);
+    IReadOnlyDictionary<string, string> AliasMap,
+    bool AliasesComplete = false);
 
 /// <summary>Reads the model catalog of a CLI provider from the cli-proxy sidecar.</summary>
 internal interface ICliModelSource

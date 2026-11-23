@@ -25,6 +25,7 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// Ordered specialization-pack bindings per actor, keyed by <c>"&lt;actorType&gt;:&lt;profileName&gt;"</c>.
 /// Defaults to empty when absent.
 /// </param>
+/// <param name="Domain">Optional crew domain for model-matrix assignment (null = General).</param>
 public sealed record CrewSpec(
     string ExecutorProfileName,
     IReadOnlyList<string> ReviewerProfileNames,
@@ -33,7 +34,8 @@ public sealed record CrewSpec(
     IReadOnlyList<string>? AdvisorProfileNames = null,
     IReadOnlyList<string>? GroundingProviderNames = null,
     IReadOnlyList<string>? FinalizerProfileNames = null,
-    IReadOnlyDictionary<string, IReadOnlyList<string>>? ActorPackBindings = null)
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? ActorPackBindings = null,
+    Models.ModelDomain? Domain = null)
 {
     /// <summary>Resolved advisor profile names; never null after construction.</summary>
     public IReadOnlyList<string> AdvisorProfileNames { get; init; } = AdvisorProfileNames ?? Array.Empty<string>();

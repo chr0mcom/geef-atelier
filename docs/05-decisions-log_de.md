@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-08-04 (D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
+*Letzte Aktualisierung: 2026-11-23 (D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -1435,3 +1435,240 @@ DTO-Paar für beide Abrufpfade. Umgesetzt sind zwei: `ModelCatalog` behält sein
 wäre ein Basistyp plus Erweiterung gewesen, also mehr Bauteile für zwei Deserialisierungsformen, die
 sich unabhängig voneinander entwickeln. Bewusst so belassen und hier festgehalten, statt still zu
 bleiben.
+
+## D-065 — Bilderzeugung im cli-proxy (2026-11-12)
+
+**Entscheidung.** Der Proxy bietet `POST /v1/codex/images/generations` (OpenAI Images API) auf Basis des
+`$imagegen`-Skills der codex-CLI. Ein Bild je Anfrage, Antwort als Base64-PNG.
+
+**D-065/1 — Eigener Endpunkt statt Bildausgabe im Chat.** `chat/completions` kennt keine Bildausgabe;
+ein Eigenformat würde kein Client verstehen. Der Images-Endpunkt passt zur bestehenden Base-URL
+(`/v1/codex`) und zu fertigen Clients (OpenAI-SDK, Open WebUI).
+
+**D-065/2 — Kein Failover, kein Breaker.** claude kann keine Bilder erzeugen, ein Umschalten gäbe es
+nur auf sich selbst. Bildfehler fließen bewusst nicht in `failover.record_failure` ein: ein
+abgelehnter Bildprompt sagt nichts darüber, ob Textanfragen funktionieren, und darf `/health` und
+den cliproxy-watch nicht färben. Limit → 429, sonst 502.
+
+**D-065/3 — Ehrliche Parameter.** `n>1`, `response_format=url` und `output_format≠png` werden mit 400
+abgelehnt, ebenso `background=transparent` (die Bilder sind immer deckend; still ein anderes Bild zu
+liefern wäre unehrlich). `size` ist nur ein Seitenverhältnis-Wunsch im Prompt (codex hat keinen
+Größenschalter); die Antwort meldet die echte Größe aus dem PNG-Kopf. `usage` fehlt, weil die Tokens des
+Agentenlaufs nicht die des Bildmodells sind. Messung 2026-11-12: Querformat 1672 × 941, 37 s.
+Beendet codex normal ohne Bild, ist das meist eine Ablehnung des Prompts: 400 `image_generation_failed`
+(eigene Ausnahme `NoImageError`, nie nach Wortlaut klassifiziert, nie 502, damit niemand den Prompt
+wiederholt und Kontingent verbrennt).
+
+**D-065/4 — Datei statt Ereignisstrom.** Das Bild steht nicht im JSONL-Strom, sondern unter
+`$CODEX_HOME/generated_images/<thread_id>/`. Der Proxy liest es dort und löscht den Ordner immer wieder
+(`finally`); die `thread_id` wird nur als UUID akzeptiert, weil sie Teil eines gelöschten Pfades wird.
+Reste nach Zeitüberschreitung, Abbruch oder Neustart räumt der nächste Lauf ab (älter als 1 h, nur
+UUID-Ordner); ein abgebrochener Request beendet den codex-Prozess.
+
+**D-065/5 — Kontingentschutz.** Bilder zehren am ChatGPT-Plus-Fenster, das BookForge mitnutzt. Daher
+ein Bildlauf gleichzeitig (`CODEX_IMAGE_MAX_CONCURRENT`, auf `CODEX_MAX_CONCURRENT − 1` begrenzt, belegt zusätzlich einen Codex-Platz), Zeitlimit
+300 s und Tagesdeckel 50 je UTC-Tag (`IMAGE_DAILY_MAX`, im Speicher, 0 = aus).
+
+**Nicht enthalten:** `/images/edits`, mehrere Bilder je Anfrage, URLs statt Base64, Selbsttest im
+nächtlichen Selfupdate (würde jede Nacht Kontingent kosten).
+
+## D-066 — Modellmatrix: Modell nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy (2026-11-22)
+
+**Anlass.** Die Crew-Komposition funktionierte, wählte Modelle aber willkürlich:
+
+- Der Executor lief fast immer auf Opus.
+- Die Reviewer rotierten durch eine feste Rangliste (`PreferredComposerModels`).
+- Mehrere Profile liefen bezahlt über OpenRouter (`anthropic/claude-opus-5`, `openai/gpt-5.6-sol`), obwohl der cli-proxy dieselben Familien über das Abo bedient.
+- Viele Bindungen zeigten auf veraltete Generationen: `gpt-5.6-*`, Grok 4.5/4.6, DeepSeek v4 und Gemini 3.x.
+- Der Codex-Katalog des cli-proxy wurde von OpenRouter abgeleitet und lieferte API-only-IDs (`-pro`, `:batch`) statt der Abo-Modelle.
+
+Recherche: `reports/2026-11-22-modellrecherche.md`. Design: `docs/superpowers/specs/2026-11-22-modellmatrix-design.md`.
+
+**D-066/1 — Feste Regel statt Empfehlung (Variante A, Betreiberentscheidung).** `Core/Domain/Crew/Models/ModelMatrix` ist die einzige Quelle für konkrete Modell-IDs. Gebiet × Rolle ergibt eine geordnete Kandidatenliste.
+
+- **Rollen (`ModelSlot`):** Executor, FactReviewer, StyleReviewer, DomainReviewer, StrategicAdvisor, CriticalAdvisor, DomainExpertAdvisor, GroundingRefiner, TransformRewrite, TransformCondense, Composer, Helper.
+- **Gebiete (`ModelDomain`):** General, Correspondence, Legal, Academic, Marketing, Speech, Technical.
+
+Ein neues Modell ist damit eine Änderung an einer Stelle, bei Claude und Codex seit D-066/10 gar keine mehr (Always-latest-Aliase). Die Fallback-Listen und die eingefrorenen Literale von Step46 werden per Konsistenztest abgeglichen.
+
+**D-066/2 — Matrix (Stand 2026-11-22).**
+
+| Rolle | Kandidaten (Reihenfolge) |
+|---|---|
+| Executor | Opus → Sol; Technical: Fable → Opus → Astra |
+| FactReviewer | Astra → Opus → Neon → Sonnet |
+| StyleReviewer | Sol → Opus → Sonnet |
+| DomainReviewer | Legal/Academic: Neon → Astra → Opus → Fable → Sonnet; übrige: Astra → Neon → Opus → Fable → Sonnet |
+| StrategicAdvisor | Fable → Astra |
+| CriticalAdvisor | Fable → Astra |
+| DomainExpertAdvisor | Technical: Fable → Astra; Academic: Astra → Opus; übrige: Opus → Astra |
+| GroundingRefiner | Sonnet → Sol |
+| TransformRewrite | Sol → Sonnet |
+| TransformCondense | Sonnet → Sol |
+| Composer | Opus → Sonnet → Sol |
+| Helper | Haiku → Sonnet |
+
+Kürzel: Claude-Modelle laufen als `claude-cli/claude-<familie>-latest`. Sol/Astra sind `codex-cli/gpt-sol-latest|gpt-astra-latest` (seit D-066/10; aufgelöst am 2026-11-23 auf `gpt-6.2-sol|astra`). Neon ist `openrouter/google/gemini-4-neon` (bezahlt, 3 $/15 $ je MTok). Begründung je Zeile im Recherchebericht, Abschnitt 3. Luna, Terra, Grok und DeepSeek sind bewusst nicht enthalten.
+
+**D-066/3 — Verwaltet oder manuell, explizit.**
+
+- Executor-, Reviewer- und Advisor-Profile tragen `ModelSlot` und optional `ModelDomain` (neue Spalten). Ist `ModelSlot` gesetzt, ist das Profil verwaltet: Das gespeicherte Binding ist nur Anzeige, das echte Modell wird pro Run gesetzt. `ModelSlot = null` heißt manuell.
+- Es gibt keine Heuristik „ist Kandidat, also verwaltet“; die frühere Fassung hätte manuelle Wahlen still überschrieben.
+- Grounding-Refiner und Transform-Finalizer werden über einen Settings-Marker verwaltet: `modelSlot` bzw. `ModelSlot`.
+- Alle Speicherpfade normalisieren über `ManagedBindingExtensions.ForSave`.
+
+**D-066/4 — Gebiet an der Crew.**
+
+- `CrewTemplate.Domain` (neue Spalte) wählt die Matrixzeile.
+- Das Profil-Gebiet ist nur ein Override. Grund: Generische System-Reviewer werden von `juristisch`, `akademisch` und `marketing` gemeinsam genutzt.
+- Der Composer liefert weiter einen freien `domain`-String, für Packs, Namen und Dedup unverändert. ~~`ModelDomainParser` bildet ihn per Wort-Token-Synonymen auf die Matrix ab.~~ Aufgehoben durch D-066/12: Das Matrix-Gebiet kommt ausdrücklich als `model_domain`.
+
+**D-066/5 — Zuweisung genau einmal, beim Snapshot-Bau.** `IModelAssignmentService.ApplyAsync` läuft in `CrewService` zwischen den Packs und `CrewSnapshotModelResolver`. Es gelten diese Regeln:
+
+- Kandidaten, die im Live-Katalog fehlen, entfallen. Ein ausgefallener Katalog zählt als verfügbar und blockiert keinen Run.
+- Reviewer und Advisor laufen nie auf dem Modell des Executors. Der Vergleich erfolgt alias-aufgelöst; Claude-Familien-Aliase greifen auch ohne Katalog.
+- Reviewer bevorzugen eine andere Familie als der Executor.
+- Reviewer derselben Rolle bekommen reihum ein Modell aus den ersten 3 geeigneten Kandidaten (Ring).
+- Bezahlte Kandidaten gibt es außerhalb von Legal/Academic erst ab 3 Reviewern der Rolle. Je Crew sind höchstens 2 bezahlte Reviewer erlaubt; manuelle zählen mit.
+- Wenn ein Primärkandidat übersprungen wird oder ein Fallback greift, wird gewarnt.
+
+Validator und Materializer rufen den Katalog nicht auf und bleiben deterministisch. Bestehende Run-Snapshots werden nie angefasst: Fortgesetzte Alt-Runs behalten ihre Alt-Bindungen, wegen der Reproduzierbarkeit.
+
+**D-066/6 — Composer.**
+
+- Der Composer wählt `model_slot` je Inline-Teil plus `domain`. `provider`/`model` werden für LLM-Rollen ignoriert; der Materializer schreibt eine Warnung.
+- `ComposerModelCatalog` ersetzt den Live-Katalogblock.
+- Validator Step 11 prüft: Ein unbekannter oder für den Teil unzulässiger Slot ist kritisch. Ein fehlender Slot wird mit dem Default belegt (Warnung). Ein Nicht-CLI-Weg für Claude/OpenAI wird gemeldet und umgeschrieben (Warnung).
+- Step 10 (Plurality) prüft nur noch manuelle, wiederverwendete Reviewer.
+- Mitbehoben: Inline-Transform-Finalizer verloren Prompt und Modell (`Settings: []`). Inline-Grounding verlor Settings und Refiner.
+
+**D-066/7 — Bestand (Migration Step46).**
+
+- Neue Spalten.
+- Crew-Gebiet der 12 bekannten Templates.
+- Rollen-Klassifikation aller 11 eigenen Executoren, 46 eigenen Reviewer und 3 Learning-Reviewer, mit Matrix-Primärmodell als Anzeige.
+- CLI-Umschreibung für den manuellen Rest.
+- Verwaltete Refiner.
+- Leerung des veralteten Template-Studio-Defaults und Aktualisierung der CLI-Modelllisten.
+
+Unbekannte Zeilen bekommen nie eine geratene Rolle. Ein toleranter Enum-Konverter liest unbekannte Werte als „manuell“ statt die Liste zu brechen. Vor dem Deploy wird ein `pg_dump` der betroffenen Tabellen gezogen.
+
+Der Learning-Extractor lief bisher bezahlt (`openrouter/openai/gpt-5.6-sol`) und nutzt nun TransformCondense. Die Template-Studio-Defaults kommen aus der Matrix; die Provider/Model-Schlüssel wurden aus `appsettings.json` entfernt.
+
+**D-066/8 — cli-proxy.**
+
+- `/v1/codex/models` liest `$CODEX_HOME/models_cache.json` der codex-CLI: nur `visibility: list`, nach `priority` sortiert, nie `-pro`/`:batch`, erneutes Lesen bei geänderter mtime.
+- Fehlt die Datei, gilt der kuratierte Fallback (`gpt-6.2-sol`, `gpt-6.2-astra`, `gpt-6.1-terra`, `x_source: static`). Ist sie kaputt, meldet der Proxy `degraded`.
+- Die OpenRouter-Ableitung ist entfernt.
+- Der Atelier-Client loggt `x-cli-proxy-failover` als Warnung, weil ein Failover einen Reviewer unbemerkt auf das Standardmodell der Partner-CLI legt.
+
+**D-066/9 — Host-Default Codex = `gpt-6.2-sol`, nicht Astra.** Das weicht vom Wortlaut der Workflow-Regel „größtes Modell“ ab. Das Codex-Konto wird mit BookForge geteilt und war schon zweimal leer. Sol hat 500k Kontext, Astra 272k. Astra wird in der Matrix gezielt für Fakten genutzt. **Nachtrag 2026-11-23:** Der Server gibt neue Modelle nur an neue Client-Versionen frei. Die Host-CLI stand noch auf codex 0.151 und bekam `gpt-6.2-*` mit „not supported when using Codex with a ChatGPT account“ abgelehnt. Das hat codex auf dem Host bis zum Update lahmgelegt. Die Host-CLI ist jetzt auf 0.171.0 aktualisiert, dieselbe Version wie im cli-proxy-Container. Regel: Wer das Default-Modell ändert, prüft zuerst `codex --version` gegen den Container und danach `codex exec "OK" < /dev/null`.
+
+**D-066/10 — Immer aktuelle Modelle ohne Codeänderung (Betreiberwunsch 2026-11-23).** Anlass: Die Host-CLI lehnte `gpt-6.2-sol` ab (siehe D-066/9), und die Matrix hätte ein `gpt-6.3-sol` erst nach einem Release genutzt. Drei Bausteine:
+
+- **Codex-Aliase im cli-proxy:** Er bildet je Modelllinie einen Alias `gpt-<linie>-latest` (`gpt-sol-latest`, `gpt-astra-latest`, `gpt-terra-latest`, `gpt-luna-latest`). Der Alias zeigt auf das neueste gelistete Modell der Linie in `models_cache.json`, verglichen nach numerischer Version. Neue Linien bekommen den Alias automatisch.
+  - `/v1/codex/models` und `/v1/cli/codex-cli/models` liefern die Aliase zuerst und dazu `x_aliases`.
+  - Beim Aufruf wird der Alias vor `-m` in die konkrete ID übersetzt; die Antwort trägt die konkrete ID.
+- **Matrix, Fallbacks, Seeds und Step46:** Sie nutzen `codex-cli/gpt-sol-latest` und `gpt-astra-latest`. Das Atelier löst den Alias wie bei Claude über `x_aliases` auf, Run-Snapshots halten die konkrete ID.
+  - Ausgemusterte Codex-Generationen (gpt-4/5, Luna, `-mini`, o-Series) gehen auf den Alias ihrer Linie (Sol/Terra), sonst auf `gpt-astra-latest`.
+  - Offene Gewichte (`gpt-oss`) sind kein Abo-Modell und bleiben unverändert.
+- **Nächtlicher Host-Abgleich** in `scripts/cli-proxy-selfupdate.sh` (Cron 03:40): Die Host-CLIs claude und codex unter `~/.npm-global` werden auf die im Container getestete Version gebracht, nur vorwärts. Danach wird das Host-Standardmodell von codex auf die neueste Sol-Version gestellt.
+  - Jeder Schritt wird mit einer echten Anfrage geprüft, bei Fehlschlag zurückgerollt und per Telegram gemeldet.
+  - Der Abgleich läuft auch dann, wenn der Container selbst aktuell ist. `HOST_ONLY=1` führt ihn einzeln aus.
+
+**D-066/11 — Härtung nach dem GEEF-Review (2026-11-23).**
+
+- **Verfügbarkeit ehrlich:** Die Zuweisung prüft gegen die Modell-IDs, die der Live-Katalog wirklich meldet (`IModelCatalog.ListReportedModelIdsAsync`), nicht gegen die mit der statischen Liste zusammengeführte Picker-Liste.
+  - Ein HTTP-Provider ohne gesetzten API-Schlüssel zählt als nicht verfügbar.
+  - Ein bezahlter Fallback hält die Obergrenze von 2 ein.
+- **Composer-Settings nur per Whitelist** (`CrewPartSettingsPolicy`): Inline-Grounding und -Finalizer dürfen keine Ziele, Zugangsdaten, Variablennamen oder Modellbindungen setzen.
+  - Inline-`rest-api`-Grounding und Inline-`ExternalSink`-Finalizer sind kritisch; dafür müssen freigegebene Profile wiederverwendet werden.
+  - Anlass: Die neue `settings`-Durchreichung hätte sonst Webhook-Ziele bzw. REST-Header mit Umgebungsgeheimnissen aus Modelltext erlaubt.
+- **Rollen-Parser:** `model_slot` nimmt nur einen einzelnen Namen an. Kombinationen wie `FactReviewer,StyleReviewer` und Nicht-String-Werte sind kritisch.
+- **Plurality:** Validator Step 10 vergleicht nur noch zwei manuelle Bindungen (§7.2). Ein manueller Reviewer auf dem Modell eines verwalteten Executors wird beim Snapshot-Bau gewarnt.
+- **Speicherpfade:** Auch LearningExtract-Bindungen werden CLI-normalisiert. Grounding-Marker sind nur `GroundingRefiner`. Die Template-Studio-Meta-Bindung wird beim Speichern normalisiert, und das Studio-Prompt-Beispiel setzt `ModelSlot` statt Provider/Model.
+- **Step46 erweitert:**
+  - System-Transform-Finalizer bekommen Marker und Matrixbindung, System-Grounding-Refiner werden verwaltet.
+  - Eigene Transform- und LearningExtract-Bindungen folgen der CLI-Regel; nackte o-Series-IDs werden erkannt.
+  - Je Klassifikationszeile steht eine Begründung im Code.
+  - Die inaktive `gemini-cli`-Modellliste bleibt unverändert, weil der Provider abgelehnt ist (D-066 „Abgelehnt“).
+- **Gebiets-Parser:** `weg` und `paper` greifen nur noch in Komposita (`weg-etv`, `research-paper`), `white-paper` zählt als Marketing. Neu ist die Endungs-Suche (`*recht` → `mietrecht`). `insurance` allein bleibt bewusst außerhalb von Legal: Kulanzanfragen sind Korrespondenz.
+- **GroundingQueryExtractor:** Er nutzt die Matrixrolle Helper, wenn `Llm:Actors` ihn nicht explizit konfiguriert; der Schlüssel ist aus `appsettings.json` entfernt.
+- **Nachgeschärft nach Review-Runde 2:**
+  - **Codex-Aliase:** Der Proxy meldet `x_aliases_complete: true`. Das Atelier ersetzt dann die Abbildung, statt sie wie bei Claude zu mergen, auch bei statischem Start. Bei `degraded` bleibt die alte Abbildung stehen. Der Snapshot hält die ID, die der Proxy in diesem Moment aufrufen würde.
+  - **Ausgemusterte Codex-IDs:** Es gibt eine Regel (`CliRoute.IsRetiredCodexModel`: gpt-4/5, o-Series, Luna, `-mini`). Step46 nutzt dieselbe Regel als eingefrorenes Regex-Literal, ein Paritätstest prüft C# gegen SQL. Eine richtig geroutete neuere ID wie `codex-cli/gpt-6.3-sol` bleibt unverändert. Die Ersatz-Aliase sind Konstanten in `ModelMatrix`.
+  - **Fallback:** zwischenzeitlich gestuft; durch D-066/12 ersetzt (ein Prädikat ohne eigenen Fallback-Pfad). `IModelCatalog.ListReportedModelIdsAsync` hat keine Default-Implementierung mehr; unbekannt heißt `null`.
+  - **Finalizer-Typ:** Validator, Policy und Materializer nutzen denselben geparsten Typ (getrimmt, ohne Groß-/Kleinschreibung). Ein unbekannter Typ ist kritisch. Die toten Provider/Model-Prüfungen im Validator sind entfernt.
+  - **Failover-Warnung:** Sie kommt nur noch bei einem Wechsel der CLI-Familie, nicht bei `claude->claude-alt`.
+  - **Gebiets-Parser:** zwischenzeitlich mit einer expliziten Liste der Rechtsgebiete; durch D-066/12 ersetzt (keine Heuristik mehr).
+  - **Host-Abgleich:** Er läuft in jedem Ausstiegszweig. Der Smoke-Test prüft Exit-Code und letzte Antwort. `config.toml` wird per TOML geprüft und atomar geschrieben. Gescheiterte Rollbacks werden eigens gemeldet, der Gateway-Schlüssel steht nicht mehr in `argv`. Das Skript ist mit Fake-CLIs getestet.
+  - **Paritätstest:** Er prüft `_FALLBACK_MODELS` des cli-proxy gegen die Atelier-Listen.
+- **Deploy-Reihenfolge (zwingend):**
+  1. erst `cli-proxy`, dann `web`. Ein alter Proxy kennt `gpt-sol-latest`/`gpt-astra-latest` nicht: Die Aufrufe scheitern und landen per Failover bei claude, die Zuweisung sieht Sol/Astra als nicht verfügbar.
+  2. Post-Deploy-Prüfung: `GET /v1/cli/codex-cli/models` liefert `x_source: live`, `x_aliases_complete: true` und ein `x_aliases` mit `gpt-sol-latest`.
+- **Bewusst so belassen:**
+  - **Codex-Alias ohne Untergrenze:** Listet `models_cache.json` für eine Linie nur noch eine ausgemusterte Version, zeigt der Alias darauf. Die Liste führt der Server; eine fest kodierte Untergrenze widerspräche „ohne Codeänderung“. Der nächtliche Smoke-Test meldet den Fall.
+  - **Learning-Extractor:** Er hält im Snapshot keine konkrete ID, weil er nach dem Lauf arbeitet; die Reproduzierbarkeit hängt nicht daran.
+  - **Python-Code:** Die Konvention „keine Inline-Kommentare“ gilt nur für .NET. Neue Kommentare in D-066-Python-Code sind trotzdem als Docstrings formuliert.
+  - **Webhook-Executor:** Seine Netzgrenze für vom Betreiber konfigurierte Senken bleibt unverändert; der Inline-Weg ist geschlossen.
+  - **Mehrzeiliges TOML-`model`:** Der Host-Abgleich unterstützt keinen mehrzeiligen `model`-Wert. Er schreibt dann nichts, meldet das und endet mit Status ≠ 0 (getestet). Das Skript selbst schreibt nur einzeilig.
+  - **`degraded`:** Das Atelier ersetzt die Alias-Abbildung bei `degraded` nicht und ist damit strenger als die Gateway-Doku, die es erlaubt.
+  - **Vorrang:** Eine eindeutige Modell-ID entscheidet über die Familie, der Provider nur bei mehrdeutigen IDs (`CliRoute` und Step46).
+- **Beobachtet, außerhalb von D-066:** Die claude-Alias-Probe (D-064) liefert `claude-fable-latest` nicht in `x_aliases`. Fable-Akteure halten im Snapshot deshalb den Alias statt der konkreten ID.
+- **Nicht repariert, nur benannt:**
+  - Crews aus dem Template-Studio haben kein Matrix-Gebiet (`CrewTemplate.Domain` bleibt leer, also General). Ein Gebietsfeld im Studio wäre eine neue Funktion; die Richtung ist die billigere, sichere.
+  - Die Validator-Warnung zu `model_domain` läuft im Modus `existing-template` nicht, weil dort das vorhandene Template sein eigenes Gebiet mitbringt.
+  - Die zwei eigenen Transform-Finalizer `custom-natural-german-voice-polish` und `custom-german-review-consolidation-transform` haben seit dem alten Materializer-Fehler leere Settings und werden still übersprungen.
+  - Custom-Crews über MCP (`CrewSpec.Domain`) laufen mangels Befüllung mit `General`.
+
+**D-066/12 — Strukturänderungen nach Review-Runde 3 (2026-11-23).** Anlass: Zwei Brennpunkte kamen dreimal in Folge als neue Instanz wieder.
+
+1. Der Gebiets-Parser lieferte Falsch-Positive: `weg`/`paper` → `*recht` → `rechts*`.
+2. Der Fallback der Zuweisung deckte einzelne Regel-Kombinationen nicht ab.
+
+Der GEEF-Workflow sieht dann Anhalten vor. Der Betreiber hatte die Entscheidung an einen Fable-Berater delegiert. Dieser entschied: weitermachen, aber den Ansatz wechseln statt weiter zu patchen. Architektur: `geef_architecture.md` §9.
+
+- **Matrix-Gebiet explizit:** Der Composer setzt das Pflichtfeld `model_domain`. Die Enum-Werte entsprechen `ModelDomain`; ein Drift-Test gleicht Schema und Enum ab.
+  - Aufgelöst wird an einer Stelle (`CrewSpecArtifact.EffectiveModelDomain`): exakter Name, sonst der freie `domain`-String als exakter Name, sonst General.
+  - Fehlt `model_domain` oder ist es ungültig, gibt der Validator eine Warnung. Die Crew läuft dann auf dem freien `domain`-String, wenn er ein exakter Enum-Name ist (Kompatibilität mit alten Artefakten), sonst auf General.
+  - Die Synonymtabelle ist gelöscht. Damit sind auch die Wortlisten aus D-066/11 hinfällig.
+  - Bewusst akzeptiert: Eine Fehleinstufung durch den Composer kostet höchstens zwei bezahlte Reviewer.
+- **Ein Zuweisungsprädikat** (`ModelChooser`, reine Funktion über die Katalog-Fakten Confirmed/Unknown/Missing/Unusable):
+  - **Hart, nie gelockert:** H1 nicht unbenutzbar. H2: Bezahlt nur für Reviewer, höchstens 2 je Crew, außerhalb von Legal/Academic erst ab 3 Reviewern derselben Rolle.
+  - **Weich, in fester Reihenfolge:** nicht im Live-Katalog, Executor-Modell, außerhalb des Rings, schon im Slot vergeben, gleiche Familie, Matrixposition.
+  - **Ring:** wird je Wahl aus den Kandidaten gebildet, die die harten Regeln inklusive des aktuellen Bezahlkontingents erfüllen. Das Gedächtnis, welche Modelle schon vergeben sind, gilt je Slot über alle Profil-Gebiete hinweg. Reviewer werden in Index-Reihenfolge vergeben.
+  - **Bewusste Verhaltensänderung:** Ist das Bezahlkontingent ausgeschöpft, bekommt der nächste Reviewer ein noch unbenutztes Modell statt einer Wiederholung (Beispiel: fünf Academic-DomainReviewer → Neon, Astra, Fable, Neon, Sonnet statt …, Astra). Die letzte Instanz nimmt den ersten unbezahlten Kandidaten statt des ersten.
+  - **Letzte Instanz:** immer der erste unbezahlte Kandidat. Der eigene Fallback-Pfad ist entfallen.
+  - **Absicherung:** ein erschöpfender Invarianten-Test I1–I5 über rund 645.000 Kombinationen. Er kreuzt Katalogzustand je Provider (inkl. fehlender Nicht-Erstmodelle) × Executor × Gebiet × Rolle (inkl. Helper) × 1–4 Reviewer × Profil-Overrides × eingeschobene zweite Rolle × manuelle bezahlte/unbezahlte Reviewer. Die Prüfungen beziehen sich auf den Zustand zum Zeitpunkt jeder Wahl: Ein unbenutzbarer Provider ist nur zulässig ohne erlaubte Alternative; die Plurality-Warnung ist Pflicht; eine Wiederholung ist nur zulässig ohne freien Kandidaten. Per Mutation geprüft; nach Iteration 4 verschärft, nachdem die erste Fassung Warnungen zu großzügig als Beleg akzeptiert hatte.
+  - **Katalog:** Ein leeres HTTP-200 meldet `[]` (unbenutzbar), ein Transportfehler `null` (unbekannt).
+- **Katalog (nach Runde 5):** Ein fehlender API-Schlüssel meldet den Provider immer als unbenutzbar, auch wenn der Listenabruf in den Zeitablauf läuft. Der cli-proxy liefert die kuratierte Codex-Liste, sobald `models_cache.json` fehlt; so bleibt `gpt-sol-latest` (Failover) auflösbar. Step46 trimmt auch Tabulatoren und Zeilenumbrüche wie C#.
+- **Nach der Bestätigungsrunde 6:**
+  - Das Template-Studio akzeptiert Transform-Vorschläge ohne Provider. Der Prompt landet in den Settings, eine sichtbare manuelle Modellwahl wird übernommen.
+  - Der Codex-Failover startet ohne `-m` (CLI-Standard), wenn der Katalog keine Sol-Linie meldet.
+  - Ein gedrosselter Refresh nach Cacheverlust liefert die kuratierte Liste.
+  - Step46 trimmt den Vertikaltabulator korrekt (`\x0B` statt `\v`).
+  - Der Host-Abgleich prüft die neue codex-CLI vor einem Rollback auch mit dem Zielmodell.
+  - Der Invarianten-Test läuft in einer eigenen, nicht parallelen Test-Collection.
+- **Deduplizierung:** Ein ähnliches vorhandenes Template wird nur übernommen, wenn sein Gebiet dem effektiven `model_domain` entspricht; sonst wird ein neues angelegt (Warnung).
+- **Composer-`urls`:** `urls` steht nicht mehr in der Settings-Whitelist. Ein Inline-`url-fetch` wird mit Warnung verworfen, der Composer-Prompt nennt `url-fetch`, `rest-api` und `ExternalSink` „nur per Wiederverwendung“.
+  - **Offen, eigene priorisierte Härtung:** DNS-Pinning (Verbindung an die geprüfte IP binden) für `url-fetch`, `rest-api` und den MCP-Client. Die Schwäche ist vorbestehend und betrifft auch das Template-Studio über MCP; das Pinning ist Voraussetzung für ein agentisches `url-fetch`.
+- **Weitere Härtungen:**
+  - Strenge Enum-Namen (`EnumNames.ParseExact`) für Parser und EF-Konverter, keine Zahlen, Vorzeichen oder Kombinationen.
+  - Vorrang der Modell-ID vor dem Provider in `CliRoute.FamilyOf`; Step46 trimmt wie C#. Paritätsfälle mit Leerraum und verkehrten Bindungen sind ergänzt.
+  - Container-Smoke im Selfupdate mit Exit-Code, Provider-Header, ohne Failover und mit exaktem „pong“. Ein gescheiterter Rollback endet mit Status 2.
+  - Die Doku verspricht keinen HTTP-Default ohne `model` mehr.
+- **Stoppschwelle:** Zeigt ein Reviewer bei grünem Invarianten-Test ein Gegenbeispiel zu I1–I5, oder wäre ein Befund nur mit einer neuen Wortliste bzw. Ausnahme zu beheben, wird angehalten und dem Betreiber vorgelegt.
+
+**Abgelehnt.**
+
+- `gemini-cli` als dritte Familie: im Atelier inaktiv, kein Login im Proxy.
+- Ein Codex-Budget je Crew: eigenes Feature; die Atelier-Nutzung ist gering.
+- Die Laufzeit-Kandidatenkette und ein Audit-Block „ModelAssignments“ im Snapshot: Folgepunkte.
+- Ein Familien-Mapping im Proxy-Failover: berührt alle Portfolio-Konsumenten.
+
+**Lastabschätzung.**
+
+- `klassik`: 2 Codex-Aufrufe je Iteration (Astra, Sol).
+- `juristisch`: je Iteration Astra + Sol + Neon (bezahlt), dazu einmalig der Advisor Astra.
+- Composer: je Iteration Astra ×2 + Sol; Neon greift nicht.
+- Advisor „Teufels Anwalt“: läuft auf Fable (Claude-Abo) statt Codex.

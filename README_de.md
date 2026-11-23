@@ -42,6 +42,8 @@ Text-Generations-Pipeline-Plattform auf Basis des [Geef SDK](https://github.com/
 
 **Spezialisierungs-Packs ✅** Generische Akteure (Rollen-Prompt + `{specialization}`-Slot) + wiederverwendbare gescopte `SpecializationPack`s, pro Crew gebunden. Effektiver Prompt zur Snapshot-Bauzeit komponiert (CrewSnapshot v3 + Provenienz), in der Audit-UI sichtbar. Die sechs domänen-spezialisierten System-Reviewer wurden zu zwei generischen Rollen + sechs DomainScoped-Packs. `/packs`-CRUD, Scope-Durchsetzung, Composer-Integration (`pack_names`/`packs` + Pack-Katalog-Grounding), Lebenszyklus (Cascade-Delete, Promote/Demote/Clone mit LLM-Generalitäts-Review, Auto-GC). Siehe [docs/11-specialization-packs_de.md](docs/11-specialization-packs_de.md) (D-061).
 
+**Modellmatrix ✅** Modellwahl nach Rolle (`ModelSlot`) und Crew-Gebiet aus einer recherchierten `ModelMatrix`; Claude/OpenAI nur über den Abo-cli-proxy; Zuweisung beim Snapshot-Bau mit Live-Verfügbarkeit, Executor-Ausschluss, Reviewern aus anderer Familie, Reviewer-Ring und Bezahlt-Deckel; der Composer wählt `model_slot`; Migration Step46 hat alle bestehenden eigenen Profile neu klassifiziert; Codex-Katalog des cli-proxy aus `models_cache.json` (D-066, 2026-11-22).
+
 Aktuell: **über 1800 Tests** (grün; vorbestehende Testcontainers-/E2E-Umgebungs-Flakes ausgenommen).
 
 Vollständiger Scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope_de.md)
@@ -179,6 +181,14 @@ Jeder Run verwendet eine konfigurierbare Crew aus Executor (schreibt den Draft) 
 **System-Profile** sind im Code versioniert und read-only. **Custom-Profile** können per `ICrewService` oder MCP erstellt und in der DB gespeichert werden.
 
 Jeder Run speichert einen vollständig eingebetteten **CrewSnapshot** in der DB — damit bleibt der Run reproduzierbar, auch wenn Profile später geändert werden.
+
+**Modellmatrix (D-066):** Profile geben eine Rolle (`ModelSlot`) an, Crews ein Gebiet. Das System setzt jedem verwalteten Akteur beim Run-Start sein Modell aus `ModelMatrix`.
+
+- Claude läuft immer über `claude-cli`, OpenAI über `codex-cli`.
+- Verwaltete Reviewer meiden das Executor-Modell (geteilt nur mit Warnung, wenn kein anderer Kandidat nutzbar ist) und bevorzugen eine andere Familie; ein manuell gebundener Reviewer behält sein Modell und wird nur gewarnt.
+- Profile auf „Manual“ behalten ihr gewähltes Modell.
+
+Siehe [docs/08-crew-system_de.md](docs/08-crew-system_de.md).
 
 ### Crew-Verwaltung in der UI
 

@@ -1,6 +1,7 @@
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
+using Geef.Atelier.Core.Domain.Crew.Models;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 
 namespace Geef.Atelier.Core.Domain.Crew;
@@ -11,12 +12,9 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// live in the database under the <c>"custom-"</c> name prefix.
 /// </summary>
 /// <remarks>
-/// <para>Model defaults follow the Atelier model-pluralism convention (Vision doc, Leitstern 3 +
-/// CLAUDE.md "Reviewer-Modell außerhalb der Anthropic-Familie"): the executor stays on Anthropic
-/// (continuity with PS-2), reviewers use external models for genuine outside perspective.</para>
-/// <para>If a chosen reviewer model is unavailable on OpenRouter or regresses against the
-/// Hadwiger-Nelson replay (PS-5 AC 10), fall back to <c>claude-opus-latest</c> for all
-/// reviewers and document the change in the PS-5 report.</para>
+/// <para>Models are never literals here: every LLM role carries a <see cref="ModelSlot"/> and takes its displayed
+/// binding from <see cref="ModelMatrix"/>; the concrete model is assigned per run at snapshot-build time
+/// (D-066). Shared generic profiles carry no profile domain and inherit the crew's <see cref="CrewTemplate.Domain"/>.</para>
 /// </remarks>
 public static class SystemCrew
 {
@@ -32,10 +30,11 @@ public static class SystemCrew
         DisplayName: "Default Executor",
         Description: "Standard Atelier drafting executor: clear, concise, briefing-bound prose; revises iterations against reviewer findings.",
         SystemPrompt: SystemPrompts.Executor,
-        Provider: "claude-cli",
-        Model: "claude-opus-latest",
+        Provider: ModelMatrix.Primary(ModelSlot.Executor).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.Executor).Model,
         MaxTokens: 256000,
-        IsSystem: true);
+        IsSystem: true,
+        ModelSlot: ModelSlot.Executor);
 
     /// <summary>Briefing-fidelity reviewer — checks the draft against briefing requirements (PS-2 severity calibration).</summary>
     public static readonly ReviewerProfile BriefingFidelityProfile = new(
@@ -43,10 +42,11 @@ public static class SystemCrew
         DisplayName: "Briefing Fidelity",
         Description: "Verifies that the draft fully addresses every briefing requirement. Outside-model perspective for genuine independence from the executor.",
         SystemPrompt: SystemPrompts.BriefingFidelity,
-        Provider: "codex-cli",
-        Model: "gpt-5.6-sol",
+        Provider: ModelMatrix.Primary(ModelSlot.FactReviewer).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.FactReviewer).Model,
         MaxTokens: 64000,
-        IsSystem: true);
+        IsSystem: true,
+        ModelSlot: ModelSlot.FactReviewer);
 
     /// <summary>Clarity reviewer — checks argumentation, structure, and style (PS-2 severity calibration).</summary>
     public static readonly ReviewerProfile ClarityProfile = new(
@@ -54,10 +54,11 @@ public static class SystemCrew
         DisplayName: "Clarity",
         Description: "Audits clarity, argumentation, structure, and style. Outside-model perspective; complements the briefing-fidelity reviewer with a different model family.",
         SystemPrompt: SystemPrompts.Clarity,
-        Provider: "codex-cli",
-        Model: "gpt-5.6-sol",
+        Provider: ModelMatrix.Primary(ModelSlot.StyleReviewer).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.StyleReviewer).Model,
         MaxTokens: 64000,
-        IsSystem: true);
+        IsSystem: true,
+        ModelSlot: ModelSlot.StyleReviewer);
 
     // ── Generic domain reviewer profiles ────────────────────────────────────────────
     // Both carry a generic role prompt with a {specialization} slot. Domain specifics are supplied
@@ -70,10 +71,11 @@ public static class SystemCrew
         DisplayName: "Domain Terminology Reviewer",
         Description: "Generic reviewer for precise, consistent domain terminology and field conventions. Specialised per crew via a bound specialization pack (e.g. legal-terminology, academic-citation, marketing-voice).",
         SystemPrompt: SystemPrompts.DomainTerminologyReviewer,
-        Provider: "codex-cli",
-        Model: "gpt-5.6-sol",
+        Provider: ModelMatrix.Primary(ModelSlot.StyleReviewer).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.StyleReviewer).Model,
         MaxTokens: 64000,
-        IsSystem: true);
+        IsSystem: true,
+        ModelSlot: ModelSlot.StyleReviewer);
 
     /// <summary>Generic substantive-rigor reviewer — specialised per crew via a bound pack.</summary>
     public static readonly ReviewerProfile SubstantiveRigorReviewerProfile = new(
@@ -81,10 +83,11 @@ public static class SystemCrew
         DisplayName: "Substantive Rigor Reviewer",
         Description: "Generic reviewer for substantive soundness: logical validity, claim safety, and adequacy of support. Specialised per crew via a bound specialization pack (e.g. legal-clause-risk, academic-argumentation, marketing-conversion).",
         SystemPrompt: SystemPrompts.SubstantiveRigorReviewer,
-        Provider: "claude-cli",
-        Model: "claude-opus-latest",
+        Provider: ModelMatrix.Primary(ModelSlot.DomainReviewer).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.DomainReviewer).Model,
         MaxTokens: 64000,
-        IsSystem: true);
+        IsSystem: true,
+        ModelSlot: ModelSlot.DomainReviewer);
 
     // ── Auto-Crew: crew-composer executor ──────────────────────────────────────
 
@@ -94,10 +97,11 @@ public static class SystemCrew
         DisplayName: "Crew Composer Executor",
         Description: "Specialist executor for auto-crew composition runs. Analyzes task descriptions and calls submit_crew_spec with a complete crew configuration following Reuse-First and model-plurality rules.",
         SystemPrompt: SystemPrompts.CrewComposerExecutor,
-        Provider: "claude-cli",
-        Model: "claude-opus-latest",
+        Provider: ModelMatrix.Primary(ModelSlot.Composer).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.Composer).Model,
         MaxTokens: 64000,
-        IsSystem: true);
+        IsSystem: true,
+        ModelSlot: ModelSlot.Composer);
 
     // ── Auto-Crew: crew-composer reviewers ─────────────────────────────────────
 
@@ -118,10 +122,11 @@ public static class SystemCrew
         DisplayName: "Crew Completeness",
         Description: "Verifies that the proposed crew spec contains all mandatory roles: executor, at least one reviewer, and at least one finalizer. Flags missing domain-specific roles for domain tasks.",
         SystemPrompt: SystemPrompts.CrewComposerCompleteness,
-        Provider: "codex-cli",
-        Model: "gpt-5.6-sol",
+        Provider: ModelMatrix.Primary(ModelSlot.FactReviewer).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.FactReviewer).Model,
         MaxTokens: 64000,
-        IsSystem: true);
+        IsSystem: true,
+        ModelSlot: ModelSlot.FactReviewer);
 
     /// <summary>Reviews every new profile's system prompt for completeness and inclusion of the severity taxonomy.</summary>
     public static readonly ReviewerProfile CrewComposerPromptQualityProfile = new(
@@ -129,10 +134,11 @@ public static class SystemCrew
         DisplayName: "Prompt Quality",
         Description: "Audits system prompts in the proposed crew for completeness, task-specificity, and the mandatory severity taxonomy block in reviewer prompts.",
         SystemPrompt: SystemPrompts.CrewComposerPromptQuality,
-        Provider: "openrouter",
-        Model: "google/gemini-3.6-flash",
+        Provider: ModelMatrix.Primary(ModelSlot.StyleReviewer).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.StyleReviewer).Model,
         MaxTokens: 64000,
-        IsSystem: true);
+        IsSystem: true,
+        ModelSlot: ModelSlot.StyleReviewer);
 
     /// <summary>Checks whether the crew fits the task: domain, models, grounding, and complexity.</summary>
     public static readonly ReviewerProfile CrewComposerFitProfile = new(
@@ -140,10 +146,11 @@ public static class SystemCrew
         DisplayName: "Crew Fit",
         Description: "Evaluates whether the proposed crew is appropriate for the task: domain relevance, model choices, grounding configuration, and overall complexity balance.",
         SystemPrompt: SystemPrompts.CrewComposerFit,
-        Provider: "codex-cli",
-        Model: "gpt-5.6-sol",
+        Provider: ModelMatrix.Primary(ModelSlot.DomainReviewer).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.DomainReviewer).Model,
         MaxTokens: 64000,
-        IsSystem: true);
+        IsSystem: true,
+        ModelSlot: ModelSlot.DomainReviewer);
 
     /// <summary>Checks that reuse references are correct and the right composition mode was chosen.</summary>
     public static readonly ReviewerProfile CrewComposerReuseCorrectnessProfile = new(
@@ -151,10 +158,11 @@ public static class SystemCrew
         DisplayName: "Reuse Correctness",
         Description: "Verifies that reused profiles fit the task, detects unnecessary duplicates, and checks that the correct composition mode (existing-template / composed / new) was selected.",
         SystemPrompt: SystemPrompts.CrewComposerReuseCorrectness,
-        Provider: "claude-cli",
-        Model: "claude-opus-latest",
+        Provider: ModelMatrix.Primary(ModelSlot.DomainReviewer).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.DomainReviewer).Model,
         MaxTokens: 64000,
-        IsSystem: true);
+        IsSystem: true,
+        ModelSlot: ModelSlot.DomainReviewer);
 
     /// <summary>Reviews tool-binding decisions in the proposed crew spec.</summary>
     public static readonly ReviewerProfile CrewComposerToolBindingProfile = new(
@@ -162,10 +170,11 @@ public static class SystemCrew
         DisplayName: "Tool Binding Review",
         Description: "Audits tool_names bindings in actor profiles: checks necessity, access-class compliance (ReadOnly only in Phase B), role fit, and catalog membership.",
         SystemPrompt: SystemPrompts.CrewComposerToolBinding,
-        Provider: "openrouter",
-        Model: "google/gemini-3.6-flash",
+        Provider: ModelMatrix.Primary(ModelSlot.FactReviewer).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.FactReviewer).Model,
         MaxTokens: 64000,
-        IsSystem: true);
+        IsSystem: true,
+        ModelSlot: ModelSlot.FactReviewer);
 
     // ── Auto-Crew: crew-design-advisor ─────────────────────────────────────────
 
@@ -175,12 +184,13 @@ public static class SystemCrew
         DisplayName: "Crew Design Advisor",
         Description: "Strategic pre-composition advisor. Analyzes the user's task for domain, quality risks, suitable crew archetypes, grounding needs, and complexity calibration before the executor begins.",
         SystemPrompt: SystemPrompts.CrewDesignAdvisor,
-        Provider: "claude-cli",
-        Model: "claude-opus-latest",
+        Provider: ModelMatrix.Primary(ModelSlot.StrategicAdvisor).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.StrategicAdvisor).Model,
         MaxTokens: 64000,
         Mode: AdvisorMode.Strategic,
         Trigger: AdvisorTrigger.BeforeFirstExecution,
-        IsSystem: true);
+        IsSystem: true,
+        ModelSlot: ModelSlot.StrategicAdvisor);
 
     // ── Auto-Crew: grounding providers ─────────────────────────────────────────
 
@@ -225,21 +235,20 @@ public static class SystemCrew
             [GroundingProviderProfile.KeyStaticContent] =
                 "Crew Design Rules (binding for all auto-composed crews):\n" +
                 "\n" +
-                "PROVIDER/MODEL RULES (most critical — any violation fails validation):\n" +
-                "- ONLY use provider names and model IDs from the 'Valid Provider/Model Pairs' catalog injected into the executor prompt.\n" +
-                "- Valid providers: claude-cli, codex-cli, openrouter, openai-direct, google-ai-studio, deepseek, xai, ollama-local.\n" +
-                "- NEVER use openai, google, anthropic, x-ai, or any other invented provider name.\n" +
-                "- Prefer NEWEST top-tier models. Do not use legacy models (gemini-2.5, gpt-4o, superseded Claude Opus generations, etc.).\n" +
-                "- Recommended defaults: claude-cli/claude-opus-latest (executor), codex-cli/gpt-5.6-sol, openrouter/x-ai/grok-4.5 (reviewers).\n" +
+                "MODEL RULES (D-066 model matrix — binding):\n" +
+                "- NEVER choose provider or model. Set the crew 'model_domain' and, on every inline LLM part, 'model_slot'. The system assigns the model from the model matrix.\n" +
+                "- Valid model_domain values: General, Correspondence, Legal, Academic, Marketing, Speech, Technical. Legal and Academic enable paid domain reviewers: use them only for real legal or scholarly work. The free 'domain' string is only a naming/pack hint.\n" +
+                "- Valid model_slot values: Executor (executor); FactReviewer, StyleReviewer, DomainReviewer (reviewers); StrategicAdvisor, CriticalAdvisor, DomainExpertAdvisor (advisors); TransformRewrite, TransformCondense (Transform finalizers); Helper (lightweight filter/classifier).\n" +
+                "- Claude and OpenAI models always run through the subscription CLIs (claude-cli, codex-cli); model plurality and cross-vendor reviewers are enforced automatically.\n" +
                 "\n" +
                 "REUSE-FIRST (reduces validation risk to zero):\n" +
-                "- Default executor: { \"reuse\": \"default-executor\" } — never needs provider/model.\n" +
+                "- Executor: always a NEW inline, task-specialized profile with model_slot 'Executor'.\n" +
                 "- Default output finalizer: { \"reuse\": \"learning-extractor\" } — deterministic, never needs provider/model.\n" +
                 "- Deterministic finalizer types (file-export, metadata-enrich, external-sink, crew-materialize, learning-extractor, learning-publisher): do NOT set provider or model.\n" +
-                "- Only LLM-based roles (executor, reviewer, advisor, transform-finalizer) need provider + model.\n" +
+                "- LLM-based roles (executor, reviewer, advisor, transform-finalizer) need a model_slot, never provider/model.\n" +
                 "\n" +
                 "OTHER BINDING RULES:\n" +
-                "1. Model plurality: reviewer models must differ from the executor model (independent perspective).\n" +
+                "1. Model plurality: reviewers never share the executor's model; the matrix enforces it — pick the right model_slot per reviewer.\n" +
                 "2. Severity taxonomy: every new REVIEWER prompt MUST include the verbatim taxonomy block (advisors/finalizers/grounding do NOT need it).\n" +
                 "3. Naming: ^[a-z0-9\\-]+$, max 64 chars.\n" +
                 "4. Prompts in English.\n" +
@@ -301,7 +310,8 @@ public static class SystemCrew
         GroundingProviderNames: new[] { CrewCatalogDefaultProfile.Name, CrewDesignRulesProfile.Name, ToolCatalogDefaultProfile.Name, PackCatalogDefaultProfile.Name },
         FinalizerProfileNames: new[] { CrewMaterializerProfile.Name },
         RunFinalizersOnMaxAttempts: false,
-        IsSystem: true);
+        IsSystem: true,
+        Domain: ModelDomain.General);
 
     /// <summary>The only system template in PS-5: the Klassik crew that reproduces the PS-2 hardcoded behaviour.</summary>
     public static readonly CrewTemplate KlassikTemplate = new(
@@ -315,7 +325,8 @@ public static class SystemCrew
         AdvisorProfileNames: Array.Empty<string>(),
         GroundingProviderNames: new[] { "tavily-refined", "run-attachments", "learning-retriever-default" },
         FinalizerProfileNames: new[] { "learning-extractor" },
-        IsSystem: true);
+        IsSystem: true,
+        Domain: ModelDomain.General);
 
     // ── Domain templates ────────────────────────────────────────────────────────────
 
@@ -336,7 +347,8 @@ public static class SystemCrew
         {
             ["reviewer:domain-terminology-reviewer"] = new[] { Specialization.SystemPacks.LegalTerminology.Name },
             ["reviewer:substantive-rigor-reviewer"]  = new[] { Specialization.SystemPacks.LegalClauseRisk.Name },
-        });
+        },
+        Domain: ModelDomain.Legal);
 
     /// <summary>Akademisch template — for scientific texts: papers, argumentation essays, research texts.</summary>
     public static readonly CrewTemplate AkademischTemplate = new(
@@ -355,7 +367,8 @@ public static class SystemCrew
         {
             ["reviewer:domain-terminology-reviewer"] = new[] { Specialization.SystemPacks.AcademicCitation.Name },
             ["reviewer:substantive-rigor-reviewer"]  = new[] { Specialization.SystemPacks.AcademicArgumentation.Name },
-        });
+        },
+        Domain: ModelDomain.Academic);
 
     /// <summary>Marketing template — for marketing copy: landing pages, emails, ad copy.</summary>
     public static readonly CrewTemplate MarketingTemplate = new(
@@ -374,7 +387,8 @@ public static class SystemCrew
         {
             ["reviewer:domain-terminology-reviewer"] = new[] { Specialization.SystemPacks.MarketingVoice.Name },
             ["reviewer:substantive-rigor-reviewer"]  = new[] { Specialization.SystemPacks.MarketingConversion.Name },
-        });
+        },
+        Domain: ModelDomain.Marketing);
 
     /// <summary>System grounding-provider profile for Tavily Basic web-search (1 credit/search, ~5 sources).</summary>
     public static readonly GroundingProviderProfile TavilyBasicProfile = new(
@@ -407,8 +421,9 @@ public static class SystemCrew
             ["IncludeAnswer"]     = "true",
             ["MinRelevanceScore"] = "0.3",
             ["ExtractQuery"]      = "true",
-            [GroundingProviderProfile.KeyRefinementProvider]    = "deepseek",
-            [GroundingProviderProfile.KeyRefinementModel]       = "deepseek/deepseek-v4-flash",
+            [GroundingProviderProfile.KeyRefinementProvider]    = ModelMatrix.Primary(ModelSlot.GroundingRefiner).Provider,
+            [GroundingProviderProfile.KeyRefinementModel]       = ModelMatrix.Primary(ModelSlot.GroundingRefiner).Model,
+            [GroundingProviderProfile.KeyModelSlot] = nameof(ModelSlot.GroundingRefiner),
             [GroundingProviderProfile.KeyRefinementMaxTokens]   = "2048",
             [GroundingProviderProfile.KeyRefinementMode]        = "0",
         },
@@ -448,8 +463,9 @@ public static class SystemCrew
         {
             [GroundingProviderProfile.KeyAcademicSource]             = "semantic-scholar",
             [GroundingProviderProfile.KeyAcademicMaxPapers]          = "5",
-            [GroundingProviderProfile.KeyRefinementProvider]         = "google-ai-studio",
-            [GroundingProviderProfile.KeyRefinementModel]            = "models/gemini-3.6-flash",
+            [GroundingProviderProfile.KeyRefinementProvider]         = ModelMatrix.Primary(ModelSlot.GroundingRefiner).Provider,
+            [GroundingProviderProfile.KeyRefinementModel]            = ModelMatrix.Primary(ModelSlot.GroundingRefiner).Model,
+            [GroundingProviderProfile.KeyModelSlot] = nameof(ModelSlot.GroundingRefiner),
             [GroundingProviderProfile.KeyRefinementMaxTokens]        = "2048",
             [GroundingProviderProfile.KeyRefinementMode]             = "0",
         },
@@ -468,8 +484,9 @@ public static class SystemCrew
             [GroundingProviderProfile.KeyRecencyDays]         = "7",
             [GroundingProviderProfile.KeyNewsMaxResults]      = "5",
             [GroundingProviderProfile.KeyNewsSearchDepth]     = "basic",
-            [GroundingProviderProfile.KeyRefinementProvider]  = "deepseek",
-            [GroundingProviderProfile.KeyRefinementModel]     = "deepseek/deepseek-v4-flash",
+            [GroundingProviderProfile.KeyRefinementProvider]  = ModelMatrix.Primary(ModelSlot.GroundingRefiner).Provider,
+            [GroundingProviderProfile.KeyRefinementModel]     = ModelMatrix.Primary(ModelSlot.GroundingRefiner).Model,
+            [GroundingProviderProfile.KeyModelSlot] = nameof(ModelSlot.GroundingRefiner),
             [GroundingProviderProfile.KeyRefinementMaxTokens] = "2048",
             [GroundingProviderProfile.KeyRefinementMode]      = "0",
         },
@@ -527,12 +544,14 @@ public static class SystemCrew
         DisplayName: "Legal Domain Expert",
         Description: "Pre-checks briefings for legal practicability before drafting begins. Identifies constraints, terminological traps, regulatory context, missing information, and risk areas where qualifications are needed.",
         SystemPrompt: SystemPrompts.LegalDomainExpert,
-        Provider: "claude-cli",
-        Model: "claude-opus-latest",
+        Provider: ModelMatrix.Primary(ModelSlot.DomainExpertAdvisor, ModelDomain.Legal).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.DomainExpertAdvisor, ModelDomain.Legal).Model,
         MaxTokens: 64000,
         Mode: AdvisorMode.DomainExpert,
         Trigger: AdvisorTrigger.BeforeFirstExecution,
-        IsSystem: true);
+        IsSystem: true,
+        ModelSlot: ModelSlot.DomainExpertAdvisor,
+        ModelDomain: ModelDomain.Legal);
 
     /// <summary>Academic rigor advisor — challenges weakest assumptions in the draft before every iteration.</summary>
     public static readonly AdvisorProfile AcademicRigorAdvisorProfile = new(
@@ -540,12 +559,14 @@ public static class SystemCrew
         DisplayName: "Academic Rigor Advisor",
         Description: "Challenges the weakest assumptions, contested claims, and methodological gaps in the current draft before each iteration. Rotates focus to prevent repetitive critique.",
         SystemPrompt: SystemPrompts.AcademicRigorAdvisor,
-        Provider: "claude-cli",
-        Model: "claude-opus-latest",
+        Provider: ModelMatrix.Primary(ModelSlot.DomainExpertAdvisor, ModelDomain.Academic).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.DomainExpertAdvisor, ModelDomain.Academic).Model,
         MaxTokens: 64000,
         Mode: AdvisorMode.Critical,
         Trigger: AdvisorTrigger.BeforeEveryExecution,
-        IsSystem: true);
+        IsSystem: true,
+        ModelSlot: ModelSlot.DomainExpertAdvisor,
+        ModelDomain: ModelDomain.Academic);
 
     /// <summary>Strategic advisor consulted once before the executor begins: surfaces unclear constraints and missing context.</summary>
     public static readonly AdvisorProfile BriefingClarifierProfile = new(
@@ -553,12 +574,13 @@ public static class SystemCrew
         DisplayName: "Briefing Clarifier",
         Description: "Strategic consultant. Analyzes briefings for unclear constraints, missing context, or unrealistic scope before the Executor begins.",
         SystemPrompt: "You are a strategic consultant reviewing a text briefing before an AI executor processes it. Identify up to 5 key strategic observations: unclear constraints, missing context, unrealistic scope, or conflicting requirements. Be concise (2-3 sentences per point). Do NOT write the text yourself — advise the executor.",
-        Provider: "claude-cli",
-        Model: "claude-opus-latest",
+        Provider: ModelMatrix.Primary(ModelSlot.StrategicAdvisor).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.StrategicAdvisor).Model,
         MaxTokens: 64000,
         Mode: AdvisorMode.Strategic,
         Trigger: AdvisorTrigger.BeforeFirstExecution,
-        IsSystem: true);
+        IsSystem: true,
+        ModelSlot: ModelSlot.StrategicAdvisor);
 
     /// <summary>Adversarial advisor consulted before every iteration: challenges weak assumptions in the current draft.</summary>
     public static readonly AdvisorProfile DevilsAdvocateProfile = new(
@@ -566,12 +588,13 @@ public static class SystemCrew
         DisplayName: "Devil's Advocate",
         Description: "Adversarial perspective. After each iteration, challenges the strongest claims of the artifact to surface weak assumptions.",
         SystemPrompt: "You are a critical reviewer tasked with challenging an AI-generated text artifact. In 2-4 sentences, identify the weakest assumptions or most contestable claims. Be constructive — aim to strengthen the final text, not tear it down. Do NOT rewrite the text.",
-        Provider: "claude-cli",
-        Model: "claude-opus-latest",
+        Provider: ModelMatrix.Primary(ModelSlot.CriticalAdvisor).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.CriticalAdvisor).Model,
         MaxTokens: 64000,
         Mode: AdvisorMode.DevilsAdvocate,
         Trigger: AdvisorTrigger.BeforeEveryExecution,
-        IsSystem: true);
+        IsSystem: true,
+        ModelSlot: ModelSlot.CriticalAdvisor);
 
     /// <summary>All system advisor profiles, indexed by name.</summary>
     public static readonly IReadOnlyDictionary<string, AdvisorProfile> AdvisorProfiles =
@@ -750,8 +773,9 @@ public static class SystemCrew
         Settings: new Dictionary<string, string>
         {
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformAntiAiVoice,
-            [TransformSettings.KeyProvider] = "codex-cli",
-            [TransformSettings.KeyModel] = "gpt-5.6-sol",
+            [TransformSettings.KeyProvider] = ModelMatrix.Primary(ModelSlot.TransformRewrite).Provider,
+            [TransformSettings.KeyModel] = ModelMatrix.Primary(ModelSlot.TransformRewrite).Model,
+            [TransformSettings.KeyModelSlot] = nameof(ModelSlot.TransformRewrite),
             [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);
@@ -764,8 +788,9 @@ public static class SystemCrew
         Settings: new Dictionary<string, string>
         {
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformToneFormalization,
-            [TransformSettings.KeyProvider] = "codex-cli",
-            [TransformSettings.KeyModel] = "gpt-5.6-sol",
+            [TransformSettings.KeyProvider] = ModelMatrix.Primary(ModelSlot.TransformRewrite).Provider,
+            [TransformSettings.KeyModel] = ModelMatrix.Primary(ModelSlot.TransformRewrite).Model,
+            [TransformSettings.KeyModelSlot] = nameof(ModelSlot.TransformRewrite),
             [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);
@@ -778,8 +803,9 @@ public static class SystemCrew
         Settings: new Dictionary<string, string>
         {
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformToneCasual,
-            [TransformSettings.KeyProvider] = "codex-cli",
-            [TransformSettings.KeyModel] = "gpt-5.6-sol",
+            [TransformSettings.KeyProvider] = ModelMatrix.Primary(ModelSlot.TransformRewrite).Provider,
+            [TransformSettings.KeyModel] = ModelMatrix.Primary(ModelSlot.TransformRewrite).Model,
+            [TransformSettings.KeyModelSlot] = nameof(ModelSlot.TransformRewrite),
             [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);
@@ -792,8 +818,9 @@ public static class SystemCrew
         Settings: new Dictionary<string, string>
         {
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformExecutiveSummary,
-            [TransformSettings.KeyProvider] = "codex-cli",
-            [TransformSettings.KeyModel] = "gpt-5.6-sol",
+            [TransformSettings.KeyProvider] = ModelMatrix.Primary(ModelSlot.TransformCondense).Provider,
+            [TransformSettings.KeyModel] = ModelMatrix.Primary(ModelSlot.TransformCondense).Model,
+            [TransformSettings.KeyModelSlot] = nameof(ModelSlot.TransformCondense),
             [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);
@@ -806,8 +833,9 @@ public static class SystemCrew
         Settings: new Dictionary<string, string>
         {
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformKeyTakeaways,
-            [TransformSettings.KeyProvider] = "codex-cli",
-            [TransformSettings.KeyModel] = "gpt-5.6-sol",
+            [TransformSettings.KeyProvider] = ModelMatrix.Primary(ModelSlot.TransformCondense).Provider,
+            [TransformSettings.KeyModel] = ModelMatrix.Primary(ModelSlot.TransformCondense).Model,
+            [TransformSettings.KeyModelSlot] = nameof(ModelSlot.TransformCondense),
             [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);
@@ -820,8 +848,9 @@ public static class SystemCrew
         Settings: new Dictionary<string, string>
         {
             [TransformSettings.KeySystemPrompt] = SystemPrompts.TransformGlossary,
-            [TransformSettings.KeyProvider] = "codex-cli",
-            [TransformSettings.KeyModel] = "gpt-5.6-sol",
+            [TransformSettings.KeyProvider] = ModelMatrix.Primary(ModelSlot.TransformCondense).Provider,
+            [TransformSettings.KeyModel] = ModelMatrix.Primary(ModelSlot.TransformCondense).Model,
+            [TransformSettings.KeyModelSlot] = nameof(ModelSlot.TransformCondense),
             [TransformSettings.KeyMaxTokens] = "60000",
         },
         IsSystem: true);

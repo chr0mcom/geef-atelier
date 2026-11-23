@@ -42,4 +42,12 @@ public interface IModelCatalog
     /// target. Returns <paramref name="modelId"/> unchanged when no mapping is known. Never throws.
     /// </summary>
     Task<string> ResolveModelAsync(string providerName, string modelId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns only the model ids the backend itself reported for <paramref name="providerName"/> (including resolved
+    /// always-latest aliases), without the curated ids the picker list merges in. Returns null when no authoritative
+    /// live answer exists (fallback, static-by-design or failure), so callers treat availability as unknown, and an
+    /// empty list when the provider is known to be unusable (for example a missing API key).
+    /// </summary>
+    Task<IReadOnlyList<string>?> ListReportedModelIdsAsync(string providerName, CancellationToken ct = default);
 }

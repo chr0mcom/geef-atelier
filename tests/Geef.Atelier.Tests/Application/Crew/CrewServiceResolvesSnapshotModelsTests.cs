@@ -44,6 +44,7 @@ public sealed class CrewServiceResolvesSnapshotModelsTests
             new NoTemplateRepo(),
             new InMemorySpecializationPackRepository(),
             catalog,
+            new Geef.Atelier.Tests.Fakes.PassThroughModelAssignmentService(),
             NullLogger<CrewService>.Instance);
 
         return (service, catalog);

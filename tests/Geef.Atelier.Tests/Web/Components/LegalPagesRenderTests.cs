@@ -122,7 +122,7 @@ public sealed class LegalPagesRenderTests : TestContext
 
         var cut = RenderComponent<Privacy>();
 
-        Assert.Contains("Datenschutz", cut.Markup);
+        Assert.Contains("Privacy policy", cut.Markup);
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public sealed class LegalPagesRenderTests : TestContext
 
         var cut = RenderComponent<Terms>();
 
-        Assert.Contains("Nutzungsbedingungen", cut.Markup);
+        Assert.Contains("Terms of use", cut.Markup);
     }
 
     [Fact]

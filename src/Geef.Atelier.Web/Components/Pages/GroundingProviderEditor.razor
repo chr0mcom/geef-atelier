@@ -6,6 +6,7 @@
 @using Geef.Atelier.Application.Providers
 @using Geef.Atelier.Core.Domain.Crew
 @using Geef.Atelier.Core.Domain.Crew.Grounding
+@using Geef.Atelier.Core.Domain.Crew.Models
 @using Geef.Atelier.Core.Domain.Providers
 @using Geef.Atelier.Web.Display
 @using Geef.Atelier.Web.Resources
@@ -422,7 +423,7 @@
 
                     <div class="field">
                         <label class="form-checkbox-label">
-                            <InputCheckbox @bind-Value="_form.RefinementEnabled" disabled="@_isReadOnly" />
+                            <InputCheckbox @bind-Value="_form.RefinementEnabled" @bind-Value:after="OnRefinementEnabledChanged" disabled="@_isReadOnly" data-testid="refinement-enabled-checkbox" />
                             Enable AI refinement
                         </label>
                         <FieldHelp Text="@GroundingFieldHelps.RefinementEnabled" />
@@ -430,11 +431,47 @@
 
                     @if (_form.RefinementEnabled)
                     {
+                        <div class="field" data-testid="refinement-model-assignment">
+                            <label>Model assignment</label>
+                            <div class="radio-group" data-testid="refinement-assignment-mode">
+                                <label class="radio-option">
+                                    <input type="radio"
+                                           name="refinement-assignment-mode"
+                                           value="automatic"
+                                           checked="@_form.RefinementAutomatic"
+                                           disabled="@_isReadOnly"
+                                           data-testid="refinement-assignment-automatic"
+                                           @onchange="() => SetRefinementAutomatic(true)" />
+                                    <span>
+                                        <strong>Automatic by role</strong>
+                                        <span class="radio-description">The refiner model is chosen from the model matrix by role.</span>
+                                    </span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio"
+                                           name="refinement-assignment-mode"
+                                           value="manual"
+                                           checked="@(!_form.RefinementAutomatic)"
+                                           disabled="@_isReadOnly"
+                                           data-testid="refinement-assignment-manual"
+                                           @onchange="() => SetRefinementAutomatic(false)" />
+                                    <span>
+                                        <strong>Manual</strong>
+                                        <span class="radio-description">You pick the provider and model yourself; they are never replaced.</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
                         <div class="field">
                             <label>Refinement provider</label>
-                            <select @bind="_form.RefinementProvider" @bind:after="OnRefinementProviderChanged" disabled="@_isReadOnly"
+                            <select @bind="_form.RefinementProvider" @bind:after="OnRefinementProviderChanged" disabled="@(_isReadOnly || _form.RefinementAutomatic)"
                                     data-testid="refinement-provider-select">
                                 <option value="">-- select provider --</option>
+                                @if (!string.IsNullOrEmpty(_form.RefinementProvider) && _providers.All(x => x.Name != _form.RefinementProvider))
+                                {
+                                    <option value="@_form.RefinementProvider">@_form.RefinementProvider</option>
+                                }
                                 <optgroup label="HTTP">
                                     @foreach (var p in _providers.Where(x => x.IsActive && x.Type == ProviderType.Http))
                                     {
@@ -455,9 +492,14 @@
                             <label>Refinement model</label>
                             <ModelSelector Provider="@_form.RefinementProvider"
                                            @bind-Value="_form.RefinementModel"
-                                           Disabled="@_isReadOnly"
+                                           Disabled="@(_isReadOnly || _form.RefinementAutomatic)"
                                            DataTestId="refinement-model-selector" />
                             <FieldHelp Text="@GroundingFieldHelps.RefinementModel" />
+                            @if (!_form.RefinementAutomatic && !_isReadOnly
+                                 && new ModelCandidate(_form.RefinementProvider, _form.RefinementModel).DescribeCliRouteRewrite() is { } notice)
+                            {
+                                <FieldHelp Text="@notice" DataTestId="refinement-cli-route-notice" />
+                            }
                         </div>
 
                         <div class="field">
@@ -594,6 +636,24 @@
         _form.RefinementModel = "";
     }
 
+    private void OnRefinementEnabledChanged()
+    {
+        if (_form.RefinementEnabled && string.IsNullOrWhiteSpace(_form.RefinementProvider))
+        {
+            _form.RefinementAutomatic = true;
+            _form.ApplyRefinementPrimary();
+        }
+    }
+
+    private void SetRefinementAutomatic(bool automatic)
+    {
+        if (_isReadOnly || _form.RefinementAutomatic == automatic)
+            return;
+        _form.RefinementAutomatic = automatic;
+        if (automatic)
+            _form.ApplyRefinementPrimary();
+    }
+
     private void OnRefinementTemperatureChanged(ChangeEventArgs e)
     {
         var raw = e.Value?.ToString();
@@ -684,6 +744,14 @@
         public double? RefinementTemperature { get; set; }
         public int RefinementMode { get; set; } = 0; // 0 = Filter, 1 = Synthesize
         public string RefinementInstructions { get; set; } = "";
+        public bool RefinementAutomatic { get; set; }
+
+        public void ApplyRefinementPrimary()
+        {
+            var primary = ModelMatrix.Primary(ModelSlot.GroundingRefiner);
+            RefinementProvider = primary.Provider;
+            RefinementModel = primary.Model;
+        }
 
         // static-context
         public string StaticLabel { get; set; } = "";
@@ -725,7 +793,7 @@
             p.ProviderSettings.TryGetValue("TopK", out var topKStr);
             p.ProviderSettings.TryGetValue("TagFilter", out var tagFilter);
             p.ProviderSettings.TryGetValue("Scope", out var scope);
-            return new GroundingFormModel
+            var form = new GroundingFormModel
             {
                 Name = p.Name,
                 DisplayName = p.DisplayName,
@@ -767,7 +835,11 @@
                 RestApiAuthHeaderEnv = p.RestApiAuthHeaderEnv ?? "",
                 RestApiAuthHeaderName = p.RestApiAuthHeaderName,
                 RestApiAuthHeaderFormat = p.RestApiAuthHeaderFormat,
+                RefinementAutomatic = p.RefinementModelSlot == ModelSlot.GroundingRefiner,
             };
+            if (form.RefinementAutomatic)
+                form.ApplyRefinementPrimary();
+            return form;
         }
 
         public GroundingProviderProfile ToProfile()
@@ -813,6 +885,13 @@
                 settings[GroundingProviderProfile.KeyRefinementModel] = RefinementModel;
                 settings[GroundingProviderProfile.KeyRefinementMaxTokens] = RefinementMaxTokens.ToString();
                 settings[GroundingProviderProfile.KeyRefinementMode] = RefinementMode.ToString();
+                if (RefinementAutomatic)
+                {
+                    var primary = ModelMatrix.Primary(ModelSlot.GroundingRefiner);
+                    settings[GroundingProviderProfile.KeyRefinementProvider] = primary.Provider;
+                    settings[GroundingProviderProfile.KeyRefinementModel] = primary.Model;
+                    settings[GroundingProviderProfile.KeyModelSlot] = ModelSlot.GroundingRefiner.ToString();
+                }
                 if (RefinementTemperature.HasValue)
                     settings[GroundingProviderProfile.KeyRefinementTemperature] = RefinementTemperature.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 if (!string.IsNullOrWhiteSpace(RefinementInstructions))

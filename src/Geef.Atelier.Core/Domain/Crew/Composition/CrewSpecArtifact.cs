@@ -76,6 +76,19 @@ public sealed record CrewPartSpec
     /// and advisor parts.
     /// </summary>
     public IReadOnlyList<string>? PackNames { get; init; }
+
+    /// <summary>
+    /// Raw model-matrix slot requested by the composer (<c>model_slot</c>), e.g. <c>"FactReviewer"</c>. The model is
+    /// assigned from the matrix; the validator reports unknown values. Applies to inline executor, reviewer,
+    /// advisor and Transform-finalizer parts.
+    /// </summary>
+    public string? ModelSlot { get; init; }
+
+    /// <summary>
+    /// Optional inline settings (<c>settings</c>) for grounding providers and finalizers, e.g. <c>refinementMode</c>
+    /// for a grounding provider. Values are raw strings.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? Settings { get; init; }
 }
 
 /// <summary>
@@ -111,8 +124,20 @@ public sealed record CrewSpecArtifact
     /// <summary>Whether this spec reuses an existing template, composes from existing parts, or defines everything new.</summary>
     public CrewSpecMode Mode { get; init; }
 
-    /// <summary>Domain hint for the crew (e.g. "legal", "academic", "general").</summary>
+    /// <summary>Free domain hint for naming, deduplication and domain-scoped packs (e.g. "legal", "academic", "general").</summary>
     public string Domain { get; init; } = "general";
+
+    /// <summary>Raw <c>model_domain</c> chosen by the composer: the model-matrix row (D-066/12). Null when absent.</summary>
+    public string? MatrixDomain { get; init; }
+
+    /// <summary>
+    /// The model-matrix domain of the crew, resolved in exactly one place: <see cref="MatrixDomain"/> as an exact enum name,
+    /// else <see cref="Domain"/> as an exact enum name, else <see cref="Models.ModelDomain.General"/>. No keyword heuristics.
+    /// </summary>
+    public Models.ModelDomain EffectiveModelDomain() =>
+        Models.EnumNames.ParseExact<Models.ModelDomain>(MatrixDomain)
+        ?? Models.EnumNames.ParseExact<Models.ModelDomain>(Domain)
+        ?? Models.ModelDomain.General;
 
     /// <summary>Meta-LLM rationale explaining why this crew configuration was chosen.</summary>
     public string Rationale { get; init; } = string.Empty;

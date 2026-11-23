@@ -46,7 +46,8 @@ public static class CrewSnapshotBuilder
             Advisors: advisors,
             GroundingProviders: groundingProviders,
             Finalizers: finalizers,
-            RunFinalizersOnMaxAttempts: template.RunFinalizersOnMaxAttempts);
+            RunFinalizersOnMaxAttempts: template.RunFinalizersOnMaxAttempts,
+            CrewDomain: template.Domain ?? Core.Domain.Crew.Models.ModelDomain.General);
     }
 
     /// <summary>
@@ -101,7 +102,8 @@ public static class CrewSnapshotBuilder
             ConvergenceOverride: spec.ConvergenceOverride,
             Advisors: advisors,
             GroundingProviders: groundingProviders,
-            Finalizers: finalizers);
+            Finalizers: finalizers,
+            CrewDomain: spec.Domain ?? Core.Domain.Crew.Models.ModelDomain.General);
     }
 
     /// <summary>

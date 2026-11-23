@@ -26,3 +26,18 @@
     color: oklch(0.45 0.10 30);
     background: oklch(0.97 0.02 30);
 }
+
+.domain-badge--correspondence {
+    color: oklch(0.45 0.08 200);
+    background: oklch(0.96 0.02 200);
+}
+
+.domain-badge--speech {
+    color: oklch(0.44 0.10 320);
+    background: oklch(0.97 0.02 320);
+}
+
+.domain-badge--technical {
+    color: oklch(0.42 0.03 260);
+    background: oklch(0.96 0.01 260);
+}

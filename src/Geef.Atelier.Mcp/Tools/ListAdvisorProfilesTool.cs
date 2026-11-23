@@ -19,7 +19,8 @@ public static class ListAdvisorProfilesTool
             .Select(p => new AdvisorProfileDto(
                 p.Name, p.DisplayName, p.Description,
                 p.Mode.ToString(), p.Trigger.ToString(),
-                p.Provider, p.Model, p.IsSystem))
+                p.Provider, p.Model, p.IsSystem,
+                p.ModelSlot?.ToString(), p.ModelDomain?.ToString()))
             .ToList();
     }
 }

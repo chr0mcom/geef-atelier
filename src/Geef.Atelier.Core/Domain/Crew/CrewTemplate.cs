@@ -45,6 +45,7 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// <c>SpecializationPack.Name</c>s composed into that actor's effective prompt at snapshot-build time.
 /// The same generic actor can carry different packs in different crews. Empty when no packs are bound.
 /// </param>
+/// <param name="Domain">Domain the crew works in; selects the model-matrix row for managed profiles (null = General).</param>
 public sealed record CrewTemplate(
     string Name,
     string DisplayName,
@@ -58,7 +59,8 @@ public sealed record CrewTemplate(
     bool IsSystem,
     IReadOnlyList<string>? FinalizerProfileNames = null,
     bool RunFinalizersOnMaxAttempts = false,
-    IReadOnlyDictionary<string, IReadOnlyList<string>>? ActorPackBindings = null)
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? ActorPackBindings = null,
+    Models.ModelDomain? Domain = null)
 {
     /// <summary>Resolved finalizer profile names; never null after construction.</summary>
     public IReadOnlyList<string> FinalizerProfileNames { get; init; } = FinalizerProfileNames ?? Array.Empty<string>();

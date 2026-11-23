@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
 import os
 import shutil
 import time
 import uuid
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 
 import claude_adapter
@@ -19,8 +21,10 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from openai_format import (
     ChatCompletionRequest,
     ChatCompletionResponse,
+    ImageGenerationRequest,
     ToolChoiceObject,
     UsageInfo,
+    png_dimensions,
     make_refusal_response,
     make_text_response,
     make_tool_calls_response,
@@ -98,6 +102,7 @@ async def lifespan(app: FastAPI):  # noqa: ANN001
     # Re-initialise semaphores after the event loop is running.
     claude_adapter._semaphore = asyncio.Semaphore(claude_adapter.MAX_CONCURRENT)
     codex_adapter._semaphore = asyncio.Semaphore(codex_adapter.MAX_CONCURRENT)
+    codex_adapter._image_semaphore = asyncio.Semaphore(codex_adapter.IMAGE_MAX_CONCURRENT)
     # Sync provider configs from backend (best-effort; failure is non-fatal).
     await provider_sync.sync_now()
     # Handles are retained: asyncio keeps only weak references to running tasks, so a bare
@@ -174,6 +179,19 @@ def _route_model(model: str) -> str:
         return "codex"
     # Default to claude for unknown models.
     return "claude"
+
+
+async def _resolve_codex_alias(req: ChatCompletionRequest) -> ChatCompletionRequest:
+    """Swap an always-latest codex alias (`gpt-sol-latest`) for the concrete model id.
+
+    Done at the entry point so that the CLI call, the response `model` field and the SSE frames
+    all carry the concrete id. Anything that is not a known alias passes through untouched.
+    """
+    resolved = await codex_adapter.resolve_model_alias(req.model)
+    if resolved == req.model:
+        return req
+    log.info("codex alias %s resolved to %s", req.model, resolved)
+    return req.model_copy(update={"model": resolved.split("/")[-1]})
 
 
 _API_KEYS = {k.strip() for k in os.getenv("CLI_PROXY_API_KEYS", "").split(",") if k.strip()}
@@ -704,17 +722,24 @@ async def _call_backend(req: ChatCompletionRequest, backend: str) -> ChatComplet
     return await (_call_claude(req) if failover.cli_of(backend) == "claude" else _call_codex(req))
 
 
+#: Model used when a request is handed over to codex by the failover (always-latest alias, D-066/10);
+#: the same constant is the codex adapter's default for a request without a model.
+FAILOVER_CODEX_MODEL = codex_adapter.FAILOVER_MODEL
+
+
 def _retarget(req: ChatCompletionRequest, primary: str, target: str) -> ChatCompletionRequest:
     """Adapt the request for a backend the caller did not ask for.
 
     The model name must NOT travel across the backend boundary: handing
-    `claude-haiku-latest` to `codex -m` is a guaranteed failure. Both adapters skip the
-    model flag on a falsy name, so an empty model means "use that CLI's own default" --
-    which for codex is the newest top model configured in ~/.codex/config.toml.
+    `claude-haiku-latest` to `codex -m` is a guaranteed failure. A request handed to codex
+    runs on `gpt-sol-latest`, which the codex adapter resolves to the newest listed Sol model:
+    the container's codex config sets no default model, so an empty name would leave the
+    model to whatever the CLI build defaults to (D-066/10). A request handed to claude gets
+    an empty name, i.e. the claude CLI's own default.
     """
     if failover.cli_of(target) == failover.cli_of(primary):
         return req  # a second account of the same CLI speaks the same model names
-    return req.model_copy(update={"model": ""})
+    return req.model_copy(update={"model": FAILOVER_CODEX_MODEL if failover.cli_of(target) == "codex" else ""})
 
 
 async def _complete_with_failover(
@@ -965,12 +990,15 @@ async def cli_list_models(provider_name: str, refresh: int = 0) -> JSONResponse:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     models, source, aliases = await adapter.list_models_with_source(config, bypass_cache=bool(refresh))
-    return JSONResponse({
+    body: dict[str, object] = {
         "object": "list",
         "data": [{"id": m, "object": "model"} for m in models],
         "x_source": source,
         "x_aliases": aliases,
-    })
+    }
+    if adapter.aliases_complete:
+        body["x_aliases_complete"] = True
+    return JSONResponse(body)
 
 
 # ---------------------------------------------------------------------------
@@ -995,10 +1023,101 @@ async def codex_completions(req: ChatCompletionRequest, http_request: Request, r
     codex is faulted (auth/limit/transport); see failover.py."""
     _check_auth(http_request)
     _begin_request(req)
+    req = await _resolve_codex_alias(req)
     if req.stream:
         return _stream_completion(req, "codex")
     async with _inflight_guard():
         return await _complete_with_failover(req, "codex", response)
+
+
+# ---------------------------------------------------------------------------
+# Image generation (codex only — claude cannot generate images, so there is no failover)
+# ---------------------------------------------------------------------------
+
+# Images draw on the same ChatGPT subscription window as BookForge's codex work, so a runaway
+# caller must not be able to empty it. 0 disables the cap. The counter is per UTC day, in memory:
+# a restart resets it, which is acceptable for a safety net.
+IMAGE_DAILY_MAX = int(os.getenv("IMAGE_DAILY_MAX", "50"))
+_image_day = ""
+_image_count = 0
+
+_IMAGE_SIZES = ("auto", *codex_adapter.IMAGE_SIZE_HINTS)
+
+
+def _validate_image_request(req: ImageGenerationRequest) -> None:
+    """Honest param policy, like the chat route: reject what codex cannot deliver instead of
+    pretending. `model`, `quality` and `user` are accepted and ignored."""
+    if req.n is not None and req.n != 1:
+        raise OpenAIError(
+            "n>1 is not supported (each image is one subscription-billed CLI run); send one "
+            "request per image.", status_code=400, code="unsupported_parameter", param="n")
+    if req.response_format not in (None, "b64_json"):
+        raise OpenAIError(
+            "Only response_format=b64_json is supported; images are returned inline, not as URLs.",
+            status_code=400, code="unsupported_value", param="response_format")
+    if req.output_format not in (None, "png"):
+        raise OpenAIError(
+            "Only output_format=png is supported.",
+            status_code=400, code="unsupported_value", param="output_format")
+    if req.background not in (None, "auto", "opaque"):
+        raise OpenAIError(
+            f"background {req.background!r} is not supported; images are always opaque.",
+            status_code=400, code="unsupported_value", param="background")
+    if req.size is not None and req.size not in _IMAGE_SIZES:
+        raise OpenAIError(
+            f"size {req.size!r} is not supported; use one of: {', '.join(_IMAGE_SIZES)}.",
+            status_code=400, code="unsupported_value", param="size")
+
+
+def _take_image_slot() -> None:
+    """Count one image job against today's cap; 429 once the cap is reached."""
+    global _image_day, _image_count
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if today != _image_day:
+        _image_day, _image_count = today, 0
+    if IMAGE_DAILY_MAX and _image_count >= IMAGE_DAILY_MAX:
+        raise OpenAIError(
+            f"Daily image limit of {IMAGE_DAILY_MAX} reached; it resets at 00:00 UTC.",
+            status_code=429, type="rate_limit_error", code="rate_limit_exceeded")
+    _image_count += 1
+
+
+@app.post("/v1/codex/images/generations")
+async def codex_image_generations(
+    req: ImageGenerationRequest, http_request: Request
+) -> JSONResponse:
+    """OpenAI Images API (`images.generate`) backed by codex's `$imagegen`. One PNG per request,
+    returned as base64. Not part of the claude⇄codex failover and it never touches the circuit
+    breaker: an image fault says nothing about whether text completions work."""
+    _check_auth(http_request)
+    _validate_image_request(req)
+    _take_image_slot()
+    async with _inflight_guard():
+        try:
+            png, parts = await codex_adapter.generate_image(req.prompt, req.size)
+        except codex_adapter.NoImageError as exc:
+            log.warning("codex image generation produced no image: %s", exc)
+            raise OpenAIError(str(exc), status_code=400, code="image_generation_failed") from exc
+        except (RuntimeError, OSError) as exc:
+            reason = failover.classify(exc)
+            log.error("codex image generation failed (%s): %s", reason, exc)
+            if reason == "limit":
+                raise OpenAIError(str(exc), status_code=429, type="rate_limit_error",
+                                  code="rate_limit_exceeded") from exc
+            raise OpenAIError(str(exc), status_code=502, type="api_error") from exc
+    dims = png_dimensions(png)
+    # The usage of the surrounding agent turn is not the image model's usage, so it is logged
+    # for the operator but not returned (the field is optional in the Images API).
+    log.info("codex image generated | %d bytes | %s | agent turn tokens in=%d out=%d",
+             len(png), dims, parts.input_tokens, parts.output_tokens)
+    body = {
+        "created": int(time.time()),
+        "data": [{"b64_json": base64.b64encode(png).decode("ascii")}],
+        "output_format": "png",
+    }
+    if dims:
+        body["size"] = f"{dims[0]}x{dims[1]}"
+    return JSONResponse(body, headers={"x-cli-proxy-provider": "codex"})
 
 
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
@@ -1011,6 +1130,8 @@ async def chat_completions(req: ChatCompletionRequest, http_request: Request, re
     _check_auth(http_request)
     _begin_request(req)
     backend = _route_model(req.model)
+    if backend == "codex":
+        req = await _resolve_codex_alias(req)
     if req.document_mode:
         raise HTTPException(
             status_code=400,
@@ -1041,12 +1162,17 @@ async def claude_models(refresh: int = 0) -> JSONResponse:
 
 @app.get("/v1/codex/models")
 async def codex_models(refresh: int = 0) -> JSONResponse:
-    """Lists the 10 newest OpenAI models, fetched live from OpenRouter (24 h cache).
-    `x_source` is "degraded" when the fetch failed and the ids are a cached or offline
-    substitute. `refresh=1` bypasses the cache."""
-    models, source = await codex_adapter.list_models_with_source_async(bool(refresh))
+    """Lists the codex subscription models read from the CLI's models_cache.json, preceded by
+    the always-latest aliases (`gpt-sol-latest`, ...). `x_aliases` maps each alias to the
+    concrete model it resolves to right now. `x_source` is "degraded" when the cache file was
+    unusable and "static" when the CLI has not written it yet; both serve cached/curated ids.
+    `x_aliases_complete` is always true here: the map is derived completely from the served list,
+    the same list and function `resolve_model_alias` uses for a call, whatever `x_source` says.
+    `refresh=1` bypasses the cache."""
+    models, source, aliases = await codex_adapter.list_models_with_aliases_async(bool(refresh))
     data = [{"id": m, "object": "model", "owned_by": "openai"} for m in models]
-    return JSONResponse({"object": "list", "data": data, "x_source": source, "x_aliases": {}})
+    return JSONResponse({"object": "list", "data": data, "x_source": source, "x_aliases": aliases,
+                         "x_aliases_complete": codex_adapter.ALIASES_COMPLETE})
 
 
 @app.get("/v1/models")

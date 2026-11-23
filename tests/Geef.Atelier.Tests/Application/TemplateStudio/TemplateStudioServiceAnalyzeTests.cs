@@ -82,6 +82,9 @@ public sealed class TemplateStudioServiceAnalyzeTests
 
     private sealed class NoopModelCatalog : IModelCatalog
     {
+        public Task<IReadOnlyList<string>?> ListReportedModelIdsAsync(string providerName, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<string>?>(null);
+
         public Task<IReadOnlyList<ModelInfo>> ListModelsAsync(string providerName, CancellationToken ct = default)
             => Task.FromResult((IReadOnlyList<ModelInfo>)[]);
         public Task<IReadOnlyList<ModelInfo>> RefreshAsync(string providerName, CancellationToken ct = default)
@@ -425,10 +428,10 @@ public sealed class TemplateStudioServiceAnalyzeTests
         var store = new FakeStudioSettingsService();
         var svc = CreateService(new ToolCallFakeLlmClient(MinimalProposalJson), studioSettings: store);
 
-        await svc.SaveDefaultAsync(new StudioModelChoice("codex-cli", "gpt-5.5", 20000), CancellationToken.None);
+        await svc.SaveDefaultAsync(new StudioModelChoice("codex-cli", "gpt-sol-latest", 20000), CancellationToken.None);
 
         Assert.Equal("codex-cli", store.Current.Provider);
-        Assert.Equal("gpt-5.5", store.Current.Model);
+        Assert.Equal("gpt-sol-latest", store.Current.Model);
         Assert.Equal(20000, store.Current.MaxTokens);
     }
 
@@ -440,8 +443,19 @@ public sealed class TemplateStudioServiceAnalyzeTests
 
         await svc.SaveDefaultAsync(new StudioModelChoice("", "", 0), CancellationToken.None);
 
-        Assert.Equal("openrouter", store.Current.Provider);
-        Assert.Equal("anthropic/claude-sonnet-4-5", store.Current.Model);
+        Assert.Equal("claude-cli", store.Current.Provider);
+        Assert.Equal("claude-sonnet-latest", store.Current.Model);
         Assert.Equal(4096, store.Current.MaxTokens);
+    }
+
+    [Fact]
+    public async Task SaveDefaultAsync_RoutesClaudeAndOpenAiChoicesThroughTheCli()
+    {
+        var store = new FakeStudioSettingsService();
+        var svc = CreateService(new ToolCallFakeLlmClient(MinimalProposalJson), studioSettings: store);
+
+        await svc.SaveDefaultAsync(new StudioModelChoice("openrouter", "openai/gpt-5.6-sol", 8000), CancellationToken.None);
+
+        Assert.Equal(("codex-cli", "gpt-sol-latest"), (store.Current.Provider, store.Current.Model));
     }
 }

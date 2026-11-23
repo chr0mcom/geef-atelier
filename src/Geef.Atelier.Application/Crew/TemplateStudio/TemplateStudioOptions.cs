@@ -1,13 +1,15 @@
+using Geef.Atelier.Core.Domain.Crew.Models;
+
 namespace Geef.Atelier.Application.Crew.TemplateStudio;
 
 /// <summary>Configuration options for the Template Studio meta-LLM calls.</summary>
 public sealed class TemplateStudioOptions
 {
-    /// <summary>LLM provider name for Studio meta-analysis calls. Defaults to "openrouter".</summary>
-    public string Provider { get; set; } = "openrouter";
+    /// <summary>LLM provider name for Studio meta-analysis calls. Defaults to the model-matrix composer slot (D-066).</summary>
+    public string Provider { get; set; } = ModelMatrix.Primary(ModelSlot.Composer).Provider;
 
-    /// <summary>OpenRouter model identifier for the meta-LLM analysis call.</summary>
-    public string Model { get; set; } = "anthropic/claude-opus-5";
+    /// <summary>Model identifier for the meta-LLM analysis call. Defaults to the model-matrix composer slot (D-066).</summary>
+    public string Model { get; set; } = ModelMatrix.Primary(ModelSlot.Composer).Model;
 
     /// <summary>Max tokens for the meta-LLM analysis response. Must accommodate several
     /// fully structured profile system prompts plus reasoning fields in a single tool call.</summary>
@@ -34,25 +36,25 @@ public sealed class StudioDefaults
     public const int MinMaxTokens = 10000;
 
     // Reviewer defaults
-    public string ReviewerModel { get; set; } = "openai/gpt-5.6-sol";
-    public string ReviewerProvider { get; set; } = "openrouter";
+    public string ReviewerModel { get; set; } = ModelMatrix.Primary(ModelSlot.FactReviewer).Model;
+    public string ReviewerProvider { get; set; } = ModelMatrix.Primary(ModelSlot.FactReviewer).Provider;
     public int ReviewerMaxTokens { get; set; } = 16384;
 
     // Executor defaults
-    public string ExecutorModel { get; set; } = "anthropic/claude-opus-5";
-    public string ExecutorProvider { get; set; } = "openrouter";
+    public string ExecutorModel { get; set; } = ModelMatrix.Primary(ModelSlot.Executor).Model;
+    public string ExecutorProvider { get; set; } = ModelMatrix.Primary(ModelSlot.Executor).Provider;
     public int ExecutorMaxTokens { get; set; } = 60000;
 
     // Advisor defaults
-    public string AdvisorModel { get; set; } = "openai/gpt-5.6-sol";
-    public string AdvisorProvider { get; set; } = "openrouter";
+    public string AdvisorModel { get; set; } = ModelMatrix.Primary(ModelSlot.StrategicAdvisor).Model;
+    public string AdvisorProvider { get; set; } = ModelMatrix.Primary(ModelSlot.StrategicAdvisor).Provider;
     public int AdvisorMaxTokens { get; set; } = 16384;
     public string AdvisorMode { get; set; } = "Strategic";
     public string AdvisorTrigger { get; set; } = "BeforeFirstExecution";
 
     // GroundingProvider defaults
     public string GroundingProviderType { get; set; } = "tavily";
-    public string GroundingProviderProvider { get; set; } = "openrouter";
+    public string GroundingProviderProvider { get; set; } = ModelMatrix.Primary(ModelSlot.GroundingRefiner).Provider;
 
     // Template defaults
     public string EvaluationStrategy { get; set; } = "Sequential";

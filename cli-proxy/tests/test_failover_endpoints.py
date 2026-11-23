@@ -52,13 +52,13 @@ class TestClaudeFailsOverToCodex:
         assert codex.await_count == 1
 
     def test_model_name_does_not_travel_to_the_partner_cli(self, client: TestClient) -> None:
-        # `codex -m claude-haiku-latest` would fail outright; the partner must use its own default.
+        # `codex -m claude-haiku-latest` would fail outright; codex gets its always-latest Sol alias instead.
         with patch.object(main.claude_adapter, "complete_with_usage", _boom(_AUTH_ERROR)), \
              patch.object(main.codex_adapter, "complete_with_usage", _ok()) as codex:
             client.post("/v1/claude/chat/completions", json=_BODY)
 
         passed_model = codex.await_args.args[1]
-        assert not passed_model, f"model {passed_model!r} must not cross the backend boundary"
+        assert passed_model == main.FAILOVER_CODEX_MODEL, f"model {passed_model!r} must not cross the backend boundary"
 
     def test_response_still_echoes_the_requested_model(self, client: TestClient) -> None:
         with patch.object(main.claude_adapter, "complete_with_usage", _boom(_AUTH_ERROR)), \
@@ -149,7 +149,7 @@ class TestBreakerRouting:
         failover.record_failure("claude", "auth", "boom")
 
         async def _stream(prompt, model, max_tokens):
-            assert not model, "model must not cross the backend boundary"
+            assert model == main.FAILOVER_CODEX_MODEL, "model must not cross the backend boundary"
             yield ("delta", "streamed by codex")
 
         with patch.object(main.codex_adapter, "stream", _stream):
@@ -193,7 +193,7 @@ class TestStreamingFailover:
         assert resp.status_code == 200
         assert "from codex" in resp.text
         assert '"api_error"' not in resp.text, "the client must see content, not an error frame"
-        assert not codex.await_args.args[1], "model must not cross the backend boundary"
+        assert codex.await_args.args[1] == main.FAILOVER_CODEX_MODEL, "model must not cross the backend boundary"
         st = failover.snapshot()["backends"]["claude"]
         assert st["last_reason"] == "limit"
         assert st["failover_count"] == 1

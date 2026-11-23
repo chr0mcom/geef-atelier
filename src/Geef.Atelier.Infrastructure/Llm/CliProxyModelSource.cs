@@ -66,7 +66,8 @@ internal sealed class CliProxyModelSource(
                 ModelIds: ids,
                 IsLive: isLive,
                 HasLiveSource: hasLiveSource,
-                AliasMap: payload.Aliases ?? new Dictionary<string, string>());
+                AliasMap: payload.Aliases ?? new Dictionary<string, string>(),
+                AliasesComplete: payload.AliasesComplete == true);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
@@ -89,6 +90,9 @@ internal sealed class CliProxyModelSource(
 
         [JsonPropertyName("x_aliases")]
         public Dictionary<string, string>? Aliases { get; set; }
+
+        [JsonPropertyName("x_aliases_complete")]
+        public bool? AliasesComplete { get; set; }
     }
 
     private sealed class CliModelEntry

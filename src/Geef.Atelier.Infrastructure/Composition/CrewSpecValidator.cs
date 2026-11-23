@@ -2,6 +2,8 @@ using Geef.Atelier.Application.Composition;
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Composition;
+using Geef.Atelier.Core.Domain.Crew.Finalizers;
+using Geef.Atelier.Core.Domain.Crew.Models;
 using Geef.Atelier.Core.Domain.Crew.Specialization;
 using Geef.Atelier.Core.Domain.Tools;
 using Geef.Atelier.Core.Persistence.Crew;
@@ -17,7 +19,7 @@ namespace Geef.Atelier.Infrastructure.Composition;
 ///   <item>parsing the JSON into a <see cref="CrewSpecArtifact"/>,</item>
 ///   <item>resolving every <c>reuse</c> reference against the live profile catalog,</item>
 ///   <item>checking that all required fields are present for inline definitions, and</item>
-///   <item>verifying that provider/model combinations exist in the model catalog.</item>
+///   <item>checking model slots and the CLI-route rule (models come from the model matrix, D-066).</item>
 /// </list>
 /// </summary>
 internal sealed class CrewSpecValidator(
@@ -96,7 +98,7 @@ internal sealed class CrewSpecValidator(
                 Field:      "executor.reuse",
                 Message:    "The executor must be a new, inline, task-specialized profile — reusing an " +
                             $"executor (here '{spec.Executor.Reuse}') is not allowed. Define an inline executor " +
-                            "with name, provider, model, max_tokens and a task-specific system_prompt.",
+                            "with name, model_slot \"Executor\", max_tokens and a task-specific system_prompt.",
                 IsCritical: true));
         }
         else
@@ -138,20 +140,15 @@ internal sealed class CrewSpecValidator(
         {
             for (var i = 0; i < spec.Finalizers.Count; i++)
             {
-                // Only LLM-based finalizers (Transform) need a provider/model.
-                // Deterministic finalizer types (FileExport, MetadataEnrich, ExternalSink,
-                // CrewMaterialize, LearningExtract, LearningPublish) have no LLM call.
-                // For those, skip both the required-field check and the availability check.
-                var finalizerType = spec.Finalizers[i].FinalizerType;
-                var isLlmFinalizer = string.Equals(finalizerType, "Transform", StringComparison.OrdinalIgnoreCase);
+                var isTransform = spec.Finalizers[i].IsInlineTransform();
 
                 await ValidateProfileRefAsync(
                     spec.Finalizers[i], $"finalizers[{i}]",
                     name => crewService.GetFinalizerProfileAsync(name, cancellationToken),
                     issues, cancellationToken,
-                    skipModelCheck: !isLlmFinalizer,
-                    skipProviderModelRequired: !isLlmFinalizer,
-                    skipSystemPromptRequired: !isLlmFinalizer);
+                    skipSystemPromptRequired: !isTransform);
+
+                ValidateInlineFinalizerSettings(spec.Finalizers[i], $"finalizers[{i}]", issues);
             }
         }
 
@@ -175,8 +172,6 @@ internal sealed class CrewSpecValidator(
                 groundingRef, $"grounding_providers[{i}]",
                 name => crewService.GetGroundingProviderProfileAsync(name, cancellationToken),
                 issues, cancellationToken,
-                skipModelCheck: true,
-                skipProviderModelRequired: true,
                 skipSystemPromptRequired: true);
 
             // For inline definitions the provider_type must be a registered discriminator; otherwise
@@ -184,6 +179,8 @@ internal sealed class CrewSpecValidator(
             // for type ..."). Reuse references are skipped — they resolve to an existing valid profile.
             if (string.IsNullOrWhiteSpace(groundingRef.Reuse))
             {
+                ValidateInlineGroundingSettings(groundingRef, $"grounding_providers[{i}]", issues);
+
                 if (string.IsNullOrWhiteSpace(groundingRef.ProviderType))
                 {
                     issues.Add(new CrewSpecValidationIssue(
@@ -208,16 +205,91 @@ internal sealed class CrewSpecValidator(
         // Step 9 – specialization-pack bindings
         await ValidatePackBindingsAsync(spec, issues, cancellationToken);
 
+        ValidateModelSlots(spec, issues);
+
         await ValidateModelPluralityAsync(spec, issues, cancellationToken);
 
         return issues;
     }
 
     /// <summary>
-    /// Step 10 — flags reviewers that end up on the same model as the executor. Since always-latest aliases
-    /// and concrete ids can name the same model, both sides are resolved before comparing —
-    /// otherwise a crew whose executor names the always-latest alias and whose reviewer names the
-    /// concrete id it points at passes every check and is still a monoculture reviewing itself.
+    /// Step 11 — model slots and CLI route (D-066). Inline LLM parts get their model from the model matrix: an
+    /// unparsable or disallowed <c>model_slot</c> is critical, a missing one defaults (warning), and a
+    /// Claude/OpenAI binding on a non-CLI provider is reported as being rewritten (warning). A missing or invalid
+    /// <c>model_domain</c> is a warning: the crew then runs on the row that <c>CrewSpecArtifact.EffectiveModelDomain</c>
+    /// resolves (the free <c>domain</c> only if it is an exact enum name, else General).
+    /// </summary>
+    private static void ValidateModelSlots(CrewSpecArtifact spec, List<CrewSpecValidationIssue> issues)
+    {
+        if (EnumNames.ParseExact<ModelDomain>(spec.MatrixDomain) is null)
+        {
+            issues.Add(new CrewSpecValidationIssue(
+                Field:      "model_domain",
+                Message:    spec.MatrixDomain is null
+                    ? $"No model_domain given; using '{spec.EffectiveModelDomain()}'. Valid values: {string.Join(", ", Enum.GetNames<ModelDomain>())}."
+                    : $"model_domain '{spec.MatrixDomain}' is not valid; using '{spec.EffectiveModelDomain()}'. Valid values: {string.Join(", ", Enum.GetNames<ModelDomain>())}.",
+                IsCritical: false));
+        }
+
+        var parts = new List<(string Path, CrewPartSpec Part, CrewPartKind Kind)>();
+        if (spec.Executor is not null)
+            parts.Add(("executor", spec.Executor, CrewPartKind.Executor));
+        for (var i = 0; i < spec.Reviewers.Count; i++)
+            parts.Add(($"reviewers[{i}]", spec.Reviewers[i], CrewPartKind.Reviewer));
+        for (var i = 0; i < spec.Advisors.Count; i++)
+            parts.Add(($"advisors[{i}]", spec.Advisors[i], CrewPartKind.Advisor));
+        for (var i = 0; i < spec.Finalizers.Count; i++)
+        {
+            if (spec.Finalizers[i].IsInlineTransform())
+                parts.Add(($"finalizers[{i}]", spec.Finalizers[i], CrewPartKind.TransformFinalizer));
+        }
+
+        foreach (var (path, part, kind) in parts)
+        {
+            if (!string.IsNullOrWhiteSpace(part.Reuse))
+                continue;
+
+            var allowed = string.Join(", ", kind.AllowedSlots());
+            if (string.IsNullOrWhiteSpace(part.ModelSlot))
+            {
+                issues.Add(new CrewSpecValidationIssue(
+                    Field:      $"{path}.model_slot",
+                    Message:    $"No model_slot given; defaulting to '{part.DefaultSlot(kind)}'. Valid values: {allowed}.",
+                    IsCritical: false));
+            }
+            else if (!ModelSlotParser.TryParse(part.ModelSlot, out var slot))
+            {
+                issues.Add(new CrewSpecValidationIssue(
+                    Field:      $"{path}.model_slot",
+                    Message:    $"Unknown model_slot '{part.ModelSlot}'. Valid values: {allowed}.",
+                    IsCritical: true));
+            }
+            else if (!slot.IsAllowedFor(kind))
+            {
+                issues.Add(new CrewSpecValidationIssue(
+                    Field:      $"{path}.model_slot",
+                    Message:    $"model_slot '{slot}' is not valid for this part. Valid values: {allowed}.",
+                    IsCritical: true));
+            }
+
+            if (!string.IsNullOrWhiteSpace(part.Provider) && !string.IsNullOrWhiteSpace(part.Model)
+                && CliRoute.IsNonCliRoute(part.Provider!, part.Model!))
+            {
+                var target = CliRoute.Normalize(part.Provider!, part.Model!);
+                issues.Add(new CrewSpecValidationIssue(
+                    Field:      $"{path}.provider",
+                    Message:    $"'{part.Provider}/{part.Model}' will be rewritten to the subscription CLI route '{target}'; " +
+                                "provider and model are assigned by the model matrix anyway.",
+                    IsCritical: false));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Step 10 — flags reused reviewers with a manual binding that equals the manual binding of a reused executor.
+    /// Managed actors (inline parts and profiles with a model slot) are excluded on both sides: the model matrix
+    /// assigns them at run start, where a manual reviewer on a managed executor's model is reported as a warning.
+    /// Aliases and concrete ids are resolved before comparing.
     /// </summary>
     private async Task ValidateModelPluralityAsync(
         CrewSpecArtifact spec, List<CrewSpecValidationIssue> issues, CancellationToken cancellationToken)
@@ -225,64 +297,46 @@ internal sealed class CrewSpecValidator(
         if (spec.Executor is null)
             return;
 
-        var executor = await EffectiveBindingAsync(spec.Executor, cancellationToken);
+        var executor = await EffectiveExecutorBindingAsync(spec, cancellationToken);
         if (executor is null)
             return;
 
         for (var i = 0; i < spec.Reviewers.Count; i++)
         {
-            var reviewer = await EffectiveBindingAsync(spec.Reviewers[i], cancellationToken);
-            if (reviewer is null)
+            var reviewerName = spec.Reviewers[i].Reuse;
+            if (string.IsNullOrWhiteSpace(reviewerName))
                 continue;
 
-            if (!string.Equals(reviewer.Value.Provider, executor.Value.Provider, StringComparison.OrdinalIgnoreCase))
+            var reviewer = await crewService.GetReviewerProfileAsync(reviewerName, cancellationToken);
+            if (reviewer is null || reviewer.ModelSlot is not null
+                || string.IsNullOrWhiteSpace(reviewer.Provider) || string.IsNullOrWhiteSpace(reviewer.Model))
                 continue;
 
-            if (string.Equals(reviewer.Value.Model, executor.Value.Model, StringComparison.OrdinalIgnoreCase))
+            var reviewerModel = await ResolveModelSafeAsync(reviewer.Provider, reviewer.Model, cancellationToken);
+            if (CliRoute.IsSameModel(reviewerModel, executor.Value.Model))
             {
                 issues.Add(new CrewSpecValidationIssue(
-                    Field:      $"reviewers[{i}].model",
-                    Message:    $"Reviewer runs on the same model as the executor ('{reviewer.Value.Model}'), so the crew reviews itself. "
-                                + "Model plurality requires a different model, ideally from another vendor.",
+                    Field:      $"reviewers[{i}].reuse",
+                    Message:    $"Reused reviewer '{reviewerName}' has a manual binding on the executor's model ('{reviewer.Model}'), so the crew reviews itself. "
+                                + "Model plurality requires a different model, ideally from another vendor; prefer a reviewer with a model slot.",
                     IsCritical: false));
             }
         }
     }
 
-    /// <summary>
-    /// Returns the provider and resolved model an actor will actually run on. Reused actors carry no
-    /// inline provider or model, so the referenced profile is looked up — reusing a system reviewer
-    /// is the common case, and skipping it would leave the likeliest monoculture unreported.
-    /// </summary>
-    private async Task<(string Provider, string Model)?> EffectiveBindingAsync(
-        CrewPartSpec part, CancellationToken cancellationToken)
+    /// <summary>Manual binding of a reused executor without model slot; null for inline or managed executors.</summary>
+    private async Task<(string Provider, string Model)?> EffectiveExecutorBindingAsync(
+        CrewSpecArtifact spec, CancellationToken cancellationToken)
     {
-        var provider = part.Provider;
-        var model = part.Model;
-
-        if (!string.IsNullOrWhiteSpace(part.Reuse))
-        {
-            var reviewer = await crewService.GetReviewerProfileAsync(part.Reuse!, cancellationToken);
-            if (reviewer is not null)
-            {
-                provider = reviewer.Provider;
-                model = reviewer.Model;
-            }
-            else
-            {
-                var executorProfile = await crewService.GetExecutorProfileAsync(part.Reuse!, cancellationToken);
-                if (executorProfile is null)
-                    return null;
-
-                provider = executorProfile.Provider;
-                model = executorProfile.Model;
-            }
-        }
-
-        if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(model))
+        var part = spec.Executor!;
+        if (string.IsNullOrWhiteSpace(part.Reuse))
             return null;
 
-        return (provider!, await ResolveModelSafeAsync(provider!, model!, cancellationToken));
+        var profile = await crewService.GetExecutorProfileAsync(part.Reuse!, cancellationToken);
+        if (profile is null || profile.ModelSlot is not null
+            || string.IsNullOrWhiteSpace(profile.Provider) || string.IsNullOrWhiteSpace(profile.Model))
+            return null;
+        return (profile.Provider, await ResolveModelSafeAsync(profile.Provider, profile.Model, cancellationToken));
     }
 
     private async Task<string> ResolveModelSafeAsync(string provider, string model, CancellationToken cancellationToken)
@@ -399,17 +453,26 @@ internal sealed class CrewSpecValidator(
         // Grounding providers are Push-only; they never call an LLM with agentic tools.
         var actorBindings = new List<(string Path, string? Provider, IReadOnlyList<string>? ToolNames)>();
 
+        var crewDomain = spec.EffectiveModelDomain();
+        string? EffectiveProvider(CrewPartSpec part, CrewPartKind kind) =>
+            string.IsNullOrWhiteSpace(part.Reuse)
+                ? ModelMatrix.Primary(part.EffectiveSlot(kind), crewDomain).Provider
+                : part.Provider;
+
         if (spec.Executor is not null)
-            actorBindings.Add(("executor", spec.Executor.Provider, spec.Executor.ToolNames));
+            actorBindings.Add(("executor", EffectiveProvider(spec.Executor, CrewPartKind.Executor), spec.Executor.ToolNames));
 
         for (var i = 0; i < spec.Reviewers.Count; i++)
-            actorBindings.Add(($"reviewers[{i}]", spec.Reviewers[i].Provider, spec.Reviewers[i].ToolNames));
+            actorBindings.Add(($"reviewers[{i}]", EffectiveProvider(spec.Reviewers[i], CrewPartKind.Reviewer), spec.Reviewers[i].ToolNames));
 
         for (var i = 0; i < spec.Advisors.Count; i++)
-            actorBindings.Add(($"advisors[{i}]", spec.Advisors[i].Provider, spec.Advisors[i].ToolNames));
+            actorBindings.Add(($"advisors[{i}]", EffectiveProvider(spec.Advisors[i], CrewPartKind.Advisor), spec.Advisors[i].ToolNames));
 
         for (var i = 0; i < spec.Finalizers.Count; i++)
-            actorBindings.Add(($"finalizers[{i}]", spec.Finalizers[i].Provider, spec.Finalizers[i].ToolNames));
+        {
+            var provider = spec.Finalizers[i].IsInlineTransform() ? EffectiveProvider(spec.Finalizers[i], CrewPartKind.TransformFinalizer) : spec.Finalizers[i].Provider;
+            actorBindings.Add(($"finalizers[{i}]", provider, spec.Finalizers[i].ToolNames));
+        }
 
         // Cache all tool lookups in one batch to avoid N+1.
         var allNames = actorBindings
@@ -462,17 +525,15 @@ internal sealed class CrewSpecValidator(
     }
 
     /// <summary>
-    /// Validates a single profile reference: resolves <c>reuse</c> names against the catalog, or
-    /// checks required inline fields. Optionally verifies the provider/model combination.
+    /// Validates a single profile reference: resolves <c>reuse</c> names against the catalog, or checks the required
+    /// inline fields. Models are never required inline: they come from the model matrix (D-066).
     /// </summary>
-    private async Task ValidateProfileRefAsync<TProfile>(
+    private static async Task ValidateProfileRefAsync<TProfile>(
         CrewPartSpec profileRef,
         string fieldPath,
         Func<string, Task<TProfile?>> catalogLookup,
         List<CrewSpecValidationIssue> issues,
         CancellationToken cancellationToken,
-        bool skipModelCheck = false,
-        bool skipProviderModelRequired = false,
         bool skipSystemPromptRequired = false)
         where TProfile : class
     {
@@ -501,42 +562,68 @@ internal sealed class CrewSpecValidator(
                 Message:    "Inline profile is missing a required 'system_prompt' field.",
                 IsCritical: false));
 
-        if (!skipProviderModelRequired)
-        {
-            if (string.IsNullOrWhiteSpace(profileRef.Provider))
-                issues.Add(new CrewSpecValidationIssue(
-                    Field:      $"{fieldPath}.provider",
-                    Message:    "Inline profile is missing a required 'provider' field.",
-                    IsCritical: false));
+    }
 
-            if (string.IsNullOrWhiteSpace(profileRef.Model))
-                issues.Add(new CrewSpecValidationIssue(
-                    Field:      $"{fieldPath}.model",
-                    Message:    "Inline profile is missing a required 'model' field.",
-                    IsCritical: false));
+    private static void ValidateInlineGroundingSettings(CrewPartSpec part, string path, List<CrewSpecValidationIssue> issues)
+    {
+        if (part.ProviderType is { } type && CrewPartSettingsPolicy.ReuseOnlyGroundingTypes.Contains(type))
+        {
+            issues.Add(new CrewSpecValidationIssue(
+                Field:      $"{path}.provider_type",
+                Message:    $"Grounding provider type '{type}' needs operator-configured targets and credentials; reuse an existing profile instead of defining it inline.",
+                IsCritical: true));
         }
 
-        // Provider/model availability check (only when all fields present and not skipped)
-        if (!skipModelCheck
-            && !string.IsNullOrWhiteSpace(profileRef.Provider)
-            && !string.IsNullOrWhiteSpace(profileRef.Model))
+        if (part.ProviderType is { } droppedType && CrewPartSettingsPolicy.DroppedInlineGroundingTypes.Contains(droppedType))
         {
-            try
-            {
-                var models = await modelCatalog.ListModelsAsync(profileRef.Provider, cancellationToken);
-                var available = models.Any(m =>
-                    string.Equals(m.Id, profileRef.Model, StringComparison.OrdinalIgnoreCase));
+            issues.Add(new CrewSpecValidationIssue(
+                Field:      $"{path}.provider_type",
+                Message:    $"Inline '{droppedType}' grounding providers are dropped: their targets may only come from a reused, operator-made profile.",
+                IsCritical: false));
+            return;
+        }
 
-                if (!available)
-                    issues.Add(new CrewSpecValidationIssue(
-                        Field:      $"{fieldPath}.model",
-                        Message:    $"Model '{profileRef.Model}' is not currently available from provider '{profileRef.Provider}'.",
-                        IsCritical: false));
-            }
-            catch
-            {
-                // Network or provider issue — skip availability check gracefully, same as TemplateStudioService.
-            }
+        var dropped = part.DroppedGroundingKeys();
+        if (dropped.Count > 0)
+        {
+            issues.Add(new CrewSpecValidationIssue(
+                Field:      $"{path}.settings",
+                Message:    $"Settings not allowed for inline grounding providers are ignored: {string.Join(", ", dropped)}.",
+                IsCritical: false));
+        }
+    }
+
+    private static void ValidateInlineFinalizerSettings(CrewPartSpec part, string path, List<CrewSpecValidationIssue> issues)
+    {
+        if (!string.IsNullOrWhiteSpace(part.Reuse))
+            return;
+
+        if (!string.IsNullOrWhiteSpace(part.FinalizerType) && !CrewPartSettingsPolicy.TryParseFinalizerType(part.FinalizerType, out _))
+        {
+            issues.Add(new CrewSpecValidationIssue(
+                Field:      $"{path}.finalizer_type",
+                Message:    $"Unknown finalizer_type '{part.FinalizerType}'. Valid values: {string.Join(", ", Enum.GetNames<FinalizerType>())}.",
+                IsCritical: true));
+            return;
+        }
+
+        var type = CrewPartSettingsPolicy.ParseFinalizerType(part.FinalizerType);
+        if (CrewPartSettingsPolicy.ReuseOnlyFinalizerTypes.Contains(type))
+        {
+            issues.Add(new CrewSpecValidationIssue(
+                Field:      $"{path}.finalizer_type",
+                Message:    $"Finalizer type '{type}' sends the result to an external target; reuse an existing sink profile instead of defining it inline.",
+                IsCritical: true));
+            return;
+        }
+
+        var dropped = part.DroppedFinalizerKeys(type);
+        if (dropped.Count > 0)
+        {
+            issues.Add(new CrewSpecValidationIssue(
+                Field:      $"{path}.settings",
+                Message:    $"Settings not allowed for inline {type} finalizers are ignored: {string.Join(", ", dropped)}.",
+                IsCritical: false));
         }
     }
 }

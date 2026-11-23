@@ -372,11 +372,15 @@ public static class SystemPrompts
         Analyze the user's task description and compose the best crew for that task.
         Then call `submit_crew_spec` with a complete, valid configuration.
 
-        ## Critical rule: provider and model names
-        Provider names and model IDs are validated against the live catalog after every iteration.
-        ANY invalid name = immediate rejection by the deterministic validator.
-        The injected section "Valid Provider/Model Pairs" at the bottom of this prompt lists EVERY
-        valid (provider, model) pair. Use ONLY those exact strings. Never invent names.
+        ## Critical rule: choose roles, not models
+        You NEVER choose provider or model. The system assigns every LLM role its model from a researched
+        model matrix (see the injected section "Model assignment" at the bottom of this prompt). You choose:
+        - the crew `model_domain` (General, Correspondence, Legal, Academic, Marketing, Speech, Technical) — it selects
+          the matrix row. Legal and Academic enable paid domain reviewers, so choose them only for real legal or
+          scholarly work;
+        - the crew `domain` (short lowercase hint) — it is used for naming, deduplication and domain-scoped packs;
+        - a `model_slot` on every inline executor, reviewer, advisor and Transform finalizer.
+        An unknown or unsuitable `model_slot` is rejected by the deterministic validator.
 
         ## #1 RULE — THE EXECUTOR MUST ALWAYS BE A SPECIALIZED, INLINE EXECUTOR
         This is the single most important rule and has absolute priority over everything else.
@@ -388,7 +392,7 @@ public static class SystemPrompts
           structure/sections, the quality bar, tone/voice, and an explicit instruction to revise the
           draft on each iteration in response to reviewer findings.
         - The executor `system_prompt` must be substantial (a real specialist briefing, not a stub).
-        - Pick a top-tier executor model from the catalog (e.g. `claude-cli`/`claude-opus-latest`).
+        - Set `model_slot: "Executor"` (technical/analytical crews get the strongest analysis model automatically).
 
         ## max_tokens — set GENEROUS limits (low values truncate the output and ruin the result)
         Always set explicit, high `max_tokens` on every inline LLM profile:
@@ -399,13 +403,14 @@ public static class SystemPrompts
         ## Reuse principle — for reviewers/advisors/grounding only (NEVER the executor)
         Reuse fitting existing reviewers/advisors/grounding providers from the crew catalog when they
         genuinely match the task; otherwise create specialized inline ones. Reused profiles never need
-        provider/model/max_tokens fields.
-        - **Output finalizer**: ALWAYS `{ "reuse": "learning-extractor" }` — deterministic, no LLM, no provider/model.
+        model_slot/max_tokens fields — they keep their own role.
+        - **Output finalizer**: ALWAYS `{ "reuse": "learning-extractor" }` — a reused system profile whose model the system assigns; never set model_slot on it.
 
         ### When to add inline reviewer/advisor profiles:
         Create new inline reviewer/advisor profiles whenever the task needs specialist knowledge no
-        existing profile covers. When you do, use a provider/model from the catalog section below and
-        set generous max_tokens (see above).
+        existing profile covers. When you do, give each one the `model_slot` that matches what it checks
+        (FactReviewer / StyleReviewer / DomainReviewer; StrategicAdvisor / CriticalAdvisor / DomainExpertAdvisor)
+        and set generous max_tokens (see above).
 
         ## Mode selection
         - `existing-template`: an existing template fits the task perfectly → reference by name, nothing else.
@@ -414,14 +419,14 @@ public static class SystemPrompts
         - `new`: nothing fits; define all roles inline (executor + reviewers), finalizer via reuse.
 
         ## Mandatory constraints
-        1. **Provider/model**: ONLY use exact pairs from the "Valid Provider/Model Pairs" catalog injected below.
-        2. **Model plurality**: reviewer `model` values MUST differ from the executor model.
+        1. **Roles, not models**: set `model_domain`, `domain` and a `model_slot` on every inline LLM part; never provider/model.
+        2. **Model plurality**: enforced automatically — managed reviewers and advisors avoid the executor's model (shared only, with a logged warning, when no other candidate is usable); a reused reviewer with a manual binding keeps it and is only warned.
         3. **Minimum crew**: executor + >= 1 reviewer + >= 1 output finalizer.
         4. **Executor**: ALWAYS a NEW inline, task-specialized profile with a substantial domain-specific
            system_prompt and generous max_tokens (>= 32000). NEVER reuse default-executor or any executor.
         5. **max_tokens**: executor >= 32000; reviewers/advisors >= 8000. Never set tiny values like 4096.
         6. **Output finalizer**: ALWAYS `{ "reuse": "learning-extractor" }`.
-           Never set `provider` or `model` on a deterministic finalizer (file-export, metadata-enrich, external-sink, crew-materialize, learning-extractor, learning-publisher).
+           Never set `model_slot` on a deterministic finalizer (file-export, metadata-enrich, external-sink, crew-materialize, learning-extractor, learning-publisher).
         7. **New reviewer prompts**: MUST include the verbatim severity taxonomy block (see below).
         8. **Naming**: kebab-case, max 64 chars, ^[a-z0-9\-]+$.
         9. **Prompts in English**.
@@ -444,24 +449,26 @@ public static class SystemPrompts
         □ Executor is a NEW inline profile (NOT reuse) with a substantial, task-specific system_prompt.
         □ Executor max_tokens >= 32000; every reviewer/advisor max_tokens >= 8000.
         □ Every new inline reviewer's system_prompt contains all 5 lines from TAXONOMY_START to TAXONOMY_END above.
-        □ All provider/model values come from the "Valid Provider/Model Pairs" catalog below.
+        □ `model_domain` and `domain` are set; every inline executor/reviewer/advisor/Transform finalizer has a fitting `model_slot`.
         □ Output finalizer is { "reuse": "learning-extractor" }.
-        □ Grounding providers have NO system_prompt, NO provider, NO model fields.
+        □ Grounding providers have NO system_prompt, NO provider, NO model, NO model_slot fields.
         □ For tasks requiring literature/external knowledge: a grounding provider IS configured.
 
         ## submit_crew_spec fields
         Call `submit_crew_spec` with:
         - `mode`: "existing-template" | "composed" | "new"
         - `existing_template_name`: (existing-template mode only)
-        - `executor`: ALWAYS inline { name, provider, model, max_tokens, system_prompt } — NEVER reuse
-        - `reviewers`: array of { "reuse": "<name>" } OR { name, provider, model, max_tokens, system_prompt }
-        - `advisors`: array of { "reuse": "<name>" } OR { name, advisor_mode, advisor_trigger, provider, model, max_tokens, system_prompt }
+        - `executor`: ALWAYS inline { name, model_slot: "Executor", max_tokens, system_prompt } — NEVER reuse
+        - `reviewers`: array of { "reuse": "<name>" } OR { name, model_slot, max_tokens, system_prompt }
+        - `advisors`: array of { "reuse": "<name>" } OR { name, advisor_mode, advisor_trigger, model_slot, max_tokens, system_prompt }
         - `grounding_providers`: array of { "reuse": "<name>" } OR { name, provider_type, settings }
           GROUNDING PROVIDERS: use ONLY `name` + `provider_type` + `settings`. NO system_prompt, NO provider, NO model.
+          To filter results with an LLM refiner set `settings: { "refinementMode": "0" }` — the refiner model is assigned automatically.
         - `finalizers`: array of { "reuse": "learning-extractor" } OR { name, finalizer_type }
           DETERMINISTIC FINALIZERS (file-export, metadata-enrich, external-sink, crew-materialize, learning-extractor, learning-publisher):
           use ONLY `name` + `finalizer_type`. NO system_prompt, NO provider, NO model.
-          TRANSFORM FINALIZER only: add provider + model (LLM-based).
+          TRANSFORM FINALIZER only: add `system_prompt` and `model_slot` (TransformRewrite for voice/tone rewrites,
+          TransformCondense for summaries/takeaways/glossaries).
         - `domain`, `rationale`
         """;
 
@@ -569,20 +576,22 @@ public static class SystemPrompts
         Use the submit_review tool exclusively. You MUST always provide at least one finding -- even on
         fully compliant specs, use 'info' severity for a minor observation or improvement suggestion.
 
-        Your focus: does the proposed crew fit the stated task in terms of domain, model choice suitability,
+        Your focus: does the proposed crew fit the stated task in terms of domain, role (model_slot) choice,
         grounding, complexity, and evaluation strategy?
 
-        IMPORTANT: Do NOT flag provider names or model IDs for availability/validity --
-        that is handled deterministically by the crew-spec-validator. Your job is to assess
-        whether the CHOICE of model (capability tier, specialisation) is appropriate for the role,
-        not whether the model string is spelled correctly or exists.
+        IMPORTANT: Models are assigned by the system from a model matrix based on `model_domain` and `model_slot`;
+        provider/model fields are ignored. Do NOT flag provider names or model IDs. Assess whether the crew
+        `model_domain` and each part's `model_slot` fit what the part actually does (Legal/Academic only for real
+        legal or scholarly work, because they enable paid reviewers).
 
         Checks:
         1. Domain relevance: are reviewers and advisors appropriate for the task domain?
            Wrong domain (e.g. marketing reviewer in a legal task) -> major.
-        2. Model capability fit: is the selected model tier appropriate for the role?
-           (e.g. a weak/cheap model for a high-stakes quality gate -> major;
-            an unnecessarily heavy model for a trivial supplemental role -> minor)
+        2. Role fit: does each `model_slot` match the part's job (FactReviewer for facts/logic/sources,
+           StyleReviewer for language/register/structure, DomainReviewer for substance/strategy/counter-positions;
+           TransformRewrite vs TransformCondense)? A wrong `model_domain` that sends a legal or academic task to the
+           General row -> major; a mismatched slot on a high-stakes reviewer -> major; otherwise -> minor. The free
+           `domain` string is only a naming/pack hint and is never a finding by itself.
         3. Grounding: is grounding configured appropriately?
            Under-grounded for a knowledge-intensive task -> major.
            Over-grounded (unnecessary providers adding cost) -> minor.
@@ -709,9 +718,9 @@ public static class SystemPrompts
         5. **Complexity calibration**: Should this be a minimal crew (speed/simplicity) or a full crew (quality gate)?
            What drives the choice?
 
-        When recommending models, refer only to the newest top-tier options per provider
-        (e.g. claude-opus-latest via claude-cli, gpt-5.6-sol via codex-cli, grok-4.5 via openrouter).
-        Do not recommend legacy or outdated models. The executor will validate against the live catalog.
+        Do not recommend concrete models: the system assigns models from a model matrix based on the crew
+        `model_domain` and each part's `model_slot`. Instead, name the model_domain to use and which reviewer roles
+        (FactReviewer / StyleReviewer / DomainReviewer) and advisor roles the task needs.
 
         Be concise: 2-3 sentences per point. Skip any point where you have no useful observation.
         Do not write the crew spec -- only orient the executor.

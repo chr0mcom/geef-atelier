@@ -28,6 +28,8 @@ internal sealed class ReviewerProfileConfiguration : IEntityTypeConfiguration<Re
         builder.Property(r => r.Model).HasMaxLength(200).IsRequired();
         builder.Property(r => r.MaxTokens).IsRequired(false);
         builder.Property(r => r.IsSystem).IsRequired().HasDefaultValue(false);
+        builder.Property(r => r.ModelSlot).HasTolerantEnumConversion();
+        builder.Property(r => r.ModelDomain).HasTolerantEnumConversion();
 
         builder.Property(r => r.ToolNames)
             .HasColumnType("jsonb")

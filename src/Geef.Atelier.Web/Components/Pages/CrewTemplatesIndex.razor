@@ -38,7 +38,7 @@
                         <td>
                             @t.DisplayName
                             @if (t.IsSystem) { <span class="crew-badge">System</span> }
-                            <DomainBadge TemplateName="@t.Name" />
+                            <DomainBadge TemplateName="@t.Name" Domain="@t.Domain" />
                         </td>
                         <td>@t.ExecutorProfileName</td>
                         <td>@t.ReviewerProfileNames.Count</td>

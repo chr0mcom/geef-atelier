@@ -395,6 +395,9 @@ public sealed class CrewSpecValidatorToolBindingsTests
     /// <summary>Reports one known (provider, model) pair as available; everything else empty.</summary>
     private sealed class KnownModelCatalog(string provider, string model) : IModelCatalog
     {
+        public Task<IReadOnlyList<string>?> ListReportedModelIdsAsync(string providerName, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<string>?>(null);
+
         public Task<IReadOnlyList<ModelInfo>> ListModelsAsync(string providerName, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<ModelInfo>>(
                 string.Equals(providerName, provider, StringComparison.OrdinalIgnoreCase)

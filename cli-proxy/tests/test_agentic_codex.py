@@ -145,8 +145,8 @@ def test_failover_serves_tool_calls_via_codex_decision_file(client: TestClient):
     assert data["choices"][0]["message"]["tool_calls"][0]["function"]["name"] == "kanban_show"
     assert resp.headers["x-cli-proxy-provider"] == "codex"
     assert resp.headers["x-cli-proxy-failover"] == "claude->codex"
-    # The model name must not travel to the codex CLI (empty -> its own default).
-    assert not codex_mock.await_args.args[1]
+    # The claude model name must not travel to the codex CLI; codex runs on its always-latest Sol alias.
+    assert codex_mock.await_args.args[1] == main.FAILOVER_CODEX_MODEL
     # The response still echoes the requested model.
     assert data["model"] == "claude-sonnet-latest"
 

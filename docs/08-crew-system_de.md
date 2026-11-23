@@ -2,7 +2,7 @@
 
 *[English](08-crew-system.md) · **Deutsch***
 
-Letzte Aktualisierung: 2026-06-04 (D-059: Auto-Crew — Abschnitt Kompositions-Run ergänzt)
+Letzte Aktualisierung: 2026-11-23 (D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
 
 ## Überblick
 
@@ -32,31 +32,76 @@ Das Crew-System ersetzt die in PS-2 hartkodierte Dreier-Crew (Executor + Briefin
 
 ## System-Profile (Code-Konstanten)
 
-Definiert in `Geef.Atelier.Core.Domain.Crew.SystemCrew` (read-only, versioniert mit dem Code):
+Definiert in `Geef.Atelier.Core.Domain.Crew.SystemCrew` (read-only, versioniert mit dem Code). Seit D-066 enthält `SystemCrew` keine Modell-Literale mehr: Jede LLM-Rolle trägt einen `ModelSlot`, und ihr angezeigtes Binding ist das Matrix-Primärmodell. Das tatsächliche Modell setzt die Modellmatrix pro Run (siehe Abschnitt **Modellmatrix (D-066)**).
 
-Provider/Modelle Stand Mai 2026 (nach der Umstellung auf die Subscription-CLIs,
-D-027/D-032): Executor und Anthropic-Reviewer laufen über `claude-cli`, die übrigen
-Reviewer über `codex-cli`. Modell-Pluralismus bleibt gewahrt (Reviewer ≠ Executor-Modell).
+| Name | Typ | Rolle (`ModelSlot`) | Primärmodell (General) |
+|---|---|---|---|
+| `default-executor` | Executor | Executor | `claude-cli` / `claude-opus-latest` (Technical: Fable) |
+| `briefing-fidelity` | Reviewer | FactReviewer | `codex-cli` / `gpt-astra-latest` |
+| `clarity` | Reviewer | StyleReviewer | `codex-cli` / `gpt-sol-latest` |
+| `domain-terminology-reviewer` | Reviewer | StyleReviewer | `codex-cli` / `gpt-sol-latest` |
+| `substantive-rigor-reviewer` | Reviewer | DomainReviewer | `codex-cli` / `gpt-astra-latest` (Legal/Academic: Gemini 4 Neon) |
+| `crew-composer-executor` | Executor | Composer | `claude-cli` / `claude-opus-latest` |
+| `crew-composer-completeness`, `crew-composer-tool-binding` | Reviewer | FactReviewer | Ring: Astra, dann Sonnet |
+| `crew-composer-fit`, `crew-composer-reuse-correctness` | Reviewer | DomainReviewer | Ring: Astra, dann Fable |
+| `crew-composer-prompt-quality` | Reviewer | StyleReviewer | `codex-cli` / `gpt-sol-latest` |
+| `crew-spec-validator` | Reviewer | — (deterministisch) | — |
 
-| Name | Typ | Provider / Modell |
-|---|---|---|
-| `default-executor` | ExecutorProfile | `claude-cli` / `claude-opus-4-8` |
-| `briefing-fidelity` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
-| `clarity` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
-| `legal-jargon-precision` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
-| `legal-clause-risk` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
-| `academic-citation-readiness` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
-| `academic-argumentation-rigor` | ReviewerProfile | `claude-cli` / `claude-opus-4-8` |
-| `marketing-audience-clarity` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
-| `marketing-conversion-strength` | ReviewerProfile | `codex-cli` / `gpt-5.6-sol` |
+**System-Templates** (vier + Composer), jeweils mit Crew-Gebiet (`CrewTemplate.Domain`):
 
-**System-Templates** (vier): `klassik` (Evaluation `Parallel`, keine Advisors —
-reproduziert das ursprüngliche PS-2-Verhalten) sowie die Domain-Templates
-`juristisch` (`Sequential`, Advisor `legal-domain-expert`),
-`akademisch` (`Sequential`, Advisor `academic-rigor-advisor`) und
-`marketing` (`Parallel`, keine Advisors).
+- `klassik`: General, Evaluation `Parallel`, keine Advisors; reproduziert das ursprüngliche PS-2-Verhalten.
+- `juristisch`: Legal, `Sequential`, Advisor `legal-domain-expert`.
+- `akademisch`: Academic, `Sequential`, Advisor `academic-rigor-advisor`.
+- `marketing`: Marketing, `Parallel`, keine Advisors.
+- `crew-composer`: General.
 
 Alle vier Standard-Templates liefern drei Standard-Grounding-Provider (`tavily-basic`, `run-attachments`, `learning-retriever-default`) und einen Standard-Finalizer (`learning-extractor`) aus. Einzige Ausnahme ist das `learning-evaluation`-Template — es enthält weder `learning-retriever-default` noch `learning-extractor` (Rekursionsstopp).
+
+## Modellmatrix (D-066)
+
+**Grundsatz:** Ein Profil sagt, welche **Rolle** es spielt; die Crew sagt, in welchem **Gebiet** sie arbeitet. Das Modell setzt das System aus `Core/Domain/Crew/Models/ModelMatrix`. Claude-Modelle laufen immer über `claude-cli`, OpenAI-Modelle immer über `codex-cli`. Andere Wege werden beim Speichern umgeschrieben (`CliRoute`, `ManagedBindingExtensions.ForSave`). Die Recherche steht in `reports/2026-11-22-modellrecherche.md`, die Begründung in D-066.
+
+| Rolle | Kandidaten (Reihenfolge) |
+|---|---|
+| Executor | Opus → Sol; Technical: Fable → Opus → Astra |
+| FactReviewer | Astra → Opus → Neon → Sonnet |
+| StyleReviewer | Sol → Opus → Sonnet |
+| DomainReviewer | Legal/Academic: Neon → Astra → Opus → Fable → Sonnet; übrige: Astra → Neon → Opus → Fable → Sonnet |
+| StrategicAdvisor / CriticalAdvisor | Fable → Astra |
+| DomainExpertAdvisor | Technical: Fable → Astra; Academic: Astra → Opus; übrige: Opus → Astra |
+| GroundingRefiner | Sonnet → Sol |
+| TransformRewrite / TransformCondense | Sol → Sonnet / Sonnet → Sol |
+| Composer | Opus → Sonnet → Sol |
+| Helper | Haiku → Sonnet |
+
+Gebiete: General, Correspondence, Legal, Academic, Marketing, Speech, Technical.
+
+**Verwaltet oder manuell:**
+
+- `ModelSlot` gesetzt bedeutet verwaltet: Das gespeicherte Binding ist nur Anzeige. `ModelSlot = null` bedeutet manuell: Das Binding gilt so, wie es gespeichert ist (nur CLI-normalisiert).
+- Grounding-Refiner und Transform-Finalizer nutzen stattdessen den Settings-Marker `modelSlot` bzw. `ModelSlot`.
+- Im Editor heißt das „Model assignment: Automatic by role / Manual“.
+
+**Zuweisung beim Run-Start** (`IModelAssignmentService.ApplyAsync`, zwischen Packs und Alias-Auflösung):
+
+1. Gebiet = Profil-Override, sonst Crew-Gebiet, sonst General. Das Crew-Gebiet setzt der Composer ausdrücklich als `model_domain` (`CrewSpecArtifact.EffectiveModelDomain`). Es gibt keine Ableitung aus Stichwörtern. Fehlt das Feld oder ist es ungültig, warnt der Validator, und es gilt der freie `domain`-String, sofern er ein exakter Gebietsname ist (alte Artefakte), sonst General.
+2. Kandidaten, die der Live-Katalog nicht wirklich meldet, entfallen; die mit der statischen Liste zusammengeführte Picker-Liste zählt dafür nicht. Ist der Katalog nicht erreichbar, gilt der Kandidat als verfügbar. Ein HTTP-Provider ohne gesetzten API-Schlüssel gilt als nicht verfügbar.
+3. Reviewer und Advisor laufen nicht auf dem Modell des Executors (alias-aufgelöst), solange es eine erlaubte Alternative gibt; sonst nur mit Plurality-Warnung. Reviewer bevorzugen eine andere Familie. Ein manueller Reviewer auf dem Executor-Modell bleibt, wird aber gewarnt.
+4. Reviewer derselben Rolle bekommen reihum ein Modell aus den ersten 3 geeigneten Kandidaten (Ring).
+5. Bezahlte Kandidaten gibt es außerhalb von Legal/Academic erst ab 3 Reviewern der Rolle. Je Crew sind höchstens 2 bezahlte Reviewer erlaubt.
+6. Bleibt nach den harten Regeln nichts übrig, gilt der erste unbezahlte Kandidat, mit Warnung. Ein übersprungener Primärkandidat wird ebenfalls geloggt.
+
+Die Schritte 2–6 sind eine einzige Regel (`ModelChooser`): Harte Regeln (H1 nutzbar, H2 Bezahlregel) werden nie gelockert, weiche Regeln (Live-Katalog, Executor-Modell, Ring, Wiederholung im Slot, Familie, Matrixposition) sortieren nur. Der Ring wird je Wahl aus den gerade erlaubten Kandidaten gebildet; das Gedächtnis über bereits vergebene Modelle gilt je Rolle über alle Profil-Gebiete. `ModelAssignmentInvariantTests` prüft die Eigenschaften über alle Kombinationen.
+
+**Immer aktuelle Modelle (D-066/10):**
+
+- **Aliase:** Die Matrix nennt Familien-Aliase, keine Versionen: `claude-opus-latest` usw. und `gpt-sol-latest`/`gpt-astra-latest`. Der cli-proxy löst die Codex-Aliase auf das neueste gelistete Modell der Linie in `models_cache.json` auf, die Claude-Aliase über die claude-CLI. Kommt etwa `gpt-6.3-sol`, nutzen alle verwalteten Profile es ohne Codeänderung. Der Run-Snapshot hält die konkrete ID fest.
+- **Nächtlicher Job:** `scripts/cli-proxy-selfupdate.sh` (Cron 03:40) hält die CLIs im Container und auf dem Host aktuell und stellt das Host-Standardmodell von codex auf die neueste Sol-Version. Hintergrund: Neue Modelle gibt der Server nur an aktuelle CLI-Versionen frei.
+- **Code-Änderung nötig** ist nur noch bei einer neuen Modelllinie, einem neuen Anbieter oder einer neuen Rolle: die Zeile in `ModelMatrix` ändern. Der Konsistenztest `ModelMatrixTests` meldet Drift zu `CodexSubscriptionModels`, `StaticModelFallback.ForCodexCli`, `SystemProviders` und `_FALLBACK_MODELS` im cli-proxy.
+
+**Composer-Settings:** Inline-Grounding und -Finalizer des Composers dürfen nur unkritische Einstellungen setzen (Whitelist `CrewPartSettingsPolicy`). Ziele, Zugangsdaten, Variablennamen und Modellbindungen werden verworfen und als Warnung gemeldet. Inline-`rest-api` und Inline-`ExternalSink` sind kritisch; dafür ein freigegebenes Profil wiederverwenden.
+
+Verwaltete Profile folgen nach dem Deploy automatisch; manuelle Profile bleiben unverändert.
 
 ## Custom-Profile
 
@@ -123,8 +168,7 @@ public enum AdvisorTrigger { BeforeFirstExecution, BeforeEveryExecution, OnConve
 
 ### System-Advisors
 
-Provider/Modell Stand Mai 2026: alle System-Advisors laufen über
-`claude-cli` / `claude-opus-4-8`.
+Modelle seit D-066 aus der Modellmatrix: `briefing-clarifier` und `crew-design-advisor` sind StrategicAdvisor (Fable), `devils-advocate` ist CriticalAdvisor (Fable), `legal-domain-expert` ist DomainExpertAdvisor/Legal (Opus, das als Executor-Modell entfällt, deshalb zur Laufzeit Astra), `academic-rigor-advisor` ist DomainExpertAdvisor/Academic (Astra).
 
 | Name | Mode | Trigger | Zweck |
 |---|---|---|---|

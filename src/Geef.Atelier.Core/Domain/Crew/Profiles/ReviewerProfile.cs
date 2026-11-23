@@ -23,6 +23,11 @@ namespace Geef.Atelier.Core.Domain.Crew.Profiles;
 /// agentic tool-use loop before submitting its final review. When empty the reviewer uses the
 /// standard single-shot completion path.
 /// </param>
+/// <param name="ModelSlot">
+/// Role in the model matrix (D-066). When set, the model is assigned from <see cref="Models.ModelMatrix"/> at run
+/// start; <c>null</c> means the provider/model above were chosen manually and are used as-is.
+/// </param>
+/// <param name="ModelDomain">Optional profile-level domain; <c>null</c> inherits the crew's domain.</param>
 public sealed record ReviewerProfile(
     string Name,
     string DisplayName,
@@ -32,4 +37,6 @@ public sealed record ReviewerProfile(
     string Model,
     int? MaxTokens,
     bool IsSystem,
-    IReadOnlyList<string>? ToolNames = null);
+    IReadOnlyList<string>? ToolNames = null,
+    Models.ModelSlot? ModelSlot = null,
+    Models.ModelDomain? ModelDomain = null);

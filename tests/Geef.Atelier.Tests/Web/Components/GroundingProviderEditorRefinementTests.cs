@@ -176,6 +176,9 @@ public sealed class GroundingProviderEditorRefinementTests : TestContext
 
     private sealed class StubModelCatalog : IModelCatalog
     {
+        public Task<IReadOnlyList<string>?> ListReportedModelIdsAsync(string providerName, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<string>?>(null);
+
         public Task<IReadOnlyList<ModelInfo>> ListModelsAsync(string providerName, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<ModelInfo>>([]);
 

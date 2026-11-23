@@ -101,6 +101,7 @@ public sealed class LearningRetrievalProviderListingTests
             new InMemoryCrewTemplateRepository(),
             new Geef.Atelier.Tests.Fakes.InMemorySpecializationPackRepository(),
             new Geef.Atelier.Tests.Fakes.PassThroughModelCatalog(),
+            new Geef.Atelier.Tests.Fakes.PassThroughModelAssignmentService(),
             logger ?? NullLogger<CrewService>.Instance);
 
     // ── In-memory fakes ───────────────────────────────────────────────────────

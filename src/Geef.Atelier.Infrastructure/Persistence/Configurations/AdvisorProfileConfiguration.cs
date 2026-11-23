@@ -36,6 +36,8 @@ internal sealed class AdvisorProfileConfiguration : IEntityTypeConfiguration<Adv
             .HasMaxLength(50)
             .IsRequired();
         builder.Property(a => a.IsSystem).IsRequired().HasDefaultValue(false);
+        builder.Property(a => a.ModelSlot).HasTolerantEnumConversion();
+        builder.Property(a => a.ModelDomain).HasTolerantEnumConversion();
 
         builder.Property(a => a.ToolNames)
             .HasColumnType("jsonb")

@@ -1,4 +1,5 @@
 using Geef.Atelier.Application.Crew.Grounding;
+using Geef.Atelier.Core.Domain.Crew.Models;
 using Geef.Atelier.Infrastructure.Llm;
 using Microsoft.Extensions.Logging;
 
@@ -8,6 +9,8 @@ namespace Geef.Atelier.Infrastructure.Grounding;
 /// Uses a small LLM call (the <c>GroundingQueryExtractor</c> actor) to turn a briefing
 /// into one focused web-search query, or to decide that web search is not useful.
 /// Always degrades gracefully — any failure falls back to searching with the raw briefing.
+/// The model comes from the <see cref="ModelSlot.Helper"/> slot of the model matrix (D-066) unless
+/// <c>Llm:Actors:GroundingQueryExtractor</c> overrides it explicitly.
 /// </summary>
 internal sealed class LlmGroundingQueryExtractor(
     ILlmClientResolver resolver,
@@ -16,6 +19,7 @@ internal sealed class LlmGroundingQueryExtractor(
     private const string ActorName = "GroundingQueryExtractor";
     private const string NoSearchToken = "NO_SEARCH";
     private const int MaxQueryLength = 400;
+    private const int DefaultMaxTokens = 256;
 
     private const string SystemPrompt = """
         You convert a writing briefing into ONE focused web-search query.
@@ -33,7 +37,7 @@ internal sealed class LlmGroundingQueryExtractor(
     {
         try
         {
-            var (client, model, maxTokens) = resolver.ForActor(ActorName);
+            var (client, model, maxTokens) = ResolveActor();
 
             var response = await client.CompleteAsync(new LlmRequest
             {
@@ -72,5 +76,18 @@ internal sealed class LlmGroundingQueryExtractor(
     {
         var trimmed = briefingText.Trim();
         return trimmed.Length <= MaxQueryLength ? trimmed : trimmed[..MaxQueryLength];
+    }
+
+    private (ILlmClient Client, string Model, int MaxTokens) ResolveActor()
+    {
+        try
+        {
+            return resolver.ForActor(ActorName);
+        }
+        catch (InvalidOperationException)
+        {
+            var helper = ModelMatrix.Primary(ModelSlot.Helper);
+            return resolver.ForProfile(helper.Provider, helper.Model, DefaultMaxTokens);
+        }
     }
 }

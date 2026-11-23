@@ -454,7 +454,6 @@
           !string.IsNullOrEmpty(slot.Draft.Provider) &&
           !string.IsNullOrWhiteSpace(slot.Draft.SystemPrompt);
 
-    // Finalizer validation: Name + DisplayName required; Transform also needs Provider+SystemPrompt.
     private static bool IsFinalizerSlotValid(SlotState slot)
     {
         if (slot.Mode == StudioSlotMode.UseExisting)
@@ -463,7 +462,8 @@
         if (string.IsNullOrWhiteSpace(slot.Draft.Name) || string.IsNullOrWhiteSpace(slot.Draft.DisplayName))
             return false;
         if (slot.Draft.FinalizerType == "Transform")
-            return !string.IsNullOrEmpty(slot.Draft.Provider) && !string.IsNullOrWhiteSpace(slot.Draft.SystemPrompt);
+            return !string.IsNullOrWhiteSpace(slot.Draft.SystemPrompt)
+                   || !string.IsNullOrWhiteSpace(slot.Draft.FinalizerSettings?.GetValueOrDefault(TransformSettings.KeySystemPrompt));
         return true;
     }
 

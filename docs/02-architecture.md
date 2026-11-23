@@ -2,7 +2,7 @@
 
 *[Deutsch](02-architecture_de.md) · **English***
 
-*Last updated: 2026-08-04 (D-064: dynamic model catalog for CLI providers via the cli-proxy, three-state provenance, alias resolution at snapshot build time)*
+*Last updated: 2026-11-22 (D-066: model matrix — columns `ModelSlot`/`ModelDomain`/`Domain` (Step46), assignment at snapshot build; before that 2026-08-04, D-064: dynamic model catalog for CLI providers via the cli-proxy, three-state provenance, alias resolution at snapshot build time)*
 
 ## Layer diagram
 
@@ -325,6 +325,7 @@ Every run uses a **crew** of an executor + reviewers. Profiles are reusable conf
 | `CrewTemplates` | Step10 | Custom crew templates. |
 | `AdvisorProfiles` | Step11 | Custom advisor profiles. |
 | `AdvisorConsultations` | Step11 | Persisted advisor outputs per iteration. |
+| Columns `ModelSlot`/`ModelDomain` (executor/reviewer/advisor), `Domain` (CrewTemplates) | Step46 | Model matrix (D-066): role and domain; managed profiles get their model at snapshot-build time from `ModelMatrix` (`IModelAssignmentService`, Application). Nullable `varchar(40)`, tolerant enum converter. |
 
 ### ProfileBasedReviewer / ProfileBasedExecutor
 

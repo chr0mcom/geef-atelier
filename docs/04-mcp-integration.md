@@ -2,7 +2,7 @@
 
 *[Deutsch](04-mcp-integration_de.md) · **English***
 
-*Last updated: 2026-05-22 (D-052: academic-search und rest-api als neue providerType-Werte in list_grounding_provider_profiles + materialize_template_proposal dokumentiert)*
+*Last updated: 2026-11-22 (D-066: `ModelSlot`/`ModelDomain`/`Domain` in the list tools; before that 2026-05-22, D-052: academic-search und rest-api als neue providerType-Werte in list_grounding_provider_profiles + materialize_template_proposal dokumentiert)*
 
 ## Why MCP
 
@@ -123,9 +123,9 @@ Besides the six run tools the server offers nine more — **15 MCP tools** in to
 
 | Tool | Purpose |
 |---|---|
-| `list_crew_templates` | List crew templates (system + custom) |
-| `list_reviewer_profiles` | List reviewer profiles (system + custom) |
-| `list_advisor_profiles` | List advisor profiles (system + custom) |
+| `list_crew_templates` | List crew templates (system + custom); since D-066 includes `Domain` |
+| `list_reviewer_profiles` | List reviewer profiles (system + custom); since D-066 includes `ModelSlot`/`ModelDomain` (`null` = manual model) |
+| `list_advisor_profiles` | List advisor profiles (system + custom); since D-066 includes `ModelSlot`/`ModelDomain` |
 | `list_grounding_provider_profiles` | List grounding-provider profiles (incl. `refinementEnabled` / `refinementMode`) |
 | `list_knowledge_documents` | List global knowledge-base documents |
 | `analyze_template_proposal` | Analyze a task description, produce a template proposal (persisted) |

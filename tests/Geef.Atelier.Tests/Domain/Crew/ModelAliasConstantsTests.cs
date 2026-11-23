@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Models;
 using Geef.Atelier.Core.Domain.Providers;
 using Geef.Atelier.Infrastructure.Llm;
 
@@ -15,24 +16,28 @@ public sealed class ModelAliasConstantsTests
     private const string OpusAlias = "claude-opus-latest";
 
     [Fact]
-    public void PreferredComposerExecutorUsesTheAlias()
+    public void MatrixExecutorAndComposerUseTheAlias()
     {
-        Assert.Equal("claude-cli", PreferredComposerModels.Executor.Provider);
-        Assert.Equal(OpusAlias, PreferredComposerModels.Executor.Model);
+        Assert.Equal(new ModelCandidate("claude-cli", OpusAlias), ModelMatrix.Primary(ModelSlot.Executor));
+        Assert.Equal(new ModelCandidate("claude-cli", OpusAlias), ModelMatrix.Primary(ModelSlot.Composer));
     }
 
     [Fact]
-    public void PreferredComposerExecutorIsInTheClaudeCliCatalog()
+    public void MatrixClaudeCandidatesAreAllAliasesInTheClaudeCliCatalog()
     {
-        Assert.Contains(StaticModelFallback.ForClaudeCli, m => m.Id == PreferredComposerModels.Executor.Model);
-    }
-
-    [Fact]
-    public void PreferredCliReviewersAreInTheirProviderCatalogs()
-    {
-        foreach (var (provider, model) in PreferredComposerModels.Reviewers.Where(r => r.Provider.EndsWith("-cli")))
+        foreach (var candidate in ModelMatrix.All.Where(c => c.Provider == "claude-cli"))
         {
-            Assert.Contains(StaticModelFallback.For(provider), m => m.Id == model);
+            Assert.EndsWith("-latest", candidate.Model);
+            Assert.Contains(StaticModelFallback.ForClaudeCli, m => m.Id == candidate.Model);
+        }
+    }
+
+    [Fact]
+    public void MatrixCliCandidatesAreInTheirProviderCatalogs()
+    {
+        foreach (var candidate in ModelMatrix.All.Where(c => c.Provider.EndsWith("-cli")))
+        {
+            Assert.Contains(StaticModelFallback.For(candidate.Provider), m => m.Id == candidate.Model);
         }
     }
 

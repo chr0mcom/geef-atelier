@@ -36,6 +36,7 @@ internal sealed class CrewTemplateConfiguration : IEntityTypeConfiguration<CrewT
             .HasMaxLength(50)
             .IsRequired();
         builder.Property(t => t.IsSystem).IsRequired().HasDefaultValue(false);
+        builder.Property(t => t.Domain).HasTolerantEnumConversion();
 
         builder.Property(t => t.ReviewerProfileNames)
             .HasColumnType("jsonb")

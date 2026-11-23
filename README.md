@@ -42,6 +42,8 @@ Text-generation pipeline platform built on the [Geef SDK](https://github.com/chr
 
 **Specialization Packs ✅** Generic actors (role prompt + `{specialization}` slot) + reusable scoped `SpecializationPack`s bound per crew. Effective prompt composed at snapshot-build time (CrewSnapshot v3 + provenance), audit UI shows it. The six domain-specialized system reviewers became two generic roles + six DomainScoped packs. `/packs` CRUD, scope enforcement, composer integration (`pack_names`/`packs` + pack-catalog grounding), lifecycle (cascade-delete, promote/demote/clone with LLM generality review, auto-GC). See [docs/11-specialization-packs.md](docs/11-specialization-packs.md) (D-061).
 
+**Model matrix ✅** Model chosen by role (`ModelSlot`) and crew domain from a researched `ModelMatrix`; Claude/OpenAI only via the subscription cli-proxy; assignment at snapshot build with live availability, executor exclusion, cross-family reviewers, reviewer ring and paid cap; composer picks `model_slot`; migration Step46 reclassified all existing custom profiles; cli-proxy codex catalog from `models_cache.json` (D-066, 2026-11-22).
+
 Currently: **over 1800 tests** (green; pre-existing Testcontainers/E2E env flakes excluded).
 
 Full scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope.md)
@@ -179,6 +181,14 @@ Every run uses a configurable crew of an executor (writes the draft) and reviewe
 **System profiles** are versioned in code and read-only. **Custom profiles** can be created via `ICrewService` or MCP and are stored in the DB.
 
 Every run stores a fully embedded **CrewSnapshot** in the DB — so the run stays reproducible even if profiles are changed later.
+
+**Model matrix (D-066):** profiles declare a role (`ModelSlot`) and crews a domain; the system assigns each managed actor its model from `ModelMatrix` at run start.
+
+- Claude always runs via `claude-cli` and OpenAI via `codex-cli`.
+- Managed reviewers avoid the executor's model (shared only with a logged warning when no other candidate is usable) and prefer another vendor family; a manually bound reviewer keeps its model and is only warned.
+- Profiles set to "Manual" keep their chosen model.
+
+See [docs/08-crew-system.md](docs/08-crew-system.md).
 
 ### Crew management in the UI
 

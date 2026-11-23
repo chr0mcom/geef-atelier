@@ -16,6 +16,7 @@
     <PackageReference Include="ModelContextProtocol.Core" />
     <PackageReference Include="HtmlAgilityPack" />
     <PackageReference Include="MailKit" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
     <PackageReference Include="Markdig" />
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />

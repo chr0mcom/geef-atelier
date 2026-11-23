@@ -6,7 +6,9 @@
 @using Geef.Atelier.Application.Crew
 @using Geef.Atelier.Application.Providers
 @using Geef.Atelier.Core.Domain.Crew.Finalizers
+@using Geef.Atelier.Core.Domain.Crew.Models
 @using Geef.Atelier.Core.Domain.Providers
+@using Geef.Atelier.Web.Display
 @using Geef.Atelier.Web.Resources
 @inject ICrewService CrewService
 @inject IProviderService ProviderService
@@ -165,13 +167,68 @@
                         <small class="form-hint">Tip: end with "Respond in the language of the input text."</small>
                         <FieldHelp Text="@StudioFieldHelps.FinalizerTransformSystemPrompt" DataTestId="field-help-transform-system-prompt" />
                     </div>
+                    <div class="field" data-testid="transform-model-assignment">
+                        <label>Model assignment</label>
+                        <div class="radio-group" data-testid="transform-assignment-mode">
+                            <label class="radio-option">
+                                <input type="radio"
+                                       name="transform-assignment-mode"
+                                       value="automatic"
+                                       checked="@_form.TransformAutomatic"
+                                       disabled="@(!CanEdit)"
+                                       data-testid="transform-assignment-automatic"
+                                       @onchange="() => SetTransformAutomatic(true)" />
+                                <span>
+                                    <strong>Automatic by role</strong>
+                                    <span class="radio-description">The model is chosen from the model matrix by role.</span>
+                                </span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio"
+                                       name="transform-assignment-mode"
+                                       value="manual"
+                                       checked="@(!_form.TransformAutomatic)"
+                                       disabled="@(!CanEdit)"
+                                       data-testid="transform-assignment-manual"
+                                       @onchange="() => SetTransformAutomatic(false)" />
+                                <span>
+                                    <strong>Manual</strong>
+                                    <span class="radio-description">You pick the provider and model yourself; they are never replaced.</span>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+                    @if (_form.TransformAutomatic)
+                    {
+                        <div class="field">
+                            <label>Role</label>
+                            <InputSelect TValue="ModelSlot"
+                                         Value="_form.TransformSlot"
+                                         ValueChanged="OnTransformSlotChanged"
+                                         ValueExpression="() => _form.TransformSlot"
+                                         disabled="@(!CanEdit)"
+                                         data-testid="transform-slot-select">
+                                @foreach (var slot in ModelSlotExtensions.TransformSlots)
+                                {
+                                    <option value="@slot">@slot</option>
+                                }
+                            </InputSelect>
+                            <FieldHelp Text="@_form.TransformSlot.Describe()" DataTestId="transform-slot-help" />
+                            <FieldHelp Text="Resolved at run start from the model matrix; provider and model below show the current primary choice."
+                                       DataTestId="transform-assignment-hint" />
+                        </div>
+                    }
                     <div class="field">
                         <label>Provider</label>
                         <select class="form-input"
                                 value="@_form.TransformProvider"
                                 @onchange="OnTransformProviderChanged"
-                                disabled="@(!CanEdit)"
+                                disabled="@(!CanEdit || _form.TransformAutomatic)"
                                 data-testid="input-transform-provider">
+                            @if (!string.IsNullOrEmpty(_form.TransformProvider) && _providers.All(x => x.Name != _form.TransformProvider))
+                            {
+                                <option value="@_form.TransformProvider" selected>@_form.TransformProvider</option>
+                            }
                             <optgroup label="HTTP">
                                 @foreach (var p in _providers.Where(x => x.IsActive && x.Type == ProviderType.Http))
                                 {
@@ -191,9 +248,14 @@
                         <label>Model</label>
                         <ModelSelector Provider="@_form.TransformProvider"
                                        @bind-Value="_form.TransformModel"
-                                       Disabled="@(!CanEdit)"
+                                       Disabled="@(!CanEdit || _form.TransformAutomatic)"
                                        DataTestId="input-transform-model" />
                         <FieldHelp Text="@FinalizerFieldHelps.TransformModel" DataTestId="field-help-transform-model" />
+                        @if (!_form.TransformAutomatic && CanEdit
+                             && new ModelCandidate(_form.TransformProvider, _form.TransformModel).DescribeCliRouteRewrite() is { } notice)
+                        {
+                            <FieldHelp Text="@notice" DataTestId="transform-cli-route-notice" />
+                        }
                     </div>
                     <div class="field">
                         <label>Max Tokens</label>
@@ -259,6 +321,21 @@
         _form.TransformModel = "";
     }
 
+    private void SetTransformAutomatic(bool automatic)
+    {
+        if (!CanEdit || _form.TransformAutomatic == automatic)
+            return;
+        _form.TransformAutomatic = automatic;
+        if (automatic)
+            _form.ApplyTransformPrimary();
+    }
+
+    private void OnTransformSlotChanged(ModelSlot slot)
+    {
+        _form.TransformSlot = slot;
+        _form.ApplyTransformPrimary();
+    }
+
     private void OnTemperatureChanged(ChangeEventArgs e)
     {
         var raw = e.Value?.ToString();
@@ -309,14 +386,14 @@
         public string SinkKind { get; set; } = WebhookSinkSettings.SinkKindValue;
 
         [Url(ErrorMessage = "Please enter a valid URL.")]
-        public string WebhookUrl { get; set; } = string.Empty;
+        public string? WebhookUrl { get; set; }
 
         public string WebhookAuthHeader { get; set; } = string.Empty;
         public string WebhookContentType { get; set; } = "application/json";
         public int WebhookTimeout { get; set; } = 30;
 
         [EmailAddress(ErrorMessage = "Please enter a valid email address.")]
-        public string EmailTo { get; set; } = string.Empty;
+        public string? EmailTo { get; set; }
 
         public string EmailSubject { get; set; } = "Geef.Atelier — Result";
         public bool EmailAttachAsFile { get; set; } = false;
@@ -328,10 +405,20 @@
         [Required(ErrorMessage = "System prompt is required.")]
         public string SystemPrompt { get; set; } = string.Empty;
 
-        public string TransformProvider { get; set; } = "codex-cli";
-        public string TransformModel { get; set; } = "gpt-5.5";
+        public bool TransformAutomatic { get; set; } = true;
+        public ModelSlot TransformSlot { get; set; } = ModelSlot.TransformCondense;
+        public string TransformProvider { get; set; } = ModelMatrix.Primary(ModelSlot.TransformCondense).Provider;
+        public string TransformModel { get; set; } = ModelMatrix.Primary(ModelSlot.TransformCondense).Model;
         public int TransformMaxTokens { get; set; } = 4096;
         public double? TransformTemperature { get; set; } = null;
+        public Dictionary<string, string> OriginalSettings { get; set; } = [];
+
+        public void ApplyTransformPrimary()
+        {
+            var primary = ModelMatrix.Primary(TransformSlot);
+            TransformProvider = primary.Provider;
+            TransformModel = primary.Model;
+        }
 
         public static FinalizerFormModel From(FinalizerProfile p)
         {
@@ -380,6 +467,13 @@
                     m.TransformModel = ts.Model;
                     m.TransformMaxTokens = ts.MaxTokens;
                     m.TransformTemperature = ts.Temperature;
+                    var hasBinding = !string.IsNullOrWhiteSpace(p.Settings.GetValueOrDefault(TransformSettings.KeyProvider))
+                                     && !string.IsNullOrWhiteSpace(p.Settings.GetValueOrDefault(TransformSettings.KeyModel));
+                    m.TransformAutomatic = ts.ModelSlot is { } slot
+                        ? ModelSlotExtensions.TransformSlots.Contains(slot)
+                        : !hasBinding;
+                    m.TransformSlot = m.TransformAutomatic ? ts.ModelSlot ?? ModelSlot.TransformCondense : ModelSlot.TransformCondense;
+                    m.OriginalSettings = new Dictionary<string, string>(p.Settings);
                     break;
             }
             return m;
@@ -394,15 +488,14 @@
                 FinalizerType.MetadataEnrich =>
                     new MetadataEnrichSettings(EnricherType).ToDict(),
                 FinalizerType.ExternalSink when SinkKind == EmailSinkSettings.SinkKindValue =>
-                    new EmailSinkSettings(EmailTo, EmailSubject, EmailAttachAsFile, EmailAttachmentFormat).ToDict(),
+                    new EmailSinkSettings(EmailTo ?? string.Empty, EmailSubject, EmailAttachAsFile, EmailAttachmentFormat).ToDict(),
                 FinalizerType.ExternalSink =>
                     new WebhookSinkSettings(
-                        WebhookUrl,
+                        WebhookUrl ?? string.Empty,
                         string.IsNullOrWhiteSpace(WebhookAuthHeader) ? null : WebhookAuthHeader,
                         WebhookContentType,
                         WebhookTimeout).ToDict(),
-                FinalizerType.Transform =>
-                    new TransformSettings(SystemPrompt, TransformProvider, TransformModel, TransformMaxTokens, TransformTemperature).ToDict(),
+                FinalizerType.Transform => BuildTransformSettings(),
                 _ => [],
             };
             return new FinalizerProfile(
@@ -412,6 +505,33 @@
                 FinalizerType: FinalizerType,
                 Settings: settings,
                 IsSystem: false);
+        }
+
+        private Dictionary<string, string> BuildTransformSettings()
+        {
+            var provider = TransformProvider;
+            var model = TransformModel;
+            if (TransformAutomatic)
+            {
+                var primary = ModelMatrix.Primary(TransformSlot);
+                provider = primary.Provider;
+                model = primary.Model;
+            }
+
+            var known = new[]
+            {
+                TransformSettings.KeySystemPrompt, TransformSettings.KeyProvider, TransformSettings.KeyModel,
+                TransformSettings.KeyMaxTokens, TransformSettings.KeyTemperature, TransformSettings.KeyModelSlot,
+            };
+            var settings = OriginalSettings
+                .Where(kv => !known.Contains(kv.Key))
+                .ToDictionary(kv => kv.Key, kv => kv.Value);
+            var typed = new TransformSettings(
+                SystemPrompt, provider, model, TransformMaxTokens, TransformTemperature,
+                TransformAutomatic ? TransformSlot : null).ToDict();
+            foreach (var (key, value) in typed)
+                settings[key] = value;
+            return settings;
         }
     }
 }

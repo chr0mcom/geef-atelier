@@ -57,17 +57,19 @@ public sealed class KlassikUnchangedRegressionTests
     }
 
     [Fact]
-    public void BriefingFidelityProfile_UsesCodexCli_Gpt56Sol()
+    public void BriefingFidelityProfile_IsFactReviewer_OnCodexAstra()
     {
         Assert.Equal("codex-cli", SystemCrew.BriefingFidelityProfile.Provider);
-        Assert.Equal("gpt-5.6-sol", SystemCrew.BriefingFidelityProfile.Model);
+        Assert.Equal("gpt-astra-latest", SystemCrew.BriefingFidelityProfile.Model);
+        Assert.Equal(Geef.Atelier.Core.Domain.Crew.Models.ModelSlot.FactReviewer, SystemCrew.BriefingFidelityProfile.ModelSlot);
     }
 
     [Fact]
-    public void ClarityProfile_UsesCodexCli_Gpt56Sol()
+    public void ClarityProfile_IsStyleReviewer_OnCodexSol()
     {
         Assert.Equal("codex-cli", SystemCrew.ClarityProfile.Provider);
-        Assert.Equal("gpt-5.6-sol", SystemCrew.ClarityProfile.Model);
+        Assert.Equal("gpt-sol-latest", SystemCrew.ClarityProfile.Model);
+        Assert.Equal(Geef.Atelier.Core.Domain.Crew.Models.ModelSlot.StyleReviewer, SystemCrew.ClarityProfile.ModelSlot);
     }
 
     [Fact]

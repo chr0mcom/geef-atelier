@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Crew.Models;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
@@ -18,6 +19,7 @@ internal sealed class CrewService(
     ICrewTemplateRepository templateRepo,
     ISpecializationPackRepository packRepo,
     IModelCatalog modelCatalog,
+    IModelAssignmentService modelAssignment,
     ILogger<CrewService> logger) : ICrewService
 {
     private const string ReadOnlyMessage = "System profile is read-only — copy it as a custom variant.";
@@ -36,6 +38,7 @@ internal sealed class CrewService(
 
     public async Task<ReviewerProfile> CreateCustomReviewerProfileAsync(ReviewerProfile profile, CancellationToken cancellationToken = default)
     {
+        profile = profile.ForSave();
         var baseName = SystemCrew.EnsureCustomPrefix(profile.Name);
         var uniqueName = await UniqueNameAsync(baseName, n => reviewerRepo.GetByNameAsync(n, cancellationToken));
         var normalized = profile with { Name = uniqueName, IsSystem = false };
@@ -45,6 +48,7 @@ internal sealed class CrewService(
 
     public async Task<ReviewerProfile> UpdateCustomReviewerProfileAsync(ReviewerProfile profile, CancellationToken cancellationToken = default)
     {
+        profile = profile.ForSave();
         if (SystemCrew.IsSystemName(profile.Name))
             throw new InvalidOperationException(ReadOnlyMessage);
         await reviewerRepo.UpdateAsync(profile, cancellationToken);
@@ -75,6 +79,7 @@ internal sealed class CrewService(
 
     public async Task<ExecutorProfile> CreateCustomExecutorProfileAsync(ExecutorProfile profile, CancellationToken cancellationToken = default)
     {
+        profile = profile.ForSave();
         var baseName = SystemCrew.EnsureCustomPrefix(profile.Name);
         var uniqueName = await UniqueNameAsync(baseName, n => executorRepo.GetByNameAsync(n, cancellationToken));
         var normalized = profile with { Name = uniqueName, IsSystem = false };
@@ -84,6 +89,7 @@ internal sealed class CrewService(
 
     public async Task<ExecutorProfile> UpdateCustomExecutorProfileAsync(ExecutorProfile profile, CancellationToken cancellationToken = default)
     {
+        profile = profile.ForSave();
         if (SystemCrew.IsSystemName(profile.Name))
             throw new InvalidOperationException(ReadOnlyMessage);
         await executorRepo.UpdateAsync(profile, cancellationToken);
@@ -114,6 +120,7 @@ internal sealed class CrewService(
 
     public async Task<AdvisorProfile> CreateCustomAdvisorProfileAsync(AdvisorProfile profile, CancellationToken cancellationToken = default)
     {
+        profile = profile.ForSave();
         if (SystemCrew.IsSystemAdvisorName(profile.Name))
             throw new InvalidOperationException(ReadOnlyAdvisorMessage);
         var baseName = SystemCrew.EnsureCustomPrefix(profile.Name);
@@ -125,6 +132,7 @@ internal sealed class CrewService(
 
     public async Task<AdvisorProfile> UpdateCustomAdvisorProfileAsync(AdvisorProfile profile, CancellationToken cancellationToken = default)
     {
+        profile = profile.ForSave();
         if (SystemCrew.IsSystemAdvisorName(profile.Name))
             throw new InvalidOperationException(ReadOnlyAdvisorMessage);
         await advisorRepo.UpdateAsync(profile, cancellationToken);
@@ -176,6 +184,7 @@ internal sealed class CrewService(
     public async Task<GroundingProviderProfile> CreateCustomGroundingProviderProfileAsync(
         GroundingProviderProfile profile, CancellationToken cancellationToken = default)
     {
+        profile = profile.ForSave();
         if (SystemCrew.IsSystemGroundingProviderName(profile.Name))
             throw new InvalidOperationException(ReadOnlyGroundingMessage);
         var baseName = SystemCrew.EnsureCustomPrefix(profile.Name);
@@ -188,6 +197,7 @@ internal sealed class CrewService(
     public async Task<GroundingProviderProfile> UpdateCustomGroundingProviderProfileAsync(
         GroundingProviderProfile profile, CancellationToken cancellationToken = default)
     {
+        profile = profile.ForSave();
         if (SystemCrew.IsSystemGroundingProviderName(profile.Name))
             throw new InvalidOperationException(ReadOnlyGroundingMessage);
         await groundingRepo.UpdateAsync(profile, cancellationToken);
@@ -233,6 +243,7 @@ internal sealed class CrewService(
     public async Task<FinalizerProfile> CreateCustomFinalizerProfileAsync(
         FinalizerProfile profile, CancellationToken cancellationToken = default)
     {
+        profile = profile.ForSave();
         if (SystemCrew.IsSystemFinalizerName(profile.Name))
             throw new InvalidOperationException(ReadOnlyFinalizerMessage);
         var baseName = SystemCrew.EnsureCustomPrefix(profile.Name);
@@ -245,6 +256,7 @@ internal sealed class CrewService(
     public async Task<FinalizerProfile> UpdateCustomFinalizerProfileAsync(
         FinalizerProfile profile, CancellationToken cancellationToken = default)
     {
+        profile = profile.ForSave();
         if (SystemCrew.IsSystemFinalizerName(profile.Name))
             throw new InvalidOperationException(ReadOnlyFinalizerMessage);
         var updated = profile with { UpdatedAt = DateTimeOffset.UtcNow };
@@ -465,6 +477,7 @@ internal sealed class CrewService(
             catch (Exception ex) { logger.LogWarning(ex, "Failed to update LastUsedAt for {Count} packs.", usedNames.Count); }
         }
 
-        return await CrewSnapshotModelResolver.ResolveAsync(composed, modelCatalog, cancellationToken);
+        var assigned = await modelAssignment.ApplyAsync(composed, cancellationToken);
+        return await CrewSnapshotModelResolver.ResolveAsync(assigned, modelCatalog, cancellationToken);
     }
 }

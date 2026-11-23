@@ -2,7 +2,7 @@
 
 *[English](02-architecture.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-08-04 (D-064: dynamischer Modell-Katalog für CLI-Provider über den cli-proxy, dreiwertige Herkunft, Alias-Auflösung zum Snapshot-Bauzeitpunkt)*
+*Letzte Aktualisierung: 2026-11-22 (D-066: Modellmatrix — Spalten `ModelSlot`/`ModelDomain`/`Domain` (Step46), Zuweisung beim Snapshot-Bau; zuvor 2026-08-04, D-064: dynamischer Modell-Katalog für CLI-Provider über den cli-proxy, dreiwertige Herkunft, Alias-Auflösung zum Snapshot-Bauzeitpunkt)*
 
 ## Schichtenbild
 
@@ -278,6 +278,7 @@ Jeder Run verwendet eine **Crew** aus Executor + Reviewers. Profile sind wiederv
 | `CrewTemplates` | Step10 | Custom Crew-Templates. |
 | `AdvisorProfiles` | Step11 | Custom Advisor-Profile. |
 | `AdvisorConsultations` | Step11 | Persistierte Advisor-Outputs pro Iteration. |
+| Spalten `ModelSlot`/`ModelDomain` (Executor/Reviewer/Advisor), `Domain` (CrewTemplates) | Step46 | Modellmatrix (D-066): Rolle und Gebiet; verwaltete Profile bekommen ihr Modell beim Snapshot-Bau aus `ModelMatrix` (`IModelAssignmentService`, Application). Nullable `varchar(40)`, toleranter Enum-Konverter. |
 
 ### ProfileBasedReviewer / ProfileBasedExecutor
 

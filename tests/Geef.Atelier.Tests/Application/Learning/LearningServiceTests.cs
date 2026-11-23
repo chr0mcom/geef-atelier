@@ -35,14 +35,15 @@ public sealed class LearningServiceTests
     }
 
     [Fact]
-    public async Task ApproveAsync_WrongOwner_ThrowsInvalidOperationException()
+    public async Task ApproveAsync_OtherUser_IsAllowed_BecauseThePageIsAuthorizedAndOwnersAreSubmitChannels()
     {
         var entry = MakeEntry("alice");
         var repo  = new CapturingLearningRepository(entry);
         var svc   = new LearningService(repo);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => svc.ApproveAsync(entry.Id, "bob"));
+        await svc.ApproveAsync(entry.Id, "bob");
+
+        Assert.Equal(LearningStatus.Approved, repo.LastStatus);
     }
 
     // ── RejectAsync ───────────────────────────────────────────────────────
@@ -61,14 +62,15 @@ public sealed class LearningServiceTests
     }
 
     [Fact]
-    public async Task RejectAsync_WrongOwner_ThrowsInvalidOperationException()
+    public async Task RejectAsync_OtherUser_IsAllowed()
     {
         var entry = MakeEntry("alice");
         var repo  = new CapturingLearningRepository(entry);
         var svc   = new LearningService(repo);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => svc.RejectAsync(entry.Id, "charlie"));
+        await svc.RejectAsync(entry.Id, "charlie");
+
+        Assert.Equal(LearningStatus.Rejected, repo.LastStatus);
     }
 
     // ── DeleteAsync ───────────────────────────────────────────────────────
@@ -86,14 +88,15 @@ public sealed class LearningServiceTests
     }
 
     [Fact]
-    public async Task DeleteAsync_WrongOwner_ThrowsInvalidOperationException()
+    public async Task DeleteAsync_OtherUser_IsAllowed()
     {
         var entry = MakeEntry("alice");
         var repo  = new CapturingLearningRepository(entry);
         var svc   = new LearningService(repo);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => svc.DeleteAsync(entry.Id, "mallory"));
+        await svc.DeleteAsync(entry.Id, "mallory");
+
+        Assert.True(repo.DeleteCalled);
     }
 
     [Fact]
