@@ -1626,7 +1626,7 @@ Der Learning-Extractor lief bisher bezahlt (`openrouter/openai/gpt-5.6-sol`) und
 1. Der Gebiets-Parser lieferte Falsch-Positive: `weg`/`paper` → `*recht` → `rechts*`.
 2. Der Fallback der Zuweisung deckte einzelne Regel-Kombinationen nicht ab.
 
-Der GEEF-Workflow sieht dann Anhalten vor. Der Betreiber hatte die Entscheidung an einen Fable-Berater delegiert. Dieser entschied: weitermachen, aber den Ansatz wechseln statt weiter zu patchen. Architektur: `geef_architecture.md` §9.
+Der GEEF-Workflow sieht dann Anhalten vor. Der Betreiber hatte die Entscheidung an einen Fable-Berater delegiert. Dieser entschied: weitermachen, aber den Ansatz wechseln statt weiter zu patchen. Architektur: `reports/2026-11-23-modellmatrix-d066-architektur-und-verlauf.md` §8–§9.
 
 - **Matrix-Gebiet explizit:** Der Composer setzt das Pflichtfeld `model_domain`. Die Enum-Werte entsprechen `ModelDomain`; ein Drift-Test gleicht Schema und Enum ab.
   - Aufgelöst wird an einer Stelle (`CrewSpecArtifact.EffectiveModelDomain`): exakter Name, sonst der freie `domain`-String als exakter Name, sonst General.

@@ -25,7 +25,7 @@
 #      Zurück-Taggen im Build-Fehlerpfad.
 #   6. Erfolg: Telegram-Meldung mit Versionen und geänderter Modellliste. Hat sich die Modellliste geändert, wird openwebui neu
 #      gestartet (Open WebUI lässt bei Modelländerungen Datenbank-Handles offen, siehe websites/openwebui/CLAUDE.md).
-#   7. Host-Abgleich (Vertrag: geef_architecture.md §8.4). Er läuft nach dem Lock in JEDEM Ausstiegszweig über die gemeinsame
+#   7. Host-Abgleich (Vertrag: reports/2026-11-23-modellmatrix-d066-architektur-und-verlauf.md, §8.4). Er läuft nach dem Lock in JEDEM Ausstiegszweig über die gemeinsame
 #      Funktion `finish <rc>` (Versionsermittlung gescheitert, alles aktuell, DRY_RUN, gesperrte Zielversionen, Gateway belegt,
 #      Build fehlgeschlagen, Rollback, Erfolg), nicht nur nach einem Container-Update. Er richtet sich nach der im Container
 #      laufenden, dort schon getesteten Version. `finish` endet mit dem schlechtesten Status aus Container-Teil und Host-Abgleich.
