@@ -2,7 +2,7 @@
 
 *[English](01-vision-and-scope.md) · **Deutsch***
 
-*Letzte Aktualisierung: 22. Mai 2026 (D-054: Continuous-Learning-Loop in den Scope aufgenommen; learning-retrieval-Providertyp)*
+*Letzte Aktualisierung: 2026-11-24 (D-068: höchstens drei kurze Rückfragen mit Klickantworten vor dem Lauf, nie währenddessen; D-067: Learning-Schleife standardmäßig pausiert; zuvor 22. Mai 2026, D-054: Continuous-Learning-Loop in den Scope aufgenommen; learning-retrieval-Providertyp)*
 
 ## Vision
 
@@ -24,18 +24,18 @@ Das Projekt ist die produktive Anwendung des [Geef SDK](https://github.com/chr0m
 - MCP-Server-Schnittstelle, damit externe KI-Clients (Claude Desktop, Claude Code, Custom-Agents) Aufträge erteilen und Ergebnisse abholen können — Auth über statisches Bearer-Token oder self-hosted OAuth 2.1
 - Multi-Provider-LLM-Support: OpenRouter (Pay-per-Token) sowie Subscription-CLIs (Claude Code, Codex) über einen lokalen Proxy; Reviewer/Advisor bewusst mit Fremd-Modellen
 - Quellen-Übergabe in mehreren Formen: Datei-Upload (PDF, DOCX, TXT, MD), URLs, Freitext-Briefing, Stil-Referenztexte; semantische Wissensbasis (Vector-Store-RAG) und Run-lokale Attachments
-- Fire-and-Forget-Workflow: Auftrag starten, später Status prüfen, am Ende Ergebnis abholen — keine Mensch-im-Loop-Eingriffe während des Runs
+- Fire-and-Forget-Workflow: Auftrag starten, später Status prüfen, am Ende Ergebnis abholen — keine Mensch-im-Loop-Eingriffe während des Runs. **Vor** dem Lauf sind höchstens drei kurze Rückfragen mit fertigen Antworten zum Anklicken erlaubt, immer überspringbar (D-068)
 - Persistente Run-Historie mit vollständigem Iterations-Trail
 - Run-Fortsetzung: einen fehlgeschlagenen oder abgebrochenen Run ab dem letzten Draft-Text (Seed-Modus) oder mit frischer Pipeline (Clean-Modus) fortsetzen — D-046
 - Datei-Export in den Formaten md / html / pdf / docx / txt / json über die Finalizer-Pipeline (D-044); die fünf Finalizer-Profil-Typen (FileExport, MetadataEnrich, ExternalSink, Transform) sind als Teil des Crew-Systems implementiert
 - Grounding-Anreicherung in mehreren Formen: Tavily-Websuche (`tavily`), semantische Vector-Store-RAG (`vector-store`), kuratierter Fixtext für Style-Guides und Glossare (`static-context`), gezieltes URL-Fetching mit SSRF-Schutz (`url-fetch`), Tavily-Newssuche mit Datumsfilter (`news-search`), akademische Literaturrecherche bei arXiv / Semantic Scholar / OpenAlex (`academic-search`) und generisches REST-Endpoint-Grounding mit SSRF-Schutz und JSONPath-Extraktion (`rest-api`); jeder Provider unterstützt optional einen KI-Refinement-Pass (D-050–D-052); domänen-bewusste Abfrage aus dem Learning-Store (`learning-retrieval`, D-054)
-- **Continuous-Learning-Loop (D-054):** Ein opt-in-`learning-extractor`-Finalizer extrahiert strukturierte Fakten aus abgeschlossenen Runs und stößt fire-and-forget einen dedizierten Qualitäts-Gate-Run an (`learning-evaluation`-Crew). Nur Learnings, die das Gate konvergent durchlaufen (drei strenge Reviewer, `AbortOnCritical=true`, Multi-Modell-Pluralismus), werden als `Approved` im Learning-Store gespeichert (`LearningEntries`-Tabelle, getrennter Namespace von der kuratierten Wissensbasis). Der `learning-retrieval`-Grounding-Provider spielt sie gewichtet nach Domänen-Ähnlichkeit in spätere Runs ein. Verwaltungs-UI unter `/crew/learnings`; MCP-Tool `list_learnings`. Drei Schutzmechanismen gegen Model Collapse: (1) getrennter Namespace, (2) auditierbares Gate, (3) ausschließlich strukturierte Fakten
+- **Continuous-Learning-Loop (D-054):** Ein opt-in-`learning-extractor`-Finalizer extrahiert strukturierte Fakten aus abgeschlossenen Runs und stößt fire-and-forget einen dedizierten Qualitäts-Gate-Run an (`learning-evaluation`-Crew). Nur Learnings, die das Gate konvergent durchlaufen (drei strenge Reviewer, `AbortOnCritical=true`, Multi-Modell-Pluralismus), werden als `Approved` im Learning-Store gespeichert (`LearningEntries`-Tabelle, getrennter Namespace von der kuratierten Wissensbasis). Der `learning-retrieval`-Grounding-Provider spielt sie gewichtet nach Domänen-Ähnlichkeit in spätere Runs ein. Verwaltungs-UI unter `/crew/learnings`; MCP-Tool `list_learnings`. Drei Schutzmechanismen gegen Model Collapse: (1) getrennter Namespace, (2) auditierbares Gate, (3) ausschließlich strukturierte Fakten. **Seit D-067 pausiert** (`Learning:Enabled`, Standard `false`); soll durch ein Gedächtnis je Nutzer ersetzt werden (D-068)
 
 ## Out of Scope (vorerst)
 
 - Echte Mandantenfähigkeit / Multi-Tenant-Isolation (das System ist Mehrbenutzer, aber single-tenant: ein Admin, gemeinsame Konfiguration; pro Nutzer ist nur die Run-Sichtbarkeit isoliert)
 - Öffentlicher Zugang ohne Auth
-- Mensch-im-Loop zwischen Iterationen (bewusst nicht implementiert; Fire-and-Forget bleibt das Modell)
+- Mensch-im-Loop zwischen Iterationen (bewusst nicht implementiert; Fire-and-Forget bleibt das Modell: keine Rückfragen oder Eingriffe, während der Lauf läuft). Nur **vor** dem Lauf darf das Atelier höchstens drei kurze Rückfragen mit Klickantworten stellen, und nur dann, wenn sich die Antwort weder aus Auftrag, Dateien, Profil oder Gedächtnis entnehmen noch recherchieren noch vernünftig annehmen lässt, der Anwender sie wissen kann und sie das Ergebnis wesentlich ändert (D-068)
 - Mobile Apps oder native Clients
 - Kommerzielles Hosting, Billing, Abrechnung
 - Ungefiltertes Cross-Run-Self-RAG (bewusst verworfen; der Continuous-Learning-Loop oben bietet gegatetes Cross-Run-Lernen mit drei Schutzmechanismen gegen Model Collapse)
