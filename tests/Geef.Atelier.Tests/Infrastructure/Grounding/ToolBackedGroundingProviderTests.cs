@@ -79,7 +79,7 @@ public sealed class ToolBackedGroundingProviderTests
     }
 
     [Fact]
-    public async Task EnrichAsync_ToolExecutionError_ReturnsEmptyResult()
+    public async Task EnrichAsync_ToolExecutionError_ThrowsSoTheGroundingStepRecordsAWarning()
     {
         var tool = MakeStaticContextTool();
         var repo = new StubToolDefinitionRepository(tool);
@@ -87,11 +87,10 @@ public sealed class ToolBackedGroundingProviderTests
         var provider = BuildProvider(executor, repo);
         var profile = MakeProfile("static-context");
 
-        var result = await provider.EnrichAsync("briefing text", profile, Guid.NewGuid(), default);
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => provider.EnrichAsync("briefing text", profile, Guid.NewGuid(), default));
 
-        Assert.Equal(string.Empty, result.EnrichedContext);
-        Assert.Empty(result.Citations);
-        Assert.Null(result.CostEur);
+        Assert.Contains("Test error", ex.Message);
     }
 
     [Fact]

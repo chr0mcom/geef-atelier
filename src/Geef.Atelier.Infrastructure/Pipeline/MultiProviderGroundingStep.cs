@@ -1,6 +1,7 @@
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
+using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Llm;
@@ -16,7 +17,10 @@ namespace Geef.Atelier.Infrastructure.Pipeline;
 /// When a profile has a refinement binding configured, the raw provider output is passed
 /// through <see cref="IGroundingRefiner"/> before being included in the final context.
 /// When a profile has a non-null <see cref="GroundingProviderProfile.ToolName"/>, execution
-/// is delegated to <see cref="ToolBackedGroundingProvider"/> instead of the legacy factory path.
+/// is delegated to <see cref="ToolBackedGroundingProvider"/> instead of the legacy factory path,
+/// except for the system profiles in <see cref="GroundingPathSelection.ProviderTypePathSystemProfiles"/>,
+/// which always take the legacy path (also when an older run snapshot still carries their tool name).
+/// A provider that fails is skipped and recorded as a run warning.
 /// </summary>
 internal sealed class MultiProviderGroundingStep(
     IGroundingStep inner,
@@ -26,7 +30,8 @@ internal sealed class MultiProviderGroundingStep(
     ILogger<MultiProviderGroundingStep> logger,
     IGroundingRefiner? refiner = null,
     IGroundingConsultationRepository? consultationRepository = null,
-    ToolBackedGroundingProvider? toolBackedProvider = null) : IGroundingStep
+    ToolBackedGroundingProvider? toolBackedProvider = null,
+    IRunWarningSink? warningSink = null) : IGroundingStep
 {
     public async Task<SdkGroundingResult> RunAsync(string input, CancellationToken cancellationToken)
     {
@@ -38,20 +43,12 @@ internal sealed class MultiProviderGroundingStep(
             logger.LogInformation("MultiProviderGroundingStep: run={RunId} calling provider={Provider}",
                 runId, profile.Name);
 
-            // New path: if the profile references a ToolDefinition by name, delegate to ToolBackedGroundingProvider.
-            // Legacy path: use the ProviderType-based factory (unchanged behaviour for all existing profiles).
-            IGroundingProvider provider;
-            if (profile.ToolName is { Length: > 0 } && toolBackedProvider is not null)
-            {
-                provider = toolBackedProvider;
-            }
-            else
-            {
-                provider = factory.Create(profile.ProviderType);
-            }
-
             try
             {
+                var provider = profile.UsesToolPath() && toolBackedProvider is not null
+                    ? toolBackedProvider
+                    : factory.Create(profile.ProviderType);
+
                 var result = await LlmResilience.ExecuteAsync(
                     ct => provider.EnrichAsync(input, profile, runId, ct), cancellationToken);
 
@@ -93,11 +90,16 @@ internal sealed class MultiProviderGroundingStep(
             }
             catch (Exception ex)
             {
-                // Grounding enrichment is optional. If a provider is unavailable even after retries,
-                // skip it and continue with the remaining providers rather than aborting the run.
                 logger.LogWarning(ex,
                     "MultiProviderGroundingStep: run={RunId} provider={Provider} failed and was skipped.",
                     runId, profile.Name);
+                if (warningSink is not null)
+                    await warningSink.ReportAsync(
+                        runId,
+                        RunWarningSources.Grounding,
+                        RunWarningCodes.GroundingProviderSkipped,
+                        $"A source could not be read and was skipped: {profile.DisplayNameOrName()} (reason: {ex.Message.ToWarningDetail()}).",
+                        ct: cancellationToken);
             }
         }
 
