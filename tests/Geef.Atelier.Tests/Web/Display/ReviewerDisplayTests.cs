@@ -20,4 +20,19 @@ public sealed class ReviewerDisplayTests
     {
         Assert.Equal(input, ReviewerDisplay.ToDisplay(input));
     }
+
+    [Fact]
+    public void CodeOnlyProfilesAndTemplatesShowTheirDisplayNames()
+    {
+        Assert.Equal("Automatic checks", ReviewerDisplay.ToDisplay("deterministic-checks"));
+        Assert.Equal("Writer", ReviewerDisplay.GetExecutorDisplay("direct-writer"));
+        Assert.Equal("Direct", ReviewerDisplay.GetTemplateDisplay("direct"));
+    }
+
+    [Fact]
+    public void CatalogueProfilesStillWinOverTheFallback()
+    {
+        Assert.Equal("Clarity", ReviewerDisplay.ToDisplay("clarity"));
+        Assert.Equal("unknown-template", ReviewerDisplay.GetTemplateDisplay("unknown-template"));
+    }
 }
