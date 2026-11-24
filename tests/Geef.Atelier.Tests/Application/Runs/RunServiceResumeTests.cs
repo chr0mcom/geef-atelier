@@ -224,7 +224,9 @@ public sealed class RunServiceResumeTests
             new NoOpCrewService(),
             new NoOpAdvisorConsultationRepository(),
             new NoOpKnowledgeService(),
-            NullLogger<RunService>.Instance);
+            NullLogger<RunService>.Instance,
+            new InMemoryRunWarnings(),
+            new InMemoryRunWarnings());
 
     private static RunEntity MakeRun(Guid id, RunStatus status, string? createdByUser) =>
         new RunEntity

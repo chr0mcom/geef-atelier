@@ -135,6 +135,9 @@ public sealed class SubmitRequestToolAttachmentTests
 
     private sealed class CapturingRunService : IRunService
     {
+        public Task<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>> ListRunWarningsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>>([]);
+
         public IReadOnlyList<RunAttachmentInput>? LastAttachments { get; private set; }
 
         public Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default)

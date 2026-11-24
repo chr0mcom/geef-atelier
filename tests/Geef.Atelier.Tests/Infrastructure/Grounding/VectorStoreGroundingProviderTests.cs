@@ -106,6 +106,7 @@ public sealed class VectorStoreGroundingProviderTests
 
         var services = new ServiceCollection();
         services.AddScoped<IVectorSearchRepository>(_ => vectorRepo);
+        services.AddScoped<Geef.Atelier.Application.Crew.Knowledge.IRunAttachmentLineage, Geef.Atelier.Tests.Fakes.SelfOnlyAttachmentLineage>();
         services.AddScoped<IGroundingConsultationRepository>(_ => consultationRepo);
 
         var provider = new VectorStoreGroundingProvider(

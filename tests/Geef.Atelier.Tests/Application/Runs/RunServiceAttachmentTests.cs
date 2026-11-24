@@ -209,7 +209,7 @@ public sealed class RunServiceAttachmentTests
             Warnings = [new ModelAssignmentWarning("briefing-fidelity", "no usable candidate for slot FactReviewer; falling back", "Briefing fidelity")],
         };
         var svc = new RunService(persistence, new StubRunRepository(), crew, new StubAdvisorConsultationRepository(),
-            new NoOpKnowledgeService(), NullLogger<RunService>.Instance, warningSink: sink);
+            new NoOpKnowledgeService(), NullLogger<RunService>.Instance, warningSink: sink, warningRepository: new InMemoryRunWarnings());
 
         var runId = await svc.SubmitRunAsync(new SubmitRunRequest("briefing", "{}"));
 
@@ -232,7 +232,9 @@ public sealed class RunServiceAttachmentTests
             new StubCrewService(),
             new StubAdvisorConsultationRepository(),
             knowledge ?? new NoOpKnowledgeService(),
-            NullLogger<RunService>.Instance);
+            NullLogger<RunService>.Instance,
+            new InMemoryRunWarnings(),
+            new InMemoryRunWarnings());
 
     // --- Fakes ---
 

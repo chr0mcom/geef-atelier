@@ -147,6 +147,7 @@ public sealed class MultiProviderOrderingTests
     {
         var services = new ServiceCollection();
         services.AddScoped<IVectorSearchRepository>(_ => trackingRepo);
+        services.AddScoped<Geef.Atelier.Application.Crew.Knowledge.IRunAttachmentLineage, Geef.Atelier.Tests.Fakes.SelfOnlyAttachmentLineage>();
         services.AddScoped<IGroundingConsultationRepository>(_ => new NullGroundingConsultationRepository());
 
         var provider = new VectorStoreGroundingProvider(

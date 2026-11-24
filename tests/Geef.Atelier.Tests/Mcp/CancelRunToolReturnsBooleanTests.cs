@@ -45,6 +45,9 @@ public sealed class CancelRunToolReturnsBooleanTests
 
     private sealed class FakeRunServiceCancellable(Guid cancellableId) : IRunService
     {
+        public Task<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>> ListRunWarningsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>>([]);
+
         public Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default)
             => Task.FromResult(Guid.NewGuid());
 

@@ -21,10 +21,10 @@ internal sealed class RunService(
     IAdvisorConsultationRepository        consultationRepository,
     IKnowledgeService                     knowledgeService,
     ILogger<RunService>                   logger,
+    IRunWarningSink                       warningSink,
+    IRunWarningRepository                 warningRepository,
     IGroundingConsultationRepository?     groundingConsultationRepository = null,
-    IToolInvocationRepository?            toolInvocationRepository = null,
-    IRunWarningSink?                      warningSink = null,
-    IRunWarningRepository?                warningRepository = null) : IRunService
+    IToolInvocationRepository?            toolInvocationRepository = null) : IRunService
 {
     internal const string AttachmentUploadFailedMessage = "The attached files could not be prepared. Please submit the task again.";
 
@@ -144,8 +144,6 @@ internal sealed class RunService(
 
     private async Task ReportAssignmentWarningsAsync(Guid runId, IReadOnlyList<Crew.Models.ModelAssignmentWarning> warnings)
     {
-        if (warningSink is null)
-            return;
         foreach (var warning in warnings)
             await warningSink.ReportAsync(runId, RunWarningSources.ModelAssignment, RunWarningCodes.ModelAssignment,
                 $"The AI model for \"{warning.ShownName}\" could not be chosen as planned, so a different one was used.");
@@ -154,8 +152,6 @@ internal sealed class RunService(
     /// <inheritdoc/>
     public async Task<IReadOnlyList<RunWarningEntity>> ListRunWarningsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
     {
-        if (warningRepository is null)
-            return [];
         if (requestingUsername is not null && await GetRunAsync(runId, requestingUsername, cancellationToken) is null)
             return [];
         return await warningRepository.ListByRunAsync(runId, cancellationToken);

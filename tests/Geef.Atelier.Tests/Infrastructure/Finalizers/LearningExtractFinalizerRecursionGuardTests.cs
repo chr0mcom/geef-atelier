@@ -215,6 +215,9 @@ public sealed class LearningExtractFinalizerRecursionGuardTests
 
     private sealed class CapturingRunService : IRunService
     {
+        public Task<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>> ListRunWarningsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>>([]);
+
         public bool SubmitCalled { get; private set; }
 
         public Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default)

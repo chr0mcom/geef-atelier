@@ -23,8 +23,6 @@ internal sealed class VectorStoreGroundingProvider(
     IServiceScopeFactory scopeFactory,
     ILogger<VectorStoreGroundingProvider> logger) : IGroundingProvider
 {
-    private const int MaxLineageRuns = 10;
-
     public string ProviderType => "vector-store";
 
     /// <inheritdoc/>
@@ -67,7 +65,8 @@ internal sealed class VectorStoreGroundingProvider(
         IReadOnlyList<Guid?> runFilters = [null];
         if (scopeFilter == KnowledgeScope.RunLocal)
         {
-            runFilters = await AttachmentRunIdsAsync(scope.ServiceProvider, runId, ct);
+            var lineage = scope.ServiceProvider.GetRequiredService<IRunAttachmentLineage>();
+            runFilters = (await lineage.RunsWithAttachmentsAsync(runId, ct)).Select(id => (Guid?)id).ToList();
             if (runFilters.Count == 0)
             {
                 logger.LogInformation(
@@ -116,40 +115,6 @@ internal sealed class VectorStoreGroundingProvider(
             TokensOrCreditsUsed: embedding.TokenCount,
             CostEur: embedding.CostEur,
             ConsultationId: consultation.Id);
-    }
-
-    /// <summary>
-    /// Run ids whose attachments belong to <paramref name="runId"/>: the run itself and, following resume
-    /// (<c>ParentRunId</c>) and auto-composition (<c>ParentCompositionRunId</c>) links, its ancestors — only those
-    /// that actually have attachments. Without the document repository (isolated tests) the run itself is searched.
-    /// </summary>
-    private static async Task<IReadOnlyList<Guid?>> AttachmentRunIdsAsync(IServiceProvider services, Guid runId, CancellationToken ct)
-    {
-        var documents = services.GetService<IKnowledgeDocumentRepository>();
-        var runs = services.GetService<IRunRepository>();
-        if (documents is null || runs is null)
-            return [runId];
-
-        var result = new List<Guid?>();
-        var visited = new HashSet<Guid>();
-        var pending = new Queue<Guid>([runId]);
-        while (pending.Count > 0 && visited.Count < MaxLineageRuns)
-        {
-            var current = pending.Dequeue();
-            if (!visited.Add(current))
-                continue;
-
-            if ((await documents.ListByRunAsync(current, ct)).Count > 0)
-                result.Add(current);
-
-            var run = await runs.GetByIdAsync(current, ct);
-            if (run?.ParentRunId is { } parent)
-                pending.Enqueue(parent);
-            if (run?.ParentCompositionRunId is { } composer)
-                pending.Enqueue(composer);
-        }
-
-        return result;
     }
 
     private static string BuildEnrichedContext(

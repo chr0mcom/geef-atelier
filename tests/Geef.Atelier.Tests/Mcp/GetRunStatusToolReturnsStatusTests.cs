@@ -47,6 +47,9 @@ public sealed class GetRunStatusToolReturnsStatusTests
 
     private sealed class FakeRunServiceWithRun(Guid knownId, RunStatus status) : IRunService
     {
+        public Task<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>> ListRunWarningsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>>([]);
+
         public Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default)
             => Task.FromResult(Guid.NewGuid());
 

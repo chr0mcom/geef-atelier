@@ -23,6 +23,7 @@ public static class KnowledgeServiceExtensions
         services.AddScoped<IKnowledgeService, KnowledgeService>();
         services.AddScoped<IKnowledgeDocumentRepository, KnowledgeDocumentRepository>();
         services.AddScoped<IVectorSearchRepository, VectorSearchRepository>();
+        services.AddScoped<IRunAttachmentLineage, RunAttachmentLineage>();
 
         return services;
     }

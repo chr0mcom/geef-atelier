@@ -13,6 +13,9 @@ namespace Geef.Atelier.Tests.Fakes;
 /// </summary>
 internal sealed class StubRunService(RunDetails details, IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>? warnings = null) : IRunService
 {
+    public Task<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>> ListRunWarningsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>>(warnings ?? Array.Empty<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>());
+
     public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null,
         string? requestingUsername = null, CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<RunEntity>>([details.Run]);

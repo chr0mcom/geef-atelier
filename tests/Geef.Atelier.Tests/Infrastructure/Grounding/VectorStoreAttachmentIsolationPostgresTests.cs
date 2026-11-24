@@ -120,6 +120,7 @@ public sealed class VectorStoreAttachmentIsolationPostgresTests(PostgresFixture 
         services.AddScoped<IVectorSearchRepository, VectorSearchRepository>();
         services.AddScoped<IKnowledgeDocumentRepository, KnowledgeDocumentRepository>();
         services.AddScoped<IRunRepository, RunRepository>();
+        services.AddScoped<IRunAttachmentLineage, Geef.Atelier.Infrastructure.Knowledge.RunAttachmentLineage>();
         services.AddScoped<IGroundingConsultationRepository, NullConsultations>();
         return new VectorStoreGroundingProvider(
             new FixedEmbeddingProvider(),

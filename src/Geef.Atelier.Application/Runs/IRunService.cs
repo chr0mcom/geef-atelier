@@ -15,11 +15,10 @@ public interface IRunService
     /// <summary>
     /// Returns the warnings recorded for a run (Step47), in the order they were recorded. Returns an empty list
     /// when the run does not exist or <paramref name="requestingUsername"/> is set and does not own it.
-    /// The default implementation reports no warnings.
+    /// Pass null to bypass the ownership check (admin mode).
     /// </summary>
     Task<IReadOnlyList<Core.Domain.Warnings.RunWarningEntity>> ListRunWarningsAsync(
-        Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Core.Domain.Warnings.RunWarningEntity>>([]);
+        Guid runId, string? requestingUsername, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns the run with the given ID, or null if not found.

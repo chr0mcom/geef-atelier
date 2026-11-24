@@ -35,11 +35,11 @@ internal sealed class RunOrchestratorService(
     IOptions<ConvergenceOptions>        convergenceOptions,
     ILoggerFactory                      loggerFactory,
     ILogger<RunOrchestratorService>     logger,
+    IRunWarningSink                     warningSink,
     IGroundingProviderFactory?          groundingProviderFactory = null,
     IPricingCatalog?                    pricingCatalog = null,
     IOptions<CostTrackingOptions>?      costTrackingOptions = null,
-    IFinalizerExecutorFactory?          finalizerExecutorFactory = null,
-    IRunWarningSink?                    warningSink = null) : BackgroundService
+    IFinalizerExecutorFactory?          finalizerExecutorFactory = null) : BackgroundService
 {
     internal const string ResultNotSavedMessage = "The result could not be saved completely.";
 
@@ -189,7 +189,7 @@ internal sealed class RunOrchestratorService(
 
         // Watcher polls DB flag; signals cts if CancellationRequested=true.
         var watcherTask = Task.Run(() => WatchCancellationAsync(run.Id, cts), CancellationToken.None);
-        using var warningScope = warningSink is null ? null : RunWarningScope.Begin(run.Id, warningSink);
+        using var warningScope = RunWarningScope.Begin(run.Id, warningSink);
 
         try
         {
@@ -584,7 +584,7 @@ internal sealed class RunOrchestratorService(
     }
 
     private Task ReportWarningAsync(Guid runId, string source, string code, string message, int? iteration = null) =>
-        warningSink?.ReportAsync(runId, source, code, message, iteration, CancellationToken.None) ?? Task.CompletedTask;
+        warningSink.ReportAsync(runId, source, code, message, iteration, CancellationToken.None);
 
     /// <summary>
     /// Records one warning per reviewer that could not complete its check in an iteration, naming the reviewer by the
