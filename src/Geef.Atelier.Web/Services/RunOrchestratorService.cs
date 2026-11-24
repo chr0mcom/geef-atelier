@@ -13,11 +13,14 @@ using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
+using Geef.Atelier.Core.Persistence.Orders;
 using Geef.Atelier.Infrastructure.Composition;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Pipeline;
+using Geef.Atelier.Infrastructure.Pipeline.Assembly;
+using Geef.Atelier.Infrastructure.Pipeline.Direct;
 using Geef.Atelier.Infrastructure.Pricing;
 using Geef.Sdk;
 using Microsoft.EntityFrameworkCore;
@@ -39,7 +42,8 @@ internal sealed class RunOrchestratorService(
     IGroundingProviderFactory           groundingProviderFactory,
     IPricingCatalog?                    pricingCatalog = null,
     IOptions<CostTrackingOptions>?      costTrackingOptions = null,
-    IFinalizerExecutorFactory?          finalizerExecutorFactory = null) : BackgroundService
+    IFinalizerExecutorFactory?          finalizerExecutorFactory = null,
+    IPipelineAssemblerSelector?         assemblerSelector = null) : BackgroundService
 {
     internal const string ResultNotSavedMessage = "The result could not be saved completely.";
     internal const string UnexpectedErrorMessage = "The task stopped because of an unexpected error.";
@@ -47,6 +51,7 @@ internal sealed class RunOrchestratorService(
     internal const string RestartedWhileFinishingMessage = "The result may be incomplete because the service was restarted while finishing.";
 
     private readonly OrchestratorOptions _opts = options.Value;
+    private readonly IPipelineAssemblerSelector _assemblers = assemblerSelector ?? PipelineAssemblerSelector.Default;
     private readonly DateTimeOffset _createdAt = DateTimeOffset.UtcNow;
     private readonly SemaphoreSlim _slots = new(options.Value.MaxConcurrentRuns, options.Value.MaxConcurrentRuns);
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _runCts   = new();
@@ -267,68 +272,11 @@ internal sealed class RunOrchestratorService(
             var accumulator = costTrackingEnabled ? new RunCostAccumulator() : null;
 
             await using var scope = scopeFactory.CreateAsyncScope();
-            var consultations              = scope.ServiceProvider.GetRequiredService<IAdvisorConsultationRepository>();
-            var groundingRefiner           = scope.ServiceProvider.GetService<IGroundingRefiner>();
-            var groundingConsultationRepo  = scope.ServiceProvider.GetService<IGroundingConsultationRepository>();
-            var toolBackedGroundingProvider = scope.ServiceProvider.GetService<Geef.Atelier.Infrastructure.Grounding.ToolBackedGroundingProvider>();
-
-            GeefPipelineRunner<FinalizedDocument> runner;
-            var isCompositionRun = run.Kind == RunKind.CrewComposition
-                || snapshot.TemplateName == SystemCrew.CrewComposerTemplateName;
-            if (isCompositionRun)
-            {
-                var crewSpecValidator = scope.ServiceProvider.GetRequiredService<ICrewSpecValidator>();
-                var validatorReviewer = new CrewSpecValidatorReviewer(crewSpecValidator);
-                var composerExecutor  = ActivatorUtilities.CreateInstance<CrewComposerExecutor>(
-                    scope.ServiceProvider, snapshot.Executor);
-
-                runner = AtelierPipelineFactory.Build(
-                    snapshot, llmClientResolver, convergenceOptions,
-                    consultationRepository: consultations,
-                    runId: run.Id,
-                    loggerFactory: loggerFactory,
-                    additionalSinks: [sink],
-                    groundingProviderFactory: groundingProviderFactory,
-                    pricingCatalog: pricingCatalog,
-                    costAccumulator: accumulator,
-                    groundingRefiner: groundingRefiner,
-                    groundingConsultationRepository: groundingConsultationRepo,
-                    customExecutionStep: composerExecutor,
-                    specialReviewerResolver: profile =>
-                        profile.Name == "crew-spec-validator" ? validatorReviewer : null,
-                    toolBackedGroundingProvider: toolBackedGroundingProvider,
-                    warningSink: warningSink);
-            }
-            else
-            {
-                runner = run.SeedDraftText is not null
-                    ? AtelierPipelineFactory.BuildWithSeedDraft(
-                        snapshot, llmClientResolver, convergenceOptions, run.SeedDraftText,
-                        consultationRepository: consultations,
-                        runId: run.Id,
-                        loggerFactory: loggerFactory,
-                        additionalSinks: [sink],
-                        groundingProviderFactory: groundingProviderFactory,
-                        pricingCatalog: pricingCatalog,
-                        costAccumulator: accumulator,
-                        groundingRefiner: groundingRefiner,
-                        groundingConsultationRepository: groundingConsultationRepo,
-                        toolBackedGroundingProvider: toolBackedGroundingProvider,
-                        warningSink: warningSink)
-                    : AtelierPipelineFactory.Build(
-                        snapshot, llmClientResolver, convergenceOptions,
-                        consultationRepository: consultations,
-                        runId: run.Id,
-                        loggerFactory: loggerFactory,
-                        additionalSinks: [sink],
-                        groundingProviderFactory: groundingProviderFactory,
-                        pricingCatalog: pricingCatalog,
-                        costAccumulator: accumulator,
-                        groundingRefiner: groundingRefiner,
-                        groundingConsultationRepository: groundingConsultationRepo,
-                        toolBackedGroundingProvider: toolBackedGroundingProvider,
-                        warningSink: warningSink);
-            }
+            var assemblyContext = new PipelineAssemblyContext(
+                run, snapshot, scope.ServiceProvider, scopeFactory, llmClientResolver, convergenceOptions, loggerFactory,
+                sink, accumulator, warningSink, groundingProviderFactory, pricingCatalog);
+            var assembler = _assemblers.Select(run, snapshot);
+            var runner = assembler.Assemble(assemblyContext);
 
             var result = await runner.RunAsync(run.BriefingText, cts.Token);
 
@@ -341,6 +289,7 @@ internal sealed class RunOrchestratorService(
                     await FinalizeRunCostsAsync(run.Id, accumulator, cts.Token);
                 await RunFinalizersSafelyAsync(run.Id, snapshot, cts.Token);
                 await SetDeliveredOutcomeAsync(run.Id, delivered.Outcome, delivered.Iteration);
+                await FinishAssemblyAsync(assembler, assemblyContext, result, cts.Token);
             }
             else
             {
@@ -364,6 +313,7 @@ internal sealed class RunOrchestratorService(
                         await ReportWarningAsync(run.Id, RunWarningSources.Finalizer, RunWarningCodes.FinalizersNotRun,
                             "The finishing steps were not run because the text did not pass all checks.");
                     await SetDeliveredOutcomeAsync(run.Id, delivered.Outcome, delivered.Iteration);
+                    await FinishAssemblyAsync(assembler, assemblyContext, result, cts.Token);
                 }
                 else
                 {
@@ -371,30 +321,35 @@ internal sealed class RunOrchestratorService(
                 }
             }
 
+            await TouchOrderSafelyAsync(run);
             await NotifySafelyAsync(run.Id);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             // Do not pass the already-cancelled stoppingToken — use None so the DB write completes.
             await OverrideToAbortedAsync(run.Id, "Service stopping");
+            await TouchOrderSafelyAsync(run);
             await NotifySafelyAsync(run.Id);
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
             // User-initiated cancellation: sink may have written Failed; override to Aborted.
             await OverrideToAbortedAsync(run.Id, "Cancelled by user");
+            await TouchOrderSafelyAsync(run);
             await NotifySafelyAsync(run.Id);
         }
         catch (InvalidCrewSnapshotException ex)
         {
             logger.LogError("Run {RunId} has an unusable crew snapshot; failing it without a fallback crew: {Error}", run.Id, ex.ToRedactedLogText());
             await MarkRunFailedAsync(run.Id, ex.Message);
+            await TouchOrderSafelyAsync(run);
             await NotifySafelyAsync(run.Id);
         }
         catch (Exception ex)
         {
             logger.LogError("Run {RunId} pipeline threw unhandled exception: {Error}", run.Id, ex.ToRedactedLogText());
             await MarkRunFailedAsync(run.Id, SanitizeErrorMessage(ex));
+            await TouchOrderSafelyAsync(run);
             await NotifySafelyAsync(run.Id);
         }
         finally
@@ -491,6 +446,12 @@ internal sealed class RunOrchestratorService(
     /// </summary>
     internal static string SanitizeErrorMessage(Exception ex)
     {
+        for (var direct = ex; direct is not null; direct = direct.InnerException)
+        {
+            if (direct is DirectPathException)
+                return direct.Message;
+        }
+
         var current = ex;
         while (current is not null)
         {
@@ -632,6 +593,41 @@ internal sealed class RunOrchestratorService(
             logger.LogError("Finishing steps of run {RunId} could not be completed: {Error}", runId, ex.ToRedactedLogText());
             await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerFailed,
                 "The finishing steps could not be completed.");
+        }
+    }
+
+    /// <summary>
+    /// Lets the assembler store results of its kind of run (the report of the direct path) after the outcome is
+    /// recorded. A failure is logged and never changes the delivered result; cancellation propagates.
+    /// </summary>
+    private async Task FinishAssemblyAsync(
+        IPipelineAssembler assembler, PipelineAssemblyContext context, GeefPipelineResult<FinalizedDocument> result, CancellationToken ct)
+    {
+        try
+        {
+            await assembler.OnRunFinishedAsync(context, result, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogError("Results of run {RunId} could not be stored completely after it finished: {Error}", context.Run.Id, ex.ToRedactedLogText());
+        }
+    }
+
+    /// <summary>Moves the order of a finished run to the top of "My work"; never throws.</summary>
+    private async Task TouchOrderSafelyAsync(RunEntity run)
+    {
+        if (run.OrderId is not { } orderId)
+            return;
+        try
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var orders = scope.ServiceProvider.GetService<IOrderRepository>();
+            if (orders is not null)
+                await orders.TouchAsync(orderId, DateTimeOffset.UtcNow, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("The order of run {RunId} could not be updated: {Error}", run.Id, ex.ToRedactedLogText());
         }
     }
 

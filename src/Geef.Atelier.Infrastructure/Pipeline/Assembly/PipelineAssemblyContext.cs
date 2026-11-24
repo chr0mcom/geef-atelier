@@ -23,6 +23,6 @@ internal sealed record PipelineAssemblyContext(
     ILoggerFactory LoggerFactory,
     IGeefEventSink EventSink,
     ICostAccumulator? CostAccumulator,
-    IRunWarningSink? WarningSink,
+    IRunWarningSink WarningSink,
     IGroundingProviderFactory? GroundingProviderFactory,
     IPricingCatalog? PricingCatalog);

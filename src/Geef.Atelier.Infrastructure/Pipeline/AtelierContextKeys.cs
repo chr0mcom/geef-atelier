@@ -52,4 +52,10 @@ internal static class AtelierContextKeys
     /// own words, checked by <c>DeterministicChecksReviewer</c>.
     /// </summary>
     public static readonly ContextKey<OrderConstraints> OrderConstraints = new("geef:atelier:order-constraints");
+
+    /// <summary>
+    /// Set by <c>DirectWriterExecutor</c> after the first writing pass when it could judge from the input tokens whether
+    /// the attached files were read in full; read by the direct-path report.
+    /// </summary>
+    public static readonly ContextKey<ReadEvidence> ReadEvidence = new("geef:atelier:read-evidence");
 }

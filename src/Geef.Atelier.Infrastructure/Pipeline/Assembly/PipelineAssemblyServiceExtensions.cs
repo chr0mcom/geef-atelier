@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Geef.Atelier.Infrastructure.Pipeline.Assembly;
 
@@ -6,5 +7,13 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Assembly;
 public static class PipelineAssemblyServiceExtensions
 {
     /// <summary>Registers the composition, direct, seed-draft and standard assemblers and the selector.</summary>
-    public static IServiceCollection AddPipelineAssemblers(this IServiceCollection services) => services;
+    public static IServiceCollection AddPipelineAssemblers(this IServiceCollection services)
+    {
+        services.AddSingleton<IPipelineAssembler, CompositionPipelineAssembler>();
+        services.AddSingleton<IPipelineAssembler, DirectPipelineAssembler>();
+        services.AddSingleton<IPipelineAssembler, SeedDraftPipelineAssembler>();
+        services.AddSingleton<IPipelineAssembler, StandardPipelineAssembler>();
+        services.TryAddSingleton<IPipelineAssemblerSelector, PipelineAssemblerSelector>();
+        return services;
+    }
 }
