@@ -1,0 +1,32 @@
+using Geef.Atelier.Core.Domain.Orders;
+
+namespace Geef.Atelier.Application.Orders;
+
+/// <summary>Application service for orders, the unit the person sees. Runs stay the log underneath. <c>requestingUsername = null</c> bypasses the ownership check (admin), as in <see cref="Runs.IRunService"/>.</summary>
+public interface IOrderService
+{
+    /// <summary>
+    /// Validates the request and the sources (owner, count, page selection, budget), creates the order and, because there is no intake step
+    /// in this stage, moves it straight to <see cref="OrderState.Ready"/> and creates version 1 of its run in the same transaction.
+    /// Throws <see cref="OrderSubmissionException"/> for problems the person can fix.
+    /// </summary>
+    Task<OrderSubmission> SubmitAsync(SubmitOrderRequest request, CancellationToken ct = default);
+
+    /// <summary>Returns the order page data, or <c>null</c> when the order is unknown or foreign.</summary>
+    Task<OrderView?> GetAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default);
+
+    /// <summary>Returns the delivered text with placeholders, open checks, used sources and warnings, or <c>null</c> when the order is unknown or foreign.</summary>
+    Task<OrderResult?> GetResultAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default);
+
+    /// <summary>Lists orders newest activity first. <paramref name="ownerUsername"/> = null lists all users (admin view).</summary>
+    Task<IReadOnlyList<OrderListItem>> ListAsync(string? ownerUsername, int limit = 50, CancellationToken ct = default);
+
+    /// <summary>Returns as soon as the display state differs from <paramref name="knownState"/> or is finished, at the latest after <paramref name="maxWait"/>. Polls the database; never longer than <c>Orders:MaxWaitSeconds</c>.</summary>
+    Task<OrderView?> WaitForChangeAsync(Guid orderId, string? requestingUsername, OrderDisplayState? knownState, TimeSpan maxWait, CancellationToken ct = default);
+
+    /// <summary>Stops the order: before a run exists the state becomes <see cref="OrderState.Cancelled"/>; with an active run the run is cancelled.</summary>
+    Task<bool> CancelAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default);
+
+    /// <summary>Deletes a finished or stopped order with its runs; sources that no other order uses are deleted with their files.</summary>
+    Task<bool> DeleteAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default);
+}

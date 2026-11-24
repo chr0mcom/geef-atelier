@@ -184,4 +184,8 @@ public interface ICrewService
     async Task<ResolvedCrewSnapshot> ResolveSnapshotWithWarningsAsync(
         string? crewTemplateName, CrewSpec? customCrew, CancellationToken cancellationToken = default) =>
         new(await ResolveSnapshotAsync(crewTemplateName, customCrew, cancellationToken), []);
+
+    /// <summary>Builds and model-assigns the snapshot of a template that exists only in code (e.g. <see cref="SystemCrew.DirectTemplate"/>); profiles are looked up in the code-only catalogue first.</summary>
+    Task<ResolvedCrewSnapshot> ResolveCodeTemplateSnapshotAsync(CrewTemplate template, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Code-only templates are not supported by this crew service.");
 }

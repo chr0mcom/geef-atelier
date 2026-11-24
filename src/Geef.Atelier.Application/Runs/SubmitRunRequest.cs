@@ -1,5 +1,6 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Orders;
 
 namespace Geef.Atelier.Application.Runs;
 
@@ -13,4 +14,5 @@ public sealed record SubmitRunRequest(
     RunKind Kind = RunKind.Standard,
     bool AutoCompose = false,
     bool ChainToTaskRun = true,
-    Guid? ParentCompositionRunId = null);
+    Guid? ParentCompositionRunId = null,
+    OrderEntry Entry = OrderEntry.Web);
