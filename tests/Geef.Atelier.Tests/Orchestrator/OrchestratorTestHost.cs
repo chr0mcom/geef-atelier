@@ -58,6 +58,7 @@ internal sealed class OrchestratorTestHost : IAsyncDisposable
                     o.PollingInterval            = opts.PollingInterval;
                     o.MaxConcurrentRuns          = opts.MaxConcurrentRuns;
                     o.CancellationPollingInterval = opts.CancellationPollingInterval;
+                    o.PreparationTimeout          = opts.PreparationTimeout;
                 });
                 services.AddSingleton<IOptions<ConvergenceOptions>>(
                     Options.Create(new ConvergenceOptions()));

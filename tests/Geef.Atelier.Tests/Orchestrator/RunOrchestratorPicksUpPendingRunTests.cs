@@ -4,6 +4,8 @@ using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Persistence;
 using Microsoft.EntityFrameworkCore;
 
+using Geef.Atelier.Tests.Fakes;
+
 namespace Geef.Atelier.Tests.Orchestrator;
 
 /// <summary>
@@ -25,7 +27,7 @@ public sealed class RunOrchestratorPicksUpPendingRunTests(PostgresFixture fixtur
         // Arrange — create a Pending run
         await using var ctx = fixture.NewContext();
         var svc   = new RunPersistenceService(ctx);
-        var runId = await svc.CreateRunAsync(Briefing, "{}", cancellationToken: CancellationToken.None);
+        var runId = await svc.CreateRunAsync(Briefing, "{}", crewSnapshotJson: TestCrewSnapshots.KlassikJson, cancellationToken: CancellationToken.None);
 
         // Act — start the orchestrator
         await using var host = new OrchestratorTestHost(fixture, new FakeLlmClient());

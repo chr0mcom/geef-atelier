@@ -4,6 +4,7 @@ using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Grounding;
@@ -45,7 +46,8 @@ internal static class AtelierPipelineFactory
         IGroundingConsultationRepository? groundingConsultationRepository = null,
         IExecutionStep? customExecutionStep = null,
         Func<Geef.Atelier.Core.Domain.Crew.Profiles.ReviewerProfile, IReviewer?>? specialReviewerResolver = null,
-        ToolBackedGroundingProvider? toolBackedGroundingProvider = null)
+        ToolBackedGroundingProvider? toolBackedGroundingProvider = null,
+        IRunWarningSink? warningSink = null)
     {
         IGroundingStep grounding = new BriefingGroundingStep();
         if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
@@ -56,7 +58,8 @@ internal static class AtelierPipelineFactory
                     ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance,
                 groundingRefiner,
                 groundingConsultationRepository,
-                toolBackedGroundingProvider);
+                toolBackedGroundingProvider,
+                warningSink);
         }
 
         IExecutionStep execution = customExecutionStep
@@ -96,7 +99,8 @@ internal static class AtelierPipelineFactory
         ICostAccumulator? costAccumulator = null,
         IGroundingRefiner? groundingRefiner = null,
         IGroundingConsultationRepository? groundingConsultationRepository = null,
-        ToolBackedGroundingProvider? toolBackedGroundingProvider = null)
+        ToolBackedGroundingProvider? toolBackedGroundingProvider = null,
+        IRunWarningSink? warningSink = null)
     {
         IGroundingStep grounding = new SeedDraftGroundingStep(seedDraftText);
         if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
@@ -107,7 +111,8 @@ internal static class AtelierPipelineFactory
                     ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance,
                 groundingRefiner,
                 groundingConsultationRepository,
-                toolBackedGroundingProvider);
+                toolBackedGroundingProvider,
+                warningSink);
         }
 
         IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);
@@ -212,8 +217,9 @@ internal static class AtelierPipelineFactory
     };
 
     /// <summary>
-    /// Returns reviewers for the given profiles, falling back to <see cref="AutoApproveReviewer"/> when
-    /// the profile list is empty (single-pass / reviewer-free template).
+    /// Returns reviewers for the given profiles. A crew without reviewers is rejected: silently approving every
+    /// draft would deliver unchecked text as if it had been reviewed. The system crews, the template studio and the
+    /// crew-spec validator always provide at least one reviewer; only a hand-edited template can lack one.
     /// When <paramref name="specialReviewerResolver"/> is supplied, each profile is offered to it first;
     /// a non-null return value replaces the default <see cref="ProfileBasedReviewer"/> for that profile.
     /// </summary>
@@ -225,7 +231,8 @@ internal static class AtelierPipelineFactory
         Func<Geef.Atelier.Core.Domain.Crew.Profiles.ReviewerProfile, IReviewer?>? specialReviewerResolver = null)
     {
         if (profiles.Count == 0)
-            return [new AutoApproveReviewer()];
+            throw new InvalidOperationException(
+                "The crew of this run has no reviewers, so its text could not be checked. Add at least one reviewer to the crew and start again.");
 
         var classifier = new HttpTransientFaultClassifier();
         return profiles.Select(r =>
