@@ -2,7 +2,7 @@
 
 *[English](08-crew-system.md) · **Deutsch***
 
-Letzte Aktualisierung: 2026-11-23 (D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
+Letzte Aktualisierung: 2026-11-24 (D-067: strenges Lesen des Snapshots, mindestens ein Reviewer, Outcome nach den Finalizern, Warnungen am Lauf, System-Grounding wieder über den Provider-Typ-Weg, Learning standardmäßig pausiert; zuvor 2026-11-23, D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
 
 ## Überblick
 
@@ -55,7 +55,7 @@ Definiert in `Geef.Atelier.Core.Domain.Crew.SystemCrew` (read-only, versioniert 
 - `marketing`: Marketing, `Parallel`, keine Advisors.
 - `crew-composer`: General.
 
-Alle vier Standard-Templates liefern drei Standard-Grounding-Provider (`tavily-basic`, `run-attachments`, `learning-retriever-default`) und einen Standard-Finalizer (`learning-extractor`) aus. Einzige Ausnahme ist das `learning-evaluation`-Template — es enthält weder `learning-retriever-default` noch `learning-extractor` (Rekursionsstopp).
+Alle vier Standard-Templates liefern drei Standard-Grounding-Provider (`tavily-basic`, `run-attachments`, `learning-retriever-default`) und einen Standard-Finalizer (`learning-extractor`) aus. Einzige Ausnahme ist das `learning-evaluation`-Template — es enthält weder `learning-retriever-default` noch `learning-extractor` (Rekursionsstopp). Seit D-067 laufen die Learning-Teile leer, solange `Learning:Enabled` nicht gesetzt ist (siehe [Kontinuierlicher Lernzyklus](#kontinuierlicher-lernzyklus-d-054)).
 
 ## Modellmatrix (D-066)
 
@@ -141,6 +141,19 @@ Verwaltete Profile folgen nach dem Deploy automatisch; manuelle Profile bleiben 
 ```
 
 Serialisiert mit `JsonNamingPolicy.CamelCase`. Gespeichert auf `Runs.CrewSnapshot` (JSONB).
+
+**Snapshot für einen Lauf lesen (D-067).** Der Orchestrator liest den Snapshot streng über
+`CrewSnapshot.DeserializeForRun`. Ein fehlender, unlesbarer oder leerer Snapshot, eine unbekannte
+Schema-Version oder ein Snapshot ohne Executor-, Reviewer- oder Advisor-Liste löst
+`InvalidCrewSnapshotException` aus, und der Lauf endet `Failed` mit verständlicher Meldung. Der frühere
+stille Rückfall auf die `klassik`-Crew ist entfernt. Das tolerante `CrewSnapshot.Deserialize` bleibt nur für
+die Anzeige. Ein Lauf mit Anhängen wird ohne Snapshot abgelegt, bis seine Anhänge bereit sind
+([02-architecture](02-architecture_de.md#vorbereitungs-zeitlimit-für-läufe-mit-anhängen)).
+
+**Mindestens ein Reviewer.** Eine Crew ohne Reviewer kann nicht laufen: `AtelierPipelineFactory` baut die
+Pipeline nicht, und der Lauf endet `Failed` mit Meldung. Der frühere `AutoApproveReviewer`, der jeden
+Entwurf still freigab, ist entfernt. Template Studio und Composer verlangen bereits einen Reviewer; der
+Template-Editor prüft das beim Speichern noch nicht, eine solche Crew scheitert dann beim Laufstart.
 
 ## Advisor-Pässe (PS-7)
 
@@ -261,6 +274,11 @@ public enum FinalizerType
 
 Finalizer laufen sequenziell in der in `CrewTemplate.FinalizerProfileNames` festgelegten Reihenfolge, nachdem die Convergence-Schleife beendet wurde. Das Flag `CrewTemplate.RunFinalizersOnMaxAttempts` steuert, ob Finalizer auch bei einem Convergence-Failure (Max-Attempts überschritten) ausgeführt werden.
 
+Seit D-067:
+
+- `Runs.Outcome` wird erst gesetzt, wenn die Finalizer fertig sind und der (gegebenenfalls umgewandelte) endgültige Text abgelegt ist; `Outcome` bedeutet also „fertig abgelegt, inklusive Finalizer“ ([02-architecture](02-architecture_de.md#lauf-ergebnis-outcome-und-runstatus)).
+- Ein Finalizer, der fehlschlägt, übersprungen oder nicht ausgeführt wird (Best-Effort-Lauf ohne `RunFinalizersOnMaxAttempts`), wird zur Warnung am Lauf (`finalizer.failed`, `finalizer.skipped`, `finalizer.not_run`), statt still durchzugehen.
+
 ### RunArtifact-Entity
 
 Jede Finalizer-Ausführung hinterlässt einen `RunArtifact`-Datensatz:
@@ -373,12 +391,18 @@ Vollständige Tool-Liste (15 Tools): siehe [09-endpoint-reference.md](09-endpoin
 
 Grounding-Provider reichern das Briefing vor der GEEF-Ausführungsschleife mit externem Kontext an.
 
+**Ist-Zustand (D-067):**
+
+- Die fünf System-Profile `tavily-basic`, `tavily-refined`, `run-attachments`, `knowledge-base-default` und `academic-default` laufen über ihren unten genannten typspezifischen Provider, nicht über den Tool-Pfad, auch bei älteren Snapshots, die noch einen `ToolName` tragen. Nur eigene Profile mit `ToolName` nutzen den Tool-gestützten Provider ([10-tool-system](10-tool-system_de.md#a-t9--grounding-neuaufbau-auf-zentrale-tools)).
+- Ein Provider, der übersprungen wird oder scheitert (fehlender Schlüssel, unbekannter Typ, Fehler), wird zur Warnung am Lauf (`grounding.provider_skipped`, `grounding.tool_failed`) statt zu still leerem Kontext.
+- Schlüssel- und Header-Verweise (`authHeaderEnv`, `apiKeyEnv`) werden nur für Namen auf der Allowlist angenommen und gelesen ([10-tool-system](10-tool-system_de.md#secrets-und-die-allowlist-für-umgebungsvariablen)); der Grounding-Editor ist nur für Admins.
+
 ### Provider-Typen
 
 | Typ | Implementierung | Beschreibung | Settings |
 |---|---|---|---|
 | `tavily` | `TavilyGroundingProvider` | Web-Suche via Tavily API (Basic oder Advanced). API-Key pro Profil. | `Tier` (basic/advanced), `MaxResults`, `IncludeAnswer` |
-| `vector-store` | `VectorStoreGroundingProvider` | Semantische Suche in einer pgvector-Sammlung. Scope: `global`, `run-local` oder `both`. | `TopK`, `Scope`, `TagFilter` |
+| `vector-store` | `VectorStoreGroundingProvider` | Semantische Suche in einer pgvector-Sammlung. Scope: `global`, `run-local` oder `both`; ein fehlender oder unbekannter Scope wird fail-closed behandelt (D-067). `run-local` findet die Anhänge des Laufs und des Laufs, den er fortsetzt. | `TopK`, `Scope`, `TagFilter` |
 | `static-context` | `StaticContextGroundingProvider` | Kuratierter Fixtext, der bei jedem Run unverändert injiziert wird. Keine externe API. Ideal für Style-Guides, Glossare, Markenstimme. | `label`, `content` (max 200.000 Zeichen, Soft-Limit 50.000) |
 | `url-fetch` | `UrlFetchGroundingProvider` | Fetcht konkrete URLs, bereinigt HTML via HtmlAgilityPack, gibt Textinhalt zurück. SSRF-Guard blockiert private IPs. | `urls` (newline-separated), `maxContentPerUrl` (Default 8000), `stripBoilerplate` (bool, Default true) |
 | `news-search` | `NewsSearchGroundingProvider` | Tavily-API mit `topic=news` + `days`-Filter. Für zeitkritische Themen. Attribution via `PublishedDate`. | `recencyDays` (Default 7), `newsMaxResults` (Default 5), `newsSearchDepth` (basic/advanced) |
@@ -544,7 +568,15 @@ Der Edit-Step exponiert das vollständige Feld-Set für das Template und jeden P
 
 Finalizer-Vorschläge erscheinen in der LLM-Analyse-Ausgabe des Studios; `CreateProfileAsync` behandelt den Finalizer-Zweig; `StudioEditStep` stellt den Finalizer-Slot-Abschnitt neben den übrigen Profil-Slots bereit.
 
+Seit D-067 entfernt das Studio `authHeaderEnv`/`apiKeyEnv` mit einer Warnung aus vorgeschlagenen Grounding-Profilen, und sein Prompt bietet diese Schlüssel nicht mehr an; Verweise auf Geheimnisse setzen nur Administratoren im Grounding-Editor.
+
 ## Kontinuierlicher Lernzyklus (D-054)
+
+> **Seit D-067 pausiert.** Die Schleife läuft nur, wenn `Learning:Enabled` auf `true` steht (Standard
+> `false`). Solange sie aus ist, kehren `learning-extractor` und `learning-publisher` sofort zurück (kein
+> LLM-Aufruf, kein Eintrag, kein `learning-evaluation`-Lauf, kein Embedding), `learning-retrieval` liefert
+> leeren Kontext, und `/crew/learnings` zeigt, dass Learning pausiert ist. Crews mit diesen Teilen bleiben
+> gültig. Die Schleife soll durch ein Gedächtnis je Nutzer ersetzt werden (D-068).
 
 ### Architektur
 
