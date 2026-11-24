@@ -4,6 +4,7 @@ using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Application.Providers;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Infrastructure.Llm;
+using Geef.Atelier.Core.Domain.Warnings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -51,7 +52,7 @@ internal sealed class TransformFinalizerExecutor(
                         FinalizerProfileName = profile.Name,
                         ArtifactType = ArtifactType.Status,
                         StorageUri = "error",
-                        StatusMessage = $"Finalizer provider '{settings.Provider}' not found or inactive",
+                        StatusMessage = "The AI service for this step is not available.",
                         CreatedAt = DateTimeOffset.UtcNow,
                     },
                     CostEur: null,
@@ -87,7 +88,7 @@ internal sealed class TransformFinalizerExecutor(
                 logger.LogWarning(
                     "Transform finalizer {Profile} returned empty response; original text preserved.", profile.Name);
                 artifact = MakeStatusArtifact(context.RunId, profile.Name, "warning",
-                    "Transform returned empty response — original text preserved.");
+                    "The step returned no text, so the original text was kept.");
             }
             else
             {
@@ -109,9 +110,9 @@ internal sealed class TransformFinalizerExecutor(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Transform finalizer failed for profile {Profile}", profile.Name);
+            logger.LogError("Transform finalizer failed for profile {Profile}: {Error}", profile.Name, ex.ToRedactedLogText());
             artifact = MakeStatusArtifact(context.RunId, profile.Name, "error",
-                $"Transform failed: {ex.Message}");
+                "The step could not change the text.");
         }
 
         return new FinalizerExecutionResult(

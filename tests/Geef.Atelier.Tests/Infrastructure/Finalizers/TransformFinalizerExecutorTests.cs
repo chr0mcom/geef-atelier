@@ -116,9 +116,9 @@ public sealed class TransformFinalizerExecutorTests
     }
 
     [Fact]
-    public async Task Execute_WhenLlmThrows_ProducesStatusArtifact()
+    public async Task Execute_WhenLlmThrows_ProducesStatusArtifactWithAPlainSentence()
     {
-        var throwingClient = ThrowingLlmClient.GenericError("LLM unavailable");
+        var throwingClient = ThrowingLlmClient.GenericError("LLM unavailable at http://cli-proxy:8090 key=sk-proj-0123456789abcdef");
         var executor = BuildExecutor(throwingClient);
 
         var result = await executor.ExecuteAsync(
@@ -127,7 +127,30 @@ public sealed class TransformFinalizerExecutorTests
         Assert.Null(result.UpdatedText);
         Assert.NotNull(result.Artifact);
         Assert.Equal(ArtifactType.Status, result.Artifact!.ArtifactType);
-        Assert.Contains("Transform failed", result.Artifact.StatusMessage);
+        Assert.Equal("error", result.Artifact.StorageUri);
+        Assert.Equal("The step could not change the text.", result.Artifact.StatusMessage);
+    }
+
+    /// <summary>N4 (Etappe 0, review round 2): the log entry of a failed step carries the error without the key.</summary>
+    [Fact]
+    public async Task Execute_WhenLlmThrows_LogsTheErrorWithoutTheKey()
+    {
+        var logger = new CapturingLogger();
+        var services = new ServiceCollection();
+        services.AddSingleton<IProviderService>(new FakeProviderService());
+        var executor = new TransformFinalizerExecutor(
+            new TestLlmClientResolver(ThrowingLlmClient.GenericError("Incorrect API key provided: abcd1234efgh5678 (key=sk-proj-0123456789abcdef)")),
+            new ZeroPricingCatalog(),
+            services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
+            logger);
+
+        await executor.ExecuteAsync(ProfileWith("Some prompt."), MakeContext(), CancellationToken.None);
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Contains("Incorrect API key provided", entry);
+        Assert.DoesNotContain("abcd1234efgh5678", entry);
+        Assert.DoesNotContain("sk-proj-0123", entry);
+        Assert.Null(logger.LastException);
     }
 
     /// <summary>A cancelled run (user cancel or service stop) is not a failed step: the cancellation propagates.</summary>
@@ -180,7 +203,7 @@ public sealed class TransformFinalizerExecutorTests
         Assert.Null(result.UpdatedText);
         Assert.NotNull(result.Artifact);
         Assert.Equal(ArtifactType.Status, result.Artifact!.ArtifactType);
-        Assert.Contains("not found or inactive", result.Artifact.StatusMessage);
+        Assert.Equal("The AI service for this step is not available.", result.Artifact.StatusMessage);
         Assert.Equal(0, fakeClient.CallCount);
     }
 
@@ -197,8 +220,27 @@ public sealed class TransformFinalizerExecutorTests
         Assert.Null(result.UpdatedText);
         Assert.NotNull(result.Artifact);
         Assert.Equal(ArtifactType.Status, result.Artifact!.ArtifactType);
-        Assert.Contains("not found or inactive", result.Artifact.StatusMessage);
+        Assert.Equal("The AI service for this step is not available.", result.Artifact.StatusMessage);
         Assert.Equal(0, fakeClient.CallCount);
+    }
+
+    private sealed class CapturingLogger : Microsoft.Extensions.Logging.ILogger<TransformFinalizerExecutor>
+    {
+        public List<string> Entries { get; } = [];
+
+        public Exception? LastException { get; private set; }
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel < Microsoft.Extensions.Logging.LogLevel.Error)
+                return;
+            Entries.Add(formatter(state, exception));
+            LastException = exception;
+        }
     }
 
     // ---------------------------------------------------------------------------

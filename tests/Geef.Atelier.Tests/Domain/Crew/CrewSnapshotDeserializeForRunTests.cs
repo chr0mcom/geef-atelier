@@ -32,6 +32,22 @@ public sealed class CrewSnapshotDeserializeForRunTests
         Assert.Contains(expected, ex.Message);
     }
 
+    /// <summary>
+    /// Funktional 5 / B7 (Etappe 0, review round 2): the reason is a fixed sentence; the JSON path and position of the
+    /// parser error stay in the inner exception for the log.
+    /// </summary>
+    [Theory]
+    [InlineData("{not json")]
+    [InlineData("""{"schemaVersion":3,"executor":42,"reviewers":[],"advisors":[]}""")]
+    [InlineData("""{"schemaVersion":3,"executor":{"name":"x"},"reviewers":[{"name":1}],"advisors":[]}""")]
+    public void UnreadableSnapshotsGiveAFixedSentenceWithoutParserDetails(string json)
+    {
+        var ex = Assert.Throws<InvalidCrewSnapshotException>(() => CrewSnapshot.DeserializeForRun(json));
+
+        Assert.Equal("The saved setup of this task could not be read. Please submit it again.", ex.Message);
+        Assert.NotNull(ex.InnerException);
+    }
+
     [Fact]
     public void TolerantReadStaysAvailableForDisplay()
     {

@@ -9,6 +9,7 @@ using Geef.Atelier.Core.Domain.Crew.Learning;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Infrastructure.Llm;
+using Geef.Atelier.Core.Domain.Warnings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -123,10 +124,14 @@ internal sealed class LearningExtractFinalizerExecutor(
                 inputTokens   = response.TokenUsage.InputTokens;
                 outputTokens  = response.TokenUsage.OutputTokens;
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
-                logger.LogError(ex, "LearningExtract: LLM call failed for run {RunId}", context.RunId);
-                return Error(context.RunId, profile.Name, $"LLM extraction failed: {ex.Message}");
+                logger.LogError("LearningExtract: LLM call failed for run {RunId}: {Error}", context.RunId, ex.ToRedactedLogText());
+                return Error(context.RunId, profile.Name, "The lesson could not be worked out from the result.");
             }
 
             // ── Persist proposed learning entry ───────────────────────────────
@@ -170,8 +175,8 @@ internal sealed class LearningExtractFinalizerExecutor(
             {
                 // A submit failure must not fail the original run — the entry remains Proposed
                 // and can be retried or manually reviewed.
-                logger.LogError(ex,
-                    "LearningExtract: failed to submit learning-evaluation run for entry {EntryId}", entry.Id);
+                logger.LogError(
+                    "LearningExtract: failed to submit learning-evaluation run for entry {EntryId}: {Error}", entry.Id, ex.ToRedactedLogText());
             }
 
             return new FinalizerExecutionResult(
@@ -184,10 +189,14 @@ internal sealed class LearningExtractFinalizerExecutor(
                 OutputTokens: outputTokens,
                 ProviderName: settings.Provider);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
-            logger.LogError(ex, "LearningExtract: unexpected error for run {RunId}", context.RunId);
-            return Error(context.RunId, profile.Name, $"Unexpected error: {ex.Message}");
+            logger.LogError("LearningExtract: unexpected error for run {RunId}: {Error}", context.RunId, ex.ToRedactedLogText());
+            return Error(context.RunId, profile.Name, "The step stopped because of an unexpected error.");
         }
     }
 

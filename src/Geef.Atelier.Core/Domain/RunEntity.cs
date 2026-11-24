@@ -16,6 +16,11 @@ public sealed class RunEntity
     public DateTimeOffset? StartedAt { get; init; }
     public DateTimeOffset? CompletedAt { get; init; }
     public string? FinalText { get; init; }
+    /// <summary>
+    /// Why the run failed or stopped, shown to the user: a fixed plain-English sentence without technical details
+    /// (exception texts, upstream answers, host or variable names, paths, technical profile names). Details belong in
+    /// the log; same rule as <c>IRunWarningSink.ReportAsync</c>.
+    /// </summary>
     public string? ErrorMessage { get; init; }
     public int TokensTotal { get; init; }
     public decimal CostTotal { get; init; }
@@ -56,7 +61,8 @@ public sealed class RunEntity
 
     /// <summary>
     /// Set when one or more finalizer steps fail. The run status remains <c>Completed</c>;
-    /// this field captures the partial-failure description for display in the UI.
+    /// this field captures the partial-failure description for display in the UI. Plain-English sentences that name
+    /// steps by their display name, without technical details (same rule as <see cref="ErrorMessage"/>).
     /// </summary>
     public string? FinalizerErrorMessage { get; set; }
 

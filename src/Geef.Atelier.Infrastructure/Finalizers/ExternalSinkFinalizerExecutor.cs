@@ -3,6 +3,7 @@ using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Infrastructure.Finalizers.FormatConverters;
 using MailKit.Net.Smtp;
 using MailKit.Security;
+using Geef.Atelier.Core.Domain.Warnings;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
@@ -44,9 +45,9 @@ internal sealed class ExternalSinkFinalizerExecutor(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "ExternalSink failed for profile {Profile} (kind={Kind})",
-                profile.Name, sinkKind);
-            artifact = StatusArtifact(context.RunId, profile.Name, $"Sink delivery failed: {ex.Message}");
+            logger.LogError("ExternalSink failed for profile {Profile} (kind={Kind}): {Error}",
+                profile.Name, sinkKind, ex.ToRedactedLogText());
+            artifact = StatusArtifact(context.RunId, profile.Name, "The text could not be delivered.");
         }
 
         return new FinalizerExecutionResult(
@@ -103,7 +104,7 @@ internal sealed class ExternalSinkFinalizerExecutor(
             FinalizerProfileName = profile.Name,
             ArtifactType = ok ? ArtifactType.Url : ArtifactType.Status,
             StorageUri = ok ? settings.Url : "error",
-            StatusMessage = ok ? null : $"HTTP {statusCode}",
+            StatusMessage = ok ? null : $"The receiving service rejected the text (code {statusCode}).",
             CreatedAt = DateTimeOffset.UtcNow,
         };
     }
@@ -120,7 +121,7 @@ internal sealed class ExternalSinkFinalizerExecutor(
         {
             logger.LogWarning("SMTP is not configured; email sink skipped for profile {Profile}",
                 profile.Name);
-            return StatusArtifact(context.RunId, profile.Name, "SMTP not configured — email skipped");
+            return StatusArtifact(context.RunId, profile.Name, "Email is not set up on this server, so no email was sent.");
         }
 
         var message = new MimeMessage();

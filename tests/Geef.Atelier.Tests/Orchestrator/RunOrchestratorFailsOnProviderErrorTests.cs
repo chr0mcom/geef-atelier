@@ -3,6 +3,7 @@ using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Persistence;
+using Geef.Atelier.Web.Services;
 
 using Geef.Atelier.Tests.Fakes;
 
@@ -132,7 +133,8 @@ public sealed class RunOrchestratorFailsOnProviderErrorTests(PostgresFixture fix
         Assert.NotNull(run);
         Assert.Equal(RunStatus.Failed, run.Status);
         Assert.NotNull(run.ErrorMessage);
-        Assert.Contains("Pipeline execution failed", run.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(RunOrchestratorService.UnexpectedErrorMessage, run.ErrorMessage);
+        Assert.DoesNotContain("Totally unexpected", run.ErrorMessage);
         Assert.NotNull(run.CompletedAt);
     }
 

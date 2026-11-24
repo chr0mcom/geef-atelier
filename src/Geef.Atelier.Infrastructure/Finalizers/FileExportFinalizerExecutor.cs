@@ -1,6 +1,7 @@
 using Geef.Atelier.Application.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Infrastructure.Finalizers.FormatConverters;
+using Geef.Atelier.Core.Domain.Warnings;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text;
@@ -31,7 +32,7 @@ internal sealed class FileExportFinalizerExecutor(
             var (bytes, extension, contentType) = ConvertToFormat(context.CurrentText, format, context.TemplateName ?? "document");
 
             if (bytes.Length > _options.MaxFileSizeBytes)
-                throw new InvalidOperationException(
+                throw new FileTooLargeException(
                     $"Export size {bytes.Length:N0} bytes exceeds the configured limit of {_options.MaxFileSizeBytes:N0} bytes.");
 
             var filename = BuildFilename(context.RunId, profile.Name, extension);
@@ -56,10 +57,16 @@ internal sealed class FileExportFinalizerExecutor(
                 CreatedAt = DateTimeOffset.UtcNow,
             };
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
-            logger.LogError(ex, "File export failed for profile {Profile}", profile.Name);
-            errorMessage = $"Export failed: {ex.Message}";
+            logger.LogError("File export failed for profile {Profile}: {Error}", profile.Name, ex.ToRedactedLogText());
+            errorMessage = ex is FileTooLargeException
+                ? "The file exceeds the size limit and was not saved."
+                : "The file could not be saved.";
         }
 
         if (errorMessage is not null)
@@ -129,4 +136,6 @@ internal sealed class FileExportFinalizerExecutor(
             .Select(c => char.IsLetterOrDigit(c) || c == '-' || c == '_' ? c : '_'));
         return $"{safe}-{runId.ToString("N")[..8]}.{extension}";
     }
+
+    private sealed class FileTooLargeException(string message) : Exception(message);
 }

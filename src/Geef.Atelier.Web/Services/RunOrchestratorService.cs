@@ -42,6 +42,8 @@ internal sealed class RunOrchestratorService(
     IFinalizerExecutorFactory?          finalizerExecutorFactory = null) : BackgroundService
 {
     internal const string ResultNotSavedMessage = "The result could not be saved completely.";
+    internal const string UnexpectedErrorMessage = "The task stopped because of an unexpected error.";
+    internal const string FinalizerUnexpectedErrorMessage = "The step stopped because of an unexpected error.";
     internal const string RestartedWhileFinishingMessage = "The result may be incomplete because the service was restarted while finishing.";
 
     private readonly OrchestratorOptions _opts = options.Value;
@@ -376,7 +378,7 @@ internal sealed class RunOrchestratorService(
         }
         catch (InvalidCrewSnapshotException ex)
         {
-            logger.LogError(ex, "Run {RunId} has an unusable crew snapshot; failing it without a fallback crew.", run.Id);
+            logger.LogError("Run {RunId} has an unusable crew snapshot; failing it without a fallback crew: {Error}", run.Id, ex.ToRedactedLogText());
             await MarkRunFailedAsync(run.Id, ex.Message);
             await NotifySafelyAsync(run.Id);
         }
@@ -473,11 +475,10 @@ internal sealed class RunOrchestratorService(
     }
 
     /// <summary>
-    /// Produces a sanitized, user-visible error message from a pipeline exception.
-    /// Walks the full inner-exception chain so that exceptions wrapped by the Geef SDK
+    /// Produces the user-visible error message for a pipeline exception: always one of a few fixed plain-English
+    /// sentences, never text taken from the exception (no keys, hosts, variable names, paths or stack traces); the
+    /// details go to the log only. Walks the full inner-exception chain so that exceptions wrapped by the Geef SDK
     /// are handled by the most-specific matching rule.
-    /// Sensitive details (API keys, full stack traces, provider URLs) are never included: the fallback carries only the
-    /// first line of the message with credential-like fragments removed (<see cref="RunWarningTextExtensions.ToWarningDetail"/>).
     /// </summary>
     internal static string SanitizeErrorMessage(Exception ex)
     {
@@ -487,24 +488,24 @@ internal sealed class RunOrchestratorService(
             if (current is HttpRequestException { StatusCode: { } code })
                 return (int)code switch
                 {
-                    400 => "LLM provider returned an invalid response (HTTP 400). Check model name and configuration.",
-                    401 => "LLM provider authentication failed.",
-                    403 => "LLM provider access denied.",
-                    429 => "LLM provider rate limit exceeded. Retry later.",
-                    >= 500 => "LLM provider temporarily unavailable. Retry later.",
-                    _ => $"LLM provider returned an error (HTTP {(int)code})."
+                    400 => "The AI service rejected the request (code 400). Please check the model settings.",
+                    401 => "The AI service rejected the sign-in (authentication failed).",
+                    403 => "The AI service denied access.",
+                    429 => "The AI service is busy right now (rate limit reached). Please try again later.",
+                    >= 500 => "The AI service is unavailable right now. Please try again later.",
+                    _ => $"The AI service answered with an error (code {(int)code})."
                 };
 
             if (current is HttpRequestException)
-                return "LLM provider request failed. Check connectivity and configuration.";
+                return "The AI service could not be reached (request failed). Please try again later.";
 
             if (current is TaskCanceledException)
-                return "LLM provider request timed out.";
+                return "The AI service took too long to answer (timed out).";
 
             current = current.InnerException;
         }
 
-        return $"Pipeline execution failed: {ex.Message.ToWarningDetail()}";
+        return UnexpectedErrorMessage;
     }
 
     /// <summary>
@@ -841,9 +842,9 @@ internal sealed class RunOrchestratorService(
             {
                 logger.LogError("Finalizer {Profile} threw unexpectedly for run {RunId}: {Error}",
                     profile.Name, runId, ex.ToRedactedLogText());
-                errorMessages.Add($"{profile.Name}: {ex.Message.ToWarningDetail()}");
-                await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerFailed,
-                    $"The finishing step \"{profile.DisplayNameOrName()}\" failed.");
+                var failedMessage = $"The finishing step \"{profile.DisplayNameOrName()}\" failed.";
+                errorMessages.Add(failedMessage);
+                await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerFailed, failedMessage);
 
                 // Persist a Status artifact so the failure is visible in the Run detail UI.
                 var errorArtifact = new RunArtifact
@@ -853,7 +854,7 @@ internal sealed class RunOrchestratorService(
                     FinalizerProfileName = profile.Name,
                     ArtifactType = ArtifactType.Status,
                     StorageUri = "error",
-                    StatusMessage = $"Unexpected error: {ex.Message.ToWarningDetail()}",
+                    StatusMessage = FinalizerUnexpectedErrorMessage,
                     CreatedAt = DateTimeOffset.UtcNow,
                 };
                 try { await artifactRepo.CreateAsync(errorArtifact, ct); }

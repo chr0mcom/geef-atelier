@@ -4,7 +4,6 @@ using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.Crew.Specialization;
 using Geef.Atelier.Core.Domain.Tools;
-using Geef.Atelier.Core.Domain.Warnings;
 
 namespace Geef.Atelier.Core.Domain.Crew;
 
@@ -128,7 +127,7 @@ public sealed record CrewSnapshot(
         catch (Exception ex) when (ex is JsonException or NotSupportedException or InvalidOperationException or ArgumentException)
         {
             throw new InvalidCrewSnapshotException(
-                $"The saved setup of this task could not be read ({ex.Message.ToWarningDetail()}). Please submit it again.", ex);
+                "The saved setup of this task could not be read. Please submit it again.", ex);
         }
 
         if (snapshot is null)

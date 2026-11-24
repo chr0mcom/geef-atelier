@@ -5,14 +5,15 @@ namespace Geef.Atelier.Tests.Orchestrator;
 
 /// <summary>
 /// Unit tests for <see cref="RunOrchestratorService.SanitizeErrorMessage"/>.
-/// Ensures user-visible messages are informative but contain no sensitive details.
+/// User-visible messages are fixed plain-English sentences: informative, but never text taken from the exception
+/// (keys, hosts, variable names, paths).
 /// </summary>
 public sealed class MessageSanitizerTests
 {
     [Theory]
     [InlineData(HttpStatusCode.BadRequest,          "400")]
     [InlineData(HttpStatusCode.Unauthorized,        "authentication")]
-    [InlineData(HttpStatusCode.Forbidden,           "access denied")]
+    [InlineData(HttpStatusCode.Forbidden,           "denied access")]
     [InlineData(HttpStatusCode.TooManyRequests,     "rate limit")]
     [InlineData(HttpStatusCode.InternalServerError, "unavailable")]
     [InlineData(HttpStatusCode.ServiceUnavailable,  "unavailable")]
@@ -47,14 +48,13 @@ public sealed class MessageSanitizerTests
     }
 
     [Fact]
-    public void SanitizesGenericException_UsesFirstLineOnly()
+    public void SanitizesGenericException_UsesAFixedSentenceWithoutTheMessage()
     {
         var ex  = new InvalidOperationException("First line of message.\nSecond line with sk-secret details.");
         var msg = RunOrchestratorService.SanitizeErrorMessage(ex);
 
-        Assert.StartsWith("Pipeline execution failed:", msg);
-        Assert.Contains("First line", msg);
-        Assert.DoesNotContain("Second line", msg);
+        Assert.Equal(RunOrchestratorService.UnexpectedErrorMessage, msg);
+        Assert.DoesNotContain("First line", msg);
         Assert.DoesNotContain("sk-secret", msg);
     }
 
@@ -70,14 +70,27 @@ public sealed class MessageSanitizerTests
     [Theory]
     [InlineData("Provider rejected key sk-or-v1-0123456789abcdef0123456789abcdef0123", "sk-or-v1")]
     [InlineData("Unauthorized: Authorization: Bearer abcdefghijklmnop.qrstuvwxyz", "abcdefghijklmnop")]
-    [InlineData("call failed for https://api.example.org/search?api_key=tvly-ABCDEF0123456789XYZ", "tvly-ABCDEF")]
+    [InlineData("call failed for https://api.example.org/search?api_key=tvly-ABCDEF0123456789XYZ", "api.example.org")]
     [InlineData("config error: password=hunter2hunter2", "hunter2")]
-    public void SanitizesGenericException_RemovesKeysFromTheFirstLine(string message, string secretFragment)
+    [InlineData("TAVILY_API_KEY environment variable is not set", "TAVILY_API_KEY")]
+    [InlineData("Connection refused (geef-atelier-postgres:5432)", "geef-atelier-postgres")]
+    [InlineData("Could not find file '/srv/docker/websites/geef_atelier/data/x.json'", "/srv/docker")]
+    public void SanitizesGenericException_NeverShowsKeysHostsVariablesOrPaths(string message, string fragment)
     {
         var msg = RunOrchestratorService.SanitizeErrorMessage(new InvalidOperationException(message));
 
-        Assert.StartsWith("Pipeline execution failed:", msg);
-        Assert.DoesNotContain(secretFragment, msg);
-        Assert.Contains("[redacted]", msg);
+        Assert.Equal(RunOrchestratorService.UnexpectedErrorMessage, msg);
+        Assert.DoesNotContain(fragment, msg);
+    }
+
+    [Fact]
+    public void SanitizesWrappedHttpErrors_ByTheirStatusCode()
+    {
+        var ex = new InvalidOperationException("wrapped", new HttpRequestException("upstream sk-abc", null, HttpStatusCode.TooManyRequests));
+
+        var msg = RunOrchestratorService.SanitizeErrorMessage(ex);
+
+        Assert.Contains("rate limit", msg, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("sk-abc", msg);
     }
 }

@@ -223,6 +223,9 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
         Assert.DoesNotContain(statusNotes, n => n != null && n.Contains("sk-or-v1"));
         var stored = await db.Runs.AsNoTracking().SingleAsync(r => r.Id == runId);
         Assert.DoesNotContain("sk-or-v1", stored.FinalizerErrorMessage ?? string.Empty);
+        Assert.Equal("The finishing step \"Throwing step\" failed.", stored.FinalizerErrorMessage);
+        Assert.Contains(statusNotes, n => n == Geef.Atelier.Web.Services.RunOrchestratorService.FinalizerUnexpectedErrorMessage);
+        Assert.DoesNotContain(statusNotes, n => n != null && (n.Contains("exploded") || n.Contains("throwing-step")));
     }
 
     [Fact(Timeout = 30_000)]

@@ -27,7 +27,12 @@ public sealed class RunArtifact
     /// </summary>
     public required string StorageUri { get; init; }
 
-    /// <summary>Human-readable note for <see cref="ArtifactType.Status"/> artifacts; null for file/URL artifacts.</summary>
+    /// <summary>
+    /// Human-readable note for <see cref="ArtifactType.Status"/> artifacts; null for file/URL artifacts. For error,
+    /// warning and info notes a plain-English sentence without technical details (exception texts, upstream answers,
+    /// host or variable names, paths), same rule as <c>RunEntity.ErrorMessage</c>; transform artifacts carry their
+    /// diff as JSON.
+    /// </summary>
     public string? StatusMessage { get; init; }
 
     public required DateTimeOffset CreatedAt { get; init; }
