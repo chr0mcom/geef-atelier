@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-24 (D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
+*Letzte Aktualisierung: 2026-11-24 (D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -1828,10 +1828,12 @@ dem bestehenden Motor; das Geef-SDK bleibt unverändert.
 
 - **Aufbau je Pipeline-Art.** Der Orchestrator baut jede Pipeline über einen `IPipelineAssembler`
   (Komposition 100, Direktweg 90, Fortsetzung 50, Klassik 0). Die drei bisherigen Wege verhalten sich wie
-  vorher; neu ist nur der Haken `OnRunFinishedAsync` nach dem gespeicherten Ergebnis.
+  vorher; neu ist nur der Haken `OnRunFinishedAsync`, aufgerufen nach dem gespeicherten Text und vor dem
+  Ausgang, damit ein Auftrag nie ohne seinen Bericht als fertig erscheint.
 - **Quellen.** `OrderGroundingStep` lädt die Dateien des Auftrags und rendert sie als Quellenblock
   (`<sources>`/`<source>` mit Seitenmarken, entschärfte Tags). Über `Sources:FullTextMaxChars` steht eine
-  Dokumentkarte mit exakten Zeilennummern davor. Der Block geht als Hintergrunddokument an den Schreiber, das
+  Dokumentkarte mit exakten Zeilennummern davor; der Modus folgt `SourceBudgetPlanner.Classify`, derselben
+  Regel wie auf der Startseite und im Auftragsdienst. Der Block geht als Hintergrunddokument an den Schreiber, das
   der cli-proxy ab 50 kB als `context.md` ablegt. Eine Datei mit der Rolle „Vorlage zum Überarbeiten“ wird
   stattdessen Ausgangstext in `draft.md`. In der Fabrik ersetzt der neue Parameter `customGroundingStep` die
   Briefing-Stufe.
@@ -1849,9 +1851,57 @@ dem bestehenden Motor; das Geef-SDK bleibt unverändert.
   Unklares meint, wird Notiz statt Prüfung. `DeterministicChecksReviewer` meldet Verstöße als `Rejected`;
   höchstens eine Korrektur (`MaxIterations = 2`), danach liefert die SDK-Regel die bessere Fassung.
   Platzhalter sind erlaubt und erscheinen als „Fill in before sending“, außer der Auftrag verbietet sie.
+  Regeln nach der ersten Prüfrunde: „Leer“ ist ein Text nur ohne ein einziges Wort (Slogan oder Betreffzeile
+  sind in Ordnung); eine Länge wird nur geprüft, wenn der Auftrag sie nennt; eine Vorrede an den Leser („Here's
+  what I learned:“) ist ein Hinweis und blockiert nie; nummerierte Zeilen gelten erst ab zwei hintereinander als
+  Liste und nie, wenn sie mit einem Datum beginnen („24. November 2026“); „not/never/auf keinen Fall … more
+  than/mehr als“ und eine nachgestellte Verneinung („Mehr als 100 Wörter sollen es nicht sein“) ergeben eine
+  Obergrenze, „nicht weniger als“ eine Untergrenze, jede andere Verneinung im Satz lässt die Länge ungeprüft;
+  „ohne Zwischenüberschriften“ erlaubt einen Titel in der ersten Zeile.
 - **Bericht.** `Runs.ReportJson` (`RunReport`, Schema 1) mit Vorgaben, Prüfergebnissen der ausgelieferten
   Fassung, Platzhaltern, Quellen, Lesebeleg und Vermerken.
 
 **Begründung.** Der Vorversuch zum Lesen von `context.md` zeigte: Der Agent sucht oft, statt zu lesen; ganz
 gelesen wird verlässlich nur bis etwa 150.000 Zeichen. Der codex-Dokumentmodus liefert im Container keinen
 Text. Deshalb Lesebeleg, ausdrückliche Leseanweisung, kein Failover und eigene Leertext-Prüfung.
+
+## D-070 — Etappe 1: Aufträge, Quellen und was die Person sieht (2026-11-24)
+
+**Status:** umgesetzt (Pakete P1, P3, P4 der Etappe 1 und die Korrekturen nach der ersten Prüfrunde), Abnahme am
+echten Lauf nach der Integration.
+
+**Entscheidung.**
+
+- **Der Auftrag ist die Einheit, die die Person sieht.** Neue Tabellen `Orders`, `Sources`, `OrderSources` und
+  `RunSourceUsages` (Migration Step48, handgeschrieben, additiv und idempotent). Läufe bleiben das technische
+  Protokoll; `Runs.OrderId` und `Runs.OrderVersion` verbinden sie mit ihrem Auftrag (Version 1..n je Auftrag, eine
+  Komposition trägt die Version ihres Schreiblaufs). Step48 verknüpft bestehende Läufe: ein Auftrag je Kette ab
+  einem Lauf ohne Elternlauf; Lernläufe bleiben ohne Auftrag. Die alten Wege (`/new`, `submit_request`,
+  Fortsetzen) legen ebenfalls Aufträge an oder erweitern sie; ein Fehler beim Verknüpfen wird geloggt und stoppt
+  den Lauf nie.
+- **Anzeigezustand nur aus Auftrag und aktuellem Lauf.** Acht Zustände (`preparing`, `needs_input`, `queued`,
+  `working`, `delivered`, `delivered_with_open_points`, `failed`, `stopped`), abgeleitet von `OrderStateResolver`
+  aus `Orders.State` und dem aktuellen Lauf (höchste Standardversion). Ein Auftrag mit Text erscheint nie als
+  gescheitert. Ein Lauf, der seinen Endstatus hat, aber noch keinen Ausgang, gilt bis zu 30 Sekunden als
+  `working` (Bericht und Ausgang werden direkt nach dem Status gespeichert), ebenso eine fertige Komposition, bis
+  ihr Schreiblauf existiert. Ein durch einen kritischen Befund beendeter Lauf mit Text ist
+  `delivered_with_open_points`, nicht `stopped`.
+- **Dateien.** Ein Upload je Datei (`POST /api/sources`) antwortet mit einer Quittung (Seiten, Zeichen,
+  Lesequalität, Warnungen, Größenklasse). Grenzen: bis 150.000 Zeichen bekommt der Schreiber alles im Volltext,
+  bis 600.000 mit einer Karte der Dateien, darüber wählt die Person Seiten ihrer PDFs (`Sources:FullTextMaxChars`,
+  `Sources:MapMaxChars`; der erste Plan nannte 300.000/900.000, der Vorversuch zeigte, dass vollständiges Lesen nur
+  bis etwa 150.000 verlässlich ist). Die Startseite zählt gewählte Seiten über den Auftragsdienst mit denselben
+  Regeln wie der Start (`IOrderService.CheckSourcesAsync`) und hält „Start“ gesperrt, solange eine Auswahl fehlt,
+  falsch oder noch zu lang ist; eine Datei ohne Seiten, die allein zu lang ist, verlangt eine kürzere Fassung.
+  Originale liegen in einem eigenen Speicher-Volume und werden von einem Hintergrunddienst entfernt, sobald kein
+  Auftrag sie mehr nutzt.
+- **MCP.** `submit_order`, `get_order_status` (Long-Poll) und `get_order_result`; `submit_request` bleibt als
+  Hülle über Aufträgen. Mit dem statischen Token braucht ein Auftrag einen Benutzernamen
+  (`AtelierMcp:StaticTokenUser` oder `AtelierUser:Username`), sonst lehnen `submit_order`/`submit_request` ab.
+- **Verdrahtung ohne stillen Rückfall.** Auftragsdienst, Assembler, Schreiber des Direktwegs und Orchestrator
+  verlangen ihre Abhängigkeiten; eine fehlende Registrierung scheitert beim Start, statt mit Standardwerten
+  weiterzulaufen.
+
+**Begründung.** Die Person denkt in Anfragen und Texten, nicht in Läufen und Crews. Eine einzige Stelle, die die
+Anzeige ableitet, hält Web und MCP gleich, und die Grenzen folgen dem, was der Schreiber verlässlich liest.
+

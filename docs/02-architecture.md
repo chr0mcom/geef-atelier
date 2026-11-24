@@ -589,6 +589,27 @@ user to submit it again; a restart of the service cleans up the same way. A resu
 attachments of the run it continues (lineage via `ParentRunId`/`ParentCompositionRunId`). A run without
 attachments triggers no embedding call.
 
+## Orders and sources (D-069, D-070)
+
+| Table (Step48) | Content |
+|---|---|
+| `Orders` | The person's request word for word, mode (`Direct`/`Careful`), entry (`Web`/`Mcp`/`Legacy`), state (`Analyzing`, `NeedsInput`, `Ready`, `Cancelled`), owner |
+| `Sources` | One uploaded file: extracted text with page markers (`[[page N]]`), counts, quality, warnings, path of the kept original, expiry while no order uses it |
+| `OrderSources` | Which source belongs to which order, with role, position and page selection (`1-40,55`) |
+| `RunSourceUsages` | Which file went into which run, in which mode (`FullText`, `FullTextWithMap`) and with how many characters |
+
+`Runs.OrderId`/`Runs.OrderVersion` link a run to its order. `OrderService` (Application) validates and creates an
+order with its first run in one transaction; `OrderStateResolver` (Core) derives the display state from
+`Orders.State` and the current run only. Size limits come from `SourceBudgetPlanner.Classify`, which the start page,
+the order service (`CheckSourcesAsync`, `SubmitAsync`) and the source block of the writer (`SourceBlockRenderer`)
+share; `OrderSourcePrompts` builds the prompt sources for the direct path and the careful mode alike.
+
+The orchestrator picks an `IPipelineAssembler` per run (composition 100, direct 90, resume 50, classic 0). The
+direct path (`DirectPipelineAssembler`) uses the code-only template `direct` (`SystemCrew.CodeOnly*`; the names are
+reserved like system names): `OrderGroundingStep`, `DirectWriterExecutor`, `DeterministicChecksReviewer`, at most
+two passes, report in `Runs.ReportJson`. Details: D-069 and D-070 in the
+[decisions log](05-decisions-log.md).
+
 ## Configuration switches (D-067)
 
 | Key | Default | Effect |

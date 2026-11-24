@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-11-24 (D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
+*Last updated: 2026-11-24 (D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -1765,10 +1765,12 @@ unchanged.
 
 - **One assembler per kind of pipeline.** The orchestrator builds every pipeline through an `IPipelineAssembler`
   (composition 100, direct 90, resume 50, classic 0). The three existing paths behave as before; the only addition
-  is the hook `OnRunFinishedAsync` after the result is stored.
+  is the hook `OnRunFinishedAsync`, called after the text is stored and before the outcome is recorded, so that an
+  order never shows as finished without its report.
 - **Sources.** `OrderGroundingStep` loads the files of the order and renders them as a source block
   (`<sources>`/`<source>` with page markers, defused tags). Above `Sources:FullTextMaxChars` a document map with
-  exact line numbers comes first. The block goes to the writer as background document, which the cli-proxy stores
+  exact line numbers comes first; the mode follows `SourceBudgetPlanner.Classify`, the same rule as on the start page
+  and in the order service. The block goes to the writer as background document, which the cli-proxy stores
   as `context.md` above 50 kB. A file with the role "template to revise" becomes the starting text in `draft.md`
   instead. In the factory the new parameter `customGroundingStep` replaces the briefing step.
 - **Writer.** One call in document mode, without failover (`x-cli-proxy-failover: off`), because another CLI cannot
@@ -1784,9 +1786,52 @@ unchanged.
   something unclear becomes a note instead of a check. `DeterministicChecksReviewer` reports violations as
   `Rejected`; at most one correction (`MaxIterations = 2`), after which the SDK rule delivers the better version.
   Placeholders are allowed and shown as "Fill in before sending" unless the request forbids them.
+  Rules after the first review: a text is "empty" only without a single word (a slogan or subject line is fine); a
+  length is checked only when the request states it; a remark to the reader before the text ("Here's what I
+  learned:") is a note, never blocking; numbered lines count as a list only from two in a row and never when they
+  start with a date ("24. November 2026"); "not/never/auf keinen Fall … more than" and a negation after the number
+  ("Mehr als 100 Wörter sollen es nicht sein") give an upper limit, "not less than" a lower one, any other negation in
+  the sentence leaves the length unchecked; "no subheadings" allows a title on the first line.
 - **Report.** `Runs.ReportJson` (`RunReport`, schema 1) with constraints, check results of the delivered version,
   placeholders, sources, read evidence and notes.
 
 **Reason.** The pre-test on reading `context.md` showed that the agent often searches instead of reading; it reads
 in full reliably only up to about 150,000 characters. The codex document mode yields no text in the container.
 Hence read evidence, an explicit reading instruction, no failover and an own empty-text check.
+
+## D-070 — Stage 1: orders, sources and what the person sees (2026-11-24)
+
+**Status:** implemented (packages P1, P3, P4 of stage 1 plus the fixes after the first review), acceptance on a real
+run after integration.
+
+**Decision.**
+
+- **The order is the unit the person sees.** New tables `Orders`, `Sources`, `OrderSources` and `RunSourceUsages`
+  (migration Step48, hand-written, additive and idempotent). Runs keep their role as the technical log; `Runs.OrderId`
+  and `Runs.OrderVersion` link them to their order (version 1..n per order, a composition carries the version of its
+  writing run). Step48 links existing runs to orders: one order per chain from a run without parent run; learning runs
+  stay without order. The old ways (`/new`, `submit_request`, resume) create or extend orders as well; a failure to
+  link is logged and never stops the run.
+- **Display state only from the order and its current run.** Eight states (`preparing`, `needs_input`, `queued`,
+  `working`, `delivered`, `delivered_with_open_points`, `failed`, `stopped`), derived by `OrderStateResolver` from
+  `Orders.State` and the current run (highest standard version). An order with text is never shown as failed. A run
+  that reached its final status but has no outcome yet counts as `working` for up to 30 seconds (the report and outcome
+  are stored right after the status), and so does a finished composition until its writing run exists. A run ended by
+  a critical finding that still has a text is `delivered_with_open_points`, not `stopped`.
+- **Files.** One upload per file (`POST /api/sources`) answers with a receipt (pages, characters, quality, warnings,
+  size class). Limits: up to 150,000 characters the writer gets everything in full text, up to 600,000 with a map of
+  the files, above that the person chooses pages of PDF files (`Sources:FullTextMaxChars`, `Sources:MapMaxChars`; the
+  first plan said 300,000/900,000, the pre-test showed that full reading is reliable only up to about 150,000). The
+  start page counts chosen pages through the order service with the same rules as the start
+  (`IOrderService.CheckSourcesAsync`) and keeps "Start" locked while a choice is missing, wrong or still too long; a
+  file without pages that is too long on its own asks for a shorter version. Originals are kept in their own storage
+  volume and removed by a background job when no order uses them any more.
+- **MCP.** `submit_order`, `get_order_status` (long poll) and `get_order_result`; `submit_request` stays as a shell
+  over orders. With the static token an order needs a user name (`AtelierMcp:StaticTokenUser` or
+  `AtelierUser:Username`), otherwise `submit_order`/`submit_request` refuse.
+- **Wiring without silent fallbacks.** The order service, the assemblers, the writer of the direct path and the
+  orchestrator require their dependencies; a missing registration fails at start instead of running with defaults.
+
+**Reason.** The person thinks in requests and texts, not in runs and crews. A single place that derives what is shown
+keeps web and MCP consistent, and the limits follow what the writer reliably reads.
+

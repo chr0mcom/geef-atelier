@@ -534,11 +534,44 @@ extern erreichbaren Routen:
 | `/admin/oauth-clients` | GET | Cookie (Admin) | OAuth-Client-Verwaltung |
 | `/account/connected-clients` | GET | Cookie | Selbstverwaltung der eigenen verbundenen OAuth-Clients |
 | `/crew`, `/crew/templates`, `/crew/profiles/*`, `/crew/studio`, `/crew/knowledge` | GET | Cookie | Crew-/Template-/Profil-/Studio-/Wissensbasis-Verwaltung |
+| `/start` | GET | Cookie | Startseite für einen neuen Auftrag: Anfrage, Dateien mit Quittung, „Extra careful“ (D-070) |
+| `/work`, `/orders` | GET | Cookie | „My work“: die Aufträge der Person, neueste Aktivität zuerst (Admins können alle Nutzer zeigen) |
+| `/orders/{id}` | GET | Cookie | Auftragsseite: Fortschritt, Text, offene Punkte, „How it was made“, Versionen |
 | `/runs`, `/runs/{id}`, `/new` | GET | Cookie | Run-Liste, Run-Detail, neuer Auftrag |
 | `/crew/providers/*`, `/tools/*`, `/mcp-servers/*`, `/crew/profiles/grounding-providers/create`, `/crew/profiles/grounding-providers/edit/{name}` | GET | Cookie (Admin) | Provider-, Tool-, MCP-Server- und Grounding-Editoren — seit D-067 nur für Admins, weil sie Geheimnisse beim Namen nennen |
 
 Run-bezogene Seiten unterliegen der Run-User-Isolation (D-042): jeder Nutzer sieht
 nur eigene Runs; der Admin kann per explizitem Umschalter systemweit sehen.
+
+---
+
+## Endpunkte für Quellen und Auftragsexport (D-070)
+
+Alle drei verlangen die Cookie-Anmeldung; API-Aufrufe ohne sie bekommen `401`/`403` statt einer Weiterleitung zur
+Anmeldeseite. Schreibende Aufrufe brauchen das Antiforgery-Token im Header `RequestVerificationToken` und, wenn der
+Browser einen schickt, einen `Origin` gleich dem Host (sonst `400`).
+
+| Endpunkt | Methode | Antwort |
+|---|---|---|
+| `/api/sources` | POST (multipart, genau eine Datei) | `201` mit der Quittung und `Location: /api/sources/{id}`; `200` mit `duplicate: true`, wenn dieselbe Person dieselbe Datei schon hochgeladen hat; `422` mit `usable: false`, `sourceId: null` und `reason` bei einer Datei ohne lesbaren Text; `400`/`413` mit `{ "reason": "…" }` |
+| `/api/sources/{id}` | GET | Die Quittung einer eigenen Quelle, sonst `404` |
+| `/api/sources/{id}` | DELETE | `204`; `409` mit Begründung, solange ein Auftrag die Datei nutzt; `404` für unbekannte oder fremde Quellen |
+| `/orders/{id}/export/{format}` | GET | Der Text des Auftrags als `docx`, `pdf` oder `md` (optional `?version=n`); `404` für unbekannte oder fremde Aufträge oder einen Auftrag ohne Text, `400` für ein unbekanntes Format |
+
+Die Quittung ist JSON in camelCase mit Enum-Werten als camelCase-Strings, zum Beispiel:
+
+```json
+{
+  "sourceId": "<uuid|null>", "fileName": "offer.pdf", "kind": "pdf", "sizeBytes": 2202009,
+  "pageCount": 80, "charCount": 160485, "wordCount": 24100, "quality": "good|partial|poor|unreadable",
+  "usable": true, "duplicate": false, "budgetClass": "fullText|withMap|tooLarge",
+  "preview": "<Anfang des Textes>", "warnings": [ { "code": "pdf.pages_without_text", "message": "…", "pages": [3, 7] } ],
+  "reason": null, "estimatedTokens": 84466
+}
+```
+
+Aufträge selbst startet die Startseite über `IOrderService` im Blazor-Circuit; einen eigenen HTTP-Endpunkt zum
+Anlegen eines Auftrags gibt es nicht.
 
 ---
 

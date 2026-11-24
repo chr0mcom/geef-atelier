@@ -258,6 +258,9 @@ Lädt den Binärinhalt eines File-Artifacts als Base64 herunter. Funktioniert nu
 Seit der Run-User-Isolation sind Runs pro Nutzer getrennt sichtbar — auch über MCP:
 Über OAuth gestellte/abgefragte Runs gehören dem autorisierenden Nutzer; Requests mit
 statischem `ATELIER_MCP_TOKEN` (Claude Code CLI) werden dem Admin zugeordnet.
+Seit Etappe 1 (D-070) braucht das statische Token für Aufträge einen Benutzernamen: `AtelierMcp:StaticTokenUser`
+oder ersatzweise `AtelierUser:Username`. Fehlt beides, lehnen `submit_order` und `submit_request` mit einer
+einfachen Fehlermeldung ab; die Lauf-Werkzeuge funktionieren weiter.
 `list_runs`/`get_run_*` liefern nur die Runs des jeweiligen Nutzers (kein
 Run-Existenz-Leak); ist der Aufrufer Admin, kann er mit dem `list_runs`-Parameter
 `includeAllUsers=true` systemweit sehen (für Nicht-Admins wirkungslos).

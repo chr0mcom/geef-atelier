@@ -38,7 +38,7 @@ The cross-cutting process rules live in the parent infrastructure repository und
 
 - **Phase:** Walking skeleton completed; in production at `https://geef.stefan-bechtel.de`. Numerous post-skeleton extensions shipped (crew system, advisor passes, grounding/vector-store RAG, run attachments, cost tracking, Template Studio, domain templates, MCP OAuth 2.1, multi-user, run-user isolation, finalizer pipeline, grounding refinement, academic search, REST-API grounding, landing page, continuous learning loop).
 - **Last updated:** 2026-11-24
-- **Current state & next steps:** see the [project README](../README.md) (implementation status) and the [decisions log](05-decisions-log.md) (chronological decision history, most recently D-067 "stage 0: safety net" and D-068 "direction of the rebuild"). The rebuild following D-068 replaces large parts of the crew, tool and learning systems in stages; documents mark parts that are frozen or due for removal.
+- **Current state & next steps:** see the [project README](../README.md) (implementation status) and the [decisions log](05-decisions-log.md) (chronological decision history, most recently D-068 "direction of the rebuild", D-069 "stage 1: direct-path engine" and D-070 "stage 1: orders, sources and what the person sees"). The rebuild following D-068 replaces large parts of the crew, tool and learning systems in stages; documents mark parts that are frozen or due for removal.
 
 ## Conventions
 
