@@ -1789,9 +1789,19 @@ unchanged.
   Rules after the first review: a text is "empty" only without a single word (a slogan or subject line is fine); a
   length is checked only when the request states it; a remark to the reader before the text ("Here's what I
   learned:") is a note, never blocking; numbered lines count as a list only from two in a row and never when they
-  start with a date ("24. November 2026"); "not/never/auf keinen Fall … more than" and a negation after the number
-  ("Mehr als 100 Wörter sollen es nicht sein") give an upper limit, "not less than" a lower one, any other negation in
-  the sentence leaves the length unchecked; "no subheadings" allows a title on the first line.
+  start with a date ("24. November 2026"); "no subheadings" allows a title on the first line.
+  Rules after the second review (precision before recall): a negation only acts inside its own clause (clauses end
+  at punctuation, dashes and "und/and/aber/but/oder/or/sondern/while/obwohl …"), so "Write more than 100 words and
+  don't use emojis" keeps the lower limit. A wording with one direction ("höchstens", "at most", "less than",
+  "mindestens", "at least", "nicht weniger als") is never turned around; a negation before it in its clause leaves
+  the length unchecked. "more than/mehr als/exceed" becomes an upper limit only with a negation right before it (at
+  most one word in between: "must not be more than", "nie mehr als") or with the fixed "… sollen es nicht sein"
+  after it; any other negation in its clause leaves the length unchecked. A length becomes a check only when every
+  length in the request is clear: one unclear length, another count in the same clause (pages, minutes) or a length
+  for a part of the text leaves only a note. "more than A and not more than B" gives the range A–B. The tolerance
+  rounds the upper bound down and the lower bound up ("at most 5 words" accepts 5). Separators such as "* * *" are
+  not lists. A possible remark to the reader does not pass but never blocks; it is shown to the person as a hint
+  apart from the open checks.
 - **Report.** `Runs.ReportJson` (`RunReport`, schema 1) with constraints, check results of the delivered version,
   placeholders, sources, read evidence and notes.
 
