@@ -3,7 +3,7 @@
 Ein kleines, dauerhaftes Werkzeug, um die Textqualität des Ateliers gegen Vergleichswege zu messen: ein festes
 Aufgabenset, mehrere **Arme** (z. B. roher Einzelaufruf gegen das laufende Atelier), ein **blinder Paarvergleich**
 durch einen Juror und ein Markdown-Bericht. Vorlage waren die Messungen vom 2026-11-24
-(`/srv/backup/geef-atelier-analyse-20261124/`); deren Daten gehören nicht ins Repo.
+(Rohdaten außerhalb des Repos beim Betreiber); deren Daten gehören nicht ins Repo.
 
 Nur Python-Standardbibliothek plus `subprocess`; die Tests brauchen `pytest`.
 

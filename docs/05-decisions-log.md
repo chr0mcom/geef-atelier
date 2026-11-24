@@ -1686,11 +1686,13 @@ D-068 the loop will be replaced by a per-user memory.
 only from the committed state; with uncommitted changes it pauses and reports this, also with `FORCE=1`.
 
 **D-067/10 — Mini run after every deploy.** `scripts/atelier-smoke.sh` signs in, submits a short job over
-MCP and waits for the result (exit code 0 only on success). Setup: [`ops/atelier-smoke.md`](ops/atelier-smoke.md).
+MCP, waits until the run's `outcome` is set and only then reads the result (exit code 0 only for
+`Converged` or `DeliveredWithOpenPoints` with a text). Setup: [`ops/atelier-smoke.md`](ops/atelier-smoke.md).
 
 **D-067/11 — Watcher.** `scripts/atelier-watch.sh` reports stuck runs, an unhealthy cli-proxy and unhealthy
 containers through the server's existing alert channel, only for new or changed problems and once when
-they clear. Setup: [`ops/atelier-watch.md`](ops/atelier-watch.md).
+they clear; if its state cannot be stored, it keeps it in a fallback location and never floods the
+channel. Setup: [`ops/atelier-watch.md`](ops/atelier-watch.md).
 
 **D-067/12 — Measuring tool.** `tools/Eval` compares the Atelier with other paths on a fixed task set by
 blind pairwise comparison; real tasks stay outside Git ([`tools/Eval/README.md`](../tools/Eval/README.md)).

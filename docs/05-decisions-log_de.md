@@ -1746,12 +1746,14 @@ nur aus dem committeten Stand; bei nicht committeten Änderungen setzt es aus un
 `FORCE=1`.
 
 **D-067/10 — Mini-Lauf nach jedem Deploy.** `scripts/atelier-smoke.sh` meldet sich an, reicht über MCP einen
-kurzen Auftrag ein und wartet auf das Ergebnis (Exit-Code 0 nur bei Erfolg). Einrichtung:
+kurzen Auftrag ein, wartet, bis das `outcome` des Laufs gesetzt ist, und liest erst dann das Ergebnis
+(Exit-Code 0 nur bei `Converged` oder `DeliveredWithOpenPoints` mit Text). Einrichtung:
 [`ops/atelier-smoke.md`](ops/atelier-smoke.md).
 
 **D-067/11 — Wächter.** `scripts/atelier-watch.sh` meldet hängende Läufe, einen ungesunden cli-proxy und
 ungesunde Container über den vorhandenen Meldekanal des Servers, nur bei neuen oder geänderten Problemen und
-einmal bei Entwarnung. Einrichtung: [`ops/atelier-watch.md`](ops/atelier-watch.md).
+einmal bei Entwarnung; lässt sich sein Zustand nicht speichern, hält er ihn in einer Ersatzablage und flutet
+den Kanal nie. Einrichtung: [`ops/atelier-watch.md`](ops/atelier-watch.md).
 
 **D-067/12 — Messwerkzeug.** `tools/Eval` vergleicht das Atelier per blindem Paarvergleich mit anderen Wegen
 auf einem festen Aufgabenset; echte Aufträge bleiben außerhalb von Git
