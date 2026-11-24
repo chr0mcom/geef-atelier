@@ -1,0 +1,11 @@
+@using Geef.Atelier.Core.Domain.Orders
+
+<span class="order-state order-state--@State.ToTone()" data-testid="order-state" data-state="@State.ToKey()">
+    <span class="order-state-dot" aria-hidden="true"></span>
+    @State.ToLabel()
+</span>
+
+@code {
+    /// <summary>The display state to show.</summary>
+    [Parameter, EditorRequired] public OrderDisplayState State { get; set; }
+}

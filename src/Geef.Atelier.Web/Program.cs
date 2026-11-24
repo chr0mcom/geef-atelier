@@ -131,19 +131,7 @@ builder.Services
     .AddScheme<AuthenticationSchemeOptions, BearerTokenHandler>(
         McpAuthorizationConstants.BearerScheme, _ => { });
 
-builder.Services.AddAuthorization(o =>
-{
-    o.AddPolicy(McpAuthorizationConstants.McpPolicy, p =>
-    {
-        p.AuthenticationSchemes = new[] { McpAuthorizationConstants.BearerScheme };
-        p.RequireAuthenticatedUser();
-    });
-    o.AddPolicy("AdminPolicy", p =>
-    {
-        p.AuthenticationSchemes = new[] { CookieAuthenticationDefaults.AuthenticationScheme };
-        p.RequireRole("admin");
-    });
-});
+builder.Services.AddAuthorization(o => o.AddAtelierPolicies());
 
 builder.Services.AddAtelierMcp();
 builder.Services.AddCascadingAuthenticationState();
@@ -168,51 +156,7 @@ var app = builder.Build();
 await app.Services.MigrateDatabaseOrFailAsync();
 app.Configuration.WarnAboutMissingGroundingKeys(app.Services.GetRequiredService<ILogger<Program>>());
 
-// Seed the admin user from ATELIER_USER / ATELIER_PASSWORD_HASH env vars
-using (var scope = app.Services.CreateScope())
-{
-    var logger      = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    var userOpts    = scope.ServiceProvider.GetRequiredService<IOptions<AtelierUserOptions>>().Value;
-    var userRepo    = scope.ServiceProvider.GetRequiredService<IAtelierUserRepository>();
-
-    if (!string.IsNullOrEmpty(userOpts.Username) && !string.IsNullOrEmpty(userOpts.PasswordHash))
-    {
-        try
-        {
-            var existing = await userRepo.FindByUsernameAsync(userOpts.Username, CancellationToken.None);
-            if (existing is null)
-            {
-                var admin = new AtelierUser(
-                    UserId: Guid.NewGuid().ToString(),
-                    Username: userOpts.Username,
-                    PasswordHash: userOpts.PasswordHash,
-                    Email: null,
-                    IsActive: true,
-                    IsAdmin: true,
-                    CreatedAt: DateTimeOffset.UtcNow,
-                    UpdatedAt: DateTimeOffset.UtcNow);
-                await userRepo.AddAsync(admin, CancellationToken.None);
-                logger.LogInformation("Admin user '{Username}' seeded from environment variables", userOpts.Username);
-            }
-            else if (!existing.IsAdmin || existing.PasswordHash != userOpts.PasswordHash)
-            {
-                var synced = existing with
-                {
-                    PasswordHash = userOpts.PasswordHash,
-                    IsAdmin = true,
-                    IsActive = true,
-                    UpdatedAt = DateTimeOffset.UtcNow
-                };
-                await userRepo.UpdateAsync(synced, CancellationToken.None);
-                logger.LogInformation("Admin user '{Username}' synchronized from environment variables", userOpts.Username);
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to seed admin user from environment variables");
-        }
-    }
-}
+await app.Services.SeedAdminUserFromOptionsAsync();
 
 app.UseForwardedHeaders();
 

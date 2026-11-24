@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Sockets;
 using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Crew.Knowledge;
+using Geef.Atelier.Application.Orders;
+using Geef.Atelier.Application.Sources;
 using Geef.Atelier.Application.OAuth;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
@@ -12,6 +14,7 @@ using Geef.Atelier.Mcp;
 using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Persistence;
+using Geef.Atelier.Tests.Web.Components.Orders;
 using Geef.Atelier.Web.Auth;
 using Geef.Atelier.Web.Components;
 using Geef.Atelier.Web.Endpoints;
@@ -43,6 +46,9 @@ internal sealed class WebTestHost : IAsyncDisposable
     /// <summary>The semaphore that gates LLM calls. Release to allow pipeline execution; initial count is passed via <see cref="StartAsync"/>.</summary>
     public SemaphoreSlim Gate { get; }
 
+    /// <summary>The application's services, for tests that drive fakes or publish live updates.</summary>
+    public IServiceProvider Services => _app.Services;
+
     /// <summary>The bearer token accepted by the <c>/mcp</c> endpoint in this test host.</summary>
     public string McpToken => "test-mcp-token";
 
@@ -63,11 +69,15 @@ internal sealed class WebTestHost : IAsyncDisposable
     /// When false, real Cookie auth is configured with a test user (username: "test-user", password: "test-password").
     /// </param>
     /// <param name="ct">Cancellation token for startup.</param>
+    /// <param name="configureServices">Registers test doubles after the application services (last registration wins).</param>
+    /// <param name="configureApp">Maps additional test endpoints before the Blazor pages.</param>
     public static async Task<WebTestHost> StartAsync(
         PostgresFixture   fixture,
         int               initialGateCount = 100,
         bool              authenticated    = true,
-        CancellationToken ct               = default)
+        CancellationToken ct               = default,
+        Action<IServiceCollection>? configureServices = null,
+        Action<WebApplication>?     configureApp      = null)
     {
         var port = FindFreePort();
         var url  = $"http://127.0.0.1:{port}";
@@ -93,6 +103,8 @@ internal sealed class WebTestHost : IAsyncDisposable
         builder.Services.AddAtelierApplication();
         builder.Services.AddSingleton<Geef.Atelier.Application.Crew.IModelCatalog, Geef.Atelier.Tests.Fakes.PassThroughModelCatalog>();
         builder.Services.AddScoped<IKnowledgeService, NoOpKnowledgeService>();
+        builder.Services.TryAddSingleton<IOrderService, FakeOrderService>();
+        builder.Services.TryAddSingleton<ISourceIntakeService, FakeSourceIntakeService>();
 
         // Orchestrator: fast polling for tests
         builder.Services.Configure<OrchestratorOptions>(o =>
@@ -147,14 +159,7 @@ internal sealed class WebTestHost : IAsyncDisposable
                 .AddScheme<AuthenticationSchemeOptions, BearerTokenHandler>(
                     McpAuthorizationConstants.BearerScheme, _ => { });
         }
-        builder.Services.AddAuthorization(o =>
-        {
-            o.AddPolicy(McpAuthorizationConstants.McpPolicy, p =>
-            {
-                p.AuthenticationSchemes = new[] { McpAuthorizationConstants.BearerScheme };
-                p.RequireAuthenticatedUser();
-            });
-        });
+        builder.Services.AddAuthorization(o => o.AddAtelierPolicies());
         builder.Services.AddCascadingAuthenticationState();
 
         // MCP: token auth + OAuth services + MCP server
@@ -170,10 +175,14 @@ internal sealed class WebTestHost : IAsyncDisposable
         // Blazor Server
         builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
+        configureServices?.Invoke(builder.Services);
+
         var app = builder.Build();
 
         await using (var scope = app.Services.CreateAsyncScope())
             await scope.ServiceProvider.GetRequiredService<AtelierDbContext>().Database.MigrateAsync(ct);
+        if (!authenticated)
+            await app.Services.SeedAdminUserFromOptionsAsync(ct);
 
         app.UseAuthentication();
         app.UseAuthorization();
@@ -181,6 +190,7 @@ internal sealed class WebTestHost : IAsyncDisposable
         app.MapRunHub();
         app.MapMcp("/mcp").RequireAuthorization(McpAuthorizationConstants.McpPolicy);
         app.MapAuthEndpoints();
+        configureApp?.Invoke(app);
         app.MapStaticAssets();
         app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 

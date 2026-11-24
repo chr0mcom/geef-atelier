@@ -16,26 +16,29 @@ public static class ReviewerDisplay
     };
 
     public static string ToDisplay(string reviewerName) =>
-        DisplayNames.TryGetValue(reviewerName, out var display) ? display : reviewerName;
+        DisplayNames.TryGetValue(reviewerName, out var display) ? display
+        : SystemCrew.CodeOnlyReviewerProfiles.TryGetValue(reviewerName, out var codeOnly) ? codeOnly.DisplayName
+        : reviewerName;
 
     /// <summary>
     /// Returns the display name for an executor profile.
-    /// Looks up <see cref="SystemCrew.ExecutorProfiles"/> first; falls back to
-    /// <paramref name="fallbackDisplayName"/> or <paramref name="profileName"/>.
+    /// Looks up <see cref="SystemCrew.ExecutorProfiles"/> first, then <see cref="SystemCrew.CodeOnlyExecutorProfiles"/>;
+    /// falls back to <paramref name="fallbackDisplayName"/> or <paramref name="profileName"/>.
     /// </summary>
     public static string GetExecutorDisplay(string profileName, string? fallbackDisplayName = null) =>
-        SystemCrew.ExecutorProfiles.TryGetValue(profileName, out var profile)
-            ? profile.DisplayName
-            : fallbackDisplayName ?? profileName;
+        SystemCrew.ExecutorProfiles.TryGetValue(profileName, out var profile) ? profile.DisplayName
+        : SystemCrew.CodeOnlyExecutorProfiles.TryGetValue(profileName, out var codeOnly) ? codeOnly.DisplayName
+        : fallbackDisplayName ?? profileName;
 
     /// <summary>
     /// Returns the display name for a crew template.
-    /// Looks up <see cref="SystemCrew.CrewTemplates"/> first; falls back to <paramref name="templateName"/>.
+    /// Looks up <see cref="SystemCrew.CrewTemplates"/> first, then <see cref="SystemCrew.CodeOnlyTemplates"/>; falls back
+    /// to <paramref name="templateName"/>.
     /// </summary>
     public static string GetTemplateDisplay(string templateName) =>
-        SystemCrew.CrewTemplates.TryGetValue(templateName, out var template)
-            ? template.DisplayName
-            : templateName;
+        SystemCrew.CrewTemplates.TryGetValue(templateName, out var template) ? template.DisplayName
+        : SystemCrew.CodeOnlyTemplates.TryGetValue(templateName, out var codeOnly) ? codeOnly.DisplayName
+        : templateName;
 
     /// <summary>Returns a human-readable label for an <see cref="EvaluationStrategy"/> value.</summary>
     public static string GetEvaluationStrategyDisplay(EvaluationStrategy strategy) =>

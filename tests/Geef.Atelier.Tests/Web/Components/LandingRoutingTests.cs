@@ -51,15 +51,15 @@ public sealed class LandingRoutingTests : TestContext
     // ── Login post-login redirect helper ────────────────────────────────
 
     [Fact]
-    public void Login_ResolvePostLogin_NullReturnsWorkshop()
+    public void Login_ResolvePostLogin_NullReturnsStart()
     {
-        Assert.Equal("/workshop", Login.ResolvePostLogin(null));
+        Assert.Equal("/start", Login.ResolvePostLogin(null));
     }
 
     [Fact]
-    public void Login_ResolvePostLogin_EmptyReturnsWorkshop()
+    public void Login_ResolvePostLogin_EmptyReturnsStart()
     {
-        Assert.Equal("/workshop", Login.ResolvePostLogin(""));
+        Assert.Equal("/start", Login.ResolvePostLogin(""));
     }
 
     [Fact]

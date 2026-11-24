@@ -23,7 +23,7 @@ public sealed class LogoutFlowTests(PlaywrightFixture pw, PostgresFixture pg) : 
         await page.FillAsync("input#username", "test-user");
         await page.FillAsync("input#password", "test-password");
         await page.ClickAsync("button.btn-login");
-        await page.WaitForURLAsync("**/workshop**", new PageWaitForURLOptions { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/start", new PageWaitForURLOptions { Timeout = 15_000 });
     }
 
     [Fact]
@@ -33,7 +33,7 @@ public sealed class LogoutFlowTests(PlaywrightFixture pw, PostgresFixture pg) : 
         try
         {
             await LoginAsync(page);
-            Assert.Contains("/workshop", page.Url);
+            Assert.EndsWith("/start", page.Url);
 
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             // Open user-menu dropdown, then click logout
@@ -58,7 +58,7 @@ public sealed class LogoutFlowTests(PlaywrightFixture pw, PostgresFixture pg) : 
         try
         {
             await LoginAsync(page);
-            Assert.Contains("/workshop", page.Url);
+            Assert.EndsWith("/start", page.Url);
 
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
             // Open user-menu dropdown, then click logout

@@ -1,0 +1,54 @@
+@using Geef.Atelier.Core.Domain.Orders
+
+@switch (Display.ShownState())
+{
+    case OrderDisplayState.Delivered:
+        <div class="order-banner order-banner--ready" role="status" data-testid="order-banner" data-state="@Display.ShownState().ToKey()">
+            <strong>Your text is ready.</strong>
+            <span>Read it below, copy it or download it.</span>
+        </div>
+        break;
+    case OrderDisplayState.DeliveredWithOpenPoints:
+        <div class="order-banner order-banner--check" role="status" data-testid="order-banner" data-state="@Display.ShownState().ToKey()">
+            <strong>Your text is ready – please check it.</strong>
+            <span>A few points need your attention before you use it. They are listed under “Open points”.</span>
+        </div>
+        break;
+    case OrderDisplayState.Failed:
+        <div class="order-banner order-banner--failed" role="alert" data-testid="order-banner" data-state="@Display.ShownState().ToKey()">
+            <strong>No text was written.</strong>
+            <span>Something went wrong on our side. You can try again with the same request.</span>
+            <a class="btn primary small" href="@RetryHref" data-testid="order-try-again">Try again</a>
+        </div>
+        break;
+    case OrderDisplayState.Stopped when Display.HasText:
+        <div class="order-banner order-banner--stopped" role="status" data-testid="order-banner" data-state="@Display.ShownState().ToKey()">
+            <strong>This was stopped.</strong>
+            <span>The text below is the last version that was written.</span>
+            <a class="btn small" href="@RetryHref" data-testid="order-try-again">Start again with the same request</a>
+        </div>
+        break;
+    case OrderDisplayState.Stopped:
+        <div class="order-banner order-banner--stopped" role="status" data-testid="order-banner" data-state="@Display.ShownState().ToKey()">
+            <strong>This was stopped before a text was written.</strong>
+            <span>You can start again with the same request.</span>
+            <a class="btn primary small" href="@RetryHref" data-testid="order-try-again">Start again with the same request</a>
+        </div>
+        break;
+    case OrderDisplayState.NeedsInput:
+        <div class="order-banner order-banner--check" role="status" data-testid="order-banner" data-state="@Display.ShownState().ToKey()">
+            <strong>We need a few answers from you.</strong>
+            <span>Answer the questions so that the writing can start.</span>
+        </div>
+        break;
+}
+
+@code {
+    /// <summary>The order whose state is shown.</summary>
+    [Parameter, EditorRequired] public Guid OrderId { get; set; }
+
+    /// <summary>How the order is shown.</summary>
+    [Parameter, EditorRequired] public OrderDisplay Display { get; set; } = null!;
+
+    string RetryHref => $"/start?from={OrderId}";
+}

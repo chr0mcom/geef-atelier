@@ -1,0 +1,96 @@
+@using Geef.Atelier.Core.Domain.Sources
+
+<li class="source-card source-card--@StatusKey" data-testid="source-card" data-status="@StatusKey">
+    <div class="source-card-head">
+        <span class="source-card-name" data-testid="source-card-name">@Item.FileName</span>
+        <button type="button" class="btn small ghost source-card-remove"
+                data-testid="source-card-remove"
+                aria-label="Remove @Item.FileName"
+                @onclick="() => OnRemove.InvokeAsync(Item)">
+            Remove
+        </button>
+    </div>
+
+    @if (Item.Status == SourceUploadStatus.Uploading)
+    {
+        <div class="source-card-progress" data-testid="source-card-progress">
+            <progress class="source-card-bar" max="100" value="@Item.Percent" aria-label="Upload progress"></progress>
+            <span class="source-card-meta">@(Item.Percent >= 100 ? "Reading the file…" : $"Uploading… {Item.Percent}%")</span>
+        </div>
+    }
+    else if (Item.Receipt is { } receipt && Item.Status == SourceUploadStatus.Ready)
+    {
+        <div class="source-card-meta" data-testid="source-card-summary">@receipt.ToSummary()</div>
+        @if (receipt.Warnings.Count > 0)
+        {
+            <ul class="source-card-warnings" data-testid="source-card-warnings">
+                @foreach (var warning in receipt.Warnings)
+                {
+                    <li data-testid="source-card-warning" data-code="@warning.Code">@warning.ToPlainText()</li>
+                }
+            </ul>
+        }
+        @if (receipt.BudgetClass == SourceBudgetClass.TooLarge)
+        {
+            <label class="source-card-pages">
+                <span>Pages to use</span>
+                <input type="text" inputmode="numeric" placeholder="for example 1-40, 55"
+                       data-testid="source-card-pages"
+                       value="@Item.Pages"
+                       @onchange="PagesChangedAsync" />
+            </label>
+        }
+        @if (!string.IsNullOrWhiteSpace(receipt.Preview))
+        {
+            <details class="source-card-preview">
+                <summary data-testid="source-card-preview-toggle">Show the beginning</summary>
+                <p data-testid="source-card-preview">@receipt.Preview</p>
+            </details>
+        }
+    }
+    else
+    {
+        <div class="source-card-problem" role="alert" data-testid="source-card-problem">
+            <span>@Item.Problem</span>
+            @switch (Item.Recovery)
+            {
+                case SourceUploadRecovery.Retry:
+                    <button type="button" class="btn small" data-testid="source-card-retry" @onclick="() => OnRetry.InvokeAsync(Item)">Try again</button>
+                    break;
+                case SourceUploadRecovery.SignIn:
+                    <a class="btn small" data-testid="source-card-sign-in" href="/login?ReturnUrl=%2Fstart">Sign in</a>
+                    break;
+                case SourceUploadRecovery.Reload:
+                    <a class="btn small" data-testid="source-card-reload" href="/start" data-enhance-nav="false">Reload</a>
+                    break;
+            }
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Item.Hint) && Item.Status != SourceUploadStatus.Ready)
+    {
+        <div class="source-card-hint" data-testid="source-card-hint">@Item.Hint</div>
+    }
+</li>
+
+@code {
+    /// <summary>The file shown on this card.</summary>
+    [Parameter, EditorRequired] public SourceUploadItem Item { get; set; } = null!;
+
+    /// <summary>Raised when the person removes the file.</summary>
+    [Parameter] public EventCallback<SourceUploadItem> OnRemove { get; set; }
+
+    /// <summary>Raised when the person retries a failed upload.</summary>
+    [Parameter] public EventCallback<SourceUploadItem> OnRetry { get; set; }
+
+    /// <summary>Raised when the person changes the pages to use.</summary>
+    [Parameter] public EventCallback<SourceUploadItem> OnPagesChanged { get; set; }
+
+    string StatusKey => Item.Status.ToString().ToLowerInvariant();
+
+    async Task PagesChangedAsync(ChangeEventArgs e)
+    {
+        Item.Pages = string.IsNullOrWhiteSpace(e.Value?.ToString()) ? null : e.Value!.ToString()!.Trim();
+        await OnPagesChanged.InvokeAsync(Item);
+    }
+}
