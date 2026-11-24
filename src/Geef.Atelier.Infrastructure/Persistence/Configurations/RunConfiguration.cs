@@ -1,4 +1,5 @@
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Orders;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -73,5 +74,17 @@ internal sealed class RunConfiguration : IEntityTypeConfiguration<RunEntity>
 
         builder.Property(r => r.ParentCompositionRunId).IsRequired(false);
         builder.HasIndex(r => r.ParentCompositionRunId).HasDatabaseName("IX_Runs_ParentCompositionRunId");
+
+        builder.Property(r => r.OrderId).IsRequired(false);
+        builder.Property(r => r.OrderVersion).IsRequired(false);
+        builder.HasIndex(r => new { r.OrderId, r.OrderVersion }, "IX_Runs_OrderId_OrderVersion");
+        builder.HasIndex(r => new { r.OrderId, r.OrderVersion }, "UX_Runs_OrderId_OrderVersion_Standard")
+            .IsUnique()
+            .HasFilter("\"OrderId\" IS NOT NULL AND \"Kind\" = 0");
+        builder.HasOne<OrderEntity>()
+            .WithMany()
+            .HasForeignKey(r => r.OrderId)
+            .HasConstraintName("FK_Runs_Orders_OrderId")
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

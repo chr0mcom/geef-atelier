@@ -19,10 +19,13 @@ public sealed class SourceOptions
     public int MaxPages { get; set; } = 500;
 
     /// <summary>Total characters of an order that go into the prompt in full text without a document map (inclusive).</summary>
-    public int FullTextMaxChars { get; set; } = 300_000;
+    public int FullTextMaxChars { get; set; } = 150_000;
 
     /// <summary>Total characters of an order that are still accepted with a document map (inclusive); above, the order is refused.</summary>
-    public int MapMaxChars { get; set; } = 900_000;
+    public int MapMaxChars { get; set; } = 600_000;
+
+    /// <summary>Measured characters per model token of extracted text, used for token estimates.</summary>
+    public double CharsPerToken { get; set; } = 1.9;
 
     /// <summary>Longest line of extracted text; longer lines are wrapped.</summary>
     public int MaxLineChars { get; set; } = 1_000;
@@ -41,4 +44,19 @@ public sealed class SourceOptions
 
     /// <summary>How often expired unattached sources are deleted.</summary>
     public TimeSpan CleanupInterval { get; set; } = TimeSpan.FromHours(1);
+
+    /// <summary>How long the original file of a source is kept after the last order using it finished; the extracted text stays.</summary>
+    public TimeSpan OriginalRetention { get; set; } = TimeSpan.FromDays(30);
+
+    /// <summary>Longest time the layout analysis of one PDF page may take before the plain text order is used instead.</summary>
+    public TimeSpan PageLayoutTimeout { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>Most entries a Word file (a ZIP archive) may contain.</summary>
+    public int MaxArchiveEntries { get; set; } = 10_000;
+
+    /// <summary>Largest total uncompressed size of a Word file, in bytes.</summary>
+    public long MaxUncompressedBytes { get; set; } = 268_435_456;
+
+    /// <summary>Highest ratio of uncompressed to compressed size of one entry of a Word file.</summary>
+    public int MaxCompressionRatio { get; set; } = 200;
 }

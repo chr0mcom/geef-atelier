@@ -11,6 +11,9 @@ public interface IOrderBriefComposer
 
 internal sealed class VerbatimOrderBriefComposer : IOrderBriefComposer
 {
-    public string Compose(OrderEntity order) =>
-        throw new NotImplementedException();
+    public string Compose(OrderEntity order)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        return order.RequestText;
+    }
 }
