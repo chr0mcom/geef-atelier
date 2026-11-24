@@ -22,6 +22,8 @@ namespace Geef.Atelier.Infrastructure.Grounding;
 ///   them has an attachment, the provider returns an empty result without an embedding call.</item>
 ///   <item><c>both</c>: the shared documents plus the attachments of that same lineage.</item>
 /// </list>
+/// The <c>TagFilter</c> setting narrows the shared documents only; attachments carry no tags and are always searched in
+/// full for the runs of the lineage.
 /// Attachments of other runs or users are never searched. Any other value is unknown: the provider falls back to the
 /// shared documents (fail-closed) and records a run warning (<see cref="RunWarningCodes.GroundingScopeUnknown"/>).
 /// </summary>
@@ -97,7 +99,8 @@ internal sealed class VectorStoreGroundingProvider(
 
         var searchResults = new List<Core.Domain.Crew.Knowledge.VectorSearchResult>();
         foreach (var (scopeFilter, runIdFilter) in searches)
-            searchResults.AddRange(await searchRepo.SearchAsync(embedding.Vector, topK, tagFilter, scopeFilter, runIdFilter, ct));
+            searchResults.AddRange(await searchRepo.SearchAsync(
+                embedding.Vector, topK, scopeFilter == KnowledgeScope.Global ? tagFilter : null, scopeFilter, runIdFilter, ct));
         if (searches.Count > 1)
             searchResults = searchResults.OrderByDescending(r => r.Similarity).Take(topK).ToList();
 
