@@ -30,11 +30,11 @@ public sealed class IsolatedExtractionTests : IDisposable
             Directory.Delete(_work, recursive: true);
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task PdfAndWordFilesGiveTheSameTextAsInsideTheProcess()
     {
         var pdf = SyntheticDocuments.Pdf(3, p => string.Concat(Enumerable.Repeat($"Page {p} explains the offer in detail. ", 12)));
-        var docx = SyntheticDocuments.Docx(["# Offer", "Thank you for your request.", "- Planting", "- Lawn care"]);
+        var docx = SyntheticDocuments.Docx(["# Offer", "Thank you for your request.", "- Planting", "- Lawn care", "Grüße aus Köln – 日本語 😀 \"quoted\" <tag> & more"]);
 
         var isolatedPdf = await Run(Options()).RunAsync(SourceKind.Pdf, Input("a.pdf", pdf), _work, CancellationToken.None);
         var isolatedDocx = await Run(Options()).RunAsync(SourceKind.Docx, Input("a.docx", docx), _work, CancellationToken.None);
@@ -50,7 +50,7 @@ public sealed class IsolatedExtractionTests : IDisposable
         Assert.True(ProcessProbe.IsGone(isolatedPdf.ProcessId!.Value));
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task ReasonsOfUnreadableFilesComeBackFromTheProcess()
     {
         var result = await Run(Options()).RunAsync(SourceKind.Pdf, Input("locked.pdf", SyntheticDocuments.EncryptedPdf()), _work, CancellationToken.None);
@@ -61,7 +61,7 @@ public sealed class IsolatedExtractionTests : IDisposable
         Assert.Contains(result.Extraction.Warnings, w => w.Code == SourceWarningCodes.Encrypted);
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task DeeplyNestedWordFileIsUnreadableAndThisProcessLives()
     {
         var bomb = HostileDocuments.DeeplyNestedDocx(20_000);
@@ -84,7 +84,7 @@ public sealed class IsolatedExtractionTests : IDisposable
         Assert.False(Process.GetCurrentProcess().HasExited);
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task ACrashOfTheProcessBecomesAnUnreadableResult()
     {
         var result = await Run(Options(), allowTestModes: true).RunAsync(SourceExtractionWorker.TestCrashKind, Input("any.pdf", [1]), _work, CancellationToken.None);
@@ -95,7 +95,7 @@ public sealed class IsolatedExtractionTests : IDisposable
         Assert.Equal(IsolatedExtractionProcess.TooComplexReason, result.Extraction.FailureReason);
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task FlateBombStaysWithinTheMemoryLimitOfTheProcess()
     {
         var text = string.Concat(Enumerable.Repeat("Readable words before the bomb ", 12));
@@ -118,10 +118,22 @@ public sealed class IsolatedExtractionTests : IDisposable
         Assert.True(precheck.PeakMemoryBytes < 256 * 1_048_576, $"peak memory {precheck.PeakMemoryBytes / 1_048_576} MB");
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task AHangingProcessIsKilledWithItsWholeTreeAndLeavesNoZombie()
     {
         Environment.SetEnvironmentVariable(SecretVariable, "must-not-reach-the-child");
+        try
+        {
+            await HangAndCheckTreeAsync();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(SecretVariable, null);
+        }
+    }
+
+    private async Task HangAndCheckTreeAsync()
+    {
         var marker = Input($"hang-{Guid.NewGuid():N}.pdf", [1]);
         var childId = 0;
         string? childEnvironment = null;
@@ -155,7 +167,7 @@ public sealed class IsolatedExtractionTests : IDisposable
         Assert.Contains(SourceExtractionWorker.LimitsVariable + "=", childEnvironment, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [LinuxFact]
     public async Task AnAnswerAboveTheOutputLimitIsUnreadable()
     {
         var pdf = SyntheticDocuments.Pdf(2, p => string.Concat(Enumerable.Repeat($"Page {p} has plenty of words. ", 20)));
@@ -165,6 +177,65 @@ public sealed class IsolatedExtractionTests : IDisposable
         Assert.Equal(IsolatedExtractionOutcome.OutputTooLarge, result.Outcome);
         Assert.Equal(IsolatedExtractionProcess.TooComplexReason, result.Extraction.FailureReason);
         Assert.True(await ProcessProbe.WaitGoneAsync(result.ProcessId!.Value, TimeSpan.FromSeconds(3)));
+    }
+
+    [LinuxFact]
+    public async Task TextBeyondTheLimitIsRefusedInTheProcessWithTheDefaultLimits()
+    {
+        var wordy = HostileDocuments.WordyDocx(3_100_000);
+        var bomb = HostileDocuments.TextBombDocx(3_200_000);
+        Assert.True(bomb.Length < 16 * 1_024, $"the bomb is only {bomb.Length} bytes");
+
+        var refused = await Run(Options()).RunAsync(SourceKind.Docx, Input("wordy.docx", wordy), _work, CancellationToken.None);
+        var scanned = await Run(Options(o => o.MaxCompressionRatio = 1_000_000)).RunAsync(SourceKind.Docx, Input("bomb.docx", bomb), _work, CancellationToken.None);
+
+        Assert.Equal(IsolatedExtractionOutcome.Completed, refused.Outcome);
+        Assert.Equal(SourceExtraction.TooMuchTextReason, refused.Extraction.FailureReason);
+        Assert.True(refused.Elapsed < TimeSpan.FromSeconds(30), $"took {refused.Elapsed}");
+        Assert.Equal(SourceExtraction.TooMuchTextReason, scanned.Extraction.FailureReason);
+        Assert.True(scanned.PeakMemoryBytes < 384 * 1_048_576, $"peak memory {scanned.PeakMemoryBytes / 1_048_576} MB");
+        Assert.True(ProcessProbe.IsGone(refused.ProcessId!.Value));
+    }
+
+    [Fact]
+    public void TheAnswerLimitFitsTheTextLimit()
+    {
+        var options = new SourceOptions();
+
+        Assert.Equal(3_000_000, options.MaxExtractedChars);
+        Assert.Equal(16_777_216, options.ExtractionMaxOutputBytes);
+        Assert.True(options.ExtractionMaxOutputBytes >= 4L * options.MaxExtractedChars + 1_048_576);
+        Assert.Equal(options.MaxExtractedChars, ExtractionLimits.From(options, TimeSpan.FromSeconds(1)).ToOptions().MaxExtractedChars);
+    }
+
+    [LinuxFact]
+    public async Task NativeMemoryBeyondTheLimitIsKilledByTheWatchdog()
+    {
+        var result = await Run(Options(o =>
+        {
+            o.ExtractionMemoryLimitBytes = 64 * 1_048_576;
+            o.ExtractionTimeout = TimeSpan.FromSeconds(30);
+        }), allowTestModes: true).RunAsync(SourceExtractionWorker.TestNativeMemoryKind, Input("native.pdf", [1]), _work, CancellationToken.None);
+
+        Assert.Equal(IsolatedExtractionOutcome.MemoryExceeded, result.Outcome);
+        Assert.Equal(IsolatedExtractionProcess.TooComplexReason, result.Extraction.FailureReason);
+        Assert.True(result.PeakMemoryBytes > 320 * 1_048_576, $"peak memory {result.PeakMemoryBytes / 1_048_576} MB");
+        Assert.True(result.PeakMemoryBytes < 900 * 1_048_576, $"peak memory {result.PeakMemoryBytes / 1_048_576} MB");
+        Assert.True(await ProcessProbe.WaitGoneAsync(result.ProcessId!.Value, TimeSpan.FromSeconds(5)));
+    }
+
+    [LinuxFact]
+    public async Task RunningOutOfManagedMemoryEndsAsTooComplex()
+    {
+        var result = await Run(Options(o =>
+        {
+            o.ExtractionMemoryLimitBytes = 64 * 1_048_576;
+            o.ExtractionTimeout = TimeSpan.FromSeconds(30);
+        }), allowTestModes: true).RunAsync(SourceExtractionWorker.TestManagedMemoryKind, Input("managed.pdf", [1]), _work, CancellationToken.None);
+
+        Assert.Equal(SourceExtractionWorker.ExitTooComplex, result.ExitCode);
+        Assert.Equal(IsolatedExtractionOutcome.MemoryExceeded, result.Outcome);
+        Assert.Equal(IsolatedExtractionProcess.TooComplexReason, result.Extraction.FailureReason);
     }
 
     [Fact]
@@ -184,7 +255,7 @@ public sealed class IsolatedExtractionTests : IDisposable
         var blocking = new BlockingExtractor(SourceKind.Pdf);
         using var limiter = new SourceIntakeLimiter(Microsoft.Extensions.Options.Options.Create(options));
         var runner = new SourceExtractionRunner(
-            [blocking, new PlainTextSourceExtractor()],
+            [blocking, new PlainTextSourceExtractor(Microsoft.Extensions.Options.Options.Create(options))],
             new IsolatedExtractionProcess(Microsoft.Extensions.Options.Options.Create(options), NullLogger<IsolatedExtractionProcess>.Instance),
             limiter,
             Microsoft.Extensions.Options.Options.Create(options),
@@ -248,6 +319,16 @@ public sealed class IsolatedExtractionTests : IDisposable
 public sealed class IsolatedExtractionCollection
 {
     public const string Name = "IsolatedExtraction";
+}
+
+/// <summary>A test that starts real extraction processes and looks at them through <c>/proc</c>; skipped outside Linux.</summary>
+public sealed class LinuxFactAttribute : FactAttribute
+{
+    public LinuxFactAttribute()
+    {
+        if (!OperatingSystem.IsLinux())
+            Skip = "Needs Linux: the test watches the extraction processes through /proc.";
+    }
 }
 
 /// <summary>Looks at processes through <c>/proc</c> (Linux).</summary>

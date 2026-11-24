@@ -12,7 +12,13 @@ internal static class PageMarkerDefusing
     public static bool LooksLikePageMarker(this string line)
     {
         ArgumentNullException.ThrowIfNull(line);
-        var trimmed = line.AsSpan().Trim();
+        return line.AsSpan().LooksLikePageMarker();
+    }
+
+    /// <summary>True when the trimmed line starts with <c>[[</c>, ends with <c>]]</c> and mentions <c>page</c>.</summary>
+    public static bool LooksLikePageMarker(this ReadOnlySpan<char> line)
+    {
+        var trimmed = line.Trim();
         return trimmed.StartsWith("[[", StringComparison.Ordinal)
                && trimmed.EndsWith("]]", StringComparison.Ordinal)
                && trimmed.Contains("page", StringComparison.OrdinalIgnoreCase);

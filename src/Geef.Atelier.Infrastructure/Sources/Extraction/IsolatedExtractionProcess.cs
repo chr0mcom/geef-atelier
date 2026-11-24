@@ -19,8 +19,8 @@ internal sealed record IsolatedExtractionResult(SourceExtraction Extraction, Iso
 /// <summary>
 /// Runs <see cref="SourceExtractionWorker"/> in a separate process of the same application: minimal environment without
 /// the configuration of the web process, temporary working directory, managed heap limit
-/// (<c>DOTNET_GCHeapHardLimit</c>), a memory watchdog, a bounded answer and a hard time limit after which the whole
-/// process tree is killed. Every failure becomes an unreadable result with a plain-English reason; nothing is thrown
+/// (<c>DOTNET_GCHeapHardLimit</c>), a memory watchdog, a bounded answer that is parsed while it streams in (no copy of
+/// the whole answer) and a hard time limit after which the whole process tree is killed. Every failure becomes an unreadable result with a plain-English reason; nothing is thrown
 /// for a broken or hostile file.
 /// </summary>
 internal sealed class IsolatedExtractionProcess(IOptions<SourceOptions> options, ILogger<IsolatedExtractionProcess> logger)
@@ -71,16 +71,17 @@ internal sealed class IsolatedExtractionProcess(IOptions<SourceOptions> options,
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
         limit.CancelAfter(opts.ExtractionTimeout);
         var watch = new ProcessWatch(process, opts.ExtractionMemoryLimitBytes + NativeMemoryAllowance);
-        var output = ReadBoundedAsync(process.StandardOutput.BaseStream, opts.ExtractionMaxOutputBytes, limit.Token);
+        var answerStream = new BoundedReadStream(process.StandardOutput.BaseStream, opts.ExtractionMaxOutputBytes);
+        var output = ParseAnswerAsync(answerStream, limit.Token);
         var errors = ReadErrorsAsync(process.StandardError, limit.Token);
         var watcher = watch.RunAsync(WatchInterval, limit.Token);
 
         var outcome = IsolatedExtractionOutcome.Completed;
-        byte[]? answer = null;
+        SourceExtraction? answer = null;
         try
         {
             answer = await output;
-            if (answer is null)
+            if (answerStream.Exceeded)
                 outcome = IsolatedExtractionOutcome.OutputTooLarge;
             else
                 await process.WaitForExitAsync(limit.Token);
@@ -113,7 +114,7 @@ internal sealed class IsolatedExtractionProcess(IOptions<SourceOptions> options,
 
         return exitCode switch
         {
-            SourceExtractionWorker.ExitOk => Parse(answer!) is { } extraction
+            SourceExtractionWorker.ExitOk => answer is { } extraction
                 ? Finish(extraction, IsolatedExtractionOutcome.Completed, exitCode, peak, clock, processId)
                 : Finish(Unreadable(FailedReason), IsolatedExtractionOutcome.Failed, exitCode, peak, clock, processId),
             SourceExtractionWorker.ExitTooComplex => Finish(Unreadable(TooComplexReason), IsolatedExtractionOutcome.MemoryExceeded, exitCode, peak, clock, processId),
@@ -174,19 +175,20 @@ internal sealed class IsolatedExtractionProcess(IOptions<SourceOptions> options,
         return File.Exists(fromRuntime) ? fromRuntime : "dotnet";
     }
 
-    private static async Task<byte[]?> ReadBoundedAsync(Stream stream, long maxBytes, CancellationToken ct)
+    private static async Task<SourceExtraction?> ParseAnswerAsync(BoundedReadStream stream, CancellationToken ct)
     {
-        using var buffer = new MemoryStream();
-        var chunk = new byte[81_920];
-        int read;
-        while ((read = await stream.ReadAsync(chunk, ct)) > 0)
+        SourceExtraction? extraction;
+        try
         {
-            if (buffer.Length + read > maxBytes)
-                return null;
-            buffer.Write(chunk, 0, read);
+            extraction = await JsonSerializer.DeserializeAsync<SourceExtraction>(stream, ExtractionLimits.Json, ct);
+        }
+        catch (JsonException)
+        {
+            await stream.CopyToAsync(Stream.Null, ct);
+            return null;
         }
 
-        return buffer.ToArray();
+        return extraction is null || stream.Exceeded ? null : Validate(extraction);
     }
 
     private static async Task<string> ReadErrorsAsync(StreamReader reader, CancellationToken ct)
@@ -228,21 +230,13 @@ internal sealed class IsolatedExtractionProcess(IOptions<SourceOptions> options,
         }
     }
 
-    private static SourceExtraction? Parse(byte[] answer)
+    private static SourceExtraction? Validate(SourceExtraction extraction)
     {
-        try
-        {
-            var extraction = JsonSerializer.Deserialize<SourceExtraction>(answer, ExtractionLimits.Json);
-            if (extraction is null || !Enum.IsDefined(extraction.Quality))
-                return null;
-            if (extraction.Quality == SourceQuality.Unreadable)
-                return string.IsNullOrWhiteSpace(extraction.FailureReason) ? extraction with { FailureReason = FailedReason } : extraction;
-            return extraction.Text is null ? null : extraction with { EmptyPages = extraction.EmptyPages ?? [], Warnings = extraction.Warnings ?? [] };
-        }
-        catch (JsonException)
-        {
+        if (!Enum.IsDefined(extraction.Quality))
             return null;
-        }
+        if (extraction.Quality == SourceQuality.Unreadable)
+            return string.IsNullOrWhiteSpace(extraction.FailureReason) ? extraction with { FailureReason = FailedReason } : extraction;
+        return extraction.Text is null ? null : extraction with { EmptyPages = extraction.EmptyPages ?? [], Warnings = extraction.Warnings ?? [] };
     }
 
     private static string ReasonFor(IsolatedExtractionOutcome outcome) => outcome switch
@@ -265,6 +259,68 @@ internal sealed class IsolatedExtractionProcess(IOptions<SourceOptions> options,
         }
         catch (Exception ex) when (ex is OperationCanceledException or IOException or InvalidOperationException)
         {
+        }
+    }
+
+    /// <summary>Reads at most a number of bytes from the answer of the process; beyond it the stream ends and <see cref="Exceeded"/> is set.</summary>
+    private sealed class BoundedReadStream(Stream inner, long maxBytes) : Stream
+    {
+        private long _read;
+
+        public bool Exceeded { get; private set; }
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => _read;
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+
+        public override int Read(Span<byte> buffer)
+        {
+            if (Exceeded)
+                return 0;
+            var read = inner.Read(buffer);
+            return Count(read);
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (Exceeded)
+                return 0;
+            var read = await inner.ReadAsync(buffer, cancellationToken);
+            return Count(read);
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        private int Count(int read)
+        {
+            _read += read;
+            if (_read <= maxBytes)
+                return read;
+            Exceeded = true;
+            return 0;
         }
     }
 

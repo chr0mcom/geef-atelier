@@ -36,7 +36,9 @@ internal sealed class IncomingUpload(string directory, string filePath, long len
 
     /// <summary>
     /// Streams <paramref name="content"/> into a new directory below <paramref name="storageRoot"/>; <c>null</c> when it is
-    /// larger than <paramref name="maxBytes"/> (nothing is left behind then).
+    /// larger than <paramref name="maxBytes"/> (nothing is left behind then). A failure while reading
+    /// <paramref name="content"/> (a broken or interrupted upload) ends as <see cref="UploadInterruptedException"/>; a
+    /// failure while writing the file keeps its own type.
     /// </summary>
     public static async Task<IncomingUpload?> ReceiveAsync(Stream content, string storageRoot, long maxBytes, CancellationToken ct)
     {
@@ -53,7 +55,7 @@ internal sealed class IncomingUpload(string directory, string filePath, long len
             {
                 var chunk = new byte[81_920];
                 int read;
-                while ((read = await content.ReadAsync(chunk, ct)) > 0)
+                while ((read = await ReadAsync(content, chunk, ct)) > 0)
                 {
                     length += read;
                     if (length > maxBytes)
@@ -76,6 +78,18 @@ internal sealed class IncomingUpload(string directory, string filePath, long len
         {
             DeleteDirectory(directory);
             throw;
+        }
+    }
+
+    private static async Task<int> ReadAsync(Stream content, byte[] chunk, CancellationToken ct)
+    {
+        try
+        {
+            return await content.ReadAsync(chunk, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new UploadInterruptedException(ex);
         }
     }
 
@@ -120,3 +134,6 @@ internal sealed class IncomingUpload(string directory, string filePath, long len
         return options;
     }
 }
+
+/// <summary>Raised when the content of an upload could not be read to its end (broken or interrupted upload).</summary>
+internal sealed class UploadInterruptedException(Exception inner) : Exception("The upload could not be read to its end.", inner);

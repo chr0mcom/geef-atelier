@@ -1,13 +1,17 @@
 using System.Text;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Sources;
+using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Infrastructure.Sources.Extraction;
 
 /// <summary>
 /// Reads text and Markdown files: a byte order mark decides the encoding; without one, valid UTF-8 is read as UTF-8,
-/// text with many zero bytes as UTF-16, and anything else as Windows-1252 with a warning.
+/// text with many zero bytes as UTF-16, and anything else as Windows-1252 with a warning. The characters are counted
+/// before the text is decoded; a file with more than <see cref="SourceOptions.MaxExtractedChars"/> is refused without
+/// building its text.
 /// </summary>
-internal sealed class PlainTextSourceExtractor : ISourceTextExtractor
+internal sealed class PlainTextSourceExtractor(IOptions<SourceOptions> options) : ISourceTextExtractor
 {
     internal const string EmptyReason = "This file has no text.";
 
@@ -18,12 +22,17 @@ internal sealed class PlainTextSourceExtractor : ISourceTextExtractor
     public SourceKind Kind => SourceKind.Text;
 
     public Task<SourceExtraction> ExtractAsync(ReadOnlyMemory<byte> content, CancellationToken ct) =>
-        Task.FromResult(Extract(content.Span));
+        Task.FromResult(Extract(content.Span, options.Value.MaxExtractedChars));
 
-    internal static SourceExtraction Extract(ReadOnlySpan<byte> bytes)
+    internal static SourceExtraction Extract(ReadOnlySpan<byte> bytes, int maxChars = int.MaxValue)
     {
         var warnings = new List<SourceWarning>();
-        var text = Decode(bytes, warnings)
+        var (encoding, start) = ChooseEncoding(bytes, warnings);
+        var body = bytes[start..];
+        if (encoding.GetCharCount(body) > maxChars)
+            return SourceExtraction.TooMuchText();
+
+        var text = encoding.GetString(body)
             .Replace("\0", string.Empty, StringComparison.Ordinal)
             .Replace("\r\n", "\n", StringComparison.Ordinal)
             .Replace('\r', '\n')
@@ -32,7 +41,7 @@ internal sealed class PlainTextSourceExtractor : ISourceTextExtractor
         if (text.Length == 0)
             return SourceExtraction.Unreadable(EmptyReason);
 
-        var replacements = text.Count(c => c == '�');
+        var replacements = text.Count(c => c == '\uFFFD');
         if (replacements > 0)
             warnings.Add(new SourceWarning(SourceWarningCodes.ReplacementCharacters,
                 "Some characters could not be read and were replaced."));
@@ -41,33 +50,34 @@ internal sealed class PlainTextSourceExtractor : ISourceTextExtractor
         return new SourceExtraction(text, null, [], quality, warnings, null);
     }
 
-    internal static string Decode(ReadOnlySpan<byte> bytes, List<SourceWarning> warnings)
+    private static (Encoding Encoding, int Start) ChooseEncoding(ReadOnlySpan<byte> bytes, List<SourceWarning> warnings)
     {
         if (bytes.StartsWith((ReadOnlySpan<byte>)[0xEF, 0xBB, 0xBF]))
-            return Encoding.UTF8.GetString(bytes[3..]);
+            return (Encoding.UTF8, 3);
         if (bytes.StartsWith((ReadOnlySpan<byte>)[0xFF, 0xFE, 0x00, 0x00]))
-            return Encoding.UTF32.GetString(bytes[4..]);
+            return (Encoding.UTF32, 4);
         if (bytes.StartsWith((ReadOnlySpan<byte>)[0xFF, 0xFE]))
-            return Encoding.Unicode.GetString(bytes[2..]);
+            return (Encoding.Unicode, 2);
         if (bytes.StartsWith((ReadOnlySpan<byte>)[0xFE, 0xFF]))
-            return Encoding.BigEndianUnicode.GetString(bytes[2..]);
+            return (Encoding.BigEndianUnicode, 2);
 
         if (SourceKindDetector.LooksLikeUtf16(bytes, out var littleEndian))
         {
             warnings.Add(new SourceWarning(SourceWarningCodes.EncodingGuessed,
                 "The text encoding was guessed (UTF-16). If characters look wrong, save the file as UTF-8."));
-            return (littleEndian ? Encoding.Unicode : Encoding.BigEndianUnicode).GetString(bytes);
+            return (littleEndian ? Encoding.Unicode : Encoding.BigEndianUnicode, 0);
         }
 
         try
         {
-            return StrictUtf8.GetString(bytes);
+            StrictUtf8.GetCharCount(bytes);
+            return (StrictUtf8, 0);
         }
         catch (DecoderFallbackException)
         {
             warnings.Add(new SourceWarning(SourceWarningCodes.EncodingGuessed,
                 "The text encoding was guessed (Windows-1252). If characters look wrong, save the file as UTF-8."));
-            return Encoding.GetEncoding(1252).GetString(bytes);
+            return (Encoding.GetEncoding(1252), 0);
         }
     }
 }

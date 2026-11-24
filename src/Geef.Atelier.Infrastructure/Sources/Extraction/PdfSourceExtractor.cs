@@ -21,7 +21,8 @@ namespace Geef.Atelier.Infrastructure.Sources.Extraction;
 /// <see cref="SourceOptions.PageLayoutTimeout"/> falls back to the plain content order; after half of
 /// <see cref="SourceOptions.ExtractionTimeout"/> or three slow pages every further page uses the plain order. Before the
 /// file is opened, the unpacked size of its compressed text streams is checked against
-/// <see cref="SourceOptions.MaxPdfInflatedBytes"/>. Lines of page text that look like page markers are neutralised.
+/// <see cref="SourceOptions.MaxPdfInflatedBytes"/>. Lines of page text that look like page markers are neutralised. Reading
+/// stops as soon as the text grows beyond <see cref="SourceOptions.MaxExtractedChars"/>.
 /// </summary>
 internal sealed class PdfSourceExtractor(IOptions<SourceOptions> options, ILogger<PdfSourceExtractor> logger) : ISourceTextExtractor
 {
@@ -124,6 +125,8 @@ internal sealed class PdfSourceExtractor(IOptions<SourceOptions> options, ILogge
             builder.Append(PageMarkers.For(number));
             if (text.Length > 0)
                 builder.Append('\n').Append(text);
+            if (builder.Length > opts.MaxExtractedChars)
+                return SourceExtraction.TooMuchText(pageCount);
         }
 
         stats.Elapsed = total.Elapsed;
