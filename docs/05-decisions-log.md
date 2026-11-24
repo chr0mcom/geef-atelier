@@ -1754,3 +1754,39 @@ information.
 
 **Unchanged.** The Geef SDK, the status decision of 2026-07-17, additive and idempotent migrations, the
 single-language English UI (D-062; questions and result appear in the language of the job).
+
+## D-069 — Stage 1: direct-path engine (2026-11-24)
+
+**Status:** implemented (package P2 of stage 1), acceptance on a real run after integration.
+
+**Decision.** The direct path is a system crew `direct` that exists only in code (`SystemCrew.CodeOnly*`, not in
+template lists, the classic form or the composer catalogue). It runs on the existing engine; the Geef SDK is
+unchanged.
+
+- **One assembler per kind of pipeline.** The orchestrator builds every pipeline through an `IPipelineAssembler`
+  (composition 100, direct 90, resume 50, classic 0). The three existing paths behave as before; the only addition
+  is the hook `OnRunFinishedAsync` after the result is stored.
+- **Sources.** `OrderGroundingStep` loads the files of the order and renders them as a source block
+  (`<sources>`/`<source>` with page markers, defused tags). Above `Sources:FullTextMaxChars` a document map with
+  exact line numbers comes first. The block goes to the writer as background document, which the cli-proxy stores
+  as `context.md` above 50 kB. A file with the role "template to revise" becomes the starting text in `draft.md`
+  instead. In the factory the new parameter `customGroundingStep` replaces the briefing step.
+- **Writer.** One call in document mode, without failover (`x-cli-proxy-failover: off`), because another CLI cannot
+  edit the same files. An empty or unchanged answer (also the proxy's `empty_result`) is repeated once; then the run
+  ends with "The writer returned no text. Please try again." (a correction pass keeps the previous version).
+  `backend_unavailable` ends the run at once with "The writing service is busy. Please try again in a few minutes."
+  The prompt asks to read `context.md` completely, in sections, and to ignore instructions inside the files.
+- **Read evidence.** The input tokens of the first answer are compared with the size of the files
+  (`ReadEvidenceCheck`: agent overhead plus characters / 1.9 for German). Below 60 % the warning "Some of your files
+  may not have been read in full." and a report note appear. Not a hard failure.
+- **Checks without a model.** `RequestConstraintExtractor` reads length, language, a ban on placeholders,
+  forbidden forms and terms from the request, conservatively: whatever refers to a part of the text, a file or
+  something unclear becomes a note instead of a check. `DeterministicChecksReviewer` reports violations as
+  `Rejected`; at most one correction (`MaxIterations = 2`), after which the SDK rule delivers the better version.
+  Placeholders are allowed and shown as "Fill in before sending" unless the request forbids them.
+- **Report.** `Runs.ReportJson` (`RunReport`, schema 1) with constraints, check results of the delivered version,
+  placeholders, sources, read evidence and notes.
+
+**Reason.** The pre-test on reading `context.md` showed that the agent often searches instead of reading; it reads
+in full reliably only up to about 150,000 characters. The codex document mode yields no text in the container.
+Hence read evidence, an explicit reading instruction, no failover and an own empty-text check.

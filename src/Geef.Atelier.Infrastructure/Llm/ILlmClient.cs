@@ -83,6 +83,13 @@ public sealed record LlmRequest
     /// per-argument OS limit (MAX_ARG_STRLEN, 128 KB). Only meaningful when DocumentMode=true.
     /// </summary>
     public string? ContextDocument { get; init; }
+
+    /// <summary>
+    /// When true, the cli-proxy is asked not to fail over to another CLI for this call (request header
+    /// <c>x-cli-proxy-failover: off</c>). Used by callers whose result is only usable from the requested CLI, such as
+    /// the direct-path writer in document mode. Other providers ignore it.
+    /// </summary>
+    public bool DisableFailover { get; init; }
 }
 
 /// <summary>

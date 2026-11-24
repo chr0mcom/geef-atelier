@@ -37,6 +37,7 @@ public static class GroundingServiceExtensions
         services.AddSingleton<IGroundingProvider, CrewCatalogGroundingProvider>();
         services.AddSingleton<IGroundingProvider, ToolCatalogGroundingProvider>();
         services.AddSingleton<IGroundingProvider, PackCatalogGroundingProvider>();
+        services.AddSingleton<IGroundingProvider, OrderSourcesGroundingProvider>();
         services.AddSingleton<IGroundingProviderFactory, GroundingProviderFactory>();
 
         // Tool-backed provider: delegates to IToolExecutor when a profile has ToolName set.

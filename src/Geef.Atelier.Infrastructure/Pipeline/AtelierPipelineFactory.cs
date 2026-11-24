@@ -37,6 +37,8 @@ internal static class AtelierPipelineFactory
     /// <see cref="AdvisorTrigger.BeforeEveryExecution"/>) and convergence-failure recovery
     /// advisors (<see cref="AdvisorTrigger.OnConvergenceFailure"/>) are registered directly
     /// with the SDK builder and consulted by the runner at the appropriate lifecycle points.
+    /// A <paramref name="customGroundingStep"/> replaces the briefing grounding step; the crew's grounding providers
+    /// are then not called (the custom step brings its own material, as the direct path does with the order's files).
     /// </summary>
     public static GeefPipelineRunner<FinalizedDocument> Build(
         CrewSnapshot snapshot,
@@ -54,10 +56,11 @@ internal static class AtelierPipelineFactory
         IGroundingConsultationRepository? groundingConsultationRepository = null,
         IExecutionStep? customExecutionStep = null,
         Func<Geef.Atelier.Core.Domain.Crew.Profiles.ReviewerProfile, IReviewer?>? specialReviewerResolver = null,
-        ToolBackedGroundingProvider? toolBackedGroundingProvider = null)
+        ToolBackedGroundingProvider? toolBackedGroundingProvider = null,
+        IGroundingStep? customGroundingStep = null)
     {
-        IGroundingStep grounding = new BriefingGroundingStep();
-        if (snapshot.GroundingProviders is { Count: > 0 })
+        IGroundingStep grounding = customGroundingStep ?? new BriefingGroundingStep();
+        if (customGroundingStep is null && snapshot.GroundingProviders is { Count: > 0 })
         {
             if (groundingProviderFactory is null)
                 throw new InvalidOperationException(MissingGroundingFactoryMessage);

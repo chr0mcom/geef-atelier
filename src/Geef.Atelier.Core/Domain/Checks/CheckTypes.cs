@@ -6,8 +6,31 @@ public enum LengthUnit { Words = 0, Characters = 1 }
 /// <summary>Forms the request can forbid.</summary>
 public enum ForbiddenPattern { Lists = 0, Headings = 1, Emojis = 2 }
 
-/// <summary>A length the request asks for; <see cref="Quote"/> is the passage of the request it was read from.</summary>
-public sealed record LengthConstraint(LengthUnit Unit, int? Min, int? Max, string Quote);
+/// <summary>How a length was phrased in the request; decides the tolerance of the check.</summary>
+public enum LengthKind
+{
+    /// <summary>A range such as <c>120–180 Wörter</c>: accepted from Min·0.95 to Max·1.05.</summary>
+    Range = 0,
+
+    /// <summary>An upper limit such as <c>max. 200 Wörter</c>: accepted up to Max·1.02.</summary>
+    AtMost = 1,
+
+    /// <summary>A lower limit such as <c>mindestens 500 Wörter</c>: accepted from Min·0.98.</summary>
+    AtLeast = 2,
+
+    /// <summary>An approximate length such as <c>ca. 300 Wörter</c>: accepted within ±20 %.</summary>
+    About = 3,
+
+    /// <summary>A plain length such as <c>in 300 Wörtern</c>: accepted within ±15 %.</summary>
+    Stated = 4,
+}
+
+/// <summary>
+/// A length the request asks for; <see cref="Quote"/> is the passage of the request it was read from. <see cref="Min"/>
+/// and <see cref="Max"/> are the numbers as stated (both equal for <see cref="LengthKind.About"/> and
+/// <see cref="LengthKind.Stated"/>); the tolerance follows from <see cref="Kind"/>.
+/// </summary>
+public sealed record LengthConstraint(LengthUnit Unit, int? Min, int? Max, string Quote, LengthKind Kind = LengthKind.Range);
 
 /// <summary>A form the request forbids, with the passage it was read from.</summary>
 public sealed record PatternRule(ForbiddenPattern Pattern, string Quote);

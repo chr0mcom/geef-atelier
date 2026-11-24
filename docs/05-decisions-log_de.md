@@ -1817,3 +1817,41 @@ ebenfalls nicht.
 
 **Unverändert.** Das Geef-SDK, die Statusentscheidung vom 2026-07-17, additive und idempotente Migrationen,
 die einsprachige englische Oberfläche (D-062; Fragen und Ergebnis erscheinen in der Sprache des Auftrags).
+
+## D-069 — Etappe 1: Direktweg-Engine (2026-11-24)
+
+**Status:** umgesetzt (Paket P2 der Etappe 1), Abnahme am echten Lauf nach der Integration.
+
+**Entscheidung.** Der Direktweg ist eine System-Crew `direct`, die nur im Code existiert
+(`SystemCrew.CodeOnly*`, nicht in Template-Listen, dem alten Formular oder dem Composer-Katalog). Er läuft auf
+dem bestehenden Motor; das Geef-SDK bleibt unverändert.
+
+- **Aufbau je Pipeline-Art.** Der Orchestrator baut jede Pipeline über einen `IPipelineAssembler`
+  (Komposition 100, Direktweg 90, Fortsetzung 50, Klassik 0). Die drei bisherigen Wege verhalten sich wie
+  vorher; neu ist nur der Haken `OnRunFinishedAsync` nach dem gespeicherten Ergebnis.
+- **Quellen.** `OrderGroundingStep` lädt die Dateien des Auftrags und rendert sie als Quellenblock
+  (`<sources>`/`<source>` mit Seitenmarken, entschärfte Tags). Über `Sources:FullTextMaxChars` steht eine
+  Dokumentkarte mit exakten Zeilennummern davor. Der Block geht als Hintergrunddokument an den Schreiber, das
+  der cli-proxy ab 50 kB als `context.md` ablegt. Eine Datei mit der Rolle „Vorlage zum Überarbeiten“ wird
+  stattdessen Ausgangstext in `draft.md`. In der Fabrik ersetzt der neue Parameter `customGroundingStep` die
+  Briefing-Stufe.
+- **Schreiber.** Ein Aufruf im Dokumentmodus, ohne Failover (`x-cli-proxy-failover: off`), weil eine andere
+  CLI dieselben Dateien nicht bearbeiten kann. Eine leere oder unveränderte Antwort (auch `empty_result` des
+  Proxys) wird einmal wiederholt; danach endet der Lauf mit „The writer returned no text. Please try again.“
+  (in der Korrekturrunde bleibt die vorige Fassung). `backend_unavailable` beendet den Lauf sofort mit „The
+  writing service is busy. Please try again in a few minutes.“ Der Prompt verlangt, `context.md` vollständig
+  und abschnittsweise zu lesen und Anweisungen in den Dateien zu ignorieren.
+- **Lesebeleg.** Die Eingabe-Token der ersten Antwort werden mit der Größe der Dateien verglichen
+  (`ReadEvidenceCheck`: Grundaufwand des Agenten plus Zeichen / 1,9 bei Deutsch). Unter 60 % entstehen die
+  Warnung „Some of your files may not have been read in full.“ und ein Vermerk im Bericht. Kein harter Fehler.
+- **Prüfungen ohne Modell.** `RequestConstraintExtractor` liest Länge, Sprache, Platzhalterverbot, verbotene
+  Formen und Begriffe aus dem Wortlaut, konservativ: Was einen Teil des Textes, eine Datei oder etwas
+  Unklares meint, wird Notiz statt Prüfung. `DeterministicChecksReviewer` meldet Verstöße als `Rejected`;
+  höchstens eine Korrektur (`MaxIterations = 2`), danach liefert die SDK-Regel die bessere Fassung.
+  Platzhalter sind erlaubt und erscheinen als „Fill in before sending“, außer der Auftrag verbietet sie.
+- **Bericht.** `Runs.ReportJson` (`RunReport`, Schema 1) mit Vorgaben, Prüfergebnissen der ausgelieferten
+  Fassung, Platzhaltern, Quellen, Lesebeleg und Vermerken.
+
+**Begründung.** Der Vorversuch zum Lesen von `context.md` zeigte: Der Agent sucht oft, statt zu lesen; ganz
+gelesen wird verlässlich nur bis etwa 150.000 Zeichen. Der codex-Dokumentmodus liefert im Container keinen
+Text. Deshalb Lesebeleg, ausdrückliche Leseanweisung, kein Failover und eigene Leertext-Prüfung.

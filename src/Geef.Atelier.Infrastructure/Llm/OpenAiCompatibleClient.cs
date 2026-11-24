@@ -14,6 +14,9 @@ internal sealed class OpenAiCompatibleClient(
     /// <summary>Header the cli-proxy sets when another CLI served the request (e.g. <c>codex->claude</c>).</summary>
     internal const string FailoverHeader = "x-cli-proxy-failover";
 
+    /// <summary>Value of <see cref="FailoverHeader"/> on a request that must not be failed over.</summary>
+    internal const string FailoverOff = "off";
+
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken)
     {
         // null  → keyless provider (e.g. Ollama): skip auth header entirely
@@ -29,6 +32,8 @@ internal sealed class OpenAiCompatibleClient(
         // Only add auth header when an API key is configured.
         if (apiKey is { Length: > 0 })
             httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
+        if (request.DisableFailover)
+            httpRequest.Headers.Add(FailoverHeader, FailoverOff);
         httpRequest.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
         using var response = await httpClient.SendAsync(httpRequest, cancellationToken);
@@ -39,7 +44,7 @@ internal sealed class OpenAiCompatibleClient(
                 $"LLM request to '{baseEndpoint}' for model '{request.Model}' failed with " +
                 $"{(int)response.StatusCode} {response.ReasonPhrase}: {ExtractError(json).RedactSecrets()}",
                 inner: null,
-                statusCode: response.StatusCode);
+                statusCode: response.StatusCode).WithErrorCode(ExtractErrorCode(json));
 
         await ReportFailoverAsync(response, request.Model);
 
@@ -90,6 +95,27 @@ internal sealed class OpenAiCompatibleClient(
     {
         var dash = backend.IndexOf('-');
         return dash > 0 ? backend[..dash] : backend;
+    }
+
+    /// <summary>The machine-readable <c>error.code</c> of an OpenAI-shaped error body, or <c>null</c>.</summary>
+    private static string? ExtractErrorCode(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            return doc.RootElement.TryGetProperty("error", out var error)
+                   && error.ValueKind == JsonValueKind.Object
+                   && error.TryGetProperty("code", out var code)
+                   && code.ValueKind == JsonValueKind.String
+                ? code.GetString()
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     // Surfaces the provider's actual error text (OpenAI-shaped { "error": { "message": ... } })
