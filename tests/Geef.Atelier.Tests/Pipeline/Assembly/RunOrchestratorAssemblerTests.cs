@@ -34,7 +34,7 @@ public sealed class RunOrchestratorAssemblerTests(PostgresFixture fixture)
     }
 
     [Fact(Timeout = 30_000)]
-    public async Task The_selected_assembler_builds_the_pipeline_and_finishes_after_the_outcome()
+    public async Task The_selected_assembler_builds_the_pipeline_and_stores_its_results_before_the_outcome()
     {
         await using var ctx = fixture.NewContext();
         var runId = await new RunPersistenceService(ctx).CreateRunAsync("Assembler test", "{}", crewSnapshotJson: TestCrewSnapshots.KlassikJson, cancellationToken: CancellationToken.None);
@@ -58,7 +58,8 @@ public sealed class RunOrchestratorAssemblerTests(PostgresFixture fixture)
 
         Assert.Equal(RunStatus.Completed, run!.Status);
         Assert.Equal(1, recording.FinishedCalls);
-        Assert.Equal((RunOutcome?)RunOutcome.Converged, recording.OutcomeSeenWhenFinished);
+        Assert.Null(recording.OutcomeSeenWhenFinished);
+        Assert.Equal((RunOutcome?)RunOutcome.Converged, run.Outcome);
     }
 
     [Theory]

@@ -10,7 +10,10 @@ public sealed record OrderListRow(OrderEntity Order, RunEntity? CurrentRun, int 
 /// <summary>A pipeline event of a run as needed for the progress display.</summary>
 public sealed record RunEventRow(string EventType, int? Iteration, DateTimeOffset At);
 
-/// <summary>Persistence of orders and their link to runs. Every write that changes an order together with a run is one transaction.</summary>
+/// <summary>
+/// Persistence of orders and their link to runs. Every write that changes an order together with a run is one transaction; a
+/// write that fails leaves nothing behind in the shared context, so that trying again does not add the first attempt twice.
+/// </summary>
 public interface IOrderRepository
 {
     /// <summary>Inserts the order (state <see cref="OrderState.Ready"/>), its source links and its first run (version 1) in one transaction and clears <c>ExpiresAt</c> of the linked sources.</summary>
@@ -28,7 +31,11 @@ public interface IOrderRepository
     /// <summary>Returns all runs of the order, of every kind.</summary>
     Task<IReadOnlyList<RunEntity>> ListRunsAsync(Guid orderId, CancellationToken ct = default);
 
-    /// <summary>Lists orders newest activity first; <paramref name="ownerUsername"/> = null lists all users.</summary>
+    /// <summary>
+    /// Lists orders newest activity first; <paramref name="ownerUsername"/> = null lists all users. The current run of a row is
+    /// a slim copy for the list (status, outcome, kind, version, times, word count); its <see cref="RunEntity.FinalText"/>
+    /// only tells whether a text exists, and briefing, configuration, crew snapshot and report are left empty.
+    /// </summary>
     Task<IReadOnlyList<OrderListRow>> ListAsync(string? ownerUsername, int limit, CancellationToken ct = default);
 
     /// <summary>Returns the pipeline events of a run in the order they happened.</summary>

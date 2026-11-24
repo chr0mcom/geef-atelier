@@ -30,6 +30,7 @@ internal sealed class FakeOrderService : IOrderService
     public Exception? GetError { get; set; }
     public bool CancelResult { get; set; } = true;
     public bool DeleteResult { get; set; } = true;
+    public Exception? DeleteError { get; set; }
     public TaskCompletionSource? Hold { get; set; }
     public int Calls => Volatile.Read(ref _calls);
     public int MaxActive => Volatile.Read(ref _maxActive);
@@ -158,6 +159,8 @@ internal sealed class FakeOrderService : IOrderService
         try
         {
             Deleted.Enqueue(orderId);
+            if (DeleteError is not null)
+                throw DeleteError;
             return DeleteResult && _orders.TryRemove(orderId, out _);
         }
         finally

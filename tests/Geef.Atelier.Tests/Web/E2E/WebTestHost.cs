@@ -1,3 +1,4 @@
+using Geef.Atelier.Infrastructure.Pipeline.Assembly;
 using System.Net;
 using System.Net.Sockets;
 using Geef.Atelier.Application.Auth;
@@ -116,6 +117,7 @@ internal sealed class WebTestHost : IAsyncDisposable
         builder.Services.TryAddSingleton<Geef.Atelier.Application.Crew.Grounding.IGroundingProviderFactory>(sp =>
             new Geef.Atelier.Infrastructure.Grounding.GroundingProviderFactory(
                 sp.GetServices<Geef.Atelier.Application.Crew.Grounding.IGroundingProvider>()));
+        builder.Services.AddPipelineAssemblers();
         builder.Services.AddHostedService<RunOrchestratorService>();
 
         // SignalR + Notifier

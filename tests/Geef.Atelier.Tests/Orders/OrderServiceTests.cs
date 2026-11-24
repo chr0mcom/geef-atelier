@@ -198,11 +198,12 @@ public sealed class OrderServiceTests(PostgresFixture postgres)
             await service.WaitForChangeAsync(submission.OrderId, user, OrderDisplayState.Working, TimeSpan.FromSeconds(30));
             Assert.True(DateTimeOffset.UtcNow - immediate < TimeSpan.FromSeconds(1));
 
-            await Assert.ThrowsAsync<InvalidOperationException>(() => service.DeleteAsync(submission.OrderId, user));
+            await Assert.ThrowsAsync<OrderStillWorkingException>(() => service.DeleteAsync(submission.OrderId, user));
 
             Assert.True(await service.CancelAsync(submission.OrderId, user));
             Assert.True(await sp.GetRequiredService<Geef.Atelier.Infrastructure.Persistence.AtelierDbContext>().Runs
                 .Where(r => r.Id == submission.RunId).Select(r => r.CancellationRequested).SingleAsync());
+            Assert.True(await service.CancelAsync(submission.OrderId, user));
             return 0;
         });
 

@@ -37,7 +37,6 @@ internal sealed class OrderService(
 {
     internal const string EmptyRequestMessage = "Please describe what you need.";
     internal const string MissingSourceMessage = "One of the files was not found. Please add it again.";
-    internal const string StillWorkingMessage = "This order is still being worked on. Stop it first.";
     internal const string MapNotice = "Your files are long, so the writer gets a map of them and reads the parts that matter.";
     private static readonly JsonSerializerOptions SnapshotJsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private static readonly RunStatus[] ActiveStatuses = [RunStatus.Pending, RunStatus.Running];
@@ -135,7 +134,7 @@ internal sealed class OrderService(
 
         var orderRuns = await orders.ListRunsAsync(orderId, ct);
         var current = OrderStateResolver.SelectCurrentRun(orderRuns);
-        var display = OrderStateResolver.Resolve(order.State, current?.ToRunState());
+        var display = OrderStateResolver.Resolve(order.State, current?.ToRunState(time.GetUtcNow()));
         if (current is null)
             return new OrderResult(orderId, display, null, null, null, null, [], [], [], [], NoteFor(display));
 
@@ -166,7 +165,7 @@ internal sealed class OrderService(
         var rows = await orders.ListAsync(ownerUsername, limit, ct);
         return rows.Select(r =>
         {
-            var display = OrderStateResolver.Resolve(r.Order.State, r.CurrentRun?.ToRunState());
+            var display = OrderStateResolver.Resolve(r.Order.State, r.CurrentRun?.ToRunState(time.GetUtcNow()));
             return new OrderListItem(
                 r.Order.Id,
                 r.Order.RequestText.ToOrderTitle(),
@@ -213,9 +212,17 @@ internal sealed class OrderService(
             changed = order.State is not OrderState.Cancelled
                       && await orders.TrySetStateAsync(orderId, order.State, OrderState.Cancelled, ct);
         }
+        else if (!ActiveStatuses.Contains(current.Status))
+        {
+            changed = false;
+        }
+        else if (current.CancellationRequested)
+        {
+            return true;
+        }
         else
         {
-            changed = ActiveStatuses.Contains(current.Status) && await runs.RequestCancellationAsync(current.Id, ct);
+            changed = await runs.RequestCancellationAsync(current.Id, ct);
         }
 
         if (changed)
@@ -231,7 +238,7 @@ internal sealed class OrderService(
 
         var orderRuns = await orders.ListRunsAsync(orderId, ct);
         if (orderRuns.Any(r => ActiveStatuses.Contains(r.Status)))
-            throw new InvalidOperationException(StillWorkingMessage);
+            throw new OrderStillWorkingException();
 
         var linked = await sources.ListForOrderAsync(orderId, includeText: false, ct);
         if (!await orders.DeleteAsync(orderId, ct))
@@ -265,7 +272,7 @@ internal sealed class OrderService(
     {
         var orderRuns = await orders.ListRunsAsync(order.Id, ct);
         var current = OrderStateResolver.SelectCurrentRun(orderRuns);
-        var display = OrderStateResolver.Resolve(order.State, current?.ToRunState());
+        var display = OrderStateResolver.Resolve(order.State, current?.ToRunState(time.GetUtcNow()));
         var linked = await sources.ListForOrderAsync(order.Id, includeText: false, ct);
         var events = current is null ? [] : await orders.ListRunEventsAsync(current.Id, ct);
         var warnings = current is null ? [] : await warningRepository.ListByRunAsync(current.Id, ct);

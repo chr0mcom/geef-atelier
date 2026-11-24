@@ -13,6 +13,9 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
 {
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
+    /// <summary>Stands in for the final text in the slim runs of <see cref="ListAsync"/>, which only need to know whether a text exists.</summary>
+    internal const string TextMarker = "…";
+
     public async Task CreateWithFirstRunAsync(OrderEntity order, IReadOnlyList<OrderSourceEntity> sources, RunEntity run, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(order);
@@ -22,14 +25,22 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
             throw new ArgumentException("The first run must belong to the order and carry version 1.", nameof(run));
         EnsureLinksBelongTo(order, sources);
 
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        db.Orders.Add(order);
-        db.OrderSources.AddRange(sources);
-        db.Runs.Add(run);
-        await db.SaveChangesAsync(ct);
-        await ClearExpiryAsync(sources, ct);
-        await tx.CommitAsync(ct);
-        db.ChangeTracker.Clear();
+        try
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            db.Orders.Add(order);
+            db.OrderSources.AddRange(sources);
+            db.Runs.Add(run);
+            await db.SaveChangesAsync(ct);
+            await ClearExpiryAsync(sources, ct);
+            await tx.CommitAsync(ct);
+            db.ChangeTracker.Clear();
+        }
+        catch
+        {
+            db.ChangeTracker.Clear();
+            throw;
+        }
     }
 
     public async Task CreateAsync(OrderEntity order, IReadOnlyList<OrderSourceEntity> sources, CancellationToken ct = default)
@@ -38,13 +49,21 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
         ArgumentNullException.ThrowIfNull(sources);
         EnsureLinksBelongTo(order, sources);
 
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        db.Orders.Add(order);
-        db.OrderSources.AddRange(sources);
-        await db.SaveChangesAsync(ct);
-        await ClearExpiryAsync(sources, ct);
-        await tx.CommitAsync(ct);
-        db.ChangeTracker.Clear();
+        try
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            db.Orders.Add(order);
+            db.OrderSources.AddRange(sources);
+            await db.SaveChangesAsync(ct);
+            await ClearExpiryAsync(sources, ct);
+            await tx.CommitAsync(ct);
+            db.ChangeTracker.Clear();
+        }
+        catch
+        {
+            db.ChangeTracker.Clear();
+            throw;
+        }
     }
 
     public async Task<int> AddRunAsync(Guid orderId, RunEntity run, CancellationToken ct = default)
@@ -53,22 +72,30 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
         if (run.OrderId is { } given && given != orderId)
             throw new ArgumentException("The run belongs to another order.", nameof(run));
 
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        if (!await LockOrderAsync(orderId, ct))
-            throw new InvalidOperationException($"Order {orderId} not found.");
+        try
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            if (!await LockOrderAsync(orderId, ct))
+                throw new InvalidOperationException($"Order {orderId} not found.");
 
-        var version = run.Kind == RunKind.CrewComposition && run.OrderVersion is { } kept
-            ? kept
-            : await NextStandardVersionAsync(orderId, ct);
+            var version = run.Kind == RunKind.CrewComposition && run.OrderVersion is { } kept
+                ? kept
+                : await NextStandardVersionAsync(orderId, ct);
 
-        var entry = db.Runs.Add(run);
-        entry.Property(r => r.OrderId).CurrentValue = orderId;
-        entry.Property(r => r.OrderVersion).CurrentValue = version;
-        await db.SaveChangesAsync(ct);
-        await TouchInTransactionAsync(orderId, _time.GetUtcNow(), ct);
-        await tx.CommitAsync(ct);
-        db.ChangeTracker.Clear();
-        return version;
+            var entry = db.Runs.Add(run);
+            entry.Property(r => r.OrderId).CurrentValue = orderId;
+            entry.Property(r => r.OrderVersion).CurrentValue = version;
+            await db.SaveChangesAsync(ct);
+            await TouchInTransactionAsync(orderId, _time.GetUtcNow(), ct);
+            await tx.CommitAsync(ct);
+            db.ChangeTracker.Clear();
+            return version;
+        }
+        catch
+        {
+            db.ChangeTracker.Clear();
+            throw;
+        }
     }
 
     public Task<OrderEntity?> GetAsync(Guid orderId, CancellationToken ct = default) =>
@@ -98,6 +125,21 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
         var ids = orders.Select(o => o.Id).ToList();
         var runs = await db.Runs.AsNoTracking()
             .Where(r => r.OrderId != null && ids.Contains(r.OrderId.Value))
+            .Select(r => new RunEntity
+            {
+                Id = r.Id,
+                CreatedAt = r.CreatedAt,
+                Status = r.Status,
+                BriefingText = string.Empty,
+                ConfigJson = string.Empty,
+                CompletedAt = r.CompletedAt,
+                FinalText = r.FinalText == null || r.FinalText.Trim() == string.Empty ? null : TextMarker,
+                WordCount = r.WordCount,
+                Kind = r.Kind,
+                Outcome = r.Outcome,
+                OrderId = r.OrderId,
+                OrderVersion = r.OrderVersion,
+            })
             .ToListAsync(ct);
         var counts = await db.OrderSources.AsNoTracking()
             .Where(l => ids.Contains(l.OrderId))
@@ -148,55 +190,63 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
 
     public async Task<Guid> LinkLegacyRunAsync(Guid runId, OrderEntry entry, CancellationToken ct = default)
     {
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-
-        var run = await db.Runs.AsNoTracking().FirstOrDefaultAsync(r => r.Id == runId, ct)
-                  ?? throw new InvalidOperationException($"Run {runId} not found.");
-        if (run.OrderId is { } existing)
-            return existing;
-        if (run.Kind == RunKind.Learning)
-            throw new InvalidOperationException("Learning runs do not belong to an order.");
-
-        var parentId = run.ParentCompositionRunId ?? run.ParentRunId;
-        var parent = parentId is null
-            ? null
-            : await db.Runs.AsNoTracking()
-                .Where(r => r.Id == parentId && r.OrderId != null)
-                .Select(r => new { OrderId = r.OrderId!.Value, r.OrderVersion, r.Kind })
-                .FirstOrDefaultAsync(ct);
-
-        Guid orderId;
-        int version;
-        var now = _time.GetUtcNow();
-        if (parent is not null && await LockOrderAsync(parent.OrderId, ct))
+        try
         {
-            orderId = parent.OrderId;
-            version = await InheritedVersionAsync(run, parent.OrderId, parent.OrderVersion, parent.Kind, ct);
-        }
-        else
-        {
-            orderId = run.Id;
-            version = 1;
-            db.Orders.Add(new OrderEntity
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+            var run = await db.Runs.AsNoTracking().FirstOrDefaultAsync(r => r.Id == runId, ct)
+                      ?? throw new InvalidOperationException($"Run {runId} not found.");
+            if (run.OrderId is { } existing)
+                return existing;
+            if (run.Kind == RunKind.Learning)
+                throw new InvalidOperationException("Learning runs do not belong to an order.");
+
+            var parentId = run.ParentCompositionRunId ?? run.ParentRunId;
+            var parent = parentId is null
+                ? null
+                : await db.Runs.AsNoTracking()
+                    .Where(r => r.Id == parentId && r.OrderId != null)
+                    .Select(r => new { OrderId = r.OrderId!.Value, r.OrderVersion, r.Kind })
+                    .FirstOrDefaultAsync(ct);
+
+            Guid orderId;
+            int version;
+            var now = _time.GetUtcNow();
+            if (parent is not null && await LockOrderAsync(parent.OrderId, ct))
             {
-                Id = orderId,
-                CreatedByUser = run.CreatedByUser,
-                RequestText = LegacyRequestText(run),
-                Mode = OrderMode.Careful,
-                State = OrderState.Ready,
-                Entry = entry,
-                CrewTemplateName = run.Kind == RunKind.CrewComposition ? null : run.CrewTemplateName,
-                CreatedAt = run.CreatedAt,
-                UpdatedAt = now,
-            });
-            await db.SaveChangesAsync(ct);
-        }
+                orderId = parent.OrderId;
+                version = await InheritedVersionAsync(run, parent.OrderId, parent.OrderVersion, parent.Kind, ct);
+            }
+            else
+            {
+                orderId = run.Id;
+                version = 1;
+                db.Orders.Add(new OrderEntity
+                {
+                    Id = orderId,
+                    CreatedByUser = run.CreatedByUser,
+                    RequestText = LegacyRequestText(run),
+                    Mode = OrderMode.Careful,
+                    State = OrderState.Ready,
+                    Entry = entry,
+                    CrewTemplateName = run.Kind == RunKind.CrewComposition ? null : run.CrewTemplateName,
+                    CreatedAt = run.CreatedAt,
+                    UpdatedAt = now,
+                });
+                await db.SaveChangesAsync(ct);
+            }
 
-        await SetLinkAsync(run.Id, orderId, version, ct);
-        await TouchInTransactionAsync(orderId, now, ct);
-        await tx.CommitAsync(ct);
-        db.ChangeTracker.Clear();
-        return orderId;
+            await SetLinkAsync(run.Id, orderId, version, ct);
+            await TouchInTransactionAsync(orderId, now, ct);
+            await tx.CommitAsync(ct);
+            db.ChangeTracker.Clear();
+            return orderId;
+        }
+        catch
+        {
+            db.ChangeTracker.Clear();
+            throw;
+        }
     }
 
     public async Task TouchAsync(Guid orderId, DateTimeOffset at, CancellationToken ct = default) =>

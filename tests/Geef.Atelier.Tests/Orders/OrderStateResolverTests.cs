@@ -21,6 +21,8 @@ public sealed class OrderStateResolverTests
         { 8, OrderState.Ready, RunKind.Standard, RunStatus.Pending, null, false, OrderDisplayState.Queued, false },
         { 9, OrderState.Ready, RunKind.Standard, RunStatus.Running, null, false, OrderDisplayState.Working, false },
         { 10, OrderState.Ready, RunKind.Standard, RunStatus.Aborted, RunOutcome.Aborted, true, OrderDisplayState.Stopped, true },
+        { 10, OrderState.Ready, RunKind.Standard, RunStatus.Aborted, RunOutcome.DeliveredWithOpenPoints, true, OrderDisplayState.DeliveredWithOpenPoints, true },
+        { 10, OrderState.Ready, RunKind.Standard, RunStatus.Aborted, RunOutcome.DeliveredWithOpenPoints, false, OrderDisplayState.Stopped, true },
         { 11, OrderState.Ready, RunKind.Standard, RunStatus.Failed, RunOutcome.Aborted, true, OrderDisplayState.Stopped, true },
         { 12, OrderState.Ready, RunKind.Standard, RunStatus.Completed, RunOutcome.DeliveredWithOpenPoints, true, OrderDisplayState.DeliveredWithOpenPoints, true },
         { 13, OrderState.Ready, RunKind.Standard, RunStatus.Completed, RunOutcome.Converged, true, OrderDisplayState.Delivered, true },
@@ -86,8 +88,43 @@ public sealed class OrderStateResolverTests
     public void ToRunStateTreatsBlankTextAsNoText()
     {
         var run = Run(RunKind.Standard, 1, DateTimeOffset.UtcNow, finalText: "  \n ");
-        Assert.False(run.ToRunState().HasText);
-        Assert.True(Run(RunKind.Standard, 1, DateTimeOffset.UtcNow, finalText: "Hello").ToRunState().HasText);
+        Assert.False(run.ToRunState(DateTimeOffset.UtcNow).HasText);
+        Assert.True(Run(RunKind.Standard, 1, DateTimeOffset.UtcNow, finalText: "Hello").ToRunState(DateTimeOffset.UtcNow).HasText);
+    }
+
+    [Theory]
+    [InlineData(RunKind.Standard, RunStatus.Completed, null, 2, true)]
+    [InlineData(RunKind.Standard, RunStatus.Failed, null, 2, true)]
+    [InlineData(RunKind.Standard, RunStatus.Aborted, null, 2, true)]
+    [InlineData(RunKind.Standard, RunStatus.Completed, null, 31, false)]
+    [InlineData(RunKind.Standard, RunStatus.Completed, RunOutcome.Converged, 2, false)]
+    [InlineData(RunKind.Standard, RunStatus.Failed, RunOutcome.Failed, 2, false)]
+    [InlineData(RunKind.Standard, RunStatus.Running, null, 2, false)]
+    [InlineData(RunKind.CrewComposition, RunStatus.Completed, RunOutcome.Converged, 2, true)]
+    [InlineData(RunKind.CrewComposition, RunStatus.Completed, RunOutcome.Converged, 31, false)]
+    [InlineData(RunKind.CrewComposition, RunStatus.Failed, RunOutcome.Failed, 2, false)]
+    public void A_run_is_finishing_for_a_short_while_until_its_outcome_is_stored(RunKind kind, RunStatus status, RunOutcome? outcome, int secondsAgo, bool finishing)
+    {
+        var now = new DateTimeOffset(2026, 11, 24, 12, 0, 0, TimeSpan.Zero);
+        var run = new RunEntity
+        {
+            Id = Guid.NewGuid(), CreatedAt = now.AddMinutes(-5), Status = status, BriefingText = "b", ConfigJson = "{}",
+            Kind = kind, Outcome = outcome, CompletedAt = status is RunStatus.Running ? null : now.AddSeconds(-secondsAgo), FinalText = "Text",
+        };
+
+        var state = run.ToRunState(now);
+
+        Assert.Equal(finishing, state.Finishing);
+        if (finishing)
+            Assert.Equal(new OrderDisplay(OrderDisplayState.Working, true, false), OrderStateResolver.Resolve(OrderState.Ready, state));
+    }
+
+    [Fact]
+    public void A_cancelled_order_is_stopped_even_while_its_run_is_finishing()
+    {
+        var display = OrderStateResolver.Resolve(OrderState.Cancelled, new OrderRunState(RunStatus.Aborted, null, RunKind.Standard, false, Finishing: true));
+
+        Assert.Equal(OrderDisplayState.Stopped, display.State);
     }
 
     [Theory]

@@ -1,7 +1,11 @@
 namespace Geef.Atelier.Core.Domain.Orders;
 
-/// <summary>The parts of a run that decide how its order is shown.</summary>
-public sealed record OrderRunState(RunStatus Status, RunOutcome? Outcome, RunKind Kind, bool HasText);
+/// <summary>
+/// The parts of a run that decide how its order is shown. <see cref="Finishing"/> is true for a few seconds after the run
+/// reached its final status while its outcome, text or report are still being stored (or, for a composition, while the
+/// writing run is being created).
+/// </summary>
+public sealed record OrderRunState(RunStatus Status, RunOutcome? Outcome, RunKind Kind, bool HasText, bool Finishing = false);
 
 /// <summary>How an order is shown: its display state, whether a text exists and whether the order is finished.</summary>
 public sealed record OrderDisplay(OrderDisplayState State, bool HasText, bool IsFinished);
@@ -12,6 +16,9 @@ public sealed record OrderDisplay(OrderDisplayState State, bool HasText, bool Is
 /// </summary>
 public static class OrderStateResolver
 {
+    /// <summary>How long after its final status a run without outcome still counts as finishing.</summary>
+    public static readonly TimeSpan FinishingWindow = TimeSpan.FromSeconds(30);
+
     /// <summary>Resolves the display state; the first matching row of the truth table wins, and an existing run wins over the order state.</summary>
     public static OrderDisplay Resolve(OrderState state, OrderRunState? currentRun)
     {
@@ -28,6 +35,9 @@ public static class OrderStateResolver
                 _ => new(OrderDisplayState.Queued, false, false),
             };
 
+        if (currentRun.Finishing)
+            return new(OrderDisplayState.Working, hasText, false);
+
         if (currentRun.Kind == RunKind.CrewComposition)
             return currentRun.Status switch
             {
@@ -40,6 +50,7 @@ public static class OrderStateResolver
         {
             (RunStatus.Pending, _, _) => new(OrderDisplayState.Queued, hasText, false),
             (RunStatus.Running, _, _) => new(OrderDisplayState.Working, hasText, false),
+            (RunStatus.Aborted, RunOutcome.DeliveredWithOpenPoints, true) => new(OrderDisplayState.DeliveredWithOpenPoints, true, true),
             (RunStatus.Aborted, _, _) => new(OrderDisplayState.Stopped, hasText, true),
             (RunStatus.Failed, RunOutcome.Aborted, _) => new(OrderDisplayState.Stopped, hasText, true),
             (RunStatus.Completed, RunOutcome.DeliveredWithOpenPoints, true) => new(OrderDisplayState.DeliveredWithOpenPoints, true, true),
@@ -71,11 +82,19 @@ public static class OrderStateResolver
             .FirstOrDefault();
     }
 
-    /// <summary>Extracts the parts of <paramref name="run"/> that the resolver needs; a text exists when <see cref="RunEntity.FinalText"/> is not blank.</summary>
-    public static OrderRunState ToRunState(this RunEntity run)
+    /// <summary>
+    /// Extracts the parts of <paramref name="run"/> that the resolver needs; a text exists when <see cref="RunEntity.FinalText"/>
+    /// is not blank. A run that ended less than <see cref="FinishingWindow"/> before <paramref name="now"/> is still finishing
+    /// while it has no outcome, and so is a completed composition (its writing run follows).
+    /// </summary>
+    public static OrderRunState ToRunState(this RunEntity run, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(run);
-        return new(run.Status, run.Outcome, run.Kind, !string.IsNullOrWhiteSpace(run.FinalText));
+        var ended = run.Status is RunStatus.Completed or RunStatus.Failed or RunStatus.Aborted;
+        var recent = run.CompletedAt is { } completed && now - completed < FinishingWindow;
+        var finishing = ended && recent
+            && (run.Outcome is null || (run.Kind == RunKind.CrewComposition && run.Status == RunStatus.Completed && run.Outcome == RunOutcome.Converged));
+        return new(run.Status, run.Outcome, run.Kind, !string.IsNullOrWhiteSpace(run.FinalText), finishing);
     }
 
     /// <summary>Returns the snake_case name used on the wire (MCP, JSON), e.g. <c>delivered_with_open_points</c>.</summary>

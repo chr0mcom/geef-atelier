@@ -31,9 +31,15 @@ public interface IOrderService
     /// <summary>Returns as soon as the display state differs from <paramref name="knownState"/> or is finished, at the latest after <paramref name="maxWait"/>. Polls the database; never longer than <c>Orders:MaxWaitSeconds</c>.</summary>
     Task<OrderView?> WaitForChangeAsync(Guid orderId, string? requestingUsername, OrderDisplayState? knownState, TimeSpan maxWait, CancellationToken ct = default);
 
-    /// <summary>Stops the order: before a run exists the state becomes <see cref="OrderState.Cancelled"/>; with an active run the run is cancelled.</summary>
+    /// <summary>
+    /// Stops the order: before a run exists the state becomes <see cref="OrderState.Cancelled"/>; with an active run the run is
+    /// cancelled. Asking again while the run is still stopping returns true as well.
+    /// </summary>
     Task<bool> CancelAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default);
 
-    /// <summary>Deletes a finished or stopped order with its runs; sources that no other order uses are deleted with their files.</summary>
+    /// <summary>
+    /// Deletes a finished or stopped order with its runs; sources that no other order uses are deleted with their files.
+    /// Throws <see cref="OrderStillWorkingException"/> while a run of the order is still working.
+    /// </summary>
     Task<bool> DeleteAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default);
 }

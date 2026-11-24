@@ -149,6 +149,20 @@ public sealed class MyWorkTests : TestContext
     }
 
     [Fact]
+    public void DeletingAnOrderThatIsStillWorkingSaysToStopItFirst()
+    {
+        _orders.DeleteError = new OrderStillWorkingException();
+        _orders.Add("alice", OrderTestData.View(OrderDisplayState.Delivered));
+        var cut = RenderComponent<MyWork>();
+
+        cut.Find("[data-testid='work-row-delete']").Click();
+        cut.Find("[data-testid='work-delete-confirm-button']").Click();
+
+        Assert.Contains("This order is still being worked on. Stop it first.", cut.Find("[data-testid='work-action-error']").TextContent);
+        Assert.DoesNotContain("Something went wrong", cut.Markup);
+    }
+
+    [Fact]
     public void AdministratorsCanShowAllUsers()
     {
         _auth.SetAuthorized("root");
