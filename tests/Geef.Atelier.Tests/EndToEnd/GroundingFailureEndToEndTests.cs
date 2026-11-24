@@ -12,7 +12,9 @@ namespace Geef.Atelier.Tests.EndToEnd;
 /// <summary>
 /// The core promise of Etappe 0 as one chain over the real wiring (review finding T1): a grounding provider fails,
 /// the run still ends normally, the failure is stored as a run warning without technical details, and the real MCP
-/// endpoint returns that warning from <c>get_run_status</c> and <c>get_run_result</c>.
+/// endpoint returns that warning from <c>get_run_status</c> and <c>get_run_result</c>. The run is submitted through the
+/// container's <see cref="IRunService"/> and executed by the container's orchestrator, so the test also proves that
+/// both receive a working warning path from the production wiring.
 /// </summary>
 [Collection(EndToEndCollection.Name)]
 [Trait("Category", "EndToEnd")]

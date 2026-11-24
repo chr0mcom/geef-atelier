@@ -2,7 +2,6 @@ using System.Reflection;
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Providers;
-using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Application.Security;
 using Geef.Atelier.Application.Tools;
 using Geef.Atelier.Core.Persistence.Mcp;
@@ -47,18 +46,6 @@ public sealed class ProductionWiringEndToEndTests(PostgresFixture postgres)
         };
 
         Assert.All(consumers, consumer => Assert.Same(configured, PolicyOf(consumer)));
-    }
-
-    [Fact]
-    public async Task Run_service_and_orchestrator_get_the_warning_dependencies_from_the_container()
-    {
-        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
-        await using var scope = host.Services.CreateAsyncScope();
-
-        var runService = scope.ServiceProvider.GetRequiredService<IRunService>();
-
-        Assert.NotNull(runService);
-        Assert.NotNull(host.Services.GetRequiredService<Geef.Atelier.Web.Services.RunOrchestratorService>());
     }
 
     [Fact]
