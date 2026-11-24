@@ -717,8 +717,8 @@ dieselbe Anwendung in einem **eigenen Prozess**, damit eine bösartige Datei den
    Uploads gleichzeitig; ein weiterer wird sofort mit HTTP 429, `Retry-After: 5` und „You are already adding 2 files at
    the same time. Please wait until one is done, then try again.“ abgelehnt. Über alle Personen laufen höchstens
    `Sources:MaxConcurrentIntakes` Uploads gleichzeitig; wer keinen Platz bekommt, wartet bis
-   `Sources:ExtractionQueueTimeout`, sonst lautet die Quittung „The service is busy with other uploads. Please try again
-   in a minute.“ Beide Plätze werden **vor** dem Lesen des Request-Bodys belegt: `POST /api/sources` liest den
+   `Sources:ExtractionQueueTimeout`, sonst kommt HTTP 503 mit `Retry-After: 30` und der Quittung „The service is busy
+   with other uploads. Please try again in a minute.“ (die Karte bietet „Try again“ an). Beide Plätze werden **vor** dem Lesen des Request-Bodys belegt: `POST /api/sources` liest den
    Multipart-Body als Strom (kein Formularpuffer) und nimmt das Antiforgery-Token nur aus dem Header. Eingefügter Text
    braucht keinen der Plätze, weil er schon im Speicher liegt.
 2. **Streamen und Zeit.** Der Upload wird nach `<StorageRoot>/.incoming/<id>/upload.part` geschrieben (Verzeichnis

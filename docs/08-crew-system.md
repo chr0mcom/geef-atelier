@@ -700,8 +700,9 @@ by the same application in a **separate process**, so a hostile file can never t
 1. **Upload place and slot.** Each person runs at most `Sources:MaxConcurrentUploadsPerUser` (2) uploads at the same
    time; a further one is refused at once with HTTP 429, `Retry-After: 5` and "You are already adding 2 files at the
    same time. Please wait until one is done, then try again." Across all people at most `Sources:MaxConcurrentIntakes`
-   uploads run at the same time; a caller waits up to `Sources:ExtractionQueueTimeout`, otherwise the receipt says "The
-   service is busy with other uploads. Please try again in a minute." Both are taken **before** the request body is
+   uploads run at the same time; a caller waits up to `Sources:ExtractionQueueTimeout`, otherwise the answer is HTTP 503
+   with `Retry-After: 30` and the receipt "The service is busy with other uploads. Please try again in a minute." (the
+   card offers "Try again"). Both are taken **before** the request body is
    read: `POST /api/sources` reads the multipart body as a stream (no form buffer) and takes the antiforgery token only
    from the header. Pasted text needs neither, because it is already in memory.
 2. **Streaming and time.** The upload is written to `<StorageRoot>/.incoming/<id>/upload.part` (directory 0700, file

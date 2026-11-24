@@ -120,7 +120,7 @@ internal sealed class SourceIntakeService(
 
         var charCount = normalized.CharCount;
         var budget = SourceBudgetPlanner.Classify(charCount, opts);
-        AddBudgetWarning(warnings, budget, charCount, opts);
+        AddBudgetWarning(warnings, budget, charCount, kind, opts);
 
         var sourceId = Guid.NewGuid();
         string storagePath;
@@ -200,12 +200,12 @@ internal sealed class SourceIntakeService(
     {
         if (usage.Count + 1 > opts.MaxUnattachedSourcesPerUser)
             return string.Create(CultureInfo.InvariantCulture,
-                $"You have {usage.Count:N0} files that are not used in an order yet. Remove some of them or start an order first.");
+                $"You have {usage.Count:N0} files that are not used in an order yet. Please try again later or contact an administrator.");
         if (usage.Bytes + incomingBytes > opts.MaxUnattachedBytesPerUser)
             return string.Create(CultureInfo.InvariantCulture,
-                $"Your files that are not used in an order yet would take more than {opts.MaxUnattachedBytesPerUser / 1_048_576.0:0.#} MB. Remove some of them or start an order first.");
+                $"Your files that are not used in an order yet would take more than {opts.MaxUnattachedBytesPerUser / 1_048_576.0:0.#} MB. Please try again later or contact an administrator.");
         return string.Create(CultureInfo.InvariantCulture,
-            $"Your files that are not used in an order yet would hold more than {opts.MaxUnattachedCharsPerUser:N0} characters of text. Remove some of them or start an order first.");
+            $"Your files that are not used in an order yet would hold more than {opts.MaxUnattachedCharsPerUser:N0} characters of text. Please try again later or contact an administrator.");
     }
 
     public Task<SourceReceipt> IntakeTextAsync(string title, string text, string ownerUsername, SourceOrigin origin, CancellationToken ct = default)
@@ -247,7 +247,7 @@ internal sealed class SourceIntakeService(
             warnings.Add(new SourceWarning(SourceWarningCodes.Duplicate, DuplicateMessage));
         var budget = SourceBudgetPlanner.Classify(source.CharCount, opts);
         if (warnings.All(w => w.Code is not (SourceWarningCodes.UsesDocumentMap or SourceWarningCodes.OverBudget)))
-            AddBudgetWarning(warnings, budget, source.CharCount, opts);
+            AddBudgetWarning(warnings, budget, source.CharCount, source.Kind, opts);
 
         return new SourceReceipt(
             source.Id,
@@ -267,13 +267,16 @@ internal sealed class SourceIntakeService(
             EstimatedTokens: SourceBudgetPlanner.EstimateTokens(source.CharCount, opts));
     }
 
-    private static void AddBudgetWarning(List<SourceWarning> warnings, SourceBudgetClass budget, int chars, SourceOptions opts)
+    private static void AddBudgetWarning(List<SourceWarning> warnings, SourceBudgetClass budget, int chars, SourceKind kind, SourceOptions opts)
     {
         if (budget == SourceBudgetClass.WithMap)
             warnings.Add(new SourceWarning(SourceWarningCodes.UsesDocumentMap, MapMessage));
         else if (budget == SourceBudgetClass.TooLarge)
-            warnings.Add(new SourceWarning(SourceWarningCodes.OverBudget, string.Create(CultureInfo.InvariantCulture,
-                $"This file is too long to use completely ({chars:N0} characters, the limit is {opts.MapMaxChars:N0}). Choose the pages to use.")));
+            warnings.Add(new SourceWarning(SourceWarningCodes.OverBudget, kind == SourceKind.Pdf
+                ? string.Create(CultureInfo.InvariantCulture,
+                    $"This file is too long to use completely ({chars:N0} characters, the limit is {opts.MapMaxChars:N0}). Choose the pages to use.")
+                : string.Create(CultureInfo.InvariantCulture,
+                    $"This file is too long ({chars:N0} characters, the limit is {opts.MapMaxChars:N0}). Please use a shorter version.")));
     }
 
     private static SourceReceipt Refused(string fileName, long size, string reason, SourceKind? kind = null, int? pageCount = null,
