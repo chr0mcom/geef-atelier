@@ -1,6 +1,8 @@
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Profiles;
+using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Application.Orders;
 
@@ -17,12 +19,113 @@ public interface IOrderBriefComposer
     IntakeBrief Compose(OrderBriefInput input);
 }
 
-internal sealed class IntakeBriefComposer : IOrderBriefComposer
+internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOrderBriefComposer
 {
+    public const string RequestSection = "request";
+    public const string UnderstandingSection = "understanding";
+    public const string AnswersSection = "answers";
+    public const string CorrectionsSection = "corrections";
+    public const string AssumptionsSection = "assumptions";
+    public const string ProfileSection = "profile";
+
+    public const string AnswersHeading = "Answers the person gave before writing:";
+    public const string CorrectionsHeading = "Corrections to assumptions:";
+    public const string AssumptionsHeading = "Assumptions (not confirmed – treat them as defaults, do not state them as facts):";
+    public const string ProfileHeading = "About the person (use only where it fits the text; never invent anything beyond it):";
+    public const string LeftToYou = "left to you";
+    public const string ByAssistant = " (answered by the assistant)";
+
     public IntakeBrief Compose(OrderBriefInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(input.Order);
-        return new IntakeBrief(input.Order.RequestText, ["request"]);
+
+        var prepared = options.Value.BriefMode == BriefMode.PreparedBrief;
+        var record = input.Record;
+        var answers = (input.Answers ?? []).GroupBy(a => a.QuestionId, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        var sections = new List<string> { RequestSection };
+        var intake = new List<string>();
+
+        if (prepared && record?.Output is { } output && !string.IsNullOrWhiteSpace(output.Understanding))
+        {
+            intake.Add("What will be written: " + OneLine(output.Understanding));
+            if (!string.IsNullOrWhiteSpace(output.TextType))
+                intake.Add("Text type: " + OneLine(output.TextType));
+            sections.Add(UnderstandingSection);
+        }
+
+        var answerLines = (record?.Questions ?? [])
+            .Where(q => answers.ContainsKey(q.Id))
+            .Select(q => $"- {OneLine(q.Text)} → {Describe(q, answers[q.Id])}")
+            .ToList();
+        if (answerLines.Count > 0)
+        {
+            intake.Add(AnswersHeading);
+            intake.AddRange(answerLines);
+            sections.Add(AnswersSection);
+        }
+
+        var corrected = new HashSet<string>(StringComparer.Ordinal);
+        var correctionLines = new List<string>();
+        foreach (var assumption in record?.Assumptions ?? [])
+        {
+            if (!answers.TryGetValue(assumption.Id, out var answer) || string.IsNullOrWhiteSpace(answer.FreeText))
+                continue;
+            corrected.Add(assumption.Id);
+            correctionLines.Add($"- {OneLine(assumption.Text)} → {OneLine(answer.FreeText)}{Mark(answer)}");
+        }
+
+        if (correctionLines.Count > 0)
+        {
+            intake.Add(CorrectionsHeading);
+            intake.AddRange(correctionLines);
+            sections.Add(CorrectionsSection);
+        }
+
+        if (prepared)
+        {
+            var remaining = (record?.Assumptions ?? []).Where(a => !corrected.Contains(a.Id)).Select(a => "- " + OneLine(a.Text)).ToList();
+            if (remaining.Count > 0)
+            {
+                intake.Add(AssumptionsHeading);
+                intake.AddRange(remaining);
+                sections.Add(AssumptionsSection);
+            }
+        }
+
+        var blocks = new List<string>();
+        if (intake.Count > 0)
+            blocks.Add(string.Join('\n', intake));
+        if (ProfilePrompt.Render(input.Profile) is { } profile)
+        {
+            blocks.Add(ProfileHeading + "\n" + profile);
+            sections.Add(ProfileSection);
+        }
+
+        var text = blocks.Count == 0
+            ? input.Order.RequestText
+            : input.Order.RequestText + "\n\n---\n" + string.Join("\n\n", blocks);
+        return new IntakeBrief(text, sections);
     }
+
+    private static string Describe(ClarifyQuestion question, OrderAnswer answer)
+    {
+        var free = string.IsNullOrWhiteSpace(answer.FreeText) ? null : OneLine(answer.FreeText);
+        if (answer.DecideForMe)
+            return free is null ? LeftToYou : $"{LeftToYou} – \"{free}\"";
+
+        var label = question.Options.FirstOrDefault(o => o.Id == answer.OptionId)?.Label;
+        var value = (label, free) switch
+        {
+            ({ } l, { } f) => $"{OneLine(l)} – \"{f}\"",
+            ({ } l, null) => OneLine(l),
+            (null, { } f) => $"\"{f}\"",
+            _ => null,
+        };
+        return value is null ? LeftToYou : value + Mark(answer);
+    }
+
+    private static string Mark(OrderAnswer answer) => answer.Origin == AnswerOrigin.Client ? ByAssistant : string.Empty;
+
+    private static string OneLine(string text) => string.Join(' ', text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 }
