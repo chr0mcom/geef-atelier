@@ -10,7 +10,6 @@ using Geef.Sdk.Providers;
 using Geef.Sdk.Results;
 using FindingSeverity = Geef.Sdk.Results.FindingSeverity;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 
@@ -29,21 +28,18 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 internal sealed class DirectWriterExecutor(
     ExecutorProfile profile,
     ILlmClientResolver resolver,
-    IPricingCatalog? pricingCatalog = null,
-    ICostAccumulator? costAccumulator = null,
-    IRunWarningSink? warningSink = null,
-    Guid runId = default,
-    ILogger? logger = null,
-    IDraftOutputSplitter? splitter = null) : IExecutionStep
+    IPricingCatalog? pricingCatalog,
+    ICostAccumulator? costAccumulator,
+    IRunWarningSink warningSink,
+    Guid runId,
+    ILogger logger,
+    IDraftOutputSplitter splitter) : IExecutionStep
 {
     /// <summary>Warning shown when the writer most likely searched the files instead of reading them.</summary>
     public const string PartialReadWarning = "Some of your files may not have been read in full.";
 
     /// <summary>Characters of the files sampled to guess their language for the token estimate.</summary>
     private const int LanguageSampleChars = 20_000;
-
-    private readonly ILogger _logger = logger ?? NullLogger.Instance;
-    private readonly IDraftOutputSplitter _splitter = splitter ?? IdentityDraftOutputSplitter.Instance;
 
     public async Task<ExecutionResult> RunAsync(IRunContext context, CancellationToken cancellationToken)
     {
@@ -86,7 +82,7 @@ internal sealed class DirectWriterExecutor(
         };
 
         var response = await CompleteAndRecordAsync(client, request, iteration, cancellationToken);
-        var text = response is null ? string.Empty : _splitter.Split(response.Text).Text;
+        var text = response is null ? string.Empty : splitter.Split(response.Text).Text;
         var notes = new List<string>();
 
         if (IsNoText(text, baseline))
@@ -94,7 +90,7 @@ internal sealed class DirectWriterExecutor(
             LogNoText(response, model, iteration, attempt: 1);
             response = await CompleteAndRecordAsync(
                 client, request with { UserPrompt = userPrompt + DirectWriterPrompts.RetryReminder(documentMode) }, iteration, cancellationToken);
-            text = response is null ? string.Empty : _splitter.Split(response.Text).Text;
+            text = response is null ? string.Empty : splitter.Split(response.Text).Text;
 
             if (IsNoText(text, baseline))
             {
@@ -121,7 +117,7 @@ internal sealed class DirectWriterExecutor(
             {
                 updated = updated.Set(AtelierContextKeys.ReadEvidence, evidence);
                 notes.Add($"read-evidence expected={evidence.ExpectedInputTokens} actual={evidence.ActualInputTokens} share={evidence.ReadShare}");
-                if (!evidence.ReadInFull && warningSink is not null)
+                if (!evidence.ReadInFull)
                     await warningSink.ReportAsync(runId, RunWarningSources.Llm, DirectWarningCodes.PartialRead, PartialReadWarning, iteration, cancellationToken);
             }
         }
@@ -159,7 +155,7 @@ internal sealed class DirectWriterExecutor(
     }
 
     private void LogNoText(LlmResponse? response, string model, int iteration, int attempt) =>
-        _logger.LogWarning(
+        logger.LogWarning(
             "Direct writer returned no usable text (provider {Provider}, model {Model}, iteration {Iteration}, attempt {Attempt}, finish reason {FinishReason}, {Length} characters, tokens in {InputTokens}, out {OutputTokens}).",
             profile.Provider, model, iteration, attempt, response?.FinishReason.RedactSecrets() ?? LlmApiError.EmptyResultCode,
             response?.Text?.Length ?? 0, response?.TokenUsage.InputTokens ?? 0, response?.TokenUsage.OutputTokens ?? 0);
@@ -174,12 +170,12 @@ internal sealed class DirectWriterExecutor(
         }
         catch (ProxySignalException signal) when (signal.Code == LlmApiError.EmptyResultCode)
         {
-            _logger.LogWarning("Direct writer: the cli-proxy reported an empty result (iteration {Iteration}): {Detail}", iteration, signal.Detail);
+            logger.LogWarning("Direct writer: the cli-proxy reported an empty result (iteration {Iteration}): {Detail}", iteration, signal.Detail);
             return null;
         }
         catch (ProxySignalException signal)
         {
-            _logger.LogWarning("Direct writer: the writing service is unavailable and failover is off (iteration {Iteration}): {Detail}", iteration, signal.Detail);
+            logger.LogWarning("Direct writer: the writing service is unavailable and failover is off (iteration {Iteration}): {Detail}", iteration, signal.Detail);
             throw new DirectPathException(DirectPathException.WritingServiceBusy);
         }
 

@@ -639,7 +639,10 @@ public static class SystemCrew
     public static bool IsSystemName(string name) =>
         ReviewerProfiles.ContainsKey(name)
         || ExecutorProfiles.ContainsKey(name)
-        || CrewTemplates.ContainsKey(name);
+        || CrewTemplates.ContainsKey(name)
+        || CodeOnlyReviewerProfiles.ContainsKey(name)
+        || CodeOnlyExecutorProfiles.ContainsKey(name)
+        || CodeOnlyTemplates.ContainsKey(name);
 
     /// <summary>True when the supplied name matches a system advisor profile.</summary>
     public static bool IsSystemAdvisorName(string name) =>
@@ -647,7 +650,7 @@ public static class SystemCrew
 
     /// <summary>True when the supplied name matches a system grounding-provider profile.</summary>
     public static bool IsSystemGroundingProviderName(string name) =>
-        GroundingProviderProfiles.ContainsKey(name);
+        GroundingProviderProfiles.ContainsKey(name) || name == OrderSourcesProfile.Name;
 
     // ── System Finalizer Profiles ──────────────────────────────────────────────────
 

@@ -115,10 +115,7 @@ internal sealed class LiveRunNotifier(
         try
         {
             await using var scope = scopeFactory.CreateAsyncScope();
-            var orders = scope.ServiceProvider.GetService<IOrderRepository>();
-            if (orders is null)
-                return null;
-            var order = await orders.GetAsync(orderId, cancellationToken);
+            var order = await scope.ServiceProvider.GetRequiredService<IOrderRepository>().GetAsync(orderId, cancellationToken);
             if (order is null)
                 return null;
             if (_orderOwners.Count >= OwnerCacheLimit)
