@@ -7,8 +7,10 @@
 #      Smoke-Client und Tausch gegen ein Zugriffstoken. Zugangsdaten nur aus der Datei $ATELIER_SMOKE_ENV
 #      (Standard /srv/docker/websites/geef_atelier/.smoke.env, Modus 0600, gitignored). Werte werden nie ausgegeben.
 #   3. Auftrag über den MCP-Endpunkt (/mcp, Werkzeug submit_request): Ein-Satz-Briefing mit dem Klassik-Template.
-#   4. Warten auf das Ende (get_run_status), höchstens ATELIER_SMOKE_TIMEOUT Sekunden.
-#   5. Prüfen (get_run_result): Status Completed, Text vorhanden, keine Fehlermeldung.
+#   4. Warten, bis get_run_status ein outcome meldet (nicht nur einen terminalen Status: der Text ist erst mit
+#      gesetztem outcome endgültig, also nach den Abschlussschritten), höchstens ATELIER_SMOKE_TIMEOUT Sekunden.
+#   5. Erst dann get_run_result lesen und prüfen: outcome Converged oder DeliveredWithOpenPoints und Text vorhanden
+#      ist bestanden; outcome Failed oder Aborted, fehlender Text oder Zeitlimit ohne outcome ist gescheitert.
 #   6. Eine Ergebniszeile auf stdout und Exit-Code.
 #
 # Exit-Code: 0 = bestanden, 1 = Lauf gescheitert oder Zeitlimit, 2 = Smoke-Konto fehlt, ist unvollständig oder unzulässig
@@ -143,6 +145,18 @@ def as_text(value, what):
     if not isinstance(value, str):
         raise UnexpectedResponse(f"{what} ist kein Text, sondern {type(value).__name__}")
     return value.strip()
+
+
+TERMINAL_STATUSES = ("Completed", "Failed", "Aborted")
+SUCCESS_OUTCOMES = ("Converged", "DeliveredWithOpenPoints")
+KNOWN_OUTCOMES = (*SUCCESS_OUTCOMES, "Failed", "Aborted")
+
+
+def as_outcome(value, what):
+    text = as_text(value, what)
+    if text and text not in KNOWN_OUTCOMES:
+        raise UnexpectedResponse(f"{what} hat den unbekannten Wert {text[:40]!r}")
+    return text
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -325,27 +339,34 @@ def main():
     while True:
         current = mcp.tool("get_run_status", {"runId": run_id})
         status = str(current.get("status") or "")
-        if status in ("Completed", "Failed", "Aborted"):
+        outcome = as_outcome(current.get("outcome"), "outcome von get_run_status")
+        if outcome:
             break
         if time.monotonic() - started > TIMEOUT:
-            result(f"FEHLER (zeitlimit): Lauf {run_id} nach {TIMEOUT} s noch im Status {status or '?'}", 1)
-        step(f"Status {status or '?'}")
+            if status in TERMINAL_STATUSES:
+                result(f"FEHLER (zeitlimit): Lauf {run_id} nach {TIMEOUT} s im Status {status}, aber ohne outcome; "
+                       "der Text ist erst mit gesetztem outcome endgültig (Abschlussschritte noch offen oder abgebrochen)", 1)
+            result(f"FEHLER (zeitlimit): Lauf {run_id} nach {TIMEOUT} s noch im Status {status or '?'}, ohne outcome", 1)
+        step(f"Status {status or '?'}, outcome noch offen")
         time.sleep(POLL)
 
     final = mcp.tool("get_run_result", {"runId": run_id})
     elapsed = int(time.monotonic() - started)
+    outcome = as_outcome(final.get("outcome"), "outcome von get_run_result") or outcome
+    final_status = str(final.get("status") or status)
     text = as_text(final.get("finaltext"), "finalText von get_run_result")
     error = as_text(final.get("errormessage"), "errorMessage von get_run_result")
     problems = []
-    if final.get("status", status) != "Completed":
-        problems.append(f"Status {final.get('status', status)}")
+    if outcome not in SUCCESS_OUTCOMES:
+        problems.append(f"outcome {outcome} (Status {final_status})")
     if not text:
         problems.append("kein Text")
-    if error:
-        problems.append(f"Fehlermeldung: {error[:160]}")
     if problems:
+        if error:
+            problems.append(f"Fehlermeldung: {error[:160]}")
         result(f"FEHLER (lauf): Lauf {run_id} nach {elapsed} s: {'; '.join(problems)}", 1)
-    result(f"OK: Lauf {run_id} Completed in {elapsed} s, {len(text)} Zeichen Text ({TEMPLATE})", 0)
+    open_points = "" if outcome == "Converged" else f", Status {final_status}, offene Punkte"
+    result(f"OK: Lauf {run_id} {outcome} in {elapsed} s, {len(text)} Zeichen Text ({TEMPLATE}){open_points}", 0)
 
 
 try:

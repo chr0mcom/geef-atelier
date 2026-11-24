@@ -30,6 +30,13 @@ DOCKER_FAKE = r"""
 """
 
 
+def _outcome(s):
+    """Outcome erst, wenn der Status terminal ist und weitere ``outcome_delay`` Abfragen vergangen sind (Abschlussschritte)."""
+    if s.get("hang") or s.get("never_outcome"):
+        return None
+    return s.get("final_outcome", "Converged") if s.get("polls", 0) >= 2 + s.get("outcome_delay", 0) else None
+
+
 class FakeAtelier(BaseHTTPRequestHandler):
     scenario: dict = {}
 
@@ -120,11 +127,16 @@ class FakeAtelier(BaseHTTPRequestHandler):
                     payload = {"runId": "run-1", "status": "Pending", "errorMessage": None}
                 elif name == "get_run_status":
                     s["polls"] = s.get("polls", 0) + 1
-                    done = s["polls"] >= 2
-                    payload = {"runId": "run-1", "status": s.get("final_status", "Completed") if done and not s.get("hang") else "Running", "errorMessage": None}
+                    done = s["polls"] >= 2 and not s.get("hang")
+                    payload = {"runId": "run-1", "status": s.get("final_status", "Completed") if done else "Running",
+                               "errorMessage": None, "outcome": _outcome(s)}
                 else:
+                    s["result_reads"] = s.get("result_reads", 0) + 1
+                    s["result_read_at_poll"] = s.get("polls", 0)
+                    final = _outcome(s) is not None
                     payload = {"runId": "run-1", "status": s.get("final_status", "Completed"),
-                               "finalText": s.get("final_text", "Der Smoke-Test läuft."), "errorMessage": s.get("error")}
+                               "finalText": s.get("final_text", "Der Smoke-Test läuft.") if final else "VORLÄUFIG vor dem Abschlussschritt",
+                               "errorMessage": s.get("error"), "outcome": _outcome(s)}
                     if "result_payload" in s:
                         payload = s["result_payload"]
                 res = {"content": [{"type": "text", "text": json.dumps(payload)}], "isError": False}
@@ -214,7 +226,8 @@ def test_happy_path_one_line_and_no_secrets(sandbox, server):
     r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}"))
     assert r.returncode == 0, r.stdout + r.stderr
     lines = r.stdout.strip().splitlines()
-    assert len(lines) == 1 and lines[0].startswith("SMOKE OK: Lauf run-1 Completed")
+    assert len(lines) == 1 and lines[0].startswith("SMOKE OK: Lauf run-1 Converged")
+    assert "offene Punkte" not in lines[0]
     assert scenario["submitted"]["crewTemplate"] == "klassik"
     assert len(scenario["submitted"]["briefingText"]) < 200
     assert [c["method"] for c in scenario["calls"]][:2] == ["initialize", "notifications/initialized"]
@@ -247,9 +260,12 @@ def test_state_mismatch_exits_3(sandbox, server):
 @pytest.mark.parametrize(
     ("scenario_update", "expected"),
     [
-        ({"final_status": "Failed", "error": "Did not converge"}, "Status Failed"),
+        ({"final_status": "Failed", "final_outcome": "Failed", "error": "Did not converge"},
+         "outcome Failed (Status Failed); Fehlermeldung: Did not converge"),
+        ({"final_status": "Aborted", "final_outcome": "Aborted"}, "outcome Aborted (Status Aborted)"),
+        ({"final_status": "Completed", "final_outcome": "Failed"}, "outcome Failed (Status Completed)"),
         ({"final_text": ""}, "kein Text"),
-        ({"error": "Finalizer kaputt"}, "Fehlermeldung: Finalizer kaputt"),
+        ({"final_outcome": "DeliveredWithOpenPoints", "final_status": "Failed", "final_text": ""}, "kein Text"),
     ],
 )
 def test_bad_run_exits_1(sandbox, server, scenario_update, expected):
@@ -260,12 +276,42 @@ def test_bad_run_exits_1(sandbox, server, scenario_update, expected):
     assert "FEHLER (lauf)" in r.stdout and expected in r.stdout
 
 
+@pytest.mark.parametrize("final_status", ["Failed", "Aborted"])
+def test_delivered_with_open_points_passes_and_says_so(sandbox, server, final_status):
+    httpd, scenario = server
+    scenario.update(final_outcome="DeliveredWithOpenPoints", final_status=final_status, error="Did not converge")
+    r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}"))
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert r.stdout.startswith("SMOKE OK: Lauf run-1 DeliveredWithOpenPoints")
+    assert f"Status {final_status}, offene Punkte" in r.stdout
+
+
+def test_waits_for_outcome_not_for_terminal_status_and_reads_text_once_afterwards(sandbox, server):
+    httpd, scenario = server
+    scenario["outcome_delay"] = 3
+    r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}"))
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert scenario["polls"] == 5
+    assert scenario["result_reads"] == 1 and scenario["result_read_at_poll"] == 5
+    assert f"{len('Der Smoke-Test läuft.')} Zeichen Text" in r.stdout
+
+
 def test_timeout_exits_1(sandbox, server):
     httpd, scenario = server
     scenario["hang"] = True
     r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}", ATELIER_SMOKE_TIMEOUT="2"))
     assert r.returncode == 1
-    assert "FEHLER (zeitlimit)" in r.stdout
+    assert "FEHLER (zeitlimit)" in r.stdout and "Status Running, ohne outcome" in r.stdout
+
+
+def test_terminal_status_without_outcome_times_out_with_clear_error(sandbox, server):
+    httpd, scenario = server
+    scenario["never_outcome"] = True
+    r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}", ATELIER_SMOKE_TIMEOUT="2"))
+    assert r.returncode == 1, r.stdout
+    assert r.stdout.startswith("SMOKE FEHLER (zeitlimit)")
+    assert "im Status Completed, aber ohne outcome" in r.stdout
+    assert scenario.get("result_reads", 0) == 0
 
 
 # Kein Passwort über unverschlüsseltes HTTP an fremde Hosts (Q15)
@@ -337,7 +383,10 @@ def test_unexpected_token_response_exits_4(sandbox, server, body, expected):
         ({"plain_body": "<html>"}, "initialize ohne lesbare Antwort"),
         ({"rpc_result": [1]}, "Feld result der Antwort auf initialize ist kein JSON-Objekt"),
         ({"raw_for": "tools/call", "sse_data": "[]"}, "SSE-Datenzeile der Antwort auf tools/call"),
-        ({"result_payload": {"runId": "run-1", "status": "Completed", "finalText": 42}}, "finalText von get_run_result ist kein Text"),
+        ({"result_payload": {"runId": "run-1", "status": "Completed", "finalText": 42, "outcome": "Converged"}},
+         "finalText von get_run_result ist kein Text"),
+        ({"final_outcome": "Weird"}, "outcome von get_run_status hat den unbekannten Wert 'Weird'"),
+        ({"final_outcome": 3}, "outcome von get_run_status ist kein Text"),
     ],
 )
 def test_unexpected_mcp_response_exits_4(sandbox, server, update, expected):
