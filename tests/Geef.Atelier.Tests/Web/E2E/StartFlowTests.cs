@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Geef.Atelier.Application.Orders;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Tests.Persistence;
@@ -62,7 +64,7 @@ public sealed class StartFlowTests(PlaywrightFixture pw, PostgresFixture pg) : I
 
             await page.Locator("[data-testid='source-card'][data-status='ready']").WaitForAsync(new LocatorWaitForOptions { Timeout = 15_000 });
             Assert.Contains("Read completely", await page.Locator("[data-testid='source-card-summary']").InnerTextAsync());
-            Assert.Contains("of 300,000 characters used completely", await page.Locator("[data-testid='start-budget']").InnerTextAsync());
+            Assert.Contains($"of {new SourceOptions().FullTextMaxChars.ToString("N0", CultureInfo.GetCultureInfo("en-US"))} characters used completely", await page.Locator("[data-testid='start-budget']").InnerTextAsync());
 
             await WaitEnabledAsync(page, "[data-testid='start-submit']");
             await page.ClickAsync("[data-testid='start-submit']");

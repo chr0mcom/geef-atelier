@@ -225,11 +225,26 @@ public sealed class StartPageTests : TestContext
         Assert.Contains("Too long to read completely", cut.FindAll("[data-testid='source-card-summary']")[1].TextContent);
     }
 
+    public static TheoryData<int, string, string> SumLineCases()
+    {
+        var defaults = new SourceOptions();
+        var full = defaults.FullTextMaxChars;
+        var map = defaults.MapMaxChars;
+        var part = full / 2 + 13_000;
+        return new TheoryData<int, string, string>
+        {
+            { part, $"Files: {EnglishGrouped(part)} of {EnglishGrouped(full)} characters used completely.", "ok" },
+            { full, $"Files: {EnglishGrouped(full)} of {EnglishGrouped(full)} characters used completely.", "ok" },
+            { full + 1, $"That is more than {EnglishGrouped(full)}, so the writer gets a table of contents", "map" },
+            { map, "so the writer gets a table of contents", "map" },
+            { map + 1, $"That is more than the limit of {EnglishGrouped(map)}.", "over" },
+        };
+    }
+
+    private static string EnglishGrouped(int value) => value.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("en-US"));
+
     [Theory]
-    [InlineData(163_000, "Files: 163,000 of 300,000 characters used completely.", "ok")]
-    [InlineData(300_000, "Files: 300,000 of 300,000 characters used completely.", "ok")]
-    [InlineData(300_001, "so the writer gets a table of contents", "map")]
-    [InlineData(900_001, "That is more than the limit of 900,000.", "over")]
+    [MemberData(nameof(SumLineCases))]
     public async Task TheSumLineSaysHowMuchOfTheFilesIsUsed(int chars, string expected, string tone)
     {
         var cut = RenderComponent<Start>();
@@ -239,6 +254,23 @@ public sealed class StartPageTests : TestContext
         var line = cut.Find("[data-testid='start-budget']");
         Assert.Contains(expected, line.TextContent);
         Assert.Contains($"start-budget--{tone}", line.ClassList);
+    }
+
+    [Fact]
+    public async Task TheSumLineFollowsTheConfiguredLimits()
+    {
+        Services.Configure<SourceOptions>(o =>
+        {
+            o.FullTextMaxChars = 1_000;
+            o.MapMaxChars = 5_000;
+        });
+        var cut = RenderComponent<Start>();
+
+        await UploadAsync(cut, "u1", OrderReceipts.Usable("a.md", chars: 1_200));
+
+        var line = cut.Find("[data-testid='start-budget']");
+        Assert.Contains("That is more than 1,000, so the writer gets a table of contents", line.TextContent);
+        Assert.Contains("start-budget--map", line.ClassList);
     }
 
     [Fact]
