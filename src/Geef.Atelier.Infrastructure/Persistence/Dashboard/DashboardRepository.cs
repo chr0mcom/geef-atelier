@@ -203,7 +203,9 @@ internal sealed class DashboardRepository(AtelierDbContext db) : IDashboardRepos
 
         var entries = raw.Select(x =>
         {
-            var display = SystemCrew.CrewTemplates.TryGetValue(x.Template, out var t) ? t.DisplayName : x.Template;
+            var display = SystemCrew.CrewTemplates.TryGetValue(x.Template, out var t) ? t.DisplayName
+                : SystemCrew.CodeOnlyTemplates.TryGetValue(x.Template, out var codeOnly) ? codeOnly.DisplayName
+                : x.Template;
             return new CrewDnaEntry(x.Template, display, x.Count, (double)x.Count / total);
         }).ToList();
 

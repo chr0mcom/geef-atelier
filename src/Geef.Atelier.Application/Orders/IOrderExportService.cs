@@ -17,6 +17,31 @@ public interface IOrderExportService
 public static class ExportFormatExtensions
 {
     /// <summary>Parses the route values <c>docx</c>, <c>pdf</c> and <c>md</c>.</summary>
-    public static bool TryParseRoute(string value, out ExportFormat format) =>
-        throw new NotImplementedException();
+    public static bool TryParseRoute(string value, out ExportFormat format)
+    {
+        switch (value?.Trim().ToLowerInvariant())
+        {
+            case "docx":
+                format = ExportFormat.Docx;
+                return true;
+            case "pdf":
+                format = ExportFormat.Pdf;
+                return true;
+            case "md":
+                format = ExportFormat.Markdown;
+                return true;
+            default:
+                format = default;
+                return false;
+        }
+    }
+
+    /// <summary>Returns the route value and file extension of <paramref name="format"/>.</summary>
+    public static string ToRouteValue(this ExportFormat format) => format switch
+    {
+        ExportFormat.Docx => "docx",
+        ExportFormat.Pdf => "pdf",
+        ExportFormat.Markdown => "md",
+        _ => throw new ArgumentOutOfRangeException(nameof(format), format, null),
+    };
 }

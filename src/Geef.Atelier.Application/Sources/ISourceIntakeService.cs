@@ -5,7 +5,7 @@ namespace Geef.Atelier.Application.Sources;
 /// <summary>One uploaded file as received. <see cref="DeclaredContentType"/> is only a hint and never trusted.</summary>
 public sealed record SourceUpload(string FileName, string? DeclaredContentType, long Length, Stream Content);
 
-/// <summary>Receipt for one file: what was read, whether it can be used and why not.</summary>
+/// <summary>Receipt for one file: what was read, whether it can be used and why not. <see cref="EstimatedTokens"/> is the estimated size for the writing model.</summary>
 public sealed record SourceReceipt(
     Guid? SourceId,
     string FileName,
@@ -20,7 +20,8 @@ public sealed record SourceReceipt(
     SourceBudgetClass BudgetClass,
     string Preview,
     IReadOnlyList<SourceWarning> Warnings,
-    string? Reason);
+    string? Reason,
+    int EstimatedTokens = 0);
 
 /// <summary>Reads, checks and stores one file per call and answers with a receipt. Unusable files are not stored. Files are always bound to <c>ownerUsername</c>.</summary>
 public interface ISourceIntakeService

@@ -8,7 +8,9 @@ using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Tools;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Persistence;
+using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Persistence.Crew;
+using Geef.Atelier.Core.Persistence.Orders;
 using Geef.Atelier.Core.Persistence.Tools;
 using Microsoft.Extensions.Logging;
 
@@ -24,7 +26,8 @@ internal sealed class RunService(
     IRunWarningSink                       warningSink,
     IRunWarningRepository                 warningRepository,
     IGroundingConsultationRepository?     groundingConsultationRepository = null,
-    IToolInvocationRepository?            toolInvocationRepository = null) : IRunService
+    IToolInvocationRepository?            toolInvocationRepository = null,
+    IOrderRepository?                     orderRepository = null) : IRunService
 {
     internal const string AttachmentUploadFailedMessage = "The attached files could not be prepared. Please submit the task again.";
 
@@ -104,6 +107,9 @@ internal sealed class RunService(
             effectiveBriefing, normalizedConfig, request.CreatedByUser,
             resolvedTemplateName, hasAttachments ? null : snapshotJson, effectiveKind,
             request.ParentCompositionRunId, cancellationToken);
+
+        if (effectiveKind != RunKind.Learning)
+            await LinkToOrderAsync(runId, request.Entry, cancellationToken);
 
         await ReportAssignmentWarningsAsync(runId, resolved.Warnings);
 
@@ -241,7 +247,7 @@ internal sealed class RunService(
             }
         }
 
-        return await persistence.CreateResumedRunAsync(
+        var resumedId = await persistence.CreateResumedRunAsync(
             details.Run.BriefingText,
             details.Run.ConfigJson,
             details.Run.CreatedByUser,
@@ -251,6 +257,25 @@ internal sealed class RunService(
             seedDraftText,
             details.Run.Kind,
             cancellationToken);
+
+        if (details.Run.Kind != RunKind.Learning)
+            await LinkToOrderAsync(resumedId, OrderEntry.Legacy, cancellationToken);
+
+        return resumedId;
+    }
+
+    private async Task LinkToOrderAsync(Guid runId, OrderEntry entry, CancellationToken cancellationToken)
+    {
+        if (orderRepository is null)
+            return;
+        try
+        {
+            await orderRepository.LinkLegacyRunAsync(runId, entry, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError("Run {RunId} could not be linked to an order; it runs without one: {Error}", runId, ex.ToRedactedLogText());
+        }
     }
 
     /// <inheritdoc/>
@@ -324,7 +349,11 @@ internal sealed class RunService(
         if (run.Status is RunStatus.Pending or RunStatus.Running)
             throw new InvalidOperationException("Running or pending runs cannot be deleted. Cancel the run first.");
 
+        var link = orderRepository is null ? null : await orderRepository.GetLinkForRunAsync(runId, cancellationToken);
         await repository.DeleteAsync(runId, cancellationToken);
+
+        if (link is { OrderId: var orderId } && (await orderRepository!.ListRunsAsync(orderId, cancellationToken)).Count == 0)
+            await orderRepository.DeleteAsync(orderId, cancellationToken);
         return true;
     }
 }

@@ -53,6 +53,7 @@ services:
     volumes:
       - geef-atelier-exports:/app/exports
       - geef-atelier-dpkeys:/app/dataprotection-keys
+      - geef-atelier-sources:/app/sources
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
@@ -174,3 +175,4 @@ volumes:
   geef-atelier-cli-auth:
   geef-atelier-exports:
   geef-atelier-dpkeys:
+  geef-atelier-sources:
