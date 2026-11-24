@@ -29,6 +29,7 @@ public sealed class OrderDetailTests : TestContext
         Services.AddSingleton<IOrderService>(_orders);
         Services.AddSingleton<IRunUpdateFeed>(_feed);
         Services.AddScoped<CircuitDataGate>();
+        Services.AddOptions();
         JSInterop.Mode = JSRuntimeMode.Loose;
         _auth = this.AddTestAuthorization();
         _auth.SetAuthorized("alice");
