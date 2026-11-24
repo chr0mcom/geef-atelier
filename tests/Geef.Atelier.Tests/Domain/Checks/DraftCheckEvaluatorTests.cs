@@ -77,11 +77,11 @@ public sealed class DraftCheckEvaluatorTests
     [InlineData("Sure! Here's your post:")]
     [InlineData("Here's what I learned from ten years in sales:")]
     [InlineData("Gerne teile ich heute drei Erkenntnisse aus meinem ersten Jahr:")]
-    public void A_possible_preamble_is_a_note_that_never_blocks(string firstLine)
+    public void A_possible_preamble_is_an_open_point_that_never_blocks(string firstLine)
     {
         var result = Single(DraftCheckEvaluator.Evaluate(firstLine + "\n\nSehr geehrte Frau Muster, vielen Dank für Ihre Nachricht.", OrderConstraints.None), DraftCheckCodes.Preamble);
 
-        Assert.True(result.Passed);
+        Assert.False(result.Passed);
         Assert.False(result.Blocking);
         Assert.StartsWith("The text may start with a remark to the reader", result.Message);
     }
@@ -111,6 +111,20 @@ public sealed class DraftCheckEvaluatorTests
     [InlineData(LengthKind.Stated, 300, 300, 254, false)]
     [InlineData(LengthKind.Stated, 300, 300, 345, true)]
     [InlineData(LengthKind.Stated, 300, 300, 346, false)]
+    [InlineData(LengthKind.AtMost, null, 5, 5, true)]
+    [InlineData(LengthKind.AtMost, null, 5, 6, false)]
+    [InlineData(LengthKind.AtMost, null, 6, 7, false)]
+    [InlineData(LengthKind.AtMost, null, 49, 49, true)]
+    [InlineData(LengthKind.AtMost, null, 49, 50, false)]
+    [InlineData(LengthKind.AtMost, null, 50, 51, true)]
+    [InlineData(LengthKind.AtLeast, 20, null, 20, true)]
+    [InlineData(LengthKind.AtLeast, 20, null, 19, false)]
+    [InlineData(LengthKind.AtLeast, 100, null, 98, true)]
+    [InlineData(LengthKind.AtLeast, 100, null, 97, false)]
+    [InlineData(LengthKind.Range, 10, 20, 9, false)]
+    [InlineData(LengthKind.Range, 10, 20, 10, true)]
+    [InlineData(LengthKind.Range, 10, 20, 21, true)]
+    [InlineData(LengthKind.Range, 10, 20, 22, false)]
     public void Length_tolerances_follow_the_kind(LengthKind kind, int? min, int? max, int words, bool passes)
     {
         var result = Single(
@@ -218,6 +232,9 @@ public sealed class DraftCheckEvaluatorTests
     [InlineData("12. Mai\n1. März\nZwei Termine stehen fest.")]
     [InlineData("1. Advent: Wir laden Sie herzlich zu unserem Adventskaffee ein.")]
     [InlineData("Ein Absatz ohne Liste. Im Jahr 2024 - so heißt es - war alles gut.")]
+    [InlineData("Erster Teil der Geschichte.\n\n* * *\n\nZweiter Teil der Geschichte.")]
+    [InlineData("Erster Teil.\n- - -\nZweiter Teil.\n***\nDritter Teil.")]
+    [InlineData("Erster Teil.\n•••\nZweiter Teil.")]
     public void Dates_and_single_numbered_lines_are_not_lists(string draft)
     {
         Assert.True(Single(DraftCheckEvaluator.Evaluate(draft, Forbid(ForbiddenPattern.Lists)), DraftCheckCodes.Lists).Passed);
@@ -228,6 +245,7 @@ public sealed class DraftCheckEvaluatorTests
     [InlineData("Drei Gründe:\n\n1) Erstens das.\n\n2) Zweitens dies.")]
     [InlineData("Drei Gründe:\n- Erstens das.")]
     [InlineData("Three reasons:\n• First this.\n• Then that.")]
+    [InlineData("Teil eins.\n* * *\n* Ein Punkt.")]
     public void Real_lists_are_found(string draft)
     {
         Assert.False(Single(DraftCheckEvaluator.Evaluate(draft, Forbid(ForbiddenPattern.Lists)), DraftCheckCodes.Lists).Passed);

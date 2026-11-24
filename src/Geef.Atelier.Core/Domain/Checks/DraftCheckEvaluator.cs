@@ -16,6 +16,9 @@ public static partial class DraftCheckEvaluator
     [GeneratedRegex(@"^\s*[-*•]\s+", RegexOptions.CultureInvariant)]
     private static partial Regex BulletLinePattern();
 
+    [GeneratedRegex(@"^\s*(?:[-*•_]\s*){3,}$", RegexOptions.CultureInvariant)]
+    private static partial Regex SeparatorLinePattern();
+
     [GeneratedRegex(@"^\s*\d+[.)]\s+", RegexOptions.CultureInvariant)]
     private static partial Regex NumberedLinePattern();
 
@@ -34,8 +37,9 @@ public static partial class DraftCheckEvaluator
     /// <summary>
     /// Runs every check that applies and returns one result per check. The empty-text check always runs and fails only
     /// for a draft without a single word; a short text (a slogan, a subject line) is not empty. A remark to the reader
-    /// before the text is never blocking: it is reported as a note, because a first line such as "Here's what I
-    /// learned:" can just as well be the opening of the text.
+    /// before the text is never blocking, because a first line such as "Here's what I learned:" can just as well be the
+    /// opening of the text: it does not pass but is not blocking, so it leads to no correction and is shown to the
+    /// person as an open point.
     /// </summary>
     public static IReadOnlyList<DraftCheckResult> Evaluate(string draft, OrderConstraints constraints)
     {
@@ -50,7 +54,7 @@ public static partial class DraftCheckEvaluator
 
         var firstLine = text.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.Length > 0) ?? string.Empty;
         results.Add(PreamblePattern().IsMatch(firstLine)
-            ? new DraftCheckResult(DraftCheckCodes.Preamble, true, false,
+            ? new DraftCheckResult(DraftCheckCodes.Preamble, false, false,
                 $"The text may start with a remark to the reader (\"{Shorten(firstLine)}\"). Remove it before you send the text if it is not part of it.", null)
             : new DraftCheckResult(DraftCheckCodes.Preamble, true, true, "The text starts directly.", null));
 
@@ -165,14 +169,18 @@ public static partial class DraftCheckEvaluator
             $"The text has {Format(actual)} {unitName}. The request asks for {asked} (\"{length.Quote}\"). {fix}", length.Quote);
     }
 
-    /// <summary>The accepted range of a length constraint after its tolerance; <c>null</c> means open.</summary>
+    /// <summary>
+    /// The accepted range of a length constraint after its tolerance; <c>null</c> means open. The tolerance never adds
+    /// a whole word or character that it does not cover: the upper bound is rounded down and the lower bound up, so
+    /// "at most 5 words" accepts 5 and "at least 20 words" asks for 20.
+    /// </summary>
     public static (int? Low, int? High) AcceptedBounds(LengthConstraint length) => length.Kind switch
     {
-        LengthKind.AtMost => (null, Ceil(length.Max, 1.02)),
-        LengthKind.AtLeast => (Floor(length.Min, 0.98), null),
-        LengthKind.About => (Floor(length.Min, 0.80), Ceil(length.Max, 1.20)),
-        LengthKind.Stated => (Floor(length.Min, 0.85), Ceil(length.Max, 1.15)),
-        _ => (Floor(length.Min, 0.95), Ceil(length.Max, 1.05)),
+        LengthKind.AtMost => (null, Down(length.Max, 102)),
+        LengthKind.AtLeast => (Up(length.Min, 98), null),
+        LengthKind.About => (Up(length.Min, 80), Down(length.Max, 120)),
+        LengthKind.Stated => (Up(length.Min, 85), Down(length.Max, 115)),
+        _ => (Up(length.Min, 95), Down(length.Max, 105)),
     };
 
     private static string DescribeRequest(LengthConstraint length, string unitName) => length.Kind switch
@@ -208,7 +216,8 @@ public static partial class DraftCheckEvaluator
 
     /// <summary>
     /// True when the text has a bullet line, or at least two numbered lines in a row (blank lines in between do not
-    /// count). A line that starts with a date such as "24. November 2026" or "3. May 2026" is not a numbered line.
+    /// count). A line that starts with a date such as "24. November 2026" or "3. May 2026" is not a numbered line, and a
+    /// separator such as "* * *" or "- - -" is not a bullet line.
     /// </summary>
     private static bool ContainsList(string text)
     {
@@ -217,6 +226,11 @@ public static partial class DraftCheckEvaluator
         {
             if (line.Trim().Length == 0)
                 continue;
+            if (SeparatorLinePattern().IsMatch(line))
+            {
+                previousNumbered = false;
+                continue;
+            }
             if (BulletLinePattern().IsMatch(line))
                 return true;
             var numbered = NumberedLinePattern().IsMatch(line) && !DateLinePattern().IsMatch(line);
@@ -265,11 +279,11 @@ public static partial class DraftCheckEvaluator
         return false;
     }
 
-    private static int? Floor(int? value, double factor) =>
-        value is null ? null : (int)Math.Floor(value.Value * factor);
+    private static int? Down(int? value, int percent) =>
+        value is null ? null : (int)Math.Min(int.MaxValue, (long)value.Value * percent / 100);
 
-    private static int? Ceil(int? value, double factor) =>
-        value is null ? null : (int)Math.Ceiling(value.Value * factor);
+    private static int? Up(int? value, int percent) =>
+        value is null ? null : (int)Math.Min(int.MaxValue, ((long)value.Value * percent + 99) / 100);
 
     private static string Format(int? value) =>
         value?.ToString("N0", CultureInfo.InvariantCulture) ?? "?";

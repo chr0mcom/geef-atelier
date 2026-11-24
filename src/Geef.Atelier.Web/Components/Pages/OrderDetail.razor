@@ -123,7 +123,7 @@
                 @if (_result is { } checks && _view.Display.IsFinished)
                 {
                     <h3>Automatic checks</h3>
-                    <p data-testid="order-how-checks">@(checks.OpenChecks.Count switch { 0 => "All automatic checks passed.", 1 => "One check is still open – see “Open points”.", var n => $"{n} checks are still open – see “Open points”." })</p>
+                    <p data-testid="order-how-checks">@(checks.OpenChecks.Count(c => c.Blocking) switch { 0 => "All automatic checks passed.", 1 => "One check is still open – see “Open points”.", var n => $"{n} checks are still open – see “Open points”." })</p>
                 }
 
                 @if (_view.Runs.Count > 0)

@@ -144,6 +144,21 @@ public sealed class OrderDetailTests : TestContext
     }
 
     [Fact]
+    public void AHintThatNeverBlocksIsShownApartFromTheOpenChecks()
+    {
+        var view = _orders.Add("alice", OrderTestData.View(OrderDisplayState.Delivered));
+        _orders.SetResult(OrderTestData.Result(view,
+            openChecks: [new DraftCheckResult(DraftCheckCodes.Preamble, false, false, "The text may start with a remark to the reader (\"Gerne, hier ist der Beitrag:\").", null)]));
+
+        var cut = Render(view.OrderId);
+
+        Assert.Contains("Gerne, hier ist der Beitrag:", cut.Find("[data-testid='order-hint']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='order-open-check']"));
+        Assert.DoesNotContain("may not yet do everything", cut.Markup);
+        Assert.Contains("All automatic checks passed.", cut.Find("[data-testid='order-how-checks']").TextContent);
+    }
+
+    [Fact]
     public void WithoutOpenPointsThereIsNoOpenPointsBlockAndNoInventedAssumptions()
     {
         var view = _orders.Add("alice", OrderTestData.View(OrderDisplayState.Delivered));
