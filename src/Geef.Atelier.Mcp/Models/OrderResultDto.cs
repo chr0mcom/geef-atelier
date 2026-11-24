@@ -11,6 +11,7 @@ namespace Geef.Atelier.Mcp.Models;
 /// <param name="SourcesUsed">Files that went into the text and how.</param>
 /// <param name="Warnings">Problems the order worked around; empty when none.</param>
 /// <param name="Note">A plain-English hint on what to tell the person or what to do next.</param>
+/// <param name="Assumptions">What the writer assumed because the request did not say it; <c>null</c> when the request was not analysed.</param>
 public sealed record OrderResultDto(
     string OrderId,
     string State,
@@ -21,4 +22,5 @@ public sealed record OrderResultDto(
     IReadOnlyList<string> OpenChecks,
     IReadOnlyList<OrderSourceUsageDto> SourcesUsed,
     IReadOnlyList<RunWarningDto> Warnings,
-    string? Note);
+    string? Note,
+    IReadOnlyList<AssumptionDto>? Assumptions = null);
