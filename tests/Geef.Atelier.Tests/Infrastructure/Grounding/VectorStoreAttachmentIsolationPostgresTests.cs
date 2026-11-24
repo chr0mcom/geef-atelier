@@ -22,8 +22,9 @@ namespace Geef.Atelier.Tests.Infrastructure.Grounding;
 /// Q1 and B1 (Etappe 0 reviews): whatever the <c>Scope</c> setting of a vector-store profile says, the attachments of
 /// another user's run are never returned. <c>both</c> returns the shared documents plus the attachments of the run and
 /// its resumed-from parent; a missing setting and <c>global</c> return the shared documents only; an unknown value falls
-/// back to the shared documents and records a run warning. Two users, real Postgres with pgvector, the real provider,
-/// lineage and repository.
+/// back to the shared documents and records a run warning. The profile always sets a tag filter and, as in production,
+/// attachments are stored without tags: the filter narrows the shared documents only and never hides an attachment.
+/// Two users, real Postgres with pgvector, the real provider, lineage and repository.
 /// </summary>
 [Collection("Postgres")]
 public sealed class VectorStoreAttachmentIsolationPostgresTests(PostgresFixture fixture)
@@ -33,9 +34,11 @@ public sealed class VectorStoreAttachmentIsolationPostgresTests(PostgresFixture 
     private const string SharedText = "SHARED-KNOWLEDGE";
     private const string AliceOwn = "ALICE-OWN-ATTACHMENT";
     private const string AliceParent = "ALICE-PARENT-ATTACHMENT";
+    private const string SharedOtherTag = "SHARED-WITH-ANOTHER-TAG";
 
     private readonly InMemoryRunWarnings _warnings = new();
     private readonly string _tag = Guid.NewGuid().ToString("N");
+    private readonly string _otherTag = Guid.NewGuid().ToString("N");
 
     [Theory]
     [InlineData(null)]
@@ -50,7 +53,7 @@ public sealed class VectorStoreAttachmentIsolationPostgresTests(PostgresFixture 
         var result = await EnrichAsync(aliceRun, scope);
 
         Assert.Contains(SharedText, result.EnrichedContext);
-        AssertNoAttachments(result, AliceOwn, AliceParent, BobSecret);
+        AssertNoAttachments(result, AliceOwn, AliceParent, BobSecret, SharedOtherTag);
         Assert.Empty(_warnings.All);
     }
 
@@ -65,7 +68,7 @@ public sealed class VectorStoreAttachmentIsolationPostgresTests(PostgresFixture 
 
         Assert.Contains(AliceOwn, result.EnrichedContext);
         Assert.Contains(AliceParent, result.EnrichedContext);
-        AssertNoAttachments(result, BobSecret, SharedText);
+        AssertNoAttachments(result, BobSecret, SharedText, SharedOtherTag);
         Assert.Empty(_warnings.All);
     }
 
@@ -81,14 +84,38 @@ public sealed class VectorStoreAttachmentIsolationPostgresTests(PostgresFixture 
         Assert.Contains(SharedText, result.EnrichedContext);
         Assert.Contains(AliceOwn, result.EnrichedContext);
         Assert.Contains(AliceParent, result.EnrichedContext);
-        AssertNoAttachments(result, BobSecret);
+        AssertNoAttachments(result, BobSecret, SharedOtherTag);
         Assert.Empty(_warnings.All);
 
         var bobResult = await EnrichAsync(bobRun, scope);
 
         Assert.Contains(BobSecret, bobResult.EnrichedContext);
         Assert.Contains(SharedText, bobResult.EnrichedContext);
-        AssertNoAttachments(bobResult, AliceOwn, AliceParent);
+        AssertNoAttachments(bobResult, AliceOwn, AliceParent, SharedOtherTag);
+    }
+
+    [Theory]
+    [InlineData("both")]
+    [InlineData("run-local")]
+    public async Task TagFilterNeverHidesUntaggedAttachmentsButStillNarrowsSharedDocuments(string scope)
+    {
+        var (aliceRun, _) = await SeedTwoUsersAsync();
+
+        var withFilter = await EnrichAsync(aliceRun, scope);
+
+        Assert.Contains(AliceOwn, withFilter.EnrichedContext);
+        Assert.Contains(AliceParent, withFilter.EnrichedContext);
+        AssertNoAttachments(withFilter, BobSecret, SharedOtherTag);
+
+        var otherTagResult = await EnrichAsync(aliceRun, scope, tagFilter: $"{_otherTag}, no-such-tag");
+
+        Assert.Contains(AliceOwn, otherTagResult.EnrichedContext);
+        Assert.Contains(AliceParent, otherTagResult.EnrichedContext);
+        AssertNoAttachments(otherTagResult, BobSecret, SharedText);
+        if (scope == "both")
+            Assert.Contains(SharedOtherTag, otherTagResult.EnrichedContext);
+        else
+            AssertNoAttachments(otherTagResult, SharedOtherTag);
     }
 
     [Fact]
@@ -102,7 +129,7 @@ public sealed class VectorStoreAttachmentIsolationPostgresTests(PostgresFixture 
         var result = await EnrichAsync(carolRun, "both");
 
         Assert.Contains(SharedText, result.EnrichedContext);
-        AssertNoAttachments(result, AliceOwn, AliceParent, BobSecret);
+        AssertNoAttachments(result, AliceOwn, AliceParent, BobSecret, SharedOtherTag);
     }
 
     [Theory]
@@ -152,9 +179,9 @@ public sealed class VectorStoreAttachmentIsolationPostgresTests(PostgresFixture 
         Assert.Empty(results);
     }
 
-    private async Task<GroundingResult> EnrichAsync(Guid runId, string? scope)
+    private async Task<GroundingResult> EnrichAsync(Guid runId, string? scope, string? tagFilter = null)
     {
-        var settings = new Dictionary<string, string> { ["TopK"] = "50", ["TagFilter"] = _tag };
+        var settings = new Dictionary<string, string> { ["TopK"] = "50", ["TagFilter"] = tagFilter ?? _tag };
         if (scope is not null)
             settings["Scope"] = scope;
         return await BuildProvider().EnrichAsync("anything", Profile(settings), runId, CancellationToken.None);
@@ -190,18 +217,19 @@ public sealed class VectorStoreAttachmentIsolationPostgresTests(PostgresFixture 
             await db.SaveChangesAsync();
         }
 
-        await SeedDocumentAsync(KnowledgeScope.RunLocal, bobRun, BobSecret);
-        await SeedDocumentAsync(KnowledgeScope.Global, null, SharedText);
-        await SeedDocumentAsync(KnowledgeScope.RunLocal, aliceRun, AliceOwn);
-        await SeedDocumentAsync(KnowledgeScope.RunLocal, aliceParent, AliceParent);
+        await SeedDocumentAsync(KnowledgeScope.RunLocal, bobRun, BobSecret, []);
+        await SeedDocumentAsync(KnowledgeScope.Global, null, SharedText, [_tag]);
+        await SeedDocumentAsync(KnowledgeScope.Global, null, SharedOtherTag, [_otherTag]);
+        await SeedDocumentAsync(KnowledgeScope.RunLocal, aliceRun, AliceOwn, []);
+        await SeedDocumentAsync(KnowledgeScope.RunLocal, aliceParent, AliceParent, []);
         return (aliceRun, bobRun);
     }
 
-    private async Task SeedDocumentAsync(KnowledgeScope scope, Guid? runId, string content)
+    private async Task SeedDocumentAsync(KnowledgeScope scope, Guid? runId, string content, IReadOnlyList<string> tags)
     {
         await using var db = fixture.NewContext();
         var document = new KnowledgeDocument(Guid.NewGuid(), content, "", "doc.md", "text/markdown", content.Length, content,
-            [_tag], "stub", Dimensions, 1, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, scope, runId);
+            tags, "stub", Dimensions, 1, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, scope, runId);
         await new KnowledgeDocumentRepository(db).CreateAsync(document, CancellationToken.None);
         await new VectorSearchRepository(db).CreateChunkAsync(
             new KnowledgeDocumentChunk(Guid.NewGuid(), document.Id, 0, content, Vector(), 1, DateTimeOffset.UtcNow), CancellationToken.None);

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Geef.Atelier.Application.Security;
 using Geef.Atelier.Application.Tools;
 using Geef.Atelier.Core.Domain.Mcp;
 using Geef.Atelier.Core.Domain.Tools;
@@ -7,6 +8,7 @@ using Geef.Atelier.Core.Persistence.Tools;
 using Geef.Atelier.Infrastructure.Mcp;
 using Geef.Atelier.Infrastructure.Tools;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using ModelContextProtocol.Client;
 
@@ -225,6 +227,124 @@ public sealed class ToolExecutorTests
         var invocations = await repo.GetByRunIdAsync(ctx.RunId);
         Assert.Single(invocations);
         Assert.Equal(ToolInvocationOutcome.Failed, invocations[0].Outcome);
+    }
+
+    private const string LeakedSecret = "abcd1234efgh5678";
+
+    [Fact]
+    public async Task ExecuteAsync_McpCallThrows_ReturnsAFixedSentenceAndLogsOnlyTheRedactedException()
+    {
+        var serverId = Guid.NewGuid();
+        var config = new McpServerConfig { Id = serverId, Name = "server", Url = "http://localhost:9999", IsActive = true };
+        var tool = MakeTool(ToolType.McpTool, new Dictionary<string, string>
+        {
+            [ToolDefinitionSettingsKeys.McpServerId]     = serverId.ToString(),
+            [ToolDefinitionSettingsKeys.McpOriginalName] = "some-tool",
+        });
+        var logger = new CapturingToolExecutorLogger();
+        var executor = new ToolExecutor(
+            new InMemoryToolInvocationRepository().ToScopeFactory(), new NoOpHttpClientFactory(),
+            new FixedMcpServerConfigRepository(config),
+            new ThrowingMcpClientFactory(new HttpRequestException($"bad credentials supplied: token={LeakedSecret}")),
+            logger);
+
+        var result = await executor.ExecuteAsync(tool, "{}", MakeContext());
+
+        Assert.Equal(ToolExecutor.McpToolFailedMessage, result.Error);
+        logger.AssertRedacted();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WebSearchThrows_ReturnsAFixedSentenceAndLogsOnlyTheRedactedException()
+    {
+        var tool = MakeTool(ToolType.WebSearch) with { SecretRef = "TAVILY_API_KEY" };
+        var logger = new CapturingToolExecutorLogger();
+        var executor = new ToolExecutor(
+            new InMemoryToolInvocationRepository().ToScopeFactory(),
+            new ThrowingHttpClientFactory(new HttpRequestException($"upstream said key={LeakedSecret}")),
+            new NullMcpServerConfigRepository(), new NullMcpClientFactory(), logger, new FixedKeyPolicy());
+
+        var result = await executor.ExecuteAsync(tool, """{"query":"test"}""", MakeContext());
+
+        Assert.Equal(ToolExecutor.WebSearchFailedMessage, result.Error);
+        logger.AssertRedacted();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UnexpectedException_ReturnsAFixedSentenceAndLogsOnlyTheRedactedException()
+    {
+        var tool = MakeTool(ToolType.McpTool, new Dictionary<string, string>
+        {
+            [ToolDefinitionSettingsKeys.McpServerId]     = Guid.NewGuid().ToString(),
+            [ToolDefinitionSettingsKeys.McpOriginalName] = "some-tool",
+        });
+        var logger = new CapturingToolExecutorLogger();
+        var repo = new InMemoryToolInvocationRepository();
+        var executor = new ToolExecutor(
+            repo.ToScopeFactory(), new NoOpHttpClientFactory(),
+            new ThrowingMcpServerConfigRepository(new InvalidOperationException($"connection failed: password={LeakedSecret}")),
+            new NullMcpClientFactory(), logger);
+        var ctx = MakeContext();
+
+        var result = await executor.ExecuteAsync(tool, "{}", ctx);
+
+        Assert.Equal(ToolExecutor.ToolFailedMessage, result.Error);
+        logger.AssertRedacted();
+        Assert.Contains(logger.Entries, e => e.Message.Contains(ctx.RunId.ToString(), StringComparison.Ordinal));
+        Assert.Equal(ToolInvocationOutcome.Failed, Assert.Single(await repo.GetByRunIdAsync(ctx.RunId)).Outcome);
+    }
+
+    private sealed class CapturingToolExecutorLogger : ILogger<ToolExecutor>
+    {
+        public List<(LogLevel Level, string Message, Exception? Exception)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Entries.Add((logLevel, formatter(state, exception), exception));
+
+        public void AssertRedacted()
+        {
+            var failure = Assert.Single(Entries, e => e.Level >= LogLevel.Warning);
+            Assert.Null(failure.Exception);
+            Assert.DoesNotContain(LeakedSecret, failure.Message);
+            Assert.Contains(Geef.Atelier.Core.Domain.Warnings.SecretRedactionExtensions.Placeholder, failure.Message);
+        }
+    }
+
+    private sealed class ThrowingMcpClientFactory(Exception exception) : IAtelierMcpClientFactory
+    {
+        public Task<McpClient> ConnectAsync(McpServerConfig config, CancellationToken ct = default) => throw exception;
+    }
+
+    private sealed class ThrowingHttpClientFactory(Exception exception) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) =>
+            new(new ThrowingHandler(exception)) { BaseAddress = new Uri("http://localhost.invalid/") };
+
+        private sealed class ThrowingHandler(Exception exception) : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+                throw exception;
+        }
+    }
+
+    private sealed class FixedKeyPolicy : IEnvReferencePolicy
+    {
+        public bool IsAllowed(string? name) => true;
+        public void EnsureAllowed(string? name, string field) { }
+        public string? Read(string? name, string usage) => "test-key";
+    }
+
+    private sealed class ThrowingMcpServerConfigRepository(Exception exception) : IMcpServerConfigRepository
+    {
+        public Task<IReadOnlyList<McpServerConfig>> GetAllAsync(CancellationToken ct = default) => throw exception;
+        public Task<IReadOnlyList<McpServerConfig>> GetActiveAsync(CancellationToken ct = default) => throw exception;
+        public Task<McpServerConfig?> GetByIdAsync(Guid id, CancellationToken ct = default) => throw exception;
+        public Task UpsertAsync(McpServerConfig config, CancellationToken ct = default) => Task.CompletedTask;
+        public Task DeleteAsync(Guid id, CancellationToken ct = default) => Task.CompletedTask;
     }
 }
 

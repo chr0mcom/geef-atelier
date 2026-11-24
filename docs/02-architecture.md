@@ -154,7 +154,7 @@ Problems a run worked around instead of stopping (D-067). Deleted together with 
 | RunId | uuid (FK→Runs) | index `IX_RunWarnings_RunId` |
 | Iteration | int | nullable; iteration in which the problem occurred |
 | Source | varchar(100) | `grounding`, `review`, `model-assignment`, `llm`, `finalizer` or `run` (constants in `RunWarningSources`) |
-| Code | varchar(100) | stable machine-readable code, e.g. `grounding.provider_skipped`, `grounding.scope_unknown`, `review.reviewer_failed`, `llm.failover`, `finalizer.failed`, `run.result_not_saved` (constants in `RunWarningCodes`) |
+| Code | varchar(100) | stable machine-readable code, e.g. `grounding.provider_skipped`, `grounding.scope_unknown`, `review.reviewer_failed`, `llm.failover`, `finalizer.failed`, `run.result_not_saved`, `run.restarted_while_finishing` (constants in `RunWarningCodes`) |
 | Message | text | short plain-English explanation for the user |
 | CreatedAt | timestamptz | |
 
@@ -519,9 +519,18 @@ findings of the last iteration are stored as well, so the run detail page and MC
 `Status` and `Outcome` can briefly disagree: the event sink sets `Completed` (or `Failed`) and the text
 before the finalizers run, `Outcome` follows only afterwards. Clients therefore wait for `Outcome`, not for
 a terminal status; `scripts/atelier-smoke.sh` and the `atelier` arm of `tools/Eval` do so. If the service
-is stopped hard during the finalizers, the crash recovery at the next start also sets an outcome for runs
-whose status is already terminal but whose `Outcome` is still empty, so no client waits forever. A
-cancellation or service stop during the finalizers ends as `Aborted` without "finalizer failed" warnings.
+is stopped hard during the finalizers, the crash recovery at the next start sets an outcome for runs whose
+status is already terminal but whose `Outcome` is still empty, so no client waits forever: with a text
+`Converged` (status `Completed`) or `DeliveredWithOpenPoints`, without one `Failed`, plus the warning
+`run.restarted_while_finishing`. Because older runs (before Step47) have no `Outcome` either, only runs that
+completed after the earliest run with an `Outcome` are repaired; as long as no run has an `Outcome`, nothing
+is changed. The repair runs after the reset of stale `Running` runs and on its own, so a failure in it never
+blocks that reset.
+
+A cancellation or service stop during the finalizers ends with `Outcome = Aborted`, without "finalizer
+failed" warnings. `Outcome` is what counts here: the status of a converged run stays `Completed`; a run
+that was `Failed` (not converged) becomes `Aborted`. The results of finalizers that finished before the stop
+are kept (changed text, their artifacts, costs); the remaining finalizers do not run.
 
 Only MCP returns `Outcome` (`get_run_status`, `get_run_result`). The web interface does not read it: the
 "Warnings" block on the run detail page (`RunWarningsBlock`) chooses its intro sentence from `Status` and
@@ -540,7 +549,9 @@ A run records every problem it works around as a warning in `RunWarnings`, for e
 `IRunWarningSink` (Core contract, Infrastructure implementation `RunWarningSink`) writes each warning
 in its own short-lived database scope; a failed write is logged and never stops the run. It is a required
 dependency everywhere it is used (run service, orchestrator, pipeline factory, grounding step), so a missing
-registration fails at start instead of silently dropping warnings. The LLM client reports failovers through
+registration fails at start instead of silently dropping warnings. The same holds for the grounding provider
+factory in the orchestrator; the pipeline factory refuses to build a crew with sources when no grounding
+provider factory is passed. The LLM client reports failovers through
 the ambient `RunWarningScope`, which the orchestrator opens per run.
 
 Warnings appear on the run detail page in a "Warnings" block (only when there are any) and in the MCP
@@ -548,10 +559,15 @@ fields `warnings` and `outcome` of `get_run_status` and `get_run_result`
 ([09-endpoint-reference](09-endpoint-reference.md#run-status-and-result-warnings-and-outcome)).
 Warning texts and the error texts stored at the run (`ErrorMessage`, status messages) are fixed, short,
 plain sentences for the user, with display names where needed; technical details such as exception texts,
-host names, key names or upstream error bodies go only to the log. Before anything technical is logged or
+host names, key names or upstream error bodies go only to the log. The reason a run stopped before all checks
+passed is one fixed sentence per stop reason (`RunStopMessageExtensions`), and the skip reasons of source sorting
+(`GroundingRefiner`) are fixed sentences too. Before anything technical is logged or
 stored, `SecretRedactionExtensions` (Core, `RedactSecrets`, `ToRedactedLogText`) replaces credential-like
 fragments (known key formats, bearer tokens, `name=value` pairs with a secret-sounding name, long opaque
-tokens) with `[redacted]`.
+tokens) with `[redacted]`. A name counts as secret-sounding when its last part is a word such as `key`, `token`,
+`secret` or `password` (also `OPENAI_API_KEY`, `x-api-key`, `apiKey`); its value is removed only when it looks
+like a secret (at least 12 characters without whitespace with a letter and a digit) or when it is a URL query
+parameter. Ordinary sentences such as "Key: Strategic goals" or "Basic research" stay unchanged.
 
 ### Fail loud instead of silent
 

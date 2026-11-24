@@ -45,8 +45,8 @@ internal sealed class ExternalSinkFinalizerExecutor(
         }
         catch (Exception ex)
         {
-            logger.LogError("ExternalSink failed for profile {Profile} (kind={Kind}): {Error}",
-                profile.Name, sinkKind, ex.ToRedactedLogText());
+            logger.LogError("ExternalSink failed for run {RunId}, profile {Profile} (kind={Kind}): {Error}",
+                context.RunId, profile.Name, sinkKind, ex.ToRedactedLogText());
             artifact = StatusArtifact(context.RunId, profile.Name, "The text could not be delivered.");
         }
 

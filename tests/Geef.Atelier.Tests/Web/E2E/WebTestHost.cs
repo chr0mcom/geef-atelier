@@ -25,6 +25,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Tests.Web.E2E;
@@ -100,6 +101,9 @@ internal sealed class WebTestHost : IAsyncDisposable
             o.MaxConcurrentRuns          = 10;
             o.CancellationPollingInterval = TimeSpan.FromMilliseconds(200);
         });
+        builder.Services.TryAddSingleton<Geef.Atelier.Application.Crew.Grounding.IGroundingProviderFactory>(sp =>
+            new Geef.Atelier.Infrastructure.Grounding.GroundingProviderFactory(
+                sp.GetServices<Geef.Atelier.Application.Crew.Grounding.IGroundingProvider>()));
         builder.Services.AddHostedService<RunOrchestratorService>();
 
         // SignalR + Notifier

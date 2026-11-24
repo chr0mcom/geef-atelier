@@ -110,7 +110,8 @@ internal sealed class TransformFinalizerExecutor(
         }
         catch (Exception ex)
         {
-            logger.LogError("Transform finalizer failed for profile {Profile}: {Error}", profile.Name, ex.ToRedactedLogText());
+            logger.LogError("Transform finalizer failed for run {RunId}, profile {Profile}: {Error}",
+                context.RunId, profile.Name, ex.ToRedactedLogText());
             artifact = MakeStatusArtifact(context.RunId, profile.Name, "error",
                 "The step could not change the text.");
         }

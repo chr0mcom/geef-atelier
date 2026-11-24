@@ -63,7 +63,8 @@ internal sealed class FileExportFinalizerExecutor(
         }
         catch (Exception ex)
         {
-            logger.LogError("File export failed for profile {Profile}: {Error}", profile.Name, ex.ToRedactedLogText());
+            logger.LogError("File export failed for run {RunId}, profile {Profile}: {Error}",
+                context.RunId, profile.Name, ex.ToRedactedLogText());
             errorMessage = ex is FileTooLargeException
                 ? "The file exceeds the size limit and was not saved."
                 : "The file could not be saved.";

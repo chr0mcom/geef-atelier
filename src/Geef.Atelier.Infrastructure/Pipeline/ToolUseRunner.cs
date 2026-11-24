@@ -189,7 +189,7 @@ internal sealed class ToolUseRunner(
                         logger?.LogError(
                             "ToolUseRunner: tool execution failed: name={ToolName} run={RunId}: {Error}",
                             call.Name, invocationContext.RunId, ex.ToRedactedLogText());
-                        toolResult = new ToolExecutionResult("", null, ex.Message.RedactSecrets());
+                        toolResult = new ToolExecutionResult("", null, $"Tool '{call.Name}' could not be run.");
                     }
 
                     toolResultContent = toolResult.Error is not null

@@ -57,7 +57,7 @@ public sealed class PostgresEventSinkHandlesBestEffortNonConvergenceTests(Postgr
         // the Failed status set by the PipelineFailedEvent handler, but still surface the draft.
         var run = await verify.Runs.SingleAsync(r => r.Id == runId);
         Assert.Equal(RunStatus.Failed, run.Status);
-        Assert.Equal("Pipeline stopped: maximum iterations reached", run.ErrorMessage);
+        Assert.Equal("The text still had open points after the maximum number of rounds.", run.ErrorMessage);
         Assert.False(string.IsNullOrEmpty(run.FinalText));
         Assert.True(run.WordCount > 0);
         Assert.NotNull(run.CompletedAt);
@@ -112,7 +112,7 @@ public sealed class PostgresEventSinkHandlesBestEffortNonConvergenceTests(Postgr
 
         var run = await verify.Runs.SingleAsync(r => r.Id == runId);
         Assert.Equal(RunStatus.Aborted, run.Status);
-        Assert.Equal("Aborted due to critical reviewer finding", run.ErrorMessage);
+        Assert.Equal("A check found a serious problem, so the work was stopped.", run.ErrorMessage);
         Assert.False(string.IsNullOrEmpty(run.FinalText));
         Assert.NotNull(run.CompletedAt);
 
@@ -148,7 +148,7 @@ public sealed class PostgresEventSinkHandlesBestEffortNonConvergenceTests(Postgr
         await using var verify = fixture.NewContext();
         var run = await verify.Runs.SingleAsync(r => r.Id == runId);
         Assert.Equal(RunStatus.Failed, run.Status);
-        Assert.Equal("Pipeline stopped without full convergence", run.ErrorMessage);
+        Assert.Equal(RunStopMessageExtensions.StoppedWithOpenPointsMessage, run.ErrorMessage);
         Assert.NotNull(run.CompletedAt);
     }
 

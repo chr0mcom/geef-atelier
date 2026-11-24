@@ -131,7 +131,7 @@ public sealed class TransformFinalizerExecutorTests
         Assert.Equal("The step could not change the text.", result.Artifact.StatusMessage);
     }
 
-    /// <summary>N4 (Etappe 0, review round 2): the log entry of a failed step carries the error without the key.</summary>
+    /// <summary>N4 (Etappe 0, review round 2): the log entry of a failed step carries the run id and the error without the key.</summary>
     [Fact]
     public async Task Execute_WhenLlmThrows_LogsTheErrorWithoutTheKey()
     {
@@ -144,9 +144,11 @@ public sealed class TransformFinalizerExecutorTests
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
             logger);
 
-        await executor.ExecuteAsync(ProfileWith("Some prompt."), MakeContext(), CancellationToken.None);
+        var context = MakeContext();
+        await executor.ExecuteAsync(ProfileWith("Some prompt."), context, CancellationToken.None);
 
         var entry = Assert.Single(logger.Entries);
+        Assert.Contains(context.RunId.ToString(), entry);
         Assert.Contains("Incorrect API key provided", entry);
         Assert.DoesNotContain("abcd1234efgh5678", entry);
         Assert.DoesNotContain("sk-proj-0123", entry);

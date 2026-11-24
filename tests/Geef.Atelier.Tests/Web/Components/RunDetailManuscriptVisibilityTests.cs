@@ -46,7 +46,7 @@ public sealed class RunDetailManuscriptVisibilityTests : TestContext
     public void FailedRunWithFinalText_RendersManuscriptAndResumeButton()
     {
         RegisterServices(RunStatus.Failed, "# Best effort\n\nDraft.",
-            "Pipeline stopped: maximum iterations reached");
+            "The text still had open points after the maximum number of rounds.");
 
         var cut = RenderComponent<RunDetail>(p => p.Add(c => c.RunId, _runId));
 
@@ -58,7 +58,7 @@ public sealed class RunDetailManuscriptVisibilityTests : TestContext
     public void FailedRunWithoutFinalText_DoesNotRenderManuscript()
     {
         RegisterServices(RunStatus.Failed, finalText: null,
-            "Pipeline stopped: maximum iterations reached");
+            "The text still had open points after the maximum number of rounds.");
 
         var cut = RenderComponent<RunDetail>(p => p.Add(c => c.RunId, _runId));
 
@@ -69,7 +69,7 @@ public sealed class RunDetailManuscriptVisibilityTests : TestContext
     public void AbortedRunWithFinalText_RendersManuscript()
     {
         RegisterServices(RunStatus.Aborted, "# Best effort\n\nDraft.",
-            "Aborted due to critical reviewer finding");
+            "A check found a serious problem, so the work was stopped.");
 
         var cut = RenderComponent<RunDetail>(p => p.Add(c => c.RunId, _runId));
 

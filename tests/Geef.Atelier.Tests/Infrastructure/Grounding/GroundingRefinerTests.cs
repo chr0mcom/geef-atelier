@@ -74,7 +74,7 @@ public sealed class GroundingRefinerTests
         var (refined, outcome) = await refiner.RefineAsync(raw, "briefing", config, "tavily-test", Guid.NewGuid(), default);
 
         Assert.True(outcome.WasSkipped);
-        Assert.Contains("not found or inactive", outcome.SkipReason);
+        Assert.Equal(GroundingRefiner.ServiceUnavailableSkipReason, outcome.SkipReason);
         Assert.Equal(raw.Citations.Count, outcome.RefinedCitations.Count);
         Assert.Equal(0, client.CallCount);
     }
@@ -136,6 +136,40 @@ public sealed class GroundingRefinerTests
 
         Assert.True(outcome.WasSkipped);
         Assert.Equal(2, outcome.RefinedCitations.Count);
+        Assert.Equal(GroundingRefiner.NotSortedSkipReason, outcome.SkipReason);
+    }
+
+    [Theory]
+    [InlineData(GroundingRefinementMode.Filter, "not json at all", "tool_calls")]
+    [InlineData(GroundingRefinementMode.Filter, "{\"other\": 1}", "tool_calls")]
+    [InlineData(GroundingRefinementMode.Filter, "{\"sources\": [{\"index\": \"zero\", \"keep\": true, \"reason\": \"x\"}]}", "tool_calls")]
+    [InlineData(GroundingRefinementMode.Synthesize, "{\"synthesized_text\": ", "tool_calls")]
+    [InlineData(GroundingRefinementMode.Synthesize, "{\"referenced_indices\": [0]}", "tool_calls")]
+    [InlineData(GroundingRefinementMode.Filter, "{\"sources\": []}", "length")]
+    public async Task RefineAsync_UnusableAnswer_SkipsWithAFixedSentenceWithoutTechnicalDetail(
+        GroundingRefinementMode mode, string toolJson, string finishReason)
+    {
+        var refiner = BuildRefiner(new ToolCallClient(toolJson, finishReason));
+        var raw = MakeRaw(2);
+
+        var (refined, outcome) = await refiner.RefineAsync(raw, "briefing", MakeConfig(mode), "tavily-test", Guid.NewGuid(), default);
+
+        Assert.True(outcome.WasSkipped);
+        Assert.Equal(GroundingRefiner.NotSortedSkipReason, outcome.SkipReason);
+        Assert.Same(raw, refined);
+    }
+
+    [Fact]
+    public async Task RefineAsync_NoCitations_SkipsWithAPlainSentence()
+    {
+        var client = new ToolCallClient("{}");
+        var refiner = BuildRefiner(client);
+
+        var (_, outcome) = await refiner.RefineAsync(MakeRaw(0), "briefing", MakeConfig(), "tavily-test", Guid.NewGuid(), default);
+
+        Assert.True(outcome.WasSkipped);
+        Assert.Equal(GroundingRefiner.NoSourcesSkipReason, outcome.SkipReason);
+        Assert.Equal(0, client.CallCount);
     }
 
     [Fact]
@@ -207,7 +241,7 @@ public sealed class GroundingRefinerTests
     // -------------------------------------------------------------------------
 
     /// <summary>Returns a deterministic tool_calls response with the given JSON.</summary>
-    private sealed class ToolCallClient(string toolArgumentsJson) : ILlmClient
+    private sealed class ToolCallClient(string toolArgumentsJson, string finishReason = "tool_calls") : ILlmClient
     {
         public int CallCount { get; private set; }
 
@@ -219,7 +253,7 @@ public sealed class GroundingRefinerTests
                 Text = string.Empty,
                 ToolName = "submit_refinement",
                 ToolArgumentsJson = toolArgumentsJson,
-                FinishReason = "tool_calls",
+                FinishReason = finishReason,
                 TokenUsage = new LlmTokenUsage { InputTokens = 50, OutputTokens = 30 },
             });
         }

@@ -1620,12 +1620,12 @@ Research: `reports/2026-11-22-modellrecherche.md`. Design: `docs/superpowers/spe
 ## D-067 — Stage 0: safety net (2026-11-24)
 
 **Context.** An analysis on 2026-11-24 found that attached files, web search and learnings had had no
-effect in production since grounding was rebuilt on central tools (D-060), and nobody noticed. The system
+effect in production since grounding was rebuilt on central tools (D-060), without any visible error. The system
 grounding profiles pointed at tools that were not wired in `ToolExecutor` or read a key name the container
 does not set; the error ended as empty context. There was no test over the real wiring, runs did not report
 problems they worked around, and several places silently fell back to substitute behaviour: to the classic
 crew on an unreadable snapshot, to approving everything for a crew without reviewers, to starting despite a
-failed migration. Stage 0 brings nothing new to the user, but makes sure nothing breaks silently any more.
+failed migration. Stage 0 adds no new features for the user; it makes such failures visible.
 It is the precondition for the rebuild in D-068.
 
 **D-067/1 — End-to-end harness over the real wiring.** `tests/Geef.Atelier.Tests/EndToEnd` starts the

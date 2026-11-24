@@ -52,7 +52,7 @@ public sealed class PostgresEventSinkHandlesCriticalAbortTests(PostgresFixture f
         var run = await verify.Runs.SingleAsync(r => r.Id == runId);
         Assert.Equal(RunStatus.Aborted, run.Status);
         Assert.NotNull(run.ErrorMessage);
-        Assert.Contains("critical", run.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("A check found a serious problem, so the work was stopped.", run.ErrorMessage);
         Assert.NotNull(run.CompletedAt);
         Assert.Null(run.FinalText);
 

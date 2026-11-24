@@ -153,7 +153,7 @@ Probleme, die ein Lauf umgangen hat, statt anzuhalten (D-067). Werden mit dem La
 | RunId | uuid (FK→Runs) | Index `IX_RunWarnings_RunId` |
 | Iteration | int | nullable; Iteration, in der das Problem auftrat |
 | Source | varchar(100) | `grounding`, `review`, `model-assignment`, `llm`, `finalizer` oder `run` (Konstanten in `RunWarningSources`) |
-| Code | varchar(100) | stabiler maschinenlesbarer Code, z. B. `grounding.provider_skipped`, `grounding.scope_unknown`, `review.reviewer_failed`, `llm.failover`, `finalizer.failed`, `run.result_not_saved` (Konstanten in `RunWarningCodes`) |
+| Code | varchar(100) | stabiler maschinenlesbarer Code, z. B. `grounding.provider_skipped`, `grounding.scope_unknown`, `review.reviewer_failed`, `llm.failover`, `finalizer.failed`, `run.result_not_saved`, `run.restarted_while_finishing` (Konstanten in `RunWarningCodes`) |
 | Message | text | kurze, einfache englische Erklärung für den Anwender |
 | CreatedAt | timestamptz | |
 
@@ -474,9 +474,18 @@ gespeichert, sodass Detailseite und MCP zeigen, warum er stoppte.
 `Status` und `Outcome` können kurz auseinanderliegen: Der Event-Sink setzt `Completed` (oder `Failed`) und
 den Text vor den Finalizern, `Outcome` folgt erst danach. Clients warten deshalb auf `Outcome`, nicht auf
 einen Endstatus; `scripts/atelier-smoke.sh` und der Arm `atelier` von `tools/Eval` tun das. Wird der Dienst
-während der Finalizer hart beendet, setzt der Wiederanlauf beim nächsten Start auch für Läufe mit bereits
-terminalem Status und leerem `Outcome` ein Ergebnis, sodass kein Client endlos wartet. Ein Abbruch oder
-Dienststopp während der Finalizer endet als `Aborted`, ohne Warnungen „Finalizer fehlgeschlagen“.
+während der Finalizer hart beendet, setzt der Wiederanlauf beim nächsten Start für Läufe mit bereits
+terminalem Status und leerem `Outcome` ein Ergebnis, sodass kein Client endlos wartet: mit Text `Converged`
+(Status `Completed`) oder `DeliveredWithOpenPoints`, ohne Text `Failed`, dazu die Warnung
+`run.restarted_while_finishing`. Weil ältere Läufe (vor Step47) ebenfalls kein `Outcome` haben, werden nur
+Läufe repariert, die nach dem frühesten Lauf mit `Outcome` endeten; solange kein Lauf ein `Outcome` hat,
+ändert sich nichts. Die Reparatur läuft nach dem Zurücksetzen hängengebliebener `Running`-Läufe und für sich;
+ein Fehler darin verhindert dieses Zurücksetzen nie.
+
+Ein Abbruch oder Dienststopp während der Finalizer endet mit `Outcome = Aborted`, ohne Warnungen „Finalizer
+fehlgeschlagen“. Maßgeblich ist dabei `Outcome`: Der Status eines konvergierten Laufs bleibt `Completed`, ein
+Lauf mit `Failed` (nicht konvergiert) wird `Aborted`. Die Ergebnisse der Finalizer, die vor dem Stopp fertig
+waren, bleiben erhalten (geänderter Text, ihre Artefakte, Kosten); die übrigen Finalizer laufen nicht mehr.
 
 Nur MCP liefert `Outcome` (`get_run_status`, `get_run_result`). Die Weboberfläche liest es nicht: Der Block
 „Warnings“ auf der Detailseite (`RunWarningsBlock`) wählt seinen Einleitungssatz nach `Status` und danach,
@@ -496,7 +505,9 @@ Ein Lauf hält jedes Problem, das er umgeht, als Warnung in `RunWarnings` fest, 
 Warnung in einem eigenen kurzlebigen Datenbank-Scope; ein fehlgeschlagener Schreibvorgang wird geloggt
 und hält den Lauf nie an. Überall, wo sie gebraucht wird (Run-Service, Orchestrator, Pipeline-Fabrik,
 Grounding-Schritt), ist sie eine Pflicht-Abhängigkeit; eine fehlende Registrierung scheitert also beim
-Start, statt Warnungen still zu verlieren. Der LLM-Client meldet Failover über den ambienten
+Start, statt Warnungen still zu verlieren. Dasselbe gilt für die Grounding-Provider-Fabrik im Orchestrator;
+die Pipeline-Fabrik baut eine Crew mit Quellen nicht, wenn keine Grounding-Provider-Fabrik übergeben wird. Der
+LLM-Client meldet Failover über den ambienten
 `RunWarningScope`, den der Orchestrator je Lauf öffnet.
 
 Warnungen erscheinen auf der Detailseite im Block „Warnings“ (nur wenn vorhanden) und in den MCP-Feldern
@@ -504,11 +515,18 @@ Warnungen erscheinen auf der Detailseite im Block „Warnings“ (nur wenn vorha
 ([09-endpoint-reference](09-endpoint-reference_de.md#lauf-status-und-ergebnis-warnings-und-outcome)).
 Warnungstexte und die am Lauf gespeicherten Fehlertexte (`ErrorMessage`, Statusmeldungen) sind feste,
 kurze, einfache Sätze für den Anwender, bei Bedarf mit Anzeigenamen; technische Einzelheiten wie
-Ausnahmetexte, Hostnamen, Schlüsselnamen oder Fehlertexte vorgelagerter Dienste gehen nur ins Log. Bevor
+Ausnahmetexte, Hostnamen, Schlüsselnamen oder Fehlertexte vorgelagerter Dienste gehen nur ins Log. Der Grund,
+aus dem ein Lauf vor dem Bestehen aller Prüfungen endete, ist ein fester Satz je Abbruchgrund
+(`RunStopMessageExtensions`); auch die Überspring-Gründe der Quellen-Sortierung (`GroundingRefiner`) sind feste
+Sätze. Bevor
 etwas Technisches geloggt oder gespeichert wird, ersetzt `SecretRedactionExtensions` (Core,
 `RedactSecrets`, `ToRedactedLogText`) Bruchstücke, die nach Zugangsdaten aussehen (bekannte
 Schlüsselformate, Bearer-Tokens, `name=wert`-Paare mit geheim klingendem Namen, lange undurchsichtige
-Zeichenfolgen), durch `[redacted]`.
+Zeichenfolgen), durch `[redacted]`. Ein Name gilt als geheim klingend, wenn sein letzter Teil ein Wort wie
+`key`, `token`, `secret` oder `password` ist (auch `OPENAI_API_KEY`, `x-api-key`, `apiKey`); sein Wert wird nur
+entfernt, wenn er nach einem Geheimnis aussieht (mindestens 12 Zeichen ohne Leerzeichen mit Buchstabe und
+Ziffer) oder ein URL-Parameter ist. Gewöhnliche Sätze wie „Key: Strategic goals“ oder „Basic research“ bleiben
+unverändert.
 
 ### Laut statt still
 

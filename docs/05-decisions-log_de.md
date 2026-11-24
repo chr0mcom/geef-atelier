@@ -1676,13 +1676,13 @@ Der GEEF-Workflow sieht dann Anhalten vor. Der Betreiber hatte die Entscheidung 
 ## D-067 — Etappe 0: Sicherheitsnetz (2026-11-24)
 
 **Kontext.** Eine Analyse am 2026-11-24 ergab: Angehängte Dateien, Websuche und Learnings waren seit dem
-Umbau des Groundings auf zentrale Tools (D-060) in der Produktion wirkungslos, und niemand merkte es. Die
+Umbau des Groundings auf zentrale Tools (D-060) in der Produktion wirkungslos, ohne dass ein Fehler sichtbar wurde. Die
 System-Grounding-Profile verwiesen auf Werkzeuge, die im `ToolExecutor` nicht verdrahtet waren oder einen
 Schlüsselnamen lasen, den der Container nicht setzt; der Fehler endete als leerer Kontext. Es gab keinen
 Test über die echte Verdrahtung, Läufe meldeten umgangene Probleme nicht, und mehrere Stellen fielen still
 auf Ersatzverhalten zurück: auf die Klassik-Crew bei unlesbarem Snapshot, auf eine Freigabe ohne Reviewer
 bei einer Crew ohne Reviewer, auf einen Start trotz gescheiterter Migration. Etappe 0 bringt dem Anwender
-nichts Neues, sorgt aber dafür, dass nichts mehr still kaputtgeht. Sie ist die Voraussetzung für den Umbau
+keine neuen Funktionen; sie macht solche Fehler sichtbar. Sie ist die Voraussetzung für den Umbau
 nach D-068.
 
 **D-067/1 — Ende-zu-Ende-Gerüst über die echte Verdrahtung.** `tests/Geef.Atelier.Tests/EndToEnd` startet

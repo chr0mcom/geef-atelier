@@ -22,6 +22,16 @@ internal sealed class GroundingRefiner(
 {
     private const int MaxRefinementSources = 20;
 
+    /// <summary>Shown when there was nothing to sort.</summary>
+    internal const string NoSourcesSkipReason = "There were no sources to sort.";
+
+    /// <summary>Shown when the service chosen for sorting the sources is missing or switched off.</summary>
+    internal const string ServiceUnavailableSkipReason =
+        "The service chosen for sorting the sources is not available, so they were used as found.";
+
+    /// <summary>Shown for every other failure; the technical detail goes to the log only.</summary>
+    internal const string NotSortedSkipReason = "The sources could not be sorted, so they were used as found.";
+
     private static readonly LlmTool FilterTool = new()
     {
         Name = "submit_refinement",
@@ -82,7 +92,7 @@ internal sealed class GroundingRefiner(
                 DroppedCitations: [],
                 SynthesizedText: null,
                 WasSkipped: true,
-                SkipReason: "No citations to refine."));
+                SkipReason: NoSourcesSkipReason));
         }
 
         // Validate provider via a short-lived scope (IProviderService is scoped).
@@ -100,7 +110,7 @@ internal sealed class GroundingRefiner(
                     DroppedCitations: [],
                     SynthesizedText: null,
                     WasSkipped: true,
-                    SkipReason: $"Refinement provider '{config.Binding.Provider}' not found or inactive."));
+                    SkipReason: ServiceUnavailableSkipReason));
             }
         }
 
@@ -140,14 +150,9 @@ internal sealed class GroundingRefiner(
             if (response.FinishReason != "tool_calls" || response.ToolArgumentsJson is null)
             {
                 logger.LogWarning(
-                    "GroundingRefiner: LLM did not call submit_refinement (finish_reason='{Reason}'); skipping.",
-                    response.FinishReason);
-                return (raw, new RefinementOutcome(
-                    RefinedCitations: raw.Citations,
-                    DroppedCitations: [],
-                    SynthesizedText: null,
-                    WasSkipped: true,
-                    SkipReason: $"Refiner LLM did not call submit_refinement (finish_reason='{response.FinishReason}')."));
+                    "GroundingRefiner: run={RunId} LLM did not call submit_refinement for '{GroundingProvider}' (finish_reason='{Reason}'); skipping.",
+                    runId, groundingProviderName, response.FinishReason);
+                return GracefulDegradation(raw);
             }
 
             // Attempt to record cost regardless of parse outcome.
@@ -175,28 +180,25 @@ internal sealed class GroundingRefiner(
                 config.Mode, groundingProviderName, inputTokens, outputTokens, model);
 
             return config.Mode == GroundingRefinementMode.Synthesize
-                ? ParseSynthesizeResult(response.ToolArgumentsJson, raw, sourcesToRefine, overflow)
-                : ParseFilterResult(response.ToolArgumentsJson, raw, sourcesToRefine, overflow);
+                ? ParseSynthesizeResult(response.ToolArgumentsJson, raw, sourcesToRefine, overflow, runId, groundingProviderName)
+                : ParseFilterResult(response.ToolArgumentsJson, raw, sourcesToRefine, overflow, runId, groundingProviderName);
         }
         catch (Exception ex)
         {
             logger.LogError(
-                "GroundingRefiner: unhandled error during refinement for '{Provider}'; falling back to raw result: {Error}",
-                groundingProviderName, ex.ToRedactedLogText());
-            return (raw, new RefinementOutcome(
-                RefinedCitations: raw.Citations,
-                DroppedCitations: [],
-                SynthesizedText: null,
-                WasSkipped: true,
-                SkipReason: "The sources could not be sorted, so they were used as found."));
+                "GroundingRefiner: run={RunId} unhandled error during refinement for '{Provider}'; falling back to raw result: {Error}",
+                runId, groundingProviderName, ex.ToRedactedLogText());
+            return GracefulDegradation(raw);
         }
     }
 
-    private static (GroundingResult Refined, RefinementOutcome Outcome) ParseFilterResult(
+    private (GroundingResult Refined, RefinementOutcome Outcome) ParseFilterResult(
         string toolArgumentsJson,
         GroundingResult raw,
         IReadOnlyList<SourceCitation> sourcesToRefine,
-        IReadOnlyList<SourceCitation> overflow)
+        IReadOnlyList<SourceCitation> overflow,
+        Guid runId,
+        string groundingProviderName)
     {
         try
         {
@@ -204,7 +206,12 @@ internal sealed class GroundingRefiner(
             var root = doc.RootElement;
 
             if (!root.TryGetProperty("sources", out var sourcesEl))
-                return GracefulDegradation(raw, "Filter tool response missing 'sources' field.");
+            {
+                logger.LogWarning(
+                    "GroundingRefiner: run={RunId} filter tool response for '{GroundingProvider}' has no 'sources' field; skipping.",
+                    runId, groundingProviderName);
+                return GracefulDegradation(raw);
+            }
 
             var retained = new List<SourceCitation>();
             var dropped = new List<DroppedCitation>();
@@ -257,17 +264,22 @@ internal sealed class GroundingRefiner(
                 WasSkipped: false,
                 SkipReason: null));
         }
-        catch (JsonException ex)
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
         {
-            return GracefulDegradation(raw, $"Failed to parse filter tool response: {ex.Message}");
+            logger.LogWarning(
+                "GroundingRefiner: run={RunId} filter tool response for '{GroundingProvider}' could not be read; skipping: {Error}",
+                runId, groundingProviderName, ex.ToRedactedLogText());
+            return GracefulDegradation(raw);
         }
     }
 
-    private static (GroundingResult Refined, RefinementOutcome Outcome) ParseSynthesizeResult(
+    private (GroundingResult Refined, RefinementOutcome Outcome) ParseSynthesizeResult(
         string toolArgumentsJson,
         GroundingResult raw,
         IReadOnlyList<SourceCitation> sourcesToRefine,
-        IReadOnlyList<SourceCitation> overflow)
+        IReadOnlyList<SourceCitation> overflow,
+        Guid runId,
+        string groundingProviderName)
     {
         try
         {
@@ -275,7 +287,12 @@ internal sealed class GroundingRefiner(
             var root = doc.RootElement;
 
             if (!root.TryGetProperty("synthesized_text", out var synthesizedEl))
-                return GracefulDegradation(raw, "Synthesize tool response missing 'synthesized_text' field.");
+            {
+                logger.LogWarning(
+                    "GroundingRefiner: run={RunId} synthesize tool response for '{GroundingProvider}' has no 'synthesized_text' field; skipping.",
+                    runId, groundingProviderName);
+                return GracefulDegradation(raw);
+            }
 
             var synthesizedText = synthesizedEl.GetString() ?? string.Empty;
 
@@ -316,7 +333,7 @@ internal sealed class GroundingRefiner(
                 .Where(i => i < sourcesToRefine.Count)
                 .Select(i =>
                 {
-                    var reason = dropReasons.TryGetValue(i.ToString(), out var r) ? r : "Excluded by synthesizer.";
+                    var reason = dropReasons.TryGetValue(i.ToString(), out var r) ? r : "Not used for the summary.";
                     return new DroppedCitation(sourcesToRefine[i], reason);
                 })
                 .ToList();
@@ -336,19 +353,22 @@ internal sealed class GroundingRefiner(
                 WasSkipped: false,
                 SkipReason: null));
         }
-        catch (JsonException ex)
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
         {
-            return GracefulDegradation(raw, $"Failed to parse synthesize tool response: {ex.Message}");
+            logger.LogWarning(
+                "GroundingRefiner: run={RunId} synthesize tool response for '{GroundingProvider}' could not be read; skipping: {Error}",
+                runId, groundingProviderName, ex.ToRedactedLogText());
+            return GracefulDegradation(raw);
         }
     }
 
-    private static (GroundingResult, RefinementOutcome) GracefulDegradation(GroundingResult raw, string reason)
+    private static (GroundingResult, RefinementOutcome) GracefulDegradation(GroundingResult raw)
         => (raw, new RefinementOutcome(
             RefinedCitations: raw.Citations,
             DroppedCitations: [],
             SynthesizedText: null,
             WasSkipped: true,
-            SkipReason: reason));
+            SkipReason: NotSortedSkipReason));
 
     private static string BuildUserPrompt(string briefing, IReadOnlyList<SourceCitation> sources)
     {

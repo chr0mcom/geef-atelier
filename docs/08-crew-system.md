@@ -250,7 +250,8 @@ Since D-067:
 
 - `Runs.Outcome` is set only after the finalizers have finished and the (possibly transformed) final text is stored, so `Outcome` means "finished and stored, including all finalizers" ([02-architecture](02-architecture.md#run-outcome-and-runstatus)).
 - A finalizer that fails, is skipped, or is not run (best-effort run without `RunFinalizersOnMaxAttempts`) becomes a run warning (`finalizer.failed`, `finalizer.skipped`, `finalizer.not_run`) instead of passing silently.
-- A cancellation or service stop while the finalizers run is not a finalizer failure: the run ends with `Outcome = Aborted` and gets no `finalizer.failed` warning. A text stored before the stop stays readable.
+- A cancellation or service stop while the finalizers run is not a finalizer failure: the run ends with `Outcome = Aborted` and gets no `finalizer.failed` warning. The results of finalizers that finished before the stop are kept (changed text, artifacts, costs); the remaining ones do not run. The status of a converged run stays `Completed`; `Outcome` is what counts.
+- If the service is stopped hard while the finalizers run, the next start gives the run an outcome and the warning `run.restarted_while_finishing` (source `run`).
 - If the result cannot be stored completely, the run gets the warning `run.result_not_saved` (source `run`) and `Outcome = Failed`.
 
 ### RunArtifact entity
@@ -389,7 +390,7 @@ Grounding providers enrich the briefing with external context before the GEEF ex
 | Type | Implementation | Description | Settings |
 |---|---|---|---|
 | `tavily` | `TavilyGroundingProvider` | Web search via Tavily API (basic or advanced). API key per profile. | `Tier` (basic/advanced), `MaxResults`, `IncludeAnswer` |
-| `vector-store` | `VectorStoreGroundingProvider` | Semantic search in a pgvector collection. Scope: `global` (shared documents only), `run-local` (attachments of the run and of the runs it continues, never those of other runs) or `both` (shared documents plus those attachments). A missing scope means `global`; an unknown value is also treated as `global` (fail-closed, never other runs' attachments) and the run gets the warning `grounding.scope_unknown` (D-067). | `TopK`, `Scope`, `TagFilter` |
+| `vector-store` | `VectorStoreGroundingProvider` | Semantic search in a pgvector collection. Scope: `global` (shared documents only), `run-local` (attachments of the run and of the runs it continues, never those of other runs) or `both` (shared documents plus those attachments). A missing scope means `global`; an unknown value is also treated as `global` (fail-closed, never other runs' attachments) and the run gets the warning `grounding.scope_unknown` (D-067). `TagFilter` narrows the shared documents only; attachments have no tags and are never hidden by it. | `TopK`, `Scope`, `TagFilter` |
 | `static-context` | `StaticContextGroundingProvider` | Curated fixed text injected unchanged at every run. No external API. Ideal for style guides, glossaries, brand voice. | `label`, `content` (max 200,000 chars, soft limit 50,000) |
 | `url-fetch` | `UrlFetchGroundingProvider` | Fetches specific URLs, cleans HTML via HtmlAgilityPack, returns text content. SSRF guard blocks private IPs. | `urls` (newline-separated), `maxContentPerUrl` (default 8000), `stripBoilerplate` (bool, default true) |
 | `news-search` | `NewsSearchGroundingProvider` | Tavily API with `topic=news` + `days` filter. For time-critical topics. Attribution via `PublishedDate`. | `recencyDays` (default 7), `newsMaxResults` (default 5), `newsSearchDepth` (basic/advanced) |

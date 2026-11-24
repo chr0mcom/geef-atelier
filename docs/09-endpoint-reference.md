@@ -216,7 +216,8 @@ that already had a text. A client waits until `outcome` is set (not just a termi
 reads `finalText`; before that the text can still be changed by a finalizer.
 
 `outcome = "Failed"` or `"Aborted"` does not mean that there is no text: a run cancelled after its text was
-stored keeps it, and a run whose result could not be stored completely is `Failed` with the warning
+stored keeps it (a run stopped during the finalizers can even keep `status = "Completed"` with
+`outcome = "Aborted"`), and a run whose result could not be stored completely is `Failed` with the warning
 `run.result_not_saved`. Check `finalText` in the result; with `Failed` it is not guaranteed to be complete.
 Details: [02-architecture](02-architecture.md#run-outcome-and-runstatus).
 
