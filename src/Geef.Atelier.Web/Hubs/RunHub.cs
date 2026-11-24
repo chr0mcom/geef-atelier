@@ -1,51 +1,60 @@
+using Geef.Atelier.Application.Runs;
+using Geef.Atelier.Web.Notifications;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
 namespace Geef.Atelier.Web.Hubs;
 
-/// <summary>SignalR hub for live run-status updates. Group-based routing keyed by run id, plus a global group for the runs-list page.</summary>
-public sealed class RunHub : Hub
+/// <summary>
+/// SignalR hub for live run-status updates, signed-in users only. Group names are derived on the server from the
+/// caller's identity (<see cref="RunUpdateTopics"/>); a caller can never pick another user's group.
+/// </summary>
+[Authorize]
+public sealed class RunHub(IRunService runService) : Hub
 {
-    /// <summary>Name of the SignalR group subscribed to by the runs-list page for any-run updates.</summary>
-    public const string AllRunsGroup = "all-runs";
+    /// <summary>Subscribes the caller to updates of a run they own (any run for administrators).</summary>
+    public async Task JoinRunGroupAsync(Guid runId)
+    {
+        if (!await runService.CanWatchRunAsync(Context.User, runId, Context.ConnectionAborted))
+            throw new HubException("This run is not available.");
+        await Groups.AddToGroupAsync(Context.ConnectionId, RunUpdateTopics.Run(runId));
+    }
 
-    /// <summary>Subscribes the caller to live updates for a specific run.</summary>
-    public Task JoinRunGroupAsync(Guid runId) =>
-        Groups.AddToGroupAsync(Context.ConnectionId, GroupName(runId));
-
-    /// <summary>Unsubscribes the caller from live updates for a specific run.</summary>
+    /// <summary>Unsubscribes the caller from updates of a run.</summary>
     public Task LeaveRunGroupAsync(Guid runId) =>
-        Groups.RemoveFromGroupAsync(Context.ConnectionId, GroupName(runId));
+        Groups.RemoveFromGroupAsync(Context.ConnectionId, RunUpdateTopics.Run(runId));
 
-    /// <summary>Subscribes the caller to any-run updates (used by the runs-list page).</summary>
-    public Task JoinAllRunsGroupAsync() =>
-        Groups.AddToGroupAsync(Context.ConnectionId, AllRunsGroup);
+    /// <summary>Subscribes the caller to list updates: own runs, or all runs for administrators.</summary>
+    public Task JoinRunsListGroupAsync() =>
+        Context.User.RunListTopic() is { } topic
+            ? Groups.AddToGroupAsync(Context.ConnectionId, topic)
+            : throw new HubException("Sign in required.");
 
-    /// <summary>Unsubscribes the caller from any-run updates.</summary>
-    public Task LeaveAllRunsGroupAsync() =>
-        Groups.RemoveFromGroupAsync(Context.ConnectionId, AllRunsGroup);
+    /// <summary>Unsubscribes the caller from list updates.</summary>
+    public Task LeaveRunsListGroupAsync() =>
+        Context.User.RunListTopic() is { } topic
+            ? Groups.RemoveFromGroupAsync(Context.ConnectionId, topic)
+            : Task.CompletedTask;
 
-    /// <summary>Subscribes the caller to live dashboard updates for their own runs.</summary>
-    public Task JoinDashboardGroupAsync(string username) =>
-        Groups.AddToGroupAsync(Context.ConnectionId, DashboardGroup(username));
+    /// <summary>Subscribes the caller to dashboard events of their own runs.</summary>
+    public Task JoinDashboardGroupAsync() =>
+        Context.User.WatcherName() is { } name
+            ? Groups.AddToGroupAsync(Context.ConnectionId, RunUpdateTopics.UserDashboard(name))
+            : throw new HubException("Sign in required.");
 
-    /// <summary>Unsubscribes the caller from personal dashboard updates.</summary>
-    public Task LeaveDashboardGroupAsync(string username) =>
-        Groups.RemoveFromGroupAsync(Context.ConnectionId, DashboardGroup(username));
+    /// <summary>Unsubscribes the caller from their dashboard events.</summary>
+    public Task LeaveDashboardGroupAsync() =>
+        Context.User.WatcherName() is { } name
+            ? Groups.RemoveFromGroupAsync(Context.ConnectionId, RunUpdateTopics.UserDashboard(name))
+            : Task.CompletedTask;
 
-    /// <summary>Subscribes the caller to the admin all-users dashboard group.</summary>
+    /// <summary>Subscribes an administrator to dashboard events of all users.</summary>
     public Task JoinDashboardAllGroupAsync() =>
-        Groups.AddToGroupAsync(Context.ConnectionId, DashboardAllGroup);
+        Context.User.IsAtelierAdmin()
+            ? Groups.AddToGroupAsync(Context.ConnectionId, RunUpdateTopics.AdminDashboard)
+            : throw new HubException("Administrators only.");
 
-    /// <summary>Unsubscribes the caller from the admin all-users dashboard group.</summary>
+    /// <summary>Unsubscribes the caller from the all-users dashboard events.</summary>
     public Task LeaveDashboardAllGroupAsync() =>
-        Groups.RemoveFromGroupAsync(Context.ConnectionId, DashboardAllGroup);
-
-    /// <summary>Name of the SignalR group for admin all-scope dashboard live updates.</summary>
-    public const string DashboardAllGroup = "dashboard-all";
-
-    /// <summary>Returns the SignalR group name for a given run id.</summary>
-    internal static string GroupName(Guid runId) => $"run-{runId}";
-
-    /// <summary>Returns the SignalR group name for a user's personal dashboard.</summary>
-    internal static string DashboardGroup(string username) => $"dashboard-{username}";
+        Groups.RemoveFromGroupAsync(Context.ConnectionId, RunUpdateTopics.AdminDashboard);
 }

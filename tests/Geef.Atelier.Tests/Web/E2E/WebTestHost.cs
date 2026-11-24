@@ -103,8 +103,7 @@ internal sealed class WebTestHost : IAsyncDisposable
         builder.Services.AddHostedService<RunOrchestratorService>();
 
         // SignalR + Notifier
-        builder.Services.AddSignalR();
-        builder.Services.AddSingleton<IRunNotifier, SignalRRunNotifier>();
+        builder.Services.AddRunLiveUpdates();
 
         // Auth
         if (authenticated)

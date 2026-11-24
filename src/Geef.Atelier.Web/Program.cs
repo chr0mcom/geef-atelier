@@ -98,8 +98,7 @@ builder.Services.AddHostedService<ModelCatalogWarmUpService>();
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<AtelierDbContext>();
 
-builder.Services.AddSignalR();
-builder.Services.AddSingleton<IRunNotifier, SignalRRunNotifier>();
+builder.Services.AddRunLiveUpdates();
 
 builder.Services.AddAtelierAuth(builder.Configuration);
 builder.Services.AddAtelierMcpAuth(builder.Configuration);
@@ -258,7 +257,7 @@ app.Use(async (ctx, next) =>
 
 app.MapHealthChecks("/health").AllowAnonymous();
 
-app.MapHub<RunHub>("/hubs/runs");
+app.MapHub<RunHub>("/hubs/runs").RequireAuthorization();
 
 app.MapMcp("/mcp").RequireAuthorization(McpAuthorizationConstants.McpPolicy);
 
