@@ -19,7 +19,9 @@ namespace Geef.Atelier.Infrastructure.Sources.Extraction;
 /// Reads PDFs page by page with layout analysis (words, Docstrum blocks, unsupervised reading order), so columns and
 /// paragraphs come out in reading order. A page whose analysis fails or takes longer than
 /// <see cref="SourceOptions.PageLayoutTimeout"/> falls back to the plain content order; after half of
-/// <see cref="SourceOptions.ExtractionTimeout"/> or three slow pages every further page uses the plain order.
+/// <see cref="SourceOptions.ExtractionTimeout"/> or three slow pages every further page uses the plain order. Before the
+/// file is opened, the unpacked size of its compressed text streams is checked against
+/// <see cref="SourceOptions.MaxPdfInflatedBytes"/>. Lines of page text that look like page markers are neutralised.
 /// </summary>
 internal sealed class PdfSourceExtractor(IOptions<SourceOptions> options, ILogger<PdfSourceExtractor> logger) : ISourceTextExtractor
 {
@@ -27,19 +29,23 @@ internal sealed class PdfSourceExtractor(IOptions<SourceOptions> options, ILogge
     internal const string EncryptedReason = "This PDF is protected with a password. Please upload a copy without a password.";
     internal const string BrokenReason = "This file could not be read as a PDF.";
     internal const string TooSlowReason = "Reading this PDF took too long.";
+    internal const string InflatedReason = "This PDF is unusually large inside and was not opened.";
     private const int MaxSlowPages = 3;
     private const int UnusableAverageChars = 20;
 
     public SourceKind Kind => SourceKind.Pdf;
 
     public Task<SourceExtraction> ExtractAsync(ReadOnlyMemory<byte> content, CancellationToken ct) =>
-        Task.Run(() => Extract(content.ToArray(), ct), ct);
+        Task.Run(() => Extract(content.AsArray(), ct), ct);
 
     internal PdfExtractionStats? LastStats { get; private set; }
 
     private SourceExtraction Extract(byte[] bytes, CancellationToken ct)
     {
         var opts = options.Value;
+        if (bytes.ExceedsInflatedLimit(opts.MaxPdfInflatedBytes))
+            return SourceExtraction.Unreadable(InflatedReason);
+
         PdfDocument document;
         try
         {
@@ -49,7 +55,7 @@ internal sealed class PdfSourceExtractor(IOptions<SourceOptions> options, ILogge
         {
             return SourceExtraction.Unreadable(EncryptedReason, [new SourceWarning(SourceWarningCodes.Encrypted, "The PDF is protected with a password.")]);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not (OperationCanceledException or OutOfMemoryException))
         {
             logger.LogInformation("PDF could not be opened: {Error}", ex.GetType().Name);
             return SourceExtraction.Unreadable(BrokenReason);
@@ -62,7 +68,7 @@ internal sealed class PdfSourceExtractor(IOptions<SourceOptions> options, ILogge
             {
                 pageCount = document.NumberOfPages;
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (ex is not (OperationCanceledException or OutOfMemoryException))
             {
                 logger.LogInformation("PDF page count could not be read: {Error}", ex.GetType().Name);
                 return SourceExtraction.Unreadable(BrokenReason);
@@ -101,7 +107,7 @@ internal sealed class PdfSourceExtractor(IOptions<SourceOptions> options, ILogge
                 var useLayout = slowPages < MaxSlowPages && total.Elapsed < layoutBudget;
                 text = useLayout ? ReadWithLayout(page, opts.PageLayoutTimeout, stats, ref slowPages) : ReadPlain(page, stats);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (ex is not (OperationCanceledException or OutOfMemoryException))
             {
                 logger.LogInformation("PDF page {Page} could not be read: {Error}", number, ex.GetType().Name);
                 stats.FailedPages++;
@@ -221,7 +227,7 @@ internal sealed class PdfSourceExtractor(IOptions<SourceOptions> options, ILogge
             if (builder.Length > 0)
                 builder.Append(blank > 0 ? "\n\n" : "\n");
             blank = 0;
-            builder.Append(PageMarkers.TryParseMarker(line.Trim(), out _) ? line.Replace("[[", "[ [", StringComparison.Ordinal) : line);
+            builder.Append(line.DefusePageMarker());
         }
 
         return builder.ToString();

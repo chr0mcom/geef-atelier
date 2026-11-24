@@ -2,7 +2,10 @@ using System.Text;
 
 namespace Geef.Atelier.Infrastructure.Sources.Extraction;
 
-/// <summary>Breaks lines that are longer than a limit, at the last space before the limit when there is one.</summary>
+/// <summary>
+/// Breaks lines that are longer than a limit, at the last space before the limit when there is one. A piece of a broken
+/// line that looks like a page marker is neutralised, so wrapping never creates a page break.
+/// </summary>
 internal static class LineWrapper
 {
     /// <summary>Returns <paramref name="text"/> with no line longer than <paramref name="maxLineChars"/>; <paramref name="wrapped"/> tells whether a line was broken.</summary>
@@ -24,10 +27,16 @@ internal static class LineWrapper
                 builder.Append('\n');
             first = false;
 
+            if (line.Length <= maxLineChars)
+            {
+                builder.Append(line);
+                continue;
+            }
+
+            wrapped = true;
             var rest = line.AsSpan();
             while (rest.Length > maxLineChars)
             {
-                wrapped = true;
                 var window = rest[..(maxLineChars + 1)];
                 var cut = window.LastIndexOf(' ');
                 if (cut < maxLineChars / 2)
@@ -35,17 +44,17 @@ internal static class LineWrapper
                     cut = maxLineChars;
                     if (char.IsHighSurrogate(rest[cut - 1]))
                         cut--;
-                    builder.Append(rest[..cut]).Append('\n');
+                    builder.Append(rest[..cut].ToString().DefusePageMarker()).Append('\n');
                     rest = rest[cut..];
                 }
                 else
                 {
-                    builder.Append(rest[..cut].TrimEnd()).Append('\n');
+                    builder.Append(rest[..cut].TrimEnd().ToString().DefusePageMarker()).Append('\n');
                     rest = rest[(cut + 1)..];
                 }
             }
 
-            builder.Append(rest);
+            builder.Append(rest.ToString().DefusePageMarker());
         }
 
         return builder.ToString();
