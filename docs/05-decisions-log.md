@@ -1852,3 +1852,27 @@ between planning and storing an order ends as "One of the files was not found. P
 **Reason.** The security review of stage 1 showed that a 3 KB Word file ended the whole web process (stack overflow),
 a 400 KB PDF used 4.7 GB, and the old time limit did not stop the work. Only a process boundary makes stack overflow,
 memory and CPU limits enforceable; the checks in the extractors keep the common cases fast.
+
+### D-069 addendum, second round — limits of uploads and extracted text (2026-11-24)
+
+**Decision.** (1) One source holds at most `Sources:MaxExtractedChars` (3 million characters; a book of 1,000 pages has
+about 2 million). The extraction process stops as soon as the text passes the limit (Word while scanning the XML
+parts, before the document model; PDF at the page that passes it), text files are counted before decoding, and the
+web process checks again before it copies the text. (2) The answer of the extraction process is limited to 16 MiB
+(the text limit at up to four bytes per character, letters outside ASCII unescaped, plus room for the JSON) and is
+parsed while it streams in. (3) The quota of files no order uses also counts characters (20 million per person) and is
+checked again inside the inserting transaction under a lock per person (`pg_advisory_xact_lock`). (4) The upload
+endpoint reads the multipart body as a stream without a form buffer and takes the person's upload place (at most two
+at the same time, otherwise HTTP 429) and the global upload slot before it reads the body; a request ends after
+5 minutes (HTTP 408) or when it sends slower than 4 KiB/s; pasted text takes no slot. (5) Line ends are unified before
+page-marker look-alikes are neutralised, so a lone `\r` cannot forge a page. (6) The compose file limits the web
+container to 6 GiB (`mem_limit: 6g`).
+
+**Reason.** The second security review showed that a 399 KB Word file (compression ratio 140, within every archive
+limit) produced 58.7 million characters and more than 1 GB in the web process per upload, that the quota counted only
+file bytes and could be passed by parallel uploads, and that the request body was buffered before any slot was taken.
+A text limit at the source closes the first point where the text is still in the limited child process; the lock
+makes the quota exact; streaming makes the slots effective. The memory limit is the second layer: the web process
+usually stays below 1 GB, each extraction process may use 1 GiB of managed heap and at most two run at the same time,
+the rest is headroom; the limit keeps one service from pushing a shared host into swapping or the out-of-memory
+killer.

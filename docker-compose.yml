@@ -9,6 +9,10 @@ services:
     pull_policy: never
     container_name: geef-atelier-web
     restart: unless-stopped
+    # Second layer behind the limits of the source intake (D-069 addendum): the web process usually stays below 1 GB,
+    # each extraction process may use 1 GiB of managed heap (at most two at a time); the limit protects the other
+    # services of a shared host.
+    mem_limit: 6g
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
