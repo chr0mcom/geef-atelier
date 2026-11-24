@@ -14,6 +14,10 @@ public sealed class ProductionSnapshotFixtureTests
     public void EveryProductionSnapshotIsUsableForARun()
     {
         var files = SnapshotFixturesFactAttribute.Files();
+        var minimum = SnapshotFixturesFactAttribute.MinimumCount();
+        Assert.True(files.Count >= minimum,
+            $"{SnapshotFixturesFactAttribute.Variable} holds {files.Count} snapshots, expected at least {minimum} " +
+            $"({SnapshotFixturesFactAttribute.MinimumVariable}); the export looks incomplete.");
         var problems = new List<string>();
 
         foreach (var file in files)
@@ -42,10 +46,19 @@ public sealed class ProductionSnapshotFixtureTests
     }
 }
 
-/// <summary>Skips the test unless <c>ATELIER_SNAPSHOT_FIXTURES</c> points to a directory with JSON files.</summary>
+/// <summary>
+/// Skips the test unless <c>ATELIER_SNAPSHOT_FIXTURES</c> points to a directory with JSON files. The optional
+/// <c>ATELIER_SNAPSHOT_FIXTURES_MIN</c> sets how many files the export must contain at least (default 1), so a partial
+/// export fails instead of passing quietly.
+/// </summary>
 public sealed class SnapshotFixturesFactAttribute : FactAttribute
 {
     public const string Variable = "ATELIER_SNAPSHOT_FIXTURES";
+    public const string MinimumVariable = "ATELIER_SNAPSHOT_FIXTURES_MIN";
+
+    /// <summary>Minimum number of snapshot files from <see cref="MinimumVariable"/>; 1 when unset or not a positive number.</summary>
+    public static int MinimumCount() =>
+        int.TryParse(Environment.GetEnvironmentVariable(MinimumVariable), out var minimum) && minimum > 0 ? minimum : 1;
 
     public SnapshotFixturesFactAttribute()
     {
