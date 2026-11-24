@@ -310,12 +310,15 @@
 
     protected override async Task OnInitializedAsync()
     {
+        var disposeToken = _disposeCts.Token;
         var auth     = await AuthProvider.GetAuthenticationStateAsync();
         var isAdmin  = auth.User.IsInRole("admin");
         var username = auth.User.Identity?.Name;
         _requestingUser = isAdmin ? null : username;
 
         await LoadAsync();
+        if (_disposed)
+            return;
         var subscription = await LiveUpdates.WatchRunAsync(auth.User, RunId, async _ =>
         {
             await InvokeAsync(async () =>
@@ -323,7 +326,7 @@
                 await LoadAsync();
                 StateHasChanged();
             });
-        }, _disposeCts.Token);
+        }, disposeToken);
         if (_disposed)
         {
             subscription?.Dispose();
@@ -490,7 +493,6 @@
     {
         _disposed = true;
         _disposeCts.Cancel();
-        _disposeCts.Dispose();
         _subscription?.Dispose();
         return ValueTask.CompletedTask;
     }
