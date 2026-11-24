@@ -1,6 +1,8 @@
+using Geef.Atelier.Application.Crew.Finalizers;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
@@ -8,6 +10,7 @@ using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Geef.Atelier.Tests.Orchestrator;
 
@@ -186,6 +189,52 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
         Assert.Contains("Service restarted", run.ErrorMessage);
     }
 
+    [Fact(Timeout = 30_000)]
+    public async Task SkippedAndFailingFinishingStepsBecomeWarnings()
+    {
+        var snapshot = TestCrewSnapshots.Klassik with
+        {
+            Finalizers =
+            [
+                new FinalizerProfile("skipping-step", "Skipping step", "d", FinalizerType.Transform, [], false),
+                new FinalizerProfile("throwing-step", "Throwing step", "d", FinalizerType.MetadataEnrich, [], false),
+                new FinalizerProfile("error-step", "Error step", "d", FinalizerType.FileExport, [], false),
+            ],
+        };
+        var runId = await CreateRunAsync(TestCrewSnapshots.Serialize(snapshot));
+        await using var host = new OrchestratorTestHost(fixture, new FakeLlmClient(), FastOptions(),
+            services => services.AddSingleton<IFinalizerExecutorFactory, ScriptedFinalizerFactory>());
+        await host.StartAsync();
+
+        var run = await WaitForTerminalAsync(runId);
+        var warnings = await WaitForWarningsAsync(runId, 3);
+
+        Assert.Equal((RunOutcome?)RunOutcome.Converged, run.Outcome);
+        Assert.Contains(warnings, w => w.Code == RunWarningCodes.FinalizerSkipped && w.Message.Contains("Skipping step") && w.Message.Contains("nothing to do"));
+        Assert.Contains(warnings, w => w.Code == RunWarningCodes.FinalizerFailed && w.Message.Contains("Throwing step") && w.Message.Contains("exploded"));
+        Assert.Contains(warnings, w => w.Code == RunWarningCodes.FinalizerFailed && w.Message.Contains("Error step") && w.Message.Contains("disk full"));
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task FinishingStepsThatAreNotRunAfterNonConvergenceBecomeAWarning()
+    {
+        var snapshot = TestCrewSnapshots.Klassik with
+        {
+            ConvergenceOverride = new ConvergencePolicyOverride(MaxIterations: 1, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
+            Finalizers = [new FinalizerProfile("export", "Export", "d", FinalizerType.FileExport, [], false)],
+            RunFinalizersOnMaxAttempts = false,
+        };
+        var runId = await CreateRunAsync(TestCrewSnapshots.Serialize(snapshot));
+
+        await using var host = new OrchestratorTestHost(fixture, new RejectingFakeLlmClient(), FastOptions());
+        await host.StartAsync();
+        var run = await WaitForTerminalAsync(runId);
+        var warnings = await WaitForWarningsAsync(runId, 1);
+
+        Assert.Equal((RunOutcome?)RunOutcome.DeliveredWithOpenPoints, run.Outcome);
+        Assert.Contains(warnings, w => w.Code == RunWarningCodes.FinalizersNotRun);
+    }
+
     private async Task<Guid> CreateRunAsync(string? crewSnapshotJson)
     {
         await using var db = fixture.NewContext();
@@ -230,10 +279,49 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
             .ToDictionaryAsync(g => g.Key, g => g.Count());
     }
 
+    private async Task<List<RunWarningEntity>> WaitForWarningsAsync(Guid runId, int expected)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (true)
+        {
+            var warnings = await WarningsAsync(runId);
+            if (warnings.Count >= expected || DateTime.UtcNow > deadline)
+                return warnings;
+            await Task.Delay(100);
+        }
+    }
+
     private async Task<List<RunWarningEntity>> WarningsAsync(Guid runId)
     {
         await using var db = fixture.NewContext();
         return await db.RunWarnings.AsNoTracking().Where(w => w.RunId == runId).ToListAsync();
+    }
+
+    private sealed class ScriptedFinalizerFactory : IFinalizerExecutorFactory
+    {
+        public IFinalizerExecutor GetExecutor(FinalizerType type) => new Scripted(type);
+
+        private sealed class Scripted(FinalizerType type) : IFinalizerExecutor
+        {
+            public FinalizerType Type => type;
+
+            public Task<FinalizerExecutionResult> ExecuteAsync(FinalizerProfile profile, FinalizerExecutionContext context, CancellationToken cancellationToken) =>
+                type switch
+                {
+                    FinalizerType.Transform => Task.FromResult(new FinalizerExecutionResult(null, null, null, profile.Name, SkipReason: "nothing to do")),
+                    FinalizerType.FileExport => Task.FromResult(new FinalizerExecutionResult(null, new RunArtifact
+                    {
+                        Id = Guid.NewGuid(),
+                        RunId = context.RunId,
+                        FinalizerProfileName = profile.Name,
+                        ArtifactType = ArtifactType.Status,
+                        StorageUri = "error",
+                        StatusMessage = "disk full",
+                        CreatedAt = DateTimeOffset.UtcNow,
+                    }, null, profile.Name)),
+                    _ => throw new InvalidOperationException("exploded"),
+                };
+        }
     }
 
     private sealed class CountingLlmClient : ILlmClient

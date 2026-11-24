@@ -1,5 +1,6 @@
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Application.Crew.Knowledge;
+using Geef.Atelier.Application.Crew.Models;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
@@ -9,6 +10,7 @@ using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Knowledge;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Persistence;
+using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Tests.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -151,6 +153,72 @@ public sealed class RunServiceAttachmentTests
         Assert.Contains("Attachment upload failed", persistence.LastFailureMessage);
     }
 
+    [Fact]
+    public async Task SubmitRunAsync_WithAttachments_StoresTheSnapshotOnlyAfterTheUpload()
+    {
+        var persistence = new CapturingPersistenceService();
+        var knowledge   = new CapturingKnowledgeService(() => persistence.LastUpdatedSnapshotJson);
+        var svc         = BuildService(persistence: persistence, knowledge: knowledge);
+
+        await svc.SubmitRunAsync(new SubmitRunRequest("briefing", "{}",
+            Attachments: [new RunAttachmentInput("doc.md", "text/markdown", "content"u8.ToArray())]));
+
+        Assert.True(persistence.CreatedWithSnapshot.HasValue);
+        Assert.False(persistence.CreatedWithSnapshot!.Value);
+        Assert.All(knowledge.SnapshotSeenDuringUpload, Assert.Null);
+        Assert.NotNull(persistence.LastUpdatedSnapshotJson);
+    }
+
+    [Fact]
+    public async Task SubmitRunAsync_WithoutAttachments_StoresTheSnapshotAtCreation()
+    {
+        var persistence = new CapturingPersistenceService();
+        var svc         = BuildService(persistence: persistence);
+
+        await svc.SubmitRunAsync(new SubmitRunRequest("briefing", "{}"));
+
+        Assert.True(persistence.CreatedWithSnapshot);
+    }
+
+    [Fact]
+    public async Task SubmitRunAsync_WithAttachments_DoesNotAddRunAttachmentsTwice()
+    {
+        var persistence = new CapturingPersistenceService();
+        var customCrew = new CrewSpec(
+            ExecutorProfileName: SystemCrew.DefaultExecutorProfile.Name,
+            ReviewerProfileNames: [SystemCrew.BriefingFidelityProfile.Name],
+            EvaluationStrategy: EvaluationStrategy.Parallel,
+            ConvergenceOverride: null,
+            GroundingProviderNames: [SystemCrew.TavilyRefinedProfile.Name, SystemCrew.RunAttachmentsProfile.Name]);
+        var svc = BuildService(persistence: persistence, knowledge: new CapturingKnowledgeService());
+
+        await svc.SubmitRunAsync(new SubmitRunRequest("briefing", "{}", CustomCrew: customCrew,
+            Attachments: [new RunAttachmentInput("doc.md", "text/markdown", "x"u8.ToArray())]));
+
+        var names = CrewSnapshot.Deserialize(persistence.LastUpdatedSnapshotJson)!.GroundingProviders!.Select(p => p.Name).ToList();
+        Assert.Equal([SystemCrew.TavilyRefinedProfile.Name, SystemCrew.RunAttachmentsProfile.Name], names);
+    }
+
+    [Fact]
+    public async Task SubmitRunAsync_StoresModelAssignmentWarningsOnTheNewRun()
+    {
+        var persistence = new CapturingPersistenceService();
+        var sink        = new Geef.Atelier.Tests.Pipeline.RecordingWarningSink();
+        var crew        = new StubCrewService
+        {
+            Warnings = [new ModelAssignmentWarning("briefing-fidelity", "no usable candidate for slot FactReviewer; falling back")],
+        };
+        var svc = new RunService(persistence, new StubRunRepository(), crew, new StubAdvisorConsultationRepository(),
+            new NoOpKnowledgeService(), NullLogger<RunService>.Instance, warningSink: sink);
+
+        var runId = await svc.SubmitRunAsync(new SubmitRunRequest("briefing", "{}"));
+
+        var warning = Assert.Single(sink.Warnings);
+        Assert.Equal((runId, RunWarningSources.ModelAssignment, RunWarningCodes.ModelAssignment), (warning.RunId, warning.Source, warning.Code));
+        Assert.Contains("briefing-fidelity", warning.Message);
+        Assert.Contains("falling back", warning.Message);
+    }
+
     // --- Builder ---
 
     private static RunService BuildService(
@@ -171,6 +239,7 @@ public sealed class RunServiceAttachmentTests
         private Guid _lastRunId = Guid.NewGuid();
         public string? LastUpdatedSnapshotJson { get; private set; }
         public string? LastFailureMessage { get; private set; }
+        public bool? CreatedWithSnapshot { get; private set; }
 
         public Task<Guid> CreateRunAsync(
             string briefingText, string configJson,
@@ -179,6 +248,7 @@ public sealed class RunServiceAttachmentTests
             Guid? parentCompositionRunId = null,
             CancellationToken cancellationToken = default)
         {
+            CreatedWithSnapshot = crewSnapshotJson is not null;
             _lastRunId = Guid.NewGuid();
             return Task.FromResult(_lastRunId);
         }
@@ -202,15 +272,17 @@ public sealed class RunServiceAttachmentTests
             => Task.FromResult(Guid.NewGuid());
     }
 
-    private sealed class CapturingKnowledgeService : IKnowledgeService
+    private sealed class CapturingKnowledgeService(Func<string?>? snapshotProbe = null) : IKnowledgeService
     {
         public record UploadCall(Guid RunId, string Filename, string ContentType);
         public List<UploadCall> UploadCalls { get; } = [];
+        public List<string?> SnapshotSeenDuringUpload { get; } = [];
 
         public Task<KnowledgeDocument> UploadRunAttachmentAsync(
             Guid runId, string title, Stream content, string filename,
             string contentType, CancellationToken ct)
         {
+            SnapshotSeenDuringUpload.Add(snapshotProbe?.Invoke());
             UploadCalls.Add(new UploadCall(runId, filename, contentType));
             return Task.FromResult(MakeDoc(runId));
         }
@@ -248,6 +320,11 @@ public sealed class RunServiceAttachmentTests
 
     private sealed class StubCrewService : ICrewService
     {
+        public IReadOnlyList<ModelAssignmentWarning> Warnings { get; init; } = [];
+
+        public async Task<ResolvedCrewSnapshot> ResolveSnapshotWithWarningsAsync(string? crewTemplateName, CrewSpec? customCrew, CancellationToken cancellationToken = default)
+            => new(await ResolveSnapshotAsync(crewTemplateName, customCrew, cancellationToken), Warnings);
+
         public Task<CrewSnapshot> ResolveSnapshotAsync(string? crewTemplateName, CrewSpec? customCrew, CancellationToken cancellationToken = default)
         {
             IReadOnlyList<GroundingProviderProfile>? groundingProviders = null;

@@ -32,7 +32,8 @@ internal sealed class OrchestratorTestHost : IAsyncDisposable
     public OrchestratorTestHost(
         PostgresFixture      fixture,
         ILlmClient           llmClient,
-        OrchestratorOptions? options = null)
+        OrchestratorOptions? options = null,
+        Action<IServiceCollection>? configureServices = null)
     {
         var opts = options ?? new OrchestratorOptions
         {
@@ -63,6 +64,7 @@ internal sealed class OrchestratorTestHost : IAsyncDisposable
                 services.AddSingleton<IOptions<ConvergenceOptions>>(
                     Options.Create(new ConvergenceOptions()));
                 services.AddSingleton<IRunNotifier, NoOpRunNotifier>();
+                configureServices?.Invoke(services);
                 services.AddHostedService<RunOrchestratorService>();
             })
             .Build();

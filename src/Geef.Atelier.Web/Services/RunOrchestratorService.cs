@@ -42,6 +42,7 @@ internal sealed class RunOrchestratorService(
     IRunWarningSink?                    warningSink = null) : BackgroundService
 {
     private readonly OrchestratorOptions _opts = options.Value;
+    private readonly DateTimeOffset _createdAt = DateTimeOffset.UtcNow;
     private readonly SemaphoreSlim _slots = new(options.Value.MaxConcurrentRuns, options.Value.MaxConcurrentRuns);
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _runCts   = new();
     private readonly ConcurrentDictionary<Guid, Task>                    _runTasks  = new();
@@ -49,10 +50,9 @@ internal sealed class RunOrchestratorService(
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var serviceStartedAt = DateTimeOffset.UtcNow;
         try
         {
-            await RecoverCrashedRunsAsync(serviceStartedAt, stoppingToken);
+            await RecoverCrashedRunsAsync(_createdAt, stoppingToken);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
@@ -96,10 +96,10 @@ internal sealed class RunOrchestratorService(
 
     /// <summary>
     /// On startup, marks any runs left in Running state as Failed — they were interrupted by a crash or restart.
-    /// Pending runs without a saved snapshot that were created before this start were still being prepared when
-    /// the previous instance stopped; they can never become ready and are failed as well.
+    /// Pending runs without a saved snapshot that were created before this service instance existed were still
+    /// being prepared when the previous instance stopped; they can never become ready and are failed as well.
     /// </summary>
-    private async Task RecoverCrashedRunsAsync(DateTimeOffset serviceStartedAt, CancellationToken stoppingToken)
+    private async Task RecoverCrashedRunsAsync(DateTimeOffset createdBefore, CancellationToken stoppingToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
@@ -116,7 +116,7 @@ internal sealed class RunOrchestratorService(
         if (affected > 0)
             logger.LogWarning("Crash recovery: marked {Count} stale Running runs as Failed.", affected);
 
-        var unprepared = await FailUnpreparedRunsAsync(db, serviceStartedAt, "Service restarted while the task was being prepared", stoppingToken);
+        var unprepared = await FailUnpreparedRunsAsync(db, createdBefore, "Service restarted while the task was being prepared", stoppingToken);
         if (unprepared > 0)
             logger.LogWarning("Crash recovery: marked {Count} Pending runs without snapshot as Failed.", unprepared);
     }

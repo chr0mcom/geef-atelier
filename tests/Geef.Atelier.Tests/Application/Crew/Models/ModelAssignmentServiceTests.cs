@@ -291,6 +291,38 @@ public sealed class ModelAssignmentServiceTests
         Assert.Equal("gpt-astra-latest", result.Reviewers[0].Model);
     }
 
+    [Fact]
+    public async Task ApplyCollectsAWarningPerAssignmentThatDidNotGoAsPlanned()
+    {
+        var catalog = new FakeCatalog { Lists = { ["claude-cli"] = ["claude-sonnet-latest"] } };
+        var snapshot = new CrewSnapshot(
+            CrewSnapshot.CurrentSchemaVersion, null,
+            new ExecutorProfile("writer", "E", "d", "p", "claude-cli", "claude-opus-latest", 32000, false, ModelSlot: ModelSlot.Executor),
+            [new ReviewerProfile("domain", "D", "d", "p", "x", "y", 8000, false, ModelSlot: ModelSlot.DomainReviewer)],
+            EvaluationStrategy.Parallel, null, []);
+        var warnings = new List<ModelAssignmentWarning>();
+
+        await Service(catalog).ApplyAsync(snapshot, warnings);
+
+        var warning = Assert.Single(warnings, w => w.ActorName == "writer");
+        Assert.Contains("not available", warning.Detail);
+    }
+
+    [Fact]
+    public async Task ApplyWithoutWarningsReportsNothing()
+    {
+        var snapshot = new CrewSnapshot(
+            CrewSnapshot.CurrentSchemaVersion, null,
+            new ExecutorProfile("writer", "E", "d", "p", "claude-cli", "claude-opus-latest", 32000, false, ModelSlot: ModelSlot.Executor),
+            [new ReviewerProfile("domain", "D", "d", "p", "x", "y", 8000, false, ModelSlot: ModelSlot.DomainReviewer)],
+            EvaluationStrategy.Parallel, null, []);
+        var warnings = new List<ModelAssignmentWarning>();
+
+        await Service().ApplyAsync(snapshot, warnings);
+
+        Assert.Empty(warnings);
+    }
+
     private static ReviewerAssignmentRequest Managed(ModelSlot slot) => new(slot, null, new ModelCandidate("", ""));
 
     private sealed class FakeCatalog : IModelCatalog

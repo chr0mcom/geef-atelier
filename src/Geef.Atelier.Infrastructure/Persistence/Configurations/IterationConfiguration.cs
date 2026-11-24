@@ -14,6 +14,11 @@ internal sealed class IterationConfiguration : IEntityTypeConfiguration<Iteratio
 
         builder.HasIndex(i => i.RunId);
 
+        builder.HasOne<RunEntity>()
+            .WithMany()
+            .HasForeignKey(i => i.RunId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.Property(i => i.ExecutorInputTokens).IsRequired(false);
         builder.Property(i => i.ExecutorOutputTokens).IsRequired(false);
 
