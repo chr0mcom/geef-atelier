@@ -12,6 +12,8 @@ public interface IVectorSearchRepository
     /// <paramref name="queryEmbedding"/>, optionally filtered to chunks whose parent document
     /// contains at least one tag from <paramref name="tagFilter"/>, belongs to
     /// <paramref name="scopeFilter"/>, or is attached to run <paramref name="runIdFilter"/>.
+    /// Run-local documents are returned only when they belong to <paramref name="runIdFilter"/>; a search without a
+    /// run id never returns any run's attachments.
     /// </summary>
     Task<IReadOnlyList<VectorSearchResult>> SearchAsync(
         float[] queryEmbedding,

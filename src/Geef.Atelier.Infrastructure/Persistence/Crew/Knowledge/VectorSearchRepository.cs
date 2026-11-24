@@ -10,6 +10,8 @@ namespace Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge;
 /// Pgvector.EntityFrameworkCore 0.3.0 is incompatible with Npgsql 10.x.
 /// Named parameters (@name) are used instead of positional ($N) to avoid
 /// Npgsql auto-prepare cache conflicts across pooled connections.
+/// Run-local documents (attachments) are only returned for the run named in <c>runIdFilter</c>; without it the
+/// search never reaches another run's attachments, whatever the other filters say.
 /// </summary>
 internal sealed class VectorSearchRepository(AtelierDbContext context) : IVectorSearchRepository
 {
@@ -35,6 +37,7 @@ internal sealed class VectorSearchRepository(AtelierDbContext context) : IVector
                 WHERE 1=1
                   AND (@scopeFilter IS NULL OR d.""Scope"" = @scopeFilter)
                   AND (@runIdFilter IS NULL OR d.""RunId"" = @runIdFilter)
+                  AND (d.""Scope"" <> @runLocalScope OR d.""RunId"" = @runIdFilter)
                   AND (@tags IS NULL OR d.""Tags"" && @tags::text[])
                 ORDER BY c.""Embedding"" <=> @vec::vector
                 LIMIT @topk";
@@ -49,6 +52,8 @@ internal sealed class VectorSearchRepository(AtelierDbContext context) : IVector
         var scopeParam = new Npgsql.NpgsqlParameter("@scopeFilter", NpgsqlTypes.NpgsqlDbType.Integer);
         scopeParam.Value = scopeFilter.HasValue ? (object)(int)scopeFilter.Value : DBNull.Value;
         cmd.Parameters.Add(scopeParam);
+
+        cmd.Parameters.AddWithValue("@runLocalScope", (int)KnowledgeScope.RunLocal);
 
         var runIdParam = new Npgsql.NpgsqlParameter("@runIdFilter", NpgsqlTypes.NpgsqlDbType.Uuid);
         runIdParam.Value = runIdFilter.HasValue ? (object)runIdFilter.Value : DBNull.Value;
