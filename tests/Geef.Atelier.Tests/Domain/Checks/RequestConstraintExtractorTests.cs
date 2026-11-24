@@ -51,7 +51,7 @@ public sealed class RequestConstraintExtractorTests
     [InlineData("Mehr als 100 Wörter sollen es nicht sein.", 100)]
     [InlineData("Der Text darf nicht mehr als 250 Wörter haben.", 250)]
     [InlineData("Schreibe ohne mehr als 80 Wörter zu brauchen eine Einladung.", 80)]
-    [InlineData("More than 300 words is not what I want.", 300)]
+    [InlineData("It must not exceed 300 words.", 300)]
     public void A_negated_more_than_is_an_upper_limit(string request, int max)
     {
         var length = RequestConstraintExtractor.Extract(request).Length;
@@ -81,10 +81,10 @@ public sealed class RequestConstraintExtractorTests
     }
 
     [Theory]
-    [InlineData("Ich will keinen kurzen Text, schreibe mehr als 300 Wörter.")]
-    [InlineData("Don't make it boring and write more than 300 words.")]
-    [InlineData("Schreibe einen Beitrag, der nicht langweilig ist, mit mehr als 500 Wörtern.")]
-    public void A_negation_elsewhere_in_the_sentence_leaves_the_length_unchecked(string request)
+    [InlineData("Ich will keinen Text mit mehr als 300 Wörtern.")]
+    [InlineData("More than 300 words is not what I want.")]
+    [InlineData("Der Text soll keine mehr als 300 Wörter haben.")]
+    public void A_negation_elsewhere_in_the_clause_leaves_the_length_unchecked(string request)
     {
         var constraints = RequestConstraintExtractor.Extract(request);
 
