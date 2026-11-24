@@ -274,6 +274,24 @@ public sealed class OrderDetailTests : TestContext
     }
 
     [Fact]
+    public async Task TheTabTitleFollowsTheState()
+    {
+        var title = JSInterop.SetupModule("./js/page-title.js");
+        title.SetupVoid("set", _ => true).SetVoidResult();
+        var view = _orders.Add("alice", OrderTestData.View(OrderDisplayState.Working, title: "Delay email"));
+        var cut = Render(view.OrderId);
+        await WaitUntilAsync(() => _feed.OrderHandler is not null);
+        cut.WaitForAssertion(() => Assert.Contains(title.Invocations["set"], i => (string)i.Arguments[0]! == "Writing · Delay email — Atelier"));
+
+        var done = OrderTestData.View(OrderDisplayState.Delivered, orderId: view.OrderId, title: "Delay email");
+        _orders.Update(view.OrderId, _ => done);
+        _orders.SetResult(OrderTestData.Result(done));
+        await _feed.OrderHandler!(view.OrderId);
+
+        cut.WaitForAssertion(() => Assert.Contains(title.Invocations["set"], i => (string)i.Arguments[0]! == "Ready · Delay email — Atelier"));
+    }
+
+    [Fact]
     public async Task ItReloadsOnceAfterSubscribingSoAFinalUpdateIsNotLost()
     {
         var view = _orders.Add("alice", OrderTestData.View(OrderDisplayState.Working));

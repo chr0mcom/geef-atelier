@@ -10,6 +10,7 @@
 @inject IRunUpdateFeed LiveUpdates
 @inject CircuitDataGate DataGate
 @inject ILogger<OrderDetail> Logger
+@inject IJSRuntime JS
 
 <PageTitle>@TabTitle</PageTitle>
 
@@ -153,6 +154,8 @@
     string? _requestingUser;
     DateTimeOffset _loadedAt = DateTimeOffset.UtcNow;
     IDisposable? _subscription;
+    IJSObjectReference? _titleModule;
+    string? _shownTitle;
     System.Threading.Timer? _clock;
     bool _disposed;
     readonly CancellationTokenSource _disposeCts = new();
@@ -200,10 +203,24 @@
             await LoadAsync();
     }
 
-    protected override void OnAfterRender(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender && !_disposed)
             _clock = new System.Threading.Timer(_ => _ = TickAsync(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        var title = TabTitle;
+        if (title == _shownTitle || _disposed)
+            return;
+        _shownTitle = title;
+        try
+        {
+            _titleModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/page-title.js");
+            if (_titleModule is not null)
+                await _titleModule.InvokeVoidAsync("set", title);
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException or InvalidOperationException)
+        {
+            Logger.LogDebug(ex, "Updating the tab title failed");
+        }
     }
 
     async Task TickAsync()
@@ -282,12 +299,22 @@
     static string Shorten(string text, int max) =>
         text.Length > max ? text[..max].TrimEnd() + "…" : text;
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         _disposed = true;
         _disposeCts.Cancel();
         _subscription?.Dispose();
         _clock?.Dispose();
-        return ValueTask.CompletedTask;
+        if (_titleModule is not null)
+        {
+            try
+            {
+                await _titleModule.DisposeAsync();
+            }
+            catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException)
+            {
+                Logger.LogDebug(ex, "Releasing the title script failed");
+            }
+        }
     }
 }
