@@ -610,13 +610,13 @@ Helpers: `SubmitAsync` (real `IRunService`), `WaitForTerminalAsync` (waits for a
 
 **What it proves:** a request runs through the real wiring from submission (web or MCP) to the stored
 result, and the content of attachments and web search actually reaches the executor prompt. The tests
-with the trait `Etappe0=NachReparatur` fail when the grounding repair of D-067 is reverted; this was
-checked by reverting it.
+in `PromptWiringEndToEndTests` fail when the grounding repair of D-067 is reverted; this was checked by
+reverting it. They are ordinary regression tests without a special trait.
 
 ```bash
 export MSBUILDNODEREUSE=0 DOTNET_CLI_TELEMETRY_OPTOUT=1
 dotnet test tests/Geef.Atelier.Tests/Geef.Atelier.Tests.csproj --filter "FullyQualifiedName~Geef.Atelier.Tests.EndToEnd"
-dotnet test tests/Geef.Atelier.Tests/Geef.Atelier.Tests.csproj --filter "Etappe0=NachReparatur"
+dotnet test tests/Geef.Atelier.Tests/Geef.Atelier.Tests.csproj --filter "FullyQualifiedName~PromptWiringEndToEndTests"
 ```
 
 The tests need Docker (Testcontainers) and run in their own collection without parallelism. A new

@@ -29,7 +29,6 @@ public sealed class PromptWiringEndToEndTests(PostgresFixture postgres)
         "Write a short factual summary about the history of the Nordkap lighthouse for a visitor leaflet.";
 
     [Fact]
-    [Trait(EndToEndCollection.StageTrait, EndToEndCollection.AfterRepair)]
     public async Task Attachment_content_reaches_the_executor_prompt()
     {
         await using var host = await AtelierEndToEndHost.StartAsync(postgres);
@@ -47,7 +46,6 @@ public sealed class PromptWiringEndToEndTests(PostgresFixture postgres)
     }
 
     [Fact]
-    [Trait(EndToEndCollection.StageTrait, EndToEndCollection.AfterRepair)]
     public async Task Web_search_result_reaches_the_executor_prompt()
     {
         await using var host = await AtelierEndToEndHost.StartAsync(postgres);
@@ -65,7 +63,6 @@ public sealed class PromptWiringEndToEndTests(PostgresFixture postgres)
     }
 
     [Fact]
-    [Trait(EndToEndCollection.StageTrait, EndToEndCollection.AfterRepair)]
     public async Task Classic_crew_delivers_web_search_and_attachment_side_by_side()
     {
         await using var host = await AtelierEndToEndHost.StartAsync(postgres);
@@ -87,7 +84,6 @@ public sealed class PromptWiringEndToEndTests(PostgresFixture postgres)
     }
 
     [Fact]
-    [Trait(EndToEndCollection.StageTrait, EndToEndCollection.SequenceDefect)]
     public async Task Two_tool_backed_grounding_providers_both_reach_the_executor_prompt()
     {
         await using var host = await AtelierEndToEndHost.StartAsync(postgres);
