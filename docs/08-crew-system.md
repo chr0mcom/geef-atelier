@@ -250,7 +250,8 @@ Since D-067:
 
 - `Runs.Outcome` is set only after the finalizers have finished and the (possibly transformed) final text is stored, so `Outcome` means "finished and stored, including all finalizers" ([02-architecture](02-architecture.md#run-outcome-and-runstatus)).
 - A finalizer that fails, is skipped, or is not run (best-effort run without `RunFinalizersOnMaxAttempts`) becomes a run warning (`finalizer.failed`, `finalizer.skipped`, `finalizer.not_run`) instead of passing silently.
-- A cancellation or service stop while the finalizers run is not a finalizer failure: the run ends with `Outcome = Aborted` and gets no `finalizer.failed` warning. A text stored before the stop stays readable.
+- A cancellation or service stop while the finalizers run is not a finalizer failure: the run ends with `Outcome = Aborted` and gets no `finalizer.failed` warning. The results of finalizers that finished before the stop are kept (changed text, artifacts, costs); the remaining ones do not run. The status of a converged run stays `Completed`; `Outcome` is what counts.
+- If the service is stopped hard while the finalizers run, the next start gives the run an outcome and the warning `run.restarted_while_finishing` (source `run`).
 - If the result cannot be stored completely, the run gets the warning `run.result_not_saved` (source `run`) and `Outcome = Failed`.
 
 ### RunArtifact entity

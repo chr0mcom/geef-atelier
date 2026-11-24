@@ -217,7 +217,8 @@ auf einen terminalen `status`), und liest erst dann `finalText`; vorher kann ein
 ändern.
 
 `outcome = "Failed"` oder `"Aborted"` heißt nicht, dass es keinen Text gibt: Ein Lauf, der nach dem
-Speichern seines Textes abgebrochen wurde, behält ihn, und ein Lauf, dessen Ergebnis nicht vollständig
+Speichern seines Textes abgebrochen wurde, behält ihn (ein während der Finalizer gestoppter Lauf kann sogar
+`status = "Completed"` mit `outcome = "Aborted"` behalten), und ein Lauf, dessen Ergebnis nicht vollständig
 gespeichert werden konnte, ist `Failed` mit der Warnung `run.result_not_saved`. `finalText` im Ergebnis
 prüfen; bei `Failed` ist er nicht sicher vollständig. Einzelheiten:
 [02-architecture](02-architecture_de.md#lauf-ergebnis-outcome-und-runstatus).

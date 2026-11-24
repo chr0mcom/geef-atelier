@@ -104,16 +104,13 @@ internal sealed class RunOrchestratorService(
     /// Pending runs without a saved snapshot that were created before this service instance existed were still
     /// being prepared when the previous instance stopped; they can never become ready and are failed as well.
     /// Runs that were stopped while their finishing steps ran keep their terminal status but have no outcome; they
-    /// get one now (<see cref="RecoverRunsInterruptedWhileFinishingAsync"/>).
+    /// get one afterwards (<see cref="RecoverRunsInterruptedWhileFinishingAsync"/>). That repair runs last and on its
+    /// own: when it fails, it is logged and the resets before it stay in effect.
     /// </summary>
     private async Task RecoverCrashedRunsAsync(DateTimeOffset createdBefore, CancellationToken stoppingToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
-
-        var finishing = await RecoverRunsInterruptedWhileFinishingAsync(db, stoppingToken);
-        if (finishing > 0)
-            logger.LogWarning("Crash recovery: recorded an outcome for {Count} runs stopped while finishing.", finishing);
 
         var affected = await db.Runs
             .Where(r => r.Status == RunStatus.Running)
@@ -130,6 +127,17 @@ internal sealed class RunOrchestratorService(
         var unprepared = await FailUnpreparedRunsAsync(db, createdBefore, "Service restarted while the task was being prepared", stoppingToken);
         if (unprepared > 0)
             logger.LogWarning("Crash recovery: marked {Count} Pending runs without snapshot as Failed.", unprepared);
+
+        try
+        {
+            var finishing = await RecoverRunsInterruptedWhileFinishingAsync(db, stoppingToken);
+            if (finishing > 0)
+                logger.LogWarning("Crash recovery: recorded an outcome for {Count} runs stopped while finishing.", finishing);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !stoppingToken.IsCancellationRequested)
+        {
+            logger.LogError("Crash recovery: runs stopped while finishing could not be given an outcome: {Error}", ex.ToRedactedLogText());
+        }
     }
 
     /// <summary>
@@ -192,7 +200,8 @@ internal sealed class RunOrchestratorService(
 
     /// <summary>
     /// Loads at most <c>_slots.CurrentCount</c> Pending runs from the database and dispatches each
-    /// after an atomic claim to prevent double-processing in multi-instance deployments.
+    /// after an atomic claim. The orchestrator assumes a single instance: the crash recovery at start resets every
+    /// Running run, so a second instance would fail the runs of the first.
     /// A Pending run without a snapshot is still being prepared (attachments are uploaded before the snapshot is
     /// written) and is left alone until it is ready or exceeds <see cref="OrchestratorOptions.PreparationTimeout"/>.
     /// </summary>
@@ -770,6 +779,8 @@ internal sealed class RunOrchestratorService(
     /// artifacts and the error message is set on the run row (partial-success contract).
     /// A cancellation of <paramref name="ct"/> (user cancel or service stop) is not a step failure: it propagates
     /// without a warning or an error artifact, also when an executor swallowed it and returned an error result.
+    /// The results of the steps that finished before the cancellation (changed text, costs, error notes) are stored
+    /// first, so the run matches the artifacts those steps already wrote; the remaining steps do not run.
     /// </summary>
     private async Task ExecuteFinalizationAsync(
         Guid runId,
@@ -805,76 +816,103 @@ internal sealed class RunOrchestratorService(
             CurrentText: currentText,
             RunCompletedAt: completedAt);
 
-        foreach (var profile in finalizers)
+        try
         {
-            try
+            foreach (var profile in finalizers)
             {
-                var executor = finalizerExecutorFactory.GetExecutor(profile.FinalizerType);
-                var ctx = baseContext with { CurrentText = currentText };
-                var result = await executor.ExecuteAsync(profile, ctx, ct);
-                ct.ThrowIfCancellationRequested();
-
-                if (result.UpdatedText is not null)
-                    currentText = result.UpdatedText;
-
-                if (result.Artifact is not null)
-                    await artifactRepo.CreateAsync(result.Artifact.WithRedactedStatus(), ct);
-
-                await ReportFinalizerResultAsync(runId, profile, result);
-
-                if (result.InputTokens > 0)
+                try
                 {
-                    costEntities.Add(new FinalizationActorCost
+                    var executor = finalizerExecutorFactory.GetExecutor(profile.FinalizerType);
+                    var ctx = baseContext with { CurrentText = currentText };
+                    var result = await executor.ExecuteAsync(profile, ctx, ct);
+                    ct.ThrowIfCancellationRequested();
+
+                    if (result.UpdatedText is not null)
+                        currentText = result.UpdatedText;
+
+                    if (result.Artifact is not null)
+                        await artifactRepo.CreateAsync(result.Artifact.WithRedactedStatus(), ct);
+
+                    await ReportFinalizerResultAsync(runId, profile, result);
+
+                    if (result.InputTokens > 0)
+                    {
+                        costEntities.Add(new FinalizationActorCost
+                        {
+                            Id = Guid.NewGuid(),
+                            RunId = runId,
+                            ActorName = result.ActorName,
+                            ModelName = result.ModelName,
+                            InputTokens = result.InputTokens,
+                            OutputTokens = result.OutputTokens,
+                            CostEur = result.CostEur,
+                            ProviderName = result.ProviderName,
+                            CreatedAt = DateTimeOffset.UtcNow,
+                        });
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+                {
+                    logger.LogError("Finalizer {Profile} threw unexpectedly for run {RunId}: {Error}",
+                        profile.Name, runId, ex.ToRedactedLogText());
+                    var failedMessage = $"The finishing step \"{profile.DisplayNameOrName()}\" failed.";
+                    errorMessages.Add(failedMessage);
+                    await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerFailed, failedMessage);
+
+                    var errorArtifact = new RunArtifact
                     {
                         Id = Guid.NewGuid(),
                         RunId = runId,
-                        ActorName = result.ActorName,
-                        ModelName = result.ModelName,
-                        InputTokens = result.InputTokens,
-                        OutputTokens = result.OutputTokens,
-                        CostEur = result.CostEur,
-                        ProviderName = result.ProviderName,
+                        FinalizerProfileName = profile.Name,
+                        ArtifactType = ArtifactType.Status,
+                        StorageUri = "error",
+                        StatusMessage = FinalizerUnexpectedErrorMessage,
                         CreatedAt = DateTimeOffset.UtcNow,
-                    });
-                }
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
-            {
-                logger.LogError("Finalizer {Profile} threw unexpectedly for run {RunId}: {Error}",
-                    profile.Name, runId, ex.ToRedactedLogText());
-                var failedMessage = $"The finishing step \"{profile.DisplayNameOrName()}\" failed.";
-                errorMessages.Add(failedMessage);
-                await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerFailed, failedMessage);
-
-                // Persist a Status artifact so the failure is visible in the Run detail UI.
-                var errorArtifact = new RunArtifact
-                {
-                    Id = Guid.NewGuid(),
-                    RunId = runId,
-                    FinalizerProfileName = profile.Name,
-                    ArtifactType = ArtifactType.Status,
-                    StorageUri = "error",
-                    StatusMessage = FinalizerUnexpectedErrorMessage,
-                    CreatedAt = DateTimeOffset.UtcNow,
-                };
-                try { await artifactRepo.CreateAsync(errorArtifact, ct); }
-                catch (Exception dbEx)
-                {
-                    logger.LogError(dbEx,
-                        "Failed to persist error artifact for finalizer {Profile}, run {RunId}.",
-                        profile.Name, runId);
+                    };
+                    try { await artifactRepo.CreateAsync(errorArtifact, ct); }
+                    catch (Exception dbEx)
+                    {
+                        logger.LogError(dbEx,
+                            "Failed to persist error artifact for finalizer {Profile}, run {RunId}.",
+                            profile.Name, runId);
+                    }
                 }
             }
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            if (costEntities.Count > 0 || errorMessages.Count > 0 || !string.Equals(currentText, finalText, StringComparison.Ordinal))
+            {
+                try
+                {
+                    await StoreFinalizationAsync(db, runId, currentText, costEntities, errorMessages, CancellationToken.None);
+                }
+                catch (Exception storeEx)
+                {
+                    logger.LogError("Results of the finished steps of run {RunId} could not be stored after the cancellation: {Error}",
+                        runId, storeEx.ToRedactedLogText());
+                }
+            }
+            throw;
+        }
 
-        // Persist finalizer costs
+        await StoreFinalizationAsync(db, runId, currentText, costEntities, errorMessages, ct);
+    }
+
+    private static async Task StoreFinalizationAsync(
+        AtelierDbContext db,
+        Guid runId,
+        string currentText,
+        List<FinalizationActorCost> costEntities,
+        List<string> errorMessages,
+        CancellationToken ct)
+    {
         if (costEntities.Count > 0)
         {
             db.FinalizationActorCosts.AddRange(costEntities);
             await db.SaveChangesAsync(ct);
         }
 
-        // Update run: FinalText (if transforms changed it), FinalizerCostEur, FinalizerErrorMessage
         var totalFinalizerCost = costEntities.Any(c => c.CostEur.HasValue)
             ? costEntities.Sum(c => c.CostEur ?? 0m)
             : (decimal?)null;

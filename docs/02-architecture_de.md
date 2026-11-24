@@ -153,7 +153,7 @@ Probleme, die ein Lauf umgangen hat, statt anzuhalten (D-067). Werden mit dem La
 | RunId | uuid (FK→Runs) | Index `IX_RunWarnings_RunId` |
 | Iteration | int | nullable; Iteration, in der das Problem auftrat |
 | Source | varchar(100) | `grounding`, `review`, `model-assignment`, `llm`, `finalizer` oder `run` (Konstanten in `RunWarningSources`) |
-| Code | varchar(100) | stabiler maschinenlesbarer Code, z. B. `grounding.provider_skipped`, `grounding.scope_unknown`, `review.reviewer_failed`, `llm.failover`, `finalizer.failed`, `run.result_not_saved` (Konstanten in `RunWarningCodes`) |
+| Code | varchar(100) | stabiler maschinenlesbarer Code, z. B. `grounding.provider_skipped`, `grounding.scope_unknown`, `review.reviewer_failed`, `llm.failover`, `finalizer.failed`, `run.result_not_saved`, `run.restarted_while_finishing` (Konstanten in `RunWarningCodes`) |
 | Message | text | kurze, einfache englische Erklärung für den Anwender |
 | CreatedAt | timestamptz | |
 
@@ -474,9 +474,18 @@ gespeichert, sodass Detailseite und MCP zeigen, warum er stoppte.
 `Status` und `Outcome` können kurz auseinanderliegen: Der Event-Sink setzt `Completed` (oder `Failed`) und
 den Text vor den Finalizern, `Outcome` folgt erst danach. Clients warten deshalb auf `Outcome`, nicht auf
 einen Endstatus; `scripts/atelier-smoke.sh` und der Arm `atelier` von `tools/Eval` tun das. Wird der Dienst
-während der Finalizer hart beendet, setzt der Wiederanlauf beim nächsten Start auch für Läufe mit bereits
-terminalem Status und leerem `Outcome` ein Ergebnis, sodass kein Client endlos wartet. Ein Abbruch oder
-Dienststopp während der Finalizer endet als `Aborted`, ohne Warnungen „Finalizer fehlgeschlagen“.
+während der Finalizer hart beendet, setzt der Wiederanlauf beim nächsten Start für Läufe mit bereits
+terminalem Status und leerem `Outcome` ein Ergebnis, sodass kein Client endlos wartet: mit Text `Converged`
+(Status `Completed`) oder `DeliveredWithOpenPoints`, ohne Text `Failed`, dazu die Warnung
+`run.restarted_while_finishing`. Weil ältere Läufe (vor Step47) ebenfalls kein `Outcome` haben, werden nur
+Läufe repariert, die nach dem frühesten Lauf mit `Outcome` endeten; solange kein Lauf ein `Outcome` hat,
+ändert sich nichts. Die Reparatur läuft nach dem Zurücksetzen hängengebliebener `Running`-Läufe und für sich;
+ein Fehler darin verhindert dieses Zurücksetzen nie.
+
+Ein Abbruch oder Dienststopp während der Finalizer endet mit `Outcome = Aborted`, ohne Warnungen „Finalizer
+fehlgeschlagen“. Maßgeblich ist dabei `Outcome`: Der Status eines konvergierten Laufs bleibt `Completed`, ein
+Lauf mit `Failed` (nicht konvergiert) wird `Aborted`. Die Ergebnisse der Finalizer, die vor dem Stopp fertig
+waren, bleiben erhalten (geänderter Text, ihre Artefakte, Kosten); die übrigen Finalizer laufen nicht mehr.
 
 Nur MCP liefert `Outcome` (`get_run_status`, `get_run_result`). Die Weboberfläche liest es nicht: Der Block
 „Warnings“ auf der Detailseite (`RunWarningsBlock`) wählt seinen Einleitungssatz nach `Status` und danach,

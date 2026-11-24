@@ -17,7 +17,9 @@ namespace Geef.Atelier.Tests.Orchestrator;
 /// Funktional 2 (Etappe 0, review round 2): a user cancel or a service stop while a finishing step runs is not a
 /// failure of that step. The run ends as Aborted without a "finishing step failed" warning and without an error
 /// artifact, whether the executor lets the cancellation through or swallows it and returns an error result. This holds
-/// on the converged path and on the best-effort path (finishing steps after the last round without approval).
+/// on the converged path and on the best-effort path (finishing steps after the last round without approval). The
+/// results of steps that finished before the cancellation (changed text, costs) are kept; the status of a converged
+/// run stays Completed, only the outcome says Aborted.
 /// </summary>
 [Collection("Postgres")]
 public sealed class RunOrchestratorFinalizerCancellationTests(PostgresFixture fixture)
@@ -94,6 +96,36 @@ public sealed class RunOrchestratorFinalizerCancellationTests(PostgresFixture fi
         await AssertNoStepFailureAsync(runId);
     }
 
+    [Fact(Timeout = 30_000)]
+    public async Task CancelAfterAFinishedTransformKeepsItsTextAndCosts()
+    {
+        var finalizers = new TransformThenWaitFactory();
+        var runId = await CreateRunAsync(finalizers:
+        [
+            new FinalizerProfile("rewrite", "Rewrite", "d", FinalizerType.Transform, [], false),
+            new FinalizerProfile("deliver", "Deliver", "d", FinalizerType.ExternalSink, [], false),
+        ]);
+        await using var host = new OrchestratorTestHost(fixture, new FakeLlmClient(), FastOptions(),
+            services => services.AddSingleton<IFinalizerExecutorFactory>(finalizers));
+        await host.StartAsync();
+        await finalizers.Waiting.Task.WaitAsync(TimeSpan.FromSeconds(20));
+
+        await using (var db = fixture.NewContext())
+            await db.Runs.Where(r => r.Id == runId).ExecuteUpdateAsync(s => s.SetProperty(r => r.CancellationRequested, true));
+        var run = await WaitForOutcomeAsync(runId);
+
+        Assert.Equal((RunOutcome?)RunOutcome.Aborted, run.Outcome);
+        Assert.Equal(RunStatus.Completed, run.Status);
+        Assert.Equal(TransformThenWaitFactory.TransformedText, run.FinalText);
+        Assert.Equal(0.25m, run.FinalizerCostEur);
+        Assert.Null(run.FinalizerErrorMessage);
+        await using var verify = fixture.NewContext();
+        var cost = Assert.Single(await verify.FinalizationActorCosts.AsNoTracking().Where(c => c.RunId == runId).ToListAsync());
+        Assert.Equal("rewrite", cost.ActorName);
+        Assert.DoesNotContain(await verify.RunWarnings.AsNoTracking().Where(w => w.RunId == runId).ToListAsync(),
+            w => w.Code == RunWarningCodes.FinalizerFailed);
+    }
+
     private async Task AssertNoStepFailureAsync(Guid runId)
     {
         await using var db = fixture.NewContext();
@@ -105,11 +137,11 @@ public sealed class RunOrchestratorFinalizerCancellationTests(PostgresFixture fi
         Assert.Null(run.FinalizerErrorMessage);
     }
 
-    private async Task<Guid> CreateRunAsync(bool bestEffort = false)
+    private async Task<Guid> CreateRunAsync(bool bestEffort = false, IReadOnlyList<FinalizerProfile>? finalizers = null)
     {
         var snapshot = TestCrewSnapshots.Klassik with
         {
-            Finalizers = [new FinalizerProfile("waiting-step", "Waiting step", "d", FinalizerType.Transform, [], false)],
+            Finalizers = finalizers ?? [new FinalizerProfile("waiting-step", "Waiting step", "d", FinalizerType.Transform, [], false)],
         };
         if (bestEffort)
             snapshot = snapshot with
@@ -132,6 +164,30 @@ public sealed class RunOrchestratorFinalizerCancellationTests(PostgresFixture fi
             if (run.Outcome is not null || DateTime.UtcNow > deadline)
                 return run;
             await Task.Delay(100);
+        }
+    }
+
+    private sealed class TransformThenWaitFactory : IFinalizerExecutorFactory
+    {
+        public const string TransformedText = "The rewritten text.";
+
+        public TaskCompletionSource Waiting { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public IFinalizerExecutor GetExecutor(FinalizerType type) => new Step(this, type);
+
+        private sealed class Step(TransformThenWaitFactory owner, FinalizerType type) : IFinalizerExecutor
+        {
+            public FinalizerType Type => type;
+
+            public async Task<FinalizerExecutionResult> ExecuteAsync(FinalizerProfile profile, FinalizerExecutionContext context, CancellationToken cancellationToken)
+            {
+                if (type == FinalizerType.Transform)
+                    return new FinalizerExecutionResult(TransformedText, null, 0.25m, profile.Name, "model", InputTokens: 10, OutputTokens: 5, ProviderName: "provider");
+
+                owner.Waiting.TrySetResult();
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+                return new FinalizerExecutionResult(null, null, null, profile.Name);
+            }
         }
     }
 

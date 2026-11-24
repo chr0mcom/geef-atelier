@@ -154,7 +154,7 @@ Problems a run worked around instead of stopping (D-067). Deleted together with 
 | RunId | uuid (FK→Runs) | index `IX_RunWarnings_RunId` |
 | Iteration | int | nullable; iteration in which the problem occurred |
 | Source | varchar(100) | `grounding`, `review`, `model-assignment`, `llm`, `finalizer` or `run` (constants in `RunWarningSources`) |
-| Code | varchar(100) | stable machine-readable code, e.g. `grounding.provider_skipped`, `grounding.scope_unknown`, `review.reviewer_failed`, `llm.failover`, `finalizer.failed`, `run.result_not_saved` (constants in `RunWarningCodes`) |
+| Code | varchar(100) | stable machine-readable code, e.g. `grounding.provider_skipped`, `grounding.scope_unknown`, `review.reviewer_failed`, `llm.failover`, `finalizer.failed`, `run.result_not_saved`, `run.restarted_while_finishing` (constants in `RunWarningCodes`) |
 | Message | text | short plain-English explanation for the user |
 | CreatedAt | timestamptz | |
 
@@ -519,9 +519,18 @@ findings of the last iteration are stored as well, so the run detail page and MC
 `Status` and `Outcome` can briefly disagree: the event sink sets `Completed` (or `Failed`) and the text
 before the finalizers run, `Outcome` follows only afterwards. Clients therefore wait for `Outcome`, not for
 a terminal status; `scripts/atelier-smoke.sh` and the `atelier` arm of `tools/Eval` do so. If the service
-is stopped hard during the finalizers, the crash recovery at the next start also sets an outcome for runs
-whose status is already terminal but whose `Outcome` is still empty, so no client waits forever. A
-cancellation or service stop during the finalizers ends as `Aborted` without "finalizer failed" warnings.
+is stopped hard during the finalizers, the crash recovery at the next start sets an outcome for runs whose
+status is already terminal but whose `Outcome` is still empty, so no client waits forever: with a text
+`Converged` (status `Completed`) or `DeliveredWithOpenPoints`, without one `Failed`, plus the warning
+`run.restarted_while_finishing`. Because older runs (before Step47) have no `Outcome` either, only runs that
+completed after the earliest run with an `Outcome` are repaired; as long as no run has an `Outcome`, nothing
+is changed. The repair runs after the reset of stale `Running` runs and on its own, so a failure in it never
+blocks that reset.
+
+A cancellation or service stop during the finalizers ends with `Outcome = Aborted`, without "finalizer
+failed" warnings. `Outcome` is what counts here: the status of a converged run stays `Completed`; a run
+that was `Failed` (not converged) becomes `Aborted`. The results of finalizers that finished before the stop
+are kept (changed text, their artifacts, costs); the remaining finalizers do not run.
 
 Only MCP returns `Outcome` (`get_run_status`, `get_run_result`). The web interface does not read it: the
 "Warnings" block on the run detail page (`RunWarningsBlock`) chooses its intro sentence from `Status` and

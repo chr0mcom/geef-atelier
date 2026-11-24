@@ -3,6 +3,7 @@ using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Geef.Atelier.Tests.Orchestrator;
 
@@ -10,7 +11,9 @@ namespace Geef.Atelier.Tests.Orchestrator;
 /// Funktional 1 (Etappe 0, review round 2): a run whose process ended while its finishing steps ran has a terminal
 /// status but no outcome. On the next start the orchestrator records the outcome (Converged for Completed with text,
 /// DeliveredWithOpenPoints for Failed or Aborted with text, Failed without text) and a plain warning. Runs that
-/// completed before the first run with an outcome (finished before Step47) stay untouched. Real Postgres.
+/// completed before the first run with an outcome (finished before Step47) stay untouched. The repair runs after the
+/// reset of stale Running runs and on its own, so a failure in it never keeps a Running run from being reset. Real
+/// Postgres.
 /// </summary>
 [Collection("Postgres")]
 public sealed class RunOrchestratorRecoversRunsInterruptedWhileFinishingTests(PostgresFixture fixture)
@@ -64,6 +67,34 @@ public sealed class RunOrchestratorRecoversRunsInterruptedWhileFinishingTests(Po
         Assert.Contains(statuses, r => r.Id == failedWithText && r.Status == RunStatus.Failed);
         Assert.Contains(statuses, r => r.Id == abortedWithText && r.Status == RunStatus.Aborted);
         Assert.All(statuses, r => Assert.Equal(InterruptedCompletedAt, r.CompletedAt));
+    }
+
+    [Fact(Timeout = 30_000)]
+    public async Task Service_OnStart_ResetsStaleRunningRunsEvenWhenTheFinishingRepairFails()
+    {
+        await SeedAsync(RunStatus.Completed, "first", RunOutcome.Converged, FirstOutcomeCompletedAt);
+        await SeedAsync(RunStatus.Completed, "finished text", null, InterruptedCompletedAt);
+        var stale = await SeedAsync(RunStatus.Running, null, null, InterruptedCompletedAt);
+
+        await using (var host = new OrchestratorTestHost(fixture, new FakeLlmClient(),
+            new Geef.Atelier.Core.Configuration.OrchestratorOptions { PollingInterval = TimeSpan.FromSeconds(60), MaxConcurrentRuns = 1 },
+            services => services.AddSingleton<IRunWarningSink>(new ThrowingRunWarningSink())))
+        {
+            await host.StartAsync();
+            await WaitUntilAsync(async () => await OutcomeAsync(stale) is not null);
+            await host.StopAsync();
+        }
+
+        await using var db = fixture.NewContext();
+        var staleRun = await db.Runs.AsNoTracking().SingleAsync(r => r.Id == stale);
+        Assert.Equal(RunStatus.Failed, staleRun.Status);
+        Assert.Equal(RunOutcome.Failed, staleRun.Outcome);
+    }
+
+    private sealed class ThrowingRunWarningSink : IRunWarningSink
+    {
+        public Task ReportAsync(Guid runId, string source, string code, string message, int? iteration = null, CancellationToken ct = default) =>
+            throw new InvalidOperationException("warning store unavailable");
     }
 
     private async Task<Guid> SeedAsync(RunStatus status, string? finalText, RunOutcome? outcome, DateTimeOffset completedAt)

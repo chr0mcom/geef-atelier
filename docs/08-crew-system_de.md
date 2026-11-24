@@ -279,7 +279,8 @@ Seit D-067:
 
 - `Runs.Outcome` wird erst gesetzt, wenn die Finalizer fertig sind und der (gegebenenfalls umgewandelte) endgültige Text abgelegt ist; `Outcome` bedeutet also „fertig abgelegt, inklusive Finalizer“ ([02-architecture](02-architecture_de.md#lauf-ergebnis-outcome-und-runstatus)).
 - Ein Finalizer, der fehlschlägt, übersprungen oder nicht ausgeführt wird (Best-Effort-Lauf ohne `RunFinalizersOnMaxAttempts`), wird zur Warnung am Lauf (`finalizer.failed`, `finalizer.skipped`, `finalizer.not_run`), statt still durchzugehen.
-- Ein Abbruch oder Dienststopp während der Finalizer ist kein Fehler eines Finalizers: Der Lauf endet mit `Outcome = Aborted` und bekommt keine Warnung `finalizer.failed`. Ein vor dem Stopp gespeicherter Text bleibt lesbar.
+- Ein Abbruch oder Dienststopp während der Finalizer ist kein Fehler eines Finalizers: Der Lauf endet mit `Outcome = Aborted` und bekommt keine Warnung `finalizer.failed`. Die Ergebnisse der Finalizer, die vor dem Stopp fertig waren, bleiben erhalten (geänderter Text, Artefakte, Kosten); die übrigen laufen nicht mehr. Der Status eines konvergierten Laufs bleibt `Completed`; maßgeblich ist `Outcome`.
+- Wird der Dienst während der Finalizer hart beendet, bekommt der Lauf beim nächsten Start ein Ergebnis und die Warnung `run.restarted_while_finishing` (Quelle `run`).
 - Lässt sich das Ergebnis nicht vollständig speichern, bekommt der Lauf die Warnung `run.result_not_saved` (Quelle `run`) und `Outcome = Failed`.
 
 ### RunArtifact-Entity
