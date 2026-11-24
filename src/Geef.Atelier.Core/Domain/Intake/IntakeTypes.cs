@@ -121,7 +121,23 @@ public sealed record IntakeRecord(
     /// <summary>Schema version written by this code.</summary>
     public const int CurrentSchemaVersion = 1;
 
+    /// <summary>Text of the single assumption of a <see cref="Fallback"/> record.</summary>
+    public const string NotCheckedAssumption = "The request was not checked for missing details; the writer works from it as written.";
+
     /// <summary>Record of a failed or skipped intake: no questions, one assumption "not checked".</summary>
     public static IntakeRecord Fallback(IntakeRecordStatus status, string? errorCode, int durationMs, string? model, BriefMode briefMode) =>
-        throw new NotImplementedException();
+        new(
+            CurrentSchemaVersion,
+            status,
+            model,
+            Math.Max(0, durationMs),
+            errorCode,
+            null,
+            [],
+            [],
+            [new IntakeAssumption("a1", GapTopic.Other, NotCheckedAssumption, AssumptionConfidence.Unsure)],
+            [],
+            [],
+            null,
+            briefMode);
 }
