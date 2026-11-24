@@ -1,0 +1,28 @@
+@using Geef.Atelier.Application.Orders
+
+@if (Sources.Count > 0)
+{
+    <section class="order-block order-sources-used" aria-labelledby="order-sources-used-title" data-testid="order-sources-used">
+        <h2 id="order-sources-used-title">From your files</h2>
+        <ul>
+            @foreach (var source in Sources)
+            {
+                <li data-testid="order-source-used">
+                    <span class="order-source-name">@source.FileName</span>
+                    <span class="order-source-meta">@Describe(source)</span>
+                </li>
+            }
+        </ul>
+    </section>
+}
+
+@code {
+    /// <summary>How each file went into the text.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<OrderSourceUsageView> Sources { get; set; } = [];
+
+    static string Describe(OrderSourceUsageView source)
+    {
+        var text = $"{source.Mode.ToPlainText()} · {source.Characters.Grouped()} characters";
+        return string.IsNullOrWhiteSpace(source.Pages) ? text : $"{text} · pages {source.Pages}";
+    }
+}

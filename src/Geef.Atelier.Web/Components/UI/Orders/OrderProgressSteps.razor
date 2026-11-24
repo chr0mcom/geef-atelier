@@ -1,0 +1,43 @@
+@using Geef.Atelier.Application.Orders
+
+<section class="order-progress" aria-labelledby="order-progress-title" data-testid="order-progress">
+    <div class="order-progress-head">
+        <h2 id="order-progress-title">@(string.IsNullOrWhiteSpace(Progress.CurrentLabel) ? "Working on it" : Progress.CurrentLabel)</h2>
+        <span class="order-progress-clock" data-testid="order-elapsed" title="Time since you started">@Elapsed.ToClock()</span>
+    </div>
+    <ol class="order-steps">
+        @foreach (var step in Progress.Steps)
+        {
+            <li class="order-step order-step--@step.Status.ToString().ToLowerInvariant()" data-testid="order-step" data-key="@step.Key" data-status="@step.Status.ToString().ToLowerInvariant()">
+                <span class="order-step-mark" aria-hidden="true"></span>
+                <span class="order-step-label">@step.Label</span>
+                <span class="order-step-time">@StepTime(step)</span>
+            </li>
+        }
+    </ol>
+    <p class="order-progress-hint" data-testid="order-progress-hint">Usually about 5 minutes. You can close this page – your text will be waiting in My work.</p>
+    @if (ChildContent is not null)
+    {
+        <div class="order-progress-actions">@ChildContent</div>
+    }
+</section>
+
+@code {
+    /// <summary>Steps and current label from the order service.</summary>
+    [Parameter, EditorRequired] public OrderProgress Progress { get; set; } = null!;
+
+    /// <summary>Elapsed time to show; ticks on the page while the order runs.</summary>
+    [Parameter] public TimeSpan Elapsed { get; set; }
+
+    /// <summary>Actions such as the stop button.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    static string StepTime(OrderStep step) => step switch
+    {
+        { Status: OrderStepStatus.Done, StartedAt: { } s, EndedAt: { } e } => (e - s).ToClock(),
+        { Status: OrderStepStatus.Active } => "now",
+        { Status: OrderStepStatus.Skipped } => "not needed",
+        { Status: OrderStepStatus.Failed } => "stopped",
+        _ => string.Empty,
+    };
+}

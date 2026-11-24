@@ -1,0 +1,293 @@
+@page "/work"
+@page "/orders"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@implements IAsyncDisposable
+@using Geef.Atelier.Application.Orders
+@using Geef.Atelier.Core.Domain.Orders
+@using Geef.Atelier.Web.Components.UI.Orders
+@inject IOrderService Orders
+@inject AuthenticationStateProvider AuthProvider
+@inject IRunUpdateFeed LiveUpdates
+@inject CircuitDataGate DataGate
+@inject ILogger<MyWork> Logger
+
+<PageTitle>My work — Atelier</PageTitle>
+
+<div class="work" data-testid="work-page">
+    <div class="runs-head work-head">
+        <div>
+            <h1>My work</h1>
+            <div class="sub">Everything you asked for, newest first.</div>
+        </div>
+        <a class="btn primary" href="/start" data-testid="work-new">New</a>
+    </div>
+
+    <div class="work-tools">
+        <label class="work-search">
+            <span class="work-search-label">Search</span>
+            <input type="search" placeholder="Search by title" data-testid="work-search"
+                   @bind="_search" @bind:event="oninput" @bind:after="ResetPage" />
+        </label>
+        <div class="filters" role="group" aria-label="Show">
+            @foreach (var filter in Filters)
+            {
+                var count = _items?.Count(i => filter.Matches(i.Display.ShownState())) ?? 0;
+                <FilterPill Label="@($"{filter.Label} ({count})")"
+                            Active="@(_filter == filter.Key)"
+                            OnClick="@(() => SetFilter(filter.Key))" />
+            }
+        </div>
+        @if (_isAdmin)
+        {
+            <label class="admin-toggle">
+                <input type="checkbox" data-testid="work-all-users" @bind="_showAllUsers" @bind:after="LoadAsync" />
+                Show all users
+            </label>
+        }
+    </div>
+
+    @if (_loadFailed)
+    {
+        <div class="order-banner order-banner--failed" role="alert" data-testid="work-load-failed">
+            <strong>Your list could not be loaded.</strong>
+            <span>Something went wrong on our side. Try again in a moment.</span>
+            <button type="button" class="btn small" data-testid="work-reload" @onclick="LoadAsync">Try again</button>
+        </div>
+    }
+
+    @if (_actionError is not null)
+    {
+        <div class="order-banner order-banner--failed" role="alert" data-testid="work-action-error">
+            <strong>That did not work.</strong>
+            <span>@_actionError</span>
+            <button type="button" class="btn small" @onclick="() => _actionError = null">OK</button>
+        </div>
+    }
+
+    @if (_items is null)
+    {
+        @if (!_loadFailed)
+        {
+            <EmptyState Message="Loading…" />
+        }
+    }
+    else if (_items.Count == 0)
+    {
+        <div class="work-empty" data-testid="work-empty">
+            <EmptyState Message="Nothing here yet. Tell us what you need written, and it will show up here." />
+            <div class="order-empty-actions">
+                <a class="btn primary" href="/start" data-testid="work-empty-start">Write something</a>
+            </div>
+        </div>
+    }
+    else if (Visible.Count == 0)
+    {
+        <div class="work-empty" data-testid="work-no-match">
+            <EmptyState Message="Nothing matches your search or filter." />
+            <div class="order-empty-actions">
+                <button type="button" class="btn" data-testid="work-clear" @onclick="ClearFilters">Show everything</button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <ul class="work-list" data-testid="work-list">
+            @foreach (var item in PageItems)
+            {
+                <li class="work-row" data-testid="work-row" data-order-id="@item.OrderId">
+                    <div class="work-row-main">
+                        <a class="work-row-title" href="/orders/@item.OrderId" data-testid="work-row-link">@item.Title</a>
+                        <span class="work-row-meta">
+                            @item.UpdatedAt.ToListDate()
+                            @if (item.WordCount is int words)
+                            {
+                                <span> · @words.Grouped() words</span>
+                            }
+                            @if (item.SourceCount > 0)
+                            {
+                                <span> · @(item.SourceCount == 1 ? "1 file" : $"{item.SourceCount} files")</span>
+                            }
+                            @if (item.Mode == OrderMode.Careful)
+                            {
+                                <span> · Extra careful</span>
+                            }
+                        </span>
+                    </div>
+                    <OrderStateBadge State="item.Display.ShownState()" />
+                    @if (item.Display.IsFinished)
+                    {
+                        <button type="button" class="btn small ghost danger" data-testid="work-row-delete"
+                                aria-label="Delete @item.Title"
+                                @onclick="() => _toDelete = item">
+                            Delete
+                        </button>
+                    }
+                    else
+                    {
+                        <span class="work-row-delete-placeholder" aria-hidden="true"></span>
+                    }
+                </li>
+            }
+        </ul>
+
+        @if (PageCount > 1)
+        {
+            <nav class="work-pager" aria-label="Pages">
+                <button type="button" class="btn small" data-testid="work-prev" disabled="@(_page <= 1)" @onclick="() => _page--">Newer</button>
+                <span data-testid="work-page-info">Page @_page of @PageCount</span>
+                <button type="button" class="btn small" data-testid="work-next" disabled="@(_page >= PageCount)" @onclick="() => _page++">Older</button>
+            </nav>
+        }
+    }
+</div>
+
+<Modal Show="_toDelete is not null" OnClose="() => _toDelete = null" DataTestId="work-delete-confirm">
+    <Title>Delete this?</Title>
+    <ChildContent>
+        <p>“@_toDelete?.Title” will be deleted with its text and its files. This cannot be undone.</p>
+    </ChildContent>
+    <Actions>
+        <button type="button" class="btn danger" data-testid="work-delete-confirm-button" disabled="@_deleting" @onclick="DeleteAsync">Delete</button>
+        <button type="button" class="btn ghost" data-testid="work-delete-cancel" @onclick="() => _toDelete = null">Keep it</button>
+    </Actions>
+</Modal>
+
+@code {
+    private const int PageSize = 20;
+    private const int LoadLimit = 500;
+
+    sealed record WorkFilter(string Key, string Label, Func<OrderDisplayState, bool> Matches);
+
+    static readonly WorkFilter[] Filters =
+    [
+        new("all", "All", _ => true),
+        new("working", "In progress", s => s.IsBusy()),
+        new("ready", "Ready", s => s is OrderDisplayState.Delivered or OrderDisplayState.DeliveredWithOpenPoints),
+        new("problems", "Stopped or failed", s => s is OrderDisplayState.Failed or OrderDisplayState.Stopped),
+    ];
+
+    IReadOnlyList<OrderListItem>? _items;
+    string _search = string.Empty;
+    string _filter = "all";
+    int _page = 1;
+    bool _isAdmin;
+    bool _showAllUsers;
+    bool _loadFailed;
+    bool _deleting;
+    string? _username;
+    string? _actionError;
+    OrderListItem? _toDelete;
+    IDisposable? _subscription;
+    bool _disposed;
+
+    IReadOnlyList<OrderListItem> Visible
+    {
+        get
+        {
+            if (_items is null)
+                return [];
+            var filter = Filters.First(f => f.Key == _filter);
+            var term = _search.Trim();
+            return _items
+                .Where(i => filter.Matches(i.Display.ShownState()))
+                .Where(i => term.Length == 0 || i.Title.Contains(term, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+    }
+
+    int PageCount => Math.Max(1, (Visible.Count + PageSize - 1) / PageSize);
+
+    IEnumerable<OrderListItem> PageItems => Visible.Skip((Math.Min(_page, PageCount) - 1) * PageSize).Take(PageSize);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        _isAdmin = auth.User.IsInRole("admin");
+        _username = auth.User.Identity?.Name;
+
+        await LoadAsync();
+        if (_disposed)
+            return;
+        var subscription = LiveUpdates.WatchOrderList(auth.User, async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadAsync();
+                StateHasChanged();
+            });
+        });
+        if (_disposed)
+        {
+            subscription.Dispose();
+            return;
+        }
+        _subscription = subscription;
+        await LoadAsync();
+    }
+
+    Task LoadAsync() => DataGate.RunAsync(LoadCoreAsync);
+
+    async Task LoadCoreAsync()
+    {
+        try
+        {
+            var owner = _showAllUsers && _isAdmin ? null : _username;
+            _items = await Orders.ListAsync(owner, LoadLimit);
+            _loadFailed = false;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Loading the order list failed");
+            _loadFailed = true;
+        }
+    }
+
+    void SetFilter(string key)
+    {
+        _filter = key;
+        _page = 1;
+    }
+
+    void ResetPage() => _page = 1;
+
+    void ClearFilters()
+    {
+        _search = string.Empty;
+        _filter = "all";
+        _page = 1;
+    }
+
+    async Task DeleteAsync()
+    {
+        if (_toDelete is not { } item)
+            return;
+        _deleting = true;
+        _actionError = null;
+        try
+        {
+            var deleted = await DataGate.RunAsync(() => Orders.DeleteAsync(item.OrderId, _isAdmin ? null : _username));
+            if (!deleted)
+                _actionError = "It could not be deleted, maybe because it is still being worked on. Try again when it is finished.";
+            _toDelete = null;
+            await LoadAsync();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Deleting order {OrderId} failed", item.OrderId);
+            _toDelete = null;
+            _actionError = "Something went wrong on our side. Try again in a moment.";
+        }
+        finally
+        {
+            _deleting = false;
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        _subscription?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

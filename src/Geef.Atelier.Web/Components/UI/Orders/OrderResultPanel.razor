@@ -1,0 +1,67 @@
+@using Geef.Atelier.Application.Orders
+@inject IJSRuntime JS
+
+<section class="order-result" aria-labelledby="order-result-title" data-testid="order-result">
+    <div class="order-result-bar">
+        <h2 id="order-result-title" class="order-result-title">Your text</h2>
+        @if (Result.WordCount is int words)
+        {
+            <span class="order-result-meta" data-testid="order-word-count">@words.Grouped() words</span>
+        }
+        <div class="order-result-actions">
+            <button type="button" class="btn small" data-testid="order-copy" @onclick="CopyAsync">
+                <IconCopy Size="13" />
+                @(_copied ? "Copied" : "Copy")
+            </button>
+            <details class="order-download" data-testid="order-download">
+                <summary class="btn small">
+                    <IconDownload Size="13" />
+                    Download
+                </summary>
+                <div class="order-download-menu">
+                    <a href="@ExportHref("docx")" download data-testid="order-download-docx">Word</a>
+                    <a href="@ExportHref("pdf")" download data-testid="order-download-pdf">PDF</a>
+                    <a href="@ExportHref("md")" download data-testid="order-download-md">Markdown</a>
+                </div>
+            </details>
+        </div>
+    </div>
+    @if (_copyFailed)
+    {
+        <div class="order-copy-failed" role="alert" data-testid="order-copy-failed">Copying did not work in this browser. Select the text below and copy it yourself.</div>
+    }
+    <div class="order-result-sheet">
+        <MarkdownView Markdown="@Result.Text" Class="order-result-text" />
+    </div>
+</section>
+
+@code {
+    /// <summary>The delivered result.</summary>
+    [Parameter, EditorRequired] public OrderResult Result { get; set; } = null!;
+
+    bool _copied;
+    bool _copyFailed;
+
+    string ExportHref(string format) =>
+        Result.Version is int version
+            ? $"/orders/{Result.OrderId}/export/{format}?version={version}"
+            : $"/orders/{Result.OrderId}/export/{format}";
+
+    async Task CopyAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", Result.Text ?? string.Empty);
+            _copied = true;
+            _copyFailed = false;
+        }
+        catch (JSException)
+        {
+            _copyFailed = true;
+        }
+        catch (InvalidOperationException)
+        {
+            _copyFailed = true;
+        }
+    }
+}

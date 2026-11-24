@@ -1,0 +1,293 @@
+@page "/orders/{orderId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@implements IAsyncDisposable
+@using Geef.Atelier.Application.Orders
+@using Geef.Atelier.Core.Domain.Orders
+@using Geef.Atelier.Web.Components.UI.Orders
+@inject IOrderService Orders
+@inject AuthenticationStateProvider AuthProvider
+@inject IRunUpdateFeed LiveUpdates
+@inject CircuitDataGate DataGate
+@inject ILogger<OrderDetail> Logger
+
+<PageTitle>@TabTitle</PageTitle>
+
+<div class="order-page" data-testid="order-page">
+    @if (_loadFailed && _view is null)
+    {
+        <div class="order-banner order-banner--failed" role="alert" data-testid="order-load-failed">
+            <strong>This page could not be loaded.</strong>
+            <span>Something went wrong on our side. Try again in a moment.</span>
+            <button type="button" class="btn small" data-testid="order-reload" @onclick="ReloadAsync">Try again</button>
+        </div>
+    }
+    else if (!_loaded)
+    {
+        <EmptyState Message="Loading…" />
+    }
+    else if (_view is null)
+    {
+        <div class="order-missing" data-testid="order-not-found">
+            <EmptyState Message="We could not find this. It may have been deleted, or it belongs to someone else." />
+            <div class="order-empty-actions">
+                <a class="btn primary" href="/work">Go to My work</a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <nav class="crumb" aria-label="Breadcrumb">
+            <a href="/work">My work</a>
+            <span class="sep" aria-hidden="true">/</span>
+            <span>@Shorten(_view.Title, 60)</span>
+        </nav>
+
+        <header class="order-head">
+            <h1 class="order-title" data-testid="order-title">@_view.Title</h1>
+            <div class="order-head-meta">
+                <OrderStateBadge State="_view.Display.ShownState()" />
+                <span class="order-head-date">Started @_view.CreatedAt.ToListDate()</span>
+                @if (_view.Mode == OrderMode.Careful)
+                {
+                    <span class="order-head-mode" data-testid="order-mode-careful">Extra careful</span>
+                }
+            </div>
+        </header>
+
+        @if (_actionError is not null)
+        {
+            <div class="order-banner order-banner--failed" role="alert" data-testid="order-action-error">
+                <strong>That did not work.</strong>
+                <span>@_actionError</span>
+                <button type="button" class="btn small" @onclick="() => _actionError = null">OK</button>
+            </div>
+        }
+
+        <OrderStatusBanner OrderId="_view.OrderId" Display="_view.Display" />
+
+        @if (!_view.Display.IsFinished)
+        {
+            <OrderProgressSteps Progress="_view.Progress" Elapsed="Elapsed">
+                <button type="button" class="btn small ghost" data-testid="order-stop" disabled="@_stopping" @onclick="StopAsync">
+                    @(_stopping ? "Stopping…" : "Stop")
+                </button>
+            </OrderProgressSteps>
+        }
+
+        @if (_result is { Text: not null } result && _view.Display.HasText)
+        {
+            <OrderResultPanel Result="result" />
+            <OrderOpenPoints Result="result" />
+            <OrderSourcesUsed Sources="result.SourcesUsed" />
+            @if (!string.IsNullOrWhiteSpace(result.Note))
+            {
+                <p class="order-note" data-testid="order-note">@result.Note</p>
+            }
+        }
+
+        <RunWarningsBlock Warnings="Warnings" Status="_view.CurrentRun?.Status" HasText="_view.Display.HasText" />
+
+        <details class="order-how" data-testid="order-how-made">
+            <summary>How it was made</summary>
+            <div class="order-how-body">
+                <h3>Your request</h3>
+                <p class="order-how-request" data-testid="order-how-request">@_view.RequestText</p>
+
+                <h3>Steps</h3>
+                <ol class="order-how-steps">
+                    @foreach (var step in _view.Progress.Steps)
+                    {
+                        <li data-testid="order-how-step">@step.Label — @StepSummary(step)</li>
+                    }
+                </ol>
+
+                @if (_view.Sources.Count > 0)
+                {
+                    <h3>Your files</h3>
+                    <ul class="order-how-files">
+                        @foreach (var source in _view.Sources)
+                        {
+                            <li data-testid="order-how-file">@source.FileName · @source.CharCount.Grouped() characters@(source.PageCount is int pages ? $" · {pages.Grouped()} pages" : "")@(string.IsNullOrWhiteSpace(source.PageSelection) ? "" : $" · pages used: {source.PageSelection}")</li>
+                        }
+                    </ul>
+                }
+
+                @if (_result is { } checks && _view.Display.IsFinished)
+                {
+                    <h3>Automatic checks</h3>
+                    <p data-testid="order-how-checks">@(checks.OpenChecks.Count switch { 0 => "All automatic checks passed.", 1 => "One check is still open – see “Open points”.", var n => $"{n} checks are still open – see “Open points”." })</p>
+                }
+
+                @if (_view.Runs.Count > 0)
+                {
+                    <h3>Versions</h3>
+                    <ul class="order-how-versions">
+                        @foreach (var run in _view.Runs)
+                        {
+                            <li data-testid="order-how-version">
+                                @(run.Version is int v ? $"Version {v}" : "Preparation") · @run.CreatedAt.ToListDate()@(run.WordCount is int words ? $" · {words.Grouped()} words" : "")
+                            </li>
+                        }
+                    </ul>
+                }
+
+                @if (_view.CurrentRun is { } current)
+                {
+                    <p class="order-how-tech"><a href="/runs/@current.RunId" data-testid="order-technical-details">Technical details</a></p>
+                }
+            </div>
+        </details>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid OrderId { get; set; }
+
+    OrderView? _view;
+    OrderResult? _result;
+    bool _loaded;
+    bool _loadFailed;
+    bool _stopping;
+    string? _actionError;
+    string? _requestingUser;
+    DateTimeOffset _loadedAt = DateTimeOffset.UtcNow;
+    IDisposable? _subscription;
+    System.Threading.Timer? _clock;
+    bool _disposed;
+    readonly CancellationTokenSource _disposeCts = new();
+
+    TimeSpan Elapsed => _view is null ? TimeSpan.Zero : _view.Progress.Elapsed + (DateTimeOffset.UtcNow - _loadedAt);
+
+    IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity> Warnings =>
+        _result is { Warnings.Count: > 0 } r ? r.Warnings : _view?.Warnings ?? [];
+
+    string TabTitle => _view is null
+        ? "Your text — Atelier"
+        : $"{_view.Display.ShownState().ToLabel()} · {Shorten(_view.Title, 40)} — Atelier";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        _requestingUser = auth.User.IsInRole("admin") ? null : auth.User.Identity?.Name;
+
+        await LoadAsync();
+        if (_disposed)
+            return;
+        IDisposable? subscription = null;
+        try
+        {
+            subscription = await LiveUpdates.WatchOrderAsync(auth.User, OrderId, async _ =>
+            {
+                await InvokeAsync(async () =>
+                {
+                    await LoadAsync();
+                    StateHasChanged();
+                });
+            }, _disposeCts.Token);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Live updates for order {OrderId} could not be started", OrderId);
+        }
+        if (_disposed)
+        {
+            subscription?.Dispose();
+            return;
+        }
+        _subscription = subscription;
+        if (subscription is not null)
+            await LoadAsync();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && !_disposed)
+            _clock = new System.Threading.Timer(_ => _ = TickAsync(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    async Task TickAsync()
+    {
+        if (_disposed || _view is null || _view.Display.IsFinished)
+            return;
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
+
+    Task LoadAsync() => DataGate.RunAsync(LoadCoreAsync);
+
+    async Task LoadCoreAsync()
+    {
+        try
+        {
+            var view = await Orders.GetAsync(OrderId, _requestingUser);
+            var result = view is { Display.HasText: true }
+                ? await Orders.GetResultAsync(OrderId, _requestingUser)
+                : null;
+            _view = view;
+            _result = result;
+            _loadedAt = DateTimeOffset.UtcNow;
+            _loadFailed = false;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Loading order {OrderId} failed", OrderId);
+            _loadFailed = true;
+        }
+        _loaded = true;
+    }
+
+    async Task ReloadAsync()
+    {
+        await LoadAsync();
+    }
+
+    async Task StopAsync()
+    {
+        _stopping = true;
+        _actionError = null;
+        try
+        {
+            var stopped = await DataGate.RunAsync(() => Orders.CancelAsync(OrderId, _requestingUser));
+            if (!stopped)
+                _actionError = "It could not be stopped, maybe because it has just finished. The page shows the current state.";
+            await LoadAsync();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Stopping order {OrderId} failed", OrderId);
+            _actionError = "Something went wrong on our side. Try again in a moment.";
+        }
+        finally
+        {
+            _stopping = false;
+        }
+    }
+
+    static string StepSummary(OrderStep step) => step switch
+    {
+        { Status: OrderStepStatus.Done, StartedAt: { } s, EndedAt: { } e } => $"done in {(e - s).ToClock()}",
+        { Status: OrderStepStatus.Done } => "done",
+        { Status: OrderStepStatus.Active } => "in progress",
+        { Status: OrderStepStatus.Skipped } => "not needed",
+        { Status: OrderStepStatus.Failed } => "stopped",
+        _ => "not started",
+    };
+
+    static string Shorten(string text, int max) =>
+        text.Length > max ? text[..max].TrimEnd() + "…" : text;
+
+    public ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        _disposeCts.Cancel();
+        _subscription?.Dispose();
+        _clock?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

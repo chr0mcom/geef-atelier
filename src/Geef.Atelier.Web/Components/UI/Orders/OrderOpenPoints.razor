@@ -1,0 +1,33 @@
+@using Geef.Atelier.Application.Orders
+
+@if (Result.Placeholders.Count > 0 || Result.OpenChecks.Count > 0)
+{
+    <section class="order-block order-open-points" aria-labelledby="order-open-points-title" data-testid="order-open-points">
+        <h2 id="order-open-points-title">Open points</h2>
+        @if (Result.Placeholders.Count > 0)
+        {
+            <p>Fill these in before you send the text:</p>
+            <ul class="order-placeholders">
+                @foreach (var placeholder in Result.Placeholders)
+                {
+                    <li data-testid="order-placeholder"><code>@placeholder</code></li>
+                }
+            </ul>
+        }
+        @if (Result.OpenChecks.Count > 0)
+        {
+            <p>The text may not yet do everything you asked for:</p>
+            <ul class="order-open-checks">
+                @foreach (var check in Result.OpenChecks)
+                {
+                    <li data-testid="order-open-check" data-code="@check.Code">@check.Message</li>
+                }
+            </ul>
+        }
+    </section>
+}
+
+@code {
+    /// <summary>The delivered result with placeholders and open checks.</summary>
+    [Parameter, EditorRequired] public OrderResult Result { get; set; } = null!;
+}
