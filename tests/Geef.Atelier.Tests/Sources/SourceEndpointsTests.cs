@@ -1,11 +1,17 @@
+using System.Diagnostics;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using Geef.Atelier.Application.Auth;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Sources;
+using Geef.Atelier.Infrastructure.Sources;
 using Geef.Atelier.Tests.EndToEnd;
 using Geef.Atelier.Tests.Persistence;
 using Geef.Atelier.Tests.TestData;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using static Geef.Atelier.Tests.Orders.OrderTestData;
 
 namespace Geef.Atelier.Tests.Sources;
@@ -142,6 +148,168 @@ public sealed class SourceEndpointsTests(PostgresFixture postgres)
         using (var upload = await host.PostSourceAsync(nameless, "mine.md", Encoding.UTF8.GetBytes("Nameless notes " + Guid.NewGuid())))
             Assert.Equal(HttpStatusCode.Forbidden, upload.StatusCode);
         Assert.Equal(sourcesBefore, await host.QueryAsync(db => db.Sources.CountAsync()));
+    }
+
+    [Fact]
+    public async Task APersonRunsAtMostTwoUploadsAtOnceWhileOthersStillGetThrough()
+    {
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres, services => services.Configure<SourceOptions>(o => o.MaxConcurrentIntakes = 3));
+        var busy = await host.CreateSignedInClientAsync("busy-" + Guid.NewGuid().ToString("N")[..6]);
+        var other = await host.CreateSignedInClientAsync("other-" + Guid.NewGuid().ToString("N")[..6]);
+        var release = new TaskCompletionSource();
+        var first = SendStalledAsync(host, busy, "first.txt", release.Task);
+        var second = SendStalledAsync(host, busy, "second.txt", release.Task);
+        await WaitForIncomingAsync(host, 2);
+
+        using (var third = await host.PostSourceAsync(busy, "third.md", Encoding.UTF8.GetBytes("Third " + Guid.NewGuid())))
+        {
+            Assert.Equal(HttpStatusCode.TooManyRequests, third.StatusCode);
+            Assert.Equal("5", third.Headers.GetValues("Retry-After").Single());
+            Assert.Contains("You are already adding 2 files at the same time. Please wait until one is done, then try again.", await third.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        }
+
+        using (var meanwhile = await host.PostSourceAsync(other, "other.md", Encoding.UTF8.GetBytes("Other person " + Guid.NewGuid())))
+            Assert.Equal(HttpStatusCode.Created, meanwhile.StatusCode);
+
+        release.SetResult();
+        using (var done = await first)
+            Assert.Equal(HttpStatusCode.Created, done.StatusCode);
+        using (var done = await second)
+            Assert.Equal(HttpStatusCode.Created, done.StatusCode);
+        using var later = await host.PostSourceAsync(busy, "third.md", Encoding.UTF8.GetBytes("Third " + Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Created, later.StatusCode);
+    }
+
+    [Fact]
+    public async Task AnUploadThatStallsIsCutOffAfterTheTimeAndFreesItsSlot()
+    {
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres, services => services.Configure<SourceOptions>(o =>
+        {
+            o.MaxConcurrentIntakes = 1;
+            o.ExtractionQueueTimeout = TimeSpan.FromMilliseconds(500);
+            o.UploadTimeout = TimeSpan.FromSeconds(2);
+        }));
+        var slow = await host.CreateSignedInClientAsync("slow-" + Guid.NewGuid().ToString("N")[..6]);
+        var other = await host.CreateSignedInClientAsync("other-" + Guid.NewGuid().ToString("N")[..6]);
+        var never = new TaskCompletionSource();
+        var clock = Stopwatch.StartNew();
+
+        var stalled = SendStalledAsync(host, slow, "stalled.txt", never.Task);
+        await WaitForIncomingAsync(host, 1);
+        using (var blocked = await host.PostSourceAsync(other, "blocked.md", Encoding.UTF8.GetBytes("Blocked " + Guid.NewGuid())))
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, blocked.StatusCode);
+
+        using (var cut = await stalled.WaitAsync(TimeSpan.FromSeconds(60)))
+        {
+            Assert.Equal(HttpStatusCode.RequestTimeout, cut.StatusCode);
+            Assert.Contains(Geef.Atelier.Web.Endpoints.SourceEndpoints.TimeoutReason, await cut.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        }
+
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(60), $"took {clock.Elapsed}");
+        using var after = await host.PostSourceAsync(other, "after.md", Encoding.UTF8.GetBytes("After " + Guid.NewGuid()));
+        Assert.Equal(HttpStatusCode.Created, after.StatusCode);
+        Assert.Equal(0, await IncomingCountAsync(host));
+        never.TrySetResult();
+    }
+
+    [Fact]
+    public async Task BrokenUploadsAre400AndOnlyOneFileIsAccepted()
+    {
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
+        var username = "owner-" + Guid.NewGuid().ToString("N")[..6];
+        var owner = await host.CreateSignedInClientAsync(username);
+
+        using (var truncated = await SendRawAsync(host, owner, "--b1\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.txt\"\r\n\r\nhalf a file without its end"))
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, truncated.StatusCode);
+            Assert.Contains("The upload could not be read.", await truncated.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        }
+
+        using (var noBoundary = await SendRawAsync(host, owner, "this is not multipart at all"))
+            Assert.Equal(HttpStatusCode.BadRequest, noBoundary.StatusCode);
+
+        using (var noFile = await SendRawAsync(host, owner, "--b1\r\nContent-Disposition: form-data; name=\"note\"\r\n\r\njust a field\r\n--b1--\r\n"))
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, noFile.StatusCode);
+            Assert.Contains("Send exactly one file per upload.", await noFile.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        }
+
+        var two = $"--b1\r\nContent-Disposition: form-data; name=\"file\"; filename=\"one.txt\"\r\n\r\nFirst {Guid.NewGuid()}\r\n" +
+                  $"--b1\r\nContent-Disposition: form-data; name=\"file\"; filename=\"two.txt\"\r\n\r\nSecond {Guid.NewGuid()}\r\n--b1--\r\n";
+        using (var twoFiles = await SendRawAsync(host, owner, two))
+            Assert.Equal(HttpStatusCode.BadRequest, twoFiles.StatusCode);
+
+        var withField = $"--b1\r\nContent-Disposition: form-data; name=\"note\"\r\n\r\nignored\r\n" +
+                        $"--b1\r\nContent-Disposition: form-data; name=\"file\"; filename=\"kept.txt\"\r\n\r\nKept {Guid.NewGuid()}\r\n--b1--\r\n";
+        using (var kept = await SendRawAsync(host, owner, withField))
+            Assert.Equal(HttpStatusCode.Created, kept.StatusCode);
+
+        Assert.Equal(["kept.txt"], await host.QueryAsync(db => db.Sources.Where(s => s.OwnerUsername == username).Select(s => s.FileName).ToListAsync()));
+        Assert.Equal(0, await IncomingCountAsync(host));
+    }
+
+    private static async Task<HttpResponseMessage> SendRawAsync(AtelierEndToEndHost host, HttpClient client, string body)
+    {
+        var content = new ByteArrayContent(Encoding.UTF8.GetBytes(body));
+        content.Headers.ContentType = MediaTypeHeaderValue.Parse("multipart/form-data; boundary=b1");
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/sources") { Content = content };
+        request.Headers.Add(AtelierEndToEndHost.AntiforgeryHeader, await host.GetAntiforgeryTokenAsync(client));
+        return await client.SendAsync(request);
+    }
+
+    private static async Task<HttpResponseMessage> SendStalledAsync(AtelierEndToEndHost host, HttpClient client, string fileName, Task release)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/sources") { Content = new StalledContent(fileName, release) };
+        request.Headers.Add(AtelierEndToEndHost.AntiforgeryHeader, await host.GetAntiforgeryTokenAsync(client));
+        return await client.SendAsync(request);
+    }
+
+    private static async Task WaitForIncomingAsync(AtelierEndToEndHost host, int count)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        while (await IncomingCountAsync(host) < count)
+        {
+            Assert.True(DateTime.UtcNow < deadline, $"fewer than {count} uploads started");
+            await Task.Delay(50);
+        }
+    }
+
+    private static Task<int> IncomingCountAsync(AtelierEndToEndHost host)
+    {
+        var root = host.Services.GetRequiredService<IOptions<SourceOptions>>().Value.StorageRoot;
+        var incoming = Path.Combine(root, IncomingUpload.IncomingFolder);
+        return Task.FromResult(Directory.Exists(incoming) ? Directory.GetDirectories(incoming).Length : 0);
+    }
+
+    /// <summary>Sends the head of a multipart upload and part of the file, then waits for <c>release</c> before it ends.</summary>
+    private sealed class StalledContent : HttpContent
+    {
+        private const string Boundary = "stalled-boundary";
+        private readonly string _fileName;
+        private readonly Task _release;
+
+        public StalledContent(string fileName, Task release)
+        {
+            _fileName = fileName;
+            _release = release;
+            Headers.ContentType = MediaTypeHeaderValue.Parse($"multipart/form-data; boundary={Boundary}");
+        }
+
+        protected override async Task SerializeToStreamAsync(Stream stream, System.Net.TransportContext? context)
+        {
+            await stream.WriteAsync(Encoding.ASCII.GetBytes($"--{Boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{_fileName}\"\r\nContent-Type: text/plain\r\n\r\n"));
+            await stream.WriteAsync(Encoding.UTF8.GetBytes($"The first part of {_fileName} {Guid.NewGuid()} "));
+            await stream.FlushAsync();
+            await _release;
+            await stream.WriteAsync(Encoding.UTF8.GetBytes("and the rest of it."));
+            await stream.WriteAsync(Encoding.ASCII.GetBytes($"\r\n--{Boundary}--\r\n"));
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
     }
 
     private const System.Text.Json.JsonValueKind JsonValueKindNull = System.Text.Json.JsonValueKind.Null;

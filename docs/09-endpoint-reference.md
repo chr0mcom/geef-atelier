@@ -551,7 +551,7 @@ Writes need the antiforgery token in the `RequestVerificationToken` header and, 
 
 | Endpoint | Method | Answer |
 |---|---|---|
-| `/api/sources` | POST (multipart, exactly one file) | `201` with the receipt and `Location: /api/sources/{id}`; `200` with `duplicate: true` when the same person uploaded the same file before; `422` with `usable: false`, `sourceId: null` and `reason` for a file without readable text; `400`/`413` with `{ "reason": "…" }` |
+| `/api/sources` | POST (multipart, exactly one file) | `201` with the receipt and `Location: /api/sources/{id}`; `200` with `duplicate: true` when the same person uploaded the same file before; `422` with `usable: false`, `sourceId: null` and `reason` for a file without readable text, with far more text than one source may have, beyond the quota or while the service is busy; `413` with `{ "reason": "…" }` for a file above the size limit; `429` with the receipt and `Retry-After: 5` when the person already runs two uploads; `408` with `{ "reason": "…" }` when the upload takes longer than `Sources:UploadTimeout`; `400` with `{ "reason": "…" }` for a missing token, a broken or interrupted body or not exactly one file. The body is read as a stream; the token must come in the header |
 | `/api/sources/{id}` | GET | The receipt of an own source, otherwise `404` |
 | `/api/sources/{id}` | DELETE | `204`; `409` with a reason while an order uses the file; `404` for unknown or foreign sources |
 | `/orders/{id}/export/{format}` | GET | The text of the order as `docx`, `pdf` or `md` (optional `?version=n`); `404` for unknown or foreign orders or an order without text, `400` for an unknown format |

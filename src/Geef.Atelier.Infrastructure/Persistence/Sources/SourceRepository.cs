@@ -166,14 +166,40 @@ internal sealed class SourceRepository(AtelierDbContext db) : ISourceRepository,
         return affected > 0;
     }
 
-    public async Task<(int Count, long Bytes)> GetUnattachedUsageAsync(string ownerUsername, CancellationToken ct = default)
+    public async Task<SourceUsage> GetUnattachedUsageAsync(string ownerUsername, CancellationToken ct = default)
     {
         var usage = await db.Sources.AsNoTracking()
             .Where(s => s.OwnerUsername == ownerUsername && !s.InLibrary && !db.OrderSources.Any(l => l.SourceId == s.Id))
             .GroupBy(_ => 1)
-            .Select(g => new { Count = g.Count(), Bytes = g.Sum(s => s.SizeBytes) })
+            .Select(g => new { Count = g.Count(), Bytes = g.Sum(s => s.SizeBytes), Chars = g.Sum(s => (long)s.CharCount) })
             .FirstOrDefaultAsync(ct);
-        return usage is null ? (0, 0) : (usage.Count, usage.Bytes);
+        return usage is null ? default : new SourceUsage(usage.Count, usage.Bytes, usage.Chars);
+    }
+
+    public async Task<SourceUsage?> AddWithinQuotaAsync(SourceEntity source, SourceQuota quota, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        try
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtext({source.OwnerUsername}))", ct);
+            var usage = await GetUnattachedUsageAsync(source.OwnerUsername, ct);
+            if (!quota.Allows(usage, source.SizeBytes, source.CharCount))
+                return usage;
+
+            db.Sources.Add(source);
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return null;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: UniqueHashIndex })
+        {
+            throw new SourceAlreadyStoredException(ex);
+        }
+        finally
+        {
+            db.ChangeTracker.Clear();
+        }
     }
 
     public async Task<IReadOnlySet<string>> FindKnownStoragePathsAsync(IReadOnlyCollection<string> storagePaths, CancellationToken ct = default)

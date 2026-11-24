@@ -17,7 +17,8 @@ namespace Geef.Atelier.Infrastructure.Sources.Extraction;
 /// <c> | </c>. Headers, footers, comments, deleted text and pictures are left out; pictures raise a warning. Before the
 /// file is opened, the archive is checked against entry count, total size and compression ratio, and every XML part is
 /// read once as a stream without a DTD and with a nesting limit, so no deep or oversized part reaches the document model.
-/// The body is walked without recursion.
+/// The same pass counts the characters of all text runs; above <see cref="SourceOptions.MaxExtractedChars"/> the file is
+/// refused before the document model is built. The body is walked without recursion and stops at the same limit.
 /// </summary>
 internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogger<DocxSourceExtractor> logger) : ISourceTextExtractor
 {
@@ -26,6 +27,7 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
     internal const string NoTextReason = "This Word file has no text.";
     internal const string NestingReason = "This Word file has too many nested parts and was not opened.";
     internal const long RatioCheckFromBytes = 65_536;
+    private const string WordNamespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
     public SourceKind Kind => SourceKind.Docx;
 
@@ -43,6 +45,8 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
                 return SourceExtraction.Unreadable(NestingReason);
             case XmlScanResult.Broken:
                 return SourceExtraction.Unreadable(BrokenReason);
+            case XmlScanResult.TooMuchText:
+                return SourceExtraction.TooMuchText();
         }
 
         try
@@ -53,7 +57,7 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
             if (body is null)
                 return SourceExtraction.Unreadable(NoTextReason);
 
-            var state = new WalkState();
+            var state = new WalkState(Math.Max(1, options.Value.MaxExtractedChars));
             Walk(body, state, ct);
             var text = state.Builder.ToString().Replace("\0", string.Empty, StringComparison.Ordinal).Trim();
             if (text.Length == 0)
@@ -66,6 +70,10 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
                     : string.Create(CultureInfo.InvariantCulture, $"{state.Pictures} pictures were skipped; only the text is used.")));
 
             return new SourceExtraction(text, null, [], SourceQuality.Good, warnings, null);
+        }
+        catch (TextLimitExceededException)
+        {
+            return SourceExtraction.TooMuchText();
         }
         catch (Exception ex) when (ex is not (OperationCanceledException or OutOfMemoryException))
         {
@@ -102,8 +110,10 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
 
     /// <summary>
     /// Reads every XML part of the archive once as a stream: no DTD, at most <see cref="SourceOptions.MaxUncompressedBytes"/>
-    /// characters and at most <see cref="SourceOptions.MaxXmlDepth"/> levels of nesting. Parts that do not start with
-    /// <c>&lt;</c> (pictures and other binary parts) are skipped.
+    /// characters and at most <see cref="SourceOptions.MaxXmlDepth"/> levels of nesting. The characters inside Word text
+    /// runs (<c>w:t</c>) of all parts are counted in chunks; above <see cref="SourceOptions.MaxExtractedChars"/> the scan
+    /// stops with <see cref="XmlScanResult.TooMuchText"/>. Parts that do not start with <c>&lt;</c> (pictures and other
+    /// binary parts) are skipped.
     /// </summary>
     internal static XmlScanResult ScanXmlParts(byte[] bytes, SourceOptions options)
     {
@@ -118,6 +128,9 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
             IgnoreProcessingInstructions = true,
         };
 
+        var maxTextChars = Math.Max(1L, options.MaxExtractedChars);
+        var textChars = 0L;
+        var chunk = new char[4_096];
         try
         {
             using var archive = new ZipArchive(new MemoryStream(bytes, writable: false), ZipArchiveMode.Read);
@@ -128,10 +141,26 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
 
                 using var stream = entry.Open();
                 using var reader = XmlReader.Create(stream, settings);
+                var inText = false;
                 while (reader.Read())
                 {
                     if (reader.Depth > options.MaxXmlDepth)
                         return XmlScanResult.TooDeep;
+
+                    switch (reader.NodeType)
+                    {
+                        case XmlNodeType.Element:
+                            inText = !reader.IsEmptyElement && reader.LocalName == "t" && reader.NamespaceURI == WordNamespace;
+                            break;
+                        case XmlNodeType.EndElement:
+                            inText = false;
+                            break;
+                        case XmlNodeType.Text or XmlNodeType.CDATA or XmlNodeType.SignificantWhitespace or XmlNodeType.Whitespace when inText:
+                            textChars += CountValue(reader, chunk, maxTextChars - textChars);
+                            if (textChars > maxTextChars)
+                                return XmlScanResult.TooMuchText;
+                            break;
+                    }
                 }
             }
 
@@ -141,6 +170,23 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
         {
             return XmlScanResult.Broken;
         }
+    }
+
+    private static long CountValue(XmlReader reader, char[] chunk, long allowed)
+    {
+        if (!reader.CanReadValueChunk)
+            return reader.Value.Length;
+
+        long count = 0;
+        int read;
+        while ((read = reader.ReadValueChunk(chunk, 0, chunk.Length)) > 0)
+        {
+            count += read;
+            if (count > allowed)
+                break;
+        }
+
+        return count;
     }
 
     private static bool LooksLikeXml(ZipArchiveEntry entry)
@@ -193,7 +239,7 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
     private static void AppendParagraph(Paragraph paragraph, WalkState state)
     {
         state.Pictures += CountPictures(paragraph);
-        var text = ParagraphText(paragraph);
+        var text = ParagraphText(paragraph, state.MaxChars);
         if (text.Trim().Length == 0)
             return;
 
@@ -207,20 +253,25 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
     {
         var rows = new List<string>();
         var first = true;
+        var total = 0L;
         foreach (var row in table.Elements<TableRow>())
         {
             var cells = row.Elements<TableCell>()
                 .Select(cell =>
                 {
                     state.Pictures += CountPictures(cell);
-                    return string.Join(' ', cell.Descendants<Paragraph>().Select(ParagraphText).Where(t => t.Trim().Length > 0).Select(t => t.Trim()))
+                    return string.Join(' ', cell.Descendants<Paragraph>().Select(p => ParagraphText(p, state.MaxChars)).Where(t => t.Trim().Length > 0).Select(t => t.Trim()))
                         .Replace('|', '/');
                 })
                 .ToList();
             if (cells.Count == 0)
                 continue;
 
-            rows.Add("| " + string.Join(" | ", cells) + " |");
+            var line = "| " + string.Join(" | ", cells) + " |";
+            total += line.Length + 1;
+            if (state.Builder.Length + total > state.MaxChars)
+                throw new TextLimitExceededException();
+            rows.Add(line);
             if (first)
                 rows.Add("|" + string.Concat(Enumerable.Repeat(" --- |", cells.Count)));
             first = false;
@@ -230,11 +281,14 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
             AppendBlock(state, string.Join('\n', rows));
     }
 
-    private static string ParagraphText(Paragraph paragraph)
+    private static string ParagraphText(Paragraph paragraph, int maxChars)
     {
         var builder = new StringBuilder();
         foreach (var element in paragraph.Descendants())
         {
+            if (builder.Length > maxChars)
+                throw new TextLimitExceededException();
+
             switch (element)
             {
                 case Text text when text.Parent is not null && !IsInsideTable(text, paragraph):
@@ -300,12 +354,17 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
             state.Builder.Append(state.LastWasList && block.StartsWith("- ", StringComparison.Ordinal) ? "\n" : "\n\n");
         state.Builder.Append(block);
         state.LastWasList = block.StartsWith("- ", StringComparison.Ordinal);
+        if (state.Builder.Length > state.MaxChars)
+            throw new TextLimitExceededException();
     }
 
-    internal enum XmlScanResult { Fine = 0, TooDeep = 1, Broken = 2 }
+    internal enum XmlScanResult { Fine = 0, TooDeep = 1, Broken = 2, TooMuchText = 3 }
 
-    private sealed class WalkState
+    private sealed class TextLimitExceededException() : Exception("The Word file holds more text than one source may have.");
+
+    private sealed class WalkState(int maxChars)
     {
+        public int MaxChars { get; } = maxChars;
         public StringBuilder Builder { get; } = new();
         public int Pictures { get; set; }
         public bool LastWasList { get; set; }

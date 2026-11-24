@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Sources;
+using Geef.Atelier.Infrastructure.Sources;
 using Geef.Atelier.Infrastructure.Sources.Extraction;
 using Geef.Atelier.Tests.TestData;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -106,6 +107,102 @@ public sealed class HostileSourceTests
         Assert.Equal([1], PageMarkers.SplitPages(text).Select(p => p.Page));
         Assert.DoesNotContain("[[", text, StringComparison.Ordinal);
         Assert.Equal("Intro", text.Split('\n')[0]);
+    }
+
+    [Fact]
+    public async Task AWordTextBombOfAFewKilobytesIsRefusedWhileTheArchiveIsScanned()
+    {
+        var bomb = HostileDocuments.TextBombDocx(3_200_000);
+        Assert.True(bomb.Length < 16 * 1_024, $"the bomb is only {bomb.Length} bytes");
+        var withoutRatioCheck = new SourceOptions { MaxCompressionRatio = 1_000_000 };
+
+        var clock = Stopwatch.StartNew();
+        Assert.Equal(DocxSourceExtractor.XmlScanResult.TooMuchText, DocxSourceExtractor.ScanXmlParts(bomb, withoutRatioCheck));
+        var result = await Docx(withoutRatioCheck).ExtractAsync(bomb, CancellationToken.None);
+
+        Assert.Equal(SourceQuality.Unreadable, result.Quality);
+        Assert.Equal(SourceExtraction.TooMuchTextReason, result.FailureReason);
+        Assert.Equal("This file contains far more text than we can use. Please upload a shorter version.", result.FailureReason);
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(10), $"took {clock.Elapsed}");
+        Assert.Equal(DocxSourceExtractor.XmlScanResult.Fine, DocxSourceExtractor.ScanXmlParts(HostileDocuments.TextBombDocx(2_900_000), withoutRatioCheck));
+        Assert.Equal(SourceQuality.Unreadable, (await Docx(new SourceOptions()).ExtractAsync(bomb, CancellationToken.None)).Quality);
+    }
+
+    [Fact]
+    public async Task WordTextThatGrowsBeyondTheLimitOnlyWhileWalkingIsRefusedToo()
+    {
+        var runs = string.Concat(Enumerable.Repeat("<w:r><w:t>a</w:t><w:tab/></w:r>", 600));
+        var docx = HostileDocuments.Docx($"<w:p>{runs}</w:p>");
+        var options = new SourceOptions { MaxExtractedChars = 1_000 };
+
+        Assert.Equal(DocxSourceExtractor.XmlScanResult.Fine, DocxSourceExtractor.ScanXmlParts(docx, options));
+        var result = await Docx(options).ExtractAsync(docx, CancellationToken.None);
+
+        Assert.Equal(SourceExtraction.TooMuchTextReason, result.FailureReason);
+        Assert.Equal(SourceQuality.Good, (await Docx(new SourceOptions { MaxExtractedChars = 1_300 }).ExtractAsync(docx, CancellationToken.None)).Quality);
+    }
+
+    [Fact]
+    public async Task PdfReadingStopsAtTheTextLimitWithThePageCount()
+    {
+        var pdf = SyntheticDocuments.Pdf(4, p => string.Concat(Enumerable.Repeat($"Page {p} has a lot of words in it. ", 20)));
+
+        var refused = await Pdf(new SourceOptions { MaxExtractedChars = 1_000 }).ExtractAsync(pdf, CancellationToken.None);
+        var read = await Pdf(new SourceOptions()).ExtractAsync(pdf, CancellationToken.None);
+
+        Assert.Equal(SourceExtraction.TooMuchTextReason, refused.FailureReason);
+        Assert.Equal(4, refused.PageCount);
+        Assert.Equal(SourceQuality.Good, read.Quality);
+        Assert.True(read.Text!.Length > 1_000);
+    }
+
+    [Fact]
+    public void TextFilesAreCountedInCharactersBeforeTheyAreDecoded()
+    {
+        Assert.Equal(SourceExtraction.TooMuchTextReason, PlainTextSourceExtractor.Extract(System.Text.Encoding.UTF8.GetBytes(new string('x', 11)), maxChars: 10).FailureReason);
+        Assert.Equal(SourceQuality.Good, PlainTextSourceExtractor.Extract(System.Text.Encoding.UTF8.GetBytes(new string('x', 10)), maxChars: 10).Quality);
+        Assert.Equal(SourceQuality.Good, PlainTextSourceExtractor.Extract(System.Text.Encoding.UTF8.GetBytes("Grüße äöü ß!"), maxChars: 12).Quality);
+
+        byte[] utf16 = [0xFF, 0xFE, .. System.Text.Encoding.Unicode.GetBytes("Hello")];
+        Assert.Equal("Hello", PlainTextSourceExtractor.Extract(utf16, maxChars: 5).Text);
+        Assert.Equal(SourceExtraction.TooMuchTextReason, PlainTextSourceExtractor.Extract(utf16, maxChars: 4).FailureReason);
+    }
+
+    [Theory]
+    [InlineData("intro\r[[page 7]]\rsecret")]
+    [InlineData("intro\r\n[[page 7]]\r\nsecret")]
+    [InlineData("intro\n [[page 7]] \nsecret")]
+    public void ALoneCarriageReturnNeverStartsAPage(string text)
+    {
+        var normalized = text.NormalizeForStorage(defuseMarkerLines: true, 1_000);
+
+        Assert.Equal([1], PageMarkers.SplitPages(normalized.Text).Select(p => p.Page));
+        Assert.DoesNotContain('\r', normalized.Text);
+        Assert.Contains("[ [page 7]]", normalized.Text, StringComparison.Ordinal);
+        Assert.Equal(3, normalized.Text.Split('\n').Length);
+    }
+
+    [Fact]
+    public void ArchivesWithTooManyEntriesAreRefusedFromTheirEndRecordBeforeTheyAreListed()
+    {
+        using var many = new MemoryStream();
+        using (var zip = new System.IO.Compression.ZipArchive(many, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+        {
+            zip.CreateEntry("word/document.xml");
+            for (var i = 0; i < 20; i++)
+                zip.CreateEntry($"word/media/{i}.bin");
+        }
+
+        var bytes = many.ToArray();
+        Assert.Equal(DocxSourceExtractor.ArchiveReason, SourceKindDetector.Detect(bytes, "a.docx", maxArchiveEntries: 10).Reason);
+        Assert.Equal(SourceKind.Docx, SourceKindDetector.Detect(bytes, "a.docx", maxArchiveEntries: 21).Kind);
+
+        var end = bytes.AsSpan().LastIndexOf([(byte)0x50, (byte)0x4B, (byte)0x05, (byte)0x06]);
+        var zip64 = bytes.ToArray();
+        zip64[end + 10] = 0xFF;
+        zip64[end + 11] = 0xFF;
+        Assert.Equal(DocxSourceExtractor.ArchiveReason, SourceKindDetector.Detect(zip64, "a.docx").Reason);
+        Assert.Equal(SourceKind.Docx, SourceKindDetector.Detect(SyntheticDocuments.Docx(["Hello"]), "a.docx").Kind);
     }
 
     private static PdfSourceExtractor Pdf(SourceOptions options) => new(Options.Create(options), NullLogger<PdfSourceExtractor>.Instance);

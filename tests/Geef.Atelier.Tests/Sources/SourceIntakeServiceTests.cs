@@ -347,7 +347,7 @@ public sealed class SourceIntakeServiceTests(PostgresFixture fixture) : IDisposa
     [Fact]
     public async Task TheSameFileUploadedInParallelIsStoredOnce()
     {
-        await using var provider = Build();
+        await using var provider = Build(o => o.MaxConcurrentUploadsPerUser = 8);
         var user = NewUser();
         var bytes = Encoding.UTF8.GetBytes("Parallel upload " + Guid.NewGuid());
 
@@ -429,6 +429,196 @@ public sealed class SourceIntakeServiceTests(PostgresFixture fixture) : IDisposa
     }
 
     [Fact]
+    public async Task ALoneCarriageReturnInWordAndTextFilesNeverStartsAPage()
+    {
+        await using var provider = Build();
+        var user = NewUser();
+
+        var docx = await IntakeAsync(provider, user, "cr.docx", HostileDocuments.Docx($"<w:p><w:r><w:t>intro {Guid.NewGuid()}&#13;[[page 7]]&#13;secret</w:t></w:r></w:p>"));
+        var markdown = await IntakeAsync(provider, user, "cr.md", Encoding.UTF8.GetBytes($"intro {Guid.NewGuid()}\r[[page 7]]\rsecret"));
+        var text = await IntakeAsync(provider, user, "cr.txt", Encoding.UTF8.GetBytes($"intro {Guid.NewGuid()}\r[[page 7]]\r\nsecret"));
+
+        await using var db = fixture.NewContext();
+        foreach (var receipt in new[] { docx, markdown, text })
+        {
+            Assert.True(receipt.Usable, receipt.Reason);
+            var stored = await db.Sources.AsNoTracking().SingleAsync(s => s.Id == receipt.SourceId);
+            Assert.Equal([1], PageMarkers.SplitPages(stored.ExtractedText!).Select(p => p.Page));
+            Assert.DoesNotContain('\r', stored.ExtractedText!);
+            Assert.EndsWith("\n[ [page 7]]\nsecret", stored.ExtractedText!, StringComparison.Ordinal);
+            Assert.Equal(PageMarkers.StripMarkers(stored.ExtractedText!).Length, stored.CharCount);
+        }
+    }
+
+    [Fact]
+    public async Task FilesWithFarMoreTextThanTheLimitAreRefusedAndNothingIsStored()
+    {
+        await using var provider = Build(o => o.MaxExtractedChars = 5_000);
+        var user = NewUser();
+
+        var text = await IntakeAsync(provider, user, "long.txt", Encoding.UTF8.GetBytes(new string('a', 5_001)));
+        var docx = await IntakeAsync(provider, user, "long.docx", SyntheticDocuments.Docx([.. Enumerable.Range(0, 30).Select(i => $"Paragraph {i} {new string('w', 200)}")]));
+        var pdf = await IntakeAsync(provider, user, "long.pdf", SyntheticDocuments.Pdf(12, p => string.Concat(Enumerable.Repeat($"Page {p} explains the plan. ", 20))));
+        var fits = await IntakeAsync(provider, user, "fits.txt", Encoding.UTF8.GetBytes(new string('b', 4_990) + " ok"));
+
+        foreach (var refused in new[] { text, docx, pdf })
+        {
+            Assert.False(refused.Usable);
+            Assert.Null(refused.SourceId);
+            Assert.Equal("This file contains far more text than we can use. Please upload a shorter version.", refused.Reason);
+        }
+
+        Assert.True(fits.Usable, fits.Reason);
+        await using var db = fixture.NewContext();
+        Assert.Equal(1, await db.Sources.CountAsync(s => s.OwnerUsername == user));
+    }
+
+    [Fact]
+    public async Task TheWebProcessRefusesTooMuchTextEvenWhenTheReaderDeliversIt()
+    {
+        var runner = new FixedTextRunner(new string('z', 2_001));
+        await using var provider = Build(o => o.MaxExtractedChars = 2_000, replace: services => services.AddSingleton<ISourceExtractionRunner>(runner));
+        var user = NewUser();
+
+        var refused = await IntakeAsync(provider, user, "a.txt", Encoding.UTF8.GetBytes("Small file " + Guid.NewGuid()));
+
+        Assert.False(refused.Usable);
+        Assert.Equal(SourceExtraction.TooMuchTextReason, refused.Reason);
+        Assert.Equal(1, runner.Calls);
+        await using var db = fixture.NewContext();
+        Assert.False(await db.Sources.AnyAsync(s => s.OwnerUsername == user));
+    }
+
+    [Fact]
+    public async Task TheQuotaAlsoCountsCharactersOfText()
+    {
+        await using var provider = Build(o => o.MaxUnattachedCharsPerUser = 1_000);
+        var user = NewUser();
+
+        var first = await IntakeAsync(provider, user, "1.txt", Encoding.UTF8.GetBytes(new string('a', 560) + Guid.NewGuid()));
+        var second = await IntakeAsync(provider, user, "2.txt", Encoding.UTF8.GetBytes(new string('b', 560) + Guid.NewGuid()));
+
+        Assert.True(first.Usable, first.Reason);
+        Assert.False(second.Usable);
+        Assert.Equal("Your files that are not used in an order yet would hold more than 1,000 characters of text. Remove some of them or start an order first.", second.Reason);
+        Assert.Single(Directory.GetFiles(Path.Combine(_root, SourceFileStore.OwnerFolder(user))));
+
+        var order = Order(user);
+        await using (var db = fixture.NewContext())
+        {
+            db.Orders.Add(order);
+            db.OrderSources.Add(Link(order.Id, first.SourceId!.Value));
+            await db.SaveChangesAsync();
+        }
+
+        Assert.True((await IntakeAsync(provider, user, "2.txt", Encoding.UTF8.GetBytes(new string('b', 560) + Guid.NewGuid()))).Usable);
+        await using var check = fixture.NewContext();
+        var usage = await new SourceRepository(check).GetUnattachedUsageAsync(user);
+        Assert.Equal(1, usage.Count);
+        Assert.InRange(usage.Chars, 1, 1_000);
+    }
+
+    [Fact]
+    public async Task SevenParallelUploadsNeverPassTheQuotaTogether()
+    {
+        await using var provider = Build(o =>
+        {
+            o.MaxUnattachedSourcesPerUser = 3;
+            o.MaxConcurrentUploadsPerUser = 8;
+        });
+        var user = NewUser();
+
+        var receipts = await Task.WhenAll(Enumerable.Range(0, 7).Select(i =>
+            IntakeAsync(provider, user, $"{i}.txt", Encoding.UTF8.GetBytes($"Parallel file {i} {Guid.NewGuid()}"))));
+
+        Assert.Equal(3, receipts.Count(r => r.Usable));
+        Assert.All(receipts.Where(r => !r.Usable), r => Assert.Equal("You have 3 files that are not used in an order yet. Remove some of them or start an order first.", r.Reason));
+        await using var db = fixture.NewContext();
+        Assert.Equal(3, await db.Sources.CountAsync(s => s.OwnerUsername == user));
+        Assert.Equal(3, Directory.GetFiles(Path.Combine(_root, SourceFileStore.OwnerFolder(user))).Length);
+
+        await using var bySize = Build(o =>
+        {
+            o.MaxUnattachedBytesPerUser = 2_500;
+            o.MaxConcurrentUploadsPerUser = 8;
+        });
+        var sizeUser = NewUser();
+        var sized = await Task.WhenAll(Enumerable.Range(0, 7).Select(i =>
+            IntakeAsync(bySize, sizeUser, $"{i}.txt", Encoding.UTF8.GetBytes(new string((char)('a' + i), 1_000)))));
+        Assert.Equal(2, sized.Count(r => r.Usable));
+        await using var check = fixture.NewContext();
+        Assert.True(await check.Sources.Where(s => s.OwnerUsername == sizeUser).SumAsync(s => s.SizeBytes) <= 2_500);
+    }
+
+    [Fact]
+    public async Task OnePersonRunsAtMostTwoUploadsAndOthersAreNotBlocked()
+    {
+        await using var provider = Build(o => o.MaxConcurrentIntakes = 4);
+        var busy = NewUser();
+        var first = new HeldStream(Encoding.UTF8.GetBytes("First held " + Guid.NewGuid()));
+        var second = new HeldStream(Encoding.UTF8.GetBytes("Second held " + Guid.NewGuid()));
+
+        var running = new[]
+        {
+            IntakeAsync(provider, busy, "1.txt", first),
+            IntakeAsync(provider, busy, "2.txt", second),
+        };
+        await Task.WhenAll(first.Reading.Task, second.Reading.Task).WaitAsync(TimeSpan.FromSeconds(10));
+
+        var third = await IntakeAsync(provider, busy, "3.txt", Encoding.UTF8.GetBytes("Third " + Guid.NewGuid()));
+        var other = await IntakeAsync(provider, NewUser(), "other.txt", Encoding.UTF8.GetBytes("Other person " + Guid.NewGuid()));
+
+        Assert.False(third.Usable);
+        Assert.Equal(SourceRefusal.TooManyUploads, third.Refusal);
+        Assert.Equal("You are already adding 2 files at the same time. Please wait until one is done, then try again.", third.Reason);
+        Assert.True(other.Usable, other.Reason);
+
+        first.Release.SetResult();
+        second.Release.SetResult();
+        Assert.All(await Task.WhenAll(running), r => Assert.True(r.Usable, r.Reason));
+        Assert.True((await IntakeAsync(provider, busy, "3.txt", Encoding.UTF8.GetBytes("Third " + Guid.NewGuid()))).Usable);
+    }
+
+    [Fact]
+    public async Task PastedTextNeedsNoUploadSlot()
+    {
+        await using var provider = Build(o =>
+        {
+            o.MaxConcurrentIntakes = 1;
+            o.MaxConcurrentUploadsPerUser = 1;
+            o.ExtractionQueueTimeout = TimeSpan.FromMilliseconds(300);
+        });
+        var user = NewUser();
+        var slow = new HeldStream(Encoding.UTF8.GetBytes("Slow upload " + Guid.NewGuid()));
+
+        await using var scope = provider.CreateAsyncScope();
+        var intake = scope.ServiceProvider.GetRequiredService<ISourceIntakeService>();
+        var held = intake.IntakeAsync(new SourceUpload("slow.txt", null, 0, slow), user, SourceOrigin.WebUpload);
+        await slow.Reading.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var pasted = await intake.IntakeTextAsync("Brief", "Pasted while a file is uploading. " + Guid.NewGuid(), user, SourceOrigin.Pasted);
+
+        Assert.True(pasted.Usable, pasted.Reason);
+        slow.Release.SetResult();
+        Assert.True((await held).Usable);
+    }
+
+    [Fact]
+    public async Task AnUploadThatBreaksOffIsRefusedAndLeavesNothingBehind()
+    {
+        await using var provider = Build();
+        var user = NewUser();
+
+        var receipt = await IntakeAsync(provider, user, "broken.txt", new BreakingStream(Encoding.UTF8.GetBytes("Half a file " + Guid.NewGuid())));
+
+        Assert.False(receipt.Usable);
+        Assert.Equal(SourceRefusal.Interrupted, receipt.Refusal);
+        Assert.Equal("The upload was interrupted. Please try again.", receipt.Reason);
+        var incoming = Path.Combine(_root, IncomingUpload.IncomingFolder);
+        Assert.True(!Directory.Exists(incoming) || Directory.GetFileSystemEntries(incoming).Length == 0);
+    }
+
+    [Fact]
     public async Task AHostileWordFileIsRefusedThroughTheIntakeAndNothingIsStored()
     {
         await using var provider = Build();
@@ -492,6 +682,29 @@ public sealed class SourceIntakeServiceTests(PostgresFixture fixture) : IDisposa
         }
     }
 
+    [Fact]
+    public async Task OrphanScanDeletesNothingWhenMostStoredFilesAreUnknownToTheDatabase()
+    {
+        await using var provider = Build();
+        var user = NewUser();
+        var kept = await IntakeAsync(provider, user, "kept.txt", Encoding.UTF8.GetBytes("Kept " + Guid.NewGuid()));
+        string keptPath;
+        await using (var db = fixture.NewContext())
+            keptPath = Path.Combine(_root, (await db.Sources.AsNoTracking().SingleAsync(s => s.Id == kept.SourceId)).StoragePath!);
+        File.SetLastWriteTimeUtc(keptPath, DateTime.UtcNow.AddDays(-3));
+        var folder = Path.Combine(_root, SourceFileStore.OwnerFolder(user));
+        var restored = Enumerable.Range(0, SourceOrphanScanner.GuardMinimumFiles + 2).Select(_ => Touch(Path.Combine(folder, $"{Guid.NewGuid():N}.pdf"))).ToList();
+        var cleanup = provider.GetServices<IHostedService>().OfType<SourceCleanupBackgroundService>().Single();
+
+        Assert.Equal(0, await cleanup.RemoveOrphansAsync(CancellationToken.None));
+        Assert.All(restored, path => Assert.True(File.Exists(path)));
+
+        foreach (var path in restored.Skip(3))
+            File.Delete(path);
+        Assert.Equal(3, await cleanup.RemoveOrphansAsync(CancellationToken.None));
+        Assert.True(File.Exists(keptPath));
+    }
+
     private static string Touch(string path)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -500,11 +713,14 @@ public sealed class SourceIntakeServiceTests(PostgresFixture fixture) : IDisposa
         return path;
     }
 
-    private async Task<SourceReceipt> IntakeAsync(ServiceProvider provider, string user, string name, byte[] bytes, string? declared = null)
+    private Task<SourceReceipt> IntakeAsync(ServiceProvider provider, string user, string name, byte[] bytes, string? declared = null) =>
+        IntakeAsync(provider, user, name, new MemoryStream(bytes), declared);
+
+    private static async Task<SourceReceipt> IntakeAsync(ServiceProvider provider, string user, string name, Stream content, string? declared = null)
     {
         await using var scope = provider.CreateAsyncScope();
         var intake = scope.ServiceProvider.GetRequiredService<ISourceIntakeService>();
-        return await intake.IntakeAsync(new SourceUpload(name, declared, bytes.Length, new MemoryStream(bytes)), user, SourceOrigin.WebUpload);
+        return await intake.IntakeAsync(new SourceUpload(name, declared, content.CanSeek ? content.Length : 0, content), user, SourceOrigin.WebUpload);
     }
 
     private ServiceProvider Build(Action<SourceOptions>? configure = null, TimeProvider? time = null, Action<IServiceCollection>? replace = null)
@@ -540,6 +756,30 @@ public sealed class SourceIntakeServiceTests(PostgresFixture fixture) : IDisposa
             Reading.TrySetResult();
             await Release.Task.WaitAsync(cancellationToken);
             return await base.ReadAsync(buffer, cancellationToken);
+        }
+    }
+
+    private sealed class BreakingStream(byte[] content) : MemoryStream(content)
+    {
+        private bool _served;
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (_served)
+                throw new IOException("The connection was closed.");
+            _served = true;
+            return base.ReadAsync(buffer[..Math.Min(buffer.Length, 4)], cancellationToken);
+        }
+    }
+
+    private sealed class FixedTextRunner(string text) : ISourceExtractionRunner
+    {
+        public int Calls { get; private set; }
+
+        public Task<SourceExtraction> ExtractAsync(SourceKind kind, string inputPath, string workDirectory, CancellationToken ct)
+        {
+            Calls++;
+            return Task.FromResult(new SourceExtraction(text, null, [], SourceQuality.Good, [], null));
         }
     }
 

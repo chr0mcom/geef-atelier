@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Geef.Atelier.Core.Configuration;
@@ -17,11 +18,17 @@ internal sealed record ExtractionLimits(
     long MaxUncompressedBytes,
     int MaxCompressionRatio,
     int MaxXmlDepth,
-    long MaxPdfInflatedBytes)
+    long MaxPdfInflatedBytes,
+    int MaxExtractedChars)
 {
-    /// <summary>JSON format of the limits and of the extraction result.</summary>
+    /// <summary>
+    /// JSON format of the limits and of the extraction result. Text is written without escaping letters outside ASCII
+    /// (at most four bytes per character), so the answer stays within <see cref="SourceOptions.ExtractionMaxOutputBytes"/>;
+    /// the JSON only travels through the private pipe between the two processes.
+    /// </summary>
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
@@ -35,7 +42,8 @@ internal sealed record ExtractionLimits(
         options.MaxUncompressedBytes,
         options.MaxCompressionRatio,
         options.MaxXmlDepth,
-        options.MaxPdfInflatedBytes);
+        options.MaxPdfInflatedBytes,
+        options.MaxExtractedChars);
 
     /// <summary>Builds the options the extractors read.</summary>
     public SourceOptions ToOptions() => new()
@@ -49,5 +57,6 @@ internal sealed record ExtractionLimits(
         MaxCompressionRatio = MaxCompressionRatio,
         MaxXmlDepth = MaxXmlDepth,
         MaxPdfInflatedBytes = MaxPdfInflatedBytes,
+        MaxExtractedChars = MaxExtractedChars,
     };
 }

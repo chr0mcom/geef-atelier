@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Sources;
@@ -11,8 +12,9 @@ namespace Geef.Atelier.Infrastructure.Sources.Extraction;
 /// Extraction mode of the application process: <c>dotnet Geef.Atelier.Web.dll --extract-source &lt;pdf|docx&gt; &lt;file&gt;</c>.
 /// Runs before any host is built (no DI, database, configuration or sign-in), reads the limits from
 /// <see cref="LimitsVariable"/>, writes the <see cref="SourceExtraction"/> as JSON to standard output and, on failure,
-/// a short error code to standard error with a matching exit code. The modes <see cref="TestHangKind"/> and
-/// <see cref="TestCrashKind"/> exist for tests and are accepted only when <see cref="TestModesVariable"/> is set.
+/// a short error code to standard error with a matching exit code. The modes <see cref="TestHangKind"/>,
+/// <see cref="TestCrashKind"/>, <see cref="TestManagedMemoryKind"/> and <see cref="TestNativeMemoryKind"/> exist for tests
+/// and are accepted only when <see cref="TestModesVariable"/> is set.
 /// </summary>
 internal static class SourceExtractionWorker
 {
@@ -21,6 +23,9 @@ internal static class SourceExtractionWorker
     public const string TestModesVariable = "GEEF_EXTRACTION_TEST_MODES";
     public const string TestHangKind = "test-hang";
     public const string TestCrashKind = "test-crash";
+    public const string TestManagedMemoryKind = "test-managed-memory";
+    public const string TestNativeMemoryKind = "test-native-memory";
+    private const long TestNativeMemoryCeiling = 900L * 1_048_576;
     public const int ExitOk = 0;
     public const int ExitUsage = 2;
     public const int ExitUnreadable = 3;
@@ -38,22 +43,28 @@ internal static class SourceExtractionWorker
 
         if (args is not [Switch, var kindArgument, var path])
             return Fail(errors, ExitUsage, "usage");
-        if (Environment.GetEnvironmentVariable(TestModesVariable) == "1")
+        var testModes = Environment.GetEnvironmentVariable(TestModesVariable) == "1";
+        if (testModes)
         {
             if (kindArgument == TestHangKind)
                 return Hang(path);
             if (kindArgument == TestCrashKind)
                 return Crash(0);
+            if (kindArgument == TestNativeMemoryKind)
+                return GrowNativeMemory();
         }
 
-        if (ParseKind(kindArgument) is not { } kind)
+        if (ParseKind(kindArgument) is null && !(testModes && kindArgument == TestManagedMemoryKind))
             return Fail(errors, ExitUsage, "usage");
 
         try
         {
+            if (kindArgument == TestManagedMemoryKind)
+                return GrowManagedMemory();
+
             var options = ReadLimits()?.ToOptions() ?? new SourceOptions();
             var bytes = await File.ReadAllBytesAsync(path);
-            ISourceTextExtractor extractor = kind == SourceKind.Pdf
+            ISourceTextExtractor extractor = ParseKind(kindArgument) == SourceKind.Pdf
                 ? new PdfSourceExtractor(Options.Create(options), NullLogger<PdfSourceExtractor>.Instance)
                 : new DocxSourceExtractor(Options.Create(options), NullLogger<DocxSourceExtractor>.Instance);
             var result = await extractor.ExtractAsync(bytes, CancellationToken.None);
@@ -101,6 +112,30 @@ internal static class SourceExtractionWorker
             start.ArgumentList.Add("sleep 300; : \"$0\"");
             start.ArgumentList.Add(marker);
             Process.Start(start);
+        }
+
+        Thread.Sleep(Timeout.Infinite);
+        return ExitOk;
+    }
+
+    private static int GrowManagedMemory()
+    {
+        var kept = new List<byte[]>();
+        while (true)
+            kept.Add(GC.AllocateArray<byte>(4 * 1_048_576, pinned: false));
+    }
+
+    private static int GrowNativeMemory()
+    {
+        const int block = 4 * 1_048_576;
+        long total = 0;
+        while (total < TestNativeMemoryCeiling)
+        {
+            var pointer = Marshal.AllocHGlobal(block);
+            for (var offset = 0; offset < block; offset += 4_096)
+                Marshal.WriteByte(pointer, offset, 1);
+            total += block;
+            Thread.Sleep(10);
         }
 
         Thread.Sleep(Timeout.Infinite);

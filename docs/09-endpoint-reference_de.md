@@ -553,7 +553,7 @@ Browser einen schickt, einen `Origin` gleich dem Host (sonst `400`).
 
 | Endpunkt | Methode | Antwort |
 |---|---|---|
-| `/api/sources` | POST (multipart, genau eine Datei) | `201` mit der Quittung und `Location: /api/sources/{id}`; `200` mit `duplicate: true`, wenn dieselbe Person dieselbe Datei schon hochgeladen hat; `422` mit `usable: false`, `sourceId: null` und `reason` bei einer Datei ohne lesbaren Text; `400`/`413` mit `{ "reason": "…" }` |
+| `/api/sources` | POST (multipart, genau eine Datei) | `201` mit der Quittung und `Location: /api/sources/{id}`; `200` mit `duplicate: true`, wenn dieselbe Person dieselbe Datei schon hochgeladen hat; `422` mit `usable: false`, `sourceId: null` und `reason` bei einer Datei ohne lesbaren Text, mit weit mehr Text als eine Quelle haben darf, über dem Kontingent oder wenn der Dienst ausgelastet ist; `413` mit `{ "reason": "…" }` bei einer Datei über der Größengrenze; `429` mit der Quittung und `Retry-After: 5`, wenn die Person schon zwei Uploads laufen hat; `408` mit `{ "reason": "…" }`, wenn der Upload länger als `Sources:UploadTimeout` dauert; `400` mit `{ "reason": "…" }` bei fehlendem Token, kaputtem oder abgebrochenem Body oder nicht genau einer Datei. Der Body wird als Strom gelesen; das Token muss im Header kommen |
 | `/api/sources/{id}` | GET | Die Quittung einer eigenen Quelle, sonst `404` |
 | `/api/sources/{id}` | DELETE | `204`; `409` mit Begründung, solange ein Auftrag die Datei nutzt; `404` für unbekannte oder fremde Quellen |
 | `/orders/{id}/export/{format}` | GET | Der Text des Auftrags als `docx`, `pdf` oder `md` (optional `?version=n`); `404` für unbekannte oder fremde Aufträge oder einen Auftrag ohne Text, `400` für ein unbekanntes Format |

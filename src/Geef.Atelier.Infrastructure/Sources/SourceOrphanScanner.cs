@@ -8,10 +8,15 @@ namespace Geef.Atelier.Infrastructure.Sources;
 /// <c>*.part</c> files and stored files that no source refers to, each only when older than
 /// <see cref="SourceOptions.OrphanFileAge"/>. Looks only at the root and the owner folders directly below it, never
 /// follows links and resolves every candidate through <see cref="ISourceFileStore.Resolve"/>, so nothing outside the
-/// root is touched.
+/// root is touched. When at least <see cref="GuardMinimumFiles"/> stored files are unknown and they are more than half of
+/// all old stored files, the database most likely does not match the volume (restored from an older backup or empty);
+/// then no stored file is deleted and an error is logged.
 /// </summary>
 internal sealed class SourceOrphanScanner(ISourceFileStore files, SourceOptions options, DateTimeOffset now, ILogger logger)
 {
+    /// <summary>Fewest unknown stored files from which the guard against a database that does not match the volume applies.</summary>
+    internal const int GuardMinimumFiles = 10;
+
     private const int BatchSize = 500;
 
     /// <summary>Runs the pass and returns how many files or directories were removed.</summary>
@@ -25,6 +30,8 @@ internal sealed class SourceOrphanScanner(ISourceFileStore files, SourceOptions 
         var removed = RemoveStaleUploads(root, cutoff);
 
         var candidates = new List<string>();
+        var unknown = new List<string>();
+        var checkedFiles = 0;
         foreach (var directory in SafeEnumerate(() => Directory.EnumerateDirectories(root)))
         {
             ct.ThrowIfCancellationRequested();
@@ -47,12 +54,19 @@ internal sealed class SourceOrphanScanner(ISourceFileStore files, SourceOptions 
 
                 candidates.Add(relative);
                 if (candidates.Count >= BatchSize)
-                    removed += await RemoveUnknownAsync(retention, candidates, ct);
+                    checkedFiles += await CollectUnknownAsync(retention, candidates, unknown, ct);
             }
         }
 
-        removed += await RemoveUnknownAsync(retention, candidates, ct);
-        return removed;
+        checkedFiles += await CollectUnknownAsync(retention, candidates, unknown, ct);
+        if (unknown.Count >= GuardMinimumFiles && unknown.Count * 2 > checkedFiles)
+        {
+            logger.LogError("{Unknown} of {Checked} stored source files are unknown to the database; none were deleted. Check whether the database matches the sources volume.",
+                unknown.Count, checkedFiles);
+            return removed;
+        }
+
+        return removed + unknown.Count(files.TryDelete);
     }
 
     private int RemoveStaleUploads(string root, DateTime cutoff)
@@ -83,15 +97,16 @@ internal sealed class SourceOrphanScanner(ISourceFileStore files, SourceOptions 
         return removed;
     }
 
-    private async Task<int> RemoveUnknownAsync(ISourceRetentionStore retention, List<string> candidates, CancellationToken ct)
+    private static async Task<int> CollectUnknownAsync(ISourceRetentionStore retention, List<string> candidates, List<string> unknown, CancellationToken ct)
     {
         if (candidates.Count == 0)
             return 0;
 
         var known = await retention.FindKnownStoragePathsAsync(candidates, ct);
-        var removed = candidates.Count(path => !known.Contains(path) && files.TryDelete(path));
+        unknown.AddRange(candidates.Where(path => !known.Contains(path)));
+        var count = candidates.Count;
         candidates.Clear();
-        return removed;
+        return count;
     }
 
     private static bool IsLink(string path)

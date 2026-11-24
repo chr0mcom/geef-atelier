@@ -21,6 +21,41 @@ internal static class HostileDocuments
         return Docx(body.ToString());
     }
 
+    /// <summary>
+    /// A Word file of a few KB whose single text run holds <paramref name="chars"/> times the same letter; it compresses
+    /// about 1000:1, so it passes only with the compression-ratio check switched off.
+    /// </summary>
+    public static byte[] TextBombDocx(int chars) =>
+        Docx($"<w:p><w:r><w:t>{new string('a', chars)}</w:t></w:r></w:p>");
+
+    /// <summary>
+    /// A Word file with <paramref name="chars"/> characters of varied words in paragraphs of about 500 characters; it
+    /// compresses only a few times, so it passes the archive checks with the default limits.
+    /// </summary>
+    public static byte[] WordyDocx(int chars, int seed = 1)
+    {
+        string[] vocabulary = ["offer", "garden", "planting", "lawn", "care", "season", "price", "client", "request", "winter", "summer", "hedge", "water", "stone", "path", "light", "soil", "seed", "flower", "tree"];
+        var random = new Random(seed);
+        var body = new StringBuilder(chars * 2);
+        var written = 0;
+        while (written < chars)
+        {
+            body.Append("<w:p><w:r><w:t>");
+            var paragraph = 0;
+            while (paragraph < 500 && written < chars)
+            {
+                var word = $"{vocabulary[random.Next(vocabulary.Length)]}{random.Next(1_000)} ";
+                body.Append(word);
+                paragraph += word.Length;
+                written += word.Length;
+            }
+
+            body.Append("</w:t></w:r></w:p>");
+        }
+
+        return Docx(body.ToString());
+    }
+
     /// <summary>A Word file with one <c>word/document.xml</c> whose body is <paramref name="bodyXml"/>.</summary>
     public static byte[] Docx(string bodyXml)
     {

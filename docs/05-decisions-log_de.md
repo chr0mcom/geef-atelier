@@ -1936,3 +1936,28 @@ again.“
 Overflow), eine 400-KB-PDF brauchte 4,7 GB, und der alte Zeitdeckel hielt die Arbeit nicht an. Erst eine
 Prozessgrenze macht Grenzen für Stack, Speicher und CPU durchsetzbar; die Prüfungen in den Extraktoren halten die
 häufigen Fälle schnell.
+
+### Zusatz zu D-069, zweite Runde — Grenzen für Uploads und extrahierten Text (2026-11-24)
+
+**Entscheidung.** (1) Eine Quelle hat höchstens `Sources:MaxExtractedChars` Zeichen (3 Mio.; ein Buch mit 1.000 Seiten
+hat rund 2 Mio.). Der Extraktionsprozess hört auf, sobald der Text die Grenze überschreitet (Word schon beim Prüfen der
+XML-Teile, vor dem Dokumentmodell; PDF bei der Seite, die sie überschreitet), Textdateien werden vor dem Dekodieren
+gezählt, und der Webprozess prüft noch einmal, bevor er den Text kopiert. (2) Die Antwort des Extraktionsprozesses ist
+auf 16 MiB begrenzt (die Textgrenze mit höchstens vier Byte je Zeichen, Buchstaben außerhalb von ASCII unmaskiert,
+plus Platz für das JSON) und wird gelesen, während sie hereinkommt. (3) Das Kontingent für Dateien ohne Auftrag zählt
+auch Zeichen (20 Mio. je Person) und wird in der einfügenden Transaktion unter einer Sperre je Person
+(`pg_advisory_xact_lock`) noch einmal geprüft. (4) Der Upload-Endpunkt liest den Multipart-Body als Strom ohne
+Formularpuffer und belegt den Upload-Platz der Person (höchstens zwei gleichzeitig, sonst HTTP 429) und den globalen
+Upload-Platz, bevor er den Body liest; eine Anfrage endet nach 5 Minuten (HTTP 408) oder wenn sie langsamer als
+4 KiB/s sendet; eingefügter Text belegt keinen Platz. (5) Zeilenenden werden vereinheitlicht, bevor Zeilen, die wie
+Seitenmarken aussehen, entschärft werden; ein einzelnes `\r` kann also keine Seite fälschen. (6) Die Compose-Datei
+begrenzt den Web-Container auf 6 GiB (`mem_limit: 6g`).
+
+**Begründung.** Der zweite Sicherheitsreview zeigte: Eine 399-KB-Word-Datei (Kompressionsverhältnis 140, innerhalb
+aller Archivgrenzen) lieferte 58,7 Mio. Zeichen und mehr als 1 GB im Webprozess je Upload, das Kontingent zählte nur
+Dateibytes und ließ sich mit parallelen Uploads überschreiten, und der Request-Body wurde gepuffert, bevor ein Platz
+belegt war. Eine Textgrenze an der Quelle schließt den ersten Punkt dort, wo der Text noch im begrenzten Kindprozess
+liegt; die Sperre macht das Kontingent genau; das Streamen macht die Plätze wirksam. Das Speicherlimit ist die zweite
+Schicht: Der Webprozess bleibt üblicherweise unter 1 GB, jeder Extraktionsprozess darf 1 GiB verwalteten Speicher
+nutzen und höchstens zwei laufen gleichzeitig, der Rest ist Puffer; das Limit verhindert, dass ein Dienst einen
+gemeinsam genutzten Host ins Auslagern oder zum OOM-Killer treibt.

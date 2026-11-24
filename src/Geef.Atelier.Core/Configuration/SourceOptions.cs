@@ -27,6 +27,12 @@ public sealed class SourceOptions
     /// <summary>Measured characters per model token of extracted text, used for token estimates.</summary>
     public double CharsPerToken { get; set; } = 1.9;
 
+    /// <summary>
+    /// Most characters of extracted text one source may have (a book of 1,000 pages has about 2 million). A file with more
+    /// text is refused while it is read, in the extraction process and again in the web process before the text is copied.
+    /// </summary>
+    public int MaxExtractedChars { get; set; } = 3_000_000;
+
     /// <summary>Longest line of extracted text; longer lines are wrapped.</summary>
     public int MaxLineChars { get; set; } = 1_000;
 
@@ -54,11 +60,23 @@ public sealed class SourceOptions
     /// <summary>Most uploads processed at the same time across all users.</summary>
     public int MaxConcurrentIntakes { get; set; } = 8;
 
+    /// <summary>Most uploads one user may run at the same time; a further upload is refused at once (HTTP 429).</summary>
+    public int MaxConcurrentUploadsPerUser { get; set; } = 2;
+
+    /// <summary>Longest time one upload request may take from the first byte to the receipt (HTTP 408 after it).</summary>
+    public TimeSpan UploadTimeout { get; set; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>Slowest accepted transfer rate of an upload in bytes per second, after a grace period of 10 seconds; 0 keeps the server default.</summary>
+    public int MinUploadBytesPerSecond { get; set; } = 4_096;
+
     /// <summary>How long an upload waits for a free slot before it is refused as busy.</summary>
     public TimeSpan ExtractionQueueTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
-    /// <summary>Largest answer of the extraction process in bytes; a larger answer counts as unreadable.</summary>
-    public long ExtractionMaxOutputBytes { get; set; } = 67_108_864;
+    /// <summary>
+    /// Largest answer of the extraction process in bytes (16 MiB); a larger answer counts as unreadable. Sized for
+    /// <see cref="MaxExtractedChars"/> at up to four bytes per character plus room for the JSON around the text.
+    /// </summary>
+    public long ExtractionMaxOutputBytes { get; set; } = 16_777_216;
 
     /// <summary>Path of the application assembly that runs the extraction process; set by the web host when empty.</summary>
     public string? ExtractionWorkerAssembly { get; set; }
@@ -71,6 +89,9 @@ public sealed class SourceOptions
 
     /// <summary>Largest total size in bytes of the sources a user keeps that are not attached to an order (500 MB).</summary>
     public long MaxUnattachedBytesPerUser { get; set; } = 524_288_000;
+
+    /// <summary>Most characters of extracted text in total of the sources a user keeps that are not attached to an order.</summary>
+    public long MaxUnattachedCharsPerUser { get; set; } = 20_000_000;
 
     /// <summary>Age after which files in the sources directory that no source refers to are deleted.</summary>
     public TimeSpan OrphanFileAge { get; set; } = TimeSpan.FromHours(24);
@@ -93,7 +114,7 @@ public sealed class SourceOptions
     /// <summary>Highest ratio of uncompressed to compressed size of one entry of a Word file.</summary>
     public int MaxCompressionRatio { get; set; } = 200;
 
-    /// <summary>Deepest element nesting accepted in the main part of a Word file.</summary>
+    /// <summary>Deepest element nesting accepted in every XML part of a Word file.</summary>
     public int MaxXmlDepth { get; set; } = 100;
 
     /// <summary>Largest total size in bytes that the compressed text streams of a PDF may unpack to (256 MiB); pictures are not counted.</summary>

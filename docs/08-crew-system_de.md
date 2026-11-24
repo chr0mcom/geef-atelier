@@ -713,23 +713,47 @@ dieselbe Anwendung in einem **eigenen Prozess**, damit eine bösartige Datei den
 
 ### Ablauf der Aufnahme
 
-1. **Upload-Platz.** Höchstens `Sources:MaxConcurrentIntakes` Uploads laufen gleichzeitig; wer keinen Platz bekommt,
-   wartet bis `Sources:ExtractionQueueTimeout`, sonst lautet die Quittung „The service is busy with other uploads.
-   Please try again in a minute.“
-2. **Streamen.** Der Upload wird nach `<StorageRoot>/.incoming/<id>/upload.part` geschrieben (Verzeichnis 0700,
-   Datei 0600), unterwegs gehasht und bei `Sources:MaxFileBytes` begrenzt. Im Speicher bleiben nur die ersten 8 KiB
-   für die Typerkennung.
+1. **Upload-Platz der Person und globaler Platz.** Jede Person hat höchstens `Sources:MaxConcurrentUploadsPerUser` (2)
+   Uploads gleichzeitig; ein weiterer wird sofort mit HTTP 429, `Retry-After: 5` und „You are already adding 2 files at
+   the same time. Please wait until one is done, then try again.“ abgelehnt. Über alle Personen laufen höchstens
+   `Sources:MaxConcurrentIntakes` Uploads gleichzeitig; wer keinen Platz bekommt, wartet bis
+   `Sources:ExtractionQueueTimeout`, sonst lautet die Quittung „The service is busy with other uploads. Please try again
+   in a minute.“ Beide Plätze werden **vor** dem Lesen des Request-Bodys belegt: `POST /api/sources` liest den
+   Multipart-Body als Strom (kein Formularpuffer) und nimmt das Antiforgery-Token nur aus dem Header. Eingefügter Text
+   braucht keinen der Plätze, weil er schon im Speicher liegt.
+2. **Streamen und Zeit.** Der Upload wird nach `<StorageRoot>/.incoming/<id>/upload.part` geschrieben (Verzeichnis
+   0700, Datei 0600), unterwegs gehasht und bei `Sources:MaxFileBytes` begrenzt. Im Speicher bleiben nur die ersten
+   8 KiB für die Typerkennung. Die Anfrage endet nach `Sources:UploadTimeout` (5 Minuten, HTTP 408 „The upload took too
+   long. Check your connection and try again.“) und, hinter Kestrel, wenn sie langsamer als
+   `Sources:MinUploadBytesPerSecond` sendet (4 KiB/s nach 10 s Schonfrist); beides gibt die Plätze frei. Ein kaputter
+   oder abgebrochener Body endet als 400 „The upload could not be read.“; nur eine Datei über der Größengrenze bekommt
+   413.
 3. **Wiederverwendung und Kontingent.** Eine gleiche Datei desselben Besitzers wird wiederverwendet (der eindeutige
    Index `UX_Sources_OwnerUsername_Sha256` sorgt dafür, dass parallele Uploads derselben Datei bei einer Quelle
-   enden). Dateien, die kein Auftrag nutzt, zählen gegen `Sources:MaxUnattachedSourcesPerUser` (50) und
-   `Sources:MaxUnattachedBytesPerUser` (500 MB).
-4. **Extraktion.** Text und Markdown liest der Webprozess selbst. PDF und Word belegen einen Extraktionsplatz
+   enden). Dateien, die kein Auftrag nutzt, zählen gegen `Sources:MaxUnattachedSourcesPerUser` (50),
+   `Sources:MaxUnattachedBytesPerUser` (500 MB) und `Sources:MaxUnattachedCharsPerUser` (20 Mio. Zeichen Text). Das
+   Kontingent wird vor dem Lesen und noch einmal in der einfügenden Transaktion unter einer Sperre je Person
+   (`pg_advisory_xact_lock(hashtext(owner))`) geprüft, sodass parallele Uploads es nicht gemeinsam überschreiten.
+4. **Typprüfung.** Die Art ergibt sich aus dem Inhalt. Bevor der Webprozess ein ZIP-Archiv öffnet, liest er dessen
+   Endsatz: mehr Einträge als `Sources:MaxArchiveEntries`, ein zentrales Verzeichnis über 1 KiB je erlaubtem Eintrag
+   oder ein ZIP64-Verzeichnis (keine Word-Datei braucht eines) lehnen die Datei ab, ohne das Archiv aufzulisten.
+   `%PDF-` in den ersten 1.024 Byte gilt absichtlich als PDF (Leseprogramme akzeptieren die Kopfzeile dort überall).
+5. **Extraktion.** Text und Markdown liest der Webprozess selbst. PDF und Word belegen einen Extraktionsplatz
    (`Sources:ExtractionMaxConcurrency`, Standard 2) und laufen als
    `dotnet <Anwendungs-Assembly> --extract-source <pdf|docx> <datei>`. `Program.cs` verzweigt in diesen Modus, bevor ein
-   Host gebaut wird: kein DI, keine Datenbank, keine Konfiguration, keine Anmeldung.
-5. **Seitenmarken.** Zeilen, die wie `[[page N]]` aussehen, werden in Text-, Markdown- und Word-Dateien sowie in jedem
-   Stück einer vom Zeilenumbruch geteilten Zeile entschärft; echte Marken schreibt nur der PDF-Extraktor.
-6. **Ablage.** Die empfangene Datei wird nach `<StorageRoot>/<Besitzer-Hash>/<id>.<endung>` verschoben; das
+   Host gebaut wird: kein DI, keine Datenbank, keine Konfiguration, keine Anmeldung. Die Antwort des Prozesses wird
+   gelesen, während sie hereinkommt; sie liegt nie als ganzes Byte-Array im Speicher.
+6. **Textgrenze.** Eine Quelle hat höchstens `Sources:MaxExtractedChars` Zeichen (3 Mio.; ein Buch mit 1.000 Seiten
+   hat rund 2 Mio.). Word-Dateien werden schon beim Prüfen ihrer XML-Teile gezählt, bevor das Dokumentmodell entsteht,
+   und noch einmal beim Durchlaufen; das Lesen einer PDF endet bei der Seite, die die Grenze überschreitet; Textdateien
+   werden vor dem Dekodieren gezählt; der Webprozess prüft die Länge noch einmal, bevor er den Text kopiert. Die
+   Quittung lautet „This file contains far more text than we can use. Please upload a shorter version.“
+7. **Aufbereitung in einem Durchlauf.** Zuerst werden die Zeilenenden zu `\n` (ein einzelnes `\r` beginnt also eine
+   Zeile, bevor irgendetwas die Zeilen prüft), Zeilen, die wie `[[page N]]` aussehen, werden in Text-, Markdown- und
+   Word-Dateien entschärft, lange Zeilen umbrochen (jedes Stück wird ebenfalls entschärft) und Zeichen und Wörter ohne
+   Seitenmarken gezählt. Text, der nichts davon braucht, wird nicht kopiert. Echte Marken schreibt nur der
+   PDF-Extraktor.
+8. **Ablage.** Die empfangene Datei wird nach `<StorageRoot>/<Besitzer-Hash>/<id>.<endung>` verschoben; das
    temporäre Verzeichnis wird in jedem Fall entfernt.
 
 ### Grenzen des Extraktionsprozesses
@@ -738,7 +762,8 @@ dieselbe Anwendung in einem **eigenen Prozess**, damit eine bösartige Datei den
 |---|---|---|---|
 | Gesamtzeit | `ExtractionTimeout` | 60 s | ganzer Prozessbaum wird beendet, „Reading this file took too long.“ |
 | Verwalteter Speicher | `ExtractionMemoryLimitBytes` | 1 GiB | `DOTNET_GCHeapHardLimit` im Kind; ein Wächter beendet es zusätzlich oberhalb der Grenze plus 256 MiB |
-| Antwortgröße | `ExtractionMaxOutputBytes` | 64 MiB | Prozess wird beendet, Datei unlesbar |
+| Text | `MaxExtractedChars` | 3.000.000 Zeichen | Lesen endet, „This file contains far more text than we can use. Please upload a shorter version.“ |
+| Antwortgröße | `ExtractionMaxOutputBytes` | 16 MiB | Prozess wird beendet, Datei unlesbar; bemessen auf die Textgrenze mit höchstens vier Byte je Zeichen (Buchstaben außerhalb von ASCII werden nicht maskiert) plus Platz für das JSON |
 | Umgebung | — | — | geleert; nur `PATH`, `HOME`/`TMPDIR` (das private Upload-Verzeichnis), GC-Einstellungen und die Extraktionsgrenzen als JSON |
 | Arbeitsverzeichnis | — | — | das private Upload-Verzeichnis |
 
@@ -759,10 +784,15 @@ nur Art, Ergebnis, Dauer, Exit-Code und Spitzenspeicher, nie Dateiinhalte oder -
 
 Der stündliche Aufräumdienst löscht nach `Sources:OrphanFileAge` (24 h) zusätzlich liegengebliebene
 Upload-Verzeichnisse, `*.part`-Dateien und abgelegte Dateien, auf die keine Quelle verweist. Er betrachtet nur die
-Wurzel und die Besitzerordner darunter, überspringt Links und löst jeden Pfad innerhalb der Wurzel auf.
+Wurzel und die Besitzerordner darunter, überspringt Links und löst jeden Pfad innerhalb der Wurzel auf. Sind
+mindestens 10 abgelegte Dateien unbekannt und machen sie mehr als die Hälfte aller alten abgelegten Dateien aus, passt
+die Datenbank vermutlich nicht zum Volume (aus einer älteren Sicherung wiederhergestellt oder leer gestartet); dann
+löscht er keine abgelegte Datei und protokolliert einen Fehler.
 
 ### Hinweis für den Betrieb
 
-Der Container hat kein hartes Speicherlimit. Bei zwei Extraktionsplätzen mit je 1 GiB verwaltetem Speicher plus
-Webprozess ist ein Limit von etwa 3–4 GiB für den Web-Container eine sinnvolle Obergrenze; die Entscheidung liegt beim
-Betrieb.
+Die Compose-Datei begrenzt den Speicher des Web-Containers auf 6 GiB (`mem_limit: 6g`), als zweite Schicht hinter den
+Grenzen oben: Der Webprozess bleibt üblicherweise unter 1 GB, jeder Extraktionsprozess darf 1 GiB verwalteten Speicher
+(plus den Spielraum des Wächters) nutzen, und höchstens zwei laufen gleichzeitig; der Rest ist Puffer. Das Limit
+schützt die anderen Dienste eines gemeinsam genutzten Hosts. Hat der Host weniger Speicher übrig, senkt man
+`ExtractionMaxConcurrency` oder `ExtractionMemoryLimitBytes` zusammen mit dem Limit.

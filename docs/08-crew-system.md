@@ -697,21 +697,44 @@ by the same application in a **separate process**, so a hostile file can never t
 
 ### Intake steps
 
-1. **Upload slot.** At most `Sources:MaxConcurrentIntakes` uploads run at the same time; a caller waits up to
-   `Sources:ExtractionQueueTimeout`, otherwise the receipt says "The service is busy with other uploads. Please try
-   again in a minute."
-2. **Streaming.** The upload is written to `<StorageRoot>/.incoming/<id>/upload.part` (directory 0700, file 0600),
-   hashed on the way and capped at `Sources:MaxFileBytes`. Only the first 8 KiB stay in memory for type detection.
+1. **Upload place and slot.** Each person runs at most `Sources:MaxConcurrentUploadsPerUser` (2) uploads at the same
+   time; a further one is refused at once with HTTP 429, `Retry-After: 5` and "You are already adding 2 files at the
+   same time. Please wait until one is done, then try again." Across all people at most `Sources:MaxConcurrentIntakes`
+   uploads run at the same time; a caller waits up to `Sources:ExtractionQueueTimeout`, otherwise the receipt says "The
+   service is busy with other uploads. Please try again in a minute." Both are taken **before** the request body is
+   read: `POST /api/sources` reads the multipart body as a stream (no form buffer) and takes the antiforgery token only
+   from the header. Pasted text needs neither, because it is already in memory.
+2. **Streaming and time.** The upload is written to `<StorageRoot>/.incoming/<id>/upload.part` (directory 0700, file
+   0600), hashed on the way and capped at `Sources:MaxFileBytes`. Only the first 8 KiB stay in memory for type
+   detection. The request ends after `Sources:UploadTimeout` (5 minutes, HTTP 408 "The upload took too long. Check your
+   connection and try again.") and, behind Kestrel, when it sends slower than `Sources:MinUploadBytesPerSecond`
+   (4 KiB/s after a grace period of 10 s); both free the place and the slot. A broken or interrupted body ends as 400
+   "The upload could not be read."; only a file above the size limit gets 413.
 3. **Reuse and quota.** An identical file of the same owner is reused (the unique index
    `UX_Sources_OwnerUsername_Sha256` makes parallel uploads of the same file end in one source). Files that no order
-   uses count against `Sources:MaxUnattachedSourcesPerUser` (50) and `Sources:MaxUnattachedBytesPerUser` (500 MB).
-4. **Extraction.** Text and Markdown are read in the web process. PDF and Word take an extraction slot
+   uses count against `Sources:MaxUnattachedSourcesPerUser` (50), `Sources:MaxUnattachedBytesPerUser` (500 MB) and
+   `Sources:MaxUnattachedCharsPerUser` (20 million characters of text). The quota is checked before reading and again
+   inside the inserting transaction under a lock per person (`pg_advisory_xact_lock(hashtext(owner))`), so parallel
+   uploads cannot pass it together.
+4. **Type check.** The kind comes from the content. Before a ZIP archive is opened in the web process, its end record
+   is read: more entries than `Sources:MaxArchiveEntries`, a central directory larger than 1 KiB per allowed entry or a
+   ZIP64 directory (no Word file needs one) refuse the file without listing the archive. `%PDF-` within the first
+   1,024 bytes counts as a PDF on purpose (readers accept the header anywhere there).
+5. **Extraction.** Text and Markdown are read in the web process. PDF and Word take an extraction slot
    (`Sources:ExtractionMaxConcurrency`, default 2) and run as
    `dotnet <application assembly> --extract-source <pdf|docx> <file>`. `Program.cs` branches into this mode before any
-   host is built: no DI, database, configuration or sign-in.
-5. **Page markers.** Lines that look like `[[page N]]` are neutralised in text, Markdown and Word files, and in every
-   piece of a line that the line wrapper breaks; only the PDF extractor writes real markers.
-6. **Store.** The received file is moved into `<StorageRoot>/<owner hash>/<id>.<ext>`; the temporary directory is
+   host is built: no DI, database, configuration or sign-in. The answer of the process is parsed while it streams in;
+   it is never held as a whole byte array.
+6. **Text limit.** One source holds at most `Sources:MaxExtractedChars` (3 million characters; a book of 1,000 pages has
+   about 2 million). Word files are counted while their XML parts are scanned, before the document model is built, and
+   again while the body is walked; PDF reading stops at the page that passes the limit; text files are counted before
+   they are decoded; the web process checks the length again before it copies the text. The receipt says "This file
+   contains far more text than we can use. Please upload a shorter version."
+7. **Preparation in one pass.** Line ends become `\n` first (so a lone `\r` starts a line before anything looks at
+   the lines), lines that look like `[[page N]]` are neutralised in text, Markdown and Word files, long lines are broken
+   (every broken piece is neutralised as well) and characters and words are counted without page markers. Text that
+   needs none of this is not copied. Only the PDF extractor writes real markers.
+8. **Store.** The received file is moved into `<StorageRoot>/<owner hash>/<id>.<ext>`; the temporary directory is
    removed in every case.
 
 ### Limits of the extraction process
@@ -720,7 +743,8 @@ by the same application in a **separate process**, so a hostile file can never t
 |---|---|---|---|
 | Total time | `ExtractionTimeout` | 60 s | whole process tree killed, "Reading this file took too long." |
 | Managed memory | `ExtractionMemoryLimitBytes` | 1 GiB | `DOTNET_GCHeapHardLimit` in the child; a watchdog also kills it above the limit plus 256 MiB |
-| Answer size | `ExtractionMaxOutputBytes` | 64 MiB | process killed, file unreadable |
+| Text | `MaxExtractedChars` | 3,000,000 characters | reading stops, "This file contains far more text than we can use. Please upload a shorter version." |
+| Answer size | `ExtractionMaxOutputBytes` | 16 MiB | process killed, file unreadable; sized for the text limit at up to four bytes per character (letters outside ASCII are not escaped) plus room for the JSON |
 | Environment | — | — | cleared; only `PATH`, `HOME`/`TMPDIR` (the private upload directory), GC settings and the extraction limits as JSON |
 | Working directory | — | — | the private upload directory |
 
@@ -741,10 +765,14 @@ logs kind, outcome, duration, exit code and peak memory, never file content or n
 
 The hourly cleanup also deletes, after `Sources:OrphanFileAge` (24 h), left-over upload directories, `*.part` files
 and stored files that no source refers to. It looks only at the root and the owner folders below it, skips links and
-resolves every path inside the root.
+resolves every path inside the root. When at least 10 stored files are unknown and they are more than half of all old
+stored files, the database most likely does not match the volume (restored from an older backup or started empty);
+then it deletes no stored file and logs an error.
 
 ### Operations note
 
-The container has no hard memory limit. With two extraction slots of 1 GiB managed heap each plus the web process, a
-memory limit of the web container of about 3–4 GiB is a reasonable upper bound; setting it is a decision for
-operations.
+The compose file limits the memory of the web container to 6 GiB (`mem_limit: 6g`) as a second layer behind the
+limits above: the web process usually stays below 1 GB, each extraction process may use 1 GiB of managed heap (plus
+the watchdog allowance) and at most two run at the same time; the rest is headroom. The limit protects the other
+services of a shared host. If the host has less memory to spare, lower `ExtractionMaxConcurrency` or
+`ExtractionMemoryLimitBytes` together with the limit.
