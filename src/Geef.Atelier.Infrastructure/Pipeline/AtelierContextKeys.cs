@@ -1,5 +1,7 @@
+using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Infrastructure.Llm;
+using Geef.Atelier.Infrastructure.Pipeline.Direct;
 using Geef.Sdk.Context;
 
 namespace Geef.Atelier.Infrastructure.Pipeline;
@@ -38,4 +40,16 @@ internal static class AtelierContextKeys
     /// to prime the LLM with a prior draft rather than generating from scratch.
     /// </summary>
     public static readonly ContextKey<string>         SeedDraft        = new("geef:atelier:seed-draft");
+
+    /// <summary>
+    /// Injected by <c>OrderGroundingStep</c> on the direct path: the rendered source block of the order, handed to the
+    /// writer as background document.
+    /// </summary>
+    public static readonly ContextKey<OrderSourceBundle> OrderSources = new("geef:atelier:order-sources");
+
+    /// <summary>
+    /// Injected by <c>OrderGroundingStep</c> on the direct path: the constraints read from the request in the person's
+    /// own words, checked by <c>DeterministicChecksReviewer</c>.
+    /// </summary>
+    public static readonly ContextKey<OrderConstraints> OrderConstraints = new("geef:atelier:order-constraints");
 }
