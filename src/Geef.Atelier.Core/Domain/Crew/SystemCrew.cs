@@ -905,4 +905,79 @@ public static class SystemCrew
     /// <summary>Ensures the supplied name carries the <c>"custom-"</c> prefix; idempotent.</summary>
     public static string EnsureCustomPrefix(string name) =>
         name.StartsWith(CustomPrefix, StringComparison.Ordinal) ? name : CustomPrefix + name;
+
+    /// <summary>Name of the code-only template of the direct path.</summary>
+    public const string DirectTemplateName = "direct";
+
+    /// <summary>Writer of the direct path: one writing pass from the request and the attached files.</summary>
+    public static readonly ExecutorProfile DirectWriterProfile = new(
+        Name: "direct-writer",
+        DisplayName: "Writer",
+        Description: "Writes the requested text in one pass from the request and the attached files; never invents facts.",
+        SystemPrompt: SystemPrompts.DirectWriter,
+        Provider: ModelMatrix.Primary(ModelSlot.Executor).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.Executor).Model,
+        MaxTokens: 256000,
+        IsSystem: true,
+        ModelSlot: ModelSlot.Executor);
+
+    /// <summary>Checks without an AI model; the implementation is injected at pipeline build time, this entry only registers the profile.</summary>
+    public static readonly ReviewerProfile DeterministicChecksProfile = new(
+        Name: "deterministic-checks",
+        DisplayName: "Automatic checks",
+        Description: "Checks length, placeholders, forbidden patterns, required terms and language without an AI model. Injected at pipeline build time.",
+        SystemPrompt: "",
+        Provider: "",
+        Model: "",
+        MaxTokens: 0,
+        IsSystem: true);
+
+    /// <summary>Passes the files attached to an order in full text (careful mode).</summary>
+    public static readonly GroundingProviderProfile OrderSourcesProfile = new(
+        Name: "order-sources",
+        DisplayName: "Your files",
+        Description: "Passes the files attached to the order in full text.",
+        ProviderType: GroundingProviderTypes.OrderSources,
+        ProviderSettings: new Dictionary<string, string>(),
+        MaxQueriesPerRun: 1,
+        IsSystem: true);
+
+    /// <summary>
+    /// Code-only template of the direct path. Deliberately not part of <see cref="CrewTemplates"/>, so it never shows up
+    /// in template lists, the classic form or the composer catalogue.
+    /// </summary>
+    public static readonly CrewTemplate DirectTemplate = new(
+        Name: DirectTemplateName,
+        DisplayName: "Direct",
+        Description: "One writing pass with all files in full text, automatic checks without a model, at most one correction.",
+        ExecutorProfileName: DirectWriterProfile.Name,
+        ReviewerProfileNames: [DeterministicChecksProfile.Name],
+        EvaluationStrategy: EvaluationStrategy.Parallel,
+        ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 2, AbortOnCritical: false, DetectRegression: false, StagnationThreshold: 2),
+        AdvisorProfileNames: [],
+        GroundingProviderNames: [],
+        IsSystem: true,
+        FinalizerProfileNames: [],
+        Domain: ModelDomain.General);
+
+    /// <summary>Executor profiles that exist only in code, indexed by name.</summary>
+    public static readonly IReadOnlyDictionary<string, ExecutorProfile> CodeOnlyExecutorProfiles =
+        new Dictionary<string, ExecutorProfile>
+        {
+            [DirectWriterProfile.Name] = DirectWriterProfile,
+        };
+
+    /// <summary>Reviewer profiles that exist only in code, indexed by name.</summary>
+    public static readonly IReadOnlyDictionary<string, ReviewerProfile> CodeOnlyReviewerProfiles =
+        new Dictionary<string, ReviewerProfile>
+        {
+            [DeterministicChecksProfile.Name] = DeterministicChecksProfile,
+        };
+
+    /// <summary>Crew templates that exist only in code, indexed by name.</summary>
+    public static readonly IReadOnlyDictionary<string, CrewTemplate> CodeOnlyTemplates =
+        new Dictionary<string, CrewTemplate>
+        {
+            [DirectTemplate.Name] = DirectTemplate,
+        };
 }

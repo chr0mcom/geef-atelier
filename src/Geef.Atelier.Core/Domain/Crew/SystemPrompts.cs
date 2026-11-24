@@ -476,6 +476,10 @@ public static class SystemPrompts
     public const string CrewSpecValidator =
         "Deterministic structural validator -- injected at pipeline build time.";
 
+    /// <summary>System prompt of the writer on the direct path (placeholder; the final text is part of the direct-path engine).</summary>
+    public const string DirectWriter =
+        "Direct writer -- the final system prompt is supplied with the direct-path engine.";
+
     /// <summary>System prompt for the crew-composer-completeness reviewer.</summary>
     public const string CrewComposerCompleteness = """
         You are a crew completeness validator reviewing a proposed Geef.Atelier crew specification.
