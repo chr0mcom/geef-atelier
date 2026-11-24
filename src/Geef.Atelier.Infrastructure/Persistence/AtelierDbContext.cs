@@ -7,6 +7,7 @@ using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.OAuth;
 using Geef.Atelier.Core.Domain.Tools;
+using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge;
 using Geef.Atelier.Infrastructure.Persistence.Crew.Learning;
 using Geef.Atelier.Infrastructure.Persistence.Entities;
@@ -25,6 +26,7 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     public DbSet<IterationEntity> Iterations => Set<IterationEntity>();
     public DbSet<FindingEntity> Findings => Set<FindingEntity>();
     public DbSet<EventEntity> Events => Set<EventEntity>();
+    public DbSet<RunWarningEntity> RunWarnings => Set<RunWarningEntity>();
 
     public DbSet<ReviewerProfile> ReviewerProfiles => Set<ReviewerProfile>();
     public DbSet<ExecutorProfile> ExecutorProfiles => Set<ExecutorProfile>();

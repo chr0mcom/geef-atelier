@@ -91,4 +91,16 @@ public sealed class RunEntity
     /// Null for runs not originated from an auto-compose flow.
     /// </summary>
     public Guid? ParentCompositionRunId { get; init; }
+
+    /// <summary>
+    /// What the run delivered (Step47). Set once when the run ends; <c>null</c> while it is pending or running and
+    /// for runs that finished before Step47. Independent of <see cref="Status"/>.
+    /// </summary>
+    public RunOutcome? Outcome { get; init; }
+
+    /// <summary>Number of the iteration whose text was delivered, or <c>null</c> when no text was delivered.</summary>
+    public int? DeliveredIteration { get; init; }
+
+    /// <summary>Structured run report as JSON. Reserved for the result report; <c>null</c> until it is written.</summary>
+    public string? ReportJson { get; init; }
 }

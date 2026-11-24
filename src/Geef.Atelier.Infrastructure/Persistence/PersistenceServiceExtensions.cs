@@ -7,6 +7,7 @@ using Geef.Atelier.Core.Persistence.OAuth;
 using Geef.Atelier.Core.Persistence.Providers;
 using Geef.Atelier.Core.Persistence.TemplateStudio;
 using Geef.Atelier.Core.Persistence.Tools;
+using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Infrastructure.SiteSettings;
 using Geef.Atelier.Infrastructure.Dashboard;
 using Geef.Atelier.Infrastructure.Persistence.Crew;
@@ -56,6 +57,8 @@ public static class PersistenceServiceExtensions
         services.AddScoped<IToolInvocationRepository, ToolInvocationRepository>();
         services.AddScoped<IMcpServerConfigRepository, McpServerConfigRepository>();
         services.AddScoped<ISpecializationPackRepository, SpecializationPackRepository>();
+        services.AddScoped<IRunWarningRepository, RunWarningRepository>();
+        services.AddSingleton<IRunWarningSink, RunWarningSink>();
         services.AddMemoryCache();
         services.AddSingleton<IDashboardService, DashboardService>();
         return services;
