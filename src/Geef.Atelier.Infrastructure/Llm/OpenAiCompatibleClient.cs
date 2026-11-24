@@ -40,11 +40,11 @@ internal sealed class OpenAiCompatibleClient(
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
-            throw new LlmApiException(
+            throw new HttpRequestException(
                 $"LLM request to '{baseEndpoint}' for model '{request.Model}' failed with " +
                 $"{(int)response.StatusCode} {response.ReasonPhrase}: {ExtractError(json).RedactSecrets()}",
-                response.StatusCode,
-                ExtractErrorCode(json));
+                inner: null,
+                statusCode: response.StatusCode).WithErrorCode(ExtractErrorCode(json));
 
         await ReportFailoverAsync(response, request.Model);
 

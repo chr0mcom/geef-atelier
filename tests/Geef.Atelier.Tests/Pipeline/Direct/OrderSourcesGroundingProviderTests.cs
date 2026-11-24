@@ -85,11 +85,10 @@ public sealed class OpenAiCompatibleClientFailoverSwitchTests
         }));
         var client = new OpenAiCompatibleClient(new HttpClient(handler), "http://proxy.invalid/v1/claude", "k");
 
-        var error = await Assert.ThrowsAsync<LlmApiException>(() =>
+        var error = await Assert.ThrowsAsync<HttpRequestException>(() =>
             client.CompleteAsync(new LlmRequest { Model = "m", SystemPrompt = "s", UserPrompt = "u" }, CancellationToken.None));
 
         Assert.Equal(HttpStatusCode.BadGateway, error.StatusCode);
-        Assert.Equal(LlmApiException.EmptyResultCode, error.ErrorCode);
-        Assert.IsAssignableFrom<HttpRequestException>(error);
+        Assert.Equal(LlmApiError.EmptyResultCode, error.ErrorCode());
     }
 }

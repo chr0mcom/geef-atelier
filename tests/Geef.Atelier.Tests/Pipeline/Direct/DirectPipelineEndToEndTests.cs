@@ -169,7 +169,7 @@ public sealed class DirectPipelineEndToEndTests
         var (run, _) = harness.CreateRun("Schreibe eine kurze Notiz an das Team, max. 50 Wörter.");
         harness.Script.EnqueueExecutorText(Words(80, "Hallo"));
         harness.Script.EnqueueExecutorText("");
-        harness.Script.EnqueueExecutorError(502, LlmApiException.EmptyResultCode);
+        harness.Script.EnqueueExecutorError(502, LlmApiError.EmptyResultCode);
 
         var outcome = await harness.RunAsync(run);
 
@@ -215,8 +215,8 @@ public sealed class DirectPipelineEndToEndTests
     {
         var harness = new DirectPipelineHarness();
         var (run, _) = harness.CreateRun("Write a short note to the team.");
-        harness.Script.EnqueueExecutorError(502, LlmApiException.EmptyResultCode);
-        harness.Script.EnqueueExecutorError(502, LlmApiException.EmptyResultCode);
+        harness.Script.EnqueueExecutorError(502, LlmApiError.EmptyResultCode);
+        harness.Script.EnqueueExecutorError(502, LlmApiError.EmptyResultCode);
 
         var error = await Assert.ThrowsAnyAsync<Exception>(() => harness.RunAsync(run));
 
@@ -229,7 +229,7 @@ public sealed class DirectPipelineEndToEndTests
     {
         var harness = new DirectPipelineHarness();
         var (run, _) = harness.CreateRun("Write a short note to the team.");
-        harness.Script.EnqueueExecutorError(502, LlmApiException.EmptyResultCode);
+        harness.Script.EnqueueExecutorError(502, LlmApiError.EmptyResultCode);
         harness.Script.EnqueueExecutorText(Words(30, "Hello"));
 
         var outcome = await harness.RunAsync(run);
@@ -243,7 +243,7 @@ public sealed class DirectPipelineEndToEndTests
     {
         var harness = new DirectPipelineHarness();
         var (run, _) = harness.CreateRun("Write a short note to the team.");
-        harness.Script.EnqueueExecutorError(503, LlmApiException.BackendUnavailableCode);
+        harness.Script.EnqueueExecutorError(503, LlmApiError.BackendUnavailableCode);
 
         var error = await Assert.ThrowsAnyAsync<Exception>(() => harness.RunAsync(run));
 

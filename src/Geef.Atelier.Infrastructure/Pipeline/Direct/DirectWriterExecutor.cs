@@ -161,7 +161,7 @@ internal sealed class DirectWriterExecutor(
     private void LogNoText(LlmResponse? response, string model, int iteration, int attempt) =>
         _logger.LogWarning(
             "Direct writer returned no usable text (provider {Provider}, model {Model}, iteration {Iteration}, attempt {Attempt}, finish reason {FinishReason}, {Length} characters, tokens in {InputTokens}, out {OutputTokens}).",
-            profile.Provider, model, iteration, attempt, response?.FinishReason.RedactSecrets() ?? LlmApiException.EmptyResultCode,
+            profile.Provider, model, iteration, attempt, response?.FinishReason.RedactSecrets() ?? LlmApiError.EmptyResultCode,
             response?.Text?.Length ?? 0, response?.TokenUsage.InputTokens ?? 0, response?.TokenUsage.OutputTokens ?? 0);
 
     /// <summary>Calls the writer; <c>null</c> when the cli-proxy reported an empty result.</summary>
@@ -172,7 +172,7 @@ internal sealed class DirectWriterExecutor(
         {
             response = await LlmResilience.ExecuteAsync(ct => CompleteOrSignalAsync(client, request, ct), cancellationToken);
         }
-        catch (ProxySignalException signal) when (signal.Code == LlmApiException.EmptyResultCode)
+        catch (ProxySignalException signal) when (signal.Code == LlmApiError.EmptyResultCode)
         {
             _logger.LogWarning("Direct writer: the cli-proxy reported an empty result (iteration {Iteration}): {Detail}", iteration, signal.Detail);
             return null;
@@ -205,9 +205,9 @@ internal sealed class DirectWriterExecutor(
         {
             return await client.CompleteAsync(request, ct);
         }
-        catch (LlmApiException ex) when (ex.ErrorCode is LlmApiException.EmptyResultCode or LlmApiException.BackendUnavailableCode)
+        catch (HttpRequestException ex) when (ex.ErrorCode() is LlmApiError.EmptyResultCode or LlmApiError.BackendUnavailableCode)
         {
-            throw new ProxySignalException(ex.ErrorCode, ex.Message.RedactSecrets());
+            throw new ProxySignalException(ex.ErrorCode()!, ex.Message.RedactSecrets());
         }
     }
 
