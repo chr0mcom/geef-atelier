@@ -105,6 +105,9 @@
 @code {
     private const string ModulePath = "./js/source-upload.js";
 
+    /// <summary>Why Start is blocked when a file without pages (Word, text) is too long on its own next to a PDF, so choosing pages cannot help.</summary>
+    public const string TooLongWithoutPagesBlock = "Remove the file that is too long, or use a shorter version.";
+
     [SupplyParameterFromQuery(Name = "from")] public Guid? From { get; set; }
 
     readonly List<SourceUploadItem> _items = [];
@@ -175,6 +178,8 @@
 
     bool AnyPdf => ReadyItems.Any(i => i.Receipt!.PageCount is not null);
 
+    bool PagesCannotHelp => AnyPdf && ReadyItems.Any(i => i.Receipt!.PageCount is null && i.Receipt.BudgetClass == SourceBudgetClass.TooLarge);
+
     string? SelectionBlock
     {
         get
@@ -190,7 +195,8 @@
             if (effective.Problem is not null)
                 return "Change the pages you entered, or remove a file.";
             if (effective.Class == SourceBudgetClass.TooLarge)
-                return AnyPdf ? "Choose the pages to use, or remove a file." : "Remove a file, or use a shorter version.";
+                return PagesCannotHelp ? TooLongWithoutPagesBlock
+                    : AnyPdf ? "Choose the pages to use, or remove a file." : "Remove a file, or use a shorter version.";
             return null;
         }
     }
@@ -216,6 +222,7 @@
             {
                 SourceBudgetClass.FullText => ($"Files{chosen}: {total.Grouped()} of {options.FullTextMaxChars.Grouped()} characters used completely.", "ok"),
                 SourceBudgetClass.WithMap => ($"Files{chosen}: {total.Grouped()} characters. That is more than {options.FullTextMaxChars.Grouped()}, so the writer gets a table of contents and reads the parts that matter.", "map"),
+                _ when PagesCannotHelp => ($"Files: {total.Grouped()} characters. That is more than the limit of {options.MapMaxChars.Grouped()}. A file without pages is too long on its own: remove it, or use a shorter version.", "over"),
                 _ when HasPageInput => ($"Files with the pages you chose: {total.Grouped()} characters. That is still more than the limit of {options.MapMaxChars.Grouped()}. Choose fewer pages, or remove a file.", "over"),
                 _ when AnyPdf => ($"Files: {total.Grouped()} characters. That is more than the limit of {options.MapMaxChars.Grouped()}. Enter the pages to use for each PDF file above, or remove a file.", "over"),
                 _ => ($"Files: {total.Grouped()} characters. That is more than the limit of {options.MapMaxChars.Grouped()}. Remove a file, or use shorter versions of your files.", "over"),
