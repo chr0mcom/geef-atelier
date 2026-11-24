@@ -30,15 +30,24 @@
                 }
             </ul>
         }
-        @if (receipt.BudgetClass == SourceBudgetClass.TooLarge)
+        @if (AskForPages && receipt.PageCount is not null)
         {
             <label class="source-card-pages">
                 <span>Pages to use</span>
                 <input type="text" inputmode="numeric" placeholder="for example 1-40, 55"
                        data-testid="source-card-pages"
                        value="@Item.Pages"
+                       aria-invalid="@(PagesProblem is null ? "false" : "true")"
                        @onchange="PagesChangedAsync" />
             </label>
+            @if (PagesProblem is not null)
+            {
+                <p class="source-card-pages-problem" role="alert" data-testid="source-card-pages-problem">@PagesProblem</p>
+            }
+        }
+        else if (receipt.PageCount is null && receipt.BudgetClass == SourceBudgetClass.TooLarge)
+        {
+            <p class="source-card-too-long" data-testid="source-card-too-long">@TooLongText</p>
         }
         @if (!string.IsNullOrWhiteSpace(receipt.Preview))
         {
@@ -85,6 +94,15 @@
 
     /// <summary>Raised when the person changes the pages to use.</summary>
     [Parameter] public EventCallback<SourceUploadItem> OnPagesChanged { get; set; }
+
+    /// <summary>True when the page asks for the pages to use; the field appears only for files with pages (PDF).</summary>
+    [Parameter] public bool AskForPages { get; set; }
+
+    /// <summary>Plain-English problem with the pages entered, shown under the field.</summary>
+    [Parameter] public string? PagesProblem { get; set; }
+
+    /// <summary>Shown instead of the page field on a file without pages that is too long on its own.</summary>
+    public const string TooLongText = "This file is too long. Please use a shorter version.";
 
     string StatusKey => Item.Status.ToString().ToLowerInvariant();
 

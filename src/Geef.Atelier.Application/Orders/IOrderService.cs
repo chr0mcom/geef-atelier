@@ -12,6 +12,13 @@ public interface IOrderService
     /// </summary>
     Task<OrderSubmission> SubmitAsync(SubmitOrderRequest request, CancellationToken ct = default);
 
+    /// <summary>
+    /// Measures <paramref name="sources"/> with their page selections the same way as <see cref="SubmitAsync"/> does, without
+    /// creating anything. A problem the person can fix (a file that is not found, pages that do not exist, pages chosen for a
+    /// file that is not a PDF) comes back as <see cref="SourceSelectionCheck.Problem"/>.
+    /// </summary>
+    Task<SourceSelectionCheck> CheckSourcesAsync(IReadOnlyList<OrderSourceSelection> sources, string ownerUsername, CancellationToken ct = default);
+
     /// <summary>Returns the order page data, or <c>null</c> when the order is unknown or foreign.</summary>
     Task<OrderView?> GetAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default);
 

@@ -218,6 +218,7 @@ public sealed class MyWorkTests : TestContext
             Fail ? throw new InvalidOperationException("db") : inner.ListAsync(ownerUsername, limit, ct);
 
         public Task<OrderSubmission> SubmitAsync(SubmitOrderRequest request, CancellationToken ct = default) => inner.SubmitAsync(request, ct);
+        public Task<SourceSelectionCheck> CheckSourcesAsync(IReadOnlyList<OrderSourceSelection> sources, string ownerUsername, CancellationToken ct = default) => inner.CheckSourcesAsync(sources, ownerUsername, ct);
         public Task<OrderView?> GetAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) => inner.GetAsync(orderId, requestingUsername, ct);
         public Task<OrderResult?> GetResultAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) => inner.GetResultAsync(orderId, requestingUsername, ct);
         public Task<OrderView?> WaitForChangeAsync(Guid orderId, string? requestingUsername, OrderDisplayState? knownState, TimeSpan maxWait, CancellationToken ct = default) => inner.WaitForChangeAsync(orderId, requestingUsername, knownState, maxWait, ct);
