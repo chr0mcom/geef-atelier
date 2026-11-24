@@ -508,7 +508,11 @@ Ausnahmetexte, Hostnamen, Schlüsselnamen oder Fehlertexte vorgelagerter Dienste
 etwas Technisches geloggt oder gespeichert wird, ersetzt `SecretRedactionExtensions` (Core,
 `RedactSecrets`, `ToRedactedLogText`) Bruchstücke, die nach Zugangsdaten aussehen (bekannte
 Schlüsselformate, Bearer-Tokens, `name=wert`-Paare mit geheim klingendem Namen, lange undurchsichtige
-Zeichenfolgen), durch `[redacted]`.
+Zeichenfolgen), durch `[redacted]`. Ein Name gilt als geheim klingend, wenn sein letzter Teil ein Wort wie
+`key`, `token`, `secret` oder `password` ist (auch `OPENAI_API_KEY`, `x-api-key`, `apiKey`); sein Wert wird nur
+entfernt, wenn er nach einem Geheimnis aussieht (mindestens 12 Zeichen ohne Leerzeichen mit Buchstabe und
+Ziffer) oder ein URL-Parameter ist. Gewöhnliche Sätze wie „Key: Strategic goals“ oder „Basic research“ bleiben
+unverändert.
 
 ### Laut statt still
 

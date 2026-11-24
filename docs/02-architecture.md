@@ -551,7 +551,10 @@ plain sentences for the user, with display names where needed; technical details
 host names, key names or upstream error bodies go only to the log. Before anything technical is logged or
 stored, `SecretRedactionExtensions` (Core, `RedactSecrets`, `ToRedactedLogText`) replaces credential-like
 fragments (known key formats, bearer tokens, `name=value` pairs with a secret-sounding name, long opaque
-tokens) with `[redacted]`.
+tokens) with `[redacted]`. A name counts as secret-sounding when its last part is a word such as `key`, `token`,
+`secret` or `password` (also `OPENAI_API_KEY`, `x-api-key`, `apiKey`); its value is removed only when it looks
+like a secret (at least 12 characters without whitespace with a letter and a digit) or when it is a URL query
+parameter. Ordinary sentences such as "Key: Strategic goals" or "Basic research" stay unchanged.
 
 ### Fail loud instead of silent
 
