@@ -355,6 +355,7 @@
         try
         {
             var template = _form.ToTemplate(ConvergenceOpts.Value);
+            template.EnsureHasReviewer();
             if (IsNew)
             {
                 await CrewService.CreateCustomCrewTemplateAsync(template);

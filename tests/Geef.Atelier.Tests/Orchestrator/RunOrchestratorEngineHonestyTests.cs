@@ -146,6 +146,7 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
     public async Task PendingRunWithoutSnapshotIsNotStartedAndFailsAfterThePreparationTimeout()
     {
         var llm = new CountingLlmClient();
+        await RetireOtherPendingRunsAsync(Guid.Empty);
         await using var host = new OrchestratorTestHost(fixture, llm, FastOptions(TimeSpan.FromMilliseconds(300)));
         await host.StartAsync();
         var runId = await CreateRunAsync(crewSnapshotJson: null);
@@ -253,9 +254,22 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
 
     private async Task<RunEntity> RunToEndAsync(ILlmClient llm, Guid runId, OrchestratorOptions? options = null)
     {
+        await RetireOtherPendingRunsAsync(runId);
         await using var host = new OrchestratorTestHost(fixture, llm, options ?? FastOptions());
         await host.StartAsync();
         return await WaitForTerminalAsync(runId);
+    }
+
+    /// <summary>
+    /// Other test classes of the shared database leave pending runs behind; the host started here would process them
+    /// and its LLM call count would no longer belong to the run under test.
+    /// </summary>
+    private async Task RetireOtherPendingRunsAsync(Guid runId)
+    {
+        await using var db = fixture.NewContext();
+        await db.Runs
+            .Where(r => r.Status == RunStatus.Pending && r.Id != runId)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RunStatus.Aborted));
     }
 
     private async Task<RunEntity> WaitForTerminalAsync(Guid runId)
