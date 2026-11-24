@@ -10,6 +10,16 @@ namespace Geef.Atelier.Core.Domain.Checks;
 /// </summary>
 public static partial class DraftCheckEvaluator
 {
+    /// <summary>
+    /// How far, in percent of the limit, a length may miss the request before a correction is asked for. A smaller
+    /// miss outside the tolerance of <see cref="AcceptedBounds"/> fails without blocking and only shows as an open point,
+    /// so even a length that was read wrongly can force a correction only when the text is far off.
+    /// </summary>
+    public const int BlockingDeviationPercent = 25;
+
+    /// <summary>Added to the length finding when it is the only blocking problem.</summary>
+    public const string KeepEverythingElse = "Keep everything else unchanged.";
+
     [GeneratedRegex(@"\[[^\[\]\n]{2,80}\]", RegexOptions.CultureInvariant)]
     private static partial Regex PlaceholderPattern();
 
@@ -109,6 +119,20 @@ public static partial class DraftCheckEvaluator
                     $"The text does not contain \"{rule.Term}\", which the request asks for (\"{rule.Quote}\"). Add it where it fits naturally.", rule.Quote));
         }
 
+        return KeepRestWhenOnlyLengthFails(results);
+    }
+
+    /// <summary>
+    /// When the length is the only blocking check that failed, the correction must not touch anything else, so its
+    /// message ends with <see cref="KeepEverythingElse"/>.
+    /// </summary>
+    private static IReadOnlyList<DraftCheckResult> KeepRestWhenOnlyLengthFails(List<DraftCheckResult> results)
+    {
+        var failed = results.Where(r => r is { Passed: false, Blocking: true }).ToList();
+        if (failed is not [{ Code: DraftCheckCodes.Length } only])
+            return results;
+        var index = results.IndexOf(only);
+        results[index] = only with { Message = $"{only.Message} {KeepEverythingElse}" };
         return results;
     }
 
@@ -162,12 +186,26 @@ public static partial class DraftCheckEvaluator
             return new DraftCheckResult(DraftCheckCodes.Length, true, true,
                 $"The text has {Format(actual)} {unitName}; the request asks for {asked}.", length.Quote);
 
+        var (blockLow, blockHigh) = BlockingBounds(length);
+        var farOff = blockLow is not null && actual < blockLow || blockHigh is not null && actual > blockHigh;
+        if (!farOff)
+            return new DraftCheckResult(DraftCheckCodes.Length, false, false,
+                $"The text has {Format(actual)} {unitName}; the request asks for {asked} (\"{length.Quote}\"). The difference is small, so the text was not changed for it.", length.Quote);
+
         var fix = high is not null && actual > high
             ? $"Shorten it to {asked} without dropping anything the request requires."
             : $"Extend it to {asked} without adding facts that are not in the request or the files.";
         return new DraftCheckResult(DraftCheckCodes.Length, false, true,
             $"The text has {Format(actual)} {unitName}. The request asks for {asked} (\"{length.Quote}\"). {fix}", length.Quote);
     }
+
+    /// <summary>
+    /// The range outside which a length leads to a correction: the stated numbers missed by more than
+    /// <see cref="BlockingDeviationPercent"/> percent ("at most 100 words" corrects from 126 words, "at least 200 words"
+    /// below 150). <c>null</c> means open.
+    /// </summary>
+    public static (int? Low, int? High) BlockingBounds(LengthConstraint length) =>
+        (Up(length.Min, 100 - BlockingDeviationPercent), Down(length.Max, 100 + BlockingDeviationPercent));
 
     /// <summary>
     /// The accepted range of a length constraint after its tolerance; <c>null</c> means open. The tolerance never adds

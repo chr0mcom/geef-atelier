@@ -63,6 +63,31 @@ public sealed class DeterministicChecksReviewerTests
     }
 
     [Fact]
+    public async Task A_small_length_miss_leads_to_no_correction()
+    {
+        var constraints = OrderConstraints.None with { Length = new LengthConstraint(LengthUnit.Words, null, 100, "höchstens 100 Wörter", LengthKind.AtMost) };
+
+        var result = await Review(string.Join(' ', Enumerable.Repeat("Wort", 120)), constraints);
+
+        Assert.Equal(ReviewDecision.Approved, result.Decision);
+        var finding = Assert.Single(result.Findings);
+        Assert.Equal(FindingSeverity.Info, finding.Severity);
+    }
+
+    [Fact]
+    public async Task A_far_off_length_as_the_only_problem_asks_the_writer_to_keep_everything_else()
+    {
+        var constraints = OrderConstraints.None with { Length = new LengthConstraint(LengthUnit.Words, null, 100, "höchstens 100 Wörter", LengthKind.AtMost) };
+
+        var result = await Review(string.Join(' ', Enumerable.Repeat("Wort", 126)), constraints);
+
+        Assert.Equal(ReviewDecision.Rejected, result.Decision);
+        var finding = Assert.Single(result.Findings);
+        Assert.Equal(FindingSeverity.Error, finding.Severity);
+        Assert.EndsWith("Keep everything else unchanged.", finding.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Without_a_draft_the_empty_check_rejects()
     {
         var result = await new DeterministicChecksReviewer().ReviewAsync(new RunContext(), CancellationToken.None);
