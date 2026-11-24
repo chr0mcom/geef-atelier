@@ -20,6 +20,16 @@ internal static class SourceKindDetector
     /// <summary>Detects the kind of <paramref name="content"/>.</summary>
     public static DetectedKind Detect(ReadOnlySpan<byte> content, string fileName)
     {
+        var bytes = content.StartsWith((ReadOnlySpan<byte>)[0x50, 0x4B]) ? content.ToArray() : [];
+        return Detect(content, fileName, () => IsWordArchive(new MemoryStream(bytes, writable: false)));
+    }
+
+    /// <summary>Detects the kind of the file at <paramref name="path"/> from its first bytes <paramref name="head"/>.</summary>
+    public static DetectedKind DetectFile(string path, ReadOnlySpan<byte> head, string fileName) =>
+        Detect(head, fileName, () => IsWordArchive(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 81_920)));
+
+    private static DetectedKind Detect(ReadOnlySpan<byte> content, string fileName, Func<bool> isWordArchive)
+    {
         if (content.Length == 0)
             return new(null, "This file is empty.");
 
@@ -28,7 +38,7 @@ internal static class SourceKindDetector
             return new(SourceKind.Pdf, null);
 
         if (content.StartsWith((ReadOnlySpan<byte>)[0x50, 0x4B, 0x03, 0x04]))
-            return IsWordArchive(content) ? new(SourceKind.Docx, null) : new(null, UnsupportedReason);
+            return isWordArchive() ? new(SourceKind.Docx, null) : new(null, UnsupportedReason);
 
         if (content.StartsWith((ReadOnlySpan<byte>)[0xD0, 0xCF, 0x11, 0xE0]))
             return new(null, OldWordReason);
@@ -108,15 +118,16 @@ internal static class SourceKindDetector
         return control <= sample.Length / 100;
     }
 
-    private static bool IsWordArchive(ReadOnlySpan<byte> content)
+    private static bool IsWordArchive(Stream content)
     {
         try
         {
-            using var archive = new ZipArchive(new MemoryStream(content.ToArray(), writable: false), ZipArchiveMode.Read);
+            using var archive = new ZipArchive(content, ZipArchiveMode.Read, leaveOpen: false);
             return archive.GetEntry("word/document.xml") is not null;
         }
         catch (InvalidDataException)
         {
+            content.Dispose();
             return false;
         }
     }

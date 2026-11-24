@@ -9,8 +9,11 @@ namespace Geef.Atelier.Infrastructure.Sources;
 /// <summary>Stores original files on the sources volume. Paths are built only from the owner hash, the source id and a fixed extension.</summary>
 internal interface ISourceFileStore
 {
-    /// <summary>Writes the original file and returns its path relative to <see cref="SourceOptions.StorageRoot"/>.</summary>
-    Task<string> SaveAsync(string ownerUsername, Guid sourceId, string extension, ReadOnlyMemory<byte> content, CancellationToken ct);
+    /// <summary>
+    /// Moves the received file <paramref name="receivedPath"/> into the store and returns its path relative to
+    /// <see cref="SourceOptions.StorageRoot"/>.
+    /// </summary>
+    Task<string> SaveFromFileAsync(string ownerUsername, Guid sourceId, string extension, string receivedPath, CancellationToken ct);
 
     /// <summary>Deletes a stored file; false when it did not exist or the path lies outside the root. Never throws for IO problems.</summary>
     bool TryDelete(string relativePath);
@@ -21,20 +24,17 @@ internal interface ISourceFileStore
 
 internal sealed class SourceFileStore(IOptions<SourceOptions> options, ILogger<SourceFileStore> logger) : ISourceFileStore
 {
-    public async Task<string> SaveAsync(string ownerUsername, Guid sourceId, string extension, ReadOnlyMemory<byte> content, CancellationToken ct)
+    public Task<string> SaveFromFileAsync(string ownerUsername, Guid sourceId, string extension, string receivedPath, CancellationToken ct)
     {
         if (extension is not (".pdf" or ".docx" or ".txt" or ".md"))
             throw new ArgumentException("Unknown storage extension.", nameof(extension));
+        ct.ThrowIfCancellationRequested();
 
         var relative = $"{OwnerFolder(ownerUsername)}/{sourceId:N}{extension}";
         var full = Resolve(relative) ?? throw new InvalidOperationException("The storage path leaves the sources root.");
         Directory.CreateDirectory(Path.GetDirectoryName(full)!);
-
-        var temp = full + ".part";
-        await using (var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None, 81_920, useAsync: true))
-            await stream.WriteAsync(content, ct);
-        File.Move(temp, full, overwrite: true);
-        return relative;
+        File.Move(receivedPath, full, overwrite: true);
+        return Task.FromResult(relative);
     }
 
     public bool TryDelete(string relativePath)

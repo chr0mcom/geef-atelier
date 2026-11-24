@@ -16,6 +16,7 @@ using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Pipeline.Assembly;
 using Geef.Atelier.Infrastructure.Sources;
+using Geef.Atelier.Infrastructure.Sources.Extraction;
 using Geef.Atelier.Infrastructure.Finalizers;
 using Geef.Atelier.Infrastructure.TemplateStudio;
 using Geef.Atelier.Infrastructure.Mcp;
@@ -34,6 +35,9 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+
+if (SourceExtractionWorker.IsRequested(args))
+    return await SourceExtractionWorker.RunAsync(args, Console.OpenStandardOutput(), Console.Error);
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -94,6 +98,11 @@ builder.Services.Configure<ConvergenceOptions>(builder.Configuration.GetSection(
 builder.Services.Configure<Geef.Atelier.Core.Configuration.EnvReferenceOptions>(
     builder.Configuration.GetSection(Geef.Atelier.Core.Configuration.EnvReferenceOptions.SectionName));
 builder.Services.Configure<SourceOptions>(builder.Configuration.GetSection(SourceOptions.SectionName));
+builder.Services.PostConfigure<SourceOptions>(o =>
+{
+    if (string.IsNullOrWhiteSpace(o.ExtractionWorkerAssembly))
+        o.ExtractionWorkerAssembly = typeof(Program).Assembly.Location;
+});
 builder.Services.Configure<OrderOptions>(builder.Configuration.GetSection(OrderOptions.SectionName));
 builder.Services.AddSources(builder.Configuration);
 builder.Services.AddPipelineAssemblers();
@@ -216,6 +225,7 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+return 0;
 
 // Required for WebApplicationFactory in integration tests
 public partial class Program { }

@@ -24,6 +24,9 @@ public static class SourceServiceExtensions
         services.AddSingleton<ISourceTextExtractor, PdfSourceExtractor>();
         services.AddSingleton<ISourceTextExtractor, DocxSourceExtractor>();
         services.AddSingleton<ISourceTextExtractor, PlainTextSourceExtractor>();
+        services.AddSingleton<SourceIntakeLimiter>();
+        services.AddSingleton<IsolatedExtractionProcess>();
+        services.AddSingleton<ISourceExtractionRunner, SourceExtractionRunner>();
         services.AddScoped<ISourceIntakeService, SourceIntakeService>();
         services.AddScoped<IOrderExportService, OrderExportService>();
         services.AddHostedService<SourceCleanupBackgroundService>();

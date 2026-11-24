@@ -4,11 +4,14 @@ using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Persistence.Sources;
 using Geef.Atelier.Infrastructure.Sources;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Geef.Atelier.Infrastructure.Persistence.Sources;
 
 internal sealed class SourceRepository(AtelierDbContext db) : ISourceRepository, ISourceRetentionStore
 {
+    internal const string UniqueHashIndex = "UX_Sources_OwnerUsername_Sha256";
+
     private static readonly RunStatus[] ActiveStatuses = [RunStatus.Pending, RunStatus.Running];
 
     private static readonly Expression<Func<SourceEntity, SourceEntity>> WithoutText = s => new SourceEntity
@@ -38,8 +41,18 @@ internal sealed class SourceRepository(AtelierDbContext db) : ISourceRepository,
     {
         ArgumentNullException.ThrowIfNull(source);
         db.Sources.Add(source);
-        await db.SaveChangesAsync(ct);
-        db.ChangeTracker.Clear();
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: UniqueHashIndex })
+        {
+            throw new SourceAlreadyStoredException(ex);
+        }
+        finally
+        {
+            db.ChangeTracker.Clear();
+        }
     }
 
     public Task<SourceEntity?> GetAsync(Guid sourceId, bool includeText, CancellationToken ct = default) =>
@@ -143,6 +156,38 @@ internal sealed class SourceRepository(AtelierDbContext db) : ISourceRepository,
     public async Task ExtendExpiryAsync(Guid sourceId, DateTimeOffset expiresAt, CancellationToken ct = default) =>
         await db.Sources.Where(s => s.Id == sourceId && s.ExpiresAt != null && s.ExpiresAt < expiresAt)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.ExpiresAt, expiresAt), ct);
+
+    public async Task<bool> DeleteIfExpiredAndUnattachedAsync(Guid sourceId, DateTimeOffset now, CancellationToken ct = default)
+    {
+        var affected = await db.Sources
+            .Where(s => s.Id == sourceId && s.ExpiresAt != null && s.ExpiresAt < now && !s.InLibrary
+                        && !db.OrderSources.Any(l => l.SourceId == s.Id))
+            .ExecuteDeleteAsync(ct);
+        return affected > 0;
+    }
+
+    public async Task<(int Count, long Bytes)> GetUnattachedUsageAsync(string ownerUsername, CancellationToken ct = default)
+    {
+        var usage = await db.Sources.AsNoTracking()
+            .Where(s => s.OwnerUsername == ownerUsername && !s.InLibrary && !db.OrderSources.Any(l => l.SourceId == s.Id))
+            .GroupBy(_ => 1)
+            .Select(g => new { Count = g.Count(), Bytes = g.Sum(s => s.SizeBytes) })
+            .FirstOrDefaultAsync(ct);
+        return usage is null ? (0, 0) : (usage.Count, usage.Bytes);
+    }
+
+    public async Task<IReadOnlySet<string>> FindKnownStoragePathsAsync(IReadOnlyCollection<string> storagePaths, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(storagePaths);
+        if (storagePaths.Count == 0)
+            return new HashSet<string>(StringComparer.Ordinal);
+        var paths = storagePaths.Distinct(StringComparer.Ordinal).ToList();
+        var known = await db.Sources.AsNoTracking()
+            .Where(s => s.StoragePath != null && paths.Contains(s.StoragePath))
+            .Select(s => s.StoragePath!)
+            .ToListAsync(ct);
+        return known.ToHashSet(StringComparer.Ordinal);
+    }
 
     private static IQueryable<SourceEntity> Project(IQueryable<SourceEntity> query, bool includeText) =>
         includeText ? query : query.Select(WithoutText);

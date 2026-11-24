@@ -8,8 +8,10 @@ using Microsoft.Extensions.Options;
 namespace Geef.Atelier.Infrastructure.Sources;
 
 /// <summary>
-/// Deletes sources that were never attached to an order once they expired (row and file), and frees the original files
-/// of sources whose orders all finished more than <see cref="SourceOptions.OriginalRetention"/> ago (the text stays).
+/// Deletes sources that were never attached to an order once they expired (row and file), frees the original files
+/// of sources whose orders all finished more than <see cref="SourceOptions.OriginalRetention"/> ago (the text stays), and
+/// removes files in the sources directory that no source refers to once they are older than
+/// <see cref="SourceOptions.OrphanFileAge"/> (left-over uploads, half-written files).
 /// </summary>
 internal sealed class SourceCleanupBackgroundService(
     IServiceScopeFactory scopeFactory,
@@ -42,6 +44,24 @@ internal sealed class SourceCleanupBackgroundService(
     /// <summary>Runs one cleanup pass and returns how many sources were deleted and how many originals were freed.</summary>
     internal async Task<(int Deleted, int OriginalsFreed)> RunOnceAsync(CancellationToken ct)
     {
+        var result = await CleanSourcesAsync(ct);
+        await RemoveOrphansAsync(ct);
+        return result;
+    }
+
+    /// <summary>Removes orphaned files and left-over upload directories below the sources root; returns how many entries were removed.</summary>
+    internal async Task<int> RemoveOrphansAsync(CancellationToken ct)
+    {
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var retention = scope.ServiceProvider.GetRequiredService<ISourceRetentionStore>();
+        var removed = await new SourceOrphanScanner(files, options.Value, _time.GetUtcNow(), logger).RunAsync(retention, ct);
+        if (removed > 0)
+            logger.LogInformation("Source cleanup removed {Removed} orphaned files.", removed);
+        return removed;
+    }
+
+    private async Task<(int Deleted, int OriginalsFreed)> CleanSourcesAsync(CancellationToken ct)
+    {
         await using var scope = scopeFactory.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<ISourceRepository>();
         var retention = scope.ServiceProvider.GetRequiredService<ISourceRetentionStore>();
@@ -50,7 +70,7 @@ internal sealed class SourceCleanupBackgroundService(
         var deleted = 0;
         foreach (var source in await repository.ListExpiredUnattachedAsync(now, BatchSize, ct))
         {
-            if (!await repository.DeleteIfUnattachedAsync(source.Id, ct))
+            if (!await retention.DeleteIfExpiredAndUnattachedAsync(source.Id, now, ct))
                 continue;
             deleted++;
             if (source.StoragePath is { } path)
