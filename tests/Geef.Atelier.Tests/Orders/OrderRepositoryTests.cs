@@ -122,6 +122,53 @@ public sealed class OrderRepositoryTests(PostgresFixture fixture)
     }
 
     [Fact]
+    public async Task ListAsyncLoadsOnlyWhatTheListNeedsOfTheCurrentRun()
+    {
+        var user = NewUser();
+        var withText = Order(user, "with text");
+        var blank = Order(user, "blank text");
+        var run = Run(user, withText.Id, 1, status: RunStatus.Completed, finalText: "A long delivered text", briefing: "Secret briefing");
+        run.WordCount = 4;
+        await using (var db = fixture.NewContext())
+        {
+            var repo = new OrderRepository(db);
+            await repo.CreateWithFirstRunAsync(withText, [], run);
+            await repo.CreateWithFirstRunAsync(blank, [], Run(user, blank.Id, 1, status: RunStatus.Failed, finalText: "  \n "));
+        }
+
+        await using var read = fixture.NewContext();
+        var rows = await new OrderRepository(read).ListAsync(user, 10);
+
+        var current = rows.Single(r => r.Order.Id == withText.Id).CurrentRun!;
+        Assert.Equal(run.Id, current.Id);
+        Assert.Equal(RunStatus.Completed, current.Status);
+        Assert.Equal(4, current.WordCount);
+        Assert.True(current.ToRunState(DateTimeOffset.UtcNow).HasText);
+        Assert.Equal(string.Empty, current.BriefingText);
+        Assert.Null(current.CrewSnapshot);
+        Assert.NotEqual("A long delivered text", current.FinalText);
+        Assert.False(rows.Single(r => r.Order.Id == blank.Id).CurrentRun!.ToRunState(DateTimeOffset.UtcNow).HasText);
+    }
+
+    [Fact]
+    public async Task AFailedCreateLeavesNothingBehindForTheNextTry()
+    {
+        var user = NewUser();
+        await using var db = fixture.NewContext();
+        var repo = new OrderRepository(db);
+        var first = Order(user, "first try");
+        await Assert.ThrowsAsync<DbUpdateException>(() =>
+            repo.CreateWithFirstRunAsync(first, [Link(first.Id, Guid.NewGuid())], Run(user, first.Id, 1)));
+
+        var second = Order(user, "second try");
+        await repo.CreateWithFirstRunAsync(second, [], Run(user, second.Id, 1));
+
+        await using var check = fixture.NewContext();
+        Assert.Equal(["second try"], await check.Orders.Where(o => o.CreatedByUser == user).Select(o => o.RequestText).ToListAsync());
+        Assert.Equal(1, await check.Runs.CountAsync(r => r.CreatedByUser == user));
+    }
+
+    [Fact]
     public async Task TrySetStateOnlyMovesFromTheExpectedState()
     {
         var order = Order(NewUser(), state: OrderState.Analyzing);
