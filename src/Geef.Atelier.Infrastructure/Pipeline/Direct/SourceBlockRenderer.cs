@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.RegularExpressions;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Sources;
@@ -7,7 +6,8 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 
 /// <summary>
 /// Renders the files of an order into the background document of the writer: every file inside a
-/// <c>&lt;source&gt;</c> tag with its page markers. Above <see cref="SourceOptions.FullTextMaxChars"/> characters a
+/// <c>&lt;source&gt;</c> tag with its page markers. The mode follows <see cref="SourceBudgetPlanner.Classify"/>, the same rule
+/// as on the start page and in the order service: above <see cref="SourceOptions.FullTextMaxChars"/> characters a
 /// <c>&lt;source-map&gt;</c> precedes the files; its line numbers are exact (1-based) for the rendered document,
 /// because the cli-proxy writes the document unchanged to <c>context.md</c>. Tag-like text inside files and file names
 /// is defused so that a file cannot close its own tag.
@@ -24,9 +24,6 @@ internal static partial class SourceBlockRenderer
     public const string MapHeader =
         "Map of this document: every file with the lines it takes up, and the line where each listed page starts. Line 1 is the first line of this document.";
 
-    [GeneratedRegex(@"^\[\[page (\d+)\]\]$", RegexOptions.CultureInvariant)]
-    private static partial Regex PageMarkerLine();
-
     [GeneratedRegex("<(/?)(source)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex TagStart();
 
@@ -39,7 +36,9 @@ internal static partial class SourceBlockRenderer
             return OrderSourceBundle.Empty;
 
         var total = sources.Sum(s => s.Characters);
-        var mode = total <= options.FullTextMaxChars ? SourceUsageMode.FullText : SourceUsageMode.FullTextWithMap;
+        var mode = SourceBudgetPlanner.Classify(total, options) == SourceBudgetClass.FullText
+            ? SourceUsageMode.FullText
+            : SourceUsageMode.FullTextWithMap;
 
         var body = new List<string> { $"<sources count=\"{sources.Count}\" characters=\"{total}\">" };
         var rendered = new List<RenderedSource>(sources.Count);
@@ -50,8 +49,7 @@ internal static partial class SourceBlockRenderer
             var pages = new List<(int Page, int Line)>();
             foreach (var line in ContentLines(source.Text))
             {
-                var marker = PageMarkerLine().Match(line);
-                if (marker.Success && int.TryParse(marker.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var page))
+                if (PageMarkers.TryParseMarker(line, out var page))
                     pages.Add((page, body.Count));
                 body.Add(Defuse(line));
             }

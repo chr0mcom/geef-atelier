@@ -126,6 +126,41 @@ public sealed class OrderServiceTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task CheckingTheChosenPagesCountsLikeTheStartWithoutCreatingAnything()
+    {
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
+        var user = NewUser();
+        var page = string.Concat(Enumerable.Repeat("Long tender text with many details. ", 120));
+        var big = SourceFor(user, pages: 200, page);
+        await host.QueryAsync(async db =>
+        {
+            db.Sources.Add(big);
+            return await db.SaveChangesAsync();
+        });
+
+        Task<SourceSelectionCheck> CheckAsync(params OrderSourceSelection[] selections) =>
+            host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().CheckSourcesAsync(selections, user));
+
+        var whole = await CheckAsync(new OrderSourceSelection(big.Id));
+        Assert.Equal(new SourceSelectionCheck(big.CharCount, SourceBudgetClass.TooLarge, null), whole);
+
+        var chosen = await CheckAsync(new OrderSourceSelection(big.Id, "55, 1-40"));
+        var expected = PageMarkers.StripMarkers(PageSelection.TryParse("1-40,55", 200, out var selection, out _) ? selection!.ApplyTo(big.ExtractedText!) : "").Length;
+        Assert.Equal(new SourceSelectionCheck(expected, SourceBudgetClass.WithMap, null), chosen);
+
+        var wrong = await CheckAsync(new OrderSourceSelection(big.Id, "1-300"));
+        Assert.Equal(SourceBudgetClass.TooLarge, wrong.Class);
+        Assert.Equal("Pages for \"tender.pdf\": Page 300 does not exist; the file has 200 pages.", wrong.Problem);
+
+        var foreign = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().CheckSourcesAsync([new OrderSourceSelection(big.Id)], NewUser()));
+        Assert.Equal("One of the files was not found. Please add it again.", foreign.Problem);
+
+        var submission = await SubmitAsync(host, new SubmitOrderRequest("Summarise.", user, OrderEntry.Web, [new OrderSourceSelection(big.Id, "55, 1-40")]));
+        Assert.Equal(1, await host.QueryAsync(db => db.Orders.CountAsync(o => o.CreatedByUser == user)));
+        Assert.NotEqual(Guid.Empty, submission.OrderId);
+    }
+
+    [Fact]
     public async Task ViewsListsCancellationDeletionAndWaiting()
     {
         await using var host = await AtelierEndToEndHost.StartAsync(postgres);
@@ -163,11 +198,12 @@ public sealed class OrderServiceTests(PostgresFixture postgres)
             await service.WaitForChangeAsync(submission.OrderId, user, OrderDisplayState.Working, TimeSpan.FromSeconds(30));
             Assert.True(DateTimeOffset.UtcNow - immediate < TimeSpan.FromSeconds(1));
 
-            await Assert.ThrowsAsync<InvalidOperationException>(() => service.DeleteAsync(submission.OrderId, user));
+            await Assert.ThrowsAsync<OrderStillWorkingException>(() => service.DeleteAsync(submission.OrderId, user));
 
             Assert.True(await service.CancelAsync(submission.OrderId, user));
             Assert.True(await sp.GetRequiredService<Geef.Atelier.Infrastructure.Persistence.AtelierDbContext>().Runs
                 .Where(r => r.Id == submission.RunId).Select(r => r.CancellationRequested).SingleAsync());
+            Assert.True(await service.CancelAsync(submission.OrderId, user));
             return 0;
         });
 

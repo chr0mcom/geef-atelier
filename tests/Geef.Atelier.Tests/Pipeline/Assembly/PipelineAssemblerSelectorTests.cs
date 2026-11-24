@@ -4,7 +4,9 @@ using Geef.Atelier.Infrastructure.Pipeline.Assembly;
 using Geef.Atelier.Infrastructure.Pipeline.Direct;
 using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Tests.Pipeline.Direct;
+using Geef.Atelier.Core.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Tests.Pipeline.Assembly;
 
@@ -42,7 +44,9 @@ public sealed class PipelineAssemblerSelectorTests
             _ => (Run(), TestCrewSnapshots.Klassik),
         };
 
-        Assert.IsType(expected, PipelineAssemblerSelector.Default.Select(run, snapshot));
+        var selector = new ServiceCollection().AddOptions().AddPipelineAssemblers().BuildServiceProvider().GetRequiredService<IPipelineAssemblerSelector>();
+
+        Assert.IsType(expected, selector.Select(run, snapshot));
     }
 
     [Fact]
@@ -62,7 +66,7 @@ public sealed class PipelineAssemblerSelectorTests
         var harness = new DirectPipelineHarness();
         var run = Run();
 
-        var error = Assert.Throws<DirectPathException>(() => new DirectPipelineAssembler().Assemble(harness.Context(run)));
+        var error = Assert.Throws<DirectPathException>(() => new DirectPipelineAssembler(Options.Create(new SourceOptions())).Assemble(harness.Context(run)));
 
         Assert.Equal(DirectPathException.NoOrder, error.Message);
     }

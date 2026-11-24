@@ -56,6 +56,15 @@ public sealed class SystemCrewConstantsTests
     }
 
     [Fact]
+    public void Code_only_names_are_reserved_like_the_other_system_names()
+    {
+        Assert.True(SystemCrew.IsSystemName(SystemCrew.DirectTemplateName));
+        Assert.True(SystemCrew.IsSystemName(SystemCrew.DirectWriterProfile.Name));
+        Assert.True(SystemCrew.IsSystemName(SystemCrew.DeterministicChecksProfile.Name));
+        Assert.True(SystemCrew.IsSystemGroundingProviderName(SystemCrew.OrderSourcesProfile.Name));
+    }
+
+    [Fact]
     public void IsSystemName_ReturnsFalseForCustomNames()
     {
         Assert.False(SystemCrew.IsSystemName("custom-my-reviewer"));

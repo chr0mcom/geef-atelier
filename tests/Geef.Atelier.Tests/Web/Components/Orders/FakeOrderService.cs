@@ -24,10 +24,13 @@ internal sealed class FakeOrderService : IOrderService
     public ConcurrentQueue<Guid> Cancelled { get; } = new();
     public ConcurrentQueue<Guid> Deleted { get; } = new();
     public ConcurrentQueue<string?> ListedFor { get; } = new();
+    public ConcurrentQueue<IReadOnlyList<OrderSourceSelection>> Checked { get; } = new();
+    public Func<IReadOnlyList<OrderSourceSelection>, SourceSelectionCheck> CheckSources { get; set; } = _ => new SourceSelectionCheck(0, SourceBudgetClass.FullText, null);
     public Exception? SubmitError { get; set; }
     public Exception? GetError { get; set; }
     public bool CancelResult { get; set; } = true;
     public bool DeleteResult { get; set; } = true;
+    public Exception? DeleteError { get; set; }
     public TaskCompletionSource? Hold { get; set; }
     public int Calls => Volatile.Read(ref _calls);
     public int MaxActive => Volatile.Read(ref _maxActive);
@@ -57,6 +60,20 @@ internal sealed class FakeOrderService : IOrderService
             var view = OrderTestData.View(OrderDisplayState.Queued, title: Title(request.RequestText), requestText: request.RequestText, mode: request.Mode);
             Add(request.CreatedByUser, view);
             return new OrderSubmission(view.OrderId, OrderDisplayState.Queued, view.CurrentRun?.RunId, []);
+        }
+        finally
+        {
+            Leave();
+        }
+    }
+
+    public async Task<SourceSelectionCheck> CheckSourcesAsync(IReadOnlyList<OrderSourceSelection> sources, string ownerUsername, CancellationToken ct = default)
+    {
+        await EnterAsync();
+        try
+        {
+            Checked.Enqueue(sources);
+            return CheckSources(sources);
         }
         finally
         {
@@ -142,6 +159,8 @@ internal sealed class FakeOrderService : IOrderService
         try
         {
             Deleted.Enqueue(orderId);
+            if (DeleteError is not null)
+                throw DeleteError;
             return DeleteResult && _orders.TryRemove(orderId, out _);
         }
         finally

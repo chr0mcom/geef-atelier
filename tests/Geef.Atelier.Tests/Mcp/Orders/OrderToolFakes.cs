@@ -100,6 +100,9 @@ internal sealed class FakeOrderService : IOrderService
             ?? new OrderSubmission(Guid.NewGuid(), OrderDisplayState.Queued, Guid.NewGuid(), []));
     }
 
+    public Task<SourceSelectionCheck> CheckSourcesAsync(IReadOnlyList<OrderSourceSelection> sources, string ownerUsername, CancellationToken ct = default) =>
+        throw new NotSupportedException();
+
     public Task<OrderView?> GetAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default)
     {
         Gets.Add((orderId, requestingUsername));

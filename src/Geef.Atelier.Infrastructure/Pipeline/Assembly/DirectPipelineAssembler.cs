@@ -21,9 +21,9 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Assembly;
 /// (<c>Runs.ReportJson</c>). Accepts runs of the code-only template <see cref="SystemCrew.DirectTemplateName"/>, also
 /// with a seed draft.
 /// </summary>
-internal sealed class DirectPipelineAssembler(IOptions<SourceOptions>? sourceOptions = null) : IPipelineAssembler
+internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOptions) : IPipelineAssembler
 {
-    private readonly SourceOptions _sourceOptions = sourceOptions?.Value ?? new SourceOptions();
+    private readonly SourceOptions _sourceOptions = sourceOptions.Value;
 
     /// <inheritdoc/>
     public int Priority => 90;
@@ -42,7 +42,8 @@ internal sealed class DirectPipelineAssembler(IOptions<SourceOptions>? sourceOpt
             context.LoggerFactory.CreateLogger<OrderGroundingStep>());
         var writer = new DirectWriterExecutor(
             context.Snapshot.Executor, context.LlmClientResolver, context.PricingCatalog, context.CostAccumulator,
-            context.WarningSink, context.Run.Id, context.LoggerFactory.CreateLogger<DirectWriterExecutor>());
+            context.WarningSink, context.Run.Id, context.LoggerFactory.CreateLogger<DirectWriterExecutor>(),
+            IdentityDraftOutputSplitter.Instance);
         var checks = new DeterministicChecksReviewer();
 
         return AtelierPipelineFactory.Build(
@@ -72,21 +73,12 @@ internal sealed class DirectPipelineAssembler(IOptions<SourceOptions>? sourceOpt
         IReadOnlyList<RunSourceUsageEntity> usages;
         await using (var scope = context.ScopeFactory.CreateAsyncScope())
         {
-            var repository = scope.ServiceProvider.GetService<ISourceRepository>();
-            usages = repository is null ? [] : await repository.ListRunUsagesAsync(context.Run.Id, ct);
+            usages = await scope.ServiceProvider.GetRequiredService<ISourceRepository>().ListRunUsagesAsync(context.Run.Id, ct);
         }
 
         var delivered = result.ToDeliveredOutcome();
         var report = DirectReportBuilder.Build(constraints, text, usages, delivered.Iteration, result.TotalIterations, evidence);
 
-        var writer = context.RunServices.GetService<IRunReportWriter>();
-        if (writer is null)
-        {
-            context.LoggerFactory.CreateLogger<DirectPipelineAssembler>()
-                .LogWarning("Run {RunId}: no report writer is registered; the report was not stored.", context.Run.Id);
-            return;
-        }
-
-        await writer.WriteAsync(context.Run.Id, RunReportJson.Serialize(report), ct);
+        await context.RunServices.GetRequiredService<IRunReportWriter>().WriteAsync(context.Run.Id, RunReportJson.Serialize(report), ct);
     }
 }

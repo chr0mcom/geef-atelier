@@ -44,6 +44,8 @@ Text-Generations-Pipeline-Plattform auf Basis des [Geef SDK](https://github.com/
 
 **Modellmatrix ✅** Modellwahl nach Rolle (`ModelSlot`) und Crew-Gebiet aus einer recherchierten `ModelMatrix`; Claude/OpenAI nur über den Abo-cli-proxy; Zuweisung beim Snapshot-Bau mit Live-Verfügbarkeit, Executor-Ausschluss, Reviewern aus anderer Familie, Reviewer-Ring und Bezahlt-Deckel; der Composer wählt `model_slot`; Migration Step46 hat alle bestehenden eigenen Profile neu klassifiziert; Codex-Katalog des cli-proxy aus `models_cache.json` (D-066, 2026-11-22).
 
+**Etappe 1: Aufträge und Direktweg ✅** Der Auftrag ist die Einheit, die die Person sieht (`/start`, `/work`, `/orders/{id}`); Dateien werden einzeln mit Quittung hochgeladen und als Quellen gehalten; der Direktweg schreibt mit den Dateien im Volltext (ab 150.000 Zeichen mit Karte, ab 600.000 mit Seitenauswahl), prüft das Ergebnis ohne Modell und korrigiert einmal; MCP-Werkzeuge `submit_order`, `get_order_status`, `get_order_result`; Migration Step48 verknüpft bestehende Läufe mit Aufträgen (D-069, D-070, 2026-11-24).
+
 Aktuell: **über 1800 Tests** (grün; vorbestehende Testcontainers-/E2E-Umgebungs-Flakes ausgenommen).
 
 Vollständiger Scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope_de.md)

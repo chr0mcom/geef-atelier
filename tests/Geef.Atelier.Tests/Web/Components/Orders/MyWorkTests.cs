@@ -149,6 +149,20 @@ public sealed class MyWorkTests : TestContext
     }
 
     [Fact]
+    public void DeletingAnOrderThatIsStillWorkingSaysToStopItFirst()
+    {
+        _orders.DeleteError = new OrderStillWorkingException();
+        _orders.Add("alice", OrderTestData.View(OrderDisplayState.Delivered));
+        var cut = RenderComponent<MyWork>();
+
+        cut.Find("[data-testid='work-row-delete']").Click();
+        cut.Find("[data-testid='work-delete-confirm-button']").Click();
+
+        Assert.Contains("This order is still being worked on. Stop it first.", cut.Find("[data-testid='work-action-error']").TextContent);
+        Assert.DoesNotContain("Something went wrong", cut.Markup);
+    }
+
+    [Fact]
     public void AdministratorsCanShowAllUsers()
     {
         _auth.SetAuthorized("root");
@@ -218,6 +232,7 @@ public sealed class MyWorkTests : TestContext
             Fail ? throw new InvalidOperationException("db") : inner.ListAsync(ownerUsername, limit, ct);
 
         public Task<OrderSubmission> SubmitAsync(SubmitOrderRequest request, CancellationToken ct = default) => inner.SubmitAsync(request, ct);
+        public Task<SourceSelectionCheck> CheckSourcesAsync(IReadOnlyList<OrderSourceSelection> sources, string ownerUsername, CancellationToken ct = default) => inner.CheckSourcesAsync(sources, ownerUsername, ct);
         public Task<OrderView?> GetAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) => inner.GetAsync(orderId, requestingUsername, ct);
         public Task<OrderResult?> GetResultAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) => inner.GetResultAsync(orderId, requestingUsername, ct);
         public Task<OrderView?> WaitForChangeAsync(Guid orderId, string? requestingUsername, OrderDisplayState? knownState, TimeSpan maxWait, CancellationToken ct = default) => inner.WaitForChangeAsync(orderId, requestingUsername, knownState, maxWait, ct);

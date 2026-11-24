@@ -51,6 +51,8 @@ public sealed class RunLiveUpdateSecurityTests(PostgresFixture fixture) : IAsync
         builder.Services.AddAtelierApplication();
         builder.Services.AddSingleton<Geef.Atelier.Application.Crew.IModelCatalog, PassThroughModelCatalog>();
         builder.Services.AddScoped<IKnowledgeService, NoOpKnowledgeService>();
+        builder.Services.AddSingleton<Geef.Atelier.Application.Sources.ISourceIntakeService, Geef.Atelier.Tests.Web.Components.Orders.FakeSourceIntakeService>();
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddAuthentication(HeaderAuthHandler.SchemeName)
             .AddScheme<AuthenticationSchemeOptions, HeaderAuthHandler>(HeaderAuthHandler.SchemeName, _ => { });
         builder.Services.AddAuthorization();

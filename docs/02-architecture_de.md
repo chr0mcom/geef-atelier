@@ -548,6 +548,28 @@ erneutes Einreichen auf `Failed` gesetzt; ein Neustart des Dienstes räumt ebens
 Lauf findet die Anhänge des Laufs, den er fortsetzt (Abstammung über `ParentRunId`/
 `ParentCompositionRunId`). Ein Lauf ohne Anhänge löst keinen Embedding-Aufruf aus.
 
+## Aufträge und Quellen (D-069, D-070)
+
+| Tabelle (Step48) | Inhalt |
+|---|---|
+| `Orders` | Die Anfrage der Person im Wortlaut, Modus (`Direct`/`Careful`), Eingang (`Web`/`Mcp`/`Legacy`), Zustand (`Analyzing`, `NeedsInput`, `Ready`, `Cancelled`), Besitzer |
+| `Sources` | Eine hochgeladene Datei: extrahierter Text mit Seitenmarken (`[[page N]]`), Zählwerte, Lesequalität, Warnungen, Pfad des aufbewahrten Originals, Ablaufzeit, solange kein Auftrag sie nutzt |
+| `OrderSources` | Welche Quelle zu welchem Auftrag gehört, mit Rolle, Position und Seitenauswahl (`1-40,55`) |
+| `RunSourceUsages` | Welche Datei in welchen Lauf ging, in welchem Modus (`FullText`, `FullTextWithMap`) und mit wie vielen Zeichen |
+
+`Runs.OrderId`/`Runs.OrderVersion` verbinden einen Lauf mit seinem Auftrag. `OrderService` (Application) prüft und
+legt einen Auftrag mit seinem ersten Lauf in einer Transaktion an; `OrderStateResolver` (Core) leitet den
+Anzeigezustand nur aus `Orders.State` und dem aktuellen Lauf ab. Die Größengrenzen kommen aus
+`SourceBudgetPlanner.Classify`, das Startseite, Auftragsdienst (`CheckSourcesAsync`, `SubmitAsync`) und der
+Quellenblock des Schreibers (`SourceBlockRenderer`) teilen; `OrderSourcePrompts` baut die Quellen für Direktweg und
+sorgfältigen Modus gleich.
+
+Der Orchestrator wählt je Lauf einen `IPipelineAssembler` (Komposition 100, Direktweg 90, Fortsetzung 50,
+Klassik 0). Der Direktweg (`DirectPipelineAssembler`) nutzt die Code-Vorlage `direct` (`SystemCrew.CodeOnly*`; die
+Namen sind wie Systemnamen reserviert): `OrderGroundingStep`, `DirectWriterExecutor`,
+`DeterministicChecksReviewer`, höchstens zwei Durchgänge, Bericht in `Runs.ReportJson`. Einzelheiten: D-069 und
+D-070 im [Decisions-Log](05-decisions-log_de.md).
+
 ## Konfigurationsschalter (D-067)
 
 | Schlüssel | Standard | Wirkung |

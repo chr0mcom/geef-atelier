@@ -6,6 +6,7 @@
 @using Geef.Atelier.Application.Sources
 @using Geef.Atelier.Core.Configuration
 @using Geef.Atelier.Core.Domain.Orders
+@using Geef.Atelier.Core.Domain.Sources
 @using Geef.Atelier.Web.Components.UI.Orders
 @using Microsoft.Extensions.Options
 @inject IOrderService Orders
@@ -63,7 +64,8 @@
         <ul class="source-cards" data-testid="source-cards">
             @foreach (var item in _items)
             {
-                <SourceReceiptCard @key="item.LocalId" Item="item" OnRemove="RemoveAsync" OnRetry="RetryAsync" OnPagesChanged="PagesChanged" />
+                <SourceReceiptCard @key="item.LocalId" Item="item" OnRemove="RemoveAsync" OnRetry="RetryAsync" OnPagesChanged="PagesChangedAsync"
+                                   AskForPages="AsksForPages(item)" PagesProblem="@PagesProblem(item)" />
             }
         </ul>
     }
@@ -117,6 +119,9 @@
     (string Title, string Message)? _error;
     string? _username;
     string? _requestingUser;
+    SourceSelectionCheck? _check;
+    string? _checkKey;
+    bool _checkFailed;
     IJSObjectReference? _module;
     IJSObjectReference? _handle;
     DotNetObjectReference<Start>? _self;
@@ -124,7 +129,7 @@
 
     int MaxFiles => SourceSettings.Value.MaxFilesPerOrder;
 
-    bool CanStart => _interactive && !_submitting && !string.IsNullOrWhiteSpace(_request) && !_items.Any(i => i.Blocks);
+    bool CanStart => _interactive && !_submitting && !string.IsNullOrWhiteSpace(_request) && !_items.Any(i => i.Blocks) && SelectionBlock is null;
 
     string? BlockedReason =>
         _submitting ? null
@@ -132,22 +137,89 @@
         : _items.Any(i => i.Status == SourceUploadStatus.Uploading) ? "Wait until your files are read."
         : _items.Any(i => i.Blocks) ? "Remove the file that cannot be used, or try it again."
         : string.IsNullOrWhiteSpace(_request) ? "Describe what you need first."
+        : SelectionBlock;
+
+    List<SourceUploadItem> ReadyItems => _items.Where(i => i.Status == SourceUploadStatus.Ready && i.Receipt is not null).ToList();
+
+    int RawTotal => (int)Math.Min(int.MaxValue, ReadyItems.Sum(i => (long)i.Receipt!.CharCount));
+
+    bool RawOver => SourceBudgetPlanner.Classify(RawTotal, SourceSettings.Value) == SourceBudgetClass.TooLarge;
+
+    bool AsksForPages(SourceUploadItem item) =>
+        item.Receipt?.PageCount is not null && (RawOver || !string.IsNullOrWhiteSpace(item.Pages));
+
+    string? PagesProblem(SourceUploadItem item) =>
+        item.Receipt?.PageCount is { } pageCount && !string.IsNullOrWhiteSpace(item.Pages)
+        && !PageSelection.TryParse(item.Pages, pageCount, out _, out var error)
+            ? error
+            : null;
+
+    bool HasPageInput => ReadyItems.Any(i => AsksForPages(i) && !string.IsNullOrWhiteSpace(i.Pages));
+
+    bool HasPageProblem => ReadyItems.Any(i => PagesProblem(i) is not null);
+
+    List<OrderSourceSelection> CurrentSelections => _items
+        .Where(i => i is { Status: SourceUploadStatus.Ready, Receipt.SourceId: not null })
+        .Select(i => new OrderSourceSelection(i.Receipt!.SourceId!.Value, AsksForPages(i) ? i.Pages : null))
+        .ToList();
+
+    static string KeyOf(IEnumerable<OrderSourceSelection> selections) =>
+        string.Join('|', selections.Select(s => $"{s.SourceId:N}:{s.PageSelection}"));
+
+    bool CheckIsCurrent => _checkKey is not null && _checkKey == KeyOf(CurrentSelections) && (_check is not null || _checkFailed);
+
+    (int Total, SourceBudgetClass Class, string? Problem)? Effective =>
+        !HasPageInput ? (RawTotal, SourceBudgetPlanner.Classify(RawTotal, SourceSettings.Value), null)
+        : CheckIsCurrent && _check is { } check ? (check.TotalChars, check.Class, check.Problem)
         : null;
+
+    bool AnyPdf => ReadyItems.Any(i => i.Receipt!.PageCount is not null);
+
+    string? SelectionBlock
+    {
+        get
+        {
+            if (ReadyItems.Count == 0)
+                return null;
+            if (HasPageProblem)
+                return "Check the pages you entered.";
+            if (HasPageInput && !CheckIsCurrent)
+                return "Counting the pages you chose…";
+            if (Effective is not { } effective)
+                return null;
+            if (effective.Problem is not null)
+                return "Change the pages you entered, or remove a file.";
+            if (effective.Class == SourceBudgetClass.TooLarge)
+                return AnyPdf ? "Choose the pages to use, or remove a file." : "Remove a file, or use a shorter version.";
+            return null;
+        }
+    }
 
     (string Text, string Tone)? BudgetLine
     {
         get
         {
-            var ready = _items.Where(i => i.Status == SourceUploadStatus.Ready && i.Receipt is not null).ToList();
-            if (ready.Count == 0)
+            if (ReadyItems.Count == 0)
                 return null;
-            var total = ready.Sum(i => i.Receipt!.CharCount);
             var options = SourceSettings.Value;
-            if (total <= options.FullTextMaxChars)
-                return ($"Files: {total.Grouped()} of {options.FullTextMaxChars.Grouped()} characters used completely.", "ok");
-            if (total <= options.MapMaxChars)
-                return ($"Files: {total.Grouped()} characters. That is more than {options.FullTextMaxChars.Grouped()}, so the writer gets a table of contents and reads the parts that matter.", "map");
-            return ($"Files: {total.Grouped()} characters. That is more than the limit of {options.MapMaxChars.Grouped()}. Enter the pages to use, or remove a file.", "over");
+            if (HasPageProblem)
+                return ("Files: some of the pages you entered do not exist or are written in a way that cannot be read. Check them on the file.", "over");
+            if (HasPageInput && !CheckIsCurrent)
+                return ("Files: counting the pages you chose…", "ok");
+            if (Effective is not { } effective)
+                return ("Files: the pages you chose could not be counted right now. You can still press Start.", "map");
+            if (effective.Problem is not null)
+                return ($"Files: {effective.Problem}", "over");
+            var total = effective.Total;
+            var chosen = HasPageInput ? " with the pages you chose" : "";
+            return effective.Class switch
+            {
+                SourceBudgetClass.FullText => ($"Files{chosen}: {total.Grouped()} of {options.FullTextMaxChars.Grouped()} characters used completely.", "ok"),
+                SourceBudgetClass.WithMap => ($"Files{chosen}: {total.Grouped()} characters. That is more than {options.FullTextMaxChars.Grouped()}, so the writer gets a table of contents and reads the parts that matter.", "map"),
+                _ when HasPageInput => ($"Files with the pages you chose: {total.Grouped()} characters. That is still more than the limit of {options.MapMaxChars.Grouped()}. Choose fewer pages, or remove a file.", "over"),
+                _ when AnyPdf => ($"Files: {total.Grouped()} characters. That is more than the limit of {options.MapMaxChars.Grouped()}. Enter the pages to use for each PDF file above, or remove a file.", "over"),
+                _ => ($"Files: {total.Grouped()} characters. That is more than the limit of {options.MapMaxChars.Grouped()}. Remove a file, or use shorter versions of your files.", "over"),
+            };
         }
     }
 
@@ -157,7 +229,10 @@
         _username = auth.User.Identity?.Name;
         _requestingUser = auth.User.IsInRole("admin") ? null : _username;
         if (From is { } orderId)
+        {
             await PrefillAsync(orderId);
+            await RefreshCheckAsync();
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -286,6 +361,7 @@
         {
             await ForgetAsync(item);
         }
+        await InvokeAsync(RefreshCheckAsync);
         await InvokeAsync(StateHasChanged);
     }
 
@@ -294,6 +370,7 @@
         _items.Remove(item);
         _notice = null;
         await ForgetAsync(item);
+        await RefreshCheckAsync();
         if (item is { FromEarlierOrder: false, Status: SourceUploadStatus.Ready, Receipt.SourceId: { } sourceId }
             && !_items.Any(other => other.Receipt?.SourceId == sourceId)
             && _module is not null && _handle is not null)
@@ -334,7 +411,44 @@
         }
     }
 
-    void PagesChanged(SourceUploadItem item) => _error = null;
+    async Task PagesChangedAsync(SourceUploadItem item)
+    {
+        _error = null;
+        await RefreshCheckAsync();
+    }
+
+    async Task RefreshCheckAsync()
+    {
+        if (!HasPageInput || HasPageProblem || _username is not { } user)
+        {
+            _check = null;
+            _checkKey = null;
+            _checkFailed = false;
+            return;
+        }
+
+        var selections = CurrentSelections;
+        var key = KeyOf(selections);
+        if (key == _checkKey && (_check is not null || _checkFailed))
+            return;
+
+        _checkKey = key;
+        _check = null;
+        _checkFailed = false;
+        StateHasChanged();
+        try
+        {
+            var result = await DataGate.RunAsync(() => Orders.CheckSourcesAsync(selections, user));
+            if (_checkKey == key)
+                _check = result;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Counting the chosen pages failed");
+            if (_checkKey == key)
+                _checkFailed = true;
+        }
+    }
 
     async Task ForgetAsync(SourceUploadItem item)
     {
@@ -358,10 +472,7 @@
         _error = null;
         try
         {
-            var sources = _items
-                .Where(i => i is { Status: SourceUploadStatus.Ready, Receipt.SourceId: not null })
-                .Select(i => new OrderSourceSelection(i.Receipt!.SourceId!.Value, i.Pages))
-                .ToList();
+            var sources = CurrentSelections;
             var request = new SubmitOrderRequest(
                 _request,
                 _username,

@@ -10,16 +10,19 @@ namespace Geef.Atelier.Core.Domain.Checks;
 /// </summary>
 public static partial class DraftCheckEvaluator
 {
-    /// <summary>Fewest words a draft needs to count as a text.</summary>
-    public const int MinimumWords = 5;
-
     [GeneratedRegex(@"\[[^\[\]\n]{2,80}\]", RegexOptions.CultureInvariant)]
     private static partial Regex PlaceholderPattern();
 
-    [GeneratedRegex(@"^\s*([-*•]|\d+[.)])\s+", RegexOptions.Multiline | RegexOptions.CultureInvariant)]
-    private static partial Regex ListLinePattern();
+    [GeneratedRegex(@"^\s*[-*•]\s+", RegexOptions.CultureInvariant)]
+    private static partial Regex BulletLinePattern();
 
-    [GeneratedRegex(@"^#{1,6}\s", RegexOptions.Multiline | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^\s*\d+[.)]\s+", RegexOptions.CultureInvariant)]
+    private static partial Regex NumberedLinePattern();
+
+    [GeneratedRegex(@"^\s*\d{1,2}\.?\s*(?:Jan(?:uar|uary)?|J(?:ä|ae)n(?:ner)?|Feb(?:ruar|ruary)?|M(?:ä|ae)r(?:z)?|Mar(?:ch)?|Apr(?:il)?|Mai|May|Jun(?:i|e)?|Jul(?:i|y)?|Aug(?:ust)?|Sep(?:t|tember)?|Okt(?:ober)?|Oct(?:ober)?|Nov(?:ember)?|Dez(?:ember)?|Dec(?:ember)?)(?!\p{L})", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex DateLinePattern();
+
+    [GeneratedRegex(@"^#{1,6}\s", RegexOptions.CultureInvariant)]
     private static partial Regex HeadingLinePattern();
 
     [GeneratedRegex(@"^(Here is|Here's|Hier ist|Hier sind|Gerne|Sure|Certainly|Natürlich)\b.*:\s*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
@@ -28,22 +31,27 @@ public static partial class DraftCheckEvaluator
     [GeneratedRegex(@"^[\d\s,;–-]+$|^\^", RegexOptions.CultureInvariant)]
     private static partial Regex FootnotePattern();
 
-    /// <summary>Runs every check that applies (empty text and preamble always) and returns one result per check.</summary>
+    /// <summary>
+    /// Runs every check that applies and returns one result per check. The empty-text check always runs and fails only
+    /// for a draft without a single word; a short text (a slogan, a subject line) is not empty. A remark to the reader
+    /// before the text is never blocking: it is reported as a note, because a first line such as "Here's what I
+    /// learned:" can just as well be the opening of the text.
+    /// </summary>
     public static IReadOnlyList<DraftCheckResult> Evaluate(string draft, OrderConstraints constraints)
     {
         var text = draft ?? string.Empty;
         var results = new List<DraftCheckResult>();
 
         var words = CountWords(text);
-        results.Add(words < MinimumWords
+        results.Add(words == 0
             ? new DraftCheckResult(DraftCheckCodes.Empty, false, true,
-                $"The text is empty or almost empty ({words} words). Write the complete text the request asks for.", null)
+                "The text is empty. Write the complete text the request asks for.", null)
             : new DraftCheckResult(DraftCheckCodes.Empty, true, true, $"The text has {words} words.", null));
 
         var firstLine = text.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.Length > 0) ?? string.Empty;
         results.Add(PreamblePattern().IsMatch(firstLine)
-            ? new DraftCheckResult(DraftCheckCodes.Preamble, false, true,
-                $"The text starts with an introduction to the reader (\"{Shorten(firstLine)}\"). Remove it and start directly with the text itself.", null)
+            ? new DraftCheckResult(DraftCheckCodes.Preamble, true, false,
+                $"The text may start with a remark to the reader (\"{Shorten(firstLine)}\"). Remove it before you send the text if it is not part of it.", null)
             : new DraftCheckResult(DraftCheckCodes.Preamble, true, true, "The text starts directly.", null));
 
         if (constraints.Length is { } length)
@@ -181,19 +189,57 @@ public static partial class DraftCheckEvaluator
     {
         var (code, found, what) = rule.Pattern switch
         {
-            ForbiddenPattern.Lists => (DraftCheckCodes.Lists, ListLinePattern().IsMatch(text), "lists or bullet points"),
-            ForbiddenPattern.Headings => (DraftCheckCodes.Headings, HeadingLinePattern().IsMatch(text), "headings"),
+            ForbiddenPattern.Lists => (DraftCheckCodes.Lists, ContainsList(text), "lists or bullet points"),
+            ForbiddenPattern.Headings => (DraftCheckCodes.Headings, ContainsHeading(text, allowTitle: false), "headings"),
+            ForbiddenPattern.Subheadings => (DraftCheckCodes.Headings, ContainsHeading(text, allowTitle: true), "subheadings"),
             _ => (DraftCheckCodes.Emojis, ContainsEmoji(text), "emojis"),
         };
         var fix = rule.Pattern switch
         {
             ForbiddenPattern.Lists => "Turn every list into continuous sentences.",
             ForbiddenPattern.Headings => "Remove the headings and keep the text as continuous prose.",
+            ForbiddenPattern.Subheadings => "Remove the subheadings and keep the text as continuous prose; a title at the top may stay.",
             _ => "Remove every emoji.",
         };
         return found
             ? new DraftCheckResult(code, false, true, $"The text has {what}, but the request rules them out (\"{rule.Quote}\"). {fix}", rule.Quote)
             : new DraftCheckResult(code, true, true, $"The text has no {what}.", rule.Quote);
+    }
+
+    /// <summary>
+    /// True when the text has a bullet line, or at least two numbered lines in a row (blank lines in between do not
+    /// count). A line that starts with a date such as "24. November 2026" or "3. May 2026" is not a numbered line.
+    /// </summary>
+    private static bool ContainsList(string text)
+    {
+        var previousNumbered = false;
+        foreach (var line in text.Split('\n'))
+        {
+            if (line.Trim().Length == 0)
+                continue;
+            if (BulletLinePattern().IsMatch(line))
+                return true;
+            var numbered = NumberedLinePattern().IsMatch(line) && !DateLinePattern().IsMatch(line);
+            if (numbered && previousNumbered)
+                return true;
+            previousNumbered = numbered;
+        }
+        return false;
+    }
+
+    /// <summary>True when the text has a Markdown heading; with <paramref name="allowTitle"/> a heading on the first non-blank line is a title and allowed.</summary>
+    private static bool ContainsHeading(string text, bool allowTitle)
+    {
+        var first = true;
+        foreach (var line in text.Split('\n'))
+        {
+            if (line.Trim().Length == 0)
+                continue;
+            if (HeadingLinePattern().IsMatch(line) && !(allowTitle && first))
+                return true;
+            first = false;
+        }
+        return false;
     }
 
     private static bool ContainsTerm(string text, string term, bool wholeWord)

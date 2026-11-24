@@ -41,6 +41,66 @@ public sealed class RequestConstraintExtractorTests
     }
 
     [Theory]
+    [InlineData("The text must not be more than 150 words.", 150)]
+    [InlineData("Don't write more than 100 words.", 100)]
+    [InlineData("Don’t write more than 120 words.", 120)]
+    [InlineData("Please do not use more than 200 words for the reply.", 200)]
+    [InlineData("Write a short note to the team, never more than 100 words.", 100)]
+    [InlineData("Auf keinen Fall mehr als 100 Wörter.", 100)]
+    [InlineData("Nie mehr als 100 Wörter bitte.", 100)]
+    [InlineData("Mehr als 100 Wörter sollen es nicht sein.", 100)]
+    [InlineData("Der Text darf nicht mehr als 250 Wörter haben.", 250)]
+    [InlineData("Schreibe ohne mehr als 80 Wörter zu brauchen eine Einladung.", 80)]
+    [InlineData("More than 300 words is not what I want.", 300)]
+    public void A_negated_more_than_is_an_upper_limit(string request, int max)
+    {
+        var length = RequestConstraintExtractor.Extract(request).Length;
+
+        Assert.NotNull(length);
+        Assert.Equal(LengthKind.AtMost, length.Kind);
+        Assert.Null(length.Min);
+        Assert.Equal(max, length.Max);
+    }
+
+    [Theory]
+    [InlineData("Write more than 100 words.", 100)]
+    [InlineData("Mehr als 100 Wörter bitte.", 100)]
+    [InlineData("Write more than 300 words, not less.", 300)]
+    [InlineData("Not less than 300 words, please.", 300)]
+    [InlineData("Nicht weniger als 300 Wörter.", 300)]
+    [InlineData("Der Text soll nicht unter 400 Wörter haben.", 400)]
+    [InlineData("Keep it not under 200 words.", 200)]
+    public void More_than_without_negation_and_negated_less_than_are_lower_limits(string request, int min)
+    {
+        var length = RequestConstraintExtractor.Extract(request).Length;
+
+        Assert.NotNull(length);
+        Assert.Equal(LengthKind.AtLeast, length.Kind);
+        Assert.Equal(min, length.Min);
+        Assert.Null(length.Max);
+    }
+
+    [Theory]
+    [InlineData("Ich will keinen kurzen Text, schreibe mehr als 300 Wörter.")]
+    [InlineData("Don't make it boring and write more than 300 words.")]
+    [InlineData("Schreibe einen Beitrag, der nicht langweilig ist, mit mehr als 500 Wörtern.")]
+    public void A_negation_elsewhere_in_the_sentence_leaves_the_length_unchecked(string request)
+    {
+        var constraints = RequestConstraintExtractor.Extract(request);
+
+        Assert.Null(constraints.Length);
+        Assert.Contains(constraints.Notes, n => n.StartsWith("A length next to a negation", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_turned_limit_quotes_the_negation()
+    {
+        var length = RequestConstraintExtractor.Extract("The text must not be more than 150 words.").Length;
+
+        Assert.Equal("not be more than 150 words", length!.Quote);
+    }
+
+    [Theory]
     [InlineData("Übernimm die 200 Wörter Einleitung des Originals und schreibe den Rest neu.")]
     [InlineData("Fasse den 5000 Wörter langen Text zusammen.")]
     [InlineData("Der Originaltext hat etwa 2000 Wörter. Kürze ihn deutlich.")]
@@ -134,7 +194,9 @@ public sealed class RequestConstraintExtractorTests
     [InlineData("Bitte ohne Stichpunkte.", ForbiddenPattern.Lists)]
     [InlineData("Write it without bullet points.", ForbiddenPattern.Lists)]
     [InlineData("No lists.", ForbiddenPattern.Lists)]
-    [InlineData("Ohne Zwischenüberschriften.", ForbiddenPattern.Headings)]
+    [InlineData("Ohne Zwischenüberschriften.", ForbiddenPattern.Subheadings)]
+    [InlineData("Ohne Überschriften.", ForbiddenPattern.Headings)]
+    [InlineData("Write it without subheadings.", ForbiddenPattern.Subheadings)]
     [InlineData("No headings, please.", ForbiddenPattern.Headings)]
     [InlineData("Keine Emojis.", ForbiddenPattern.Emojis)]
     [InlineData("Do not use emojis.", ForbiddenPattern.Emojis)]

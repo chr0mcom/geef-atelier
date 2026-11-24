@@ -10,6 +10,13 @@ namespace Geef.Atelier.Application.Orders;
 /// <summary>A source chosen for an order, with an optional page selection such as <c>1-40,55</c>.</summary>
 public sealed record OrderSourceSelection(Guid SourceId, string? PageSelection = null, SourceRole Role = SourceRole.Facts);
 
+/// <summary>
+/// The files of an order measured before the start: <see cref="TotalChars"/> after the page selections, its size class and a
+/// plain-English <see cref="Problem"/> when a selection cannot be used (then the class is <see cref="SourceBudgetClass.TooLarge"/>
+/// and the total is 0).
+/// </summary>
+public sealed record SourceSelectionCheck(int TotalChars, SourceBudgetClass Class, string? Problem);
+
 /// <summary>A new order as submitted through the web or MCP.</summary>
 public sealed record SubmitOrderRequest(
     string RequestText,
@@ -78,3 +85,6 @@ public sealed record OrderListItem(Guid OrderId, string Title, OrderDisplay Disp
 
 /// <summary>Raised for problems the person can fix (empty request, too many files, budget exceeded, foreign source). The message is plain English for the UI and MCP.</summary>
 public sealed class OrderSubmissionException(string message) : InvalidOperationException(message);
+
+/// <summary>Thrown when an order is deleted while one of its runs is still working; the message is meant for the person.</summary>
+public sealed class OrderStillWorkingException() : InvalidOperationException("This order is still being worked on. Stop it first.");

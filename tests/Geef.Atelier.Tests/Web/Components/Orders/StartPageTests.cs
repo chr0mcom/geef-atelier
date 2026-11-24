@@ -213,16 +213,115 @@ public sealed class StartPageTests : TestContext
     }
 
     [Fact]
-    public async Task OnlyAFileThatIsTooLongAsksForPages()
+    public async Task EveryPdfAsksForPagesOnceTheFilesTogetherAreTooLong()
+    {
+        var limit = new SourceOptions().MapMaxChars;
+        var cut = RenderComponent<Start>();
+        cut.Find("[data-testid='start-request']").Input("Compare the two reports.");
+
+        await UploadAsync(cut, "u1", OrderReceipts.Usable("a.pdf", chars: limit * 2 / 3, pages: 200, budget: SourceBudgetClass.WithMap));
+        Assert.Empty(cut.FindAll("[data-testid='source-card-pages']"));
+        Assert.False(cut.Find("[data-testid='start-submit']").HasAttribute("disabled"));
+
+        await UploadAsync(cut, "u2", OrderReceipts.Usable("b.pdf", chars: limit * 2 / 3, pages: 180, budget: SourceBudgetClass.WithMap));
+        await UploadAsync(cut, "u3", OrderReceipts.Usable("notes.md", chars: 1_000));
+
+        Assert.Equal(2, cut.FindAll("[data-testid='source-card-pages']").Count);
+        Assert.Empty(cut.FindAll("[data-testid='source-card-too-long']"));
+        var line = cut.Find("[data-testid='start-budget']");
+        Assert.Contains("Enter the pages to use for each PDF file above, or remove a file.", line.TextContent);
+        Assert.Contains("start-budget--over", line.ClassList);
+        Assert.True(cut.Find("[data-testid='start-submit']").HasAttribute("disabled"));
+        Assert.Equal("Choose the pages to use, or remove a file.", cut.Find("[data-testid='start-blocked-reason']").TextContent);
+        Assert.Empty(_orders.Checked);
+    }
+
+    [Fact]
+    public async Task ChosenPagesAreCountedByTheServerAndUnlockStart()
+    {
+        var limit = new SourceOptions().MapMaxChars;
+        var a = OrderReceipts.Usable("a.pdf", chars: limit * 2 / 3, pages: 200, budget: SourceBudgetClass.WithMap);
+        var b = OrderReceipts.Usable("b.pdf", chars: limit * 2 / 3, pages: 180, budget: SourceBudgetClass.WithMap);
+        _orders.CheckSources = selections => selections.Any(x => x.PageSelection == "1-20")
+            ? new SourceSelectionCheck(limit / 2, SourceBudgetClass.WithMap, null)
+            : new SourceSelectionCheck(limit + 5, SourceBudgetClass.TooLarge, null);
+        var cut = RenderComponent<Start>();
+        cut.Find("[data-testid='start-request']").Input("Compare the two reports.");
+        await UploadAsync(cut, "u1", a);
+        await UploadAsync(cut, "u2", b);
+
+        cut.FindAll("[data-testid='source-card-pages']")[0].Change("1-190");
+
+        Assert.Contains("That is still more than the limit", cut.Find("[data-testid='start-budget']").TextContent);
+        Assert.True(cut.Find("[data-testid='start-submit']").HasAttribute("disabled"));
+
+        cut.FindAll("[data-testid='source-card-pages']")[0].Change("1-20");
+
+        Assert.Equal(
+            new[] { new OrderSourceSelection(a.SourceId!.Value, "1-20"), new OrderSourceSelection(b.SourceId!.Value, null) },
+            _orders.Checked.Last());
+        var line = cut.Find("[data-testid='start-budget']");
+        Assert.StartsWith("Files with the pages you chose:", line.TextContent);
+        Assert.Contains("start-budget--map", line.ClassList);
+        Assert.Equal(2, cut.FindAll("[data-testid='source-card-pages']").Count);
+        Assert.False(cut.Find("[data-testid='start-submit']").HasAttribute("disabled"));
+
+        cut.Find("[data-testid='start-submit']").Click();
+
+        Assert.Equal("1-20", Assert.Single(_orders.Submitted).Sources![0].PageSelection);
+    }
+
+    [Fact]
+    public async Task PagesThatDoNotExistAreShownOnTheCardAndLockStart()
     {
         var cut = RenderComponent<Start>();
+        cut.Find("[data-testid='start-request']").Input("Summarise the bill.");
+        await UploadAsync(cut, "u1", OrderReceipts.Usable("huge.pdf", chars: new SourceOptions().MapMaxChars + 1, pages: 480, budget: SourceBudgetClass.TooLarge));
 
-        await UploadAsync(cut, "u1", OrderReceipts.Usable("map.pdf", chars: 450_000, pages: 200, budget: SourceBudgetClass.WithMap));
+        cut.Find("[data-testid='source-card-pages']").Change("470-500");
+
+        Assert.Equal("Page 500 does not exist; the file has 480 pages.", cut.Find("[data-testid='source-card-pages-problem']").TextContent);
+        Assert.Equal("true", cut.Find("[data-testid='source-card-pages']").GetAttribute("aria-invalid"));
+        Assert.True(cut.Find("[data-testid='start-submit']").HasAttribute("disabled"));
+        Assert.Equal("Check the pages you entered.", cut.Find("[data-testid='start-blocked-reason']").TextContent);
+        Assert.Empty(_orders.Checked);
+    }
+
+    [Fact]
+    public async Task AProblemTheServerFindsWithThePagesIsShownAndLocksStart()
+    {
+        _orders.CheckSources = _ => new SourceSelectionCheck(0, SourceBudgetClass.TooLarge, "One of the files was not found. Please add it again.");
+        var cut = RenderComponent<Start>();
+        cut.Find("[data-testid='start-request']").Input("Summarise the bill.");
+        await UploadAsync(cut, "u1", OrderReceipts.Usable("huge.pdf", chars: new SourceOptions().MapMaxChars + 1, pages: 480, budget: SourceBudgetClass.TooLarge));
+
+        cut.Find("[data-testid='source-card-pages']").Change("1-40");
+
+        Assert.Contains("One of the files was not found.", cut.Find("[data-testid='start-budget']").TextContent);
+        Assert.True(cut.Find("[data-testid='start-submit']").HasAttribute("disabled"));
+        Assert.Equal("Change the pages you entered, or remove a file.", cut.Find("[data-testid='start-blocked-reason']").TextContent);
+    }
+
+    [Theory]
+    [InlineData(SourceKind.Docx, "report.docx")]
+    [InlineData(SourceKind.Text, "notes.txt")]
+    public async Task AFileWithoutPagesThatIsTooLongAsksForAShorterVersion(SourceKind kind, string fileName)
+    {
+        var cut = RenderComponent<Start>();
+        cut.Find("[data-testid='start-request']").Input("Summarise it.");
+        var receipt = OrderReceipts.Usable(fileName, chars: new SourceOptions().MapMaxChars + 1, budget: SourceBudgetClass.TooLarge) with { Kind = kind };
+
+        await UploadAsync(cut, "u1", receipt);
+
         Assert.Empty(cut.FindAll("[data-testid='source-card-pages']"));
+        Assert.Equal("This file is too long. Please use a shorter version.", cut.Find("[data-testid='source-card-too-long']").TextContent);
+        Assert.Contains("Remove a file, or use shorter versions of your files.", cut.Find("[data-testid='start-budget']").TextContent);
+        Assert.True(cut.Find("[data-testid='start-submit']").HasAttribute("disabled"));
+        Assert.Equal("Remove a file, or use a shorter version.", cut.Find("[data-testid='start-blocked-reason']").TextContent);
 
-        await UploadAsync(cut, "u2", OrderReceipts.Usable("huge.pdf", chars: 950_000, pages: 480, budget: SourceBudgetClass.TooLarge));
-        Assert.Single(cut.FindAll("[data-testid='source-card-pages']"));
-        Assert.Contains("Too long to read completely", cut.FindAll("[data-testid='source-card-summary']")[1].TextContent);
+        cut.Find("[data-testid='source-card-remove']").Click();
+
+        Assert.False(cut.Find("[data-testid='start-submit']").HasAttribute("disabled"));
     }
 
     public static TheoryData<int, string, string> SumLineCases()

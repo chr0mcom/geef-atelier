@@ -40,10 +40,10 @@ internal sealed class RunOrchestratorService(
     ILogger<RunOrchestratorService>     logger,
     IRunWarningSink                     warningSink,
     IGroundingProviderFactory           groundingProviderFactory,
+    IPipelineAssemblerSelector          assemblerSelector,
     IPricingCatalog?                    pricingCatalog = null,
     IOptions<CostTrackingOptions>?      costTrackingOptions = null,
-    IFinalizerExecutorFactory?          finalizerExecutorFactory = null,
-    IPipelineAssemblerSelector?         assemblerSelector = null) : BackgroundService
+    IFinalizerExecutorFactory?          finalizerExecutorFactory = null) : BackgroundService
 {
     internal const string ResultNotSavedMessage = "The result could not be saved completely.";
     internal const string UnexpectedErrorMessage = "The task stopped because of an unexpected error.";
@@ -51,7 +51,7 @@ internal sealed class RunOrchestratorService(
     internal const string RestartedWhileFinishingMessage = "The result may be incomplete because the service was restarted while finishing.";
 
     private readonly OrchestratorOptions _opts = options.Value;
-    private readonly IPipelineAssemblerSelector _assemblers = assemblerSelector ?? PipelineAssemblerSelector.Default;
+    private readonly IPipelineAssemblerSelector _assemblers = assemblerSelector;
     private readonly DateTimeOffset _createdAt = DateTimeOffset.UtcNow;
     private readonly SemaphoreSlim _slots = new(options.Value.MaxConcurrentRuns, options.Value.MaxConcurrentRuns);
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _runCts   = new();
@@ -288,8 +288,8 @@ internal sealed class RunOrchestratorService(
                 if (accumulator is not null)
                     await FinalizeRunCostsAsync(run.Id, accumulator, cts.Token);
                 await RunFinalizersSafelyAsync(run.Id, snapshot, cts.Token);
-                await SetDeliveredOutcomeAsync(run.Id, delivered.Outcome, delivered.Iteration);
                 await FinishAssemblyAsync(assembler, assemblyContext, result, cts.Token);
+                await SetDeliveredOutcomeAsync(run.Id, delivered.Outcome, delivered.Iteration);
             }
             else
             {
@@ -312,8 +312,8 @@ internal sealed class RunOrchestratorService(
                     else if (snapshot.Finalizers?.Count > 0)
                         await ReportWarningAsync(run.Id, RunWarningSources.Finalizer, RunWarningCodes.FinalizersNotRun,
                             "The finishing steps were not run because the text did not pass all checks.");
-                    await SetDeliveredOutcomeAsync(run.Id, delivered.Outcome, delivered.Iteration);
                     await FinishAssemblyAsync(assembler, assemblyContext, result, cts.Token);
+                    await SetDeliveredOutcomeAsync(run.Id, delivered.Outcome, delivered.Iteration);
                 }
                 else
                 {
@@ -597,8 +597,9 @@ internal sealed class RunOrchestratorService(
     }
 
     /// <summary>
-    /// Lets the assembler store results of its kind of run (the report of the direct path) after the outcome is
-    /// recorded. A failure is logged and never changes the delivered result; cancellation propagates.
+    /// Lets the assembler store results of its kind of run (the report of the direct path) before the outcome is
+    /// recorded, so that an order never shows as finished without its report. A failure is logged and never changes the
+    /// delivered result; cancellation propagates.
     /// </summary>
     private async Task FinishAssemblyAsync(
         IPipelineAssembler assembler, PipelineAssemblyContext context, GeefPipelineResult<FinalizedDocument> result, CancellationToken ct)
@@ -621,9 +622,7 @@ internal sealed class RunOrchestratorService(
         try
         {
             await using var scope = scopeFactory.CreateAsyncScope();
-            var orders = scope.ServiceProvider.GetService<IOrderRepository>();
-            if (orders is not null)
-                await orders.TouchAsync(orderId, DateTimeOffset.UtcNow, CancellationToken.None);
+            await scope.ServiceProvider.GetRequiredService<IOrderRepository>().TouchAsync(orderId, DateTimeOffset.UtcNow, CancellationToken.None);
         }
         catch (Exception ex)
         {

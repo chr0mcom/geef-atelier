@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Sources;
+using Geef.Atelier.Core.Persistence.Sources;
 using Geef.Atelier.Infrastructure.Pipeline.Direct;
 
 namespace Geef.Atelier.Tests.Pipeline.Direct;
@@ -18,7 +19,7 @@ public sealed partial class SourceBlockRendererTests
                 sb.Append($"Text of page {p}, line {l}.\n");
         }
         var text = sb.ToString();
-        return new PromptSource(Guid.NewGuid(), id, name, SourceKind.Pdf, pages, selected, text, PageMarkerText.CountWithoutMarkers(text));
+        return new PromptSource(Guid.NewGuid(), id, name, SourceKind.Pdf, pages, selected, text, text.CharCountWithoutPageMarkers());
     }
 
     private static PromptSource Markdown(string id, string name, string text) =>
@@ -112,5 +113,61 @@ public sealed partial class SourceBlockRendererTests
 
         Assert.Equal(SourceUsageMode.FullText, SourceBlockRenderer.Render([source], new SourceOptions { FullTextMaxChars = 500 }).Mode);
         Assert.Equal(SourceUsageMode.FullTextWithMap, SourceBlockRenderer.Render([source], new SourceOptions { FullTextMaxChars = 499 }).Mode);
+    }
+
+    [Theory]
+    [InlineData(400)]
+    [InlineData(500)]
+    [InlineData(501)]
+    [InlineData(1_000)]
+    [InlineData(1_001)]
+    public void The_mode_follows_the_same_rule_as_the_budget_planner(int chars)
+    {
+        var options = new SourceOptions { FullTextMaxChars = 500, MapMaxChars = 1_000 };
+        var expected = SourceBudgetPlanner.Classify(chars, options) == SourceBudgetClass.FullText
+            ? SourceUsageMode.FullText
+            : SourceUsageMode.FullTextWithMap;
+
+        Assert.Equal(expected, SourceBlockRenderer.Render([Markdown("S1", "a.md", new string('x', chars))], options).Mode);
+    }
+
+    [Fact]
+    public void Prompt_sources_count_a_page_selection_like_the_order_service()
+    {
+        var text = string.Concat(Enumerable.Range(1, 6).Select(p => $"[[page {p}]]\n  Seite {p} mit etwas Text.  \n"));
+        var source = new SourceEntity
+        {
+            Id = Guid.NewGuid(), OwnerUsername = "u", FileName = "a.pdf", ContentType = "application/pdf", Kind = SourceKind.Pdf,
+            SizeBytes = 1, Sha256 = new string('0', 64), ExtractedText = text, PageCount = 6, CharCount = text.CharCountWithoutPageMarkers(),
+            WordCount = 0, Quality = SourceQuality.Good, Warnings = [], Origin = SourceOrigin.WebUpload, CreatedAt = DateTimeOffset.UnixEpoch,
+        };
+        var link = new OrderSourceEntity { OrderId = Guid.NewGuid(), SourceId = source.Id, Role = SourceRole.Facts, Position = 0, PageSelection = "2-3, 6", AddedAt = DateTimeOffset.UnixEpoch };
+        Assert.True(PageSelection.TryParse("2-3, 6", 6, out var selection, out _));
+
+        var prompt = new[] { new OrderSourceItem(link, source) }.ToPromptSources(_ => Assert.Fail("selection applies"));
+
+        var single = Assert.Single(prompt.Sources);
+        Assert.Equal(PageMarkers.StripMarkers(selection!.ApplyTo(text)).Length, single.Characters);
+        Assert.Equal("2-3,6", single.PagesIncluded);
+    }
+
+    [Fact]
+    public void A_selection_that_no_longer_fits_uses_the_whole_file_and_is_reported()
+    {
+        var text = "[[page 1]]\nEins\n[[page 2]]\nZwei";
+        var source = new SourceEntity
+        {
+            Id = Guid.NewGuid(), OwnerUsername = "u", FileName = "a.pdf", ContentType = "application/pdf", Kind = SourceKind.Pdf,
+            SizeBytes = 1, Sha256 = new string('0', 64), ExtractedText = text, PageCount = 2, CharCount = text.CharCountWithoutPageMarkers(),
+            WordCount = 0, Quality = SourceQuality.Good, Warnings = [], Origin = SourceOrigin.WebUpload, CreatedAt = DateTimeOffset.UnixEpoch,
+        };
+        var link = new OrderSourceEntity { OrderId = Guid.NewGuid(), SourceId = source.Id, Role = SourceRole.Facts, Position = 3, PageSelection = "5-9", AddedAt = DateTimeOffset.UnixEpoch };
+        var reported = new List<Guid>();
+
+        var prompt = new[] { new OrderSourceItem(link, source) }.ToPromptSources(i => reported.Add(i.Source.Id));
+
+        Assert.Equal([source.Id], reported);
+        Assert.Null(Assert.Single(prompt.Sources).PagesIncluded);
+        Assert.Equal(3, prompt.Positions[source.Id]);
     }
 }

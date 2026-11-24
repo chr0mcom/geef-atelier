@@ -1,3 +1,4 @@
+using Geef.Atelier.Infrastructure.Pipeline.Assembly;
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Crew.Knowledge;
 using Geef.Atelier.Application.Runs;
@@ -70,6 +71,7 @@ internal sealed class OrchestratorTestHost : IAsyncDisposable
                 configureServices?.Invoke(services);
                 services.TryAddSingleton<IGroundingProviderFactory>(sp =>
                     new GroundingProviderFactory(sp.GetServices<IGroundingProvider>()));
+                services.AddPipelineAssemblers();
                 services.AddHostedService<RunOrchestratorService>();
             })
             .Build();

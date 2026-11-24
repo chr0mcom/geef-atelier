@@ -272,6 +272,11 @@
             _toDelete = null;
             await LoadAsync();
         }
+        catch (OrderStillWorkingException ex)
+        {
+            _toDelete = null;
+            _actionError = ex.Message;
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             Logger.LogWarning(ex, "Deleting order {OrderId} failed", item.OrderId);

@@ -532,11 +532,44 @@ externally reachable routes:
 | `/admin/oauth-clients` | GET | Cookie (admin) | OAuth client management |
 | `/account/connected-clients` | GET | Cookie | Self-service for one's own connected OAuth clients |
 | `/crew`, `/crew/templates`, `/crew/profiles/*`, `/crew/studio`, `/crew/knowledge` | GET | Cookie | Crew/template/profile/Studio/knowledge-base management |
+| `/start` | GET | Cookie | Start page for a new order: request, files with receipts, "Extra careful" (D-070) |
+| `/work`, `/orders` | GET | Cookie | "My work": the person's orders, newest activity first (admins can show all users) |
+| `/orders/{id}` | GET | Cookie | Order page: progress, text, open points, "How it was made", versions |
 | `/runs`, `/runs/{id}`, `/new` | GET | Cookie | Run list, run detail, new job |
 | `/crew/providers/*`, `/tools/*`, `/mcp-servers/*`, `/crew/profiles/grounding-providers/create`, `/crew/profiles/grounding-providers/edit/{name}` | GET | Cookie (admin) | Provider, tool, MCP server and grounding editors — admin-only since D-067 because they reference secrets by name |
 
 Run-related pages are subject to run-user isolation (D-042): each user sees
 only their own runs; the admin can see system-wide via an explicit toggle.
+
+---
+
+## Sources and order export endpoints (D-070)
+
+All three require the cookie sign-in; API calls without it get `401`/`403` instead of a redirect to the login page.
+Writes need the antiforgery token in the `RequestVerificationToken` header and, when the browser sends one, an
+`Origin` equal to the host (otherwise `400`).
+
+| Endpoint | Method | Answer |
+|---|---|---|
+| `/api/sources` | POST (multipart, exactly one file) | `201` with the receipt and `Location: /api/sources/{id}`; `200` with `duplicate: true` when the same person uploaded the same file before; `422` with `usable: false`, `sourceId: null` and `reason` for a file without readable text; `400`/`413` with `{ "reason": "…" }` |
+| `/api/sources/{id}` | GET | The receipt of an own source, otherwise `404` |
+| `/api/sources/{id}` | DELETE | `204`; `409` with a reason while an order uses the file; `404` for unknown or foreign sources |
+| `/orders/{id}/export/{format}` | GET | The text of the order as `docx`, `pdf` or `md` (optional `?version=n`); `404` for unknown or foreign orders or an order without text, `400` for an unknown format |
+
+The receipt is JSON in camelCase with enum values as camelCase strings, for example:
+
+```json
+{
+  "sourceId": "<uuid|null>", "fileName": "offer.pdf", "kind": "pdf", "sizeBytes": 2202009,
+  "pageCount": 80, "charCount": 160485, "wordCount": 24100, "quality": "good|partial|poor|unreadable",
+  "usable": true, "duplicate": false, "budgetClass": "fullText|withMap|tooLarge",
+  "preview": "<beginning of the text>", "warnings": [ { "code": "pdf.pages_without_text", "message": "…", "pages": [3, 7] } ],
+  "reason": null, "estimatedTokens": 84466
+}
+```
+
+Orders themselves are started from the start page through `IOrderService` inside the Blazor circuit; there is no
+separate HTTP endpoint for submitting an order.
 
 ---
 

@@ -31,18 +31,15 @@ internal sealed class OrderService(
     IOptions<OrderOptions> orderOptions,
     IOptions<SourceOptions> sourceOptions,
     ILogger<OrderService> logger,
-    ISourceIntakeService? intake = null,
-    IOrderNotifier? notifier = null,
-    TimeProvider? timeProvider = null) : IOrderService
+    ISourceIntakeService intake,
+    IOrderNotifier notifier,
+    TimeProvider time) : IOrderService
 {
     internal const string EmptyRequestMessage = "Please describe what you need.";
     internal const string MissingSourceMessage = "One of the files was not found. Please add it again.";
-    internal const string StillWorkingMessage = "This order is still being worked on. Stop it first.";
     internal const string MapNotice = "Your files are long, so the writer gets a map of them and reads the parts that matter.";
     private static readonly JsonSerializerOptions SnapshotJsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private static readonly RunStatus[] ActiveStatuses = [RunStatus.Pending, RunStatus.Running];
-
-    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
     public async Task<OrderSubmission> SubmitAsync(SubmitOrderRequest request, CancellationToken ct = default)
     {
@@ -58,19 +55,18 @@ internal sealed class OrderService(
             throw new OrderSubmissionException(Invariant(
                 $"Your request is too long ({text.Length:N0} characters, the limit is {options.RequestMaxChars:N0}). Please shorten it or attach the material as a file."));
 
-        var selections = (request.Sources ?? [])
-            .GroupBy(s => s.SourceId)
-            .Select(g => g.First())
-            .ToList();
+        var selections = Distinct(request.Sources);
         if (selections.Count > srcOptions.MaxFilesPerOrder)
             throw new OrderSubmissionException(Invariant($"You can use at most {srcOptions.MaxFilesPerOrder} files per order."));
 
         var plan = await PlanSourcesAsync(selections, request.CreatedByUser, srcOptions, ct);
+        if (plan.Budget.Class == SourceBudgetClass.TooLarge)
+            throw new OrderSubmissionException(TooLargeMessage(plan.Budget));
         var notices = new List<string>();
         if (plan.Budget.Class == SourceBudgetClass.WithMap)
             notices.Add(MapNotice);
 
-        var now = _time.GetUtcNow();
+        var now = time.GetUtcNow();
         var order = new OrderEntity
         {
             Id = Guid.NewGuid(),
@@ -110,6 +106,20 @@ internal sealed class OrderService(
         return new OrderSubmission(order.Id, OrderDisplayState.Queued, run.Id, notices);
     }
 
+    public async Task<SourceSelectionCheck> CheckSourcesAsync(IReadOnlyList<OrderSourceSelection> sources, string ownerUsername, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ownerUsername);
+        try
+        {
+            var plan = await PlanSourcesAsync(Distinct(sources), ownerUsername, sourceOptions.Value, ct);
+            return new SourceSelectionCheck(plan.Budget.TotalChars, plan.Budget.Class, null);
+        }
+        catch (OrderSubmissionException ex)
+        {
+            return new SourceSelectionCheck(0, SourceBudgetClass.TooLarge, ex.Message);
+        }
+    }
+
     public async Task<OrderView?> GetAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default)
     {
         var order = await GetOwnedAsync(orderId, requestingUsername, ct);
@@ -124,7 +134,7 @@ internal sealed class OrderService(
 
         var orderRuns = await orders.ListRunsAsync(orderId, ct);
         var current = OrderStateResolver.SelectCurrentRun(orderRuns);
-        var display = OrderStateResolver.Resolve(order.State, current?.ToRunState());
+        var display = OrderStateResolver.Resolve(order.State, current?.ToRunState(time.GetUtcNow()));
         if (current is null)
             return new OrderResult(orderId, display, null, null, null, null, [], [], [], [], NoteFor(display));
 
@@ -155,7 +165,7 @@ internal sealed class OrderService(
         var rows = await orders.ListAsync(ownerUsername, limit, ct);
         return rows.Select(r =>
         {
-            var display = OrderStateResolver.Resolve(r.Order.State, r.CurrentRun?.ToRunState());
+            var display = OrderStateResolver.Resolve(r.Order.State, r.CurrentRun?.ToRunState(time.GetUtcNow()));
             return new OrderListItem(
                 r.Order.Id,
                 r.Order.RequestText.ToOrderTitle(),
@@ -174,7 +184,7 @@ internal sealed class OrderService(
         var limit = TimeSpan.FromSeconds(Math.Max(0, options.MaxWaitSeconds));
         var wait = maxWait < TimeSpan.Zero ? TimeSpan.Zero : maxWait > limit ? limit : maxWait;
         var poll = options.WaitPollInterval > TimeSpan.Zero ? options.WaitPollInterval : TimeSpan.FromSeconds(1);
-        var deadline = _time.GetUtcNow() + wait;
+        var deadline = time.GetUtcNow() + wait;
 
         while (true)
         {
@@ -182,10 +192,10 @@ internal sealed class OrderService(
             if (view is null || view.Display.IsFinished || knownState is null || view.Display.State != knownState)
                 return view;
 
-            var remaining = deadline - _time.GetUtcNow();
+            var remaining = deadline - time.GetUtcNow();
             if (remaining <= TimeSpan.Zero)
                 return view;
-            await Task.Delay(remaining < poll ? remaining : poll, _time, ct);
+            await Task.Delay(remaining < poll ? remaining : poll, time, ct);
         }
     }
 
@@ -202,9 +212,17 @@ internal sealed class OrderService(
             changed = order.State is not OrderState.Cancelled
                       && await orders.TrySetStateAsync(orderId, order.State, OrderState.Cancelled, ct);
         }
+        else if (!ActiveStatuses.Contains(current.Status))
+        {
+            changed = false;
+        }
+        else if (current.CancellationRequested)
+        {
+            return true;
+        }
         else
         {
-            changed = ActiveStatuses.Contains(current.Status) && await runs.RequestCancellationAsync(current.Id, ct);
+            changed = await runs.RequestCancellationAsync(current.Id, ct);
         }
 
         if (changed)
@@ -220,7 +238,7 @@ internal sealed class OrderService(
 
         var orderRuns = await orders.ListRunsAsync(orderId, ct);
         if (orderRuns.Any(r => ActiveStatuses.Contains(r.Status)))
-            throw new InvalidOperationException(StillWorkingMessage);
+            throw new OrderStillWorkingException();
 
         var linked = await sources.ListForOrderAsync(orderId, includeText: false, ct);
         if (!await orders.DeleteAsync(orderId, ct))
@@ -230,10 +248,7 @@ internal sealed class OrderService(
         {
             try
             {
-                if (intake is not null)
-                    await intake.DeleteAsync(item.Source.Id, null, ct);
-                else
-                    await sources.DeleteIfUnattachedAsync(item.Source.Id, ct);
+                await intake.DeleteAsync(item.Source.Id, null, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -257,12 +272,12 @@ internal sealed class OrderService(
     {
         var orderRuns = await orders.ListRunsAsync(order.Id, ct);
         var current = OrderStateResolver.SelectCurrentRun(orderRuns);
-        var display = OrderStateResolver.Resolve(order.State, current?.ToRunState());
+        var display = OrderStateResolver.Resolve(order.State, current?.ToRunState(time.GetUtcNow()));
         var linked = await sources.ListForOrderAsync(order.Id, includeText: false, ct);
         var events = current is null ? [] : await orders.ListRunEventsAsync(current.Id, ct);
         var warnings = current is null ? [] : await warningRepository.ListByRunAsync(current.Id, ct);
         var finishedAt = display.IsFinished ? current?.CompletedAt ?? order.UpdatedAt : (DateTimeOffset?)null;
-        var progress = OrderProgressMapper.Map(display, order.Mode, linked.Count > 0, events, order.CreatedAt, finishedAt, _time.GetUtcNow());
+        var progress = OrderProgressMapper.Map(display, order.Mode, linked.Count > 0, events, order.CreatedAt, finishedAt, time.GetUtcNow());
 
         return new OrderView(
             order.Id,
@@ -309,7 +324,7 @@ internal sealed class OrderService(
                 if (!PageSelection.TryParse(selection.PageSelection, pageCount, out var pages, out var error))
                     throw new OrderSubmissionException($"Pages for \"{source.FileName}\": {error}");
                 canonical = pages!.ToString();
-                chars = PageMarkers.StripMarkers(pages.ApplyTo(source.ExtractedText ?? string.Empty)).Length;
+                chars = pages.ApplyTo(source.ExtractedText ?? string.Empty).CharCountWithoutPageMarkers();
             }
 
             links.Add(new OrderSourceEntity
@@ -325,17 +340,19 @@ internal sealed class OrderService(
         }
 
         var budget = SourceBudgetPlanner.Plan(items, options);
-        if (budget.Class == SourceBudgetClass.TooLarge)
-        {
-            var candidates = items.Where(i => i.PageCount is not null).OrderByDescending(i => i.CharCount).Select(i => i.FileName).ToList();
-            var choose = candidates.Count > 0
-                ? $" Choose pages for: {string.Join(", ", candidates)}."
-                : " Please use fewer or shorter files.";
-            throw new OrderSubmissionException(Invariant(
-                $"Your files are too long to use completely ({budget.TotalChars:N0} characters, the limit is {budget.MapMaxChars:N0}).") + choose);
-        }
-
         return new SourcePlan(links, budget);
+    }
+
+    private static List<OrderSourceSelection> Distinct(IReadOnlyList<OrderSourceSelection>? selections) =>
+        (selections ?? []).GroupBy(s => s.SourceId).Select(g => g.First()).ToList();
+
+    private static string TooLargeMessage(SourceBudgetPlan budget)
+    {
+        var candidates = budget.Items.Where(i => i.PageCount is not null).OrderByDescending(i => i.CharCount).Select(i => i.FileName).ToList();
+        var choose = candidates.Count > 0
+            ? $" Choose pages for: {string.Join(", ", candidates)}."
+            : " Please use fewer or shorter files.";
+        return Invariant($"Your files are too long to use completely ({budget.TotalChars:N0} characters, the limit is {budget.MapMaxChars:N0}).") + choose;
     }
 
     private async Task<ResolvedCrewSnapshot> ResolveSnapshotAsync(SubmitOrderRequest request, bool hasSources, CancellationToken ct)
@@ -365,8 +382,6 @@ internal sealed class OrderService(
 
     private async Task NotifyAsync(Guid orderId)
     {
-        if (notifier is null)
-            return;
         try
         {
             await notifier.NotifyOrderUpdatedAsync(orderId);

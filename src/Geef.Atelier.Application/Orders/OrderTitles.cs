@@ -25,6 +25,8 @@ public static class OrderTitles
         var cut = line.LastIndexOf(' ', MaxTitleChars - 1);
         if (cut < MaxTitleChars / 2)
             cut = MaxTitleChars - 1;
+        if (char.IsHighSurrogate(line[cut - 1]))
+            cut--;
         return line[..cut].TrimEnd(' ', ',', ';', ':', '-') + "…";
     }
 
