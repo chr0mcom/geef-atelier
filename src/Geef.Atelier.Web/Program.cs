@@ -20,6 +20,7 @@ using Geef.Atelier.Infrastructure.Sources.Extraction;
 using Geef.Atelier.Infrastructure.Finalizers;
 using Geef.Atelier.Infrastructure.TemplateStudio;
 using Geef.Atelier.Infrastructure.Mcp;
+using Geef.Atelier.Infrastructure.Orders;
 using Geef.Atelier.Infrastructure.Tools;
 using Geef.Atelier.Mcp;
 using Geef.Atelier.Web.Auth;
@@ -105,6 +106,7 @@ builder.Services.PostConfigure<SourceOptions>(o =>
 });
 builder.Services.Configure<OrderOptions>(builder.Configuration.GetSection(OrderOptions.SectionName));
 builder.Services.AddSources(builder.Configuration);
+builder.Services.AddOrderExport();
 builder.Services.AddRequestTimeouts();
 builder.Services.AddPipelineAssemblers();
 builder.Services.AddHostedService<RunOrchestratorService>();
