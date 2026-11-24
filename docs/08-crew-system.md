@@ -689,3 +689,62 @@ When a task-run is chained from a composition-run, `Runs.ParentCompositionRunId`
 - `LearningExtractFinalizerExecutor`: `if (run.Kind == RunKind.CrewComposition) return Ok;` — no learnings extracted from composition-runs.
 - `CrewMaterializeFinalizerExecutor`: the chained run is always `RunKind.Standard`; no nested composition is possible.
 - `CrewComposerExecutor`: only active for `Kind == CrewComposition`; rejects other run kinds.
+
+## Uploaded files: safe reading (D-069 addendum)
+
+Files from `POST /api/sources` and from MCP attachments go through `SourceIntakeService`. PDF and Word files are read
+by the same application in a **separate process**, so a hostile file can never take the web process down.
+
+### Intake steps
+
+1. **Upload slot.** At most `Sources:MaxConcurrentIntakes` uploads run at the same time; a caller waits up to
+   `Sources:ExtractionQueueTimeout`, otherwise the receipt says "The service is busy with other uploads. Please try
+   again in a minute."
+2. **Streaming.** The upload is written to `<StorageRoot>/.incoming/<id>/upload.part` (directory 0700, file 0600),
+   hashed on the way and capped at `Sources:MaxFileBytes`. Only the first 8 KiB stay in memory for type detection.
+3. **Reuse and quota.** An identical file of the same owner is reused (the unique index
+   `UX_Sources_OwnerUsername_Sha256` makes parallel uploads of the same file end in one source). Files that no order
+   uses count against `Sources:MaxUnattachedSourcesPerUser` (50) and `Sources:MaxUnattachedBytesPerUser` (500 MB).
+4. **Extraction.** Text and Markdown are read in the web process. PDF and Word take an extraction slot
+   (`Sources:ExtractionMaxConcurrency`, default 2) and run as
+   `dotnet <application assembly> --extract-source <pdf|docx> <file>`. `Program.cs` branches into this mode before any
+   host is built: no DI, database, configuration or sign-in.
+5. **Page markers.** Lines that look like `[[page N]]` are neutralised in text, Markdown and Word files, and in every
+   piece of a line that the line wrapper breaks; only the PDF extractor writes real markers.
+6. **Store.** The received file is moved into `<StorageRoot>/<owner hash>/<id>.<ext>`; the temporary directory is
+   removed in every case.
+
+### Limits of the extraction process
+
+| Limit | Option | Default | Effect when hit |
+|---|---|---|---|
+| Total time | `ExtractionTimeout` | 60 s | whole process tree killed, "Reading this file took too long." |
+| Managed memory | `ExtractionMemoryLimitBytes` | 1 GiB | `DOTNET_GCHeapHardLimit` in the child; a watchdog also kills it above the limit plus 256 MiB |
+| Answer size | `ExtractionMaxOutputBytes` | 64 MiB | process killed, file unreadable |
+| Environment | — | — | cleared; only `PATH`, `HOME`/`TMPDIR` (the private upload directory), GC settings and the extraction limits as JSON |
+| Working directory | — | — | the private upload directory |
+
+A crash (for example a stack overflow, exit code 128 and above), an out-of-memory exit or a kill ends as a receipt
+with "This file is too complex to read. Please save it again or split it into smaller files." The web process only
+logs kind, outcome, duration, exit code and peak memory, never file content or names.
+`Sources:ExtractionMode = InProcess` exists only for tests of the extractors.
+
+### Defences inside the extractors
+
+- **Word:** archive check (entries, total size `MaxUncompressedBytes` = 64 MiB, compression ratio from 64 KiB entry
+  size on), then every XML part is read once as a stream without DTD and with a nesting limit (`MaxXmlDepth` = 100)
+  before the document model is built; the body is walked without recursion.
+- **PDF:** before opening, the Flate streams that are not pictures are unpacked into nothing and added up; above
+  `MaxPdfInflatedBytes` (256 MiB) the file is refused. Nested filters are left to the process limits.
+
+### Cleanup
+
+The hourly cleanup also deletes, after `Sources:OrphanFileAge` (24 h), left-over upload directories, `*.part` files
+and stored files that no source refers to. It looks only at the root and the owner folders below it, skips links and
+resolves every path inside the root.
+
+### Operations note
+
+The container has no hard memory limit. With two extraction slots of 1 GiB managed heap each plus the web process, a
+memory limit of the web container of about 3–4 GiB is a reasonable upper bound; setting it is a decision for
+operations.

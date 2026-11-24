@@ -83,9 +83,10 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
     /// <summary>
     /// Creates an isolated database, boots the application through <c>Program</c> (which runs the
     /// migrations) and verifies that no migration is pending. The orchestrator stays held until
-    /// <see cref="ReleaseOrchestrator"/> or <see cref="SubmitAsync"/>.
+    /// <see cref="ReleaseOrchestrator"/> or <see cref="SubmitAsync"/>. <paramref name="configureServices"/> runs last and
+    /// may replace registrations for a single test.
     /// </summary>
-    public static async Task<AtelierEndToEndHost> StartAsync(PostgresFixture postgres)
+    public static async Task<AtelierEndToEndHost> StartAsync(PostgresFixture postgres, Action<IServiceCollection>? configureServices = null)
     {
         var connectionString = await CreateIsolatedDatabaseAsync(postgres.ConnectionString);
         var keyDirectory = Path.Combine(Path.GetTempPath(), $"geef-e2e-keys-{Guid.NewGuid():N}");
@@ -154,6 +155,8 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
                             throw new HttpRequestException($"E2E host blocks outgoing calls of client '{name}' to {request.RequestUri}.");
                         });
                     }));
+
+                configureServices?.Invoke(services);
             });
         });
 

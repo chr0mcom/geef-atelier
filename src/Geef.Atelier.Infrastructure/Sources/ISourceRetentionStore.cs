@@ -15,4 +15,19 @@ internal interface ISourceRetentionStore
 
     /// <summary>Moves the expiry of a still unattached source to <paramref name="expiresAt"/> when that is later; attached sources keep no expiry.</summary>
     Task ExtendExpiryAsync(Guid sourceId, DateTimeOffset expiresAt, CancellationToken ct = default);
+
+    /// <summary>
+    /// Deletes the source only when it is still expired at <paramref name="now"/>, not in the library and not linked to an
+    /// order, so an upload that just renewed its expiry keeps it.
+    /// </summary>
+    Task<bool> DeleteIfExpiredAndUnattachedAsync(Guid sourceId, DateTimeOffset now, CancellationToken ct = default);
+
+    /// <summary>Count and total size of the sources of <paramref name="ownerUsername"/> that are neither linked to an order nor in the library.</summary>
+    Task<(int Count, long Bytes)> GetUnattachedUsageAsync(string ownerUsername, CancellationToken ct = default);
+
+    /// <summary>Returns those of <paramref name="storagePaths"/> that a source refers to.</summary>
+    Task<IReadOnlySet<string>> FindKnownStoragePathsAsync(IReadOnlyCollection<string> storagePaths, CancellationToken ct = default);
 }
+
+/// <summary>Raised when a source with the same owner and SHA-256 was stored at the same moment by another upload.</summary>
+internal sealed class SourceAlreadyStoredException(Exception inner) : Exception("A source with the same content already exists for this owner.", inner);

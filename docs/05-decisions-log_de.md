@@ -1905,3 +1905,23 @@ echten Lauf nach der Integration.
 **Begründung.** Die Person denkt in Anfragen und Texten, nicht in Läufen und Crews. Eine einzige Stelle, die die
 Anzeige ableitet, hält Web und MCP gleich, und die Grenzen folgen dem, was der Schreiber verlässlich liest.
 
+### Zusatz zu D-069 — sichere Aufnahme hochgeladener Dateien (2026-11-24)
+
+**Entscheidung.** PDF- und Word-Dateien werden in einem eigenen Prozess derselben Anwendung gelesen
+(`--extract-source`, Verzweigung in `Program.cs` vor dem Aufbau des Hosts) mit harter Gesamtzeit (Abbruch des ganzen
+Prozessbaums), Grenze für den verwalteten Speicher (`DOTNET_GCHeapHardLimit`, 1 GiB) plus Speicherwächter,
+begrenzter Antwort, geleerter Umgebung und privatem temporären Arbeitsverzeichnis. Jeder Absturz, Abbruch oder jede
+Grenze endet als Quittung „unlesbar“ mit einem einfachen Satz. Uploads werden in eine private temporäre Datei
+gestreamt statt in den Speicher; dazu kommen eine globale Grenze für Uploads (8) und Extraktionen (2) mit Wartezeit,
+ein Kontingent je Nutzer für Dateien ohne Auftrag (50 Dateien, 500 MB), ein eindeutiger Index auf Besitzer und Hash
+(in Step48, das noch nicht deployt war) und ein Verwaisten-Scan im Aufräumdienst. In den Extraktoren: XML-Tiefenlimit
+100 ohne DTD vor dem Word-Dokumentmodell, Durchlauf ohne Rekursion, `MaxUncompressedBytes` 64 MiB mit
+Verhältnisprüfung ab 64 KiB und eine Grobprüfung der entpackten Größe von PDF-Strömen (256 MiB). Zeilen, die wie
+Seitenmarken aussehen, werden nach dem Zeilenumbruch und in allen Nicht-PDF-Dateien entschärft. Eine Quelle, die
+zwischen Planung und Speichern eines Auftrags gelöscht wird, endet als „One of the files was not found. Please add it
+again.“
+
+**Begründung.** Der Sicherheitsreview von Etappe 1 zeigte: Eine 3-KB-Word-Datei beendete den ganzen Webprozess (Stack
+Overflow), eine 400-KB-PDF brauchte 4,7 GB, und der alte Zeitdeckel hielt die Arbeit nicht an. Erst eine
+Prozessgrenze macht Grenzen für Stack, Speicher und CPU durchsetzbar; die Prüfungen in den Extraktoren halten die
+häufigen Fälle schnell.

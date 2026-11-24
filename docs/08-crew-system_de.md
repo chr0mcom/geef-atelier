@@ -705,3 +705,64 @@ Wird ein Task-Run aus einem Kompositions-Run verkettet, wird `Runs.ParentComposi
 - `LearningExtractFinalizerExecutor`: `if (run.Kind == RunKind.CrewComposition) return Ok;` — aus Kompositions-Runs werden keine Learnings extrahiert.
 - `CrewMaterializeFinalizerExecutor`: der verkettete Run ist stets `RunKind.Standard`; verschachtelte Komposition ist nicht möglich.
 - `CrewComposerExecutor`: nur für `Kind == CrewComposition` aktiv; andere Run-Arten werden abgewiesen.
+
+## Hochgeladene Dateien sicher lesen (Zusatz zu D-069)
+
+Dateien aus `POST /api/sources` und aus MCP-Anhängen laufen durch `SourceIntakeService`. PDF- und Word-Dateien liest
+dieselbe Anwendung in einem **eigenen Prozess**, damit eine bösartige Datei den Webprozess nie beenden kann.
+
+### Ablauf der Aufnahme
+
+1. **Upload-Platz.** Höchstens `Sources:MaxConcurrentIntakes` Uploads laufen gleichzeitig; wer keinen Platz bekommt,
+   wartet bis `Sources:ExtractionQueueTimeout`, sonst lautet die Quittung „The service is busy with other uploads.
+   Please try again in a minute.“
+2. **Streamen.** Der Upload wird nach `<StorageRoot>/.incoming/<id>/upload.part` geschrieben (Verzeichnis 0700,
+   Datei 0600), unterwegs gehasht und bei `Sources:MaxFileBytes` begrenzt. Im Speicher bleiben nur die ersten 8 KiB
+   für die Typerkennung.
+3. **Wiederverwendung und Kontingent.** Eine gleiche Datei desselben Besitzers wird wiederverwendet (der eindeutige
+   Index `UX_Sources_OwnerUsername_Sha256` sorgt dafür, dass parallele Uploads derselben Datei bei einer Quelle
+   enden). Dateien, die kein Auftrag nutzt, zählen gegen `Sources:MaxUnattachedSourcesPerUser` (50) und
+   `Sources:MaxUnattachedBytesPerUser` (500 MB).
+4. **Extraktion.** Text und Markdown liest der Webprozess selbst. PDF und Word belegen einen Extraktionsplatz
+   (`Sources:ExtractionMaxConcurrency`, Standard 2) und laufen als
+   `dotnet <Anwendungs-Assembly> --extract-source <pdf|docx> <datei>`. `Program.cs` verzweigt in diesen Modus, bevor ein
+   Host gebaut wird: kein DI, keine Datenbank, keine Konfiguration, keine Anmeldung.
+5. **Seitenmarken.** Zeilen, die wie `[[page N]]` aussehen, werden in Text-, Markdown- und Word-Dateien sowie in jedem
+   Stück einer vom Zeilenumbruch geteilten Zeile entschärft; echte Marken schreibt nur der PDF-Extraktor.
+6. **Ablage.** Die empfangene Datei wird nach `<StorageRoot>/<Besitzer-Hash>/<id>.<endung>` verschoben; das
+   temporäre Verzeichnis wird in jedem Fall entfernt.
+
+### Grenzen des Extraktionsprozesses
+
+| Grenze | Option | Standard | Wirkung |
+|---|---|---|---|
+| Gesamtzeit | `ExtractionTimeout` | 60 s | ganzer Prozessbaum wird beendet, „Reading this file took too long.“ |
+| Verwalteter Speicher | `ExtractionMemoryLimitBytes` | 1 GiB | `DOTNET_GCHeapHardLimit` im Kind; ein Wächter beendet es zusätzlich oberhalb der Grenze plus 256 MiB |
+| Antwortgröße | `ExtractionMaxOutputBytes` | 64 MiB | Prozess wird beendet, Datei unlesbar |
+| Umgebung | — | — | geleert; nur `PATH`, `HOME`/`TMPDIR` (das private Upload-Verzeichnis), GC-Einstellungen und die Extraktionsgrenzen als JSON |
+| Arbeitsverzeichnis | — | — | das private Upload-Verzeichnis |
+
+Ein Absturz (etwa ein Stack Overflow, Exit-Code ab 128), ein Speicherende oder ein Abbruch endet als Quittung mit
+„This file is too complex to read. Please save it again or split it into smaller files.“ Der Webprozess protokolliert
+nur Art, Ergebnis, Dauer, Exit-Code und Spitzenspeicher, nie Dateiinhalte oder -namen.
+`Sources:ExtractionMode = InProcess` gibt es nur für Tests der Extraktoren.
+
+### Schutz in den Extraktoren
+
+- **Word:** Archivprüfung (Einträge, Gesamtgröße `MaxUncompressedBytes` = 64 MiB, Kompressionsverhältnis ab 64 KiB
+  Eintragsgröße), danach wird jeder XML-Teil einmal streamend ohne DTD und mit Tiefenlimit (`MaxXmlDepth` = 100)
+  gelesen, bevor das Dokumentmodell entsteht; der Inhalt wird ohne Rekursion durchlaufen.
+- **PDF:** Vor dem Öffnen werden die Flate-Ströme, die keine Bilder sind, ins Leere entpackt und aufsummiert; über
+  `MaxPdfInflatedBytes` (256 MiB) wird die Datei abgelehnt. Verschachtelte Filter fangen die Prozessgrenzen ab.
+
+### Aufräumen
+
+Der stündliche Aufräumdienst löscht nach `Sources:OrphanFileAge` (24 h) zusätzlich liegengebliebene
+Upload-Verzeichnisse, `*.part`-Dateien und abgelegte Dateien, auf die keine Quelle verweist. Er betrachtet nur die
+Wurzel und die Besitzerordner darunter, überspringt Links und löst jeden Pfad innerhalb der Wurzel auf.
+
+### Hinweis für den Betrieb
+
+Der Container hat kein hartes Speicherlimit. Bei zwei Extraktionsplätzen mit je 1 GiB verwaltetem Speicher plus
+Webprozess ist ein Limit von etwa 3–4 GiB für den Web-Container eine sinnvolle Obergrenze; die Entscheidung liegt beim
+Betrieb.

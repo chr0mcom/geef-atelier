@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Security.Cryptography;
 using Geef.Atelier.Application.Sources;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Dashboard;
@@ -11,18 +10,24 @@ using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Infrastructure.Sources;
 
+/// <summary>
+/// Receives one file at a time: streams it into a private temporary file (hashing on the way), reuses an identical file of
+/// the same owner, enforces the per-user quota of unattached sources, reads the text through
+/// <see cref="ISourceExtractionRunner"/>, neutralises page-marker look-alikes and moves the original into the store.
+/// At most <see cref="SourceOptions.MaxConcurrentIntakes"/> uploads run at the same time.
+/// </summary>
 internal sealed class SourceIntakeService(
     ISourceRepository repository,
     ISourceRetentionStore retention,
     ISourceFileStore files,
-    IEnumerable<ISourceTextExtractor> extractors,
+    ISourceExtractionRunner extraction,
+    SourceIntakeLimiter limiter,
     IOptions<SourceOptions> options,
     ILogger<SourceIntakeService> logger,
     TimeProvider? timeProvider = null) : ISourceIntakeService
 {
     internal const string DuplicateMessage = "You added this file before; the earlier copy is used.";
     internal const string MapMessage = "Large file: parts will be searched, not read in full.";
-    internal const string TooSlowReason = "Reading this file took too long.";
     internal const string SaveFailedReason = "The file could not be saved. Please try again.";
 
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
@@ -37,31 +42,53 @@ internal sealed class SourceIntakeService(
         if (upload.Length > opts.MaxFileBytes)
             return Refused(fileName, upload.Length, TooLargeReason(opts));
 
-        var bytes = await ReadCappedAsync(upload.Content, opts.MaxFileBytes, ct);
-        if (bytes is null)
-            return Refused(fileName, upload.Length, TooLargeReason(opts));
-        if (bytes.Length == 0)
-            return Refused(fileName, 0, "This file is empty.");
-
-        var sha = Convert.ToHexStringLower(SHA256.HashData(bytes));
-        var existing = await repository.FindByHashAsync(ownerUsername, sha, ct);
-        if (existing is not null)
+        using var slot = await limiter.EnterIntakeAsync(ct);
+        if (slot is null)
         {
-            await retention.ExtendExpiryAsync(existing.Id, _time.GetUtcNow() + opts.UnattachedRetention, ct);
-            var stored = await repository.GetAsync(existing.Id, includeText: true, ct) ?? existing;
-            return ToReceipt(stored, duplicate: true);
+            logger.LogWarning("An upload was refused because all upload slots stayed busy.");
+            return Refused(fileName, upload.Length, SourceIntakeLimiter.BusyReason);
         }
 
-        var detected = SourceKindDetector.Detect(bytes, fileName);
+        IncomingUpload? received;
+        try
+        {
+            received = await IncomingUpload.ReceiveAsync(upload.Content, opts.StorageRoot, opts.MaxFileBytes, ct);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.LogError("An upload could not be written to the sources volume: {Error}", ex.GetType().Name);
+            return Refused(fileName, upload.Length, SaveFailedReason);
+        }
+
+        if (received is null)
+            return Refused(fileName, upload.Length, TooLargeReason(opts));
+
+        await using (received)
+            return await IntakeReceivedAsync(received, fileName, ownerUsername, origin, opts, ct);
+    }
+
+    private async Task<SourceReceipt> IntakeReceivedAsync(IncomingUpload received, string fileName, string ownerUsername, SourceOrigin origin, SourceOptions opts, CancellationToken ct)
+    {
+        if (received.Length == 0)
+            return Refused(fileName, 0, "This file is empty.");
+
+        if (await ReuseAsync(ownerUsername, received.Sha256, opts, ct) is { } reused)
+            return reused;
+
+        if (await QuotaReasonAsync(ownerUsername, received.Length, opts, ct) is { } quota)
+            return Refused(fileName, received.Length, quota);
+
+        var detected = SourceKindDetector.DetectFile(received.FilePath, received.Head, fileName);
         if (detected.Kind is not { } kind)
-            return Refused(fileName, bytes.Length, detected.Reason ?? SourceKindDetector.UnsupportedReason);
+            return Refused(fileName, received.Length, detected.Reason ?? SourceKindDetector.UnsupportedReason);
 
-        var extraction = await ExtractAsync(kind, bytes, opts, ct);
-        if (extraction.Quality == SourceQuality.Unreadable || string.IsNullOrWhiteSpace(extraction.Text))
-            return Refused(fileName, bytes.Length, extraction.FailureReason ?? "This file has no readable text.", kind, extraction.PageCount, extraction.Warnings);
+        var result = await extraction.ExtractAsync(kind, received.FilePath, received.Directory, ct);
+        if (result.Quality == SourceQuality.Unreadable || string.IsNullOrWhiteSpace(result.Text))
+            return Refused(fileName, received.Length, result.FailureReason ?? "This file has no readable text.", kind, result.PageCount, result.Warnings);
 
-        var warnings = extraction.Warnings.ToList();
-        var text = LineWrapper.Wrap(extraction.Text, opts.MaxLineChars, out var wrapped);
+        var warnings = result.Warnings.ToList();
+        var content = kind == SourceKind.Pdf ? result.Text : result.Text.DefusePageMarkerLines();
+        var text = LineWrapper.Wrap(content, opts.MaxLineChars, out var wrapped);
         if (wrapped && kind is not SourceKind.Pdf)
             warnings.Add(new SourceWarning(SourceWarningCodes.LongLinesWrapped, "Very long lines were split so they can be read."));
 
@@ -74,12 +101,12 @@ internal sealed class SourceIntakeService(
         string storagePath;
         try
         {
-            storagePath = await files.SaveAsync(ownerUsername, sourceId, kind.StorageExtension(), bytes, ct);
+            storagePath = await files.SaveFromFileAsync(ownerUsername, sourceId, kind.StorageExtension(), received.FilePath, ct);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             logger.LogError("Source file could not be stored: {Error}", ex.GetType().Name);
-            return Refused(fileName, bytes.Length, SaveFailedReason, kind, extraction.PageCount, warnings);
+            return Refused(fileName, received.Length, SaveFailedReason, kind, result.PageCount, warnings);
         }
 
         var now = _time.GetUtcNow();
@@ -90,14 +117,14 @@ internal sealed class SourceIntakeService(
             FileName = fileName,
             ContentType = kind.ContentType(),
             Kind = kind,
-            SizeBytes = bytes.Length,
-            Sha256 = sha,
+            SizeBytes = received.Length,
+            Sha256 = received.Sha256,
             StoragePath = storagePath,
             ExtractedText = text,
-            PageCount = extraction.PageCount,
+            PageCount = result.PageCount,
             CharCount = charCount,
             WordCount = WordCounter.Count(plain),
-            Quality = extraction.Quality,
+            Quality = result.Quality,
             Warnings = warnings,
             Origin = origin,
             ExpiresAt = now + opts.UnattachedRetention,
@@ -108,6 +135,12 @@ internal sealed class SourceIntakeService(
         {
             await repository.AddAsync(source, ct);
         }
+        catch (SourceAlreadyStoredException)
+        {
+            files.TryDelete(storagePath);
+            return await ReuseAsync(ownerUsername, received.Sha256, opts, ct)
+                   ?? Refused(fileName, received.Length, SaveFailedReason, kind, result.PageCount, warnings);
+        }
         catch
         {
             files.TryDelete(storagePath);
@@ -115,6 +148,29 @@ internal sealed class SourceIntakeService(
         }
 
         return ToReceipt(source, duplicate: false);
+    }
+
+    private async Task<SourceReceipt?> ReuseAsync(string ownerUsername, string sha, SourceOptions opts, CancellationToken ct)
+    {
+        var existing = await repository.FindByHashAsync(ownerUsername, sha, ct);
+        if (existing is null)
+            return null;
+
+        await retention.ExtendExpiryAsync(existing.Id, _time.GetUtcNow() + opts.UnattachedRetention, ct);
+        var stored = await repository.GetAsync(existing.Id, includeText: true, ct);
+        return stored is null ? null : ToReceipt(stored, duplicate: true);
+    }
+
+    private async Task<string?> QuotaReasonAsync(string ownerUsername, long incomingBytes, SourceOptions opts, CancellationToken ct)
+    {
+        var (count, bytes) = await retention.GetUnattachedUsageAsync(ownerUsername, ct);
+        if (count >= opts.MaxUnattachedSourcesPerUser)
+            return string.Create(CultureInfo.InvariantCulture,
+                $"You have {count:N0} files that are not used in an order yet. Remove some of them or start an order first.");
+        if (bytes + incomingBytes > opts.MaxUnattachedBytesPerUser)
+            return string.Create(CultureInfo.InvariantCulture,
+                $"Your files that are not used in an order yet would take more than {opts.MaxUnattachedBytesPerUser / 1_048_576.0:0.#} MB. Remove some of them or start an order first.");
+        return null;
     }
 
     public Task<SourceReceipt> IntakeTextAsync(string title, string text, string ownerUsername, SourceOrigin origin, CancellationToken ct = default)
@@ -189,21 +245,6 @@ internal sealed class SourceIntakeService(
         return plain[..cut].TrimEnd() + "…";
     }
 
-    private async Task<SourceExtraction> ExtractAsync(SourceKind kind, byte[] bytes, SourceOptions opts, CancellationToken ct)
-    {
-        var extractor = extractors.FirstOrDefault(e => e.Kind == kind)
-                        ?? extractors.First(e => e.Kind == SourceKind.Text);
-        try
-        {
-            return await extractor.ExtractAsync(bytes, ct).WaitAsync(opts.ExtractionTimeout, ct);
-        }
-        catch (TimeoutException)
-        {
-            logger.LogWarning("Extraction of a {Kind} file took longer than {Timeout}.", kind, opts.ExtractionTimeout);
-            return SourceExtraction.Unreadable(TooSlowReason);
-        }
-    }
-
     private static void AddBudgetWarning(List<SourceWarning> warnings, SourceBudgetClass budget, int chars, SourceOptions opts)
     {
         if (budget == SourceBudgetClass.WithMap)
@@ -221,19 +262,4 @@ internal sealed class SourceIntakeService(
         opts.MaxFileBytes >= 1_048_576
             ? string.Create(CultureInfo.InvariantCulture, $"This file is larger than {opts.MaxFileBytes / 1_048_576.0:0.#} MB.")
             : string.Create(CultureInfo.InvariantCulture, $"This file is larger than {Math.Max(1, opts.MaxFileBytes / 1_024)} KB.");
-
-    private static async Task<byte[]?> ReadCappedAsync(Stream content, long maxBytes, CancellationToken ct)
-    {
-        using var buffer = new MemoryStream();
-        var chunk = new byte[81_920];
-        int read;
-        while ((read = await content.ReadAsync(chunk, ct)) > 0)
-        {
-            if (buffer.Length + read > maxBytes)
-                return null;
-            buffer.Write(chunk, 0, read);
-        }
-
-        return buffer.ToArray();
-    }
 }

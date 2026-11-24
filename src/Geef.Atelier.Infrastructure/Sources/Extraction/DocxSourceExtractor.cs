@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO.Compression;
 using System.Text;
+using System.Xml;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
@@ -13,25 +14,36 @@ namespace Geef.Atelier.Infrastructure.Sources.Extraction;
 
 /// <summary>
 /// Reads the body of a Word file as Markdown: headings as <c>#</c>, list items as <c>- </c>, tables row by row with
-/// <c> | </c>. Headers, footers, comments, deleted text and pictures are left out; pictures raise a warning. The archive
-/// is checked against entry count, total size and compression ratio before it is opened.
+/// <c> | </c>. Headers, footers, comments, deleted text and pictures are left out; pictures raise a warning. Before the
+/// file is opened, the archive is checked against entry count, total size and compression ratio, and every XML part is
+/// read once as a stream without a DTD and with a nesting limit, so no deep or oversized part reaches the document model.
+/// The body is walked without recursion.
 /// </summary>
 internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogger<DocxSourceExtractor> logger) : ISourceTextExtractor
 {
     internal const string BrokenReason = "This file could not be read as a Word document.";
     internal const string ArchiveReason = "This Word file is unusually large inside and was not opened.";
     internal const string NoTextReason = "This Word file has no text.";
-    private const long RatioCheckFromBytes = 1_048_576;
+    internal const string NestingReason = "This Word file has too many nested parts and was not opened.";
+    internal const long RatioCheckFromBytes = 65_536;
 
     public SourceKind Kind => SourceKind.Docx;
 
     public Task<SourceExtraction> ExtractAsync(ReadOnlyMemory<byte> content, CancellationToken ct) =>
-        Task.Run(() => Extract(content.ToArray()), ct);
+        Task.Run(() => Extract(content.AsArray(), ct), ct);
 
-    private SourceExtraction Extract(byte[] bytes)
+    private SourceExtraction Extract(byte[] bytes, CancellationToken ct)
     {
         if (!ArchiveIsSafe(bytes, options.Value))
             return SourceExtraction.Unreadable(ArchiveReason);
+
+        switch (ScanXmlParts(bytes, options.Value))
+        {
+            case XmlScanResult.TooDeep:
+                return SourceExtraction.Unreadable(NestingReason);
+            case XmlScanResult.Broken:
+                return SourceExtraction.Unreadable(BrokenReason);
+        }
 
         try
         {
@@ -42,7 +54,7 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
                 return SourceExtraction.Unreadable(NoTextReason);
 
             var state = new WalkState();
-            Walk(body, state);
+            Walk(body, state, ct);
             var text = state.Builder.ToString().Replace("\0", string.Empty, StringComparison.Ordinal).Trim();
             if (text.Length == 0)
                 return SourceExtraction.Unreadable(NoTextReason);
@@ -55,7 +67,7 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
 
             return new SourceExtraction(text, null, [], SourceQuality.Good, warnings, null);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not (OperationCanceledException or OutOfMemoryException))
         {
             logger.LogInformation("Word file could not be read: {Error}", ex.GetType().Name);
             return SourceExtraction.Unreadable(BrokenReason);
@@ -88,11 +100,80 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
         }
     }
 
-    private static void Walk(OpenXmlElement container, WalkState state)
+    /// <summary>
+    /// Reads every XML part of the archive once as a stream: no DTD, at most <see cref="SourceOptions.MaxUncompressedBytes"/>
+    /// characters and at most <see cref="SourceOptions.MaxXmlDepth"/> levels of nesting. Parts that do not start with
+    /// <c>&lt;</c> (pictures and other binary parts) are skipped.
+    /// </summary>
+    internal static XmlScanResult ScanXmlParts(byte[] bytes, SourceOptions options)
     {
-        foreach (var element in container.ChildElements)
+        var settings = new XmlReaderSettings
         {
-            switch (element)
+            DtdProcessing = DtdProcessing.Prohibit,
+            XmlResolver = null,
+            MaxCharactersInDocument = Math.Max(1, options.MaxUncompressedBytes),
+            MaxCharactersFromEntities = 0,
+            IgnoreComments = true,
+            IgnoreWhitespace = true,
+            IgnoreProcessingInstructions = true,
+        };
+
+        try
+        {
+            using var archive = new ZipArchive(new MemoryStream(bytes, writable: false), ZipArchiveMode.Read);
+            foreach (var entry in archive.Entries)
+            {
+                if (entry.Length == 0 || !LooksLikeXml(entry))
+                    continue;
+
+                using var stream = entry.Open();
+                using var reader = XmlReader.Create(stream, settings);
+                while (reader.Read())
+                {
+                    if (reader.Depth > options.MaxXmlDepth)
+                        return XmlScanResult.TooDeep;
+                }
+            }
+
+            return XmlScanResult.Fine;
+        }
+        catch (Exception ex) when (ex is XmlException or InvalidDataException or IOException)
+        {
+            return XmlScanResult.Broken;
+        }
+    }
+
+    private static bool LooksLikeXml(ZipArchiveEntry entry)
+    {
+        using var stream = entry.Open();
+        Span<byte> head = stackalloc byte[64];
+        var read = stream.ReadAtLeast(head, head.Length, throwOnEndOfStream: false);
+        foreach (var b in head[..read])
+        {
+            if (b is (byte)' ' or (byte)'\t' or (byte)'\r' or (byte)'\n' or 0xEF or 0xBB or 0xBF or 0xFE or 0xFF or 0x00)
+                continue;
+            return b == (byte)'<';
+        }
+
+        return false;
+    }
+
+    private static void Walk(OpenXmlElement root, WalkState state, CancellationToken ct)
+    {
+        var pending = new Stack<IEnumerator<OpenXmlElement>>();
+        pending.Push(((IEnumerable<OpenXmlElement>)root.ChildElements).GetEnumerator());
+        while (pending.Count > 0)
+        {
+            var children = pending.Peek();
+            if (!children.MoveNext())
+            {
+                children.Dispose();
+                pending.Pop();
+                continue;
+            }
+
+            ct.ThrowIfCancellationRequested();
+            switch (children.Current)
             {
                 case Paragraph paragraph:
                     AppendParagraph(paragraph, state);
@@ -102,8 +183,8 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
                     break;
                 case SectionProperties:
                     break;
-                default:
-                    Walk(element, state);
+                case var other:
+                    pending.Push(((IEnumerable<OpenXmlElement>)other.ChildElements).GetEnumerator());
                     break;
             }
         }
@@ -220,6 +301,8 @@ internal sealed class DocxSourceExtractor(IOptions<SourceOptions> options, ILogg
         state.Builder.Append(block);
         state.LastWasList = block.StartsWith("- ", StringComparison.Ordinal);
     }
+
+    internal enum XmlScanResult { Fine = 0, TooDeep = 1, Broken = 2 }
 
     private sealed class WalkState
     {

@@ -297,7 +297,7 @@ public sealed class Step48OrdersAndSourcesMigrationTests : IAsyncLifetime
         foreach (var index in new[]
                  {
                      "IX_Orders_CreatedByUser_CreatedAt", "IX_Orders_State", "IX_Sources_OwnerUsername_CreatedAt",
-                     "IX_Sources_OwnerUsername_Sha256", "IX_Sources_ExpiresAt", "IX_OrderSources_SourceId",
+                     "UX_Sources_OwnerUsername_Sha256", "IX_Sources_ExpiresAt", "IX_OrderSources_SourceId",
                      "IX_RunSourceUsages_RunId", "IX_Runs_OrderId_OrderVersion", "UX_Runs_OrderId_OrderVersion_Standard",
                  })
             Assert.Equal(1, await db.Database.SqlQuery<int>($"""SELECT count(*)::int AS "Value" FROM pg_indexes WHERE indexname = {index}""").SingleAsync());
@@ -307,6 +307,12 @@ public sealed class Step48OrdersAndSourcesMigrationTests : IAsyncLifetime
             """).SingleAsync();
         Assert.Contains("UNIQUE", unique, StringComparison.Ordinal);
         Assert.Contains("\"Kind\" = 0", unique, StringComparison.Ordinal);
+
+        var sourceHash = await db.Database.SqlQueryRaw<string>("""
+            SELECT indexdef AS "Value" FROM pg_indexes WHERE indexname = 'UX_Sources_OwnerUsername_Sha256'
+            """).SingleAsync();
+        Assert.Contains("UNIQUE", sourceHash, StringComparison.Ordinal);
+        Assert.Equal(0, await db.Database.SqlQuery<int>($"""SELECT count(*)::int AS "Value" FROM pg_indexes WHERE indexname = 'IX_Sources_OwnerUsername_Sha256'""").SingleAsync());
     }
 
     private static Task InsertRunAsync(
@@ -331,7 +337,7 @@ public sealed class Step48OrdersAndSourcesMigrationTests : IAsyncLifetime
     private static SourceEntity NewSource(Guid id) => new()
     {
         Id = id, OwnerUsername = "u1", FileName = "notes.md", ContentType = "text/markdown", Kind = SourceKind.Markdown,
-        SizeBytes = 10, Sha256 = new string('a', 64), CharCount = 10, WordCount = 2, Quality = SourceQuality.Good,
+        SizeBytes = 10, Sha256 = Convert.ToHexStringLower(id.ToByteArray()).PadRight(64, 'a'), CharCount = 10, WordCount = 2, Quality = SourceQuality.Good,
         Warnings = [], Origin = SourceOrigin.WebUpload, CreatedAt = T0,
     };
 
