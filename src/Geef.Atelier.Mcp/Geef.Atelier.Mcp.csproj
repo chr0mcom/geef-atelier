@@ -12,6 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Geef.Atelier.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Geef.Atelier.Application\Geef.Atelier.Application.csproj" />
     <ProjectReference Include="..\Geef.Atelier.Infrastructure\Geef.Atelier.Infrastructure.csproj" />
   </ItemGroup>
