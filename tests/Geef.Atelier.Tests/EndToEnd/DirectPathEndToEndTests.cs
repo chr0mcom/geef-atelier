@@ -114,6 +114,9 @@ public sealed class DirectPathEndToEndTests(PostgresFixture postgres)
         Assert.Single(RunReportJson.TryParse(run.ReportJson)!.OpenChecks);
         var order = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetAsync(orderId, null));
         Assert.Equal(OrderDisplayState.DeliveredWithOpenPoints, order!.Display.State);
+        var result = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetResultAsync(orderId, "e2e-direct"));
+        Assert.False(string.IsNullOrWhiteSpace(result!.Text));
+        Assert.Equal(DraftCheckCodes.Length, Assert.Single(result.OpenChecks).Code);
     }
 
     [Fact]
