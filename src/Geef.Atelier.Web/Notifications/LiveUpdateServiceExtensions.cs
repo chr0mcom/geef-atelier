@@ -11,7 +11,7 @@ public static class LiveUpdateServiceExtensions
     {
         services.AddSignalR();
         services.AddSingleton<IRunUpdateFeed, InProcessRunUpdateFeed>();
-        services.AddSingleton<IRunNotifier, SignalRRunNotifier>();
+        services.AddSingleton<IRunNotifier, LiveRunNotifier>();
         return services;
     }
 
