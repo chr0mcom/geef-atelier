@@ -11,7 +11,7 @@ namespace Geef.Atelier.Infrastructure.Persistence.Migrations
     /// already ran, partly or fully:
     /// <list type="number">
     ///   <item><c>Orders</c>, <c>Sources</c>, <c>OrderSources</c> and <c>RunSourceUsages</c> with their indexes and
-    ///   foreign keys.</item>
+    ///   foreign keys. A file is stored once per owner: <c>UX_Sources_OwnerUsername_Sha256</c> is unique.</item>
     ///   <item><c>Runs.OrderId</c> and <c>Runs.OrderVersion</c> with a cascading foreign key to <c>Orders</c>.</item>
     ///   <item>Data migration: every chain of existing runs (edge = <c>COALESCE(ParentCompositionRunId, ParentRunId)</c>)
     ///   becomes one <c>Careful</c>/<c>Ready</c>/<c>Legacy</c> order whose id is the id of the root run. Learning runs stay
@@ -73,7 +73,8 @@ CREATE TABLE IF NOT EXISTS "Sources" (
     CONSTRAINT "PK_Sources" PRIMARY KEY ("Id")
 );
 CREATE INDEX IF NOT EXISTS "IX_Sources_OwnerUsername_CreatedAt" ON "Sources" ("OwnerUsername", "CreatedAt" DESC);
-CREATE INDEX IF NOT EXISTS "IX_Sources_OwnerUsername_Sha256" ON "Sources" ("OwnerUsername", "Sha256");
+DROP INDEX IF EXISTS "IX_Sources_OwnerUsername_Sha256";
+CREATE UNIQUE INDEX IF NOT EXISTS "UX_Sources_OwnerUsername_Sha256" ON "Sources" ("OwnerUsername", "Sha256");
 CREATE INDEX IF NOT EXISTS "IX_Sources_ExpiresAt" ON "Sources" ("ExpiresAt") WHERE "ExpiresAt" IS NOT NULL;
 """);
 

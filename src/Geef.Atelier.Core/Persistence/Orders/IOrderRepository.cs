@@ -13,10 +13,14 @@ public sealed record RunEventRow(string EventType, int? Iteration, DateTimeOffse
 /// <summary>Persistence of orders and their link to runs. Every write that changes an order together with a run is one transaction.</summary>
 public interface IOrderRepository
 {
-    /// <summary>Inserts the order (state <see cref="OrderState.Ready"/>), its source links and its first run (version 1) in one transaction and clears <c>ExpiresAt</c> of the linked sources.</summary>
+    /// <summary>
+    /// Inserts the order (state <see cref="OrderState.Ready"/>), its source links and its first run (version 1) in one
+    /// transaction and clears <c>ExpiresAt</c> of the linked sources. Throws <see cref="OrderSourceMissingException"/> when
+    /// a linked source was deleted in the meantime; nothing is stored then and a later call starts clean.
+    /// </summary>
     Task CreateWithFirstRunAsync(OrderEntity order, IReadOnlyList<OrderSourceEntity> sources, RunEntity run, CancellationToken ct = default);
 
-    /// <summary>Inserts an order without a run (stage 2: state <see cref="OrderState.Analyzing"/>).</summary>
+    /// <summary>Inserts an order without a run (stage 2: state <see cref="OrderState.Analyzing"/>); throws <see cref="OrderSourceMissingException"/> like <see cref="CreateWithFirstRunAsync"/>.</summary>
     Task CreateAsync(OrderEntity order, IReadOnlyList<OrderSourceEntity> sources, CancellationToken ct = default);
 
     /// <summary>Adds a run as the next version (max version + 1, inside the transaction) and returns the version. Composition runs keep the version passed in <paramref name="run"/>.</summary>

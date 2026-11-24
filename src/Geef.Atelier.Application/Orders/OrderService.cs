@@ -103,7 +103,15 @@ internal sealed class OrderService(
         };
 
         var links = plan.Links.Select(l => l with { OrderId = order.Id, AddedAt = now }).ToList();
-        await orders.CreateWithFirstRunAsync(order, links, run, ct);
+        try
+        {
+            await orders.CreateWithFirstRunAsync(order, links, run, ct);
+        }
+        catch (OrderSourceMissingException)
+        {
+            throw new OrderSubmissionException(MissingSourceMessage);
+        }
+
         await ReportAssignmentWarningsAsync(run.Id, resolved.Warnings);
         await NotifyAsync(order.Id);
 

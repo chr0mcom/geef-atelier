@@ -6,11 +6,14 @@ using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Persistence.Orders;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Geef.Atelier.Infrastructure.Persistence.Orders;
 
 internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider? timeProvider = null) : IOrderRepository
 {
+    private const string SourceForeignKey = "FK_OrderSources_Sources_SourceId";
+
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
     public async Task CreateWithFirstRunAsync(OrderEntity order, IReadOnlyList<OrderSourceEntity> sources, RunEntity run, CancellationToken ct = default)
@@ -22,14 +25,12 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
             throw new ArgumentException("The first run must belong to the order and carry version 1.", nameof(run));
         EnsureLinksBelongTo(order, sources);
 
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        db.Orders.Add(order);
-        db.OrderSources.AddRange(sources);
-        db.Runs.Add(run);
-        await db.SaveChangesAsync(ct);
-        await ClearExpiryAsync(sources, ct);
-        await tx.CommitAsync(ct);
-        db.ChangeTracker.Clear();
+        await InsertAsync(sources, ct, () =>
+        {
+            db.Orders.Add(order);
+            db.OrderSources.AddRange(sources);
+            db.Runs.Add(run);
+        });
     }
 
     public async Task CreateAsync(OrderEntity order, IReadOnlyList<OrderSourceEntity> sources, CancellationToken ct = default)
@@ -38,13 +39,31 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
         ArgumentNullException.ThrowIfNull(sources);
         EnsureLinksBelongTo(order, sources);
 
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        db.Orders.Add(order);
-        db.OrderSources.AddRange(sources);
-        await db.SaveChangesAsync(ct);
-        await ClearExpiryAsync(sources, ct);
-        await tx.CommitAsync(ct);
-        db.ChangeTracker.Clear();
+        await InsertAsync(sources, ct, () =>
+        {
+            db.Orders.Add(order);
+            db.OrderSources.AddRange(sources);
+        });
+    }
+
+    private async Task InsertAsync(IReadOnlyList<OrderSourceEntity> sources, CancellationToken ct, Action add)
+    {
+        try
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            add();
+            await db.SaveChangesAsync(ct);
+            await ClearExpiryAsync(sources, ct);
+            await tx.CommitAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation, ConstraintName: SourceForeignKey })
+        {
+            throw new OrderSourceMissingException(ex);
+        }
+        finally
+        {
+            db.ChangeTracker.Clear();
+        }
     }
 
     public async Task<int> AddRunAsync(Guid orderId, RunEntity run, CancellationToken ct = default)

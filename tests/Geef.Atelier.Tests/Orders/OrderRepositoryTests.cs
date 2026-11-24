@@ -1,5 +1,6 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Orders;
+using Geef.Atelier.Core.Persistence.Orders;
 using Geef.Atelier.Infrastructure.Persistence.Orders;
 using Geef.Atelier.Infrastructure.Persistence.Sources;
 using Geef.Atelier.Tests.Persistence;
@@ -33,6 +34,27 @@ public sealed class OrderRepositoryTests(PostgresFixture fixture)
         Assert.Equal(order.Id, stored.OrderId);
         Assert.Equal(1, stored.OrderVersion);
         Assert.Null((await check.Sources.SingleAsync(s => s.Id == source.Id)).ExpiresAt);
+    }
+
+    [Fact]
+    public async Task CreateWithFirstRunReportsADeletedSourceAndLeavesTheContextClean()
+    {
+        var user = NewUser();
+        var order = Order(user);
+        await using var db = fixture.NewContext();
+        var repository = new OrderRepository(db);
+
+        await Assert.ThrowsAsync<OrderSourceMissingException>(() =>
+            repository.CreateWithFirstRunAsync(order, [Link(order.Id, Guid.NewGuid())], Run(user, order.Id, 1)));
+        Assert.Empty(db.ChangeTracker.Entries());
+
+        var retry = Order(user);
+        await repository.CreateWithFirstRunAsync(retry, [], Run(user, retry.Id, 1));
+
+        await using var check = fixture.NewContext();
+        Assert.False(await check.Orders.AnyAsync(o => o.Id == order.Id));
+        Assert.False(await check.Runs.AnyAsync(r => r.OrderId == order.Id));
+        Assert.Equal(1, await check.Runs.CountAsync(r => r.OrderId == retry.Id));
     }
 
     [Fact]
