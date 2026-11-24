@@ -35,6 +35,12 @@ public static class RunWarningCodes
 
     /// <summary>The run finished, but its status or final text could not be stored; it was recorded as failed.</summary>
     public const string ResultNotSaved = "run.result_not_saved";
+
+    /// <summary>
+    /// The service was restarted while the finishing steps ran; the outcome was recorded on the next start and the
+    /// result may be incomplete.
+    /// </summary>
+    public const string RestartedWhileFinishing = "run.restarted_while_finishing";
 }
 
 /// <summary>Values of <see cref="RunWarningEntity.Source"/>: the part of the system that reported the warning.</summary>

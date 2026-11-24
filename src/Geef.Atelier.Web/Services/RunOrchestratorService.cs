@@ -42,6 +42,7 @@ internal sealed class RunOrchestratorService(
     IFinalizerExecutorFactory?          finalizerExecutorFactory = null) : BackgroundService
 {
     internal const string ResultNotSavedMessage = "The result could not be saved completely.";
+    internal const string RestartedWhileFinishingMessage = "The result may be incomplete because the service was restarted while finishing.";
 
     private readonly OrchestratorOptions _opts = options.Value;
     private readonly DateTimeOffset _createdAt = DateTimeOffset.UtcNow;
@@ -100,11 +101,17 @@ internal sealed class RunOrchestratorService(
     /// On startup, marks any runs left in Running state as Failed — they were interrupted by a crash or restart.
     /// Pending runs without a saved snapshot that were created before this service instance existed were still
     /// being prepared when the previous instance stopped; they can never become ready and are failed as well.
+    /// Runs that were stopped while their finishing steps ran keep their terminal status but have no outcome; they
+    /// get one now (<see cref="RecoverRunsInterruptedWhileFinishingAsync"/>).
     /// </summary>
     private async Task RecoverCrashedRunsAsync(DateTimeOffset createdBefore, CancellationToken stoppingToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
+
+        var finishing = await RecoverRunsInterruptedWhileFinishingAsync(db, stoppingToken);
+        if (finishing > 0)
+            logger.LogWarning("Crash recovery: recorded an outcome for {Count} runs stopped while finishing.", finishing);
 
         var affected = await db.Runs
             .Where(r => r.Status == RunStatus.Running)
@@ -121,6 +128,54 @@ internal sealed class RunOrchestratorService(
         var unprepared = await FailUnpreparedRunsAsync(db, createdBefore, "Service restarted while the task was being prepared", stoppingToken);
         if (unprepared > 0)
             logger.LogWarning("Crash recovery: marked {Count} Pending runs without snapshot as Failed.", unprepared);
+    }
+
+    /// <summary>
+    /// Gives an outcome to runs whose process ended while their finishing steps ran: the status is already terminal
+    /// (the event sink writes it when the pipeline ends), but the outcome is written only after the finishing steps,
+    /// so such a run would count as "still working" forever. With a saved text the outcome is
+    /// <see cref="RunOutcome.Converged"/> (status Completed) or <see cref="RunOutcome.DeliveredWithOpenPoints"/>,
+    /// without one <see cref="RunOutcome.Failed"/>; each run gets the warning <see cref="RestartedWhileFinishingMessage"/>.
+    /// Runs that finished before Step47 also have no outcome and must stay untouched. No column records when Step47
+    /// went live, so the earliest completion time of a run that has an outcome serves as that point: every run with an
+    /// outcome finished under Step47, and only runs that completed after it are considered. Until the first run has an
+    /// outcome nothing is changed. A run that completed before that first outcome was written (only possible in the
+    /// first minutes after the upgrade) is not repaired; that is the conservative side.
+    /// </summary>
+    private async Task<int> RecoverRunsInterruptedWhileFinishingAsync(AtelierDbContext db, CancellationToken ct)
+    {
+        var outcomesSince = await db.Runs
+            .Where(r => r.Outcome != null && r.CompletedAt != null)
+            .MinAsync(r => r.CompletedAt, ct);
+        if (outcomesSince is null)
+            return 0;
+
+        var interrupted = await db.Runs
+            .AsNoTracking()
+            .Where(r => r.Outcome == null
+                        && r.CompletedAt != null
+                        && r.CompletedAt > outcomesSince
+                        && (r.Status == RunStatus.Completed || r.Status == RunStatus.Failed || r.Status == RunStatus.Aborted))
+            .Select(r => new { r.Id, r.Status, HasText = r.FinalText != null })
+            .ToListAsync(ct);
+
+        var recovered = 0;
+        foreach (var run in interrupted)
+        {
+            var outcome = !run.HasText ? RunOutcome.Failed
+                : run.Status == RunStatus.Completed ? RunOutcome.Converged
+                : RunOutcome.DeliveredWithOpenPoints;
+            var written = await db.Runs
+                .Where(r => r.Id == run.Id && r.Outcome == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.Outcome, outcome), ct);
+            if (written == 0)
+                continue;
+            recovered++;
+            await ReportWarningAsync(run.Id, RunWarningSources.Run, RunWarningCodes.RestartedWhileFinishing,
+                RestartedWhileFinishingMessage);
+        }
+
+        return recovered;
     }
 
     private static Task<int> FailUnpreparedRunsAsync(AtelierDbContext db, DateTimeOffset createdBefore, string message, CancellationToken ct) =>
