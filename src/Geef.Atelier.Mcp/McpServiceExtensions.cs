@@ -8,7 +8,7 @@ public static class McpServiceExtensions
     public static IServiceCollection AddAtelierMcp(this IServiceCollection services)
     {
         services
-            .AddMcpServer()
+            .AddMcpServer(o => o.ServerInstructions = McpServerInstructions.Text)
             .WithHttpTransport(o => o.Stateless = true)
             .WithToolsFromAssembly(typeof(McpAssemblyMarker).Assembly);
         return services;

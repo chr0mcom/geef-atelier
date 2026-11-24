@@ -2,7 +2,7 @@
 
 *[English](09-endpoint-reference.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-24 (D-067: `warnings` und `outcome` in `get_run_status`/`get_run_result`, Ergebnis erst nach `outcome` lesen; `/hubs/runs` bleibt bis Etappe 8; `/hubs/runs` nur für Angemeldete; Editoren nur für Admins und `/access-denied`; Learning standardmäßig pausiert; zuvor 2026-05-22, D-054: Tool list_learnings ergänzt; providerType um learning-retrieval erweitert)*
+*Letzte Aktualisierung: 2026-11-24 (Etappe 1: Auftrags-Werkzeuge `submit_order`, `get_order_status`, `get_order_result`, `submit_request` als Hülle mit `orderId`, Server-Hinweise, `list_learnings` nur für Admins; D-067: `warnings` und `outcome` in `get_run_status`/`get_run_result`, Ergebnis erst nach `outcome` lesen; `/hubs/runs` bleibt bis Etappe 8; `/hubs/runs` nur für Angemeldete; Editoren nur für Admins und `/access-denied`; Learning standardmäßig pausiert; zuvor 2026-05-22, D-054: Tool list_learnings ergänzt; providerType um learning-retrieval erweitert)*
 
 Alle HTTP-Endpunkte von Geef.Atelier, die extern erreichbar sind — MCP, OAuth 2.1
 sowie die Web-UI-/Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`.
@@ -31,6 +31,99 @@ Darüber entdecken OAuth-fähige Clients automatisch den Authorization Server.
 ### MCP-Tools
 
 Der MCP-Server stellt folgende Tools bereit, die über den `/mcp`-Endpunkt aufgerufen werden können. Run-bezogene Tools erzwingen dieselbe Run-User-Isolation wie die Web-UI (D-042): Nicht-Admin-Nutzer können nur auf eigene Runs zugreifen.
+
+#### Aufträge: `submit_order`, `get_order_status`, `get_order_result`
+
+Seit Etappe 1 ist der **Auftrag** die Einheit, die der Mensch sieht; Läufe bleiben das technische Protokoll darunter (ein Auftrag kann mehrere Läufe haben). Aufträge sind wie Läufe besitzergeprüft: Nicht-Admins sehen nur ihre eigenen Aufträge, ein unbekannter oder fremder Auftrag ergibt den Fehler `Order not found.` Parameter- und Feldnamen sind camelCase.
+
+**Eingabe `submit_order`:**
+```json
+{
+  "request": "<string, Pflicht: der Auftrag im Wortlaut des Menschen>",
+  "attachments": "<string, optional: JSON-Array [{\"filename\":\"angebot.pdf\",\"contentType\":\"application/pdf\",\"contentBase64\":\"...\"}]>",
+  "extraCareful": false
+}
+```
+
+Unterstützte `contentType`-Werte: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/markdown` (auch `text/x-markdown`), `text/plain` (Parameter wie `; charset=utf-8` werden ignoriert). `extraCareful = true` startet den langsameren Modus mit mehreren Prüfrunden; sonst gilt der Direktweg.
+
+**Ausgabe `submit_order`:**
+```json
+{
+  "orderId": "<uuid>",
+  "state": "queued",
+  "runId": "<uuid|null>",
+  "message": "<Klartext: was als Nächstes zu tun ist>",
+  "sources": [ { "fileName": "angebot.pdf", "pages": 80, "characters": 160485, "quality": "good|partial|poor", "warnings": ["<string>"] } ]
+}
+```
+
+`state` kann bereits `needs_input` sein (mit `runId = null`), sobald Aufträge Rückfragen stellen (Etappe 2); Clients, die den Wert nicht kennen, rufen `get_order_status` auf.
+
+**Prüfung der Anhänge.** Bevor eine Datei gelesen wird, weist der Server ab, was offensichtlich nicht die Datei selbst ist: ungültiges Base64, leerer Inhalt, Text mit weniger als 10 sichtbaren Zeichen, kurze Texte, die nur auf eine Datei verweisen (etwa „siehe angehängte Vollversion“), Text, der selbst Base64 ist (doppelt kodiert), und Inhalt, dessen Magic Bytes nicht zum `contentType` passen (ein „PDF“ ohne `%PDF-`, eine `.docx` ohne ZIP-Kopf, ein als Text angegebenes PDF oder ZIP). Eine Datei, die die Annahme nicht verwenden kann (etwa ein Scan ohne Text), wird mit ihrem Grund abgewiesen. In jedem Fall wird nichts gestartet, die von diesem Aufruf gespeicherten Dateien werden wieder freigegeben, und die Meldung nennt den richtigen Weg: die vollständige Originaldatei als Base64 mit passendem `contentType` übergeben; ist die Datei zu groß für ein Argument, den Auftrag in der Weboberfläche anlegen und die Datei dort ablegen.
+
+**Eingabe `get_order_status`:** `{ "orderId": "<uuid>", "waitSeconds": 25 }`
+
+`waitSeconds` wird auf `0 … Orders:MaxWaitSeconds` (Standard 50) geklemmt; `0` antwortet sofort. Der Aufruf wartet, bis sich der Anzeigezustand ändert oder der Auftrag fertig ist, spätestens `waitSeconds` lang. Bricht der Client ab, endet das Warten sofort.
+
+**Ausgabe `get_order_status`:**
+```json
+{
+  "orderId": "<uuid>",
+  "state": "preparing|needs_input|queued|working|delivered|delivered_with_open_points|failed|stopped",
+  "done": false,
+  "step": "Writing",
+  "elapsedSeconds": 42,
+  "version": 1,
+  "runId": "<uuid|null>",
+  "warnings": [ { "code": "<string>", "message": "<string>" } ],
+  "nextCheckSeconds": 10,
+  "outcome": "Converged|DeliveredWithOpenPoints|Failed|Aborted|null"
+}
+```
+
+`nextCheckSeconds` ist `0`, wenn `done` wahr ist, sonst `10`. `outcome` ist das Ergebnis des aktuellen Laufs, sobald er beendet ist.
+
+**Eingabe `get_order_result`:** `{ "orderId": "<uuid>" }`
+
+**Ausgabe `get_order_result`:**
+```json
+{
+  "orderId": "<uuid>",
+  "state": "delivered_with_open_points",
+  "text": "<string|null>",
+  "wordCount": 180,
+  "version": 1,
+  "placeholders": ["[Liefertermin]"],
+  "openChecks": ["<Klartext: eine Prüfung, die der Text nicht bestanden hat>"],
+  "sourcesUsed": [ { "fileName": "angebot.pdf", "mode": "full_text|full_text_with_map|excluded", "characters": 160485 } ],
+  "warnings": [ { "code": "<string>", "message": "<string>" } ],
+  "note": "<string|null>"
+}
+```
+
+`text` ist auch bei `delivered_with_open_points` gesetzt (der beste Text mit den offenen Prüfungen) und bei einem gestoppten Auftrag, der schon einen Text hatte; `null` ist er, solange der Auftrag läuft oder wenn kein Text entstand (`failed`). `note` sagt in Klartext, was dem Menschen zu sagen ist.
+
+Alle drei Antworten wachsen nur um angehängte Felder; Clients ignorieren Felder, die sie nicht kennen.
+
+#### `submit_request` (Hülle über Aufträge)
+
+Der ältere Einstieg behält seine Antwort, legt aber jetzt einen Auftrag ohne Rückfragen an.
+
+**Eingabe:** `briefingText` (Pflicht), `configJson` (optional; wird nur auf gültiges JSON geprüft und ändert nichts mehr), `crewTemplate` (optional), `customCrew` (optional, CrewSpec-JSON mit mindestens `executorProfileName`), `attachments` (wie bei `submit_order`).
+
+**Ausgabe:**
+```json
+{ "runId": "<uuid>", "status": "Pending", "errorMessage": null, "orderId": "<uuid>" }
+```
+
+Ohne `crewTemplate` und `customCrew` gilt `Orders:LegacySubmitDefaultMode` (Standard: Direktweg; `Careful` schaltet auf das klassische Template zurück). Mit einem von beiden ist der Auftrag `Careful` und nutzt dieses Template bzw. diese Crew. Ungültiges `customCrew`-JSON ist ein Fehler (vor Etappe 1 wurde es still ignoriert). `get_run_status`/`get_run_result` funktionieren weiter mit `runId`; `orderId` gilt für die Auftrags-Werkzeuge. `submit_auto_crew_request` verhält sich wie bisher; auch seine Läufe hängen an Aufträgen.
+
+#### Server-Hinweise und Werkzeugfehler
+
+Beim `initialize` sendet der Server Hinweise: den Auftrag im Wortlaut des Menschen übergeben, Dateien nur als Anhang mit Originalinhalt (nie Platzhalter), Aufträge dauern typisch 1 bis 10 Minuten, mit `get_order_status` und `waitSeconds` warten statt mit eigener Sleep-Schleife, den Text unverändert weitergeben, nichts erfinden.
+
+Lehnt ein Werkzeug einen Aufruf ab, antwortet es mit `isError: true` und dem Text `An error occurred invoking '<tool>': <Meldung>`; die Meldung ist englischer Klartext und sagt, wie der Aufruf zu korrigieren ist.
 
 #### `list_run_artifacts`
 
@@ -143,7 +236,7 @@ Funktioniert nur für `ArtifactType.File`-Artefakte. Liest die Datei vom `Export
 
 #### `list_learnings`
 
-Listet Learning-Einträge aus dem Learning-Store (D-054). Seit D-067 ist die Learning-Schleife standardmäßig pausiert (`Learning:Enabled = false`); das Tool listet weiterhin die vorhandenen Einträge, solange der Schalter aus ist, kommen aber keine neuen hinzu.
+**Nur für Administratoren** (seit Etappe 1): andere Nutzer bekommen den Fehler „Only administrators can list learning entries, because they contain material from every user.“ Listet Learning-Einträge aller Nutzer aus dem Learning-Store (D-054). Seit D-067 ist die Learning-Schleife standardmäßig pausiert (`Learning:Enabled = false`); das Tool listet weiterhin die vorhandenen Einträge, solange der Schalter aus ist, kommen aber keine neuen hinzu.
 
 **Input:**
 ```json
@@ -184,7 +277,7 @@ Beide Parameter sind optional. Ohne `status_filter` werden alle Status zurückge
 | `created_at` | ISO8601 | Extraktions-Zeitstempel |
 | `approved_at` | ISO8601 \| null | Genehmigungs-Zeitstempel (null solange Proposed oder Rejected) |
 
-**Hinweis:** `structured_facts_json` wird bewusst nicht exponiert — das rohe Fakten-JSON ist für MCP-Kontext zu umfangreich und nur über die Web-UI zugänglich. Auth: Standard-Run-User-Isolation; Nicht-Admin-Nutzer sehen nur ihre eigenen Einträge.
+**Hinweis:** `structured_facts_json` wird bewusst nicht exponiert — das rohe Fakten-JSON ist für MCP-Kontext zu umfangreich und nur über die Web-UI zugänglich. Auth: nur Administratoren, weil die Liste Einträge aller Nutzer enthält.
 
 #### Lauf-Status und Ergebnis: `warnings` und `outcome`
 
