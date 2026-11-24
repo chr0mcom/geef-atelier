@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-24 (D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
+*Letzte Aktualisierung: 2026-11-24 (Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -1943,8 +1943,8 @@ häufigen Fälle schnell.
 hat rund 2 Mio.). Der Extraktionsprozess hört auf, sobald der Text die Grenze überschreitet (Word schon beim Prüfen der
 XML-Teile, vor dem Dokumentmodell; PDF bei der Seite, die sie überschreitet), Textdateien werden vor dem Dekodieren
 gezählt, und der Webprozess prüft noch einmal, bevor er den Text kopiert. (2) Die Antwort des Extraktionsprozesses ist
-auf 16 MiB begrenzt (die Textgrenze mit höchstens vier Byte je Zeichen, Buchstaben außerhalb von ASCII unmaskiert,
-plus Platz für das JSON) und wird gelesen, während sie hereinkommt. (3) Das Kontingent für Dateien ohne Auftrag zählt
+auf 16 MiB begrenzt (im Zusatz zu D-070 auf 20 MiB korrigiert: sechs Byte je UTF-16-Einheit, plus Platz für das
+JSON) und wird gelesen, während sie hereinkommt. (3) Das Kontingent für Dateien ohne Auftrag zählt
 auch Zeichen (20 Mio. je Person) und wird in der einfügenden Transaktion unter einer Sperre je Person
 (`pg_advisory_xact_lock`) noch einmal geprüft. (4) Der Upload-Endpunkt liest den Multipart-Body als Strom ohne
 Formularpuffer und belegt den Upload-Platz der Person (höchstens zwei gleichzeitig, sonst HTTP 429) und den globalen
@@ -1961,3 +1961,27 @@ liegt; die Sperre macht das Kontingent genau; das Streamen macht die Plätze wir
 Schicht: Der Webprozess bleibt üblicherweise unter 1 GB, jeder Extraktionsprozess darf 1 GiB verwalteten Speicher
 nutzen und höchstens zwei laufen gleichzeitig, der Rest ist Puffer; das Limit verhindert, dass ein Dienst einen
 gemeinsam genutzten Host ins Auslagern oder zum OOM-Killer treibt.
+
+### Zusatz zu D-070 — Längenprüfung bewusst konservativ; Antworten beim Upload (2026-11-24)
+
+**Entscheidung.** (1) Die Längenprüfung ohne Modell blockiert nur bei eindeutiger Lage und grober Abweichung; sonst
+bleibt es bei einer Notiz. Eine Länge wird nur dann zur blockierenden Regel, wenn der ganze Auftrag (ohne Zitate, Code
+und angehängten Text) genau eine Längenangabe oder ein klares Paar enthält, keine andere Mengenangabe, keinen Rückbezug
+auf einen früheren Text und keine Überarbeitung, ein an die Zahl gebundenes Grenzwort, keine fremde Präposition
+zwischen Befehlsverb und Länge im selben Teilsatz und keine Zusammensetzung wie „300-Wörter-Text“ (`LengthRuleGate`).
+Die Richtungsregeln der zweiten Runde gelten zusätzlich. (2) Eine Korrektur wird nur verlangt, wenn der Text die Grenze
+um mehr als 25 % verfehlt; eine kleinere Abweichung ist ein offener Punkt. (3) Ist die Länge der einzige blockierende
+Befund, endet die Anweisung mit „Keep everything else unchanged.“ (4) Sind alle Upload-Plätze belegt, antwortet der
+Upload mit 503, `Retry-After: 30` und der Quittung; die Kontingent-Meldung nennt keinen Weg mehr, den die Seite nicht
+bietet; eine zu lange Word- oder Textdatei verlangt eine kürzere Fassung statt einer Seitenauswahl. (5) Die
+Antwortgrenze des Extraktionsprozesses beträgt 20 MiB (sechs Byte je UTF-16-Einheit, weil Emoji und Formatzeichen
+maskiert werden); das korrigiert Punkt (2) der zweiten Runde.
+
+**Begründung.** Jede Prüfrunde fand eine neue Klasse von Falsch-Blockierungen in der wortbasierten Lesart von Längen
+(Obergrenze als Untergrenze, Verneinung im Folgesatzteil, die Grenze eines Tweets als Grenze von dreien, Zahlen einer
+Studie oder eines Buchs, die Länge der vorigen Fassung, Längen in einer zitierten Mail). Eine Falsch-Blockierung ist
+teuer: Die Korrekturrunde zwingt den Schreiber gegen den Wunsch der Person, bis zu mehreren tausend Wörtern. Das
+Flicken einzelner Sätze konvergierte nicht; deshalb ist die Regel jetzt strukturell, Präzision geht vor Trefferquote,
+und die Falsch-Blockier-Rate wird an synthetischen Aufträgen gemessen, die ein getrennter Generator vor dem Extraktor
+beschriftet hat (Entwicklungsmenge, zurückgehaltene Menge und eine zweite Menge im Eiltipp-Stil). Die Schwelle von
+25 % begrenzt den Schaden eines verbleibenden Lesefehlers auf Texte, die weit daneben liegen.

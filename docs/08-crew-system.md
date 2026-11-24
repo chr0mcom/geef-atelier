@@ -745,7 +745,7 @@ by the same application in a **separate process**, so a hostile file can never t
 | Total time | `ExtractionTimeout` | 60 s | whole process tree killed, "Reading this file took too long." |
 | Managed memory | `ExtractionMemoryLimitBytes` | 1 GiB | `DOTNET_GCHeapHardLimit` in the child; a watchdog also kills it above the limit plus 256 MiB |
 | Text | `MaxExtractedChars` | 3,000,000 characters | reading stops, "This file contains far more text than we can use. Please upload a shorter version." |
-| Answer size | `ExtractionMaxOutputBytes` | 16 MiB | process killed, file unreadable; sized for the text limit at up to four bytes per character (letters outside ASCII are not escaped) plus room for the JSON |
+| Answer size | `ExtractionMaxOutputBytes` | 20 MiB | process killed, file unreadable; sized for the text limit at up to six bytes per UTF-16 unit (emoji and format characters are written as `\uXXXX`, letters of the basic plane are not escaped) plus room for the JSON |
 | Environment | — | — | cleared; only `PATH`, `HOME`/`TMPDIR` (the private upload directory), GC settings and the extraction limits as JSON |
 | Working directory | — | — | the private upload directory |
 
@@ -777,3 +777,20 @@ limits above: the web process usually stays below 1 GB, each extraction process 
 the watchdog allowance) and at most two run at the same time; the rest is headroom. The limit protects the other
 services of a shared host. If the host has less memory to spare, lower `ExtractionMaxConcurrency` or
 `ExtractionMemoryLimitBytes` together with the limit.
+
+## Automatic length check of the direct path (D-070 addendum)
+
+The length check without a model is deliberately conservative: it blocks only when the request is clear and the text
+is far off; otherwise it leaves a note. `RequestConstraintExtractor` reads lengths only outside quotes, code and text
+attached after a lead-in ("Answer this e-mail:"). `LengthRuleGate` then lets a length become a blocking check only
+when the whole request has exactly one length in words or characters (or a clear pair such as "between 100 and 150
+words"), no other count (pieces, "each/per/je", variants, pages, minutes), no word that refers to an earlier text or a
+revision ("draft", "previous", "too long", "shorten", "summarize", "translate" …), a limit word bound to the number
+("at most", "höchstens", "about" … or "with/of/in N words" right after the text to write), no foreign preposition
+between the instruction verb and the length in the same clause ("a title for a book with at least 80,000 words") and
+no compound such as "300-word post". Every other length gives the note "Your request mentions a length (…); it was
+not checked automatically." Even a blocking length leads to a correction only when the text misses the limit by more
+than 25 % ("at most 100 words" from 126 words, "at least 200 words" below 150); a smaller miss is an open point. When
+the length is the only blocking problem, the instruction to the writer ends with "Keep everything else unchanged."
+The rate of false blocks is measured on synthetic, independently labelled requests
+(`tests/Geef.Atelier.Tests/Domain/Checks/Corpus/`, `LengthCorpusTests`).
