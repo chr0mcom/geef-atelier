@@ -1,3 +1,4 @@
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -21,6 +22,12 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<OrderEntity>
         builder.Property(o => o.ClarifyJson).HasColumnType("jsonb").IsRequired(false);
         builder.Property(o => o.AnswersJson).HasColumnType("jsonb").IsRequired(false);
         builder.Property(o => o.ClaimedAt).IsRequired(false);
+        builder.Property(o => o.IntakeOutcome).HasTolerantEnumConversion<IntakeOutcome>().HasMaxLength(20);
+        builder.Property(o => o.IntakeAttempts).IsRequired();
+        builder.Property(o => o.IntakeStartedAt).IsRequired(false);
+        builder.Property(o => o.IntakeFinishedAt).IsRequired(false);
+        builder.Property(o => o.QuestionsAskedAt).IsRequired(false);
+        builder.Property(o => o.AnsweredAt).IsRequired(false);
         builder.Property(o => o.CreatedAt).IsRequired();
         builder.Property(o => o.UpdatedAt).IsRequired();
 
@@ -28,5 +35,11 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<OrderEntity>
             .IsDescending(false, true)
             .HasDatabaseName("IX_Orders_CreatedByUser_CreatedAt");
         builder.HasIndex(o => o.State).HasDatabaseName("IX_Orders_State");
+        builder.HasIndex(o => o.CreatedAt)
+            .HasFilter("\"State\" = 'Analyzing'")
+            .HasDatabaseName("IX_Orders_Intake_Analyzing");
+        builder.HasIndex(o => o.QuestionsAskedAt)
+            .HasFilter("\"State\" = 'NeedsInput'")
+            .HasDatabaseName("IX_Orders_Intake_NeedsInput");
     }
 }

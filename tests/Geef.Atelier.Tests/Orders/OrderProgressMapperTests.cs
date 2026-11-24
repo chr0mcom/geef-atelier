@@ -1,4 +1,5 @@
 using Geef.Atelier.Application.Orders;
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Persistence.Orders;
 
@@ -95,6 +96,74 @@ public sealed class OrderProgressMapperTests
         var queued = OrderProgressMapper.Map(new OrderDisplay(OrderDisplayState.Queued, false, false), OrderMode.Direct, true, [], T0, null, T0.AddSeconds(2));
         Assert.All(queued.Steps, s => Assert.Equal(OrderStepStatus.Pending, s.Status));
         Assert.Equal("Waiting to start", queued.CurrentLabel);
+    }
+
+    [Fact]
+    public void OrdersWithoutIntakeKeepTheirSteps()
+    {
+        var order = OrderTestData.Order("user-a", at: T0);
+
+        Assert.Null(order.ToIntakeProgress());
+        Assert.Equal(["write", "check", "done"], OrderProgressMapper.Map(Working, OrderMode.Direct, false, [], T0, null, T0, order.ToIntakeProgress()).Steps.Select(s => s.Key));
+    }
+
+    [Fact]
+    public void ReadingTheRequestIsActiveWhileAnalysing()
+    {
+        var order = OrderTestData.Order("user-a", state: OrderState.Analyzing, at: T0) with { IntakeStartedAt = T0.AddSeconds(2) };
+        var preparing = new OrderDisplay(OrderDisplayState.Preparing, false, false);
+
+        var progress = OrderProgressMapper.Map(preparing, OrderMode.Direct, false, [], T0, null, T0.AddSeconds(5), order.ToIntakeProgress());
+
+        Assert.Equal(["understand", "write", "check", "done"], progress.Steps.Select(s => s.Key));
+        Assert.Equal(("Reading your request", OrderStepStatus.Active, T0.AddSeconds(2), (DateTimeOffset?)null),
+            (progress.Steps[0].Label, progress.Steps[0].Status, progress.Steps[0].StartedAt!.Value, progress.Steps[0].EndedAt));
+        Assert.Equal("Getting ready", progress.CurrentLabel);
+        Assert.All(progress.Steps.Skip(1), s => Assert.Equal(OrderStepStatus.Pending, s.Status));
+    }
+
+    [Fact]
+    public void QuestionsAddTheAnswersStepUntilTheyAreAnswered()
+    {
+        var waiting = OrderTestData.Order("user-a", state: OrderState.NeedsInput, at: T0) with
+        {
+            IntakeOutcome = IntakeOutcome.Asked, IntakeStartedAt = T0, IntakeFinishedAt = T0.AddSeconds(9), QuestionsAskedAt = T0.AddSeconds(9),
+        };
+        var needsInput = new OrderDisplay(OrderDisplayState.NeedsInput, false, false);
+
+        var asked = OrderProgressMapper.Map(needsInput, OrderMode.Careful, false, [], T0, null, T0.AddMinutes(1), waiting.ToIntakeProgress());
+        Assert.Equal(["understand", "answers", "write", "review", "done"], asked.Steps.Select(s => s.Key));
+        Assert.Equal((OrderStepStatus.Done, OrderStepStatus.Active), (asked.Steps[0].Status, asked.Steps[1].Status));
+        Assert.Equal("Your answers", asked.Steps[1].Label);
+        Assert.Equal("Needs your answers", asked.CurrentLabel);
+
+        var answered = waiting with { State = OrderState.Ready, IntakeOutcome = IntakeOutcome.Answered, AnsweredAt = T0.AddMinutes(2) };
+        var steps = OrderProgressMapper.Map(Working, OrderMode.Careful, false, [new("ExecutionStartedEvent", 1, T0.AddMinutes(3))], T0, null, T0.AddMinutes(4), answered.ToIntakeProgress()).Steps;
+        Assert.Equal((OrderStepStatus.Done, T0.AddMinutes(2)), (steps[1].Status, steps[1].EndedAt!.Value));
+        Assert.Equal(OrderStepStatus.Active, steps[2].Status);
+
+        var auto = waiting with { State = OrderState.Ready, IntakeOutcome = IntakeOutcome.AutoStarted, AnsweredAt = T0.AddDays(1) };
+        Assert.Equal(OrderStepStatus.Skipped, OrderProgressMapper.Map(Working, OrderMode.Careful, false, [], T0, null, T0.AddDays(1), auto.ToIntakeProgress()).Steps[1].Status);
+        var stopped = waiting with { State = OrderState.Cancelled };
+        var stoppedSteps = OrderProgressMapper.Map(new OrderDisplay(OrderDisplayState.Stopped, false, true), OrderMode.Careful, false, [], T0, T0.AddMinutes(1), T0.AddMinutes(1), stopped.ToIntakeProgress()).Steps;
+        Assert.Equal((OrderStepStatus.Done, OrderStepStatus.Skipped), (stoppedSteps[0].Status, stoppedSteps[1].Status));
+    }
+
+    [Fact]
+    public void SkippingOrAFailedIntakeShowsReadingAsSkipped()
+    {
+        var skipped = OrderTestData.Order("user-a", at: T0) with { IntakeOutcome = IntakeOutcome.Skipped, IntakeFinishedAt = T0.AddSeconds(3) };
+        var failed = skipped with { IntakeOutcome = IntakeOutcome.Failed };
+        var clarified = skipped with { IntakeOutcome = IntakeOutcome.Clarified };
+        var stoppedWhileReading = OrderTestData.Order("user-a", state: OrderState.Analyzing, at: T0);
+        var stoppedDisplay = new OrderDisplay(OrderDisplayState.Stopped, false, true);
+
+        Assert.Equal(OrderStepStatus.Skipped, OrderProgressMapper.Map(Working, OrderMode.Direct, false, [], T0, null, T0, skipped.ToIntakeProgress()).Steps[0].Status);
+        Assert.Equal(OrderStepStatus.Skipped, OrderProgressMapper.Map(Working, OrderMode.Direct, false, [], T0, null, T0, failed.ToIntakeProgress()).Steps[0].Status);
+        var done = OrderProgressMapper.Map(Working, OrderMode.Direct, false, [], T0, null, T0, clarified.ToIntakeProgress()).Steps;
+        Assert.Equal((OrderStepStatus.Done, T0, T0.AddSeconds(3)), (done[0].Status, done[0].StartedAt!.Value, done[0].EndedAt!.Value));
+        Assert.DoesNotContain(done, s => s.Key == OrderProgressMapper.AnswersKey);
+        Assert.Equal(OrderStepStatus.Skipped, OrderProgressMapper.Map(stoppedDisplay, OrderMode.Direct, false, [], T0, T0, T0, stoppedWhileReading.ToIntakeProgress()).Steps[0].Status);
     }
 
     private static OrderDisplay Working => new(OrderDisplayState.Working, false, false);

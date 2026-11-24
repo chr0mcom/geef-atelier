@@ -1,12 +1,24 @@
 using System.Globalization;
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Persistence.Orders;
 
 namespace Geef.Atelier.Application.Orders;
 
+/// <summary>What the progress display needs to know about the intake of an order (stage 2).</summary>
+public sealed record OrderIntakeProgress(
+    OrderState State,
+    IntakeOutcome? Outcome,
+    DateTimeOffset? StartedAt,
+    DateTimeOffset? FinishedAt,
+    DateTimeOffset? QuestionsAskedAt,
+    DateTimeOffset? AnsweredAt);
+
 /// <summary>Maps the display state and the pipeline events of the current run to plain-English progress steps.</summary>
 public static class OrderProgressMapper
 {
+    public const string UnderstandKey = "understand";
+    public const string AnswersKey = "answers";
     public const string FilesKey = "files";
     public const string WriteKey = "write";
     public const string CheckKey = "check";
@@ -27,9 +39,10 @@ public static class OrderProgressMapper
     /// <summary>
     /// Builds the steps of the progress display: direct path <c>files</c> (only with sources), <c>write</c>, <c>check</c>,
     /// <c>fix</c> (only when a second iteration began), <c>done</c>; careful path <c>files</c> (only with sources), <c>write</c>,
-    /// <c>review</c>, <c>done</c>.
+    /// <c>review</c>, <c>done</c>. Clarified orders (<paramref name="intake"/> given) start with <c>understand</c> and, when
+    /// questions were asked, <c>answers</c>.
     /// </summary>
-    public static OrderProgress Map(OrderDisplay display, OrderMode mode, bool hasSources, IReadOnlyList<RunEventRow> events, DateTimeOffset orderCreatedAt, DateTimeOffset? finishedAt, DateTimeOffset now)
+    public static OrderProgress Map(OrderDisplay display, OrderMode mode, bool hasSources, IReadOnlyList<RunEventRow> events, DateTimeOffset orderCreatedAt, DateTimeOffset? finishedAt, DateTimeOffset now, OrderIntakeProgress? intake = null)
     {
         ArgumentNullException.ThrowIfNull(display);
         ArgumentNullException.ThrowIfNull(events);
@@ -46,8 +59,48 @@ public static class OrderProgressMapper
         if (elapsed < TimeSpan.Zero)
             elapsed = TimeSpan.Zero;
 
-        var result = steps.Select(s => new OrderStep(s.Key, s.Label, s.Status, s.StartedAt, s.EndedAt)).ToList();
+        var result = IntakeSteps(intake, display, orderCreatedAt)
+            .Concat(steps.Select(s => new OrderStep(s.Key, s.Label, s.Status, s.StartedAt, s.EndedAt)))
+            .ToList();
         return new OrderProgress(result, CurrentLabel(result, display), elapsed);
+    }
+
+    /// <summary>The intake facts of <paramref name="order"/> for <see cref="Map"/>; null when the order was never clarified.</summary>
+    public static OrderIntakeProgress? ToIntakeProgress(this OrderEntity order)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        return order.State is OrderState.Analyzing or OrderState.NeedsInput || order.IntakeOutcome is not null
+            ? new OrderIntakeProgress(order.State, order.IntakeOutcome, order.IntakeStartedAt, order.IntakeFinishedAt, order.QuestionsAskedAt, order.AnsweredAt)
+            : null;
+    }
+
+    private static IEnumerable<OrderStep> IntakeSteps(OrderIntakeProgress? intake, OrderDisplay display, DateTimeOffset orderCreatedAt)
+    {
+        if (intake is null)
+            yield break;
+
+        var stopped = display.State == OrderDisplayState.Stopped;
+        var understandStatus = intake.State switch
+        {
+            OrderState.Analyzing => stopped ? OrderStepStatus.Skipped : OrderStepStatus.Active,
+            _ when intake.Outcome is IntakeOutcome.Failed => OrderStepStatus.Skipped,
+            _ when intake.Outcome is IntakeOutcome.Skipped && intake.QuestionsAskedAt is null => OrderStepStatus.Skipped,
+            _ when stopped && intake.FinishedAt is null => OrderStepStatus.Skipped,
+            _ => OrderStepStatus.Done,
+        };
+        var understandEnd = understandStatus == OrderStepStatus.Active ? null : intake.FinishedAt ?? intake.QuestionsAskedAt;
+        yield return new OrderStep(UnderstandKey, "Reading your request", understandStatus, intake.StartedAt ?? orderCreatedAt, understandEnd);
+
+        if (intake.QuestionsAskedAt is not { } asked)
+            yield break;
+
+        var answersStatus = intake.State switch
+        {
+            OrderState.NeedsInput => OrderStepStatus.Active,
+            _ when intake.Outcome is IntakeOutcome.Answered => OrderStepStatus.Done,
+            _ => OrderStepStatus.Skipped,
+        };
+        yield return new OrderStep(AnswersKey, "Your answers", answersStatus, asked, answersStatus == OrderStepStatus.Active ? null : intake.AnsweredAt);
     }
 
     private static List<StepDraft> DirectSteps(bool hasSources, List<RunEventRow> events)

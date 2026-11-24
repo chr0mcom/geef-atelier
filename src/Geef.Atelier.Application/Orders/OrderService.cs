@@ -1,19 +1,20 @@
 using System.Globalization;
-using System.Text.Json;
 using Geef.Atelier.Application.Crew;
-using Geef.Atelier.Application.Crew.Models;
+using Geef.Atelier.Application.Intake;
 using Geef.Atelier.Application.Sources;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Checks;
-using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Reports;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Core.Persistence;
+using Geef.Atelier.Core.Persistence.Intake;
 using Geef.Atelier.Core.Persistence.Orders;
+using Geef.Atelier.Core.Persistence.Profiles;
 using Geef.Atelier.Core.Persistence.Sources;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -33,12 +34,21 @@ internal sealed class OrderService(
     ILogger<OrderService> logger,
     ISourceIntakeService intake,
     IOrderNotifier notifier,
-    TimeProvider time) : IOrderService
+    TimeProvider time,
+    IOrderRunStarter runStarter,
+    IUserProfileRepository profiles,
+    IIntakeShadowRepository shadows,
+    IOptions<IntakeOptions> intakeOptions,
+    IOrderIntakeSignal? intakeSignal = null) : IOrderService
 {
     internal const string EmptyRequestMessage = "Please describe what you need.";
     internal const string MissingSourceMessage = "One of the files was not found. Please add it again.";
     internal const string MapNotice = "Your files are long, so the writer gets a map of them and reads the parts that matter.";
-    private static readonly JsonSerializerOptions SnapshotJsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    internal const string OrderNotFoundMessage = "This order was not found.";
+    internal const string StillReadingMessage = "Atelier is still reading the request. Please wait a moment and try again.";
+    internal const string AlreadyStartedNotice = "This order had already started.";
+    internal const string StoppedNotice = "This order was stopped.";
+    internal const string NeedsAnswersNote = "The order needs your answers first.";
     private static readonly RunStatus[] ActiveStatuses = [RunStatus.Pending, RunStatus.Running];
 
     public async Task<OrderSubmission> SubmitAsync(SubmitOrderRequest request, CancellationToken ct = default)
@@ -67,48 +77,39 @@ internal sealed class OrderService(
             notices.Add(MapNotice);
 
         var now = time.GetUtcNow();
+        var route = OrderIntakeRouting.Decide(options.IntakeMode, request.AllowQuestions, request.CustomCrew is not null, text.Length, intakeOptions.Value.SkipAboveChars);
         var order = new OrderEntity
         {
             Id = Guid.NewGuid(),
             CreatedByUser = request.CreatedByUser,
             RequestText = text,
             Mode = request.Mode,
-            State = OrderState.Ready,
+            State = route == OrderIntakeRoute.Clarify ? OrderState.Analyzing : OrderState.Ready,
             Entry = request.Entry,
             CrewTemplateName = request.Mode == OrderMode.Careful ? request.CrewTemplateName : null,
             CreatedAt = now,
             UpdatedAt = now,
         };
-
-        var resolved = await ResolveSnapshotAsync(request, hasSources: plan.Links.Count > 0, ct);
-        var run = new RunEntity
-        {
-            Id = Guid.NewGuid(),
-            CreatedAt = now,
-            Status = RunStatus.Pending,
-            BriefingText = briefComposer.Compose(new OrderBriefInput(order, null, [], null)).Text,
-            ConfigJson = "{}",
-            CreatedByUser = request.CreatedByUser,
-            CrewTemplateName = resolved.Snapshot.TemplateName,
-            CrewSnapshot = JsonSerializer.Serialize(resolved.Snapshot, SnapshotJsonOptions),
-            TokensTotal = 0,
-            CostTotal = 0m,
-            Kind = RunKind.Standard,
-            OrderId = order.Id,
-            OrderVersion = 1,
-        };
-
         var links = plan.Links.Select(l => l with { OrderId = order.Id, AddedAt = now }).ToList();
-        try
+
+        if (route == OrderIntakeRoute.Clarify)
         {
-            await orders.CreateWithFirstRunAsync(order, links, run, ct);
-        }
-        catch (OrderSourceMissingException)
-        {
-            throw new OrderSubmissionException(MissingSourceMessage);
+            if (request.Mode == OrderMode.Careful)
+                await crewService.ResolveOrderSnapshotAsync(request.Mode, request.CrewTemplateName, null, links.Count > 0, ct);
+            await CreateAsync(() => orders.CreateAsync(order, links, ct));
+            intakeSignal?.Wake();
+            await NotifyAsync(order.Id);
+            return new OrderSubmission(order.Id, OrderStateResolver.Resolve(order.State, null).State, null, notices);
         }
 
-        await ReportAssignmentWarningsAsync(run.Id, resolved.Warnings);
+        var resolved = await crewService.ResolveOrderSnapshotAsync(request.Mode, request.CrewTemplateName, request.CustomCrew, links.Count > 0, ct);
+        var profile = await profiles.GetAsync(request.CreatedByUser, ct);
+        var run = resolved.ToFirstRun(order, briefComposer.Compose(new OrderBriefInput(order, null, [], profile)).Text, now);
+        await CreateAsync(() => orders.CreateWithFirstRunAsync(order, links, run, ct));
+
+        await warningSink.ReportAssignmentWarningsAsync(run.Id, resolved.Warnings);
+        if (route == OrderIntakeRoute.StartNowWithShadow)
+            await AddShadowAsync(order.Id, now, ct);
         await NotifyAsync(order.Id);
 
         return new OrderSubmission(order.Id, OrderDisplayState.Queued, run.Id, notices);
@@ -144,7 +145,7 @@ internal sealed class OrderService(
         var current = OrderStateResolver.SelectCurrentRun(orderRuns);
         var display = OrderStateResolver.Resolve(order.State, current?.ToRunState(time.GetUtcNow()));
         if (current is null)
-            return new OrderResult(orderId, display, null, null, null, null, [], [], [], [], NoteFor(display));
+            return new OrderResult(orderId, display, null, null, null, null, [], [], [], [], NoteFor(display), UncorrectedAssumptions(order));
 
         var report = current.ReportJson is null ? null : RunReportJson.TryParse(current.ReportJson);
         var usages = await sources.ListRunUsagesAsync(current.Id, ct);
@@ -162,7 +163,8 @@ internal sealed class OrderService(
             report?.Checks.Where(c => !c.Passed).ToList() ?? [],
             usages.Select(u => new OrderSourceUsageView(u.FileName, u.Mode, u.CharsIncluded, u.PagesIncluded)).ToList(),
             warnings,
-            NoteFor(display));
+            NoteFor(display),
+            UncorrectedAssumptions(order));
     }
 
     public async Task<IReadOnlyList<OrderListItem>> ListAsync(string? ownerUsername, int limit = 50, CancellationToken ct = default)
@@ -268,11 +270,79 @@ internal sealed class OrderService(
         return true;
     }
 
-    public Task<OrderSubmission> AnswerAsync(AnswerOrderRequest request, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+    public async Task<OrderSubmission> AnswerAsync(AnswerOrderRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var order = await GetOwnedAsync(request.OrderId, request.RequestingUsername, ct)
+                    ?? throw new OrderAnswerException(OrderNotFoundMessage);
+        if (order.State == OrderState.Analyzing)
+            throw new OrderAnswerException(StillReadingMessage);
+        if (order.State != OrderState.NeedsInput)
+            return await CurrentWithNoticeAsync(order.Id, ct);
 
-    public Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+        var record = IntakeRecordJson.TryParse(order.ClarifyJson);
+        var answers = OrderAnswerRules.Normalize(record, request.Answers, intakeOptions.Value.MaxFreeTextChars);
+        var runId = await runStarter.TryStartAsync(
+            new RunStartRequest(order, OrderState.NeedsInput, record, answers, IntakeOutcome.Answered, RecordIsNew: false), ct);
+        return runId is null ? await CurrentWithNoticeAsync(order.Id, ct) : await SubmissionAsync(order.Id, [], ct);
+    }
+
+    public async Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default)
+    {
+        var order = await GetOwnedAsync(orderId, requestingUsername, ct)
+                    ?? throw new OrderAnswerException(OrderNotFoundMessage);
+        if (order.State is not (OrderState.Analyzing or OrderState.NeedsInput))
+            return await CurrentWithNoticeAsync(order.Id, ct);
+
+        var record = order.State == OrderState.NeedsInput ? IntakeRecordJson.TryParse(order.ClarifyJson) : null;
+        var runId = await runStarter.TryStartAsync(
+            new RunStartRequest(order, order.State, record, [], IntakeOutcome.Skipped, RecordIsNew: false), ct);
+        return runId is null ? await CurrentWithNoticeAsync(order.Id, ct) : await SubmissionAsync(order.Id, [], ct);
+    }
+
+    private async Task<OrderSubmission> CurrentWithNoticeAsync(Guid orderId, CancellationToken ct)
+    {
+        var order = await orders.GetAsync(orderId, ct) ?? throw new OrderAnswerException(OrderNotFoundMessage);
+        var notice = order.State switch
+        {
+            OrderState.Cancelled => StoppedNotice,
+            OrderState.Ready => AlreadyStartedNotice,
+            _ => null,
+        };
+        return await SubmissionAsync(orderId, notice is null ? [] : [notice], ct);
+    }
+
+    private async Task<OrderSubmission> SubmissionAsync(Guid orderId, IReadOnlyList<string> notices, CancellationToken ct)
+    {
+        var order = await orders.GetAsync(orderId, ct) ?? throw new OrderAnswerException(OrderNotFoundMessage);
+        var view = await BuildViewAsync(order, ct);
+        return new OrderSubmission(view.OrderId, view.Display.State, view.CurrentRun?.RunId, notices, view.Clarification);
+    }
+
+    private async Task CreateAsync(Func<Task> create)
+    {
+        try
+        {
+            await create();
+        }
+        catch (OrderSourceMissingException)
+        {
+            throw new OrderSubmissionException(MissingSourceMessage);
+        }
+    }
+
+    private async Task AddShadowAsync(Guid orderId, DateTimeOffset at, CancellationToken ct)
+    {
+        try
+        {
+            await shadows.AddPendingAsync(orderId, at, ct);
+            intakeSignal?.Wake();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "The shadow intake of order {OrderId} could not be queued.", orderId);
+        }
+    }
 
     private async Task<OrderEntity?> GetOwnedAsync(Guid orderId, string? requestingUsername, CancellationToken ct)
     {
@@ -291,7 +361,7 @@ internal sealed class OrderService(
         var events = current is null ? [] : await orders.ListRunEventsAsync(current.Id, ct);
         var warnings = current is null ? [] : await warningRepository.ListByRunAsync(current.Id, ct);
         var finishedAt = display.IsFinished ? current?.CompletedAt ?? order.UpdatedAt : (DateTimeOffset?)null;
-        var progress = OrderProgressMapper.Map(display, order.Mode, linked.Count > 0, events, order.CreatedAt, finishedAt, time.GetUtcNow());
+        var progress = OrderProgressMapper.Map(display, order.Mode, linked.Count > 0, events, order.CreatedAt, finishedAt, time.GetUtcNow(), order.ToIntakeProgress());
 
         return new OrderView(
             order.Id,
@@ -308,7 +378,40 @@ internal sealed class OrderService(
             linked.Select(i => new OrderSourceView(i.Source.Id, i.Source.FileName, i.Source.Kind, i.Source.PageCount, i.Source.CharCount,
                 i.Source.Quality, i.Link.PageSelection, i.Source.Warnings)).ToList(),
             progress,
-            warnings);
+            warnings,
+            BuildClarification(order, linked));
+    }
+
+    private ClarificationView? BuildClarification(OrderEntity order, IReadOnlyList<OrderSourceItem> linked)
+    {
+        var record = IntakeRecordJson.TryParse(order.ClarifyJson);
+        if (record is null && order.IntakeOutcome is null)
+            return null;
+
+        var after = intakeOptions.Value.NeedsInputAutoStartAfter;
+        return new ClarificationView(
+            order.IntakeOutcome,
+            record?.Output?.TextType,
+            record?.Output?.Language,
+            record?.Output?.Understanding,
+            record?.Assumptions ?? [],
+            record?.Questions ?? [],
+            IntakeRecordJson.ParseAnswers(order.AnswersJson),
+            record?.RevisionSourceId is { } sourceId ? linked.FirstOrDefault(i => i.Source.Id == sourceId)?.Source.FileName : null,
+            order.QuestionsAskedAt,
+            order.QuestionsAskedAt is { } asked && after > TimeSpan.Zero ? asked + after : null);
+    }
+
+    private static IReadOnlyList<IntakeAssumption>? UncorrectedAssumptions(OrderEntity order)
+    {
+        var record = IntakeRecordJson.TryParse(order.ClarifyJson);
+        if (record is null)
+            return null;
+        var corrected = IntakeRecordJson.ParseAnswers(order.AnswersJson)
+            .Where(a => !string.IsNullOrWhiteSpace(a.FreeText))
+            .Select(a => a.QuestionId)
+            .ToHashSet(StringComparer.Ordinal);
+        return record.Assumptions.Where(a => !corrected.Contains(a.Id)).ToList();
     }
 
     private static OrderRunView ToRunView(RunEntity run) =>
@@ -369,31 +472,6 @@ internal sealed class OrderService(
         return Invariant($"Your files are too long to use completely ({budget.TotalChars:N0} characters, the limit is {budget.MapMaxChars:N0}).") + choose;
     }
 
-    private async Task<ResolvedCrewSnapshot> ResolveSnapshotAsync(SubmitOrderRequest request, bool hasSources, CancellationToken ct)
-    {
-        if (request.Mode == OrderMode.Direct)
-            return await crewService.ResolveCodeTemplateSnapshotAsync(SystemCrew.DirectTemplate, ct);
-
-        var resolved = await crewService.ResolveSnapshotWithWarningsAsync(
-            request.CustomCrew is null ? request.CrewTemplateName ?? SystemCrew.KlassikTemplateName : request.CrewTemplateName,
-            request.CustomCrew,
-            ct);
-        if (!hasSources)
-            return resolved;
-
-        var providers = (resolved.Snapshot.GroundingProviders ?? [])
-            .Where(p => p.Name != SystemCrew.RunAttachmentsProfile.Name && p.Name != SystemCrew.OrderSourcesProfile.Name)
-            .ToList();
-        return resolved with { Snapshot = resolved.Snapshot with { GroundingProviders = [SystemCrew.OrderSourcesProfile, .. providers] } };
-    }
-
-    private async Task ReportAssignmentWarningsAsync(Guid runId, IReadOnlyList<ModelAssignmentWarning> warnings)
-    {
-        foreach (var warning in warnings)
-            await warningSink.ReportAsync(runId, RunWarningSources.ModelAssignment, RunWarningCodes.ModelAssignment,
-                $"The AI model for \"{warning.ShownName}\" could not be chosen as planned, so a different one was used.");
-    }
-
     private async Task NotifyAsync(Guid orderId)
     {
         try
@@ -412,6 +490,7 @@ internal sealed class OrderService(
         OrderDisplayState.Failed => "No text was written.",
         OrderDisplayState.Stopped => display.HasText ? "The order was stopped; this is the last text." : "The order was stopped.",
         OrderDisplayState.Delivered => null,
+        OrderDisplayState.NeedsInput => NeedsAnswersNote,
         _ => "The text is not ready yet.",
     };
 

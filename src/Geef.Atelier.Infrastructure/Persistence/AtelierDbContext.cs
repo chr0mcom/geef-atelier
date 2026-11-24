@@ -89,6 +89,5 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AtelierDbContext).Assembly);
-        modelBuilder.IgnoreIntakeUntilStep49();
     }
 }
