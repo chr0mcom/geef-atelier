@@ -18,8 +18,9 @@ using Application_IKnowledgeService = Geef.Atelier.Application.Crew.Knowledge.IK
 namespace Geef.Atelier.Tests.Web.Components;
 
 /// <summary>
-/// Live updates and user actions on the run pages (review findings Q6, Q12/A7, Q19 of Etappe 0): a live reload and a
-/// filter click never use the circuit's data services at the same time, the detail page reloads once after it has
+/// Live updates and user actions on the run pages (review findings Q6, Q12/A7, Q19 of Etappe 0 and finding 3 of the
+/// second test review): a live reload and a filter click on the list, and a live reload of the detail page and a
+/// delete or resume, never use the circuit's data services at the same time; the detail page reloads once after it has
 /// subscribed (a final update between first load and subscription is not lost), and a subscription granted after the
 /// page was closed is released at once.
 /// </summary>
@@ -51,6 +52,51 @@ public sealed class LiveReloadDataAccessTests : TestContext
 
         Assert.Equal(3, probe.Calls);
         Assert.Equal(1, probe.MaxActive);
+    }
+
+    [Fact]
+    public async Task LiveReloadOfTheDetailPageAndADeleteNeverQueryAtTheSameTime()
+    {
+        var (probe, feed, runId) = RegisterProbe();
+        var cut = await RenderSettledDetailAsync(probe, feed, runId);
+        cut.Find("[data-testid='delete-run-button']").Click();
+        cut.Find("[data-testid='delete-confirm-input']").Input(runId.ToString("N")[..8].ToUpperInvariant());
+
+        var liveReload = Task.Run(() => feed.RunHandler!(runId));
+        await WaitUntilAsync(() => probe.Calls == 3);
+        var delete = cut.InvokeAsync(() => cut.Find("[data-testid='delete-confirm-button']").ClickAsync(new MouseEventArgs()));
+        await Task.Delay(300);
+
+        Assert.Equal(3, probe.Calls);
+        probe.Hold.SetResult();
+        await liveReload.WaitAsync(TimeSpan.FromSeconds(10));
+        await delete.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(4, probe.Calls);
+        Assert.Equal(1, probe.MaxActive);
+        Assert.EndsWith("/runs", Services.GetRequiredService<FakeNavigationManager>().Uri);
+    }
+
+    [Fact]
+    public async Task ResumeAndALiveReloadOfTheDetailPageNeverQueryAtTheSameTime()
+    {
+        var (probe, feed, runId) = RegisterProbe();
+        var cut = await RenderSettledDetailAsync(probe, feed, runId);
+        cut.Find("[data-testid='resume-run-button']").Click();
+
+        var resume = cut.InvokeAsync(() => cut.Find("[data-testid='resume-confirm-button']").ClickAsync(new MouseEventArgs()));
+        await WaitUntilAsync(() => probe.Calls == 3);
+        var liveReload = Task.Run(() => feed.RunHandler!(runId));
+        await Task.Delay(300);
+
+        Assert.Equal(3, probe.Calls);
+        probe.Hold.SetResult();
+        await resume.WaitAsync(TimeSpan.FromSeconds(10));
+        await liveReload.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(4, probe.Calls);
+        Assert.Equal(1, probe.MaxActive);
+        Assert.Empty(cut.FindAll("[data-testid='resume-error']"));
     }
 
     [Fact]
@@ -88,6 +134,41 @@ public sealed class LiveReloadDataAccessTests : TestContext
 
         Assert.True(feed.LastToken.IsCancellationRequested);
         Assert.True(subscription.Disposed);
+    }
+
+    private (ConcurrencyProbeRunService Probe, ScriptedFeed Feed, Guid RunId) RegisterProbe()
+    {
+        var runId = Guid.NewGuid();
+        var details = new RunDetails(
+            new RunEntity
+            {
+                Id = runId,
+                CreatedAt = DateTimeOffset.UtcNow,
+                Status = RunStatus.Failed,
+                BriefingText = "Test briefing",
+                ConfigJson = "{}",
+                FinalText = "Draft.",
+                CrewSnapshot = TestCrewSnapshots.KlassikJson,
+            },
+            []);
+        var probe = new ConcurrencyProbeRunService(details.Run, details) { ImmediateCalls = 2 };
+        var feed = new ScriptedFeed { RunSubscription = Task.FromResult<IDisposable?>(new TrackedSubscription()) };
+        Services.AddSingleton<IRunService>(probe);
+        Services.AddSingleton<IRunUpdateFeed>(feed);
+        Services.AddScoped<CircuitDataGate>();
+        Services.AddSingleton<IRunArtifactRepository>(new StubArtifactRepository([]));
+        Services.AddSingleton<Application_IKnowledgeService>(new NoOpKnowledgeService());
+        Services.AddSingleton(typeof(ILogger<>), typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
+        this.AddTestAuthorization().SetAuthorized("user");
+        return (probe, feed, runId);
+    }
+
+    private async Task<IRenderedComponent<RunDetail>> RenderSettledDetailAsync(ConcurrencyProbeRunService probe, ScriptedFeed feed, Guid runId)
+    {
+        var cut = RenderComponent<RunDetail>(p => p.Add(c => c.RunId, runId));
+        await WaitUntilAsync(() => feed.RunHandler is not null && probe.Calls == 2 && probe.Active == 0);
+        cut.WaitForState(() => cut.FindAll("[data-testid='resume-run-button']").Count == 1, TimeSpan.FromSeconds(10));
+        return cut;
     }
 
     private CountingDetailRunService Register(ScriptedFeed feed)
@@ -137,6 +218,8 @@ public sealed class LiveReloadDataAccessTests : TestContext
     {
         public Func<Guid, Task>? ListHandler { get; private set; }
 
+        public Func<Guid, Task>? RunHandler { get; private set; }
+
         public Task<IDisposable?> RunSubscription { get; init; } = Task.FromResult<IDisposable?>(null);
 
         public CancellationToken LastToken { get; private set; }
@@ -144,6 +227,7 @@ public sealed class LiveReloadDataAccessTests : TestContext
         public Task<IDisposable?> WatchRunAsync(ClaimsPrincipal user, Guid runId, Func<Guid, Task> onUpdated, CancellationToken ct = default)
         {
             LastToken = ct;
+            RunHandler = onUpdated;
             return RunSubscription;
         }
 

@@ -1,5 +1,6 @@
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Warnings;
 
 namespace Geef.Atelier.Tests.Fakes;
@@ -7,9 +8,10 @@ namespace Geef.Atelier.Tests.Fakes;
 /// <summary>
 /// <see cref="IRunService"/> that records how many calls overlap, the way a shared <c>DbContext</c> would see them.
 /// Every call after the first <see cref="ImmediateCalls"/> waits for <see cref="Hold"/>; <see cref="GetRunAsync"/>
-/// can be held separately through <see cref="GetRunHold"/>.
+/// can be held separately through <see cref="GetRunHold"/>. With <paramref name="details"/> the detail page can load
+/// (<see cref="GetRunWithGroundingAsync"/>) and resume; both count like the other data calls.
 /// </summary>
-internal sealed class ConcurrencyProbeRunService(RunEntity? run = null) : IRunService
+internal sealed class ConcurrencyProbeRunService(RunEntity? run = null, RunDetails? details = null) : IRunService
 {
     private int _active;
     private int _maxActive;
@@ -29,6 +31,9 @@ internal sealed class ConcurrencyProbeRunService(RunEntity? run = null) : IRunSe
 
     /// <summary>Number of calls started so far.</summary>
     public int Calls => Volatile.Read(ref _calls);
+
+    /// <summary>Number of calls in progress right now.</summary>
+    public int Active => Volatile.Read(ref _active);
 
     public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null, string? requestingUsername = null, CancellationToken cancellationToken = default) =>
         TrackAsync<IReadOnlyList<RunEntity>>(run is null ? [] : [run]);
@@ -53,11 +58,24 @@ internal sealed class ConcurrencyProbeRunService(RunEntity? run = null) : IRunSe
 
     public Task<RunDetails?> GetRunDetailsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-    public Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) =>
+        details is null
+            ? throw new NotSupportedException()
+            : TrackAsync<RunWithGroundingViewModel?>(new RunWithGroundingViewModel(
+                Details: details,
+                Snapshot: null,
+                GroundedBrief: details.Run.BriefingText,
+                GroundingAdvisors: [],
+                RecoveryAdvisors: [],
+                AdvisorsByIteration: Enumerable.Empty<AdvisorConsultation>().ToLookup(x => x.IterationNumber),
+                GroundingConsultations: [],
+                ToolInvocations: [],
+                Warnings: []));
 
     public Task<WelcomeStats> GetWelcomeStatsAsync(string? requestingUsername, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-    public Task<Guid> ResumeRunAsync(ResumeOptions options, string? requestingUsername, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<Guid> ResumeRunAsync(ResumeOptions options, string? requestingUsername, CancellationToken cancellationToken = default) =>
+        details is null ? throw new NotSupportedException() : TrackAsync(Guid.NewGuid());
 
     private async Task<T> TrackAsync<T>(T result)
     {

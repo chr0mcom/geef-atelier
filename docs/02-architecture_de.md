@@ -568,13 +568,13 @@ Hilfen: `SubmitAsync` (echter `IRunService`), `WaitForTerminalAsync` (wartet auf
 
 **Was es beweist:** Ein Auftrag läuft über die echte Verdrahtung vom Einreichen (Web oder MCP) bis zum
 abgelegten Ergebnis, und der Inhalt von Anhängen und Websuche kommt tatsächlich im Executor-Prompt an. Die
-Tests mit dem Merkmal `Etappe0=NachReparatur` schlagen fehl, wenn man die Grounding-Reparatur aus D-067
-zurücknimmt; das wurde durch Zurücknehmen geprüft.
+Tests in `PromptWiringEndToEndTests` schlagen fehl, wenn man die Grounding-Reparatur aus D-067 zurücknimmt;
+das wurde durch Zurücknehmen geprüft. Sie sind gewöhnliche Regressionstests ohne eigenes Merkmal.
 
 ```bash
 export MSBUILDNODEREUSE=0 DOTNET_CLI_TELEMETRY_OPTOUT=1
 dotnet test tests/Geef.Atelier.Tests/Geef.Atelier.Tests.csproj --filter "FullyQualifiedName~Geef.Atelier.Tests.EndToEnd"
-dotnet test tests/Geef.Atelier.Tests/Geef.Atelier.Tests.csproj --filter "Etappe0=NachReparatur"
+dotnet test tests/Geef.Atelier.Tests/Geef.Atelier.Tests.csproj --filter "FullyQualifiedName~PromptWiringEndToEndTests"
 ```
 
 Die Tests brauchen Docker (Testcontainers) und laufen in einer eigenen Collection ohne Parallelität. Ein
