@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import policy
+from cli_errors import clip_redacted, codex_failure_detail
 from usage import UsageParts
 from workspace import (
     ephemeral_dir,
@@ -446,10 +447,9 @@ async def _run_codex_decision(
 
     stdout_txt = stdout.decode(errors="replace")
     if proc.returncode != 0:
-        err = stderr.decode(errors="replace").strip()
         raise RuntimeError(
             f"codex CLI (agentic file mode) exited with code {proc.returncode}: "
-            f"{err or stdout_txt[:200]}"
+            f"{codex_failure_detail(stdout_txt, stderr.decode(errors='replace'))}"
         )
 
     usage = _parse_codex_usage(stdout_txt)
@@ -541,7 +541,8 @@ async def _stream_codex(
         await proc.wait()
         if proc.returncode not in (0, None):
             err = (await proc.stderr.read()).decode(errors="replace").strip()
-            raise RuntimeError(f"codex CLI (stream) exited with code {proc.returncode}: {err[:200]}")
+            raise RuntimeError(
+                f"codex CLI (stream) exited with code {proc.returncode}: {clip_redacted(err, 200)}")
         yield ("usage", usage)
     except TimeoutError:
         raise RuntimeError(f"codex CLI (stream) timed out after {CLI_TIMEOUT_SECONDS} seconds")
@@ -613,8 +614,10 @@ async def _run_codex_document(
         raise RuntimeError(f"codex CLI (document mode) timed out after {CLI_TIMEOUT_SECONDS}s")
 
     if proc.returncode != 0:
-        err = stderr.decode(errors="replace").strip()
-        raise RuntimeError(f"codex CLI (document mode) exited with code {proc.returncode}: {err}")
+        raise RuntimeError(
+            f"codex CLI (document mode) exited with code {proc.returncode}: "
+            f"{codex_failure_detail(stdout.decode(errors='replace'), stderr.decode(errors='replace'))}"
+        )
 
     draft_path = workspace_path / "draft.md"
     try:
@@ -679,8 +682,10 @@ async def _run_codex(
             raise RuntimeError(f"codex CLI timed out after {CLI_TIMEOUT_SECONDS} seconds")
 
         if proc.returncode != 0:
-            err = stderr.decode(errors="replace").strip()
-            raise RuntimeError(f"codex CLI exited with code {proc.returncode}: {err}")
+            raise RuntimeError(
+                f"codex CLI exited with code {proc.returncode}: "
+                f"{codex_failure_detail(stdout.decode(errors='replace'), stderr.decode(errors='replace'))}"
+            )
 
         usage = _parse_codex_usage(stdout.decode(errors="replace"))
 
@@ -777,9 +782,9 @@ async def _run_codex_image(prompt: str, size: str | None) -> tuple[bytes, UsageP
     image_dir = Path(CODEX_HOME) / "generated_images" / thread_id if thread_id else None
     try:
         if proc.returncode != 0:
-            err = stderr.decode(errors="replace").strip()
             raise RuntimeError(
-                f"codex CLI (image) exited with code {proc.returncode}: {err or stdout_txt[:200]}")
+                f"codex CLI (image) exited with code {proc.returncode}: "
+                f"{codex_failure_detail(stdout_txt, stderr.decode(errors='replace'))}")
         png = _read_generated_png(image_dir)
         if png is None:
             said = _parse_codex_text(stdout_txt)

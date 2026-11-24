@@ -12,6 +12,7 @@ from pathlib import Path
 
 import failover
 import policy
+from cli_errors import RESULT_CHARS, claude_failure_detail, clip_redacted
 from usage import UsageParts
 from workspace import (
     ephemeral_dir,
@@ -460,20 +461,13 @@ async def _run_claude_decision(
         raise RuntimeError(f"claude CLI (agentic file mode) timed out after {CLI_TIMEOUT_SECONDS}s")
 
     if proc.returncode != 0:
-        stderr_msg = stderr.decode(errors="replace").strip()
-        stdout_txt = stdout.decode(errors="replace")
         # The CLI reports the human-readable cause in the JSON "result" field. Since CLI
         # 2.1.219 the (long) usage object precedes it, so a naive prefix truncation cut the
         # cause off and failover.classify() saw only "exited with code" — a session-limit
         # outage was raised as "transport" instead of "limit" (incident 2026-07-24).
-        cause = ""
-        try:
-            cause = str(json.loads(stdout_txt).get("result") or "")[:300]
-        except ValueError:
-            pass
         raise RuntimeError(
             f"claude CLI (agentic file mode) exited with code {proc.returncode}: "
-            f"{cause or stderr_msg or stdout_txt[:200]}"
+            f"{claude_failure_detail(stdout.decode(errors='replace'), stderr.decode(errors='replace'))}"
         )
 
     # Usage (and a fallback answer) come from the stdout JSON; the decision itself is the file.
@@ -566,14 +560,16 @@ async def _stream_claude(
                     if ev.get("is_error"):
                         status = ev.get("api_error_status")
                         raise RuntimeError(
-                            f"claude CLI API error (status={status}): {ev.get('result', '')[:300]}"
+                            f"claude CLI API error (status={status}): "
+                            f"{clip_redacted(str(ev.get('result', '')), RESULT_CHARS)}"
                         )
                     final_text, usage = _extract_result_and_usage(ev, "")
         await feeder
         await proc.wait()
         if proc.returncode not in (0, None):
             err = (await proc.stderr.read()).decode(errors="replace").strip()
-            raise RuntimeError(f"claude CLI (stream) exited with code {proc.returncode}: {err[:200]}")
+            raise RuntimeError(
+                f"claude CLI (stream) exited with code {proc.returncode}: {clip_redacted(err, 200)}")
         # No partial deltas were emitted (older CLI / no partial support) — emit the final text once.
         if not emitted and final_text:
             yield ("delta", final_text)
@@ -651,10 +647,11 @@ async def _run_claude_document(
         raise RuntimeError(f"claude CLI (document mode) timed out after {CLI_TIMEOUT_SECONDS}s")
 
     if proc.returncode != 0:
-        stderr_msg = stderr.decode(errors="replace").strip()
+        # The cause fields (subtype, is_error, result, api_error_status) follow the long usage
+        # block, so the former stdout[:200] kept only token counts (pre-study V1, 2026-11-24).
         raise RuntimeError(
             f"claude CLI (document mode) exited with code {proc.returncode}: "
-            f"{stderr_msg or stdout.decode(errors='replace')[:200]}"
+            f"{claude_failure_detail(stdout.decode(errors='replace'), stderr.decode(errors='replace'))}"
         )
 
     draft_path = workspace_path / "draft.md"
@@ -803,10 +800,11 @@ async def _exec_print(
 
     if proc.returncode != 0:
         # Errors may appear in stdout JSON (is_error: true) rather than stderr.
-        stderr_msg = stderr.decode(errors="replace").strip()
+        stderr_txt = stderr.decode(errors="replace")
         if data and data.get("is_error"):
-            raise RuntimeError(f"claude CLI error: {data.get('result', stderr_msg)}")
-        raise RuntimeError(f"claude CLI exited with code {proc.returncode}: {stderr_msg or raw[:200]}")
+            raise RuntimeError(f"claude CLI error: {claude_failure_detail(raw, stderr_txt)}")
+        raise RuntimeError(
+            f"claude CLI exited with code {proc.returncode}: {claude_failure_detail(raw, stderr_txt)}")
 
     # claude often exits 0 even when the upstream API failed (auth 401, server 500, …);
     # the failure surfaces as is_error:true in the JSON. Treat it as an error so it maps
@@ -814,7 +812,8 @@ async def _exec_print(
     if data and data.get("is_error"):
         status = data.get("api_error_status")
         raise RuntimeError(
-            f"claude CLI API error (status={status}): {data.get('result', '')[:300]}"
+            f"claude CLI API error (status={status}): "
+            f"{clip_redacted(str(data.get('result', '')), RESULT_CHARS)}"
         )
 
     return _extract_result_and_usage(data, raw)

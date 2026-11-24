@@ -48,7 +48,7 @@ Full cross-app guide: [`/srv/docker/docs/cli-proxy-openai-gateway.md`](../../../
 | `GET`  | `/v1/claude/models` | Static model list of the claude CLI |
 | `GET`  | `/v1/codex/models` | Subscription model list of the codex CLI, read from `$CODEX_HOME/models_cache.json` (only `visibility: list`, ordered by `priority`, never `-pro`/`:batch`), preceded by the always-latest aliases `gpt-<line>-latest` (`x_aliases` maps each to its concrete id, `x_aliases_complete: true`); curated fallback `gpt-6.2-sol`, `gpt-6.2-astra`, `gpt-6.1-terra` while the CLI has not written the cache (`x_source: static`) |
 | `GET`  | `/v1/models` | **DEPRECATED** combined legacy model list |
-| `GET`  | `/health` | Health check with CLI status |
+| `GET`  | `/health` | Health check with CLI status and failover state (`degraded`, per-backend breaker, `last_error_detail`, `empty_results`) |
 
 ### Explicit endpoints (recommended)
 
@@ -93,6 +93,16 @@ Like `claude-opus-latest`, codex has `gpt-<line>-latest` aliases so that consume
 - **Endpoints:** `GET /v1/codex/models` and `GET /v1/cli/codex-cli/models` list the aliases first in `data`, then the concrete ids, and return the mapping in `x_aliases` (for example `{"gpt-sol-latest": "gpt-6.2-sol", "gpt-astra-latest": "gpt-6.2-astra"}`) plus `"x_aliases_complete": true`. The flag says the mapping is derived completely and deterministically from the model list and is exactly the one the proxy applies to a call, so a consumer may replace its own alias state with it instead of merging; it holds for `x_source` `live`, `static` and `degraded`. The claude endpoints omit the field (absent means `false`). The failover to codex uses `gpt-sol-latest` internally (`DEFAULT_CODEX_MODEL`). The HTTP API still requires `model`; a request without it is rejected with 400.
 - **Requests:** a request with `model: "gpt-sol-latest"` (a prefix such as `openai/gpt-sol-latest` is ignored) runs `codex -m <concrete id>`, and the response `model` carries the concrete id. An alias no listed model satisfies is not replaced; it behaves like any other unknown model name.
 - **Reproducibility:** the alias moves with every release. Run snapshots and consumers that need reproducible results store the concrete id from `x_aliases`, not the alias.
+
+## Failover, error details and empty results
+
+The explicit endpoints hand a request over to the partner CLI (claude ⇄ codex) when the requested one fails with an auth, limit or transport fault; a circuit breaker keeps a failing backend out for a while and then lets one probe through. Successful handovers carry `x-cli-proxy-failover: <from>-><to>`, and every success carries `x-cli-proxy-provider`.
+
+- **Switching the failover off per request:** send the request header `x-cli-proxy-failover: off` (also `0` or `false`, any case) when your result depends on the model and an answer from another backend is worse than an error. The request then stays on the requested backend (no second account, no partner CLI). A failure comes back as the usual error envelope with the CLI's cause, and it counts for the breaker as usual. If the breaker of the requested backend is open, the request is answered at once with `503`, `code: backend_unavailable` and a `Retry-After` header instead of being redirected. Without the header, or with any other value, nothing changes.
+- **Error details:** when a CLI exits non-zero, the error message names the cause instead of the first 200 characters of stdout: for claude the fields `result` (at most 300 characters), `subtype`, `is_error` and `api_error_status` of its JSON result, for codex stderr plus the message of the last error event; without such fields the first 200 characters of the output, as before. Credential-like fragments (`sk-…`, `tvly-…`, `AIza…`, `gsk_…`, bearer tokens, `key=…` and similar) are replaced by `[redacted]` (`src/redaction.py`, the same rules as Geef.Atelier). Prompt and context texts never appear in these messages.
+- **Empty document-mode results:** a document-mode run (claude or codex, also after a handover) that exits normally but leaves `draft.md` empty and unchanged is answered with `502`, `type: api_error`, `code: empty_result` instead of `200` with empty text. It counts as a failure of the backend that produced it (only that one; after a handover the origin's breaker is not charged again) and is not handed over again. Text written into the draft, an unchanged non-empty draft and plain chat or streaming answers behave as before.
+- **`/health`:** each entry under `failover.backends` additionally carries `last_error_detail` (the redacted error message with the cause, up to 2000 characters; `last_error` keeps its 500-character cut) and `empty_results` (count of empty document-mode results since start).
+- **Known limitation, codex document mode in containers:** codex runs document mode with `--sandbox workspace-write`. Its Linux sandbox (bubblewrap) needs user namespaces, which Docker's default seccomp profile does not grant, so codex can neither read `context.md` nor write `draft.md` there. Such runs now end as `empty_result` instead of an empty success.
 
 ## Lean mode (claude, since 2026-11-07)
 
