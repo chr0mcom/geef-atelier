@@ -5,8 +5,21 @@ namespace Geef.Atelier.Application.Runs;
 /// <summary>Application-service contract for submitting, querying, listing, and cancelling pipeline runs.</summary>
 public interface IRunService
 {
-    /// <summary>Submits a new run request for processing.</summary>
+    /// <summary>
+    /// Submits a new run request for processing. With attachments the crew snapshot is stored only after every
+    /// attachment is uploaded and indexed; the orchestrator never claims a run without a snapshot, so the run
+    /// cannot start before its attachments are available. Model-assignment warnings are stored on the new run.
+    /// </summary>
     Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the warnings recorded for a run (Step47), in the order they were recorded. Returns an empty list
+    /// when the run does not exist or <paramref name="requestingUsername"/> is set and does not own it.
+    /// The default implementation reports no warnings.
+    /// </summary>
+    Task<IReadOnlyList<Core.Domain.Warnings.RunWarningEntity>> ListRunWarningsAsync(
+        Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Core.Domain.Warnings.RunWarningEntity>>([]);
 
     /// <summary>
     /// Returns the run with the given ID, or null if not found.

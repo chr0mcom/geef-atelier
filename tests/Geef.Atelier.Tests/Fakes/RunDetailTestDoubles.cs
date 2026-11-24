@@ -11,7 +11,7 @@ namespace Geef.Atelier.Tests.Fakes;
 /// Shared <see cref="IRunService"/> stub for RunDetail component tests: serves a single
 /// fixed <see cref="RunDetails"/> instance for all read paths.
 /// </summary>
-internal sealed class StubRunService(RunDetails details) : IRunService
+internal sealed class StubRunService(RunDetails details, IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>? warnings = null) : IRunService
 {
     public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null,
         string? requestingUsername = null, CancellationToken ct = default) =>
@@ -38,7 +38,8 @@ internal sealed class StubRunService(RunDetails details) : IRunService
             RecoveryAdvisors: [],
             AdvisorsByIteration: Enumerable.Empty<AdvisorConsultation>().ToLookup(x => x.IterationNumber),
             GroundingConsultations: Array.Empty<GroundingConsultation>(),
-            ToolInvocations: []));
+            ToolInvocations: [],
+            Warnings: warnings));
 
     public Task<WelcomeStats> GetWelcomeStatsAsync(string? user, CancellationToken ct = default) =>
         Task.FromResult(new WelcomeStats(0, 0, 0, 0, 0, 0));

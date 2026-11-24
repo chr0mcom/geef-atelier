@@ -4,6 +4,8 @@ using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Persistence;
 
+using Geef.Atelier.Tests.Fakes;
+
 namespace Geef.Atelier.Tests.Orchestrator;
 
 /// <summary>
@@ -25,7 +27,7 @@ public sealed class RunOrchestratorRespectsConcurrencyLimitTests(PostgresFixture
         await using var ctx = fixture.NewContext();
         var svc = new RunPersistenceService(ctx);
         for (var i = 0; i < 4; i++)
-            runIds.Add(await svc.CreateRunAsync($"Concurrency run {i + 1}", "{}", cancellationToken: CancellationToken.None));
+            runIds.Add(await svc.CreateRunAsync($"Concurrency run {i + 1}", "{}", crewSnapshotJson: TestCrewSnapshots.KlassikJson, cancellationToken: CancellationToken.None));
 
         // Gate starts closed (0 permits) — all API calls block
         var gate = new SemaphoreSlim(0, int.MaxValue);

@@ -7,6 +7,7 @@ using Geef.Atelier.Core.Domain.Tools;
 using Geef.Atelier.Core.Persistence.Mcp;
 using Geef.Atelier.Core.Persistence.Tools;
 using Geef.Atelier.Infrastructure.Mcp;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
 
@@ -14,16 +15,17 @@ namespace Geef.Atelier.Infrastructure.Tools;
 
 /// <summary>
 /// Dispatches tool invocations to the appropriate executor and persists an audit record for
-/// each call.
+/// each call. The audit record is written in its own short-lived scope and a failed write is only logged:
+/// it never discards the tool result and never leaves a broken entity in the run's shared <c>DbContext</c>.
 /// <list type="bullet">
 ///   <item><see cref="ToolType.StaticContext"/> — returns configured static text (fully wired).</item>
 ///   <item><see cref="ToolType.WebSearch"/> — calls Tavily API (wired in A-T9).</item>
 ///   <item><see cref="ToolType.McpTool"/> — connects to the configured MCP server and calls the tool by its original name.</item>
-///   <item>All other types — return a "not yet wired" notice result (not an error; grounding-provider path is used).</item>
+///   <item>All other types — return a "NotYetWired" error result.</item>
 /// </list>
 /// </summary>
 internal sealed class ToolExecutor(
-    IToolInvocationRepository invocationRepository,
+    IServiceScopeFactory scopeFactory,
     IHttpClientFactory httpClientFactory,
     IMcpServerConfigRepository mcpServerConfigRepository,
     IAtelierMcpClientFactory mcpClientFactory,
@@ -86,9 +88,29 @@ internal sealed class ToolExecutor(
             CreatedAt = DateTimeOffset.UtcNow
         };
 
-        await invocationRepository.AddAsync(invocation, ct);
+        await WriteAuditAsync(invocation, ct);
 
         return result;
+    }
+
+    private async Task WriteAuditAsync(ToolInvocation invocation, CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IToolInvocationRepository>();
+            await repository.AddAsync(invocation, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "Tool audit record could not be written: tool={ToolName} run={RunId}; the tool result is kept.",
+                invocation.ToolName, invocation.RunId);
+        }
     }
 
     // -------------------------------------------------------------------------

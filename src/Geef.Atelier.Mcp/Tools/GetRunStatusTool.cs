@@ -9,7 +9,7 @@ namespace Geef.Atelier.Mcp.Tools;
 [McpServerToolType]
 public static class GetRunStatusTool
 {
-    [McpServerTool, Description("Gets the current status of a run by its ID.")]
+    [McpServerTool, Description("Gets the current status of a run by its ID, including warnings about sources, checks or models the run had to skip or replace, and the outcome once it has ended.")]
     public static async Task<RunStatusDto?> GetRunStatus(
         IRunService runService,
         ICurrentUserService currentUser,
@@ -19,6 +19,9 @@ public static class GetRunStatusTool
         if (!Guid.TryParse(runId, out var guid)) return null;
         var requestingUsername = currentUser.IsAdmin ? null : currentUser.Username;
         var run = await runService.GetRunAsync(guid, requestingUsername, cancellationToken);
-        return run is null ? null : new RunStatusDto(run.Id.ToString(), run.Status.ToString(), run.ErrorMessage);
+        if (run is null) return null;
+        var warnings = await runService.ListRunWarningsAsync(guid, requestingUsername, cancellationToken);
+        return new RunStatusDto(run.Id.ToString(), run.Status.ToString(), run.ErrorMessage,
+            warnings.ToDtos(), run.Outcome?.ToString());
     }
 }

@@ -15,4 +15,7 @@ internal sealed class PassThroughModelAssignmentService : IModelAssignmentServic
         Task.FromResult<IReadOnlyList<ModelAssignment>>(reviewers.Select(r => new ModelAssignment(r.Current, false, null)).ToList());
 
     public Task<CrewSnapshot> ApplyAsync(CrewSnapshot snapshot, CancellationToken ct = default) => Task.FromResult(snapshot);
+
+    public Task<CrewSnapshot> ApplyAsync(CrewSnapshot snapshot, ICollection<ModelAssignmentWarning> warnings, CancellationToken ct = default) =>
+        Task.FromResult(snapshot);
 }

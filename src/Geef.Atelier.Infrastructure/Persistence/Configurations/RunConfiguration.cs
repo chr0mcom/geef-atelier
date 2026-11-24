@@ -67,6 +67,10 @@ internal sealed class RunConfiguration : IEntityTypeConfiguration<RunEntity>
         builder.HasIndex(r => r.CreatedAt).HasDatabaseName("IX_Runs_CreatedAt");
         builder.HasIndex(r => new { r.Status, r.CompletedAt }).HasDatabaseName("IX_Runs_Status_CompletedAt");
 
+        builder.Property(r => r.Outcome).HasConversion<int?>().IsRequired(false);
+        builder.Property(r => r.DeliveredIteration).IsRequired(false);
+        builder.Property(r => r.ReportJson).HasColumnType("text").IsRequired(false);
+
         builder.Property(r => r.ParentCompositionRunId).IsRequired(false);
         builder.HasIndex(r => r.ParentCompositionRunId).HasDatabaseName("IX_Runs_ParentCompositionRunId");
     }

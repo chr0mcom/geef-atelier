@@ -4,6 +4,7 @@ using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.Crew.Specialization;
 using Geef.Atelier.Core.Domain.Tools;
+using Geef.Atelier.Core.Domain.Warnings;
 
 namespace Geef.Atelier.Core.Domain.Crew;
 
@@ -13,7 +14,7 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// after referenced profiles are renamed or deleted.
 /// </summary>
 /// <param name="SchemaVersion">
-/// Format version. Increment when the snapshot schema changes; deserialisation throws on
+/// Format version. Increment when the snapshot schema changes; <see cref="DeserializeForRun"/> throws on
 /// unknown versions to surface format drift early.
 /// </param>
 /// <param name="TemplateName">
@@ -78,8 +79,8 @@ public sealed record CrewSnapshot(
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     /// <summary>
-    /// Attempts to deserialize a <see cref="CrewSnapshot"/> from a JSON string.
-    /// Returns <c>null</c> if <paramref name="json"/> is null, empty, or cannot be parsed.
+    /// Tolerant read for display purposes: returns <c>null</c> if <paramref name="json"/> is null, empty, or cannot
+    /// be parsed. Never use it to decide which crew a run executes; use <see cref="DeserializeForRun"/>.
     /// </summary>
     public static CrewSnapshot? Deserialize(string? json)
     {
@@ -93,5 +94,46 @@ public sealed record CrewSnapshot(
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Strict read for executing a run. Throws <see cref="InvalidCrewSnapshotException"/> with a user-facing
+    /// reason when the snapshot is missing, unreadable, of an unknown schema version or lacks the executor or the
+    /// reviewer and advisor lists. There is no fallback crew.
+    /// </summary>
+    public static CrewSnapshot DeserializeForRun(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            throw new InvalidCrewSnapshotException("This task has no saved setup, so it cannot start. Please submit it again.");
+
+        CrewSnapshot? snapshot;
+        try
+        {
+            snapshot = JsonSerializer.Deserialize<CrewSnapshot>(json, DeserializeOpts);
+        }
+        catch (Exception ex) when (ex is JsonException or NotSupportedException or InvalidOperationException or ArgumentException)
+        {
+            throw new InvalidCrewSnapshotException(
+                $"The saved setup of this task could not be read ({ex.Message.ToWarningDetail()}). Please submit it again.", ex);
+        }
+
+        if (snapshot is null)
+            throw new InvalidCrewSnapshotException("The saved setup of this task is empty. Please submit it again.");
+        if (snapshot.SchemaVersion is < 1 or > CurrentSchemaVersion)
+            throw new InvalidCrewSnapshotException(
+                $"The saved setup of this task uses an unknown format (version {snapshot.SchemaVersion}). Please submit it again.");
+
+        var missing = new List<string>();
+        if (snapshot.Executor is null)
+            missing.Add("writer");
+        if (snapshot.Reviewers is null)
+            missing.Add("checks");
+        if (snapshot.Advisors is null)
+            missing.Add("advisors");
+        if (missing.Count > 0)
+            throw new InvalidCrewSnapshotException(
+                $"The saved setup of this task is incomplete (missing: {string.Join(", ", missing)}). Please submit it again.");
+
+        return snapshot;
     }
 }

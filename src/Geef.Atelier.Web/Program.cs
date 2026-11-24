@@ -22,6 +22,7 @@ using Geef.Atelier.Mcp;
 using Geef.Atelier.Web.Auth;
 using Geef.Atelier.Web.Components;
 using Geef.Atelier.Web.Endpoints;
+using Geef.Atelier.Web.Health;
 using Geef.Atelier.Web.Hubs;
 using Geef.Atelier.Web.Notifications;
 using Geef.Atelier.Web.Services;
@@ -67,7 +68,7 @@ builder.Services.AddKnowledge(builder.Configuration);
 // Crew composition infrastructure (ICrewTemplateEmbeddingRepository, etc.)
 builder.Services.AddCrewComposition();
 
-// Grounding providers — ApiKey intentionally not logged; missing key fails at run time, not at startup.
+// Grounding providers — ApiKey never logged; a missing key is reported by name at startup and as a run warning.
 builder.Services.AddGroundingProviders(builder.Configuration);
 
 // Tool execution infrastructure (IToolExecutor + IToolSchemaProvider)
@@ -94,7 +95,8 @@ builder.Services.AddHostedService<PackArchivalBackgroundService>();
 builder.Services.AddHostedService<ModelCatalogWarmUpService>();
 
 builder.Services.AddHealthChecks()
-    .AddDbContextCheck<AtelierDbContext>();
+    .AddDbContextCheck<AtelierDbContext>()
+    .AddCheck<PendingMigrationsHealthCheck>("pending-migrations");
 
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IRunNotifier, SignalRRunNotifier>();
@@ -156,22 +158,9 @@ builder.Services.AddRazorComponents()
 
 var app = builder.Build();
 
-// Auto-migrate at startup; failure is logged but does not crash the host
-// so that the health check can report Unhealthy rather than causing an unhandled exception.
-using (var scope = app.Services.CreateScope())
-{
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    try
-    {
-        await scope.ServiceProvider
-            .GetRequiredService<AtelierDbContext>()
-            .Database.MigrateAsync();
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Database migration failed on startup; health check will report Unhealthy");
-    }
-}
+// Auto-migrate at startup; a failed migration stops the host instead of serving an outdated schema.
+await app.Services.MigrateDatabaseOrFailAsync();
+app.Configuration.WarnAboutMissingGroundingKeys(app.Services.GetRequiredService<ILogger<Program>>());
 
 // Seed the admin user from ATELIER_USER / ATELIER_PASSWORD_HASH env vars
 using (var scope = app.Services.CreateScope())

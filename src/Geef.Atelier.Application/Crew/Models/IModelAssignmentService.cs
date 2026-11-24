@@ -41,5 +41,12 @@ public interface IModelAssignmentService
     /// refiners and Transform finalizers carrying a slot marker) bound to its assigned model. Manual actors
     /// are returned unchanged. Never throws because of catalog problems.
     /// </summary>
-    Task<CrewSnapshot> ApplyAsync(CrewSnapshot snapshot, CancellationToken ct = default);
+    Task<CrewSnapshot> ApplyAsync(CrewSnapshot snapshot, CancellationToken ct = default) =>
+        ApplyAsync(snapshot, new List<ModelAssignmentWarning>(), ct);
+
+    /// <summary>
+    /// Like <see cref="ApplyAsync(CrewSnapshot, CancellationToken)"/>, and adds one entry to
+    /// <paramref name="warnings"/> for every assignment that fell back or breaks model plurality.
+    /// </summary>
+    Task<CrewSnapshot> ApplyAsync(CrewSnapshot snapshot, ICollection<ModelAssignmentWarning> warnings, CancellationToken ct = default);
 }

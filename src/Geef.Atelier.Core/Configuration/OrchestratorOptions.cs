@@ -11,4 +11,10 @@ public sealed class OrchestratorOptions
 
     /// <summary>How often the per-run cancellation watcher polls the database for the CancellationRequested flag.</summary>
     public TimeSpan CancellationPollingInterval { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// How long a Pending run may stay without a saved crew snapshot (attachments still being prepared) before it
+    /// is failed. A run without a snapshot is never picked up.
+    /// </summary>
+    public TimeSpan PreparationTimeout { get; set; } = TimeSpan.FromMinutes(15);
 }

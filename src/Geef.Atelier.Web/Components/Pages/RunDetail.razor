@@ -138,6 +138,8 @@
             </div>
         </div>
 
+        <RunWarningsBlock Warnings="_viewModel?.Warnings" />
+
         <CrewSummary Snapshot="_snapshot" FallbackTemplateName="@_details.Run.CrewTemplateName" />
 
         <ActorPromptCompositionBlock Compositions="_snapshot?.PromptCompositions" />

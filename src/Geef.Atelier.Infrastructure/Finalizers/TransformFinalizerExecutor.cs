@@ -28,7 +28,8 @@ internal sealed class TransformFinalizerExecutor(
         {
             logger.LogWarning("Transform finalizer {Profile} has no system prompt configured; skipping.",
                 profile.Name);
-            return new FinalizerExecutionResult(null, null, null, profile.Name);
+            return new FinalizerExecutionResult(null, null, null, profile.Name,
+                SkipReason: "no instructions are configured for this step");
         }
 
         // Validate that the configured provider exists and is active.

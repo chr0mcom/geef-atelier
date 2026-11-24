@@ -67,7 +67,7 @@ internal sealed class CrewMaterializeFinalizerExecutor(
                 logger.LogWarning(
                     "CrewMaterialize: run {RunId} has no final text (spec JSON); skipping materialization.",
                     context.RunId);
-                return Ok(profile.Name);
+                return Ok(profile.Name) with { SkipReason = "it received no result to save" };
             }
 
             // ── Materialize ───────────────────────────────────────────────────────

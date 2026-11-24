@@ -6,6 +6,7 @@ using Geef.Atelier.Core.Persistence.Mcp;
 using Geef.Atelier.Core.Persistence.Tools;
 using Geef.Atelier.Infrastructure.Mcp;
 using Geef.Atelier.Infrastructure.Tools;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using ModelContextProtocol.Client;
 
@@ -39,8 +40,8 @@ public sealed class ToolExecutorTests
             ActorName: "default-executor",
             Sequence: 1);
 
-    private static ToolExecutor BuildExecutor(InMemoryToolInvocationRepository repo) =>
-        new(repo, new NoOpHttpClientFactory(), new NullMcpServerConfigRepository(), new NullMcpClientFactory(), NullLogger<ToolExecutor>.Instance);
+    private static ToolExecutor BuildExecutor(IToolInvocationRepository repo) =>
+        new(repo.ToScopeFactory(), new NoOpHttpClientFactory(), new NullMcpServerConfigRepository(), new NullMcpClientFactory(), NullLogger<ToolExecutor>.Instance);
 
     // -------------------------------------------------------------------------
     // Tests
@@ -170,7 +171,7 @@ public sealed class ToolExecutorTests
         });
         var repo = new InMemoryToolInvocationRepository();
         var executor = new ToolExecutor(
-            repo,
+            repo.ToScopeFactory(),
             new NoOpHttpClientFactory(),
             new FixedMcpServerConfigRepository(inactiveConfig),
             new NullMcpClientFactory(),
@@ -195,6 +196,20 @@ public sealed class ToolExecutorTests
         // Must not throw — returns a not-yet-wired notice
         Assert.Equal("NotYetWired", result.Error);
         Assert.Contains("GroundingProvider path", result.Output);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AuditWriteFails_KeepsTheToolResult()
+    {
+        var tool = MakeTool(
+            ToolType.StaticContext,
+            new Dictionary<string, string> { [ToolDefinitionSettingsKeys.StaticContent] = "kept" });
+        var executor = BuildExecutor(new ThrowingToolInvocationRepository());
+
+        var result = await executor.ExecuteAsync(tool, "{}", MakeContext());
+
+        Assert.Equal("kept", result.Output);
+        Assert.Null(result.Error);
     }
 
     [Fact]
@@ -240,6 +255,24 @@ internal sealed class InMemoryToolInvocationRepository : IToolInvocationReposito
             .ToList();
         return Task.FromResult(result);
     }
+}
+
+internal sealed class ThrowingToolInvocationRepository : IToolInvocationRepository
+{
+    public Task AddAsync(ToolInvocation invocation, CancellationToken ct = default) =>
+        throw new InvalidOperationException("audit store unavailable");
+
+    public Task<IReadOnlyList<ToolInvocation>> GetByRunIdAsync(Guid runId, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<ToolInvocation>>([]);
+}
+
+internal static class ToolInvocationRepositoryScopeExtensions
+{
+    public static IServiceScopeFactory ToScopeFactory(this IToolInvocationRepository repository) =>
+        new ServiceCollection()
+            .AddSingleton(repository)
+            .BuildServiceProvider()
+            .GetRequiredService<IServiceScopeFactory>();
 }
 
 /// <summary>Returns null for every GetByIdAsync call (simulates missing server config).</summary>

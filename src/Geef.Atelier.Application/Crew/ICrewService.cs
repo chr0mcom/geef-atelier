@@ -176,4 +176,12 @@ public interface ICrewService
     /// When both are null, falls back to the <c>"klassik"</c> system template.
     /// </summary>
     Task<CrewSnapshot> ResolveSnapshotAsync(string? crewTemplateName, CrewSpec? customCrew, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Like <see cref="ResolveSnapshotAsync"/>, but also returns the model-assignment warnings so the caller can
+    /// store them on the run. The default implementation reports no warnings.
+    /// </summary>
+    async Task<ResolvedCrewSnapshot> ResolveSnapshotWithWarningsAsync(
+        string? crewTemplateName, CrewSpec? customCrew, CancellationToken cancellationToken = default) =>
+        new(await ResolveSnapshotAsync(crewTemplateName, customCrew, cancellationToken), []);
 }

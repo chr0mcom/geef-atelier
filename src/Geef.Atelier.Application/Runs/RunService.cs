@@ -6,6 +6,7 @@ using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Tools;
+using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Core.Persistence.Tools;
@@ -21,7 +22,9 @@ internal sealed class RunService(
     IKnowledgeService                     knowledgeService,
     ILogger<RunService>                   logger,
     IGroundingConsultationRepository?     groundingConsultationRepository = null,
-    IToolInvocationRepository?            toolInvocationRepository = null) : IRunService
+    IToolInvocationRepository?            toolInvocationRepository = null,
+    IRunWarningSink?                      warningSink = null,
+    IRunWarningRepository?                warningRepository = null) : IRunService
 {
     private static readonly JsonSerializerOptions SnapshotJsonOpts =
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
@@ -85,20 +88,23 @@ internal sealed class RunService(
             normalizedConfig = System.Text.Encoding.UTF8.GetString(ms.ToArray());
         }
 
-        var snapshot = await crewService.ResolveSnapshotAsync(
+        var resolved = await crewService.ResolveSnapshotWithWarningsAsync(
             string.IsNullOrEmpty(effectiveTemplateName) ? null : effectiveTemplateName,
             request.AutoCompose ? null : request.CustomCrew,
             cancellationToken);
+        var snapshot = resolved.Snapshot;
         var snapshotJson = JsonSerializer.Serialize(snapshot, SnapshotJsonOpts);
         // CrewTemplateName is the template name from snapshot (null for inline spec)
         var resolvedTemplateName = snapshot.TemplateName;
+        var hasAttachments = request.Attachments is { Count: > 0 };
 
         var runId = await persistence.CreateRunAsync(
             effectiveBriefing, normalizedConfig, request.CreatedByUser,
-            resolvedTemplateName, snapshotJson, effectiveKind,
+            resolvedTemplateName, hasAttachments ? null : snapshotJson, effectiveKind,
             request.ParentCompositionRunId, cancellationToken);
 
-        // Upload run-local attachments and extend the snapshot with RunAttachmentsProfile.
+        await ReportAssignmentWarningsAsync(runId, resolved.Warnings);
+
         if (request.Attachments is { Count: > 0 } attachments)
         {
             try
@@ -114,10 +120,10 @@ internal sealed class RunService(
                         cancellationToken);
                 }
 
-                var extendedProviders = new List<GroundingProviderProfile>
-                    { SystemCrew.RunAttachmentsProfile };
-                if (snapshot.GroundingProviders is { Count: > 0 } existing)
-                    extendedProviders.AddRange(existing);
+                var existing = snapshot.GroundingProviders ?? [];
+                var extendedProviders = existing.Any(p => p.Name == SystemCrew.RunAttachmentsProfile.Name)
+                    ? existing.ToList()
+                    : [SystemCrew.RunAttachmentsProfile, .. existing];
 
                 var extendedSnapshot = snapshot with { GroundingProviders = extendedProviders };
                 var extendedSnapshotJson = JsonSerializer.Serialize(extendedSnapshot, SnapshotJsonOpts);
@@ -132,6 +138,25 @@ internal sealed class RunService(
         }
 
         return runId;
+    }
+
+    private async Task ReportAssignmentWarningsAsync(Guid runId, IReadOnlyList<Crew.Models.ModelAssignmentWarning> warnings)
+    {
+        if (warningSink is null)
+            return;
+        foreach (var warning in warnings)
+            await warningSink.ReportAsync(runId, RunWarningSources.ModelAssignment, RunWarningCodes.ModelAssignment,
+                $"The AI model for '{warning.ActorName}' could not be chosen as planned, so a replacement was used ({warning.Detail.ToWarningDetail()}).");
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<RunWarningEntity>> ListRunWarningsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
+    {
+        if (warningRepository is null)
+            return [];
+        if (requestingUsername is not null && await GetRunAsync(runId, requestingUsername, cancellationToken) is null)
+            return [];
+        return await warningRepository.ListByRunAsync(runId, cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -273,6 +298,10 @@ internal sealed class RunService(
             ? await toolInvocationRepository.GetByRunIdAsync(runId, cancellationToken)
             : [];
 
+        IReadOnlyList<RunWarningEntity> warnings = warningRepository is not null
+            ? await warningRepository.ListByRunAsync(runId, cancellationToken)
+            : [];
+
         return new RunWithGroundingViewModel(
             details,
             snapshot,
@@ -281,7 +310,8 @@ internal sealed class RunService(
             recoveryAdvisors,
             advisorsByIteration,
             groundingConsultations,
-            toolInvocations);
+            toolInvocations,
+            warnings);
     }
 
     /// <inheritdoc/>

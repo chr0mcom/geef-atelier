@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Geef.Atelier.Core.Domain.Warnings;
 using Microsoft.Extensions.Logging;
 
 namespace Geef.Atelier.Infrastructure.Llm;
@@ -40,7 +41,7 @@ internal sealed class OpenAiCompatibleClient(
                 inner: null,
                 statusCode: response.StatusCode);
 
-        WarnOnFailover(response, request.Model);
+        await ReportFailoverAsync(response, request.Model);
 
         return OpenAiMessageFormat.DeserializeResponse(json);
     }
@@ -48,20 +49,29 @@ internal sealed class OpenAiCompatibleClient(
     /// <summary>
     /// A cli-proxy failover silently runs the request on the partner CLI's default model, which can put a
     /// reviewer onto the executor's model family (D-066). The response still names the requested model, so the
-    /// header is the only trace — surface it.
+    /// header is the only trace — log it and record it as a warning on the run executing on this async flow
+    /// (<see cref="RunWarningScope"/>), once per hop and requested model.
     /// </summary>
-    private void WarnOnFailover(HttpResponseMessage response, string requestedModel)
+    private async Task ReportFailoverAsync(HttpResponseMessage response, string requestedModel)
     {
-        if (logger is null || !response.Headers.TryGetValues(FailoverHeader, out var values))
+        if (!response.Headers.TryGetValues(FailoverHeader, out var values))
             return;
 
         var hops = values.ToList();
         if (hops.Count > 0 && hops.All(IsSameCliHop))
             return;
 
-        logger.LogWarning(
+        var failover = string.Join(",", hops);
+        logger?.LogWarning(
             "cli-proxy failover {Failover}: request for model '{Model}' was served by another CLI with its default model; model plurality may not hold for this call.",
-            string.Join(",", hops), requestedModel);
+            failover, requestedModel);
+
+        if (RunWarningScope.Current is { } scope)
+            await scope.ReportOnceAsync(
+                $"{RunWarningCodes.LlmFailover}|{failover}|{requestedModel}",
+                RunWarningSources.Llm,
+                RunWarningCodes.LlmFailover,
+                $"An AI service was unavailable, so another one answered instead ({failover.ToWarningDetail()}; requested model {requestedModel.ToWarningDetail()}). Some checks may have used the same model as the writer.");
     }
 
     /// <summary>

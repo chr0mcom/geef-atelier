@@ -29,6 +29,7 @@ namespace Geef.Atelier.Application.Runs;
 /// All tool invocations recorded for this run, ordered by <see cref="ToolInvocation.Sequence"/>.
 /// Empty when no tool calls occurred or the run was created before tool-invocation tracking was introduced.
 /// </param>
+/// <param name="Warnings">Problems the run worked around (Step47), in the order they were recorded; empty when none.</param>
 public sealed record RunWithGroundingViewModel(
     RunDetails Details,
     CrewSnapshot? Snapshot,
@@ -37,4 +38,5 @@ public sealed record RunWithGroundingViewModel(
     IReadOnlyList<AdvisorConsultation> RecoveryAdvisors,
     ILookup<int, AdvisorConsultation> AdvisorsByIteration,
     IReadOnlyList<GroundingConsultation> GroundingConsultations,
-    IReadOnlyList<ToolInvocation> ToolInvocations);
+    IReadOnlyList<ToolInvocation> ToolInvocations,
+    IReadOnlyList<Core.Domain.Warnings.RunWarningEntity>? Warnings = null);
