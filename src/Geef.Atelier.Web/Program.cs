@@ -105,6 +105,7 @@ builder.Services.PostConfigure<SourceOptions>(o =>
 });
 builder.Services.Configure<OrderOptions>(builder.Configuration.GetSection(OrderOptions.SectionName));
 builder.Services.AddSources(builder.Configuration);
+builder.Services.AddRequestTimeouts();
 builder.Services.AddPipelineAssemblers();
 builder.Services.AddHostedService<RunOrchestratorService>();
 builder.Services.AddHostedService<OAuthCleanupBackgroundService>();
@@ -196,6 +197,7 @@ app.Use(async (ctx, next) =>
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
+app.UseRequestTimeouts();
 
 // Prevent caching of authenticated responses.
 app.Use(async (ctx, next) =>
