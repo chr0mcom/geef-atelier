@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-11-23 (D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
+*Last updated: 2026-11-24 (D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -1616,3 +1616,131 @@ Research: `reports/2026-11-22-modellrecherche.md`. Design: `docs/superpowers/spe
 - **Deploy order:** `cli-proxy` before `web`. Afterwards `GET /v1/cli/codex-cli/models` must show `x_source: live`, `x_aliases_complete: true` and `gpt-sol-latest` in `x_aliases`.
 
 **Rejected:** `gemini-cli` as third family (inactive); a codex budget per crew; a run-time candidate chain; a family mapping in the proxy failover.
+
+## D-067 — Stage 0: safety net (2026-11-24)
+
+**Context.** An analysis on 2026-11-24 found that attached files, web search and learnings had had no
+effect in production since grounding was rebuilt on central tools (D-060), and nobody noticed. The system
+grounding profiles pointed at tools that were not wired in `ToolExecutor` or read a key name the container
+does not set; the error ended as empty context. There was no test over the real wiring, runs did not report
+problems they worked around, and several places silently fell back to substitute behaviour: to the classic
+crew on an unreadable snapshot, to approving everything for a crew without reviewers, to starting despite a
+failed migration. Stage 0 brings nothing new to the user, but makes sure nothing breaks silently any more.
+It is the precondition for the rebuild in D-068.
+
+**D-067/1 — End-to-end harness over the real wiring.** `tests/Geef.Atelier.Tests/EndToEnd` starts the
+application through `WebApplicationFactory<Program>` against real Postgres (Testcontainers). Only the HTTP
+counterparts (cli-proxy, Tavily, embeddings) are replaced, and their request bodies are recorded. The tests
+prove that attachment and web-search content reach the executor prompt, and they fail when the grounding
+repair is reverted. Every new pipeline path gets a test here from entry point to result. Description:
+[02-architecture](02-architecture.md#testing-and-measuring-d-067).
+
+**D-067/2 — Warnings at the run.** Whatever a run works around (skipped source, failed reviewer, deviating
+model assignment, failover, finalizer problem) is stored as a warning in the new table `RunWarnings`
+(`IRunWarningSink`, its own short-lived database scope per write, never decisive for the run). Shown on the
+run detail page and in the MCP field `warnings` of `get_run_status` and `get_run_result`. The texts are
+short sentences for the user; technical details belong in the log.
+
+**D-067/3 — `Outcome` as a display signal, `RunStatus` unchanged.** `Runs.Outcome` (`Converged`,
+`DeliveredWithOpenPoints`, `Failed`, `Aborted`) and `Runs.DeliveredIteration` state what a run delivered.
+`Outcome` means "finished and stored, including finalizers". `RunStatus` stays as decided: a run without
+convergence ends `Failed` even when it delivers a text (status decision of 2026-07-17). The display derives
+"delivered with open points" from `Outcome`. On failure, the findings of the last iteration are stored too.
+
+**D-067/4 — Fail loud instead of silent.** A failed migration aborts the start; the health check
+`pending-migrations` reports pending migrations. An unusable crew snapshot fails the run with a message
+(`CrewSnapshot.DeserializeForRun`) instead of falling back to the classic crew. A crew without reviewers
+fails at start; `AutoApproveReviewer` is removed. A run without a snapshot is not resumed but rejected
+immediately with a message. An unknown grounding type is skipped with a warning.
+
+**D-067/5 — Grounding bridge until the rebuild.** The five system grounding profiles no longer have a
+`ToolName` and run through the provider-type path again; a run-time rule (`GroundingPathSelection`) also
+covers older snapshots, and migration Step47 cleans stored rows. The agentic tool path was never wired into
+the pipeline; it stays frozen and its removal is planned (D-068). A run with attachments becomes ready only
+after its attachments are uploaded (snapshot afterwards, time limit `Orchestrator:PreparationTimeout`,
+default 15 minutes); a resumed run finds the attachments of its predecessor.
+
+**D-067/6 — Allow list for environment variables.** User-editable configuration may only reference
+environment variables on an allow list (`IEnvReferencePolicy`: built-in list, prefix `ATELIER_SECRET_*`,
+additions via `EnvReference:Allowed`). Names not on the list are rejected on save and never read at run
+time. The editors for providers, tools, MCP servers and grounding are admin-only; Template Studio no longer
+takes over key references.
+
+**D-067/7 — Hub for signed-in users only.** `RunHub` requires sign-in, derives group names on the server
+from the identity and ends when the sign-in expires. The Blazor pages get live updates through the
+in-process `IRunUpdateFeed` with the same access rules and no longer open a `HubConnection`. List updates
+go only to owners and administrators.
+
+**D-067/8 — Learning switch off.** `Learning:Enabled` (default `false`) pauses the learning loop: no
+extraction, no gate run, no embedding, empty retrieval. Crews with learning parts stay valid. Following
+D-068 the loop will be replaced by a per-user memory.
+
+**D-067/9 — Nightly update builds only from the committed state.** The nightly cli-proxy self-update builds
+only from the committed state; with uncommitted changes it pauses and reports this, also with `FORCE=1`.
+
+**D-067/10 — Mini run after every deploy.** `scripts/atelier-smoke.sh` signs in, submits a short job over
+MCP and waits for the result (exit code 0 only on success). Setup: [`ops/atelier-smoke.md`](ops/atelier-smoke.md).
+
+**D-067/11 — Watcher.** `scripts/atelier-watch.sh` reports stuck runs, an unhealthy cli-proxy and unhealthy
+containers through the server's existing alert channel, only for new or changed problems and once when
+they clear. Setup: [`ops/atelier-watch.md`](ops/atelier-watch.md).
+
+**D-067/12 — Measuring tool.** `tools/Eval` compares the Atelier with other paths on a fixed task set by
+blind pairwise comparison; real tasks stay outside Git ([`tools/Eval/README.md`](../tools/Eval/README.md)).
+
+**Consequences.**
+
+- Problems become visible at the run instead of silently lowering quality; some runs that used to run
+  silently with substitute behaviour now fail with a message.
+- Runs that ended before Step47 have `Outcome = NULL`; there is no backfill.
+- The template editor does not yet check for a reviewer on save; such crews fail at start.
+- Migration Step47 is additive and idempotent (`RunWarnings`, `Runs.Outcome`, `Runs.DeliveredIteration`,
+  `Runs.ReportJson`, clearing `ToolName` on five system profiles).
+- The documentation describes the tool path as frozen ([10-tool-system](10-tool-system.md)).
+
+**Way back.**
+
+- Step47 removes nothing; `Down` only reverts the new parts. The new MCP fields are optional; older clients
+  ignore them.
+- Learning can be switched on again with `Learning:Enabled = true`.
+- Missing names on the allow list are added via `EnvReference:Allowed` or the prefix `ATELIER_SECRET_*`,
+  without a new build.
+- Smoke run, watcher and the lock in the nightly update are scripts outside the application and can be
+  reverted individually.
+- There is no way back to the tool path for the system profiles or to silent fallbacks; removing exactly
+  these states was the point of this stage.
+
+## D-068 — Direction of the rebuild: order, direct path, questions, sources, memory (2026-11-24)
+
+**Status:** decided, being implemented. A direction decision; the individual stages get their own entries.
+
+**Goal.** A user, including a layperson, types one sentence, optionally adds files, and within minutes gets
+a result they prefer to a direct model call. The result invents nothing, keeps hard requirements and states
+its assumptions.
+
+**Rationale.** Measurements on eleven real jobs showed: asking questions beats merely assuming 9 : 1, an
+additional review round does not improve the verdict, and neither does preparing the job without new
+information.
+
+**Direction.**
+
+- **Question rule.** For every gap in a job, this order applies: take it from the job and the files → take
+  it from the profile and memory → research it → assume it reasonably and mark it as an assumption → ask
+  only when the user can know the answer and it changes the result substantially. At most three questions,
+  short, with ready-made answers to click, always skippable. Questions are asked only **before** the run,
+  never during it; without questions the run starts at once. The code enforces the rule, not the goodwill of
+  a model.
+- **Order as the unit users see.** Users see orders: clarification, sources, versions, result. Runs remain
+  the record underneath.
+- **Direct path as the default.** Clarify, research if needed, one writing call with all sources in full
+  text, checks and at most one correction. The existing loop remains selectable as "Extra careful".
+- **Sources in full text.** Files go into the prompt in full instead of through an excerpt search;
+  researched quotes are checked word for word against the retrieved text.
+- **Memory.** Profile, remembered answers and corrections per user, without embeddings; it replaces the
+  learning loop.
+- **Removal in stages.** Agentic tool path, MCP client, Template Studio, crew composer, learning gate and
+  embeddings are removed step by step. Tables are dropped only one deploy after the code is gone; old
+  snapshots stay readable.
+
+**Unchanged.** The Geef SDK, the status decision of 2026-07-17, additive and idempotent migrations, the
+single-language English UI (D-062; questions and result appear in the language of the job).

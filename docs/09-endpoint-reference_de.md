@@ -2,7 +2,7 @@
 
 *[English](09-endpoint-reference.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-05-22 (D-054: Tool list_learnings ergänzt; providerType um learning-retrieval erweitert)*
+*Letzte Aktualisierung: 2026-11-24 (D-067: `warnings` und `outcome` in `get_run_status`/`get_run_result`; `/hubs/runs` nur für Angemeldete; Editoren nur für Admins und `/access-denied`; Learning standardmäßig pausiert; zuvor 2026-05-22, D-054: Tool list_learnings ergänzt; providerType um learning-retrieval erweitert)*
 
 Alle HTTP-Endpunkte von Geef.Atelier, die extern erreichbar sind — MCP, OAuth 2.1
 sowie die Web-UI-/Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`.
@@ -143,7 +143,7 @@ Funktioniert nur für `ArtifactType.File`-Artefakte. Liest die Datei vom `Export
 
 #### `list_learnings`
 
-Listet Learning-Einträge aus dem Learning-Store (D-054).
+Listet Learning-Einträge aus dem Learning-Store (D-054). Seit D-067 ist die Learning-Schleife standardmäßig pausiert (`Learning:Enabled = false`); das Tool listet weiterhin die vorhandenen Einträge, solange der Schalter aus ist, kommen aber keine neuen hinzu.
 
 **Input:**
 ```json
@@ -185,6 +185,35 @@ Beide Parameter sind optional. Ohne `status_filter` werden alle Status zurückge
 | `approved_at` | ISO8601 \| null | Genehmigungs-Zeitstempel (null solange Proposed oder Rejected) |
 
 **Hinweis:** `structured_facts_json` wird bewusst nicht exponiert — das rohe Fakten-JSON ist für MCP-Kontext zu umfangreich und nur über die Web-UI zugänglich. Auth: Standard-Run-User-Isolation; Nicht-Admin-Nutzer sehen nur ihre eigenen Einträge.
+
+#### Lauf-Status und Ergebnis: `warnings` und `outcome`
+
+Seit D-067 liefern `get_run_status` und `get_run_result` zwei zusätzliche Felder. Beide sind additiv;
+ältere Clients können sie ignorieren. Feldnamen sind camelCase.
+
+**Ausgabe von `get_run_status`:**
+```json
+{
+  "runId": "<uuid>",
+  "status": "Pending|Running|Completed|Failed|Aborted",
+  "errorMessage": "<string|null>",
+  "warnings": [ { "code": "<string>", "message": "<string>" } ],
+  "outcome": "Converged|DeliveredWithOpenPoints|Failed|Aborted|null"
+}
+```
+
+`get_run_result` liefert dieselben Felder und zusätzlich `finalText`.
+
+| Feld | Typ | Beschreibung |
+|---|---|---|
+| `warnings` | array | Probleme, die der Lauf umgangen hat, statt anzuhalten (übersprungene Quellen, ausgefallene Reviewer, Modell-Failover, Finalizer-Probleme). Leer, wenn es keine gab. `code` ist stabil und maschinenlesbar (z. B. `grounding.provider_skipped`); `message` ist ein kurzer, einfacher englischer Satz, dessen Wortlaut sich ändern kann. |
+| `outcome` | string \| null | Was der Lauf geliefert hat, sobald er fertig **und abgelegt ist, inklusive aller Finalizer**. `null`, solange der Lauf aktiv ist, und bei Läufen, die vor Step47 endeten. |
+
+**Ergebnis lesen:** `status` behält seine Bedeutung. Ein Lauf, der ohne Konvergenz stoppt, hat weiterhin
+`status = "Failed"`, liefert aber seinen besten Entwurf mit `outcome = "DeliveredWithOpenPoints"` und
+einem `finalText`. Ein Client wartet, bis `outcome` gesetzt ist, und liest dann `finalText`; ein Lauf mit
+`outcome = "Failed"` oder `"Aborted"` hat keinen brauchbaren Text. Einzelheiten:
+[02-architecture](02-architecture_de.md#lauf-ergebnis-outcome-und-runstatus).
 
 ---
 
@@ -394,16 +423,18 @@ extern erreichbaren Routen:
 | Endpunkt | Methode | Auth | Zweck |
 |----------|---------|------|-------|
 | `/` | GET | Cookie | Startseite / Atelier-Übersicht |
-| `/health` | GET | Keine | Health-Check (`Healthy`) — für Reverse-Proxy/Container-Lifecycle |
+| `/health` | GET | Keine | Health-Check (`Healthy`) — für Reverse-Proxy/Container-Lifecycle; umfasst die Datenbank und den Check `pending-migrations` (D-067) |
 | `/login` | GET/POST | Keine | Login-Seite (Static SSR) |
 | `/auth/logout` | POST | Cookie | Logout (Anti-Forgery, Minimal-API) |
 | `/settings/theme` | POST | Keine | Theme-Wechsel-Fallback (No-JS), Redirect zum Referer |
-| `/hubs/runs` | WS | — | SignalR-Hub für Live-Run-Updates |
+| `/hubs/runs` | WS | Cookie | SignalR-Hub für Live-Run-Updates, nur für Angemeldete; Gruppennamen leitet der Server ab (D-067). Die eigenen Seiten der Anwendung nutzen stattdessen den prozessinternen `IRunUpdateFeed`. |
+| `/access-denied` | GET | Cookie | Erscheint für Angemeldete, die eine Seite ohne Berechtigung öffnen (D-067) |
 | `/admin/users` | GET | Cookie (Admin) | Benutzerverwaltung |
 | `/admin/oauth-clients` | GET | Cookie (Admin) | OAuth-Client-Verwaltung |
 | `/account/connected-clients` | GET | Cookie | Selbstverwaltung der eigenen verbundenen OAuth-Clients |
 | `/crew`, `/crew/templates`, `/crew/profiles/*`, `/crew/studio`, `/crew/knowledge` | GET | Cookie | Crew-/Template-/Profil-/Studio-/Wissensbasis-Verwaltung |
 | `/runs`, `/runs/{id}`, `/new` | GET | Cookie | Run-Liste, Run-Detail, neuer Auftrag |
+| `/crew/providers/*`, `/tools/*`, `/mcp-servers/*`, `/crew/profiles/grounding-providers/create`, `/crew/profiles/grounding-providers/edit/{name}` | GET | Cookie (Admin) | Provider-, Tool-, MCP-Server- und Grounding-Editoren — seit D-067 nur für Admins, weil sie Geheimnisse beim Namen nennen |
 
 Run-bezogene Seiten unterliegen der Run-User-Isolation (D-042): jeder Nutzer sieht
 nur eigene Runs; der Admin kann per explizitem Umschalter systemweit sehen.

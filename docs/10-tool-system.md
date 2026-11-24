@@ -2,9 +2,28 @@
 
 *[Deutsch](10-tool-system_de.md) · **English***
 
-*Last updated: 2026-06-10 (D-060, Phases A–C complete)*
+*Last updated: 2026-11-24 (D-067: actual state after stage 0 — agentic path never wired and frozen, five system grounding profiles back on the provider-type path, environment-variable references only via the allow list; before that 2026-06-10, D-060, Phases A–C complete)*
 
 ---
+
+> **Current state (D-067, 2026-11-24) — read this first.** Large parts of this document describe the
+> D-060 design, not what runs in production:
+>
+> - **The agentic tool path (Pull) is frozen, and its removal is planned** (D-068). It was never wired
+>   into the pipeline: `AtelierPipelineFactory` builds `ProfileBasedExecutor`, `ProfileBasedReviewer`
+>   and `ProfileBasedAdvisor` without an `IToolUseRunner`, so actors with `ToolNames` bindings run
+>   single-shot like every other actor. The bindings are stored and validated, but they have no effect.
+> - **Only some tool types are executable.** `ToolExecutor` runs `static-context`, `web-search` and
+>   `mcp-tool`; all other types return a "not yet wired" error.
+> - **The five system grounding profiles use the provider-type path again.** `tavily-basic`,
+>   `tavily-refined`, `run-attachments`, `knowledge-base-default` and `academic-default` have no
+>   `ToolName` any more and run through their type-specific grounding provider, also when an older
+>   snapshot still carries a `ToolName` (see [A-T9](#a-t9--grounding-rebuild-on-central-tools)).
+>   Only custom profiles with a `ToolName` still use `ToolBackedGroundingProvider`.
+> - **Environment-variable references are filtered by an allow list** (`IEnvReferencePolicy`); see
+>   [Secrets](#secrets-and-the-environment-variable-allow-list).
+>
+> Background: [decisions log D-067 and D-068](05-decisions-log.md).
 
 ## Overview
 
@@ -36,7 +55,19 @@ public sealed record ToolDefinition(
 
 **Name rules:** lowercase kebab-case, `[a-z0-9]` start/end, regex `^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`. Custom tools may use any valid name; system tools have well-known names (see `SystemTools`).
 
-**Secrets:** `SecretRef` stores only the name of an environment variable (e.g. `"TAVILY_API_KEY"`). The value is resolved at execution time via `Environment.GetEnvironmentVariable`. It is never stored in the database, logs, snapshots, or the UI.
+**Secrets:** `SecretRef` stores only the name of an environment variable (e.g. `"TAVILY_API_KEY"`). The value is never stored in the database, logs, snapshots, or the UI. See the next section for which names are allowed.
+
+### Secrets and the environment-variable allow list
+
+Since D-067, every environment-variable name that user-editable configuration can reference goes through `IEnvReferencePolicy` (`Application/Security/`). This covers tool `SecretRef`, provider `ApiKeyEnv`/`EndpointEnvOverride`, MCP server `AuthHeaderEnv` and the grounding settings `authHeaderEnv`/`apiKeyEnv`.
+
+- **Allowed names:** a built-in default list (`EnvReferenceOptions.DefaultAllowed`: the provider and Tavily key names in use) plus the prefix `ATELIER_SECRET_*` for new secrets. Additional names or prefixes (ending in `*`) come from the configuration key `EnvReference:Allowed` (an array; it extends the default list and never replaces it). Infrastructure secrets (database, MCP token, cli-proxy key, admin password) are deliberately not on the list.
+- **On save:** a name that is not allowed is rejected with a message (provider, tool, MCP server and grounding editors, including the repository write of the MCP editor).
+- **At run time:** a name that is not allowed is never read; the call proceeds without the value and a warning without the value is logged. This also protects older rows saved before the allow list existed.
+- **Template Studio** drops `authHeaderEnv`/`apiKeyEnv` from proposals with a warning.
+- **Editors:** the provider, tool, MCP server and grounding editors are admin-only.
+
+To add a new secret, give it a name with the prefix `ATELIER_SECRET_` or add the name to `EnvReference:Allowed`.
 
 ### Tool Types (`ToolType` constants)
 
@@ -101,6 +132,8 @@ public sealed record ToolDefinition(
                     ├── learning-retrieval → LearningRepository
                     └── mcp-tool       → AtelierMcpClientFactory → McpClient
 ```
+
+Design as of D-060. Actual state (D-067): the PULL branch is not wired into the pipeline, the PUSH branch is used only by custom grounding profiles with a `ToolName`, and `ToolExecutor` executes only `static-context`, `web-search` and `mcp-tool`.
 
 ---
 
@@ -193,15 +226,24 @@ Degradation is **visible**, never silent: the run log and the UI badge both show
 IReadOnlyList<string> ToolNames { get; init; } // names from ToolDefinition catalog
 ```
 
-If `ToolNames` is non-empty and the provider supports agentic tools, the actor runs via `IToolUseRunner` instead of single-shot `ILlmClient.CompleteAsync`. For reviewers, `submit_review` remains the mandatory final tool call; the loop ends when it arrives.
+Design intent: if `ToolNames` is non-empty and the provider supports agentic tools, the actor runs via `IToolUseRunner` instead of single-shot `ILlmClient.CompleteAsync`. For reviewers, `submit_review` remains the mandatory final tool call; the loop ends when it arrives.
+
+**Actual state (D-067):** this switch never takes effect in a run. The `ProfileBased*` actors accept an optional `IToolUseRunner`, but `AtelierPipelineFactory` never passes one, so every actor runs single-shot regardless of its `ToolNames`. The path is frozen and its removal is planned (D-068).
 
 Migration Step38 adds the `ToolNames` JSON column to `ExecutorProfiles`, `ReviewerProfiles`, `AdvisorProfiles`, `FinalizerProfiles`.
 
 ### A-T9 — Grounding Rebuild on Central Tools
 
-All grounding providers now reference a `ToolDefinition` by name (`ToolName` on `GroundingProviderProfile`). The 8 type-specific grounding provider classes were refactored: raw capability logic moved into reusable executors (e.g. `TavilySearchClient`, `VectorSearchExecutor`). A new `ToolBackedGroundingProvider` wraps any tool type for eager Push invocation.
+D-060 planned that every grounding profile references a `ToolDefinition` by name (`ToolName` on `GroundingProviderProfile`) and runs through `ToolBackedGroundingProvider`, which wraps any tool type for eager Push invocation. Raw capability logic moved into reusable executors (e.g. `TavilySearchClient`, `VectorSearchExecutor`).
 
-System grounding provider profiles are defined in `SystemCrew` (code constants), referencing system `ToolDefinition`s (also code constants in `SystemTools`). Migration Step40 seeds the system tools into the database on first start.
+**Actual state (D-067):** the tool path was broken for the system profiles (knowledge base and academic search are not wired in `ToolExecutor`, and web search read a key name the container does not set), so attachments, web search and the knowledge base silently reached no prompt. Since stage 0:
+
+- The five system profiles `tavily-basic`, `tavily-refined`, `run-attachments`, `knowledge-base-default` and `academic-default` carry no `ToolName` in `SystemCrew`; migration Step47 clears a stored `ToolName` for exactly these rows.
+- `GroundingPathSelection.UsesToolPath()` sends a profile to the tool path only when it has a `ToolName` **and** is not one of these five system profiles. Older run snapshots that still carry a `ToolName` therefore also use the provider-type path (relevant for resumed runs).
+- A grounding provider that is skipped or fails becomes a run warning instead of silent empty context; a failing tool now raises an error instead of returning an empty result.
+- `ToolInvocation.Sequence` is assigned in the database (with retries on conflict), and the audit record is written in its own scope; a failed audit write no longer discards the tool result.
+
+System grounding provider profiles are defined in `SystemCrew` (code constants). System `ToolDefinition`s are code constants in `SystemTools`; migration Step40 seeds them into the database on first start.
 
 Migration Step39 adds the `ToolName` column to `GroundingProviderProfiles`.
 
@@ -286,13 +328,15 @@ public sealed record McpServerConfig
 }
 ```
 
-`AuthHeaderEnv` stores only the environment variable name. At connection time, `AtelierMcpClientFactory` reads the value from the environment and injects it as `Authorization: Bearer <token>`.
+`AuthHeaderEnv` stores only the environment variable name. At connection time, `AtelierMcpClientFactory` reads the value through `IEnvReferencePolicy` (only allowed names, see [Secrets](#secrets-and-the-environment-variable-allow-list)) and injects it as `Authorization: Bearer <token>`.
+
+> The MCP client (this phase) is part of the removal planned in D-068.
 
 `IAtelierMcpClientFactory.ConnectAsync(config, ct)`:
 1. Validates the URL (`Uri.TryCreate`, absolute)
 2. Passes the URL through `IUrlSafetyValidator` (SSRF guard — blocks private IPs, localhost, internal domains)
 3. Creates an `HttpClient` from the `"mcp-client"` named factory
-4. Optionally adds the `Authorization` header from the ENV var
+4. Optionally adds the `Authorization` header from the ENV var (allow list applies)
 5. Creates `HttpClientTransport` → `McpClient.CreateAsync`
 
 Returns a connected `McpClient` implementing `IAsyncDisposable`.
@@ -357,6 +401,7 @@ When `allow_mutating_tools` is absent or `false`, the validator blocks any Mutat
 | `Step39ToolNameOnGroundingProfiles` | 39 | New column `ToolName` on `GroundingProviderProfiles` |
 | `Step40SystemToolsSeed` | 40 | Idempotent upsert of 9 system `ToolDefinition`s on startup |
 | `Step41McpServerConfigs` | 41 | New table: `mcp_server_configs` |
+| `Step47EngineHonesty` | 47 | Clears `ToolName` on the five system grounding profiles (D-067); the other parts of Step47 are described in [02-architecture](02-architecture.md#runs) |
 
 **No existing data was lost.** All migrations only add new tables and columns. The `DOWN` rollback paths are the only places that contain `DROP` or `ALTER … DROP COLUMN`.
 
@@ -364,7 +409,8 @@ When `allow_mutating_tools` is absent or `false`, the validator blocks any Mutat
 
 ## Security Notes
 
-- **Secrets** — `SecretRef` is an ENV-var key name only. The actual API key/token is never persisted in the DB, the `CrewSnapshot`, logs, or any UI field.
+- **Secrets** — `SecretRef` is an ENV-var key name only. The actual API key/token is never persisted in the DB, the `CrewSnapshot`, logs, or any UI field. Only names on the allow list (`IEnvReferencePolicy`, `EnvReference:Allowed`, prefix `ATELIER_SECRET_*`) are accepted on save and read at run time.
+- **Admin-only editors** — tools, MCP servers, providers and grounding profiles can only be created or changed by administrators.
 - **SSRF** — `IUrlSafetyValidator` blocks private IP ranges, `localhost`, link-local, and internal hostnames before any HTTP call originating from a `ToolDefinition` (url-fetch, rest-api, mcp-tool).
 - **Mutating access** — `ToolAccessClass.Mutating` is blocked by default. The operator must explicitly set `allow_mutating_tools: true` per spec. The UI highlights Mutating tools with a red danger badge.
 - **Per-turn cap** — the agentic loop never runs indefinitely. Default cap: 5 tool calls per actor turn. Cap-reached state is audited as `ToolInvocationOutcome.CapReached`.

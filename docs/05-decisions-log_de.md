@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-23 (D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
+*Letzte Aktualisierung: 2026-11-24 (D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -1672,3 +1672,138 @@ Der GEEF-Workflow sieht dann Anhalten vor. Der Betreiber hatte die Entscheidung 
 - `juristisch`: je Iteration Astra + Sol + Neon (bezahlt), dazu einmalig der Advisor Astra.
 - Composer: je Iteration Astra ×2 + Sol; Neon greift nicht.
 - Advisor „Teufels Anwalt“: läuft auf Fable (Claude-Abo) statt Codex.
+
+## D-067 — Etappe 0: Sicherheitsnetz (2026-11-24)
+
+**Kontext.** Eine Analyse am 2026-11-24 ergab: Angehängte Dateien, Websuche und Learnings waren seit dem
+Umbau des Groundings auf zentrale Tools (D-060) in der Produktion wirkungslos, und niemand merkte es. Die
+System-Grounding-Profile verwiesen auf Werkzeuge, die im `ToolExecutor` nicht verdrahtet waren oder einen
+Schlüsselnamen lasen, den der Container nicht setzt; der Fehler endete als leerer Kontext. Es gab keinen
+Test über die echte Verdrahtung, Läufe meldeten umgangene Probleme nicht, und mehrere Stellen fielen still
+auf Ersatzverhalten zurück: auf die Klassik-Crew bei unlesbarem Snapshot, auf eine Freigabe ohne Reviewer
+bei einer Crew ohne Reviewer, auf einen Start trotz gescheiterter Migration. Etappe 0 bringt dem Anwender
+nichts Neues, sorgt aber dafür, dass nichts mehr still kaputtgeht. Sie ist die Voraussetzung für den Umbau
+nach D-068.
+
+**D-067/1 — Ende-zu-Ende-Gerüst über die echte Verdrahtung.** `tests/Geef.Atelier.Tests/EndToEnd` startet
+die Anwendung über `WebApplicationFactory<Program>` gegen echtes Postgres (Testcontainers). Ersetzt werden
+nur die HTTP-Gegenstellen (cli-proxy, Tavily, Embeddings), deren Anfragekörper aufgezeichnet werden. Die
+Tests weisen nach, dass Anhang und Websuche im Executor-Prompt ankommen, und schlagen fehl, wenn man die
+Grounding-Reparatur zurücknimmt. Jeder neue Pipeline-Weg bekommt hier einen Test vom Einstieg bis zum
+Ergebnis. Beschreibung: [02-architecture](02-architecture_de.md#testen-und-messen-d-067).
+
+**D-067/2 — Warnungen am Lauf.** Was ein Lauf umgeht (übersprungene Quelle, ausgefallener Reviewer,
+abweichende Modellzuweisung, Failover, Finalizer-Problem), wird als Warnung in der neuen Tabelle
+`RunWarnings` gespeichert (`IRunWarningSink`, eigener kurzlebiger Datenbank-Scope je Schreibvorgang, nie
+laufentscheidend). Anzeige auf der Detailseite und in den MCP-Feldern `warnings` von `get_run_status` und
+`get_run_result`. Die Texte sind kurze Sätze für den Anwender; technische Einzelheiten gehören ins Log.
+
+**D-067/3 — `Outcome` als Anzeigesignal, `RunStatus` unverändert.** `Runs.Outcome` (`Converged`,
+`DeliveredWithOpenPoints`, `Failed`, `Aborted`) und `Runs.DeliveredIteration` sagen, was ein Lauf geliefert
+hat. `Outcome` bedeutet „fertig abgelegt, inklusive Finalizer“. `RunStatus` bleibt wie entschieden: Ein Lauf
+ohne Konvergenz endet `Failed`, auch wenn er einen Text liefert (Statusentscheidung vom 2026-07-17). Die
+Anzeige leitet „geliefert mit offenen Punkten“ aus `Outcome` ab. Bei einem Fehlschlag werden die Befunde der
+letzten Iteration mitgespeichert.
+
+**D-067/4 — Laut statt still.** Eine gescheiterte Migration bricht den Start ab; der Health-Check
+`pending-migrations` meldet offene Migrationen. Ein unbrauchbarer Crew-Snapshot lässt den Lauf mit Meldung
+scheitern (`CrewSnapshot.DeserializeForRun`), statt auf die Klassik-Crew zu fallen. Eine Crew ohne Reviewer
+scheitert beim Start; der `AutoApproveReviewer` ist entfernt. Ein Lauf ohne Snapshot wird nicht fortgesetzt,
+sondern sofort mit Meldung abgelehnt. Ein unbekannter Grounding-Typ wird als Warnung übersprungen.
+
+**D-067/5 — Grounding-Brücke bis zum Umbau.** Die fünf System-Grounding-Profile haben keinen `ToolName`
+mehr und laufen wieder über den Provider-Typ-Weg; eine Laufzeitregel (`GroundingPathSelection`) gilt auch
+für ältere Snapshots, Migration Step47 bereinigt gespeicherte Zeilen. Der agentische Tool-Pfad war nie mit
+der Pipeline verdrahtet; er bleibt eingefroren, sein Rückbau ist vorgesehen (D-068). Ein Lauf mit Anhängen
+wird erst nach dem Hochladen der Anhänge startbereit (Snapshot danach, Zeitlimit
+`Orchestrator:PreparationTimeout`, Standard 15 Minuten); ein fortgesetzter Lauf findet die Anhänge seines
+Vorgängers.
+
+**D-067/6 — Allowlist für Umgebungsvariablen.** Konfiguration, die Nutzer bearbeiten können, darf nur
+Umgebungsvariablen von einer Allowlist nennen (`IEnvReferencePolicy`: eingebaute Liste, Präfix
+`ATELIER_SECRET_*`, Ergänzungen über `EnvReference:Allowed`). Nicht erlaubte Namen werden beim Speichern
+abgelehnt und zur Laufzeit nie gelesen. Die Editoren für Provider, Tools, MCP-Server und Grounding sind nur
+für Admins; das Template Studio übernimmt keine Schlüsselverweise mehr.
+
+**D-067/7 — Hub nur für Angemeldete.** `RunHub` verlangt eine Anmeldung, bildet Gruppennamen serverseitig
+aus der Identität und endet bei Ablauf der Anmeldung. Die Blazor-Seiten bekommen Live-Updates über den
+prozessinternen `IRunUpdateFeed` mit denselben Zugriffsregeln und öffnen keine `HubConnection` mehr.
+Listen-Updates gehen nur an Besitzer und Admins.
+
+**D-067/8 — Learning-Schalter aus.** `Learning:Enabled` (Standard `false`) hält die Learning-Schleife an:
+kein Extrakt, kein Prüflauf, kein Embedding, leerer Abruf. Crews mit Learning-Teilen bleiben gültig. Die
+Schleife wird nach D-068 durch ein Gedächtnis je Nutzer ersetzt.
+
+**D-067/9 — Nacht-Update baut nur aus committetem Stand.** Das nächtliche Selbst-Update des cli-proxy baut
+nur aus dem committeten Stand; bei nicht committeten Änderungen setzt es aus und meldet das, auch mit
+`FORCE=1`.
+
+**D-067/10 — Mini-Lauf nach jedem Deploy.** `scripts/atelier-smoke.sh` meldet sich an, reicht über MCP einen
+kurzen Auftrag ein und wartet auf das Ergebnis (Exit-Code 0 nur bei Erfolg). Einrichtung:
+[`ops/atelier-smoke.md`](ops/atelier-smoke.md).
+
+**D-067/11 — Wächter.** `scripts/atelier-watch.sh` meldet hängende Läufe, einen ungesunden cli-proxy und
+ungesunde Container über den vorhandenen Meldekanal des Servers, nur bei neuen oder geänderten Problemen und
+einmal bei Entwarnung. Einrichtung: [`ops/atelier-watch.md`](ops/atelier-watch.md).
+
+**D-067/12 — Messwerkzeug.** `tools/Eval` vergleicht das Atelier per blindem Paarvergleich mit anderen Wegen
+auf einem festen Aufgabenset; echte Aufträge bleiben außerhalb von Git
+([`tools/Eval/README.md`](../tools/Eval/README.md)).
+
+**Folgen.**
+
+- Probleme werden am Lauf sichtbar, statt die Qualität still zu senken; manche Läufe scheitern jetzt mit
+  Meldung, die vorher still mit Ersatzverhalten liefen.
+- Läufe, die vor Step47 endeten, haben `Outcome = NULL`; es gibt keine Nachberechnung.
+- Der Template-Editor prüft beim Speichern noch nicht auf einen Reviewer; solche Crews scheitern beim Start.
+- Migration Step47 ist additiv und idempotent (`RunWarnings`, `Runs.Outcome`, `Runs.DeliveredIteration`,
+  `Runs.ReportJson`, Bereinigung von `ToolName` an fünf System-Profilen).
+- Die Doku beschreibt den Tool-Pfad als eingefroren ([10-tool-system](10-tool-system_de.md)).
+
+**Rückweg.**
+
+- Step47 entfernt nichts; `Down` nimmt nur die neuen Teile zurück. Die neuen Felder in MCP sind optional,
+  ältere Clients ignorieren sie.
+- Learning lässt sich mit `Learning:Enabled = true` wieder einschalten.
+- Fehlende Namen auf der Allowlist werden über `EnvReference:Allowed` oder das Präfix `ATELIER_SECRET_*`
+  ergänzt, ohne neuen Build.
+- Smoke-Lauf, Wächter und die Sperre im Nacht-Update sind Skripte außerhalb der Anwendung und lassen sich
+  einzeln zurücknehmen.
+- Zurück zum Tool-Pfad für die System-Profile oder zu stillen Rückfällen führt kein Weg; genau diese
+  Zustände hat die Etappe beseitigt.
+
+## D-068 — Richtung Umbau: Auftrag, Direktweg, Rückfragen, Quellen, Gedächtnis (2026-11-24)
+
+**Status:** beschlossen, in Umsetzung. Richtungsentscheidung; die einzelnen Etappen bekommen eigene Einträge.
+
+**Ziel.** Ein Anwender, auch ein Laie, tippt einen Satz, gibt optional Dateien mit und bekommt in Minuten ein
+Ergebnis, das er dem direkten Modellaufruf vorzieht. Das Ergebnis erfindet nichts, hält harte Vorgaben ein
+und weist seine Annahmen aus.
+
+**Begründung.** Messungen auf elf echten Aufträgen zeigten: Rückfragen schlagen bloßes Annehmen 9 : 1, eine
+zusätzliche Prüfrunde hebt das Urteil nicht, und eine Aufbereitung des Auftrags ohne neue Information
+ebenfalls nicht.
+
+**Richtung.**
+
+- **Fragenregel.** Für jede Lücke im Auftrag gilt diese Reihenfolge: aus Auftrag und Dateien nehmen → aus
+  Profil und Gedächtnis nehmen → recherchieren → vernünftig annehmen und als Annahme ausweisen → nur dann
+  fragen, wenn der Anwender die Antwort wissen kann und sie das Ergebnis wesentlich ändert. Höchstens drei
+  Fragen, kurz, mit fertigen Antworten zum Anklicken, immer überspringbar. Gefragt wird nur **vor** dem Lauf,
+  nie während; ohne Fragen startet der Lauf sofort. Die Regel setzt der Code durch, nicht das Wohlwollen
+  eines Modells.
+- **Auftrag als Anzeigeeinheit.** Anwender sehen Aufträge: Klärung, Quellen, Versionen, Ergebnis. Läufe
+  bleiben das Protokoll darunter.
+- **Direktweg als Standard.** Klären, bei Bedarf recherchieren, ein Schreibaufruf mit allen Quellen im
+  Volltext, Prüfungen und höchstens eine Korrektur. Die bisherige Schleife bleibt als „Extra careful“
+  wählbar.
+- **Quellen im Volltext.** Dateien gehen vollständig in den Prompt statt über eine Ausschnittsuche;
+  recherchierte Zitate werden wörtlich gegen den abgerufenen Text geprüft.
+- **Gedächtnis.** Profil, gemerkte Antworten und Korrekturen je Nutzer, ohne Embeddings; es ersetzt die
+  Learning-Schleife.
+- **Rückbau in Etappen.** Agentischer Tool-Pfad, MCP-Client, Template Studio, Crew-Composer, Learning-Gate
+  und Embeddings werden schrittweise entfernt. Tabellen werden erst ein Deploy nach dem Wegfall des Codes
+  gelöscht; alte Snapshots bleiben lesbar.
+
+**Unverändert.** Das Geef-SDK, die Statusentscheidung vom 2026-07-17, additive und idempotente Migrationen,
+die einsprachige englische Oberfläche (D-062; Fragen und Ergebnis erscheinen in der Sprache des Auftrags).

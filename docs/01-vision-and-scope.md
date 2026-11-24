@@ -2,7 +2,7 @@
 
 *[Deutsch](01-vision-and-scope_de.md) · **English***
 
-*Last updated: 22 May 2026 (D-054: continuous learning loop added to scope; learning-retrieval provider type)*
+*Last updated: 2026-11-24 (D-068: at most three short questions with click answers before the run, never during it; D-067: learning loop paused by default; before that 22 May 2026, D-054: continuous learning loop added to scope; learning-retrieval provider type)*
 
 ## Vision
 
@@ -24,18 +24,18 @@ The project is the productive application of the [Geef SDK](https://github.com/c
 - MCP server interface so external AI clients (Claude Desktop, Claude Code, custom agents) can submit jobs and fetch results — auth via static bearer token or self-hosted OAuth 2.1
 - Multi-provider LLM support: OpenRouter (pay-per-token) plus subscription CLIs (Claude Code, Codex) via a local proxy; reviewers/advisors deliberately on foreign models
 - Source ingestion in several forms: file upload (PDF, DOCX, TXT, MD), URLs, free-text briefing, style reference texts; semantic knowledge base (vector-store RAG) and run-local attachments
-- Fire-and-forget workflow: start a job, check status later, fetch the result at the end — no human-in-the-loop interventions during the run
+- Fire-and-forget workflow: start a job, check status later, fetch the result at the end — no human-in-the-loop interventions during the run. **Before** the run, at most three short questions with ready-made answers to click are allowed, always skippable (D-068)
 - Persistent run history with a complete iteration trail
 - Run resumption: continue a failed or aborted run from its last draft text (seed mode) or with a fresh pipeline (clean mode) — D-046
 - File export in formats md / html / pdf / docx / txt / json via the Finalizer pipeline (D-044); the five Finalizer profile types (FileExport, MetadataEnrich, ExternalSink, Transform) are implemented as part of the crew system
 - Grounding enrichment in multiple forms: Tavily web search (`tavily`), semantic vector-store RAG (`vector-store`), curated fixed text for style guides and glossaries (`static-context`), specific URL fetching with SSRF protection (`url-fetch`), Tavily news search with date filter (`news-search`), academic paper retrieval from arXiv / Semantic Scholar / OpenAlex (`academic-search`), and generic REST endpoint grounding with SSRF protection and JSONPath extraction (`rest-api`); each provider supports an optional AI refinement pass (D-050–D-052); domain-aware retrieval from the learning store (`learning-retrieval`, D-054)
-- **Continuous learning loop (D-054):** an opt-in `learning-extractor` finalizer extracts structured facts from completed runs and fires a dedicated quality-gate run (`learning-evaluation` crew) fire-and-forget. Only learnings that converge through the gate (three strict reviewers, `AbortOnCritical=true`, multi-model pluralism) are stored as `Approved` in the learning store (`LearningEntries` table, separate namespace from the curated knowledge base). The `learning-retrieval` grounding provider re-injects them into later runs weighted by domain similarity. Management UI at `/crew/learnings`; MCP tool `list_learnings`. Three protective mechanisms against model collapse: (1) separate namespace, (2) auditable gate, (3) structured facts only
+- **Continuous learning loop (D-054):** an opt-in `learning-extractor` finalizer extracts structured facts from completed runs and fires a dedicated quality-gate run (`learning-evaluation` crew) fire-and-forget. Only learnings that converge through the gate (three strict reviewers, `AbortOnCritical=true`, multi-model pluralism) are stored as `Approved` in the learning store (`LearningEntries` table, separate namespace from the curated knowledge base). The `learning-retrieval` grounding provider re-injects them into later runs weighted by domain similarity. Management UI at `/crew/learnings`; MCP tool `list_learnings`. Three protective mechanisms against model collapse: (1) separate namespace, (2) auditable gate, (3) structured facts only. **Paused since D-067** (`Learning:Enabled`, default `false`); to be replaced by a per-user memory (D-068)
 
 ## Out of scope (for now)
 
 - True multi-tenancy / tenant isolation (the system is multi-user but single-tenant: one admin, shared configuration; only run visibility is isolated per user)
 - Public access without auth
-- Human-in-the-loop between iterations (deliberately not implemented; fire-and-forget remains the model)
+- Human-in-the-loop between iterations (deliberately not implemented; fire-and-forget remains the model: no questions or interventions while the run is in progress). Only **before** the run may the Atelier ask at most three short questions with click answers, and only when the answer cannot be taken from the job, the files, the profile or memory, cannot be researched and cannot reasonably be assumed, the user can know it, and it changes the result substantially (D-068)
 - Mobile apps or native clients
 - Commercial hosting, billing, invoicing
 - Unfiltered cross-run self-RAG (deliberately rejected; the continuous learning loop above provides gated cross-run learning with three protective mechanisms against model collapse)
