@@ -2,7 +2,7 @@
 
 *[Deutsch](04-mcp-integration_de.md) · **English***
 
-*Last updated: 2026-11-22 (D-066: `ModelSlot`/`ModelDomain`/`Domain` in the list tools; before that 2026-05-22, D-052: academic-search und rest-api als neue providerType-Werte in list_grounding_provider_profiles + materialize_template_proposal dokumentiert)*
+*Last updated: 2026-11-24 (stage 1: order tools, `submit_request` as a shell, server instructions, `list_learnings` admin only; before that 2026-11-22, D-066: `ModelSlot`/`ModelDomain`/`Domain` in the list tools; before that 2026-05-22, D-052: academic-search und rest-api als neue providerType-Werte in list_grounding_provider_profiles + materialize_template_proposal dokumentiert)*
 
 ## Why MCP
 
@@ -24,29 +24,32 @@ It follows that everything the user can do in the UI should also be doable via M
 
 ## Tools the MCP server offers
 
+### Orders: `submit_order`, `get_order_status`, `get_order_result` (stage 1)
+
+Since stage 1 the person works with **orders**; runs stay the technical log underneath (one order can have several runs). The recommended flow for a client:
+
+1. `submit_order` with the person's request **word for word** (`request`), optional files in `attachments` (JSON array of `{filename, contentType, contentBase64}`; PDF, Word, Markdown or text) and `extraCareful` only when the person asks for extra care. The call returns at once with `orderId`, `state` (for example `queued`), `runId` and a receipt per file (pages, characters, quality, warnings).
+2. `get_order_status` with `orderId` and `waitSeconds` (default 25, at most 50). The server waits for a change itself, so the client needs no sleep loop of its own; the answer has `state`, `done`, the current step in plain English, `elapsedSeconds`, `outcome`, `warnings` and `nextCheckSeconds` (0 when done, otherwise 10).
+3. When `done` is true: `get_order_result` returns the text, placeholders to fill in, open checks, the files used and warnings. The text is also returned when checks are open (`delivered_with_open_points`); when no text was written (`failed`), the client says so and writes no replacement.
+
+Attachments that are obviously not the file itself are rejected before they are read: invalid Base64, empty or very short content, texts that only refer to a file ("see attached full version"), Base64 encoded twice and content whose magic bytes do not match `contentType`. The error names the right way: pass the complete original file as Base64 with the matching `contentType`, or, if the file is too large for an argument, start the order in the web app. Unknown or foreign orders give `Order not found.`; the answers only ever grow by appended fields (`state = needs_input` is reserved for orders that ask questions, stage 2). Schemas: [`09-endpoint-reference.md`](09-endpoint-reference.md#orders-submit_order-get_order_status-get_order_result).
+
+**Server instructions.** During `initialize` the server sends instructions (`ServerInstructions`): request word for word, files only as attachments with their original content, typical duration 1 to 10 minutes, wait with `get_order_status` instead of an own loop, give the text as it is, invent nothing.
+
+**Tool errors.** A refused call answers with `isError: true` and `An error occurred invoking '<tool>': <message>`; the message says how to fix the call.
+
 ### `submit_request`
 
-Queues a new job.
+The older entry point, since stage 1 a shell over orders: it creates an order **without questions** and keeps its answer.
 
-**Input:**
-```json
-{
-  "briefing": "string (required) — Beschreibung der Aufgabe und des gewünschten Ergebnisses",
-  "options": {
-    "executor_model": "string (optional) — z.B. 'claude-opus-4-7'",
-    "reviewer_models": ["array (optional) — Liste von Modellen für die Reviewer"],
-    "max_iterations": "int (optional, default 3)"
-  }
-}
-```
+**Input:** `briefingText` (required), `configJson` (optional, only checked for valid JSON), `crewTemplate` (optional), `customCrew` (optional CrewSpec JSON with at least `executorProfileName`; invalid JSON is an error), `attachments` (as for `submit_order`).
 
 **Output:**
 ```json
-{
-  "run_id": "uuid",
-  "status": "Pending"
-}
+{ "runId": "uuid", "status": "Pending", "errorMessage": null, "orderId": "uuid" }
 ```
+
+Without `crewTemplate`/`customCrew` the mode follows `Orders:LegacySubmitDefaultMode` (default: direct path); with one of them the order is `Careful` and uses that template or crew. `submit_auto_crew_request` keeps its behaviour; its runs are attached to orders as well.
 
 ### `get_run_status`
 
@@ -89,7 +92,7 @@ Returns the finished result. Only when status=Completed.
 
 ### `list_runs`
 
-Lists existing runs.
+Lists existing runs (the technical log entries, not orders; one order can have several runs). For orders use `get_order_status` and `get_order_result` with the `orderId`.
 
 **Input:**
 ```json
@@ -119,7 +122,7 @@ Cancels a running run. Returns `true` if the cancellation was triggered; `false`
 
 ### Further tools (crew, knowledge base, Template Studio)
 
-Besides the six run tools the server offers nine more — **15 MCP tools** in total:
+Besides the order and run tools the server offers further tools, among them:
 
 | Tool | Purpose |
 |---|---|
@@ -389,6 +392,7 @@ Enter the URL `https://geef.stefan-bechtel.de/mcp` — the client detects `WWW-A
 | Tool name | `list_learnings` |
 | Parameters | `status_filter?` (Proposed / Approved / Rejected), `domain_filter?` (string) |
 | Returns | Array of `LearningEntryDto` |
+| Access | Administrators only (since stage 1); other users get a clear error, because the list contains entries of every user |
 
 **`LearningEntryDto` fields:** `id`, `text` (truncated to 300 chars), `source_run_id`, `learning_run_id?`, `domain`, `status`, `owner_username`, `created_at`, `approved_at?`.
 

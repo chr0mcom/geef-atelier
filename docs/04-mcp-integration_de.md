@@ -2,7 +2,7 @@
 
 *[English](04-mcp-integration.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-22 (D-066: `ModelSlot`/`ModelDomain`/`Domain` in den Listen-Tools; zuvor 2026-05-20, D-051: neue providerType-Werte static-context, url-fetch, news-search in list_grounding_provider_profiles + materialize_template_proposal dokumentiert)*
+*Letzte Aktualisierung: 2026-11-24 (Etappe 1: Auftrags-Werkzeuge, `submit_request` als Hülle, Server-Hinweise, `list_learnings` nur für Admins; zuvor 2026-11-22, D-066: `ModelSlot`/`ModelDomain`/`Domain` in den Listen-Tools; zuvor 2026-05-20, D-051: neue providerType-Werte static-context, url-fetch, news-search in list_grounding_provider_profiles + materialize_template_proposal dokumentiert)*
 
 ## Warum MCP
 
@@ -24,29 +24,32 @@ Daraus folgt: alles, was der User in der UI tun kann, soll auch via MCP tun kön
 
 ## Tools, die der MCP-Server anbietet
 
+### Aufträge: `submit_order`, `get_order_status`, `get_order_result` (Etappe 1)
+
+Seit Etappe 1 arbeitet der Mensch mit **Aufträgen**; Läufe bleiben das technische Protokoll darunter (ein Auftrag kann mehrere Läufe haben). Der empfohlene Ablauf für einen Client:
+
+1. `submit_order` mit dem Auftrag **im Wortlaut des Menschen** (`request`), optionalen Dateien in `attachments` (JSON-Array aus `{filename, contentType, contentBase64}`; PDF, Word, Markdown oder Text) und `extraCareful` nur, wenn der Mensch besondere Sorgfalt wünscht. Der Aufruf antwortet sofort mit `orderId`, `state` (etwa `queued`), `runId` und einer Quittung je Datei (Seiten, Zeichen, Qualität, Warnungen).
+2. `get_order_status` mit `orderId` und `waitSeconds` (Standard 25, höchstens 50). Der Server wartet selbst auf eine Änderung, der Client braucht keine eigene Sleep-Schleife; die Antwort enthält `state`, `done`, den aktuellen Schritt in Klartext, `elapsedSeconds`, `outcome`, `warnings` und `nextCheckSeconds` (0 wenn fertig, sonst 10).
+3. Wenn `done` wahr ist: `get_order_result` liefert den Text, auszufüllende Platzhalter, offene Prüfungen, die genutzten Dateien und Warnungen. Der Text kommt auch bei offenen Prüfungen (`delivered_with_open_points`); entstand kein Text (`failed`), sagt der Client das und schreibt keinen Ersatz.
+
+Anhänge, die offensichtlich nicht die Datei selbst sind, werden vor dem Lesen abgewiesen: ungültiges Base64, leerer oder sehr kurzer Inhalt, Texte, die nur auf eine Datei verweisen („siehe angehängte Vollversion“), doppelt kodiertes Base64 und Inhalt, dessen Magic Bytes nicht zum `contentType` passen. Die Meldung nennt den richtigen Weg: die vollständige Originaldatei als Base64 mit passendem `contentType` übergeben oder, wenn die Datei für ein Argument zu groß ist, den Auftrag in der Weboberfläche anlegen. Unbekannte oder fremde Aufträge ergeben `Order not found.`; die Antworten wachsen nur um angehängte Felder (`state = needs_input` ist für Aufträge mit Rückfragen reserviert, Etappe 2). Schemas: [`09-endpoint-reference_de.md`](09-endpoint-reference_de.md#aufträge-submit_order-get_order_status-get_order_result).
+
+**Server-Hinweise.** Beim `initialize` sendet der Server Hinweise (`ServerInstructions`): Auftrag im Wortlaut, Dateien nur als Anhang mit Originalinhalt, typische Dauer 1 bis 10 Minuten, mit `get_order_status` warten statt mit eigener Schleife, den Text unverändert weitergeben, nichts erfinden.
+
+**Werkzeugfehler.** Ein abgelehnter Aufruf antwortet mit `isError: true` und `An error occurred invoking '<tool>': <Meldung>`; die Meldung sagt, wie der Aufruf zu korrigieren ist.
+
 ### `submit_request`
 
-Stellt einen neuen Auftrag in die Warteschlange.
+Der ältere Einstieg, seit Etappe 1 eine Hülle über Aufträge: Er legt einen Auftrag **ohne Rückfragen** an und behält seine Antwort.
 
-**Input:**
+**Eingabe:** `briefingText` (Pflicht), `configJson` (optional, wird nur auf gültiges JSON geprüft), `crewTemplate` (optional), `customCrew` (optional, CrewSpec-JSON mit mindestens `executorProfileName`; ungültiges JSON ist ein Fehler), `attachments` (wie bei `submit_order`).
+
+**Ausgabe:**
 ```json
-{
-  "briefing": "string (required) — Beschreibung der Aufgabe und des gewünschten Ergebnisses",
-  "options": {
-    "executor_model": "string (optional) — z.B. 'claude-opus-4-7'",
-    "reviewer_models": ["array (optional) — Liste von Modellen für die Reviewer"],
-    "max_iterations": "int (optional, default 3)"
-  }
-}
+{ "runId": "uuid", "status": "Pending", "errorMessage": null, "orderId": "uuid" }
 ```
 
-**Output:**
-```json
-{
-  "run_id": "uuid",
-  "status": "Pending"
-}
-```
+Ohne `crewTemplate`/`customCrew` folgt der Modus `Orders:LegacySubmitDefaultMode` (Standard: Direktweg); mit einem von beiden ist der Auftrag `Careful` und nutzt dieses Template bzw. diese Crew. `submit_auto_crew_request` verhält sich wie bisher; auch seine Läufe hängen an Aufträgen.
 
 ### `get_run_status`
 
@@ -89,7 +92,7 @@ Liefert das fertige Ergebnis. Nur bei Status=Completed.
 
 ### `list_runs`
 
-Listet bestehende Runs.
+Listet bestehende Runs (die technischen Protokolleinträge, nicht Aufträge; ein Auftrag kann mehrere Runs haben). Für Aufträge `get_order_status` und `get_order_result` mit der `orderId` nutzen.
 
 **Input:**
 ```json
@@ -119,7 +122,7 @@ Bricht einen laufenden Run ab. Gibt `true` zurück, wenn der Abbruch ausgelöst 
 
 ### Weitere Tools (Crew, Wissensbasis, Template Studio)
 
-Neben den sechs Run-Tools bietet der Server neun weitere — insgesamt **15 MCP-Tools**:
+Neben den Auftrags- und Run-Tools bietet der Server weitere Tools, darunter:
 
 | Tool | Zweck |
 |---|---|
@@ -378,6 +381,7 @@ URL `https://geef.stefan-bechtel.de/mcp` eingeben — der Client erkennt `WWW-Au
 | Tool-Name | `list_learnings` |
 | Parameter | `status_filter?` (Proposed / Approved / Rejected), `domain_filter?` (String) |
 | Rückgabe | Array von `LearningEntryDto` |
+| Zugriff | Nur Administratoren (seit Etappe 1); andere Nutzer bekommen eine klare Fehlermeldung, weil die Liste Einträge aller Nutzer enthält |
 
 **`LearningEntryDto`-Felder:** `id`, `text` (gekürzt auf 300 Zeichen), `source_run_id`, `learning_run_id?`, `domain`, `status`, `owner_username`, `created_at`, `approved_at?`.
 

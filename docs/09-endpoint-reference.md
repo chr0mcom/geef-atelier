@@ -2,7 +2,7 @@
 
 *[Deutsch](09-endpoint-reference_de.md) · **English***
 
-*Last updated: 2026-11-24 (D-067: `warnings` and `outcome` in `get_run_status`/`get_run_result`, reading the result after `outcome`; `/hubs/runs` stays until stage 8; `/hubs/runs` only for signed-in users; admin-only editors and `/access-denied`; learning paused by default; before that 2026-05-22, D-054: `list_learnings` tool added; `providerType` updated to include `learning-retrieval`)*
+*Last updated: 2026-11-24 (stage 1: order tools `submit_order`, `get_order_status`, `get_order_result`, `submit_request` as a shell with `orderId`, server instructions, `list_learnings` admin only; D-067: `warnings` and `outcome` in `get_run_status`/`get_run_result`, reading the result after `outcome`; `/hubs/runs` stays until stage 8; `/hubs/runs` only for signed-in users; admin-only editors and `/access-denied`; learning paused by default; before that 2026-05-22, D-054: `list_learnings` tool added; `providerType` updated to include `learning-retrieval`)*
 
 All externally reachable HTTP endpoints of Geef.Atelier — MCP, OAuth 2.1
 and the web-UI/account endpoints. Base URL: `https://geef.stefan-bechtel.de`.
@@ -31,6 +31,99 @@ Through this, OAuth-capable clients discover the authorization server automatica
 ### MCP tools
 
 The MCP server exposes the following tools callable via the `/mcp` endpoint. Run-related tools enforce the same run-user isolation as the web UI (D-042): non-admin users can only access their own runs.
+
+#### Orders: `submit_order`, `get_order_status`, `get_order_result`
+
+Since stage 1 an **order** is the unit the person sees; runs stay the technical log underneath (one order can have several runs). Orders are owner-checked like runs: non-admins only see their own orders, an unknown or foreign order gives the error `Order not found.` Parameter and field names are camelCase.
+
+**`submit_order` input:**
+```json
+{
+  "request": "<string, required: the person's request word for word>",
+  "attachments": "<string, optional: JSON array [{\"filename\":\"offer.pdf\",\"contentType\":\"application/pdf\",\"contentBase64\":\"...\"}]>",
+  "extraCareful": false
+}
+```
+
+Supported `contentType` values: `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `text/markdown` (also `text/x-markdown`), `text/plain` (parameters such as `; charset=utf-8` are ignored). `extraCareful = true` starts the slower mode with several review rounds; otherwise the direct path is used.
+
+**`submit_order` output:**
+```json
+{
+  "orderId": "<uuid>",
+  "state": "queued",
+  "runId": "<uuid|null>",
+  "message": "<plain English: what to do next>",
+  "sources": [ { "fileName": "offer.pdf", "pages": 80, "characters": 160485, "quality": "good|partial|poor", "warnings": ["<string>"] } ]
+}
+```
+
+`state` can already be `needs_input` (with `runId = null`) once orders can ask questions (stage 2); clients that do not know it should call `get_order_status`.
+
+**Attachment checks.** Before a file is read, the server rejects what is obviously not the file itself: invalid Base64, empty content, text with fewer than 10 visible characters, short texts that only refer to a file (for example "see attached full version"), text that is itself Base64 (encoded twice), and content whose magic bytes do not match `contentType` (a "PDF" without `%PDF-`, a `.docx` without ZIP header, a PDF or ZIP declared as text). A file that the intake cannot use (for example a scan without text) is rejected with its reason. In every case nothing is started, files stored by this call are released again, and the error names the right way: pass the complete original file as Base64 with the matching `contentType`; if the file is too large to pass as an argument, start the order in the web app and add the file there.
+
+**`get_order_status` input:** `{ "orderId": "<uuid>", "waitSeconds": 25 }`
+
+`waitSeconds` is clamped to `0 … Orders:MaxWaitSeconds` (default 50); `0` answers at once. The call waits until the display state changes or the order is finished, at the latest after `waitSeconds`. When the client goes away, the wait ends at once.
+
+**`get_order_status` output:**
+```json
+{
+  "orderId": "<uuid>",
+  "state": "preparing|needs_input|queued|working|delivered|delivered_with_open_points|failed|stopped",
+  "done": false,
+  "step": "Writing",
+  "elapsedSeconds": 42,
+  "version": 1,
+  "runId": "<uuid|null>",
+  "warnings": [ { "code": "<string>", "message": "<string>" } ],
+  "nextCheckSeconds": 10,
+  "outcome": "Converged|DeliveredWithOpenPoints|Failed|Aborted|null"
+}
+```
+
+`nextCheckSeconds` is `0` when `done` is true, otherwise `10`. `outcome` is the outcome of the current run once it has ended.
+
+**`get_order_result` input:** `{ "orderId": "<uuid>" }`
+
+**`get_order_result` output:**
+```json
+{
+  "orderId": "<uuid>",
+  "state": "delivered_with_open_points",
+  "text": "<string|null>",
+  "wordCount": 180,
+  "version": 1,
+  "placeholders": ["[delivery date]"],
+  "openChecks": ["<plain English: a check the text did not pass>"],
+  "sourcesUsed": [ { "fileName": "offer.pdf", "mode": "full_text|full_text_with_map|excluded", "characters": 160485 } ],
+  "warnings": [ { "code": "<string>", "message": "<string>" } ],
+  "note": "<string|null>"
+}
+```
+
+`text` is also set for `delivered_with_open_points` (the best text with the open checks) and for a stopped order that already had a text; it is `null` while the order is working or when no text was written (`failed`). `note` says in plain English what to tell the person.
+
+All three answers only ever grow by appended fields; clients ignore fields they do not know.
+
+#### `submit_request` (shell over orders)
+
+The older entry point keeps its answer but now creates an order without questions.
+
+**Input:** `briefingText` (required), `configJson` (optional; only checked for valid JSON, it no longer changes anything), `crewTemplate` (optional), `customCrew` (optional CrewSpec JSON with at least `executorProfileName`), `attachments` (as for `submit_order`).
+
+**Output:**
+```json
+{ "runId": "<uuid>", "status": "Pending", "errorMessage": null, "orderId": "<uuid>" }
+```
+
+Without `crewTemplate` and `customCrew` the order uses `Orders:LegacySubmitDefaultMode` (default: direct path; `Careful` switches back to the classic template). With either of them the order is `Careful` and uses that template or crew. Invalid `customCrew` JSON is an error (before stage 1 it was silently ignored). `get_run_status`/`get_run_result` keep working with `runId`; `orderId` works with the order tools. `submit_auto_crew_request` keeps its behaviour; its runs are attached to orders as well.
+
+#### Server instructions and tool errors
+
+During `initialize` the server sends instructions: pass the person's request word for word, files only as attachments with their original content (never placeholders), orders typically take 1 to 10 minutes, wait with `get_order_status` and `waitSeconds` instead of an own sleep loop, give the text as it is, invent nothing.
+
+A tool that refuses a call answers with `isError: true` and the text `An error occurred invoking '<tool>': <message>`; the message is plain English and says how to fix the call.
 
 #### `list_run_artifacts`
 
@@ -143,7 +236,7 @@ Only works for `ArtifactType.File` artifacts. Reads the file from the `ExportPat
 
 #### `list_learnings`
 
-Lists learning entries from the learning store (D-054). Since D-067 the learning loop is paused by default (`Learning:Enabled = false`); the tool still lists the existing entries, but no new ones are added while the switch is off.
+**Administrators only** (since stage 1): other users get the error "Only administrators can list learning entries, because they contain material from every user." Lists learning entries of all users from the learning store (D-054). Since D-067 the learning loop is paused by default (`Learning:Enabled = false`); the tool still lists the existing entries, but no new ones are added while the switch is off.
 
 **Input:**
 ```json
@@ -184,7 +277,7 @@ Both parameters are optional. Omit `status_filter` to return all statuses; omit 
 | `created_at` | ISO8601 | Extraction timestamp |
 | `approved_at` | ISO8601 \| null | Approval timestamp (null while Proposed or Rejected) |
 
-**Note:** `structured_facts_json` is intentionally not exposed — the raw fact JSON is too verbose for MCP context and is only accessible via the web UI. Auth: standard run-user isolation; non-admin users see only their own entries.
+**Note:** `structured_facts_json` is intentionally not exposed — the raw fact JSON is too verbose for MCP context and is only accessible via the web UI. Auth: administrators only, because the list contains entries of every user.
 
 #### Run status and result: `warnings` and `outcome`
 
