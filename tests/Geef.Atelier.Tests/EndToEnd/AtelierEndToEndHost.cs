@@ -26,7 +26,7 @@ namespace Geef.Atelier.Tests.EndToEnd;
 /// Only the outer boundary is replaced: the primary handlers of the named HTTP clients for the LLM endpoint,
 /// the cli-proxy model listing, Tavily and embeddings. Every other named client is blocked and logged.
 /// </summary>
-internal sealed class AtelierEndToEndHost : IAsyncDisposable
+internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
 {
     public const string McpToken = "e2e-mcp-token";
     public const int EmbeddingDimensions = 1536;
