@@ -23,7 +23,8 @@ namespace Geef.Atelier.Application.Crew.Finalizers;
 /// <param name="ProviderName">Provider that served this finalizer step; null for non-LLM finalizers.</param>
 /// <param name="SkipReason">
 /// Set when the step did nothing although it was expected to act (for example a transform without a system
-/// prompt). The orchestrator records it as a run warning. Null for steps that ran or skipped on purpose.
+/// prompt). The orchestrator records it as a run warning that reads "… was skipped because {SkipReason}.", so it is a
+/// short plain-English clause without technical details. Null for steps that ran or skipped on purpose.
 /// </param>
 public sealed record FinalizerExecutionResult(
     string? UpdatedText,

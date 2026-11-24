@@ -72,8 +72,9 @@ public sealed class OpenAiCompatibleClientFailoverTests
 
         var warning = Assert.Single(sink.Warnings);
         Assert.Equal((runId, RunWarningSources.Llm, RunWarningCodes.LlmFailover), (warning.RunId, warning.Source, warning.Code));
-        Assert.Contains("codex->claude", warning.Message);
-        Assert.Contains("gpt-6.2-astra", warning.Message);
+        Assert.Contains("another one answered instead", warning.Message);
+        Assert.DoesNotContain("codex", warning.Message);
+        Assert.DoesNotContain("gpt-6.2-astra", warning.Message);
         Assert.Null(RunWarningScope.Current);
     }
 
@@ -91,7 +92,6 @@ public sealed class OpenAiCompatibleClientFailoverTests
         })));
 
         Assert.Equal(runs.Order().ToList(), sink.Warnings.Select(w => w.RunId).Order().ToList());
-        Assert.All(sink.Warnings, w => Assert.Contains($"m-{w.RunId}", w.Message));
     }
 
     private static HttpClient Http(string? failover) => new(new Handler(failover));

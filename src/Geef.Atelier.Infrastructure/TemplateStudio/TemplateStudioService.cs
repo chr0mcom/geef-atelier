@@ -500,15 +500,19 @@ internal sealed class TemplateStudioService(
             case ProposedProfileType.GroundingProvider:
             {
                 var settings      = new Dictionary<string, string>(profile.GroundingProviderSettings ?? new Dictionary<string, string>());
+                var shownName = string.IsNullOrWhiteSpace(profile.DisplayName) ? profile.Name : profile.DisplayName;
                 foreach (var key in new[] { GroundingProviderProfile.KeyRestApiAuthHeaderEnv, GroundingProviderProfile.KeyAcademicApiKeyEnv })
                 {
                     if (settings.Remove(key))
-                        warnings.Add($"Setting '{key}' of grounding profile '{profile.Name}' was removed: credentials can only be set by an administrator.");
+                    {
+                        logger.LogWarning("Template Studio removed setting {Key} from grounding profile {Profile}.", key, profile.Name);
+                        warnings.Add($"The sign-in setting of the source \"{shownName}\" was removed. Only an administrator can set it.");
+                    }
                 }
                 var providerType  = profile.GroundingProviderType ?? "tavily";
                 var availableProviders = providerCatalog.ListProviders().Select(p => p.Name).ToHashSet();
                 if (!availableProviders.Contains(profile.Provider))
-                    warnings.Add($"Provider '{profile.Provider}' for grounding profile '{profile.Name}' requires configuration.");
+                    warnings.Add($"The source \"{shownName}\" needs an AI service that is not set up yet.");
                 var created = await crewService.CreateCustomGroundingProviderProfileAsync(new GroundingProviderProfile(
                     Name:             profile.Name,
                     DisplayName:      profile.DisplayName,

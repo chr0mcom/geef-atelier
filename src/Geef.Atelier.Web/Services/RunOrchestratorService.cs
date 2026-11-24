@@ -264,7 +264,7 @@ internal sealed class RunOrchestratorService(
 
             var result = await runner.RunAsync(run.BriefingText, cts.Token);
 
-            await ReportFailedReviewersAsync(run.Id, result.History);
+            await ReportFailedReviewersAsync(run.Id, snapshot, result.History);
             var delivered = result.ToDeliveredOutcome();
 
             if (result.Success)
@@ -417,7 +417,8 @@ internal sealed class RunOrchestratorService(
     /// Produces a sanitized, user-visible error message from a pipeline exception.
     /// Walks the full inner-exception chain so that exceptions wrapped by the Geef SDK
     /// are handled by the most-specific matching rule.
-    /// Sensitive details (API keys, full stack traces, provider URLs) are never included.
+    /// Sensitive details (API keys, full stack traces, provider URLs) are never included: the fallback carries only the
+    /// first line of the message with credential-like fragments removed (<see cref="RunWarningTextExtensions.ToWarningDetail"/>).
     /// </summary>
     internal static string SanitizeErrorMessage(Exception ex)
     {
@@ -444,7 +445,7 @@ internal sealed class RunOrchestratorService(
             current = current.InnerException;
         }
 
-        return $"Pipeline execution failed: {ex.Message.Split('\n')[0].Trim()}";
+        return $"Pipeline execution failed: {ex.Message.ToWarningDetail()}";
     }
 
     /// <summary>
@@ -501,15 +502,18 @@ internal sealed class RunOrchestratorService(
     private Task ReportWarningAsync(Guid runId, string source, string code, string message, int? iteration = null) =>
         warningSink?.ReportAsync(runId, source, code, message, iteration, CancellationToken.None) ?? Task.CompletedTask;
 
-    /// <summary>Records one warning per reviewer that could not complete its check in an iteration.</summary>
-    private async Task ReportFailedReviewersAsync(Guid runId, Geef.Sdk.Runtime.IterationHistory history)
+    /// <summary>
+    /// Records one warning per reviewer that could not complete its check in an iteration, naming the reviewer by the
+    /// display name from the snapshot.
+    /// </summary>
+    private async Task ReportFailedReviewersAsync(Guid runId, CrewSnapshot snapshot, Geef.Sdk.Runtime.IterationHistory history)
     {
         foreach (var record in history.Records)
         {
             foreach (var review in record.EvaluationResult.FailedReviewers)
             {
                 await ReportWarningAsync(runId, RunWarningSources.Review, RunWarningCodes.ReviewerFailed,
-                    $"A check could not be completed in round {record.Iteration} and was left out: {review.ReviewerName}.",
+                    $"The check \"{snapshot.ReviewerDisplayName(review.ReviewerName)}\" could not be completed in round {record.Iteration} and was left out.",
                     record.Iteration);
             }
         }
@@ -671,7 +675,7 @@ internal sealed class RunOrchestratorService(
                     currentText = result.UpdatedText;
 
                 if (result.Artifact is not null)
-                    await artifactRepo.CreateAsync(result.Artifact, ct);
+                    await artifactRepo.CreateAsync(result.Artifact.WithRedactedStatus(), ct);
 
                 await ReportFinalizerResultAsync(runId, profile, result);
 
@@ -693,11 +697,11 @@ internal sealed class RunOrchestratorService(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Finalizer {Profile} threw unexpectedly for run {RunId}.",
-                    profile.Name, runId);
-                errorMessages.Add($"{profile.Name}: {ex.Message}");
+                logger.LogError("Finalizer {Profile} threw unexpectedly for run {RunId}: {Error}",
+                    profile.Name, runId, ex.ToRedactedLogText());
+                errorMessages.Add($"{profile.Name}: {ex.Message.ToWarningDetail()}");
                 await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerFailed,
-                    $"A finishing step failed: {profile.DisplayNameOrName()} (reason: {ex.Message.ToWarningDetail()}).");
+                    $"The finishing step \"{profile.DisplayNameOrName()}\" failed.");
 
                 // Persist a Status artifact so the failure is visible in the Run detail UI.
                 var errorArtifact = new RunArtifact
@@ -707,7 +711,7 @@ internal sealed class RunOrchestratorService(
                     FinalizerProfileName = profile.Name,
                     ArtifactType = ArtifactType.Status,
                     StorageUri = "error",
-                    StatusMessage = $"Unexpected error: {ex.Message}",
+                    StatusMessage = $"Unexpected error: {ex.Message.ToWarningDetail()}",
                     CreatedAt = DateTimeOffset.UtcNow,
                 };
                 try { await artifactRepo.CreateAsync(errorArtifact, ct); }
@@ -751,16 +755,19 @@ internal sealed class RunOrchestratorService(
         var name = profile.DisplayNameOrName();
         if (result.SkipReason is { } skip)
             await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerSkipped,
-                $"A finishing step was skipped: {name} (reason: {skip.ToWarningDetail()}).");
+                $"The finishing step \"{name}\" was skipped because {skip.ToWarningDetail()}.");
 
         if (result.Artifact is { ArtifactType: ArtifactType.Status } artifact)
         {
+            if (artifact.StorageUri is "error" or "warning")
+                logger.LogWarning("Finalizer {Profile} reported {Kind} for run {RunId}: {Detail}",
+                    profile.Name, artifact.StorageUri, runId, artifact.StatusMessage.RedactSecrets());
             if (artifact.StorageUri == "error")
                 await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerFailed,
-                    $"A finishing step failed: {name} (reason: {artifact.StatusMessage.ToWarningDetail()}).");
+                    $"The finishing step \"{name}\" failed.");
             else if (artifact.StorageUri == "warning")
                 await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerSkipped,
-                    $"A finishing step had no effect: {name} (reason: {artifact.StatusMessage.ToWarningDetail()}).");
+                    $"The finishing step \"{name}\" had no effect.");
         }
     }
 

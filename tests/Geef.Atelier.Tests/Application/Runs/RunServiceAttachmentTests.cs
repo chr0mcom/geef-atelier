@@ -150,7 +150,7 @@ public sealed class RunServiceAttachmentTests
                 Attachments: [new RunAttachmentInput("doc.md", "text/markdown", "content"u8.ToArray())])));
 
         Assert.NotNull(persistence.LastFailureMessage);
-        Assert.Contains("Attachment upload failed", persistence.LastFailureMessage);
+        Assert.Equal(RunService.AttachmentUploadFailedMessage, persistence.LastFailureMessage);
     }
 
     [Fact]
@@ -206,7 +206,7 @@ public sealed class RunServiceAttachmentTests
         var sink        = new Geef.Atelier.Tests.Pipeline.RecordingWarningSink();
         var crew        = new StubCrewService
         {
-            Warnings = [new ModelAssignmentWarning("briefing-fidelity", "no usable candidate for slot FactReviewer; falling back")],
+            Warnings = [new ModelAssignmentWarning("briefing-fidelity", "no usable candidate for slot FactReviewer; falling back", "Briefing fidelity")],
         };
         var svc = new RunService(persistence, new StubRunRepository(), crew, new StubAdvisorConsultationRepository(),
             new NoOpKnowledgeService(), NullLogger<RunService>.Instance, warningSink: sink);
@@ -215,8 +215,10 @@ public sealed class RunServiceAttachmentTests
 
         var warning = Assert.Single(sink.Warnings);
         Assert.Equal((runId, RunWarningSources.ModelAssignment, RunWarningCodes.ModelAssignment), (warning.RunId, warning.Source, warning.Code));
-        Assert.Contains("briefing-fidelity", warning.Message);
-        Assert.Contains("falling back", warning.Message);
+        Assert.Contains("\"Briefing fidelity\"", warning.Message);
+        Assert.DoesNotContain("briefing-fidelity", warning.Message);
+        Assert.DoesNotContain("falling back", warning.Message);
+        Assert.DoesNotContain("FactReviewer", warning.Message);
     }
 
     // --- Builder ---

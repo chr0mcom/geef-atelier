@@ -26,6 +26,8 @@ internal sealed class RunService(
     IRunWarningSink?                      warningSink = null,
     IRunWarningRepository?                warningRepository = null) : IRunService
 {
+    internal const string AttachmentUploadFailedMessage = "The attached files could not be prepared. Please submit the task again.";
+
     private static readonly JsonSerializerOptions SnapshotJsonOpts =
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -131,8 +133,8 @@ internal sealed class RunService(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Attachment upload failed for run {RunId}; marking run as Failed", runId);
-                await persistence.MarkRunFailedAsync(runId, $"Attachment upload failed: {ex.Message}", cancellationToken);
+                logger.LogError("Attachment upload failed for run {RunId}; marking run as Failed: {Error}", runId, ex.ToRedactedLogText());
+                await persistence.MarkRunFailedAsync(runId, AttachmentUploadFailedMessage, cancellationToken);
                 throw;
             }
         }
@@ -146,7 +148,7 @@ internal sealed class RunService(
             return;
         foreach (var warning in warnings)
             await warningSink.ReportAsync(runId, RunWarningSources.ModelAssignment, RunWarningCodes.ModelAssignment,
-                $"The AI model for '{warning.ActorName}' could not be chosen as planned, so a replacement was used ({warning.Detail.ToWarningDetail()}).");
+                $"The AI model for \"{warning.ShownName}\" could not be chosen as planned, so a different one was used.");
     }
 
     /// <inheritdoc/>

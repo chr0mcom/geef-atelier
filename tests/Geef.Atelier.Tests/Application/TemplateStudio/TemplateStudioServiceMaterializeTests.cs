@@ -421,7 +421,8 @@ public sealed class TemplateStudioServiceMaterializeTests
         var result = await svc.MaterializeAsync(Guid.NewGuid(), request, CancellationToken.None);
 
         Assert.NotEmpty(result.Warnings);
-        Assert.Contains(result.Warnings, w => w.Contains("unknown-provider"));
+        Assert.Contains(result.Warnings, w => w.Contains("not set up yet"));
+        Assert.DoesNotContain(result.Warnings, w => w.Contains("unknown-provider"));
     }
 
     [Fact]
@@ -456,6 +457,7 @@ public sealed class TemplateStudioServiceMaterializeTests
         Assert.False(created.ProviderSettings.ContainsKey(GroundingProviderProfile.KeyRestApiAuthHeaderEnv));
         Assert.False(created.ProviderSettings.ContainsKey(GroundingProviderProfile.KeyAcademicApiKeyEnv));
         Assert.Equal("https://example.com/api", created.ProviderSettings[GroundingProviderProfile.KeyRestApiUrl]);
-        Assert.Equal(2, result.Warnings.Count(w => w.Contains("credentials can only be set by an administrator")));
+        Assert.Equal(2, result.Warnings.Count(w => w.Contains("Only an administrator can set it")));
+        Assert.DoesNotContain(result.Warnings, w => w.Contains("authHeaderEnv") || w.Contains("apiKeyEnv"));
     }
 }

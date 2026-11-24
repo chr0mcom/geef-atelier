@@ -15,7 +15,7 @@ internal sealed class RunWarningSink(IServiceScopeFactory scopeFactory, ILogger<
             Iteration = iteration,
             Source = source.Clip(RunWarningLimits.SourceLength),
             Code = code.Clip(RunWarningLimits.CodeLength),
-            Message = message.Clip(RunWarningLimits.MessageLength),
+            Message = message.RedactSecrets().Clip(RunWarningLimits.MessageLength),
             CreatedAt = DateTimeOffset.UtcNow,
         };
 

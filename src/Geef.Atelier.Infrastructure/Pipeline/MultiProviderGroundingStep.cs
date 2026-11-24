@@ -90,15 +90,15 @@ internal sealed class MultiProviderGroundingStep(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex,
-                    "MultiProviderGroundingStep: run={RunId} provider={Provider} failed and was skipped.",
-                    runId, profile.Name);
+                logger.LogWarning(
+                    "MultiProviderGroundingStep: run={RunId} provider={Provider} failed and was skipped: {Error}",
+                    runId, profile.Name, ex.ToRedactedLogText());
                 if (warningSink is not null)
                     await warningSink.ReportAsync(
                         runId,
                         RunWarningSources.Grounding,
                         RunWarningCodes.GroundingProviderSkipped,
-                        $"A source could not be read and was skipped: {profile.DisplayNameOrName()} (reason: {ex.Message.ToWarningDetail()}).",
+                        profile.SkippedSourceWarning(),
                         ct: cancellationToken);
             }
         }

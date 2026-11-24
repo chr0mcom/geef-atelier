@@ -35,7 +35,7 @@ internal sealed class ModelAssignmentService(IModelCatalog modelCatalog, ILogger
         if (executor.ModelSlot is { } executorSlot)
         {
             var assignment = await session.AssignSingleAsync(executorSlot, executor.ModelDomain ?? crewDomain, executor: null);
-            ReportTo(warnings, executor.Name, assignment);
+            ReportTo(warnings, executor.Name, executor.DisplayName, assignment);
             executor = executor with { Provider = assignment.Candidate.Provider, Model = assignment.Candidate.Model };
         }
 
@@ -48,7 +48,7 @@ internal sealed class ModelAssignmentService(IModelCatalog modelCatalog, ILogger
         var reviewers = snapshot.Reviewers
             .Select((r, i) =>
             {
-                ReportTo(warnings, r.Name, reviewerAssignments[i]);
+                ReportTo(warnings, r.Name, r.DisplayName, reviewerAssignments[i]);
                 if (r.ModelSlot is null)
                     return r;
                 return r with { Provider = reviewerAssignments[i].Candidate.Provider, Model = reviewerAssignments[i].Candidate.Model };
@@ -65,7 +65,7 @@ internal sealed class ModelAssignmentService(IModelCatalog modelCatalog, ILogger
             }
 
             var assignment = await session.AssignSingleAsync(advisorSlot, advisor.ModelDomain ?? crewDomain, executorBinding);
-            ReportTo(warnings, advisor.Name, assignment);
+            ReportTo(warnings, advisor.Name, advisor.DisplayName, assignment);
             advisors.Add(advisor with { Provider = assignment.Candidate.Provider, Model = assignment.Candidate.Model });
         }
 
@@ -95,7 +95,7 @@ internal sealed class ModelAssignmentService(IModelCatalog modelCatalog, ILogger
             }
 
             var assignment = await session.AssignSingleAsync(slot, crewDomain, executor: null);
-            ReportTo(warnings, profile.Name, assignment);
+            ReportTo(warnings, profile.Name, profile.DisplayName, assignment);
             var settings = new Dictionary<string, string>(profile.ProviderSettings)
             {
                 [GroundingProviderProfile.KeyRefinementProvider] = assignment.Candidate.Provider,
@@ -123,7 +123,7 @@ internal sealed class ModelAssignmentService(IModelCatalog modelCatalog, ILogger
             }
 
             var assignment = await session.AssignSingleAsync(slot, crewDomain, executor: null);
-            ReportTo(warnings, profile.Name, assignment);
+            ReportTo(warnings, profile.Name, profile.DisplayName, assignment);
             var settings = new Dictionary<string, string>(profile.Settings)
             {
                 [TransformSettings.KeyProvider] = assignment.Candidate.Provider,
@@ -144,11 +144,11 @@ internal sealed class ModelAssignmentService(IModelCatalog modelCatalog, ILogger
         return hasBinding ? null : ModelSlot.TransformCondense;
     }
 
-    private void ReportTo(ICollection<ModelAssignmentWarning> warnings, string actorName, ModelAssignment assignment)
+    private void ReportTo(ICollection<ModelAssignmentWarning> warnings, string actorName, string? displayName, ModelAssignment assignment)
     {
         if (assignment.Warning is null)
             return;
-        warnings.Add(new ModelAssignmentWarning(actorName, assignment.Warning));
+        warnings.Add(new ModelAssignmentWarning(actorName, assignment.Warning, displayName));
         logger.LogWarning(
             "Model matrix: actor '{Actor}' assigned {Candidate} — {Warning}",
             actorName, assignment.Candidate, assignment.Warning);
