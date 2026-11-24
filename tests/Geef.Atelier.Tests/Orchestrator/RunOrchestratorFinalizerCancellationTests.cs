@@ -16,7 +16,8 @@ namespace Geef.Atelier.Tests.Orchestrator;
 /// <summary>
 /// Funktional 2 (Etappe 0, review round 2): a user cancel or a service stop while a finishing step runs is not a
 /// failure of that step. The run ends as Aborted without a "finishing step failed" warning and without an error
-/// artifact, whether the executor lets the cancellation through or swallows it and returns an error result.
+/// artifact, whether the executor lets the cancellation through or swallows it and returns an error result. This holds
+/// on the converged path and on the best-effort path (finishing steps after the last round without approval).
 /// </summary>
 [Collection("Postgres")]
 public sealed class RunOrchestratorFinalizerCancellationTests(PostgresFixture fixture)
@@ -53,6 +54,28 @@ public sealed class RunOrchestratorFinalizerCancellationTests(PostgresFixture fi
     [Theory(Timeout = 30_000)]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task UserCancelDuringAFinishingStepAfterABestEffortDraftIsNoStepFailure(bool executorSwallowsCancellation)
+    {
+        var finalizers = new WaitingFinalizerFactory(executorSwallowsCancellation);
+        var runId = await CreateRunAsync(bestEffort: true);
+        await using var host = new OrchestratorTestHost(fixture, new RejectingFakeLlmClient(), FastOptions(),
+            services => services.AddSingleton<IFinalizerExecutorFactory>(finalizers));
+        await host.StartAsync();
+        await finalizers.Entered.Task.WaitAsync(TimeSpan.FromSeconds(20));
+
+        await using (var db = fixture.NewContext())
+            await db.Runs.Where(r => r.Id == runId).ExecuteUpdateAsync(s => s.SetProperty(r => r.CancellationRequested, true));
+        var run = await WaitForOutcomeAsync(runId);
+
+        Assert.Equal((RunOutcome?)RunOutcome.Aborted, run.Outcome);
+        Assert.Equal(RunStatus.Aborted, run.Status);
+        Assert.True(finalizers.SawCancellation);
+        await AssertNoStepFailureAsync(runId);
+    }
+
+    [Theory(Timeout = 30_000)]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task ServiceStopDuringAFinishingStepIsNoStepFailure(bool executorSwallowsCancellation)
     {
         var finalizers = new WaitingFinalizerFactory(executorSwallowsCancellation);
@@ -82,12 +105,18 @@ public sealed class RunOrchestratorFinalizerCancellationTests(PostgresFixture fi
         Assert.Null(run.FinalizerErrorMessage);
     }
 
-    private async Task<Guid> CreateRunAsync()
+    private async Task<Guid> CreateRunAsync(bool bestEffort = false)
     {
         var snapshot = TestCrewSnapshots.Klassik with
         {
             Finalizers = [new FinalizerProfile("waiting-step", "Waiting step", "d", FinalizerType.Transform, [], false)],
         };
+        if (bestEffort)
+            snapshot = snapshot with
+            {
+                ConvergenceOverride = new ConvergencePolicyOverride(MaxIterations: 1, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
+                RunFinalizersOnMaxAttempts = true,
+            };
         await using var db = fixture.NewContext();
         return await new RunPersistenceService(db).CreateRunAsync(
             $"Finalizer cancellation test {Guid.NewGuid():N}.", "{}", crewSnapshotJson: TestCrewSnapshots.Serialize(snapshot));

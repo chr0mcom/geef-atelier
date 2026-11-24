@@ -87,7 +87,7 @@ public sealed class RunOrchestratorOutcomeOrderingTests(PostgresFixture fixture)
     {
         var briefing = Briefing();
         var runId = await CreateRunAsync(briefing, NonConvergingSnapshotJson());
-        await using var trigger = await RowTrigger.CreateAsync(fixture, briefing,
+        await using var trigger = await RunRowTrigger.CreateAsync(fixture, briefing,
             """NEW."FinalizerErrorMessage" IS NOT NULL AND OLD."FinalizerErrorMessage" IS NULL""",
             "PERFORM pg_sleep(1.5); RETURN NEW;");
         await using var host = new OrchestratorTestHost(fixture, new RejectingFakeLlmClient(), FastOptions());
@@ -104,7 +104,7 @@ public sealed class RunOrchestratorOutcomeOrderingTests(PostgresFixture fixture)
     {
         var briefing = Briefing();
         var runId = await CreateRunAsync(briefing, NonConvergingSnapshotJson());
-        await using var trigger = await RowTrigger.CreateAsync(fixture, briefing,
+        await using var trigger = await RunRowTrigger.CreateAsync(fixture, briefing,
             """NEW."FinalizerErrorMessage" IS NOT NULL AND OLD."FinalizerErrorMessage" IS NULL""",
             "RAISE EXCEPTION 'injected draft write failure';");
         await using var host = new OrchestratorTestHost(fixture, new RejectingFakeLlmClient(), FastOptions());
@@ -122,7 +122,7 @@ public sealed class RunOrchestratorOutcomeOrderingTests(PostgresFixture fixture)
     {
         var briefing = Briefing();
         var runId = await CreateRunAsync(briefing, TestCrewSnapshots.KlassikJson);
-        await using var trigger = await RowTrigger.CreateAsync(fixture, briefing,
+        await using var trigger = await RunRowTrigger.CreateAsync(fixture, briefing,
             """NEW."Status" = 'Completed' AND OLD."Status" <> 'Completed'""",
             "RAISE EXCEPTION 'injected completion write failure';");
         await using var host = new OrchestratorTestHost(fixture, new FakeLlmClient(), FastOptions());
@@ -216,33 +216,6 @@ public sealed class RunOrchestratorOutcomeOrderingTests(PostgresFixture fixture)
                 await owner.Release.Task.WaitAsync(cancellationToken);
                 return new FinalizerExecutionResult(TransformedText, null, null, profile.Name);
             }
-        }
-    }
-
-    private sealed class RowTrigger(PostgresFixture fixture, string name) : IAsyncDisposable
-    {
-        public static async Task<RowTrigger> CreateAsync(PostgresFixture fixture, string briefing, string condition, string body)
-        {
-            var name = $"test_outcome_{Guid.NewGuid():N}";
-            var literal = briefing.Replace("'", "''");
-            var sql = $$"""
-                CREATE FUNCTION {{name}}() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN {{body}} END $fn$;
-                CREATE TRIGGER {{name}} BEFORE UPDATE ON "Runs" FOR EACH ROW
-                    WHEN (NEW."BriefingText" = '{{literal}}' AND {{condition}}) EXECUTE FUNCTION {{name}}();
-                """;
-            await using var db = fixture.NewContext();
-            await db.Database.ExecuteSqlRawAsync(sql);
-            return new RowTrigger(fixture, name);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            var sql = $"""
-                DROP TRIGGER IF EXISTS {name} ON "Runs";
-                DROP FUNCTION IF EXISTS {name}();
-                """;
-            await using var db = fixture.NewContext();
-            await db.Database.ExecuteSqlRawAsync(sql);
         }
     }
 }
