@@ -40,12 +40,14 @@ FAKES = {
         case $1 in
           exec)
             [[ -n ${FAKE_PSQL_FAIL:-} ]] && { echo "psql: error: connection refused" >&2; exit 2; }
+            [[ -z ${FAKE_PSQL_NO_SENTINEL:-} ]] && echo '#watch-ok'
             cat "$FAKE_DIR/stuck_runs" 2>/dev/null
             ;;
           inspect)
+            [[ -n ${FAKE_DOCKER_DOWN:-} ]] && { echo "Cannot connect to the Docker daemon at unix:///var/run/docker.sock" >&2; exit 1; }
             name=${@: -1}
             f="$FAKE_DIR/ctr_$name"
-            [[ -f $f ]] || exit 1
+            [[ -f $f ]] || { echo "error: no such object: $name" >&2; exit 1; }
             cat "$f"
             ;;
         esac
@@ -293,3 +295,208 @@ def test_script_is_sourceable_without_side_effects(tmp_path):
                        capture_output=True, text=True, env={"PATH": "/usr/bin:/bin"}, cwd=tmp_path)
     assert r.returncode == 0
     assert r.stdout.strip() == "/srv/backup/atelier-watch 60 21600"
+
+
+# Unklare Daten: eigener Zustand, Meldung, nie ein Ende des offenen Alarms (Q8)
+
+UNREADABLE_HEALTH = [
+    "[]",
+    "null",
+    "",
+    "   \n",
+    "<html><body>502 Bad Gateway</body></html>",
+    "42",
+    '"ok"',
+    '{"status": "ok", "failover": []}',
+    '{"status": "ok", "failover": {"backends": [1, 2]}}',
+]
+
+
+def _open_proxy_alarm(sb):
+    health = json.loads(json.dumps(HEALTHY))
+    health["degraded"] = True
+    sb.set_health(health)
+    sb.run()
+    assert len(sb.alarms) == 1 and "Problem (proxy)" in sb.alarms[0]
+    assert (sb.state / "proxy.state").read_text().startswith("problem|")
+
+
+@pytest.mark.parametrize("body", UNREADABLE_HEALTH)
+def test_unreadable_health_never_clears_open_alarm(sb, body):
+    _open_proxy_alarm(sb)
+    sb.set_health(body)
+    r = sb.run()
+    assert r.returncode == 1, sb.logtext
+    assert not any("Wieder in Ordnung" in a for a in sb.alarms)
+    assert "] proxy: ok" not in sb.logtext and "] proxy: wieder in Ordnung" not in sb.logtext
+    assert "Traceback" not in sb.logtext
+    assert len(sb.alarms) == 2
+    assert "Unklar geändert (proxy): Gesundheitsdaten des cli-proxy nicht lesbar" in sb.alarms[1]
+    assert "gilt weiter als offen" in sb.alarms[1]
+    assert (sb.state / "proxy.state").read_text().startswith("unknown|")
+    sb.run()
+    assert len(sb.alarms) == 2
+    assert "weiterhin unklar (bereits gemeldet)" in sb.logtext
+
+
+@pytest.mark.parametrize("body", UNREADABLE_HEALTH)
+def test_unreadable_health_from_ok_is_reported(sb, body):
+    sb.set_health(body)
+    r = sb.run()
+    assert r.returncode == 1, sb.logtext
+    assert len(sb.alarms) == 1
+    assert sb.alarms[0].split(": ", 1)[1].startswith("Unklar (proxy): Gesundheitsdaten des cli-proxy nicht lesbar")
+    assert "Fertig (1 Problem(e))." in sb.logtext
+
+
+def test_unclear_then_healthy_sends_one_recovery(sb):
+    sb.set_health("[]")
+    sb.run()
+    sb.set_health(HEALTHY)
+    r = sb.run(advance=600)
+    assert r.returncode == 0
+    assert len(sb.alarms) == 2 and "Wieder in Ordnung (proxy) nach 10 min" in sb.alarms[1]
+    assert not (sb.state / "proxy.state").exists()
+
+
+def test_unclear_then_problem_is_a_change_and_keeps_since(sb):
+    _open_proxy_alarm(sb)
+    sb.set_health("[]")
+    sb.run(advance=600)
+    since = (sb.state / "proxy.state").read_text().split("|")[2]
+    health = json.loads(json.dumps(HEALTHY))
+    health["degraded"] = True
+    sb.set_health(health)
+    sb.run(advance=600)
+    assert "Problem geändert (proxy)" in sb.alarms[2]
+    assert (sb.state / "proxy.state").read_text().split("|")[2] == since
+
+
+def test_crashing_health_parser_is_unclear_not_ok(sb):
+    _open_proxy_alarm(sb)
+    _write_exec(sb.bin / "python3", "#!/usr/bin/env bash\necho 'Traceback (most recent call last):' >&2\nexit 1\n")
+    sb.set_health(HEALTHY)
+    r = sb.run()
+    assert r.returncode == 1
+    assert not any("Wieder in Ordnung" in a for a in sb.alarms)
+    assert "Auswertung gescheitert (Exit 1)" in sb.alarms[-1]
+
+
+def _open_runs_alarm(sb):
+    sb.set_stuck("1a2b3c4d 75")
+    sb.run()
+    assert "Problem (runs)" in sb.alarms[0]
+
+
+@pytest.mark.parametrize("env", [{"FAKE_PSQL_FAIL": "1"}, {"FAKE_PSQL_NO_SENTINEL": "1"}])
+def test_unreadable_runs_query_never_clears_open_alarm(sb, env):
+    _open_runs_alarm(sb)
+    sb.set_stuck()
+    r = sb.run(**env)
+    assert r.returncode == 1
+    assert not any("Wieder in Ordnung" in a for a in sb.alarms)
+    assert "Unklar geändert (runs)" in sb.alarms[1]
+    assert (sb.state / "runs.state").exists()
+
+
+def test_runs_query_without_sentinel_from_ok_is_unclear(sb):
+    r = sb.run(FAKE_PSQL_NO_SENTINEL="1")
+    assert r.returncode == 1
+    assert "Unklar (runs): Ergebnis der Läufe-Abfrage nicht lesbar (Kennzeile fehlt)" in sb.alarms[0]
+
+
+def test_runs_query_carries_sentinel(sb):
+    sb.run()
+    assert "select '#watch-ok' union all (select" in sb.read("docker.argv")
+
+
+@pytest.mark.parametrize(
+    ("env", "value", "expected"),
+    [
+        ({"FAKE_DOCKER_DOWN": "1"}, "running healthy", "Cannot connect to the Docker daemon"),
+        ({}, "running", "unerwartete Ausgabe"),
+        ({}, "<no value> <no value>", "unerwartete Ausgabe"),
+        ({}, "running healthy extra", "unerwartete Ausgabe"),
+    ],
+)
+def test_unreadable_container_state_never_clears_open_alarm(sb, env, value, expected):
+    sb.set_container("geef-atelier-web", "exited none")
+    sb.run()
+    assert "Problem (container-geef-atelier-web)" in sb.alarms[0]
+    sb.set_container("geef-atelier-web", value)
+    r = sb.run(**env)
+    assert r.returncode == 1
+    assert not any("Wieder in Ordnung" in a for a in sb.alarms)
+    assert any("Unklar geändert (container-geef-atelier-web)" in a and expected in a for a in sb.alarms)
+
+
+# Schwellwert nie ungeprüft in SQL oder Arithmetik (Q14)
+
+@pytest.mark.parametrize("value", ["60'", "abc", "0", "-5", "1 minutes'; select 1; --", " 60", "07", "9999999"])
+def test_invalid_stuck_minutes_falls_back_with_warning(sb, value):
+    r = sb.run(STUCK_MINUTES=value)
+    assert r.returncode == 0, sb.logtext
+    assert "Warnung: STUCK_MINUTES=" in sb.logtext and "nutze 60" in sb.logtext
+    argv = sb.read("docker.argv")
+    assert "interval '60 minutes'" in argv
+    assert f"interval '{value} minutes'" not in argv
+
+
+def test_empty_stuck_minutes_means_default(sb):
+    sb.run(STUCK_MINUTES="")
+    assert "interval '60 minutes'" in sb.read("docker.argv")
+
+
+def test_valid_stuck_minutes_is_used(sb):
+    sb.run(STUCK_MINUTES="90")
+    assert "interval '90 minutes'" in sb.read("docker.argv")
+    assert "Warnung" not in sb.logtext
+
+
+def test_remind_seconds_is_never_evaluated_as_arithmetic(sb, tmp_path):
+    marker = tmp_path / "pwned"
+    sb.set_stuck("1a2b3c4d 75")
+    sb.run()
+    r = sb.run(REMIND_SECONDS=f"a[$(touch {marker})]", WATCH_NOW=f"b[$(touch {marker})]")
+    assert r.returncode == 1
+    assert not marker.exists()
+    assert "Warnung: REMIND_SECONDS=" in sb.logtext
+
+
+def test_corrupt_state_file_does_not_crash(sb):
+    sb.state.mkdir()
+    (sb.state / "runs.state").write_text("problem|x|$(boom)|y\n")
+    (sb.state / "proxy.state").write_text("garbage\n")
+    r = sb.run()
+    assert "Fertig (" in sb.logtext, sb.logtext + r.stderr
+    assert "syntax error" not in sb.logtext
+
+
+# Log-Rotation nur durch den Sperrinhaber (Q21)
+
+def _big_log(sb):
+    sb.state.mkdir(exist_ok=True)
+    (sb.state / "watch.log").write_text("x" * 1_100_000 + "\n")
+
+
+def test_log_is_not_rotated_while_another_run_holds_the_lock(sb):
+    _big_log(sb)
+    holder = subprocess.Popen(["bash", "-c", f'exec 9> "{sb.state}/lock"; flock -n 9 && echo locked && sleep 20'], stdout=subprocess.PIPE, text=True)
+    try:
+        assert holder.stdout.readline().strip() == "locked"
+        r = sb.run()
+        assert r.returncode == 0
+        assert not (sb.state / "watch.log.1").exists()
+        assert sb.logtext.startswith("x" * 100)
+        assert sb.logtext.rstrip().endswith("Anderer Lauf aktiv, Abbruch.")
+    finally:
+        holder.kill()
+        holder.wait()
+
+
+def test_lock_holder_rotates_big_log(sb):
+    _big_log(sb)
+    r = sb.run()
+    assert r.returncode == 0
+    assert (sb.state / "watch.log.1").exists()
+    assert "Fertig (0 Problem(e))." in sb.logtext and not sb.logtext.startswith("x")
