@@ -1,8 +1,8 @@
 using System.ComponentModel;
-using System.Text.Json;
 using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Runs;
-using Geef.Atelier.Mcp.Models;
+using Geef.Atelier.Core.Domain.Orders;
+using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
 namespace Geef.Atelier.Mcp.Tools;
@@ -10,17 +10,6 @@ namespace Geef.Atelier.Mcp.Tools;
 [McpServerToolType]
 public static class SubmitAutoCrewRequestTool
 {
-    private static readonly JsonSerializerOptions JsonOpts =
-        new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-
-    private static readonly IReadOnlySet<string> SupportedAttachmentContentTypes =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "text/markdown",
-            "text/plain",
-            "application/pdf",
-        };
-
     [McpServerTool, Description(
         "Automatically composes the best crew for a task and then executes the task — all in one step. " +
         "Internally this triggers two pipeline runs: (1) a Crew-Composition run that analyses the task and " +
@@ -36,46 +25,7 @@ public static class SubmitAutoCrewRequestTool
         [Description("Optional attachments as a JSON array: [{\"filename\":\"report.md\",\"contentType\":\"text/plain\",\"contentBase64\":\"...\"}]. Supported content types: text/markdown, text/plain, application/pdf.")] string? attachments = null,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<RunAttachmentInput>? attachmentInputs = null;
-        if (attachments is not null)
-        {
-            AttachmentDto[]? parsed;
-            try
-            {
-                parsed = JsonSerializer.Deserialize<AttachmentDto[]>(attachments, JsonOpts);
-            }
-            catch (JsonException ex)
-            {
-                throw new ArgumentException("attachments JSON is invalid", nameof(attachments), ex);
-            }
-
-            if (parsed is { Length: > 0 })
-            {
-                var inputs = new List<RunAttachmentInput>(parsed.Length);
-                foreach (var dto in parsed)
-                {
-                    if (!SupportedAttachmentContentTypes.Contains(dto.ContentType))
-                        throw new ArgumentException($"Content type '{dto.ContentType}' is not supported", nameof(attachments));
-
-                    byte[] content;
-                    try
-                    {
-                        content = Convert.FromBase64String(dto.ContentBase64);
-                    }
-                    catch (FormatException ex)
-                    {
-                        throw new ArgumentException($"Attachment '{dto.Filename}' has invalid base64 content", nameof(attachments), ex);
-                    }
-
-                    inputs.Add(new RunAttachmentInput(
-                        Filename: dto.Filename,
-                        ContentType: dto.ContentType,
-                        Content: content));
-                }
-
-                attachmentInputs = inputs;
-            }
-        }
+        var attachmentInputs = ToLegacyAttachments(McpAttachmentParser.Parse(attachments));
 
         var runId = await runService.SubmitRunAsync(
             new SubmitRunRequest(
@@ -86,7 +36,8 @@ public static class SubmitAutoCrewRequestTool
                 CustomCrew: null,
                 Attachments: attachmentInputs,
                 AutoCompose: true,
-                ChainToTaskRun: chainToTaskRun),
+                ChainToTaskRun: chainToTaskRun,
+                Entry: OrderEntry.Mcp),
             cancellationToken);
 
         return new AutoCrewRunStatusDto(
@@ -95,10 +46,19 @@ public static class SubmitAutoCrewRequestTool
             ChainToTaskRun: chainToTaskRun);
     }
 
-    internal sealed record AttachmentDto(
-        [property: System.Text.Json.Serialization.JsonRequired] string Filename,
-        [property: System.Text.Json.Serialization.JsonRequired] string ContentType,
-        [property: System.Text.Json.Serialization.JsonRequired] string ContentBase64);
+    private static IReadOnlyList<RunAttachmentInput>? ToLegacyAttachments(
+        IReadOnlyList<(string FileName, string ContentType, byte[] Content)> attachments)
+    {
+        if (attachments.Count == 0)
+            return null;
+
+        var docx = attachments.FirstOrDefault(a => a.ContentType == McpAttachmentParser.DocxContentType);
+        if (docx.FileName is not null)
+            throw new McpException(
+                $"The attachment '{docx.FileName}' is a Word document, which this tool cannot read. Use submit_order, or attach it as PDF, Markdown or text.");
+
+        return attachments.Select(a => new RunAttachmentInput(Filename: a.FileName, ContentType: a.ContentType, Content: a.Content)).ToList();
+    }
 }
 
 public sealed record AutoCrewRunStatusDto(

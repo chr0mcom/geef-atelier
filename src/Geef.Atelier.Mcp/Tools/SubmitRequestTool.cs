@@ -1,109 +1,121 @@
 using System.ComponentModel;
 using System.Text.Json;
 using Geef.Atelier.Application.Auth;
-using Geef.Atelier.Application.Runs;
+using Geef.Atelier.Application.Orders;
+using Geef.Atelier.Application.Sources;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Mcp.Models;
+using Microsoft.Extensions.Options;
+using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
 namespace Geef.Atelier.Mcp.Tools;
 
+/// <summary>
+/// The older entry point, kept as a shell over <see cref="IOrderService"/>: it creates an order without follow-up questions
+/// and still answers with the run id. Without a crew template or custom crew it uses <c>Orders:LegacySubmitDefaultMode</c>.
+/// </summary>
 [McpServerToolType]
 public static class SubmitRequestTool
 {
+    public const string ToolDescription =
+        "Older interface: submits a writing task and returns its runId (use get_run_status and get_run_result) plus the orderId " +
+        "(also usable with get_order_status and get_order_result). Prefer submit_order for new work. " +
+        "Never asks follow-up questions. Without crewTemplate or customCrew it uses the standard direct path; " +
+        "with them it uses the slower path with several review rounds and the given team.";
+
     private static readonly JsonSerializerOptions JsonOpts =
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-    /// <summary>Supported MIME types for run-attachment uploads.</summary>
-    private static readonly IReadOnlySet<string> SupportedAttachmentContentTypes =
-        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "text/markdown",
-            "text/plain",
-            "application/pdf",
-        };
-
-    [McpServerTool, Description("Submits a new run request with a briefing text and optional JSON configuration.")]
+    [McpServerTool, Description(ToolDescription)]
     public static async Task<RunStatusDto> SubmitRequest(
-        IRunService runService,
+        IOrderService orders,
+        ISourceIntakeService intake,
         ICurrentUserService currentUser,
-        [Description("The briefing text describing the task for the AI orchestrator.")] string briefingText,
-        [Description("Optional JSON configuration object. Defaults to '{}'.")] string? configJson = null,
-        [Description("Name of the crew template to use (e.g. 'klassik'). Defaults to the system default when omitted.")] string? crewTemplate = null,
-        [Description("Optional custom crew specification as a JSON object (CrewSpec). When supplied, crewTemplate is ignored. Supported fields: executorProfileName, reviewerProfileNames, advisorProfileNames, groundingProviderProfileNames, evaluationStrategy.")] string? customCrew = null,
-        [Description("Optional attachments as a JSON array: [{\"filename\":\"report.md\",\"contentType\":\"text/plain\",\"contentBase64\":\"...\"}]. Supported content types: text/markdown, text/plain, application/pdf.")] string? attachments = null,
+        IOptions<OrderOptions> options,
+        [Description("The task in the person's own words.")] string briefingText,
+        [Description("Optional JSON object, kept for compatibility; it no longer changes anything. Invalid JSON is rejected.")] string? configJson = null,
+        [Description("Name of the crew template to use (e.g. 'klassik'). When omitted, the standard direct path is used.")] string? crewTemplate = null,
+        [Description("Optional custom crew specification as a JSON object (CrewSpec). When supplied, crewTemplate is ignored. Supported fields: executorProfileName (required), reviewerProfileNames, advisorProfileNames, groundingProviderNames, evaluationStrategy. Invalid JSON is rejected.")] string? customCrew = null,
+        [Description("Optional attachments as a JSON array: [{\"filename\":\"report.md\",\"contentType\":\"text/plain\",\"contentBase64\":\"...\"}]. contentBase64 must be the complete original file. Supported content types: application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, text/markdown, text/plain.")] string? attachments = null,
         CancellationToken cancellationToken = default)
     {
-        CrewSpec? crewSpec = null;
-        if (!string.IsNullOrWhiteSpace(customCrew))
+        var username = currentUser.RequireUsername();
+        if (string.IsNullOrWhiteSpace(briefingText))
+            throw new McpException("briefingText is empty. Pass the task in the person's own words.");
+        EnsureValidConfigJson(configJson);
+        var crewSpec = ParseCustomCrew(customCrew);
+        var template = crewSpec is null && !string.IsNullOrWhiteSpace(crewTemplate) ? crewTemplate.Trim() : null;
+        var mode = crewSpec is not null || template is not null ? OrderMode.Careful : options.Value.LegacySubmitDefaultMode;
+
+        var parsed = McpAttachmentParser.Parse(attachments);
+        var receipts = await intake.IntakeAttachmentsAsync(parsed, username, cancellationToken);
+
+        OrderSubmission submission;
+        try
         {
-            try
-            {
-                crewSpec = JsonSerializer.Deserialize<CrewSpec>(customCrew, JsonOpts);
-            }
-            catch (JsonException)
-            {
-                // Malformed JSON — ignore and fall through to template-based path.
-            }
+            submission = await orders.SubmitAsync(
+                new SubmitOrderRequest(
+                    RequestText: briefingText,
+                    CreatedByUser: username,
+                    Entry: OrderEntry.Mcp,
+                    Sources: receipts.Select(r => new OrderSourceSelection(r.SourceId!.Value)).ToList(),
+                    Mode: mode,
+                    CrewTemplateName: template,
+                    CustomCrew: crewSpec,
+                    AllowQuestions: false),
+                cancellationToken);
+        }
+        catch (OrderSubmissionException ex)
+        {
+            await intake.ReleaseNewSourcesAsync(receipts, username);
+            throw new McpException(ex.Message, ex);
         }
 
-        IReadOnlyList<RunAttachmentInput>? attachmentInputs = null;
-        if (attachments is not null)
-        {
-            AttachmentDto[]? parsed;
-            try
-            {
-                parsed = JsonSerializer.Deserialize<AttachmentDto[]>(attachments, JsonOpts);
-            }
-            catch (JsonException ex)
-            {
-                throw new ArgumentException("attachments JSON is invalid", nameof(attachments), ex);
-            }
+        if (submission.RunId is not { } runId)
+            throw new McpException(
+                $"The order {submission.OrderId} was created, but no task was started. Call get_order_status with this orderId.");
 
-            if (parsed is { Length: > 0 })
-            {
-                var inputs = new List<RunAttachmentInput>(parsed.Length);
-                foreach (var dto in parsed)
-                {
-                    if (!SupportedAttachmentContentTypes.Contains(dto.ContentType))
-                        throw new ArgumentException($"Content type '{dto.ContentType}' is not supported", nameof(attachments));
-
-                    byte[] content;
-                    try
-                    {
-                        content = Convert.FromBase64String(dto.ContentBase64);
-                    }
-                    catch (FormatException ex)
-                    {
-                        throw new ArgumentException($"Attachment '{dto.Filename}' has invalid base64 content", nameof(attachments), ex);
-                    }
-
-                    inputs.Add(new RunAttachmentInput(
-                        Filename: dto.Filename,
-                        ContentType: dto.ContentType,
-                        Content: content));
-                }
-
-                attachmentInputs = inputs;
-            }
-        }
-
-        var runId = await runService.SubmitRunAsync(
-            new SubmitRunRequest(
-                BriefingText: briefingText,
-                ConfigJson: configJson ?? "{}",
-                CreatedByUser: currentUser.Username,
-                CrewTemplateName: crewSpec is null ? crewTemplate : null,
-                CustomCrew: crewSpec,
-                Attachments: attachmentInputs),
-            cancellationToken);
-
-        return new RunStatusDto(runId.ToString(), "Pending", null);
+        return new RunStatusDto(runId.ToString(), "Pending", null, OrderId: submission.OrderId.ToString());
     }
 
-    /// <summary>DTO for deserializing a single attachment entry from the <c>attachments</c> JSON parameter.</summary>
-    internal sealed record AttachmentDto(
-        [property: System.Text.Json.Serialization.JsonRequired] string Filename,
-        [property: System.Text.Json.Serialization.JsonRequired] string ContentType,
-        [property: System.Text.Json.Serialization.JsonRequired] string ContentBase64);
+    /// <summary>Parses <paramref name="customCrew"/>; <c>null</c> when it is blank. Invalid JSON or a spec without executor is rejected.</summary>
+    internal static CrewSpec? ParseCustomCrew(string? customCrew)
+    {
+        if (string.IsNullOrWhiteSpace(customCrew))
+            return null;
+
+        CrewSpec? spec;
+        try
+        {
+            spec = JsonSerializer.Deserialize<CrewSpec>(customCrew, JsonOpts);
+        }
+        catch (JsonException ex)
+        {
+            throw new McpException(
+                $"customCrew is not valid JSON ({ex.Message}). Pass a JSON object such as " +
+                "{\"executorProfileName\":\"default-executor\",\"reviewerProfileNames\":[\"briefing-fidelity\"]}, or leave it out.", ex);
+        }
+
+        if (spec is null || string.IsNullOrWhiteSpace(spec.ExecutorProfileName))
+            throw new McpException("customCrew must be a JSON object with at least executorProfileName, or be left out.");
+
+        return spec.ReviewerProfileNames is null ? spec with { ReviewerProfileNames = [] } : spec;
+    }
+
+    private static void EnsureValidConfigJson(string? configJson)
+    {
+        if (string.IsNullOrWhiteSpace(configJson))
+            return;
+        try
+        {
+            using var _ = JsonDocument.Parse(configJson);
+        }
+        catch (JsonException ex)
+        {
+            throw new McpException("configJson must be valid JSON, or be left out.", ex);
+        }
+    }
 }
