@@ -73,8 +73,8 @@ public sealed class MessageSanitizerTests
     [InlineData("call failed for https://api.example.org/search?api_key=tvly-ABCDEF0123456789XYZ", "api.example.org")]
     [InlineData("config error: password=hunter2hunter2", "hunter2")]
     [InlineData("TAVILY_API_KEY environment variable is not set", "TAVILY_API_KEY")]
-    [InlineData("Connection refused (geef-atelier-postgres:5432)", "geef-atelier-postgres")]
-    [InlineData("Could not find file '/srv/docker/websites/geef_atelier/data/x.json'", "/srv/docker")]
+    [InlineData("Connection refused (database-host:5432)", "database-host")]
+    [InlineData("Could not find file '/var/lib/app/data/x.json'", "/var/lib/app")]
     public void SanitizesGenericException_NeverShowsKeysHostsVariablesOrPaths(string message, string fragment)
     {
         var msg = RunOrchestratorService.SanitizeErrorMessage(new InvalidOperationException(message));
