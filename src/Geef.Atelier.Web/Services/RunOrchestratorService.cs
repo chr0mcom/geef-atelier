@@ -35,12 +35,14 @@ internal sealed class RunOrchestratorService(
     IOptions<ConvergenceOptions>        convergenceOptions,
     ILoggerFactory                      loggerFactory,
     ILogger<RunOrchestratorService>     logger,
+    IRunWarningSink                     warningSink,
     IGroundingProviderFactory?          groundingProviderFactory = null,
     IPricingCatalog?                    pricingCatalog = null,
     IOptions<CostTrackingOptions>?      costTrackingOptions = null,
-    IFinalizerExecutorFactory?          finalizerExecutorFactory = null,
-    IRunWarningSink?                    warningSink = null) : BackgroundService
+    IFinalizerExecutorFactory?          finalizerExecutorFactory = null) : BackgroundService
 {
+    internal const string ResultNotSavedMessage = "The result could not be saved completely.";
+
     private readonly OrchestratorOptions _opts = options.Value;
     private readonly DateTimeOffset _createdAt = DateTimeOffset.UtcNow;
     private readonly SemaphoreSlim _slots = new(options.Value.MaxConcurrentRuns, options.Value.MaxConcurrentRuns);
@@ -187,7 +189,7 @@ internal sealed class RunOrchestratorService(
 
         // Watcher polls DB flag; signals cts if CancellationRequested=true.
         var watcherTask = Task.Run(() => WatchCancellationAsync(run.Id, cts), CancellationToken.None);
-        using var warningScope = warningSink is null ? null : RunWarningScope.Begin(run.Id, warningSink);
+        using var warningScope = RunWarningScope.Begin(run.Id, warningSink);
 
         try
         {
@@ -264,21 +266,18 @@ internal sealed class RunOrchestratorService(
 
             var result = await runner.RunAsync(run.BriefingText, cts.Token);
 
-            await ReportFailedReviewersAsync(run.Id, result.History);
+            await ReportFailedReviewersAsync(run.Id, snapshot, result.History);
             var delivered = result.ToDeliveredOutcome();
 
             if (result.Success)
             {
-                await SetOutcomeAsync(run.Id, delivered.Outcome, delivered.Iteration);
                 if (accumulator is not null)
                     await FinalizeRunCostsAsync(run.Id, accumulator, cts.Token);
-                await ExecuteFinalizationAsync(run.Id, snapshot, cts.Token);
+                await RunFinalizersSafelyAsync(run.Id, snapshot, cts.Token);
+                await SetDeliveredOutcomeAsync(run.Id, delivered.Outcome, delivered.Iteration);
             }
             else
             {
-                // Non-convergence best-effort path (standard and seed-draft runs only).
-                // The SDK already finalized the iteration with the fewest blocking findings and
-                // published PipelineCompletedEvent; result.Output.Markdown is the best-effort text.
                 logger.LogWarning(
                     "Run {RunId} did not converge (stop: {Reason}, degraded iterations: {Degraded}). Surfacing best-effort draft.",
                     run.Id, result.StopReason, result.DegradedIterations);
@@ -290,42 +289,47 @@ internal sealed class RunOrchestratorService(
                     && snapshot.RunFinalizersOnMaxAttempts
                     && snapshot.Finalizers?.Count > 0;
 
-                await SurfaceBestEffortDraftAsync(run.Id, result.Output.Markdown, result.StopReason,
-                    setNote: !shouldRunFinalizers, cts.Token);
-                await SetOutcomeAsync(run.Id, delivered.Outcome, delivered.Iteration);
-
-                if (shouldRunFinalizers)
-                    await ExecuteFinalizationAsync(run.Id, snapshot, cts.Token);
-                else if (snapshot.Finalizers?.Count > 0)
-                    await ReportWarningAsync(run.Id, RunWarningSources.Finalizer, RunWarningCodes.FinalizersNotRun,
-                        "The finishing steps were not run because the text did not pass all checks.");
-
-                try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
+                if (await SurfaceBestEffortDraftAsync(run.Id, result.Output.Markdown, result.StopReason,
+                        setNote: !shouldRunFinalizers, cts.Token))
+                {
+                    if (shouldRunFinalizers)
+                        await RunFinalizersSafelyAsync(run.Id, snapshot, cts.Token);
+                    else if (snapshot.Finalizers?.Count > 0)
+                        await ReportWarningAsync(run.Id, RunWarningSources.Finalizer, RunWarningCodes.FinalizersNotRun,
+                            "The finishing steps were not run because the text did not pass all checks.");
+                    await SetDeliveredOutcomeAsync(run.Id, delivered.Outcome, delivered.Iteration);
+                }
+                else
+                {
+                    await FailIncompleteResultAsync(run.Id);
+                }
             }
+
+            await NotifySafelyAsync(run.Id);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             // Do not pass the already-cancelled stoppingToken — use None so the DB write completes.
             await OverrideToAbortedAsync(run.Id, "Service stopping");
-            try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
+            await NotifySafelyAsync(run.Id);
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
             // User-initiated cancellation: sink may have written Failed; override to Aborted.
             await OverrideToAbortedAsync(run.Id, "Cancelled by user");
-            try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
+            await NotifySafelyAsync(run.Id);
         }
         catch (InvalidCrewSnapshotException ex)
         {
             logger.LogError(ex, "Run {RunId} has an unusable crew snapshot; failing it without a fallback crew.", run.Id);
             await MarkRunFailedAsync(run.Id, ex.Message);
-            try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
+            await NotifySafelyAsync(run.Id);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Run {RunId} pipeline threw unhandled exception.", run.Id);
+            logger.LogError("Run {RunId} pipeline threw unhandled exception: {Error}", run.Id, ex.ToRedactedLogText());
             await MarkRunFailedAsync(run.Id, SanitizeErrorMessage(ex));
-            try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
+            await NotifySafelyAsync(run.Id);
         }
         finally
         {
@@ -417,7 +421,8 @@ internal sealed class RunOrchestratorService(
     /// Produces a sanitized, user-visible error message from a pipeline exception.
     /// Walks the full inner-exception chain so that exceptions wrapped by the Geef SDK
     /// are handled by the most-specific matching rule.
-    /// Sensitive details (API keys, full stack traces, provider URLs) are never included.
+    /// Sensitive details (API keys, full stack traces, provider URLs) are never included: the fallback carries only the
+    /// first line of the message with credential-like fragments removed (<see cref="RunWarningTextExtensions.ToWarningDetail"/>).
     /// </summary>
     internal static string SanitizeErrorMessage(Exception ex)
     {
@@ -444,7 +449,7 @@ internal sealed class RunOrchestratorService(
             current = current.InnerException;
         }
 
-        return $"Pipeline execution failed: {ex.Message.Split('\n')[0].Trim()}";
+        return $"Pipeline execution failed: {ex.Message.ToWarningDetail()}";
     }
 
     /// <summary>
@@ -475,8 +480,8 @@ internal sealed class RunOrchestratorService(
     }
 
     /// <summary>
-    /// Records what the run delivered. The first outcome wins: a later failure (for example a finalizer error or a
-    /// cancellation after the text was delivered) does not overwrite it. Never throws.
+    /// Records a failure outcome (<see cref="RunOutcome.Failed"/> or <see cref="RunOutcome.Aborted"/>). The first
+    /// outcome wins: an outcome recorded earlier is not overwritten. Never throws.
     /// </summary>
     private async Task SetOutcomeAsync(Guid runId, RunOutcome outcome, int? deliveredIteration)
     {
@@ -498,18 +503,101 @@ internal sealed class RunOrchestratorService(
         }
     }
 
-    private Task ReportWarningAsync(Guid runId, string source, string code, string message, int? iteration = null) =>
-        warningSink?.ReportAsync(runId, source, code, message, iteration, CancellationToken.None) ?? Task.CompletedTask;
+    /// <summary>
+    /// Records the delivered outcome (<see cref="RunOutcome.Converged"/> or <see cref="RunOutcome.DeliveredWithOpenPoints"/>)
+    /// once the text and the finishing steps are stored. The outcome is written only when the run has a terminal status
+    /// and a saved final text; otherwise the run is failed with a warning instead of claiming a result it does not
+    /// have. An outcome recorded earlier (for example by a cancellation) is kept. Never throws.
+    /// </summary>
+    private async Task SetDeliveredOutcomeAsync(Guid runId, RunOutcome outcome, int? deliveredIteration)
+    {
+        try
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
 
-    /// <summary>Records one warning per reviewer that could not complete its check in an iteration.</summary>
-    private async Task ReportFailedReviewersAsync(Guid runId, Geef.Sdk.Runtime.IterationHistory history)
+            var written = await db.Runs
+                .Where(r => r.Id == runId
+                            && r.Outcome == null
+                            && r.FinalText != null
+                            && (r.Status == RunStatus.Completed || r.Status == RunStatus.Failed || r.Status == RunStatus.Aborted))
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.Outcome,            outcome)
+                    .SetProperty(r => r.DeliveredIteration, deliveredIteration),
+                    CancellationToken.None);
+            if (written > 0)
+                return;
+
+            var alreadyRecorded = await db.Runs
+                .Where(r => r.Id == runId)
+                .Select(r => r.Outcome != null)
+                .FirstOrDefaultAsync(CancellationToken.None);
+            if (alreadyRecorded)
+                return;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Failed to record outcome {Outcome} for run {RunId}: {Error}", outcome, runId, ex.ToRedactedLogText());
+            return;
+        }
+
+        logger.LogError("Run {RunId} finished, but its status or final text was not saved; recording it as failed.", runId);
+        await FailIncompleteResultAsync(runId);
+    }
+
+    /// <summary>Marks a run whose result could not be stored completely as failed and tells the user why.</summary>
+    private async Task FailIncompleteResultAsync(Guid runId)
+    {
+        await ReportWarningAsync(runId, RunWarningSources.Run, RunWarningCodes.ResultNotSaved, ResultNotSavedMessage);
+        await MarkRunFailedAsync(runId, ResultNotSavedMessage);
+    }
+
+    /// <summary>
+    /// Runs the finishing steps; a failure while storing their results never takes away the delivered text. It is
+    /// logged and becomes a warning. Cancellation still propagates.
+    /// </summary>
+    private async Task RunFinalizersSafelyAsync(Guid runId, CrewSnapshot snapshot, CancellationToken ct)
+    {
+        try
+        {
+            await ExecuteFinalizationAsync(runId, snapshot, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError("Finishing steps of run {RunId} could not be completed: {Error}", runId, ex.ToRedactedLogText());
+            await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerFailed,
+                "The finishing steps could not be completed.");
+        }
+    }
+
+    /// <summary>Tells live views that the run changed; a failing notifier never affects the run.</summary>
+    private async Task NotifySafelyAsync(Guid runId)
+    {
+        try
+        {
+            await runNotifier.NotifyRunUpdatedAsync(runId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Live update for run {RunId} could not be sent.", runId);
+        }
+    }
+
+    private Task ReportWarningAsync(Guid runId, string source, string code, string message, int? iteration = null) =>
+        warningSink.ReportAsync(runId, source, code, message, iteration, CancellationToken.None);
+
+    /// <summary>
+    /// Records one warning per reviewer that could not complete its check in an iteration, naming the reviewer by the
+    /// display name from the snapshot.
+    /// </summary>
+    private async Task ReportFailedReviewersAsync(Guid runId, CrewSnapshot snapshot, Geef.Sdk.Runtime.IterationHistory history)
     {
         foreach (var record in history.Records)
         {
             foreach (var review in record.EvaluationResult.FailedReviewers)
             {
                 await ReportWarningAsync(runId, RunWarningSources.Review, RunWarningCodes.ReviewerFailed,
-                    $"A check could not be completed in round {record.Iteration} and was left out: {review.ReviewerName}.",
+                    $"The check \"{snapshot.ReviewerDisplayName(review.ReviewerName)}\" could not be completed in round {record.Iteration} and was left out.",
                     record.Iteration);
             }
         }
@@ -644,7 +732,7 @@ internal sealed class RunOrchestratorService(
         var artifactRepo = scope.ServiceProvider.GetRequiredService<IRunArtifactRepository>();
 
         var run = await db.Runs.AsNoTracking().FirstOrDefaultAsync(r => r.Id == runId, ct);
-        if (run is null) return;
+        if (run?.FinalText is null) return;
 
         var finalText = run.FinalText ?? string.Empty;
         var completedAt = run.CompletedAt ?? DateTimeOffset.UtcNow;
@@ -671,7 +759,7 @@ internal sealed class RunOrchestratorService(
                     currentText = result.UpdatedText;
 
                 if (result.Artifact is not null)
-                    await artifactRepo.CreateAsync(result.Artifact, ct);
+                    await artifactRepo.CreateAsync(result.Artifact.WithRedactedStatus(), ct);
 
                 await ReportFinalizerResultAsync(runId, profile, result);
 
@@ -693,11 +781,11 @@ internal sealed class RunOrchestratorService(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Finalizer {Profile} threw unexpectedly for run {RunId}.",
-                    profile.Name, runId);
-                errorMessages.Add($"{profile.Name}: {ex.Message}");
+                logger.LogError("Finalizer {Profile} threw unexpectedly for run {RunId}: {Error}",
+                    profile.Name, runId, ex.ToRedactedLogText());
+                errorMessages.Add($"{profile.Name}: {ex.Message.ToWarningDetail()}");
                 await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerFailed,
-                    $"A finishing step failed: {profile.DisplayNameOrName()} (reason: {ex.Message.ToWarningDetail()}).");
+                    $"The finishing step \"{profile.DisplayNameOrName()}\" failed.");
 
                 // Persist a Status artifact so the failure is visible in the Run detail UI.
                 var errorArtifact = new RunArtifact
@@ -707,7 +795,7 @@ internal sealed class RunOrchestratorService(
                     FinalizerProfileName = profile.Name,
                     ArtifactType = ArtifactType.Status,
                     StorageUri = "error",
-                    StatusMessage = $"Unexpected error: {ex.Message}",
+                    StatusMessage = $"Unexpected error: {ex.Message.ToWarningDetail()}",
                     CreatedAt = DateTimeOffset.UtcNow,
                 };
                 try { await artifactRepo.CreateAsync(errorArtifact, ct); }
@@ -751,16 +839,19 @@ internal sealed class RunOrchestratorService(
         var name = profile.DisplayNameOrName();
         if (result.SkipReason is { } skip)
             await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerSkipped,
-                $"A finishing step was skipped: {name} (reason: {skip.ToWarningDetail()}).");
+                $"The finishing step \"{name}\" was skipped because {skip.ToWarningDetail()}.");
 
         if (result.Artifact is { ArtifactType: ArtifactType.Status } artifact)
         {
+            if (artifact.StorageUri is "error" or "warning")
+                logger.LogWarning("Finalizer {Profile} reported {Kind} for run {RunId}: {Detail}",
+                    profile.Name, artifact.StorageUri, runId, artifact.StatusMessage.RedactSecrets());
             if (artifact.StorageUri == "error")
                 await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerFailed,
-                    $"A finishing step failed: {name} (reason: {artifact.StatusMessage.ToWarningDetail()}).");
+                    $"The finishing step \"{name}\" failed.");
             else if (artifact.StorageUri == "warning")
                 await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerSkipped,
-                    $"A finishing step had no effect: {name} (reason: {artifact.StatusMessage.ToWarningDetail()}).");
+                    $"The finishing step \"{name}\" had no effect.");
         }
     }
 
@@ -771,8 +862,9 @@ internal sealed class RunOrchestratorService(
     /// <c>PipelineFailedEvent</c> (the trailing <c>PipelineCompletedEvent</c> with
     /// <c>Success: false</c> leaves it untouched); this method replaces the last-iteration
     /// fallback text with the SDK-selected best draft and optionally adds a convergence note.
+    /// Returns <c>false</c> when the draft could not be stored; the caller must then not report a delivered result.
     /// </summary>
-    private async Task SurfaceBestEffortDraftAsync(
+    private async Task<bool> SurfaceBestEffortDraftAsync(
         Guid runId, string bestDraft, Geef.Sdk.Policies.ConvergenceDecision? stopReason,
         bool setNote, CancellationToken ct)
     {
@@ -793,15 +885,21 @@ internal sealed class RunOrchestratorService(
                 : null;
 
             var updater = db.Runs.Where(r => r.Id == runId);
-            await updater.ExecuteUpdateAsync(s => s
+            var written = await updater.ExecuteUpdateAsync(s => s
                 .SetProperty(r => r.FinalText,  bestDraft)
                 .SetProperty(r => r.WordCount,  Core.Domain.Dashboard.WordCounter.Count(bestDraft))
                 .SetProperty(r => r.FinalizerErrorMessage, note),
                 ct);
+            return written > 0;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to surface best-effort draft for run {RunId}.", runId);
+            logger.LogError("Failed to surface best-effort draft for run {RunId}: {Error}", runId, ex.ToRedactedLogText());
+            return false;
         }
     }
 }

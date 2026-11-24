@@ -87,6 +87,9 @@ public sealed class ListRunsToolUserFilterTests
     /// <summary>Captures the requestingUsername argument passed to ListRunsAsync.</summary>
     private sealed class RecordingRunService : IRunService
     {
+        public Task<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>> ListRunWarningsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>>([]);
+
         public string? LastRequestingUsername { get; private set; } = "UNSET";
 
         public Task<IReadOnlyList<RunEntity>> ListRunsAsync(

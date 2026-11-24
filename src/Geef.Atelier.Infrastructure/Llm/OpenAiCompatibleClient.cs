@@ -71,7 +71,7 @@ internal sealed class OpenAiCompatibleClient(
                 $"{RunWarningCodes.LlmFailover}|{failover}|{requestedModel}",
                 RunWarningSources.Llm,
                 RunWarningCodes.LlmFailover,
-                $"An AI service was unavailable, so another one answered instead ({failover.ToWarningDetail()}; requested model {requestedModel.ToWarningDetail()}). Some checks may have used the same model as the writer.");
+                "An AI service was not available, so another one answered instead. Some checks may have used the same AI model as the writer.");
     }
 
     /// <summary>

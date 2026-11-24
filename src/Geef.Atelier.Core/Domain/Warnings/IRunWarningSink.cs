@@ -11,7 +11,11 @@ public interface IRunWarningSink
     /// <param name="runId">Run the warning belongs to.</param>
     /// <param name="source">Reporting part of the system, see <see cref="RunWarningSources"/>.</param>
     /// <param name="code">Stable code, see <see cref="RunWarningCodes"/>.</param>
-    /// <param name="message">Plain-English sentence for the user; truncated to a safe length.</param>
+    /// <param name="message">
+    /// Short plain-English sentence for the user, without technical details (exception texts, upstream answers,
+    /// host or variable names); those belong in the log. Credential-like fragments are removed and the text is
+    /// truncated to a safe length.
+    /// </param>
     /// <param name="iteration">Iteration number when the warning belongs to one round, otherwise <c>null</c>.</param>
     /// <param name="ct">Cancellation token.</param>
     Task ReportAsync(Guid runId, string source, string code, string message, int? iteration = null, CancellationToken ct = default);

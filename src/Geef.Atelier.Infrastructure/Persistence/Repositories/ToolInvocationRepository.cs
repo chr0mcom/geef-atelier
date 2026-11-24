@@ -5,6 +5,11 @@ using Npgsql;
 
 namespace Geef.Atelier.Infrastructure.Persistence.Repositories;
 
+/// <summary>
+/// Stores tool invocations with a per-run sequence assigned by the database. Inserts of one run are serialized by a
+/// transaction-scoped advisory lock on the run id, so concurrent tool calls of a run never compute the same next
+/// sequence; the retry on a unique violation remains as a safety net (for example rows written by an older version).
+/// </summary>
 internal sealed class ToolInvocationRepository(AtelierDbContext db) : IToolInvocationRepository
 {
     internal const int MaxSequenceAttempts = 5;
@@ -34,7 +39,19 @@ internal sealed class ToolInvocationRepository(AtelierDbContext db) : IToolInvoc
             .OrderBy(t => t.Sequence)
             .ToListAsync(ct);
 
-    private Task<int> InsertWithNextSequenceAsync(ToolInvocation invocation, CancellationToken ct) =>
+    private async Task InsertWithNextSequenceAsync(ToolInvocation invocation, CancellationToken ct)
+    {
+        await using var transaction = db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(ct)
+            : null;
+        await db.Database.ExecuteSqlAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({invocation.RunId.ToString()}, 0))", ct);
+        await InsertAsync(invocation, ct);
+        if (transaction is not null)
+            await transaction.CommitAsync(ct);
+    }
+
+    private Task<int> InsertAsync(ToolInvocation invocation, CancellationToken ct) =>
         db.Database.ExecuteSqlAsync($"""
             INSERT INTO tool_invocations
                 ("Id", "RunId", "IterationNumber", "ActorType", "ActorName", "ToolName", "ToolType",

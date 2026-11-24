@@ -35,7 +35,7 @@ public sealed class CrewTemplateAdvancedSettingsTests : TestContext
         DisplayName: name + " Display",
         Description: "desc",
         ExecutorProfileName: "default-executor",
-        ReviewerProfileNames: [],
+        ReviewerProfileNames: ["clarity"],
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: overr,
         AdvisorProfileNames: [],

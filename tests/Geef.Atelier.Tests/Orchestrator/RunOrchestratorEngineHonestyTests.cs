@@ -79,7 +79,8 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
         var warnings = await WarningsAsync(runId);
         var warning = Assert.Single(warnings, w => w.Code == RunWarningCodes.ReviewerFailed);
         Assert.Equal(RunWarningSources.Review, warning.Source);
-        Assert.Contains(SystemCrew.ClarityProfile.Name, warning.Message);
+        Assert.Contains($"\"{SystemCrew.ClarityProfile.DisplayName}\"", warning.Message);
+        Assert.DoesNotContain(SystemCrew.ClarityProfile.Name, warning.Message);
         Assert.Equal(1, warning.Iteration);
     }
 
@@ -145,6 +146,7 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
     public async Task PendingRunWithoutSnapshotIsNotStartedAndFailsAfterThePreparationTimeout()
     {
         var llm = new CountingLlmClient();
+        await RetireOtherPendingRunsAsync(Guid.Empty);
         await using var host = new OrchestratorTestHost(fixture, llm, FastOptions(TimeSpan.FromMilliseconds(300)));
         await host.StartAsync();
         var runId = await CreateRunAsync(crewSnapshotJson: null);
@@ -210,9 +212,17 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
         var warnings = await WaitForWarningsAsync(runId, 3);
 
         Assert.Equal((RunOutcome?)RunOutcome.Converged, run.Outcome);
-        Assert.Contains(warnings, w => w.Code == RunWarningCodes.FinalizerSkipped && w.Message.Contains("Skipping step") && w.Message.Contains("nothing to do"));
-        Assert.Contains(warnings, w => w.Code == RunWarningCodes.FinalizerFailed && w.Message.Contains("Throwing step") && w.Message.Contains("exploded"));
-        Assert.Contains(warnings, w => w.Code == RunWarningCodes.FinalizerFailed && w.Message.Contains("Error step") && w.Message.Contains("disk full"));
+        Assert.Contains(warnings, w => w.Code == RunWarningCodes.FinalizerSkipped && w.Message == "The finishing step \"Skipping step\" was skipped because nothing to do.");
+        Assert.Contains(warnings, w => w.Code == RunWarningCodes.FinalizerFailed && w.Message == "The finishing step \"Throwing step\" failed.");
+        Assert.Contains(warnings, w => w.Code == RunWarningCodes.FinalizerFailed && w.Message == "The finishing step \"Error step\" failed.");
+        Assert.DoesNotContain(warnings, w => w.Message.Contains("exploded") || w.Message.Contains("disk full") || w.Message.Contains("sk-or-v1"));
+
+        await using var db = fixture.NewContext();
+        var statusNotes = await db.RunArtifacts.AsNoTracking().Where(a => a.RunId == runId).Select(a => a.StatusMessage).ToListAsync();
+        Assert.Contains(statusNotes, n => n != null && n.Contains("disk full"));
+        Assert.DoesNotContain(statusNotes, n => n != null && n.Contains("sk-or-v1"));
+        var stored = await db.Runs.AsNoTracking().SingleAsync(r => r.Id == runId);
+        Assert.DoesNotContain("sk-or-v1", stored.FinalizerErrorMessage ?? string.Empty);
     }
 
     [Fact(Timeout = 30_000)]
@@ -244,9 +254,22 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
 
     private async Task<RunEntity> RunToEndAsync(ILlmClient llm, Guid runId, OrchestratorOptions? options = null)
     {
+        await RetireOtherPendingRunsAsync(runId);
         await using var host = new OrchestratorTestHost(fixture, llm, options ?? FastOptions());
         await host.StartAsync();
         return await WaitForTerminalAsync(runId);
+    }
+
+    /// <summary>
+    /// Other test classes of the shared database leave pending runs behind; the host started here would process them
+    /// and its LLM call count would no longer belong to the run under test.
+    /// </summary>
+    private async Task RetireOtherPendingRunsAsync(Guid runId)
+    {
+        await using var db = fixture.NewContext();
+        await db.Runs
+            .Where(r => r.Status == RunStatus.Pending && r.Id != runId)
+            .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RunStatus.Aborted));
     }
 
     private async Task<RunEntity> WaitForTerminalAsync(Guid runId)
@@ -316,10 +339,10 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
                         FinalizerProfileName = profile.Name,
                         ArtifactType = ArtifactType.Status,
                         StorageUri = "error",
-                        StatusMessage = "disk full",
+                        StatusMessage = "disk full, token=sk-or-v1-0123456789abcdef0123456789abcdef",
                         CreatedAt = DateTimeOffset.UtcNow,
                     }, null, profile.Name)),
-                    _ => throw new InvalidOperationException("exploded"),
+                    _ => throw new InvalidOperationException("exploded with Bearer sk-or-v1-0123456789abcdef0123456789abcdef"),
                 };
         }
     }

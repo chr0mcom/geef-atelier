@@ -58,7 +58,7 @@ public sealed class VectorSearchRepositoryScopeTests(PostgresFixture fixture)
     }
 
     [Fact]
-    public async Task SearchAsync_WithNullScopeFilter_ReturnsAllDocs()
+    public async Task SearchAsync_WithoutScopeAndRunFilter_ReturnsGlobalDocsButNeverARunsAttachment()
     {
         var runId = await CreateRunAsync();
 
@@ -75,7 +75,7 @@ public sealed class VectorSearchRepositoryScopeTests(PostgresFixture fixture)
             CancellationToken.None);
 
         Assert.Contains(results, r => r.Chunk.DocumentId == globalDoc.Id);
-        Assert.Contains(results, r => r.Chunk.DocumentId == localDoc.Id);
+        Assert.DoesNotContain(results, r => r.Chunk.DocumentId == localDoc.Id);
     }
 
     [Fact]

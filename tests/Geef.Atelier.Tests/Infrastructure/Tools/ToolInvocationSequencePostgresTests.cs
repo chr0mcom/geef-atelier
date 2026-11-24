@@ -48,6 +48,41 @@ public sealed class ToolInvocationSequencePostgresTests(PostgresFixture fixture)
     }
 
     [Fact]
+    public async Task SixWritersThatAllCollideOnTheSameSequenceStillAllPersist()
+    {
+        const int writers = 6;
+        var runId = await CreateRunAsync();
+        var trigger = $"test_slow_insert_{Guid.NewGuid():N}";
+        var create = $$"""
+            CREATE FUNCTION {{trigger}}() RETURNS trigger LANGUAGE plpgsql AS $fn$ BEGIN PERFORM pg_sleep(0.3); RETURN NEW; END $fn$;
+            CREATE TRIGGER {{trigger}} BEFORE INSERT ON tool_invocations FOR EACH ROW
+                WHEN (NEW."RunId" = '{{runId}}') EXECUTE FUNCTION {{trigger}}();
+            """;
+        var drop = $"""DROP TRIGGER IF EXISTS {trigger} ON tool_invocations; DROP FUNCTION IF EXISTS {trigger}();""";
+        await using (var db = fixture.NewContext())
+            await db.Database.ExecuteSqlRawAsync(create);
+        try
+        {
+            using var barrier = new Barrier(writers);
+            var inserts = Enumerable.Range(0, writers).Select(i => Task.Run(async () =>
+            {
+                await using var db = fixture.NewContext();
+                await db.Database.OpenConnectionAsync();
+                barrier.SignalAndWait(TimeSpan.FromSeconds(30));
+                await new ToolInvocationRepository(db).AddAsync(Invocation(runId, $"writer-{i}"));
+            })).ToList();
+            await Task.WhenAll(inserts).WaitAsync(TimeSpan.FromSeconds(60));
+        }
+        finally
+        {
+            await using var db = fixture.NewContext();
+            await db.Database.ExecuteSqlRawAsync(drop);
+        }
+
+        Assert.Equal(Enumerable.Range(0, writers).ToList(), await SequencesAsync(runId));
+    }
+
+    [Fact]
     public async Task ExistingLegacyRowWithSequenceZeroStaysValidAndTheNextCallContinues()
     {
         var runId = await CreateRunAsync();
@@ -105,6 +140,17 @@ public sealed class ToolInvocationSequencePostgresTests(PostgresFixture fixture)
             .SqlQuery<int>($"""SELECT "Sequence" AS "Value" FROM tool_invocations WHERE "RunId" = {runId} ORDER BY "Sequence" """)
             .ToListAsync();
     }
+
+    private static ToolInvocation Invocation(Guid runId, string actorName) => new()
+    {
+        Id = Guid.NewGuid(),
+        RunId = runId,
+        ActorType = "grounding",
+        ActorName = actorName,
+        ToolName = "static-context",
+        ToolType = "static-context",
+        CreatedAt = DateTimeOffset.UtcNow,
+    };
 
     private static ToolInvocationContext Context(Guid runId, string actorName) =>
         new(RunId: runId, IterationNumber: 0, ActorType: actorName.Length > 100 ? actorName : "grounding", ActorName: actorName[..Math.Min(actorName.Length, 100)], Sequence: 0);

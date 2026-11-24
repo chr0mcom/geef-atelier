@@ -21,11 +21,13 @@ internal sealed class RunService(
     IAdvisorConsultationRepository        consultationRepository,
     IKnowledgeService                     knowledgeService,
     ILogger<RunService>                   logger,
+    IRunWarningSink                       warningSink,
+    IRunWarningRepository                 warningRepository,
     IGroundingConsultationRepository?     groundingConsultationRepository = null,
-    IToolInvocationRepository?            toolInvocationRepository = null,
-    IRunWarningSink?                      warningSink = null,
-    IRunWarningRepository?                warningRepository = null) : IRunService
+    IToolInvocationRepository?            toolInvocationRepository = null) : IRunService
 {
+    internal const string AttachmentUploadFailedMessage = "The attached files could not be prepared. Please submit the task again.";
+
     private static readonly JsonSerializerOptions SnapshotJsonOpts =
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -131,8 +133,8 @@ internal sealed class RunService(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Attachment upload failed for run {RunId}; marking run as Failed", runId);
-                await persistence.MarkRunFailedAsync(runId, $"Attachment upload failed: {ex.Message}", cancellationToken);
+                logger.LogError("Attachment upload failed for run {RunId}; marking run as Failed: {Error}", runId, ex.ToRedactedLogText());
+                await persistence.MarkRunFailedAsync(runId, AttachmentUploadFailedMessage, cancellationToken);
                 throw;
             }
         }
@@ -142,18 +144,14 @@ internal sealed class RunService(
 
     private async Task ReportAssignmentWarningsAsync(Guid runId, IReadOnlyList<Crew.Models.ModelAssignmentWarning> warnings)
     {
-        if (warningSink is null)
-            return;
         foreach (var warning in warnings)
             await warningSink.ReportAsync(runId, RunWarningSources.ModelAssignment, RunWarningCodes.ModelAssignment,
-                $"The AI model for '{warning.ActorName}' could not be chosen as planned, so a replacement was used ({warning.Detail.ToWarningDetail()}).");
+                $"The AI model for \"{warning.ShownName}\" could not be chosen as planned, so a different one was used.");
     }
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<RunWarningEntity>> ListRunWarningsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
     {
-        if (warningRepository is null)
-            return [];
         if (requestingUsername is not null && await GetRunAsync(runId, requestingUsername, cancellationToken) is null)
             return [];
         return await warningRepository.ListByRunAsync(runId, cancellationToken);
@@ -215,6 +213,9 @@ internal sealed class RunService(
         if (details.Run.Status is not (RunStatus.Aborted or RunStatus.Failed))
             throw new InvalidOperationException(
                 $"Run {options.ParentRunId} is in status {details.Run.Status} and cannot be resumed. Only Aborted and Failed runs are resumable.");
+
+        if (!CrewSnapshot.IsUsableForRun(details.Run.CrewSnapshot))
+            throw new RunNotResumableException(RunNotResumableException.NotPreparedMessage);
 
         string? seedDraftText = null;
         if (options.UseSeedDraft && details.Iterations.Count > 0)

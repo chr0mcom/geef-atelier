@@ -34,7 +34,7 @@ public sealed class MultiProviderGroundingStepWarningTests
         var runId = Guid.NewGuid();
         var step = Step(
             [Profile("broken", "broken-type", "Broken Source"), Profile("ok", "ok-type")],
-            [new ThrowingProvider("broken-type", "Upstream said no\nsecond line"), new FixedProvider("ok-type", "OK block")],
+            [new ThrowingProvider("broken-type", "Upstream said no: key sk-or-v1-0123456789abcdef0123456789abcdef rejected at cli-proxy:8090\nsecond line"), new FixedProvider("ok-type", "OK block")],
             runId, sink);
 
         var result = await step.RunAsync("briefing", CancellationToken.None);
@@ -44,9 +44,10 @@ public sealed class MultiProviderGroundingStepWarningTests
         var warning = Assert.Single(sink.Warnings);
         Assert.Equal((runId, RunWarningSources.Grounding, RunWarningCodes.GroundingProviderSkipped),
             (warning.RunId, warning.Source, warning.Code));
-        Assert.Contains("Broken Source", warning.Message);
-        Assert.Contains("Upstream said no", warning.Message);
-        Assert.DoesNotContain("second line", warning.Message);
+        Assert.Equal("The source \"Broken Source\" could not be read and was skipped.", warning.Message);
+        Assert.DoesNotContain("sk-or-v1", warning.Message);
+        Assert.DoesNotContain("cli-proxy", warning.Message);
+        Assert.DoesNotContain("Upstream", warning.Message);
     }
 
     [Theory]
@@ -99,7 +100,8 @@ public sealed class MultiProviderGroundingStepWarningTests
         Assert.False(result.Context.TryGet(AtelierContextKeys.GroundingContext, out _));
         var warning = Assert.Single(sink.Warnings);
         Assert.Equal(RunWarningCodes.GroundingProviderSkipped, warning.Code);
-        Assert.Contains("TAVILY_API_KEY", warning.Message);
+        Assert.Contains("Custom Search", warning.Message);
+        Assert.DoesNotContain("TAVILY_API_KEY", warning.Message);
     }
 
     private static MultiProviderGroundingStep Step(

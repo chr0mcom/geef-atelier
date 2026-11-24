@@ -76,7 +76,9 @@ public sealed class RunServiceAutoComposeGuardTests
         new AutoComposeCrewService(),
         new NoOpAdvisorConsultationRepository(),
         new NoOpKnowledgeService(),
-        NullLogger<RunService>.Instance);
+        NullLogger<RunService>.Instance,
+        new InMemoryRunWarnings(),
+        new InMemoryRunWarnings());
 
     // ── Fakes ─────────────────────────────────────────────────────────────
 

@@ -68,6 +68,9 @@ public sealed class SubmitRequestWithCrewTests
 
     private sealed class CapturingRunService : IRunService
     {
+        public Task<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>> ListRunWarningsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>>([]);
+
         public string? LastCrewTemplateName { get; private set; }
         public CrewSpec? LastCustomCrew { get; private set; }
 

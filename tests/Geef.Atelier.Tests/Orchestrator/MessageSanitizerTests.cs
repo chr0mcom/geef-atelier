@@ -66,4 +66,18 @@ public sealed class MessageSanitizerTests
 
         Assert.Contains("rate limit", msg, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Theory]
+    [InlineData("Provider rejected key sk-or-v1-0123456789abcdef0123456789abcdef0123", "sk-or-v1")]
+    [InlineData("Unauthorized: Authorization: Bearer abcdefghijklmnop.qrstuvwxyz", "abcdefghijklmnop")]
+    [InlineData("call failed for https://api.example.org/search?api_key=tvly-ABCDEF0123456789XYZ", "tvly-ABCDEF")]
+    [InlineData("config error: password=hunter2hunter2", "hunter2")]
+    public void SanitizesGenericException_RemovesKeysFromTheFirstLine(string message, string secretFragment)
+    {
+        var msg = RunOrchestratorService.SanitizeErrorMessage(new InvalidOperationException(message));
+
+        Assert.StartsWith("Pipeline execution failed:", msg);
+        Assert.DoesNotContain(secretFragment, msg);
+        Assert.Contains("[redacted]", msg);
+    }
 }

@@ -160,6 +160,7 @@ public sealed class AtelierPipelineFactoryWithVectorStoreTests
 
         var services = new ServiceCollection();
         services.AddScoped<IVectorSearchRepository>(_ => new FixedVectorSearchRepository(searchResults));
+        services.AddScoped<Geef.Atelier.Application.Crew.Knowledge.IRunAttachmentLineage, Geef.Atelier.Tests.Fakes.SelfOnlyAttachmentLineage>();
         services.AddScoped<IGroundingConsultationRepository>(_ => consultationRepo);
 
         return new VectorStoreGroundingProvider(

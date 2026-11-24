@@ -9,6 +9,7 @@
 @inject ILogger<RunDetail> Logger
 @inject AuthenticationStateProvider AuthProvider
 @inject IRunUpdateFeed LiveUpdates
+@inject CircuitDataGate DataGate
 @using Geef.Atelier.Application.Runs
 @using Geef.Atelier.Application.Crew.Knowledge
 @using Geef.Atelier.Core.Domain
@@ -116,10 +117,13 @@
                 @if (_details.Run.Status is RunStatus.Aborted or RunStatus.Failed)
                 {
                     <div class="actions">
-                        <button class="btn secondary" data-testid="resume-run-button"
-                                @onclick="OpenResumeDialog">
-                            Resume
-                        </button>
+                        @if (_canResume)
+                        {
+                            <button class="btn secondary" data-testid="resume-run-button"
+                                    @onclick="OpenResumeDialog">
+                                Resume
+                            </button>
+                        }
                         <button class="btn danger" data-testid="delete-run-button"
                                 @onclick="() => _showDeleteModal = true">
                             Delete
@@ -138,7 +142,12 @@
             </div>
         </div>
 
-        <RunWarningsBlock Warnings="_viewModel?.Warnings" />
+        @if (_resumeError is not null)
+        {
+            <div class="error-banner" role="alert" data-testid="resume-error">@_resumeError</div>
+        }
+
+        <RunWarningsBlock Warnings="_viewModel?.Warnings" Status="_details.Run.Status" HasText="@(!string.IsNullOrWhiteSpace(_details.Run.FinalText))" />
 
         <CrewSummary Snapshot="_snapshot" FallbackTemplateName="@_details.Run.CrewTemplateName" />
 
@@ -282,6 +291,10 @@
     bool           _notFound;
     bool           _forbidden;
     IDisposable?   _subscription;
+    bool           _disposed;
+    readonly CancellationTokenSource _disposeCts = new();
+    bool           _canResume;
+    string?        _resumeError;
     CrewSnapshot?  _snapshot;
     List<KnowledgeDocument> _runAttachments = [];
     IReadOnlyList<Guid>     _runAttachmentDocumentIds = [];
@@ -303,21 +316,32 @@
         _requestingUser = isAdmin ? null : username;
 
         await LoadAsync();
-        _subscription = await LiveUpdates.WatchRunAsync(auth.User, RunId, async _ =>
+        var subscription = await LiveUpdates.WatchRunAsync(auth.User, RunId, async _ =>
         {
             await InvokeAsync(async () =>
             {
                 await LoadAsync();
                 StateHasChanged();
             });
-        });
+        }, _disposeCts.Token);
+        if (_disposed)
+        {
+            subscription?.Dispose();
+            return;
+        }
+        _subscription = subscription;
+        if (subscription is not null)
+            await LoadAsync();
     }
 
-    async Task LoadAsync()
+    Task LoadAsync() => DataGate.RunAsync(LoadCoreAsync);
+
+    async Task LoadCoreAsync()
     {
         _viewModel = await RunService.GetRunWithGroundingAsync(RunId, requestingUsername: _requestingUser, CancellationToken.None);
         _details   = _viewModel?.Details;
         _snapshot  = _viewModel?.Snapshot;
+        _canResume = CrewSnapshot.IsUsableForRun(_details?.Run.CrewSnapshot);
 
         if (_viewModel is null)
         {
@@ -377,10 +401,13 @@
         _promoteError = null;
         try
         {
-            await KnowledgeService.PromoteToGlobalAsync(
-                req.DocumentId, req.NewTitle, req.NewDescription, req.AdditionalTags, CancellationToken.None);
+            _runAttachments = await DataGate.RunAsync(async () =>
+            {
+                await KnowledgeService.PromoteToGlobalAsync(
+                    req.DocumentId, req.NewTitle, req.NewDescription, req.AdditionalTags, CancellationToken.None);
+                return (await KnowledgeService.ListRunAttachmentsAsync(RunId, CancellationToken.None)).ToList();
+            });
             _showPromoteModal = false;
-            _runAttachments = (await KnowledgeService.ListRunAttachmentsAsync(RunId, CancellationToken.None)).ToList();
             _runAttachmentDocumentIds = _runAttachments.Select(a => a.Id).ToArray();
             _promoteCandidate = null;
         }
@@ -402,7 +429,7 @@
     async Task ExecuteDeleteAsync()
     {
         _showDeleteModal = false;
-        await RunService.DeleteRunAsync(RunId, _requestingUser);
+        await DataGate.RunAsync(() => RunService.DeleteRunAsync(RunId, _requestingUser));
         Nav.NavigateTo("/runs");
     }
 
@@ -420,14 +447,20 @@
     async Task HandleResumeConfirmedAsync(ResumeOptions opts)
     {
         _showResumeDialog = false;
+        _resumeError = null;
         try
         {
-            var newRunId = await RunService.ResumeRunAsync(opts, _requestingUser);
+            var newRunId = await DataGate.RunAsync(() => RunService.ResumeRunAsync(opts, _requestingUser));
             Nav.NavigateTo($"/runs/{newRunId}");
+        }
+        catch (RunNotResumableException ex)
+        {
+            _resumeError = ex.Message;
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Resume failed for run {RunId}", RunId);
+            _resumeError = "The task could not be continued. Please try again.";
         }
     }
 
@@ -455,6 +488,9 @@
 
     public ValueTask DisposeAsync()
     {
+        _disposed = true;
+        _disposeCts.Cancel();
+        _disposeCts.Dispose();
         _subscription?.Dispose();
         return ValueTask.CompletedTask;
     }

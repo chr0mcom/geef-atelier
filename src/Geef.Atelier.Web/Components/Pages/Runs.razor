@@ -6,6 +6,7 @@
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthProvider
 @inject IRunUpdateFeed LiveUpdates
+@inject CircuitDataGate DataGate
 @using Geef.Atelier.Core.Domain
 
 <PageTitle>Runs — Geef.Atelier</PageTitle>
@@ -128,7 +129,7 @@
     async Task LoadRunsAsync()
     {
         var username = (_showAllUsers && _isAdmin) ? null : _currentUsername;
-        _runs = await RunService.ListRunsAsync(20, StatusFilter, requestingUsername: username);
+        _runs = await DataGate.RunAsync(() => RunService.ListRunsAsync(20, StatusFilter, requestingUsername: username));
     }
 
     async Task ExecuteDeleteAsync()
@@ -139,7 +140,7 @@
         _deleteError = null;
         try
         {
-            await RunService.DeleteRunAsync(id, _isAdmin ? null : _currentUsername);
+            await DataGate.RunAsync(() => RunService.DeleteRunAsync(id, _isAdmin ? null : _currentUsername));
             await LoadRunsAsync();
         }
         catch (Exception ex) { _deleteError = ex.Message; }
@@ -150,7 +151,7 @@
         var query = status.HasValue ? $"?Status={status.Value}" : string.Empty;
         Nav.NavigateTo("/runs" + query, forceLoad: false);
         var username = (_showAllUsers && _isAdmin) ? null : _currentUsername;
-        _runs = await RunService.ListRunsAsync(20, status, requestingUsername: username);
+        _runs = await DataGate.RunAsync(() => RunService.ListRunsAsync(20, status, requestingUsername: username));
         StateHasChanged();
     }
 

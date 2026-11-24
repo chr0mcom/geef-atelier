@@ -6,12 +6,15 @@ public static class RunWarningTextExtensions
     /// <summary>Maximum length of a technical detail embedded in a warning message.</summary>
     public const int DetailLength = 200;
 
-    /// <summary>First line of <paramref name="text"/>, trimmed and cut to <see cref="DetailLength"/> characters.</summary>
+    /// <summary>
+    /// First line of <paramref name="text"/>, trimmed, without credential-like fragments
+    /// (<see cref="SecretRedactionExtensions.RedactSecrets"/>) and cut to <see cref="DetailLength"/> characters.
+    /// </summary>
     public static string ToWarningDetail(this string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
             return "no details";
-        var firstLine = text.Trim().Split('\n', 2)[0].Trim().TrimEnd('\r');
+        var firstLine = text.Trim().Split('\n', 2)[0].Trim().TrimEnd('\r').RedactSecrets();
         return firstLine.Length <= DetailLength ? firstLine : firstLine[..(DetailLength - 1)] + "…";
     }
 

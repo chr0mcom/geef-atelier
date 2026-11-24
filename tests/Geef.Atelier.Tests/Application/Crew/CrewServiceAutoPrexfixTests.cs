@@ -61,6 +61,33 @@ public sealed class CrewServiceAutoPrexfixTests
     }
 
     [Fact]
+    public async Task CreateCustomTemplate_WithoutReviewer_IsRejectedWithAClearMessage()
+    {
+        var templates = new InMemoryCrewTemplateRepository();
+        var svc = BuildService(templateRepo: templates);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.CreateCustomCrewTemplateAsync(SystemCrew.KlassikTemplate with { Name = "no-checks", IsSystem = false, ReviewerProfileNames = [] }));
+
+        Assert.Equal(CrewTemplateRules.NoReviewerMessage, ex.Message);
+        Assert.Empty(await templates.ListAsync(includeSystem: false));
+    }
+
+    [Fact]
+    public async Task UpdateCustomTemplate_WithoutReviewer_IsRejected()
+    {
+        var templates = new InMemoryCrewTemplateRepository();
+        var svc = BuildService(templateRepo: templates);
+        var created = await svc.CreateCustomCrewTemplateAsync(SystemCrew.KlassikTemplate with { Name = "with-checks", IsSystem = false });
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => svc.UpdateCustomCrewTemplateAsync(created with { ReviewerProfileNames = [] }));
+
+        Assert.Equal(CrewTemplateRules.NoReviewerMessage, ex.Message);
+        Assert.NotEmpty((await templates.GetByNameAsync(created.Name))!.ReviewerProfileNames);
+    }
+
+    [Fact]
     public async Task DeleteCustomTemplate_ThrowsForSystemTemplate()
     {
         var svc = BuildService();

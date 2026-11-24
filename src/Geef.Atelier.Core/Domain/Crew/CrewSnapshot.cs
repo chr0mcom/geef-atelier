@@ -96,6 +96,20 @@ public sealed record CrewSnapshot(
         }
     }
 
+    /// <summary>True when <paramref name="json"/> passes <see cref="DeserializeForRun"/>, i.e. a run could start from it.</summary>
+    public static bool IsUsableForRun(string? json)
+    {
+        try
+        {
+            DeserializeForRun(json);
+            return true;
+        }
+        catch (InvalidCrewSnapshotException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>
     /// Strict read for executing a run. Throws <see cref="InvalidCrewSnapshotException"/> with a user-facing
     /// reason when the snapshot is missing, unreadable, of an unknown schema version or lacks the executor or the

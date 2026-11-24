@@ -1,7 +1,6 @@
 using System.Net.Http;
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Grounding;
-using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Infrastructure.Grounding.AcademicSearch;
 using Geef.Atelier.Infrastructure.Security;
 using Microsoft.Extensions.Configuration;
@@ -17,7 +16,6 @@ public static class GroundingServiceExtensions
         IConfiguration configuration)
     {
         services.Configure<TavilyOptions>(configuration.GetSection("Tavily"));
-        services.Configure<LearningOptions>(configuration.GetSection(LearningOptions.SectionName));
 
         var endpoint = configuration["Tavily:Endpoint"] ?? "https://api.tavily.com";
         if (!endpoint.EndsWith('/')) endpoint += '/';

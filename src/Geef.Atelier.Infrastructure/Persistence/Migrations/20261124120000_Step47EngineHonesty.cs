@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS "RunWarnings" (
             migrationBuilder.Sql("""
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_RunWarnings_Runs_RunId') THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                   WHERE conname = 'FK_RunWarnings_Runs_RunId' AND conrelid = '"RunWarnings"'::regclass) THEN
         ALTER TABLE "RunWarnings"
             ADD CONSTRAINT "FK_RunWarnings_Runs_RunId"
             FOREIGN KEY ("RunId") REFERENCES "Runs"("Id") ON DELETE CASCADE;

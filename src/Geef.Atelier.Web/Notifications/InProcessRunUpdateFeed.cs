@@ -20,9 +20,18 @@ internal sealed class InProcessRunUpdateFeed(
     /// <inheritdoc/>
     public async Task<IDisposable?> WatchRunAsync(ClaimsPrincipal user, Guid runId, Func<Guid, Task> onUpdated, CancellationToken ct = default)
     {
-        await using var scope = scopeFactory.CreateAsyncScope();
-        var runService = scope.ServiceProvider.GetRequiredService<IRunService>();
-        if (!await runService.CanWatchRunAsync(user, runId, ct))
+        try
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var runService = scope.ServiceProvider.GetRequiredService<IRunService>();
+            if (!await runService.CanWatchRunAsync(user, runId, ct))
+                return null;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            return null;
+        }
+        if (ct.IsCancellationRequested)
             return null;
         return Add(RunUpdateTopics.Run(runId), payload => payload is Guid id ? onUpdated(id) : Task.CompletedTask);
     }

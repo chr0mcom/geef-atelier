@@ -9,15 +9,16 @@ using Microsoft.AspNetCore.SignalR;
 namespace Geef.Atelier.Web.Notifications;
 
 /// <summary>
-/// Sends run-update and dashboard notifications to SignalR clients via <see cref="RunHub"/> and to in-process
-/// components via <see cref="IRunUpdateFeed"/>. Run-list updates go only to the owner and to administrators.
+/// Publishes run-update and dashboard notifications to the in-process <see cref="IRunUpdateFeed"/> (used by the
+/// Blazor pages) and to SignalR clients of <see cref="RunHub"/>. The hub has no client inside the application any
+/// more and stays only until its removal is decided. Run-list updates go only to the owner and to administrators.
 /// </summary>
-internal sealed class SignalRRunNotifier(
+internal sealed class LiveRunNotifier(
     IHubContext<RunHub> hub,
     IDashboardService dashboardService,
     IRunUpdateFeed feed,
     IServiceScopeFactory scopeFactory,
-    ILogger<SignalRRunNotifier> logger) : IRunNotifier
+    ILogger<LiveRunNotifier> logger) : IRunNotifier
 {
     private const int OwnerCacheLimit = 10_000;
 

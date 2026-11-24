@@ -209,6 +209,7 @@ public sealed class KlassikRegressionTests
 
         var services = new ServiceCollection();
         services.AddScoped<IVectorSearchRepository>(_ => new NullVectorSearchRepository());
+        services.AddScoped<Geef.Atelier.Application.Crew.Knowledge.IRunAttachmentLineage, Geef.Atelier.Tests.Fakes.SelfOnlyAttachmentLineage>();
         services.AddScoped<IGroundingConsultationRepository>(_ => consultationRepo);
 
         var provider = new VectorStoreGroundingProvider(

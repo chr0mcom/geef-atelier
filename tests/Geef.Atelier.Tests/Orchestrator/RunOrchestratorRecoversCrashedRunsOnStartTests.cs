@@ -54,5 +54,6 @@ public sealed class RunOrchestratorRecoversCrashedRunsOnStartTests(PostgresFixtu
         Assert.Equal(RunStatus.Failed, run.Status);
         Assert.Equal("Service restarted", run.ErrorMessage);
         Assert.NotNull(run.CompletedAt);
+        Assert.Equal((RunOutcome?)RunOutcome.Failed, run.Outcome);
     }
 }

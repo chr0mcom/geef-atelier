@@ -20,7 +20,7 @@ public sealed class CrewTemplateEditorDomainTests : Bunit.TestContext
         DisplayName: "T",
         Description: "d",
         ExecutorProfileName: "default-executor",
-        ReviewerProfileNames: [],
+        ReviewerProfileNames: ["clarity"],
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: null,
         AdvisorProfileNames: [],
@@ -103,6 +103,18 @@ public sealed class CrewTemplateEditorDomainTests : Bunit.TestContext
         await cut.Find("[data-testid='template-editor-form']").SubmitAsync();
 
         Assert.Equal(ModelDomain.Technical, crew.LastSaved?.Domain);
+    }
+
+    [Fact]
+    public async Task Save_WithoutReviewer_ShowsTheReasonAndSavesNothing()
+    {
+        var crew = Wire(Template(ModelDomain.General) with { ReviewerProfileNames = [] });
+        var cut = RenderComponent<CrewTemplateEditor>(p => p.Add(c => c.Name, "custom-t"));
+
+        await cut.Find("[data-testid='template-editor-form']").SubmitAsync();
+
+        Assert.Null(crew.LastSaved);
+        Assert.Contains(CrewTemplateRules.NoReviewerMessage, cut.Find(".error-banner").TextContent);
     }
 
     [Fact]

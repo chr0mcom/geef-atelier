@@ -15,11 +15,10 @@ public interface IRunService
     /// <summary>
     /// Returns the warnings recorded for a run (Step47), in the order they were recorded. Returns an empty list
     /// when the run does not exist or <paramref name="requestingUsername"/> is set and does not own it.
-    /// The default implementation reports no warnings.
+    /// Pass null to bypass the ownership check (admin mode).
     /// </summary>
     Task<IReadOnlyList<Core.Domain.Warnings.RunWarningEntity>> ListRunWarningsAsync(
-        Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<Core.Domain.Warnings.RunWarningEntity>>([]);
+        Guid runId, string? requestingUsername, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns the run with the given ID, or null if not found.
@@ -88,6 +87,8 @@ public interface IRunService
     /// Throws <see cref="InvalidOperationException"/> if the parent run does not exist,
     /// does not belong to <paramref name="requestingUsername"/> (when non-null),
     /// or is not in a resumable state (Aborted or Failed).
+    /// Throws <see cref="RunNotResumableException"/> (with a message for the user) when the parent run has no usable
+    /// crew snapshot, for example because its attachments could not be prepared; no new run is created then.
     /// </summary>
     Task<Guid> ResumeRunAsync(
         ResumeOptions options,

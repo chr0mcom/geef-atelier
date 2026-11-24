@@ -85,6 +85,7 @@ public sealed class VectorStoreRunAttachmentsTests
         services.AddScoped(_ => search);
         services.AddScoped(_ => documents);
         services.AddScoped(_ => runs);
+        services.AddScoped<IRunAttachmentLineage, Geef.Atelier.Infrastructure.Knowledge.RunAttachmentLineage>();
         services.AddScoped<IGroundingConsultationRepository, NullConsultations>();
         return new VectorStoreGroundingProvider(
             embeddings,

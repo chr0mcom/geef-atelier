@@ -64,6 +64,49 @@ public sealed class Step47EngineHonestyMigrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AddsTheForeignKeyAlthoughAnotherTableHasAConstraintWithTheSameName()
+    {
+        await using (var db = NewContext())
+            await db.GetService<IMigrator>().MigrateAsync(Step46);
+
+        await using (var db = NewContext())
+        {
+            await db.Database.ExecuteSqlRawAsync("""
+                CREATE TABLE "UnrelatedRunNotes" (
+                    "Id"    uuid NOT NULL PRIMARY KEY,
+                    "RunId" uuid NOT NULL,
+                    CONSTRAINT "FK_RunWarnings_Runs_RunId" FOREIGN KEY ("RunId") REFERENCES "Runs"("Id"));
+                """);
+        }
+
+        await using (var db = NewContext())
+            await db.Database.MigrateAsync();
+
+        await using (var db = NewContext())
+        {
+            await RunUpAsync(db);
+            Assert.Equal(1, await db.Database.SqlQueryRaw<int>("""
+                SELECT count(*)::int AS "Value" FROM pg_constraint
+                WHERE conname = 'FK_RunWarnings_Runs_RunId' AND conrelid = '"RunWarnings"'::regclass
+                """).SingleAsync());
+        }
+
+        var runId = Guid.NewGuid();
+        await using (var db = NewContext())
+        {
+            db.Runs.Add(new RunEntity { Id = runId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Failed, BriefingText = "b", ConfigJson = "{}" });
+            db.RunWarnings.Add(new RunWarningEntity
+            {
+                Id = Guid.NewGuid(), RunId = runId, Source = RunWarningSources.Grounding, Code = RunWarningCodes.GroundingProviderSkipped,
+                Message = "m", CreatedAt = DateTimeOffset.UtcNow,
+            });
+            await db.SaveChangesAsync();
+            await db.Runs.Where(r => r.Id == runId).ExecuteDeleteAsync();
+            Assert.Equal(0, await db.RunWarnings.CountAsync(w => w.RunId == runId));
+        }
+    }
+
+    [Fact]
     public async Task RunsTwiceOnAFreshDatabaseAndWarningsCascadeWithTheirRun()
     {
         await using (var db = NewContext())
@@ -142,7 +185,8 @@ public sealed class Step47EngineHonestyMigrationTests : IAsyncLifetime
         Assert.Equal("integer", outcomeType);
 
         Assert.Equal(1, await db.Database.SqlQueryRaw<int>("""
-            SELECT count(*)::int AS "Value" FROM pg_constraint WHERE conname = 'FK_RunWarnings_Runs_RunId'
+            SELECT count(*)::int AS "Value" FROM pg_constraint
+            WHERE conname = 'FK_RunWarnings_Runs_RunId' AND conrelid = '"RunWarnings"'::regclass
             """).SingleAsync());
         Assert.Equal(1, await db.Database.SqlQueryRaw<int>("""
             SELECT count(*)::int AS "Value" FROM pg_indexes WHERE indexname = 'IX_RunWarnings_RunId'

@@ -89,6 +89,9 @@ public sealed class GetRunDetailsMcpOwnerCheckTests
     /// </summary>
     private sealed class OwnerFilteredRunService(RunDetails details, string ownerUsername) : IRunService
     {
+        public Task<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>> ListRunWarningsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>>([]);
+
         public Task<RunDetails?> GetRunDetailsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default)
         {
             if (runId != details.Run.Id) return Task.FromResult<RunDetails?>(null);

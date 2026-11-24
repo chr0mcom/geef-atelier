@@ -34,6 +34,9 @@ public sealed class SubmitRequestToolCallsRunServiceTests
 
     private sealed class FakeRunService : IRunService
     {
+        public Task<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>> ListRunWarningsAsync(Guid runId, string? requestingUsername, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>>([]);
+
         public string? LastCreatedByUser { get; private set; }
         public string? LastBriefingText { get; private set; }
 

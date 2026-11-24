@@ -303,6 +303,7 @@ internal sealed class CrewService(
         var baseName = SystemCrew.EnsureCustomPrefix(template.Name);
         var uniqueName = await UniqueNameAsync(baseName, n => templateRepo.GetByNameAsync(n, cancellationToken));
         var normalized = template with { Name = uniqueName, IsSystem = false };
+        normalized.EnsureHasReviewer();
         await ValidatePackCoherenceAsync(normalized, cancellationToken);
         await templateRepo.CreateAsync(normalized, cancellationToken);
         return normalized;
@@ -312,6 +313,7 @@ internal sealed class CrewService(
     {
         if (SystemCrew.IsSystemName(template.Name))
             throw new InvalidOperationException(ReadOnlyTemplateMessage);
+        template.EnsureHasReviewer();
         await ValidatePackCoherenceAsync(template, cancellationToken);
         await templateRepo.UpdateAsync(template, cancellationToken);
         return template;

@@ -186,16 +186,63 @@ public sealed class RunServiceUserIsolationTests
     }
 
     // ---------------------------------------------------------------------------
+    // ListRunWarningsAsync
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ListRunWarningsAsync_OwnerAndAdminSeeTheWarningsOfTheRun()
+    {
+        var runId    = Guid.NewGuid();
+        var warnings = new InMemoryRunWarnings();
+        await warnings.ReportAsync(runId, "grounding", "grounding.provider_skipped", "first");
+        await warnings.ReportAsync(runId, "review", "review.reviewer_failed", "second");
+        await warnings.ReportAsync(Guid.NewGuid(), "grounding", "grounding.provider_skipped", "other run");
+        var svc = MakeService(new SingleRunRepository(MakeRun(runId, "alice"), cancellable: false), warnings);
+
+        var forOwner = await svc.ListRunWarningsAsync(runId, "alice");
+        var forAdmin = await svc.ListRunWarningsAsync(runId, requestingUsername: null);
+
+        Assert.Equal(["first", "second"], forOwner.Select(w => w.Message).ToList());
+        Assert.Equal(["first", "second"], forAdmin.Select(w => w.Message).ToList());
+    }
+
+    [Fact]
+    public async Task ListRunWarningsAsync_OtherUserGetsNothing()
+    {
+        var runId    = Guid.NewGuid();
+        var warnings = new InMemoryRunWarnings();
+        await warnings.ReportAsync(runId, "grounding", "grounding.provider_skipped", "private");
+        var svc = MakeService(new SingleRunRepository(MakeRun(runId, "alice"), cancellable: false), warnings);
+
+        Assert.Empty(await svc.ListRunWarningsAsync(runId, "bob"));
+    }
+
+    [Fact]
+    public async Task ListRunWarningsAsync_UnknownRunGetsNothingForAUser()
+    {
+        var warnings = new InMemoryRunWarnings();
+        var svc = MakeService(new SingleRunRepository(MakeRun(Guid.NewGuid(), "alice"), cancellable: false), warnings);
+
+        Assert.Empty(await svc.ListRunWarningsAsync(Guid.NewGuid(), "alice"));
+    }
+
+    // ---------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------
 
-    private static RunService MakeService(IRunRepository repo) => new RunService(
-        new MinimalPersistenceService(),
-        repo,
-        new MinimalCrewService(),
-        new MinimalAdvisorConsultationRepository(),
-        new NoOpKnowledgeService(),
-        NullLogger<RunService>.Instance);
+    private static RunService MakeService(IRunRepository repo, InMemoryRunWarnings? warnings = null)
+    {
+        warnings ??= new InMemoryRunWarnings();
+        return new RunService(
+            new MinimalPersistenceService(),
+            repo,
+            new MinimalCrewService(),
+            new MinimalAdvisorConsultationRepository(),
+            new NoOpKnowledgeService(),
+            NullLogger<RunService>.Instance,
+            warnings,
+            warnings);
+    }
 
     private static RunEntity MakeRun(Guid id, string? createdByUser) => new RunEntity
     {
