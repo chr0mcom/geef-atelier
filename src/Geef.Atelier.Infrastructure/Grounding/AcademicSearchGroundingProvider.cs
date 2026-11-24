@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Security;
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Persistence.Crew;
@@ -14,8 +15,11 @@ namespace Geef.Atelier.Infrastructure.Grounding;
 internal sealed class AcademicSearchGroundingProvider(
     IEnumerable<IAcademicSource> sources,
     IServiceScopeFactory scopeFactory,
-    ILogger<AcademicSearchGroundingProvider> logger) : IGroundingProvider
+    ILogger<AcademicSearchGroundingProvider> logger,
+    IEnvReferencePolicy? envReferencePolicy = null) : IGroundingProvider
 {
+    private readonly IEnvReferencePolicy _envPolicy = envReferencePolicy ?? EnvReferencePolicy.Default;
+
     public string ProviderType => GroundingProviderTypes.AcademicSearch;
 
     public async Task<GroundingResult> EnrichAsync(
@@ -37,9 +41,7 @@ internal sealed class AcademicSearchGroundingProvider(
                      ?? sources.First();
         }
 
-        var apiKey = profile.AcademicApiKeyEnv is { Length: > 0 } envVar
-            ? Environment.GetEnvironmentVariable(envVar)
-            : null;
+        var apiKey = _envPolicy.Read(profile.AcademicApiKeyEnv, $"grounding profile '{profile.Name}' API key");
 
         var searchOptions = new AcademicSearchOptions(
             MaxPapers: profile.AcademicMaxPapers,

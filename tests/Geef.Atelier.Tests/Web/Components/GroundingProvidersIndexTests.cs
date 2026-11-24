@@ -99,7 +99,23 @@ public sealed class GroundingProvidersIndexTests : TestContext
     }
 
     [Fact]
-    public void CustomProfile_RowHasEditLink()
+    public void CustomProfile_RowHasEditLink_ForAdmins()
+    {
+        var profiles = new[] { MakeGrounding("custom-foo", isSystem: false) };
+        Services.AddSingleton<ICrewService>(new StubCrewService(profiles));
+        this.AddTestAuthorization().SetAuthorized("test-user").SetRoles("admin");
+
+        var cut = RenderComponent<GroundingProvidersIndex>();
+
+        var row = cut.Find("[data-testid='grounding-provider-row-custom-foo']");
+        var editLink = row.QuerySelector("a[href*='/edit/custom-foo']");
+        Assert.NotNull(editLink);
+        Assert.Contains("/edit/custom-foo", editLink.GetAttribute("href"));
+        Assert.NotNull(cut.Find("a[href='/crew/profiles/grounding-providers/create']"));
+    }
+
+    [Fact]
+    public void CustomProfile_NoEditOrCreateLink_ForNormalUsers()
     {
         var profiles = new[] { MakeGrounding("custom-foo", isSystem: false) };
         Services.AddSingleton<ICrewService>(new StubCrewService(profiles));
@@ -108,9 +124,8 @@ public sealed class GroundingProvidersIndexTests : TestContext
         var cut = RenderComponent<GroundingProvidersIndex>();
 
         var row = cut.Find("[data-testid='grounding-provider-row-custom-foo']");
-        var editLink = row.QuerySelector("a[href*='/edit/custom-foo']");
-        Assert.NotNull(editLink);
-        Assert.Contains("/edit/custom-foo", editLink.GetAttribute("href"));
+        Assert.Null(row.QuerySelector("a[href*='/edit/custom-foo']"));
+        Assert.Empty(cut.FindAll("a[href='/crew/profiles/grounding-providers/create']"));
     }
 
     [Fact]

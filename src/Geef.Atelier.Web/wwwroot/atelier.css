@@ -4170,3 +4170,16 @@ textarea.form-control {
     font-size: 0.8125rem;
     color: var(--ink-2);
 }
+
+/* ── Access denied notice ───────────────────────────────── */
+.access-denied {
+    max-width: 36rem;
+    margin: 3rem auto;
+    padding: 0 1rem;
+}
+.access-denied h1 {
+    margin-bottom: 0.5rem;
+}
+.access-denied p {
+    margin-bottom: 1.5rem;
+}

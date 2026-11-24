@@ -1,5 +1,5 @@
 @page "/mcp-servers"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "AdminPolicy")]
 @rendermode InteractiveServer
 @using Geef.Atelier.Core.Domain.Mcp
 @using Geef.Atelier.Core.Domain.Tools

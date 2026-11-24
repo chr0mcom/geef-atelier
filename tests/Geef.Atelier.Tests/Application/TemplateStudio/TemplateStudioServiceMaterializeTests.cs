@@ -66,7 +66,13 @@ public sealed class TemplateStudioServiceMaterializeTests
         public Task<AdvisorProfile> UpdateCustomAdvisorProfileAsync(AdvisorProfile profile, CancellationToken ct = default) => Task.FromResult(profile);
         public Task DeleteCustomAdvisorProfileAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
 
-        public Task<GroundingProviderProfile> CreateCustomGroundingProviderProfileAsync(GroundingProviderProfile profile, CancellationToken ct = default) => Task.FromResult(profile);
+        public readonly List<GroundingProviderProfile> CreatedGroundings = [];
+
+        public Task<GroundingProviderProfile> CreateCustomGroundingProviderProfileAsync(GroundingProviderProfile profile, CancellationToken ct = default)
+        {
+            CreatedGroundings.Add(profile);
+            return Task.FromResult(profile);
+        }
         public Task<GroundingProviderProfile> UpdateCustomGroundingProviderProfileAsync(GroundingProviderProfile profile, CancellationToken ct = default) => Task.FromResult(profile);
         public Task DeleteCustomGroundingProviderProfileAsync(string name, CancellationToken ct = default) => Task.CompletedTask;
 
@@ -416,5 +422,40 @@ public sealed class TemplateStudioServiceMaterializeTests
 
         Assert.NotEmpty(result.Warnings);
         Assert.Contains(result.Warnings, w => w.Contains("unknown-provider"));
+    }
+
+    [Fact]
+    public async Task MaterializeAsync_StripsEnvironmentVariableReferencesFromGroundingSettings()
+    {
+        var crewService = new CapturingCrewService();
+        var proposal = new ProposedProfile(
+            ProfileType: ProposedProfileType.GroundingProvider,
+            Name: "custom-catalog-api",
+            DisplayName: "Catalog API",
+            Description: "Fetches a catalog.",
+            Model: "n/a",
+            Provider: "openrouter",
+            SystemPrompt: "Fetch.",
+            MaxTokens: null,
+            ReviewerFocus: null,
+            AdvisorMode: null,
+            AdvisorTrigger: null,
+            GroundingProviderType: "rest-api",
+            GroundingProviderSettings: new Dictionary<string, string>
+            {
+                [GroundingProviderProfile.KeyRestApiUrl] = "https://example.com/api",
+                [GroundingProviderProfile.KeyRestApiAuthHeaderEnv] = "OPENAI_API_KEY",
+                [GroundingProviderProfile.KeyAcademicApiKeyEnv] = "TAVILY_API_KEY",
+            });
+
+        var svc = CreateService(crewService, new InMemoryAnalysisRepository());
+        var result = await svc.MaterializeAsync(Guid.NewGuid(),
+            new MaterializationRequest(FinalTemplate: MakeTemplate(), FinalNewProfiles: [proposal]), CancellationToken.None);
+
+        var created = Assert.Single(crewService.CreatedGroundings);
+        Assert.False(created.ProviderSettings.ContainsKey(GroundingProviderProfile.KeyRestApiAuthHeaderEnv));
+        Assert.False(created.ProviderSettings.ContainsKey(GroundingProviderProfile.KeyAcademicApiKeyEnv));
+        Assert.Equal("https://example.com/api", created.ProviderSettings[GroundingProviderProfile.KeyRestApiUrl]);
+        Assert.Equal(2, result.Warnings.Count(w => w.Contains("credentials can only be set by an administrator")));
     }
 }

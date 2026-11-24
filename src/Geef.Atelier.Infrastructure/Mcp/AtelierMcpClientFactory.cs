@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Security;
 using Geef.Atelier.Core.Domain.Mcp;
 using Geef.Atelier.Infrastructure.Security;
 using Microsoft.Extensions.Logging;
@@ -8,8 +9,11 @@ namespace Geef.Atelier.Infrastructure.Mcp;
 internal sealed class AtelierMcpClientFactory(
     IUrlSafetyValidator urlSafetyValidator,
     IHttpClientFactory httpClientFactory,
-    ILoggerFactory loggerFactory) : IAtelierMcpClientFactory
+    ILoggerFactory loggerFactory,
+    IEnvReferencePolicy? envReferencePolicy = null) : IAtelierMcpClientFactory
 {
+    private readonly IEnvReferencePolicy _envPolicy = envReferencePolicy ?? EnvReferencePolicy.Default;
+
     public async Task<McpClient> ConnectAsync(McpServerConfig config, CancellationToken ct = default)
     {
         if (!Uri.TryCreate(config.Url, UriKind.Absolute, out var uri))
@@ -23,7 +27,7 @@ internal sealed class AtelierMcpClientFactory(
         var httpClient = httpClientFactory.CreateClient("mcp-client");
         if (!string.IsNullOrWhiteSpace(config.AuthHeaderEnv))
         {
-            var token = Environment.GetEnvironmentVariable(config.AuthHeaderEnv);
+            var token = _envPolicy.Read(config.AuthHeaderEnv, $"MCP server '{config.Name}' auth header");
             if (!string.IsNullOrWhiteSpace(token))
                 httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", $"Bearer {token}");
         }

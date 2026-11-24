@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Security;
 using Geef.Atelier.Application.Crew.Models;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
@@ -20,8 +21,11 @@ internal sealed class CrewService(
     ISpecializationPackRepository packRepo,
     IModelCatalog modelCatalog,
     IModelAssignmentService modelAssignment,
-    ILogger<CrewService> logger) : ICrewService
+    ILogger<CrewService> logger,
+    IEnvReferencePolicy? envReferencePolicy = null) : ICrewService
 {
+    private readonly IEnvReferencePolicy _envPolicy = envReferencePolicy ?? EnvReferencePolicy.Default;
+
     private const string ReadOnlyMessage = "System profile is read-only — copy it as a custom variant.";
     private const string ReadOnlyAdvisorMessage = "System advisor profile is read-only — copy it as a custom variant.";
     private const string ReadOnlyGroundingMessage = "System grounding-provider profile is read-only — copy it as a custom variant.";
@@ -187,6 +191,7 @@ internal sealed class CrewService(
         profile = profile.ForSave();
         if (SystemCrew.IsSystemGroundingProviderName(profile.Name))
             throw new InvalidOperationException(ReadOnlyGroundingMessage);
+        EnsureEnvReferencesAllowed(profile);
         var baseName = SystemCrew.EnsureCustomPrefix(profile.Name);
         var uniqueName = await UniqueNameAsync(baseName, n => groundingRepo.GetByNameAsync(n, cancellationToken));
         var normalized = profile with { Name = uniqueName, IsSystem = false };
@@ -200,8 +205,15 @@ internal sealed class CrewService(
         profile = profile.ForSave();
         if (SystemCrew.IsSystemGroundingProviderName(profile.Name))
             throw new InvalidOperationException(ReadOnlyGroundingMessage);
+        EnsureEnvReferencesAllowed(profile);
         await groundingRepo.UpdateAsync(profile, cancellationToken);
         return profile;
+    }
+
+    private void EnsureEnvReferencesAllowed(GroundingProviderProfile profile)
+    {
+        _envPolicy.EnsureAllowed(profile.RestApiAuthHeaderEnv, "Auth header variable");
+        _envPolicy.EnsureAllowed(profile.AcademicApiKeyEnv, "API key variable");
     }
 
     public Task DeleteCustomGroundingProviderProfileAsync(string name, CancellationToken cancellationToken = default)

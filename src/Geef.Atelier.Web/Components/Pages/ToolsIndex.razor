@@ -1,5 +1,5 @@
 @page "/tools"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "AdminPolicy")]
 @rendermode InteractiveServer
 @using Geef.Atelier.Core.Domain.Tools
 @using Geef.Atelier.Web.Services

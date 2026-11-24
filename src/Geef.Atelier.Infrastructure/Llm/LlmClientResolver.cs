@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Geef.Atelier.Application.Providers;
+using Geef.Atelier.Application.Security;
 using Geef.Atelier.Core.Domain.Providers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -11,8 +12,11 @@ internal sealed class LlmClientResolver(
     IHttpClientFactory factory,
     IOptions<LlmOptions> options,
     IServiceScopeFactory scopeFactory,
-    ILoggerFactory? loggerFactory = null) : ILlmClientResolver
+    ILoggerFactory? loggerFactory = null,
+    IEnvReferencePolicy? envReferencePolicy = null) : ILlmClientResolver
 {
+    private readonly IEnvReferencePolicy _envPolicy = envReferencePolicy ?? EnvReferencePolicy.Default;
+
     // One OpenAiCompatibleClient per provider, shared and thread-safe.
     private readonly ConcurrentDictionary<string, ILlmClient> _clients = new(StringComparer.OrdinalIgnoreCase);
 
@@ -114,15 +118,13 @@ internal sealed class LlmClientResolver(
         {
             var settings = HttpProviderSettings.FromSettings(provider.Settings);
 
-            var endpoint = settings.EndpointEnvOverride is { Length: > 0 } envVar
-                ? (Environment.GetEnvironmentVariable(envVar) ?? settings.Endpoint)
-                : settings.Endpoint;
+            var endpoint = _envPolicy.Read(settings.EndpointEnvOverride, $"provider '{providerName}' endpoint override") ?? settings.Endpoint;
 
             // null  → keyless provider (e.g. Ollama): no auth header, no guard
             // ""    → ApiKeyEnv configured but env var not set: will throw in client
             // "…"   → valid key
             string? apiKey = settings.ApiKeyEnv is { Length: > 0 } keyEnv
-                ? (Environment.GetEnvironmentVariable(keyEnv) ?? string.Empty)
+                ? (_envPolicy.Read(keyEnv, $"provider '{providerName}' API key") ?? string.Empty)
                 : null;
 
             return (endpoint, apiKey);

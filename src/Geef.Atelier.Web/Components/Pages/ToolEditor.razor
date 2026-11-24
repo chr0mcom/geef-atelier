@@ -1,6 +1,6 @@
 @page "/tools/create"
 @page "/tools/edit/{Name}"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "AdminPolicy")]
 @rendermode InteractiveServer
 @using System.ComponentModel.DataAnnotations
 @using System.Text.Json

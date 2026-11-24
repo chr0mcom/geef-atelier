@@ -1,5 +1,5 @@
 @page "/crew/providers/view/{name}"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "AdminPolicy")]
 @rendermode InteractiveServer
 @using Geef.Atelier.Application.Providers
 @using Geef.Atelier.Core.Domain.Providers

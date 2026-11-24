@@ -1,6 +1,6 @@
 @page "/mcp-servers/create"
 @page "/mcp-servers/edit/{Id:guid}"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "AdminPolicy")]
 @rendermode InteractiveServer
 @using System.ComponentModel.DataAnnotations
 @using Geef.Atelier.Core.Domain.Mcp

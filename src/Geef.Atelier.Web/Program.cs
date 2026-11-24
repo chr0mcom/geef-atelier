@@ -86,6 +86,8 @@ builder.Services.AddCrewComposition();
 
 builder.Services.Configure<OrchestratorOptions>(builder.Configuration.GetSection("Orchestrator"));
 builder.Services.Configure<ConvergenceOptions>(builder.Configuration.GetSection("Convergence"));
+builder.Services.Configure<Geef.Atelier.Core.Configuration.EnvReferenceOptions>(
+    builder.Configuration.GetSection(Geef.Atelier.Core.Configuration.EnvReferenceOptions.SectionName));
 builder.Services.AddHostedService<RunOrchestratorService>();
 builder.Services.AddHostedService<OAuthCleanupBackgroundService>();
 builder.Services.Configure<Geef.Atelier.Core.Configuration.PackGcOptions>(
@@ -109,7 +111,7 @@ builder.Services
     {
         o.LoginPath        = "/login";
         o.LogoutPath       = "/auth/logout";
-        o.AccessDeniedPath = "/login";
+        o.AccessDeniedPath = "/access-denied";
         o.ExpireTimeSpan   = TimeSpan.FromDays(30);
         o.SlidingExpiration = true;
         o.Cookie.HttpOnly  = true;

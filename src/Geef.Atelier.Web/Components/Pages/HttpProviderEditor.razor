@@ -1,6 +1,6 @@
 @page "/crew/providers/create/http"
 @page "/crew/providers/edit/{name}"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "AdminPolicy")]
 @rendermode InteractiveServer
 @using System.ComponentModel.DataAnnotations
 @using System.Text.Json

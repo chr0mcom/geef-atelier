@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Security;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -19,8 +20,11 @@ internal sealed class RestApiGroundingProvider(
     IHttpClientFactory httpClientFactory,
     IUrlSafetyValidator urlSafetyValidator,
     IServiceScopeFactory scopeFactory,
-    ILogger<RestApiGroundingProvider> logger) : IGroundingProvider
+    ILogger<RestApiGroundingProvider> logger,
+    IEnvReferencePolicy? envReferencePolicy = null) : IGroundingProvider
 {
+    private readonly IEnvReferencePolicy _envPolicy = envReferencePolicy ?? EnvReferencePolicy.Default;
+
     public string ProviderType => GroundingProviderTypes.RestApi;
 
     public async Task<GroundingResult> EnrichAsync(
@@ -118,11 +122,11 @@ internal sealed class RestApiGroundingProvider(
         return await response.Content.ReadAsStringAsync(ct);
     }
 
-    private static string? ResolveAuthToken(GroundingProviderProfile profile)
+    private string? ResolveAuthToken(GroundingProviderProfile profile)
     {
         if (profile.RestApiAuthHeaderEnv is not { Length: > 0 } envVar)
             return null;
-        var token = Environment.GetEnvironmentVariable(envVar);
+        var token = _envPolicy.Read(envVar, $"grounding profile '{profile.Name}' auth header");
         // Intentionally not logging the token — only log presence/absence
         return string.IsNullOrWhiteSpace(token) ? null : token;
     }

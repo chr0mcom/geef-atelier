@@ -4,8 +4,15 @@
             <Authorizing>
                 @* Auth state loading — render nothing to avoid premature redirect *@
             </Authorizing>
-            <NotAuthorized>
-                <RedirectToLogin />
+            <NotAuthorized Context="authState">
+                @if (authState.User.Identity?.IsAuthenticated == true)
+                {
+                    <AccessDeniedNotice />
+                }
+                else
+                {
+                    <RedirectToLogin />
+                }
             </NotAuthorized>
         </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
