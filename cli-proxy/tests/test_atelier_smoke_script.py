@@ -51,6 +51,7 @@ class FakeAtelier(BaseHTTPRequestHandler):
         return {k: v[0] for k, v in urllib.parse.parse_qs(self.rfile.read(length).decode()).items()}
 
     def do_GET(self):
+        self.scenario.setdefault("requests", []).append(("GET", self.path))
         if self.path.startswith("/login"):
             self._send(200, '<form><input type="hidden" name="__RequestVerificationToken" value="af-123" /></form>',
                        {"Set-Cookie": "af=1; Path=/"})
@@ -59,6 +60,7 @@ class FakeAtelier(BaseHTTPRequestHandler):
 
     def do_POST(self):
         s = self.scenario
+        s.setdefault("requests", []).append(("POST", self.path))
         if self.path == "/login":
             f = self._form()
             ok = (f.get("_handler") == "login-form" and f.get("__RequestVerificationToken") == "af-123"
@@ -79,7 +81,9 @@ class FakeAtelier(BaseHTTPRequestHandler):
         elif self.path == "/oauth/token":
             f = self._form()
             expected = base64.urlsafe_b64encode(hashlib.sha256(f.get("code_verifier", "").encode()).digest()).rstrip(b"=").decode()
-            if f.get("code") == "code-1" and expected == s.get("challenge"):
+            if s.get("token_body") is not None:
+                self._send(200, s["token_body"], ctype="application/json")
+            elif f.get("code") == "code-1" and expected == s.get("challenge"):
                 self._send(200, json.dumps({"access_token": "tok-SECRET", "token_type": "Bearer"}), ctype="application/json")
             else:
                 self._send(400, json.dumps({"error": "invalid_grant"}), ctype="application/json")
@@ -92,6 +96,20 @@ class FakeAtelier(BaseHTTPRequestHandler):
             s.setdefault("calls", []).append(msg)
             if "id" not in msg:
                 self._send(202)
+                return
+            if msg["method"] == s.get("raw_for", msg["method"]) and s.get("sse_data") is not None:
+                self._send(200, "event: message\ndata: " + s["sse_data"] + "\n\n", ctype="text/event-stream")
+                return
+            if msg["method"] == s.get("raw_for", msg["method"]) and s.get("plain_body") is not None:
+                self._send(200, s["plain_body"], ctype="application/json")
+                return
+            if msg["method"] == s.get("raw_for", msg["method"]) and "rpc_error" in s:
+                body = "data: " + json.dumps({"jsonrpc": "2.0", "id": msg["id"], "error": s["rpc_error"]}) + "\n\n"
+                self._send(200, body, ctype="text/event-stream")
+                return
+            if msg["method"] == s.get("raw_for", msg["method"]) and "rpc_result" in s:
+                body = "data: " + json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": s["rpc_result"]}) + "\n\n"
+                self._send(200, body, ctype="text/event-stream")
                 return
             if msg["method"] == "initialize":
                 res = {"protocolVersion": "2025-06-18", "capabilities": {}, "serverInfo": {"name": "fake"}}
@@ -107,6 +125,8 @@ class FakeAtelier(BaseHTTPRequestHandler):
                 else:
                     payload = {"runId": "run-1", "status": s.get("final_status", "Completed"),
                                "finalText": s.get("final_text", "Der Smoke-Test läuft."), "errorMessage": s.get("error")}
+                    if "result_payload" in s:
+                        payload = s["result_payload"]
                 res = {"content": [{"type": "text", "text": json.dumps(payload)}], "isError": False}
             body = "event: message\ndata: " + json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": res}) + "\n\n"
             self._send(200, body, ctype="text/event-stream")
@@ -115,9 +135,9 @@ class FakeAtelier(BaseHTTPRequestHandler):
 
 
 @pytest.fixture
-def server():
+def server(request):
     FakeAtelier.scenario = {}
-    httpd = ThreadingHTTPServer(("127.0.0.1", 0), FakeAtelier)
+    httpd = ThreadingHTTPServer((getattr(request, "param", "127.0.0.1"), 0), FakeAtelier)
     t = threading.Thread(target=httpd.serve_forever, daemon=True)
     t.start()
     yield httpd, FakeAtelier.scenario
@@ -246,3 +266,91 @@ def test_timeout_exits_1(sandbox, server):
     r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}", ATELIER_SMOKE_TIMEOUT="2"))
     assert r.returncode == 1
     assert "FEHLER (zeitlimit)" in r.stdout
+
+
+# Kein Passwort über unverschlüsseltes HTTP an fremde Hosts (Q15)
+
+@pytest.mark.parametrize("server", ["127.0.0.2"], indirect=True)
+def test_http_to_non_allowed_host_is_refused_before_any_request(sandbox, server):
+    httpd, scenario = server
+    r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.2:{httpd.server_port}"))
+    assert r.returncode == 2, r.stdout + r.stderr
+    assert r.stdout.startswith("SMOKE FEHLER (konfiguration)") and "unverschlüsseltes http://" in r.stdout
+    assert "127.0.0.2" in r.stdout
+    assert scenario.get("requests", []) == []
+    assert PASSWORD not in r.stdout + r.stderr
+
+
+@pytest.mark.parametrize("base", ["http://geef.example.org", "http://10.0.0.5:8080", "http://geef-atelier-web.evil.example",
+                                  "ftp://geef.example.org", "geef.example.org", "https://"])
+def test_bad_base_urls_exit_2(sandbox, base):
+    r = run(sandbox, write_env(sandbox / "s.env", base=base))
+    assert r.returncode == 2, r.stdout
+    assert r.stdout.startswith("SMOKE FEHLER (konfiguration)")
+    assert "Traceback" not in r.stderr
+
+
+@pytest.mark.parametrize("host", ["localhost", "LOCALHOST", "127.0.0.1"])
+def test_http_to_loopback_is_allowed(sandbox, server, host):
+    httpd, _ = server
+    r = run(sandbox, write_env(sandbox / "s.env", base=f"http://{host}:{httpd.server_port}"))
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+@pytest.mark.parametrize("base", ["http://[::1]:9", "http://geef-atelier-web:8080", "https://geef.invalid"])
+def test_allowed_or_https_bases_pass_the_config_check(sandbox, base):
+    r = run(sandbox, write_env(sandbox / "s.env", base=base))
+    assert r.returncode == 3, r.stdout
+    assert "FEHLER (verbindung)" in r.stdout
+
+
+# Unerwartete Antworten: eigene Ergebniszeile und Exit 4, nie ein Traceback (Q20)
+
+def _assert_unexpected(r, expected):
+    assert r.returncode == 4, r.stdout + r.stderr
+    lines = r.stdout.strip().splitlines()
+    assert len(lines) == 1 and lines[0].startswith("SMOKE FEHLER (antwort)"), r.stdout
+    assert expected in lines[0]
+    assert "Traceback" not in r.stderr
+    for secret in (PASSWORD, "tok-SECRET", "cookie-1"):
+        assert secret not in r.stdout + r.stderr
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [("[]", "kein JSON-Objekt, sondern list"), ("null", "kein JSON-Objekt, sondern NoneType"),
+     ("kein json", "kein JSON"), ('{"token_type": "Bearer"}', "ohne access_token"), ('{"access_token": 5}', "ohne access_token")],
+)
+def test_unexpected_token_response_exits_4(sandbox, server, body, expected):
+    httpd, scenario = server
+    scenario["token_body"] = body
+    r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}"))
+    _assert_unexpected(r, expected)
+
+
+@pytest.mark.parametrize(
+    ("update", "expected"),
+    [
+        ({"sse_data": "[1, 2]"}, "SSE-Datenzeile der Antwort auf initialize ist kein JSON-Objekt"),
+        ({"sse_data": '"text"'}, "SSE-Datenzeile der Antwort auf initialize ist kein JSON-Objekt"),
+        ({"plain_body": "[]"}, "Antwort auf initialize ist kein JSON-Objekt"),
+        ({"plain_body": "<html>"}, "initialize ohne lesbare Antwort"),
+        ({"rpc_result": [1]}, "Feld result der Antwort auf initialize ist kein JSON-Objekt"),
+        ({"raw_for": "tools/call", "sse_data": "[]"}, "SSE-Datenzeile der Antwort auf tools/call"),
+        ({"result_payload": {"runId": "run-1", "status": "Completed", "finalText": 42}}, "finalText von get_run_result ist kein Text"),
+    ],
+)
+def test_unexpected_mcp_response_exits_4(sandbox, server, update, expected):
+    httpd, scenario = server
+    scenario.update(update)
+    r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}"))
+    _assert_unexpected(r, expected)
+
+
+def test_string_rpc_error_is_reported_as_mcp_failure(sandbox, server):
+    httpd, scenario = server
+    scenario["rpc_error"] = "kaputt"
+    r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}"))
+    assert r.returncode == 3, r.stdout + r.stderr
+    assert "FEHLER (mcp): initialize: kaputt" in r.stdout
+    assert "Traceback" not in r.stderr

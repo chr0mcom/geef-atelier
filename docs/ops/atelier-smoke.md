@@ -15,10 +15,13 @@ Stand: 2026-11-24 · Skript: `scripts/atelier-smoke.sh` · Tests: `cli-proxy/tes
 |---|---|
 | 0 | bestanden |
 | 1 | Lauf gescheitert (Status, kein Text, Fehlermeldung) oder Zeitlimit überschritten |
-| 2 | Smoke-Konto nicht eingerichtet oder unvollständig (nur `/health` geprüft) |
+| 2 | Smoke-Konto nicht eingerichtet, unvollständig oder unzulässig konfiguriert, zum Beispiel `http://` zu einem nicht lokalen Host (nur `/health` geprüft) |
 | 3 | `/health`, Verbindung, Anmeldung oder MCP-Aufruf gescheitert |
+| 4 | Unerwartete Antwort des Ateliers: HTTP 200, aber nicht das vereinbarte Format (zum Beispiel ein JSON-Array statt eines Objekts vom Token-Endpunkt, eine SSE-Datenzeile, die kein Objekt ist, oder ein `finalText`, der kein Text ist); ebenso ein unerwarteter interner Fehler |
 
-Das Skript gibt nie Passwort, Cookie oder Token aus.
+Das Skript gibt nie Passwort, Cookie oder Token aus, und es endet immer mit genau einer Ergebniszeile, nie mit einem Traceback.
+
+**Kein Passwort im Klartext:** `ATELIER_SMOKE_BASE_URL` muss `https://` sein. `http://` ist nur für die ausdrücklich gelisteten lokalen Hosts erlaubt: `localhost`, `127.0.0.1`, `::1` und `geef-atelier-web` (Container-Name im Docker-Netz). Für jeden anderen Host bricht das Skript vor der Anmeldung mit `SMOKE FEHLER (konfiguration)` und Exit 2 ab. Weiterleitungen folgt das Skript nie.
 
 **Grenze:** Über `submit_request` lässt sich für ein Template keine Iterationsgrenze setzen (die Grenze gibt es nur in einer eigenen Crew-Spezifikation). Bremsen sind deshalb das sehr kurze Briefing und das Zeitlimit. Endet der Klassik-Lauf ohne Konvergenz als `Failed`, schlägt der Smoke fehl; das ist gewollt, weil genau das ein Anwender auch sähe.
 
@@ -67,6 +70,8 @@ Beispiele für die Ergebniszeile:
 SMOKE OK: Lauf 3f0c… Completed in 142 s, 87 Zeichen Text (klassik)
 SMOKE NICHT EINGERICHTET: Smoke-Konto fehlt (/srv/docker/websites/geef_atelier/.smoke.env nicht vorhanden). …
 SMOKE FEHLER (lauf): Lauf 3f0c… nach 1520 s: Status Failed; Fehlermeldung: …
+SMOKE FEHLER (konfiguration): ATELIER_SMOKE_BASE_URL nutzt unverschlüsseltes http:// für den Host geef.example.org; …
+SMOKE FEHLER (antwort): Antwort von /oauth/token ist kein JSON-Objekt, sondern list
 ```
 
 Die Läufe des Smoke-Kontos erscheinen in der Lauf-Liste der Admins; sie dürfen dort bleiben oder von Hand gelöscht werden.
@@ -77,4 +82,4 @@ Die Läufe des Smoke-Kontos erscheinen in der Lauf-Liste der Admins; sie dürfen
 cd cli-proxy && python3 -m pytest -q tests/test_atelier_smoke_script.py
 ```
 
-Die Tests laufen offline: Ein kleiner HTTP-Testserver spielt Login, OAuth-Freigabe, Token und MCP; `docker` ist eine Attrappe. Geprüft werden der erfolgreiche Durchlauf, alle Fehlerpfade (kein Konto, falscher Dateimodus, fehlende Schlüssel, `/health`, Verbindung, falsches Passwort, falscher Client, falscher `state`, gescheiterter Lauf, Zeitlimit) und dass keine Geheimnisse in der Ausgabe stehen.
+Die Tests laufen offline: Ein kleiner HTTP-Testserver spielt Login, OAuth-Freigabe, Token und MCP; `docker` ist eine Attrappe. Geprüft werden der erfolgreiche Durchlauf, alle Fehlerpfade (kein Konto, falscher Dateimodus, fehlende Schlüssel, `/health`, Verbindung, falsches Passwort, falscher Client, falscher `state`, gescheiterter Lauf, Zeitlimit, `http://` zu einem nicht gelisteten Host ohne jede Anfrage an ihn, unerwartete Antworten von Token-Endpunkt und MCP) und dass keine Geheimnisse in der Ausgabe stehen.
