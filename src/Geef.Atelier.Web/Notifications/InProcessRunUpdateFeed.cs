@@ -10,6 +10,15 @@ namespace Geef.Atelier.Web.Notifications;
 /// Topic-based <see cref="IRunUpdateFeed"/> held in memory. Publishing never waits for subscribers: each subscription
 /// has its own queue, runs its handler one payload at a time (components reload on a single DbContext), skips a payload
 /// that is already waiting, and logs handler failures.
+/// <para>
+/// Limit: access is decided once, when a page subscribes, from the principal of its circuit. A role taken away or a
+/// sign-in that expires while the circuit stays open takes effect only when the page subscribes again or the circuit
+/// ends; until then an administrator's dashboard subscription keeps receiving the dashboard events of all users
+/// (day-book entries, press state), and run subscriptions keep receiving run ids. Checking again on every event would
+/// not help: the circuit's principal is a snapshot of the sign-in cookie and does not change, because the admin role
+/// is written into the cookie at sign-in. The SignalR hub, in contrast, closes connections when the sign-in expires
+/// (<see cref="LiveUpdateServiceExtensions.MapRunHub"/>). Circuits are short-lived, which keeps the exposure small.
+/// </para>
 /// </summary>
 internal sealed class InProcessRunUpdateFeed(
     IServiceScopeFactory scopeFactory,

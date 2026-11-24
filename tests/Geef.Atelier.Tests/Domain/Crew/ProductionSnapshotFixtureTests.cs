@@ -7,6 +7,14 @@ namespace Geef.Atelier.Tests.Domain.Crew;
 /// Reads every exported production snapshot from the directory in <c>ATELIER_SNAPSHOT_FIXTURES</c> (one JSON file
 /// per run) through the strict run-time read. The exports contain real orders and never belong in the repository;
 /// without the variable or with an empty directory the test is skipped.
+/// <para>
+/// <c>ATELIER_SNAPSHOT_FIXTURES_MIN</c> is the number of snapshot files the export must contain at least. Set it to the
+/// number of runs that were exported (for the export of 2026-11-24 in
+/// <c>/srv/backup/geef-atelier-analyse-20261124/snapshots</c> that is 42), so a partial or truncated export fails the
+/// test instead of passing with the files that happen to be there. Without it the minimum is 1, which only proves that
+/// the directory is not empty. Example:
+/// <c>ATELIER_SNAPSHOT_FIXTURES=/srv/backup/geef-atelier-analyse-20261124/snapshots ATELIER_SNAPSHOT_FIXTURES_MIN=42 dotnet test …</c>.
+/// </para>
 /// </summary>
 public sealed class ProductionSnapshotFixtureTests
 {
