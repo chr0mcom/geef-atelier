@@ -145,7 +145,21 @@ public sealed class DirectPathEndToEndTests(PostgresFixture postgres)
         await using var lifetime = host;
 
         var run = await RunOfAsync(host, orderId);
-        Assert.Equal(RunStatus.Failed, run.Status);
+        Assert.True(run.Status == RunStatus.Failed, $"Status {run.Status}.\n{host.Llm.Describe()}");
         Assert.Equal("The writer returned no text. Please try again.", run.ErrorMessage);
+        Assert.Equal(2, host.Llm.CallsFor(LlmRole.Executor).Count);
+    }
+
+    [Fact]
+    public async Task An_unavailable_writing_service_fails_the_run_after_one_call()
+    {
+        var (host, orderId) = await SubmitAsync(postgres, "Schreibe eine kurze Notiz an das Team.", s =>
+            s.EnqueueExecutorError(503, "backend_unavailable"));
+        await using var lifetime = host;
+
+        var run = await RunOfAsync(host, orderId);
+        Assert.True(run.Status == RunStatus.Failed, $"Status {run.Status}.\n{host.Llm.Describe()}");
+        Assert.Equal("The writing service is busy. Please try again in a few minutes.", run.ErrorMessage);
+        Assert.Single(host.Llm.CallsFor(LlmRole.Executor));
     }
 }

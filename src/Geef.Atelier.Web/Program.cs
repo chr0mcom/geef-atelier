@@ -52,6 +52,9 @@ builder.Services.AddLlmClient(builder.Configuration)
         options.AttemptTimeout.Timeout             = TimeSpan.FromMinutes(28);
         options.CircuitBreaker.SamplingDuration    = TimeSpan.FromMinutes(60);
         options.Retry.MaxRetryAttempts             = 2;
+        options.Retry.ShouldHandle = args => ValueTask.FromResult(
+            !args.Outcome.Result.IsAnswerForCallerWithoutFailover()
+            && Microsoft.Extensions.Http.Resilience.HttpClientResiliencePredicates.IsTransient(args.Outcome));
     });
 
 builder.Services.AddDbContext<AtelierDbContext>(options =>
