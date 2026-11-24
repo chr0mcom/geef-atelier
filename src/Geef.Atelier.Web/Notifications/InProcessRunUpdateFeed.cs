@@ -80,6 +80,18 @@ internal sealed class InProcessRunUpdateFeed(
         return PublishAsync(topics, dashboardEvent);
     }
 
+    /// <inheritdoc/>
+    public Task<IDisposable?> WatchOrderAsync(ClaimsPrincipal user, Guid orderId, Func<Guid, Task> onUpdated, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
+    /// <inheritdoc/>
+    public IDisposable WatchOrderList(ClaimsPrincipal user, Func<Guid, Task> onUpdated) =>
+        throw new NotImplementedException();
+
+    /// <inheritdoc/>
+    public Task PublishOrderUpdatedAsync(Guid orderId, string? owner) =>
+        throw new NotImplementedException();
+
     private Task PublishAsync(IEnumerable<string> topics, object payload)
     {
         var subscriptions = topics

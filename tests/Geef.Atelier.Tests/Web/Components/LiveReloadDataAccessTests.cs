@@ -242,6 +242,13 @@ public sealed class LiveReloadDataAccessTests : TestContext
         public Task PublishRunUpdatedAsync(Guid runId, string? owner) => Task.CompletedTask;
 
         public Task PublishDashboardEventAsync(DashboardEvent dashboardEvent) => Task.CompletedTask;
+
+        public Task<IDisposable?> WatchOrderAsync(ClaimsPrincipal user, Guid orderId, Func<Guid, Task> onUpdated, CancellationToken ct = default) =>
+            Task.FromResult<IDisposable?>(null);
+
+        public IDisposable WatchOrderList(ClaimsPrincipal user, Func<Guid, Task> onUpdated) => new TrackedSubscription();
+
+        public Task PublishOrderUpdatedAsync(Guid orderId, string? owner) => Task.CompletedTask;
     }
 
     private sealed class CountingDetailRunService(IRunService inner, Guid runId) : IRunService

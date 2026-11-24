@@ -36,4 +36,23 @@ public interface IRunUpdateFeed
 
     /// <summary>Queues a dashboard event for the owner's and the admin dashboard topic; returns without waiting.</summary>
     Task PublishDashboardEventAsync(DashboardEvent dashboardEvent);
+
+    /// <summary>
+    /// Subscribes to updates of order <paramref name="orderId"/>. Returns null (and subscribes nothing) when
+    /// <paramref name="user"/> may not see the order or when <paramref name="ct"/> is cancelled before the access check
+    /// has finished.
+    /// </summary>
+    Task<IDisposable?> WatchOrderAsync(ClaimsPrincipal user, Guid orderId, Func<Guid, Task> onUpdated, CancellationToken ct = default);
+
+    /// <summary>
+    /// Subscribes to order list updates: every order for administrators, the user's own orders otherwise. Anonymous
+    /// users get an inert subscription.
+    /// </summary>
+    IDisposable WatchOrderList(ClaimsPrincipal user, Func<Guid, Task> onUpdated);
+
+    /// <summary>
+    /// Queues an order update for the order topic, the owner's order list topic and the admin order list topic; returns
+    /// without waiting for subscribers.
+    /// </summary>
+    Task PublishOrderUpdatedAsync(Guid orderId, string? owner);
 }

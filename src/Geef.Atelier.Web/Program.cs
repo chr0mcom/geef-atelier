@@ -14,6 +14,8 @@ using Geef.Atelier.Infrastructure.Pricing;
 using Geef.Atelier.Infrastructure.Knowledge;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
+using Geef.Atelier.Infrastructure.Pipeline.Assembly;
+using Geef.Atelier.Infrastructure.Sources;
 using Geef.Atelier.Infrastructure.Finalizers;
 using Geef.Atelier.Infrastructure.TemplateStudio;
 using Geef.Atelier.Infrastructure.Mcp;
@@ -88,6 +90,10 @@ builder.Services.Configure<OrchestratorOptions>(builder.Configuration.GetSection
 builder.Services.Configure<ConvergenceOptions>(builder.Configuration.GetSection("Convergence"));
 builder.Services.Configure<Geef.Atelier.Core.Configuration.EnvReferenceOptions>(
     builder.Configuration.GetSection(Geef.Atelier.Core.Configuration.EnvReferenceOptions.SectionName));
+builder.Services.Configure<SourceOptions>(builder.Configuration.GetSection(SourceOptions.SectionName));
+builder.Services.Configure<OrderOptions>(builder.Configuration.GetSection(OrderOptions.SectionName));
+builder.Services.AddSources(builder.Configuration);
+builder.Services.AddPipelineAssemblers();
 builder.Services.AddHostedService<RunOrchestratorService>();
 builder.Services.AddHostedService<OAuthCleanupBackgroundService>();
 builder.Services.Configure<Geef.Atelier.Core.Configuration.PackGcOptions>(
@@ -120,6 +126,7 @@ builder.Services
             : CookieSecurePolicy.Always;
         o.Cookie.SameSite = SameSiteMode.Strict;
         o.Cookie.Name     = "Atelier.Auth";
+        o.Events.AnswerApiWithStatusCodes();
     })
     .AddScheme<AuthenticationSchemeOptions, BearerTokenHandler>(
         McpAuthorizationConstants.BearerScheme, _ => { });
@@ -254,6 +261,8 @@ app.MapOAuthEndpoints();
 app.MapSettingsEndpoints();
 app.MapArtifactEndpoints();
 app.MapProviderEndpoints();
+app.MapSourceEndpoints();
+app.MapOrderEndpoints();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

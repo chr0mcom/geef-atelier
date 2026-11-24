@@ -171,6 +171,13 @@ public sealed class PageLeftDuringFirstLoadTests : TestContext
 
         public Task PublishDashboardEventAsync(DashboardEvent dashboardEvent) => Task.CompletedTask;
 
+        public Task<IDisposable?> WatchOrderAsync(ClaimsPrincipal user, Guid orderId, Func<Guid, Task> onUpdated, CancellationToken ct = default) =>
+            Task.FromResult<IDisposable?>(null);
+
+        public IDisposable WatchOrderList(ClaimsPrincipal user, Func<Guid, Task> onUpdated) => NewSubscription();
+
+        public Task PublishOrderUpdatedAsync(Guid orderId, string? owner) => Task.CompletedTask;
+
         private Subscription NewSubscription()
         {
             Interlocked.Increment(ref _active);
