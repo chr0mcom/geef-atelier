@@ -8,7 +8,6 @@ using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Tests.Persistence;
-using Geef.Atelier.Web.Hubs;
 using Geef.Atelier.Web.Notifications;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
@@ -60,7 +59,7 @@ public sealed class RunLiveUpdateSecurityTests(PostgresFixture fixture) : IAsync
         _app = builder.Build();
         _app.UseAuthentication();
         _app.UseAuthorization();
-        _app.MapHub<RunHub>("/hubs/runs").RequireAuthorization();
+        _app.MapRunHub();
         await _app.StartAsync();
         _server = _app.GetTestServer();
 
@@ -76,7 +75,7 @@ public sealed class RunLiveUpdateSecurityTests(PostgresFixture fixture) : IAsync
         await _app.DisposeAsync();
     }
 
-    private HubConnection Connect(string? user, bool admin = false) =>
+    private HubConnection Connect(string? user, bool admin = false, DateTimeOffset? expiresAt = null) =>
         new HubConnectionBuilder()
             .WithUrl("http://localhost/hubs/runs", o =>
             {
@@ -86,6 +85,8 @@ public sealed class RunLiveUpdateSecurityTests(PostgresFixture fixture) : IAsync
                     o.Headers[HeaderAuthHandler.UserHeader] = user;
                 if (admin)
                     o.Headers[HeaderAuthHandler.AdminHeader] = "1";
+                if (expiresAt is { } expiry)
+                    o.Headers[HeaderAuthHandler.ExpiresHeader] = expiry.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
             })
             .Build();
 
@@ -111,6 +112,34 @@ public sealed class RunLiveUpdateSecurityTests(PostgresFixture fixture) : IAsync
                 throw new TimeoutException("Condition not met within 15 s.");
             await Task.Delay(20);
         }
+    }
+
+    [Fact]
+    public async Task Hub_ClosesTheConnectionWhenTheSignInExpires()
+    {
+        await using var admin = Connect("root", admin: true, expiresAt: DateTimeOffset.UtcNow.AddSeconds(2));
+        var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        admin.Closed += _ =>
+        {
+            closed.TrySetResult();
+            return Task.CompletedTask;
+        };
+        await admin.StartAsync();
+        await admin.InvokeAsync("JoinRunGroupAsync", _bobRun);
+
+        await closed.Task.WaitAsync(TimeSpan.FromSeconds(20));
+
+        Assert.Equal(HubConnectionState.Disconnected, admin.State);
+    }
+
+    [Fact]
+    public async Task Hub_KeepsAConnectionWhoseSignInIsStillValid()
+    {
+        await using var alice = Connect("alice", expiresAt: DateTimeOffset.UtcNow.AddHours(1));
+        await alice.StartAsync();
+        await Task.Delay(TimeSpan.FromSeconds(3));
+
+        Assert.Equal(HubConnectionState.Connected, alice.State);
     }
 
     [Fact]
@@ -302,6 +331,7 @@ public sealed class RunLiveUpdateSecurityTests(PostgresFixture fixture) : IAsync
         public const string SchemeName = "TestHeader";
         public const string UserHeader = "X-Test-User";
         public const string AdminHeader = "X-Test-Admin";
+        public const string ExpiresHeader = "X-Test-Expires";
 
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
@@ -310,7 +340,11 @@ public sealed class RunLiveUpdateSecurityTests(PostgresFixture fixture) : IAsync
             var claims = new List<Claim> { new(ClaimTypes.Name, user.ToString()) };
             if (Request.Headers.ContainsKey(AdminHeader))
                 claims.Add(new Claim(ClaimTypes.Role, "admin"));
-            var ticket = new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity(claims, SchemeName)), SchemeName);
+            var properties = new AuthenticationProperties();
+            if (Request.Headers.TryGetValue(ExpiresHeader, out var expires)
+                && long.TryParse(expires, System.Globalization.CultureInfo.InvariantCulture, out var unixMs))
+                properties.ExpiresUtc = DateTimeOffset.FromUnixTimeMilliseconds(unixMs);
+            var ticket = new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity(claims, SchemeName)), properties, SchemeName);
             return Task.FromResult(AuthenticateResult.Success(ticket));
         }
     }

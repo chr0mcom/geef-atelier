@@ -1,4 +1,5 @@
 using Geef.Atelier.Core.Notifications;
+using Geef.Atelier.Web.Hubs;
 
 namespace Geef.Atelier.Web.Notifications;
 
@@ -12,5 +13,19 @@ public static class LiveUpdateServiceExtensions
         services.AddSingleton<IRunUpdateFeed, InProcessRunUpdateFeed>();
         services.AddSingleton<IRunNotifier, SignalRRunNotifier>();
         return services;
+    }
+
+    /// <summary>Hub route used by <see cref="MapRunHub"/>.</summary>
+    public const string RunHubPath = "/hubs/runs";
+
+    /// <summary>
+    /// Maps <see cref="RunHub"/> for signed-in users only. A connection is closed as soon as the authentication it was
+    /// opened with expires, so an expired session never keeps receiving run or dashboard events.
+    /// </summary>
+    public static HubEndpointConventionBuilder MapRunHub(this IEndpointRouteBuilder endpoints)
+    {
+        var hub = endpoints.MapHub<RunHub>(RunHubPath, options => options.CloseOnAuthenticationExpiration = true);
+        hub.RequireAuthorization();
+        return hub;
     }
 }

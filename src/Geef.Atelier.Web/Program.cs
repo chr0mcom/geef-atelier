@@ -23,7 +23,6 @@ using Geef.Atelier.Web.Auth;
 using Geef.Atelier.Web.Components;
 using Geef.Atelier.Web.Endpoints;
 using Geef.Atelier.Web.Health;
-using Geef.Atelier.Web.Hubs;
 using Geef.Atelier.Web.Notifications;
 using Geef.Atelier.Web.Services;
 using Microsoft.AspNetCore.Authentication;
@@ -68,7 +67,6 @@ builder.Services.AddKnowledge(builder.Configuration);
 // Crew composition infrastructure (ICrewTemplateEmbeddingRepository, etc.)
 builder.Services.AddCrewComposition();
 
-// Grounding providers — ApiKey never logged; a missing key is reported by name at startup and as a run warning.
 builder.Services.AddGroundingProviders(builder.Configuration);
 
 // Tool execution infrastructure (IToolExecutor + IToolSchemaProvider)
@@ -159,7 +157,6 @@ builder.Services.AddRazorComponents()
 
 var app = builder.Build();
 
-// Auto-migrate at startup; a failed migration stops the host instead of serving an outdated schema.
 await app.Services.MigrateDatabaseOrFailAsync();
 app.Configuration.WarnAboutMissingGroundingKeys(app.Services.GetRequiredService<ILogger<Program>>());
 
@@ -246,7 +243,7 @@ app.Use(async (ctx, next) =>
 
 app.MapHealthChecks("/health").AllowAnonymous();
 
-app.MapHub<RunHub>("/hubs/runs").RequireAuthorization();
+app.MapRunHub();
 
 app.MapMcp("/mcp").RequireAuthorization(McpAuthorizationConstants.McpPolicy);
 
