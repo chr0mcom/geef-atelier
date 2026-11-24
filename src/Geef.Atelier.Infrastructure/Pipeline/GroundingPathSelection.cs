@@ -1,3 +1,4 @@
+using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 
 namespace Geef.Atelier.Infrastructure.Pipeline;
@@ -12,11 +13,11 @@ internal static class GroundingPathSelection
     /// </summary>
     public static readonly IReadOnlySet<string> ProviderTypePathSystemProfiles = new HashSet<string>(StringComparer.Ordinal)
     {
-        "tavily-refined",
-        "tavily-basic",
-        "run-attachments",
-        "knowledge-base-default",
-        "academic-default",
+        SystemCrew.TavilyRefinedProfile.Name,
+        SystemCrew.TavilyBasicProfile.Name,
+        SystemCrew.RunAttachmentsProfile.Name,
+        SystemCrew.KnowledgeBaseDefaultProfile.Name,
+        SystemCrew.AcademicDefaultProfile.Name,
     };
 
     /// <summary>True when <paramref name="profile"/> is executed by the tool-backed provider.</summary>
