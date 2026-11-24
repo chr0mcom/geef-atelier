@@ -50,7 +50,7 @@ python3 tools/Eval/eval.py all --run-name probe --tasks tools/Eval/beispiele \
 |---|---|
 | `roh` | ein Aufruf `claude -p --model opus` ohne Werkzeuge, Prompt per stdin, leeres Arbeitsverzeichnis; Anhänge als `<anhang>`-Blöcke vor dem Kurzauftrag |
 | `roh-sonnet` | wie `roh`, mit Sonnet |
-| `atelier` | das laufende Atelier über den MCP-Endpunkt: einreichen, alle 15 s Status abfragen (bis 60 min), Ergebnis holen. Ein Lauf mit Status `Failed`, der Text liefert, zählt als Ergebnis (Entscheidung vom 2026-07-17) |
+| `atelier` | das laufende Atelier über den MCP-Endpunkt: einreichen, alle 15 s Status abfragen (bis 60 min), bis `outcome` gesetzt ist, erst dann das Ergebnis holen (ein terminaler Status allein reicht nicht: der Text ist erst mit `outcome` endgültig, also nach den Abschlussschritten). Als Ergebnis zählen `Converged` und `DeliveredWithOpenPoints` mit Text; damit zählt ein Lauf mit Status `Failed`, der einen besten Text liefert, weiter als Ergebnis (Entscheidung vom 2026-07-17). `outcome` `Failed` oder `Aborted` ist ein Fehler des Arms, ebenso ein Zeitlimit ohne `outcome`. Braucht ein Atelier ab Etappe 0 (Feld `outcome`, Step47) |
 | `referenz` | der `referenztext` aus der Aufgabe (feste Vergleichsgröße, auch für Probeläufe) |
 | eigene | `--plugin name=paket.modul:Fabrik` oder `--plugin name=pfad/datei.py:Fabrik`; die Fabrik wird mit `name=` aufgerufen und liefert ein Objekt mit `name` und `produce(task) -> ArmOutput` |
 

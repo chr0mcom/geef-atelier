@@ -11,7 +11,7 @@ from typing import Callable, Protocol
 
 from .claude_call import call_claude
 from .cli_runner import Runner, run_cli
-from .mcp import TERMINAL_STATUSES, AtelierToolAdapter, McpClient
+from .mcp import DELIVERED_OUTCOMES, TERMINAL_STATUSES, AtelierToolAdapter, McpClient
 from .tasks import Task
 
 WRITER_SYSTEM_PROMPT = (
@@ -91,7 +91,7 @@ class ReferenceArm:
 
 
 class AtelierMcpArm:
-    """Arm (b): the running Atelier, driven through its MCP endpoint (submit, poll, fetch result)."""
+    """Arm (b): the running Atelier, driven through its MCP endpoint (submit, poll until ``outcome`` is set, fetch result)."""
 
     def __init__(self, adapter: AtelierToolAdapter, name: str = "atelier", poll_interval_s: float = 15.0,
                  timeout_s: float = 3600.0, sleep: Callable[[float], None] = time.sleep,
@@ -107,16 +107,25 @@ class AtelierMcpArm:
         started = self.clock()
         run_id = self.adapter.submit(task.brief, task.attachments)
         state = self.adapter.state(run_id)
-        while state.status not in TERMINAL_STATUSES:
+        while not state.is_final:
             if self.clock() - started > self.timeout_s:
-                raise TimeoutError(f"Atelier-Lauf {run_id} nach {self.timeout_s:.0f} s nicht fertig (Status {state.status})")
+                if state.status in TERMINAL_STATUSES:
+                    raise TimeoutError(
+                        f"Atelier-Lauf {run_id} nach {self.timeout_s:.0f} s im Status {state.status}, aber ohne outcome; "
+                        "der Text ist erst mit gesetztem outcome endgültig")
+                raise TimeoutError(f"Atelier-Lauf {run_id} nach {self.timeout_s:.0f} s nicht fertig "
+                                   f"(Status {state.status}, ohne outcome)")
             self.sleep(self.poll_interval_s)
             state = self.adapter.state(run_id)
         text = self.adapter.result_text(run_id)
         duration = round(self.clock() - started, 1)
+        if state.outcome not in DELIVERED_OUTCOMES:
+            raise RuntimeError(f"Atelier-Lauf {run_id} endete mit outcome {state.outcome} (Status {state.status}) "
+                               f"ohne verwertbaren Text ({state.error or 'kein Fehlertext'})")
         if not text:
-            raise RuntimeError(f"Atelier-Lauf {run_id} endete mit {state.status} ohne Text ({state.error or 'kein Fehlertext'})")
-        return ArmOutput(text.strip(), duration, {"run_id": run_id, "status": state.status, "error": state.error})
+            raise RuntimeError(f"Atelier-Lauf {run_id} endete mit {state.outcome} ohne Text ({state.error or 'kein Fehlertext'})")
+        return ArmOutput(text.strip(), duration, {"run_id": run_id, "status": state.status, "outcome": state.outcome,
+                                                  "error": state.error})
 
 
 def atelier_arm_from_env(name: str = "atelier") -> AtelierMcpArm:
