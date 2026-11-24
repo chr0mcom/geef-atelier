@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Geef.Atelier.Mcp;
+using Geef.Atelier.Mcp.Tools;
 using Geef.Atelier.Tests.Persistence;
 using Geef.Atelier.Tests.Web.E2E;
 
@@ -52,6 +53,63 @@ public sealed class McpOrderEndpointTests(PostgresFixture pg) : IAsyncLifetime
         Assert.Contains("in their own words", tools["submit_order"]);
         Assert.Contains("max 50", tools["get_order_status"]);
         Assert.Contains("Administrators only", tools["list_learnings"]);
+    }
+
+    [Fact]
+    public async Task Tools_list_offers_answer_order_with_a_typed_answer_list()
+    {
+        var result = await PostAsync(new { jsonrpc = "2.0", id = 1, method = "tools/list" });
+
+        var tool = result.GetProperty("tools").EnumerateArray().Single(t => t.GetProperty("name").GetString() == "answer_order");
+        Assert.Equal(AnswerOrderTool.ToolDescription, tool.GetProperty("description").GetString());
+
+        var schema = tool.GetProperty("inputSchema");
+        var properties = schema.GetProperty("properties");
+        Assert.DoesNotContain("orders", properties.EnumerateObject().Select(p => p.Name));
+        Assert.Contains("orderId", Required(schema));
+        Assert.DoesNotContain("answers", Required(schema));
+        Assert.DoesNotContain("skip", Required(schema));
+        Assert.Contains("string", Types(properties.GetProperty("orderId")));
+        Assert.Contains("boolean", Types(properties.GetProperty("skip")));
+
+        var answers = properties.GetProperty("answers");
+        Assert.Contains("array", Types(answers));
+        var item = answers.GetProperty("items");
+        Assert.Contains("object", Types(item));
+        var fields = item.GetProperty("properties");
+        Assert.Equal(
+            new[] { "decideForMe", "freeText", "optionId", "origin", "questionId" },
+            fields.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
+        Assert.Contains("questionId", Required(item));
+        Assert.Contains("origin", Required(item));
+        Assert.Contains("boolean", Types(fields.GetProperty("decideForMe")));
+        Assert.Contains("\"client\"", fields.GetProperty("origin").GetProperty("description").GetString());
+        Assert.Contains("500 characters", fields.GetProperty("freeText").GetProperty("description").GetString());
+    }
+
+    [Fact]
+    public async Task Tools_list_describes_submit_order_with_the_wait_for_questions()
+    {
+        var result = await PostAsync(new { jsonrpc = "2.0", id = 1, method = "tools/list" });
+
+        var tool = result.GetProperty("tools").EnumerateArray().Single(t => t.GetProperty("name").GetString() == "submit_order");
+        Assert.Equal(SubmitOrderTool.ToolDescription, tool.GetProperty("description").GetString());
+        var properties = tool.GetProperty("inputSchema").GetProperty("properties").EnumerateObject().Select(p => p.Name).ToList();
+        Assert.Contains("request", properties);
+        Assert.Contains("attachments", properties);
+        Assert.Contains("extraCareful", properties);
+        Assert.DoesNotContain("orderOptions", properties);
+        Assert.DoesNotContain("intakeOptions", properties);
+        Assert.DoesNotContain("orders", properties);
+    }
+
+    private static IReadOnlyList<string> Required(JsonElement schema) =>
+        schema.TryGetProperty("required", out var required) ? required.EnumerateArray().Select(r => r.GetString()!).ToList() : [];
+
+    private static IReadOnlyList<string> Types(JsonElement property)
+    {
+        var type = property.GetProperty("type");
+        return type.ValueKind == JsonValueKind.Array ? type.EnumerateArray().Select(t => t.GetString()!).ToList() : [type.GetString()!];
     }
 
     private async Task<JsonElement> PostAsync(object body)
