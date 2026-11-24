@@ -1,0 +1,7 @@
+@code {
+    /// <summary>The order that is being read.</summary>
+    [Parameter, EditorRequired] public Guid OrderId { get; set; }
+
+    /// <summary>Raised after the order was started without waiting, so the page can reload.</summary>
+    [Parameter] public EventCallback OnStarted { get; set; }
+}

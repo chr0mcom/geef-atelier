@@ -1,0 +1,15 @@
+@using Geef.Atelier.Application.Orders
+
+@code {
+    /// <summary>The order that waits for answers.</summary>
+    [Parameter, EditorRequired] public Guid OrderId { get; set; }
+
+    /// <summary>Understanding, assumptions and questions of the order.</summary>
+    [Parameter, EditorRequired] public ClarificationView Clarification { get; set; } = null!;
+
+    /// <summary>Most characters of a free-text answer or an assumption correction.</summary>
+    [Parameter] public int MaxFreeTextChars { get; set; } = 500;
+
+    /// <summary>Raised after the order was started (answered or skipped), so the page can reload.</summary>
+    [Parameter] public EventCallback OnStarted { get; set; }
+}

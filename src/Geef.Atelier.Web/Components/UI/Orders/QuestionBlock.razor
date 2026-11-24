@@ -1,0 +1,18 @@
+@using Geef.Atelier.Core.Domain.Intake
+
+@code {
+    /// <summary>The question to show.</summary>
+    [Parameter, EditorRequired] public ClarifyQuestion Question { get; set; } = null!;
+
+    /// <summary>Language of the question (ISO 639-1), set as <c>lang</c>.</summary>
+    [Parameter] public string? Language { get; set; }
+
+    /// <summary>The current answer; null while nothing is chosen.</summary>
+    [Parameter] public OrderAnswer? Answer { get; set; }
+
+    /// <summary>Raised when the person chooses an option, "You decide" or types own words.</summary>
+    [Parameter] public EventCallback<OrderAnswer?> AnswerChanged { get; set; }
+
+    /// <summary>Most characters of the own words.</summary>
+    [Parameter] public int MaxFreeTextChars { get; set; } = 500;
+}
