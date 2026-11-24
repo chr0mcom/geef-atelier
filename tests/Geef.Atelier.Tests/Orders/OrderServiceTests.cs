@@ -213,6 +213,9 @@ public sealed class OrderServiceTests(PostgresFixture postgres)
         await host.WithScopeAsync(async sp =>
         {
             var service = sp.GetRequiredService<IOrderService>();
+            Assert.False(await service.DeleteAsync(submission.OrderId, NewUser()));
+            Assert.NotNull(await service.GetAsync(submission.OrderId, user));
+
             var stopped = (await service.GetResultAsync(submission.OrderId, user))!;
             Assert.Equal(OrderDisplayState.Stopped, stopped.Display.State);
             Assert.Null(stopped.Text);

@@ -292,6 +292,45 @@ public sealed class DirectPipelineEndToEndTests
     }
 
     [Fact]
+    public async Task A_pdf_template_to_revise_reaches_draft_md_without_its_page_markers()
+    {
+        var harness = new DirectPipelineHarness();
+        var (run, orderId) = harness.CreateRun("Make this letter friendlier.");
+        var template = "[[page 1]]\nDear tenant,\n\nthe heating will be repaired on Monday.\n[[page 2]]\nAccess to the flat is required.\n\nRegards\n";
+        harness.Sources.Attach(orderId, "letter.pdf", SourceKind.Pdf, template, pageCount: 2, role: SourceRole.TemplateToRevise);
+        harness.Script.ExecutorText = "Dear tenant,\n\ngood news: the heating will be repaired on Monday. We need access to the flat.\n\nKind regards";
+
+        var outcome = await harness.RunAsync(run);
+
+        Assert.True(outcome.Result.Success);
+        var call = Assert.Single(harness.WriterCalls);
+        Assert.Equal("Dear tenant,\n\nthe heating will be repaired on Monday.\nAccess to the flat is required.\n\nRegards", call.Document);
+        Assert.DoesNotContain("[[page", call.Document, StringComparison.Ordinal);
+        Assert.DoesNotContain("letter.pdf", call.ContextDocument ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task Several_sources_are_numbered_S1_S2_S3_in_the_order_the_person_chose()
+    {
+        var harness = new DirectPipelineHarness();
+        var (run, orderId) = harness.CreateRun("Write a short summary of the three notes.");
+        harness.Sources.Attach(orderId, "third.md", SourceKind.Markdown, "Third note: the lift is serviced in March.", position: 2);
+        harness.Sources.Attach(orderId, "first.md", SourceKind.Markdown, "First note: the roof was repaired in January.", position: 0);
+        harness.Sources.Attach(orderId, "second.md", SourceKind.Markdown, "Second note: the boiler was replaced in February.", position: 1);
+        harness.Script.ExecutorText = Words(120, "Summary");
+
+        var outcome = await harness.RunAsync(run);
+
+        Assert.True(outcome.Result.Success);
+        var context = Assert.Single(harness.WriterCalls).ContextDocument!;
+        var first = context.IndexOf("id=\"S1\" file=\"first.md\"", StringComparison.Ordinal);
+        var second = context.IndexOf("id=\"S2\" file=\"second.md\"", StringComparison.Ordinal);
+        var third = context.IndexOf("id=\"S3\" file=\"third.md\"", StringComparison.Ordinal);
+        Assert.True(first >= 0 && second > first && third > second, context);
+        Assert.Equal(["first.md", "second.md", "third.md"], harness.Sources.Usages.OrderBy(u => u.Position).Select(u => u.FileName));
+    }
+
+    [Fact]
     public async Task Too_few_input_tokens_for_the_files_give_a_warning_and_a_report_note()
     {
         var harness = new DirectPipelineHarness();
