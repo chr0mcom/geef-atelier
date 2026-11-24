@@ -1,0 +1,12 @@
+{
+  "id": "01-sommerfest-einladung",
+  "kurzauftrag": "Schreib eine kurze Einladung zum Sommerfest unseres Kleingartenvereins. Die Eckdaten hängen an.",
+  "anhaenge": [
+    {
+      "name": "eckdaten.md",
+      "text": "# Sommerfest Kleingartenverein Am Mühlbach (erfunden)\n\n- Datum: Samstag, 12. Juli\n- Beginn: 15 Uhr\n- Ort: Vereinsheim, Parzelle 1\n- Kuchenspenden bitte bis Donnerstag bei der Kassenwartin melden\n- Grillgut stellt der Verein\n"
+    }
+  ],
+  "original_briefing": "Einladung zum Sommerfest des (erfundenen) Kleingartenvereins Am Mühlbach als Aushang und für den E-Mail-Verteiler. Leser sind die Vereinsmitglieder, viele davon älter. Du-Form, freundlich, keine Ausrufezeichen. Höchstens 120 Wörter. Pflichtinhalte: Datum, Uhrzeit, Ort, Bitte um Kuchenspenden mit Meldung bis Donnerstag bei der Kassenwartin, Hinweis dass der Verein das Grillgut stellt. Keine weiteren Programmpunkte erfinden. Kein Platzhalter, der Text soll aushängbar sein.",
+  "referenztext": "Liebe Gartenfreundinnen und Gartenfreunde,\n\nam Samstag, 12. Juli, feiern wir unser Sommerfest. Wir beginnen um 15 Uhr am Vereinsheim bei Parzelle 1.\n\nDas Grillgut stellt der Verein. Wer einen Kuchen beitragen möchte, meldet sich bitte bis Donnerstag bei unserer Kassenwartin, damit wir gut planen können.\n\nWir freuen uns auf einen entspannten Nachmittag mit dir und deiner Familie.\n\nDein Vorstand"
+}
