@@ -20,7 +20,8 @@ internal static class SyntheticDocuments
     /// <summary>
     /// Builds a PDF with <paramref name="pages"/> pages; <paramref name="pageText"/> returns the text of each 1-based page.
     /// Lines (split at <c>\n</c>) are wrapped to the page width; an empty string gives a page without text. A page text
-    /// starting with <see cref="TwoColumns"/> is laid out in two columns separated by <c>||</c>.
+    /// starting with <see cref="TwoColumns"/> is laid out in two columns separated by <c>||</c>. The built-in Helvetica of
+    /// the PDF writer only covers ASCII: letters such as <c>ö</c> make the builder throw, so page texts stay ASCII.
     /// </summary>
     public static byte[] Pdf(int pages, Func<int, string> pageText)
     {
