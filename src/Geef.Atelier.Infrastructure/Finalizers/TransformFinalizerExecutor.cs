@@ -103,6 +103,10 @@ internal sealed class TransformFinalizerExecutor(
                     profile.Name, inputTokens, outputTokens, model, !noChanges);
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "Transform finalizer failed for profile {Profile}", profile.Name);

@@ -38,6 +38,10 @@ internal sealed class ExternalSinkFinalizerExecutor(
                 _ => await SendWebhookAsync(profile, context, cancellationToken),
             };
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, "ExternalSink failed for profile {Profile} (kind={Kind})",

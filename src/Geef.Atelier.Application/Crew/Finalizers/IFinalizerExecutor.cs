@@ -15,7 +15,10 @@ public interface IFinalizerExecutor
     /// Executes the finalizer step and returns the result.
     /// Implementations must be tolerant of failures: catch and log internally, then return a
     /// <see cref="FinalizerExecutionResult"/> with a <see cref="ArtifactType.Status"/> artifact
-    /// describing the error. Do NOT re-throw — partial success is the contract.
+    /// describing the error. Do NOT re-throw — partial success is the contract. The one exception is
+    /// cancellation: an <see cref="OperationCanceledException"/> caused by <paramref name="cancellationToken"/> (user
+    /// cancel or service stop) must propagate, because it is not a failure of the step. The status message is a short
+    /// plain-English sentence for the user; technical details belong in the log only.
     /// </summary>
     Task<FinalizerExecutionResult> ExecuteAsync(
         FinalizerProfile profile,

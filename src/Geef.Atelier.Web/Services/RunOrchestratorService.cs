@@ -767,6 +767,8 @@ internal sealed class RunOrchestratorService(
     /// <c>PostgresEventSink</c> writes it directly on <c>PipelineCompletedEvent</c>.
     /// Finalizer errors never abort the run — they are recorded as <see cref="ArtifactType.Status"/>
     /// artifacts and the error message is set on the run row (partial-success contract).
+    /// A cancellation of <paramref name="ct"/> (user cancel or service stop) is not a step failure: it propagates
+    /// without a warning or an error artifact, also when an executor swallowed it and returned an error result.
     /// </summary>
     private async Task ExecuteFinalizationAsync(
         Guid runId,
@@ -809,6 +811,7 @@ internal sealed class RunOrchestratorService(
                 var executor = finalizerExecutorFactory.GetExecutor(profile.FinalizerType);
                 var ctx = baseContext with { CurrentText = currentText };
                 var result = await executor.ExecuteAsync(profile, ctx, ct);
+                ct.ThrowIfCancellationRequested();
 
                 if (result.UpdatedText is not null)
                     currentText = result.UpdatedText;
@@ -834,7 +837,7 @@ internal sealed class RunOrchestratorService(
                     });
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 logger.LogError("Finalizer {Profile} threw unexpectedly for run {RunId}: {Error}",
                     profile.Name, runId, ex.ToRedactedLogText());

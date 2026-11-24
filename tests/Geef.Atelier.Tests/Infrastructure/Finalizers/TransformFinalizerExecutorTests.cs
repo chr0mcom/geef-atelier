@@ -130,6 +130,30 @@ public sealed class TransformFinalizerExecutorTests
         Assert.Contains("Transform failed", result.Artifact.StatusMessage);
     }
 
+    /// <summary>A cancelled run (user cancel or service stop) is not a failed step: the cancellation propagates.</summary>
+    [Fact]
+    public async Task Execute_WhenTheRunIsCancelled_PropagatesTheCancellationInsteadOfReportingAnError()
+    {
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        var executor = BuildExecutor(new ThrowingLlmClient(new OperationCanceledException(cts.Token)));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            executor.ExecuteAsync(ProfileWith("Some prompt."), MakeContext(), cts.Token));
+    }
+
+    /// <summary>A timeout of the AI call without a cancelled run is still a failed step with a status artifact.</summary>
+    [Fact]
+    public async Task Execute_WhenTheCallTimesOutWithoutCancellation_ProducesStatusArtifact()
+    {
+        var executor = BuildExecutor(ThrowingLlmClient.Timeout());
+
+        var result = await executor.ExecuteAsync(ProfileWith("Some prompt."), MakeContext(), CancellationToken.None);
+
+        Assert.NotNull(result.Artifact);
+        Assert.Equal("error", result.Artifact!.StorageUri);
+    }
+
     [Fact]
     public async Task Execute_RecordsTokenCounts()
     {
