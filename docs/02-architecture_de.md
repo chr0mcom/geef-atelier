@@ -2,7 +2,7 @@
 
 *[English](02-architecture.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-22 (D-066: Modellmatrix — Spalten `ModelSlot`/`ModelDomain`/`Domain` (Step46), Zuweisung beim Snapshot-Bau; zuvor 2026-08-04, D-064: dynamischer Modell-Katalog für CLI-Provider über den cli-proxy, dreiwertige Herkunft, Alias-Auflösung zum Snapshot-Bauzeitpunkt)*
+*Letzte Aktualisierung: 2026-11-24 (D-067: Etappe 0 Sicherheitsnetz — Warnungen am Lauf, `Runs.Outcome`, lautes Verhalten bei Start und Snapshot, Vorbereitungs-Zeitlimit, Live-Updates im Prozess und Hub nur für Angemeldete, Konfigurationsschalter, Ende-zu-Ende-Gerüst; zuvor 2026-11-22, D-066: Modellmatrix — Spalten `ModelSlot`/`ModelDomain`/`Domain` (Step46), Zuweisung beim Snapshot-Bau; zuvor 2026-08-04, D-064: dynamischer Modell-Katalog für CLI-Provider über den cli-proxy, dreiwertige Herkunft, Alias-Auflösung zum Snapshot-Bauzeitpunkt)*
 
 ## Schichtenbild
 
@@ -74,8 +74,10 @@ Geef.Atelier.slnx
 │   │                                // (RunOrchestratorService), DI-Composition
 │   └── Geef.Atelier.Mcp/            // Class Library: MCP-Tool-Definitionen,
    │                                // gehostet im Web-Projekt (shared DI, shared Container)
-└── tests/
-    └── Geef.Atelier.Tests/          // xUnit
+├── tests/
+│   └── Geef.Atelier.Tests/          // xUnit; EndToEnd/ = Ende-zu-Ende-Gerüst (D-067)
+└── tools/
+    └── Eval/                        // Python-Messwerkzeug, blinder Paarvergleich (D-067)
 ```
 
 **Begründung der Aufteilung:**
@@ -108,7 +110,9 @@ Die vier Run-Kern-Tabellen sind nachfolgend im Detail dokumentiert; die übrigen
 Gruppen sind in den jeweiligen Feature-Abschnitten bzw. im [Decisions-Log](05-decisions-log_de.md)
 (D-028 ff.) beschrieben. `Runs` trägt zusätzlich Spalten aus späteren Migrationen
 (`CreatedByUser`, `CostTotal`, `CrewTemplateName`, `CrewSnapshot`, `AdvisorRetryAttempted`,
-`FinalizerCostEur`, `FinalizerErrorMessage`, `ParentRunId`, `SeedDraftText`, `Kind`).
+`FinalizerCostEur`, `FinalizerErrorMessage`, `ParentRunId`, `SeedDraftText`, `Kind`, `ParentCompositionRunId`,
+`Outcome`, `DeliveredIteration`, `ReportJson`). Migration Step47 (D-067) ergänzt die Tabelle `RunWarnings`
+und die letzten drei `Runs`-Spalten.
 
 ### Runs
 
@@ -135,6 +139,23 @@ Gruppen sind in den jeweiligen Feature-Abschnitten bzw. im [Decisions-Log](05-de
 | ParentRunId | uuid (FK→Runs) | nullable; selbstreferenziell, kein Cascade — gesetzt, wenn dieser Run aus einem anderen Run fortgesetzt wurde (Step23). |
 | SeedDraftText | text | nullable; letzter Artifact-Text aus der Abschluss-Iteration des Parent-Runs, der als Seed für Iteration 1 dieses Runs verwendet wurde (Step23). |
 | Kind | int | `0 = Standard` (Standard), `1 = Learning` — steuert die beiden Learning-Finalizer; bestehende Rows defaulten auf Standard (Step30). |
+| Outcome | int | nullable; was der Lauf geliefert hat: `0 = Converged`, `1 = DeliveredWithOpenPoints`, `2 = Failed`, `3 = Aborted` (Step47). `NULL`, solange der Lauf aktiv ist, und bei Läufen, die vor Step47 endeten. Siehe [Lauf-Ergebnis](#lauf-ergebnis-outcome-und-runstatus). |
+| DeliveredIteration | int | nullable; Iteration, deren Text ausgeliefert wurde (Step47). |
+| ReportJson | jsonb | nullable; für den Ergebnisbericht vorgesehen (Step47); wird noch nicht geschrieben. |
+
+### RunWarnings (Step47)
+
+Probleme, die ein Lauf umgangen hat, statt anzuhalten (D-067). Werden mit dem Lauf gelöscht (`ON DELETE CASCADE`).
+
+| Spalte | Typ | Bemerkung |
+|---|---|---|
+| Id | uuid (PK) | |
+| RunId | uuid (FK→Runs) | Index `IX_RunWarnings_RunId` |
+| Iteration | int | nullable; Iteration, in der das Problem auftrat |
+| Source | varchar(100) | z. B. `grounding`, `review`, `model-assignment`, `llm`, `finalizer` |
+| Code | varchar(100) | stabiler maschinenlesbarer Code, z. B. `grounding.provider_skipped`, `review.reviewer_failed`, `llm.failover`, `finalizer.failed` |
+| Message | text | kurze, einfache englische Erklärung für den Anwender |
+| CreatedAt | timestamptz | |
 
 ### Iterations
 
@@ -424,6 +445,133 @@ Executor (Default-System-Crew: Executor `claude-cli`, Reviewer überwiegend `cod
 
 `LlmTokenUsage` (`InputTokens`, `OutputTokens`) wird pro Iteration vom `ProfileBasedExecutor`/`ProfileBasedReviewer` in den `IRunContext` gesetzt und von `PostgresEventSink` in `Runs.TokensTotal` akkumuliert (Wire-Namen `prompt_tokens`/`completion_tokens` der OpenAI-API). Seit dem Cost-Tracking (Step16) werden zusätzlich pro Akteur und Iteration die Kosten in `IterationActorCosts` persistiert und in `Runs.CostTotal` aggregiert.
 
+## Schutzmechanismen am Lauf (D-067)
+
+Etappe 0 („Sicherheitsnetz“) macht Probleme sichtbar, statt sie still durchzulassen. Hintergrund:
+[D-067](05-decisions-log_de.md).
+
+### Lauf-Ergebnis (`Outcome`) und `RunStatus`
+
+`Runs.Status` behält seine Bedeutung. Insbesondere endet ein Lauf, der ohne Konvergenz stoppt, weiterhin
+als `Failed`, auch wenn er einen Text liefert (Statusentscheidung vom 2026-07-17: Best-Effort-Läufe
+behalten `Failed`/`Aborted`). `Runs.Outcome` ist das zusätzliche Anzeigesignal dafür, was der Lauf
+geliefert hat:
+
+| `Outcome` | Bedeutung |
+|---|---|
+| `Converged` | Alle Reviewer haben zugestimmt; der konvergierte Text wurde ausgeliefert. |
+| `DeliveredWithOpenPoints` | Der Lauf stoppte ohne volle Konvergenz und lieferte seinen besten verfügbaren Entwurf (Status meist `Failed`). |
+| `Failed` | Der Lauf endete ohne brauchbaren Text. |
+| `Aborted` | Vom Anwender abgebrochen oder vom Dienst gestoppt. |
+
+`Outcome` bedeutet **„fertig abgelegt, inklusive Finalizer“**: Es wird erst gesetzt, wenn der endgültige
+Text (gegebenenfalls von einem Finalizer umgewandelt) in der Datenbank steht. Ein Client, der ein
+`Outcome` sieht, kann also den endgültigen Text lesen. Der erste Wert gewinnt; spätere Fehler
+überschreiben ihn nicht. `DeliveredIteration` nennt die Iteration, deren Text ausgeliefert wurde. Läufe,
+die vor Step47 endeten, behalten `NULL`. Scheitert ein Lauf, werden auch die Befunde der letzten Iteration
+gespeichert, sodass Detailseite und MCP zeigen, warum er stoppte.
+
+### Warnungen am Lauf
+
+Ein Lauf hält jedes Problem, das er umgeht, als Warnung in `RunWarnings` fest, zum Beispiel:
+
+- eine übersprungene oder fehlgeschlagene Grounding-Quelle (Anhänge, Websuche, Wissensbasis),
+- einen Reviewer, der in einer Iteration ausfiel,
+- ein Modell, das nicht wie geplant zugewiesen werden konnte,
+- einen Wechsel zu einer anderen Modellfamilie im LLM-Client (Failover),
+- einen Finalizer, der fehlschlug, übersprungen oder nicht ausgeführt wurde.
+
+`IRunWarningSink` (Vertrag in Core, Implementierung `RunWarningSink` in Infrastructure) schreibt jede
+Warnung in einem eigenen kurzlebigen Datenbank-Scope; ein fehlgeschlagener Schreibvorgang wird geloggt
+und hält den Lauf nie an. Der LLM-Client meldet Failover über den ambienten `RunWarningScope`, den der
+Orchestrator je Lauf öffnet.
+
+Warnungen erscheinen auf der Detailseite im Block „Warnings“ (nur wenn vorhanden) und in den MCP-Feldern
+`warnings` und `outcome` von `get_run_status` und `get_run_result`
+([09-endpoint-reference](09-endpoint-reference_de.md#lauf-status-und-ergebnis-warnings-und-outcome)).
+Warnungstexte sind kurze, einfache Sätze für den Anwender; technische Einzelheiten wie Hostnamen,
+Schlüsselnamen oder Fehlertexte vorgelagerter Dienste gehören ins Log, nicht in die Warnung (Sollzustand,
+wird mit den Nacharbeiten zu Etappe 0 vervollständigt).
+
+### Laut statt still
+
+| Situation | Verhalten seit D-067 |
+|---|---|
+| Eine Datenbank-Migration scheitert beim Start | Der Start bricht mit einem kritischen Logeintrag ab (`MigrateDatabaseOrFailAsync`). Der Health-Check `pending-migrations` meldet offene Migrationen. |
+| Der Crew-Snapshot eines Laufs fehlt, ist unlesbar, leer, hat eine unbekannte Version oder keine Executor-, Reviewer- oder Advisor-Liste | `CrewSnapshot.DeserializeForRun` wirft `InvalidCrewSnapshotException`; der Lauf endet `Failed` mit verständlicher Meldung. Einen Rückfall auf die Klassik-Crew gibt es nicht mehr; das tolerante `Deserialize` dient nur der Anzeige. |
+| Eine Crew hat keinen Reviewer | `AtelierPipelineFactory` baut die Pipeline nicht; der Lauf endet `Failed` mit Meldung. Der stille Rückfall `AutoApproveReviewer` ist entfernt. |
+| Ein Grounding-Profil hat einen unbekannten Provider-Typ | Es wird mit einer Warnung übersprungen, statt den Lauf abstürzen zu lassen. |
+| Ein Lauf ohne Crew-Snapshot wird fortgesetzt | Sollzustand: Das Fortsetzen wird sofort mit Meldung abgelehnt, statt einen Lauf anzulegen, der bis zum Vorbereitungs-Zeitlimit wartet. |
+
+### Vorbereitungs-Zeitlimit für Läufe mit Anhängen
+
+Ein Lauf mit Anhängen wird zuerst **ohne** Crew-Snapshot angelegt; der Snapshot wird erst geschrieben, wenn
+alle Anhänge hochgeladen und indiziert sind. Der Orchestrator holt nur `Pending`-Läufe **mit** Snapshot ab;
+ein Lauf kann also nicht mehr vor seinen Anhängen starten. Ein `Pending`-Lauf, der nach
+`Orchestrator:PreparationTimeout` (Standard 15 Minuten) noch keinen Snapshot hat, wird mit der Bitte um
+erneutes Einreichen auf `Failed` gesetzt; ein Neustart des Dienstes räumt ebenso auf. Ein fortgesetzter
+Lauf findet die Anhänge des Laufs, den er fortsetzt (Abstammung über `ParentRunId`/
+`ParentCompositionRunId`). Ein Lauf ohne Anhänge löst keinen Embedding-Aufruf aus.
+
+## Konfigurationsschalter (D-067)
+
+| Schlüssel | Standard | Wirkung |
+|---|---|---|
+| `Learning:Enabled` | `false` | Schaltet die Learning-Schleife (D-054) ein oder aus. Ist sie aus, kehren die Finalizer `learning-extractor` und `learning-publisher` sofort zurück (kein LLM-Aufruf, kein Eintrag, kein `learning-evaluation`-Lauf, kein Embedding), das Grounding `learning-retrieval` liefert leeren Kontext ohne Embedding, und `/crew/learnings` zeigt, dass Learning pausiert ist. Crews mit diesen Teilen bleiben gültig. |
+| `EnvReference:Allowed` | leere Liste | Zusätzliche Umgebungsvariablen-Namen oder Präfixe (mit `*` am Ende), die Konfiguration nennen darf, zusätzlich zur eingebauten Standardliste und zum Präfix `ATELIER_SECRET_*`. Einzelheiten: [10-tool-system](10-tool-system_de.md#secrets-und-die-allowlist-für-umgebungsvariablen). |
+| `Orchestrator:PreparationTimeout` | `00:15:00` | Wie lange ein `Pending`-Lauf ohne Crew-Snapshot (Anhänge noch in Vorbereitung) bleiben darf, bevor er auf `Failed` gesetzt wird. |
+
+Fehlende Grounding-Schlüssel (`Tavily:ApiKey`, der OpenRouter-Schlüssel für Embeddings) werden beim Start
+mit Namen geloggt (`GroundingKeyGuard`); Werte werden nie geloggt.
+
+## Testen und Messen (D-067)
+
+### Ende-zu-Ende-Gerüst (`tests/Geef.Atelier.Tests/EndToEnd/`)
+
+`AtelierEndToEndHost` startet die **echte** Anwendung über `WebApplicationFactory<Program>` gegen eine
+eigene Datenbank je Test auf dem Testcontainers-Postgres der `PostgresFixture`. Migration, DI-Verdrahtung,
+Orchestrator, Grounding, Pipeline, Event-Sink und MCP-Endpunkt sind die der Produktion. Ersetzt wird nur
+externes HTTP:
+
+- `ScriptedLlmEndpoint` vertritt den cli-proxy (OpenAI-Format) und antwortet je Rolle (Executor, Reviewer,
+  Refiner, Query-Extraktor); `LlmTrafficRecorder` zeichnet jeden Anfragekörper auf, auch die
+  Dokumentmodus-Felder `document` und `context_document`.
+- `FakeTavilyEndpoint`, `FakeEmbeddingsEndpoint` und `FakeCliProxyModelsEndpoint` liefern Websuche,
+  deterministische Embeddings und die Modellliste.
+- Alle übrigen benannten HTTP-Clients sind gesperrt und werden protokolliert; kein Test kann versehentlich
+  ins Netz.
+
+Hilfen: `SubmitAsync` (echter `IRunService`), `WaitForTerminalAsync` (wartet auf einen Endstatus mit
+`Outcome`), `QueryAsync`, `CallMcpToolAsync` (echter `/mcp`-Endpunkt mit Bearer-Token).
+`HeldOrchestratorStarter` startet den echten Orchestrator erst nach dem Einreichen.
+
+**Was es beweist:** Ein Auftrag läuft über die echte Verdrahtung vom Einreichen (Web oder MCP) bis zum
+abgelegten Ergebnis, und der Inhalt von Anhängen und Websuche kommt tatsächlich im Executor-Prompt an. Die
+Tests mit dem Merkmal `Etappe0=NachReparatur` schlagen fehl, wenn man die Grounding-Reparatur aus D-067
+zurücknimmt; das wurde durch Zurücknehmen geprüft.
+
+```bash
+export MSBUILDNODEREUSE=0 DOTNET_CLI_TELEMETRY_OPTOUT=1
+dotnet test tests/Geef.Atelier.Tests/Geef.Atelier.Tests.csproj --filter "FullyQualifiedName~Geef.Atelier.Tests.EndToEnd"
+dotnet test tests/Geef.Atelier.Tests/Geef.Atelier.Tests.csproj --filter "Etappe0=NachReparatur"
+```
+
+Die Tests brauchen Docker (Testcontainers) und laufen in einer eigenen Collection ohne Parallelität. Ein
+neuer Pipeline-Weg bekommt hier seinen eigenen Ende-zu-Ende-Test, vom Einstieg bis zum abgelegten Ergebnis.
+
+### Messwerkzeug `tools/Eval`
+
+Ein Python-Werkzeug, das das Atelier auf einem festen Aufgabenset per blindem Paarvergleich mit anderen
+Wegen vergleicht (zum Beispiel einem rohen Einzelaufruf eines Modells). Aufruf, Umgebungsvariablen,
+Aufgabenformat und Datenschutzregeln: [`tools/Eval/README.md`](../tools/Eval/README.md). Echte Aufträge
+bleiben außerhalb von Git.
+
+### Betriebsskripte
+
+`scripts/atelier-smoke.sh` (Mini-Lauf über MCP nach jedem Deploy) und `scripts/atelier-watch.sh` (Alarm bei
+hängenden Läufen und ungesundem cli-proxy) sind in [`ops/atelier-smoke.md`](ops/atelier-smoke.md) und
+[`ops/atelier-watch.md`](ops/atelier-watch.md) beschrieben.
+
 ## UI-Architektur (Schritt 7)
 
 ### Pages
@@ -433,22 +581,41 @@ Drei Blazor Server Pages in `src/Geef.Atelier.Web/Components/Pages/`:
 | Route | Komponente | Funktion |
 |---|---|---|
 | `/new` | `New.razor` | Submit-Formular. `EditForm` + `DataAnnotationsValidator`. Redirect zu `/runs/{id}` nach Submit. |
-| `/runs` | `Runs.razor` | Run-Liste. Status-Filter via Query-Parameter. `HubConnection` auf `all-runs`-Group. Live-Update via `AnyRunUpdated`-Event. |
-| `/runs/{id}` | `RunDetail.razor` | Run-Detail. `HubConnection` auf `run-{id}`-Group. Live-Update via `RunUpdated`-Event. Cancel-Button für Pending/Running. |
+| `/runs` | `Runs.razor` | Run-Liste. Status-Filter via Query-Parameter. Live-Update über `IRunUpdateFeed.WatchRunList` (eigene Läufe; alle Läufe für Administratoren). |
+| `/runs/{id}` | `RunDetail.razor` | Run-Detail. Live-Update über `IRunUpdateFeed.WatchRunAsync` (nur Besitzer oder Administrator). Cancel-Button für Pending/Running. Zeigt einen Block „Warnings“, wenn der Lauf Warnungen hat (D-067). |
 
-### SignalR-Hub (`RunHub`)
+### Live-Updates: `IRunUpdateFeed` und `RunHub` (D-067)
 
-`src/Geef.Atelier.Web/Hubs/RunHub.cs` — gemappt auf `/hubs/runs`.
+Die Blazor-Seiten (`Runs`, `RunDetail`, das Dashboard auf `Index`) **öffnen keine `HubConnection` mehr**.
+Vor D-067 verbanden sie sich serverseitig mit der öffentlichen URL des eigenen Hubs, ohne das Cookie des
+Nutzers, und wählten ihre Gruppennamen selbst. Jetzt abonnieren sie den prozessinternen
+`IRunUpdateFeed` (`Web/Notifications/`, Implementierung `InProcessRunUpdateFeed`, registriert über
+`AddRunLiveUpdates()`):
 
-Zwei Groups:
-- `run-{runId}` — Detail-Page-Subscriber. Sendet `"RunUpdated"` nach jedem Persist-Event.
-- `all-runs` — Runs-Listen-Page-Subscriber. Sendet `"AnyRunUpdated"` nach jedem Persist-Event.
+- Das Thema leitet der Server aus dem angemeldeten Nutzer ab (`RunUpdateTopics`); der Aufrufer wählt es
+  nie. Ein Lauf-Thema bekommt nur der Besitzer des Laufs oder ein Administrator; Listen- und
+  Dashboard-Thema enthalten die eigenen Läufe, für Administratoren alle.
+- Jeder Abonnent hat eine eigene Warteschlange; Handler laufen nacheinander, gleiche wartende Meldungen
+  werden zusammengefasst, und ein fehlerhafter Abonnent blockiert die anderen nicht. Der Publisher wartet
+  nie auf Abonnenten.
+- Sollzustand (wird mit den Nacharbeiten zu Etappe 0 vervollständigt): Der Zugriff wird bei Ablauf der
+  Anmeldung neu geprüft, und eine Seite lädt direkt nach dem Abonnieren einmal neu, damit zwischen erstem
+  Laden und Abonnement keine Meldung verloren geht.
 
-Browser-Clients verwenden `HubConnectionBuilder.WithUrl("/hubs/runs").WithAutomaticReconnect()`. Reconnect-Handler re-joinst die Group. Pages implementieren `IAsyncDisposable` mit `Leave`-Aufruf + Hub-Dispose.
+`RunHub` (`Web/Hubs/RunHub.cs`, gemappt auf `/hubs/runs`) bleibt für externe SignalR-Clients:
+
+- **Nur für Angemeldete:** `[Authorize]` am Hub und `MapHub(...).RequireAuthorization()`. Anonyme
+  Verbindungen werden abgewiesen. Sollzustand: Die Verbindung wird bei Ablauf der Anmeldung geschlossen.
+- **Serverseitig abgeleitete Gruppen:** Gruppennamen kommen aus `Context.User`, nie aus einem Parameter.
+  Einer Lauf-Gruppe tritt nur bei, wem der Lauf gehört (oder ein Administrator); sonst wirft der Hub eine
+  `HubException`. Die Listen- und Dashboard-Gruppen über alle Nutzer gibt es nur für Administratoren. Die
+  früheren Methoden mit Benutzernamen als Parameter sind entfernt.
+
+Keine Seite der Anwendung nutzt den Hub noch; er bleibt als Schnittstelle für externe Clients.
 
 ### `IRunNotifier` / `SignalRRunNotifier`
 
-`IRunNotifier` lebt in Core (`Core/Notifications/`). `PostgresEventSink` (Infrastructure) konsumiert den Vertrag — ohne Web-Dependency. `SignalRRunNotifier` lebt in Web, injiziert `IHubContext<RunHub>`, Singleton-Lifetime. Notifier-Aufrufe sind best-effort (`try/catch`).
+`IRunNotifier` lebt in Core (`Core/Notifications/`). `PostgresEventSink` (Infrastructure) konsumiert den Vertrag — ohne Web-Dependency. `SignalRRunNotifier` lebt in Web, Singleton-Lifetime, und veröffentlicht jede Meldung zweimal: in den `IRunUpdateFeed` für die Blazor-Seiten und in die `RunHub`-Gruppen für externe Clients. Den Besitzer des Laufs ermittelt er selbst (`IRunRepository`, zwischengespeichert) und schickt Listen-Updates nur an Besitzer und Administratoren, nie an alle. Notifier-Aufrufe sind best-effort (`try/catch`).
 
 **Sequenz User-Submit → Live-View:**
 
@@ -456,7 +623,7 @@ Browser-Clients verwenden `HubConnectionBuilder.WithUrl("/hubs/runs").WithAutoma
 Browser /new  →  IRunService.SubmitRunAsync  →  RunEntity (Pending) in DB
                                                 ↓
                                       RunOrchestratorService (BackgroundService)
-                                        pollt Pending, setzt Running-Claim
+                                        pollt Pending-Läufe mit Snapshot, setzt Running-Claim
                                                 ↓
                                       Geef-SDK-Pipeline (Grounding → Execution → Evaluation → Finalize)
                                                 ↓
@@ -464,11 +631,11 @@ Browser /new  →  IRunService.SubmitRunAsync  →  RunEntity (Pending) in DB
                                         (a) schreibt Event in DB
                                         (b) IRunNotifier.NotifyRunUpdatedAsync
                                                 ↓
-                                      SignalRRunNotifier → IHubContext<RunHub>
-                                        → run-{id}-Group: "RunUpdated"
-                                        → all-runs-Group: "AnyRunUpdated"
+                                      SignalRRunNotifier
+                                        → IRunUpdateFeed: Lauf-Thema, Listen-Thema des Besitzers, Admin-Listen-Thema
+                                        → RunHub-Gruppen (nur externe Clients)
                                                 ↓
-                                      Browser HubConnection.On("RunUpdated")
+                                      Seiten-Callback (WatchRunAsync / WatchRunList)
                                         → IRunService.GetRunAsync → StateHasChanged
 ```
 
@@ -675,6 +842,9 @@ Severity-Taxonomie, Anti-Pattern-Regel und Convergence-Policy-Strategie sind in 
 2. `docker build --no-cache -t geef-atelier .` im `build/`-Verzeichnis.
 3. `docker compose -f docker-compose.prod.yml up -d` startet App + Postgres; Auto-Migration on Startup (D-010) läuft beim ersten Start.
 4. Traefik erkennt den Container via Docker-Labels, stellt Let's-Encrypt-Zertifikat aus.
+5. Nach jedem Deploy den Mini-Lauf `scripts/atelier-smoke.sh` ausführen ([`ops/atelier-smoke.md`](ops/atelier-smoke.md)); eine gescheiterte Migration hält den Start bereits an (D-067).
+
+Das nächtliche Selbst-Update des cli-proxy (`scripts/cli-proxy-selfupdate.sh`) baut nur aus dem committeten Stand; bei nicht committeten Änderungen unter `cli-proxy/` setzt es aus und schickt einen Alarm, statt zu bauen (D-067).
 
 ### Modell-Katalog für CLI-Provider (D-064)
 
