@@ -27,11 +27,11 @@ internal sealed class OrderService(
     IRunRepository runs,
     IRunWarningSink warningSink,
     IRunWarningRepository warningRepository,
-    ISourceIntakeService intake,
     IOrderBriefComposer briefComposer,
     IOptions<OrderOptions> orderOptions,
     IOptions<SourceOptions> sourceOptions,
     ILogger<OrderService> logger,
+    ISourceIntakeService? intake = null,
     IOrderNotifier? notifier = null,
     TimeProvider? timeProvider = null) : IOrderService
 {
@@ -230,7 +230,10 @@ internal sealed class OrderService(
         {
             try
             {
-                await intake.DeleteAsync(item.Source.Id, null, ct);
+                if (intake is not null)
+                    await intake.DeleteAsync(item.Source.Id, null, ct);
+                else
+                    await sources.DeleteIfUnattachedAsync(item.Source.Id, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
