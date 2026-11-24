@@ -91,6 +91,23 @@ public sealed class DirectPipelineEndToEndTests
         Assert.Empty(report.OpenChecks);
     }
 
+    [Theory]
+    [InlineData("Schreibe mir einen Slogan für mein Café.", "Frisch geröstet, täglich genossen")]
+    [InlineData("Write a LinkedIn post about what I learned in sales.", "Here's what I learned from ten years in sales:\n\nListen more than you talk. Ask before you pitch. Follow up.")]
+    [InlineData("Schreibe ein Anschreiben an Herrn Meier, ohne Aufzählungen.", "24. November 2026\n\nSehr geehrter Herr Meier,\n\nvielen Dank für Ihr Schreiben. Wir melden uns bis Freitag mit einem Angebot.")]
+    public async Task Short_texts_dates_and_post_openings_pass_in_one_writer_call(string request, string text)
+    {
+        var harness = new DirectPipelineHarness();
+        var (run, _) = harness.CreateRun(request);
+        harness.Script.ExecutorText = text;
+
+        var outcome = await harness.RunAsync(run);
+
+        Assert.True(outcome.Result.Success);
+        Assert.Single(harness.WriterCalls);
+        Assert.Empty(outcome.Report!.OpenChecks);
+    }
+
     [Fact]
     public async Task A_length_violation_leads_to_exactly_one_correction_with_only_the_length_finding()
     {
