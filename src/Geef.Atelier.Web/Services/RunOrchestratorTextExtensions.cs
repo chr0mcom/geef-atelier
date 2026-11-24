@@ -14,7 +14,12 @@ internal static class RunOrchestratorTextExtensions
             ? reviewer.DisplayName
             : reviewerName;
 
-    /// <summary>A copy of <paramref name="artifact"/> whose status note has credential-like fragments removed.</summary>
+    /// <summary>
+    /// A copy of <paramref name="artifact"/> whose status note has credential-like fragments removed: error, warning
+    /// and info notes with the wide rule (<see cref="SecretRedactionExtensions.RedactSecrets"/>), other notes (such as
+    /// the diff of a transform, which is the user's own text) with unambiguous key forms only
+    /// (<see cref="SecretRedactionExtensions.RedactKnownSecrets"/>), so long words and links in the text stay.
+    /// </summary>
     public static RunArtifact WithRedactedStatus(this RunArtifact artifact) =>
         artifact.StatusMessage is null
             ? artifact
@@ -28,7 +33,9 @@ internal static class RunOrchestratorTextExtensions
                 ContentType = artifact.ContentType,
                 SizeBytes = artifact.SizeBytes,
                 StorageUri = artifact.StorageUri,
-                StatusMessage = artifact.StatusMessage.RedactSecrets(),
+                StatusMessage = artifact.StorageUri is "error" or "warning" or "info"
+                    ? artifact.StatusMessage.RedactSecrets()
+                    : artifact.StatusMessage.RedactKnownSecrets(),
                 CreatedAt = artifact.CreatedAt,
             };
 }

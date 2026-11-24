@@ -132,6 +132,26 @@ public sealed class OpenAiCompatibleClientTests
         Assert.Contains("gpt-5.5-pro", ex.Message);
     }
 
+    /// <summary>N4 (Etappe 0, review round 2): a provider that repeats the rejected key in its error text never gets it into the exception.</summary>
+    [Theory]
+    [InlineData("""{"error":{"message":"Incorrect API key provided: abcd1234efgh5678. You can find your API key at https://example.org.","type":"invalid_request_error"}}""", "abcd1234efgh5678")]
+    [InlineData("""{"error":"invalid x-api-key: zyx987wvu654"}""", "zyx987wvu654")]
+    [InlineData("""upstream said Authorization: Bearer sk-proj-0123456789abcdefghij was rejected""", "sk-proj-0123")]
+    public async Task RedactsKeysInTheProviderErrorMessage(string body, string secret)
+    {
+        var client = new OpenAiCompatibleClient(
+            CreateMockClient(body, HttpStatusCode.Unauthorized),
+            "https://api.openai.com/v1",
+            apiKey: "sk-test");
+
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() =>
+            client.CompleteAsync(new LlmRequest { Model = "gpt-5.5", SystemPrompt = "test", UserPrompt = "test" }, CancellationToken.None));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, ex.StatusCode);
+        Assert.DoesNotContain(secret, ex.Message);
+        Assert.Contains("[redacted]", ex.Message);
+    }
+
     private sealed class MockHttpMessageHandler(string responseJson, HttpStatusCode status) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(

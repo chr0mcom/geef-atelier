@@ -58,6 +58,30 @@ public sealed class RunWarningSinkTests(PostgresFixture fixture)
         Assert.Equal((100, 100, 1000), (warning.Source.Length, warning.Code.Length, warning.Message.Length));
     }
 
+    /// <summary>
+    /// B6 (Etappe 0, review round 2): a long display name in a warning stays readable, a key in the same sentence is
+    /// still removed.
+    /// </summary>
+    [Fact]
+    public async Task LongDisplayNamesStayButKeysAreRemoved()
+    {
+        var runId = await CreateRunAsync();
+        var sink = new RunWarningSink(fixture.NewScopeFactory(), NullLogger<RunWarningSink>.Instance);
+        const string sentence = "The source \"custom-tavily-refined-academic-search-v2\" could not be read and was skipped.";
+
+        await sink.ReportAsync(runId, RunWarningSources.Grounding, RunWarningCodes.GroundingProviderSkipped, sentence);
+        await sink.ReportAsync(runId, RunWarningSources.Grounding, RunWarningCodes.GroundingProviderSkipped,
+            "The source \"Export2024QuarterlyReportForManagementTeamA\" said: tvly-ABCDEFGHIJ0123456789 and Bearer abcdefghijkl0123.");
+
+        await using var db = fixture.NewContext();
+        var messages = (await new RunWarningRepository(db).ListByRunAsync(runId)).Select(w => w.Message).ToList();
+        Assert.Equal(sentence, messages[0]);
+        Assert.Contains("Export2024QuarterlyReportForManagementTeamA", messages[1]);
+        Assert.DoesNotContain("tvly-ABCDEF", messages[1]);
+        Assert.DoesNotContain("abcdefghijkl0123", messages[1]);
+        Assert.Contains(SecretRedactionExtensions.Placeholder, messages[1]);
+    }
+
     [Fact]
     public async Task UnreachableDatabaseNeverThrowsIntoTheRun()
     {
