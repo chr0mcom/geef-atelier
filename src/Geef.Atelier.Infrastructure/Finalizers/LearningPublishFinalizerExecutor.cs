@@ -1,5 +1,6 @@
 using Geef.Atelier.Application.Crew.Finalizers;
 using Geef.Atelier.Application.Crew.Knowledge;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Learning;
@@ -7,16 +8,19 @@ using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Infrastructure.Finalizers;
 
 /// <summary>
 /// Runs inside a learning-evaluation run. If the run converged, computes an embedding
 /// and marks the learning candidate Approved. If the run failed/aborted, marks it Rejected.
-/// Guards against running in Standard runs (Recursion Stop #2).
+/// Guards against running in Standard runs (Recursion Stop #2). Does nothing while
+/// <see cref="LearningOptions.Enabled"/> is false.
 /// </summary>
 internal sealed class LearningPublishFinalizerExecutor(
     IServiceScopeFactory scopeFactory,
+    IOptionsMonitor<LearningOptions> learningOptions,
     ILogger<LearningPublishFinalizerExecutor> logger) : IFinalizerExecutor
 {
     public FinalizerType Type => FinalizerType.LearningPublish;
@@ -26,6 +30,12 @@ internal sealed class LearningPublishFinalizerExecutor(
         FinalizerExecutionContext context,
         CancellationToken cancellationToken)
     {
+        if (!learningOptions.CurrentValue.Enabled)
+        {
+            logger.LogDebug("LearningPublish: learning is paused (Learning:Enabled=false); skipping run {RunId}.", context.RunId);
+            return Ok(profile.Name);
+        }
+
         try
         {
             await using var scope = scopeFactory.CreateAsyncScope();

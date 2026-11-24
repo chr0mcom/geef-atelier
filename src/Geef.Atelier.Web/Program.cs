@@ -87,6 +87,8 @@ builder.Services.AddCrewComposition();
 
 builder.Services.Configure<OrchestratorOptions>(builder.Configuration.GetSection("Orchestrator"));
 builder.Services.Configure<ConvergenceOptions>(builder.Configuration.GetSection("Convergence"));
+builder.Services.Configure<Geef.Atelier.Core.Configuration.EnvReferenceOptions>(
+    builder.Configuration.GetSection(Geef.Atelier.Core.Configuration.EnvReferenceOptions.SectionName));
 builder.Services.AddHostedService<RunOrchestratorService>();
 builder.Services.AddHostedService<OAuthCleanupBackgroundService>();
 builder.Services.Configure<Geef.Atelier.Core.Configuration.PackGcOptions>(
@@ -98,8 +100,7 @@ builder.Services.AddHealthChecks()
     .AddDbContextCheck<AtelierDbContext>()
     .AddCheck<PendingMigrationsHealthCheck>("pending-migrations");
 
-builder.Services.AddSignalR();
-builder.Services.AddSingleton<IRunNotifier, SignalRRunNotifier>();
+builder.Services.AddRunLiveUpdates();
 
 builder.Services.AddAtelierAuth(builder.Configuration);
 builder.Services.AddAtelierMcpAuth(builder.Configuration);
@@ -111,7 +112,7 @@ builder.Services
     {
         o.LoginPath        = "/login";
         o.LogoutPath       = "/auth/logout";
-        o.AccessDeniedPath = "/login";
+        o.AccessDeniedPath = "/access-denied";
         o.ExpireTimeSpan   = TimeSpan.FromDays(30);
         o.SlidingExpiration = true;
         o.Cookie.HttpOnly  = true;
@@ -245,7 +246,7 @@ app.Use(async (ctx, next) =>
 
 app.MapHealthChecks("/health").AllowAnonymous();
 
-app.MapHub<RunHub>("/hubs/runs");
+app.MapHub<RunHub>("/hubs/runs").RequireAuthorization();
 
 app.MapMcp("/mcp").RequireAuthorization(McpAuthorizationConstants.McpPolicy);
 

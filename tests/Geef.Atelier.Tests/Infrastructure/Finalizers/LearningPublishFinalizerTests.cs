@@ -9,6 +9,9 @@ using Geef.Atelier.Infrastructure.Finalizers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
+using Geef.Atelier.Core.Configuration;
+using Geef.Atelier.Tests.Fakes;
+
 namespace Geef.Atelier.Tests.Infrastructure.Finalizers;
 
 public sealed class LearningPublishFinalizerTests
@@ -72,15 +75,46 @@ public sealed class LearningPublishFinalizerTests
     private static LearningPublishFinalizerExecutor MakeExecutor(
         IRunRepository runRepo,
         ILearningRepository learningRepo,
-        IEmbeddingProvider? embeddingProvider = null)
+        IEmbeddingProvider? embeddingProvider = null,
+        bool learningEnabled = true)
     {
         var factory = BuildScopeFactory(runRepo, learningRepo, embeddingProvider);
         return new LearningPublishFinalizerExecutor(
             factory,
+            new StaticOptionsMonitor<LearningOptions>(new LearningOptions { Enabled = learningEnabled }),
             NullLogger<LearningPublishFinalizerExecutor>.Instance);
     }
 
     // ── Tests ─────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task LearningDisabled_CompletedLearningRun_NoEmbeddingNoStatusChange()
+    {
+        var runId        = Guid.NewGuid();
+        var run          = MakeRun(runId, RunStatus.Completed, RunKind.Learning);
+        var learningRepo = new CapturingLearningRepository([MakeEntry(runId)]);
+        var embedding    = new StubEmbeddingProvider();
+        var executor     = MakeExecutor(new StubRunRepository(run), learningRepo, embedding, learningEnabled: false);
+
+        var result = await executor.ExecuteAsync(MakeProfile(), MakeContext(runId, "Non-empty final text"), default);
+
+        Assert.Null(result.Artifact);
+        Assert.Equal(0, embedding.Calls);
+        Assert.Null(learningRepo.LastStatus);
+    }
+
+    [Fact]
+    public async Task LearningEnabled_CompletedLearningRun_EmbedsOnce()
+    {
+        var runId     = Guid.NewGuid();
+        var run       = MakeRun(runId, RunStatus.Completed, RunKind.Learning);
+        var embedding = new StubEmbeddingProvider();
+        var executor  = MakeExecutor(new StubRunRepository(run), new CapturingLearningRepository([MakeEntry(runId)]), embedding);
+
+        await executor.ExecuteAsync(MakeProfile(), MakeContext(runId, "Non-empty final text"), default);
+
+        Assert.Equal(1, embedding.Calls);
+    }
 
     [Fact]
     public async Task RecursionGuard_StandardRun_ReturnsOkWithoutStatusChange()
@@ -280,8 +314,13 @@ public sealed class LearningPublishFinalizerTests
         public string ModelName    => "stub-embedding";
         public int Dimensions      => 4;
 
+        public int Calls { get; private set; }
+
         public Task<EmbeddingResult> CreateAsync(string text, CancellationToken ct)
-            => Task.FromResult(new EmbeddingResult(new float[] { 0.1f, 0.2f, 0.3f, 0.4f }, 5, null));
+        {
+            Calls++;
+            return Task.FromResult(new EmbeddingResult(new float[] { 0.1f, 0.2f, 0.3f, 0.4f }, 5, null));
+        }
 
         public Task<IReadOnlyList<EmbeddingResult>> CreateBatchAsync(IReadOnlyList<string> texts, CancellationToken ct)
             => Task.FromResult<IReadOnlyList<EmbeddingResult>>(

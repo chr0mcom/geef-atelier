@@ -14,7 +14,8 @@ public interface IToolDefinitionService
     /// <summary>
     /// Inserts a new tool definition or replaces an existing one with the same
     /// <see cref="ToolDefinition.Name"/>.
-    /// Throws <see cref="InvalidOperationException"/> when attempting to overwrite a system tool.
+    /// Throws <see cref="InvalidOperationException"/> when attempting to overwrite a system tool or when
+    /// <see cref="ToolDefinition.SecretRef"/> names an environment variable outside the allow list.
     /// </summary>
     Task SaveAsync(ToolDefinition tool, CancellationToken ct = default);
 

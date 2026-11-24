@@ -5,6 +5,7 @@
 
 # Local development secrets (never commit)
 appsettings.Development.json
+.smoke.env
 
 # User-specific files
 *.rsuser

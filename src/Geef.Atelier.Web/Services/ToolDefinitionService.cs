@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Security;
 using Geef.Atelier.Core.Domain.Tools;
 using Geef.Atelier.Core.Persistence.Tools;
 
@@ -5,9 +6,11 @@ namespace Geef.Atelier.Web.Services;
 
 /// <summary>
 /// Thin application-layer façade over <see cref="IToolDefinitionRepository"/>,
-/// adding guard-rails for system-tool immutability.
+/// adding guard-rails for system-tool immutability and the environment-variable allow list.
 /// </summary>
-internal sealed class ToolDefinitionService(IToolDefinitionRepository repository) : IToolDefinitionService
+internal sealed class ToolDefinitionService(
+    IToolDefinitionRepository repository,
+    IEnvReferencePolicy envReferencePolicy) : IToolDefinitionService
 {
     /// <inheritdoc/>
     public Task<IReadOnlyList<ToolDefinition>> GetAllAsync(CancellationToken ct = default) =>
@@ -25,6 +28,7 @@ internal sealed class ToolDefinitionService(IToolDefinitionRepository repository
             throw new InvalidOperationException(
                 $"System tool '{tool.Name}' cannot be modified.");
 
+        envReferencePolicy.EnsureAllowed(tool.SecretRef, "Secret variable");
         await repository.UpsertAsync(tool, ct);
     }
 

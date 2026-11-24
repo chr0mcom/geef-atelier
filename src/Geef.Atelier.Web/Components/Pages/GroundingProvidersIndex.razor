@@ -11,7 +11,9 @@
 <div class="crew-profiles-index">
     <div class="page-header">
         <h1>Grounding Providers</h1>
-        <a href="/crew/profiles/grounding-providers/create" class="btn primary">+ New Profile</a>
+        <AuthorizeView Roles="admin">
+            <a href="/crew/profiles/grounding-providers/create" class="btn primary">+ New Profile</a>
+        </AuthorizeView>
     </div>
 
     @if (_profiles.Count == 0)
@@ -57,7 +59,9 @@
                             }
                             else
                             {
-                                <a href="/crew/profiles/grounding-providers/edit/@p.Name" class="btn small">Edit</a>
+                                <AuthorizeView Roles="admin" Context="adminAuth">
+                                    <a href="/crew/profiles/grounding-providers/edit/@p.Name" class="btn small">Edit</a>
+                                </AuthorizeView>
                                 <button class="btn small danger" @onclick="() => _profileToDelete = p">Delete</button>
                             }
                         </td>

@@ -35,6 +35,9 @@ public sealed class RunDetailArtifactsTests : TestContext
             []);
 
         Services.AddSingleton<IRunService>(new StubRunService(effectiveDetails));
+        Services.AddSingleton<Geef.Atelier.Web.Notifications.IRunUpdateFeed>(sp => new Geef.Atelier.Web.Notifications.InProcessRunUpdateFeed(
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<Geef.Atelier.Web.Notifications.InProcessRunUpdateFeed>.Instance));
         Services.AddSingleton<IRunArtifactRepository>(
             new StubArtifactRepository(artifacts ?? []));
         Services.AddSingleton<Application_IKnowledgeService>(new NoOpKnowledgeService());

@@ -2,12 +2,16 @@ namespace Geef.Atelier.Application.Providers;
 
 using System.Diagnostics;
 using Geef.Atelier.Core.Domain.Providers;
+using Geef.Atelier.Application.Security;
 using Geef.Atelier.Core.Persistence.Providers;
 
 internal sealed class ProviderService(
     IProviderRepository repository,
-    IHttpClientFactory httpClientFactory) : IProviderService
+    IHttpClientFactory httpClientFactory,
+    IEnvReferencePolicy? envReferencePolicy = null) : IProviderService
 {
+    private readonly IEnvReferencePolicy _envPolicy = envReferencePolicy ?? EnvReferencePolicy.Default;
+
     private const string SystemReadOnlyMessage = "System provider is read-only.";
     private const string SystemCannotBeDeletedMessage = "System providers cannot be deleted.";
     private const string LlmClientName = "llm";
@@ -51,6 +55,7 @@ internal sealed class ProviderService(
         if (SystemProviders.IsSystemProviderName(provider.Name))
             throw new InvalidOperationException(SystemReadOnlyMessage);
 
+        EnsureEnvReferencesAllowed(provider);
         var name = SystemProviders.EnsureCustomPrefix(provider.Name);
         var now = DateTimeOffset.UtcNow;
         var normalized = provider with { Name = name, IsSystem = false, CreatedAt = now, UpdatedAt = now };
@@ -64,6 +69,7 @@ internal sealed class ProviderService(
         if (SystemProviders.IsSystemProviderName(name))
             throw new InvalidOperationException(SystemReadOnlyMessage);
 
+        EnsureEnvReferencesAllowed(provider);
         var existing = await repository.GetByNameAsync(name, ct)
             ?? throw new InvalidOperationException($"Provider '{name}' not found.");
 
@@ -120,9 +126,7 @@ internal sealed class ProviderService(
         var settings = HttpProviderSettings.FromSettings(provider.Settings);
 
         // Resolve endpoint, honouring optional environment-variable override.
-        var endpoint = settings.EndpointEnvOverride is { Length: > 0 } envVar
-            ? (Environment.GetEnvironmentVariable(envVar) ?? settings.Endpoint)
-            : settings.Endpoint;
+        var endpoint = _envPolicy.Read(settings.EndpointEnvOverride, $"provider '{name}' endpoint override") ?? settings.Endpoint;
 
         if (string.IsNullOrWhiteSpace(endpoint))
         {
@@ -145,7 +149,7 @@ internal sealed class ProviderService(
 
             if (settings.ApiKeyEnv is { Length: > 0 } keyEnv)
             {
-                var apiKey = Environment.GetEnvironmentVariable(keyEnv) ?? string.Empty;
+                var apiKey = _envPolicy.Read(keyEnv, $"provider '{name}' API key") ?? string.Empty;
                 if (apiKey.Length > 0)
                 {
                     var headerValue = settings.AuthHeaderFormat.Replace("{key}", apiKey);
@@ -185,6 +189,15 @@ internal sealed class ProviderService(
                 ErrorMessage: ex.Message,
                 ResponseSample: null);
         }
+    }
+
+    private void EnsureEnvReferencesAllowed(Provider provider)
+    {
+        if (provider.Type != ProviderType.Http)
+            return;
+        var settings = HttpProviderSettings.FromSettings(provider.Settings);
+        _envPolicy.EnsureAllowed(settings.ApiKeyEnv, "API key variable");
+        _envPolicy.EnsureAllowed(settings.EndpointEnvOverride, "Endpoint override variable");
     }
 
     private static async Task<string?> TryReadSampleAsync(HttpResponseMessage response, CancellationToken ct)

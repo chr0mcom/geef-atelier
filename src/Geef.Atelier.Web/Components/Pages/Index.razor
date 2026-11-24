@@ -9,7 +9,7 @@
 @inject IHttpContextAccessor Http
 @using Geef.Atelier.Application.Dashboard
 @using Geef.Atelier.Core.Domain.Dashboard
-@using Microsoft.AspNetCore.SignalR.Client
+@inject IRunUpdateFeed LiveUpdates
 
 <PageTitle>Workshop — Geef.Atelier</PageTitle>
 
@@ -69,11 +69,13 @@ else
     DashboardScope          _scope       = DashboardScope.My;
     bool                    _isAdmin;
     string                  _username    = string.Empty;
-    HubConnection?          _hub;
+    System.Security.Claims.ClaimsPrincipal _user = new();
+    IDisposable?            _subscription;
 
     protected override async Task OnInitializedAsync()
     {
         var auth = await AuthProvider.GetAuthenticationStateAsync();
+        _user     = auth.User;
         _isAdmin  = auth.User.IsInRole("admin");
         _username = auth.User.Identity?.Name ?? string.Empty;
 
@@ -82,7 +84,7 @@ else
         _scope = (scopeCookie == "all" && _isAdmin) ? DashboardScope.All : DashboardScope.My;
 
         await LoadSnapshotAsync();
-        await InitHubAsync();
+        Subscribe();
     }
 
     async Task LoadSnapshotAsync()
@@ -95,77 +97,43 @@ else
     async Task SetScopeAsync(DashboardScope newScope)
     {
         if (_scope == newScope) return;
-        await LeaveHubGroupsAsync();
+        _subscription?.Dispose();
         _scope = newScope;
         await JS.InvokeVoidAsync("window.atelier.setDashboardScope",
             newScope == DashboardScope.All ? "all" : "my");
         await LoadSnapshotAsync();
-        await JoinHubGroupsAsync();
+        Subscribe();
         StateHasChanged();
     }
 
-    async Task InitHubAsync()
+    void Subscribe()
     {
-        _hub = new HubConnectionBuilder()
-            .WithUrl(Nav.ToAbsoluteUri("/hubs/runs"))
-            .WithAutomaticReconnect()
-            .Build();
-
-        _hub.On<DashboardEvent>("DashboardUpdated", async evt =>
-        {
-            if (evt.Kind == DashboardEventKind.PressUpdated)
-            {
-                // Cache already invalidated by notifier; fresh fetch
-                if (!string.IsNullOrEmpty(_username))
-                {
-                    _snapshot    = await DashboardService.GetSnapshotAsync(_username, _isAdmin, _scope);
-                    _liveDayBook = _liveDayBook.Count > 0 ? _liveDayBook : [.._snapshot.DayBook];
-                }
-            }
-            else if (evt.Kind == DashboardEventKind.DayBookUpdated && evt.DayBookEntry is { } entry)
-            {
-                _liveDayBook.Insert(0, entry);
-                if (_liveDayBook.Count > 12)
-                    _liveDayBook.RemoveAt(_liveDayBook.Count - 1);
-            }
-
-            await InvokeAsync(StateHasChanged);
-        });
-
-        _hub.Reconnected += async _ =>
-        {
-            await JoinHubGroupsAsync();
-            await LoadSnapshotAsync();
-            await InvokeAsync(StateHasChanged);
-        };
-
-        await _hub.StartAsync();
-        await JoinHubGroupsAsync();
-    }
-
-    async Task JoinHubGroupsAsync()
-    {
-        if (_hub?.State != HubConnectionState.Connected || string.IsNullOrEmpty(_username))
+        if (string.IsNullOrEmpty(_username))
             return;
-        await _hub.SendAsync("JoinDashboardGroupAsync", _username);
-        if (_isAdmin && _scope == DashboardScope.All)
-            await _hub.SendAsync("JoinDashboardAllGroupAsync");
+        _subscription = LiveUpdates.WatchDashboard(_user, _isAdmin && _scope == DashboardScope.All,
+            evt => InvokeAsync(() => OnDashboardEventAsync(evt)));
     }
 
-    async Task LeaveHubGroupsAsync()
+    async Task OnDashboardEventAsync(DashboardEvent evt)
     {
-        if (_hub?.State != HubConnectionState.Connected || string.IsNullOrEmpty(_username))
-            return;
-        try { await _hub.SendAsync("LeaveDashboardGroupAsync", _username); } catch { }
-        try { await _hub.SendAsync("LeaveDashboardAllGroupAsync"); } catch { }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_hub is not null)
+        if (evt.Kind == DashboardEventKind.PressUpdated)
         {
-            await LeaveHubGroupsAsync();
-            await _hub.DisposeAsync();
+            _snapshot    = await DashboardService.GetSnapshotAsync(_username, _isAdmin, _scope);
+            _liveDayBook = _liveDayBook.Count > 0 ? _liveDayBook : [.._snapshot.DayBook];
         }
+        else if (evt.Kind == DashboardEventKind.DayBookUpdated && evt.DayBookEntry is { } entry)
+        {
+            _liveDayBook.Insert(0, entry);
+            if (_liveDayBook.Count > 12)
+                _liveDayBook.RemoveAt(_liveDayBook.Count - 1);
+        }
+
+        StateHasChanged();
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _subscription?.Dispose();
+        return ValueTask.CompletedTask;
     }
 }

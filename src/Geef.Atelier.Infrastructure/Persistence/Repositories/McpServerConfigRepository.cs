@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Security;
 using Geef.Atelier.Core.Domain.Mcp;
 using Geef.Atelier.Core.Persistence.Mcp;
 using Geef.Atelier.Infrastructure.Persistence.Entities;
@@ -5,8 +6,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Geef.Atelier.Infrastructure.Persistence.Repositories;
 
-internal sealed class McpServerConfigRepository(AtelierDbContext db) : IMcpServerConfigRepository
+internal sealed class McpServerConfigRepository(
+    AtelierDbContext db,
+    IEnvReferencePolicy? envReferencePolicy = null) : IMcpServerConfigRepository
 {
+    private readonly IEnvReferencePolicy _envPolicy = envReferencePolicy ?? EnvReferencePolicy.Default;
+
     public async Task<IReadOnlyList<McpServerConfig>> GetAllAsync(CancellationToken ct = default) =>
         (await db.McpServerConfigs.OrderBy(e => e.Name).ToListAsync(ct))
             .Select(e => e.ToDomain()).ToList();
@@ -23,6 +28,7 @@ internal sealed class McpServerConfigRepository(AtelierDbContext db) : IMcpServe
 
     public async Task UpsertAsync(McpServerConfig config, CancellationToken ct = default)
     {
+        _envPolicy.EnsureAllowed(config.AuthHeaderEnv, "Auth header variable");
         var existing = await db.McpServerConfigs.FindAsync([config.Id], ct);
         if (existing is null)
         {

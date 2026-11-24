@@ -1,5 +1,5 @@
 @page "/tools/view/{Name}"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "AdminPolicy")]
 @rendermode InteractiveServer
 @using System.Text.Json
 @using Geef.Atelier.Core.Domain.Tools

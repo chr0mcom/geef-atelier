@@ -1,6 +1,6 @@
 @page "/crew/profiles/grounding-providers/create"
 @page "/crew/profiles/grounding-providers/edit/{name}"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "AdminPolicy")]
 @rendermode InteractiveServer
 @using Geef.Atelier.Application.Crew
 @using Geef.Atelier.Application.Providers

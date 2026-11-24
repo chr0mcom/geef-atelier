@@ -1,5 +1,5 @@
 @page "/crew/providers/create"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "AdminPolicy")]
 @inject NavigationManager Nav
 
 <PageTitle>Create Provider — Atelier</PageTitle>

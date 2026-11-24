@@ -499,7 +499,12 @@ internal sealed class TemplateStudioService(
             }
             case ProposedProfileType.GroundingProvider:
             {
-                var settings      = profile.GroundingProviderSettings ?? new Dictionary<string, string>();
+                var settings      = new Dictionary<string, string>(profile.GroundingProviderSettings ?? new Dictionary<string, string>());
+                foreach (var key in new[] { GroundingProviderProfile.KeyRestApiAuthHeaderEnv, GroundingProviderProfile.KeyAcademicApiKeyEnv })
+                {
+                    if (settings.Remove(key))
+                        warnings.Add($"Setting '{key}' of grounding profile '{profile.Name}' was removed: credentials can only be set by an administrator.");
+                }
                 var providerType  = profile.GroundingProviderType ?? "tavily";
                 var availableProviders = providerCatalog.ListProviders().Select(p => p.Name).ToHashSet();
                 if (!availableProviders.Contains(profile.Provider))

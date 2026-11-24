@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Security;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Geef.Atelier.Application.Crew;
@@ -26,8 +27,11 @@ internal sealed class ModelCatalog(
     ICliModelSource cliModelSource,
     IOptions<ModelCatalogOptions> options,
     TimeProvider timeProvider,
-    ILogger<ModelCatalog> logger) : IModelCatalog
+    ILogger<ModelCatalog> logger,
+    IEnvReferencePolicy? envReferencePolicy = null) : IModelCatalog
 {
+    private readonly IEnvReferencePolicy _envPolicy = envReferencePolicy ?? EnvReferencePolicy.Default;
+
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
     /// <summary>Marks a provider as having no alias layer, so resolution short-circuits for it.</summary>
@@ -117,7 +121,7 @@ internal sealed class ModelCatalog(
             if (provider is null || provider.Type == ProviderType.Cli)
                 return false;
             var settings = HttpProviderSettings.FromSettings(provider.Settings);
-            return settings.ApiKeyEnv is { Length: > 0 } keyEnv && string.IsNullOrEmpty(Environment.GetEnvironmentVariable(keyEnv));
+            return settings.ApiKeyEnv is { Length: > 0 } keyEnv && string.IsNullOrEmpty(_envPolicy.Read(keyEnv, $"provider '{providerName}' API key"));
         }
         catch (Exception) when (!ct.IsCancellationRequested)
         {
@@ -286,7 +290,7 @@ internal sealed class ModelCatalog(
         var settings = HttpProviderSettings.FromSettings(provider.Settings);
         var result = await BuildHttpCatalogAsync(settings, providerName, ct);
         var credentialsMissing = settings.ApiKeyEnv is { Length: > 0 } keyEnv
-                                 && string.IsNullOrEmpty(Environment.GetEnvironmentVariable(keyEnv));
+                                 && string.IsNullOrEmpty(_envPolicy.Read(keyEnv, $"provider '{providerName}' API key"));
         return credentialsMissing ? result with { Reported = [] } : result;
     }
 
@@ -304,9 +308,7 @@ internal sealed class ModelCatalog(
             return new CatalogResult(StaticModelFallback.For(providerName), ModelCatalogSource.Fallback);
         }
 
-        var endpoint = settings.EndpointEnvOverride is { Length: > 0 } envVar
-            ? (Environment.GetEnvironmentVariable(envVar) ?? settings.Endpoint)
-            : settings.Endpoint;
+        var endpoint = _envPolicy.Read(settings.EndpointEnvOverride, $"provider '{providerName}' endpoint override") ?? settings.Endpoint;
 
         if (string.IsNullOrWhiteSpace(endpoint))
         {
@@ -467,7 +469,7 @@ internal sealed class ModelCatalog(
 
             if (settings.ApiKeyEnv is { Length: > 0 } keyEnv)
             {
-                var apiKey = Environment.GetEnvironmentVariable(keyEnv) ?? string.Empty;
+                var apiKey = _envPolicy.Read(keyEnv, $"provider '{providerName}' API key") ?? string.Empty;
                 if (apiKey.Length > 0)
                 {
                     var headerValue = settings.AuthHeaderFormat.Replace("{key}", apiKey);

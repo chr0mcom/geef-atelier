@@ -2,6 +2,7 @@ using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Application.Crew.Learning;
 using Geef.Atelier.Application.Crew.Models;
 using Geef.Atelier.Application.Providers;
+using Geef.Atelier.Application.Security;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Geef.Atelier.Application.Runs;
@@ -15,6 +16,8 @@ public static class ApplicationServiceExtensions
         // IHttpClientFactory is needed by ProviderService.TestConnectionAsync.
         // AddHttpClient() is idempotent and safe to call multiple times.
         services.AddHttpClient();
+        services.AddOptions();
+        services.AddSingleton<IEnvReferencePolicy, EnvReferencePolicy>();
         services.AddScoped<IRunService, RunService>();
         services.AddSingleton<IModelAssignmentService, ModelAssignmentService>();
         services.AddScoped<ICrewService, CrewService>();

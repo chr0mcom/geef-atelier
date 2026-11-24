@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Security;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -29,8 +30,11 @@ internal sealed class ToolExecutor(
     IHttpClientFactory httpClientFactory,
     IMcpServerConfigRepository mcpServerConfigRepository,
     IAtelierMcpClientFactory mcpClientFactory,
-    ILogger<ToolExecutor> logger) : IToolExecutor
+    ILogger<ToolExecutor> logger,
+    IEnvReferencePolicy? envReferencePolicy = null) : IToolExecutor
 {
+    private readonly IEnvReferencePolicy _envPolicy = envReferencePolicy ?? EnvReferencePolicy.Default;
+
     /// <inheritdoc/>
     public async Task<ToolExecutionResult> ExecuteAsync(
         ToolDefinition tool,
@@ -191,13 +195,11 @@ internal sealed class ToolExecutor(
 
     /// <summary>
     /// Resolves the secret value referenced by <see cref="ToolDefinition.SecretRef"/> from
-    /// the process environment.  Returns <see langword="null"/> when no reference is set or
-    /// the variable is not present.
+    /// the process environment.  Returns <see langword="null"/> when no reference is set, the
+    /// variable is not present, or the name is not on the allow list (<see cref="IEnvReferencePolicy"/>).
     /// </summary>
-    private static string? ResolveSecret(ToolDefinition tool) =>
-        tool.SecretRef is { Length: > 0 } secretRef
-            ? Environment.GetEnvironmentVariable(secretRef)
-            : null;
+    private string? ResolveSecret(ToolDefinition tool) =>
+        _envPolicy.Read(tool.SecretRef, $"tool '{tool.Name}' secret");
 
     // -------------------------------------------------------------------------
     // Concrete executors (A-T9)
