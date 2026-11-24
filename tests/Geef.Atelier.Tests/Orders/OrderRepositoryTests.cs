@@ -179,7 +179,7 @@ public sealed class OrderRepositoryTests(PostgresFixture fixture)
         await using var db = fixture.NewContext();
         var repo = new OrderRepository(db);
         var first = Order(user, "first try");
-        await Assert.ThrowsAsync<DbUpdateException>(() =>
+        await Assert.ThrowsAsync<OrderSourceMissingException>(() =>
             repo.CreateWithFirstRunAsync(first, [Link(first.Id, Guid.NewGuid())], Run(user, first.Id, 1)));
 
         var second = Order(user, "second try");
