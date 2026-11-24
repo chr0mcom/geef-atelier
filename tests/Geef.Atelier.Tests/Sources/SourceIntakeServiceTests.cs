@@ -228,6 +228,18 @@ public sealed class SourceIntakeServiceTests(PostgresFixture fixture) : IDisposa
             await db.SaveChangesAsync();
         }
 
+        var recentUser = NewUser();
+        var recentReceipt = await IntakeAsync(provider, recentUser, "recent.txt", Encoding.UTF8.GetBytes("Recent text " + Guid.NewGuid()));
+        var recent = DateTimeOffset.UtcNow.AddDays(-1);
+        var recentOrder = Order(recentUser, at: recent);
+        await using (var db = fixture.NewContext())
+        {
+            db.Orders.Add(recentOrder);
+            db.OrderSources.Add(Link(recentOrder.Id, recentReceipt.SourceId!.Value));
+            db.Runs.Add(Run(recentUser, recentOrder.Id, 1, status: Geef.Atelier.Core.Domain.RunStatus.Completed, at: recent));
+            await db.SaveChangesAsync();
+        }
+
         var cleanup = provider.GetServices<IHostedService>().OfType<SourceCleanupBackgroundService>().Single();
         await cleanup.RunOnceAsync(CancellationToken.None);
 
@@ -236,6 +248,10 @@ public sealed class SourceIntakeServiceTests(PostgresFixture fixture) : IDisposa
         Assert.Null(source.StoragePath);
         Assert.NotNull(source.ExtractedText);
         Assert.Empty(Directory.GetFiles(Path.Combine(_root, SourceFileStore.OwnerFolder(user))));
+
+        var kept = await check.Sources.AsNoTracking().SingleAsync(s => s.Id == recentReceipt.SourceId);
+        Assert.NotNull(kept.StoragePath);
+        Assert.True(File.Exists(Path.Combine(_root, kept.StoragePath)));
     }
 
     [Fact]

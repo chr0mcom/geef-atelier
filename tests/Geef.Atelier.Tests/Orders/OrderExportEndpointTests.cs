@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text;
+using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Infrastructure.Persistence.Orders;
 using Geef.Atelier.Tests.EndToEnd;
 using Geef.Atelier.Tests.Persistence;
@@ -68,5 +70,38 @@ public sealed class OrderExportEndpointTests(PostgresFixture postgres)
 
         using var anonymous = host.CreateAnonymousClient();
         Assert.Equal(HttpStatusCode.Redirect, (await anonymous.GetAsync($"/orders/{order.Id}/export/md")).StatusCode);
+    }
+
+    [Fact]
+    public async Task ASignInWithoutUserNameGets403ForExportsAndRunFiles()
+    {
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
+        var username = "owner-" + Guid.NewGuid().ToString("N")[..6];
+        var nameless = await host.CreateSignedInClientAsync("nameless-" + Guid.NewGuid().ToString("N")[..6], withName: false);
+        var order = Order(username, "Write a thank-you note to the team");
+        var run = Run(username, order.Id, 1, status: RunStatus.Completed, finalText: Text);
+        var artifactId = Guid.NewGuid();
+        await host.QueryAsync(async db =>
+        {
+            await new OrderRepository(db).CreateWithFirstRunAsync(order, [], run);
+            db.RunArtifacts.Add(new RunArtifact
+            {
+                Id = artifactId, RunId = run.Id, FinalizerProfileName = "file-export", ArtifactType = ArtifactType.File,
+                Filename = "letter.md", ContentType = "text/markdown", StorageUri = "/nowhere/letter.md", CreatedAt = DateTimeOffset.UtcNow,
+            });
+            return await db.SaveChangesAsync();
+        });
+
+        using (var export = await nameless.GetAsync($"/orders/{order.Id}/export/md"))
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, export.StatusCode);
+            Assert.Contains(OwnerScope.UnknownUserMessage, await export.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        }
+
+        using (var file = await nameless.GetAsync($"/runs/{run.Id}/artifacts/{artifactId}/download"))
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, file.StatusCode);
+            Assert.Contains(OwnerScope.UnknownUserMessage, await file.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        }
     }
 }

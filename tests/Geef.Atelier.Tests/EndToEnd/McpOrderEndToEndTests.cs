@@ -3,8 +3,16 @@ using System.Text.Json;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Orders;
+using Geef.Atelier.Application.Orders;
+using Geef.Atelier.Core.Configuration;
+using Geef.Atelier.Mcp.Tools;
+using Geef.Atelier.Tests.EndToEnd.Fakes;
+using Geef.Atelier.Tests.Mcp.Orders;
 using Geef.Atelier.Tests.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using ModelContextProtocol;
 
 namespace Geef.Atelier.Tests.EndToEnd;
 
@@ -61,6 +69,21 @@ public sealed class McpOrderEndToEndTests(PostgresFixture postgres)
         var used = Assert.Single(result.GetProperty("sourcesUsed").EnumerateArray());
         Assert.Equal("office-notes.md", used.GetProperty("fileName").GetString());
         Assert.Equal("full_text", used.GetProperty("mode").GetString());
+
+        Assert.True(host.Llm.AnyExecutorPromptContains(Marker), host.Llm.Describe());
+        Assert.Contains(host.Llm.CallsFor(LlmRole.Executor), c => c.ContextDocument?.Contains(Marker, StringComparison.Ordinal) == true);
+        Assert.DoesNotContain(host.Llm.CallsFor(LlmRole.Executor), c => c.Messages.LastOrDefault(m => m.Role == "user")?.Content?.Contains(Marker, StringComparison.Ordinal) == true);
+
+        await host.WithScopeAsync(async sp =>
+        {
+            var orders = sp.GetRequiredService<IOrderService>();
+            var stranger = new FakeUser("stranger-" + Guid.NewGuid().ToString("N")[..6]);
+            var notFound = await Assert.ThrowsAsync<McpException>(() => GetOrderStatusTool.GetOrderStatus(orders, stranger, sp.GetRequiredService<IOptions<OrderOptions>>(), orderId, 0));
+            Assert.Equal(McpOrderAccess.OrderNotFound, notFound.Message);
+            notFound = await Assert.ThrowsAsync<McpException>(() => GetOrderResultTool.GetOrderResult(orders, stranger, orderId));
+            Assert.Equal(McpOrderAccess.OrderNotFound, notFound.Message);
+            return 0;
+        });
 
         var order = await host.QueryAsync(db => db.Orders.AsNoTracking().SingleAsync(o => o.Id == Guid.Parse(orderId)));
         Assert.Equal(OrderEntry.Mcp, order.Entry);

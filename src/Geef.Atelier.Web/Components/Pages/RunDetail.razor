@@ -25,7 +25,13 @@
 <PageTitle>Run @_shortId — Geef.Atelier</PageTitle>
 
 <div class="detail">
-    @if (_details is null && !_notFound && !_forbidden)
+    @if (_unknownUser)
+    {
+        <div class="forbidden-banner" data-testid="run-unknown-user">
+            <p>@OwnerScope.UnknownUserMessage</p>
+        </div>
+    }
+    else if (_details is null && !_notFound && !_forbidden)
     {
         <EmptyState Message="Loading…" />
     }
@@ -303,6 +309,7 @@
     KnowledgeDocument? _promoteCandidate;
     string? _promoteError;
     string? _requestingUser;
+    bool _unknownUser;
     bool _showResumeDialog;
     bool _showDeleteModal;
 
@@ -312,9 +319,11 @@
     {
         var disposeToken = _disposeCts.Token;
         var auth     = await AuthProvider.GetAuthenticationStateAsync();
-        var isAdmin  = auth.User.IsInRole("admin");
-        var username = auth.User.Identity?.Name;
-        _requestingUser = isAdmin ? null : username;
+        if (!auth.User.TryGetOwnerFilter(out _requestingUser))
+        {
+            _unknownUser = true;
+            return;
+        }
 
         await LoadAsync();
         if (_disposed)

@@ -1,5 +1,6 @@
 using Bunit;
 using Bunit.TestDoubles;
+using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.Orders;
@@ -180,7 +181,27 @@ public sealed class OrderDetailTests : TestContext
         cut.Find("[data-testid='order-stop']").Click();
 
         Assert.Equal(view.OrderId, Assert.Single(_orders.Cancelled));
+        Assert.Equal("alice", Assert.Single(_orders.CancelledFor));
         Assert.Equal("stopped", cut.Find("[data-testid='order-state']").GetAttribute("data-state"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ASignInWithoutUserNameShowsNothingAndAsksToSignInAgain(bool withEmptyName)
+    {
+        var view = _orders.Add("bob", OrderTestData.View(OrderDisplayState.Delivered, title: "Bob's private letter"));
+        if (withEmptyName)
+            _auth.SetAuthorized(string.Empty);
+        else
+            this.SignInWithoutUserName();
+
+        var cut = Render(view.OrderId);
+
+        Assert.Contains(OwnerScope.UnknownUserMessage, cut.Find("[data-testid='order-unknown-user']").TextContent);
+        Assert.DoesNotContain("private letter", cut.Markup);
+        Assert.Equal(0, _orders.Calls);
+        Assert.Empty(cut.FindAll("[data-testid='order-stop']"));
     }
 
     [Fact]

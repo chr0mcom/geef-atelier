@@ -65,7 +65,13 @@
         </div>
     }
 
-    @if (_items is null)
+    @if (_unknownUser)
+    {
+        <div class="order-banner order-banner--failed" role="alert" data-testid="work-unknown-user">
+            <span>@OwnerScope.UnknownUserMessage</span>
+        </div>
+    }
+    else if (_items is null)
     {
         @if (!_loadFailed)
         {
@@ -172,10 +178,11 @@
     string _filter = "all";
     int _page = 1;
     bool _isAdmin;
+    bool _unknownUser;
     bool _showAllUsers;
     bool _loadFailed;
     bool _deleting;
-    string? _username;
+    System.Security.Claims.ClaimsPrincipal _user = new();
     string? _actionError;
     OrderListItem? _toDelete;
     IDisposable? _subscription;
@@ -203,11 +210,11 @@
     protected override async Task OnInitializedAsync()
     {
         var auth = await AuthProvider.GetAuthenticationStateAsync();
-        _isAdmin = auth.User.IsInRole("admin");
-        _username = auth.User.Identity?.Name;
+        _user = auth.User;
+        _isAdmin = auth.User.IsInRole(OwnerScope.AdminRole);
 
         await LoadAsync();
-        if (_disposed)
+        if (_disposed || _unknownUser)
             return;
         var subscription = LiveUpdates.WatchOrderList(auth.User, async _ =>
         {
@@ -232,7 +239,11 @@
     {
         try
         {
-            var owner = _showAllUsers && _isAdmin ? null : _username;
+            if (!_user.TryGetListOwnerFilter(_showAllUsers, out var owner))
+            {
+                _unknownUser = true;
+                return;
+            }
             _items = await Orders.ListAsync(owner, LoadLimit);
             _loadFailed = false;
         }
@@ -266,7 +277,13 @@
         _actionError = null;
         try
         {
-            var deleted = await DataGate.RunAsync(() => Orders.DeleteAsync(item.OrderId, _isAdmin ? null : _username));
+            if (!_user.TryGetOwnerFilter(out var owner))
+            {
+                _toDelete = null;
+                _actionError = OwnerScope.UnknownUserMessage;
+                return;
+            }
+            var deleted = await DataGate.RunAsync(() => Orders.DeleteAsync(item.OrderId, owner));
             if (!deleted)
                 _actionError = "It could not be deleted, maybe because it is still being worked on. Try again when it is finished.";
             _toDelete = null;

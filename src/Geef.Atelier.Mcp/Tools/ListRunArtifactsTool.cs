@@ -20,7 +20,7 @@ public static class ListRunArtifactsTool
     {
         if (!Guid.TryParse(runId, out var guid)) return null;
 
-        var requestingUsername = currentUser.IsAdmin ? null : currentUser.Username;
+        var requestingUsername = currentUser.RequestingUsername();
         var run = await runService.GetRunDetailsAsync(guid, requestingUsername, cancellationToken);
         if (run is null) return null;
 

@@ -23,6 +23,12 @@
             <button type="button" class="btn small" data-testid="order-reload" @onclick="ReloadAsync">Try again</button>
         </div>
     }
+    else if (_unknownUser)
+    {
+        <div class="order-missing" data-testid="order-unknown-user">
+            <EmptyState Message="@OwnerScope.UnknownUserMessage" />
+        </div>
+    }
     else if (!_loaded)
     {
         <EmptyState Message="Loading…" />
@@ -149,6 +155,7 @@
     OrderResult? _result;
     bool _loaded;
     bool _loadFailed;
+    bool _unknownUser;
     bool _stopping;
     string? _actionError;
     string? _requestingUser;
@@ -172,7 +179,11 @@
     protected override async Task OnInitializedAsync()
     {
         var auth = await AuthProvider.GetAuthenticationStateAsync();
-        _requestingUser = auth.User.IsInRole("admin") ? null : auth.User.Identity?.Name;
+        if (!auth.User.TryGetOwnerFilter(out _requestingUser))
+        {
+            _unknownUser = true;
+            return;
+        }
 
         await LoadAsync();
         if (_disposed)

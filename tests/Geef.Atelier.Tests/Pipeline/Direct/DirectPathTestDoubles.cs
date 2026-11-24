@@ -64,7 +64,7 @@ internal sealed class InMemorySourceRepository : ISourceRepository
     public IReadOnlyList<RunSourceUsageEntity> Usages => _usages.ToList();
 
     public SourceEntity Attach(Guid orderId, string fileName, SourceKind kind, string text, int? pageCount = null,
-        SourceRole role = SourceRole.Facts, string? pageSelection = null, IReadOnlyList<SourceWarning>? warnings = null)
+        SourceRole role = SourceRole.Facts, string? pageSelection = null, IReadOnlyList<SourceWarning>? warnings = null, int? position = null)
     {
         var list = _links.GetOrAdd(orderId, _ => []);
         var source = new SourceEntity
@@ -79,7 +79,7 @@ internal sealed class InMemorySourceRepository : ISourceRepository
         {
             list.Add(new OrderSourceItem(new OrderSourceEntity
             {
-                OrderId = orderId, SourceId = source.Id, Role = role, Position = list.Count, PageSelection = pageSelection,
+                OrderId = orderId, SourceId = source.Id, Role = role, Position = position ?? list.Count, PageSelection = pageSelection,
                 AddedAt = DateTimeOffset.UtcNow,
             }, source));
         }

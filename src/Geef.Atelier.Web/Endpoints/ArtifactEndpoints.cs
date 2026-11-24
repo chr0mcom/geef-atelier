@@ -28,9 +28,9 @@ public static class ArtifactEndpoints
                 if (artifact.ArtifactType != ArtifactType.File)
                     return Results.BadRequest("Only file artifacts can be downloaded.");
 
-                // Owner check: admins pass null to bypass; non-admins pass their username.
-                // GetRunAsync returns null when the run belongs to a different user.
-                var requestingUsername = currentUser.IsAdmin ? null : currentUser.Username;
+                if (!currentUser.TryGetOwnerFilter(out var requestingUsername))
+                    return Results.Problem(OwnerScope.UnknownUserMessage, statusCode: StatusCodes.Status403Forbidden);
+
                 var run = await runService.GetRunAsync(runId, requestingUsername, CancellationToken.None);
                 if (run is null)
                     return Results.Forbid();

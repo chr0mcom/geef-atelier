@@ -28,12 +28,15 @@ internal sealed partial class AtelierEndToEndHost
 
     /// <summary>
     /// Creates a user and returns an HTTP client signed in with the auth cookie of that user. The client does not
-    /// follow redirects, so a challenge shows up as 302 or 401.
+    /// follow redirects, so a challenge shows up as 302 or 401. With <paramref name="withName"/> false the cookie carries
+    /// no user name (a broken sign-in), to check that owned data is then refused.
     /// </summary>
-    public async Task<HttpClient> CreateSignedInClientAsync(string username, bool isAdmin = false)
+    public async Task<HttpClient> CreateSignedInClientAsync(string username, bool isAdmin = false, bool withName = true)
     {
         var userId = await EnsureUserAsync(username, isAdmin);
-        var claims = new List<Claim> { new(ClaimTypes.Name, username), new(ClaimTypes.NameIdentifier, userId) };
+        var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, userId) };
+        if (withName)
+            claims.Add(new Claim(ClaimTypes.Name, username));
         if (isAdmin)
             claims.Add(new Claim(ClaimTypes.Role, "admin"));
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
