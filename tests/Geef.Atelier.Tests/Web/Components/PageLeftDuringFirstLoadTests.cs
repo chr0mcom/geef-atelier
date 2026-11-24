@@ -151,20 +151,23 @@ public sealed class PageLeftDuringFirstLoadTests : TestContext
 
         public Task<IDisposable?> WatchRunAsync(ClaimsPrincipal user, Guid runId, Func<Guid, Task> onUpdated, CancellationToken ct = default)
         {
+            var subscription = NewSubscription();
             Interlocked.Increment(ref _runWatchCalls);
-            return Task.FromResult<IDisposable?>(NewSubscription());
+            return Task.FromResult<IDisposable?>(subscription);
         }
 
         public IDisposable WatchRunList(ClaimsPrincipal user, Func<Guid, Task> onUpdated)
         {
+            var subscription = NewSubscription();
             Interlocked.Increment(ref _listWatchCalls);
-            return NewSubscription();
+            return subscription;
         }
 
         public IDisposable WatchDashboard(ClaimsPrincipal user, bool allUsers, Func<DashboardEvent, Task> onEvent)
         {
+            var subscription = NewSubscription();
             Interlocked.Increment(ref _dashboardWatchCalls);
-            return NewSubscription();
+            return subscription;
         }
 
         public Task PublishRunUpdatedAsync(Guid runId, string? owner) => Task.CompletedTask;
