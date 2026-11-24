@@ -1,5 +1,7 @@
 using Geef.Atelier.Application.Crew.Finalizers;
 using Geef.Atelier.Application.Runs;
+using Geef.Atelier.Core.Configuration;
+using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Learning;
@@ -99,17 +101,43 @@ public sealed class LearningExtractFinalizerTests
         IRunRepository runRepo,
         ILearningRepository learningRepo,
         IRunService runService,
-        ILlmClientResolver? llmResolver = null)
+        ILlmClientResolver? llmResolver = null,
+        bool learningEnabled = true)
     {
         llmResolver ??= new StubLlmClientResolver("Extracted learning insight.");
         var factory = BuildScopeFactory(runRepo, learningRepo, runService);
         return new LearningExtractFinalizerExecutor(
             llmResolver,
             factory,
+            new StaticOptionsMonitor<LearningOptions>(new LearningOptions { Enabled = learningEnabled }),
             NullLogger<LearningExtractFinalizerExecutor>.Instance);
     }
 
     // ── Tests ─────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task LearningDisabled_ThresholdMet_NoExtractionCallNoEntryNoLearningRun()
+    {
+        var runId        = Guid.NewGuid();
+        var run          = MakeRun(runId, RunKind.Standard);
+        var details      = new RunDetails(run, [MakeIter(runId, 1), MakeIter(runId, 2)]);
+        var learningRepo = new CapturingLearningRepository([]);
+        var runService   = new CapturingRunService();
+        var resolver     = new StubLlmClientResolver("Extracted learning insight.");
+        var executor     = MakeExecutor(
+            new StubRunRepository(run, details),
+            learningRepo,
+            runService,
+            resolver,
+            learningEnabled: false);
+
+        var result = await executor.ExecuteAsync(MakeProfile(minIterations: 2), MakeContext(runId), default);
+
+        Assert.Null(result.Artifact);
+        Assert.Equal(0, resolver.Calls);
+        Assert.False(learningRepo.CreateCalled);
+        Assert.False(runService.SubmitCalled);
+    }
 
     [Fact]
     public async Task RecursionGuard_LearningRun_ReturnsOkWithoutCreatingEntry()
@@ -405,11 +433,19 @@ public sealed class LearningExtractFinalizerTests
 
     private sealed class StubLlmClientResolver(string response) : ILlmClientResolver
     {
+        public int Calls { get; private set; }
+
         public (ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName)
-            => (new StubLlmClient(response), "stub-model", 2048);
+        {
+            Calls++;
+            return (new StubLlmClient(response), "stub-model", 2048);
+        }
 
         public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens)
-            => (new StubLlmClient(response), model, maxTokens ?? 2048);
+        {
+            Calls++;
+            return (new StubLlmClient(response), model, maxTokens ?? 2048);
+        }
 
         public bool SupportsAgenticTools(string providerName) => true;
         public bool SupportsStructuredOutputs(string providerName) => true;

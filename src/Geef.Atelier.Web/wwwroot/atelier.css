@@ -3520,6 +3520,11 @@ textarea.form-input {
     border-color: color-mix(in oklch, #22c55e 35%, transparent);
     color: color-mix(in oklch, #22c55e 60%, var(--ink-1));
 }
+.alert-info {
+    background: color-mix(in oklch, var(--ink-2, #64748b) 8%, var(--surface));
+    border-color: color-mix(in oklch, var(--ink-2, #64748b) 30%, transparent);
+    color: var(--ink-1);
+}
 
 /* ── Admin UI — user/client list rows ───────────────────── */
 .users-list {

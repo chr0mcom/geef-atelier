@@ -1,22 +1,26 @@
 using System.Text;
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Crew.Knowledge;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Learning;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Infrastructure.Grounding;
 
 /// <summary>
 /// Retrieves domain-boosted approved learnings from the learning store using cosine similarity.
-/// Same-domain learnings are boosted; cross-domain learnings are penalised.
+/// Same-domain learnings are boosted; cross-domain learnings are penalised. While
+/// <see cref="LearningOptions.Enabled"/> is false it returns an empty context without embedding.
 /// </summary>
 internal sealed class LearningRetrievalGroundingProvider(
     IEmbeddingProvider embeddingProvider,
     IServiceScopeFactory scopeFactory,
+    IOptionsMonitor<LearningOptions> learningOptions,
     ILogger<LearningRetrievalGroundingProvider> logger) : IGroundingProvider
 {
     public string ProviderType => GroundingProviderTypes.LearningRetrieval;
@@ -27,6 +31,12 @@ internal sealed class LearningRetrievalGroundingProvider(
         Guid runId,
         CancellationToken ct)
     {
+        if (!learningOptions.CurrentValue.Enabled)
+        {
+            logger.LogDebug("Learning-retrieval grounding: learning is paused (Learning:Enabled=false); run={RunId} gets no learnings.", runId);
+            return new GroundingResult(profile.Name, string.Empty, [], 0, null);
+        }
+
         var sameDomainBoost    = ParseDouble(profile.ProviderSettings, "sameDomainBoost",    1.0);
         var crossDomainPenalty = ParseDouble(profile.ProviderSettings, "crossDomainPenalty", 0.5);
         var maxLearnings       = ParseInt   (profile.ProviderSettings, "maxLearnings",       4);

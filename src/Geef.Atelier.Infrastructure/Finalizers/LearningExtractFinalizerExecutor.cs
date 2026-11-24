@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Geef.Atelier.Application.Crew.Finalizers;
 using Geef.Atelier.Application.Runs;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Learning;
@@ -10,17 +11,20 @@ using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Infrastructure.Llm;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Infrastructure.Finalizers;
 
 /// <summary>
 /// Extracts a structured learning candidate from a completed run, then fires a
 /// learning-evaluation run as fire-and-forget. Runs only for Standard runs;
-/// returns immediately for Learning and CrewComposition runs (recursion guard).
+/// returns immediately for Learning and CrewComposition runs (recursion guard) and while
+/// <see cref="LearningOptions.Enabled"/> is false (no extraction call, no learning run).
 /// </summary>
 internal sealed class LearningExtractFinalizerExecutor(
     ILlmClientResolver llmClientResolver,
     IServiceScopeFactory scopeFactory,
+    IOptionsMonitor<LearningOptions> learningOptions,
     ILogger<LearningExtractFinalizerExecutor> logger) : IFinalizerExecutor
 {
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = false };
@@ -32,6 +36,12 @@ internal sealed class LearningExtractFinalizerExecutor(
         FinalizerExecutionContext context,
         CancellationToken cancellationToken)
     {
+        if (!learningOptions.CurrentValue.Enabled)
+        {
+            logger.LogDebug("LearningExtract: learning is paused (Learning:Enabled=false); skipping run {RunId}.", context.RunId);
+            return Ok(profile.Name);
+        }
+
         try
         {
             await using var scope = scopeFactory.CreateAsyncScope();

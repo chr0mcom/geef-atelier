@@ -10,6 +10,9 @@ using Geef.Atelier.Infrastructure.Llm;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
+using Geef.Atelier.Core.Configuration;
+using Geef.Atelier.Tests.Fakes;
+
 namespace Geef.Atelier.Tests.Infrastructure.Finalizers;
 
 /// <summary>
@@ -75,6 +78,7 @@ public sealed class LearningExtractFinalizerRecursionGuardTests
         return new LearningExtractFinalizerExecutor(
             new StubLlmClientResolver("Extracted insight."),
             factory,
+            new StaticOptionsMonitor<LearningOptions>(new LearningOptions { Enabled = true }),
             NullLogger<LearningExtractFinalizerExecutor>.Instance);
     }
 

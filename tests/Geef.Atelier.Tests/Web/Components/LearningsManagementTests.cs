@@ -1,6 +1,7 @@
 using Bunit;
 using Bunit.TestDoubles;
 using Geef.Atelier.Application.Crew.Learning;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Crew.Learning;
 using Geef.Atelier.Web.Components.Pages;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,10 +25,30 @@ public sealed class LearningsManagementTests : TestContext
             CreatedAt:           DateTimeOffset.UtcNow,
             ApprovedAt:          status == LearningStatus.Approved ? DateTimeOffset.UtcNow : null);
 
-    private void SetupAuthorized(ILearningService svc, string user = "stefan")
+    private void SetupAuthorized(ILearningService svc, string user = "stefan", bool learningEnabled = false)
     {
         Services.AddSingleton(svc);
+        Services.AddOptions();
+        Services.Configure<LearningOptions>(o => o.Enabled = learningEnabled);
         this.AddTestAuthorization().SetAuthorized(user);
+    }
+
+    // ── Learning switch ───────────────────────────────────────────────────
+
+    [Fact]
+    public void LearningPaused_ShowsHonestNotice()
+    {
+        SetupAuthorized(new StubLearningService([]));
+        var cut = RenderComponent<LearningsIndex>();
+        Assert.Contains("Learning is paused.", cut.Find("[data-testid='learning-paused']").TextContent);
+    }
+
+    [Fact]
+    public void LearningEnabled_ShowsNoPausedNotice()
+    {
+        SetupAuthorized(new StubLearningService([]), learningEnabled: true);
+        var cut = RenderComponent<LearningsIndex>();
+        Assert.Empty(cut.FindAll("[data-testid='learning-paused']"));
     }
 
     // ── Page structure ────────────────────────────────────────────────────
