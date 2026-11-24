@@ -11,6 +11,7 @@ public static class RunWarningCodes
     public const string FinalizerSkipped = "finalizer.skipped";
     public const string FinalizerFailed = "finalizer.failed";
     public const string FinalizersNotRun = "finalizer.not_run";
+    public const string ResultNotSaved = "run.result_not_saved";
 }
 
 /// <summary>Values of <see cref="RunWarningEntity.Source"/>: the part of the system that reported the warning.</summary>
@@ -21,4 +22,5 @@ public static class RunWarningSources
     public const string ModelAssignment = "model-assignment";
     public const string Llm = "llm";
     public const string Finalizer = "finalizer";
+    public const string Run = "run";
 }

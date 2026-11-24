@@ -9,7 +9,7 @@ namespace Geef.Atelier.Mcp.Tools;
 [McpServerToolType]
 public static class GetRunResultTool
 {
-    [McpServerTool, Description("Gets the final result text of a run, with warnings about anything the run had to skip or replace and the outcome (Converged, DeliveredWithOpenPoints, Failed, Aborted).")]
+    [McpServerTool, Description("Gets the final result text of a run, with warnings about anything the run had to skip or replace and the outcome. The text is final only once 'outcome' is set: the outcome is written after the text and the finishing steps are saved. Outcome values: Converged, DeliveredWithOpenPoints (best text with open points, including status Aborted after a critical finding when a text exists), Failed, Aborted.")]
     public static async Task<RunResultDto?> GetRunResult(
         IRunService runService,
         ICurrentUserService currentUser,
