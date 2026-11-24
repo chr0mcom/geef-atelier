@@ -1,0 +1,7 @@
+{
+  "id": "03-absage-bewerbung",
+  "kurzauftrag": "Formuliere eine höfliche Absage an einen Bewerber für die Stelle als Lagerhelfer.",
+  "original_briefing": "Absage per E-Mail an einen Bewerber (Herr Beispiel) für die Stelle als Lagerhelfer bei der erfundenen Muster Logistik GmbH. Sie-Form, wertschätzend, kurz. Höchstens 100 Wörter. Keine Gründe für die Absage nennen. Ermutigen, sich bei künftigen Ausschreibungen wieder zu bewerben. Hinweis, dass die Unterlagen nach sechs Monaten gelöscht werden. Grußformel: „Ihr Team der Muster Logistik GmbH“. Betreffzeile mitliefern. Keine Platzhalter.",
+  "laenge": { "max": 100 },
+  "referenztext": "Betreff: Ihre Bewerbung als Lagerhelfer\n\nSehr geehrter Herr Beispiel,\n\nvielen Dank für Ihr Interesse an der Stelle als Lagerhelfer und die Zeit, die Sie in Ihre Bewerbung investiert haben. Wir haben uns für eine andere Besetzung entschieden.\n\nWir würden uns freuen, wenn Sie sich bei einer künftigen Ausschreibung erneut bei uns bewerben. Ihre Unterlagen löschen wir nach sechs Monaten.\n\nFür Ihren weiteren Weg wünschen wir Ihnen alles Gute.\n\nIhr Team der Muster Logistik GmbH"
+}
