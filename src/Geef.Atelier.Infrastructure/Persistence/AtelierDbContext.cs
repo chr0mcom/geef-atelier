@@ -5,8 +5,10 @@ using Geef.Atelier.Core.Domain.Crew.Composition;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.OAuth;
 using Geef.Atelier.Core.Domain.Orders;
+using Geef.Atelier.Core.Domain.Profiles;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Tools;
 using Geef.Atelier.Core.Domain.Warnings;
@@ -34,6 +36,9 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     public DbSet<SourceEntity> Sources => Set<SourceEntity>();
     public DbSet<OrderSourceEntity> OrderSources => Set<OrderSourceEntity>();
     public DbSet<RunSourceUsageEntity> RunSourceUsages => Set<RunSourceUsageEntity>();
+
+    public DbSet<UserProfileEntity> UserProfiles => Set<UserProfileEntity>();
+    public DbSet<OrderIntakeShadowEntity> OrderIntakeShadows => Set<OrderIntakeShadowEntity>();
 
     public DbSet<ReviewerProfile> ReviewerProfiles => Set<ReviewerProfile>();
     public DbSet<ExecutorProfile> ExecutorProfiles => Set<ExecutorProfile>();
@@ -84,5 +89,6 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AtelierDbContext).Assembly);
+        modelBuilder.IgnoreIntakeUntilStep49();
     }
 }

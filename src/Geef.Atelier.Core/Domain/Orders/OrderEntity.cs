@@ -1,3 +1,5 @@
+using Geef.Atelier.Core.Domain.Intake;
+
 namespace Geef.Atelier.Core.Domain.Orders;
 
 /// <summary>
@@ -16,6 +18,24 @@ public sealed record OrderEntity
     public string? ClarifyJson { get; init; }
     public string? AnswersJson { get; init; }
     public DateTimeOffset? ClaimedAt { get; init; }
+
+    /// <summary>How the intake ended; null when the order was not clarified (intake off, bypassed, older orders).</summary>
+    public IntakeOutcome? IntakeOutcome { get; init; }
+
+    /// <summary>Number of times the intake worker claimed the order.</summary>
+    public int IntakeAttempts { get; init; }
+
+    /// <summary>Start of the clarifier call.</summary>
+    public DateTimeOffset? IntakeStartedAt { get; init; }
+
+    /// <summary>End of the clarifier call or of its fallback.</summary>
+    public DateTimeOffset? IntakeFinishedAt { get; init; }
+
+    /// <summary>When the order entered <see cref="OrderState.NeedsInput"/>; the automatic start counts from here.</summary>
+    public DateTimeOffset? QuestionsAskedAt { get; init; }
+
+    /// <summary>When the questions were answered, skipped or the order started on its own.</summary>
+    public DateTimeOffset? AnsweredAt { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }
 }

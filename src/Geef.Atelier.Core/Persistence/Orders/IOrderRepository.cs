@@ -1,4 +1,5 @@
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
 
@@ -9,6 +10,17 @@ public sealed record OrderListRow(OrderEntity Order, RunEntity? CurrentRun, int 
 
 /// <summary>A pipeline event of a run as needed for the progress display.</summary>
 public sealed record RunEventRow(string EventType, int? Iteration, DateTimeOffset At);
+
+/// <summary>Everything that changes when an order leaves the intake and its first run starts.</summary>
+public sealed record OrderStart(
+    Guid OrderId,
+    OrderState Expected,
+    RunEntity Run,
+    string? ClarifyJson,
+    string? AnswersJson,
+    IntakeOutcome? Outcome,
+    IReadOnlyList<(Guid SourceId, SourceRole Role)> RoleChanges,
+    DateTimeOffset At);
 
 /// <summary>
 /// Persistence of orders and their link to runs. Every write that changes an order together with a run is one transaction; a
@@ -59,4 +71,26 @@ public interface IOrderRepository
 
     /// <summary>Deletes the order with its source links and runs; false when it did not exist.</summary>
     Task<bool> DeleteAsync(Guid orderId, CancellationToken ct = default);
+
+    /// <summary>Lists orders in <see cref="OrderState.Analyzing"/> that are unclaimed or whose claim is older than <paramref name="staleBefore"/>, oldest first.</summary>
+    Task<IReadOnlyList<Guid>> ListIntakeCandidatesAsync(DateTimeOffset staleBefore, int maxAttempts, int limit, CancellationToken ct = default);
+
+    /// <summary>Atomically claims the order for the intake: sets ClaimedAt, IntakeStartedAt and increments IntakeAttempts when the order is Analyzing and unclaimed or stale and has fewer than <paramref name="maxAttempts"/> attempts.</summary>
+    Task<bool> TryClaimForIntakeAsync(Guid orderId, DateTimeOffset now, DateTimeOffset staleBefore, int maxAttempts, CancellationToken ct = default);
+
+    /// <summary>Orders that are Analyzing with exhausted attempts and a stale claim, or unclaimed for longer than <paramref name="unclaimedBefore"/>; they start without questions.</summary>
+    Task<IReadOnlyList<Guid>> ListStuckIntakesAsync(DateTimeOffset staleBefore, DateTimeOffset unclaimedBefore, int maxAttempts, int limit, CancellationToken ct = default);
+
+    /// <summary>Analyzing → NeedsInput with the record; sets QuestionsAskedAt, IntakeFinishedAt, IntakeOutcome = Asked. False when the state differed.</summary>
+    Task<bool> TrySaveQuestionsAsync(Guid orderId, string clarifyJson, DateTimeOffset at, CancellationToken ct = default);
+
+    /// <summary>
+    /// In one transaction: locks the order, checks <see cref="OrderStart.Expected"/>, sets state Ready, ClarifyJson (only when given),
+    /// AnswersJson, IntakeOutcome, IntakeFinishedAt (when it was Analyzing), AnsweredAt (when it was NeedsInput), applies the role changes
+    /// and inserts the run as version 1. False when the state differed or a version-1 run already exists (no exception).
+    /// </summary>
+    Task<bool> TryStartWithRunAsync(OrderStart start, CancellationToken ct = default);
+
+    /// <summary>NeedsInput orders whose questions were asked before <paramref name="askedBefore"/>, oldest first.</summary>
+    Task<IReadOnlyList<Guid>> ListUnansweredAsync(DateTimeOffset askedBefore, int limit, CancellationToken ct = default);
 }

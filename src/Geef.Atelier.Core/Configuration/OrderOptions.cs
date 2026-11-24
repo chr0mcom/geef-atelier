@@ -1,3 +1,4 @@
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 
 namespace Geef.Atelier.Core.Configuration;
@@ -11,8 +12,8 @@ public sealed class OrderOptions
     /// <summary>Mode of <c>submit_request</c> calls without a crew template or custom crew.</summary>
     public OrderMode LegacySubmitDefaultMode { get; set; } = OrderMode.Direct;
 
-    /// <summary>Whether new orders go through the intake step first (stage 2). Off in stage 1.</summary>
-    public bool IntakeEnabled { get; set; }
+    /// <summary>Whether orders from the start page and submit_order are clarified first (stage 2). Replaces the unused IntakeEnabled.</summary>
+    public IntakeMode IntakeMode { get; set; } = IntakeMode.Shadow;
 
     /// <summary>Longest accepted request, in characters.</summary>
     public int RequestMaxChars { get; set; } = 50_000;

@@ -273,6 +273,24 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
         return affected > 0;
     }
 
+    public Task<IReadOnlyList<Guid>> ListIntakeCandidatesAsync(DateTimeOffset staleBefore, int maxAttempts, int limit, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
+    public Task<bool> TryClaimForIntakeAsync(Guid orderId, DateTimeOffset now, DateTimeOffset staleBefore, int maxAttempts, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
+    public Task<IReadOnlyList<Guid>> ListStuckIntakesAsync(DateTimeOffset staleBefore, DateTimeOffset unclaimedBefore, int maxAttempts, int limit, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
+    public Task<bool> TrySaveQuestionsAsync(Guid orderId, string clarifyJson, DateTimeOffset at, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
+    public Task<bool> TryStartWithRunAsync(OrderStart start, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
+    public Task<IReadOnlyList<Guid>> ListUnansweredAsync(DateTimeOffset askedBefore, int limit, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
     internal static string LegacyRequestText(RunEntity run)
     {
         if (run.Kind != RunKind.CrewComposition)
