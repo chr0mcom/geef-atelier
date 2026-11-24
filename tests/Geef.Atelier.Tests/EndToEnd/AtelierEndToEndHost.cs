@@ -194,7 +194,7 @@ internal sealed class AtelierEndToEndHost : IAsyncDisposable
         while (DateTimeOffset.UtcNow < deadline)
         {
             run = await QueryAsync(db => db.Runs.AsNoTracking().SingleOrDefaultAsync(r => r.Id == runId));
-            if (run is not null && TerminalStatuses.Contains(run.Status))
+            if (run is not null && TerminalStatuses.Contains(run.Status) && run.Outcome is not null)
                 return run;
             await Task.Delay(TimeSpan.FromMilliseconds(100));
         }

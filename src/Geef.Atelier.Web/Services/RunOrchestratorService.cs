@@ -266,10 +266,10 @@ internal sealed class RunOrchestratorService(
 
             await ReportFailedReviewersAsync(run.Id, result.History);
             var delivered = result.ToDeliveredOutcome();
-            await SetOutcomeAsync(run.Id, delivered.Outcome, delivered.Iteration);
 
             if (result.Success)
             {
+                await SetOutcomeAsync(run.Id, delivered.Outcome, delivered.Iteration);
                 if (accumulator is not null)
                     await FinalizeRunCostsAsync(run.Id, accumulator, cts.Token);
                 await ExecuteFinalizationAsync(run.Id, snapshot, cts.Token);
@@ -292,6 +292,7 @@ internal sealed class RunOrchestratorService(
 
                 await SurfaceBestEffortDraftAsync(run.Id, result.Output.Markdown, result.StopReason,
                     setNote: !shouldRunFinalizers, cts.Token);
+                await SetOutcomeAsync(run.Id, delivered.Outcome, delivered.Iteration);
 
                 if (shouldRunFinalizers)
                     await ExecuteFinalizationAsync(run.Id, snapshot, cts.Token);
