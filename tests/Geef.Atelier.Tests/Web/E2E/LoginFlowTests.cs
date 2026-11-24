@@ -60,7 +60,7 @@ public sealed class LoginFlowTests(PlaywrightFixture pw, PostgresFixture pg) : I
     }
 
     [Fact]
-    public async Task Login_WithValidCredentials_RedirectsToRuns()
+    public async Task Login_WithValidCredentials_RedirectsToStart()
     {
         var page = await pw.Browser.NewPageAsync();
         try
@@ -72,9 +72,10 @@ public sealed class LoginFlowTests(PlaywrightFixture pw, PostgresFixture pg) : I
             await page.FillAsync("input#password", "test-password");
             await page.ClickAsync("button.btn-login");
 
-            await page.WaitForURLAsync(new Regex(@"/workshop"), new PageWaitForURLOptions { Timeout = 15_000 });
+            await page.WaitForURLAsync(new Regex(@"/start$"), new PageWaitForURLOptions { Timeout = 15_000 });
 
-            Assert.Contains("/workshop", page.Url);
+            Assert.EndsWith("/start", page.Url);
+            await page.Locator("[data-testid='start-request']").WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
 
             var userNameEl = page.Locator(".user-name");
             await userNameEl.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible });
