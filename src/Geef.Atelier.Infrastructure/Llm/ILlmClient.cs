@@ -90,6 +90,12 @@ public sealed record LlmRequest
     /// the direct-path writer in document mode. Other providers ignore it.
     /// </summary>
     public bool DisableFailover { get; init; }
+
+    /// <summary>
+    /// Optional reasoning effort sent as <c>reasoning_effort</c> (for example <c>low</c>); the cli-proxy passes it on to the
+    /// CLI. Null or blank = the field is not sent, so the request stays exactly as before.
+    /// </summary>
+    public string? ReasoningEffort { get; init; }
 }
 
 /// <summary>

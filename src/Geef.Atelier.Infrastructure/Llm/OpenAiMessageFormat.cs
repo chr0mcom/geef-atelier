@@ -79,6 +79,7 @@ internal static class OpenAiMessageFormat
             Tools          = tools,
             ToolChoice     = toolChoice,
             ResponseFormat = responseFormat,
+            ReasoningEffort = string.IsNullOrWhiteSpace(request.ReasoningEffort) ? null : request.ReasoningEffort.Trim(),
             // bool? null → omitted by WhenWritingNull so real OpenAI/Anthropic APIs never see these fields.
             DocumentMode    = request.DocumentMode ? true : null,
             Document        = request.DocumentMode ? request.Document : null,
@@ -181,6 +182,7 @@ internal static class OpenAiMessageFormat
         [JsonPropertyName("tools")]         public ToolDto[]? Tools { get; set; }
         [JsonPropertyName("tool_choice")]   public object? ToolChoice { get; set; }
         [JsonPropertyName("response_format")] public object? ResponseFormat { get; set; }
+        [JsonPropertyName("reasoning_effort")] public string? ReasoningEffort { get; set; }
         // Document-mode fields — null (omitted) for non-CLI / non-document-mode requests.
         [JsonPropertyName("document_mode")]    public bool? DocumentMode { get; set; }
         [JsonPropertyName("document")]         public string? Document { get; set; }
