@@ -7,7 +7,8 @@ namespace Geef.Atelier.Web.Notifications;
 public static class LiveUpdateServiceExtensions
 {
     /// <summary>
-    /// Registers SignalR, <see cref="IRunUpdateFeed"/>, the <see cref="IRunNotifier"/> that feeds both, and the
+    /// Registers SignalR, <see cref="IRunUpdateFeed"/>, the <see cref="IRunNotifier"/> that feeds both (also serving as
+    /// <see cref="IOrderNotifier"/>), and the
     /// per-circuit <see cref="Components.CircuitDataGate"/> that keeps live reloads and user actions from using the
     /// circuit's database context at the same time.
     /// </summary>
@@ -16,7 +17,9 @@ public static class LiveUpdateServiceExtensions
         services.AddSignalR();
         services.AddScoped<Components.CircuitDataGate>();
         services.AddSingleton<IRunUpdateFeed, InProcessRunUpdateFeed>();
-        services.AddSingleton<IRunNotifier, LiveRunNotifier>();
+        services.AddSingleton<LiveRunNotifier>();
+        services.AddSingleton<IRunNotifier>(sp => sp.GetRequiredService<LiveRunNotifier>());
+        services.AddSingleton<IOrderNotifier>(sp => sp.GetRequiredService<LiveRunNotifier>());
         return services;
     }
 

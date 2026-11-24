@@ -20,4 +20,13 @@ public static class RunUpdateTopics
 
     /// <summary>Topic for dashboard events of <paramref name="username"/>.</summary>
     public static string UserDashboard(string username) => $"dashboard-user-{username}";
+
+    /// <summary>Topic that receives list updates for every user's orders (administrators only).</summary>
+    public const string AdminOrders = "orders-admin";
+
+    /// <summary>Topic for updates of one order.</summary>
+    public static string Order(Guid orderId) => $"order-{orderId}";
+
+    /// <summary>Topic for list updates of the orders owned by <paramref name="username"/>.</summary>
+    public static string UserOrders(string username) => $"orders-user-{username}";
 }

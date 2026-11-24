@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Security.Claims;
+using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain.Dashboard;
 
@@ -81,16 +82,38 @@ internal sealed class InProcessRunUpdateFeed(
     }
 
     /// <inheritdoc/>
-    public Task<IDisposable?> WatchOrderAsync(ClaimsPrincipal user, Guid orderId, Func<Guid, Task> onUpdated, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+    public async Task<IDisposable?> WatchOrderAsync(ClaimsPrincipal user, Guid orderId, Func<Guid, Task> onUpdated, CancellationToken ct = default)
+    {
+        try
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var orderService = scope.ServiceProvider.GetRequiredService<IOrderService>();
+            if (!await orderService.CanWatchOrderAsync(user, orderId, ct))
+                return null;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            return null;
+        }
+        if (ct.IsCancellationRequested)
+            return null;
+        return Add(RunUpdateTopics.Order(orderId), payload => payload is Guid id ? onUpdated(id) : Task.CompletedTask);
+    }
 
     /// <inheritdoc/>
     public IDisposable WatchOrderList(ClaimsPrincipal user, Func<Guid, Task> onUpdated) =>
-        throw new NotImplementedException();
+        user.OrderListTopic() is { } topic
+            ? Add(topic, payload => payload is Guid id ? onUpdated(id) : Task.CompletedTask)
+            : Subscription.None;
 
     /// <inheritdoc/>
-    public Task PublishOrderUpdatedAsync(Guid orderId, string? owner) =>
-        throw new NotImplementedException();
+    public Task PublishOrderUpdatedAsync(Guid orderId, string? owner)
+    {
+        var topics = new List<string> { RunUpdateTopics.Order(orderId), RunUpdateTopics.AdminOrders };
+        if (!string.IsNullOrWhiteSpace(owner))
+            topics.Add(RunUpdateTopics.UserOrders(owner));
+        return PublishAsync(topics, orderId);
+    }
 
     private Task PublishAsync(IEnumerable<string> topics, object payload)
     {
