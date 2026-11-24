@@ -1985,3 +1985,44 @@ Flicken einzelner Sätze konvergierte nicht; deshalb ist die Regel jetzt struktu
 und die Falsch-Blockier-Rate wird an synthetischen Aufträgen gemessen, die ein getrennter Generator vor dem Extraktor
 beschriftet hat (Entwicklungsmenge, zurückgehaltene Menge und eine zweite Menge im Eiltipp-Stil). Die Schwelle von
 25 % begrenzt den Schaden eines verbleibenden Lesefehlers auf Texte, die weit daneben liegen.
+
+
+## D-071 — Etappe 2: Klären vor dem Lauf (2026-11-25)
+
+**Status:** umgesetzt (Paket Q2 der Etappe 2: Klärer, Gate, Worker, Messwerkzeug), ausgeliefert mit
+`Orders:IntakeMode = Shadow`. `On` folgt erst in einem eigenen Commit, wenn die Abnahmetore aus Korpusmessung
+und Schattenbetrieb erfüllt sind.
+
+**Entscheidung.** Vor dem ersten Lauf analysiert ein **Klärer** den Auftrag in genau einem strukturierten Aufruf.
+Was er vorschlägt, setzt ein **Gate im Code** auf die Fragenregel zurück. Die Person bekommt höchstens drei kurze
+Fragen mit Klickantworten oder gar keine; jeder Fehler startet den Auftrag mit dem Wortlaut.
+
+- **Klärer** (`LlmClarifier`): Slot `ModelSlot.Intake` (Sonnet, Rückfall Sol), `response_format` json_schema
+  `clarify_order`, `reasoning_effort: low`, harte Grenze `Intake:Timeout` (40 s), Failover erlaubt. Er sieht den
+  Wortlaut, je Datei Anfang und Ende (2.000 + 1.000 Zeichen, zusammen höchstens 12.000, höchstens fünf Dateien)
+  und das Profil. Tags im Material werden entschärft; das Material gilt als zu analysierender Stoff, nicht als
+  Anweisung. Kein zweiter Versuch in der Anwendung: Der Proxy wiederholt eine ungültige Antwort schon einmal.
+- **Gate** (`QuestionGate`, reine Funktion, jede Regel getestet): Profil vor Frage (Sprache, Absender, Signatur,
+  Anrede); Recherchierbares wird nie gefragt; Fragen, die die Person nicht beantworten kann oder die wenig ändern,
+  werden Annahmen; bei einer Überarbeitung nie Länge, Ton oder Anrede und höchstens eine Frage; die Länge nur aus
+  der festen Vorlage (Deutsch, Englisch; sonst Annahme) und nur, wenn der Wortlaut keine nennt; Frage ≤ 120 Zeichen,
+  2–4 Optionen ≤ 60 Zeichen, keine Füllantworten („egal“, „other“), keine Sperrwörter (`JargonBlocklist`, mit
+  Pluralformen), keine fremde Sprache; ein Thema, eine Frage; Länge zuerst; höchstens drei. Jede verworfene Frage
+  wird Annahme. Alle Kennungen vergibt das Gate.
+- **Ablauf** (`OrderIntakeService`, `OrderIntakeWorker`): atomarer Claim, höchstens zwei Klärungen gleichzeitig,
+  ein Wecksignal nach dem Einreichen. Null Fragen starten den Lauf im selben Schritt (`Clarified`), sonst wartet der
+  Auftrag mit gespeicherten Fragen. Hängende Klärungen starten nach 60 s Warteschlange oder zwei Versuchen ohne
+  Fragen, unbeantwortete Fragen nach 24 h mit den Annahmen. Claims aus der Zeit vor dem Prozessstart gelten
+  sofort als verwaist.
+- **Schatten:** Im Modus `Shadow` läuft der Auftrag wie in Etappe 1; der Worker klärt zusätzlich, wenn die
+  Live-Warteschlange leer ist, und speichert nur in `OrderIntakeShadows` (höchstens 50 je UTC-Tag).
+- **Beantwortete Länge:** Die Antwort auf die Vorlagenfrage wird eine Längenprüfung „etwa n Wörter“ (±20 %), ohne
+  Textparser (`IntakeConstraints.WithAnswers` in `OrderGroundingStep`). Freitext wird nie geparst.
+- **Messung:** `tools/Eval/geef_eval/intake_corpus.py` erzeugt und beschriftet einen synthetischen Korpus,
+  `tools/IntakeEval` misst Klärer und Gate darauf, `IntakeCorpusTests` spielt die gespeicherten Rohantworten ohne
+  Modell erneut durch das Gate.
+
+**Begründung.** In der Messung vom 2026-11-24 fragte ein Agent mit freiem Werkzeugzugang in jedem Fall und brauchte
+dafür zu lange. Ein einzelner strukturierter Aufruf mit kleinem Modell und ein Gate im Code machen die Fragenregel
+überprüfbar, statt sie dem Modell zu überlassen. Annehmen ist billiger als eine überflüssige Frage, deshalb ist das
+Gate streng und jede Verwerfung nur eine Annahme mehr.

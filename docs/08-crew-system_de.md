@@ -73,6 +73,7 @@ Alle vier Standard-Templates liefern drei Standard-Grounding-Provider (`tavily-b
 | TransformRewrite / TransformCondense | Sol → Sonnet / Sonnet → Sol |
 | Composer | Opus → Sonnet → Sol |
 | Helper | Haiku → Sonnet |
+| Intake | Sonnet → Sol (Klärung eines Auftrags vor dem Schreiben, D-071; kein Profil darf diesen Slot tragen) |
 
 Gebiete: General, Correspondence, Legal, Academic, Marketing, Speech, Technical.
 
