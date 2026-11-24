@@ -93,7 +93,7 @@ public sealed class SourceOptions
     /// <summary>Highest ratio of uncompressed to compressed size of one entry of a Word file.</summary>
     public int MaxCompressionRatio { get; set; } = 200;
 
-    /// <summary>Deepest element nesting accepted in every XML part of a Word file.</summary>
+    /// <summary>Deepest element nesting accepted in the main part of a Word file.</summary>
     public int MaxXmlDepth { get; set; } = 100;
 
     /// <summary>Largest total size in bytes that the compressed text streams of a PDF may unpack to (256 MiB); pictures are not counted.</summary>
