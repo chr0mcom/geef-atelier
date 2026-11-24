@@ -1,6 +1,7 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Warnings;
@@ -29,7 +30,7 @@ public sealed record SubmitOrderRequest(
     bool AllowQuestions = true);
 
 /// <summary>Answer to a submitted order: its id, display state, first run (if any) and notices for the person.</summary>
-public sealed record OrderSubmission(Guid OrderId, OrderDisplayState State, Guid? RunId, IReadOnlyList<string> Notices);
+public sealed record OrderSubmission(Guid OrderId, OrderDisplayState State, Guid? RunId, IReadOnlyList<string> Notices, ClarificationView? Clarification = null);
 
 /// <summary>A source of an order as shown to the person.</summary>
 public sealed record OrderSourceView(Guid SourceId, string FileName, SourceKind Kind, int? PageCount, int CharCount, SourceQuality Quality, string? PageSelection, IReadOnlyList<SourceWarning> Warnings);
@@ -64,7 +65,8 @@ public sealed record OrderView(
     IReadOnlyList<OrderRunView> Runs,
     IReadOnlyList<OrderSourceView> Sources,
     OrderProgress Progress,
-    IReadOnlyList<RunWarningEntity> Warnings);
+    IReadOnlyList<RunWarningEntity> Warnings,
+    ClarificationView? Clarification = null);
 
 /// <summary>The delivered text of an order with what the person should check before using it.</summary>
 public sealed record OrderResult(
@@ -78,7 +80,8 @@ public sealed record OrderResult(
     IReadOnlyList<DraftCheckResult> OpenChecks,
     IReadOnlyList<OrderSourceUsageView> SourcesUsed,
     IReadOnlyList<RunWarningEntity> Warnings,
-    string? Note);
+    string? Note,
+    IReadOnlyList<IntakeAssumption>? Assumptions = null);
 
 /// <summary>An order as listed in "My work".</summary>
 public sealed record OrderListItem(Guid OrderId, string Title, OrderDisplay Display, OrderMode Mode, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, int SourceCount, int? WordCount);
@@ -88,3 +91,22 @@ public sealed class OrderSubmissionException(string message) : InvalidOperationE
 
 /// <summary>Thrown when an order is deleted while one of its runs is still working; the message is meant for the person.</summary>
 public sealed class OrderStillWorkingException() : InvalidOperationException("This order is still being worked on. Stop it first.");
+
+/// <summary>What the intake made of an order: understanding, assumptions, questions and the answers given so far.</summary>
+public sealed record ClarificationView(
+    IntakeOutcome? Outcome,
+    string? TextType,
+    string? Language,
+    string? Understanding,
+    IReadOnlyList<IntakeAssumption> Assumptions,
+    IReadOnlyList<ClarifyQuestion> Questions,
+    IReadOnlyList<OrderAnswer> Answers,
+    string? RevisionFileName,
+    DateTimeOffset? QuestionsAskedAt,
+    DateTimeOffset? AutoStartAt);
+
+/// <summary>The answers to the questions of an order that waits for them.</summary>
+public sealed record AnswerOrderRequest(Guid OrderId, string? RequestingUsername, IReadOnlyList<OrderAnswer> Answers);
+
+/// <summary>Raised for answers the caller can fix (unknown question, unknown option, text too long). Plain English.</summary>
+public sealed class OrderAnswerException(string message) : InvalidOperationException(message);

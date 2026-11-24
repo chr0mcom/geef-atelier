@@ -9,7 +9,7 @@ public static class OrderServiceExtensions
     public static IServiceCollection AddAtelierOrders(this IServiceCollection services)
     {
         services.AddOptions();
-        services.AddSingleton<IOrderBriefComposer, VerbatimOrderBriefComposer>();
+        services.AddSingleton<IOrderBriefComposer, IntakeBriefComposer>();
         services.AddScoped<IOrderService, OrderService>();
         return services;
     }

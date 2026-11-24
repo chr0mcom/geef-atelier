@@ -86,7 +86,7 @@ internal sealed class OrderService(
             Id = Guid.NewGuid(),
             CreatedAt = now,
             Status = RunStatus.Pending,
-            BriefingText = briefComposer.Compose(order),
+            BriefingText = briefComposer.Compose(new OrderBriefInput(order, null, [], null)).Text,
             ConfigJson = "{}",
             CreatedByUser = request.CreatedByUser,
             CrewTemplateName = resolved.Snapshot.TemplateName,
@@ -267,6 +267,12 @@ internal sealed class OrderService(
         await NotifyAsync(orderId);
         return true;
     }
+
+    public Task<OrderSubmission> AnswerAsync(AnswerOrderRequest request, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
+    public Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) =>
+        throw new NotImplementedException();
 
     private async Task<OrderEntity?> GetOwnedAsync(Guid orderId, string? requestingUsername, CancellationToken ct)
     {

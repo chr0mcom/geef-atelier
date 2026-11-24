@@ -144,6 +144,12 @@ internal sealed class FakeOrderService : IOrderService
 
     public Task<bool> DeleteAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) => Task.FromResult(false);
 
+    public Task<OrderSubmission> AnswerAsync(AnswerOrderRequest request, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
+    public Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
     private bool Visible(Guid orderId, string? requestingUsername) =>
         _orders.TryGetValue(orderId, out var entry) && (requestingUsername is null || entry.Owner == requestingUsername);
 }

@@ -175,6 +175,12 @@ internal sealed class FakeOrderService : IOrderService
         }
     }
 
+    public Task<OrderSubmission> AnswerAsync(AnswerOrderRequest request, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
+    public Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
     private async Task EnterAsync()
     {
         Interlocked.Increment(ref _calls);
