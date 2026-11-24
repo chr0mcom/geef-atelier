@@ -1,4 +1,111 @@
 @using Geef.Atelier.Application.Orders
+@using Geef.Atelier.Core.Domain.Intake
+@inject IOrderService Orders
+@inject CircuitDataGate DataGate
+@inject ILogger<ClarifyCard> Logger
+
+<section class="clarify-card" aria-labelledby="clarify-card-title" data-testid="clarify-card">
+    <h2 id="clarify-card-title" class="clarify-title" tabindex="-1" @ref="_heading">Before I start</h2>
+
+    @if (!string.IsNullOrWhiteSpace(Clarification.Understanding))
+    {
+        <div class="clarify-understanding">
+            <p class="clarify-lead">Here's what I understood:</p>
+            <p class="clarify-understanding-text" lang="@Clarification.Language" data-testid="clarify-understanding">@Clarification.Understanding</p>
+        </div>
+    }
+
+    @if (Clarification.RevisionFileName is { } fileName)
+    {
+        <div class="clarify-revision" data-testid="clarify-revision">
+            @if (_writeNew)
+            {
+                <p>OK – I'll write something new and use “@fileName” only as material.</p>
+                <button type="button" class="clarify-link" data-testid="clarify-revision-undo" @onclick="() => _writeNew = false">Undo</button>
+            }
+            else
+            {
+                <p>I'll improve “@fileName” and keep its length and voice.</p>
+                <button type="button" class="clarify-link" data-testid="clarify-revision-no" @onclick="() => _writeNew = true">No, write something new instead</button>
+            }
+        </div>
+    }
+
+    @if (Clarification.Assumptions.Count > 0)
+    {
+        <div class="clarify-assumptions">
+            <p class="clarify-lead">I'm assuming:</p>
+            <ul>
+                @foreach (var assumption in Clarification.Assumptions)
+                {
+                    var id = assumption.Id;
+                    <li class="clarify-assumption" data-testid="clarify-assumption" data-id="@id">
+                        @if (_corrections.TryGetValue(id, out var correction))
+                        {
+                            <label class="clarify-assumption-label" for="clarify-assumption-@id">Instead of “<span lang="@Clarification.Language">@assumption.Text</span>”:</label>
+                            <textarea id="clarify-assumption-@id"
+                                      class="clarify-assumption-input"
+                                      rows="2"
+                                      maxlength="@MaxFreeTextChars"
+                                      lang="@Clarification.Language"
+                                      data-testid="clarify-assumption-input"
+                                      value="@correction"
+                                      @oninput="e => _corrections[id] = Cap(e.Value?.ToString())"></textarea>
+                            <button type="button" class="clarify-link" data-testid="clarify-assumption-keep" @onclick="() => _corrections.Remove(id)">Keep it as it was</button>
+                        }
+                        else
+                        {
+                            <span class="clarify-assumption-text" lang="@Clarification.Language">@assumption.Text</span>
+                            <button type="button" class="clarify-link" data-testid="clarify-assumption-change" aria-label="Change: @assumption.Text" @onclick="() => _corrections[id] = assumption.Text">Change</button>
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+    @if (Clarification.Questions.Count > 0)
+    {
+        <div class="clarify-questions">
+            <h3 class="clarify-questions-title">@(Clarification.Questions.Count == 1 ? "One quick question" : "A few quick questions")</h3>
+            @foreach (var question in Clarification.Questions)
+            {
+                var id = question.Id;
+                <QuestionBlock @key="id"
+                               Question="question"
+                               Language="@Clarification.Language"
+                               MaxFreeTextChars="MaxFreeTextChars"
+                               Answer="@(_answers.GetValueOrDefault(id))"
+                               AnswerChanged="a => SetAnswer(id, a)" />
+            }
+            <p class="clarify-hint">Skipping is fine – I'll go with my assumptions.</p>
+        </div>
+    }
+
+    @if (_error is not null)
+    {
+        <div class="order-banner order-banner--failed" role="alert" data-testid="clarify-error">
+            <strong>That did not work.</strong>
+            <span>@_error</span>
+        </div>
+    }
+
+    <div class="clarify-actions">
+        <button type="button" class="btn primary" data-testid="clarify-start" disabled="@_busy" @onclick="StartWritingAsync">
+            @(_busy ? "Starting…" : "Start writing")
+        </button>
+        <button type="button" class="btn" data-testid="clarify-just-start" disabled="@_busy" @onclick="JustStartAsync">Just start</button>
+        @if (ChildContent is not null)
+        {
+            <span class="clarify-actions-more">@ChildContent</span>
+        }
+    </div>
+
+    @if (Clarification.AutoStartAt is { } autoStart)
+    {
+        <p class="clarify-autostart" data-testid="clarify-autostart-note">If you don't answer, I'll start with my assumptions on @autoStart.ToListDate().</p>
+    }
+</section>
 
 @code {
     /// <summary>The order that waits for answers.</summary>
@@ -7,9 +114,115 @@
     /// <summary>Understanding, assumptions and questions of the order.</summary>
     [Parameter, EditorRequired] public ClarificationView Clarification { get; set; } = null!;
 
+    /// <summary>Owner filter of the signed-in person; null for administrators.</summary>
+    [Parameter] public string? RequestingUsername { get; set; }
+
     /// <summary>Most characters of a free-text answer or an assumption correction.</summary>
     [Parameter] public int MaxFreeTextChars { get; set; } = 500;
 
-    /// <summary>Raised after the order was started (answered or skipped), so the page can reload.</summary>
-    [Parameter] public EventCallback OnStarted { get; set; }
+    /// <summary>Raised with the answer of the service after the order was started (answered or skipped), so the page can reload.</summary>
+    [Parameter] public EventCallback<OrderSubmission> OnStarted { get; set; }
+
+    /// <summary>Further actions next to the start buttons, such as the stop button.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    readonly Dictionary<string, OrderAnswer> _answers = [];
+    readonly Dictionary<string, string> _corrections = [];
+    ElementReference _heading;
+    Guid _forOrder;
+    bool _writeNew;
+    bool _busy;
+    string? _error;
+
+    protected override void OnParametersSet()
+    {
+        if (_forOrder == OrderId)
+            return;
+        _forOrder = OrderId;
+        _answers.Clear();
+        _corrections.Clear();
+        _writeNew = false;
+        _error = null;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+        try
+        {
+            await _heading.FocusAsync();
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException or InvalidOperationException)
+        {
+            Logger.LogDebug(ex, "Moving the focus to the questions failed");
+        }
+    }
+
+    void SetAnswer(string questionId, OrderAnswer? answer)
+    {
+        if (answer is null)
+            _answers.Remove(questionId);
+        else
+            _answers[questionId] = answer;
+    }
+
+    string Cap(string? text) =>
+        text is null ? string.Empty : text.Length > MaxFreeTextChars ? text[..MaxFreeTextChars] : text;
+
+    /// <summary>The answers "Start writing" sends: every question once (unanswered ones as "decide for me"), changed assumptions and the revision choice.</summary>
+    internal IReadOnlyList<OrderAnswer> BuildAnswers()
+    {
+        var answers = new List<OrderAnswer>();
+        foreach (var question in Clarification.Questions)
+        {
+            var given = _answers.GetValueOrDefault(question.Id);
+            var freeText = string.IsNullOrWhiteSpace(given?.FreeText) ? null : given.FreeText.Trim();
+            answers.Add(given is { DecideForMe: false } && (given.OptionId is not null || freeText is not null)
+                ? new OrderAnswer(question.Id, given.OptionId, freeText, false, AnswerOrigin.User)
+                : new OrderAnswer(question.Id, null, null, true, AnswerOrigin.User));
+        }
+        foreach (var assumption in Clarification.Assumptions)
+        {
+            if (_corrections.TryGetValue(assumption.Id, out var correction)
+                && !string.IsNullOrWhiteSpace(correction)
+                && !string.Equals(correction.Trim(), assumption.Text.Trim(), StringComparison.Ordinal))
+                answers.Add(new OrderAnswer(assumption.Id, null, correction.Trim(), false, AnswerOrigin.User));
+        }
+        if (_writeNew && Clarification.RevisionFileName is not null)
+            answers.Add(new OrderAnswer(ClarifyAnswerIds.Revision, ClarifyAnswerIds.RevisionNo, null, false, AnswerOrigin.User));
+        return answers;
+    }
+
+    Task StartWritingAsync() =>
+        RunAsync(() => Orders.AnswerAsync(new AnswerOrderRequest(OrderId, RequestingUsername, BuildAnswers())));
+
+    Task JustStartAsync() =>
+        RunAsync(() => Orders.SkipClarificationAsync(OrderId, RequestingUsername));
+
+    async Task RunAsync(Func<Task<OrderSubmission>> action)
+    {
+        if (_busy)
+            return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var submission = await DataGate.RunAsync(action);
+            await OnStarted.InvokeAsync(submission);
+        }
+        catch (OrderAnswerException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Answering order {OrderId} failed", OrderId);
+            _error = "Something went wrong on our side. Your answers are still here. Try again in a moment.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
 }

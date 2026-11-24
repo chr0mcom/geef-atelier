@@ -1,6 +1,111 @@
 @using Geef.Atelier.Application.Orders
+@using Geef.Atelier.Core.Domain.Intake
+
+<section class="clarify-summary@(Inline ? " clarify-summary--inline" : "")" aria-labelledby="@TitleId" data-testid="clarify-summary">
+    @if (Inline)
+    {
+        <h3 id="@TitleId">Before writing</h3>
+    }
+    else
+    {
+        <h2 id="@TitleId" class="clarify-summary-title">Before writing</h2>
+    }
+
+    @if (Clarification.Outcome is { } outcome)
+    {
+        <p class="clarify-summary-outcome" data-testid="clarify-summary-outcome">@outcome.ToPlainText()</p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Clarification.Understanding))
+    {
+        <p class="clarify-summary-understanding" data-testid="clarify-summary-understanding">
+            <span class="clarify-summary-label">What I understood:</span>
+            <span lang="@Clarification.Language">@Clarification.Understanding</span>
+        </p>
+    }
+
+    @if (AnswerLines.Count > 0)
+    {
+        <p class="clarify-summary-label">Your answers:</p>
+        <ul class="clarify-summary-list">
+            @foreach (var line in AnswerLines)
+            {
+                <li data-testid="clarify-summary-answer"><span lang="@(line.Localized ? Clarification.Language : null)">@line.Question</span> → <span lang="@(line.Localized && !line.LeftToMe ? Clarification.Language : null)">@line.Answer</span>@line.Suffix</li>
+            }
+        </ul>
+    }
+
+    @if (Clarification.Assumptions.Count > 0)
+    {
+        <p class="clarify-summary-label">Assumptions:</p>
+        <ul class="clarify-summary-list">
+            @foreach (var assumption in Clarification.Assumptions)
+            {
+                <li data-testid="clarify-summary-assumption" data-id="@assumption.Id">
+                    @if (Correction(assumption.Id) is { } correction)
+                    {
+                        <s lang="@Clarification.Language">@assumption.Text</s>
+                        <span> → </span>
+                        <span lang="@Clarification.Language">@correction.FreeText</span>
+                        <span class="clarify-summary-who">@Who(correction, "changed by you")</span>
+                    }
+                    else
+                    {
+                        <span lang="@Clarification.Language">@assumption.Text</span>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</section>
 
 @code {
     /// <summary>Understanding, answers and assumptions of a started order.</summary>
     [Parameter, EditorRequired] public ClarificationView Clarification { get; set; } = null!;
+
+    /// <summary>True inside "How it was made": a small heading in the style of that section.</summary>
+    [Parameter] public bool Inline { get; set; }
+
+    string TitleId => Inline ? "clarify-summary-inline-title" : "clarify-summary-title";
+
+    OrderAnswer? Correction(string assumptionId) =>
+        Clarification.Answers.FirstOrDefault(a => a.QuestionId == assumptionId && !string.IsNullOrWhiteSpace(a.FreeText));
+
+    sealed record AnswerLine(string Question, string Answer, bool Localized, bool LeftToMe, string Suffix);
+
+    IReadOnlyList<AnswerLine> AnswerLines
+    {
+        get
+        {
+            var lines = new List<AnswerLine>();
+            foreach (var question in Clarification.Questions)
+            {
+                var answer = Clarification.Answers.FirstOrDefault(a => a.QuestionId == question.Id);
+                if (answer is null)
+                    continue;
+                var label = question.Options.FirstOrDefault(o => o.Id == answer.OptionId)?.Label;
+                var free = string.IsNullOrWhiteSpace(answer.FreeText) ? null : answer.FreeText.Trim();
+                var text = (answer.DecideForMe, label, free) switch
+                {
+                    (true, _, _) => null,
+                    (_, { } l, { } f) => $"{l} – “{f}”",
+                    (_, { } l, null) => l,
+                    (_, null, { } f) => $"“{f}”",
+                    _ => null,
+                };
+                lines.Add(new AnswerLine(question.Text, text ?? "left to me", true, text is null, Who(answer, string.Empty)));
+            }
+            if (Clarification.RevisionFileName is { } file
+                && Clarification.Answers.Any(a => a.QuestionId == ClarifyAnswerIds.Revision && a.OptionId == ClarifyAnswerIds.RevisionNo))
+                lines.Add(new AnswerLine($"Improve “{file}”?", "No, write something new", false, false, string.Empty));
+            return lines;
+        }
+    }
+
+    static string Who(OrderAnswer answer, string byPerson) => answer.Origin switch
+    {
+        AnswerOrigin.Client => " (answered by your assistant)",
+        _ when byPerson.Length > 0 => $" ({byPerson})",
+        _ => string.Empty,
+    };
 }

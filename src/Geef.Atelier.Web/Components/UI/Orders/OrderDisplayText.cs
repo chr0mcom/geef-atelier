@@ -1,5 +1,6 @@
 using System.Globalization;
 using Geef.Atelier.Application.Sources;
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
 
@@ -60,6 +61,18 @@ public static class OrderDisplayText
     /// <summary>True for states in which the order is still being worked on.</summary>
     public static bool IsBusy(this OrderDisplayState state) =>
         state is OrderDisplayState.Preparing or OrderDisplayState.NeedsInput or OrderDisplayState.Queued or OrderDisplayState.Working;
+
+    /// <summary>One plain sentence on how the questions before writing ended, for the summary of a started order.</summary>
+    public static string ToPlainText(this IntakeOutcome outcome) => outcome switch
+    {
+        IntakeOutcome.Clarified => "Nothing needed to be asked, so writing started right away.",
+        IntakeOutcome.Asked => "Waiting for your answers.",
+        IntakeOutcome.Answered => "You answered before writing started.",
+        IntakeOutcome.Skipped => "You started without answering. My assumptions were used.",
+        IntakeOutcome.AutoStarted => "There were no answers within a day, so writing started with my assumptions.",
+        IntakeOutcome.Failed => "Your request could not be read in advance, so writing started with your request as written.",
+        _ => outcome.ToString(),
+    };
 
     /// <summary>A number with thousands separators, e.g. <c>160,485</c>.</summary>
     public static string Grouped(this int value) => value.ToString("N0", Culture);
