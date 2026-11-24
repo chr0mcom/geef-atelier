@@ -12,4 +12,7 @@ internal interface ISourceRetentionStore
 
     /// <summary>Forgets the original file of a source; its extracted text stays.</summary>
     Task ClearStoragePathAsync(Guid sourceId, CancellationToken ct = default);
+
+    /// <summary>Moves the expiry of a still unattached source to <paramref name="expiresAt"/> when that is later; attached sources keep no expiry.</summary>
+    Task ExtendExpiryAsync(Guid sourceId, DateTimeOffset expiresAt, CancellationToken ct = default);
 }

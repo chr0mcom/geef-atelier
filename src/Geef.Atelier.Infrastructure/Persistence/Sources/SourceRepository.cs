@@ -140,6 +140,10 @@ internal sealed class SourceRepository(AtelierDbContext db) : ISourceRepository,
         await db.Sources.Where(s => s.Id == sourceId)
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.StoragePath, (string?)null), ct);
 
+    public async Task ExtendExpiryAsync(Guid sourceId, DateTimeOffset expiresAt, CancellationToken ct = default) =>
+        await db.Sources.Where(s => s.Id == sourceId && s.ExpiresAt != null && s.ExpiresAt < expiresAt)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.ExpiresAt, expiresAt), ct);
+
     private static IQueryable<SourceEntity> Project(IQueryable<SourceEntity> query, bool includeText) =>
         includeText ? query : query.Select(WithoutText);
 }
