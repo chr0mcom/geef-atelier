@@ -11,7 +11,7 @@ The documentation evolves alongside the brainstorming and is updated after every
 | File | Content | Type |
 |---|---|---|
 | [01-vision-and-scope.md](01-vision-and-scope.md) | What the project is, what it is not, for whom, in what environment | Living |
-| [02-architecture.md](02-architecture.md) | Layers, components, data flow, DB schema | Living |
+| [02-architecture.md](02-architecture.md) | Layers, components, data flow, DB schema; run safeguards, configuration switches, end-to-end harness (D-067) | Living |
 | [03-walking-skeleton-plan.md](03-walking-skeleton-plan.md) | The original 10-step build plan (historical; skeleton completed) | Historical |
 | [04-mcp-integration.md](04-mcp-integration.md) | MCP server: tools, auth (bearer + OAuth 2.1), transport | Living |
 | [05-decisions-log.md](05-decisions-log.md) | Chronological, append-only log of all architecture decisions (D-001 ff.) | Historical |
@@ -19,8 +19,9 @@ The documentation evolves alongside the brainstorming and is updated after every
 | [07-design-system.md](07-design-system.md) | Theme system, typography, component inventory (as of design translation PS-3) | Living |
 | [08-crew-system.md](08-crew-system.md) | Crew/profile/template system, system profiles, advisor passes | Living |
 | [09-endpoint-reference.md](09-endpoint-reference.md) | Reference of all externally reachable HTTP endpoints (MCP, OAuth, Web/Account) | Living |
-| [10-tool-system.md](10-tool-system.md) | Central tool catalogue + agentic tool-use (Pull) + grounding (Push) + MCP client (D-060) | Living |
+| [10-tool-system.md](10-tool-system.md) | Central tool catalogue + agentic tool-use (Pull) + grounding (Push) + MCP client (D-060); actual state: Pull never wired and frozen, environment-variable allow list (D-067) | Living |
 | [11-specialization-packs.md](11-specialization-packs.md) | Generic actors + reusable scoped specialization packs (D-061) | Living |
+| [ops/atelier-smoke.md](ops/atelier-smoke.md), [ops/atelier-watch.md](ops/atelier-watch.md) | Operations: mini run after deploy, watcher for stuck runs (German only) | Living |
 
 > **Internal working directories (not in the public repository):**
 > `docs/prompts/` (step-specific build prompts) and `docs/reports/` (persistent
@@ -36,8 +37,8 @@ The cross-cutting process rules live in the parent infrastructure repository und
 ## Status
 
 - **Phase:** Walking skeleton completed; in production at `https://geef.stefan-bechtel.de`. Numerous post-skeleton extensions shipped (crew system, advisor passes, grounding/vector-store RAG, run attachments, cost tracking, Template Studio, domain templates, MCP OAuth 2.1, multi-user, run-user isolation, finalizer pipeline, grounding refinement, academic search, REST-API grounding, landing page, continuous learning loop).
-- **Last updated:** 22 May 2026
-- **Current state & next steps:** see the [project README](../README.md) (implementation status) and the [decisions log](05-decisions-log.md) (chronological decision history, most recently D-054).
+- **Last updated:** 2026-11-24
+- **Current state & next steps:** see the [project README](../README.md) (implementation status) and the [decisions log](05-decisions-log.md) (chronological decision history, most recently D-067 "stage 0: safety net" and D-068 "direction of the rebuild"). The rebuild following D-068 replaces large parts of the crew, tool and learning systems in stages; documents mark parts that are frozen or due for removal.
 
 ## Conventions
 

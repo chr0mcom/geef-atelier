@@ -11,7 +11,7 @@ Die Doku entsteht parallel zum Brainstorming und wird nach jeder Entscheidungsru
 | Datei | Inhalt | Typ |
 |---|---|---|
 | [01-vision-and-scope.md](01-vision-and-scope_de.md) | Was ist das Projekt, was nicht, für wen, in welchem Umfeld | Living |
-| [02-architecture.md](02-architecture_de.md) | Schichten, Komponenten, Datenfluss, DB-Schema | Living |
+| [02-architecture.md](02-architecture_de.md) | Schichten, Komponenten, Datenfluss, DB-Schema; Schutzmechanismen am Lauf, Konfigurationsschalter, Ende-zu-Ende-Gerüst (D-067) | Living |
 | [03-walking-skeleton-plan.md](03-walking-skeleton-plan_de.md) | Der ursprüngliche 10-Schritte-Bauplan (historisch; Skeleton abgeschlossen) | Historisch |
 | [04-mcp-integration.md](04-mcp-integration_de.md) | MCP-Server: Tools, Auth (Bearer + OAuth 2.1), Transport | Living |
 | [05-decisions-log.md](05-decisions-log_de.md) | Chronologisches, append-only Protokoll aller Architektur-Entscheidungen (D-001 ff.) | Historisch |
@@ -19,6 +19,9 @@ Die Doku entsteht parallel zum Brainstorming und wird nach jeder Entscheidungsru
 | [07-design-system.md](07-design-system_de.md) | Theme-System, Typografie, Komponenten-Inventar (Stand Design-Translation PS-3) | Living |
 | [08-crew-system.md](08-crew-system_de.md) | Crew-/Profil-/Template-System, System-Profile, Advisor-Pässe | Living |
 | [09-endpoint-reference.md](09-endpoint-reference_de.md) | Referenz aller extern erreichbaren HTTP-Endpunkte (MCP, OAuth, Web/Account) | Living |
+| [10-tool-system.md](10-tool-system_de.md) | Zentraler Tool-Katalog + agentischer Tool-Use (Pull) + Grounding (Push) + MCP-Client (D-060); Ist-Zustand: Pull nie verdrahtet und eingefroren, Allowlist für Umgebungsvariablen (D-067) | Living |
+| [11-specialization-packs.md](11-specialization-packs_de.md) | Generische Akteure + wiederverwendbare gescopte Spezialisierungs-Packs (D-061) | Living |
+| [ops/atelier-smoke.md](ops/atelier-smoke.md), [ops/atelier-watch.md](ops/atelier-watch.md) | Betrieb: Mini-Lauf nach dem Deploy, Wächter für hängende Läufe (nur Deutsch) | Living |
 
 > **Interne Arbeitsverzeichnisse (nicht im öffentlichen Repository):**
 > `docs/prompts/` (schritt-spezifische Bau-Prompts) und `docs/reports/` (persistente
@@ -34,8 +37,8 @@ Im übergeordneten Infrastruktur-Repository unter `/srv/docker/docs/` liegen die
 ## Status
 
 - **Phase:** Walking Skeleton abgeschlossen; produktiv unter `https://geef.stefan-bechtel.de`. Zahlreiche Post-Skeleton-Erweiterungen ausgeliefert (Crew-System, Advisor-Pässe, Grounding/Vector-Store-RAG, Run-Attachments, Cost-Tracking, Template Studio, Domain-Templates, MCP-OAuth 2.1, Multi-User, Run-User-Isolation, Finalizer-Pipeline, Grounding-Refinement, Academic-Search, REST-API-Grounding, Landing-Page, Continuous-Learning-Loop).
-- **Letzte Aktualisierung:** 22. Mai 2026
-- **Aktueller Stand & nächste Schritte:** siehe [Projekt-README](../README_de.md) (Implementierungsstand) und [Decisions-Log](05-decisions-log_de.md) (chronologische Entscheidungshistorie, zuletzt D-054).
+- **Letzte Aktualisierung:** 2026-11-24
+- **Aktueller Stand & nächste Schritte:** siehe [Projekt-README](../README_de.md) (Implementierungsstand) und [Decisions-Log](05-decisions-log_de.md) (chronologische Entscheidungshistorie, zuletzt D-067 „Etappe 0: Sicherheitsnetz“ und D-068 „Richtung Umbau“). Der Umbau nach D-068 ersetzt große Teile von Crew-, Tool- und Learning-System in Etappen; die Dokumente kennzeichnen eingefrorene oder zum Rückbau vorgesehene Teile.
 
 ## Konventionen
 
