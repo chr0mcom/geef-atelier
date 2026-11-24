@@ -32,15 +32,32 @@ public static class RequestConstraintExtractor
         $@"(?<a>{Num})\s*(?:–|—|-|bis|to)\s*(?<b>{Num}){Sep}{Unit}", Options);
 
     private static readonly Regex AtMostBefore = new(
-        $@"(?<![\p{{L}}])(?:max(?:imal|imum)?\.?(?:\s+of)?|höchstens|hoechstens|bis|nicht\s+mehr\s+als|keinesfalls\s+mehr\s+als|nicht\s+länger\s+als|bis\s+zu|at\s+most|no\s+more\s+than|not\s+more\s+than|no\s+longer\s+than|up\s+to|under|unter|weniger\s+als|less\s+than|fewer\s+than|within)\s*{Approx}(?<a>{Num}){Sep}{Unit}",
+        $@"(?<![\p{{L}}])(?:max(?:imal|imum)?\.?(?:\s+of)?|höchstens|hoechstens|bis|nicht\s+mehr\s+als|keinesfalls\s+mehr\s+als|nicht\s+länger\s+als|bis\s+zu|at\s+most|no\s+more\s+than|not\s+more\s+than|no\s+longer\s+than|up\s+to|within)\s*{Approx}(?<a>{Num}){Sep}{Unit}",
         Options);
 
     private static readonly Regex AtMostAfter = new(
         $@"(?<a>{Num}){Sep}{Unit}\s*(?:max(?:imal|imum)?\.?|or\s+(?:less|fewer)|oder\s+weniger|höchstens)(?!\p{{L}})", Options);
 
     private static readonly Regex AtLeastBefore = new(
-        $@"(?<![\p{{L}}])(?:mindestens|min\.|wenigstens|at\s+least|no\s+less\s+than|not\s+less\s+than|no\s+fewer\s+than|minimum(?:\s+of)?|mehr\s+als|more\s+than)\s*{Approx}(?<a>{Num}){Sep}{Unit}",
+        $@"(?<![\p{{L}}])(?:mindestens|min\.|wenigstens|at\s+least|no\s+less\s+than|not\s+less\s+than|no\s+fewer\s+than|not\s+fewer\s+than|nicht\s+weniger\s+als|keinesfalls\s+weniger\s+als|nicht\s+unter|nicht\s+kürzer\s+als|no\s+shorter\s+than|minimum(?:\s+of)?)\s*{Approx}(?<a>{Num}){Sep}{Unit}",
         Options);
+
+    private static readonly Regex MoreThanBefore = new(
+        $@"(?<![\p{{L}}])(?:mehr\s+als|more\s+than)\s*{Approx}(?<a>{Num}){Sep}{Unit}", Options);
+
+    private static readonly Regex LessThanBefore = new(
+        $@"(?<![\p{{L}}])(?:weniger\s+als|less\s+than|fewer\s+than|under|unter)\s*{Approx}(?<a>{Num}){Sep}{Unit}", Options);
+
+    private const string NegationWord = @"(?:(?<![\p{L}])(?:not|never|nie|niemals|nicht|kein(?:e|en|er|es|em)?|keinesfalls)|\p{L}n['’]t|(?<![\p{L}])auf\s+keinen\s+Fall)(?![\p{L}])";
+
+    private static readonly Regex NegationRightBefore = new(
+        $@"(?:{NegationWord}(?:\s+[\p{{L}}'’-]+){{0,2}}|(?<![\p{{L}}])ohne)\s*$", Options);
+
+    private static readonly Regex NegationRightAfter = new(
+        $@"^\s*(?:[\p{{L}}'’-]+\s+){{0,3}}?(?:(?<![\p{{L}}])(?:nicht|not|nie|never|niemals|keinesfalls)|\p{{L}}+n['’]t)(?![\p{{L}}])(?!\s+(?:weniger|less|fewer|unter|under|kürzer|shorter)(?![\p{{L}}]))", Options);
+
+    private static readonly Regex AnyNegation = new(
+        $@"{NegationWord}|(?<![\p{{L}}])ohne(?![\p{{L}}])", Options);
 
     private static readonly Regex AtLeastAfter = new(
         $@"(?<a>{Num}){Sep}{Unit}\s*(?:or\s+more|oder\s+mehr|mindestens)(?!\p{{L}})", Options);
@@ -96,7 +113,11 @@ public static class RequestConstraintExtractor
         Options);
 
     private static readonly Regex NoHeadings = new(
-        @"(?<![\p{L}])(?:(?:ohne|keine)\s+(?:Zwischen)?(?:ü|ue)berschrift(?:en)?|(?:no|without|avoid|(?:do\s+not|don't|never)\s+use)\s+(?:any\s+)?(?:sub)?(?:headings?|headers?|headlines?))",
+        @"(?<![\p{L}])(?:(?:ohne|keine)\s+(?:ü|ue)berschrift(?:en)?|(?:no|without|avoid|(?:do\s+not|don't|never)\s+use)\s+(?:any\s+)?(?:headings?|headers?|headlines?))",
+        Options);
+
+    private static readonly Regex NoSubheadings = new(
+        @"(?<![\p{L}])(?:(?:ohne|keine)\s+Zwischen(?:ü|ue)berschrift(?:en)?|(?:no|without|avoid|(?:do\s+not|don't|never)\s+use)\s+(?:any\s+)?sub-?(?:headings?|headers?|headlines?))",
         Options);
 
     private static readonly Regex NoEmojis = new(
@@ -204,7 +225,7 @@ public static class RequestConstraintExtractor
         var accepted = new List<LengthCandidate>();
         var partMentioned = false;
 
-        void Consider(Regex regex, LengthKind statedKind, bool framed)
+        void Consider(Regex regex, LengthKind statedKind, bool framed, bool negatable = false)
         {
             foreach (Match match in regex.Matches(text))
             {
@@ -226,6 +247,21 @@ public static class RequestConstraintExtractor
                     partMentioned = true;
                     notes.Add($"A length for one part of the text was not checked (\"{quote}\").");
                     continue;
+                }
+
+                if (negatable)
+                {
+                    var negation = FindNegation(text, match);
+                    if (negation.Unclear)
+                    {
+                        notes.Add($"A length next to a negation was not checked, because it is not certain whether it is a lower or an upper limit (\"{quote}\").");
+                        continue;
+                    }
+                    if (negation.Span is var (spanStart, spanEnd))
+                    {
+                        kind = kind == LengthKind.AtLeast ? LengthKind.AtMost : LengthKind.AtLeast;
+                        quote = Shorten(text[spanStart..spanEnd]);
+                    }
                 }
 
                 if (kind is LengthKind.Range or LengthKind.Stated && IsApproximate(text, match))
@@ -272,6 +308,8 @@ public static class RequestConstraintExtractor
         Consider(AtMostAfter, LengthKind.AtMost, framed: true);
         Consider(AtLeastBefore, LengthKind.AtLeast, framed: true);
         Consider(AtLeastAfter, LengthKind.AtLeast, framed: true);
+        Consider(MoreThanBefore, LengthKind.AtLeast, framed: true, negatable: true);
+        Consider(LessThanBefore, LengthKind.AtMost, framed: true, negatable: true);
         Consider(AboutBefore, LengthKind.About, framed: true);
         Consider(StatedFramed, LengthKind.Stated, framed: true);
         Consider(Bare, LengthKind.Stated, framed: false);
@@ -323,6 +361,34 @@ public static class RequestConstraintExtractor
             kind = LengthKind.Stated;
         var quote = Shorten(string.Join(" / ", constraints.Select(c => c.Quote).Distinct(StringComparer.Ordinal)));
         return new LengthConstraint(first.Unit, low, high, quote, kind);
+    }
+
+    private sealed record Negation(bool Unclear, (int Start, int End)? Span);
+
+    /// <summary>
+    /// Looks for a negation of a comparative length ("more than", "less than") in its clause. A negation right before
+    /// it (at most two words in between, as in "must not be more than" or "Don't write more than") or right after it
+    /// ("Mehr als 100 Wörter sollen es nicht sein") returns the span from the negation to the length, which turns the
+    /// limit around. Any other negation in the clause makes the meaning unclear.
+    /// </summary>
+    private static Negation FindNegation(string text, Match match)
+    {
+        var start = ClauseStart(text, match.Index);
+        var before = text[start..match.Index];
+        var direct = NegationRightBefore.Match(before);
+        if (direct.Success)
+            return new Negation(false, (start + direct.Index, match.Index + match.Length));
+
+        var afterStart = match.Index + match.Length;
+        var after = text[afterStart..ClauseEnd(text, afterStart)];
+        var comma = after.IndexOf(',', StringComparison.Ordinal);
+        if (comma >= 0)
+            after = after[..comma];
+        var postposed = NegationRightAfter.Match(after);
+        if (postposed.Success)
+            return new Negation(false, (match.Index, afterStart + postposed.Index + postposed.Length));
+
+        return new Negation(AnyNegation.IsMatch(before) || AnyNegation.IsMatch(after), null);
     }
 
     private static bool IsApproximate(string text, Match match)
@@ -385,6 +451,7 @@ public static class RequestConstraintExtractor
         var rules = new List<PatternRule>();
         AddPattern(rules, text, NoLists, ForbiddenPattern.Lists);
         AddPattern(rules, text, NoHeadings, ForbiddenPattern.Headings);
+        AddPattern(rules, text, NoSubheadings, ForbiddenPattern.Subheadings);
         AddPattern(rules, text, NoEmojis, ForbiddenPattern.Emojis);
         return rules;
     }

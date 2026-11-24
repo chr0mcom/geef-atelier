@@ -23,9 +23,10 @@ public sealed class DraftCheckEvaluatorTests
 
     [Theory]
     [InlineData("")]
-    [InlineData("Zu kurz.")]
+    [InlineData("   \n  ")]
     [InlineData("- - - # ##")]
-    public void An_almost_empty_text_is_a_blocking_failure(string draft)
+    [InlineData("… ?! –")]
+    public void A_text_without_a_single_word_is_a_blocking_failure(string draft)
     {
         var result = Single(DraftCheckEvaluator.Evaluate(draft, OrderConstraints.None), DraftCheckCodes.Empty);
 
@@ -34,15 +35,64 @@ public sealed class DraftCheckEvaluatorTests
     }
 
     [Theory]
+    [InlineData("Frisch geröstet, täglich genossen")]
+    [InlineData("Re: Ihr Angebot vom Montag")]
+    [InlineData("Atelier")]
+    [InlineData("Zu kurz.")]
+    public void A_short_text_is_not_empty(string draft)
+    {
+        var results = DraftCheckEvaluator.Evaluate(draft, OrderConstraints.None);
+
+        Assert.True(Single(results, DraftCheckCodes.Empty).Passed);
+        Assert.DoesNotContain(results, r => r.Blocking && !r.Passed);
+    }
+
+    [Fact]
+    public void A_four_word_slogan_passes_every_check_of_its_request()
+    {
+        var constraints = RequestConstraintExtractor.Extract("Schreibe mir einen Slogan für mein Café.");
+
+        var results = DraftCheckEvaluator.Evaluate("Frisch geröstet, täglich genossen", constraints);
+
+        Assert.DoesNotContain(results, r => !r.Passed);
+    }
+
+    [Fact]
+    public void A_stated_lower_limit_still_fails_a_short_text()
+    {
+        var constraints = RequestConstraintExtractor.Extract("Schreibe mindestens 50 Wörter über unser Café.");
+
+        var results = DraftCheckEvaluator.Evaluate(Words(10), constraints);
+
+        var length = Single(results, DraftCheckCodes.Length);
+        Assert.False(length.Passed);
+        Assert.True(length.Blocking);
+        Assert.True(Single(results, DraftCheckCodes.Empty).Passed);
+    }
+
+    [Theory]
     [InlineData("Here is the email you asked for:")]
     [InlineData("Hier ist der gewünschte Text:")]
     [InlineData("Gerne, hier ist die Mail:")]
     [InlineData("Sure! Here's your post:")]
-    public void A_preamble_is_a_blocking_failure(string firstLine)
+    [InlineData("Here's what I learned from ten years in sales:")]
+    [InlineData("Gerne teile ich heute drei Erkenntnisse aus meinem ersten Jahr:")]
+    public void A_possible_preamble_is_a_note_that_never_blocks(string firstLine)
     {
         var result = Single(DraftCheckEvaluator.Evaluate(firstLine + "\n\nSehr geehrte Frau Muster, vielen Dank für Ihre Nachricht.", OrderConstraints.None), DraftCheckCodes.Preamble);
 
-        Assert.False(result.Passed);
+        Assert.True(result.Passed);
+        Assert.False(result.Blocking);
+        Assert.StartsWith("The text may start with a remark to the reader", result.Message);
+    }
+
+    [Fact]
+    public void A_text_that_starts_directly_has_no_preamble_note()
+    {
+        var result = Single(DraftCheckEvaluator.Evaluate("Sehr geehrte Frau Muster, vielen Dank für Ihre Nachricht.", OrderConstraints.None), DraftCheckCodes.Preamble);
+
+        Assert.True(result.Passed);
+        Assert.True(result.Blocking);
     }
 
     [Theory]
@@ -156,6 +206,42 @@ public sealed class DraftCheckEvaluatorTests
 
         var dirty = DraftCheckEvaluator.Evaluate("# Titel\n\n- erster Punkt\n1. zweiter Punkt\nSchön 🎉", constraints);
         Assert.All(dirty.Where(r => r.Code.StartsWith("pattern.", StringComparison.Ordinal)), r => Assert.False(r.Passed));
+    }
+
+    private static OrderConstraints Forbid(ForbiddenPattern pattern) =>
+        OrderConstraints.None with { ForbiddenPatterns = [new PatternRule(pattern, "rule")] };
+
+    [Theory]
+    [InlineData("24. November 2026\n\nSehr geehrter Herr Meier,\n\nvielen Dank für Ihr Schreiben.")]
+    [InlineData("Berlin, 24. November 2026\nSehr geehrter Herr Meier, vielen Dank.")]
+    [InlineData("3. May 2026\n\nDear Ms Smith,\n\nthank you for your letter.")]
+    [InlineData("12. Mai\n1. März\nZwei Termine stehen fest.")]
+    [InlineData("1. Advent: Wir laden Sie herzlich zu unserem Adventskaffee ein.")]
+    [InlineData("Ein Absatz ohne Liste. Im Jahr 2024 - so heißt es - war alles gut.")]
+    public void Dates_and_single_numbered_lines_are_not_lists(string draft)
+    {
+        Assert.True(Single(DraftCheckEvaluator.Evaluate(draft, Forbid(ForbiddenPattern.Lists)), DraftCheckCodes.Lists).Passed);
+    }
+
+    [Theory]
+    [InlineData("Drei Gründe:\n1. Erstens das.\n2. Zweitens dies.")]
+    [InlineData("Drei Gründe:\n\n1) Erstens das.\n\n2) Zweitens dies.")]
+    [InlineData("Drei Gründe:\n- Erstens das.")]
+    [InlineData("Three reasons:\n• First this.\n• Then that.")]
+    public void Real_lists_are_found(string draft)
+    {
+        Assert.False(Single(DraftCheckEvaluator.Evaluate(draft, Forbid(ForbiddenPattern.Lists)), DraftCheckCodes.Lists).Passed);
+    }
+
+    [Fact]
+    public void A_ban_of_subheadings_allows_the_title()
+    {
+        const string titled = "# Mein Titel\n\nEin Absatz Fließtext über das Thema.";
+        const string sectioned = "# Mein Titel\n\nEin Absatz.\n\n## Abschnitt\n\nNoch ein Absatz.";
+
+        Assert.True(Single(DraftCheckEvaluator.Evaluate(titled, Forbid(ForbiddenPattern.Subheadings)), DraftCheckCodes.Headings).Passed);
+        Assert.False(Single(DraftCheckEvaluator.Evaluate(sectioned, Forbid(ForbiddenPattern.Subheadings)), DraftCheckCodes.Headings).Passed);
+        Assert.False(Single(DraftCheckEvaluator.Evaluate(titled, Forbid(ForbiddenPattern.Headings)), DraftCheckCodes.Headings).Passed);
     }
 
     [Fact]

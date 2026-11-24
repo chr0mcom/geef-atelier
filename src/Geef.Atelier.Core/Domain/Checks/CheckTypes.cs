@@ -3,8 +3,8 @@ namespace Geef.Atelier.Core.Domain.Checks;
 /// <summary>Unit of a length constraint.</summary>
 public enum LengthUnit { Words = 0, Characters = 1 }
 
-/// <summary>Forms the request can forbid.</summary>
-public enum ForbiddenPattern { Lists = 0, Headings = 1, Emojis = 2 }
+/// <summary>Forms the request can forbid. <see cref="Subheadings"/> forbids headings inside the text but allows a title on the first line.</summary>
+public enum ForbiddenPattern { Lists = 0, Headings = 1, Emojis = 2, Subheadings = 3 }
 
 /// <summary>How a length was phrased in the request; decides the tolerance of the check.</summary>
 public enum LengthKind
