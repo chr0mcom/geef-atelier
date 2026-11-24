@@ -3,14 +3,18 @@
 @attribute [Authorize]
 @implements IAsyncDisposable
 @using Geef.Atelier.Application.Orders
+@using Geef.Atelier.Core.Configuration
+@using Geef.Atelier.Core.Domain.Intake
 @using Geef.Atelier.Core.Domain.Orders
 @using Geef.Atelier.Web.Components.UI.Orders
+@using Microsoft.Extensions.Options
 @inject IOrderService Orders
 @inject AuthenticationStateProvider AuthProvider
 @inject IRunUpdateFeed LiveUpdates
 @inject CircuitDataGate DataGate
 @inject ILogger<OrderDetail> Logger
 @inject IJSRuntime JS
+@inject IOptions<IntakeOptions> IntakeSettings
 
 <PageTitle>@TabTitle</PageTitle>
 
@@ -71,10 +75,41 @@
             </div>
         }
 
-        <OrderStatusBanner OrderId="_view.OrderId" Display="_view.Display" />
-
-        @if (!_view.Display.IsFinished)
+        @if (!IsAsking)
         {
+            <OrderStatusBanner OrderId="_view.OrderId" Display="_view.Display" />
+        }
+
+        <p class="clarify-live" aria-live="polite" data-testid="order-intake-status">@IntakeStatus</p>
+
+        @if (_intakeNotice is not null)
+        {
+            <p class="order-note" role="status" data-testid="order-intake-notice">@_intakeNotice</p>
+        }
+
+        @if (IsReading)
+        {
+            <IntakeWaiting @key="_view.OrderId" OrderId="_view.OrderId" RequestingUsername="@_requestingUser" OnStarted="StartedAsync">
+                <button type="button" class="btn small ghost" data-testid="order-stop" disabled="@_stopping" @onclick="StopAsync">
+                    @(_stopping ? "Stopping…" : "Stop")
+                </button>
+            </IntakeWaiting>
+        }
+        else if (IsAsking)
+        {
+            <ClarifyCard @key="_view.OrderId" OrderId="_view.OrderId" Clarification="_view.Clarification!" RequestingUsername="@_requestingUser"
+                         MaxFreeTextChars="IntakeSettings.Value.MaxFreeTextChars" OnStarted="StartedAsync">
+                <button type="button" class="btn small ghost" data-testid="order-stop" disabled="@_stopping" @onclick="StopAsync">
+                    @(_stopping ? "Stopping…" : "Stop")
+                </button>
+            </ClarifyCard>
+        }
+        else if (!_view.Display.IsFinished)
+        {
+            @if (StartedClarification is { } started)
+            {
+                <ClarificationSummary Clarification="started" />
+            }
             <OrderProgressSteps Progress="_view.Progress" Elapsed="Elapsed">
                 <button type="button" class="btn small ghost" data-testid="order-stop" disabled="@_stopping" @onclick="StopAsync">
                     @(_stopping ? "Stopping…" : "Stop")
@@ -100,6 +135,11 @@
             <div class="order-how-body">
                 <h3>Your request</h3>
                 <p class="order-how-request" data-testid="order-how-request">@_view.RequestText</p>
+
+                @if (StartedClarification is { } summary)
+                {
+                    <ClarificationSummary Clarification="summary" Inline="true" />
+                }
 
                 <h3>Steps</h3>
                 <ol class="order-how-steps">
@@ -158,6 +198,7 @@
     bool _unknownUser;
     bool _stopping;
     string? _actionError;
+    string? _intakeNotice;
     string? _requestingUser;
     DateTimeOffset _loadedAt = DateTimeOffset.UtcNow;
     IDisposable? _subscription;
@@ -174,7 +215,29 @@
 
     string TabTitle => _view is null
         ? "Your text — Atelier"
-        : $"{_view.Display.ShownState().ToLabel()} · {Shorten(_view.Title, 40)} — Atelier";
+        : _view.Display.ShownState() == OrderDisplayState.NeedsInput
+            ? $"{OrderDisplayState.NeedsInput.ToLabel()} – {Shorten(_view.Title, 40)} — Atelier"
+            : $"{_view.Display.ShownState().ToLabel()} · {Shorten(_view.Title, 40)} — Atelier";
+
+    bool IsReading => _view is { State: OrderState.Analyzing, Display.State: OrderDisplayState.Preparing };
+
+    bool IsAsking => _view is { Display.State: OrderDisplayState.NeedsInput, Clarification: not null };
+
+    ClarificationView? StartedClarification =>
+        _view is { Clarification: { Outcome: not null and not IntakeOutcome.Asked } clarification } && !IsReading && !IsAsking
+            ? clarification
+            : null;
+
+    string IntakeStatus => IsReading
+        ? "Reading your request."
+        : IsAsking
+            ? _view!.Clarification!.Questions.Count switch
+            {
+                0 => "Before I start: please check my assumptions.",
+                1 => "Before I start: one quick question.",
+                var n => $"Before I start: {n} quick questions.",
+            }
+            : string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -236,7 +299,7 @@
 
     async Task TickAsync()
     {
-        if (_disposed || _view is null || _view.Display.IsFinished)
+        if (_disposed || _view is null || _view.Display.IsFinished || IsReading || IsAsking)
             return;
         try
         {
@@ -272,6 +335,12 @@
 
     async Task ReloadAsync()
     {
+        await LoadAsync();
+    }
+
+    async Task StartedAsync(OrderSubmission submission)
+    {
+        _intakeNotice = submission.Notices.Count > 0 ? string.Join(" ", submission.Notices) : null;
         await LoadAsync();
     }
 

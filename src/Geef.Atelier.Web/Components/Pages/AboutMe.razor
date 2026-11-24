@@ -1,9 +1,259 @@
 @page "/about-me"
+@rendermode InteractiveServer
 @attribute [Authorize]
+@using Geef.Atelier.Application.Profiles
+@using Geef.Atelier.Core.Domain.Profiles
+@inject IProfileService Profiles
+@inject AuthenticationStateProvider AuthProvider
+@inject CircuitDataGate DataGate
+@inject ILogger<AboutMe> Logger
 
 <PageTitle>About me — Atelier</PageTitle>
 
-<section class="about-me" data-testid="about-me">
-    <h1>About me</h1>
-    <p>Coming soon.</p>
-</section>
+<div class="about-me" data-testid="about-me">
+    <h1 class="about-title">About me</h1>
+    <p class="about-intro">Tell me once about yourself. I use it in every text, so you don't have to repeat it in each request. Only you can see this page.</p>
+
+    @if (_unknownUser)
+    {
+        <EmptyState Message="@OwnerScope.UnknownUserMessage" />
+    }
+    else if (!_loaded)
+    {
+        <EmptyState Message="Loading…" />
+    }
+    else
+    {
+        @if (_loadFailed)
+        {
+            <div class="order-banner order-banner--failed" role="alert" data-testid="about-load-failed">
+                <strong>Your details could not be loaded.</strong>
+                <span>You can still fill in the form. Saving replaces what was stored before.</span>
+            </div>
+        }
+
+        <div class="about-group">
+            <h2>Who you are</h2>
+            <label class="about-field">
+                <span>Your name</span>
+                <input type="text" data-testid="about-name" maxlength="@UserProfileLimits.DisplayName" autocomplete="name" @bind="_name" @bind:event="oninput" />
+            </label>
+            <label class="about-field">
+                <span>What you do</span>
+                <input type="text" data-testid="about-role" maxlength="@UserProfileLimits.Role" placeholder="For example: head of the parents' council" @bind="_role" @bind:event="oninput" />
+            </label>
+            <label class="about-field">
+                <span>Organization</span>
+                <input type="text" data-testid="about-organization" maxlength="@UserProfileLimits.Organization" autocomplete="organization" @bind="_organization" @bind:event="oninput" />
+            </label>
+        </div>
+
+        <div class="about-group">
+            <h2>How your texts should sound</h2>
+            <fieldset class="about-choice" data-testid="about-formality">
+                <legend>How should readers be addressed?</legend>
+                @foreach (var (value, label) in FormalityChoices)
+                {
+                    <label class="about-radio">
+                        <input type="radio" name="about-formality" value="@value" checked="@(_formality == value)" data-testid="about-formality-@value.ToString().ToLowerInvariant()" @onchange="() => _formality = value" />
+                        <span>@label</span>
+                    </label>
+                }
+            </fieldset>
+            <label class="about-field">
+                <span>Language of your texts</span>
+                <select data-testid="about-language" @bind="_language">
+                    <option value="">The language of my request</option>
+                    @foreach (var (languageCode, languageName) in LanguageChoices)
+                    {
+                        <option value="@languageCode">@languageName</option>
+                    }
+                </select>
+                <small>Used only when your request does not say which language.</small>
+            </label>
+            <label class="about-field">
+                <span>How you sign off</span>
+                <textarea rows="3" data-testid="about-signature" maxlength="@UserProfileLimits.Signature" placeholder="For example: Kind regards, Sam" @bind="_signature" @bind:event="oninput"></textarea>
+            </label>
+            <label class="about-field">
+                <span>Never do this</span>
+                <textarea rows="3" data-testid="about-nogos" maxlength="@UserProfileLimits.NoGos" placeholder="For example: no exclamation marks" @bind="_noGos" @bind:event="oninput"></textarea>
+            </label>
+            <label class="about-field">
+                <span>Anything else I should know</span>
+                <textarea rows="4" data-testid="about-freetext" maxlength="@UserProfileLimits.FreeText" @bind="_freeText" @bind:event="oninput"></textarea>
+            </label>
+        </div>
+
+        @if (_error is not null)
+        {
+            <div class="order-banner order-banner--failed" role="alert" data-testid="about-error">
+                <strong>This could not be saved.</strong>
+                <span>@_error</span>
+            </div>
+        }
+
+        <div class="about-actions">
+            <button type="button" class="btn primary" data-testid="about-save" disabled="@_busy" @onclick="SaveAsync">@(_busy ? "Saving…" : "Save")</button>
+            @if (_saved)
+            {
+                <span class="about-saved" role="status" data-testid="about-saved">Saved. Your next texts will use this.</span>
+            }
+        </div>
+
+        <div class="about-clear-area">
+            @if (_confirmClear)
+            {
+                <div class="about-clear-confirm" role="alert" data-testid="about-clear-confirm">
+                    <span>This deletes everything on this page. Your texts are not affected.</span>
+                    <button type="button" class="btn danger small" data-testid="about-clear-yes" disabled="@_busy" @onclick="ClearAsync">Yes, clear my profile</button>
+                    <button type="button" class="btn small" data-testid="about-clear-cancel" @onclick="() => _confirmClear = false">Cancel</button>
+                </div>
+            }
+            else
+            {
+                <button type="button" class="btn ghost small" data-testid="about-clear" @onclick="AskClear">Clear my profile</button>
+            }
+            @if (_cleared)
+            {
+                <span class="about-saved" role="status" data-testid="about-cleared">Your profile is cleared.</span>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>Choices for the address of readers; "It depends" leaves the formality unset.</summary>
+    public static readonly IReadOnlyList<(Formality Value, string Label)> FormalityChoices =
+    [
+        (Formality.Formal, "Formal (Sie)"),
+        (Formality.Informal, "Informal (du)"),
+        (Formality.Unset, "It depends"),
+    ];
+
+    /// <summary>Text languages offered on the page, as two-letter codes.</summary>
+    public static readonly IReadOnlyList<(string Code, string Name)> KnownLanguages =
+    [
+        ("de", "German"), ("en", "English"), ("fr", "French"), ("es", "Spanish"), ("it", "Italian"),
+        ("nl", "Dutch"), ("pl", "Polish"), ("pt", "Portuguese"), ("tr", "Turkish"),
+    ];
+
+    string? _username;
+    bool _unknownUser;
+    bool _loaded;
+    bool _loadFailed;
+    bool _busy;
+    bool _saved;
+    bool _cleared;
+    bool _confirmClear;
+    string? _error;
+    string? _name;
+    string? _role;
+    string? _organization;
+    Formality _formality;
+    string _language = string.Empty;
+    string? _signature;
+    string? _noGos;
+    string? _freeText;
+
+    IReadOnlyList<(string Code, string Name)> LanguageChoices =>
+        _language.Length == 0 || KnownLanguages.Any(l => l.Code == _language)
+            ? KnownLanguages
+            : [.. KnownLanguages, (_language, _language)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        var name = auth.User.Identity?.Name;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            _unknownUser = true;
+            return;
+        }
+        _username = name;
+        try
+        {
+            var view = await DataGate.RunAsync(() => Profiles.GetAsync(name));
+            Apply(view.Values);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Loading the profile failed");
+            _loadFailed = true;
+        }
+        _loaded = true;
+    }
+
+    void Apply(UserProfileInput values)
+    {
+        _name = values.DisplayName;
+        _role = values.Role;
+        _organization = values.Organization;
+        _formality = values.Formality;
+        _language = values.Language ?? string.Empty;
+        _signature = values.Signature;
+        _noGos = values.NoGos;
+        _freeText = values.FreeText;
+    }
+
+    async Task SaveAsync()
+    {
+        if (_username is not { } user)
+            return;
+        _busy = true;
+        _error = null;
+        _saved = false;
+        _cleared = false;
+        try
+        {
+            var input = new UserProfileInput(_name, _role, _organization, _formality, _language.Length == 0 ? null : _language, _signature, _noGos, _freeText);
+            var view = await DataGate.RunAsync(() => Profiles.SaveAsync(user, input));
+            Apply(view.Values);
+            _saved = true;
+        }
+        catch (ProfileValidationException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Saving the profile failed");
+            _error = "Something went wrong on our side. Your entries are still here. Try again in a moment.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    void AskClear()
+    {
+        _confirmClear = true;
+        _saved = false;
+        _cleared = false;
+    }
+
+    async Task ClearAsync()
+    {
+        if (_username is not { } user)
+            return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            await DataGate.RunAsync(() => Profiles.ClearAsync(user));
+            Apply(new UserProfileInput(null, null, null, Formality.Unset, null, null, null, null));
+            _confirmClear = false;
+            _cleared = true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Clearing the profile failed");
+            _error = "Your profile could not be cleared. Try again in a moment.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

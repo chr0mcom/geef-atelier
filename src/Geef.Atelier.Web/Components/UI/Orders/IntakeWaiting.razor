@@ -1,7 +1,59 @@
+@using Geef.Atelier.Application.Orders
+@inject IOrderService Orders
+@inject CircuitDataGate DataGate
+@inject ILogger<IntakeWaiting> Logger
+
+<section class="intake-waiting" aria-labelledby="intake-waiting-title" data-testid="intake-waiting">
+    <span class="intake-waiting-mark" aria-hidden="true"></span>
+    <div class="intake-waiting-body">
+        <h2 id="intake-waiting-title">Reading your request…</h2>
+        <p>This takes a few seconds. If something is unclear, I'll ask you before I start writing.</p>
+        @if (_error is not null)
+        {
+            <p class="clarify-error-line" role="alert" data-testid="intake-skip-error">@_error</p>
+        }
+        <div class="intake-waiting-actions">
+            <button type="button" class="btn small" data-testid="intake-skip" disabled="@_busy" @onclick="SkipAsync">
+                @(_busy ? "Starting…" : "Skip and start now")
+            </button>
+            @ChildContent
+        </div>
+    </div>
+</section>
+
 @code {
     /// <summary>The order that is being read.</summary>
     [Parameter, EditorRequired] public Guid OrderId { get; set; }
 
-    /// <summary>Raised after the order was started without waiting, so the page can reload.</summary>
-    [Parameter] public EventCallback OnStarted { get; set; }
+    /// <summary>Owner filter of the signed-in person; null for administrators.</summary>
+    [Parameter] public string? RequestingUsername { get; set; }
+
+    /// <summary>Raised with the answer of the service after the order was started without waiting, so the page can reload.</summary>
+    [Parameter] public EventCallback<OrderSubmission> OnStarted { get; set; }
+
+    /// <summary>Further actions next to "Skip and start now", such as the stop button.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    bool _busy;
+    string? _error;
+
+    async Task SkipAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var submission = await DataGate.RunAsync(() => Orders.SkipClarificationAsync(OrderId, RequestingUsername));
+            await OnStarted.InvokeAsync(submission);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Starting order {OrderId} without questions failed", OrderId);
+            _error = "That did not work. Try again in a moment.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
 }
