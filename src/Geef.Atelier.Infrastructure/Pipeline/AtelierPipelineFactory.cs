@@ -25,6 +25,13 @@ namespace Geef.Atelier.Infrastructure.Pipeline;
 internal static class AtelierPipelineFactory
 {
     /// <summary>
+    /// Thrown when a crew has sources but no grounding provider factory was passed: the sources would otherwise be
+    /// dropped without a trace.
+    /// </summary>
+    internal const string MissingGroundingFactoryMessage =
+        "The crew has sources, but no grounding provider factory was supplied to build the pipeline.";
+
+    /// <summary>
     /// Builds the pipeline dynamically from a fully-dereferenced <see cref="CrewSnapshot"/>.
     /// Pre-execution advisors (<see cref="AdvisorTrigger.BeforeFirstExecution"/> /
     /// <see cref="AdvisorTrigger.BeforeEveryExecution"/>) and convergence-failure recovery
@@ -50,8 +57,10 @@ internal static class AtelierPipelineFactory
         ToolBackedGroundingProvider? toolBackedGroundingProvider = null)
     {
         IGroundingStep grounding = new BriefingGroundingStep();
-        if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
+        if (snapshot.GroundingProviders is { Count: > 0 })
         {
+            if (groundingProviderFactory is null)
+                throw new InvalidOperationException(MissingGroundingFactoryMessage);
             grounding = new MultiProviderGroundingStep(
                 grounding, snapshot.GroundingProviders, groundingProviderFactory, runId,
                 loggerFactory?.CreateLogger<MultiProviderGroundingStep>()
@@ -103,8 +112,10 @@ internal static class AtelierPipelineFactory
         ToolBackedGroundingProvider? toolBackedGroundingProvider = null)
     {
         IGroundingStep grounding = new SeedDraftGroundingStep(seedDraftText);
-        if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
+        if (snapshot.GroundingProviders is { Count: > 0 })
         {
+            if (groundingProviderFactory is null)
+                throw new InvalidOperationException(MissingGroundingFactoryMessage);
             grounding = new MultiProviderGroundingStep(
                 grounding, snapshot.GroundingProviders, groundingProviderFactory, runId,
                 loggerFactory?.CreateLogger<MultiProviderGroundingStep>()

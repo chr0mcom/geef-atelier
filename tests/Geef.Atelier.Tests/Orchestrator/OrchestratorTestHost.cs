@@ -1,8 +1,10 @@
+using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Crew.Knowledge;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Configuration;
+using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Tests.Fakes;
@@ -13,6 +15,7 @@ using Geef.Atelier.Web.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -65,6 +68,8 @@ internal sealed class OrchestratorTestHost : IAsyncDisposable
                     Options.Create(new ConvergenceOptions()));
                 services.AddSingleton<IRunNotifier, NoOpRunNotifier>();
                 configureServices?.Invoke(services);
+                services.TryAddSingleton<IGroundingProviderFactory>(sp =>
+                    new GroundingProviderFactory(sp.GetServices<IGroundingProvider>()));
                 services.AddHostedService<RunOrchestratorService>();
             })
             .Build();

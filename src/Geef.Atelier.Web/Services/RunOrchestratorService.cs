@@ -36,7 +36,7 @@ internal sealed class RunOrchestratorService(
     ILoggerFactory                      loggerFactory,
     ILogger<RunOrchestratorService>     logger,
     IRunWarningSink                     warningSink,
-    IGroundingProviderFactory?          groundingProviderFactory = null,
+    IGroundingProviderFactory           groundingProviderFactory,
     IPricingCatalog?                    pricingCatalog = null,
     IOptions<CostTrackingOptions>?      costTrackingOptions = null,
     IFinalizerExecutorFactory?          finalizerExecutorFactory = null) : BackgroundService

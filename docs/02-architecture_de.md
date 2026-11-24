@@ -505,7 +505,9 @@ Ein Lauf hält jedes Problem, das er umgeht, als Warnung in `RunWarnings` fest, 
 Warnung in einem eigenen kurzlebigen Datenbank-Scope; ein fehlgeschlagener Schreibvorgang wird geloggt
 und hält den Lauf nie an. Überall, wo sie gebraucht wird (Run-Service, Orchestrator, Pipeline-Fabrik,
 Grounding-Schritt), ist sie eine Pflicht-Abhängigkeit; eine fehlende Registrierung scheitert also beim
-Start, statt Warnungen still zu verlieren. Der LLM-Client meldet Failover über den ambienten
+Start, statt Warnungen still zu verlieren. Dasselbe gilt für die Grounding-Provider-Fabrik im Orchestrator;
+die Pipeline-Fabrik baut eine Crew mit Quellen nicht, wenn keine Grounding-Provider-Fabrik übergeben wird. Der
+LLM-Client meldet Failover über den ambienten
 `RunWarningScope`, den der Orchestrator je Lauf öffnet.
 
 Warnungen erscheinen auf der Detailseite im Block „Warnings“ (nur wenn vorhanden) und in den MCP-Feldern

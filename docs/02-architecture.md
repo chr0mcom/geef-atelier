@@ -549,7 +549,9 @@ A run records every problem it works around as a warning in `RunWarnings`, for e
 `IRunWarningSink` (Core contract, Infrastructure implementation `RunWarningSink`) writes each warning
 in its own short-lived database scope; a failed write is logged and never stops the run. It is a required
 dependency everywhere it is used (run service, orchestrator, pipeline factory, grounding step), so a missing
-registration fails at start instead of silently dropping warnings. The LLM client reports failovers through
+registration fails at start instead of silently dropping warnings. The same holds for the grounding provider
+factory in the orchestrator; the pipeline factory refuses to build a crew with sources when no grounding
+provider factory is passed. The LLM client reports failovers through
 the ambient `RunWarningScope`, which the orchestrator opens per run.
 
 Warnings appear on the run detail page in a "Warnings" block (only when there are any) and in the MCP

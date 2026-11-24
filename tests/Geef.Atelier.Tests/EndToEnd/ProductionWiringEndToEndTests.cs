@@ -16,7 +16,8 @@ namespace Geef.Atelier.Tests.EndToEnd;
 /// <summary>
 /// The production wiring through <c>Program</c> (review finding A11 of Etappe 0): every class that falls back to the
 /// built-in <see cref="EnvReferencePolicy.Default"/> when no policy is passed actually receives the configured
-/// policy from the container, so <c>EnvReference:Allowed</c> is never silently ignored.
+/// policy from the container, so <c>EnvReference:Allowed</c> is never silently ignored. The orchestrator requires the
+/// grounding provider factory, so a missing registration fails at start instead of dropping sources silently.
 /// </summary>
 [Collection(EndToEndCollection.Name)]
 [Trait("Category", "EndToEnd")]
@@ -46,6 +47,18 @@ public sealed class ProductionWiringEndToEndTests(PostgresFixture postgres)
         };
 
         Assert.All(consumers, consumer => Assert.Same(configured, PolicyOf(consumer)));
+    }
+
+    [Fact]
+    public async Task The_orchestrator_gets_the_grounding_and_finalizer_factories_from_the_container()
+    {
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
+
+        Assert.NotNull(host.Services.GetRequiredService<Geef.Atelier.Web.Services.RunOrchestratorService>());
+        var grounding = host.Services.GetRequiredService<IGroundingProviderFactory>();
+        Assert.True(grounding.IsRegistered("vector-store"));
+        Assert.True(grounding.IsRegistered("tavily"));
+        Assert.NotNull(host.Services.GetRequiredService<Geef.Atelier.Application.Crew.Finalizers.IFinalizerExecutorFactory>());
     }
 
     [Fact]
