@@ -73,6 +73,7 @@ public static class ModelMatrix
     private static readonly IReadOnlyList<ModelCandidate> TransformCondense = [Sonnet, Sol];
     private static readonly IReadOnlyList<ModelCandidate> Composer = [Opus, Sonnet, Sol];
     private static readonly IReadOnlyList<ModelCandidate> Helper = [Haiku, Sonnet];
+    private static readonly IReadOnlyList<ModelCandidate> Intake = [Sonnet, Sol];
 
     /// <summary>Ordered candidates for <paramref name="slot"/> in <paramref name="domain"/>; never empty.</summary>
     public static IReadOnlyList<ModelCandidate> CandidatesFor(ModelSlot slot, ModelDomain domain = ModelDomain.General) =>
@@ -95,6 +96,7 @@ public static class ModelMatrix
             ModelSlot.TransformCondense => TransformCondense,
             ModelSlot.Composer => Composer,
             ModelSlot.Helper => Helper,
+            ModelSlot.Intake => Intake,
             _ => ProseExecutor,
         };
 

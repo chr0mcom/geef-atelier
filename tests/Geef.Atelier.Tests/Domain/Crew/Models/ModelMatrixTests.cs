@@ -81,6 +81,7 @@ public sealed class ModelMatrixTests
     [InlineData(ModelSlot.TransformCondense, ModelDomain.General, "claude-cli", "claude-sonnet-latest")]
     [InlineData(ModelSlot.Composer, ModelDomain.General, "claude-cli", "claude-opus-latest")]
     [InlineData(ModelSlot.Helper, ModelDomain.General, "claude-cli", "claude-haiku-latest")]
+    [InlineData(ModelSlot.Intake, ModelDomain.General, "claude-cli", "claude-sonnet-latest")]
     public void PrimariesMatchTheResearchedTable(ModelSlot slot, ModelDomain domain, string provider, string model) =>
         Assert.Equal(new ModelCandidate(provider, model), ModelMatrix.Primary(slot, domain));
 
