@@ -548,7 +548,9 @@ fields `warnings` and `outcome` of `get_run_status` and `get_run_result`
 ([09-endpoint-reference](09-endpoint-reference.md#run-status-and-result-warnings-and-outcome)).
 Warning texts and the error texts stored at the run (`ErrorMessage`, status messages) are fixed, short,
 plain sentences for the user, with display names where needed; technical details such as exception texts,
-host names, key names or upstream error bodies go only to the log. Before anything technical is logged or
+host names, key names or upstream error bodies go only to the log. The reason a run stopped before all checks
+passed is one fixed sentence per stop reason (`RunStopMessageExtensions`), and the skip reasons of source sorting
+(`GroundingRefiner`) are fixed sentences too. Before anything technical is logged or
 stored, `SecretRedactionExtensions` (Core, `RedactSecrets`, `ToRedactedLogText`) replaces credential-like
 fragments (known key formats, bearer tokens, `name=value` pairs with a secret-sounding name, long opaque
 tokens) with `[redacted]`. A name counts as secret-sounding when its last part is a word such as `key`, `token`,

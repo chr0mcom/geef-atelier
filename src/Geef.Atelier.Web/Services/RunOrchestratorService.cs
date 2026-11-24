@@ -932,16 +932,7 @@ internal sealed class RunOrchestratorService(
             await using var scope = scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
 
-            var note = setNote
-                ? stopReason switch
-                {
-                    Geef.Sdk.Policies.ConvergenceDecision.StopMaxAttemptsReached =>
-                        "Max iterations reached without full convergence. Best available draft returned.",
-                    Geef.Sdk.Policies.ConvergenceDecision.StopTimeBudgetReached =>
-                        "Time budget exceeded without full convergence. Best available draft returned.",
-                    _ => "Pipeline stopped without full convergence. Best available draft returned."
-                }
-                : null;
+            var note = setNote ? stopReason.ToBestVersionKeptMessage() : null;
 
             var updater = db.Runs.Where(r => r.Id == runId);
             var written = await updater.ExecuteUpdateAsync(s => s

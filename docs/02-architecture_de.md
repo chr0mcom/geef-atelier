@@ -504,7 +504,10 @@ Warnungen erscheinen auf der Detailseite im Block „Warnings“ (nur wenn vorha
 ([09-endpoint-reference](09-endpoint-reference_de.md#lauf-status-und-ergebnis-warnings-und-outcome)).
 Warnungstexte und die am Lauf gespeicherten Fehlertexte (`ErrorMessage`, Statusmeldungen) sind feste,
 kurze, einfache Sätze für den Anwender, bei Bedarf mit Anzeigenamen; technische Einzelheiten wie
-Ausnahmetexte, Hostnamen, Schlüsselnamen oder Fehlertexte vorgelagerter Dienste gehen nur ins Log. Bevor
+Ausnahmetexte, Hostnamen, Schlüsselnamen oder Fehlertexte vorgelagerter Dienste gehen nur ins Log. Der Grund,
+aus dem ein Lauf vor dem Bestehen aller Prüfungen endete, ist ein fester Satz je Abbruchgrund
+(`RunStopMessageExtensions`); auch die Überspring-Gründe der Quellen-Sortierung (`GroundingRefiner`) sind feste
+Sätze. Bevor
 etwas Technisches geloggt oder gespeichert wird, ersetzt `SecretRedactionExtensions` (Core,
 `RedactSecrets`, `ToRedactedLogText`) Bruchstücke, die nach Zugangsdaten aussehen (bekannte
 Schlüsselformate, Bearer-Tokens, `name=wert`-Paare mit geheim klingendem Namen, lange undurchsichtige

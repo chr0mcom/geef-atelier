@@ -125,7 +125,7 @@ internal sealed class PostgresEventSink(
                         .ExecuteUpdateAsync(s => s
                             .SetProperty(r => r.Status,       RunStatus.Failed)
                             .SetProperty(r => r.CompletedAt,  geefEvent.Timestamp)
-                            .SetProperty(r => r.ErrorMessage, "Pipeline stopped without full convergence"), ct);
+                            .SetProperty(r => r.ErrorMessage, RunStopMessageExtensions.StoppedWithOpenPointsMessage), ct);
 
                     // Best-effort completion after non-convergence: the PipelineFailedEvent
                     // handler (or the fallback above) owns Status/CompletedAt/ErrorMessage —
@@ -141,13 +141,8 @@ internal sealed class PostgresEventSink(
             case PipelineFailedEvent failed:
                 var isAbort    = failed.Reason == ConvergenceDecision.AbortCriticalBlocker;
                 var failStatus = isAbort ? RunStatus.Aborted : RunStatus.Failed;
-                var errorMsg   = failed.Reason switch
-                {
-                    ConvergenceDecision.AbortCriticalBlocker   => "Aborted due to critical reviewer finding",
-                    ConvergenceDecision.StopTimeBudgetReached  => "Pipeline stopped: time budget exceeded",
-                    ConvergenceDecision.StopMaxAttemptsReached => "Pipeline stopped: maximum iterations reached",
-                    _                                          => $"Pipeline failed: {failed.Reason}"
-                };
+                var errorMsg   = failed.Reason.ToRunStopMessage();
+                logger.LogInformation("Run {RunId} stopped before all checks passed (reason: {Reason}).", atelierRunId, failed.Reason);
                 await db.Runs
                     .Where(r => r.Id == atelierRunId)
                     .ExecuteUpdateAsync(s => s
