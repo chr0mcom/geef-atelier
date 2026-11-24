@@ -203,9 +203,28 @@ public sealed class IsolatedExtractionTests : IDisposable
         var options = new SourceOptions();
 
         Assert.Equal(3_000_000, options.MaxExtractedChars);
-        Assert.Equal(16_777_216, options.ExtractionMaxOutputBytes);
-        Assert.True(options.ExtractionMaxOutputBytes >= 4L * options.MaxExtractedChars + 1_048_576);
+        Assert.Equal(20_971_520, options.ExtractionMaxOutputBytes);
+        Assert.True(options.ExtractionMaxOutputBytes >= 6L * options.MaxExtractedChars + 1_048_576);
         Assert.Equal(options.MaxExtractedChars, ExtractionLimits.From(options, TimeSpan.FromSeconds(1)).ToOptions().MaxExtractedChars);
+    }
+
+    [Theory]
+    [InlineData("\U0001F600")]
+    [InlineData("\u200B")]
+    [InlineData("\U0001F600\u200Ba")]
+    public void TheLongestAllowedTextOfEscapedCharactersFitsTheAnswerLimit(string unit)
+    {
+        var options = new SourceOptions();
+        var builder = new StringBuilder(options.MaxExtractedChars + unit.Length);
+        while (builder.Length + unit.Length <= options.MaxExtractedChars)
+            builder.Append(unit);
+        var text = builder.ToString();
+        var answer = new SourceExtraction(text, 4_000, Enumerable.Range(1, 4_000).ToList(), SourceQuality.Good, [], null);
+
+        var bytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(answer, ExtractionLimits.Json);
+
+        Assert.True(text.Length > options.MaxExtractedChars - unit.Length);
+        Assert.True(bytes.LongLength <= options.ExtractionMaxOutputBytes, $"{bytes.LongLength} bytes for {text.Length} units");
     }
 
     [LinuxFact]

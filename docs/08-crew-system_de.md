@@ -717,8 +717,8 @@ dieselbe Anwendung in einem **eigenen Prozess**, damit eine bösartige Datei den
    Uploads gleichzeitig; ein weiterer wird sofort mit HTTP 429, `Retry-After: 5` und „You are already adding 2 files at
    the same time. Please wait until one is done, then try again.“ abgelehnt. Über alle Personen laufen höchstens
    `Sources:MaxConcurrentIntakes` Uploads gleichzeitig; wer keinen Platz bekommt, wartet bis
-   `Sources:ExtractionQueueTimeout`, sonst lautet die Quittung „The service is busy with other uploads. Please try again
-   in a minute.“ Beide Plätze werden **vor** dem Lesen des Request-Bodys belegt: `POST /api/sources` liest den
+   `Sources:ExtractionQueueTimeout`, sonst kommt HTTP 503 mit `Retry-After: 30` und der Quittung „The service is busy
+   with other uploads. Please try again in a minute.“ (die Karte bietet „Try again“ an). Beide Plätze werden **vor** dem Lesen des Request-Bodys belegt: `POST /api/sources` liest den
    Multipart-Body als Strom (kein Formularpuffer) und nimmt das Antiforgery-Token nur aus dem Header. Eingefügter Text
    braucht keinen der Plätze, weil er schon im Speicher liegt.
 2. **Streamen und Zeit.** Der Upload wird nach `<StorageRoot>/.incoming/<id>/upload.part` geschrieben (Verzeichnis
@@ -763,7 +763,7 @@ dieselbe Anwendung in einem **eigenen Prozess**, damit eine bösartige Datei den
 | Gesamtzeit | `ExtractionTimeout` | 60 s | ganzer Prozessbaum wird beendet, „Reading this file took too long.“ |
 | Verwalteter Speicher | `ExtractionMemoryLimitBytes` | 1 GiB | `DOTNET_GCHeapHardLimit` im Kind; ein Wächter beendet es zusätzlich oberhalb der Grenze plus 256 MiB |
 | Text | `MaxExtractedChars` | 3.000.000 Zeichen | Lesen endet, „This file contains far more text than we can use. Please upload a shorter version.“ |
-| Antwortgröße | `ExtractionMaxOutputBytes` | 16 MiB | Prozess wird beendet, Datei unlesbar; bemessen auf die Textgrenze mit höchstens vier Byte je Zeichen (Buchstaben außerhalb von ASCII werden nicht maskiert) plus Platz für das JSON |
+| Antwortgröße | `ExtractionMaxOutputBytes` | 20 MiB | Prozess wird beendet, Datei unlesbar; bemessen auf die Textgrenze mit höchstens sechs Byte je UTF-16-Einheit (Emoji und Formatzeichen werden als `\uXXXX` geschrieben, Buchstaben der Grundebene nicht maskiert) plus Platz für das JSON |
 | Umgebung | — | — | geleert; nur `PATH`, `HOME`/`TMPDIR` (das private Upload-Verzeichnis), GC-Einstellungen und die Extraktionsgrenzen als JSON |
 | Arbeitsverzeichnis | — | — | das private Upload-Verzeichnis |
 
@@ -796,3 +796,21 @@ Grenzen oben: Der Webprozess bleibt üblicherweise unter 1 GB, jeder Extraktions
 (plus den Spielraum des Wächters) nutzen, und höchstens zwei laufen gleichzeitig; der Rest ist Puffer. Das Limit
 schützt die anderen Dienste eines gemeinsam genutzten Hosts. Hat der Host weniger Speicher übrig, senkt man
 `ExtractionMaxConcurrency` oder `ExtractionMemoryLimitBytes` zusammen mit dem Limit.
+
+## Automatische Längenprüfung des Direktwegs (Zusatz zu D-070)
+
+Die Längenprüfung ohne Modell ist bewusst konservativ: Sie blockiert nur bei eindeutiger Lage und grober Abweichung;
+sonst bleibt es bei einer Notiz. `RequestConstraintExtractor` liest Längen nur außerhalb von Anführungszeichen, Code
+und Text, der nach einer Einleitung angehängt ist („Antworte auf diese Mail:“). `LengthRuleGate` lässt eine Länge nur
+dann zur blockierenden Prüfung werden, wenn der ganze Auftrag genau eine Längenangabe in Wörtern oder Zeichen enthält
+(oder ein klares Paar wie „zwischen 100 und 150 Wörter“), keine andere Mengenangabe (Stückzahlen, „je/pro/each“,
+Varianten, Seiten, Minuten), kein Wort mit Rückbezug oder Überarbeitung („Entwurf“, „letzte“, „zu lang“, „kürze“,
+„zusammenfassen“, „übersetze“ …), ein an die Zahl gebundenes Grenzwort („höchstens“, „at most“, „ca.“ … oder „mit/von/in
+N Wörtern“ direkt hinter dem Ergebnis), keine fremde Präposition zwischen Befehlsverb und Länge im selben Teilsatz
+(„einen Titel für ein Buch mit mindestens 80.000 Wörtern“) und keine Zusammensetzung wie „300-Wörter-Text“. Jede
+andere Länge ergibt die Notiz „Your request mentions a length (…); it was not checked automatically.“ Auch eine
+blockierende Länge löst eine Korrektur nur aus, wenn der Text die Grenze um mehr als 25 % verfehlt („höchstens 100
+Wörter“ ab 126 Wörtern, „mindestens 200 Wörter“ unter 150); eine kleinere Abweichung ist ein offener Punkt. Ist die
+Länge der einzige blockierende Befund, endet die Anweisung an den Schreiber mit „Keep everything else unchanged.“ Die
+Falsch-Blockier-Rate wird an synthetischen, unabhängig beschrifteten Aufträgen gemessen
+(`tests/Geef.Atelier.Tests/Domain/Checks/Corpus/`, `LengthCorpusTests`).

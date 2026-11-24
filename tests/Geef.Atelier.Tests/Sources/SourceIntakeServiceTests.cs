@@ -168,7 +168,14 @@ public sealed class SourceIntakeServiceTests(PostgresFixture fixture) : IDisposa
         var tooLarge = await IntakeAsync(provider, user, "huge.txt", Encoding.UTF8.GetBytes(new string('b', 400) + " " + Guid.NewGuid()));
         Assert.True(tooLarge.Usable);
         Assert.Equal(SourceBudgetClass.TooLarge, tooLarge.BudgetClass);
-        Assert.Contains(tooLarge.Warnings, w => w.Code == SourceWarningCodes.OverBudget);
+        var overBudget = Assert.Single(tooLarge.Warnings, w => w.Code == SourceWarningCodes.OverBudget).Message;
+        Assert.EndsWith("Please use a shorter version.", overBudget, StringComparison.Ordinal);
+        Assert.DoesNotContain("pages", overBudget, StringComparison.OrdinalIgnoreCase);
+
+        var longPdf = await IntakeAsync(provider, user, "long.pdf", SyntheticDocuments.Pdf(3, page => $"Page {page} {Guid.NewGuid()} " + string.Join(' ', Enumerable.Repeat("word", 40))));
+        Assert.True(longPdf.Usable);
+        Assert.Equal(SourceBudgetClass.TooLarge, longPdf.BudgetClass);
+        Assert.EndsWith("Choose the pages to use.", Assert.Single(longPdf.Warnings, w => w.Code == SourceWarningCodes.OverBudget).Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -322,7 +329,7 @@ public sealed class SourceIntakeServiceTests(PostgresFixture fixture) : IDisposa
 
         var third = await IntakeAsync(provider, user, "3.txt", Encoding.UTF8.GetBytes("Third " + Guid.NewGuid()));
         Assert.False(third.Usable);
-        Assert.Equal("You have 2 files that are not used in an order yet. Remove some of them or start an order first.", third.Reason);
+        Assert.Equal("You have 2 files that are not used in an order yet. Please try again later or contact an administrator.", third.Reason);
         Assert.True((await IntakeAsync(provider, user, "1 again.txt", firstBytes)).Duplicate);
         Assert.True((await IntakeAsync(provider, NewUser(), "3.txt", Encoding.UTF8.GetBytes("Third " + Guid.NewGuid()))).Usable);
 
@@ -341,7 +348,7 @@ public sealed class SourceIntakeServiceTests(PostgresFixture fixture) : IDisposa
         Assert.True((await IntakeAsync(bySize, sizeUser, "a.txt", Encoding.UTF8.GetBytes(new string('a', 600_000) + Guid.NewGuid()))).Usable);
         var tooMuch = await IntakeAsync(bySize, sizeUser, "b.txt", Encoding.UTF8.GetBytes(new string('b', 600_000) + Guid.NewGuid()));
         Assert.False(tooMuch.Usable);
-        Assert.Equal("Your files that are not used in an order yet would take more than 1 MB. Remove some of them or start an order first.", tooMuch.Reason);
+        Assert.Equal("Your files that are not used in an order yet would take more than 1 MB. Please try again later or contact an administrator.", tooMuch.Reason);
     }
 
     [Fact]
@@ -500,7 +507,7 @@ public sealed class SourceIntakeServiceTests(PostgresFixture fixture) : IDisposa
 
         Assert.True(first.Usable, first.Reason);
         Assert.False(second.Usable);
-        Assert.Equal("Your files that are not used in an order yet would hold more than 1,000 characters of text. Remove some of them or start an order first.", second.Reason);
+        Assert.Equal("Your files that are not used in an order yet would hold more than 1,000 characters of text. Please try again later or contact an administrator.", second.Reason);
         Assert.Single(Directory.GetFiles(Path.Combine(_root, SourceFileStore.OwnerFolder(user))));
 
         var order = Order(user);
@@ -532,7 +539,7 @@ public sealed class SourceIntakeServiceTests(PostgresFixture fixture) : IDisposa
             IntakeAsync(provider, user, $"{i}.txt", Encoding.UTF8.GetBytes($"Parallel file {i} {Guid.NewGuid()}"))));
 
         Assert.Equal(3, receipts.Count(r => r.Usable));
-        Assert.All(receipts.Where(r => !r.Usable), r => Assert.Equal("You have 3 files that are not used in an order yet. Remove some of them or start an order first.", r.Reason));
+        Assert.All(receipts.Where(r => !r.Usable), r => Assert.Equal("You have 3 files that are not used in an order yet. Please try again later or contact an administrator.", r.Reason));
         await using var db = fixture.NewContext();
         Assert.Equal(3, await db.Sources.CountAsync(s => s.OwnerUsername == user));
         Assert.Equal(3, Directory.GetFiles(Path.Combine(_root, SourceFileStore.OwnerFolder(user))).Length);

@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-11-24 (D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
+*Last updated: 2026-11-24 (D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -1869,7 +1869,7 @@ memory and CPU limits enforceable; the checks in the extractors keep the common 
 about 2 million). The extraction process stops as soon as the text passes the limit (Word while scanning the XML
 parts, before the document model; PDF at the page that passes it), text files are counted before decoding, and the
 web process checks again before it copies the text. (2) The answer of the extraction process is limited to 16 MiB
-(the text limit at up to four bytes per character, letters outside ASCII unescaped, plus room for the JSON) and is
+(corrected to 20 MiB in the D-070 addendum: six bytes per UTF-16 unit, plus room for the JSON) and is
 parsed while it streams in. (3) The quota of files no order uses also counts characters (20 million per person) and is
 checked again inside the inserting transaction under a lock per person (`pg_advisory_xact_lock`). (4) The upload
 endpoint reads the multipart body as a stream without a form buffer and takes the person's upload place (at most two
@@ -1886,3 +1886,26 @@ makes the quota exact; streaming makes the slots effective. The memory limit is 
 usually stays below 1 GB, each extraction process may use 1 GiB of managed heap and at most two run at the same time,
 the rest is headroom; the limit keeps one service from pushing a shared host into swapping or the out-of-memory
 killer.
+
+### D-070 addendum — length check deliberately conservative; upload answers (2026-11-24)
+
+**Decision.** (1) The length check without a model blocks only when the request is clear and the text is far off;
+otherwise it leaves a note. A length becomes a blocking rule only when the whole request (without quotes, code and
+attached text) has exactly one length or a clear pair, no other count, no reference to an earlier text or a revision,
+a limit word bound to the number, no foreign preposition between the instruction verb and the length in the same
+clause and no compound such as "300-word post" (`LengthRuleGate`). The direction rules of the second round apply on
+top. (2) A correction is asked for only when the text misses the limit by more than 25 %; a smaller miss is an open
+point. (3) When the length is the only blocking problem, the instruction ends with "Keep everything else unchanged."
+(4) When all upload slots stay busy, the upload answers 503 with `Retry-After: 30` and the receipt; the quota message
+no longer names a way the page does not offer; a Word or text file that is too long asks for a shorter version
+instead of a page selection. (5) The answer limit of the extraction process is 20 MiB (six bytes per UTF-16 unit:
+emoji and format characters are escaped), correcting point (2) of the second round.
+
+**Reason.** Every review round found a new class of false blocks in the word-based reading of lengths (an upper limit
+read as a lower one, negations in a later clause, the limit of one tweet read as the limit of three, numbers of a
+study or a book, the length of the previous version, lengths inside a quoted e-mail). A false block is expensive: the
+correction forces the writer against the person's wish, up to several thousand words. Patching single sentences did
+not converge, so the rule is now structural and favours precision over recall, and the false-block rate is measured on
+synthetic requests labelled by a separate generator before the extractor saw them (development set, held-out set and
+a second set in a hasty typing style). The 25 % threshold limits the damage of any remaining misreading to texts that
+are far off.

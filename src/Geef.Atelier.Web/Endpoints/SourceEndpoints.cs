@@ -24,7 +24,8 @@ namespace Geef.Atelier.Web.Endpoints;
 /// The upload is read as a stream (no form buffer): the antiforgery token must come in the header, the person's upload
 /// place and an upload slot are taken before the body is read, and the request ends after
 /// <see cref="SourceOptions.UploadTimeout"/> (408) or when it sends slower than
-/// <see cref="SourceOptions.MinUploadBytesPerSecond"/>.
+/// <see cref="SourceOptions.MinUploadBytesPerSecond"/>. When all upload slots stay busy, the answer is 503 with the
+/// receipt and a <c>Retry-After</c> header, so the page can offer to try the same file again.
 /// </summary>
 public static class SourceEndpoints
 {
@@ -33,6 +34,9 @@ public static class SourceEndpoints
 
     /// <summary>Answer of an upload that took longer than <see cref="SourceOptions.UploadTimeout"/>.</summary>
     public const string TimeoutReason = "The upload took too long. Check your connection and try again.";
+
+    /// <summary>Seconds in the <c>Retry-After</c> header when all upload slots are busy (HTTP 503).</summary>
+    public const string BusyRetryAfterSeconds = "30";
 
     private const string UnreadableReason = "The upload could not be read.";
     private const string OutOfDateReason = "The page is out of date. Reload it and try again.";
@@ -148,6 +152,9 @@ public static class SourceEndpoints
             case SourceRefusal.TooManyUploads:
                 http.Response.Headers.RetryAfter = "5";
                 return Results.Json(receipt, JsonOptions, statusCode: StatusCodes.Status429TooManyRequests);
+            case SourceRefusal.Busy:
+                http.Response.Headers.RetryAfter = BusyRetryAfterSeconds;
+                return Results.Json(receipt, JsonOptions, statusCode: StatusCodes.Status503ServiceUnavailable);
         }
 
         if (!receipt.Usable)
@@ -209,6 +216,8 @@ public static class SourceEndpoints
         }
         catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException)
         {
+            http.RequestServices.GetService<ILoggerFactory>()?.CreateLogger(typeof(SourceEndpoints))
+                .LogWarning("The minimum upload rate could not be set ({Error}); the server default applies.", ex.GetType().Name);
         }
     }
 

@@ -197,7 +197,13 @@ public sealed class SourceEndpointsTests(PostgresFixture postgres)
         var stalled = SendStalledAsync(host, slow, "stalled.txt", never.Task);
         await WaitForIncomingAsync(host, 1);
         using (var blocked = await host.PostSourceAsync(other, "blocked.md", Encoding.UTF8.GetBytes("Blocked " + Guid.NewGuid())))
-            Assert.Equal(HttpStatusCode.UnprocessableEntity, blocked.StatusCode);
+        {
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, blocked.StatusCode);
+            Assert.Equal(Geef.Atelier.Web.Endpoints.SourceEndpoints.BusyRetryAfterSeconds, blocked.Headers.GetValues("Retry-After").Single());
+            var receipt = await blocked.Content.ReadAsStringAsync();
+            Assert.Contains("\"usable\":false", receipt, StringComparison.Ordinal);
+            Assert.Contains("The service is busy with other uploads. Please try again in a minute.", receipt, StringComparison.Ordinal);
+        }
 
         using (var cut = await stalled.WaitAsync(TimeSpan.FromSeconds(60)))
         {

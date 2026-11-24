@@ -132,8 +132,62 @@ public sealed class DraftCheckEvaluatorTests
             DraftCheckCodes.Length);
 
         Assert.Equal(passes, result.Passed);
-        Assert.True(result.Blocking);
+        Assert.Equal(passes, result.Blocking);
         Assert.Equal("quote", result.Quote);
+    }
+
+    [Theory]
+    [InlineData(LengthKind.AtMost, null, 100, 125, false)]
+    [InlineData(LengthKind.AtMost, null, 100, 126, true)]
+    [InlineData(LengthKind.AtLeast, 200, null, 150, false)]
+    [InlineData(LengthKind.AtLeast, 200, null, 149, true)]
+    [InlineData(LengthKind.Range, 120, 180, 90, false)]
+    [InlineData(LengthKind.Range, 120, 180, 89, true)]
+    [InlineData(LengthKind.Range, 120, 180, 225, false)]
+    [InlineData(LengthKind.Range, 120, 180, 226, true)]
+    [InlineData(LengthKind.About, 300, 300, 225, false)]
+    [InlineData(LengthKind.About, 300, 300, 224, true)]
+    [InlineData(LengthKind.About, 300, 300, 375, false)]
+    [InlineData(LengthKind.About, 300, 300, 376, true)]
+    [InlineData(LengthKind.Stated, 300, 300, 225, false)]
+    [InlineData(LengthKind.Stated, 300, 300, 376, true)]
+    public void Only_a_miss_of_more_than_a_quarter_of_the_limit_asks_for_a_correction(LengthKind kind, int? min, int? max, int words, bool blocking)
+    {
+        var result = Single(
+            DraftCheckEvaluator.Evaluate(Words(words), With(new LengthConstraint(LengthUnit.Words, min, max, "quote", kind))),
+            DraftCheckCodes.Length);
+
+        Assert.False(result.Passed);
+        Assert.Equal(blocking, result.Blocking);
+        if (!blocking)
+            Assert.Contains("The difference is small", result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_small_miss_in_characters_is_only_an_open_point()
+    {
+        var result = Single(
+            DraftCheckEvaluator.Evaluate(new string('a', 120), With(new LengthConstraint(LengthUnit.Characters, null, 100, "q", LengthKind.AtMost))),
+            DraftCheckCodes.Length);
+
+        Assert.False(result.Passed);
+        Assert.False(result.Blocking);
+    }
+
+    [Fact]
+    public void A_length_miss_next_to_another_blocking_problem_does_not_ask_to_keep_everything_else()
+    {
+        var constraints = OrderConstraints.None with
+        {
+            Length = new LengthConstraint(LengthUnit.Words, null, 10, "max. 10 Wörter", LengthKind.AtMost),
+            ForbiddenTerms = [new TermRule("Wort", "Vermeide „Wort“")],
+        };
+
+        var length = Single(DraftCheckEvaluator.Evaluate(Words(40), constraints), DraftCheckCodes.Length);
+
+        Assert.False(length.Passed);
+        Assert.True(length.Blocking);
+        Assert.DoesNotContain(DraftCheckEvaluator.KeepEverythingElse, length.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -144,7 +198,7 @@ public sealed class DraftCheckEvaluatorTests
             DraftCheckCodes.Length);
 
         Assert.Equal(
-            "The text has 263 words. The request asks for at most 200 words (\"max. 200 Wörter\"). Shorten it to at most 200 words without dropping anything the request requires.",
+            "The text has 263 words. The request asks for at most 200 words (\"max. 200 Wörter\"). Shorten it to at most 200 words without dropping anything the request requires. Keep everything else unchanged.",
             result.Message);
     }
 
