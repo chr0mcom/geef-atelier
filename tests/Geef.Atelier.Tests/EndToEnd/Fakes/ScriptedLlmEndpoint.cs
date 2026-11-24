@@ -36,6 +36,17 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
     /// <summary>Reviewer behaviour for all reviewer calls.</summary>
     public ReviewerVerdict ReviewerVerdict { get; set; } = ReviewerVerdict.ApproveWithNote;
 
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(string? Text, int Status, string? Code)> _executorAnswers = new();
+
+    /// <summary>Queues the text of the next executor answer; once the queue is empty <see cref="ExecutorText"/> is used.</summary>
+    public void EnqueueExecutorText(string text) => _executorAnswers.Enqueue((text, 200, null));
+
+    /// <summary>Queues an error answer for the next executor call: the cli-proxy error envelope with <paramref name="code"/>.</summary>
+    public void EnqueueExecutorError(int status, string code) => _executorAnswers.Enqueue((null, status, code));
+
+    /// <summary>Input tokens reported for executor answers; <c>null</c> keeps the default estimate (prompt characters / 4).</summary>
+    public int? ExecutorPromptTokens { get; set; }
+
     /// <summary>Handles one HTTP request sent through the named <c>llm</c> client.</summary>
     public async Task<HttpResponseMessage> HandleAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
@@ -48,7 +59,34 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
         var call = Parse(recorder.NextIndex(), request.Method.Method, url, body);
         recorder.Add(call);
 
+        if (call.Role == LlmRole.Executor && _executorAnswers.TryDequeue(out var answer))
+        {
+            if (answer.Code is { } code)
+                return ErrorEnvelope(answer.Status, code);
+            return Json(Envelope(call, new JsonObject { ["role"] = "assistant", ["content"] = answer.Text }, "stop", ExecutorPromptTokens));
+        }
+
         return Json(Respond(call));
+    }
+
+    private static HttpResponseMessage ErrorEnvelope(int status, string code)
+    {
+        var payload = new JsonObject
+        {
+            ["error"] = new JsonObject
+            {
+                ["message"] = $"E2E scripted cli-proxy error {code}.",
+                ["type"] = "api_error",
+                ["code"] = code,
+            },
+        };
+        var response = new HttpResponseMessage((HttpStatusCode)status)
+        {
+            Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json"),
+        };
+        if (status == 503)
+            response.Headers.Add("Retry-After", "300");
+        return response;
     }
 
     internal static JsonObject ModelList(IEnumerable<string> ids) => new()
@@ -63,7 +101,7 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
         LlmRole.Reviewer => ToolCallResponse(call, "submit_review", ReviewArguments()),
         LlmRole.Refiner => ToolCallResponse(call, "submit_refinement", RefinementArguments(call)),
         LlmRole.QueryExtractor => TextResponse(call, "e2e lighthouse history search"),
-        LlmRole.Executor => TextResponse(call, ExecutorText),
+        LlmRole.Executor => Envelope(call, new JsonObject { ["role"] = "assistant", ["content"] = ExecutorText }, "stop", ExecutorPromptTokens),
         _ when call.ToolChoice is { } choice && choice.StartsWith("function:", StringComparison.Ordinal)
             => ToolCallResponse(call, choice["function:".Length..], new JsonObject()),
         _ => TextResponse(call, "E2E generic answer."),
@@ -130,7 +168,7 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
             }),
         }, "tool_calls");
 
-    private static JsonObject Envelope(RecordedLlmCall call, JsonObject message, string finishReason) => new()
+    private static JsonObject Envelope(RecordedLlmCall call, JsonObject message, string finishReason, int? promptTokens = null) => new()
     {
         ["id"] = $"chatcmpl-e2e-{call.Index}",
         ["object"] = "chat.completion",
@@ -143,9 +181,9 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
         }),
         ["usage"] = new JsonObject
         {
-            ["prompt_tokens"] = Math.Max(1, call.PromptText.Length / 4),
+            ["prompt_tokens"] = promptTokens ?? Math.Max(1, call.PromptText.Length / 4),
             ["completion_tokens"] = 42,
-            ["total_tokens"] = Math.Max(1, call.PromptText.Length / 4) + 42,
+            ["total_tokens"] = (promptTokens ?? Math.Max(1, call.PromptText.Length / 4)) + 42,
         },
     };
 
