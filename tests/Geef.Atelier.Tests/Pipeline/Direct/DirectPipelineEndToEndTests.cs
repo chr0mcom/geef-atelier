@@ -179,7 +179,7 @@ public sealed class DirectPipelineEndToEndTests
         Assert.Equal(DraftCheckCodes.Length, Assert.Single(outcome.Report!.OpenChecks).Code);
     }
 
-    [Fact(Skip = "Needs PageSelection of package P1; remove after merging P1.")]
+    [Fact]
     public async Task A_page_selection_limits_the_text_and_is_marked()
     {
         var harness = new DirectPipelineHarness();

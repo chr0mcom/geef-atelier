@@ -69,7 +69,6 @@ public sealed class OrderDtoCompatibilityTests
     }
 
     [Fact]
-    [Trait("Etappe1", "NachIntegration")]
     public void Wire_names_match_the_order_state_resolver()
     {
         foreach (var state in Enum.GetValues<OrderDisplayState>())

@@ -9,8 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Geef.Atelier.Tests.EndToEnd;
 
 /// <summary>
-/// Orders over the real <c>/mcp</c> endpoint and the real wiring. Tests with the trait <c>Etappe1=NachIntegration</c> need the
-/// order service, the source intake and the direct path (packages P1 and P2) and are armed after the merge.
+/// Orders over the real <c>/mcp</c> endpoint and the real wiring.
 /// </summary>
 [Collection(EndToEndCollection.Name)]
 [Trait("Category", "EndToEnd")]
@@ -22,7 +21,6 @@ public sealed class McpOrderEndToEndTests(PostgresFixture postgres)
     private const string Marker = "Marker-7Q4: the office closes at 14:00 on Fridays.";
 
     [Fact]
-    [Trait("Etappe1", "NachIntegration")]
     public async Task Submit_order_with_a_file_waits_with_the_status_tool_and_returns_the_text_with_the_file()
     {
         await using var host = await AtelierEndToEndHost.StartAsync(postgres);
@@ -71,7 +69,6 @@ public sealed class McpOrderEndToEndTests(PostgresFixture postgres)
     }
 
     [Fact]
-    [Trait("Etappe1", "NachIntegration")]
     public async Task Submit_request_with_a_template_links_its_run_to_a_careful_order()
     {
         await using var host = await AtelierEndToEndHost.StartAsync(postgres);
@@ -99,7 +96,6 @@ public sealed class McpOrderEndToEndTests(PostgresFixture postgres)
     }
 
     [Fact]
-    [Trait("Etappe1", "NachIntegration")]
     public async Task A_placeholder_attachment_is_rejected_with_a_message_the_client_can_read()
     {
         await using var host = await AtelierEndToEndHost.StartAsync(postgres);

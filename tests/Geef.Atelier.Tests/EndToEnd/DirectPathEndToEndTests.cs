@@ -14,14 +14,12 @@ namespace Geef.Atelier.Tests.EndToEnd;
 
 /// <summary>
 /// The direct path over the real wiring: upload, order, orchestrator, writer request to the (faked) cli-proxy, checks,
-/// report. Needs the orders and sources of package P1 (tables, services, endpoints, host helpers); until that is
-/// merged the tests are skipped with <see cref="NeedsOrders"/>. The integrator removes the skip after merging P1.
+/// report.
 /// </summary>
 [Collection(EndToEndCollection.Name)]
 [Trait("Category", "EndToEnd")]
 public sealed class DirectPathEndToEndTests(PostgresFixture postgres)
 {
-    private const string NeedsOrders = "Needs orders and sources (package P1); remove after merging P1.";
     private const string FirstPageMarker = "E2E-MARKER-FIRST-PAGE-3A71";
     private const string LastPageMarker = "E2E-MARKER-LAST-PAGE-C09D";
 
@@ -54,7 +52,7 @@ public sealed class DirectPathEndToEndTests(PostgresFixture postgres)
     private static Task<RunEntity> RunOfAsync(AtelierEndToEndHost host, Guid orderId) =>
         host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == orderId && r.Kind == RunKind.Standard));
 
-    [Fact(Skip = NeedsOrders)]
+    [Fact]
     public async Task Markers_of_the_first_and_the_last_page_reach_the_writer_in_document_mode()
     {
         var (host, orderId) = await SubmitAsync(postgres, "Summarise the attached report for the council.", s => s.ExecutorText = Words(100), withPdf: true);
@@ -72,7 +70,7 @@ public sealed class DirectPathEndToEndTests(PostgresFixture postgres)
         Assert.Equal((await RunOfAsync(host, orderId)).Id, usage.RunId);
     }
 
-    [Fact(Skip = NeedsOrders)]
+    [Fact]
     public async Task A_clean_text_converges_after_one_pass_with_a_report()
     {
         var (host, orderId) = await SubmitAsync(postgres, "Schreibe eine kurze Notiz an das Team, max. 50 Wörter.", s => s.ExecutorText = Words(40));
@@ -86,7 +84,7 @@ public sealed class DirectPathEndToEndTests(PostgresFixture postgres)
         Assert.True(Assert.Single(report.Checks, c => c.Code == DraftCheckCodes.Length).Passed);
     }
 
-    [Fact(Skip = NeedsOrders)]
+    [Fact]
     public async Task A_length_violation_is_corrected_once()
     {
         var (host, orderId) = await SubmitAsync(postgres, "Schreibe eine kurze Notiz an das Team, max. 50 Wörter.", s =>
@@ -104,7 +102,7 @@ public sealed class DirectPathEndToEndTests(PostgresFixture postgres)
         Assert.Equal(2, run.DeliveredIteration);
     }
 
-    [Fact(Skip = NeedsOrders)]
+    [Fact]
     public async Task Two_violations_deliver_with_open_points()
     {
         var (host, orderId) = await SubmitAsync(postgres, "Schreibe eine kurze Notiz an das Team, max. 50 Wörter.", s => s.ExecutorText = Words(80));
@@ -118,7 +116,7 @@ public sealed class DirectPathEndToEndTests(PostgresFixture postgres)
         Assert.Equal(OrderDisplayState.DeliveredWithOpenPoints, order!.Display.State);
     }
 
-    [Fact(Skip = NeedsOrders)]
+    [Fact]
     public async Task Careful_orders_pass_the_file_to_the_executor()
     {
         var (host, _) = await SubmitAsync(postgres, "Summarise the attached report carefully.", s => s.ExecutorText = Words(100), withPdf: true, mode: OrderMode.Careful);
@@ -127,7 +125,7 @@ public sealed class DirectPathEndToEndTests(PostgresFixture postgres)
         Assert.True(host.Llm.AnyExecutorPromptContains(FirstPageMarker), host.Llm.Describe());
     }
 
-    [Fact(Skip = NeedsOrders)]
+    [Fact]
     public async Task The_direct_path_never_asks_a_model_for_a_review()
     {
         var (host, _) = await SubmitAsync(postgres, "Schreibe eine kurze Notiz an das Team.", s => s.ExecutorText = Words(40));
@@ -136,7 +134,7 @@ public sealed class DirectPathEndToEndTests(PostgresFixture postgres)
         Assert.Empty(host.Llm.CallsFor(LlmRole.Reviewer));
     }
 
-    [Fact(Skip = NeedsOrders)]
+    [Fact]
     public async Task An_empty_answer_twice_fails_the_run_with_a_plain_message()
     {
         var (host, orderId) = await SubmitAsync(postgres, "Schreibe eine kurze Notiz an das Team.", s =>
