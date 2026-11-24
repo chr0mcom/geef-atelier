@@ -24,6 +24,8 @@ export function init(root, dotnet, options) {
         token: options.token,
         files: new Map(),
         requests: new Map(),
+        queue: [],
+        active: 0,
         dragDepth: 0,
         listeners: []
     };
@@ -92,9 +94,35 @@ async function addFiles(handle, fileList) {
     }
 }
 
+const maxParallelUploads = 2;
+
 function send(handle, localId) {
+    if (!handle.files.has(localId)) return;
+    if (handle.active >= maxParallelUploads) {
+        if (!handle.queue.includes(localId)) handle.queue.push(localId);
+        return;
+    }
+    start(handle, localId);
+}
+
+function next(handle) {
+    while (handle.active < maxParallelUploads && handle.queue.length > 0) {
+        const localId = handle.queue.shift();
+        if (handle.files.has(localId)) start(handle, localId);
+    }
+}
+
+function start(handle, localId) {
     const file = handle.files.get(localId);
     if (!file) return;
+    handle.active++;
+    let released = false;
+    const release = () => {
+        if (released) return;
+        released = true;
+        handle.active--;
+        next(handle);
+    };
     const form = new FormData();
     form.append('file', file, file.name);
     const xhr = new XMLHttpRequest();
@@ -109,11 +137,15 @@ function send(handle, localId) {
     };
     const finish = (status, body) => {
         handle.requests.delete(localId);
+        release();
         handle.dotnet.invokeMethodAsync('OnUploadCompleted', localId, status, body || '').catch(() => { });
     };
     xhr.onload = () => finish(xhr.status, xhr.responseText);
     xhr.onerror = () => finish(0, '');
-    xhr.onabort = () => handle.requests.delete(localId);
+    xhr.onabort = () => {
+        handle.requests.delete(localId);
+        release();
+    };
     xhr.open('POST', handle.url);
     xhr.setRequestHeader('RequestVerificationToken', handle.token);
     xhr.send(form);
@@ -126,6 +158,7 @@ export function retry(handle, localId) {
 }
 
 export function forget(handle, localId) {
+    handle.queue = handle.queue.filter(id => id !== localId);
     const xhr = handle.requests.get(localId);
     if (xhr) xhr.abort();
     handle.requests.delete(localId);
@@ -154,6 +187,7 @@ export function dispose(handle) {
     if (!handle) return;
     for (const off of handle.listeners) off();
     handle.listeners = [];
+    handle.queue = [];
     for (const xhr of handle.requests.values()) xhr.abort();
     handle.requests.clear();
     handle.files.clear();
