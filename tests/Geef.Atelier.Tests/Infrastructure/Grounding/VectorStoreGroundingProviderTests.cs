@@ -112,6 +112,7 @@ public sealed class VectorStoreGroundingProviderTests
         var provider = new VectorStoreGroundingProvider(
             embeddingProvider,
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
+            new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             NullLogger<VectorStoreGroundingProvider>.Instance);
 
         return (provider, consultationRepo);

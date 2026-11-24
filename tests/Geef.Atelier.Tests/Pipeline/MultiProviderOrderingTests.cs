@@ -153,6 +153,7 @@ public sealed class MultiProviderOrderingTests
         var provider = new VectorStoreGroundingProvider(
             new StubEmbeddingProvider(),
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
+            new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             NullLogger<VectorStoreGroundingProvider>.Instance);
 
         return new SingleProviderFactory(provider);

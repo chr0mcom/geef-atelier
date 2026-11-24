@@ -90,6 +90,7 @@ public sealed class VectorStoreRunAttachmentsTests
         return new VectorStoreGroundingProvider(
             embeddings,
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
+            new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             NullLogger<VectorStoreGroundingProvider>.Instance);
     }
 

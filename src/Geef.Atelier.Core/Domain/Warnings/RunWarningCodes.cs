@@ -9,6 +9,12 @@ public static class RunWarningCodes
     /// <summary>A tool-backed grounding source returned an error. Reserved; failures currently use <see cref="GroundingProviderSkipped"/>.</summary>
     public const string GroundingToolFailed = "grounding.tool_failed";
 
+    /// <summary>
+    /// A knowledge source has an unknown search setting (<c>Scope</c>); only the shared documents were searched and
+    /// attachments were left out.
+    /// </summary>
+    public const string GroundingScopeUnknown = "grounding.scope_unknown";
+
     /// <summary>A reviewer could not complete its check in a round and was left out of the verdict.</summary>
     public const string ReviewerFailed = "review.reviewer_failed";
 

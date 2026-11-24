@@ -215,6 +215,7 @@ public sealed class KlassikRegressionTests
         var provider = new VectorStoreGroundingProvider(
             embeddingStub,
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
+            new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             NullLogger<VectorStoreGroundingProvider>.Instance);
 
         return new SingleProviderFactory(provider);

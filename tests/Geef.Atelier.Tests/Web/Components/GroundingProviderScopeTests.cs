@@ -59,10 +59,13 @@ public sealed class GroundingProviderScopeTests : TestContext
         Assert.Equal("run-local", scopeSelect.GetAttribute("value"));
     }
 
+    /// <summary>
+    /// A profile without a <c>Scope</c> setting searches the shared documents only at run time, so the editor shows
+    /// "global" for it; showing "both" would widen the search to attachments as soon as the profile is saved.
+    /// </summary>
     [Fact]
-    public void EditForm_ProfileWithoutScopeKey_FallsBackToBoth()
+    public void EditForm_ProfileWithoutScopeKey_ShowsGlobalLikeTheRuntime()
     {
-        // Profile has no "Scope" key in ProviderSettings (legacy profile)
         var profile = MakeVectorStoreProfile("custom-vs-legacy", scope: null);
         Services.AddSingleton<ICrewService>(new StubCrewService(profile));
         Services.AddSingleton<IProviderService>(new FakeProviderService());
@@ -72,8 +75,7 @@ public sealed class GroundingProviderScopeTests : TestContext
         var cut = RenderComponent<GroundingProviderEditor>(p => p.Add(c => c.Name, "custom-vs-legacy"));
 
         var scopeSelect = cut.Find("[data-testid='input-scope']");
-        // GroundingFormModel.From() uses `scope ?? "both"` when key is absent
-        Assert.Equal("both", scopeSelect.GetAttribute("value"));
+        Assert.Equal("global", scopeSelect.GetAttribute("value"));
     }
 
     [Fact]

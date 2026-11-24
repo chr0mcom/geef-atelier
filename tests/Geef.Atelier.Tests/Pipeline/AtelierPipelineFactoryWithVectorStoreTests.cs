@@ -166,6 +166,7 @@ public sealed class AtelierPipelineFactoryWithVectorStoreTests
         return new VectorStoreGroundingProvider(
             embeddingStub,
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
+            new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             NullLogger<VectorStoreGroundingProvider>.Instance);
     }
 

@@ -274,6 +274,7 @@ public sealed class AtelierPipelineFactoryWithRunAttachmentsTests
         return new VectorStoreGroundingProvider(
             new CountingEmbeddingProviderStub(),
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
+            new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             NullLogger<VectorStoreGroundingProvider>.Instance);
     }
 

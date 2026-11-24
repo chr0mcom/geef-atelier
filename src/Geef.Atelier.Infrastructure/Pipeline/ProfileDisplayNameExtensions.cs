@@ -17,4 +17,8 @@ internal static class ProfileDisplayNameExtensions
     /// <summary>Warning text for a source that failed and was left out; names the source by its display name only.</summary>
     public static string SkippedSourceWarning(this GroundingProviderProfile profile) =>
         $"The source \"{profile.DisplayNameOrName()}\" could not be read and was skipped.";
+
+    /// <summary>Warning text for a knowledge source whose search setting is unknown; names the source by its display name only.</summary>
+    public static string UnknownScopeWarning(this GroundingProviderProfile profile) =>
+        $"The source \"{profile.DisplayNameOrName()}\" has an unknown search setting, so only shared documents were searched.";
 }
