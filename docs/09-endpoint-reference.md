@@ -2,7 +2,7 @@
 
 *[Deutsch](09-endpoint-reference_de.md) · **English***
 
-*Last updated: 2026-05-22 (D-054: `list_learnings` tool added; `providerType` updated to include `learning-retrieval`)*
+*Last updated: 2026-11-24 (D-067: `warnings` and `outcome` in `get_run_status`/`get_run_result`; `/hubs/runs` only for signed-in users; admin-only editors and `/access-denied`; learning paused by default; before that 2026-05-22, D-054: `list_learnings` tool added; `providerType` updated to include `learning-retrieval`)*
 
 All externally reachable HTTP endpoints of Geef.Atelier — MCP, OAuth 2.1
 and the web-UI/account endpoints. Base URL: `https://geef.stefan-bechtel.de`.
@@ -143,7 +143,7 @@ Only works for `ArtifactType.File` artifacts. Reads the file from the `ExportPat
 
 #### `list_learnings`
 
-Lists learning entries from the learning store (D-054).
+Lists learning entries from the learning store (D-054). Since D-067 the learning loop is paused by default (`Learning:Enabled = false`); the tool still lists the existing entries, but no new ones are added while the switch is off.
 
 **Input:**
 ```json
@@ -185,6 +185,35 @@ Both parameters are optional. Omit `status_filter` to return all statuses; omit 
 | `approved_at` | ISO8601 \| null | Approval timestamp (null while Proposed or Rejected) |
 
 **Note:** `structured_facts_json` is intentionally not exposed — the raw fact JSON is too verbose for MCP context and is only accessible via the web UI. Auth: standard run-user isolation; non-admin users see only their own entries.
+
+#### Run status and result: `warnings` and `outcome`
+
+Since D-067, `get_run_status` and `get_run_result` return two additional fields. Both are additive;
+older clients can ignore them. Field names are camelCase.
+
+**Output of `get_run_status`:**
+```json
+{
+  "runId": "<uuid>",
+  "status": "Pending|Running|Completed|Failed|Aborted",
+  "errorMessage": "<string|null>",
+  "warnings": [ { "code": "<string>", "message": "<string>" } ],
+  "outcome": "Converged|DeliveredWithOpenPoints|Failed|Aborted|null"
+}
+```
+
+`get_run_result` returns the same fields plus `finalText`.
+
+| Field | Type | Description |
+|---|---|---|
+| `warnings` | array | Problems the run worked around instead of stopping (skipped sources, failed reviewers, model failover, finalizer problems). Empty when there were none. `code` is stable and machine-readable (e.g. `grounding.provider_skipped`); `message` is a short plain-English sentence whose wording may change. |
+| `outcome` | string \| null | What the run delivered once it is finished **and stored, including all finalizers**. `null` while the run is active and for runs that ended before Step47. |
+
+**Reading the result:** `status` keeps its meaning. A run that stops without convergence still has
+`status = "Failed"` but delivers its best draft with `outcome = "DeliveredWithOpenPoints"` and a
+`finalText`. A client should wait until `outcome` is set and then read `finalText`; a run with
+`outcome = "Failed"` or `"Aborted"` has no usable text. Details:
+[02-architecture](02-architecture.md#run-outcome-and-runstatus).
 
 ---
 
@@ -394,16 +423,18 @@ externally reachable routes:
 | Endpoint | Method | Auth | Purpose |
 |----------|---------|------|-------|
 | `/` | GET | Cookie | Home page / Atelier overview |
-| `/health` | GET | None | Health check (`Healthy`) — for the reverse proxy/container lifecycle |
+| `/health` | GET | None | Health check (`Healthy`) — for the reverse proxy/container lifecycle; includes the database and the `pending-migrations` check (D-067) |
 | `/login` | GET/POST | None | Login page (static SSR) |
 | `/auth/logout` | POST | Cookie | Logout (anti-forgery, Minimal API) |
 | `/settings/theme` | POST | None | Theme-switch fallback (no-JS), redirect to the referer |
-| `/hubs/runs` | WS | — | SignalR hub for live run updates |
+| `/hubs/runs` | WS | Cookie | SignalR hub for live run updates, signed-in users only; group names are derived on the server (D-067). The application's own pages use the in-process `IRunUpdateFeed` instead. |
+| `/access-denied` | GET | Cookie | Shown to signed-in users who open a page they have no access to (D-067) |
 | `/admin/users` | GET | Cookie (admin) | User management |
 | `/admin/oauth-clients` | GET | Cookie (admin) | OAuth client management |
 | `/account/connected-clients` | GET | Cookie | Self-service for one's own connected OAuth clients |
 | `/crew`, `/crew/templates`, `/crew/profiles/*`, `/crew/studio`, `/crew/knowledge` | GET | Cookie | Crew/template/profile/Studio/knowledge-base management |
 | `/runs`, `/runs/{id}`, `/new` | GET | Cookie | Run list, run detail, new job |
+| `/crew/providers/*`, `/tools/*`, `/mcp-servers/*`, `/crew/profiles/grounding-providers/create`, `/crew/profiles/grounding-providers/edit/{name}` | GET | Cookie (admin) | Provider, tool, MCP server and grounding editors — admin-only since D-067 because they reference secrets by name |
 
 Run-related pages are subject to run-user isolation (D-042): each user sees
 only their own runs; the admin can see system-wide via an explicit toggle.
