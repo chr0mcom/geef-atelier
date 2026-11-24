@@ -5,7 +5,11 @@ namespace Geef.Atelier.Application.Runs;
 /// <summary>Application-service contract for submitting, querying, listing, and cancelling pipeline runs.</summary>
 public interface IRunService
 {
-    /// <summary>Submits a new run request for processing.</summary>
+    /// <summary>
+    /// Submits a new run request for processing. With attachments the crew snapshot is stored only after every
+    /// attachment is uploaded and indexed; the orchestrator never claims a run without a snapshot, so the run
+    /// cannot start before its attachments are available. Model-assignment warnings are stored on the new run.
+    /// </summary>
     Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>

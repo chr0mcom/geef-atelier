@@ -98,8 +98,6 @@ internal sealed class RunService(
         var resolvedTemplateName = snapshot.TemplateName;
         var hasAttachments = request.Attachments is { Count: > 0 };
 
-        // With attachments the snapshot is written only after the upload: the orchestrator never claims a run
-        // without a snapshot, so the run cannot start before its attachments are indexed.
         var runId = await persistence.CreateRunAsync(
             effectiveBriefing, normalizedConfig, request.CreatedByUser,
             resolvedTemplateName, hasAttachments ? null : snapshotJson, effectiveKind,
