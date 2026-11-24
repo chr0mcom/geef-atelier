@@ -1790,3 +1790,21 @@ unchanged.
 **Reason.** The pre-test on reading `context.md` showed that the agent often searches instead of reading; it reads
 in full reliably only up to about 150,000 characters. The codex document mode yields no text in the container.
 Hence read evidence, an explicit reading instruction, no failover and an own empty-text check.
+
+### D-069 addendum — safe intake of uploaded files (2026-11-24)
+
+**Decision.** PDF and Word files are read in a separate process of the same application
+(`--extract-source`, branched in `Program.cs` before the host is built) with a hard total time limit (kill of the
+whole process tree), a managed heap limit (`DOTNET_GCHeapHardLimit`, 1 GiB) plus a memory watchdog, a bounded
+answer, a cleared environment and a private temporary working directory. Every crash, kill or limit ends as an
+unreadable receipt with a plain sentence. Uploads stream into a private temporary file instead of memory; a global
+limit of uploads (8) and of extractions (2) with a waiting time, a per-user quota of files no order uses (50 files,
+500 MB), a unique index on owner and hash (in Step48, which was not deployed yet) and an orphan scan in the cleanup
+complete it. Inside the extractors: XML nesting limit 100 without DTD before the Word document model, iterative walk,
+`MaxUncompressedBytes` 64 MiB with the ratio check from 64 KiB, and a rough unpacked-size check of PDF streams
+(256 MiB). Page-marker look-alikes are neutralised after line wrapping and in all non-PDF files. A source deleted
+between planning and storing an order ends as "One of the files was not found. Please add it again."
+
+**Reason.** The security review of stage 1 showed that a 3 KB Word file ended the whole web process (stack overflow),
+a 400 KB PDF used 4.7 GB, and the old time limit did not stop the work. Only a process boundary makes stack overflow,
+memory and CPU limits enforceable; the checks in the extractors keep the common cases fast.
