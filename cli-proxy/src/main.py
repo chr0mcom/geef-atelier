@@ -36,6 +36,7 @@ from openai_format import (
 from structured import build_response_format_instruction, validate_and_extract
 from streaming import sse_response
 from usage import UsageParts
+from cli_errors import EmptyResultError, is_empty_document_result
 from errors import OpenAIError, install_error_handlers
 from provider_sync import ProviderConfigSync
 from tool_use_parser import (
@@ -686,6 +687,8 @@ async def _call_claude(req: ChatCompletionRequest) -> ChatCompletionResponse:
                 system_prompt, user_instruction, req.document or "", ws, req.model,
                 req.effective_max_tokens(), req.context_document, **_effort_kwargs(req),
             )
+        if is_empty_document_result(raw, req.document or ""):
+            raise EmptyResultError("claude")
         return make_text_response(req.model, raw, _to_usage_info(parts))
     return await _run_completion(req, "claude")
 
@@ -699,6 +702,8 @@ async def _call_codex(req: ChatCompletionRequest) -> ChatCompletionResponse:
                 system_prompt, user_instruction, req.document or "", ws, req.model,
                 req.effective_max_tokens(), req.context_document, **_effort_kwargs(req),
             )
+        if is_empty_document_result(raw, req.document or ""):
+            raise EmptyResultError("codex")
         return make_text_response(req.model, raw, _to_usage_info(parts))
     return await _run_completion(req, "codex")
 
@@ -742,21 +747,79 @@ def _retarget(req: ChatCompletionRequest, primary: str, target: str) -> ChatComp
     return req.model_copy(update={"model": FAILOVER_CODEX_MODEL if failover.cli_of(target) == "codex" else ""})
 
 
+#: Request header that switches the failover off for one request (values off/0/false, any case).
+#: The same name as the response header that reports a handover; a request never carries that one.
+FAILOVER_CONTROL_HEADER = "x-cli-proxy-failover"
+_FAILOVER_OFF_VALUES = frozenset({"off", "0", "false"})
+
+
+def _failover_allowed(request: Request) -> bool:
+    """False when the caller asked for no handover (`x-cli-proxy-failover: off`): its result
+    depends on the model, so a different backend's answer is worse than an error. Without the
+    header, or with any other value, the gateway behaves exactly as before."""
+    value = request.headers.get(FAILOVER_CONTROL_HEADER)
+    return value is None or value.strip().lower() not in _FAILOVER_OFF_VALUES
+
+
+def _attempt_order(backend: str, allow_failover: bool) -> list[str]:
+    """The failover chain, or only `backend` when the caller switched the failover off.
+
+    An open breaker is honoured for such a request too: it is answered at once with 503
+    `backend_unavailable` instead of being sent to a backend the breaker currently keeps out
+    (or to its partner). Once the open window elapses one probe passes, as for every request.
+    """
+    if allow_failover:
+        return failover.attempt_order(backend)
+    if not failover.available(backend):
+        retry_after = max(1, int(failover.open_until(backend) - time.time()))
+        raise OpenAIError(
+            f"Backend {backend} is temporarily unavailable after repeated failures, and failover "
+            f"is switched off for this request. Retry in about {retry_after} s.",
+            status_code=503, type="api_error", code="backend_unavailable",
+            headers={"Retry-After": str(retry_after)},
+        )
+    return [backend]
+
+
+def _empty_result_error(backend: str, target: str) -> OpenAIError:
+    """502 `empty_result` for a document-mode run of `target` that produced no text."""
+    handed_over = f" after failover from {backend}" if target != backend else ""
+    headers = {"x-cli-proxy-provider": target}
+    if target != backend:
+        headers["x-cli-proxy-failover"] = f"{backend}->{target}"
+    return OpenAIError(
+        f"Document mode returned no text: {target}{handed_over} finished without writing "
+        "anything to the document (draft.md is still empty and unchanged). The request was "
+        "not retried.",
+        status_code=502, type="api_error", code="empty_result", headers=headers,
+    )
+
+
 async def _complete_with_failover(
-    req: ChatCompletionRequest, backend: str, response: Response
+    req: ChatCompletionRequest, backend: str, response: Response, allow_failover: bool = True,
 ) -> ChatCompletionResponse:
     """Serve the completion, handing over to the partner CLI when this one is faulted.
 
     Only auth/limit/transport faults trigger the handover; a client-side fault would
     fail identically on the partner and retrying it would just hide the bug.
+
+    A document-mode run that exits normally without writing any text is answered with 502
+    `empty_result`. It counts as a failure of the backend that produced it -- and only of that
+    one: after a handover the origin's breaker already holds the origin's own fault -- and it is
+    not handed over again.
     """
-    order = failover.attempt_order(backend)
+    order = _attempt_order(backend, allow_failover)
     dead_cli: str | None = None
     for index, target in enumerate(order):
         if failover.cli_of(target) == dead_cli:
             continue
         try:
             resp = await _call_backend(_retarget(req, backend, target), target)
+        except EmptyResultError as exc:
+            error = _empty_result_error(backend, target)
+            failover.record_empty_result(target, error.message)
+            log.error("%s document mode produced no text (%s)", target, exc)
+            raise error from exc
         except (RuntimeError, OSError) as exc:
             reason = failover.classify(exc)
             failover.record_failure(target, reason, str(exc))
@@ -780,7 +843,9 @@ async def _complete_with_failover(
     raise HTTPException(status_code=502, detail="no backend available")  # pragma: no cover
 
 
-def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingResponse:
+def _stream_completion(
+    req: ChatCompletionRequest, backend: str, allow_failover: bool = True,
+) -> StreamingResponse:
     """Streaming (SSE) completion. Tool/structured extraction needs the full text, so when
     those are requested we fall back to a single buffered delta; otherwise we stream tokens.
 
@@ -794,7 +859,7 @@ def _stream_completion(req: ChatCompletionRequest, backend: str) -> StreamingRes
     at least feeds the breaker so the NEXT request routes pre-emptively.
     """
     primary = backend
-    order = failover.attempt_order(primary)
+    order = _attempt_order(primary, allow_failover)
 
     prompt = _build_prompt(req)
     rf = req.response_format
@@ -1011,10 +1076,11 @@ async def claude_completions(req: ChatCompletionRequest, http_request: Request, 
     claude is faulted (auth/limit/transport); see failover.py."""
     _check_auth(http_request)
     _begin_request(req)
+    allow_failover = _failover_allowed(http_request)
     if req.stream:
-        return _stream_completion(req, "claude")
+        return _stream_completion(req, "claude", allow_failover)
     async with _inflight_guard():
-        return await _complete_with_failover(req, "claude", response)
+        return await _complete_with_failover(req, "claude", response, allow_failover)
 
 
 @app.post("/v1/codex/chat/completions", response_model=ChatCompletionResponse)
@@ -1024,10 +1090,11 @@ async def codex_completions(req: ChatCompletionRequest, http_request: Request, r
     _check_auth(http_request)
     _begin_request(req)
     req = await _resolve_codex_alias(req)
+    allow_failover = _failover_allowed(http_request)
     if req.stream:
-        return _stream_completion(req, "codex")
+        return _stream_completion(req, "codex", allow_failover)
     async with _inflight_guard():
-        return await _complete_with_failover(req, "codex", response)
+        return await _complete_with_failover(req, "codex", response, allow_failover)
 
 
 # ---------------------------------------------------------------------------
@@ -1140,10 +1207,11 @@ async def chat_completions(req: ChatCompletionRequest, http_request: Request, re
                 "Use /v1/claude/chat/completions or /v1/codex/chat/completions instead."
             ),
         )
+    allow_failover = _failover_allowed(http_request)
     if req.stream:
-        return _stream_completion(req, backend)
+        return _stream_completion(req, backend, allow_failover)
     async with _inflight_guard():
-        return await _complete_with_failover(req, backend, response)
+        return await _complete_with_failover(req, backend, response, allow_failover)
 
 
 @app.get("/v1/claude/models")

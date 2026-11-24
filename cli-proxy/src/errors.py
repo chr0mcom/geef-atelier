@@ -29,6 +29,7 @@ class OpenAIError(Exception):
         type: str = "invalid_request_error",
         code: str | None = None,
         param: str | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
@@ -36,6 +37,7 @@ class OpenAIError(Exception):
         self.type = type
         self.code = code
         self.param = param
+        self.headers = headers
 
 
 def error_body(
@@ -78,9 +80,12 @@ def _type_for_status(status_code: int) -> str:
 
 
 async def _openai_error_handler(request: Request, exc: OpenAIError) -> JSONResponse:
-    return error_response(
+    response = error_response(
         exc.message, status_code=exc.status_code, type=exc.type, code=exc.code, param=exc.param
     )
+    if exc.headers:
+        response.headers.update(exc.headers)
+    return response
 
 
 async def _validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:

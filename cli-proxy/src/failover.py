@@ -23,6 +23,8 @@ import logging
 import os
 import time
 
+from redaction import redact_secrets
+
 log = logging.getLogger(__name__)
 
 
@@ -58,6 +60,8 @@ ALT_HOME = os.getenv("CLAUDE_HOME_ALT", "/auth/claude-alt")
 ALT_ENABLED = _env_flag("CLAUDE_ALT_ENABLED", True)
 
 _MAX_ERROR_CHARS = 500
+#: Upper bound of `last_error_detail` in /health: the redacted message with the full cause.
+_MAX_ERROR_DETAIL_CHARS = 2000
 
 # Ordered: the first matching group wins. `auth` deliberately precedes `transport`
 # because the real outage message ("...exited with code 1: Failed to authenticate...")
@@ -85,16 +89,27 @@ _PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
 #: Reasons that justify handing the request to the partner backend.
 _FAILOVER_REASONS = frozenset({"auth", "limit", "transport"})
 
+#: A document-mode run that exited normally but produced no text. It counts against the
+#: breaker of the backend that produced it (that backend did not serve the request), but it is
+#: never handed over: the caller gets an `empty_result` error instead (see main.py).
+EMPTY_RESULT = "empty_result"
+
+#: Reasons that move the circuit breaker.
+_BREAKER_REASONS = _FAILOVER_REASONS | {EMPTY_RESULT}
+
 
 class _BackendState:
     __slots__ = ("consecutive_failures", "open_until", "last_reason", "last_error",
-                 "last_failure_at", "failover_count", "tripped", "last_success_at")
+                 "last_error_detail", "last_failure_at", "failover_count", "tripped",
+                 "last_success_at", "empty_results")
 
     def __init__(self) -> None:
         self.consecutive_failures = 0
         self.open_until = 0.0
         self.last_reason: str | None = None
         self.last_error: str | None = None
+        self.last_error_detail: str | None = None
+        self.empty_results = 0
         self.last_failure_at: float | None = None
         self.failover_count = 0
         self.last_success_at: float | None = None
@@ -158,6 +173,11 @@ def available(backend: str) -> bool:
     return time.time() >= _state(backend).open_until
 
 
+def open_until(backend: str) -> float:
+    """Epoch seconds until which the breaker of `backend` stays open (0 when closed)."""
+    return _state(backend).open_until
+
+
 def record_success(backend: str) -> None:
     st = _state(backend)
     if st.consecutive_failures or st.open_until or st.tripped:
@@ -169,13 +189,14 @@ def record_success(backend: str) -> None:
 
 
 def record_failure(backend: str, reason: str, error: str) -> None:
-    """Record a failure. Only failover-worthy reasons move the breaker: a malformed
-    request is not evidence that the backend is unhealthy."""
+    """Record a failure. Only failover-worthy reasons (and an empty document-mode result)
+    move the breaker: a malformed request is not evidence that the backend is unhealthy."""
     st = _state(backend)
     st.last_reason = reason
     st.last_error = error[:_MAX_ERROR_CHARS]
+    st.last_error_detail = redact_secrets(error)[:_MAX_ERROR_DETAIL_CHARS]
     st.last_failure_at = time.time()
-    if not should_failover(reason):
+    if reason not in _BREAKER_REASONS:
         return
     st.consecutive_failures += 1
     if st.consecutive_failures >= FAILS:
@@ -184,6 +205,14 @@ def record_failure(backend: str, reason: str, error: str) -> None:
         log.warning("Breaker OPEN for %s (%ss) after %s failures | reason=%s | %s",
                     backend, OPEN_SECONDS, st.consecutive_failures, reason,
                     st.last_error)
+
+
+def record_empty_result(backend: str, error: str) -> None:
+    """Record a document-mode run of `backend` that produced no text: counted in
+    `empty_results` and as a breaker failure of exactly this backend -- never of the backend
+    the request was handed over from."""
+    _state(backend).empty_results += 1
+    record_failure(backend, EMPTY_RESULT, error)
 
 
 def record_failover(primary: str, used: str) -> None:
@@ -233,6 +262,9 @@ def snapshot() -> dict:
             "open_until": st.open_until or None,
             "last_reason": st.last_reason,
             "last_error": st.last_error,
+            # Redacted error text with the CLI's cause fields (subtype, is_error, result,
+            # api_error_status), up to 2000 characters; `last_error` keeps its 500-char cut.
+            "last_error_detail": st.last_error_detail,
             "last_failure_at": st.last_failure_at,
             # Proof of life for external monitors: a process restart clears the breaker
             # state (tripped=False) WITHOUT any real success -- the watch cron must not
@@ -240,6 +272,8 @@ def snapshot() -> dict:
             # recorded AFTER the card was raised (review finding 2026-08-19).
             "last_success_at": st.last_success_at,
             "failover_count": st.failover_count,
+            # Document-mode runs that exited normally without writing any text (since start).
+            "empty_results": st.empty_results,
             # The spare account is reported, but never counted towards `degraded`: while
             # the primary and codex serve, a dead reserve is not an incident.
             "reserve": backend in reserve,
