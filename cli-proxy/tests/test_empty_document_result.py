@@ -3,6 +3,10 @@
 Pre-study V1 (2026-11-24): three claude document-mode aborts were handed over to codex, and codex
 answered each with HTTP 200 and an empty text ("draft.md unchanged after CLI run"). The caller
 could not tell that nothing had been written.
+
+Fix C (2026-11-24): an empty result is an error of that one request only. Whether the CLI writes the
+document depends on the request's content, so it is counted and reported in /health but never moves
+a breaker (see test_empty_result_breaker.py).
 """
 from __future__ import annotations
 
@@ -71,25 +75,26 @@ class TestEmptyResultIsAnError:
         assert "x-cli-proxy-failover" not in resp.headers
         assert codex.await_count == 0, "an empty result is not handed over"
 
-    def test_counts_as_a_failure_of_the_backend(self, client: TestClient) -> None:
+    def test_is_counted_but_not_a_failure_of_the_backend(self, client: TestClient) -> None:
         with patch.object(main.claude_adapter, "complete_document", _returns("")):
             client.post("/v1/claude/chat/completions", json=_doc_body())
 
         claude = _backend(client, "claude")
         assert claude["empty_results"] == 1
-        assert claude["consecutive_failures"] == 1
-        assert claude["last_reason"] == "empty_result"
-        assert "no text" in claude["last_error_detail"]
+        assert claude["last_empty_result_at"] is not None
+        assert claude["consecutive_failures"] == 0
+        assert claude["last_reason"] is None
+        assert claude["last_error_detail"] is None
 
-    def test_repeated_empty_results_open_the_breaker(self, client: TestClient, monkeypatch) -> None:
+    def test_repeated_empty_results_leave_the_breaker_closed(self, client: TestClient, monkeypatch) -> None:
         monkeypatch.setattr(failover, "FAILS", 2)
         with patch.object(main.claude_adapter, "complete_document", _returns("")):
             client.post("/v1/claude/chat/completions", json=_doc_body())
             client.post("/v1/claude/chat/completions", json=_doc_body())
 
         claude = _backend(client, "claude")
-        assert claude["available"] is False
-        assert claude["healthy"] is False
+        assert claude["available"] is True
+        assert claude["healthy"] is True
         assert claude["empty_results"] == 2
 
     def test_codex_endpoint_too(self, client: TestClient) -> None:
@@ -126,10 +131,10 @@ class TestEmptyResultAfterFailover:
         assert claude["last_reason"] == "limit"
         assert claude["failover_count"] == 0, "codex did not serve the request"
         assert claude["empty_results"] == 0
-        assert codex["consecutive_failures"] == 1
+        assert codex["consecutive_failures"] == 0, "an empty result is no breaker failure"
         assert codex["empty_results"] == 1
-        assert codex["last_reason"] == "empty_result"
-        assert codex["last_success_at"] is None
+        assert codex["last_reason"] is None
+        assert codex["last_success_at"] is None, "nor is it a success"
 
     def test_successful_failover_is_unchanged(self, client: TestClient) -> None:
         with patch.object(main.claude_adapter, "complete_document", AsyncMock(side_effect=_CLAUDE_ABORT)), \

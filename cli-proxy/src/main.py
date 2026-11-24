@@ -804,9 +804,10 @@ async def _complete_with_failover(
     fail identically on the partner and retrying it would just hide the bug.
 
     A document-mode run that exits normally without writing any text is answered with 502
-    `empty_result`. It counts as a failure of the backend that produced it -- and only of that
-    one: after a handover the origin's breaker already holds the origin's own fault -- and it is
-    not handed over again.
+    `empty_result` and is not handed over again. It is an error of this request only: whether the
+    CLI writes the document depends on the request's content, so it is counted and reported in
+    /health but moves no breaker -- neither the producing backend's nor, after a handover, the
+    origin's (which already holds the origin's own fault).
     """
     order = _attempt_order(backend, allow_failover)
     dead_cli: str | None = None
@@ -829,6 +830,9 @@ async def _complete_with_failover(
             if not failover.should_failover(reason) or not _more_targets(order, index, dead_cli):
                 raise HTTPException(status_code=502, detail=str(exc)) from exc
             continue
+        finally:
+            if req.document_mode:
+                failover.record_document_attempt(target)
         failover.record_success(target)
         response.headers["x-cli-proxy-provider"] = target
         if req.reasoning_effort:

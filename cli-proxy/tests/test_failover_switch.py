@@ -210,11 +210,16 @@ class TestHealthFields:
     def test_existing_fields_are_unchanged(self, client: TestClient) -> None:
         body = client.get("/health").json()
         assert set(body) == {"status", "cli_status", "synced_providers", "degraded", "failover"}
-        assert set(body["failover"]) == {"enabled", "degraded", "backends"}
+        assert set(body["failover"]) == {
+            "enabled", "degraded", "backends",
+            "empty_result_alert", "empty_result_window_seconds",
+        }
         assert set(body["failover"]["backends"]["claude"]) == {
             "available", "healthy", "consecutive_failures", "open_until", "last_reason",
             "last_error", "last_failure_at", "last_success_at", "failover_count", "reserve",
             "last_error_detail", "empty_results",
+            "last_empty_result_at", "empty_results_recent", "document_requests_recent",
+            "empty_result_rate", "empty_result_alert",
         }
 
     def test_detail_is_redacted_and_longer_than_last_error(self) -> None:
