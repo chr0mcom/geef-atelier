@@ -44,6 +44,27 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
     /// <summary>Queues an error answer for the next executor call: the cli-proxy error envelope with <paramref name="code"/>.</summary>
     public void EnqueueExecutorError(int status, string code) => _executorAnswers.Enqueue((null, status, code));
 
+    /// <summary>Name of the response schema by which the clarifier call is recognised.</summary>
+    public const string ClarifierSchemaName = "clarify_order";
+
+    /// <summary>Clarifier answer once the queue is empty: a valid analysis without gaps, so the order starts without questions.</summary>
+    public const string DefaultClarifierJson =
+        """{"text_type":"Text","language":"de","understanding":"Ein Text wie beschrieben.","is_revision":false,"revision_file":null,"length_scale":"standard","gaps":[],"research_topics":[]}""";
+
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(string? Json, int Status, TimeSpan Delay)> _clarifierAnswers = new();
+
+    /// <summary>Queues the JSON content of the next clarifier answer.</summary>
+    public void EnqueueClarifierJson(string json) => _clarifierAnswers.Enqueue((json, 200, TimeSpan.Zero));
+
+    /// <summary>Queues an error answer (without <c>Retry-After</c>) for the next clarifier call.</summary>
+    public void EnqueueClarifierError(int status) => _clarifierAnswers.Enqueue((null, status, TimeSpan.Zero));
+
+    /// <summary>Queues a clarifier answer that comes only after <paramref name="delay"/> (then <see cref="DefaultClarifierJson"/>).</summary>
+    public void EnqueueClarifierDelay(TimeSpan delay) => _clarifierAnswers.Enqueue((DefaultClarifierJson, 200, delay));
+
+    /// <summary>True for a request of the clarifier (structured output or forced tool named <see cref="ClarifierSchemaName"/>).</summary>
+    public static bool IsClarifierCall(RecordedLlmCall call) => IsClarifierBody(call.RawBody);
+
     /// <summary>Input tokens reported for executor answers; <c>null</c> keeps the default estimate (prompt characters / 4).</summary>
     public int? ExecutorPromptTokens { get; set; }
 
@@ -59,6 +80,9 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
         var call = Parse(recorder.NextIndex(), request.Method.Method, url, body);
         recorder.Add(call);
 
+        if (IsClarifierBody(body))
+            return await ClarifierAsync(call, cancellationToken);
+
         if (call.Role == LlmRole.Executor && _executorAnswers.TryDequeue(out var answer))
         {
             if (answer.Code is { } code)
@@ -67,6 +91,39 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
         }
 
         return Json(Respond(call));
+    }
+
+    private async Task<HttpResponseMessage> ClarifierAsync(RecordedLlmCall call, CancellationToken cancellationToken)
+    {
+        var (json, status, delay) = _clarifierAnswers.TryDequeue(out var queued) ? queued : (DefaultClarifierJson, 200, TimeSpan.Zero);
+        if (delay > TimeSpan.Zero)
+            await Task.Delay(delay, cancellationToken);
+        if (status != 200)
+        {
+            var payload = new JsonObject
+            {
+                ["error"] = new JsonObject { ["message"] = $"E2E scripted clarifier error {status}.", ["type"] = "api_error", ["code"] = "scripted" },
+            };
+            return new HttpResponseMessage((HttpStatusCode)status)
+            {
+                Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json"),
+            };
+        }
+        return Json(Envelope(call, new JsonObject { ["role"] = "assistant", ["content"] = json }, "stop"));
+    }
+
+    private static bool IsClarifierBody(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body) || !body.Contains(ClarifierSchemaName, StringComparison.Ordinal))
+            return false;
+        using var doc = JsonDocument.Parse(body);
+        var root = doc.RootElement;
+        if (root.TryGetProperty("response_format", out var format) && format.ValueKind == JsonValueKind.Object
+            && format.TryGetProperty("json_schema", out var schema) && schema.ValueKind == JsonValueKind.Object
+            && schema.TryGetProperty("name", out var name) && name.GetString() == ClarifierSchemaName)
+            return true;
+        return root.TryGetProperty("tools", out var tools) && tools.ValueKind == JsonValueKind.Array
+            && tools.EnumerateArray().Any(t => t.TryGetProperty("function", out var fn) && fn.TryGetProperty("name", out var n) && n.GetString() == ClarifierSchemaName);
     }
 
     private static HttpResponseMessage ErrorEnvelope(int status, string code)
