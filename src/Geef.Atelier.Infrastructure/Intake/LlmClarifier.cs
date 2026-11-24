@@ -75,8 +75,8 @@ internal sealed class LlmClarifier(
 
             var output = ClarifierOutputParser.Parse(json);
             return output is null
-                ? Result(IntakeRecordStatus.Invalid, null, model, started, UnusableCode, "required fields missing")
-                : Result(IntakeRecordStatus.Ok, output, model, started, null, null);
+                ? Result(IntakeRecordStatus.Invalid, null, model, started, UnusableCode, "required fields missing", json)
+                : Result(IntakeRecordStatus.Ok, output, model, started, null, null, json);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -97,13 +97,14 @@ internal sealed class LlmClarifier(
         }
     }
 
-    private ClarifierCallResult Result(IntakeRecordStatus status, ClarifierOutput? output, string? model, long started, string? errorCode, string? detail)
+    private ClarifierCallResult Result(
+        IntakeRecordStatus status, ClarifierOutput? output, string? model, long started, string? errorCode, string? detail, string? rawJson = null)
     {
         var duration = (int)Math.Min(int.MaxValue, time.GetElapsedTime(started).TotalMilliseconds);
         if (status == IntakeRecordStatus.Ok)
             logger.LogInformation("Clarifier answered in {DurationMs} ms with {Gaps} gaps ({Model}).", duration, output!.Gaps.Count, model);
         else
             logger.LogWarning("Clarifier {Status} after {DurationMs} ms ({Model}, {Code}): {Detail}", status, duration, model, errorCode, detail);
-        return new ClarifierCallResult(status, output, model, duration, errorCode);
+        return new ClarifierCallResult(status, output, model, duration, errorCode, rawJson);
     }
 }

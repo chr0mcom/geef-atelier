@@ -100,6 +100,7 @@ public sealed class LlmClarifierTests
         Assert.Equal(Model, result.Model);
         Assert.Null(result.ErrorCode);
         Assert.Equal("Einladung", result.Output!.TextType);
+        Assert.Equal(ClarifierOutputParserTests.Valid, result.RawJson);
         Assert.Equal([(ModelSlot.Intake, ModelDomain.General)], assignments.Calls);
         Assert.Equal([(Provider, Model, (int?)1_500)], resolver.Profiles);
 

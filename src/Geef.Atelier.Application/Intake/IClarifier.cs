@@ -9,8 +9,11 @@ public sealed record IntakeFile(int Number, Guid SourceId, string FileName, Sour
 /// <summary>Input of one clarifier call.</summary>
 public sealed record ClarifierRequest(string RequestText, IReadOnlyList<IntakeFile> Files, string? ProfileBlock, bool RevisionHint);
 
-/// <summary>Result of one clarifier call; <see cref="Output"/> is set only for <see cref="IntakeRecordStatus.Ok"/>.</summary>
-public sealed record ClarifierCallResult(IntakeRecordStatus Status, ClarifierOutput? Output, string? Model, int DurationMs, string? ErrorCode);
+/// <summary>
+/// Result of one clarifier call; <see cref="Output"/> is set only for <see cref="IntakeRecordStatus.Ok"/>. <see cref="RawJson"/> is the
+/// model's answer as it came back (for the measuring tool, which replays it through the gate without a new call).
+/// </summary>
+public sealed record ClarifierCallResult(IntakeRecordStatus Status, ClarifierOutput? Output, string? Model, int DurationMs, string? ErrorCode, string? RawJson = null);
 
 /// <summary>One structured model call that analyses an order. Never throws except for cancellation by the caller; failures come back as a status.</summary>
 public interface IClarifier
