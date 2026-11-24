@@ -1,5 +1,4 @@
 using Geef.Atelier.Application.Crew.Finalizers;
-using Geef.Atelier.Core.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,7 +12,6 @@ public static class FinalizerServiceExtensions
         IConfiguration configuration)
     {
         services.Configure<FinalizerOptions>(configuration.GetSection("Finalizer"));
-        services.Configure<LearningOptions>(configuration.GetSection(LearningOptions.SectionName));
 
         services.AddHttpClient("finalizer-webhook");
 

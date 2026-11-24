@@ -9,7 +9,7 @@
 @inject ILearningService LearningService
 @inject AuthenticationStateProvider AuthState
 @inject NavigationManager Nav
-@inject Microsoft.Extensions.Options.IOptions<Geef.Atelier.Core.Configuration.LearningOptions> LearningOptions
+@inject Microsoft.Extensions.Options.IOptionsMonitor<Geef.Atelier.Core.Configuration.LearningOptions> LearningOptions
 
 <PageTitle>Learnings — Atelier</PageTitle>
 
@@ -19,7 +19,7 @@
         <a href="/crew" class="btn ghost" data-testid="btn-back">← Crew</a>
     </div>
 
-    @if (!LearningOptions.Value.Enabled)
+    @if (!LearningOptions.CurrentValue.Enabled)
     {
         <div class="alert alert-info" role="status" data-testid="learning-paused">
             Learning is paused. Nothing new is added here, and saved entries are not used for new work.
