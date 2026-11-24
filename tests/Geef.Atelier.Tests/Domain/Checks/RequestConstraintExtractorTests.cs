@@ -20,15 +20,10 @@ public sealed class RequestConstraintExtractorTests
     [InlineData("Schreibe ca. 300 Wörter über Bienen.", LengthKind.About, 300, 300)]
     [InlineData("Schreibe etwa 300 Wörter über Bienen.", LengthKind.About, 300, 300)]
     [InlineData("Write about 300 words on bees.", LengthKind.About, 300, 300)]
-    [InlineData("Fasse den Bericht in 200 Wörtern zusammen.", LengthKind.Stated, 200, 200)]
-    [InlineData("Schreibe einen 300-Wörter-Text über Bienen.", LengthKind.Stated, 300, 300)]
-    [InlineData("Write a 300-word post about bees.", LengthKind.Stated, 300, 300)]
     [InlineData("Ein LinkedIn-Post, höchstens 1.300 Zeichen.", LengthKind.AtMost, null, 1300)]
     [InlineData("Write a tweet of at most 280 characters.", LengthKind.AtMost, null, 280)]
     [InlineData("Erstelle eine Rede (Richtwert 1000 bis 1150 Wörter).", LengthKind.About, 1000, 1150)]
     [InlineData("Schreibe einen kurzen, sachlichen Absatz (80–120 Wörter) über Datensicherung.", LengthKind.Range, 80, 120)]
-    [InlineData("Richtwert: ca. 150–220 Wörter, maximal ca. 250 Wörter.", LengthKind.About, 150, 220)]
-    [InlineData("Fasse das angehängte PDF in höchstens 200 Wörtern zusammen.", LengthKind.AtMost, null, 200)]
     public void Reads_lengths(string request, LengthKind kind, int? min, int? max)
     {
         var length = RequestConstraintExtractor.Extract(request).Length;
@@ -38,6 +33,20 @@ public sealed class RequestConstraintExtractorTests
         Assert.Equal(min, length.Min);
         Assert.Equal(max, length.Max);
         Assert.False(string.IsNullOrWhiteSpace(length.Quote));
+    }
+
+    [Theory]
+    [InlineData("Fasse den Bericht in 200 Wörtern zusammen.")]
+    [InlineData("Fasse das angehängte PDF in höchstens 200 Wörtern zusammen.")]
+    [InlineData("Schreibe einen 300-Wörter-Text über Bienen.")]
+    [InlineData("Write a 300-word post about bees.")]
+    [InlineData("Richtwert: ca. 150–220 Wörter, maximal ca. 250 Wörter.")]
+    public void Lengths_that_the_whole_request_does_not_make_clear_stay_notes(string request)
+    {
+        var constraints = RequestConstraintExtractor.Extract(request);
+
+        Assert.Null(constraints.Length);
+        Assert.Contains(constraints.Notes, n => n.EndsWith("it was not checked automatically.", StringComparison.Ordinal));
     }
 
     [Theory]

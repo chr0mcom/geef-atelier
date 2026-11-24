@@ -7,7 +7,10 @@ namespace Geef.Atelier.Core.Domain.Checks;
 /// Reads constraints (length, language, placeholders, forbidden forms, forbidden and required terms) from a German or
 /// English request without an AI model. Conservative by design: a rule is only taken when its wording is
 /// unambiguous; a length that may describe a file, a part of the text or something else becomes a note instead of a
-/// check, and so do contradictory lengths or languages. Every rule keeps the passage it was read from.
+/// check, and so do contradictory lengths or languages. A length becomes a check only when <see cref="LengthRuleGate"/>
+/// finds the whole request clear about it (one length, bound to a limit word, for the text being written, without
+/// other counts or references to an earlier text); lengths inside quotes are never read. Every rule keeps the passage
+/// it was read from.
 /// </summary>
 public static class RequestConstraintExtractor
 {
@@ -94,7 +97,12 @@ public static class RequestConstraintExtractor
         $@"(?:(?<![\p{{L}}])(?:in|auf)\s+(?<a>{Num}){Sep}{Unit})|(?:(?<![\p{{L}}])(?:Länge|Laenge|Umfang|Textlänge|Wortzahl|Wortanzahl|Zeichenzahl|length|word\s+count|character\s+count)\s*(?::|von|of|=)?\s*(?<a>{Num}){Sep}{Unit})",
         Options);
 
+    private static readonly Regex ExactBefore = new(
+        $@"(?<![\p{{L}}])(?:genau|exakt|exactly|precisely)\s*(?<a>{Num}){Sep}{Unit}", Options);
+
     private static readonly Regex Bare = new($@"(?<a>{Num}){Sep}{Unit}", Options);
+
+    private static readonly Regex FramePrepositionBefore = new(@"(?<![\p{L}])(?:mit|von|of|with|in)\s+$", Options);
 
     private static readonly Regex OtherCounts = new(
         $@"(?:(?:max(?:imal|imum)?\.?|höchstens|mindestens|at\s+most|at\s+least|up\s+to|bis\s+zu|ca\.?|circa|etwa|rund|ungefähr|about|around|approximately|in|auf)\s*)(?<a>{Num})(?:\s*(?:–|-|bis|to)\s*{Num})?\s*(?:Seiten|Seite|pages?|Absätze|Absätzen|Absatz|paragraphs?|Sätze|Sätzen|Satz|sentences?|Zeilen|lines?)(?!\p{{L}})",
@@ -124,9 +132,6 @@ public static class RequestConstraintExtractor
 
     private static readonly Regex SummaryVerb = new(
         @"(?<![\p{L}])(?:fass\w*|zusammenfass\w*|zusammen|summar\w*|k(?:ü|ue)rz\w*|shorten\w*|condens\w*|(?:ü|ue)bersetz\w*|translat\w*)(?![\p{L}])", Options);
-
-    private static readonly Regex WriteVerb = new(
-        @"(?<![\p{L}])(?:schreib\w*|verfass\w*|erstell\w*|formulier\w*|entw(?:i|e)rf\w*|write|draft|compose|create|prepare)(?![\p{L}])", Options);
 
     private static readonly Regex PlaceholderBan = new(
         @"(?:(?<![\p{L}])(?:keine|ohne)\s+(?:\p{L}+\s+)?Platzhalter)|(?:Platzhalter\s+(?:sind\s+)?(?:nicht\s+erlaubt|verboten|unerw(?:ü|ue)nscht))|(?:(?<![\p{L}])(?:no|without|avoid)\s+(?:any\s+)?placeholders?)|(?:(?:do\s+not|don't|never)\s+(?:use|leave|include|add)\s+(?:any\s+)?placeholders?)",
@@ -213,7 +218,18 @@ public static class RequestConstraintExtractor
         var text = requestText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
         var notes = new List<string>();
 
-        var length = ExtractLength(text, notes);
+        var masked = LengthRuleGate.Mask(text);
+        var length = ExtractLength(masked, notes, out var source);
+        if (length is not null && (source is null || LengthRuleGate.Reject(masked, source) is not null))
+        {
+            notes.Add(UncheckedLengthNote(length.Quote));
+            length = null;
+        }
+        else if (length is null && LengthRuleGate.FirstMention(text) is { } mention && !LengthRuleGate.MentionsLength(masked))
+        {
+            notes.Add(UncheckedLengthNote(mention));
+        }
+
         var language = ExtractLanguage(text, notes);
         var placeholderBan = PlaceholderBan.Match(text);
         var patterns = ExtractPatterns(text);
@@ -241,7 +257,10 @@ public static class RequestConstraintExtractor
             notes.Distinct(StringComparer.Ordinal).ToList());
     }
 
-    private sealed record LengthCandidate(int Start, int End, LengthConstraint Constraint);
+    private sealed record LengthCandidate(LengthSource Source, LengthConstraint Constraint);
+
+    private static string UncheckedLengthNote(string quote) =>
+        $"Your request mentions a length (\"{Shorten(quote)}\"); it was not checked automatically.";
 
     /// <summary>How the wording of a length relates to negations in its clause.</summary>
     private enum Reading
@@ -268,12 +287,14 @@ public static class RequestConstraintExtractor
         (MoreThanBefore, LengthKind.AtLeast, true, Reading.Ambiguous),
         (LessThanBefore, LengthKind.AtMost, true, Reading.Unambiguous),
         (AboutBefore, LengthKind.About, true, Reading.Neutral),
+        (ExactBefore, LengthKind.Stated, true, Reading.Neutral),
         (StatedFramed, LengthKind.Stated, true, Reading.Neutral),
         (Bare, LengthKind.Stated, false, Reading.Neutral),
     ];
 
-    private static LengthConstraint? ExtractLength(string text, List<string> notes)
+    private static LengthConstraint? ExtractLength(string text, List<string> notes, out LengthSource? source)
     {
+        source = null;
         var spans = LengthPatterns
             .SelectMany(p => p.Regex.Matches(text))
             .Select(m => (Start: m.Index, End: m.Index + m.Length))
@@ -351,7 +372,10 @@ public static class RequestConstraintExtractor
                     continue;
                 }
 
-                if (!framed && !IsCompoundForWrittenText(text, match))
+                var compound = IsCompound(text, match);
+                var framedByPreposition = !match.Value.StartsWith("Länge", StringComparison.OrdinalIgnoreCase)
+                    && FramePrepositionBefore.IsMatch(text[ClauseStart(text, match.Index)..match.Groups["a"].Index]);
+                if (!framed && !compound && !framedByPreposition)
                 {
                     notes.Add($"A length was mentioned, but it is not clear what it is for, so it was not checked (\"{quote}\").");
                     continue;
@@ -371,7 +395,11 @@ public static class RequestConstraintExtractor
                     continue;
                 }
 
-                accepted.Add(new LengthCandidate(match.Index, match.Index + match.Length, constraint));
+                var marked = regex != StatedFramed && regex != Bare;
+                var pair = regex == RangePair || regex == RangeBetween || regex == RangeDash;
+                var start = marked ? match.Index : match.Groups["a"].Index;
+                accepted.Add(new LengthCandidate(
+                    new LengthSource(start, match.Index + match.Length, marked, pair, compound, framedByPreposition), constraint));
             }
         }
 
@@ -391,6 +419,8 @@ public static class RequestConstraintExtractor
             return null;
         }
 
+        if (accepted.Count == 1)
+            source = accepted[0].Source;
         var merged = Merge(accepted.Select(c => c.Constraint).ToList());
         if (merged is null)
             notes.Add("The request gives more than one length, so the length was not checked.");
@@ -799,15 +829,16 @@ public static class RequestConstraintExtractor
             || match.Value.StartsWith("auf ", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsCompoundForWrittenText(string text, Match match)
+    private static bool IsCompound(string text, Match match)
     {
-        var number = match.Groups["a"];
+        var number = match.Groups["b"].Success ? match.Groups["b"] : match.Groups["a"];
         var unit = match.Groups["unit"];
-        var between = text[(number.Index + number.Length)..unit.Index];
-        if (!between.Contains('-', StringComparison.Ordinal))
+        if (!unit.Success || unit.Index < number.Index + number.Length)
             return false;
-        var start = ClauseStart(text, match.Index);
-        return WriteVerb.IsMatch(text[start..match.Index]);
+        var between = text[(number.Index + number.Length)..unit.Index];
+        var afterUnit = unit.Index + unit.Length;
+        return between.Contains('-', StringComparison.Ordinal)
+               || afterUnit + 1 < text.Length && text[afterUnit] == '-' && char.IsLetter(text[afterUnit + 1]);
     }
 
     private static string Shorten(string value)

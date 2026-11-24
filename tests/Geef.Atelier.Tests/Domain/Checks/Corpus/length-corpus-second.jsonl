@@ -1,0 +1,180 @@
+{"request": "schreib ma ne einladung für unser sommerfest vom fußballverein, max 150 wörter", "length": {"unit": "words", "min": null, "max": 150}, "category": "clear_single", "lang": "de"}
+{"request": "newsletter intro für den tischtennisclub, so ca 200 wörter, locker aber nich zu albern", "length": {"unit": "words", "min": 200, "max": 200}, "category": "clear_single", "lang": "de"}
+{"request": "nicht über 120 wörter bitte: dankeschön an die helfer beim vereinsturnier", "length": {"unit": "words", "min": null, "max": 120}, "category": "clear_single", "lang": "de"}
+{"request": "chef will das bis morgen\nbericht übers spiel gestern, 3:2 gegen die zweite, torschützen ham wir noch nich\nmin. 500 wörter pls", "length": {"unit": "words", "min": 500, "max": null}, "category": "clear_single", "lang": "de"}
+{"request": "1500 zeichen max, ankündigung fürs lan-party wochenende in der jugendhalle, mit anmeldehinweis", "length": {"unit": "chars", "min": null, "max": 1500}, "category": "clear_single", "lang": "de"}
+{"request": "write a funny toast for my brothers 30th bday party, ~300 words", "length": {"unit": "words", "min": 300, "max": 300}, "category": "clear_single", "lang": "en"}
+{"request": "for our esports team page\nneed a recap of our weekend match, we lost in overtime but it was close\n<200 words", "length": {"unit": "words", "min": null, "max": 200}, "category": "clear_single", "lang": "en"}
+{"request": "between 80-120 words pls, welcome message for new members of our rowing club", "length": {"unit": "words", "min": 80, "max": 120}, "category": "clear_single", "lang": "en"}
+{"request": "birthday party invite for my kid, approx 250w, pirate theme, bring swimsuit", "length": {"unit": "words", "min": 250, "max": 250}, "category": "clear_single", "lang": "en"}
+{"request": "gaming guild recruitment post, 600 chars max, friendly tone, we play evenings", "length": {"unit": "chars", "min": null, "max": 600}, "category": "clear_single", "lang": "en"}
+{"request": "write a speech for the end of season banquet. at least 400 words, funny but not mean to the goalie", "length": {"unit": "words", "min": 400, "max": null}, "category": "clear_single", "lang": "en"}
+{"request": "schreib mir ne game review für unser clan blog, max 350 words, kein spoiler", "length": {"unit": "words", "min": null, "max": 350}, "category": "clear_single", "lang": "mixed"}
+{"request": "pls write halloween party einladung for my flatmates\nexactly 100 words\nsamstag 20 uhr, kostüm pflicht", "length": {"unit": "words", "min": 100, "max": 100}, "category": "clear_single", "lang": "mixed"}
+{"request": "kannst du nen match report für unsere handball mannschaft machen, so 180 words, auf deutsch pls", "length": {"unit": "words", "min": 180, "max": 180}, "category": "clear_single", "lang": "mixed"}
+{"request": "3 tweets für den ersten spieltag, jeweils max 280 zeichen, mit hashtag", "length": null, "category": "multiple_items", "lang": "de"}
+{"request": "5 slogans fürs vereinsfest, kurz, max 8 wörter pro slogan, gern mit wortspiel", "length": null, "category": "multiple_items", "lang": "en"}
+{"request": "give me 4 instagram captions for our 5k fun run each under 150 chars", "length": null, "category": "multiple_items", "lang": "en"}
+{"request": "10 funny team name ideas for our trivia night, 2-3 words each", "length": null, "category": "multiple_items", "lang": "en"}
+{"request": "3 betreffzeilen für die newsletter mail zur lan party, each max 50 chars", "length": null, "category": "multiple_items", "lang": "mixed"}
+{"request": "unser vereinsheft hat ne 40000 zeichen grenze beim druck, schreib mir nen kurzen text über die jugendabteilung und ihr sommercamp", "length": null, "category": "foreign_object", "lang": "de"}
+{"request": "im entering a gaming story contest\nthe limit is 500 words\nwrite a story about a speedrunner who loses his controller, around 400 words", "length": {"unit": "words", "min": 400, "max": 400}, "category": "foreign_object", "lang": "en"}
+{"request": "my fantasy novel is like 90000 words, need a short back cover blurb about the gamer girl protagonist", "length": null, "category": "foreign_object", "lang": "en"}
+{"request": "sms limit is 160 zeichen aber ich brauch trotzdem ne einladung zur grillparty am samstag, kurz pls", "length": null, "category": "foreign_object", "lang": "mixed"}
+{"request": "der text von vorhin war viel zu lang so 900 wörter\nmach nochmal neu aber kürzer, is für die abschlussfeier vom turnier", "length": null, "category": "revision_context", "lang": "de"}
+{"request": "kürz das auf max 100 wörter, is die ansage für das sommerturnier", "length": {"unit": "words", "min": null, "max": 100}, "category": "revision_context", "lang": "de"}
+{"request": "my draft is 1200 words, cut it down pls. its about our clubs 50th anniversary party", "length": null, "category": "revision_context", "lang": "en"}
+{"request": "too short pls make longer, like 400 words", "length": {"unit": "words", "min": 400, "max": 400}, "category": "revision_context", "lang": "en"}
+{"request": "die letzte version war ok aber make it more hype, bleib bei ~150 words", "length": {"unit": "words", "min": 150, "max": 150}, "category": "revision_context", "lang": "mixed"}
+{"request": "hier die mail vom vorstand: 'bitte Beitrag max 300 Wörter, abgabe bis freitag'\nschreib mir ne antwort dass wir das schaffen und bedank dich", "length": null, "category": "quoted_or_meta", "lang": "de"}
+{"request": "what does 'max 200 words' mean for an abstract? like incl title or not. its for my esports thesis", "length": null, "category": "quoted_or_meta", "lang": "en"}
+{"request": "reply to this mail pls: 'Hi, please send your lineup text, 120 words max, by friday'. sag zu und bedank dich kurz", "length": null, "category": "quoted_or_meta", "lang": "mixed"}
+{"request": "nicht unter 300 aber auch nicht über 500 wörter, rede für den vereinsabend", "length": {"unit": "words", "min": 300, "max": 500}, "category": "negations_conjunctions", "lang": "de"}
+{"request": "nicht mehr als 150 wörter und keine emojis, post für die gaming gruppe über das neue turnier", "length": {"unit": "words", "min": null, "max": 150}, "category": "negations_conjunctions", "lang": "de"}
+{"request": "dont go over 150 words and no emojis, invitation to my bday bbq", "length": {"unit": "words", "min": null, "max": 150}, "category": "negations_conjunctions", "lang": "en"}
+{"request": "no less than 400 words but no hashtags, bericht übers turnier am wochenende", "length": {"unit": "words", "min": 400, "max": null}, "category": "negations_conjunctions", "lang": "mixed"}
+{"request": "rede für die geburtstagsparty von opa, so 3 minuten lang, bisschen rührend", "length": null, "category": "other_units", "lang": "de"}
+{"request": "write a 2 page report on our clubs season, 5 paragraphs, with a section on the juniors", "length": null, "category": "other_units", "lang": "en"}
+{"request": "intro für unser gaming podcast, ca 30 sekunden sprechzeit, 4 sätze max", "length": null, "category": "other_units", "lang": "mixed"}
+{"request": "einladung zur party am 14.3. um 19 uhr\neintritt 5 euro, ca 40 leute, dresscode schwarz\nbitte nich zu steif", "length": null, "category": "no_length", "lang": "de"}
+{"request": "danke text an die 12 spieler die letzte saison 80% der spiele gewonnen haben, für die vereinszeitung", "length": null, "category": "no_length", "lang": "de"}
+{"request": "write a hype message for our game night, 8 players, starts at 8pm, snacks 3 bucks each", "length": null, "category": "no_length", "lang": "en"}
+{"request": "congrats note for the u12 team, they won 5 games in a row since 2024, coach is retiring", "length": null, "category": "no_length", "lang": "en"}
+{"request": "post für instagram mit 2 teilen\ntitel max 40 zeichen und beschreibung ca 200 wörter\nthema: kostümparty im vereinsheim", "length": null, "category": "adversarial", "lang": "de"}
+{"request": "schreib den text wie gestern, die 300 wörter von damals, aber für das neue turnier", "length": null, "category": "adversarial", "lang": "de"}
+{"request": "write a pep talk for our team before the finals, keep it under two hundred words", "length": {"unit": "words", "min": null, "max": 200}, "category": "adversarial", "lang": "en"}
+{"request": "chef will das bis morgen\nschreib ma ne kurze antwort an nen kunden der sich über die lieferzeit beschwert, max 150 wörter pls", "length": {"unit": "words", "min": null, "max": 150}, "category": "clear_single", "lang": "de"}
+{"request": "ankündigung fürs team chat neues ticketsystem ab montag ca 80 wörter", "length": {"unit": "words", "min": 80, "max": 80}, "category": "clear_single", "lang": "de"}
+{"request": "nicht über 120 wörter bitte, nachricht an kunde dass sein paket verspätet is und wir nen gutschein anbieten", "length": {"unit": "words", "min": null, "max": 120}, "category": "clear_single", "lang": "de"}
+{"request": "verkaufstext für unseren neuen online kurs zu zeitmanagement, min. 500 wörter", "length": {"unit": "words", "min": 500, "max": null}, "category": "clear_single", "lang": "de"}
+{"request": "1500 zeichen max, support antwort wegen kaputtem ladekabel, freundlich aber knapp", "length": {"unit": "chars", "min": null, "max": 1500}, "category": "clear_single", "lang": "de"}
+{"request": "follow up mail nach dem verkaufsgespräch\nzwischen 100 und 150 wörter, nicht zu aufdringlich", "length": {"unit": "words", "min": 100, "max": 150}, "category": "clear_single", "lang": "de"}
+{"request": "so ~300 words, internal update for the sales team abt q3 pipeline, upbeat", "length": {"unit": "words", "min": 300, "max": 300}, "category": "clear_single", "lang": "en"}
+{"request": "<200 words reply to a customer whos angry bc his order arrived damaged", "length": {"unit": "words", "min": null, "max": 200}, "category": "clear_single", "lang": "en"}
+{"request": "between 80-120 words pls, cold outreach to a small bakery owner abt our invoice tool", "length": {"unit": "words", "min": 80, "max": 120}, "category": "clear_single", "lang": "en"}
+{"request": "approx 250w intro for the new support handbook, plain english no fluff", "length": {"unit": "words", "min": 250, "max": 250}, "category": "clear_single", "lang": "en"}
+{"request": "msg to the team: standup moved to later, keep it short like 40 words", "length": {"unit": "words", "min": 40, "max": 40}, "category": "clear_single", "lang": "en"}
+{"request": "need a product page text for a standing desk, at least 400 words and make it sell", "length": {"unit": "words", "min": 400, "max": null}, "category": "clear_single", "lang": "en"}
+{"request": "thank you note to a client after contract signing\nexactly 60 words", "length": {"unit": "words", "min": 60, "max": 60}, "category": "clear_single", "lang": "en"}
+{"request": "kannst du ne short email an den kunden schreiben, sorry for the delay, max 100 words", "length": {"unit": "words", "min": null, "max": 100}, "category": "clear_single", "lang": "mixed"}
+{"request": "brauch 3 betreffzeilen für unseren sommer sale newsletter, jede max 50 zeichen", "length": null, "category": "multiple_items", "lang": "de"}
+{"request": "5 slogans für unsere neue kundenhotline je max 8 wörter, bisschen frech", "length": null, "category": "multiple_items", "lang": "de"}
+{"request": "3 short posts about our support hours change, 280 chars max each", "length": null, "category": "multiple_items", "lang": "en"}
+{"request": "product titles for 4 office chairs, each <60 chars, bit playful", "length": null, "category": "multiple_items", "lang": "en"}
+{"request": "schreib mir pro produkt nen blurb, 3 produkte: kaffeemühle, thermoskanne, tasse. je ca 30 words", "length": null, "category": "multiple_items", "lang": "mixed"}
+{"request": "meine bachelorarbeit hat 10k wörter und ich brauch ne kurze mail an meinen chef dass ich nächste woche urlaub nehm wegen abgabe", "length": null, "category": "foreign_object", "lang": "de"}
+{"request": "our sales contest entry has a 500 word limit but thats for the form, i just need a catchy one liner headline for it", "length": null, "category": "foreign_object", "lang": "en"}
+{"request": "my coworker is writing a novel, 90000 words so far, and wants a cheeky team chat msg to hype her up. make it fun", "length": null, "category": "foreign_object", "lang": "en"}
+{"request": "unser sms gateway hat 160 zeichen limit, schreib mir ne freundliche terminerinnerung für kunden pls", "length": null, "category": "foreign_object", "lang": "mixed"}
+{"request": "die mail an den kunden von vorhin is zu lang, kürz das auf max 100 wörter", "length": {"unit": "words", "min": null, "max": 100}, "category": "revision_context", "lang": "de"}
+{"request": "dein letzter text war viel zu lang so 900 wörter, nochmal für die vertriebsleitung aber kompakter", "length": null, "category": "revision_context", "lang": "de"}
+{"request": "last one was way too long like 900 words, redo the support reply", "length": null, "category": "revision_context", "lang": "en"}
+{"request": "my draft is 1200 words cut it down to about 600 for the sales meeting notes", "length": {"unit": "words", "min": 600, "max": 600}, "category": "revision_context", "lang": "en"}
+{"request": "too short pls make longer, die antwort an den kunden hatte nur 3 sätze", "length": null, "category": "revision_context", "lang": "mixed"}
+{"request": "what does 'max 200 words' mean for an abstract, does it include the title? just explain", "length": null, "category": "quoted_or_meta", "lang": "en"}
+{"request": "kunde schreibt: 'bitte antworten sie in max 50 wörtern'. schreib ne antwort wegen seiner rückerstattung", "length": null, "category": "quoted_or_meta", "lang": "de"}
+{"request": "chef mail: \"please send summary <300 words by friday\"\nkannst du die summary vom q3 sales meeting schreiben", "length": null, "category": "quoted_or_meta", "lang": "mixed"}
+{"request": "nicht über 200 wörter und keine emojis, ankündigung für team chat wegen wartungsfenster", "length": {"unit": "words", "min": null, "max": 200}, "category": "negations_conjunctions", "lang": "de"}
+{"request": "nicht unter 300 aber auch nicht über 500 wörter, angebotsbeschreibung für wartungsvertrag", "length": {"unit": "words", "min": 300, "max": 500}, "category": "negations_conjunctions", "lang": "de"}
+{"request": "dont go over 150 words, reply to a customer asking for a refund, no jargon", "length": {"unit": "words", "min": null, "max": 150}, "category": "negations_conjunctions", "lang": "en"}
+{"request": "no less than 400 words aber keine hashtags pls, blogpost über kundenservice tipps", "length": {"unit": "words", "min": 400, "max": null}, "category": "negations_conjunctions", "lang": "mixed"}
+{"request": "präsentationstext für den vertriebs kickoff, so 5 minuten sprechzeit", "length": null, "category": "other_units", "lang": "de"}
+{"request": "write a 2 page onboarding guide for new support agents", "length": null, "category": "other_units", "lang": "en"}
+{"request": "need a short voicemail script for customers, ~30 seconds, kein fachchinesisch pls", "length": null, "category": "other_units", "lang": "mixed"}
+{"request": "mail an kunden: lieferung kommt am 12.12. statt 5.12., 10% rabatt auf nächste bestellung als entschuldigung", "length": null, "category": "no_length", "lang": "de"}
+{"request": "willkommensnachricht für 25 neue mitarbeiter im vertrieb, start is am 1. märz, locker im ton", "length": null, "category": "no_length", "lang": "de"}
+{"request": "reply to a customer, plan costs 49 per month since 2024, they wanna cancel after 3 months, try to keep them", "length": null, "category": "no_length", "lang": "en"}
+{"request": "schreib ne nachricht ans team, we hit 120% of target in q2, danke an alle 8 leute", "length": null, "category": "no_length", "lang": "mixed"}
+{"request": "intro max 50 wörter, danach der hauptteil ca 400 wörter, thema kundenzufriedenheit", "length": null, "category": "adversarial", "lang": "de"}
+{"request": "the 300 words from yesterday were fine just add a closing line for the sales email", "length": null, "category": "adversarial", "lang": "en"}
+{"request": "reply an den kunden pls, nicht mehr als zweihundert wörter, he wants a discount", "length": {"unit": "words", "min": null, "max": 200}, "category": "adversarial", "lang": "mixed"}
+{"request": "schreib ma ne einladung für unsere wg party am samstag max 120 wörter pls", "length": {"unit": "words", "min": null, "max": 120}, "category": "clear_single", "lang": "de"}
+{"request": "hausaufgabe bio: zusammenfassung zur zellatmung ca 250 wörter, 9. klasse niveau", "length": {"unit": "words", "min": 250, "max": 250}, "category": "clear_single", "lang": "de"}
+{"request": "nachricht an die wg wegen dem putzplan, freundlich aber bestimmt\nnicht über 1500 zeichen bitte", "length": {"unit": "chars", "min": null, "max": 1500}, "category": "clear_single", "lang": "de"}
+{"request": "motivationsschreiben fürs stipendium, bin im 3. semester pädagogik, min. 500 wörter", "length": {"unit": "words", "min": 500, "max": null}, "category": "clear_single", "lang": "de"}
+{"request": "kurze erklärung warum die küche immer so dreckig is, 80-120 wörter, bisschen lustig", "length": {"unit": "words", "min": 80, "max": 120}, "category": "clear_single", "lang": "de"}
+{"request": "referat einleitung über klimawandel <200 wörter, muss morgen früh fertig sein", "length": {"unit": "words", "min": null, "max": 200}, "category": "clear_single", "lang": "de"}
+{"request": "need a short intro for my history essay about the printing press, so ~300 words", "length": {"unit": "words", "min": 300, "max": 300}, "category": "clear_single", "lang": "en"}
+{"request": "roommate ad for our flat share, 2 rooms free from march, we're chill students. max 150 words", "length": {"unit": "words", "min": null, "max": 150}, "category": "clear_single", "lang": "en"}
+{"request": "cover letter for a part time library job, im a first year student\n<200 words pls", "length": {"unit": "words", "min": null, "max": 200}, "category": "clear_single", "lang": "en"}
+{"request": "note to my flatmate who keeps eating my food, polite but firm, between 80-120 words", "length": {"unit": "words", "min": 80, "max": 120}, "category": "clear_single", "lang": "en"}
+{"request": "approx 250w summary of chapter 3 for my reading homework, its about migration", "length": {"unit": "words", "min": 250, "max": 250}, "category": "clear_single", "lang": "en"}
+{"request": "1500 chars max, bio for my uni debate club page, sound fun not stiff", "length": {"unit": "chars", "min": null, "max": 1500}, "category": "clear_single", "lang": "en"}
+{"request": "schreib mir ne email an meinen prof, ask for extension on my essay bc i was sick, max 100 words pls", "length": {"unit": "words", "min": null, "max": 100}, "category": "clear_single", "lang": "mixed"}
+{"request": "can u write a post for die wg whatsapp gruppe about the trash schedule, ca 60 words", "length": {"unit": "words", "min": 60, "max": 60}, "category": "clear_single", "lang": "mixed"}
+{"request": "3 tweets für unsere fachschaft zur erstsemester woche, je max 280 zeichen, mit bisschen humor", "length": null, "category": "multiple_items", "lang": "de"}
+{"request": "brauch 5 slogans für unser wg schild an der tür, je max 8 wörter lol", "length": null, "category": "multiple_items", "lang": "de"}
+{"request": "give me 4 subject lines for an email to my flatmates about the deposit, each under 60 chars", "length": null, "category": "multiple_items", "lang": "en"}
+{"request": "titles for my homework blog posts, 6 of them, max 50 characters each\ntopics: sleep, exams, cooking cheap, time mgmt, group projects, procrastination", "length": null, "category": "multiple_items", "lang": "en"}
+{"request": "schreib 3 kurze blurbs je 30 words für unsere nachhilfe-angebote: mathe, englisch, chemie", "length": null, "category": "multiple_items", "lang": "mixed"}
+{"request": "meine bachelorarbeit hat ca 10k wörter und is endlich fertig, schreib mir die danksagung dazu, herzlich und bisschen witzig", "length": null, "category": "foreign_object", "lang": "de"}
+{"request": "entering a uni writing contest, the limit is 500 words for the entry\nwrite me an opening paragraph about moving into my first flat", "length": null, "category": "foreign_object", "lang": "en"}
+{"request": "my novel is 90000 words long, need a back cover blurb for it, its about student life in a flat share", "length": null, "category": "foreign_object", "lang": "en"}
+{"request": "sms hat ja 160 zeichen limit aber ich schreib per whatsapp, mach ne nachricht an meinen mitbewohner dass die miete überfällig is", "length": null, "category": "foreign_object", "lang": "mixed"}
+{"request": "die letzte version war viel zu lang so 900 wörter, mach nochmal die erklärung zur photosynthese, einfacher", "length": null, "category": "revision_context", "lang": "de"}
+{"request": "kürz meinen text auf max 100 wörter, is die beschwerde an den vermieter wegen der heizung", "length": {"unit": "words", "min": null, "max": 100}, "category": "revision_context", "lang": "de"}
+{"request": "my draft is 1200 words cut it down, its the essay on renewable energy for class", "length": null, "category": "revision_context", "lang": "en"}
+{"request": "too short pls make longer, the thank you note to my flatmates for the farewell party. at least 150 words", "length": {"unit": "words", "min": 150, "max": null}, "category": "revision_context", "lang": "en"}
+{"request": "the last one war zu lang, ~700 words glaub ich, schreib die hausarbeit zusammenfassung nochmal neu und knackiger", "length": null, "category": "revision_context", "lang": "mixed"}
+{"request": "mein prof schreibt in der mail 'abstract max 200 wörter einreichen' was soll da alles rein? schreib mir einen zum thema lernstress", "length": null, "category": "quoted_or_meta", "lang": "de"}
+{"request": "what does 'max 200 words' mean for an abstract, does that include title and keywords? explain pls", "length": null, "category": "quoted_or_meta", "lang": "en"}
+{"request": "hier die mail von meiner mitbewohnerin: 'schreib bitte bis freitag 300 words über deine putzwoche' — antworte ihr kurz und nett", "length": null, "category": "quoted_or_meta", "lang": "mixed"}
+{"request": "nicht über 200 wörter und keine emojis, ankündigung für den lernabend in der wg am donnerstag", "length": {"unit": "words", "min": null, "max": 200}, "category": "negations_conjunctions", "lang": "de"}
+{"request": "erörterung zum thema handyverbot an schulen\nnicht unter 300 aber auch nicht über 500 wörter", "length": {"unit": "words", "min": 300, "max": 500}, "category": "negations_conjunctions", "lang": "de"}
+{"request": "dont go over 150 words, apology to my flatmate for the loud party last night, sincere not cringe", "length": {"unit": "words", "min": null, "max": 150}, "category": "negations_conjunctions", "lang": "en"}
+{"request": "no less than 400 words but no hashtags pls, blogpost über mein erasmus semester", "length": {"unit": "words", "min": 400, "max": null}, "category": "negations_conjunctions", "lang": "mixed"}
+{"request": "vortrag für mein referat, ca 5 minuten, thema schimmel in der wohnung, locker erklärt", "length": null, "category": "other_units", "lang": "de"}
+{"request": "write a 2 page essay on why sleep matters for students, simple language", "length": null, "category": "other_units", "lang": "en"}
+{"request": "schreib 3 absätze über wg leben im stil von nem blog, max 10 sätze insgesamt, englisch is ok too", "length": null, "category": "other_units", "lang": "mixed"}
+{"request": "einladung zur wg party am 14.12. ab 20 uhr, wir sind ca 15 leute, bier kostet 2€ pro flasche", "length": null, "category": "no_length", "lang": "de"}
+{"request": "reminder to flatmates: rent is 420 each, due on the 3rd, there are 4 of us so total 1680. keep it friendly", "length": null, "category": "no_length", "lang": "en"}
+{"request": "homework help: explain why 15% of 80 is 12, for a 7th grader, with an example", "length": null, "category": "no_length", "lang": "en"}
+{"request": "schreib ne nachricht an die lerngruppe, exam am 12. januar, we meet at 6pm in der bib, 5 people so far", "length": null, "category": "no_length", "lang": "mixed"}
+{"request": "einleitung max 100 wörter und schluss max 50 wörter für meinen aufsatz über das leben in der wg", "length": null, "category": "adversarial", "lang": "de"}
+{"request": "schreib mir nen text über stress im studium, so um die zweihundert wörter, locker", "length": {"unit": "words", "min": 200, "max": 200}, "category": "adversarial", "lang": "de"}
+{"request": "write it like the 300 words from yesterday but about our new cleaning rota", "length": null, "category": "adversarial", "lang": "en"}
+{"request": "schreib ma ne produktbeschreibung für meine handgetöpferten tassen, max 150 wörter pls", "length": {"unit": "words", "min": null, "max": 150}, "category": "clear_single", "lang": "de"}
+{"request": "newsletter intro für unseren wollladen ca 120 wörter locker und freundlich", "length": {"unit": "words", "min": 120, "max": 120}, "category": "clear_single", "lang": "de"}
+{"request": "text für die über-uns seite\nkleiner laden für strickzeug, familienbetrieb\nnicht über 120 wörter bitte", "length": {"unit": "words", "min": null, "max": 120}, "category": "clear_single", "lang": "de"}
+{"request": "min. 500 wörter blogartikel über seife selber sieden für anfänger", "length": {"unit": "words", "min": 500, "max": null}, "category": "clear_single", "lang": "de"}
+{"request": "anzeige für den online flohmarkt, text für selbstgenähte kissenbezüge, 1500 zeichen max", "length": {"unit": "chars", "min": null, "max": 1500}, "category": "clear_single", "lang": "de"}
+{"request": "brauche was für die shop startseite zw 80 und 120 wörter handgemachter schmuck aus draht", "length": {"unit": "words", "min": 80, "max": 120}, "category": "clear_single", "lang": "de"}
+{"request": "so ~300 words blog post on why i make my own candles, cozy tone", "length": {"unit": "words", "min": 300, "max": 300}, "category": "clear_single", "lang": "en"}
+{"request": "<200 words pls, product description for a hand knitted baby blanket, soft grey, organic cotton", "length": {"unit": "words", "min": null, "max": 200}, "category": "clear_single", "lang": "en"}
+{"request": "between 80-120 words, about page for my tiny ceramics store", "length": {"unit": "words", "min": 80, "max": 120}, "category": "clear_single", "lang": "en"}
+{"request": "approx 250w thank you note insert for orders, crafty and warm", "length": {"unit": "words", "min": 250, "max": 250}, "category": "clear_single", "lang": "en"}
+{"request": "write a return policy for my online plant shop. 400 words max, plain language", "length": {"unit": "words", "min": null, "max": 400}, "category": "clear_single", "lang": "en"}
+{"request": "need an email to customers about our shipping delay\nat least 150 words, sorry but not grovelling", "length": {"unit": "words", "min": 150, "max": null}, "category": "clear_single", "lang": "en"}
+{"request": "kannst du ne short description schreiben für meine leather wallets, max 60 words, handmade in small batches", "length": {"unit": "words", "min": null, "max": 60}, "category": "clear_single", "lang": "mixed"}
+{"request": "hey need ca 200 wörter für den shop blog, topic: how to care for wooden toys, bitte easy to read", "length": {"unit": "words", "min": 200, "max": 200}, "category": "clear_single", "lang": "mixed"}
+{"request": "3 slogans für meinen bastelladen, jeder max 8 wörter", "length": null, "category": "multiple_items", "lang": "de"}
+{"request": "produkttitel für 6 häkeltiere, je max 60 zeichen, mit keywords", "length": null, "category": "multiple_items", "lang": "de"}
+{"request": "give me 3 tweets max 280 chars each announcing our new soap bundle", "length": null, "category": "multiple_items", "lang": "en"}
+{"request": "5 subject lines for my autumn sale email, each under 50 chars", "length": null, "category": "multiple_items", "lang": "en"}
+{"request": "ein kurzer blurb pro produkt pls, jeweils ~30 words:\n1 leinenschürze\n2 holzlöffel set\n3 kräutertopf", "length": null, "category": "multiple_items", "lang": "mixed"}
+{"request": "meine freundin schreibt gerade ne bachelorarbeit mit 10k wörtern über nachhaltige mode, schreib mir ne motivierende nachricht für sie", "length": null, "category": "foreign_object", "lang": "de"}
+{"request": "theres a contest for small shops with a 500 word limit for the entry. havent started yet, write a short pitch for my pottery studio i can adapt later", "length": null, "category": "foreign_object", "lang": "en"}
+{"request": "my novel is 90000 words long and its about a woman who runs a yarn shop. write the back cover blurb", "length": null, "category": "foreign_object", "lang": "en"}
+{"request": "das sms limit is 160 zeichen, schreib ne abholbenachrichtigung für meinen laden", "length": null, "category": "foreign_object", "lang": "mixed"}
+{"request": "der letzte text war viel zu lang so 900 wörter, mach nochmal neu über unsere keramikkurse", "length": null, "category": "revision_context", "lang": "de"}
+{"request": "kürz das auf max 100 wörter, ist die beschreibung für die holzspielzeuge", "length": {"unit": "words", "min": null, "max": 100}, "category": "revision_context", "lang": "de"}
+{"request": "my draft is 1200 words cut it down pls, its the about page of my candle shop", "length": null, "category": "revision_context", "lang": "en"}
+{"request": "too short pls make longer, like 350 words", "length": {"unit": "words", "min": 350, "max": 350}, "category": "revision_context", "lang": "en"}
+{"request": "version davor war zu fluffy, mach es nochmal kürzer, no more than 80 words", "length": {"unit": "words", "min": null, "max": 80}, "category": "revision_context", "lang": "mixed"}
+{"request": "kunde schreibt mir: 'können sie mir einen text mit max 200 wörtern für meine karte liefern?' antworte höflich dass wir das machen", "length": null, "category": "quoted_or_meta", "lang": "de"}
+{"request": "what does 'max 200 words' mean for an abstract in a craft fair application, do spaces count", "length": null, "category": "quoted_or_meta", "lang": "en"}
+{"request": "in der mail vom marktveranstalter steht 'bitte beschreibung in max 300 zeichen'. antworte ihm dass wir dabei sind, mehr nicht", "length": null, "category": "quoted_or_meta", "lang": "mixed"}
+{"request": "nicht unter 300 aber auch nicht über 500 wörter, ratgeber wie man häkeln lernt", "length": {"unit": "words", "min": 300, "max": 500}, "category": "negations_conjunctions", "lang": "de"}
+{"request": "text für die produktseite vom leinenschal, nicht mehr als 200 wörter und keine emojis", "length": {"unit": "words", "min": null, "max": 200}, "category": "negations_conjunctions", "lang": "de"}
+{"request": "dont go over 150 words, product blurb for beeswax wraps, no hashtags", "length": {"unit": "words", "min": null, "max": 150}, "category": "negations_conjunctions", "lang": "en"}
+{"request": "no less than 400 words but kein hashtag spam pls, blogpost über unseren ersten markttag", "length": {"unit": "words", "min": 400, "max": null}, "category": "negations_conjunctions", "lang": "mixed"}
+{"request": "schreib ne rede für die ladeneröffnung, ca 3 minuten", "length": null, "category": "other_units", "lang": "de"}
+{"request": "one page flyer text for our craft night, 4 short paragraphs", "length": null, "category": "other_units", "lang": "en"}
+{"request": "email an kunden, 5 sätze max, über die neue lieferung wolle", "length": null, "category": "other_units", "lang": "mixed"}
+{"request": "danke-karte für kunden die seit 2019 bei uns bestellen, 15% rabatt code gibts gratis dazu", "length": null, "category": "no_length", "lang": "de"}
+{"request": "ankündigung für den bastelmarkt am 14. dezember\n12 stände, eintritt frei\nbitte freundlich", "length": null, "category": "no_length", "lang": "de"}
+{"request": "caption for our 3 year anniversary sale, 20% off everything till sunday, 40 handmade items", "length": null, "category": "no_length", "lang": "en"}
+{"request": "reply to a customer, she ordered 2 mugs and 1 broke in shipping, offer replacement, apologise", "length": null, "category": "no_length", "lang": "en"}
+{"request": "headline max 8 wörter, dann ein text mit 100 wörtern für unsere adventskranz aktion", "length": null, "category": "adversarial", "lang": "de"}
+{"request": "use the 300 words from yesterday and turn it into a newsletter for my fabric shop", "length": null, "category": "adversarial", "lang": "en"}
+{"request": "schreib mir text für meine 3 neuen kerzen sorten, nicht länger als zweihundert wörter", "length": {"unit": "words", "min": null, "max": 200}, "category": "adversarial", "lang": "mixed"}

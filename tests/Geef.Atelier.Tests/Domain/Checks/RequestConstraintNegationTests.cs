@@ -252,7 +252,7 @@ public sealed class RequestConstraintNegationTests
     [InlineData("Write less than 100 words and don't use bullet points.", "AtMost", null, 100)]
     [InlineData("Write less than 100 words and never use jargon.", "AtMost", null, 100)]
     [InlineData("Schreibe weniger als 100 Wörter und nicht zu förmlich.", "AtMost", null, 100)]
-    [InlineData("Der Text soll mehr als 100 Wörter haben und nicht zu lang sein.", "AtLeast", 100, null)]
+    [InlineData("Der Text soll mehr als 100 Wörter haben und nicht zu lang sein.", "none", null, null)]
     [InlineData("Write more than 100 words and don't be boring.", "AtLeast", 100, null)]
     [InlineData("Write less than 200 words and don't write less than 100 words.", "none", null, null)]
     [InlineData("Write more than 100 words and don't use emojis.", "AtLeast", 100, null)]
