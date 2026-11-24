@@ -37,7 +37,8 @@ internal sealed class MetadataEnrichFinalizerExecutor(
         }
         catch (Exception ex)
         {
-            logger.LogError("MetadataEnrich failed for profile {Profile}: {Error}", profile.Name, ex.ToRedactedLogText());
+            logger.LogError("MetadataEnrich failed for run {RunId}, profile {Profile}: {Error}",
+                context.RunId, profile.Name, ex.ToRedactedLogText());
             errorMessage = "The details could not be added to the text.";
         }
 
