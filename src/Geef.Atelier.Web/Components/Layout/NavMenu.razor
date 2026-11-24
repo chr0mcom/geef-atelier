@@ -3,85 +3,102 @@
 @implements IDisposable
 
 <div class="nav-links">
-    <NavLink class="nav-link" href="/workshop" Match="NavLinkMatch.All" ActiveClass="active">
-        Atelier
-    </NavLink>
-    <NavLink class="nav-link" href="/runs" ActiveClass="active">
-        Runs
-    </NavLink>
-    <NavLink class="nav-link" href="/new" ActiveClass="active">
+    <NavLink class="nav-link" href="/start" ActiveClass="active" data-testid="nav-new">
         New
     </NavLink>
+    <NavLink class="@(IsMyWorkActive() ? "nav-link active" : "nav-link")" href="/work" ActiveClass="active" data-testid="nav-my-work">
+        My work
+    </NavLink>
 
-    <div class="nav-group @(_crewOpen ? "open" : "")">
-        <button class="nav-link nav-group-trigger @(IsCrewActive() ? "active" : "")"
-                @onclick="ToggleCrew"
-                aria-expanded="@_crewOpen"
-                aria-haspopup="true">
-            Crew
+    <div class="nav-group @(_workshopOpen ? "open" : "")">
+        <button class="nav-link nav-group-trigger @(IsWorkshopActive() ? "active" : "")"
+                @onclick="ToggleWorkshop"
+                aria-expanded="@_workshopOpen"
+                aria-haspopup="true"
+                data-testid="nav-workshop">
+            Workshop
             <span class="nav-group-chevron" aria-hidden="true">▾</span>
         </button>
-        @if (_crewOpen)
+        @if (_workshopOpen)
         {
             <div class="nav-dropdown" role="menu">
-                <NavLink class="nav-link" href="/crew/templates" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                <NavLink class="nav-link" href="/workshop" Match="NavLinkMatch.All" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                    Dashboard
+                </NavLink>
+                <NavLink class="nav-link" href="/runs" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                    Runs
+                </NavLink>
+                <NavLink class="nav-link" href="/new" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                    New run (choose a team)
+                </NavLink>
+                <div class="nav-dropdown-sep">Crew</div>
+                <NavLink class="nav-link" href="/crew/templates" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
                     Templates
                 </NavLink>
-                <NavLink class="nav-link" href="/crew/studio" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                <NavLink class="nav-link" href="/crew/studio" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
                     Studio
                 </NavLink>
+                <NavLink class="nav-link" href="/crew/knowledge" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                    Knowledge
+                </NavLink>
+                <AuthorizeView Roles="admin">
+                    <NavLink class="nav-link" href="/crew/learnings" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                        Learnings
+                    </NavLink>
+                </AuthorizeView>
                 <div class="nav-dropdown-sep">Profiles</div>
-                <NavLink class="nav-link" href="/crew/profiles/reviewers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                <NavLink class="nav-link" href="/crew/profiles/reviewers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
                     Reviewers
                 </NavLink>
-                <NavLink class="nav-link" href="/crew/profiles/executors" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                <NavLink class="nav-link" href="/crew/profiles/executors" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
                     Executors
                 </NavLink>
-                <NavLink class="nav-link" href="/crew/profiles/advisors" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                <NavLink class="nav-link" href="/crew/profiles/advisors" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
                     Advisors
                 </NavLink>
-                <NavLink class="nav-link" href="/crew/profiles/grounding-providers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                <NavLink class="nav-link" href="/crew/profiles/grounding-providers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
                     Groundings
                 </NavLink>
-                <NavLink class="nav-link" href="/crew/profiles/finalizers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                <NavLink class="nav-link" href="/crew/profiles/finalizers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
                     Finalizers
                 </NavLink>
                 <AuthorizeView Roles="admin">
-                    <NavLink class="nav-link" href="/tools" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                    <NavLink class="nav-link" href="/tools" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
                         Tools
                     </NavLink>
                 </AuthorizeView>
-                <NavLink class="nav-link" href="/packs" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                <NavLink class="nav-link" href="/packs" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
                     Packs
                 </NavLink>
                 <AuthorizeView Roles="admin">
-                    <NavLink class="nav-link" href="/mcp-servers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                    <NavLink class="nav-link" href="/mcp-servers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
                         MCP Servers
                     </NavLink>
                     <div class="nav-dropdown-sep">Infrastructure</div>
-                    <NavLink class="nav-link" href="/crew/providers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseCrew">
+                    <NavLink class="nav-link" href="/crew/providers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
                         Providers
                     </NavLink>
                 </AuthorizeView>
             </div>
         }
     </div>
-
-    <NavLink class="nav-link" href="/crew/knowledge" ActiveClass="active">
-        Knowledge
-    </NavLink>
-    <NavLink class="nav-link" href="/crew/learnings" ActiveClass="active">
-        Learnings
-    </NavLink>
 </div>
 
 @code {
-    bool _crewOpen = false;
+    static readonly string[] WorkshopPrefixes = ["workshop", "runs", "new", "crew/", "tools", "packs", "mcp-servers"];
 
-    bool IsCrewActive() => Nav.Uri.Contains("/crew/");
+    bool _workshopOpen;
 
-    void ToggleCrew() => _crewOpen = !_crewOpen;
-    void CloseCrew()  => _crewOpen = false;
+    string RelativePath => Nav.ToBaseRelativePath(Nav.Uri);
+
+    bool IsWorkshopActive() =>
+        WorkshopPrefixes.Any(p => RelativePath.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+
+    bool IsMyWorkActive() =>
+        RelativePath.StartsWith("orders", StringComparison.OrdinalIgnoreCase);
+
+    void ToggleWorkshop() => _workshopOpen = !_workshopOpen;
+    void CloseWorkshop()  => _workshopOpen = false;
 
     protected override void OnInitialized()
     {
@@ -90,7 +107,7 @@
 
     void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        _crewOpen = false;
+        _workshopOpen = false;
         InvokeAsync(StateHasChanged);
     }
 
