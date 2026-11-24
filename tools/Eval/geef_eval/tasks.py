@@ -120,7 +120,7 @@ def _attachment_from_json(raw: object, task_path: Path) -> Attachment:
     if isinstance(raw.get("text"), str):
         return Attachment(name=name, content_type=_content_type(name, task_path), text=raw["text"])
     if isinstance(raw.get("pfad"), str):
-        file_path = (task_path.parent / raw["pfad"]).resolve()
+        file_path = _attachment_path(raw["pfad"], name, task_path)
         if not file_path.is_file():
             raise TaskError(f"{task_path.name}: Anhang {name!r} nicht gefunden ({raw['pfad']})")
         content_type = _content_type(name, task_path)
@@ -128,6 +128,18 @@ def _attachment_from_json(raw: object, task_path: Path) -> Attachment:
             return Attachment(name=name, content_type=content_type, data=file_path.read_bytes())
         return Attachment(name=name, content_type=content_type, text=file_path.read_text(encoding="utf-8"))
     raise TaskError(f"{task_path.name}: Anhang {name!r} braucht 'text' oder 'pfad'")
+
+
+def _attachment_path(relative: str, name: str, task_path: Path) -> Path:
+    """Resolves an attachment path; it must stay inside the task directory (no absolute paths, no escape via .. or symlinks)."""
+    root = task_path.parent.resolve()
+    if Path(relative).is_absolute():
+        raise TaskError(f"{task_path.name}: Anhang {name!r}: absolute Pfade sind nicht erlaubt ({relative}); "
+                        "den Pfad relativ zum Aufgabenordner angeben")
+    target = (root / relative).resolve()
+    if not target.is_relative_to(root):
+        raise TaskError(f"{task_path.name}: Anhang {name!r}: Pfad {relative!r} verlässt den Aufgabenordner {root}")
+    return target
 
 
 def _content_type(name: str, task_path: Path) -> str:

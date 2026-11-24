@@ -95,3 +95,40 @@ def test_cli_refuses_output_inside_a_git_repository(examples_dir, tmp_path):
         cli.main(["report", "--run-name", "x", "--tasks", str(examples_dir), "--arms", "referenz",
                   "--out", str(repo_dir)])
     assert not (repo_dir / "x").exists()
+
+
+def _cli_judge(tmp_path, examples_dir, monkeypatch, *extra):
+    monkeypatch.setattr(cli, "default_judges", lambda store, log=None, codex=False: [ScriptedJudge()])
+    return cli.main(["all", "--run-name", "fortsetzen", "--tasks", str(examples_dir), "--arms", "referenz",
+                     "--out", str(tmp_path / "out"), *extra])
+
+
+def test_cli_stores_seed_and_refuses_resume_with_another(tmp_path, examples_dir, monkeypatch):
+    monkeypatch.delenv("EVAL_SEED", raising=False)
+    assert _cli_judge(tmp_path, examples_dir, monkeypatch, "--seed", "erster") == 0
+    manifest_path = tmp_path / "out" / "fortsetzen" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert (manifest["seed"], manifest["assignment_version"]) == ("erster", 1)
+
+    with pytest.raises(SystemExit, match="Seed 'erster'"):
+        _cli_judge(tmp_path, examples_dir, monkeypatch, "--seed", "zweiter")
+    monkeypatch.setenv("EVAL_SEED", "zweiter")
+    with pytest.raises(SystemExit, match="Seed 'erster'"):
+        _cli_judge(tmp_path, examples_dir, monkeypatch)
+    assert json.loads(manifest_path.read_text(encoding="utf-8"))["seed"] == "erster"
+
+
+def test_cli_resume_without_seed_reuses_the_stored_one(tmp_path, examples_dir, monkeypatch):
+    monkeypatch.delenv("EVAL_SEED", raising=False)
+    assert _cli_judge(tmp_path, examples_dir, monkeypatch, "--seed", "erster") == 0
+    assert _cli_judge(tmp_path, examples_dir, monkeypatch) == 0
+    report = (tmp_path / "out" / "fortsetzen" / "bericht.md").read_text(encoding="utf-8")
+    assert "Seed: `erster`" in report
+
+
+def test_cli_refuses_run_directory_with_other_assignment_version(tmp_path, examples_dir, monkeypatch):
+    run_dir = tmp_path / "out" / "fortsetzen"
+    run_dir.mkdir(parents=True)
+    (run_dir / "manifest.json").write_text(json.dumps({"seed": "geef-eval", "assignment_version": 0}), encoding="utf-8")
+    with pytest.raises(SystemExit, match="Zuordnungsversion 0"):
+        _cli_judge(tmp_path, examples_dir, monkeypatch)

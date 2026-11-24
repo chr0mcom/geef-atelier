@@ -81,3 +81,67 @@ def test_readme_and_hidden_files_are_ignored(tmp_path):
     (tmp_path / "ok.json").write_text(json.dumps({"kurzauftrag": "x"}), encoding="utf-8")
 
     assert [t.id for t in load_tasks(tmp_path)] == ["ok"]
+
+
+def _task_with_path(directory, pfad, name="a.md"):
+    (directory / "t.json").write_text(json.dumps({
+        "kurzauftrag": "x", "anhaenge": [{"name": name, "pfad": pfad}],
+    }), encoding="utf-8")
+
+
+def test_attachment_with_absolute_path_is_rejected(tmp_path):
+    secret = tmp_path / "geheim.md"
+    secret.write_text("geheim", encoding="utf-8")
+    tasks = tmp_path / "aufgaben"
+    tasks.mkdir()
+    _task_with_path(tasks, str(secret))
+
+    with pytest.raises(TaskError, match="absolute Pfade"):
+        load_tasks(tasks)
+
+
+@pytest.mark.parametrize("pfad", ["../geheim.md", "dateien/../../geheim.md"])
+def test_attachment_escaping_with_dotdot_is_rejected(tmp_path, pfad):
+    (tmp_path / "geheim.md").write_text("geheim", encoding="utf-8")
+    tasks = tmp_path / "aufgaben"
+    (tasks / "dateien").mkdir(parents=True)
+    _task_with_path(tasks, pfad)
+
+    with pytest.raises(TaskError, match="verlässt den Aufgabenordner"):
+        load_tasks(tasks)
+
+
+def test_attachment_symlink_to_outside_is_rejected(tmp_path):
+    (tmp_path / "geheim.md").write_text("geheim", encoding="utf-8")
+    tasks = tmp_path / "aufgaben"
+    tasks.mkdir()
+    (tasks / "link.dat").symlink_to(tmp_path / "geheim.md")
+    _task_with_path(tasks, "link.dat")
+
+    with pytest.raises(TaskError, match="verlässt den Aufgabenordner"):
+        load_tasks(tasks)
+
+
+def test_attachment_directory_symlink_to_outside_is_rejected(tmp_path):
+    outside = tmp_path / "aussen"
+    outside.mkdir()
+    (outside / "a.md").write_text("geheim", encoding="utf-8")
+    tasks = tmp_path / "aufgaben"
+    tasks.mkdir()
+    (tasks / "dateien").symlink_to(outside, target_is_directory=True)
+    _task_with_path(tasks, "dateien/a.md")
+
+    with pytest.raises(TaskError, match="verlässt den Aufgabenordner"):
+        load_tasks(tasks)
+
+
+def test_attachment_inside_task_directory_still_works(tmp_path):
+    (tmp_path / "dateien").mkdir()
+    (tmp_path / "dateien" / "a.md").write_text("Inhalt", encoding="utf-8")
+    (tmp_path / "intern.dat").symlink_to(tmp_path / "dateien" / "a.md")
+    (tmp_path / "t.json").write_text(json.dumps({"kurzauftrag": "x", "anhaenge": [
+        {"name": "a.md", "pfad": "dateien/../dateien/a.md"}, {"name": "b.md", "pfad": "intern.dat"}]}), encoding="utf-8")
+
+    attachments = load_tasks(tmp_path)[0].attachments
+
+    assert [a.text for a in attachments] == ["Inhalt", "Inhalt"]

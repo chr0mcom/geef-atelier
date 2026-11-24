@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from .arms import build_arms
-from .judge import default_judges, judge_all
+from .judge import ASSIGNMENT_VERSION, default_judges, judge_all
 from .pipeline import produce_outputs
 from .report import build_report
 from .store import RunStore, safe_name
@@ -45,6 +45,23 @@ def _parse_plugins(values: list[str]) -> dict[str, str]:
     return plugins
 
 
+def resolve_seed(requested: str | None, manifest: dict, run_dir: Path) -> str:
+    """
+    The seed of a run directory is fixed by its first call: resuming reuses it, a different explicit seed is refused,
+    and so is a directory written with another ordering version. Otherwise old verdicts would be mapped to the wrong arm.
+    """
+    stored = manifest.get("seed")
+    version = manifest.get("assignment_version", ASSIGNMENT_VERSION)
+    if version != ASSIGNMENT_VERSION:
+        raise SystemExit(f"{run_dir} wurde mit Zuordnungsversion {version} angelegt, dieses Werkzeug nutzt "
+                         f"{ASSIGNMENT_VERSION}. Neuen Laufnamen wählen.")
+    if stored is not None and requested is not None and requested != stored:
+        raise SystemExit(f"{run_dir} wurde mit Seed {stored!r} angelegt, angefragt ist {requested!r}. Ein anderer Seed "
+                         "würde bestehende Urteile dem falschen Arm zuordnen. Ohne --seed/EVAL_SEED fortsetzen "
+                         "(nutzt den gespeicherten Seed) oder einen neuen Laufnamen wählen.")
+    return requested or stored or DEFAULT_SEED
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="eval.py", description="Messwerkzeug für Geef.Atelier")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -57,7 +74,8 @@ def build_parser() -> argparse.ArgumentParser:
         cmd.add_argument("--arms", default="roh,atelier", help="Kommagetrennte Arme, z. B. roh,atelier")
         cmd.add_argument("--plugin", action="append", default=[], help="Zusätzlicher Arm: name=modul:attribut")
         cmd.add_argument("--out", default=None, help="Ausgabeordner (Standard: EVAL_OUT_DIR oder ~/.local/state/geef-eval)")
-        cmd.add_argument("--seed", default=os.environ.get("EVAL_SEED", DEFAULT_SEED), help="Seed für die Reihenfolge")
+        cmd.add_argument("--seed", default=None,
+                         help="Seed für die Reihenfolge (Standard: EVAL_SEED, beim Fortsetzen der gespeicherte Seed, sonst geef-eval)")
         cmd.add_argument("--max-judge-calls", type=int, default=None, help="Höchstzahl neuer Jurorenaufrufe")
         cmd.add_argument("--codex-juror", action="store_true",
                          help="Zweiten Juror per Codex zuschalten (braucht EVAL_CODEX_MAX; Standard: aus)")
@@ -81,8 +99,10 @@ def main(argv: list[str] | None = None) -> int:
     judges = default_judges(store, log=store.log_call, codex=args.codex_juror)
     judge_names = [j.name for j in judges]
     manifest = store.read_json(store.manifest_path) or {"created": dt.datetime.now(dt.timezone.utc).isoformat()}
+    seed = resolve_seed(args.seed or os.environ.get("EVAL_SEED"), manifest, run_dir)
     judge_names = sorted(set(manifest.get("judges", [])) | set(judge_names))
-    manifest.update({"tasks": [t.id for t in tasks], "arms": arm_names, "judges": judge_names, "seed": args.seed})
+    manifest.update({"tasks": [t.id for t in tasks], "arms": arm_names, "judges": judge_names, "seed": seed,
+                     "assignment_version": ASSIGNMENT_VERSION})
     store.write_json(store.manifest_path, manifest)
 
     print(f"Lauf {args.run_name}: {len(tasks)} Aufgaben, Arme {', '.join(arm_names)}, Ordner {run_dir}")
@@ -93,12 +113,12 @@ def main(argv: list[str] | None = None) -> int:
         if summary["stopped_by_limit"]:
             return 3
     if args.command in ("judge", "all"):
-        summary = judge_all(tasks, arm_names, store, judges, args.seed, max_calls=args.max_judge_calls)
+        summary = judge_all(tasks, arm_names, store, judges, seed, max_calls=args.max_judge_calls)
         print(f"Bewertung: {summary}")
         if summary["stopped_by_limit"]:
             return 3
     if args.command in ("report", "all"):
-        store.write_text(store.report_path, build_report(args.run_name, tasks, arm_names, judge_names, store, args.seed))
+        store.write_text(store.report_path, build_report(args.run_name, tasks, arm_names, judge_names, store, seed))
         print(f"Bericht: {store.report_path}")
     return 0
 

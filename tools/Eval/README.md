@@ -32,6 +32,11 @@ Gemeinsame Optionen: `--run-name` (Pflicht), `--tasks` (sonst `EVAL_TASKS_DIR`),
 Alles ist **wiederaufnehmbar**: Erfolgreiche Texte und Urteile auf der Platte werden nie neu erzeugt; fehlgeschlagene
 werden beim nächsten Aufruf erneut versucht. Ein abgebrochener Lauf wird mit demselben Befehl fortgesetzt.
 
+Der Seed gehört zum Laufverzeichnis: Der erste Aufruf legt ihn (zusammen mit der Zuordnungsversion) in
+`manifest.json` ab. Ohne `--seed`/`EVAL_SEED` nutzt jeder weitere Aufruf den gespeicherten Seed; ein abweichender
+Seed wird mit einer Meldung abgelehnt, weil er bestehende Urteile dem falschen Arm zuordnen würde. Für einen anderen
+Seed einen neuen `--run-name` wählen.
+
 Probelauf mit den synthetischen Beispielen (3 Opus-Aufrufe, 6 Jurorenaufrufe, ohne Atelier):
 
 ```bash
@@ -88,7 +93,9 @@ Drei synthetische Beispiele liegen in `beispiele/`.
 ```
 
 Anhänge: `.md`, `.txt` (Text) und `.pdf` (nur per `pfad`; der Arm `roh` kann PDFs nicht lesen und vermerkt das,
-der Arm `atelier` lädt sie hoch). Pfade sind relativ zur Aufgabendatei.
+der Arm `atelier` lädt sie hoch). Pfade sind relativ zur Aufgabendatei und müssen im Aufgabenordner bleiben:
+absolute Pfade, `..` nach außen und Symlinks, die aus dem Ordner herausführen, lehnt das Werkzeug mit einer
+Fehlermeldung ab. So kann eine geteilte Aufgabendatei keine fremden Dateien an das Atelier oder an Claude schicken.
 
 **Markdown** (`<id>.md`) mit den Abschnitten `# Kurzauftrag` (Pflicht), `# Original-Briefing`, `# Referenztext`
 und beliebig vielen `# Anhang: name.md`.
@@ -99,10 +106,10 @@ und beliebig vielen `# Anhang: name.md`.
 |---|---|
 | `EVAL_TASKS_DIR` | Aufgabenverzeichnis (statt `--tasks`) |
 | `EVAL_OUT_DIR` | Ausgabeordner (Standard `~/.local/state/geef-eval`) |
-| `EVAL_ATELIER_URL` | Basis-URL des Ateliers; `/mcp` wird angehängt |
+| `EVAL_ATELIER_URL` | Basis-URL des Ateliers; `/mcp` wird angehängt. Weiterleitungen werden nicht verfolgt (das Token bleibt beim eingestellten Ursprung); bei einer Weiterleitung die Zieladresse eintragen |
 | `EVAL_ATELIER_TOKEN` | Bearer-Token für den MCP-Endpunkt |
 | `EVAL_ATELIER_CREW` | optional: Crew-Vorlage für den Arm `atelier` (sonst Standard des Ateliers) |
-| `EVAL_SEED` | Seed der Reihenfolge (statt `--seed`) |
+| `EVAL_SEED` | Seed der Reihenfolge (statt `--seed`); muss beim Fortsetzen zum gespeicherten Seed passen |
 | `EVAL_CODEX_MAX` | Obergrenze der Codex-Jurorenaufrufe je Lauf; ohne Wert bleibt der Codex-Juror aus |
 
 ## Datenschutz
