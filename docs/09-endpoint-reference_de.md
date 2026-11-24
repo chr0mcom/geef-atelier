@@ -2,7 +2,7 @@
 
 *[English](09-endpoint-reference.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-24 (Etappe 1: Auftrags-Werkzeuge `submit_order`, `get_order_status`, `get_order_result`, `submit_request` als Hülle mit `orderId`, Server-Hinweise, `list_learnings` nur für Admins; D-067: `warnings` und `outcome` in `get_run_status`/`get_run_result`, Ergebnis erst nach `outcome` lesen; `/hubs/runs` bleibt bis Etappe 8; `/hubs/runs` nur für Angemeldete; Editoren nur für Admins und `/access-denied`; Learning standardmäßig pausiert; zuvor 2026-05-22, D-054: Tool list_learnings ergänzt; providerType um learning-retrieval erweitert)*
+*Letzte Aktualisierung: 2026-11-25 (Etappe 2: `answer_order`, `needs_input` mit Fragen in `submit_order`/`get_order_status`, `assumptions` in `get_order_result`, neue Server-Hinweise; Etappe 1: Auftrags-Werkzeuge `submit_order`, `get_order_status`, `get_order_result`, `submit_request` als Hülle mit `orderId`, Server-Hinweise, `list_learnings` nur für Admins; D-067: `warnings` und `outcome` in `get_run_status`/`get_run_result`, Ergebnis erst nach `outcome` lesen; `/hubs/runs` bleibt bis Etappe 8; `/hubs/runs` nur für Angemeldete; Editoren nur für Admins und `/access-denied`; Learning standardmäßig pausiert; zuvor 2026-05-22, D-054: Tool list_learnings ergänzt; providerType um learning-retrieval erweitert)*
 
 Alle HTTP-Endpunkte von Geef.Atelier, die extern erreichbar sind — MCP, OAuth 2.1
 sowie die Web-UI-/Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`.
@@ -54,17 +54,26 @@ Unterstützte `contentType`-Werte: `application/pdf`, `application/vnd.openxmlfo
   "state": "queued",
   "runId": "<uuid|null>",
   "message": "<Klartext: was als Nächstes zu tun ist>",
-  "sources": [ { "fileName": "angebot.pdf", "pages": 80, "characters": 160485, "quality": "good|partial|poor", "warnings": ["<string>"] } ]
+  "sources": [ { "fileName": "angebot.pdf", "pages": 80, "characters": 160485, "quality": "good|partial|poor", "warnings": ["<string>"] } ],
+  "understanding": "<string|null: was Atelier schreiben wird, in der Sprache des Auftrags>",
+  "assumptions": [ { "id": "a1", "text": "<string>", "unsure": false } ],
+  "questions": [ { "id": "length", "topic": "length", "text": "<string>", "options": [ { "id": "short", "label": "<string>" } ], "defaultOptionId": "<string|null>", "allowFreeText": true } ],
+  "language": "<ISO 639-1|null>"
 }
 ```
 
-`state` kann bereits `needs_input` sein (mit `runId = null`), sobald Aufträge Rückfragen stellen (Etappe 2); Clients, die den Wert nicht kennen, rufen `get_order_status` auf.
+`submit_order` wartet im Zustand `preparing` bis zu `Intake:SubmitWaitSeconds` (Standard 30, gekappt auf `Orders:MaxWaitSeconds`) und antwortet dann mit dem aktuellen Zustand:
+- `needs_input`: `runId` ist `null`, `questions` enthält ein bis drei Fragen; `message` bittet den Client, den Menschen zu fragen und `answer_order` aufzurufen.
+- `queued`/`working`: `runId` ist gesetzt, `questions` ist `null`; `understanding`/`assumptions` sind gesetzt, wenn der Auftrag gelesen wurde.
+- `preparing` (Wartezeit abgelaufen): keine Fragen, `message` = „Still reading the request. Call get_order_status with waitSeconds=25.“
+
+`understanding`, `assumptions`, `questions` und `language` sind `null` bei Aufträgen ohne Klärung (`Orders:IntakeMode` `Off` oder `Shadow`, `submit_request`, Aufträge über `Intake:SkipAboveChars`). `topic` ist einer der Werte `length`, `audience`, `purpose`, `tone`, `formality`, `language`, `sender`, `signature`, `facts`, `format`, `date`, `scope`, `other`. Fragen heißen `q1`…`q3` oder `length`, Optionen `o1`…`o4` oder `short`/`medium`/`long`, Annahmen `a1`, ….
 
 **Prüfung der Anhänge.** Bevor eine Datei gelesen wird, weist der Server ab, was offensichtlich nicht die Datei selbst ist: ungültiges Base64, leerer Inhalt, Text mit weniger als 10 sichtbaren Zeichen, kurze Texte, die nur auf eine Datei verweisen (etwa „siehe angehängte Vollversion“), Text, der selbst Base64 ist (doppelt kodiert), und Inhalt, dessen Magic Bytes nicht zum `contentType` passen (ein „PDF“ ohne `%PDF-`, eine `.docx` ohne ZIP-Kopf, ein als Text angegebenes PDF oder ZIP). Eine Datei, die die Annahme nicht verwenden kann (etwa ein Scan ohne Text), wird mit ihrem Grund abgewiesen. In jedem Fall wird nichts gestartet, die von diesem Aufruf gespeicherten Dateien werden wieder freigegeben, und die Meldung nennt den richtigen Weg: die vollständige Originaldatei als Base64 mit passendem `contentType` übergeben; ist die Datei zu groß für ein Argument, den Auftrag in der Weboberfläche anlegen und die Datei dort ablegen.
 
 **Eingabe `get_order_status`:** `{ "orderId": "<uuid>", "waitSeconds": 25 }`
 
-`waitSeconds` wird auf `0 … Orders:MaxWaitSeconds` (Standard 50) geklemmt; `0` antwortet sofort. Der Aufruf wartet, bis sich der Anzeigezustand ändert oder der Auftrag fertig ist, spätestens `waitSeconds` lang. Bricht der Client ab, endet das Warten sofort.
+`waitSeconds` wird auf `0 … Orders:MaxWaitSeconds` (Standard 50) geklemmt; `0` antwortet sofort. Der Aufruf wartet, bis sich der Anzeigezustand ändert oder der Auftrag fertig ist, spätestens `waitSeconds` lang; bei `needs_input` antwortet er sofort. Bricht der Client ab, endet das Warten sofort.
 
 **Ausgabe `get_order_status`:**
 ```json
@@ -78,11 +87,16 @@ Unterstützte `contentType`-Werte: `application/pdf`, `application/vnd.openxmlfo
   "runId": "<uuid|null>",
   "warnings": [ { "code": "<string>", "message": "<string>" } ],
   "nextCheckSeconds": 10,
-  "outcome": "Converged|DeliveredWithOpenPoints|Failed|Aborted|null"
+  "outcome": "Converged|DeliveredWithOpenPoints|Failed|Aborted|null",
+  "understanding": "<string|null>",
+  "assumptions": [ { "id": "a1", "text": "<string>", "unsure": false } ],
+  "questions": [ { "id": "q1", "topic": "audience", "text": "<string>", "options": [ { "id": "o1", "label": "<string>" } ], "defaultOptionId": null, "allowFreeText": false } ],
+  "language": "<ISO 639-1|null>",
+  "message": "<string|null>"
 }
 ```
 
-`nextCheckSeconds` ist `0`, wenn `done` wahr ist, sonst `10`. `outcome` ist das Ergebnis des aktuellen Laufs, sobald er beendet ist.
+`understanding`, `assumptions`, `questions`, `language` und `message` sind nur bei `needs_input` gesetzt (gleiche Form wie bei `submit_order`), sonst `null`. `nextCheckSeconds` ist `0`, wenn `done` wahr ist oder der Zustand `needs_input` lautet, sonst `10`. `outcome` ist das Ergebnis des aktuellen Laufs, sobald er beendet ist.
 
 **Eingabe `get_order_result`:** `{ "orderId": "<uuid>" }`
 
@@ -98,13 +112,32 @@ Unterstützte `contentType`-Werte: `application/pdf`, `application/vnd.openxmlfo
   "openChecks": ["<Klartext: eine Prüfung, die der Text nicht bestanden hat>"],
   "sourcesUsed": [ { "fileName": "angebot.pdf", "mode": "full_text|full_text_with_map|excluded", "characters": 160485 } ],
   "warnings": [ { "code": "<string>", "message": "<string>" } ],
-  "note": "<string|null>"
+  "note": "<string|null>",
+  "assumptions": [ { "id": "a1", "text": "<string>", "unsure": true } ]
 }
 ```
 
-`text` ist auch bei `delivered_with_open_points` gesetzt (der beste Text mit den offenen Prüfungen) und bei einem gestoppten Auftrag, der schon einen Text hatte; `null` ist er, solange der Auftrag läuft oder wenn kein Text entstand (`failed`). `note` sagt in Klartext, was dem Menschen zu sagen ist.
+`text` ist auch bei `delivered_with_open_points` gesetzt (der beste Text mit den offenen Prüfungen) und bei einem gestoppten Auftrag, der schon einen Text hatte; `null` ist er, solange der Auftrag läuft oder wenn kein Text entstand (`failed`). `note` sagt in Klartext, was dem Menschen zu sagen ist. `assumptions` sind die Annahmen, mit denen geschrieben wurde (`null` bei Aufträgen ohne Klärung); sie gehören zusammen mit dem Text an den Menschen.
 
-Alle drei Antworten wachsen nur um angehängte Felder; Clients ignorieren Felder, die sie nicht kennen.
+**Eingabe `answer_order`:**
+```json
+{
+  "orderId": "<uuid, Pflicht>",
+  "answers": [ { "questionId": "length", "origin": "user|client", "optionId": "short", "freeText": "<string|null, höchstens 500 Zeichen>", "decideForMe": false } ],
+  "skip": false
+}
+```
+
+`answers` ist eine typisierte Liste (kein JSON-String). `questionId` und `origin` sind in jeder Antwort Pflicht. `questionId` nennt eine Frage (`q1`…`q3`, `length`) oder eine Annahme (`a1`, …; dann ist `freeText` die Korrektur). `origin` ist `user`, wenn der Mensch geantwortet hat, `client`, wenn der Client die Antwort aus dem Gespräch genommen hat; `memory` und andere Werte werden abgelehnt. Fragen ohne Antwort gelten als „entscheide du“. `skip = true` startet sofort mit den Annahmen von Atelier (auch solange der Auftrag noch `preparing` ist); `skip` zusammen mit nicht leerem `answers` ist ein Fehler. Unbekannte Fragen oder Optionen und Texte über 500 Zeichen lehnt der Dienst mit Klartext ab.
+
+**Ausgabe `answer_order`:**
+```json
+{ "orderId": "<uuid>", "state": "queued|working|…", "runId": "<uuid|null>", "message": "Writing has started. Call get_order_status with waitSeconds, then get_order_result when done is true." }
+```
+
+Wartet der Auftrag nicht mehr (schon gestartet, gestoppt, fertig), ändert sich nichts: Die Antwort hat den aktuellen Zustand und den Hinweis des Dienstes in `message`, ein wiederholter Aufruf schadet also nicht.
+
+Alle Antworten wachsen nur um angehängte Felder; Clients ignorieren Felder, die sie nicht kennen.
 
 #### `submit_request` (Hülle über Aufträge)
 
@@ -121,7 +154,7 @@ Ohne `crewTemplate` und `customCrew` gilt `Orders:LegacySubmitDefaultMode` (Stan
 
 #### Server-Hinweise und Werkzeugfehler
 
-Beim `initialize` sendet der Server Hinweise: den Auftrag im Wortlaut des Menschen übergeben, Dateien nur als Anhang mit Originalinhalt (nie Platzhalter), Aufträge dauern typisch 1 bis 10 Minuten, mit `get_order_status` und `waitSeconds` warten statt mit eigener Sleep-Schleife, den Text unverändert weitergeben, nichts erfinden.
+Beim `initialize` sendet der Server Hinweise: den Auftrag im Wortlaut des Menschen übergeben, Dateien nur als Anhang mit Originalinhalt (nie Platzhalter), dem Menschen die Fragen von `needs_input` mit ihren Antwortmöglichkeiten stellen (selbst nur antworten, wenn es aus dem Gespräch sicher ist, mit `origin = client`; ohne Menschen `answer_order` mit `skip=true`), Aufträge dauern typisch 1 bis 10 Minuten, mit `get_order_status` und `waitSeconds` warten statt mit eigener Sleep-Schleife, den Text unverändert samt Platzhaltern, Annahmen und offenen Prüfungen weitergeben, nichts erfinden; `submit_request` stellt nie Rückfragen.
 
 Lehnt ein Werkzeug einen Aufruf ab, antwortet es mit `isError: true` und dem Text `An error occurred invoking '<tool>': <Meldung>`; die Meldung ist englischer Klartext und sagt, wie der Aufruf zu korrigieren ist.
 
