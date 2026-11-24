@@ -6,10 +6,15 @@ namespace Geef.Atelier.Web.Notifications;
 /// <summary>DI registration for live run updates (SignalR hub notifier plus the in-process feed for components).</summary>
 public static class LiveUpdateServiceExtensions
 {
-    /// <summary>Registers SignalR, <see cref="IRunUpdateFeed"/> and the <see cref="IRunNotifier"/> that feeds both.</summary>
+    /// <summary>
+    /// Registers SignalR, <see cref="IRunUpdateFeed"/>, the <see cref="IRunNotifier"/> that feeds both, and the
+    /// per-circuit <see cref="Components.CircuitDataGate"/> that keeps live reloads and user actions from using the
+    /// circuit's database context at the same time.
+    /// </summary>
     public static IServiceCollection AddRunLiveUpdates(this IServiceCollection services)
     {
         services.AddSignalR();
+        services.AddScoped<Components.CircuitDataGate>();
         services.AddSingleton<IRunUpdateFeed, InProcessRunUpdateFeed>();
         services.AddSingleton<IRunNotifier, LiveRunNotifier>();
         return services;

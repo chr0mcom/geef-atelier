@@ -10,6 +10,7 @@
 @using Geef.Atelier.Application.Dashboard
 @using Geef.Atelier.Core.Domain.Dashboard
 @inject IRunUpdateFeed LiveUpdates
+@inject CircuitDataGate DataGate
 
 <PageTitle>Workshop — Geef.Atelier</PageTitle>
 
@@ -90,7 +91,7 @@ else
     async Task LoadSnapshotAsync()
     {
         if (string.IsNullOrEmpty(_username)) return;
-        _snapshot    = await DashboardService.GetSnapshotAsync(_username, _isAdmin, _scope);
+        _snapshot    = await DataGate.RunAsync(() => DashboardService.GetSnapshotAsync(_username, _isAdmin, _scope));
         _liveDayBook = [.._snapshot.DayBook];
     }
 
@@ -118,7 +119,7 @@ else
     {
         if (evt.Kind == DashboardEventKind.PressUpdated)
         {
-            _snapshot    = await DashboardService.GetSnapshotAsync(_username, _isAdmin, _scope);
+            _snapshot    = await DataGate.RunAsync(() => DashboardService.GetSnapshotAsync(_username, _isAdmin, _scope));
             _liveDayBook = _liveDayBook.Count > 0 ? _liveDayBook : [.._snapshot.DayBook];
         }
         else if (evt.Kind == DashboardEventKind.DayBookUpdated && evt.DayBookEntry is { } entry)

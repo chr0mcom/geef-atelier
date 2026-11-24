@@ -11,7 +11,8 @@ public interface IRunUpdateFeed
 {
     /// <summary>
     /// Subscribes to updates of run <paramref name="runId"/>. Returns null (and subscribes nothing) when
-    /// <paramref name="user"/> may not see the run.
+    /// <paramref name="user"/> may not see the run or when <paramref name="ct"/> is cancelled before the access check
+    /// has finished, so a component disposed during the check leaves no subscription behind.
     /// </summary>
     Task<IDisposable?> WatchRunAsync(ClaimsPrincipal user, Guid runId, Func<Guid, Task> onUpdated, CancellationToken ct = default);
 

@@ -15,7 +15,7 @@ public sealed class RunDetailManuscriptVisibilityTests : TestContext
 {
     private readonly Guid _runId = Guid.NewGuid();
 
-    private void RegisterServices(RunStatus status, string? finalText, string? errorMessage = null)
+    private void RegisterServices(RunStatus status, string? finalText, string? errorMessage = null, bool withSnapshot = true)
     {
         var details = new RunDetails(
             new RunEntity
@@ -27,10 +27,12 @@ public sealed class RunDetailManuscriptVisibilityTests : TestContext
                 ConfigJson = "{}",
                 FinalText = finalText,
                 ErrorMessage = errorMessage,
+                CrewSnapshot = withSnapshot ? TestCrewSnapshots.KlassikJson : null,
             },
             []);
 
         Services.AddSingleton<IRunService>(new StubRunService(details));
+        Services.AddScoped<Geef.Atelier.Web.Components.CircuitDataGate>();
         Services.AddSingleton<Geef.Atelier.Web.Notifications.IRunUpdateFeed>(sp => new Geef.Atelier.Web.Notifications.InProcessRunUpdateFeed(
             sp.GetRequiredService<IServiceScopeFactory>(),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<Geef.Atelier.Web.Notifications.InProcessRunUpdateFeed>.Instance));
@@ -84,5 +86,18 @@ public sealed class RunDetailManuscriptVisibilityTests : TestContext
 
         Assert.NotEmpty(cut.FindAll(".manuscript-wrap"));
         Assert.Empty(cut.FindAll("[data-testid='resume-run-button']"));
+    }
+
+    [Theory]
+    [InlineData(RunStatus.Failed)]
+    [InlineData(RunStatus.Aborted)]
+    public void TaskWithoutUsableSetup_OffersNoResumeButStillDelete(RunStatus status)
+    {
+        RegisterServices(status, finalText: null, "The attached files could not be prepared. Please submit the task again.", withSnapshot: false);
+
+        var cut = RenderComponent<RunDetail>(p => p.Add(c => c.RunId, _runId));
+
+        Assert.Empty(cut.FindAll("[data-testid='resume-run-button']"));
+        cut.Find("[data-testid='delete-run-button']");
     }
 }

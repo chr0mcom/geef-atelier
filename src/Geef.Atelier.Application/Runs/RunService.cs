@@ -218,6 +218,9 @@ internal sealed class RunService(
             throw new InvalidOperationException(
                 $"Run {options.ParentRunId} is in status {details.Run.Status} and cannot be resumed. Only Aborted and Failed runs are resumable.");
 
+        if (!CrewSnapshot.IsUsableForRun(details.Run.CrewSnapshot))
+            throw new RunNotResumableException(RunNotResumableException.NotPreparedMessage);
+
         string? seedDraftText = null;
         if (options.UseSeedDraft && details.Iterations.Count > 0)
         {

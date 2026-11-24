@@ -88,6 +88,8 @@ public interface IRunService
     /// Throws <see cref="InvalidOperationException"/> if the parent run does not exist,
     /// does not belong to <paramref name="requestingUsername"/> (when non-null),
     /// or is not in a resumable state (Aborted or Failed).
+    /// Throws <see cref="RunNotResumableException"/> (with a message for the user) when the parent run has no usable
+    /// crew snapshot, for example because its attachments could not be prepared; no new run is created then.
     /// </summary>
     Task<Guid> ResumeRunAsync(
         ResumeOptions options,

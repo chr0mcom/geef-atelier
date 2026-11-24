@@ -93,6 +93,7 @@ public sealed class RunServiceResumeTests
             Id = parentId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Aborted,
             BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = "alice",
             Kind = RunKind.CrewComposition,
+            CrewSnapshot = TestCrewSnapshots.KlassikJson,
         };
         var capturing = new CapturingPersistenceService();
         var repo      = new SingleDetailsRepository(parent, []);
@@ -115,6 +116,24 @@ public sealed class RunServiceResumeTests
         await svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: false, MaxIterationsOverride: null), "alice");
 
         Assert.Equal(RunKind.Standard, capturing.LastKind);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("{\"schemaVersion\":99}")]
+    public async Task ResumeRunAsync_ParentWithoutUsableSnapshot_IsRejectedAtOnceWithoutCreatingARun(string? snapshotJson)
+    {
+        var parentId  = Guid.NewGuid();
+        var parent    = MakeRunWithSnapshot(parentId, RunStatus.Failed, "alice", snapshotJson);
+        var capturing = new CapturingPersistenceService();
+        var svc       = MakeService(capturing, new SingleDetailsRepository(parent, []));
+
+        var ex = await Assert.ThrowsAsync<RunNotResumableException>(() =>
+            svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: false, MaxIterationsOverride: null), "alice"));
+
+        Assert.Equal("This task was never fully prepared and cannot be continued. Please submit it again.", ex.Message);
+        Assert.Null(capturing.LastParentRunId);
     }
 
     // ── MaxIterationsOverride ─────────────────────────────────────────────
@@ -212,6 +231,7 @@ public sealed class RunServiceResumeTests
         {
             Id = id, CreatedAt = DateTimeOffset.UtcNow, Status = status,
             BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = createdByUser,
+            CrewSnapshot = TestCrewSnapshots.KlassikJson,
         };
 
     private static RunEntity MakeRunWithSnapshot(Guid id, RunStatus status, string? createdByUser, string? snapshotJson) =>
