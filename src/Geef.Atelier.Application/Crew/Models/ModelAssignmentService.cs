@@ -22,7 +22,11 @@ internal sealed class ModelAssignmentService(IModelCatalog modelCatalog, ILogger
         new Session(modelCatalog, ct).AssignReviewersAsync(reviewers, crewDomain, executor);
 
     /// <inheritdoc />
-    public async Task<CrewSnapshot> ApplyAsync(CrewSnapshot snapshot, CancellationToken ct = default)
+    public Task<CrewSnapshot> ApplyAsync(CrewSnapshot snapshot, CancellationToken ct = default) =>
+        ApplyAsync(snapshot, new List<ModelAssignmentWarning>(), ct);
+
+    /// <inheritdoc />
+    public async Task<CrewSnapshot> ApplyAsync(CrewSnapshot snapshot, ICollection<ModelAssignmentWarning> warnings, CancellationToken ct = default)
     {
         var session = new Session(modelCatalog, ct);
         var crewDomain = snapshot.CrewDomain ?? ModelDomain.General;
@@ -31,7 +35,7 @@ internal sealed class ModelAssignmentService(IModelCatalog modelCatalog, ILogger
         if (executor.ModelSlot is { } executorSlot)
         {
             var assignment = await session.AssignSingleAsync(executorSlot, executor.ModelDomain ?? crewDomain, executor: null);
-            Report(executor.Name, assignment);
+            ReportTo(warnings, executor.Name, assignment);
             executor = executor with { Provider = assignment.Candidate.Provider, Model = assignment.Candidate.Model };
         }
 
@@ -44,7 +48,7 @@ internal sealed class ModelAssignmentService(IModelCatalog modelCatalog, ILogger
         var reviewers = snapshot.Reviewers
             .Select((r, i) =>
             {
-                Report(r.Name, reviewerAssignments[i]);
+                ReportTo(warnings, r.Name, reviewerAssignments[i]);
                 if (r.ModelSlot is null)
                     return r;
                 return r with { Provider = reviewerAssignments[i].Candidate.Provider, Model = reviewerAssignments[i].Candidate.Model };
@@ -61,7 +65,7 @@ internal sealed class ModelAssignmentService(IModelCatalog modelCatalog, ILogger
             }
 
             var assignment = await session.AssignSingleAsync(advisorSlot, advisor.ModelDomain ?? crewDomain, executorBinding);
-            Report(advisor.Name, assignment);
+            ReportTo(warnings, advisor.Name, assignment);
             advisors.Add(advisor with { Provider = assignment.Candidate.Provider, Model = assignment.Candidate.Model });
         }
 
@@ -70,13 +74,13 @@ internal sealed class ModelAssignmentService(IModelCatalog modelCatalog, ILogger
             Executor = executor,
             Reviewers = reviewers,
             Advisors = advisors,
-            GroundingProviders = await AssignGroundingAsync(session, snapshot.GroundingProviders, crewDomain),
-            Finalizers = await AssignFinalizersAsync(session, snapshot.Finalizers, crewDomain),
+            GroundingProviders = await AssignGroundingAsync(session, snapshot.GroundingProviders, crewDomain, warnings),
+            Finalizers = await AssignFinalizersAsync(session, snapshot.Finalizers, crewDomain, warnings),
         };
     }
 
     private async Task<IReadOnlyList<GroundingProviderProfile>?> AssignGroundingAsync(
-        Session session, IReadOnlyList<GroundingProviderProfile>? providers, ModelDomain crewDomain)
+        Session session, IReadOnlyList<GroundingProviderProfile>? providers, ModelDomain crewDomain, ICollection<ModelAssignmentWarning> warnings)
     {
         if (providers is not { Count: > 0 })
             return providers;
@@ -91,7 +95,7 @@ internal sealed class ModelAssignmentService(IModelCatalog modelCatalog, ILogger
             }
 
             var assignment = await session.AssignSingleAsync(slot, crewDomain, executor: null);
-            Report(profile.Name, assignment);
+            ReportTo(warnings, profile.Name, assignment);
             var settings = new Dictionary<string, string>(profile.ProviderSettings)
             {
                 [GroundingProviderProfile.KeyRefinementProvider] = assignment.Candidate.Provider,
@@ -104,7 +108,7 @@ internal sealed class ModelAssignmentService(IModelCatalog modelCatalog, ILogger
     }
 
     private async Task<IReadOnlyList<FinalizerProfile>?> AssignFinalizersAsync(
-        Session session, IReadOnlyList<FinalizerProfile>? finalizers, ModelDomain crewDomain)
+        Session session, IReadOnlyList<FinalizerProfile>? finalizers, ModelDomain crewDomain, ICollection<ModelAssignmentWarning> warnings)
     {
         if (finalizers is not { Count: > 0 })
             return finalizers;
@@ -119,7 +123,7 @@ internal sealed class ModelAssignmentService(IModelCatalog modelCatalog, ILogger
             }
 
             var assignment = await session.AssignSingleAsync(slot, crewDomain, executor: null);
-            Report(profile.Name, assignment);
+            ReportTo(warnings, profile.Name, assignment);
             var settings = new Dictionary<string, string>(profile.Settings)
             {
                 [TransformSettings.KeyProvider] = assignment.Candidate.Provider,
@@ -140,10 +144,11 @@ internal sealed class ModelAssignmentService(IModelCatalog modelCatalog, ILogger
         return hasBinding ? null : ModelSlot.TransformCondense;
     }
 
-    private void Report(string actorName, ModelAssignment assignment)
+    private void ReportTo(ICollection<ModelAssignmentWarning> warnings, string actorName, ModelAssignment assignment)
     {
         if (assignment.Warning is null)
             return;
+        warnings.Add(new ModelAssignmentWarning(actorName, assignment.Warning));
         logger.LogWarning(
             "Model matrix: actor '{Actor}' assigned {Candidate} — {Warning}",
             actorName, assignment.Candidate, assignment.Warning);

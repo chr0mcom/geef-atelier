@@ -155,14 +155,7 @@ internal sealed class PostgresEventSink(
                         .SetProperty(r => r.CompletedAt,  geefEvent.Timestamp)
                         .SetProperty(r => r.ErrorMessage, errorMsg), ct);
 
-                // For critical aborts, EvaluationRejectedEvent is not fired by the SDK —
-                // findings live in the last iteration's evaluation history.
-                if (isAbort)
-                {
-                    var lastRecord = failed.History.Records.LastOrDefault();
-                    if (lastRecord is not null)
-                        await PersistFindingsAsync(db, lastRecord.EvaluationResult.AllFindings, lastRecord.Iteration, ct);
-                }
+                await PersistMissingFindingsAsync(db, failed.History, ct);
                 break;
         }
 
@@ -224,6 +217,30 @@ internal sealed class PostgresEventSink(
             }, ct);
         }
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// The SDK publishes no evaluation event for the iteration that ends a non-converged run (stop on max
+    /// iterations, time budget or critical blocker) nor for the iteration that triggers a convergence-failure
+    /// recovery pass, so their findings only live in the history. Persists them for every iteration that has
+    /// findings in the history but none in the database; iterations already persisted through an evaluation event
+    /// are left untouched, so nothing is counted twice.
+    /// </summary>
+    private async Task PersistMissingFindingsAsync(AtelierDbContext db, Geef.Sdk.Runtime.IterationHistory history, CancellationToken ct)
+    {
+        foreach (var record in history.Records)
+        {
+            var findings = record.EvaluationResult.AllFindings;
+            if (findings.Count == 0)
+                continue;
+
+            var alreadyPersisted = await db.Findings
+                .AnyAsync(f => db.Iterations.Any(i => i.Id == f.IterationId
+                                                     && i.RunId == atelierRunId
+                                                     && i.IterationNumber == record.Iteration), ct);
+            if (!alreadyPersisted)
+                await PersistFindingsAsync(db, findings, record.Iteration, ct);
+        }
     }
 
     private async Task PersistRawEventAsync(AtelierDbContext db, IGeefEvent geefEvent, CancellationToken ct)

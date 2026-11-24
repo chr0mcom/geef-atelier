@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text;
+using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Infrastructure.Llm;
+using Geef.Atelier.Tests.Pipeline;
 using Microsoft.Extensions.Logging;
 
 namespace Geef.Atelier.Tests.Llm;
@@ -50,6 +52,46 @@ public sealed class OpenAiCompatibleClientFailoverTests
         await client.CompleteAsync(new LlmRequest { Model = "gpt-6.2-astra", SystemPrompt = "s", UserPrompt = "u", MaxTokens = 10 }, CancellationToken.None);
 
         Assert.Empty(logger.Entries);
+    }
+
+    [Fact]
+    public async Task RecordsTheFailoverOnceAsAWarningOnTheRunOfTheCurrentFlow()
+    {
+        var sink = new RecordingWarningSink();
+        var runId = Guid.NewGuid();
+        var client = new OpenAiCompatibleClient(Http("codex->claude"), "http://cli-proxy:8090/v1/codex", "k");
+        var request = new LlmRequest { Model = "gpt-6.2-astra", SystemPrompt = "s", UserPrompt = "u", MaxTokens = 10 };
+
+        using (RunWarningScope.Begin(runId, sink))
+        {
+            await Task.WhenAll(
+                client.CompleteAsync(request, CancellationToken.None),
+                Task.Run(() => client.CompleteAsync(request, CancellationToken.None)));
+        }
+        await client.CompleteAsync(request, CancellationToken.None);
+
+        var warning = Assert.Single(sink.Warnings);
+        Assert.Equal((runId, RunWarningSources.Llm, RunWarningCodes.LlmFailover), (warning.RunId, warning.Source, warning.Code));
+        Assert.Contains("codex->claude", warning.Message);
+        Assert.Contains("gpt-6.2-astra", warning.Message);
+        Assert.Null(RunWarningScope.Current);
+    }
+
+    [Fact]
+    public async Task ScopesOfParallelRunsDoNotMix()
+    {
+        var sink = new RecordingWarningSink();
+        var client = new OpenAiCompatibleClient(Http("claude->codex"), "http://cli-proxy:8090/v1/claude", "k");
+        var runs = Enumerable.Range(0, 4).Select(_ => Guid.NewGuid()).ToList();
+
+        await Task.WhenAll(runs.Select(runId => Task.Run(async () =>
+        {
+            using var _ = RunWarningScope.Begin(runId, sink);
+            await client.CompleteAsync(new LlmRequest { Model = $"m-{runId}", SystemPrompt = "s", UserPrompt = "u", MaxTokens = 10 }, CancellationToken.None);
+        })));
+
+        Assert.Equal(runs.Order().ToList(), sink.Warnings.Select(w => w.RunId).Order().ToList());
+        Assert.All(sink.Warnings, w => Assert.Contains($"m-{w.RunId}", w.Message));
     }
 
     private static HttpClient Http(string? failover) => new(new Handler(failover));

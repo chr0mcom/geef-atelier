@@ -9,7 +9,7 @@ namespace Geef.Atelier.Mcp.Tools;
 [McpServerToolType]
 public static class GetRunResultTool
 {
-    [McpServerTool, Description("Gets the final result text of a completed run.")]
+    [McpServerTool, Description("Gets the final result text of a run, with warnings about anything the run had to skip or replace and the outcome (Converged, DeliveredWithOpenPoints, Failed, Aborted).")]
     public static async Task<RunResultDto?> GetRunResult(
         IRunService runService,
         ICurrentUserService currentUser,
@@ -19,10 +19,14 @@ public static class GetRunResultTool
         if (!Guid.TryParse(runId, out var guid)) return null;
         var requestingUsername = currentUser.IsAdmin ? null : currentUser.Username;
         var run = await runService.GetRunAsync(guid, requestingUsername, cancellationToken);
-        return run is null ? null : new RunResultDto(
+        if (run is null) return null;
+        var warnings = await runService.ListRunWarningsAsync(guid, requestingUsername, cancellationToken);
+        return new RunResultDto(
             run.Id.ToString(),
             run.Status.ToString(),
             run.FinalText,
-            run.ErrorMessage);
+            run.ErrorMessage,
+            warnings.ToDtos(),
+            run.Outcome?.ToString());
     }
 }

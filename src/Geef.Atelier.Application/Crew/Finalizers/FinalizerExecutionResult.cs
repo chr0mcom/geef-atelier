@@ -21,6 +21,10 @@ namespace Geef.Atelier.Application.Crew.Finalizers;
 /// <param name="InputTokens">Input tokens consumed; 0 for non-LLM finalizers.</param>
 /// <param name="OutputTokens">Output tokens consumed; 0 for non-LLM finalizers.</param>
 /// <param name="ProviderName">Provider that served this finalizer step; null for non-LLM finalizers.</param>
+/// <param name="SkipReason">
+/// Set when the step did nothing although it was expected to act (for example a transform without a system
+/// prompt). The orchestrator records it as a run warning. Null for steps that ran or skipped on purpose.
+/// </param>
 public sealed record FinalizerExecutionResult(
     string? UpdatedText,
     RunArtifact? Artifact,
@@ -29,4 +33,5 @@ public sealed record FinalizerExecutionResult(
     string ModelName = "",
     int InputTokens = 0,
     int OutputTokens = 0,
-    string? ProviderName = null);
+    string? ProviderName = null,
+    string? SkipReason = null);

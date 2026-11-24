@@ -56,6 +56,7 @@ internal sealed class RunPersistenceService(AtelierDbContext db) : IRunPersisten
             .Where(r => r.Id == runId && !TerminalStatuses.Contains(r.Status))
             .ExecuteUpdateAsync(s => s
                 .SetProperty(r => r.Status,       RunStatus.Failed)
+                .SetProperty(r => r.Outcome,      RunOutcome.Failed)
                 .SetProperty(r => r.ErrorMessage, errorMessage)
                 .SetProperty(r => r.CompletedAt,  DateTimeOffset.UtcNow),
                 cancellationToken);

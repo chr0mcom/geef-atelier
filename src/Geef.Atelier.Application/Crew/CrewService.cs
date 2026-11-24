@@ -430,7 +430,12 @@ internal sealed class CrewService(
 
     public async Task<CrewSnapshot> ResolveSnapshotAsync(
         string? crewTemplateName, CrewSpec? customCrew, CancellationToken cancellationToken = default)
+        => (await ResolveSnapshotWithWarningsAsync(crewTemplateName, customCrew, cancellationToken)).Snapshot;
+
+    public async Task<ResolvedCrewSnapshot> ResolveSnapshotWithWarningsAsync(
+        string? crewTemplateName, CrewSpec? customCrew, CancellationToken cancellationToken = default)
     {
+        var warnings = new List<ModelAssignmentWarning>();
         if (customCrew is not null)
         {
             var customSnapshot = await CrewSnapshotBuilder.BuildAsync(
@@ -442,7 +447,7 @@ internal sealed class CrewService(
                 (name, ct) => GetFinalizerProfileAsync(name, ct),
                 cancellationToken);
 
-            return await ApplyPacksAsync(customSnapshot, customCrew.ActorPackBindings, cancellationToken);
+            return new(await ApplyPacksAsync(customSnapshot, customCrew.ActorPackBindings, warnings, cancellationToken), warnings);
         }
 
         var templateName = crewTemplateName ?? SystemCrew.KlassikTemplateName;
@@ -458,12 +463,13 @@ internal sealed class CrewService(
             (name, ct) => GetFinalizerProfileAsync(name, ct),
             cancellationToken);
 
-        return await ApplyPacksAsync(snapshot, template.ActorPackBindings, cancellationToken);
+        return new(await ApplyPacksAsync(snapshot, template.ActorPackBindings, warnings, cancellationToken), warnings);
     }
 
     private async Task<CrewSnapshot> ApplyPacksAsync(
         CrewSnapshot snapshot,
         IReadOnlyDictionary<string, IReadOnlyList<string>> bindings,
+        ICollection<ModelAssignmentWarning> warnings,
         CancellationToken cancellationToken)
     {
         var composed = await CrewSnapshotBuilder.ApplyPacksAsync(
@@ -477,7 +483,7 @@ internal sealed class CrewService(
             catch (Exception ex) { logger.LogWarning(ex, "Failed to update LastUsedAt for {Count} packs.", usedNames.Count); }
         }
 
-        var assigned = await modelAssignment.ApplyAsync(composed, cancellationToken);
+        var assigned = await modelAssignment.ApplyAsync(composed, warnings, cancellationToken);
         return await CrewSnapshotModelResolver.ResolveAsync(assigned, modelCatalog, cancellationToken);
     }
 }

@@ -1,0 +1,35 @@
+.run-warnings {
+    background: color-mix(in oklch, var(--sv-major) 12%, transparent);
+    border: 1px solid color-mix(in oklch, var(--sv-major) 45%, transparent);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin: 0 0 20px;
+    max-width: 760px;
+}
+
+.run-warnings-title {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sv-major);
+    margin: 0 0 6px;
+}
+
+.run-warnings-intro {
+    font-size: 13px;
+    color: var(--ink);
+    margin: 0 0 8px;
+}
+
+.run-warnings-list {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 13px;
+    color: var(--ink);
+}
+
+.run-warning + .run-warning {
+    margin-top: 4px;
+}

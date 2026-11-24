@@ -1,0 +1,21 @@
+@using Geef.Atelier.Core.Domain.Warnings
+
+@if (Warnings is { Count: > 0 })
+{
+    <section class="run-warnings" role="status" aria-labelledby="run-warnings-title" data-testid="run-warnings">
+        <h2 id="run-warnings-title" class="run-warnings-title">Warnings</h2>
+        <p class="run-warnings-intro">
+            The result was finished, but not everything went as planned. Please keep this in mind when you use it.
+        </p>
+        <ul class="run-warnings-list">
+            @foreach (var warning in Warnings)
+            {
+                <li class="run-warning" data-testid="run-warning" data-code="@warning.Code">@warning.Message</li>
+            }
+        </ul>
+    </section>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<RunWarningEntity>? Warnings { get; set; }
+}

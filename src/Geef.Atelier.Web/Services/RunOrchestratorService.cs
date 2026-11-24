@@ -9,6 +9,7 @@ using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
+using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
@@ -37,7 +38,8 @@ internal sealed class RunOrchestratorService(
     IGroundingProviderFactory?          groundingProviderFactory = null,
     IPricingCatalog?                    pricingCatalog = null,
     IOptions<CostTrackingOptions>?      costTrackingOptions = null,
-    IFinalizerExecutorFactory?          finalizerExecutorFactory = null) : BackgroundService
+    IFinalizerExecutorFactory?          finalizerExecutorFactory = null,
+    IRunWarningSink?                    warningSink = null) : BackgroundService
 {
     private readonly OrchestratorOptions _opts = options.Value;
     private readonly SemaphoreSlim _slots = new(options.Value.MaxConcurrentRuns, options.Value.MaxConcurrentRuns);
@@ -47,9 +49,10 @@ internal sealed class RunOrchestratorService(
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var serviceStartedAt = DateTimeOffset.UtcNow;
         try
         {
-            await RecoverCrashedRunsAsync(stoppingToken);
+            await RecoverCrashedRunsAsync(serviceStartedAt, stoppingToken);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
@@ -93,8 +96,10 @@ internal sealed class RunOrchestratorService(
 
     /// <summary>
     /// On startup, marks any runs left in Running state as Failed — they were interrupted by a crash or restart.
+    /// Pending runs without a saved snapshot that were created before this start were still being prepared when
+    /// the previous instance stopped; they can never become ready and are failed as well.
     /// </summary>
-    private async Task RecoverCrashedRunsAsync(CancellationToken stoppingToken)
+    private async Task RecoverCrashedRunsAsync(DateTimeOffset serviceStartedAt, CancellationToken stoppingToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
@@ -104,16 +109,33 @@ internal sealed class RunOrchestratorService(
             .ExecuteUpdateAsync(s => s
                 .SetProperty(r => r.Status,       RunStatus.Failed)
                 .SetProperty(r => r.ErrorMessage, "Service restarted")
+                .SetProperty(r => r.Outcome,      r => r.Outcome ?? RunOutcome.Failed)
                 .SetProperty(r => r.CompletedAt,  DateTimeOffset.UtcNow),
                 stoppingToken);
 
         if (affected > 0)
             logger.LogWarning("Crash recovery: marked {Count} stale Running runs as Failed.", affected);
+
+        var unprepared = await FailUnpreparedRunsAsync(db, serviceStartedAt, "Service restarted while the task was being prepared", stoppingToken);
+        if (unprepared > 0)
+            logger.LogWarning("Crash recovery: marked {Count} Pending runs without snapshot as Failed.", unprepared);
     }
+
+    private static Task<int> FailUnpreparedRunsAsync(AtelierDbContext db, DateTimeOffset createdBefore, string message, CancellationToken ct) =>
+        db.Runs
+            .Where(r => r.Status == RunStatus.Pending && r.CrewSnapshot == null && r.CreatedAt < createdBefore)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(r => r.Status,       RunStatus.Failed)
+                .SetProperty(r => r.ErrorMessage, message)
+                .SetProperty(r => r.Outcome,      RunOutcome.Failed)
+                .SetProperty(r => r.CompletedAt,  DateTimeOffset.UtcNow),
+                ct);
 
     /// <summary>
     /// Loads at most <c>_slots.CurrentCount</c> Pending runs from the database and dispatches each
     /// after an atomic claim to prevent double-processing in multi-instance deployments.
+    /// A Pending run without a snapshot is still being prepared (attachments are uploaded before the snapshot is
+    /// written) and is left alone until it is ready or exceeds <see cref="OrchestratorOptions.PreparationTimeout"/>.
     /// </summary>
     private async Task PollAndDispatchAsync(CancellationToken stoppingToken)
     {
@@ -124,9 +146,14 @@ internal sealed class RunOrchestratorService(
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
 
+        var timedOut = await FailUnpreparedRunsAsync(
+            db, DateTimeOffset.UtcNow - _opts.PreparationTimeout, "The task could not be prepared in time. Please submit it again.", stoppingToken);
+        if (timedOut > 0)
+            logger.LogWarning("Marked {Count} Pending runs without snapshot as Failed after the preparation timeout.", timedOut);
+
         var runs = await db.Runs
             .AsNoTracking()
-            .Where(r => r.Status == RunStatus.Pending)
+            .Where(r => r.Status == RunStatus.Pending && r.CrewSnapshot != null)
             .OrderBy(r => r.CreatedAt)
             .Take(slotsAvailable)
             .ToListAsync(stoppingToken);
@@ -135,7 +162,7 @@ internal sealed class RunOrchestratorService(
         {
             // Atomic claim: transitions Pending → Running; affectedRows=0 means another instance already picked it up.
             var claimed = await db.Runs
-                .Where(r => r.Id == run.Id && r.Status == RunStatus.Pending)
+                .Where(r => r.Id == run.Id && r.Status == RunStatus.Pending && r.CrewSnapshot != null)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(r => r.Status, RunStatus.Running),
                     stoppingToken);
@@ -160,12 +187,13 @@ internal sealed class RunOrchestratorService(
 
         // Watcher polls DB flag; signals cts if CancellationRequested=true.
         var watcherTask = Task.Run(() => WatchCancellationAsync(run.Id, cts), CancellationToken.None);
+        using var warningScope = warningSink is null ? null : RunWarningScope.Begin(run.Id, warningSink);
 
         try
         {
             var sinkLogger = loggerFactory.CreateLogger($"PostgresEventSink[{run.Id}]");
             var sink       = new PostgresEventSink(run.Id, scopeFactory, runNotifier, sinkLogger);
-            var snapshot   = ResolveSnapshot(run);
+            var snapshot   = CrewSnapshot.DeserializeForRun(run.CrewSnapshot);
 
             var costTrackingEnabled = costTrackingOptions?.Value.Enabled ?? false;
             var accumulator = costTrackingEnabled ? new RunCostAccumulator() : null;
@@ -200,7 +228,8 @@ internal sealed class RunOrchestratorService(
                     customExecutionStep: composerExecutor,
                     specialReviewerResolver: profile =>
                         profile.Name == "crew-spec-validator" ? validatorReviewer : null,
-                    toolBackedGroundingProvider: toolBackedGroundingProvider);
+                    toolBackedGroundingProvider: toolBackedGroundingProvider,
+                    warningSink: warningSink);
             }
             else
             {
@@ -216,7 +245,8 @@ internal sealed class RunOrchestratorService(
                         costAccumulator: accumulator,
                         groundingRefiner: groundingRefiner,
                         groundingConsultationRepository: groundingConsultationRepo,
-                        toolBackedGroundingProvider: toolBackedGroundingProvider)
+                        toolBackedGroundingProvider: toolBackedGroundingProvider,
+                        warningSink: warningSink)
                     : AtelierPipelineFactory.Build(
                         snapshot, llmClientResolver, convergenceOptions,
                         consultationRepository: consultations,
@@ -228,10 +258,15 @@ internal sealed class RunOrchestratorService(
                         costAccumulator: accumulator,
                         groundingRefiner: groundingRefiner,
                         groundingConsultationRepository: groundingConsultationRepo,
-                        toolBackedGroundingProvider: toolBackedGroundingProvider);
+                        toolBackedGroundingProvider: toolBackedGroundingProvider,
+                        warningSink: warningSink);
             }
 
             var result = await runner.RunAsync(run.BriefingText, cts.Token);
+
+            await ReportFailedReviewersAsync(run.Id, result.History);
+            var delivered = result.ToDeliveredOutcome();
+            await SetOutcomeAsync(run.Id, delivered.Outcome, delivered.Iteration);
 
             if (result.Success)
             {
@@ -260,6 +295,9 @@ internal sealed class RunOrchestratorService(
 
                 if (shouldRunFinalizers)
                     await ExecuteFinalizationAsync(run.Id, snapshot, cts.Token);
+                else if (snapshot.Finalizers?.Count > 0)
+                    await ReportWarningAsync(run.Id, RunWarningSources.Finalizer, RunWarningCodes.FinalizersNotRun,
+                        "The finishing steps were not run because the text did not pass all checks.");
 
                 try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
             }
@@ -274,6 +312,12 @@ internal sealed class RunOrchestratorService(
         {
             // User-initiated cancellation: sink may have written Failed; override to Aborted.
             await OverrideToAbortedAsync(run.Id, "Cancelled by user");
+            try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
+        }
+        catch (InvalidCrewSnapshotException ex)
+        {
+            logger.LogError(ex, "Run {RunId} has an unusable crew snapshot; failing it without a fallback crew.", run.Id);
+            await MarkRunFailedAsync(run.Id, ex.Message);
             try { await runNotifier.NotifyRunUpdatedAsync(run.Id); } catch { /* best-effort */ }
         }
         catch (Exception ex)
@@ -340,23 +384,6 @@ internal sealed class RunOrchestratorService(
         }
     }
 
-    private static CrewSnapshot ResolveSnapshot(RunEntity run)
-    {
-        var deserialized = CrewSnapshot.Deserialize(run.CrewSnapshot);
-        if (deserialized is not null)
-            return deserialized;
-
-        // Defensive fallback: pre-PS-5 runs have no snapshot; reconstruct from code constants.
-        return new CrewSnapshot(
-            SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
-            TemplateName: SystemCrew.KlassikTemplateName,
-            Executor: SystemCrew.DefaultExecutorProfile,
-            Reviewers: [SystemCrew.BriefingFidelityProfile, SystemCrew.ClarityProfile],
-            EvaluationStrategy: EvaluationStrategy.Parallel,
-            ConvergenceOverride: null,
-            Advisors: Array.Empty<AdvisorProfile>());
-    }
-
     /// <summary>
     /// Marks a run that is still in Running state as Failed with the given error message.
     /// Called when the Geef pipeline throws an unhandled exception that the SDK did not convert
@@ -381,6 +408,8 @@ internal sealed class RunOrchestratorService(
         {
             logger.LogError(ex, "Failed to mark run {RunId} as Failed.", runId);
         }
+
+        await SetOutcomeAsync(runId, RunOutcome.Failed, null);
     }
 
     /// <summary>
@@ -439,6 +468,49 @@ internal sealed class RunOrchestratorService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to mark run {RunId} as Aborted during shutdown.", runId);
+        }
+
+        await SetOutcomeAsync(runId, RunOutcome.Aborted, null);
+    }
+
+    /// <summary>
+    /// Records what the run delivered. The first outcome wins: a later failure (for example a finalizer error or a
+    /// cancellation after the text was delivered) does not overwrite it. Never throws.
+    /// </summary>
+    private async Task SetOutcomeAsync(Guid runId, RunOutcome outcome, int? deliveredIteration)
+    {
+        try
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
+
+            await db.Runs
+                .Where(r => r.Id == runId && r.Outcome == null)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.Outcome,            outcome)
+                    .SetProperty(r => r.DeliveredIteration, deliveredIteration),
+                    CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to record outcome {Outcome} for run {RunId}.", outcome, runId);
+        }
+    }
+
+    private Task ReportWarningAsync(Guid runId, string source, string code, string message, int? iteration = null) =>
+        warningSink?.ReportAsync(runId, source, code, message, iteration, CancellationToken.None) ?? Task.CompletedTask;
+
+    /// <summary>Records one warning per reviewer that could not complete its check in an iteration.</summary>
+    private async Task ReportFailedReviewersAsync(Guid runId, Geef.Sdk.Runtime.IterationHistory history)
+    {
+        foreach (var record in history.Records)
+        {
+            foreach (var review in record.EvaluationResult.FailedReviewers)
+            {
+                await ReportWarningAsync(runId, RunWarningSources.Review, RunWarningCodes.ReviewerFailed,
+                    $"A check could not be completed in round {record.Iteration} and was left out: {review.ReviewerName}.",
+                    record.Iteration);
+            }
         }
     }
 
@@ -557,9 +629,14 @@ internal sealed class RunOrchestratorService(
         CrewSnapshot snapshot,
         CancellationToken ct)
     {
-        if (finalizerExecutorFactory is null) return;
         var finalizers = snapshot.Finalizers;
         if (finalizers is null || finalizers.Count == 0) return;
+        if (finalizerExecutorFactory is null)
+        {
+            await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizersNotRun,
+                "The finishing steps were not run because they are not available on this server.");
+            return;
+        }
 
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
@@ -595,6 +672,8 @@ internal sealed class RunOrchestratorService(
                 if (result.Artifact is not null)
                     await artifactRepo.CreateAsync(result.Artifact, ct);
 
+                await ReportFinalizerResultAsync(runId, profile, result);
+
                 if (result.InputTokens > 0)
                 {
                     costEntities.Add(new FinalizationActorCost
@@ -616,6 +695,8 @@ internal sealed class RunOrchestratorService(
                 logger.LogError(ex, "Finalizer {Profile} threw unexpectedly for run {RunId}.",
                     profile.Name, runId);
                 errorMessages.Add($"{profile.Name}: {ex.Message}");
+                await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerFailed,
+                    $"A finishing step failed: {profile.DisplayNameOrName()} (reason: {ex.Message.ToWarningDetail()}).");
 
                 // Persist a Status artifact so the failure is visible in the Run detail UI.
                 var errorArtifact = new RunArtifact
@@ -658,6 +739,28 @@ internal sealed class RunOrchestratorService(
                 .SetProperty(r => r.FinalizerCostEur,      totalFinalizerCost)
                 .SetProperty(r => r.FinalizerErrorMessage,  errorMsg),
                 ct);
+    }
+
+    /// <summary>
+    /// Turns silent finalizer outcomes into run warnings: a step that reported a skip reason, and status
+    /// artifacts marked as error or warning.
+    /// </summary>
+    private async Task ReportFinalizerResultAsync(Guid runId, FinalizerProfile profile, FinalizerExecutionResult result)
+    {
+        var name = profile.DisplayNameOrName();
+        if (result.SkipReason is { } skip)
+            await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerSkipped,
+                $"A finishing step was skipped: {name} (reason: {skip.ToWarningDetail()}).");
+
+        if (result.Artifact is { ArtifactType: ArtifactType.Status } artifact)
+        {
+            if (artifact.StorageUri == "error")
+                await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerFailed,
+                    $"A finishing step failed: {name} (reason: {artifact.StatusMessage.ToWarningDetail()}).");
+            else if (artifact.StorageUri == "warning")
+                await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerSkipped,
+                    $"A finishing step had no effect: {name} (reason: {artifact.StatusMessage.ToWarningDetail()}).");
+        }
     }
 
     /// <summary>
