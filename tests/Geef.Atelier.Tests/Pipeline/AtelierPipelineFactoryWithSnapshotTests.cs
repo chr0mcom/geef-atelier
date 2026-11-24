@@ -33,7 +33,7 @@ public sealed class AtelierPipelineFactoryWithSnapshotTests
         var snapshot = KlassikSnapshot(strategy);
 
         var ex = Record.Exception(() =>
-            AtelierPipelineFactory.Build(snapshot, resolver, Options.Create(new ConvergenceOptions())));
+            AtelierPipelineFactory.Build(snapshot, resolver, Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings()));
 
         Assert.Null(ex);
     }
@@ -52,7 +52,7 @@ public sealed class AtelierPipelineFactoryWithSnapshotTests
             Advisors: Array.Empty<AdvisorProfile>());
 
         var ex = Record.Exception(() =>
-            AtelierPipelineFactory.Build(snapshot, resolver, Options.Create(new ConvergenceOptions())));
+            AtelierPipelineFactory.Build(snapshot, resolver, Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings()));
 
         Assert.Null(ex);
     }

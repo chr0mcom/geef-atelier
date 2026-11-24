@@ -4,6 +4,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Geef.Atelier.Infrastructure.Persistence;
 
+/// <summary>
+/// Stores run warnings. Warning messages are fixed sentences written for users, so only unambiguous key forms are
+/// removed (<see cref="SecretRedactionExtensions.RedactKnownSecrets"/>); the wide opaque-token rule would cut long
+/// display names out of the sentence.
+/// </summary>
 internal sealed class RunWarningSink(IServiceScopeFactory scopeFactory, ILogger<RunWarningSink> logger) : IRunWarningSink
 {
     public async Task ReportAsync(Guid runId, string source, string code, string message, int? iteration = null, CancellationToken ct = default)
@@ -15,7 +20,7 @@ internal sealed class RunWarningSink(IServiceScopeFactory scopeFactory, ILogger<
             Iteration = iteration,
             Source = source.Clip(RunWarningLimits.SourceLength),
             Code = code.Clip(RunWarningLimits.CodeLength),
-            Message = message.RedactSecrets().Clip(RunWarningLimits.MessageLength),
+            Message = message.RedactKnownSecrets().Clip(RunWarningLimits.MessageLength),
             CreatedAt = DateTimeOffset.UtcNow,
         };
 

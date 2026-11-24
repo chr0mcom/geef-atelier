@@ -1,6 +1,7 @@
 using Geef.Atelier.Application.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Infrastructure.Finalizers.FormatConverters;
+using Geef.Atelier.Core.Domain.Warnings;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -36,8 +37,8 @@ internal sealed class MetadataEnrichFinalizerExecutor(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "MetadataEnrich failed for profile {Profile}", profile.Name);
-            errorMessage = $"Enrich failed: {ex.Message}";
+            logger.LogError("MetadataEnrich failed for profile {Profile}: {Error}", profile.Name, ex.ToRedactedLogText());
+            errorMessage = "The details could not be added to the text.";
         }
 
         RunArtifact? artifact = null;

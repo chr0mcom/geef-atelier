@@ -30,7 +30,9 @@ internal static class DeliveredOutcomeExtensions
 
     /// <summary>
     /// Mirrors the SDK's best-effort selection (<c>GeefPipelineRunner.SelectBestIteration</c>): fewest rejected
-    /// reviews, most recent iteration as tie-breaker. Must follow the SDK if that rule ever changes.
+    /// reviews, most recent iteration as tie-breaker. Must follow the SDK if that rule ever changes. Profile-based
+    /// reviewers report blocking findings as <see cref="ReviewDecision.ApprovedWithWarnings"/>, never as
+    /// <see cref="ReviewDecision.Rejected"/>, so with them both the SDK and this method pick the most recent iteration.
     /// </summary>
     public static int? BestEffortIteration(this IterationHistory history) =>
         history.Records

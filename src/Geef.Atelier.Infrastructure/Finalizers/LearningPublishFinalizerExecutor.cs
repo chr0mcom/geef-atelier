@@ -6,6 +6,7 @@ using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Learning;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
+using Geef.Atelier.Core.Domain.Warnings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -108,10 +109,14 @@ internal sealed class LearningPublishFinalizerExecutor(
 
             return Ok(profile.Name);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
-            logger.LogError(ex, "LearningPublish: unexpected error for run {RunId}", context.RunId);
-            return Error(context.RunId, profile.Name, $"Unexpected error: {ex.Message}");
+            logger.LogError("LearningPublish: unexpected error for run {RunId}: {Error}", context.RunId, ex.ToRedactedLogText());
+            return Error(context.RunId, profile.Name, "The step stopped because of an unexpected error.");
         }
     }
 

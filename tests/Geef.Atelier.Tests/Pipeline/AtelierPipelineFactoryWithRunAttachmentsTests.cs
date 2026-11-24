@@ -162,7 +162,7 @@ public sealed class AtelierPipelineFactoryWithRunAttachmentsTests
         var runner = AtelierPipelineFactory.Build(
             snapshot,
             resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             runId: runId,
             groundingProviderFactory: factory);
 
@@ -189,7 +189,7 @@ public sealed class AtelierPipelineFactoryWithRunAttachmentsTests
         var runner = AtelierPipelineFactory.Build(
             snapshot,
             resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             runId: runId,
             groundingProviderFactory: factory);
 
@@ -218,7 +218,7 @@ public sealed class AtelierPipelineFactoryWithRunAttachmentsTests
         var runner = AtelierPipelineFactory.Build(
             snapshot,
             resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             runId: runId,
             groundingProviderFactory: factory);
 
@@ -247,7 +247,7 @@ public sealed class AtelierPipelineFactoryWithRunAttachmentsTests
         var runner = AtelierPipelineFactory.Build(
             snapshot,
             resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             runId: runId,
             groundingProviderFactory: factory);
 
@@ -274,6 +274,7 @@ public sealed class AtelierPipelineFactoryWithRunAttachmentsTests
         return new VectorStoreGroundingProvider(
             new CountingEmbeddingProviderStub(),
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
+            new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             NullLogger<VectorStoreGroundingProvider>.Instance);
     }
 

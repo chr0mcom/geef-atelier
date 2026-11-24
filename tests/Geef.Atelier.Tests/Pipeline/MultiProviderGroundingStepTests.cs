@@ -21,7 +21,7 @@ public sealed class MultiProviderGroundingStepTests
         var inner = new PassThroughGroundingStep("inner-context");
         var step  = new MultiProviderGroundingStep(
             inner, [], new StubGroundingProviderFactory([]), Guid.NewGuid(),
-            NullLogger<MultiProviderGroundingStep>.Instance);
+            NullLogger<MultiProviderGroundingStep>.Instance, new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings());
 
         var result = await step.RunAsync("briefing", CancellationToken.None);
 
@@ -37,7 +37,7 @@ public sealed class MultiProviderGroundingStepTests
         var inner = new PassThroughGroundingStep("ignored");
         var step  = new MultiProviderGroundingStep(
             inner, [profile], new StubGroundingProviderFactory([stubProvider]), Guid.NewGuid(),
-            NullLogger<MultiProviderGroundingStep>.Instance);
+            NullLogger<MultiProviderGroundingStep>.Instance, new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings());
 
         var result = await step.RunAsync("briefing", CancellationToken.None);
 
@@ -61,7 +61,7 @@ public sealed class MultiProviderGroundingStepTests
         var inner = new PassThroughGroundingStep("inner");
         var step  = new MultiProviderGroundingStep(
             inner, profiles, new StubGroundingProviderFactory(providers), Guid.NewGuid(),
-            NullLogger<MultiProviderGroundingStep>.Instance);
+            NullLogger<MultiProviderGroundingStep>.Instance, new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings());
 
         var result = await step.RunAsync("briefing", CancellationToken.None);
 
@@ -83,7 +83,7 @@ public sealed class MultiProviderGroundingStepTests
         var inner = new PassThroughGroundingStep("inner");
         var step  = new MultiProviderGroundingStep(
             inner, profiles, new StubGroundingProviderFactory(providers), Guid.NewGuid(),
-            NullLogger<MultiProviderGroundingStep>.Instance);
+            NullLogger<MultiProviderGroundingStep>.Instance, new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings());
 
         await step.RunAsync("briefing", CancellationToken.None);
 

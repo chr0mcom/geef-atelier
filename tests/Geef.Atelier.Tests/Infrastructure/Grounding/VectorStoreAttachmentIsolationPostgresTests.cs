@@ -1,12 +1,15 @@
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Crew.Knowledge;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
+using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew.Knowledge;
+using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge;
+using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Tests.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -16,8 +19,11 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Geef.Atelier.Tests.Infrastructure.Grounding;
 
 /// <summary>
-/// Q1 (Etappe 0 review): a vector-store profile without a scope or with an unknown scope must never return the
-/// attachment of another user's run. Two users, real Postgres with pgvector, the real provider and repository.
+/// Q1 and B1 (Etappe 0 reviews): whatever the <c>Scope</c> setting of a vector-store profile says, the attachments of
+/// another user's run are never returned. <c>both</c> returns the shared documents plus the attachments of the run and
+/// its resumed-from parent; a missing setting and <c>global</c> return the shared documents only; an unknown value falls
+/// back to the shared documents and records a run warning. Two users, real Postgres with pgvector, the real provider,
+/// lineage and repository.
 /// </summary>
 [Collection("Postgres")]
 public sealed class VectorStoreAttachmentIsolationPostgresTests(PostgresFixture fixture)
@@ -25,40 +31,100 @@ public sealed class VectorStoreAttachmentIsolationPostgresTests(PostgresFixture 
     private const int Dimensions = 1536;
     private const string BobSecret = "BOB-PRIVATE-ATTACHMENT";
     private const string SharedText = "SHARED-KNOWLEDGE";
+    private const string AliceOwn = "ALICE-OWN-ATTACHMENT";
+    private const string AliceParent = "ALICE-PARENT-ATTACHMENT";
+
+    private readonly InMemoryRunWarnings _warnings = new();
+    private readonly string _tag = Guid.NewGuid().ToString("N");
 
     [Theory]
     [InlineData(null)]
     [InlineData("")]
-    [InlineData("everything")]
-    [InlineData("RUN_LOCAL")]
-    public async Task ProfileWithoutOrWithUnknownScopeNeverReturnsAnotherUsersAttachment(string? scope)
+    [InlineData("   ")]
+    [InlineData("global")]
+    [InlineData(" Global ")]
+    public async Task MissingOrGlobalScopeReturnsSharedDocumentsOnlyWithoutWarning(string? scope)
     {
         var (aliceRun, _) = await SeedTwoUsersAsync();
-        var provider = BuildProvider();
-        var settings = new Dictionary<string, string> { ["TopK"] = "50" };
-        if (scope is not null)
-            settings["Scope"] = scope;
 
-        var result = await provider.EnrichAsync("anything", Profile(settings), aliceRun, CancellationToken.None);
+        var result = await EnrichAsync(aliceRun, scope);
 
-        Assert.DoesNotContain(BobSecret, result.EnrichedContext);
-        Assert.All(result.Citations, c => Assert.DoesNotContain(BobSecret, c.Snippet));
         Assert.Contains(SharedText, result.EnrichedContext);
+        AssertNoAttachments(result, AliceOwn, AliceParent, BobSecret);
+        Assert.Empty(_warnings.All);
+    }
+
+    [Theory]
+    [InlineData("run-local")]
+    [InlineData("RUN-LOCAL")]
+    public async Task RunLocalScopeReturnsOnlyTheOwnAndParentAttachments(string scope)
+    {
+        var (aliceRun, _) = await SeedTwoUsersAsync();
+
+        var result = await EnrichAsync(aliceRun, scope);
+
+        Assert.Contains(AliceOwn, result.EnrichedContext);
+        Assert.Contains(AliceParent, result.EnrichedContext);
+        AssertNoAttachments(result, BobSecret, SharedText);
+        Assert.Empty(_warnings.All);
+    }
+
+    [Theory]
+    [InlineData("both")]
+    [InlineData(" Both ")]
+    public async Task BothScopeReturnsSharedDocumentsPlusOwnAndParentAttachmentsButNeverAnotherUsers(string scope)
+    {
+        var (aliceRun, bobRun) = await SeedTwoUsersAsync();
+
+        var result = await EnrichAsync(aliceRun, scope);
+
+        Assert.Contains(SharedText, result.EnrichedContext);
+        Assert.Contains(AliceOwn, result.EnrichedContext);
+        Assert.Contains(AliceParent, result.EnrichedContext);
+        AssertNoAttachments(result, BobSecret);
+        Assert.Empty(_warnings.All);
+
+        var bobResult = await EnrichAsync(bobRun, scope);
+
+        Assert.Contains(BobSecret, bobResult.EnrichedContext);
+        Assert.Contains(SharedText, bobResult.EnrichedContext);
+        AssertNoAttachments(bobResult, AliceOwn, AliceParent);
     }
 
     [Fact]
-    public async Task RunLocalScopeReturnsOnlyTheOwnAttachment()
+    public async Task BothScopeWithoutAnyAttachmentStillReturnsSharedDocuments()
+    {
+        await SeedTwoUsersAsync();
+        Guid carolRun;
+        await using (var db = fixture.NewContext())
+            carolRun = await new RunPersistenceService(db).CreateRunAsync("carol", "{}", createdByUser: "carol");
+
+        var result = await EnrichAsync(carolRun, "both");
+
+        Assert.Contains(SharedText, result.EnrichedContext);
+        AssertNoAttachments(result, AliceOwn, AliceParent, BobSecret);
+    }
+
+    [Theory]
+    [InlineData("everything")]
+    [InlineData("RUN_LOCAL")]
+    [InlineData("both,global")]
+    public async Task UnknownScopeReturnsSharedDocumentsOnlyAndRecordsAPlainRunWarning(string scope)
     {
         var (aliceRun, _) = await SeedTwoUsersAsync();
-        await SeedDocumentAsync(KnowledgeScope.RunLocal, aliceRun, "ALICE-OWN-ATTACHMENT");
-        var provider = BuildProvider();
 
-        var result = await provider.EnrichAsync("anything",
-            Profile(new Dictionary<string, string> { ["TopK"] = "50", ["Scope"] = "run-local" }), aliceRun, CancellationToken.None);
+        var result = await EnrichAsync(aliceRun, scope);
 
-        Assert.Contains("ALICE-OWN-ATTACHMENT", result.EnrichedContext);
-        Assert.DoesNotContain(BobSecret, result.EnrichedContext);
-        Assert.DoesNotContain(SharedText, result.EnrichedContext);
+        Assert.Contains(SharedText, result.EnrichedContext);
+        AssertNoAttachments(result, AliceOwn, AliceParent, BobSecret);
+        var warning = Assert.Single(_warnings.All);
+        Assert.Equal(aliceRun, warning.RunId);
+        Assert.Equal(RunWarningSources.Grounding, warning.Source);
+        Assert.Equal(RunWarningCodes.GroundingScopeUnknown, warning.Code);
+        Assert.Equal(
+            "The source \"Knowledge\" has an unknown search setting, so only shared documents were searched.",
+            warning.Message);
+        Assert.DoesNotContain(scope, warning.Message);
     }
 
     [Fact]
@@ -86,18 +152,48 @@ public sealed class VectorStoreAttachmentIsolationPostgresTests(PostgresFixture 
         Assert.Empty(results);
     }
 
+    private async Task<GroundingResult> EnrichAsync(Guid runId, string? scope)
+    {
+        var settings = new Dictionary<string, string> { ["TopK"] = "50", ["TagFilter"] = _tag };
+        if (scope is not null)
+            settings["Scope"] = scope;
+        return await BuildProvider().EnrichAsync("anything", Profile(settings), runId, CancellationToken.None);
+    }
+
+    private static void AssertNoAttachments(GroundingResult result, params string[] texts)
+    {
+        foreach (var text in texts)
+        {
+            Assert.DoesNotContain(text, result.EnrichedContext);
+            Assert.All(result.Citations, c => Assert.DoesNotContain(text, c.Snippet));
+        }
+    }
+
     private async Task<(Guid AliceRun, Guid BobRun)> SeedTwoUsersAsync()
     {
-        Guid aliceRun, bobRun;
+        Guid aliceParent, bobRun;
         await using (var db = fixture.NewContext())
         {
             var runs = new RunPersistenceService(db);
-            aliceRun = await runs.CreateRunAsync("alice", "{}", createdByUser: "alice");
+            aliceParent = await runs.CreateRunAsync("alice first", "{}", createdByUser: "alice");
             bobRun = await runs.CreateRunAsync("bob", "{}", createdByUser: "bob");
+        }
+
+        var aliceRun = Guid.NewGuid();
+        await using (var db = fixture.NewContext())
+        {
+            db.Runs.Add(new RunEntity
+            {
+                Id = aliceRun, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Pending, BriefingText = "alice resumed",
+                ConfigJson = "{}", CreatedByUser = "alice", ParentRunId = aliceParent,
+            });
+            await db.SaveChangesAsync();
         }
 
         await SeedDocumentAsync(KnowledgeScope.RunLocal, bobRun, BobSecret);
         await SeedDocumentAsync(KnowledgeScope.Global, null, SharedText);
+        await SeedDocumentAsync(KnowledgeScope.RunLocal, aliceRun, AliceOwn);
+        await SeedDocumentAsync(KnowledgeScope.RunLocal, aliceParent, AliceParent);
         return (aliceRun, bobRun);
     }
 
@@ -105,7 +201,7 @@ public sealed class VectorStoreAttachmentIsolationPostgresTests(PostgresFixture 
     {
         await using var db = fixture.NewContext();
         var document = new KnowledgeDocument(Guid.NewGuid(), content, "", "doc.md", "text/markdown", content.Length, content,
-            [], "stub", Dimensions, 1, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, scope, runId);
+            [_tag], "stub", Dimensions, 1, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, scope, runId);
         await new KnowledgeDocumentRepository(db).CreateAsync(document, CancellationToken.None);
         await new VectorSearchRepository(db).CreateChunkAsync(
             new KnowledgeDocumentChunk(Guid.NewGuid(), document.Id, 0, content, Vector(), 1, DateTimeOffset.UtcNow), CancellationToken.None);
@@ -125,6 +221,7 @@ public sealed class VectorStoreAttachmentIsolationPostgresTests(PostgresFixture 
         return new VectorStoreGroundingProvider(
             new FixedEmbeddingProvider(),
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
+            _warnings,
             NullLogger<VectorStoreGroundingProvider>.Instance);
     }
 

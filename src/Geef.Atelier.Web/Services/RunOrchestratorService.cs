@@ -42,6 +42,9 @@ internal sealed class RunOrchestratorService(
     IFinalizerExecutorFactory?          finalizerExecutorFactory = null) : BackgroundService
 {
     internal const string ResultNotSavedMessage = "The result could not be saved completely.";
+    internal const string UnexpectedErrorMessage = "The task stopped because of an unexpected error.";
+    internal const string FinalizerUnexpectedErrorMessage = "The step stopped because of an unexpected error.";
+    internal const string RestartedWhileFinishingMessage = "The result may be incomplete because the service was restarted while finishing.";
 
     private readonly OrchestratorOptions _opts = options.Value;
     private readonly DateTimeOffset _createdAt = DateTimeOffset.UtcNow;
@@ -100,11 +103,17 @@ internal sealed class RunOrchestratorService(
     /// On startup, marks any runs left in Running state as Failed — they were interrupted by a crash or restart.
     /// Pending runs without a saved snapshot that were created before this service instance existed were still
     /// being prepared when the previous instance stopped; they can never become ready and are failed as well.
+    /// Runs that were stopped while their finishing steps ran keep their terminal status but have no outcome; they
+    /// get one now (<see cref="RecoverRunsInterruptedWhileFinishingAsync"/>).
     /// </summary>
     private async Task RecoverCrashedRunsAsync(DateTimeOffset createdBefore, CancellationToken stoppingToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AtelierDbContext>();
+
+        var finishing = await RecoverRunsInterruptedWhileFinishingAsync(db, stoppingToken);
+        if (finishing > 0)
+            logger.LogWarning("Crash recovery: recorded an outcome for {Count} runs stopped while finishing.", finishing);
 
         var affected = await db.Runs
             .Where(r => r.Status == RunStatus.Running)
@@ -121,6 +130,54 @@ internal sealed class RunOrchestratorService(
         var unprepared = await FailUnpreparedRunsAsync(db, createdBefore, "Service restarted while the task was being prepared", stoppingToken);
         if (unprepared > 0)
             logger.LogWarning("Crash recovery: marked {Count} Pending runs without snapshot as Failed.", unprepared);
+    }
+
+    /// <summary>
+    /// Gives an outcome to runs whose process ended while their finishing steps ran: the status is already terminal
+    /// (the event sink writes it when the pipeline ends), but the outcome is written only after the finishing steps,
+    /// so such a run would count as "still working" forever. With a saved text the outcome is
+    /// <see cref="RunOutcome.Converged"/> (status Completed) or <see cref="RunOutcome.DeliveredWithOpenPoints"/>,
+    /// without one <see cref="RunOutcome.Failed"/>; each run gets the warning <see cref="RestartedWhileFinishingMessage"/>.
+    /// Runs that finished before Step47 also have no outcome and must stay untouched. No column records when Step47
+    /// went live, so the earliest completion time of a run that has an outcome serves as that point: every run with an
+    /// outcome finished under Step47, and only runs that completed after it are considered. Until the first run has an
+    /// outcome nothing is changed. A run that completed before that first outcome was written (only possible in the
+    /// first minutes after the upgrade) is not repaired; that is the conservative side.
+    /// </summary>
+    private async Task<int> RecoverRunsInterruptedWhileFinishingAsync(AtelierDbContext db, CancellationToken ct)
+    {
+        var outcomesSince = await db.Runs
+            .Where(r => r.Outcome != null && r.CompletedAt != null)
+            .MinAsync(r => r.CompletedAt, ct);
+        if (outcomesSince is null)
+            return 0;
+
+        var interrupted = await db.Runs
+            .AsNoTracking()
+            .Where(r => r.Outcome == null
+                        && r.CompletedAt != null
+                        && r.CompletedAt > outcomesSince
+                        && (r.Status == RunStatus.Completed || r.Status == RunStatus.Failed || r.Status == RunStatus.Aborted))
+            .Select(r => new { r.Id, r.Status, HasText = r.FinalText != null })
+            .ToListAsync(ct);
+
+        var recovered = 0;
+        foreach (var run in interrupted)
+        {
+            var outcome = !run.HasText ? RunOutcome.Failed
+                : run.Status == RunStatus.Completed ? RunOutcome.Converged
+                : RunOutcome.DeliveredWithOpenPoints;
+            var written = await db.Runs
+                .Where(r => r.Id == run.Id && r.Outcome == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.Outcome, outcome), ct);
+            if (written == 0)
+                continue;
+            recovered++;
+            await ReportWarningAsync(run.Id, RunWarningSources.Run, RunWarningCodes.RestartedWhileFinishing,
+                RestartedWhileFinishingMessage);
+        }
+
+        return recovered;
     }
 
     private static Task<int> FailUnpreparedRunsAsync(AtelierDbContext db, DateTimeOffset createdBefore, string message, CancellationToken ct) =>
@@ -321,7 +378,7 @@ internal sealed class RunOrchestratorService(
         }
         catch (InvalidCrewSnapshotException ex)
         {
-            logger.LogError(ex, "Run {RunId} has an unusable crew snapshot; failing it without a fallback crew.", run.Id);
+            logger.LogError("Run {RunId} has an unusable crew snapshot; failing it without a fallback crew: {Error}", run.Id, ex.ToRedactedLogText());
             await MarkRunFailedAsync(run.Id, ex.Message);
             await NotifySafelyAsync(run.Id);
         }
@@ -418,11 +475,10 @@ internal sealed class RunOrchestratorService(
     }
 
     /// <summary>
-    /// Produces a sanitized, user-visible error message from a pipeline exception.
-    /// Walks the full inner-exception chain so that exceptions wrapped by the Geef SDK
+    /// Produces the user-visible error message for a pipeline exception: always one of a few fixed plain-English
+    /// sentences, never text taken from the exception (no keys, hosts, variable names, paths or stack traces); the
+    /// details go to the log only. Walks the full inner-exception chain so that exceptions wrapped by the Geef SDK
     /// are handled by the most-specific matching rule.
-    /// Sensitive details (API keys, full stack traces, provider URLs) are never included: the fallback carries only the
-    /// first line of the message with credential-like fragments removed (<see cref="RunWarningTextExtensions.ToWarningDetail"/>).
     /// </summary>
     internal static string SanitizeErrorMessage(Exception ex)
     {
@@ -432,24 +488,24 @@ internal sealed class RunOrchestratorService(
             if (current is HttpRequestException { StatusCode: { } code })
                 return (int)code switch
                 {
-                    400 => "LLM provider returned an invalid response (HTTP 400). Check model name and configuration.",
-                    401 => "LLM provider authentication failed.",
-                    403 => "LLM provider access denied.",
-                    429 => "LLM provider rate limit exceeded. Retry later.",
-                    >= 500 => "LLM provider temporarily unavailable. Retry later.",
-                    _ => $"LLM provider returned an error (HTTP {(int)code})."
+                    400 => "The AI service rejected the request (code 400). Please check the model settings.",
+                    401 => "The AI service rejected the sign-in (authentication failed).",
+                    403 => "The AI service denied access.",
+                    429 => "The AI service is busy right now (rate limit reached). Please try again later.",
+                    >= 500 => "The AI service is unavailable right now. Please try again later.",
+                    _ => $"The AI service answered with an error (code {(int)code})."
                 };
 
             if (current is HttpRequestException)
-                return "LLM provider request failed. Check connectivity and configuration.";
+                return "The AI service could not be reached (request failed). Please try again later.";
 
             if (current is TaskCanceledException)
-                return "LLM provider request timed out.";
+                return "The AI service took too long to answer (timed out).";
 
             current = current.InnerException;
         }
 
-        return $"Pipeline execution failed: {ex.Message.ToWarningDetail()}";
+        return UnexpectedErrorMessage;
     }
 
     /// <summary>
@@ -712,6 +768,8 @@ internal sealed class RunOrchestratorService(
     /// <c>PostgresEventSink</c> writes it directly on <c>PipelineCompletedEvent</c>.
     /// Finalizer errors never abort the run — they are recorded as <see cref="ArtifactType.Status"/>
     /// artifacts and the error message is set on the run row (partial-success contract).
+    /// A cancellation of <paramref name="ct"/> (user cancel or service stop) is not a step failure: it propagates
+    /// without a warning or an error artifact, also when an executor swallowed it and returned an error result.
     /// </summary>
     private async Task ExecuteFinalizationAsync(
         Guid runId,
@@ -754,6 +812,7 @@ internal sealed class RunOrchestratorService(
                 var executor = finalizerExecutorFactory.GetExecutor(profile.FinalizerType);
                 var ctx = baseContext with { CurrentText = currentText };
                 var result = await executor.ExecuteAsync(profile, ctx, ct);
+                ct.ThrowIfCancellationRequested();
 
                 if (result.UpdatedText is not null)
                     currentText = result.UpdatedText;
@@ -779,13 +838,13 @@ internal sealed class RunOrchestratorService(
                     });
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 logger.LogError("Finalizer {Profile} threw unexpectedly for run {RunId}: {Error}",
                     profile.Name, runId, ex.ToRedactedLogText());
-                errorMessages.Add($"{profile.Name}: {ex.Message.ToWarningDetail()}");
-                await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerFailed,
-                    $"The finishing step \"{profile.DisplayNameOrName()}\" failed.");
+                var failedMessage = $"The finishing step \"{profile.DisplayNameOrName()}\" failed.";
+                errorMessages.Add(failedMessage);
+                await ReportWarningAsync(runId, RunWarningSources.Finalizer, RunWarningCodes.FinalizerFailed, failedMessage);
 
                 // Persist a Status artifact so the failure is visible in the Run detail UI.
                 var errorArtifact = new RunArtifact
@@ -795,7 +854,7 @@ internal sealed class RunOrchestratorService(
                     FinalizerProfileName = profile.Name,
                     ArtifactType = ArtifactType.Status,
                     StorageUri = "error",
-                    StatusMessage = $"Unexpected error: {ex.Message.ToWarningDetail()}",
+                    StatusMessage = FinalizerUnexpectedErrorMessage,
                     CreatedAt = DateTimeOffset.UtcNow,
                 };
                 try { await artifactRepo.CreateAsync(errorArtifact, ct); }

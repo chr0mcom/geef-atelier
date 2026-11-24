@@ -9,6 +9,12 @@ public static class RunWarningCodes
     /// <summary>A tool-backed grounding source returned an error. Reserved; failures currently use <see cref="GroundingProviderSkipped"/>.</summary>
     public const string GroundingToolFailed = "grounding.tool_failed";
 
+    /// <summary>
+    /// A knowledge source has an unknown search setting (<c>Scope</c>); only the shared documents were searched and
+    /// attachments were left out.
+    /// </summary>
+    public const string GroundingScopeUnknown = "grounding.scope_unknown";
+
     /// <summary>A reviewer could not complete its check in a round and was left out of the verdict.</summary>
     public const string ReviewerFailed = "review.reviewer_failed";
 
@@ -29,6 +35,12 @@ public static class RunWarningCodes
 
     /// <summary>The run finished, but its status or final text could not be stored; it was recorded as failed.</summary>
     public const string ResultNotSaved = "run.result_not_saved";
+
+    /// <summary>
+    /// The service was restarted while the finishing steps ran; the outcome was recorded on the next start and the
+    /// result may be incomplete.
+    /// </summary>
+    public const string RestartedWhileFinishing = "run.restarted_while_finishing";
 }
 
 /// <summary>Values of <see cref="RunWarningEntity.Source"/>: the part of the system that reported the warning.</summary>

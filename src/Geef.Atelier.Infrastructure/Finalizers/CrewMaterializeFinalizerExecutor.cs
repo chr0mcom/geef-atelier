@@ -6,6 +6,7 @@ using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Persistence;
+using Geef.Atelier.Core.Domain.Warnings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -76,11 +77,15 @@ internal sealed class CrewMaterializeFinalizerExecutor(
             {
                 result = await materializer.MaterializeAsync(specJson, context.RunId, cancellationToken);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
-                logger.LogError(ex,
-                    "CrewMaterialize: materialization failed for run {RunId}", context.RunId);
-                return Error(context.RunId, profile.Name, $"Materialization failed: {ex.Message}");
+                logger.LogError(
+                    "CrewMaterialize: materialization failed for run {RunId}: {Error}", context.RunId, ex.ToRedactedLogText());
+                return Error(context.RunId, profile.Name, "The new team could not be created.");
             }
 
             logger.LogInformation(
@@ -113,10 +118,10 @@ internal sealed class CrewMaterializeFinalizerExecutor(
                     // A submit failure must not fail the composition run — the crew was created
                     // successfully — but it MUST be visible: surface it as a Status artifact so the
                     // user sees why no follow-up task run started instead of a silent "Completed".
-                    logger.LogError(ex,
-                        "CrewMaterialize: failed to submit chained task run for composition run {RunId}", context.RunId);
+                    logger.LogError(
+                        "CrewMaterialize: failed to submit chained task run for composition run {RunId}: {Error}", context.RunId, ex.ToRedactedLogText());
                     return Error(context.RunId, profile.Name,
-                        $"Crew '{result.TemplateName}' was created, but the chained task run could not be started: {ex.Message}");
+                        $"The team \"{result.TemplateName}\" was created, but the follow-up task could not be started.");
                 }
             }
             else if (!chainToTaskRun)
@@ -128,10 +133,14 @@ internal sealed class CrewMaterializeFinalizerExecutor(
 
             return Ok(profile.Name);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
-            logger.LogError(ex, "CrewMaterialize: unexpected error for run {RunId}", context.RunId);
-            return Error(context.RunId, profile.Name, $"Unexpected error: {ex.Message}");
+            logger.LogError("CrewMaterialize: unexpected error for run {RunId}: {Error}", context.RunId, ex.ToRedactedLogText());
+            return Error(context.RunId, profile.Name, "The step stopped because of an unexpected error.");
         }
     }
 

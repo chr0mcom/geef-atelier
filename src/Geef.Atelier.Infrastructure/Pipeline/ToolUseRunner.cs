@@ -4,6 +4,7 @@ using Geef.Atelier.Application.Tools;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Tools;
 using Geef.Atelier.Infrastructure.Llm;
+using Geef.Atelier.Core.Domain.Warnings;
 using Microsoft.Extensions.Logging;
 
 namespace Geef.Atelier.Infrastructure.Pipeline;
@@ -177,18 +178,18 @@ internal sealed class ToolUseRunner(
                     catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
                     {
                         // Per-tool timeout fired; outer cancellation is still active.
-                        logger?.LogWarning(ex,
-                            "ToolUseRunner: tool timed out: name={ToolName} run={RunId}",
-                            call.Name, invocationContext.RunId);
+                        logger?.LogWarning(
+                            "ToolUseRunner: tool timed out: name={ToolName} run={RunId}: {Error}",
+                            call.Name, invocationContext.RunId, ex.ToRedactedLogText());
                         toolResult = new ToolExecutionResult(
                             "", null, $"Tool '{call.Name}' timed out after {options.PerToolTimeout.TotalSeconds:0}s.");
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
-                        logger?.LogError(ex,
-                            "ToolUseRunner: tool execution failed: name={ToolName} run={RunId}",
-                            call.Name, invocationContext.RunId);
-                        toolResult = new ToolExecutionResult("", null, ex.Message);
+                        logger?.LogError(
+                            "ToolUseRunner: tool execution failed: name={ToolName} run={RunId}: {Error}",
+                            call.Name, invocationContext.RunId, ex.ToRedactedLogText());
+                        toolResult = new ToolExecutionResult("", null, ex.Message.RedactSecrets());
                     }
 
                     toolResultContent = toolResult.Error is not null

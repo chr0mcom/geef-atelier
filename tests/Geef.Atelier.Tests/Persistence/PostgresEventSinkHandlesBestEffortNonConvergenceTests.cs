@@ -41,7 +41,7 @@ public sealed class PostgresEventSinkHandlesBestEffortNonConvergenceTests(Postgr
         var runner = AtelierPipelineFactory.Build(
             snapshot,
             new TestLlmClientResolver(new RejectingFakeLlmClient()),
-            Options.Create(new ConvergenceOptions { MaxIterations = 2 }),
+            Options.Create(new ConvergenceOptions { MaxIterations = 2 }), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             additionalSinks: [sink]);
 
         // Act — best-effort mode: the runner returns instead of throwing on non-convergence.
@@ -98,7 +98,7 @@ public sealed class PostgresEventSinkHandlesBestEffortNonConvergenceTests(Postgr
         var runner = AtelierPipelineFactory.Build(
             snapshot,
             new TestLlmClientResolver(new CriticalFakeLlmClient()),
-            Options.Create(new ConvergenceOptions { MaxIterations = 2, AbortOnCritical = true }),
+            Options.Create(new ConvergenceOptions { MaxIterations = 2, AbortOnCritical = true }), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             additionalSinks: [sink]);
 
         // Act — critical aborts also flow through the best-effort branch in Build pipelines.

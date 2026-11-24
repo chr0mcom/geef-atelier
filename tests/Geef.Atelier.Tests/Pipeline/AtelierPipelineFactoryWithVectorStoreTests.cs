@@ -145,7 +145,7 @@ public sealed class AtelierPipelineFactoryWithVectorStoreTests
             [profile],
             factory,
             Guid.NewGuid(),
-            NullLogger<MultiProviderGroundingStep>.Instance);
+            NullLogger<MultiProviderGroundingStep>.Instance, new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings());
 
         return (step, embeddingStub);
     }
@@ -166,6 +166,7 @@ public sealed class AtelierPipelineFactoryWithVectorStoreTests
         return new VectorStoreGroundingProvider(
             embeddingStub,
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
+            new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             NullLogger<VectorStoreGroundingProvider>.Instance);
     }
 

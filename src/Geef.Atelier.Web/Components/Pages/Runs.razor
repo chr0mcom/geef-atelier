@@ -103,6 +103,7 @@
 
     IReadOnlyList<RunEntity>? _runs;
     IDisposable?              _subscription;
+    bool                      _disposed;
     bool                      _isAdmin;
     string?                   _currentUsername;
     bool                      _showAllUsers;
@@ -116,6 +117,8 @@
         _currentUsername = auth.User.Identity?.Name;
 
         await LoadRunsAsync();
+        if (_disposed)
+            return;
         _subscription = LiveUpdates.WatchRunList(auth.User, async _ =>
         {
             await InvokeAsync(async () =>
@@ -157,6 +160,7 @@
 
     public ValueTask DisposeAsync()
     {
+        _disposed = true;
         _subscription?.Dispose();
         return ValueTask.CompletedTask;
     }

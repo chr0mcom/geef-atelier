@@ -2,6 +2,7 @@ using System.ClientModel;
 using System.ClientModel.Primitives;
 using System.Net;
 using System.Text;
+using Geef.Atelier.Core.Domain.Warnings;
 using OpenAI;
 using OpenAI.Responses;
 
@@ -71,14 +72,14 @@ internal sealed class OpenAiResponsesClient(
         {
             throw new HttpRequestException(
                 $"OpenAI Responses request to '{endpoint}' for model '{request.Model}' failed with " +
-                $"{ex.Status}: {ex.Message}",
+                $"{ex.Status}: {ex.Message.RedactSecrets()}",
                 inner: ex,
                 statusCode: ex.Status > 0 ? (HttpStatusCode)ex.Status : null);
         }
 
         if (result.Error is { Message.Length: > 0 } error)
             throw new HttpRequestException(
-                $"OpenAI Responses returned an error for model '{request.Model}': {error.Message}");
+                $"OpenAI Responses returned an error for model '{request.Model}': {error.Message.RedactSecrets()}");
 
         return MapResponse(result);
     }

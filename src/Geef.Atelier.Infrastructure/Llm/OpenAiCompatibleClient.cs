@@ -37,7 +37,7 @@ internal sealed class OpenAiCompatibleClient(
         if (!response.IsSuccessStatusCode)
             throw new HttpRequestException(
                 $"LLM request to '{baseEndpoint}' for model '{request.Model}' failed with " +
-                $"{(int)response.StatusCode} {response.ReasonPhrase}: {ExtractError(json)}",
+                $"{(int)response.StatusCode} {response.ReasonPhrase}: {ExtractError(json).RedactSecrets()}",
                 inner: null,
                 statusCode: response.StatusCode);
 
@@ -94,6 +94,10 @@ internal sealed class OpenAiCompatibleClient(
 
     // Surfaces the provider's actual error text (OpenAI-shaped { "error": { "message": ... } })
     // instead of the opaque "status code does not indicate success" default.
+    /// <summary>
+    /// The provider's error message from <paramref name="body"/>, or the start of the raw body. Providers may repeat the
+    /// rejected key in it, so the caller redacts it before it enters an exception message.
+    /// </summary>
     private static string ExtractError(string body)
     {
         if (string.IsNullOrWhiteSpace(body))

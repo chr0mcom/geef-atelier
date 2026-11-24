@@ -53,7 +53,7 @@ public sealed class KlassikCostRegressionTests
         var resolver    = new TestLlmClientResolver(new FakeLlmClient());
 
         var runner = AtelierPipelineFactory.Build(
-            KlassikSnapshot(), resolver, Options.Create(new ConvergenceOptions()),
+            KlassikSnapshot(), resolver, Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             pricingCatalog: catalog, costAccumulator: accumulator);
 
         await runner.RunAsync(Briefing, CancellationToken.None);
@@ -79,7 +79,7 @@ public sealed class KlassikCostRegressionTests
         var resolver    = new TestLlmClientResolver(new FakeLlmClient());
 
         var runner = AtelierPipelineFactory.Build(
-            KlassikSnapshot(), resolver, Options.Create(new ConvergenceOptions()),
+            KlassikSnapshot(), resolver, Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             pricingCatalog: catalog, costAccumulator: accumulator);
 
         await runner.RunAsync(Briefing, CancellationToken.None);
@@ -100,7 +100,7 @@ public sealed class KlassikCostRegressionTests
         var resolver    = new TestLlmClientResolver(new FakeLlmClient());
 
         var runner = AtelierPipelineFactory.Build(
-            KlassikSnapshot(), resolver, Options.Create(new ConvergenceOptions()),
+            KlassikSnapshot(), resolver, Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             pricingCatalog: catalog, costAccumulator: accumulator);
 
         await runner.RunAsync(Briefing, CancellationToken.None);
@@ -121,7 +121,7 @@ public sealed class KlassikCostRegressionTests
         var resolver    = new TestLlmClientResolver(new FakeLlmClient());
 
         var runner = AtelierPipelineFactory.Build(
-            KlassikSnapshot(), resolver, Options.Create(new ConvergenceOptions()),
+            KlassikSnapshot(), resolver, Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             pricingCatalog: catalog, costAccumulator: accumulator);
 
         await runner.RunAsync(Briefing, CancellationToken.None);

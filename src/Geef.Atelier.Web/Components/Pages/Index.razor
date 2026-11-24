@@ -72,6 +72,7 @@ else
     string                  _username    = string.Empty;
     System.Security.Claims.ClaimsPrincipal _user = new();
     IDisposable?            _subscription;
+    bool                    _disposed;
 
     protected override async Task OnInitializedAsync()
     {
@@ -99,6 +100,7 @@ else
     {
         if (_scope == newScope) return;
         _subscription?.Dispose();
+        _subscription = null;
         _scope = newScope;
         await JS.InvokeVoidAsync("window.atelier.setDashboardScope",
             newScope == DashboardScope.All ? "all" : "my");
@@ -109,7 +111,7 @@ else
 
     void Subscribe()
     {
-        if (string.IsNullOrEmpty(_username))
+        if (_disposed || string.IsNullOrEmpty(_username))
             return;
         _subscription = LiveUpdates.WatchDashboard(_user, _isAdmin && _scope == DashboardScope.All,
             evt => InvokeAsync(() => OnDashboardEventAsync(evt)));
@@ -134,6 +136,7 @@ else
 
     public ValueTask DisposeAsync()
     {
+        _disposed = true;
         _subscription?.Dispose();
         return ValueTask.CompletedTask;
     }

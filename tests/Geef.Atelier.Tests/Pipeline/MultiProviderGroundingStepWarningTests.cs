@@ -111,7 +111,7 @@ public sealed class MultiProviderGroundingStepWarningTests
         IRunWarningSink sink,
         ToolBackedGroundingProvider? toolProvider = null) =>
         new(new PassThroughStep(), profiles, new Factory(providers), runId,
-            NullLogger<MultiProviderGroundingStep>.Instance, toolBackedProvider: toolProvider, warningSink: sink);
+            NullLogger<MultiProviderGroundingStep>.Instance, sink, toolBackedProvider: toolProvider);
 
     private static ToolBackedGroundingProvider ToolProvider(IToolExecutor executor) =>
         new(executor, new StubToolDefinitionRepository(StaticTool()), NullLogger<ToolBackedGroundingProvider>.Instance);

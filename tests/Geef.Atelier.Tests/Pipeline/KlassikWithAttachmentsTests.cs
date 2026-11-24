@@ -69,7 +69,7 @@ public sealed class KlassikWithAttachmentsTests
         var runner = AtelierPipelineFactory.Build(
             KlassikWithAttachmentsSnapshot(runId),
             resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             runId: runId,
             groundingProviderFactory: factory);
 
@@ -91,7 +91,7 @@ public sealed class KlassikWithAttachmentsTests
         var runner = AtelierPipelineFactory.Build(
             KlassikWithAttachmentsSnapshot(runId),
             resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             runId: runId,
             groundingProviderFactory: factory);
 
@@ -118,7 +118,7 @@ public sealed class KlassikWithAttachmentsTests
         var runner = AtelierPipelineFactory.Build(
             KlassikWithAttachmentsSnapshot(runId),
             resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             runId: runId,
             groundingProviderFactory: factory);
 
@@ -145,6 +145,7 @@ public sealed class KlassikWithAttachmentsTests
         var provider = new VectorStoreGroundingProvider(
             new CountingEmbeddingProviderStub(),
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
+            new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             NullLogger<VectorStoreGroundingProvider>.Instance);
 
         var result = await provider.EnrichAsync(
@@ -172,6 +173,7 @@ public sealed class KlassikWithAttachmentsTests
         var provider = new VectorStoreGroundingProvider(
             embeddingStub,
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
+            new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             NullLogger<VectorStoreGroundingProvider>.Instance);
 
         return new SingleProviderFactory(provider);

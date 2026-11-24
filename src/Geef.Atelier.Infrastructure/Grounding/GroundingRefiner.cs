@@ -7,6 +7,7 @@ using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Infrastructure.Llm;
+using Geef.Atelier.Core.Domain.Warnings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -179,15 +180,15 @@ internal sealed class GroundingRefiner(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex,
-                "GroundingRefiner: unhandled error during refinement for '{Provider}'; falling back to raw result.",
-                groundingProviderName);
+            logger.LogError(
+                "GroundingRefiner: unhandled error during refinement for '{Provider}'; falling back to raw result: {Error}",
+                groundingProviderName, ex.ToRedactedLogText());
             return (raw, new RefinementOutcome(
                 RefinedCitations: raw.Citations,
                 DroppedCitations: [],
                 SynthesizedText: null,
                 WasSkipped: true,
-                SkipReason: ex.Message));
+                SkipReason: "The sources could not be sorted, so they were used as found."));
         }
     }
 

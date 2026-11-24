@@ -3,7 +3,9 @@ using Geef.Atelier.Application.Crew.Knowledge;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Knowledge;
 using Geef.Atelier.Core.Persistence;
+using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Persistence.Crew;
+using Geef.Atelier.Infrastructure.Pipeline;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -12,15 +14,21 @@ namespace Geef.Atelier.Infrastructure.Grounding;
 /// <summary>
 /// Grounding provider backed by the local vector-store knowledge base.
 /// Embeds the briefing text, runs a similarity search, and surfaces matching chunks as citations.
-/// For the run-local scope (attachments) the search covers the run and the runs it was resumed or composed from,
-/// because attachments stay with the run they were uploaded to; when none of them has an attachment, the
-/// provider returns an empty result without an embedding call. A missing <c>Scope</c> setting means the shared
-/// (global) documents; an unknown value is treated the same way and logged, so a profile can never reach the
-/// attachments of another user's run.
+/// The <c>Scope</c> setting decides what is searched:
+/// <list type="bullet">
+///   <item><c>global</c> (also when the setting is missing or blank): the shared documents only.</item>
+///   <item><c>run-local</c>: the attachments of the run and of the runs it was resumed or composed from
+///   (<see cref="IRunAttachmentLineage"/>), because attachments stay with the run they were uploaded to; when none of
+///   them has an attachment, the provider returns an empty result without an embedding call.</item>
+///   <item><c>both</c>: the shared documents plus the attachments of that same lineage.</item>
+/// </list>
+/// Attachments of other runs or users are never searched. Any other value is unknown: the provider falls back to the
+/// shared documents (fail-closed) and records a run warning (<see cref="RunWarningCodes.GroundingScopeUnknown"/>).
 /// </summary>
 internal sealed class VectorStoreGroundingProvider(
     IEmbeddingProvider embeddingProvider,
     IServiceScopeFactory scopeFactory,
+    IRunWarningSink warningSink,
     ILogger<VectorStoreGroundingProvider> logger) : IGroundingProvider
 {
     public string ProviderType => "vector-store";
@@ -44,30 +52,39 @@ internal sealed class VectorStoreGroundingProvider(
         }
 
         profile.ProviderSettings.TryGetValue("Scope", out var scopeStr);
-        var scopeFilter = scopeStr.ToKnowledgeScope();
-        if (scopeFilter is null)
+        var scopeSetting = scopeStr.ToVectorStoreScope();
+        if (scopeSetting is null)
         {
             logger.LogWarning(
                 "Vector-store grounding: run={RunId} provider={Profile} has an unknown scope '{Scope}'; only shared documents are searched.",
                 runId, profile.Name, scopeStr);
-            scopeFilter = KnowledgeScope.Global;
+            await warningSink.ReportAsync(
+                runId,
+                RunWarningSources.Grounding,
+                RunWarningCodes.GroundingScopeUnknown,
+                profile.UnknownScopeWarning(),
+                ct: ct);
+            scopeSetting = VectorStoreScope.Global;
         }
 
         logger.LogInformation(
             "Vector-store grounding: run={RunId} provider={Profile} topK={TopK} tagFilter={Tags} scope={Scope}",
             runId, profile.Name, topK,
             tagFilter is null ? "(none)" : string.Join(",", tagFilter),
-            scopeFilter);
+            scopeSetting);
 
         await using var scope = scopeFactory.CreateAsyncScope();
         var searchRepo = scope.ServiceProvider.GetRequiredService<IVectorSearchRepository>();
 
-        IReadOnlyList<Guid?> runFilters = [null];
-        if (scopeFilter == KnowledgeScope.RunLocal)
+        var searches = new List<(KnowledgeScope Scope, Guid? RunId)>();
+        if (scopeSetting is VectorStoreScope.Global or VectorStoreScope.Both)
+            searches.Add((KnowledgeScope.Global, null));
+        if (scopeSetting is VectorStoreScope.RunLocal or VectorStoreScope.Both)
         {
             var lineage = scope.ServiceProvider.GetRequiredService<IRunAttachmentLineage>();
-            runFilters = (await lineage.RunsWithAttachmentsAsync(runId, ct)).Select(id => (Guid?)id).ToList();
-            if (runFilters.Count == 0)
+            foreach (var attachmentRun in await lineage.RunsWithAttachmentsAsync(runId, ct))
+                searches.Add((KnowledgeScope.RunLocal, attachmentRun));
+            if (searches.Count == 0)
             {
                 logger.LogInformation(
                     "Vector-store grounding: run={RunId} provider={Profile} has no attachments; skipped without search.",
@@ -79,9 +96,9 @@ internal sealed class VectorStoreGroundingProvider(
         var embedding = await embeddingProvider.CreateAsync(briefingText, ct);
 
         var searchResults = new List<Core.Domain.Crew.Knowledge.VectorSearchResult>();
-        foreach (var runIdFilter in runFilters)
+        foreach (var (scopeFilter, runIdFilter) in searches)
             searchResults.AddRange(await searchRepo.SearchAsync(embedding.Vector, topK, tagFilter, scopeFilter, runIdFilter, ct));
-        if (runFilters.Count > 1)
+        if (searches.Count > 1)
             searchResults = searchResults.OrderByDescending(r => r.Similarity).Take(topK).ToList();
 
         var citations = searchResults
@@ -146,19 +163,34 @@ internal sealed class VectorStoreGroundingProvider(
         => text.Length <= maxLength ? text : text[..maxLength] + "…";
 }
 
-internal static class KnowledgeScopeSettingExtensions
+/// <summary>What a vector-store profile searches, parsed from its <c>Scope</c> setting.</summary>
+internal enum VectorStoreScope
+{
+    /// <summary>Shared documents only.</summary>
+    Global,
+
+    /// <summary>Attachments of the run and its lineage only.</summary>
+    RunLocal,
+
+    /// <summary>Shared documents plus the attachments of the run and its lineage.</summary>
+    Both
+}
+
+internal static class VectorStoreScopeSettingExtensions
 {
     /// <summary>
-    /// Parses the <c>Scope</c> provider setting: missing or blank means <see cref="KnowledgeScope.Global"/>,
-    /// <c>run-local</c> and <c>global</c> map to their scope, anything else returns <c>null</c>.
+    /// Parses the <c>Scope</c> provider setting (case-insensitive, trimmed): missing or blank means
+    /// <see cref="VectorStoreScope.Global"/>; <c>global</c>, <c>run-local</c> and <c>both</c> map to their scope;
+    /// anything else returns <c>null</c>.
     /// </summary>
-    public static KnowledgeScope? ToKnowledgeScope(this string? setting) =>
+    public static VectorStoreScope? ToVectorStoreScope(this string? setting) =>
         string.IsNullOrWhiteSpace(setting)
-            ? KnowledgeScope.Global
+            ? VectorStoreScope.Global
             : setting.Trim().ToLowerInvariant() switch
             {
-                "run-local" => KnowledgeScope.RunLocal,
-                "global"    => KnowledgeScope.Global,
+                "global"    => VectorStoreScope.Global,
+                "run-local" => VectorStoreScope.RunLocal,
+                "both"      => VectorStoreScope.Both,
                 _           => null
             };
 }

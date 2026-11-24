@@ -35,6 +35,7 @@ internal static class AtelierPipelineFactory
         CrewSnapshot snapshot,
         ILlmClientResolver resolver,
         IOptions<ConvergenceOptions> convergenceOptions,
+        IRunWarningSink warningSink,
         IAdvisorConsultationRepository? consultationRepository = null,
         Guid runId = default,
         ILoggerFactory? loggerFactory = null,
@@ -46,8 +47,7 @@ internal static class AtelierPipelineFactory
         IGroundingConsultationRepository? groundingConsultationRepository = null,
         IExecutionStep? customExecutionStep = null,
         Func<Geef.Atelier.Core.Domain.Crew.Profiles.ReviewerProfile, IReviewer?>? specialReviewerResolver = null,
-        ToolBackedGroundingProvider? toolBackedGroundingProvider = null,
-        IRunWarningSink? warningSink = null)
+        ToolBackedGroundingProvider? toolBackedGroundingProvider = null)
     {
         IGroundingStep grounding = new BriefingGroundingStep();
         if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
@@ -56,10 +56,10 @@ internal static class AtelierPipelineFactory
                 grounding, snapshot.GroundingProviders, groundingProviderFactory, runId,
                 loggerFactory?.CreateLogger<MultiProviderGroundingStep>()
                     ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance,
+                warningSink,
                 groundingRefiner,
                 groundingConsultationRepository,
-                toolBackedGroundingProvider,
-                warningSink);
+                toolBackedGroundingProvider);
         }
 
         IExecutionStep execution = customExecutionStep
@@ -90,6 +90,7 @@ internal static class AtelierPipelineFactory
         ILlmClientResolver resolver,
         IOptions<ConvergenceOptions> convergenceOptions,
         string seedDraftText,
+        IRunWarningSink warningSink,
         IAdvisorConsultationRepository? consultationRepository = null,
         Guid runId = default,
         ILoggerFactory? loggerFactory = null,
@@ -99,8 +100,7 @@ internal static class AtelierPipelineFactory
         ICostAccumulator? costAccumulator = null,
         IGroundingRefiner? groundingRefiner = null,
         IGroundingConsultationRepository? groundingConsultationRepository = null,
-        ToolBackedGroundingProvider? toolBackedGroundingProvider = null,
-        IRunWarningSink? warningSink = null)
+        ToolBackedGroundingProvider? toolBackedGroundingProvider = null)
     {
         IGroundingStep grounding = new SeedDraftGroundingStep(seedDraftText);
         if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
@@ -109,10 +109,10 @@ internal static class AtelierPipelineFactory
                 grounding, snapshot.GroundingProviders, groundingProviderFactory, runId,
                 loggerFactory?.CreateLogger<MultiProviderGroundingStep>()
                     ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance,
+                warningSink,
                 groundingRefiner,
                 groundingConsultationRepository,
-                toolBackedGroundingProvider,
-                warningSink);
+                toolBackedGroundingProvider);
         }
 
         IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);
@@ -219,7 +219,8 @@ internal static class AtelierPipelineFactory
     /// <summary>
     /// Returns reviewers for the given profiles. A crew without reviewers is rejected: silently approving every
     /// draft would deliver unchecked text as if it had been reviewed. The system crews, the template studio and the
-    /// crew-spec validator always provide at least one reviewer; only a hand-edited template can lack one.
+    /// crew-spec validator always provide at least one reviewer; only a hand-edited template can lack one. The run then
+    /// fails with <see cref="InvalidCrewSnapshotException"/>, whose message is shown to the user as it is.
     /// When <paramref name="specialReviewerResolver"/> is supplied, each profile is offered to it first;
     /// a non-null return value replaces the default <see cref="ProfileBasedReviewer"/> for that profile.
     /// </summary>
@@ -231,8 +232,8 @@ internal static class AtelierPipelineFactory
         Func<Geef.Atelier.Core.Domain.Crew.Profiles.ReviewerProfile, IReviewer?>? specialReviewerResolver = null)
     {
         if (profiles.Count == 0)
-            throw new InvalidOperationException(
-                "The crew of this run has no reviewers, so its text could not be checked. Add at least one reviewer to the crew and start again.");
+            throw new InvalidCrewSnapshotException(
+                "The team for this task has no reviewers, so its text could not be checked. Add at least one reviewer and start again.");
 
         var classifier = new HttpTransientFaultClassifier();
         return profiles.Select(r =>

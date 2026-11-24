@@ -804,7 +804,7 @@
                 IncludeAnswer = !string.Equals(includeAnswerStr, "false", StringComparison.OrdinalIgnoreCase),
                 TopK = int.TryParse(topKStr, out var tk) ? tk : 5,
                 TagFilter = tagFilter ?? "",
-                Scope = scope ?? "both",
+                Scope = string.IsNullOrWhiteSpace(scope) ? "global" : scope,
                 MaxQueriesPerRun = p.MaxQueriesPerRun,
                 RefinementEnabled = p.RefinementBinding is not null,
                 RefinementProvider = p.ProviderSettings.GetValueOrDefault(GroundingProviderProfile.KeyRefinementProvider, ""),

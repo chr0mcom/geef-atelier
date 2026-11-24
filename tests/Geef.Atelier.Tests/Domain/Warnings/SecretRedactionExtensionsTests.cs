@@ -1,8 +1,12 @@
+using System.Diagnostics;
 using Geef.Atelier.Core.Domain.Warnings;
 
 namespace Geef.Atelier.Tests.Domain.Warnings;
 
-/// <summary>Credential-like fragments are removed from technical texts; ordinary words, ids and model names stay.</summary>
+/// <summary>
+/// Credential-like fragments are removed from technical texts; ordinary words, ids and model names stay. Texts for users
+/// (warnings) only lose unambiguous key forms, so long display names survive; every pattern runs in linear time.
+/// </summary>
 public sealed class SecretRedactionExtensionsTests
 {
     [Theory]
@@ -20,6 +24,74 @@ public sealed class SecretRedactionExtensionsTests
 
         Assert.DoesNotContain(secretFragment, redacted);
         Assert.Contains(SecretRedactionExtensions.Placeholder, redacted);
+    }
+
+    [Theory]
+    [InlineData("Incorrect API key provided: abcd1234efgh5678", "abcd1234efgh5678")]
+    [InlineData("Incorrect API key provided: abcd1234efgh5678. You can find your key at …", "abcd1234efgh5678")]
+    [InlineData("invalid credentials: AbCd0123+/EfGh4567/IjKl89+MnOpQrSt012=", "AbCd0123+/EfGh")]
+    [InlineData("signature dGhpcyBpcyBhIHNlY3JldCBrZXkgMTIzNDU2Nzg5MA== rejected", "dGhpcyBpcyBhIHNlY3JldCBrZXkg")]
+    [InlineData("GET /v1/search?key=short123&q=test", "short123")]
+    [InlineData("headers: Authorization: Custom-Scheme value-abc 123", "value-abc")]
+    [InlineData("headers: x-api-key: zyx987wvu654", "zyx987wvu654")]
+    [InlineData("{\"x-api-key\":\"zyx987wvu654\"}", "zyx987wvu654")]
+    [InlineData("groq said: invalid gsk_AbCdEfGhIjKlMnOpQrSt0123", "gsk_AbCdEf")]
+    public void RemovesCommonForms(string text, string secretFragment)
+    {
+        var redacted = text.RedactSecrets();
+
+        Assert.DoesNotContain(secretFragment, redacted);
+        Assert.Contains(SecretRedactionExtensions.Placeholder, redacted);
+    }
+
+    [Theory]
+    [InlineData("The source \"custom-tavily-refined-academic-search-v2\" could not be read and was skipped.")]
+    [InlineData("The check \"reviewer-for-long-academic-papers-2026-edition\" could not be completed in round 2 and was left out.")]
+    [InlineData("The finishing step \"Export2024QuarterlyReportForManagementTeamA\" failed.")]
+    public void KnownSecretsOnlyKeepsLongDisplayNames(string text)
+    {
+        Assert.Equal(text, text.RedactKnownSecrets());
+        Assert.NotEqual(text, text.RedactSecrets());
+    }
+
+    [Theory]
+    [InlineData("The source \"Web\" could not be read: sk-proj-0123456789abcdef.", "sk-proj-0123")]
+    [InlineData("Answer was Bearer abcdefghijkl0123", "abcdefghijkl0123")]
+    [InlineData("call with key=hunter2hunter2 failed", "hunter2hunter2")]
+    [InlineData("tvly-ABCDEFGHIJ0123456789 rejected", "tvly-ABCDEF")]
+    [InlineData("AIzaSyA0123456789abcdefghijklmnopqrstu rejected", "AIzaSyA0123")]
+    [InlineData("gsk_AbCdEfGhIjKlMnOpQrSt0123 rejected", "gsk_AbCdEf")]
+    [InlineData("Incorrect API key provided: abcd1234efgh5678", "abcd1234efgh5678")]
+    public void KnownSecretsStillRemovesKeys(string text, string secretFragment) =>
+        Assert.DoesNotContain(secretFragment, text.RedactKnownSecrets());
+
+    [Theory]
+    [InlineData("key")]
+    [InlineData("key provided")]
+    [InlineData("Authorization")]
+    [InlineData("Bearer")]
+    [InlineData("a1")]
+    [InlineData("Ab1+")]
+    [InlineData("x-api-key")]
+    public void StaysLinearOnLongHostileInput(string unit)
+    {
+        var inputs = new[]
+        {
+            string.Concat(Enumerable.Repeat(unit + " ", 50_000)),
+            unit + new string(' ', 200_000),
+            unit + new string(' ', 200_000) + ":" + new string(' ', 200_000) + "x",
+            string.Concat(Enumerable.Repeat(unit, 100_000)),
+            string.Concat(Enumerable.Repeat(new string('a', 31) + "1!", 10_000)),
+        };
+
+        var watch = Stopwatch.StartNew();
+        foreach (var input in inputs)
+        {
+            input.RedactSecrets();
+            input.RedactKnownSecrets();
+        }
+
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), $"Redaction took {watch.Elapsed}.");
     }
 
     [Theory]
