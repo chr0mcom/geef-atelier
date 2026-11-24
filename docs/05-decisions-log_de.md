@@ -1701,15 +1701,20 @@ laufentscheidend). Anzeige auf der Detailseite und in den MCP-Feldern `warnings`
 **D-067/3 — `Outcome` als Anzeigesignal, `RunStatus` unverändert.** `Runs.Outcome` (`Converged`,
 `DeliveredWithOpenPoints`, `Failed`, `Aborted`) und `Runs.DeliveredIteration` sagen, was ein Lauf geliefert
 hat. `Outcome` bedeutet „fertig abgelegt, inklusive Finalizer“. `RunStatus` bleibt wie entschieden: Ein Lauf
-ohne Konvergenz endet `Failed`, auch wenn er einen Text liefert (Statusentscheidung vom 2026-07-17). Die
-Anzeige leitet „geliefert mit offenen Punkten“ aus `Outcome` ab. Bei einem Fehlschlag werden die Befunde der
-letzten Iteration mitgespeichert.
+ohne Konvergenz endet `Failed`, auch wenn er einen Text liefert (Statusentscheidung vom 2026-07-17).
+`Outcome` liefert MCP (`get_run_status`, `get_run_result`); die Weboberfläche liest es nicht, ihr Block
+„Warnings“ wählt seinen Wortlaut nach `Status` und danach, ob ein Text vorliegt. `DeliveredWithOpenPoints`
+umfasst auch einen Lauf, den ein kritischer Befund stoppte (Status `Aborted`) und der einen Text hat. Bei
+einem Fehlschlag werden die Befunde der letzten Iteration mitgespeichert.
 
 **D-067/4 — Laut statt still.** Eine gescheiterte Migration bricht den Start ab; der Health-Check
 `pending-migrations` meldet offene Migrationen. Ein unbrauchbarer Crew-Snapshot lässt den Lauf mit Meldung
 scheitern (`CrewSnapshot.DeserializeForRun`), statt auf die Klassik-Crew zu fallen. Eine Crew ohne Reviewer
-scheitert beim Start; der `AutoApproveReviewer` ist entfernt. Ein Lauf ohne Snapshot wird nicht fortgesetzt,
-sondern sofort mit Meldung abgelehnt. Ein unbekannter Grounding-Typ wird als Warnung übersprungen.
+scheitert beim Start; der `AutoApproveReviewer` ist entfernt, und eine Crew-Vorlage ohne Reviewer lässt sich
+weder anlegen noch speichern (`CrewTemplateRules.EnsureHasReviewer`, auch im Vorlagen-Editor). Ein Lauf ohne
+Snapshot wird nicht fortgesetzt, sondern sofort mit Meldung abgelehnt (`RunNotResumableException`). Ein
+unbekannter Grounding-Typ wird als Warnung übersprungen. Fehlertexte am Lauf und Warnungen sind feste,
+einfache Sätze; technische Einzelheiten gehen nur ins Log.
 
 **D-067/5 — Grounding-Brücke bis zum Umbau.** Die fünf System-Grounding-Profile haben keinen `ToolName`
 mehr und laufen wieder über den Provider-Typ-Weg; eine Laufzeitregel (`GroundingPathSelection`) gilt auch
@@ -1726,9 +1731,11 @@ abgelehnt und zur Laufzeit nie gelesen. Die Editoren für Provider, Tools, MCP-S
 für Admins; das Template Studio übernimmt keine Schlüsselverweise mehr.
 
 **D-067/7 — Hub nur für Angemeldete.** `RunHub` verlangt eine Anmeldung, bildet Gruppennamen serverseitig
-aus der Identität und endet bei Ablauf der Anmeldung. Die Blazor-Seiten bekommen Live-Updates über den
-prozessinternen `IRunUpdateFeed` mit denselben Zugriffsregeln und öffnen keine `HubConnection` mehr.
-Listen-Updates gehen nur an Besitzer und Admins.
+aus der Identität und endet bei Ablauf der Anmeldung (`MapRunHub`). Die Blazor-Seiten bekommen Live-Updates
+über den prozessinternen `IRunUpdateFeed` mit denselben Zugriffsregeln und öffnen keine `HubConnection`
+mehr. Listen-Updates gehen nur an Besitzer und Admins. Ein externer Client des Hubs ist nicht bekannt;
+`RunHub` und der Hub-Teil von `LiveRunNotifier` bleiben, so abgesichert, bis zum Rückbau in Etappe 8
+(D-068).
 
 **D-067/8 — Learning-Schalter aus.** `Learning:Enabled` (Standard `false`) hält die Learning-Schleife an:
 kein Extrakt, kein Prüflauf, kein Embedding, leerer Abruf. Crews mit Learning-Teilen bleiben gültig. Die
@@ -1755,7 +1762,6 @@ auf einem festen Aufgabenset; echte Aufträge bleiben außerhalb von Git
 - Probleme werden am Lauf sichtbar, statt die Qualität still zu senken; manche Läufe scheitern jetzt mit
   Meldung, die vorher still mit Ersatzverhalten liefen.
 - Läufe, die vor Step47 endeten, haben `Outcome = NULL`; es gibt keine Nachberechnung.
-- Der Template-Editor prüft beim Speichern noch nicht auf einen Reviewer; solche Crews scheitern beim Start.
 - Migration Step47 ist additiv und idempotent (`RunWarnings`, `Runs.Outcome`, `Runs.DeliveredIteration`,
   `Runs.ReportJson`, Bereinigung von `ToolName` an fünf System-Profilen).
 - Die Doku beschreibt den Tool-Pfad als eingefroren ([10-tool-system](10-tool-system_de.md)).
@@ -1802,8 +1808,10 @@ ebenfalls nicht.
 - **Gedächtnis.** Profil, gemerkte Antworten und Korrekturen je Nutzer, ohne Embeddings; es ersetzt die
   Learning-Schleife.
 - **Rückbau in Etappen.** Agentischer Tool-Pfad, MCP-Client, Template Studio, Crew-Composer, Learning-Gate
-  und Embeddings werden schrittweise entfernt. Tabellen werden erst ein Deploy nach dem Wegfall des Codes
-  gelöscht; alte Snapshots bleiben lesbar.
+  und Embeddings werden schrittweise entfernt. Der SignalR-Hub `RunHub` (kein Client in der Anwendung, kein
+  bekannter externer Client) entfällt spätestens in Etappe 8, zusammen mit dem Hub-Teil von
+  `LiveRunNotifier`; bis dahin bleibt er auf Angemeldete beschränkt. Tabellen werden erst ein Deploy nach
+  dem Wegfall des Codes gelöscht; alte Snapshots bleiben lesbar.
 
 **Unverändert.** Das Geef-SDK, die Statusentscheidung vom 2026-07-17, additive und idempotente Migrationen,
 die einsprachige englische Oberfläche (D-062; Fragen und Ergebnis erscheinen in der Sprache des Auftrags).

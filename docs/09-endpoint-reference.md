@@ -2,7 +2,7 @@
 
 *[Deutsch](09-endpoint-reference_de.md) · **English***
 
-*Last updated: 2026-11-24 (D-067: `warnings` and `outcome` in `get_run_status`/`get_run_result`; `/hubs/runs` only for signed-in users; admin-only editors and `/access-denied`; learning paused by default; before that 2026-05-22, D-054: `list_learnings` tool added; `providerType` updated to include `learning-retrieval`)*
+*Last updated: 2026-11-24 (D-067: `warnings` and `outcome` in `get_run_status`/`get_run_result`, reading the result after `outcome`; `/hubs/runs` stays until stage 8; `/hubs/runs` only for signed-in users; admin-only editors and `/access-denied`; learning paused by default; before that 2026-05-22, D-054: `list_learnings` tool added; `providerType` updated to include `learning-retrieval`)*
 
 All externally reachable HTTP endpoints of Geef.Atelier — MCP, OAuth 2.1
 and the web-UI/account endpoints. Base URL: `https://geef.stefan-bechtel.de`.
@@ -207,13 +207,18 @@ older clients can ignore them. Field names are camelCase.
 | Field | Type | Description |
 |---|---|---|
 | `warnings` | array | Problems the run worked around instead of stopping (skipped sources, failed reviewers, model failover, finalizer problems). Empty when there were none. `code` is stable and machine-readable (e.g. `grounding.provider_skipped`); `message` is a short plain-English sentence whose wording may change. |
-| `outcome` | string \| null | What the run delivered once it is finished **and stored, including all finalizers**. `null` while the run is active and for runs that ended before Step47. |
+| `outcome` | string \| null | What the run delivered once it is finished **and stored, including all finalizers**. `null` while the run is still working, **also when `status` already looks terminal** (the status is set before the finalizers run), and for runs that ended before Step47. |
 
 **Reading the result:** `status` keeps its meaning. A run that stops without convergence still has
 `status = "Failed"` but delivers its best draft with `outcome = "DeliveredWithOpenPoints"` and a
-`finalText`. A client should wait until `outcome` is set and then read `finalText`; a run with
-`outcome = "Failed"` or `"Aborted"` has no usable text. Details:
-[02-architecture](02-architecture.md#run-outcome-and-runstatus).
+`finalText`; the same outcome with `status = "Aborted"` means a critical reviewer finding stopped a run
+that already had a text. A client waits until `outcome` is set (not just a terminal `status`) and only then
+reads `finalText`; before that the text can still be changed by a finalizer.
+
+`outcome = "Failed"` or `"Aborted"` does not mean that there is no text: a run cancelled after its text was
+stored keeps it, and a run whose result could not be stored completely is `Failed` with the warning
+`run.result_not_saved`. Check `finalText` in the result; with `Failed` it is not guaranteed to be complete.
+Details: [02-architecture](02-architecture.md#run-outcome-and-runstatus).
 
 ---
 
@@ -427,7 +432,7 @@ externally reachable routes:
 | `/login` | GET/POST | None | Login page (static SSR) |
 | `/auth/logout` | POST | Cookie | Logout (anti-forgery, Minimal API) |
 | `/settings/theme` | POST | None | Theme-switch fallback (no-JS), redirect to the referer |
-| `/hubs/runs` | WS | Cookie | SignalR hub for live run updates, signed-in users only; group names are derived on the server (D-067). The application's own pages use the in-process `IRunUpdateFeed` instead. |
+| `/hubs/runs` | WS | Cookie | SignalR hub for live run updates, signed-in users only; group names are derived on the server and the connection closes when the sign-in expires (D-067). The application's own pages use the in-process `IRunUpdateFeed` instead; no external client is known, and the hub is removed in stage 8 (D-068). |
 | `/access-denied` | GET | Cookie | Shown to signed-in users who open a page they have no access to (D-067) |
 | `/admin/users` | GET | Cookie (admin) | User management |
 | `/admin/oauth-clients` | GET | Cookie (admin) | OAuth client management |

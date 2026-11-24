@@ -2,7 +2,7 @@
 
 *[English](09-endpoint-reference.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-24 (D-067: `warnings` und `outcome` in `get_run_status`/`get_run_result`; `/hubs/runs` nur für Angemeldete; Editoren nur für Admins und `/access-denied`; Learning standardmäßig pausiert; zuvor 2026-05-22, D-054: Tool list_learnings ergänzt; providerType um learning-retrieval erweitert)*
+*Letzte Aktualisierung: 2026-11-24 (D-067: `warnings` und `outcome` in `get_run_status`/`get_run_result`, Ergebnis erst nach `outcome` lesen; `/hubs/runs` bleibt bis Etappe 8; `/hubs/runs` nur für Angemeldete; Editoren nur für Admins und `/access-denied`; Learning standardmäßig pausiert; zuvor 2026-05-22, D-054: Tool list_learnings ergänzt; providerType um learning-retrieval erweitert)*
 
 Alle HTTP-Endpunkte von Geef.Atelier, die extern erreichbar sind — MCP, OAuth 2.1
 sowie die Web-UI-/Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`.
@@ -207,12 +207,19 @@ Seit D-067 liefern `get_run_status` und `get_run_result` zwei zusätzliche Felde
 | Feld | Typ | Beschreibung |
 |---|---|---|
 | `warnings` | array | Probleme, die der Lauf umgangen hat, statt anzuhalten (übersprungene Quellen, ausgefallene Reviewer, Modell-Failover, Finalizer-Probleme). Leer, wenn es keine gab. `code` ist stabil und maschinenlesbar (z. B. `grounding.provider_skipped`); `message` ist ein kurzer, einfacher englischer Satz, dessen Wortlaut sich ändern kann. |
-| `outcome` | string \| null | Was der Lauf geliefert hat, sobald er fertig **und abgelegt ist, inklusive aller Finalizer**. `null`, solange der Lauf aktiv ist, und bei Läufen, die vor Step47 endeten. |
+| `outcome` | string \| null | Was der Lauf geliefert hat, sobald er fertig **und abgelegt ist, inklusive aller Finalizer**. `null`, solange der Lauf noch arbeitet, **auch wenn `status` schon terminal aussieht** (der Status wird vor den Finalizern gesetzt), und bei Läufen, die vor Step47 endeten. |
 
 **Ergebnis lesen:** `status` behält seine Bedeutung. Ein Lauf, der ohne Konvergenz stoppt, hat weiterhin
 `status = "Failed"`, liefert aber seinen besten Entwurf mit `outcome = "DeliveredWithOpenPoints"` und
-einem `finalText`. Ein Client wartet, bis `outcome` gesetzt ist, und liest dann `finalText`; ein Lauf mit
-`outcome = "Failed"` oder `"Aborted"` hat keinen brauchbaren Text. Einzelheiten:
+einem `finalText`; dasselbe Ergebnis mit `status = "Aborted"` heißt, dass ein kritischer Reviewer-Befund
+einen Lauf gestoppt hat, der schon einen Text hatte. Ein Client wartet, bis `outcome` gesetzt ist (nicht nur
+auf einen terminalen `status`), und liest erst dann `finalText`; vorher kann ein Finalizer den Text noch
+ändern.
+
+`outcome = "Failed"` oder `"Aborted"` heißt nicht, dass es keinen Text gibt: Ein Lauf, der nach dem
+Speichern seines Textes abgebrochen wurde, behält ihn, und ein Lauf, dessen Ergebnis nicht vollständig
+gespeichert werden konnte, ist `Failed` mit der Warnung `run.result_not_saved`. `finalText` im Ergebnis
+prüfen; bei `Failed` ist er nicht sicher vollständig. Einzelheiten:
 [02-architecture](02-architecture_de.md#lauf-ergebnis-outcome-und-runstatus).
 
 ---
@@ -427,7 +434,7 @@ extern erreichbaren Routen:
 | `/login` | GET/POST | Keine | Login-Seite (Static SSR) |
 | `/auth/logout` | POST | Cookie | Logout (Anti-Forgery, Minimal-API) |
 | `/settings/theme` | POST | Keine | Theme-Wechsel-Fallback (No-JS), Redirect zum Referer |
-| `/hubs/runs` | WS | Cookie | SignalR-Hub für Live-Run-Updates, nur für Angemeldete; Gruppennamen leitet der Server ab (D-067). Die eigenen Seiten der Anwendung nutzen stattdessen den prozessinternen `IRunUpdateFeed`. |
+| `/hubs/runs` | WS | Cookie | SignalR-Hub für Live-Run-Updates, nur für Angemeldete; Gruppennamen leitet der Server ab, und die Verbindung schließt bei Ablauf der Anmeldung (D-067). Die eigenen Seiten der Anwendung nutzen stattdessen den prozessinternen `IRunUpdateFeed`; ein externer Client ist nicht bekannt, der Hub entfällt in Etappe 8 (D-068). |
 | `/access-denied` | GET | Cookie | Erscheint für Angemeldete, die eine Seite ohne Berechtigung öffnen (D-067) |
 | `/admin/users` | GET | Cookie (Admin) | Benutzerverwaltung |
 | `/admin/oauth-clients` | GET | Cookie (Admin) | OAuth-Client-Verwaltung |
