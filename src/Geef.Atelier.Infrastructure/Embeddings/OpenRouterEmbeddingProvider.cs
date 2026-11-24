@@ -1,3 +1,4 @@
+using Geef.Atelier.Core.Domain.Warnings;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -97,7 +98,9 @@ internal sealed class OpenRouterEmbeddingProvider(
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(cts.Token);
-            throw new HttpRequestException($"OpenRouter embeddings returned {(int)response.StatusCode}: {body}");
+            var detail = body.RedactSecrets();
+            throw new HttpRequestException(
+                $"OpenRouter embeddings returned {(int)response.StatusCode}: {(detail.Length > 300 ? detail[..300] + "…" : detail)}");
         }
 
         var result = await response.Content.ReadFromJsonAsync<EmbeddingResponse>(JsonOpts, cts.Token)

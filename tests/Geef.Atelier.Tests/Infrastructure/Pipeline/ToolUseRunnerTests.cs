@@ -176,13 +176,14 @@ public sealed class ToolUseRunnerTests
         Assert.Equal("Fallback answer.", result.FinalText);
         Assert.Equal(1, result.ToolCallCount);
 
-        // The error must have been forwarded to the LLM as a tool-result message.
+        // A fixed failure sentence (never the raw exception text) must have been forwarded to the LLM as a tool-result message.
         var secondRequest = client.Requests[1];
         Assert.NotNull(secondRequest.Messages);
         var toolResultMsg = secondRequest.Messages!
             .FirstOrDefault(m => m.Role == "tool");
         Assert.NotNull(toolResultMsg);
-        Assert.Contains("Simulated failure", toolResultMsg!.Content);
+        Assert.Contains("could not be run", toolResultMsg!.Content);
+        Assert.DoesNotContain("Simulated failure", toolResultMsg.Content);
     }
 
     // -------------------------------------------------------------------------

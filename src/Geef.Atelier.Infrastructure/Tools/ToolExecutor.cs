@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Geef.Atelier.Application.Tools;
 using Geef.Atelier.Core.Domain.Mcp;
+using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Domain.Tools;
 using Geef.Atelier.Core.Persistence.Mcp;
 using Geef.Atelier.Core.Persistence.Tools;
@@ -24,6 +25,8 @@ namespace Geef.Atelier.Infrastructure.Tools;
 ///   <item><see cref="ToolType.McpTool"/> — connects to the configured MCP server and calls the tool by its original name.</item>
 ///   <item>All other types — return a "NotYetWired" error result.</item>
 /// </list>
+/// When a call throws, the caller (and through it the model) only gets a fixed sentence; the exception goes to the
+/// log with credential-like fragments removed (<see cref="SecretRedactionExtensions.ToRedactedLogText"/>).
 /// </summary>
 internal sealed class ToolExecutor(
     IServiceScopeFactory scopeFactory,
@@ -34,6 +37,15 @@ internal sealed class ToolExecutor(
     IEnvReferencePolicy? envReferencePolicy = null) : IToolExecutor
 {
     private readonly IEnvReferencePolicy _envPolicy = envReferencePolicy ?? EnvReferencePolicy.Default;
+
+    /// <summary>Error text when a tool call throws for an unexpected reason.</summary>
+    internal const string ToolFailedMessage = "The tool could not be run.";
+
+    /// <summary>Error text when the call to an MCP tool fails.</summary>
+    internal const string McpToolFailedMessage = "The MCP tool call failed.";
+
+    /// <summary>Error text when the web search fails.</summary>
+    internal const string WebSearchFailedMessage = "The web search failed.";
 
     /// <inheritdoc/>
     public async Task<ToolExecutionResult> ExecuteAsync(
@@ -60,10 +72,10 @@ internal sealed class ToolExecutor(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex,
-                "Tool execution failed: tool={ToolName} type={ToolType} run={RunId}",
-                tool.Name, tool.ToolType, ctx.RunId);
-            result = new ToolExecutionResult("", null, ex.Message);
+            logger.LogError(
+                "Tool execution failed: tool={ToolName} type={ToolType} run={RunId}: {Error}",
+                tool.Name, tool.ToolType, ctx.RunId, ex.ToRedactedLogText());
+            result = new ToolExecutionResult("", null, ToolFailedMessage);
         }
 
         sw.Stop();
@@ -184,8 +196,9 @@ internal sealed class ToolExecutor(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "ToolExecutor: mcp-tool call failed for tool={ToolName}", tool.Name);
-            return new ToolExecutionResult("", null, $"MCP tool call failed: {ex.Message}");
+            logger.LogWarning(
+                "ToolExecutor: mcp-tool call failed for tool={ToolName}: {Error}", tool.Name, ex.ToRedactedLogText());
+            return new ToolExecutionResult("", null, McpToolFailedMessage);
         }
     }
 
@@ -277,9 +290,9 @@ internal sealed class ToolExecutor(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex,
-                "ToolExecutor: web-search call failed for tool={ToolName}", tool.Name);
-            return new ToolExecutionResult("", null, $"Tavily web-search failed: {ex.Message}");
+            logger.LogWarning(
+                "ToolExecutor: web-search call failed for tool={ToolName}: {Error}", tool.Name, ex.ToRedactedLogText());
+            return new ToolExecutionResult("", null, WebSearchFailedMessage);
         }
     }
 
