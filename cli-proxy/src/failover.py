@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from collections import deque
 
 from redaction import redact_secrets
 
@@ -46,6 +47,24 @@ def _env_int(name: str, default: int) -> int:
 ENABLED = _env_flag("FAILOVER_ENABLED", True)
 FAILS = _env_int("FAILOVER_FAILS", 2)
 OPEN_SECONDS = _env_int("FAILOVER_OPEN_SECONDS", 300)
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, "") or default)
+    except ValueError:
+        log.warning("%s is not a number -- using default %s", name, default)
+        return default
+
+
+#: Observation window of the empty-result rate in /health (seconds).
+EMPTY_RESULT_WINDOW_SECONDS = _env_int("EMPTY_RESULT_ALERT_WINDOW_SECONDS", 600)
+#: `empty_result_alert` needs at least this many empty results inside the window ...
+EMPTY_RESULT_ALERT_MIN = _env_int("EMPTY_RESULT_ALERT_MIN", 5)
+#: ... and more than this share of the backend's document-mode attempts inside the window.
+EMPTY_RESULT_ALERT_RATIO = _env_float("EMPTY_RESULT_ALERT_RATIO", 0.5)
+#: Safety cap for the per-backend timestamp queues (they are pruned to the window anyway).
+_MAX_RECENT_EVENTS = 10_000
 
 #: Which backend covers for which. Symmetric on purpose -- codex outages are as real
 #: as claude ones, and the caller should not have to care which one is degraded.
@@ -89,19 +108,24 @@ _PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
 #: Reasons that justify handing the request to the partner backend.
 _FAILOVER_REASONS = frozenset({"auth", "limit", "transport"})
 
-#: A document-mode run that exited normally but produced no text. It counts against the
-#: breaker of the backend that produced it (that backend did not serve the request), but it is
-#: never handed over: the caller gets an `empty_result` error instead (see main.py).
+#: A document-mode run that exited normally but produced no text. It is an error of that one
+#: request (502 `empty_result`, never handed over, see main.py) and NOT a breaker failure: whether
+#: the CLI writes the document depends on the request's content (a refusal, a chat answer instead
+#: of a file edit), so it is no evidence that the backend is unhealthy. Before Fix C (2026-11-24)
+#: it counted against the breaker, and one request that came back empty twice (the Atelier's
+#: direct path retries once) blocked the backend for every other caller for OPEN_SECONDS.
+#: It is only counted and reported (`empty_results`, rate, `empty_result_alert` in /health).
 EMPTY_RESULT = "empty_result"
 
 #: Reasons that move the circuit breaker.
-_BREAKER_REASONS = _FAILOVER_REASONS | {EMPTY_RESULT}
+_BREAKER_REASONS = _FAILOVER_REASONS
 
 
 class _BackendState:
     __slots__ = ("consecutive_failures", "open_until", "last_reason", "last_error",
                  "last_error_detail", "last_failure_at", "failover_count", "tripped",
-                 "last_success_at", "empty_results")
+                 "last_success_at", "empty_results", "last_empty_result_at",
+                 "recent_empty_results", "recent_document_attempts")
 
     def __init__(self) -> None:
         self.consecutive_failures = 0
@@ -110,6 +134,9 @@ class _BackendState:
         self.last_error: str | None = None
         self.last_error_detail: str | None = None
         self.empty_results = 0
+        self.last_empty_result_at: float | None = None
+        self.recent_empty_results: deque[float] = deque(maxlen=_MAX_RECENT_EVENTS)
+        self.recent_document_attempts: deque[float] = deque(maxlen=_MAX_RECENT_EVENTS)
         self.last_failure_at: float | None = None
         self.failover_count = 0
         self.last_success_at: float | None = None
@@ -189,8 +216,9 @@ def record_success(backend: str) -> None:
 
 
 def record_failure(backend: str, reason: str, error: str) -> None:
-    """Record a failure. Only failover-worthy reasons (and an empty document-mode result)
-    move the breaker: a malformed request is not evidence that the backend is unhealthy."""
+    """Record a failure. Only failover-worthy reasons move the breaker: a malformed request is
+    not evidence that the backend is unhealthy. Empty document-mode results never come here
+    (see `record_empty_result`)."""
     st = _state(backend)
     st.last_reason = reason
     st.last_error = error[:_MAX_ERROR_CHARS]
@@ -207,12 +235,53 @@ def record_failure(backend: str, reason: str, error: str) -> None:
                     st.last_error)
 
 
+def _prune(events: deque[float], now: float) -> None:
+    cutoff = now - EMPTY_RESULT_WINDOW_SECONDS
+    while events and events[0] < cutoff:
+        events.popleft()
+
+
+def record_document_attempt(backend: str) -> None:
+    """Count one finished document-mode attempt of `backend` (whatever its outcome): the
+    denominator of the empty-result rate in /health."""
+    now = time.time()
+    st = _state(backend)
+    st.recent_document_attempts.append(now)
+    _prune(st.recent_document_attempts, now)
+
+
 def record_empty_result(backend: str, error: str) -> None:
-    """Record a document-mode run of `backend` that produced no text: counted in
-    `empty_results` and as a breaker failure of exactly this backend -- never of the backend
-    the request was handed over from."""
-    _state(backend).empty_results += 1
-    record_failure(backend, EMPTY_RESULT, error)
+    """Record a document-mode run of `backend` that produced no text.
+
+    Counted and reported only (`empty_results`, `last_empty_result_at`, the rate of the last
+    window). It leaves the breaker alone: `consecutive_failures`, `open_until`, `tripped` and
+    the `last_reason`/`last_error` picture of real faults stay as they are, and it is no success
+    either. `error` is the text of the 502 sent to the caller; it is logged by the caller."""
+    now = time.time()
+    st = _state(backend)
+    st.empty_results += 1
+    st.last_empty_result_at = now
+    st.recent_empty_results.append(now)
+    _prune(st.recent_empty_results, now)
+    log.info("Empty document-mode result of %s (not a breaker failure) | %s", backend, error)
+
+
+def _empty_result_view(st: _BackendState) -> dict:
+    now = time.time()
+    _prune(st.recent_empty_results, now)
+    _prune(st.recent_document_attempts, now)
+    empties = len(st.recent_empty_results)
+    attempts = len(st.recent_document_attempts)
+    rate = round(empties / attempts, 3) if attempts else None
+    alert = (empties >= EMPTY_RESULT_ALERT_MIN and rate is not None
+             and rate > EMPTY_RESULT_ALERT_RATIO)
+    return {
+        "last_empty_result_at": st.last_empty_result_at,
+        "empty_results_recent": empties,
+        "document_requests_recent": attempts,
+        "empty_result_rate": rate,
+        "empty_result_alert": alert,
+    }
 
 
 def record_failover(primary: str, used: str) -> None:
@@ -273,7 +342,12 @@ def snapshot() -> dict:
             "last_success_at": st.last_success_at,
             "failover_count": st.failover_count,
             # Document-mode runs that exited normally without writing any text (since start).
+            # Display only: they never move the breaker (Fix C, 2026-11-24).
             "empty_results": st.empty_results,
+            # Last such run, and the rate inside the last EMPTY_RESULT_WINDOW_SECONDS:
+            # empty results / finished document-mode attempts of this backend. The alert is
+            # set when both thresholds hold; it changes no behaviour.
+            **_empty_result_view(st),
             # The spare account is reported, but never counted towards `degraded`: while
             # the primary and codex serve, a dead reserve is not an incident.
             "reserve": backend in reserve,
@@ -281,5 +355,9 @@ def snapshot() -> dict:
     return {
         "enabled": ENABLED,
         "degraded": any(not b["healthy"] for name, b in backends.items() if name not in reserve),
+        # True when any backend (reserve included) shows a conspicuous empty-result rate. A hint
+        # for the watch scripts and operators, independent of `degraded` and the breaker.
+        "empty_result_alert": any(b["empty_result_alert"] for b in backends.values()),
+        "empty_result_window_seconds": EMPTY_RESULT_WINDOW_SECONDS,
         "backends": backends,
     }
