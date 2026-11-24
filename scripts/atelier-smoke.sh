@@ -11,8 +11,12 @@
 #   5. Prüfen (get_run_result): Status Completed, Text vorhanden, keine Fehlermeldung.
 #   6. Eine Ergebniszeile auf stdout und Exit-Code.
 #
-# Exit-Code: 0 = bestanden, 1 = Lauf gescheitert oder Zeitlimit, 2 = kein oder unvollständiges Smoke-Konto (nichts geprüft
-#            außer /health), 3 = /health, Anmeldung oder MCP-Aufruf gescheitert.
+# Exit-Code: 0 = bestanden, 1 = Lauf gescheitert oder Zeitlimit, 2 = Smoke-Konto fehlt, ist unvollständig oder unzulässig
+#            konfiguriert (nichts geprüft außer /health), 3 = /health, Anmeldung oder MCP-Aufruf gescheitert,
+#            4 = unerwartete Antwort des Ateliers (HTTP 200, aber nicht das vereinbarte Format, z. B. JSON-Array statt Objekt).
+#            Ein Traceback erscheint nie; auch ein unerwarteter interner Fehler endet mit einer Ergebniszeile und Exit 4.
+# Passwortschutz: Unverschlüsseltes http:// ist nur für die Hosts in ALLOWED_HTTP_HOSTS erlaubt (localhost, 127.0.0.1, ::1,
+#            geef-atelier-web); jeder andere http-Host bricht vor dem Login mit Exit 2 ab. Weiterleitungen folgt das Skript nie.
 # Variablen (Umgebung schlägt Datei): ATELIER_SMOKE_ENV, ATELIER_SMOKE_BASE_URL, ATELIER_SMOKE_TEMPLATE,
 #            ATELIER_SMOKE_TIMEOUT, ATELIER_SMOKE_POLL, ATELIER_SMOKE_REDIRECT_URI, ATELIER_SMOKE_SKIP_HEALTH=1 (nur Tests),
 #            ATELIER_SMOKE_VERBOSE=1 (Zwischenschritte auf stderr), WEB_CONTAINER.
@@ -103,11 +107,42 @@ if missing:
 BASE = cfg.get("ATELIER_SMOKE_BASE_URL", "https://geef.stefan-bechtel.de").rstrip("/")
 TEMPLATE = cfg.get("ATELIER_SMOKE_TEMPLATE", "klassik")
 REDIRECT_URI = cfg.get("ATELIER_SMOKE_REDIRECT_URI", "http://127.0.0.1/atelier-smoke/callback")
+ALLOWED_HTTP_HOSTS = ("localhost", "127.0.0.1", "::1", "geef-atelier-web")
+
+try:
+    _base = urllib.parse.urlsplit(BASE)
+    _host = (_base.hostname or "").lower()
+except ValueError:
+    _base, _host = None, ""
+if _base is None or _base.scheme not in ("https", "http") or not _host:
+    result("FEHLER (konfiguration): ATELIER_SMOKE_BASE_URL ist keine gültige https://-Adresse.", 2)
+if _base.scheme == "http" and _host not in ALLOWED_HTTP_HOSTS:
+    result(f"FEHLER (konfiguration): ATELIER_SMOKE_BASE_URL nutzt unverschlüsseltes http:// für den Host {_host}; "
+           f"das Passwort ginge im Klartext über das Netz. http:// ist nur für {', '.join(ALLOWED_HTTP_HOSTS)} erlaubt, "
+           "sonst https:// verwenden.", 2)
 try:
     TIMEOUT = int(cfg.get("ATELIER_SMOKE_TIMEOUT", "1500"))
     POLL = max(1, int(cfg.get("ATELIER_SMOKE_POLL", "10")))
 except ValueError:
     result("NICHT EINGERICHTET: ATELIER_SMOKE_TIMEOUT und ATELIER_SMOKE_POLL müssen ganze Zahlen sein.", 2)
+
+
+class UnexpectedResponse(Exception):
+    pass
+
+
+def as_dict(value, what):
+    if not isinstance(value, dict):
+        raise UnexpectedResponse(f"{what} ist kein JSON-Objekt, sondern {type(value).__name__}")
+    return value
+
+
+def as_text(value, what):
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise UnexpectedResponse(f"{what} ist kein Text, sondern {type(value).__name__}")
+    return value.strip()
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -189,12 +224,15 @@ def access_token():
         "redirect_uri": REDIRECT_URI,
         "code_verifier": verifier,
     })
-    try:
-        token = json.loads(text).get("access_token") if status == 200 else None
-    except ValueError:
-        token = None
-    if not token:
+    if status != 200:
         result(f"FEHLER (anmeldung): Token-Tausch gescheitert (HTTP {status})", 3)
+    try:
+        data = json.loads(text)
+    except ValueError:
+        raise UnexpectedResponse("Antwort von /oauth/token ist kein JSON") from None
+    token = as_dict(data, "Antwort von /oauth/token").get("access_token")
+    if not isinstance(token, str) or not token:
+        raise UnexpectedResponse("Antwort von /oauth/token ohne access_token")
     step("Zugriffstoken erhalten")
     return token
 
@@ -222,34 +260,39 @@ class Mcp:
                         candidate = json.loads(line[5:].strip())
                     except ValueError:
                         continue
-                    if candidate.get("id") == payload["id"]:
+                    if as_dict(candidate, f"SSE-Datenzeile der Antwort auf {method}").get("id") == payload["id"]:
                         message = candidate
         else:
             try:
                 message = json.loads(text)
             except ValueError:
                 message = None
-        if not isinstance(message, dict):
-            result(f"FEHLER (mcp): {method} ohne lesbare Antwort", 3)
+        if message is None:
+            raise UnexpectedResponse(f"{method} ohne lesbare Antwort")
+        as_dict(message, f"Antwort auf {method}")
         if "error" in message:
-            result(f"FEHLER (mcp): {method}: {str(message['error'].get('message', ''))[:200]}", 3)
-        return message.get("result") or {}
+            error = message["error"]
+            detail = error.get("message", "") if isinstance(error, dict) else error
+            result(f"FEHLER (mcp): {method}: {str(detail)[:200]}", 3)
+        return as_dict(message.get("result") or {}, f"Feld result der Antwort auf {method}")
 
     def notify(self, method):
         self._post({"jsonrpc": "2.0", "method": method})
 
     def tool(self, name, arguments):
         res = self.rpc("tools/call", {"name": name, "arguments": arguments})
+        content = res.get("content")
+        content = content if isinstance(content, list) else []
         if res.get("isError"):
-            text = " ".join(c.get("text", "") for c in res.get("content", []) if isinstance(c, dict))
+            text = " ".join(str(c.get("text", "")) for c in content if isinstance(c, dict))
             result(f"FEHLER (mcp): {name}: {text[:200]}", 3)
         data = res.get("structuredContent")
         if isinstance(data, dict) and "result" in data and len(data) == 1:
             data = data["result"]
         if not isinstance(data, dict):
             data = None
-            for c in res.get("content", []):
-                if isinstance(c, dict) and c.get("type") == "text":
+            for c in content:
+                if isinstance(c, dict) and c.get("type") == "text" and isinstance(c.get("text"), str):
                     try:
                         data = json.loads(c["text"])
                     except ValueError:
@@ -259,47 +302,56 @@ class Mcp:
         return {k.lower(): v for k, v in data.items()}
 
 
-login()
-mcp = Mcp(access_token())
-init = mcp.rpc("initialize", {
-    "protocolVersion": "2025-06-18",
-    "capabilities": {},
-    "clientInfo": {"name": "atelier-smoke", "version": "1"},
-})
-if init.get("protocolVersion"):
-    mcp.headers["MCP-Protocol-Version"] = init["protocolVersion"]
-mcp.notify("notifications/initialized")
+def main():
+    login()
+    mcp = Mcp(access_token())
+    init = mcp.rpc("initialize", {
+        "protocolVersion": "2025-06-18",
+        "capabilities": {},
+        "clientInfo": {"name": "atelier-smoke", "version": "1"},
+    })
+    if init.get("protocolVersion"):
+        mcp.headers["MCP-Protocol-Version"] = init["protocolVersion"]
+    mcp.notify("notifications/initialized")
 
-started = time.monotonic()
-submitted = mcp.tool("submit_request", {"briefingText": BRIEFING, "crewTemplate": TEMPLATE})
-run_id = submitted.get("runid")
-if not run_id:
-    result("FEHLER (mcp): submit_request ohne Lauf-ID", 3)
-step(f"Lauf {run_id} eingereicht")
+    started = time.monotonic()
+    submitted = mcp.tool("submit_request", {"briefingText": BRIEFING, "crewTemplate": TEMPLATE})
+    run_id = submitted.get("runid")
+    if not run_id:
+        result("FEHLER (mcp): submit_request ohne Lauf-ID", 3)
+    step(f"Lauf {run_id} eingereicht")
 
-status = ""
-while True:
-    current = mcp.tool("get_run_status", {"runId": run_id})
-    status = str(current.get("status") or "")
-    if status in ("Completed", "Failed", "Aborted"):
-        break
-    if time.monotonic() - started > TIMEOUT:
-        result(f"FEHLER (zeitlimit): Lauf {run_id} nach {TIMEOUT} s noch im Status {status or '?'}", 1)
-    step(f"Status {status or '?'}")
-    time.sleep(POLL)
+    status = ""
+    while True:
+        current = mcp.tool("get_run_status", {"runId": run_id})
+        status = str(current.get("status") or "")
+        if status in ("Completed", "Failed", "Aborted"):
+            break
+        if time.monotonic() - started > TIMEOUT:
+            result(f"FEHLER (zeitlimit): Lauf {run_id} nach {TIMEOUT} s noch im Status {status or '?'}", 1)
+        step(f"Status {status or '?'}")
+        time.sleep(POLL)
 
-final = mcp.tool("get_run_result", {"runId": run_id})
-elapsed = int(time.monotonic() - started)
-text = (final.get("finaltext") or "").strip()
-error = (final.get("errormessage") or "").strip()
-problems = []
-if final.get("status", status) != "Completed":
-    problems.append(f"Status {final.get('status', status)}")
-if not text:
-    problems.append("kein Text")
-if error:
-    problems.append(f"Fehlermeldung: {error[:160]}")
-if problems:
-    result(f"FEHLER (lauf): Lauf {run_id} nach {elapsed} s: {'; '.join(problems)}", 1)
-result(f"OK: Lauf {run_id} Completed in {elapsed} s, {len(text)} Zeichen Text ({TEMPLATE})", 0)
+    final = mcp.tool("get_run_result", {"runId": run_id})
+    elapsed = int(time.monotonic() - started)
+    text = as_text(final.get("finaltext"), "finalText von get_run_result")
+    error = as_text(final.get("errormessage"), "errorMessage von get_run_result")
+    problems = []
+    if final.get("status", status) != "Completed":
+        problems.append(f"Status {final.get('status', status)}")
+    if not text:
+        problems.append("kein Text")
+    if error:
+        problems.append(f"Fehlermeldung: {error[:160]}")
+    if problems:
+        result(f"FEHLER (lauf): Lauf {run_id} nach {elapsed} s: {'; '.join(problems)}", 1)
+    result(f"OK: Lauf {run_id} Completed in {elapsed} s, {len(text)} Zeichen Text ({TEMPLATE})", 0)
+
+
+try:
+    main()
+except UnexpectedResponse as exc:
+    result(f"FEHLER (antwort): {exc}", 4)
+except Exception as exc:
+    result(f"FEHLER (unerwartet): interner Fehler {type(exc).__name__}", 4)
 PY

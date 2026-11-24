@@ -1,11 +1,16 @@
 import base64
 import json
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
 from conftest import FakeRunner
 from geef_eval.arms import AtelierMcpArm, RawClaudeArm, ReferenceArm, build_arms, load_plugin, raw_prompt
-from geef_eval.mcp import AtelierRunState, AtelierToolAdapter, HttpReply, McpClient, McpError, parse_jsonrpc_reply
+from geef_eval.mcp import (
+    AtelierRunState, AtelierToolAdapter, HttpReply, McpClient, McpError, RedirectRefused, parse_jsonrpc_reply,
+    urllib_transport,
+)
 from geef_eval.tasks import Attachment, Task
 
 TASK = Task(id="t1", brief="Schreib eine Einladung.",
@@ -201,3 +206,75 @@ def test_adapter_encodes_attachments_and_allows_renamed_tools():
     sent = json.loads(arguments["attachments"])[0]
     assert sent["filename"] == "eckdaten.md"
     assert base64.b64decode(sent["contentBase64"]).decode("utf-8") == "Samstag 15 Uhr"
+
+
+def _serve(handler_factory):
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler_factory)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return httpd
+
+
+def _recording_handler(seen):
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def _record(self):
+            seen.append({"path": self.path, "authorization": self.headers.get("Authorization")})
+            body = json.dumps({"jsonrpc": "2.0", "id": 1, "result": {}}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        do_GET = _record
+        do_POST = _record
+
+    return Handler
+
+
+def _redirecting_handler(target, code):
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            self.send_response(code)
+            self.send_header("Location", target)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    return Handler
+
+
+@pytest.mark.parametrize("code", [301, 302, 303, 307, 308])
+def test_bearer_token_never_follows_a_redirect_to_another_origin(code):
+    seen = []
+    other = _serve(_recording_handler(seen))
+    first = _serve(_redirecting_handler(f"http://localhost:{other.server_port}/mcp?x=1", code))
+    try:
+        client = McpClient(f"http://127.0.0.1:{first.server_port}", "TOKEN-SECRET", transport=urllib_transport, timeout_s=10)
+        with pytest.raises(RedirectRefused) as info:
+            client.call_tool("submit_request", {"briefingText": "x"})
+    finally:
+        first.shutdown()
+        other.shutdown()
+
+    assert seen == []
+    assert f"HTTP {code} nach http://localhost:{other.server_port}" in str(info.value)
+    assert "TOKEN-SECRET" not in str(info.value) and "x=1" not in str(info.value)
+    assert isinstance(info.value, McpError)
+
+
+def test_urllib_transport_still_talks_to_the_configured_endpoint():
+    seen = []
+    server = _serve(_recording_handler(seen))
+    try:
+        reply = urllib_transport(f"http://127.0.0.1:{server.server_port}/mcp", {"Authorization": "Bearer T"}, b"{}", 10)
+    finally:
+        server.shutdown()
+
+    assert reply.status == 200
+    assert seen == [{"path": "/mcp", "authorization": "Bearer T"}]

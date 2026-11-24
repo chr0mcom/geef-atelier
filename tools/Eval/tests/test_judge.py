@@ -5,8 +5,8 @@ import pytest
 from conftest import FakeRunner, verdict_json
 from geef_eval.cli_runner import LimitError
 from geef_eval.judge import (
-    ClaudeJudge, CodexBusyError, CodexJudge, assignment, classify, default_judges, judge_all, judge_prompt,
-    order_for_pass, outcomes, pair_key, validate_verdict,
+    AssignmentConflict, ClaudeJudge, CodexBusyError, CodexJudge, JudgeJob, assignment, classify, default_judges,
+    judge_all, judge_prompt, order_for_pass, outcomes, pair_key, run_job, validate_verdict,
 )
 from geef_eval.store import RunStore
 from geef_eval.tasks import Task
@@ -88,7 +88,7 @@ def test_judge_all_two_passes_maps_labels_back_to_arms_and_logs_assignment_separ
     assert all(o.winners == ("roh", "roh") for o in results)
     assert all(o.fabricated == {"atelier": 1.0, "roh": 0.0} for o in results)
     assigned = store.read_json(store.assignment_path("t1", "atelier__vs__roh", "fake"))
-    assert set(assigned) == {"seed", "pass1", "pass2"}
+    assert set(assigned) == {"seed", "version", "pass1", "pass2"}
     verdict_file = store.read_json(store.judgment_path("t1", "atelier__vs__roh", "fake", 1))
     assert "roh" not in json.dumps(verdict_file) and "atelier" not in json.dumps(verdict_file)
 
@@ -161,3 +161,57 @@ def test_codex_judge_is_off_by_default(tmp_path, monkeypatch):
     monkeypatch.delenv("EVAL_CODEX_MAX", raising=False)
     with pytest.raises(ValueError, match="EVAL_CODEX_MAX"):
         default_judges(store, codex=True)
+
+
+def _seed_that_swaps_pass_one(task_id, key, judge, base="seed"):
+    original = assignment(base, task_id, key, judge)
+    for i in range(100):
+        candidate = f"anders-{i}"
+        if assignment(candidate, task_id, key, judge) != original:
+            return candidate
+    raise AssertionError("kein Seed mit vertauschter Reihenfolge gefunden")
+
+
+def test_resume_with_other_seed_never_rewrites_the_assignment(tmp_path):
+    store = RunStore(tmp_path)
+    write_output(store, "t1", "roh", "gut")
+    write_output(store, "t1", "atelier", "schwach")
+    key = pair_key("roh", "atelier")
+    judge_all(TASKS[:1], ["roh", "atelier"], store, [ScriptedJudge()], "seed", max_calls=1, echo=lambda _: None)
+    path = store.assignment_path("t1", key, "fake")
+    before = path.read_text(encoding="utf-8")
+    other = _seed_that_swaps_pass_one("t1", key, "fake")
+    late = ScriptedJudge()
+
+    with pytest.raises(AssignmentConflict, match="Seed 'seed'"):
+        judge_all(TASKS[:1], ["roh", "atelier"], store, [late], other, echo=lambda _: None)
+
+    assert late.prompts == []
+    assert path.read_text(encoding="utf-8") == before
+    assert store.read_json(store.judgment_path("t1", key, "fake", 2)) is None
+
+
+def test_run_job_refuses_a_foreign_assignment(tmp_path):
+    store = RunStore(tmp_path)
+    write_output(store, "t1", "roh", "gut")
+    write_output(store, "t1", "atelier", "schwach")
+    key = pair_key("roh", "atelier")
+    store.write_json(store.assignment_path("t1", key, "fake"), {"seed": "seed", "version": 99,
+                     "pass1": {"text_1": "roh", "text_2": "atelier"}, "pass2": {"text_1": "atelier", "text_2": "roh"}})
+    judge = ScriptedJudge()
+
+    with pytest.raises(AssignmentConflict, match="Version 99"):
+        run_job(JudgeJob(TASKS[0], key, judge, 2), store, "seed")
+
+    assert judge.prompts == []
+
+
+def test_resume_with_same_seed_keeps_assignment_and_completes(tmp_path):
+    store = RunStore(tmp_path)
+    write_output(store, "t1", "roh", "gut")
+    write_output(store, "t1", "atelier", "schwach")
+    judge_all(TASKS[:1], ["roh", "atelier"], store, [ScriptedJudge()], "seed", max_calls=1, echo=lambda _: None)
+    summary = judge_all(TASKS[:1], ["roh", "atelier"], store, [ScriptedJudge()], "seed", echo=lambda _: None)
+
+    assert summary["done"] == 1
+    assert [o.winners for o in outcomes(TASKS[:1], ["roh", "atelier"], store, ["fake"])] == [("roh", "roh")]

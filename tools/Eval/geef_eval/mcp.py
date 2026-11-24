@@ -5,6 +5,7 @@ import base64
 import itertools
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Callable
@@ -30,11 +31,31 @@ class McpError(RuntimeError):
     """The MCP endpoint answered with an error."""
 
 
+class RedirectRefused(McpError):
+    """The MCP endpoint answered with a redirect; it is never followed so the bearer token stays with the configured origin."""
+
+
+def _origin(url: str) -> str:
+    parts = urllib.parse.urlsplit(url)
+    return f"{parts.scheme}://{parts.hostname or '?'}" + (f":{parts.port}" if parts.port else "")
+
+
+class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        target = urllib.parse.urljoin(req.full_url, newurl)
+        raise RedirectRefused(
+            f"MCP-Endpunkt leitet weiter (HTTP {code} nach {_origin(target)}). Weiterleitungen werden nicht verfolgt, "
+            "damit das Token nicht an einen anderen Ursprung geht; EVAL_ATELIER_URL auf die Zieladresse setzen.")
+
+
+_OPENER = urllib.request.build_opener(_RefuseRedirects())
+
+
 def urllib_transport(url: str, headers: dict[str, str], body: bytes, timeout_s: float) -> HttpReply:
-    """POST via the standard library."""
+    """POST via the standard library; redirects raise ``RedirectRefused`` instead of being followed."""
     request = urllib.request.Request(url, data=body, headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(request, timeout=timeout_s) as response:
+        with _OPENER.open(request, timeout=timeout_s) as response:
             return HttpReply(response.status, {k.lower(): v for k, v in response.headers.items()},
                              response.read().decode("utf-8", errors="replace"))
     except urllib.error.HTTPError as exc:

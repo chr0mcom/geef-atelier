@@ -6,9 +6,15 @@
 #
 # Ablauf (Container-Teil):
 #   1. Installierte CLI-Versionen im laufenden Container mit `npm view <paket> version` vergleichen. Nichts Neues: weiter mit Schritt 7.
-#   1b. Nur aus dem committeten Stand bauen: Meldet `git -C "$PROJECT_DIR" status --porcelain -- cli-proxy` Änderungen (oder ist der
-#      Git-Stand nicht prüfbar), wird der Image-Neubau diese Nacht ausgesetzt (Logzeile, Telegram-Hinweis, Schlusszeile
-#      „Fertig (Status 0, ausgesetzt)“). Das gilt auch mit FORCE=1. Der Host-Abgleich (Schritt 7) läuft trotzdem.
+#   1b. Nur aus dem committeten Stand bauen: Meldet `git -C "$PROJECT_DIR" status --porcelain -- cli-proxy` Änderungen, liegen
+#      unter den Pfaden, die das Dockerfile per COPY ins Image holt (IMAGE_SOURCE_PATHS), ignorierte Dateien (außer den harmlosen
+#      __pycache__/, .pytest_cache/, *.egg-info/), oder ist der Git-Stand nicht prüfbar, wird der Image-Neubau diese Nacht
+#      ausgesetzt (Logzeile, Telegram-Hinweis, Schlusszeile „Fertig (Status 0, ausgesetzt)“). Das gilt auch mit FORCE=1. Der
+#      Host-Abgleich (Schritt 7) läuft trotzdem. Geprüft wird dreimal: vor der Ruhewartezeit (spart das Warten), unmittelbar vor
+#      `docker compose build` (eine Änderung während der Wartezeit fällt hier auf) und noch einmal vor `compose up`: Ist der
+#      Stand dann nicht mehr sauber oder zeigt `git rev-parse HEAD:cli-proxy` einen anderen Baum als vor dem Bauen, wird der
+#      Container nicht ausgetauscht, $IMAGE:latest auf das laufende Image zurückgetaggt und die Nacht als ausgesetzt beendet
+#      (Status 0; scheitert das Zurück-Taggen, Status 2). Die Zielversionen werden dabei nicht gesperrt.
 #   2. Ruhe abwarten (keine laufenden claude/codex/gemini-Prozesse im Container, höchstens WAIT_QUIET_SECONDS), sonst diese Nacht
 #      den Container-Teil überspringen.
 #   3. Vor dem Build die Image-ID des LAUFENDEN Containers erfassen (`docker inspect -f '{{.Image}}'`) und genau diese ID als
@@ -413,19 +419,73 @@ finish() {
   exit "$rc"
 }
 
+# Pfade, die cli-proxy/Dockerfile per COPY ins Image holt (Build-Kontext cli-proxy/, keine .dockerignore). Muss zum Dockerfile
+# passen; test_selfupdate_script.py prüft das.
+IMAGE_SOURCE_PATHS=(cli-proxy/pyproject.toml cli-proxy/src)
+
+# Ignorierte Dateien, die trotz .gitignore ins Image gelangen würden. Harmlos und nie gezählt: Python-Bytecode-Caches
+# (__pycache__/), .pytest_cache/ und *.egg-info/ (entsteht bei `pip install -e .` im Arbeitsverzeichnis). Ein *.pyc außerhalb
+# von __pycache__/ zählt, weil Python es ohne Quelldatei importiert. Exit 0 = Liste auf stdout, 1 = git gescheitert.
+image_ignored_files() {
+  local out line
+  out=$(git -C "$PROJECT_DIR" ls-files --others --ignored --exclude-standard -- "${IMAGE_SOURCE_PATHS[@]}" 2>&1) || { printf '%s\n' "$out"; return 1; }
+  while IFS= read -r line; do
+    [[ -z $line || $line =~ (^|/)(__pycache__|\.pytest_cache|[^/]+\.egg-info)/ ]] && continue
+    printf '%s\n' "$line"
+  done <<< "$out"
+}
+
+# Prüft, dass cli-proxy/ dem committeten Stand entspricht. Setzt TREE_PROBLEM (leer = sauber, sonst Grund für Log und Meldung)
+# und TREE_ID (`git rev-parse HEAD:cli-proxy`). Rückgabe 0 = sauber, 1 = nicht sauber oder nicht prüfbar (fail-closed).
+cli_proxy_tree_check() {
+  local out ignored
+  TREE_PROBLEM=""; TREE_ID=""
+  if ! out=$(git -C "$PROJECT_DIR" status --porcelain -- cli-proxy 2>&1); then
+    TREE_PROBLEM="Git-Stand von cli-proxy/ nicht prüfbar ($(head -1 <<< "$out"))"; return 1
+  fi
+  if [[ -n $out ]]; then
+    TREE_PROBLEM="nicht committete Änderungen unter cli-proxy/ ($(wc -l <<< "$out") Einträge: $(head -5 <<< "$out" | tr '\n' ' '))"; return 1
+  fi
+  if ! ignored=$(image_ignored_files); then
+    TREE_PROBLEM="ignorierte Dateien unter cli-proxy/ nicht prüfbar ($(head -1 <<< "$ignored"))"; return 1
+  fi
+  if [[ -n $ignored ]]; then
+    TREE_PROBLEM="ignorierte, aber ins Image kopierte Dateien unter cli-proxy/ ($(wc -l <<< "$ignored") Einträge: $(head -5 <<< "$ignored" | tr '\n' ' '))"; return 1
+  fi
+  if ! TREE_ID=$(git -C "$PROJECT_DIR" rev-parse --verify --quiet HEAD:cli-proxy 2>/dev/null) || [[ -z $TREE_ID ]]; then
+    TREE_ID=""; TREE_PROBLEM="committeter Baum von cli-proxy/ nicht ermittelbar"; return 1
+  fi
+  return 0
+}
+
 # Der Neubau nimmt das Arbeitsverzeichnis als Build-Kontext. Nur ein committeter Stand von cli-proxy/ darf an die Abnehmer
 # (BookForge, Hermes, DMS, Open WebUI) gehen. Rückgabe 0 = sauber; sonst ist der Grund geloggt und gemeldet.
+# Parameter: Prüfzeitpunkt für die Logzeile.
 cli_proxy_tree_clean() {
-  local out
-  if ! out=$(git -C "$PROJECT_DIR" status --porcelain -- cli-proxy 2>&1); then
-    log "Git-Stand von $PROJECT_DIR/cli-proxy nicht prüfbar ($(head -1 <<< "$out")), Image-Neubau ausgesetzt."
-    alarm "Image-Neubau ausgesetzt ($SUMMARY): Git-Stand von cli-proxy/ nicht prüfbar. Der Host-Abgleich läuft weiter, Details $LOG"
-    return 1
-  fi
-  [[ -z $out ]] && return 0
-  log "Nicht committete Änderungen unter cli-proxy/ ($(wc -l <<< "$out") Einträge), Image-Neubau ausgesetzt: $(head -5 <<< "$out" | tr '\n' ' ')"
-  alarm "Image-Neubau ausgesetzt ($SUMMARY): nicht committete Änderungen unter cli-proxy/. Erst committen oder verwerfen, dann baut die nächste Nacht. Der Host-Abgleich läuft weiter, Details $LOG"
+  local phase=${1:-vor dem Bauen}
+  cli_proxy_tree_check && return 0
+  log "Image-Neubau ausgesetzt ($phase): $TREE_PROBLEM"
+  alarm "Image-Neubau ausgesetzt ($SUMMARY): $TREE_PROBLEM. Erst committen oder aufräumen, dann baut die nächste Nacht. Der Host-Abgleich läuft weiter, Details $LOG"
   return 1
+}
+
+# Letzte Prüfung zwischen Build und `compose up`: Der gebaute Stand muss noch der geprüfte sein. Sonst kein Austausch,
+# $IMAGE:latest zurück auf das laufende Image. Kehrt nur bei sauberem, unverändertem Stand zurück.
+guard_before_swap() {
+  local problem
+  if cli_proxy_tree_check; then
+    [[ $TREE_ID == "$BUILD_TREE_ID" ]] && return 0
+    problem="committeter Baum von cli-proxy/ während des Builds gewechselt (${BUILD_TREE_ID:0:12} → ${TREE_ID:0:12})"
+  else
+    problem=$TREE_PROBLEM
+  fi
+  log "Kein Austausch des Containers: $problem. $IMAGE:latest wird auf ${ROLLBACK_ID:-$IMAGE:$PREV_TAG} zurückgesetzt."
+  if docker tag "$ROLLBACK_REF" "$IMAGE:latest"; then
+    alarm "Image-Neubau verworfen ($SUMMARY): $problem. Der laufende Container blieb unverändert, die nächste Nacht baut neu. Details $LOG"
+    finish 0 ausgesetzt
+  fi
+  alarm "Image-Neubau verworfen ($SUMMARY): $problem. Container nicht ausgetauscht, aber Zurück-Taggen von $IMAGE:latest auf ${ROLLBACK_ID:-$IMAGE:$PREV_TAG} FEHLGESCHLAGEN. Ein späteres compose up würde das ungeprüfte Image starten, bitte sofort prüfen. Details $LOG"
+  finish 2
 }
 
 busy() {
@@ -554,7 +614,7 @@ main() {
     finish 0
   fi
 
-  cli_proxy_tree_clean || finish 0 ausgesetzt
+  cli_proxy_tree_clean "vor der Ruhewartezeit" || finish 0 ausgesetzt
 
   if [[ ${FORCE:-0} != 1 ]]; then
     local waited=0
@@ -588,7 +648,9 @@ main() {
   fi
   log "Altes Image ${ROLLBACK_ID:-<ID unbekannt>} gesichert als $IMAGE:$PREV_TAG"
 
-  log "Baue Image neu (--no-cache)."
+  cli_proxy_tree_clean "unmittelbar vor dem Bauen" || finish 0 ausgesetzt
+  BUILD_TREE_ID=$TREE_ID
+  log "Baue Image neu (--no-cache) aus dem committeten Baum cli-proxy ${BUILD_TREE_ID:0:12}."
   if ! (cd "$PROJECT_DIR" && nice -n 10 docker compose build --no-cache cli-proxy) >> "$LOG" 2>&1; then
     echo "$TARGET" > "$BLOCKED"
     if docker tag "$ROLLBACK_REF" "$IMAGE:latest"; then
@@ -599,6 +661,7 @@ main() {
     finish 2
   fi
 
+  guard_before_swap
   (cd "$PROJECT_DIR" && docker compose up -d --no-deps cli-proxy) >> "$LOG" 2>&1 || rollback "docker compose up fehlgeschlagen"
   wait_healthy || rollback "Gateway nach dem Neustart nicht gesund (/health)"
 

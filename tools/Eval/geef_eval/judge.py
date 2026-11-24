@@ -16,9 +16,14 @@ from .cli_runner import LimitError, Runner, empty_workdir, run_cli
 from .store import RunStore
 from .tasks import Task
 
+ASSIGNMENT_VERSION = 1
 JUDGE_SYSTEM_PROMPT = "Du bist ein präziser Analyst. Du hast keine Werkzeuge. Antworte exakt im verlangten Format."
 ALLOWED_MARGINS = {"klar", "knapp", "gleichwertig"}
 TIE = "gleich"
+
+
+class AssignmentConflict(RuntimeError):
+    """A stored text-to-arm assignment was made with another seed or ordering version; judging would mix them."""
 
 
 def pair_key(arm_a: str, arm_b: str) -> str:
@@ -225,15 +230,37 @@ def _ok_output(store: RunStore, task_id: str, arm: str) -> dict | None:
     return data if data and data.get("ok") and str(data.get("text", "")).strip() else None
 
 
+def expected_assignment(seed: str, task_id: str, key: str, judge: str) -> dict:
+    passes = {f"pass{run}": dict(zip(("text_1", "text_2"), order_for_pass(seed, task_id, key, judge, run)))
+              for run in (1, 2)}
+    return {"seed": seed, "version": ASSIGNMENT_VERSION, **passes}
+
+
+def check_assignment(store: RunStore, seed: str, task_id: str, key: str, judge: str) -> dict | None:
+    """Returns the stored assignment (None if absent); raises AssignmentConflict if it does not match this seed."""
+    stored = store.read_json(store.assignment_path(task_id, key, judge))
+    if stored is None:
+        return None
+    expected = expected_assignment(seed, task_id, key, judge)
+    if (stored.get("seed") != seed or stored.get("version", ASSIGNMENT_VERSION) != ASSIGNMENT_VERSION
+            or stored.get("pass1") != expected["pass1"] or stored.get("pass2") != expected["pass2"]):
+        raise AssignmentConflict(
+            f"Zuordnung {task_id} {key} {judge} stammt von Seed {stored.get('seed')!r} "
+            f"(Version {stored.get('version', ASSIGNMENT_VERSION)}), dieser Aufruf nutzt Seed {seed!r} "
+            f"(Version {ASSIGNMENT_VERSION}). Mit dem ursprünglichen Seed fortsetzen oder einen neuen Laufnamen wählen.")
+    return stored
+
+
 def run_job(job: JudgeJob, store: RunStore, seed: str) -> None:
     """Performs one judgment and writes verdict and assignment to separate files."""
+    stored = check_assignment(store, seed, job.task.id, job.key, job.judge.name)
     first, second = order_for_pass(seed, job.task.id, job.key, job.judge.name, job.run)
     texts = [_ok_output(store, job.task.id, first)["text"], _ok_output(store, job.task.id, second)["text"]]
     prompt = judge_prompt(job.task, texts)
     obj, duration = job.judge.verdict(prompt, label=f"judge:{job.judge.name}:{job.task.id}:{job.key}:p{job.run}")
-    passes = {f"pass{run}": dict(zip(("text_1", "text_2"), order_for_pass(seed, job.task.id, job.key, job.judge.name, run)))
-              for run in (1, 2)}
-    store.write_json(store.assignment_path(job.task.id, job.key, job.judge.name), {"seed": seed, **passes})
+    if stored is None:
+        store.write_json(store.assignment_path(job.task.id, job.key, job.judge.name),
+                         expected_assignment(seed, job.task.id, job.key, job.judge.name))
     store.write_json(store.judgment_path(job.task.id, job.key, job.judge.name, job.run),
                      {"verdict": obj, "duration_s": duration})
 
@@ -242,6 +269,8 @@ def judge_all(tasks: list[Task], arm_names: list[str], store: RunStore, judges: 
               max_calls: int | None = None, workers: int = 2, echo: Callable[[str], None] = print) -> dict:
     """Runs all missing judgments (at most ``max_calls`` new ones, at most ``workers`` at a time)."""
     jobs = pending_jobs(tasks, arm_names, store, judges)
+    for job in jobs:
+        check_assignment(store, seed, job.task.id, job.key, job.judge.name)
     skipped_by_budget = 0
     if max_calls is not None and len(jobs) > max_calls:
         skipped_by_budget = len(jobs) - max_calls

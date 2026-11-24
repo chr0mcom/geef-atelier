@@ -28,11 +28,29 @@ FAKES = {
         #!/usr/bin/env bash
         echo "$*" >> "$FAKE_DIR/git.log"
         [[ -n ${FAKE_GIT_FAIL:-} ]] && { echo "fatal: not a git repository" >&2; exit 128; }
-        [[ -n ${FAKE_GIT_DIRTY:-} ]] && printf '%s\n' $FAKE_GIT_DIRTY
+        sub=$3
+        calls=$(grep -c -- "-C [^ ]* $sub " "$FAKE_DIR/git.log")
+        case $sub in
+          status)
+            [[ -n ${FAKE_GIT_DIRTY:-} ]] && printf '%s\n' $FAKE_GIT_DIRTY
+            if [[ -f $FAKE_DIR/git_dirty ]] || [[ -n ${FAKE_GIT_DIRTY_FROM_CALL:-} ]] && (( calls >= ${FAKE_GIT_DIRTY_FROM_CALL:-1} )); then
+              echo " M cli-proxy/src/main.py"
+            fi
+            ;;
+          ls-files)
+            [[ -n ${FAKE_GIT_LSFILES_FAIL:-} ]] && { echo "fatal: ls-files kaputt" >&2; exit 128; }
+            [[ -n ${FAKE_GIT_IGNORED:-} ]] && printf '%s\n' $FAKE_GIT_IGNORED
+            ;;
+          rev-parse)
+            [[ -n ${FAKE_GIT_NO_TREE:-} ]] && exit 1
+            cat "$FAKE_DIR/git_tree" 2>/dev/null || echo 1111111111111111111111111111111111111111
+            ;;
+        esac
         exit 0
     """,
     "sleep": r"""
         #!/usr/bin/env bash
+        [[ -n ${FAKE_DIRTY_DURING_WAIT:-} ]] && : > "$FAKE_DIR/git_dirty"
         exit 0
     """,
     "cp": r"""
@@ -85,7 +103,14 @@ FAKES = {
         case $1 in
           exec)
             shift 2
-            if [[ $1 == sh ]]; then echo "${FAKE_BUSY:-0}"; exit 0; fi
+            if [[ $1 == sh ]]; then
+              if [[ -n ${FAKE_BUSY_CALLS:-} ]]; then
+                n=$(( $(cat "$FAKE_DIR/busy_calls" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$FAKE_DIR/busy_calls"
+                if (( n <= FAKE_BUSY_CALLS )); then echo 1; else echo 0; fi
+                exit 0
+              fi
+              echo "${FAKE_BUSY:-0}"; exit 0
+            fi
             v=$(cat "$FAKE_DIR/ctr_$1" 2>/dev/null) || exit 1
             echo "$1 $v"
             ;;
@@ -105,6 +130,8 @@ FAKES = {
             case $2 in
               build)
                 [[ -n ${FAKE_BUILD_FAIL:-} ]] && exit 1
+                [[ -n ${FAKE_DIRTY_DURING_BUILD:-} ]] && : > "$FAKE_DIR/git_dirty"
+                [[ -n ${FAKE_TREE_DURING_BUILD:-} ]] && echo "$FAKE_TREE_DURING_BUILD" > "$FAKE_DIR/git_tree"
                 echo "sha256:new-build" > "$(ref_file geef-atelier-cli-proxy:latest)"
                 ;;
               up)
@@ -960,7 +987,7 @@ def test_dirty_tree_suspends_build_but_syncs_host(sb, extra):
     _host_outdated(sb)
     r = sb.run(FAKE_GIT_DIRTY="M_cli-proxy/app.py ??_cli-proxy/neu.py", **extra)
     assert r.returncode == 0, sb.logtext
-    assert "Nicht committete Änderungen unter cli-proxy/ (2 Einträge), Image-Neubau ausgesetzt" in sb.logtext
+    assert "Image-Neubau ausgesetzt (vor der Ruhewartezeit): nicht committete Änderungen unter cli-proxy/ (2 Einträge" in sb.logtext
     assert "Image-Neubau ausgesetzt" in sb.alarms and "nicht committete Änderungen" in sb.alarms
     assert "compose" not in sb.docker_log and " tag " not in sb.docker_log
     assert not (sb.state / "blocked-versions").exists()
@@ -983,6 +1010,131 @@ def test_dirty_tree_is_not_checked_when_nothing_to_update(sb):
     assert "Alles aktuell" in sb.logtext
     assert sb.read("git.log") == ""
     assert sb.alarms == "" or "ausgesetzt" not in sb.alarms
+
+
+def _status_checks(sb) -> int:
+    return sum(1 for line in sb.read("git.log").splitlines() if " status --porcelain -- cli-proxy" in line)
+
+
+def _assert_suspended_before_build(sb, r):
+    assert r.returncode == 0, sb.logtext
+    assert "compose build" not in sb.docker_log and "compose up" not in sb.docker_log
+    assert not (sb.state / "blocked-versions").exists()
+    assert "Fertig (Status 0, ausgesetzt)." in sb.logtext
+    assert "Image-Neubau ausgesetzt" in sb.alarms
+
+
+def test_tree_is_checked_before_wait_before_build_and_before_swap(sb):
+    sb.set_container(claude="2.1.300")
+    r = sb.run()
+    assert r.returncode == 0, sb.logtext
+    assert _status_checks(sb) == 3
+    log = sb.read("git.log")
+    assert "ls-files --others --ignored --exclude-standard -- cli-proxy/pyproject.toml cli-proxy/src" in log
+    assert "rev-parse --verify --quiet HEAD:cli-proxy" in log
+    assert "compose up -d --no-deps cli-proxy" in sb.docker_log
+
+
+def test_edit_during_quiet_wait_is_caught_right_before_build(sb):
+    sb.set_container(claude="2.1.300")
+    _host_outdated(sb)
+    r = sb.run(FAKE_BUSY_CALLS="2", FAKE_DIRTY_DURING_WAIT="1", WAIT_QUIET_SECONDS="300")
+    _assert_suspended_before_build(sb, r)
+    assert "Gateway nach 60s ruhig." in sb.logtext
+    assert "Image-Neubau ausgesetzt (unmittelbar vor dem Bauen): nicht committete Änderungen" in sb.logtext
+    assert _status_checks(sb) == 2
+    _assert_host_synced(sb)
+
+
+def test_dirty_on_second_check_suspends_even_with_force(sb):
+    sb.set_container(claude="2.1.300")
+    r = sb.run(FAKE_GIT_DIRTY_FROM_CALL="2", FORCE="1")
+    _assert_suspended_before_build(sb, r)
+    assert "unmittelbar vor dem Bauen" in sb.logtext
+
+
+def _assert_swap_refused(sb, r, reason):
+    assert r.returncode == 0, sb.logtext
+    assert "compose build --no-cache cli-proxy" in sb.docker_log
+    assert "compose up" not in sb.docker_log
+    assert reason in sb.logtext
+    assert "Kein Austausch des Containers" in sb.logtext
+    assert "Image-Neubau verworfen" in sb.alarms and "unverändert" in sb.alarms
+    assert _tag_value(sb, "latest") == "sha256:running-before"
+    assert not (sb.fake / "ctr_image").exists()
+    assert not (sb.state / "blocked-versions").exists()
+    assert "Fertig (Status 0, ausgesetzt)." in sb.logtext
+
+
+def test_edit_during_build_prevents_swap_and_restores_latest(sb):
+    sb.set_container(claude="2.1.300")
+    _host_outdated(sb)
+    r = sb.run(FAKE_DIRTY_DURING_BUILD="1", FAKE_RUNNING_BEFORE="running-before", FAKE_TAG_BEFORE="tag-before")
+    _assert_swap_refused(sb, r, "nicht committete Änderungen unter cli-proxy/")
+    _assert_host_synced(sb)
+
+
+def test_commit_during_build_prevents_swap(sb):
+    sb.set_container(claude="2.1.300")
+    r = sb.run(FAKE_TREE_DURING_BUILD="2222222222222222222222222222222222222222", FAKE_RUNNING_BEFORE="running-before")
+    _assert_swap_refused(sb, r, "während des Builds gewechselt (111111111111 → 222222222222)")
+
+
+def test_refused_swap_with_failed_retag_is_status_two(sb):
+    sb.set_container(claude="2.1.300")
+    r = sb.run(FAKE_DIRTY_DURING_BUILD="1", FAKE_ROLLBACK_TAG_FAIL="1")
+    assert r.returncode == 2, sb.logtext
+    assert "compose up" not in sb.docker_log
+    assert "FEHLGESCHLAGEN" in sb.alarms
+    assert "Fertig (Status 2)." in sb.logtext
+
+
+@pytest.mark.parametrize(
+    "ignored, counted",
+    [
+        ("cli-proxy/src/lokaler_patch.py", 1),
+        ("cli-proxy/pyproject.toml.orig cli-proxy/src/adapters/geheim.json", 2),
+        ("cli-proxy/src/modul.pyc", 1),
+        ("cli-proxy/src/__pycache__/main.cpython-312.pyc cli-proxy/src/neu.py", 1),
+    ],
+)
+def test_ignored_files_copied_into_image_suspend_build(sb, ignored, counted):
+    sb.set_container(claude="2.1.300")
+    r = sb.run(FAKE_GIT_IGNORED=ignored)
+    _assert_suspended_before_build(sb, r)
+    assert f"ignorierte, aber ins Image kopierte Dateien unter cli-proxy/ ({counted} Einträge" in sb.logtext
+    assert "__pycache__" not in sb.logtext.split("ignorierte, aber ins Image kopierte Dateien")[1].splitlines()[0]
+
+
+def test_harmless_ignored_files_do_not_block_build(sb):
+    sb.set_container(claude="2.1.300")
+    harmless = ("cli-proxy/src/__pycache__/main.cpython-312.pyc cli-proxy/src/adapters/__pycache__/x.pyc "
+                "cli-proxy/src/.pytest_cache/v/cache/nodeids cli-proxy/src/atelier_cli_proxy.egg-info/PKG-INFO")
+    r = sb.run(FAKE_GIT_IGNORED=harmless)
+    assert r.returncode == 0, sb.logtext
+    assert "ausgesetzt" not in sb.logtext
+    assert "compose up -d --no-deps cli-proxy" in sb.docker_log
+
+
+@pytest.mark.parametrize("env", [{"FAKE_GIT_LSFILES_FAIL": "1"}, {"FAKE_GIT_NO_TREE": "1"}])
+def test_unverifiable_ignored_files_or_tree_suspends_build(sb, env):
+    sb.set_container(claude="2.1.300")
+    r = sb.run(**env)
+    _assert_suspended_before_build(sb, r)
+
+
+def test_image_source_paths_match_dockerfile_copy():
+    dockerfile = SCRIPT.parents[1] / "cli-proxy" / "Dockerfile"
+    copied = set()
+    for line in dockerfile.read_text().splitlines():
+        parts = line.split()
+        if parts and parts[0].upper() in ("COPY", "ADD"):
+            sources = [p for p in parts[1:-1] if not p.startswith("--")]
+            copied.update("cli-proxy/" + s.rstrip("/").removeprefix("./") for s in sources)
+    assert not (SCRIPT.parents[1] / "cli-proxy" / ".dockerignore").exists()
+    r = subprocess.run(["bash", "-c", f'source "{SCRIPT}"; printf "%s\\n" "${{IMAGE_SOURCE_PATHS[@]}}"'],
+                       capture_output=True, text=True, timeout=30)
+    assert set(r.stdout.split()) == copied
 
 
 # 7. sourcebar
