@@ -9,6 +9,8 @@ public interface IRunService
     /// Submits a new run request for processing. With attachments the crew snapshot is stored only after every
     /// attachment is uploaded and indexed; the orchestrator never claims a run without a snapshot, so the run
     /// cannot start before its attachments are available. Model-assignment warnings are stored on the new run.
+    /// Every run except learning runs is linked to an order: a task run of a composition and a resumed run join the
+    /// order of their parent, any other run starts a new careful order (entry <see cref="SubmitRunRequest.Entry"/>).
     /// </summary>
     Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default);
 
@@ -82,8 +84,8 @@ public interface IRunService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Creates a new run that resumes a previously aborted or failed run.
-    /// Returns the ID of the newly created run.
+    /// Creates a new run that resumes a previously aborted or failed run; it joins the order of the parent as its next
+    /// version. Returns the ID of the newly created run.
     /// Throws <see cref="InvalidOperationException"/> if the parent run does not exist,
     /// does not belong to <paramref name="requestingUsername"/> (when non-null),
     /// or is not in a resumable state (Aborted or Failed).
@@ -97,6 +99,7 @@ public interface IRunService
 
     /// <summary>
     /// Permanently deletes a run and all its associated data (iterations, findings, events, costs, artifacts).
+    /// When it was the last run of its order, the order is deleted too.
     /// Returns <c>false</c> if the run does not exist or belongs to a different user (when
     /// <paramref name="requestingUsername"/> is non-null). Pass <c>null</c> to bypass the ownership check.
     /// Throws <see cref="InvalidOperationException"/> if the run is still Pending or Running.

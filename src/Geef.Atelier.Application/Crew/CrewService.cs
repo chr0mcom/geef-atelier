@@ -480,6 +480,22 @@ internal sealed class CrewService(
         return new(await ApplyPacksAsync(snapshot, template.ActorPackBindings, warnings, cancellationToken), warnings);
     }
 
+    public async Task<ResolvedCrewSnapshot> ResolveCodeTemplateSnapshotAsync(CrewTemplate template, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        var warnings = new List<ModelAssignmentWarning>();
+        var snapshot = await CrewSnapshotBuilder.BuildAsync(
+            template,
+            async (name, ct) => SystemCrew.CodeOnlyExecutorProfiles.TryGetValue(name, out var codeOnly) ? codeOnly : await executorRepo.GetByNameAsync(name, ct),
+            async (name, ct) => SystemCrew.CodeOnlyReviewerProfiles.TryGetValue(name, out var codeOnly) ? codeOnly : await reviewerRepo.GetByNameAsync(name, ct),
+            (name, ct) => advisorRepo.GetByNameAsync(name, ct),
+            (name, ct) => GetGroundingProviderProfileAsync(name, ct),
+            (name, ct) => GetFinalizerProfileAsync(name, ct),
+            cancellationToken);
+
+        return new(await ApplyPacksAsync(snapshot, template.ActorPackBindings, warnings, cancellationToken), warnings);
+    }
+
     private async Task<CrewSnapshot> ApplyPacksAsync(
         CrewSnapshot snapshot,
         IReadOnlyDictionary<string, IReadOnlyList<string>> bindings,

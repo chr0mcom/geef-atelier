@@ -115,6 +115,7 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
             web.UseSetting("Orchestrator:CancellationPollingInterval", "00:00:00.200");
             web.UseSetting("Orchestrator:MaxConcurrentRuns", "4");
             web.UseSetting("Finalizer:ExportPath", Path.Combine(keyDirectory, "exports"));
+            web.UseSetting("Sources:StorageRoot", Path.Combine(keyDirectory, "sources"));
             web.UseSetting("Logging:LogLevel:Default", "Warning");
 
             web.ConfigureTestServices(services =>
