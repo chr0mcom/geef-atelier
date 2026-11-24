@@ -4,10 +4,12 @@ using Bunit;
 using Bunit.TestDoubles;
 using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Orders;
+using Geef.Atelier.Application.Profiles;
 using Geef.Atelier.Application.Sources;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
+using Geef.Atelier.Tests.Web.Components.Profile;
 using Geef.Atelier.Web.Components;
 using Geef.Atelier.Web.Components.Pages;
 using Microsoft.AspNetCore.Components.Forms;
@@ -67,6 +69,51 @@ public sealed class StartPageTests : TestContext
         Assert.Equal("/new", cut.Find("[data-testid='start-more-options']").GetAttribute("href"));
         Assert.Empty(cut.FindAll("select"));
         Assert.DoesNotContain("crew", cut.Markup, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AnEmptyProfileShowsATipThatLeadsToAboutMe()
+    {
+        var profiles = new FakeProfileService();
+        Services.AddSingleton<IProfileService>(profiles);
+
+        var cut = RenderComponent<Start>();
+
+        var tip = cut.Find("[data-testid='start-profile-tip']");
+        Assert.Equal("Tip: tell us once about yourself under About me – it is used in every text.", tip.TextContent);
+        Assert.Equal("/about-me", tip.QuerySelector("a")!.GetAttribute("href"));
+        Assert.Equal("alice", Assert.Single(profiles.Loaded));
+    }
+
+    [Fact]
+    public void AFilledProfileShowsNoTip()
+    {
+        var profiles = new FakeProfileService();
+        profiles.Set("alice", FakeProfileService.Empty with { DisplayName = "Alice" });
+        Services.AddSingleton<IProfileService>(profiles);
+
+        var cut = RenderComponent<Start>();
+
+        Assert.Empty(cut.FindAll("[data-testid='start-profile-tip']"));
+    }
+
+    [Fact]
+    public void AProfileThatCannotBeLoadedShowsNoTipAndStartStillWorks()
+    {
+        Services.AddSingleton<IProfileService>(new FakeProfileService { GetError = new InvalidOperationException("db") });
+
+        var cut = RenderComponent<Start>();
+
+        Assert.Empty(cut.FindAll("[data-testid='start-profile-tip']"));
+        Assert.Equal("What do you need written?", cut.Find("h1").TextContent);
+    }
+
+    [Fact]
+    public void WithoutAProfileServiceThereIsNoTip()
+    {
+        var cut = RenderComponent<Start>();
+
+        Assert.Empty(cut.FindAll("[data-testid='start-profile-tip']"));
     }
 
     [Fact]
