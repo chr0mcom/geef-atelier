@@ -73,10 +73,11 @@ public sealed class SourceOptions
     public TimeSpan ExtractionQueueTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
-    /// Largest answer of the extraction process in bytes (16 MiB); a larger answer counts as unreadable. Sized for
-    /// <see cref="MaxExtractedChars"/> at up to four bytes per character plus room for the JSON around the text.
+    /// Largest answer of the extraction process in bytes (20 MiB); a larger answer counts as unreadable. Sized for
+    /// <see cref="MaxExtractedChars"/> UTF-16 units at up to six bytes each (an emoji or a format character is written
+    /// as <c>\uXXXX</c>) plus room for the JSON around the text.
     /// </summary>
-    public long ExtractionMaxOutputBytes { get; set; } = 16_777_216;
+    public long ExtractionMaxOutputBytes { get; set; } = 20_971_520;
 
     /// <summary>Path of the application assembly that runs the extraction process; set by the web host when empty.</summary>
     public string? ExtractionWorkerAssembly { get; set; }

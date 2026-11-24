@@ -216,6 +216,8 @@ public static class SourceEndpoints
         }
         catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException)
         {
+            http.RequestServices.GetService<ILoggerFactory>()?.CreateLogger(typeof(SourceEndpoints))
+                .LogWarning("The minimum upload rate could not be set ({Error}); the server default applies.", ex.GetType().Name);
         }
     }
 
