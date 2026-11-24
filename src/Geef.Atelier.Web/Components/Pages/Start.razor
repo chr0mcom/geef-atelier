@@ -226,10 +226,15 @@
     protected override async Task OnInitializedAsync()
     {
         var auth = await AuthProvider.GetAuthenticationStateAsync();
-        _username = auth.User.Identity?.Name;
-        _requestingUser = auth.User.IsInRole("admin") ? null : _username;
+        var name = auth.User.Identity?.Name;
+        _username = string.IsNullOrWhiteSpace(name) ? null : name;
         if (From is { } orderId)
         {
+            if (!auth.User.TryGetOwnerFilter(out _requestingUser))
+            {
+                _prefillNote = OwnerScope.UnknownUserMessage;
+                return;
+            }
             await PrefillAsync(orderId);
             await RefreshCheckAsync();
         }

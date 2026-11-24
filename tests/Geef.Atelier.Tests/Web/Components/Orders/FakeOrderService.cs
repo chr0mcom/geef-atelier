@@ -23,6 +23,8 @@ internal sealed class FakeOrderService : IOrderService
     public ConcurrentQueue<SubmitOrderRequest> Submitted { get; } = new();
     public ConcurrentQueue<Guid> Cancelled { get; } = new();
     public ConcurrentQueue<Guid> Deleted { get; } = new();
+    public ConcurrentQueue<string?> CancelledFor { get; } = new();
+    public ConcurrentQueue<string?> DeletedFor { get; } = new();
     public ConcurrentQueue<string?> ListedFor { get; } = new();
     public ConcurrentQueue<IReadOnlyList<OrderSourceSelection>> Checked { get; } = new();
     public Func<IReadOnlyList<OrderSourceSelection>, SourceSelectionCheck> CheckSources { get; set; } = _ => new SourceSelectionCheck(0, SourceBudgetClass.FullText, null);
@@ -143,7 +145,10 @@ internal sealed class FakeOrderService : IOrderService
         try
         {
             Cancelled.Enqueue(orderId);
-            if (CancelResult && _orders.ContainsKey(orderId))
+            CancelledFor.Enqueue(requestingUsername);
+            if (!Owns(orderId, requestingUsername))
+                return false;
+            if (CancelResult)
                 Update(orderId, v => v with { Display = new OrderDisplay(OrderDisplayState.Stopped, v.Display.HasText, true) });
             return CancelResult;
         }
@@ -159,9 +164,10 @@ internal sealed class FakeOrderService : IOrderService
         try
         {
             Deleted.Enqueue(orderId);
+            DeletedFor.Enqueue(requestingUsername);
             if (DeleteError is not null)
                 throw DeleteError;
-            return DeleteResult && _orders.TryRemove(orderId, out _);
+            return DeleteResult && Owns(orderId, requestingUsername) && _orders.TryRemove(orderId, out _);
         }
         finally
         {
@@ -182,6 +188,9 @@ internal sealed class FakeOrderService : IOrderService
     }
 
     private void Leave() => Interlocked.Decrement(ref _active);
+
+    private bool Owns(Guid orderId, string? requestingUsername) =>
+        _orders.TryGetValue(orderId, out var entry) && (requestingUsername is null || entry.Owner == requestingUsername);
 
     private static string Title(string text) => text.Length > 60 ? text[..60] : text;
 }

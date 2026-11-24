@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Tests.EndToEnd;
 using Geef.Atelier.Tests.Persistence;
@@ -99,6 +100,48 @@ public sealed class SourceEndpointsTests(PostgresFixture postgres)
         Assert.Equal(HttpStatusCode.NotFound, (await SendDeleteAsync(owner, loose, token)).StatusCode);
         Assert.False(await host.QueryAsync(db => db.Sources.AnyAsync(s => s.Id == loose)));
         Assert.Equal(0, await host.QueryAsync(db => db.Sources.CountAsync(s => s.OwnerUsername == username && s.FileName == "huge.txt")));
+    }
+
+    [Fact]
+    public async Task AnotherPersonCannotDeleteASourceButAnAdministratorCan()
+    {
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
+        var username = "owner-" + Guid.NewGuid().ToString("N")[..6];
+        var owner = await host.CreateSignedInClientAsync(username);
+        var stranger = await host.CreateSignedInClientAsync("stranger-" + Guid.NewGuid().ToString("N")[..6]);
+        var admin = await host.CreateSignedInClientAsync("admin-" + Guid.NewGuid().ToString("N")[..6], isAdmin: true);
+        var loose = (await host.UploadSourceAsync(owner, "loose.md", Encoding.UTF8.GetBytes("Loose notes " + Guid.NewGuid()))).GetProperty("sourceId").GetGuid();
+
+        Assert.Equal(HttpStatusCode.NotFound, (await SendDeleteAsync(stranger, loose, await host.GetAntiforgeryTokenAsync(stranger))).StatusCode);
+
+        Assert.True(await host.QueryAsync(db => db.Sources.AnyAsync(s => s.Id == loose && s.StoragePath != null)));
+        Assert.Equal(HttpStatusCode.OK, (await owner.GetAsync($"/api/sources/{loose}")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await SendDeleteAsync(admin, loose, await host.GetAntiforgeryTokenAsync(admin))).StatusCode);
+        Assert.False(await host.QueryAsync(db => db.Sources.AnyAsync(s => s.Id == loose)));
+    }
+
+    [Fact]
+    public async Task ASignInWithoutUserNameIsRefusedAndNeverSeesOrChangesOtherFiles()
+    {
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
+        var owner = await host.CreateSignedInClientAsync("owner-" + Guid.NewGuid().ToString("N")[..6]);
+        var nameless = await host.CreateSignedInClientAsync("nameless-" + Guid.NewGuid().ToString("N")[..6], withName: false);
+        var loose = (await host.UploadSourceAsync(owner, "loose.md", Encoding.UTF8.GetBytes("Loose notes " + Guid.NewGuid()))).GetProperty("sourceId").GetGuid();
+        var sourcesBefore = await host.QueryAsync(db => db.Sources.CountAsync());
+
+        using (var read = await nameless.GetAsync($"/api/sources/{loose}"))
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, read.StatusCode);
+            Assert.Contains(OwnerScope.UnknownUserMessage, await read.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        }
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await SendDeleteAsync(nameless, loose, await host.GetAntiforgeryTokenAsync(nameless))).StatusCode);
+        Assert.True(await host.QueryAsync(db => db.Sources.AnyAsync(s => s.Id == loose)));
+
+        using (var upload = await host.PostSourceAsync(nameless, "mine.md", Encoding.UTF8.GetBytes("Nameless notes " + Guid.NewGuid())))
+            Assert.Equal(HttpStatusCode.Forbidden, upload.StatusCode);
+        Assert.Equal(sourcesBefore, await host.QueryAsync(db => db.Sources.CountAsync()));
     }
 
     private const System.Text.Json.JsonValueKind JsonValueKindNull = System.Text.Json.JsonValueKind.Null;

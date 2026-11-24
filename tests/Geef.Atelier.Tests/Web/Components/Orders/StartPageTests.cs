@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Bunit;
 using Bunit.TestDoubles;
+using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Application.Sources;
 using Geef.Atelier.Core.Configuration;
@@ -32,6 +33,7 @@ public sealed class StartPageTests : TestContext
     private readonly FakeOrderService _orders = new();
     private readonly FakeSourceIntakeService _intake = new();
     private readonly BunitJSModuleInterop _module;
+    private readonly TestAuthorizationContext _auth;
 
     public StartPageTests()
     {
@@ -40,7 +42,8 @@ public sealed class StartPageTests : TestContext
         Services.AddSingleton<AntiforgeryStateProvider, FakeAntiforgeryStateProvider>();
         Services.AddScoped<CircuitDataGate>();
         Services.AddOptions();
-        this.AddTestAuthorization().SetAuthorized("alice");
+        _auth = this.AddTestAuthorization();
+        _auth.SetAuthorized("alice");
         _module = JSInterop.SetupModule(ModulePath);
         _module.SetupModule("init", _ => true);
         _module.Setup<int>("removeSource", _ => true).SetResult(204);
@@ -521,6 +524,28 @@ public sealed class StartPageTests : TestContext
         Assert.Equal(string.Empty, cut.Find("[data-testid='start-request']").GetAttribute("value") ?? string.Empty);
         Assert.DoesNotContain("secret", cut.Markup);
         Assert.Contains("could not find your earlier request", cut.Find("[data-testid='start-prefill-note']").TextContent);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ASignInWithoutUserNameFillsInNothingAndCannotStart(bool withEmptyName)
+    {
+        var foreign = _orders.Add("bob", OrderTestData.View(OrderDisplayState.Failed, requestText: "Bob's secret request"));
+        if (withEmptyName)
+            _auth.SetAuthorized(string.Empty);
+        else
+            this.SignInWithoutUserName();
+
+        var cut = RenderFrom(foreign.OrderId);
+
+        Assert.Equal(OwnerScope.UnknownUserMessage, cut.Find("[data-testid='start-prefill-note']").TextContent.Trim());
+        Assert.DoesNotContain("secret", cut.Markup);
+        Assert.Equal(0, _orders.Calls);
+
+        cut.Find("[data-testid='start-request']").Input("Write a haiku.");
+        cut.Find("[data-testid='start-submit']").Click();
+        Assert.Empty(_orders.Submitted);
     }
 
     [Fact]

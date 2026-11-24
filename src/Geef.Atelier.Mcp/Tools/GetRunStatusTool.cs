@@ -17,7 +17,7 @@ public static class GetRunStatusTool
         CancellationToken cancellationToken = default)
     {
         if (!Guid.TryParse(runId, out var guid)) return null;
-        var requestingUsername = currentUser.IsAdmin ? null : currentUser.Username;
+        var requestingUsername = currentUser.RequestingUsername();
         var run = await runService.GetRunAsync(guid, requestingUsername, cancellationToken);
         if (run is null) return null;
         var warnings = await runService.ListRunWarningsAsync(guid, requestingUsername, cancellationToken);

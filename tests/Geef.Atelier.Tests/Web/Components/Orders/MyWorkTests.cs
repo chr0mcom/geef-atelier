@@ -1,5 +1,6 @@
 using Bunit;
 using Bunit.TestDoubles;
+using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Web.Components;
@@ -132,7 +133,27 @@ public sealed class MyWorkTests : TestContext
         cut.Find("[data-testid='work-delete-confirm-button']").Click();
 
         Assert.Equal(done.OrderId, Assert.Single(_orders.Deleted));
+        Assert.Equal("alice", Assert.Single(_orders.DeletedFor));
         Assert.Single(cut.FindAll("[data-testid='work-row']"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ASignInWithoutUserNameShowsNoListAndAsksToSignInAgain(bool withEmptyName)
+    {
+        _orders.Add("bob", OrderTestData.View(OrderDisplayState.Delivered, title: "Bob's private letter"));
+        if (withEmptyName)
+            _auth.SetAuthorized(string.Empty);
+        else
+            this.SignInWithoutUserName();
+
+        var cut = RenderComponent<MyWork>();
+
+        Assert.Equal(OwnerScope.UnknownUserMessage, cut.Find("[data-testid='work-unknown-user']").TextContent.Trim());
+        Assert.DoesNotContain("private letter", cut.Markup);
+        Assert.Empty(_orders.ListedFor);
+        Assert.Empty(cut.FindAll("[data-testid='work-empty']"));
     }
 
     [Fact]

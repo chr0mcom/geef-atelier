@@ -27,7 +27,7 @@ public static class DownloadRunArtifactTool
         if (!Guid.TryParse(runId, out var runGuid) || !Guid.TryParse(artifactId, out var artifactGuid))
             return null;
 
-        var requestingUsername = currentUser.IsAdmin ? null : currentUser.Username;
+        var requestingUsername = currentUser.RequestingUsername();
         var run = await runService.GetRunDetailsAsync(runGuid, requestingUsername, cancellationToken);
         if (run is null) return null;
 

@@ -40,7 +40,10 @@ public static class SourceEndpoints
 
         group.MapGet("/{sourceId:guid}", async (Guid sourceId, ISourceIntakeService intake, ICurrentUserService currentUser, CancellationToken ct) =>
         {
-            var receipt = await intake.GetReceiptAsync(sourceId, RequestingUsername(currentUser), ct);
+            if (!currentUser.TryGetOwnerFilter(out var owner))
+                return UnknownUser();
+
+            var receipt = await intake.GetReceiptAsync(sourceId, owner, ct);
             return receipt is null ? Results.NotFound() : Results.Json(receipt, JsonOptions);
         });
 
@@ -48,8 +51,10 @@ public static class SourceEndpoints
         {
             if (await CheckWriteAsync(http, antiforgery) is { } refused)
                 return refused;
+            if (!currentUser.TryGetOwnerFilter(out var owner))
+                return UnknownUser();
 
-            return await intake.DeleteAsync(sourceId, RequestingUsername(currentUser), ct) switch
+            return await intake.DeleteAsync(sourceId, owner, ct) switch
             {
                 SourceDeleteResult.Deleted => Results.NoContent(),
                 SourceDeleteResult.InUse => Reason(StatusCodes.Status409Conflict, "This file is used by an order and cannot be removed."),
@@ -75,6 +80,8 @@ public static class SourceEndpoints
 
         if (await CheckWriteAsync(http, antiforgery) is { } refused)
             return refused;
+        if (!currentUser.TryGetOwnUsername(out var username))
+            return UnknownUser();
 
         if (!http.Request.HasFormContentType)
             return Reason(StatusCodes.Status400BadRequest, "Send the file as multipart form data.");
@@ -101,7 +108,7 @@ public static class SourceEndpoints
         await using var stream = file.OpenReadStream();
         var receipt = await intake.IntakeAsync(
             new SourceUpload(file.FileName, file.ContentType, file.Length, stream),
-            currentUser.Username!,
+            username,
             SourceOrigin.WebUpload,
             ct);
 
@@ -139,8 +146,7 @@ public static class SourceEndpoints
                && string.Equals(uri.IsDefaultPort ? uri.Host : $"{uri.Host}:{uri.Port}", request.Host.Value, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string? RequestingUsername(ICurrentUserService currentUser) =>
-        currentUser.IsAdmin ? null : currentUser.Username;
+    private static IResult UnknownUser() => Reason(StatusCodes.Status403Forbidden, OwnerScope.UnknownUserMessage);
 
     private static IResult Reason(int statusCode, string reason) =>
         Results.Json(new { reason }, JsonOptions, statusCode: statusCode);
