@@ -29,6 +29,7 @@ namespace Geef.Atelier.Tests.EndToEnd;
 internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
 {
     public const string McpToken = "e2e-mcp-token";
+    public const string McpTokenUser = "e2e-mcp-user";
     public const int EmbeddingDimensions = 1536;
     public const string BlockedClientLabel = "blocked";
 
@@ -104,6 +105,7 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
             web.UseSetting("hostBuilder:reloadConfigOnChange", "false");
             web.UseSetting("ConnectionStrings:DefaultConnection", connectionString);
             web.UseSetting("AtelierMcp:Token", McpToken);
+            web.UseSetting("AtelierMcp:StaticTokenUser", McpTokenUser);
             web.UseSetting("Tavily:ApiKey", "e2e-tavily-key");
             web.UseSetting("Tavily:Endpoint", "https://tavily.e2e.invalid");
             web.UseSetting("Llm:Providers:openrouter:ApiKey", "e2e-openrouter-key");
