@@ -392,7 +392,7 @@ check_state_dir() {
 main() {
   set -uo pipefail
   umask 077
-  export PATH=${WATCH_PATH:-/usr/local/bin:/usr/bin:/bin:/home/developer/.local/bin}
+  export PATH=${WATCH_PATH:-/usr/local/bin:/usr/bin:/bin:$HOME/.local/bin}
 
   mkdir -p -m 700 "$STATE_DIR" || { echo "STATE_DIR $STATE_DIR nicht anlegbar" >&2; exit 2; }
   exec 9> "$STATE_DIR/lock" || { echo "Sperrdatei $STATE_DIR/lock nicht anlegbar" >&2; exit 2; }
