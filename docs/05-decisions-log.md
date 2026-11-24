@@ -1644,14 +1644,20 @@ short sentences for the user; technical details belong in the log.
 **D-067/3 — `Outcome` as a display signal, `RunStatus` unchanged.** `Runs.Outcome` (`Converged`,
 `DeliveredWithOpenPoints`, `Failed`, `Aborted`) and `Runs.DeliveredIteration` state what a run delivered.
 `Outcome` means "finished and stored, including finalizers". `RunStatus` stays as decided: a run without
-convergence ends `Failed` even when it delivers a text (status decision of 2026-07-17). The display derives
-"delivered with open points" from `Outcome`. On failure, the findings of the last iteration are stored too.
+convergence ends `Failed` even when it delivers a text (status decision of 2026-07-17). `Outcome` is
+returned over MCP (`get_run_status`, `get_run_result`); the web interface does not read it, its "Warnings"
+block chooses its wording from `Status` and whether a text exists. `DeliveredWithOpenPoints` also covers a
+run stopped by a critical finding (status `Aborted`) that has a text. On failure, the findings of the last
+iteration are stored too.
 
 **D-067/4 — Fail loud instead of silent.** A failed migration aborts the start; the health check
 `pending-migrations` reports pending migrations. An unusable crew snapshot fails the run with a message
 (`CrewSnapshot.DeserializeForRun`) instead of falling back to the classic crew. A crew without reviewers
-fails at start; `AutoApproveReviewer` is removed. A run without a snapshot is not resumed but rejected
-immediately with a message. An unknown grounding type is skipped with a warning.
+fails at start; `AutoApproveReviewer` is removed, and creating or saving a crew template without a reviewer
+is refused (`CrewTemplateRules.EnsureHasReviewer`, also in the template editor). A run without a snapshot is
+not resumed but rejected immediately with a message (`RunNotResumableException`). An unknown grounding type
+is skipped with a warning. Error texts at the run and warnings are fixed, plain sentences; technical details
+go only to the log.
 
 **D-067/5 — Grounding bridge until the rebuild.** The five system grounding profiles no longer have a
 `ToolName` and run through the provider-type path again; a run-time rule (`GroundingPathSelection`) also
@@ -1667,9 +1673,10 @@ time. The editors for providers, tools, MCP servers and grounding are admin-only
 takes over key references.
 
 **D-067/7 — Hub for signed-in users only.** `RunHub` requires sign-in, derives group names on the server
-from the identity and ends when the sign-in expires. The Blazor pages get live updates through the
-in-process `IRunUpdateFeed` with the same access rules and no longer open a `HubConnection`. List updates
-go only to owners and administrators.
+from the identity and ends when the sign-in expires (`MapRunHub`). The Blazor pages get live updates through
+the in-process `IRunUpdateFeed` with the same access rules and no longer open a `HubConnection`. List
+updates go only to owners and administrators. No external client of the hub is known; `RunHub` and the hub
+part of `LiveRunNotifier` stay, protected this way, until their removal in stage 8 (D-068).
 
 **D-067/8 — Learning switch off.** `Learning:Enabled` (default `false`) pauses the learning loop: no
 extraction, no gate run, no embedding, empty retrieval. Crews with learning parts stay valid. Following
@@ -1679,11 +1686,13 @@ D-068 the loop will be replaced by a per-user memory.
 only from the committed state; with uncommitted changes it pauses and reports this, also with `FORCE=1`.
 
 **D-067/10 — Mini run after every deploy.** `scripts/atelier-smoke.sh` signs in, submits a short job over
-MCP and waits for the result (exit code 0 only on success). Setup: [`ops/atelier-smoke.md`](ops/atelier-smoke.md).
+MCP, waits until the run's `outcome` is set and only then reads the result (exit code 0 only for
+`Converged` or `DeliveredWithOpenPoints` with a text). Setup: [`ops/atelier-smoke.md`](ops/atelier-smoke.md).
 
 **D-067/11 — Watcher.** `scripts/atelier-watch.sh` reports stuck runs, an unhealthy cli-proxy and unhealthy
 containers through the server's existing alert channel, only for new or changed problems and once when
-they clear. Setup: [`ops/atelier-watch.md`](ops/atelier-watch.md).
+they clear; if its state cannot be stored, it keeps it in a fallback location and never floods the
+channel. Setup: [`ops/atelier-watch.md`](ops/atelier-watch.md).
 
 **D-067/12 — Measuring tool.** `tools/Eval` compares the Atelier with other paths on a fixed task set by
 blind pairwise comparison; real tasks stay outside Git ([`tools/Eval/README.md`](../tools/Eval/README.md)).
@@ -1693,7 +1702,6 @@ blind pairwise comparison; real tasks stay outside Git ([`tools/Eval/README.md`]
 - Problems become visible at the run instead of silently lowering quality; some runs that used to run
   silently with substitute behaviour now fail with a message.
 - Runs that ended before Step47 have `Outcome = NULL`; there is no backfill.
-- The template editor does not yet check for a reviewer on save; such crews fail at start.
 - Migration Step47 is additive and idempotent (`RunWarnings`, `Runs.Outcome`, `Runs.DeliveredIteration`,
   `Runs.ReportJson`, clearing `ToolName` on five system profiles).
 - The documentation describes the tool path as frozen ([10-tool-system](10-tool-system.md)).
@@ -1739,8 +1747,10 @@ information.
 - **Memory.** Profile, remembered answers and corrections per user, without embeddings; it replaces the
   learning loop.
 - **Removal in stages.** Agentic tool path, MCP client, Template Studio, crew composer, learning gate and
-  embeddings are removed step by step. Tables are dropped only one deploy after the code is gone; old
-  snapshots stay readable.
+  embeddings are removed step by step. The SignalR hub `RunHub` (no client inside the application, no known
+  external client) goes in stage 8 at the latest, together with the hub part of `LiveRunNotifier`; until
+  then it stays restricted to signed-in users. Tables are dropped only one deploy after the code is gone;
+  old snapshots stay readable.
 
 **Unchanged.** The Geef SDK, the status decision of 2026-07-17, additive and idempotent migrations, the
 single-language English UI (D-062; questions and result appear in the language of the job).

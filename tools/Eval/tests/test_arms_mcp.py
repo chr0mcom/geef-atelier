@@ -100,28 +100,84 @@ class FakeClock:
         self.now += seconds
 
 
-def test_atelier_arm_polls_until_terminal_and_accepts_failed_with_text():
+def test_atelier_arm_polls_until_outcome_and_accepts_delivered_with_open_points():
     clock = FakeClock()
     adapter = FakeAdapter([AtelierRunState("Pending"), AtelierRunState("Running"),
-                           AtelierRunState("Failed", "Pipeline stopped")], "Bester Entwurf")
+                           AtelierRunState("Failed", "Pipeline stopped"),
+                           AtelierRunState("Failed", "Pipeline stopped", "DeliveredWithOpenPoints")], "Bester Entwurf")
 
     output = AtelierMcpArm(adapter, poll_interval_s=10, sleep=clock.sleep, clock=clock).produce(TASK)
 
     assert output.text == "Bester Entwurf"
-    assert output.meta == {"run_id": "run-1", "status": "Failed", "error": "Pipeline stopped"}
-    assert output.duration_s == 20.0
+    assert output.meta == {"run_id": "run-1", "status": "Failed", "outcome": "DeliveredWithOpenPoints",
+                           "error": "Pipeline stopped"}
+    assert output.duration_s == 30.0
     assert adapter.submitted == (TASK.brief, TASK.attachments)
+
+
+class OrderRecordingAdapter(FakeAdapter):
+    """Records whether the result was read before the outcome was visible."""
+
+    def __init__(self, states, text):
+        super().__init__(states, text)
+        self.last_state = None
+        self.read_before_outcome = None
+
+    def state(self, run_id):
+        self.last_state = super().state(run_id)
+        return self.last_state
+
+    def result_text(self, run_id):
+        self.read_before_outcome = not self.last_state.is_final
+        return self.text
+
+
+def test_atelier_arm_does_not_read_text_on_terminal_status_without_outcome():
+    clock = FakeClock()
+    adapter = OrderRecordingAdapter([AtelierRunState("Completed"), AtelierRunState("Completed"),
+                                     AtelierRunState("Completed", None, "Converged")], "Endtext")
+
+    output = AtelierMcpArm(adapter, poll_interval_s=10, sleep=clock.sleep, clock=clock).produce(TASK)
+
+    assert adapter.read_before_outcome is False
+    assert output.meta["outcome"] == "Converged"
+    assert adapter.states == []
+
+
+@pytest.mark.parametrize("outcome", ["Failed", "Aborted"])
+def test_atelier_arm_rejects_failed_or_aborted_outcome_even_with_text(outcome):
+    clock = FakeClock()
+    with pytest.raises(RuntimeError, match=f"outcome {outcome}"):
+        AtelierMcpArm(FakeAdapter([AtelierRunState("Completed", None, outcome)], "halber Text"),
+                      sleep=clock.sleep, clock=clock).produce(TASK)
 
 
 def test_atelier_arm_without_text_or_in_time_fails():
     clock = FakeClock()
     with pytest.raises(RuntimeError, match="ohne Text"):
-        AtelierMcpArm(FakeAdapter([AtelierRunState("Failed")], None), sleep=clock.sleep, clock=clock).produce(TASK)
+        AtelierMcpArm(FakeAdapter([AtelierRunState("Failed", None, "DeliveredWithOpenPoints")], None),
+                      sleep=clock.sleep, clock=clock).produce(TASK)
 
     clock = FakeClock()
     endless = FakeAdapter([AtelierRunState("Running")] * 100, "x")
-    with pytest.raises(TimeoutError):
+    with pytest.raises(TimeoutError, match="Status Running, ohne outcome"):
         AtelierMcpArm(endless, poll_interval_s=10, timeout_s=30, sleep=clock.sleep, clock=clock).produce(TASK)
+
+
+def test_atelier_arm_times_out_clearly_when_terminal_status_never_gets_an_outcome():
+    clock = FakeClock()
+    stuck = OrderRecordingAdapter([AtelierRunState("Completed")] * 100, "Vorläufiger Text")
+    with pytest.raises(TimeoutError, match="im Status Completed, aber ohne outcome"):
+        AtelierMcpArm(stuck, poll_interval_s=10, timeout_s=30, sleep=clock.sleep, clock=clock).produce(TASK)
+    assert stuck.read_before_outcome is None
+
+
+@pytest.mark.parametrize(("raw", "expected"), [("Converged", "Converged"), (None, None), ("", None), ("  ", None), (3, None)])
+def test_adapter_reads_outcome_from_status_reply(raw, expected):
+    client = RecordingClient({"get_run_status": {"status": "Completed", "errorMessage": None, "outcome": raw}})
+    state = AtelierToolAdapter(client).state("r-1")
+    assert state.outcome == expected
+    assert state.is_final is (expected is not None)
 
 
 class FakeTransport:

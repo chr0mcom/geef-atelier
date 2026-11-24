@@ -162,13 +162,23 @@ def _first_text(result: dict) -> str:
 
 @dataclass(frozen=True)
 class AtelierRunState:
-    """Status of one Atelier run as seen over MCP."""
+    """
+    Status of one Atelier run as seen over MCP. ``outcome`` is the "everything is stored" signal of the Atelier
+    (stage 0): it is set only after the final text and the finishing steps are saved, so the text is final only once
+    it is set. A terminal ``status`` alone is not enough.
+    """
 
     status: str
     error: str | None = None
+    outcome: str | None = None
+
+    @property
+    def is_final(self) -> bool:
+        return bool(self.outcome)
 
 
 TERMINAL_STATUSES = frozenset({"Completed", "Failed", "Aborted"})
+DELIVERED_OUTCOMES = frozenset({"Converged", "DeliveredWithOpenPoints"})
 
 
 class AtelierToolAdapter:
@@ -208,7 +218,9 @@ class AtelierToolAdapter:
         reply = self.client.call_tool(self.tool_names["status"], {"runId": run_id})
         if not isinstance(reply, dict):
             raise McpError(f"Unerwartete Statusantwort: {str(reply)[:200]}")
-        return AtelierRunState(str(reply.get("status")), reply.get("errorMessage"))
+        outcome = reply.get("outcome")
+        return AtelierRunState(str(reply.get("status")), reply.get("errorMessage"),
+                               outcome.strip() if isinstance(outcome, str) and outcome.strip() else None)
 
     def result_text(self, run_id: str) -> str | None:
         reply = self.client.call_tool(self.tool_names["result"], {"runId": run_id})

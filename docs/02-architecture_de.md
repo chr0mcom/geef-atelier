@@ -2,7 +2,7 @@
 
 *[English](02-architecture.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-24 (D-067: Etappe 0 Sicherheitsnetz — Warnungen am Lauf, `Runs.Outcome`, lautes Verhalten bei Start und Snapshot, Vorbereitungs-Zeitlimit, Live-Updates im Prozess und Hub nur für Angemeldete, Konfigurationsschalter, Ende-zu-Ende-Gerüst; zuvor 2026-11-22, D-066: Modellmatrix — Spalten `ModelSlot`/`ModelDomain`/`Domain` (Step46), Zuweisung beim Snapshot-Bau; zuvor 2026-08-04, D-064: dynamischer Modell-Katalog für CLI-Provider über den cli-proxy, dreiwertige Herkunft, Alias-Auflösung zum Snapshot-Bauzeitpunkt)*
+*Letzte Aktualisierung: 2026-11-24 (D-067: Etappe 0 Sicherheitsnetz — Warnungen am Lauf, `Runs.Outcome`, lautes Verhalten bei Start und Snapshot, Vorbereitungs-Zeitlimit, Live-Updates im Prozess und Hub nur für Angemeldete, Konfigurationsschalter, Ende-zu-Ende-Gerüst; zweite Prüfrunde: als umgesetzt beschrieben, `LiveRunNotifier`, `CircuitDataGate`, Schwärzen von Geheimnissen, Outcome-Tabelle und Variablen für den Snapshot-Test; zuvor 2026-11-22, D-066: Modellmatrix — Spalten `ModelSlot`/`ModelDomain`/`Domain` (Step46), Zuweisung beim Snapshot-Bau; zuvor 2026-08-04, D-064: dynamischer Modell-Katalog für CLI-Provider über den cli-proxy, dreiwertige Herkunft, Alias-Auflösung zum Snapshot-Bauzeitpunkt)*
 
 ## Schichtenbild
 
@@ -152,8 +152,8 @@ Probleme, die ein Lauf umgangen hat, statt anzuhalten (D-067). Werden mit dem La
 | Id | uuid (PK) | |
 | RunId | uuid (FK→Runs) | Index `IX_RunWarnings_RunId` |
 | Iteration | int | nullable; Iteration, in der das Problem auftrat |
-| Source | varchar(100) | z. B. `grounding`, `review`, `model-assignment`, `llm`, `finalizer` |
-| Code | varchar(100) | stabiler maschinenlesbarer Code, z. B. `grounding.provider_skipped`, `review.reviewer_failed`, `llm.failover`, `finalizer.failed` |
+| Source | varchar(100) | `grounding`, `review`, `model-assignment`, `llm`, `finalizer` oder `run` (Konstanten in `RunWarningSources`) |
+| Code | varchar(100) | stabiler maschinenlesbarer Code, z. B. `grounding.provider_skipped`, `grounding.scope_unknown`, `review.reviewer_failed`, `llm.failover`, `finalizer.failed`, `run.result_not_saved` (Konstanten in `RunWarningCodes`) |
 | Message | text | kurze, einfache englische Erklärung für den Anwender |
 | CreatedAt | timestamptz | |
 
@@ -459,10 +459,10 @@ geliefert hat:
 
 | `Outcome` | Bedeutung |
 |---|---|
-| `Converged` | Alle Reviewer haben zugestimmt; der konvergierte Text wurde ausgeliefert. |
-| `DeliveredWithOpenPoints` | Der Lauf stoppte ohne volle Konvergenz und lieferte seinen besten verfügbaren Entwurf (Status meist `Failed`). |
-| `Failed` | Der Lauf endete ohne brauchbaren Text. |
-| `Aborted` | Vom Anwender abgebrochen oder vom Dienst gestoppt. |
+| `Converged` | Alle Reviewer haben zugestimmt; der konvergierte Text und die Ergebnisse der Finalizer sind gespeichert. |
+| `DeliveredWithOpenPoints` | Der Lauf stoppte ohne volle Konvergenz und lieferte seinen besten verfügbaren Entwurf. Status `Failed` (nicht konvergiert) oder `Aborted`, wenn ein kritischer Reviewer-Befund einen Lauf stoppte, der schon einen Text hat; der kritische Befund bleibt offen und steht bei den Befunden. |
+| `Failed` | Der Lauf endete ohne brauchbaren Text, oder sein Ergebnis konnte nicht vollständig gespeichert werden (Warnung `run.result_not_saved`). Ein Text kann trotzdem vorliegen; vollständig ist er dann nicht sicher. |
+| `Aborted` | Vom Anwender abgebrochen oder vom Dienst gestoppt, auch während der Finalizer. Ein vor dem Stopp gespeicherter Text bleibt lesbar (`FinalText`). |
 
 `Outcome` bedeutet **„fertig abgelegt, inklusive Finalizer“**: Es wird erst gesetzt, wenn der endgültige
 Text (gegebenenfalls von einem Finalizer umgewandelt) in der Datenbank steht. Ein Client, der ein
@@ -470,6 +470,17 @@ Text (gegebenenfalls von einem Finalizer umgewandelt) in der Datenbank steht. Ei
 überschreiben ihn nicht. `DeliveredIteration` nennt die Iteration, deren Text ausgeliefert wurde. Läufe,
 die vor Step47 endeten, behalten `NULL`. Scheitert ein Lauf, werden auch die Befunde der letzten Iteration
 gespeichert, sodass Detailseite und MCP zeigen, warum er stoppte.
+
+`Status` und `Outcome` können kurz auseinanderliegen: Der Event-Sink setzt `Completed` (oder `Failed`) und
+den Text vor den Finalizern, `Outcome` folgt erst danach. Clients warten deshalb auf `Outcome`, nicht auf
+einen Endstatus; `scripts/atelier-smoke.sh` und der Arm `atelier` von `tools/Eval` tun das. Wird der Dienst
+während der Finalizer hart beendet, setzt der Wiederanlauf beim nächsten Start auch für Läufe mit bereits
+terminalem Status und leerem `Outcome` ein Ergebnis, sodass kein Client endlos wartet. Ein Abbruch oder
+Dienststopp während der Finalizer endet als `Aborted`, ohne Warnungen „Finalizer fehlgeschlagen“.
+
+Nur MCP liefert `Outcome` (`get_run_status`, `get_run_result`). Die Weboberfläche liest es nicht: Der Block
+„Warnings“ auf der Detailseite (`RunWarningsBlock`) wählt seinen Einleitungssatz nach `Status` und danach,
+ob ein Text vorliegt.
 
 ### Warnungen am Lauf
 
@@ -483,15 +494,21 @@ Ein Lauf hält jedes Problem, das er umgeht, als Warnung in `RunWarnings` fest, 
 
 `IRunWarningSink` (Vertrag in Core, Implementierung `RunWarningSink` in Infrastructure) schreibt jede
 Warnung in einem eigenen kurzlebigen Datenbank-Scope; ein fehlgeschlagener Schreibvorgang wird geloggt
-und hält den Lauf nie an. Der LLM-Client meldet Failover über den ambienten `RunWarningScope`, den der
-Orchestrator je Lauf öffnet.
+und hält den Lauf nie an. Überall, wo sie gebraucht wird (Run-Service, Orchestrator, Pipeline-Fabrik,
+Grounding-Schritt), ist sie eine Pflicht-Abhängigkeit; eine fehlende Registrierung scheitert also beim
+Start, statt Warnungen still zu verlieren. Der LLM-Client meldet Failover über den ambienten
+`RunWarningScope`, den der Orchestrator je Lauf öffnet.
 
 Warnungen erscheinen auf der Detailseite im Block „Warnings“ (nur wenn vorhanden) und in den MCP-Feldern
 `warnings` und `outcome` von `get_run_status` und `get_run_result`
 ([09-endpoint-reference](09-endpoint-reference_de.md#lauf-status-und-ergebnis-warnings-und-outcome)).
-Warnungstexte sind kurze, einfache Sätze für den Anwender; technische Einzelheiten wie Hostnamen,
-Schlüsselnamen oder Fehlertexte vorgelagerter Dienste gehören ins Log, nicht in die Warnung (Sollzustand,
-wird mit den Nacharbeiten zu Etappe 0 vervollständigt).
+Warnungstexte und die am Lauf gespeicherten Fehlertexte (`ErrorMessage`, Statusmeldungen) sind feste,
+kurze, einfache Sätze für den Anwender, bei Bedarf mit Anzeigenamen; technische Einzelheiten wie
+Ausnahmetexte, Hostnamen, Schlüsselnamen oder Fehlertexte vorgelagerter Dienste gehen nur ins Log. Bevor
+etwas Technisches geloggt oder gespeichert wird, ersetzt `SecretRedactionExtensions` (Core,
+`RedactSecrets`, `ToRedactedLogText`) Bruchstücke, die nach Zugangsdaten aussehen (bekannte
+Schlüsselformate, Bearer-Tokens, `name=wert`-Paare mit geheim klingendem Namen, lange undurchsichtige
+Zeichenfolgen), durch `[redacted]`.
 
 ### Laut statt still
 
@@ -501,7 +518,7 @@ wird mit den Nacharbeiten zu Etappe 0 vervollständigt).
 | Der Crew-Snapshot eines Laufs fehlt, ist unlesbar, leer, hat eine unbekannte Version oder keine Executor-, Reviewer- oder Advisor-Liste | `CrewSnapshot.DeserializeForRun` wirft `InvalidCrewSnapshotException`; der Lauf endet `Failed` mit verständlicher Meldung. Einen Rückfall auf die Klassik-Crew gibt es nicht mehr; das tolerante `Deserialize` dient nur der Anzeige. |
 | Eine Crew hat keinen Reviewer | `AtelierPipelineFactory` baut die Pipeline nicht; der Lauf endet `Failed` mit Meldung. Der stille Rückfall `AutoApproveReviewer` ist entfernt. |
 | Ein Grounding-Profil hat einen unbekannten Provider-Typ | Es wird mit einer Warnung übersprungen, statt den Lauf abstürzen zu lassen. |
-| Ein Lauf ohne Crew-Snapshot wird fortgesetzt | Sollzustand: Das Fortsetzen wird sofort mit Meldung abgelehnt, statt einen Lauf anzulegen, der bis zum Vorbereitungs-Zeitlimit wartet. |
+| Ein Lauf ohne brauchbaren Crew-Snapshot wird fortgesetzt | `RunService.ResumeRunAsync` lehnt sofort mit `RunNotResumableException` ab (ein einfacher Satz für den Anwender), statt einen Lauf anzulegen, der bis zum Vorbereitungs-Zeitlimit wartet. Die Detailseite blendet „Resume“ für solche Läufe aus und zeigt die Meldung. |
 
 ### Vorbereitungs-Zeitlimit für Läufe mit Anhängen
 
@@ -520,6 +537,10 @@ Lauf findet die Anhänge des Laufs, den er fortsetzt (Abstammung über `ParentRu
 | `Learning:Enabled` | `false` | Schaltet die Learning-Schleife (D-054) ein oder aus. Ist sie aus, kehren die Finalizer `learning-extractor` und `learning-publisher` sofort zurück (kein LLM-Aufruf, kein Eintrag, kein `learning-evaluation`-Lauf, kein Embedding), das Grounding `learning-retrieval` liefert leeren Kontext ohne Embedding, und `/crew/learnings` zeigt, dass Learning pausiert ist. Crews mit diesen Teilen bleiben gültig. |
 | `EnvReference:Allowed` | leere Liste | Zusätzliche Umgebungsvariablen-Namen oder Präfixe (mit `*` am Ende), die Konfiguration nennen darf, zusätzlich zur eingebauten Standardliste und zum Präfix `ATELIER_SECRET_*`. Einzelheiten: [10-tool-system](10-tool-system_de.md#secrets-und-die-allowlist-für-umgebungsvariablen). |
 | `Orchestrator:PreparationTimeout` | `00:15:00` | Wie lange ein `Pending`-Lauf ohne Crew-Snapshot (Anhänge noch in Vorbereitung) bleiben darf, bevor er auf `Failed` gesetzt wird. |
+
+`Learning:Enabled` wird genau einmal registriert (`AddLearningSwitch`, Infrastructure); alle Leser
+(Finalizer, Retrieval-Provider, Learnings-Seite) lesen den Schalter über `IOptionsMonitor`, eine Änderung
+erreicht also alle gleich.
 
 Fehlende Grounding-Schlüssel (`Tavily:ApiKey`, der OpenRouter-Schlüssel für Embeddings) werden beim Start
 mit Namen geloggt (`GroundingKeyGuard`); Werte werden nie geloggt.
@@ -558,6 +579,22 @@ dotnet test tests/Geef.Atelier.Tests/Geef.Atelier.Tests.csproj --filter "Etappe0
 
 Die Tests brauchen Docker (Testcontainers) und laufen in einer eigenen Collection ohne Parallelität. Ein
 neuer Pipeline-Weg bekommt hier seinen eigenen Ende-zu-Ende-Test, vom Einstieg bis zum abgelegten Ergebnis.
+
+### Test gegen die Produktions-Snapshots
+
+`ProductionSnapshotFixtureTests` liest jeden exportierten Crew-Snapshot der Produktion über das strenge
+Lesen zur Laufzeit (`CrewSnapshot.DeserializeForRun`) und prüft Schema-Version, Reviewer und den
+Grounding-Weg der Systemprofile. Die Exporte enthalten echte Aufträge und gehören **nie** ins Repository;
+ohne die Variablen wird der Test übersprungen.
+
+| Variable | Bedeutung |
+|---|---|
+| `ATELIER_SNAPSHOT_FIXTURES` | Verzeichnis mit einem exportierten Snapshot je Lauf (`*.json`). |
+| `ATELIER_SNAPSHOT_FIXTURES_MIN` | Mindestzahl der Dateien im Export (Standard 1). Auf die Zahl der exportierten Läufe setzen, damit ein unvollständiger Export scheitert, statt still durchzugehen. |
+
+Vor einem Deploy, der das Lesen der Snapshots berührt, exportiert der Betreiber die aktuellen Snapshots,
+setzt beide Variablen und führt den Test aus (`--filter "FullyQualifiedName~ProductionSnapshotFixtureTests"`).
+Verzeichnis und Anzahl stehen nicht im Repository.
 
 ### Messwerkzeug `tools/Eval`
 
@@ -598,24 +635,38 @@ Nutzers, und wählten ihre Gruppennamen selbst. Jetzt abonnieren sie den prozess
 - Jeder Abonnent hat eine eigene Warteschlange; Handler laufen nacheinander, gleiche wartende Meldungen
   werden zusammengefasst, und ein fehlerhafter Abonnent blockiert die anderen nicht. Der Publisher wartet
   nie auf Abonnenten.
-- Sollzustand (wird mit den Nacharbeiten zu Etappe 0 vervollständigt): Der Zugriff wird bei Ablauf der
-  Anmeldung neu geprüft, und eine Seite lädt direkt nach dem Abonnieren einmal neu, damit zwischen erstem
-  Laden und Abonnement keine Meldung verloren geht.
+- Über den Zugriff wird beim Abonnieren entschieden. Ein Abonnement gilt so lange wie der Circuit der
+  Seite, und wie bei jeder Blazor-Server-Seite behält der Circuit die Anmeldung, mit der er geöffnet wurde;
+  eine erneute Prüfung bei Ablauf der Anmeldung ist nicht gebaut (geringes Risiko: Das Lauf-Thema trägt nur
+  eine ID, das Dashboard-Thema über alle Nutzer gibt es nur für Administratoren).
+- Die Detailseite lädt direkt nach dem Abonnieren einmal neu, damit zwischen erstem Laden und Abonnement
+  keine Meldung verloren geht.
 
-`RunHub` (`Web/Hubs/RunHub.cs`, gemappt auf `/hubs/runs`) bleibt für externe SignalR-Clients:
+**`CircuitDataGate`** (`Web/Components/`, je Circuit als Scoped registriert über `AddRunLiveUpdates()`):
+Alle Komponenten eines Circuits teilen sich einen `DbContext`, der nur eine Operation gleichzeitig erlaubt.
+Ein Nachladen durch ein Live-Update und eine Nutzeraktion (Filter, Löschen, Fortsetzen, Abbrechen) könnten
+sich sonst überschneiden. Regel: **Jeder Datenbankzugriff einer Seite mit Live-Updates läuft über
+`DataGate.RunAsync(...)`** (heute `Runs`, `RunDetail`, `Index` und `CancelButton`). Aufrufe dürfen **nicht
+verschachtelt** werden: Eine Aktion im Tor ruft nie eine andere Aktion im Tor auf (das Tor ist ein
+`SemaphoreSlim(1,1)` und würde auf sich selbst warten); Rückrufe wie `OnCancelled` oder ein Nachladen
+laufen nach dem Block im Tor.
 
-- **Nur für Angemeldete:** `[Authorize]` am Hub und `MapHub(...).RequireAuthorization()`. Anonyme
-  Verbindungen werden abgewiesen. Sollzustand: Die Verbindung wird bei Ablauf der Anmeldung geschlossen.
+`RunHub` (`Web/Hubs/RunHub.cs`, über `MapRunHub()` auf `/hubs/runs` gemappt) hat in der Anwendung keinen
+Client mehr, und ein externer Client ist nicht bekannt. Er bleibt **bis zum Rückbau in Etappe 8**
+([D-068](05-decisions-log_de.md#d-068--richtung-umbau-auftrag-direktweg-rückfragen-quellen-gedächtnis-2026-11-24))
+und ist bis dahin abgesichert:
+
+- **Nur für Angemeldete:** `[Authorize]` am Hub; `MapRunHub()` (`LiveUpdateServiceExtensions`) mappt ihn mit
+  `RequireAuthorization()` und `CloseOnAuthenticationExpiration`. Anonyme Verbindungen werden abgewiesen,
+  und eine Verbindung wird geschlossen, sobald die Anmeldung abläuft, mit der sie geöffnet wurde.
 - **Serverseitig abgeleitete Gruppen:** Gruppennamen kommen aus `Context.User`, nie aus einem Parameter.
   Einer Lauf-Gruppe tritt nur bei, wem der Lauf gehört (oder ein Administrator); sonst wirft der Hub eine
   `HubException`. Die Listen- und Dashboard-Gruppen über alle Nutzer gibt es nur für Administratoren. Die
   früheren Methoden mit Benutzernamen als Parameter sind entfernt.
 
-Keine Seite der Anwendung nutzt den Hub noch; er bleibt als Schnittstelle für externe Clients.
+### `IRunNotifier` / `LiveRunNotifier`
 
-### `IRunNotifier` / `SignalRRunNotifier`
-
-`IRunNotifier` lebt in Core (`Core/Notifications/`). `PostgresEventSink` (Infrastructure) konsumiert den Vertrag — ohne Web-Dependency. `SignalRRunNotifier` lebt in Web, Singleton-Lifetime, und veröffentlicht jede Meldung zweimal: in den `IRunUpdateFeed` für die Blazor-Seiten und in die `RunHub`-Gruppen für externe Clients. Den Besitzer des Laufs ermittelt er selbst (`IRunRepository`, zwischengespeichert) und schickt Listen-Updates nur an Besitzer und Administratoren, nie an alle. Notifier-Aufrufe sind best-effort (`try/catch`).
+`IRunNotifier` lebt in Core (`Core/Notifications/`). `PostgresEventSink` (Infrastructure) konsumiert den Vertrag — ohne Web-Dependency. `LiveRunNotifier` (`Web/Notifications/`) lebt in Web, Singleton-Lifetime, und veröffentlicht jede Meldung zweimal: in den `IRunUpdateFeed` für die Blazor-Seiten und in die `RunHub`-Gruppen (bis zum Rückbau des Hubs in Etappe 8). Den Besitzer des Laufs ermittelt er selbst (`IRunRepository`, zwischengespeichert) und schickt Listen-Updates nur an Besitzer und Administratoren, nie an alle. Notifier-Aufrufe sind best-effort (`try/catch`).
 
 **Sequenz User-Submit → Live-View:**
 
@@ -631,9 +682,9 @@ Browser /new  →  IRunService.SubmitRunAsync  →  RunEntity (Pending) in DB
                                         (a) schreibt Event in DB
                                         (b) IRunNotifier.NotifyRunUpdatedAsync
                                                 ↓
-                                      SignalRRunNotifier
+                                      LiveRunNotifier
                                         → IRunUpdateFeed: Lauf-Thema, Listen-Thema des Besitzers, Admin-Listen-Thema
-                                        → RunHub-Gruppen (nur externe Clients)
+                                        → RunHub-Gruppen (bis zum Rückbau in Etappe 8)
                                                 ↓
                                       Seiten-Callback (WatchRunAsync / WatchRunList)
                                         → IRunService.GetRunAsync → StateHasChanged
@@ -734,9 +785,12 @@ app.UseAuthorization();
 
 Traefik terminiert TLS und leitet HTTP weiter. Ohne `UseForwardedHeaders` würde `SecurePolicy.Always` in Produktion Cookies blockieren. `KnownIPNetworks.Clear()` öffnet für alle Proxy-IPs (Docker-Netzwerk-invariant).
 
-**RunHub ohne `[Authorize]` (architektonischer Trade-off):**
+**RunHub verlangt Anmeldung (seit D-067):**
 
-`RunHub` hat kein `[Authorize]`-Attribut. Begründung: Blazor Server's `HubConnectionBuilder` erzeugt server-seitige SignalR-Verbindungen, die Browser-Cookies nicht weiterleiten. Mit `[Authorize]` auf dem Hub würde das SSR-Pre-Render-Phase 401 erhalten und Blazor Circuit-Initialisierung schlägt fehl. Mitigation: Alle subscribenden Pages (`/new`, `/runs`, `/runs/{id}`) tragen `@attribute [Authorize]` — unauthentifizierte User können die Pages nicht laden, also auch keine Hub-Verbindung aufbauen.
+Bis D-067 hatte `RunHub` kein `[Authorize]`, weil sich die Blazor-Seiten serverseitig ohne Browser-Cookie mit
+ihm verbanden. Die Seiten nutzen jetzt den prozessinternen `IRunUpdateFeed`, deshalb verlangt der Hub eine
+Anmeldung (`[Authorize]`, `MapRunHub()` mit `RequireAuthorization()` und `CloseOnAuthenticationExpiration`);
+siehe [Live-Updates](#live-updates-irunupdatefeed-und-runhub-d-067).
 
 ### Test-Auth-Bypass
 

@@ -2,7 +2,7 @@
 
 *[English](08-crew-system.md) · **Deutsch***
 
-Letzte Aktualisierung: 2026-11-24 (D-067: strenges Lesen des Snapshots, mindestens ein Reviewer, Outcome nach den Finalizern, Warnungen am Lauf, System-Grounding wieder über den Provider-Typ-Weg, Learning standardmäßig pausiert; zuvor 2026-11-23, D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
+Letzte Aktualisierung: 2026-11-24 (D-067: strenges Lesen des Snapshots, mindestens ein Reviewer, Outcome nach den Finalizern, Warnungen am Lauf, System-Grounding wieder über den Provider-Typ-Weg, Learning standardmäßig pausiert; zweite Prüfrunde: Reviewer-Prüfung beim Speichern, Vektor-Scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserviert, Finalizer und Abbruch; zuvor 2026-11-23, D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
 
 ## Überblick
 
@@ -152,8 +152,9 @@ die Anzeige. Ein Lauf mit Anhängen wird ohne Snapshot abgelegt, bis seine Anhä
 
 **Mindestens ein Reviewer.** Eine Crew ohne Reviewer kann nicht laufen: `AtelierPipelineFactory` baut die
 Pipeline nicht, und der Lauf endet `Failed` mit Meldung. Der frühere `AutoApproveReviewer`, der jeden
-Entwurf still freigab, ist entfernt. Template Studio und Composer verlangen bereits einen Reviewer; der
-Template-Editor prüft das beim Speichern noch nicht, eine solche Crew scheitert dann beim Laufstart.
+Entwurf still freigab, ist entfernt. Eine Crew-Vorlage ohne Reviewer lässt sich weder anlegen noch
+speichern (`CrewTemplateRules.EnsureHasReviewer`, genutzt von `CrewService` und vom Vorlagen-Editor);
+Template Studio und Composer verlangen ebenfalls einen Reviewer.
 
 ## Advisor-Pässe (PS-7)
 
@@ -278,6 +279,8 @@ Seit D-067:
 
 - `Runs.Outcome` wird erst gesetzt, wenn die Finalizer fertig sind und der (gegebenenfalls umgewandelte) endgültige Text abgelegt ist; `Outcome` bedeutet also „fertig abgelegt, inklusive Finalizer“ ([02-architecture](02-architecture_de.md#lauf-ergebnis-outcome-und-runstatus)).
 - Ein Finalizer, der fehlschlägt, übersprungen oder nicht ausgeführt wird (Best-Effort-Lauf ohne `RunFinalizersOnMaxAttempts`), wird zur Warnung am Lauf (`finalizer.failed`, `finalizer.skipped`, `finalizer.not_run`), statt still durchzugehen.
+- Ein Abbruch oder Dienststopp während der Finalizer ist kein Fehler eines Finalizers: Der Lauf endet mit `Outcome = Aborted` und bekommt keine Warnung `finalizer.failed`. Ein vor dem Stopp gespeicherter Text bleibt lesbar.
+- Lässt sich das Ergebnis nicht vollständig speichern, bekommt der Lauf die Warnung `run.result_not_saved` (Quelle `run`) und `Outcome = Failed`.
 
 ### RunArtifact-Entity
 
@@ -394,7 +397,7 @@ Grounding-Provider reichern das Briefing vor der GEEF-Ausführungsschleife mit e
 **Ist-Zustand (D-067):**
 
 - Die fünf System-Profile `tavily-basic`, `tavily-refined`, `run-attachments`, `knowledge-base-default` und `academic-default` laufen über ihren unten genannten typspezifischen Provider, nicht über den Tool-Pfad, auch bei älteren Snapshots, die noch einen `ToolName` tragen. Nur eigene Profile mit `ToolName` nutzen den Tool-gestützten Provider ([10-tool-system](10-tool-system_de.md#a-t9--grounding-neuaufbau-auf-zentrale-tools)).
-- Ein Provider, der übersprungen wird oder scheitert (fehlender Schlüssel, unbekannter Typ, Fehler), wird zur Warnung am Lauf (`grounding.provider_skipped`, `grounding.tool_failed`) statt zu still leerem Kontext.
+- Ein Provider, der übersprungen wird oder scheitert (fehlender Schlüssel, unbekannter Typ, Fehler), wird zur Warnung am Lauf (`grounding.provider_skipped`) statt zu still leerem Kontext. Der Code `grounding.tool_failed` ist reserviert und wird derzeit nie geschrieben; auch Fehler von Tool-Quellen laufen über `grounding.provider_skipped`.
 - Schlüssel- und Header-Verweise (`authHeaderEnv`, `apiKeyEnv`) werden nur für Namen auf der Allowlist angenommen und gelesen ([10-tool-system](10-tool-system_de.md#secrets-und-die-allowlist-für-umgebungsvariablen)); der Grounding-Editor ist nur für Admins.
 
 ### Provider-Typen
@@ -402,7 +405,7 @@ Grounding-Provider reichern das Briefing vor der GEEF-Ausführungsschleife mit e
 | Typ | Implementierung | Beschreibung | Settings |
 |---|---|---|---|
 | `tavily` | `TavilyGroundingProvider` | Web-Suche via Tavily API (Basic oder Advanced). API-Key pro Profil. | `Tier` (basic/advanced), `MaxResults`, `IncludeAnswer` |
-| `vector-store` | `VectorStoreGroundingProvider` | Semantische Suche in einer pgvector-Sammlung. Scope: `global`, `run-local` oder `both`; ein fehlender oder unbekannter Scope wird fail-closed behandelt (D-067). `run-local` findet die Anhänge des Laufs und des Laufs, den er fortsetzt. | `TopK`, `Scope`, `TagFilter` |
+| `vector-store` | `VectorStoreGroundingProvider` | Semantische Suche in einer pgvector-Sammlung. Scope: `global` (nur gemeinsame Dokumente), `run-local` (Anhänge des Laufs und der Läufe, die er fortsetzt, nie die anderer Läufe) oder `both` (gemeinsame Dokumente plus diese Anhänge). Ein fehlender Scope bedeutet `global`; ein unbekannter Wert wird ebenfalls wie `global` behandelt (fail-closed, nie Anhänge anderer Läufe), und der Lauf bekommt die Warnung `grounding.scope_unknown` (D-067). | `TopK`, `Scope`, `TagFilter` |
 | `static-context` | `StaticContextGroundingProvider` | Kuratierter Fixtext, der bei jedem Run unverändert injiziert wird. Keine externe API. Ideal für Style-Guides, Glossare, Markenstimme. | `label`, `content` (max 200.000 Zeichen, Soft-Limit 50.000) |
 | `url-fetch` | `UrlFetchGroundingProvider` | Fetcht konkrete URLs, bereinigt HTML via HtmlAgilityPack, gibt Textinhalt zurück. SSRF-Guard blockiert private IPs. | `urls` (newline-separated), `maxContentPerUrl` (Default 8000), `stripBoilerplate` (bool, Default true) |
 | `news-search` | `NewsSearchGroundingProvider` | Tavily-API mit `topic=news` + `days`-Filter. Für zeitkritische Themen. Attribution via `PublishedDate`. | `recencyDays` (Default 7), `newsMaxResults` (Default 5), `newsSearchDepth` (basic/advanced) |

@@ -73,6 +73,7 @@ class Sandbox:
         self.fake = root / "fake"
         self.bin = root / "bin"
         self.state = root / "state"
+        self.fallback = root / "shm" / "atelier-watch"
         for d in (self.fake, self.bin):
             d.mkdir(parents=True)
         for name, body in FAKES.items():
@@ -102,6 +103,7 @@ class Sandbox:
             "WATCH_PATH": f"{self.bin}:/usr/bin:/bin",
             "FAKE_DIR": str(self.fake),
             "STATE_DIR": str(self.state),
+            "WATCH_FALLBACK_DIR": str(self.fallback),
             "GATEWAY": "http://gw.test:8090",
             "ALARM_CMD": str(self.bin / "alarm"),
             "WATCH_NOW": str(self.now),
@@ -500,3 +502,139 @@ def test_lock_holder_rotates_big_log(sb):
     assert r.returncode == 0
     assert (sb.state / "watch.log.1").exists()
     assert "Fertig (0 Problem(e))." in sb.logtext and not sb.logtext.startswith("x")
+
+
+# Zustand nicht speicherbar: Schreibfehler loggen, zählen, einmal melden, nie eine Flut (N6)
+
+FULL_DISK_MKTEMP = r"""
+    #!/usr/bin/env bash
+    tmpl=${@: -1}
+    if [[ -n ${FAKE_FULL_DIR:-} && $tmpl == "$FAKE_FULL_DIR"/* ]]; then
+      p=${tmpl%XXXXXX}$RANDOM$RANDOM
+      ln -s /dev/full "$p" || exit 1
+      echo "$p"
+      exit 0
+    fi
+    exec /usr/bin/mktemp "$@"
+"""
+
+needs_non_root = pytest.mark.skipif(hasattr(os, "geteuid") and os.geteuid() == 0, reason="root ignoriert Dateirechte")
+
+
+def _alarms_for(sb, key):
+    return [a for a in sb.alarms if f"({key})" in a]
+
+
+def _assert_no_temp_leftovers(directory: Path):
+    assert not [p.name for p in directory.iterdir() if p.name.startswith((".state.", ".probe."))]
+
+
+@pytest.fixture
+def read_only_state(sb):
+    sb.run()
+    sb.state.chmod(0o500)
+    yield sb
+    sb.state.chmod(0o700)
+
+
+@needs_non_root
+def test_unwritable_state_dir_reports_once_and_keeps_state_in_fallback(read_only_state):
+    sb = read_only_state
+    sb.set_stuck("1a2b3c4d 75")
+    r = sb.run()
+    assert r.returncode == 1
+    assert len(_alarms_for(sb, "runs")) == 1
+    state_alarms = _alarms_for(sb, "state-dir")
+    assert len(state_alarms) == 1 and "nicht beschreibbar" in state_alarms[0] and str(sb.fallback) in state_alarms[0]
+    assert "Schreibfehler: Zustandsverzeichnis" in sb.logtext and "Schreibfehler)." in sb.logtext
+    assert (sb.fallback / "runs.state").read_text().startswith("problem|")
+    for _ in range(5):
+        sb.run()
+    assert len(sb.alarms) == 2, sb.alarms
+    assert "runs: weiterhin gestört (bereits gemeldet)" in sb.logtext
+
+
+@needs_non_root
+def test_fallback_state_returns_to_state_dir_when_writable_again(read_only_state):
+    sb = read_only_state
+    sb.set_stuck("1a2b3c4d 75")
+    sb.run()
+    sb.state.chmod(0o700)
+    r = sb.run()
+    assert r.returncode == 1
+    assert (sb.state / "runs.state").read_text().startswith("problem|")
+    assert not (sb.fallback / "runs.state").exists()
+    assert len(_alarms_for(sb, "runs")) == 1
+    assert "Wieder in Ordnung (state-dir)" in sb.alarms[-1]
+    assert "Zustand aus der Ersatzablage zurückgeführt" in sb.logtext
+    sb.run()
+    assert len(sb.alarms) == 3
+
+
+@needs_non_root
+def test_recovery_while_state_dir_is_unwritable_is_sent_once(sb):
+    sb.set_stuck("1a2b3c4d 75")
+    sb.run()
+    sb.state.chmod(0o500)
+    try:
+        sb.set_stuck()
+        sb.run()
+        sb.run()
+        sb.run()
+    finally:
+        sb.state.chmod(0o700)
+    assert len([a for a in sb.alarms if "Wieder in Ordnung (runs)" in a]) == 1
+    assert "nicht löschbar" in sb.logtext
+    sb.run()
+    assert not (sb.state / "runs.state").exists()
+    assert len([a for a in sb.alarms if "Wieder in Ordnung (runs)" in a]) == 1
+
+
+def test_full_disk_in_state_dir_uses_fallback_without_flood(sb):
+    _write_exec(sb.bin / "mktemp", FULL_DISK_MKTEMP)
+    sb.set_stuck("1a2b3c4d 75")
+    for _ in range(6):
+        r = sb.run(FAKE_FULL_DIR=str(sb.state))
+        assert r.returncode == 1
+    assert len(_alarms_for(sb, "runs")) == 1
+    assert len(_alarms_for(sb, "state-dir")) == 1
+    assert (sb.fallback / "runs.state").exists()
+    assert "Schreibfehler" in sb.logtext
+    _assert_no_temp_leftovers(sb.state)
+
+
+def test_no_writable_place_at_all_sends_at_most_once_per_window(sb):
+    _write_exec(sb.bin / "mktemp", FULL_DISK_MKTEMP)
+    sb.set_stuck("1a2b3c4d 75")
+    for _ in range(24):
+        assert sb.run(FAKE_FULL_DIR=str(sb.root), REMIND_SECONDS="3600").returncode == 1
+    runs, state = _alarms_for(sb, "runs"), _alarms_for(sb, "state-dir")
+    assert len(runs) == 2 and len(state) == 2, sb.alarms
+    assert "keine Ersatzablage" in state[0]
+    assert "Meldung gedrosselt" in sb.logtext
+    _assert_no_temp_leftovers(sb.state)
+    _assert_no_temp_leftovers(sb.fallback)
+
+
+def test_symlinked_fallback_dir_is_never_used(sb, tmp_path):
+    _write_exec(sb.bin / "mktemp", FULL_DISK_MKTEMP)
+    target = tmp_path / "fremd"
+    target.mkdir(mode=0o700)
+    sb.fallback.parent.mkdir(parents=True)
+    sb.fallback.symlink_to(target)
+    sb.set_stuck("1a2b3c4d 75")
+    sb.run(FAKE_FULL_DIR=str(sb.state))
+    assert list(target.iterdir()) == []
+    assert "symbolischer Link" in sb.logtext
+
+
+def test_invalid_watch_interval_falls_back(sb):
+    r = sb.run(WATCH_INTERVAL="5; rm")
+    assert r.returncode == 0, sb.logtext
+    assert "Warnung: WATCH_INTERVAL=" in sb.logtext and "nutze 300" in sb.logtext
+
+
+def test_healthy_run_does_not_create_fallback_dir(sb):
+    sb.run()
+    assert not sb.fallback.exists()
+    assert "Schreibfehler" not in sb.logtext

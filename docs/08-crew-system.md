@@ -2,7 +2,7 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-11-24 (D-067: strict snapshot reading, at least one reviewer, outcome after finalizers, run warnings, system grounding back on the provider-type path, learning paused by default; before that 2026-11-23, D-066/12: explicit model_domain, one assignment rule; D-066/10–11: codex aliases, host sync, availability only as reported by the live catalog; before that 2026-11-22, D-066: model matrix — system profiles and model matrix section rewritten; before that 2026-06-04, D-059)
+Last updated: 2026-11-24 (D-067: strict snapshot reading, at least one reviewer, outcome after finalizers, run warnings, system grounding back on the provider-type path, learning paused by default; second review round: reviewer check on save, vector scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserved, finalizers and cancellation; before that 2026-11-23, D-066/12: explicit model_domain, one assignment rule; D-066/10–11: codex aliases, host sync, availability only as reported by the live catalog; before that 2026-11-22, D-066: model matrix — system profiles and model matrix section rewritten; before that 2026-06-04, D-059)
 
 ## Overview
 
@@ -123,8 +123,9 @@ until its attachments are ready ([02-architecture](02-architecture.md#preparatio
 
 **At least one reviewer.** A crew without reviewers cannot run: `AtelierPipelineFactory` refuses to build
 the pipeline and the run ends `Failed` with a message. The former `AutoApproveReviewer` that silently
-approved every draft is removed. Template Studio and the composer already require a reviewer; the template
-editor does not check this on save yet, so such a crew fails at run start.
+approved every draft is removed. Creating or saving a crew template without a reviewer is refused
+(`CrewTemplateRules.EnsureHasReviewer`, used by `CrewService` and the template editor); Template Studio and
+the composer require a reviewer as well.
 
 ## Advisor passes (PS-7)
 
@@ -249,6 +250,8 @@ Since D-067:
 
 - `Runs.Outcome` is set only after the finalizers have finished and the (possibly transformed) final text is stored, so `Outcome` means "finished and stored, including all finalizers" ([02-architecture](02-architecture.md#run-outcome-and-runstatus)).
 - A finalizer that fails, is skipped, or is not run (best-effort run without `RunFinalizersOnMaxAttempts`) becomes a run warning (`finalizer.failed`, `finalizer.skipped`, `finalizer.not_run`) instead of passing silently.
+- A cancellation or service stop while the finalizers run is not a finalizer failure: the run ends with `Outcome = Aborted` and gets no `finalizer.failed` warning. A text stored before the stop stays readable.
+- If the result cannot be stored completely, the run gets the warning `run.result_not_saved` (source `run`) and `Outcome = Failed`.
 
 ### RunArtifact entity
 
@@ -378,7 +381,7 @@ Grounding providers enrich the briefing with external context before the GEEF ex
 **Actual state (D-067):**
 
 - The five system profiles `tavily-basic`, `tavily-refined`, `run-attachments`, `knowledge-base-default` and `academic-default` run through their type-specific provider listed below, not through the tool path, also for older snapshots that still carry a `ToolName`. Only custom profiles with a `ToolName` use the tool-backed provider ([10-tool-system](10-tool-system.md#a-t9--grounding-rebuild-on-central-tools)).
-- A provider that is skipped or fails (missing key, unknown type, error) becomes a run warning (`grounding.provider_skipped`, `grounding.tool_failed`) instead of silently empty context.
+- A provider that is skipped or fails (missing key, unknown type, error) becomes a run warning (`grounding.provider_skipped`) instead of silently empty context. The code `grounding.tool_failed` is reserved and currently never written; failures of tool-backed sources also use `grounding.provider_skipped`.
 - Key and header references (`authHeaderEnv`, `apiKeyEnv`) are only accepted and read for names on the allow list ([10-tool-system](10-tool-system.md#secrets-and-the-environment-variable-allow-list)); the grounding editor is admin-only.
 
 ### Provider Types
@@ -386,7 +389,7 @@ Grounding providers enrich the briefing with external context before the GEEF ex
 | Type | Implementation | Description | Settings |
 |---|---|---|---|
 | `tavily` | `TavilyGroundingProvider` | Web search via Tavily API (basic or advanced). API key per profile. | `Tier` (basic/advanced), `MaxResults`, `IncludeAnswer` |
-| `vector-store` | `VectorStoreGroundingProvider` | Semantic search in a pgvector collection. Scope: `global`, `run-local`, or `both`; a missing or unknown scope is handled fail-closed (D-067). `run-local` finds the attachments of the run and of the run it resumes. | `TopK`, `Scope`, `TagFilter` |
+| `vector-store` | `VectorStoreGroundingProvider` | Semantic search in a pgvector collection. Scope: `global` (shared documents only), `run-local` (attachments of the run and of the runs it continues, never those of other runs) or `both` (shared documents plus those attachments). A missing scope means `global`; an unknown value is also treated as `global` (fail-closed, never other runs' attachments) and the run gets the warning `grounding.scope_unknown` (D-067). | `TopK`, `Scope`, `TagFilter` |
 | `static-context` | `StaticContextGroundingProvider` | Curated fixed text injected unchanged at every run. No external API. Ideal for style guides, glossaries, brand voice. | `label`, `content` (max 200,000 chars, soft limit 50,000) |
 | `url-fetch` | `UrlFetchGroundingProvider` | Fetches specific URLs, cleans HTML via HtmlAgilityPack, returns text content. SSRF guard blocks private IPs. | `urls` (newline-separated), `maxContentPerUrl` (default 8000), `stripBoilerplate` (bool, default true) |
 | `news-search` | `NewsSearchGroundingProvider` | Tavily API with `topic=news` + `days` filter. For time-critical topics. Attribution via `PublishedDate`. | `recencyDays` (default 7), `newsMaxResults` (default 5), `newsSearchDepth` (basic/advanced) |
