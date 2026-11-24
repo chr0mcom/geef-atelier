@@ -111,8 +111,9 @@ Gruppen sind in den jeweiligen Feature-Abschnitten bzw. im [Decisions-Log](05-de
 (D-028 ff.) beschrieben. `Runs` trägt zusätzlich Spalten aus späteren Migrationen
 (`CreatedByUser`, `CostTotal`, `CrewTemplateName`, `CrewSnapshot`, `AdvisorRetryAttempted`,
 `FinalizerCostEur`, `FinalizerErrorMessage`, `ParentRunId`, `SeedDraftText`, `Kind`, `ParentCompositionRunId`,
-`Outcome`, `DeliveredIteration`, `ReportJson`). Migration Step47 (D-067) ergänzt die Tabelle `RunWarnings`
-und die letzten drei `Runs`-Spalten.
+`Outcome`, `DeliveredIteration`, `ReportJson`, `OrderId`, `OrderVersion`). Migration Step47 (D-067) ergänzt die
+Tabelle `RunWarnings` und die Spalten `Outcome`, `DeliveredIteration` und `ReportJson`; Step48 (D-069) ergänzt
+`OrderId` und `OrderVersion`.
 
 ### Runs
 
@@ -141,7 +142,9 @@ und die letzten drei `Runs`-Spalten.
 | Kind | int | `0 = Standard` (Standard), `1 = Learning` — steuert die beiden Learning-Finalizer; bestehende Rows defaulten auf Standard (Step30). |
 | Outcome | int | nullable; was der Lauf geliefert hat: `0 = Converged`, `1 = DeliveredWithOpenPoints`, `2 = Failed`, `3 = Aborted` (Step47). `NULL`, solange der Lauf aktiv ist, und bei Läufen, die vor Step47 endeten. Siehe [Lauf-Ergebnis](#lauf-ergebnis-outcome-und-runstatus). |
 | DeliveredIteration | int | nullable; Iteration, deren Text ausgeliefert wurde (Step47). |
-| ReportJson | jsonb | nullable; für den Ergebnisbericht vorgesehen (Step47); wird noch nicht geschrieben. |
+| ReportJson | jsonb | nullable; Ergebnisbericht des Direktwegs (`RunReport`, Schema 1: Vorgaben, Prüfergebnisse des ausgelieferten Textes, Platzhalter, genutzte Dateien, Lesebeleg, Vermerke), geschrieben vor dem Ausgang (Step47). `NULL` bei Läufen der anderen Wege. |
+| OrderId | uuid (FK→Orders) | nullable; Auftrag, zu dem der Lauf gehört, `ON DELETE CASCADE` (Step48). `NULL` bei Läufen ohne Auftrag. Index `IX_Runs_OrderId_OrderVersion`. |
+| OrderVersion | int | nullable; Fassung des Auftrags, die der Lauf liefert (Step48). Je Auftrag eindeutig für Standardläufe (`UX_Runs_OrderId_OrderVersion_Standard`, `Kind = 0`). |
 
 ### RunWarnings (Step47)
 

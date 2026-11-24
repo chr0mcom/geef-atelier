@@ -14,13 +14,23 @@
                 }
             </ul>
         }
-        @if (Result.OpenChecks.Count > 0)
+        @if (Result.OpenChecks.Any(c => c.Blocking))
         {
             <p>The text may not yet do everything you asked for:</p>
             <ul class="order-open-checks">
-                @foreach (var check in Result.OpenChecks)
+                @foreach (var check in Result.OpenChecks.Where(c => c.Blocking))
                 {
                     <li data-testid="order-open-check" data-code="@check.Code">@check.Message</li>
+                }
+            </ul>
+        }
+        @if (Result.OpenChecks.Any(c => !c.Blocking))
+        {
+            <p>Please also look at this:</p>
+            <ul class="order-hints">
+                @foreach (var check in Result.OpenChecks.Where(c => !c.Blocking))
+                {
+                    <li data-testid="order-hint" data-code="@check.Code">@check.Message</li>
                 }
             </ul>
         }
@@ -28,6 +38,6 @@
 }
 
 @code {
-    /// <summary>The delivered result with placeholders and open checks.</summary>
+    /// <summary>The delivered result with placeholders, open checks and hints (open checks that never block).</summary>
     [Parameter, EditorRequired] public OrderResult Result { get; set; } = null!;
 }

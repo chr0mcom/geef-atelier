@@ -95,7 +95,11 @@ public static class SourceReceiptJson
         }
     }
 
-    /// <summary>Applies the answer of the upload endpoint to <paramref name="item"/>.</summary>
+    /// <summary>
+    /// Applies the answer of the upload endpoint to <paramref name="item"/>. A time-out, too many uploads at once or a
+    /// busy service (408, 429, 503) can be tried again with the same file, so the card offers "Try again" instead of
+    /// asking for a different file.
+    /// </summary>
     public static void ApplyResponse(this SourceUploadItem item, int status, string? body, long maxFileBytes)
     {
         item.Percent = 100;
@@ -117,6 +121,12 @@ public static class SourceReceiptJson
                     ? "This file cannot be used. Remove it, or try a different file."
                     : $"{receipt.Reason} Remove it, or try a different file.";
                 item.Recovery = SourceUploadRecovery.None;
+                break;
+            case 408 or 429 or 503:
+                item.Status = SourceUploadStatus.Failed;
+                item.Problem = receipt?.Reason is { Length: > 0 } busy ? busy
+                    : TryParseReason(body) ?? "The service is busy right now. Try again in a minute.";
+                item.Recovery = SourceUploadRecovery.Retry;
                 break;
             case 413:
                 item.Status = SourceUploadStatus.Unusable;

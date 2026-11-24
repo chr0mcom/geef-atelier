@@ -1854,10 +1854,21 @@ dem bestehenden Motor; das Geef-SDK bleibt unverändert.
   Regeln nach der ersten Prüfrunde: „Leer“ ist ein Text nur ohne ein einziges Wort (Slogan oder Betreffzeile
   sind in Ordnung); eine Länge wird nur geprüft, wenn der Auftrag sie nennt; eine Vorrede an den Leser („Here's
   what I learned:“) ist ein Hinweis und blockiert nie; nummerierte Zeilen gelten erst ab zwei hintereinander als
-  Liste und nie, wenn sie mit einem Datum beginnen („24. November 2026“); „not/never/auf keinen Fall … more
-  than/mehr als“ und eine nachgestellte Verneinung („Mehr als 100 Wörter sollen es nicht sein“) ergeben eine
-  Obergrenze, „nicht weniger als“ eine Untergrenze, jede andere Verneinung im Satz lässt die Länge ungeprüft;
-  „ohne Zwischenüberschriften“ erlaubt einen Titel in der ersten Zeile.
+  Liste und nie, wenn sie mit einem Datum beginnen („24. November 2026“); „ohne Zwischenüberschriften“ erlaubt
+  einen Titel in der ersten Zeile.
+  Regeln nach der zweiten Prüfrunde (Präzision vor Trefferquote): Eine Verneinung wirkt nur im eigenen Teilsatz
+  (Teilsätze enden an Satzzeichen, Gedankenstrichen und „und/and/aber/but/oder/or/sondern/while/obwohl …“), daher
+  bleibt bei „Write more than 100 words and don't use emojis“ die Untergrenze. Eine Wendung mit einer Richtung
+  („höchstens“, „at most“, „weniger als“, „mindestens“, „at least“, „nicht weniger als“) wird nie umgedreht; eine
+  Verneinung davor im selben Teilsatz lässt die Länge ungeprüft. „mehr als/more than/exceed“ wird nur zur
+  Obergrenze, wenn eine Verneinung unmittelbar davor steht (höchstens ein Wort dazwischen: „must not be more than“,
+  „nie mehr als“) oder die feste Nachstellung „… sollen es nicht sein“ folgt; jede andere Verneinung im Teilsatz
+  lässt die Länge ungeprüft. Eine Länge wird nur dann Prüfung, wenn alle Längen des Auftrags klar sind: eine
+  unklare Länge, eine andere Zählung im selben Teilsatz (Seiten, Minuten) oder eine Länge für einen Teil des Textes
+  ergibt nur eine Notiz. „mehr als A und nicht mehr als B“ ergibt den Bereich A–B. Die Toleranz rundet die
+  Obergrenze ab und die Untergrenze auf („höchstens 5 Wörter“ lässt 5 zu). Trennzeilen wie „* * *“ sind keine
+  Listen. Eine mögliche Vorrede an den Leser besteht nicht, blockiert aber nie; sie erscheint als Hinweis getrennt
+  von den offenen Prüfungen.
 - **Bericht.** `Runs.ReportJson` (`RunReport`, Schema 1) mit Vorgaben, Prüfergebnissen der ausgelieferten
   Fassung, Platzhaltern, Quellen, Lesebeleg und Vermerken.
 

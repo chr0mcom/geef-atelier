@@ -26,7 +26,7 @@ internal sealed class OrderGroundingStep(
     string? seedDraft,
     IServiceScopeFactory scopes,
     SourceOptions options,
-    IRunWarningSink? warnings,
+    IRunWarningSink warnings,
     ILogger<OrderGroundingStep> logger) : IGroundingStep
 {
     /// <summary>Target of the usages written by this step.</summary>
@@ -121,9 +121,6 @@ internal sealed class OrderGroundingStep(
 
     private async Task ReportWarningsAsync(IReadOnlyList<OrderSourceItem> items, OrderSourceBundle bundle, CancellationToken ct)
     {
-        if (warnings is null)
-            return;
-
         if (bundle.TotalChars > options.MapMaxChars)
             await warnings.ReportAsync(runId, RunWarningSources.Grounding, DirectWarningCodes.SourcesOverBudget, OverBudgetMessage, ct: ct);
 

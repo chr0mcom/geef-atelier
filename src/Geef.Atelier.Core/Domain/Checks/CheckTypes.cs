@@ -12,10 +12,10 @@ public enum LengthKind
     /// <summary>A range such as <c>120–180 Wörter</c>: accepted from Min·0.95 to Max·1.05.</summary>
     Range = 0,
 
-    /// <summary>An upper limit such as <c>max. 200 Wörter</c>: accepted up to Max·1.02.</summary>
+    /// <summary>An upper limit such as <c>max. 200 Wörter</c>: accepted up to Max·1.02, rounded down.</summary>
     AtMost = 1,
 
-    /// <summary>A lower limit such as <c>mindestens 500 Wörter</c>: accepted from Min·0.98.</summary>
+    /// <summary>A lower limit such as <c>mindestens 500 Wörter</c>: accepted from Min·0.98, rounded up.</summary>
     AtLeast = 2,
 
     /// <summary>An approximate length such as <c>ca. 300 Wörter</c>: accepted within ±20 %.</summary>
@@ -56,7 +56,10 @@ public sealed record OrderConstraints(
     public static OrderConstraints None { get; } = new(null, null, false, null, [], [], [], []);
 }
 
-/// <summary>Result of one check of a draft. <see cref="Blocking"/> results that did not pass lead to a correction.</summary>
+/// <summary>
+/// Result of one check of a draft. <see cref="Blocking"/> results that did not pass lead to a correction; results that
+/// did not pass and are not blocking (a possible remark to the reader) lead to none but are shown as open points.
+/// </summary>
 public sealed record DraftCheckResult(string Code, bool Passed, bool Blocking, string Message, string? Quote);
 
 /// <summary>Known codes of <see cref="DraftCheckResult"/>.</summary>

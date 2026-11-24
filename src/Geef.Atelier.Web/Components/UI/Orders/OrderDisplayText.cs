@@ -116,8 +116,11 @@ public static class OrderDisplayText
         return string.Join(" · ", parts);
     }
 
-    /// <summary>A warning about a file as one plain sentence.</summary>
-    public static string ToPlainText(this SourceWarning warning)
+    /// <summary>
+    /// A warning about a file as one plain sentence. <paramref name="hasPages"/> is false for a file without pages
+    /// (Word, text), where choosing pages is not possible.
+    /// </summary>
+    public static string ToPlainText(this SourceWarning warning, bool hasPages = true)
     {
         var pages = warning.Pages is { Count: > 0 } list
             ? $" ({(list.Count == 1 ? "page" : "pages")} {string.Join(", ", list.Take(12))}{(list.Count > 12 ? ", …" : "")})"
@@ -132,7 +135,9 @@ public static class OrderDisplayText
             SourceWarningCodes.LongLinesWrapped => "Very long lines were split so that they can be read.",
             SourceWarningCodes.DocxContentSkipped => "Pictures and similar parts of the Word file are left out. Only the text is used.",
             SourceWarningCodes.UsesDocumentMap => "This file is very long. The writer gets a table of contents and reads the parts that matter.",
-            SourceWarningCodes.OverBudget => "This file is too long to use completely. Enter the pages to use below.",
+            SourceWarningCodes.OverBudget => hasPages
+                ? "This file is too long to use completely. Enter the pages to use below."
+                : "This file is too long to use completely.",
             SourceWarningCodes.TooManyPages => "This file has too many pages.",
             SourceWarningCodes.Duplicate => "You added this file before. The copy you already have is used.",
             _ => string.IsNullOrWhiteSpace(warning.Message) ? "Something about this file needs your attention." : warning.Message + pages,

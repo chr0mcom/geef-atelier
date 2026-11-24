@@ -240,6 +240,40 @@ public sealed class StartPageTests : TestContext
     }
 
     [Fact]
+    public async Task AWordFileThatIsTooLongOnItsOwnIsNotSentToThePageField()
+    {
+        var limit = new SourceOptions().MapMaxChars;
+        var cut = RenderComponent<Start>();
+        cut.Find("[data-testid='start-request']").Input("Summarise the two files.");
+
+        await UploadAsync(cut, "u1", OrderReceipts.Usable("long.docx", chars: limit + 10, budget: SourceBudgetClass.TooLarge,
+            warnings: [new SourceWarning(SourceWarningCodes.OverBudget, "too large")]));
+        await UploadAsync(cut, "u2", OrderReceipts.Usable("short.pdf", chars: 5_000, pages: 4));
+
+        var wordCard = cut.FindAll("[data-testid='source-card']").Single(c => c.TextContent.Contains("long.docx"));
+        var warning = wordCard.QuerySelector("[data-testid='source-card-warning']")!.TextContent;
+        Assert.Equal("This file is too long to use completely.", warning);
+        Assert.NotNull(wordCard.QuerySelector("[data-testid='source-card-too-long']"));
+        Assert.Equal(Start.TooLongWithoutPagesBlock, cut.Find("[data-testid='start-blocked-reason']").TextContent);
+        Assert.Contains("A file without pages is too long on its own", cut.Find("[data-testid='start-budget']").TextContent);
+        Assert.True(cut.Find("[data-testid='start-submit']").HasAttribute("disabled"));
+    }
+
+    [Fact]
+    public async Task APdfThatIsTooLongStillAsksForPages()
+    {
+        var limit = new SourceOptions().MapMaxChars;
+        var cut = RenderComponent<Start>();
+        cut.Find("[data-testid='start-request']").Input("Summarise the report.");
+
+        await UploadAsync(cut, "u1", OrderReceipts.Usable("long.pdf", chars: limit + 10, pages: 400, budget: SourceBudgetClass.TooLarge,
+            warnings: [new SourceWarning(SourceWarningCodes.OverBudget, "too large")]));
+
+        Assert.Equal("This file is too long to use completely. Enter the pages to use below.", cut.Find("[data-testid='source-card-warning']").TextContent);
+        Assert.Equal("Choose the pages to use, or remove a file.", cut.Find("[data-testid='start-blocked-reason']").TextContent);
+    }
+
+    [Fact]
     public async Task ChosenPagesAreCountedByTheServerAndUnlockStart()
     {
         var limit = new SourceOptions().MapMaxChars;

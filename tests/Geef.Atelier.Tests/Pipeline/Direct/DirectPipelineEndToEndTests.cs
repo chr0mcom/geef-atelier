@@ -105,7 +105,8 @@ public sealed class DirectPipelineEndToEndTests
 
         Assert.True(outcome.Result.Success);
         Assert.Single(harness.WriterCalls);
-        Assert.Empty(outcome.Report!.OpenChecks);
+        Assert.DoesNotContain(outcome.Report!.OpenChecks, c => c.Blocking);
+        Assert.All(outcome.Report.OpenChecks, c => Assert.Equal(DraftCheckCodes.Preamble, c.Code));
     }
 
     [Fact]

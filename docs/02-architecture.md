@@ -111,8 +111,9 @@ described in their respective feature sections or in the [decisions log](05-deci
 (D-028 ff.). `Runs` additionally carries columns from later migrations
 (`CreatedByUser`, `CostTotal`, `CrewTemplateName`, `CrewSnapshot`, `AdvisorRetryAttempted`,
 `FinalizerCostEur`, `FinalizerErrorMessage`, `ParentRunId`, `SeedDraftText`, `Kind`, `ParentCompositionRunId`,
-`Outcome`, `DeliveredIteration`, `ReportJson`). Migration Step47 (D-067) adds the table `RunWarnings`
-and the last three `Runs` columns.
+`Outcome`, `DeliveredIteration`, `ReportJson`, `OrderId`, `OrderVersion`). Migration Step47 (D-067) adds the table
+`RunWarnings` and the columns `Outcome`, `DeliveredIteration` and `ReportJson`; Step48 (D-069) adds `OrderId` and
+`OrderVersion`.
 
 ### Runs
 
@@ -142,7 +143,9 @@ and the last three `Runs` columns.
 | ParentCompositionRunId | uuid (FK→Runs) | nullable; self-referential, no cascade — set when this task-run was chained from a composition-run (Step35). Audit link from task-run back to the crew-composer run that created its crew. |
 | Outcome | int | nullable; what the run delivered: `0 = Converged`, `1 = DeliveredWithOpenPoints`, `2 = Failed`, `3 = Aborted` (Step47). `NULL` while the run is active and for runs that ended before Step47. See [Run outcome](#run-outcome-and-runstatus). |
 | DeliveredIteration | int | nullable; iteration whose text was delivered (Step47). |
-| ReportJson | jsonb | nullable; reserved for the result report (Step47); not written yet. |
+| ReportJson | jsonb | nullable; result report of the direct path (`RunReport`, schema 1: constraints, check results of the delivered text, placeholders, files used, read evidence, notes), written before the outcome (Step47). `NULL` for runs of the other paths. |
+| OrderId | uuid (FK→Orders) | nullable; order the run belongs to, `ON DELETE CASCADE` (Step48). `NULL` for runs started without an order. Index `IX_Runs_OrderId_OrderVersion`. |
+| OrderVersion | int | nullable; version of the order the run delivers (Step48). Unique per order for standard runs (`UX_Runs_OrderId_OrderVersion_Standard`, `Kind = 0`). |
 
 ### RunWarnings (Step47)
 
