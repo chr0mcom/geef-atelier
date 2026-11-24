@@ -69,7 +69,7 @@ public sealed class KlassikWithAttachmentsTests
         var runner = AtelierPipelineFactory.Build(
             KlassikWithAttachmentsSnapshot(runId),
             resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             runId: runId,
             groundingProviderFactory: factory);
 
@@ -91,7 +91,7 @@ public sealed class KlassikWithAttachmentsTests
         var runner = AtelierPipelineFactory.Build(
             KlassikWithAttachmentsSnapshot(runId),
             resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             runId: runId,
             groundingProviderFactory: factory);
 
@@ -118,7 +118,7 @@ public sealed class KlassikWithAttachmentsTests
         var runner = AtelierPipelineFactory.Build(
             KlassikWithAttachmentsSnapshot(runId),
             resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             runId: runId,
             groundingProviderFactory: factory);
 

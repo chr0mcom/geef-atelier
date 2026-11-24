@@ -35,6 +35,7 @@ internal static class AtelierPipelineFactory
         CrewSnapshot snapshot,
         ILlmClientResolver resolver,
         IOptions<ConvergenceOptions> convergenceOptions,
+        IRunWarningSink warningSink,
         IAdvisorConsultationRepository? consultationRepository = null,
         Guid runId = default,
         ILoggerFactory? loggerFactory = null,
@@ -46,8 +47,7 @@ internal static class AtelierPipelineFactory
         IGroundingConsultationRepository? groundingConsultationRepository = null,
         IExecutionStep? customExecutionStep = null,
         Func<Geef.Atelier.Core.Domain.Crew.Profiles.ReviewerProfile, IReviewer?>? specialReviewerResolver = null,
-        ToolBackedGroundingProvider? toolBackedGroundingProvider = null,
-        IRunWarningSink? warningSink = null)
+        ToolBackedGroundingProvider? toolBackedGroundingProvider = null)
     {
         IGroundingStep grounding = new BriefingGroundingStep();
         if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
@@ -56,10 +56,10 @@ internal static class AtelierPipelineFactory
                 grounding, snapshot.GroundingProviders, groundingProviderFactory, runId,
                 loggerFactory?.CreateLogger<MultiProviderGroundingStep>()
                     ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance,
+                warningSink,
                 groundingRefiner,
                 groundingConsultationRepository,
-                toolBackedGroundingProvider,
-                warningSink);
+                toolBackedGroundingProvider);
         }
 
         IExecutionStep execution = customExecutionStep
@@ -90,6 +90,7 @@ internal static class AtelierPipelineFactory
         ILlmClientResolver resolver,
         IOptions<ConvergenceOptions> convergenceOptions,
         string seedDraftText,
+        IRunWarningSink warningSink,
         IAdvisorConsultationRepository? consultationRepository = null,
         Guid runId = default,
         ILoggerFactory? loggerFactory = null,
@@ -99,8 +100,7 @@ internal static class AtelierPipelineFactory
         ICostAccumulator? costAccumulator = null,
         IGroundingRefiner? groundingRefiner = null,
         IGroundingConsultationRepository? groundingConsultationRepository = null,
-        ToolBackedGroundingProvider? toolBackedGroundingProvider = null,
-        IRunWarningSink? warningSink = null)
+        ToolBackedGroundingProvider? toolBackedGroundingProvider = null)
     {
         IGroundingStep grounding = new SeedDraftGroundingStep(seedDraftText);
         if (snapshot.GroundingProviders is { Count: > 0 } && groundingProviderFactory is not null)
@@ -109,10 +109,10 @@ internal static class AtelierPipelineFactory
                 grounding, snapshot.GroundingProviders, groundingProviderFactory, runId,
                 loggerFactory?.CreateLogger<MultiProviderGroundingStep>()
                     ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MultiProviderGroundingStep>.Instance,
+                warningSink,
                 groundingRefiner,
                 groundingConsultationRepository,
-                toolBackedGroundingProvider,
-                warningSink);
+                toolBackedGroundingProvider);
         }
 
         IExecutionStep execution = new ProfileBasedExecutor(snapshot.Executor, resolver, pricingCatalog, costAccumulator);

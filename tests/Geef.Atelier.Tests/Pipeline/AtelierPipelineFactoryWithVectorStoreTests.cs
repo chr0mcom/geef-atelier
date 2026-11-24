@@ -145,7 +145,7 @@ public sealed class AtelierPipelineFactoryWithVectorStoreTests
             [profile],
             factory,
             Guid.NewGuid(),
-            NullLogger<MultiProviderGroundingStep>.Instance);
+            NullLogger<MultiProviderGroundingStep>.Instance, new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings());
 
         return (step, embeddingStub);
     }

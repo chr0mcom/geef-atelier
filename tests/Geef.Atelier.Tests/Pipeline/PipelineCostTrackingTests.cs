@@ -56,7 +56,7 @@ public sealed class PipelineCostTrackingTests
         var snapshot    = BuildSnapshot();
 
         var runner = AtelierPipelineFactory.Build(
-            snapshot, resolver, Options.Create(new ConvergenceOptions()),
+            snapshot, resolver, Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             pricingCatalog: catalog, costAccumulator: accumulator);
 
         await runner.RunAsync(Briefing, CancellationToken.None);
@@ -83,7 +83,7 @@ public sealed class PipelineCostTrackingTests
         var snapshot    = BuildSnapshot();
 
         var runner = AtelierPipelineFactory.Build(
-            snapshot, resolver, Options.Create(new ConvergenceOptions()),
+            snapshot, resolver, Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             pricingCatalog: catalog, costAccumulator: accumulator);
 
         await runner.RunAsync(Briefing, CancellationToken.None);
@@ -104,7 +104,7 @@ public sealed class PipelineCostTrackingTests
         var snapshot    = BuildSnapshot();
 
         var runner = AtelierPipelineFactory.Build(
-            snapshot, resolver, Options.Create(new ConvergenceOptions()),
+            snapshot, resolver, Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             pricingCatalog: catalog, costAccumulator: accumulator);
 
         await runner.RunAsync(Briefing, CancellationToken.None);
@@ -121,7 +121,7 @@ public sealed class PipelineCostTrackingTests
 
         // No accumulator or catalog passed — must not throw
         var runner = AtelierPipelineFactory.Build(
-            snapshot, resolver, Options.Create(new ConvergenceOptions()));
+            snapshot, resolver, Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings());
 
         var ex = await Record.ExceptionAsync(() => runner.RunAsync(Briefing, CancellationToken.None));
 
@@ -140,7 +140,7 @@ public sealed class PipelineCostTrackingTests
         var snapshot = BuildSnapshot();
 
         var runner = AtelierPipelineFactory.Build(
-            snapshot, resolver, Options.Create(new ConvergenceOptions()),
+            snapshot, resolver, Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             pricingCatalog: emptyCatalog, costAccumulator: accumulator);
 
         await runner.RunAsync(Briefing, CancellationToken.None);

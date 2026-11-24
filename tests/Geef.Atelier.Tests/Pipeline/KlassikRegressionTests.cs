@@ -54,7 +54,7 @@ public sealed class KlassikRegressionTests
         var runner = AtelierPipelineFactory.Build(
             KlassikSnapshot(),
             resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             groundingProviderFactory: factory);
 
         var ex = await Record.ExceptionAsync(
@@ -76,7 +76,7 @@ public sealed class KlassikRegressionTests
         var runner = AtelierPipelineFactory.Build(
             KlassikSnapshot(),
             resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             groundingProviderFactory: factory);
 
         await runner.RunAsync(Briefing, CancellationToken.None);
@@ -107,7 +107,7 @@ public sealed class KlassikRegressionTests
         var runner = AtelierPipelineFactory.Build(
             snapshot,
             resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             groundingProviderFactory: factory);
 
         await runner.RunAsync(Briefing, CancellationToken.None);
@@ -127,7 +127,7 @@ public sealed class KlassikRegressionTests
         var runner = AtelierPipelineFactory.Build(
             KlassikSnapshot(),
             resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             groundingProviderFactory: factory);
 
         var ex = await Record.ExceptionAsync(
@@ -161,7 +161,7 @@ public sealed class KlassikRegressionTests
         var runner = AtelierPipelineFactory.Build(
             KlassikSnapshot(),
             resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             groundingProviderFactory: factory);
 
         await runner.RunAsync(Briefing, CancellationToken.None);
@@ -186,7 +186,7 @@ public sealed class KlassikRegressionTests
         var runner = AtelierPipelineFactory.Build(
             KlassikSnapshot(),
             resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             groundingProviderFactory: factory);
 
         await runner.RunAsync(Briefing, CancellationToken.None);

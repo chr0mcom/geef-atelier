@@ -52,7 +52,7 @@ public sealed class AtelierPipelineRunsAgainstOpenRouterTests
 
         var runner = AtelierPipelineFactory.Build(
             KlassikSnapshot(), resolver,
-            Options.Create(new ConvergenceOptions()),
+            Options.Create(new ConvergenceOptions()), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             additionalSinks: [sink]);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(300));
@@ -99,7 +99,7 @@ public sealed class AtelierPipelineRunsAgainstOpenRouterTests
 
         var runner = AtelierPipelineFactory.Build(
             KlassikSnapshot(), resolver,
-            Options.Create(new ConvergenceOptions { AbortOnCritical = false }),
+            Options.Create(new ConvergenceOptions { AbortOnCritical = false }), new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings(),
             additionalSinks: [sink]);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(300));

@@ -28,10 +28,10 @@ internal sealed class MultiProviderGroundingStep(
     IGroundingProviderFactory factory,
     Guid runId,
     ILogger<MultiProviderGroundingStep> logger,
+    IRunWarningSink warningSink,
     IGroundingRefiner? refiner = null,
     IGroundingConsultationRepository? consultationRepository = null,
-    ToolBackedGroundingProvider? toolBackedProvider = null,
-    IRunWarningSink? warningSink = null) : IGroundingStep
+    ToolBackedGroundingProvider? toolBackedProvider = null) : IGroundingStep
 {
     public async Task<SdkGroundingResult> RunAsync(string input, CancellationToken cancellationToken)
     {
@@ -93,13 +93,12 @@ internal sealed class MultiProviderGroundingStep(
                 logger.LogWarning(
                     "MultiProviderGroundingStep: run={RunId} provider={Provider} failed and was skipped: {Error}",
                     runId, profile.Name, ex.ToRedactedLogText());
-                if (warningSink is not null)
-                    await warningSink.ReportAsync(
-                        runId,
-                        RunWarningSources.Grounding,
-                        RunWarningCodes.GroundingProviderSkipped,
-                        profile.SkippedSourceWarning(),
-                        ct: cancellationToken);
+                await warningSink.ReportAsync(
+                    runId,
+                    RunWarningSources.Grounding,
+                    RunWarningCodes.GroundingProviderSkipped,
+                    profile.SkippedSourceWarning(),
+                    ct: cancellationToken);
             }
         }
 
