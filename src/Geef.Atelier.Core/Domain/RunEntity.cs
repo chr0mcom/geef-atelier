@@ -109,4 +109,13 @@ public sealed class RunEntity
 
     /// <summary>Structured run report as JSON. Reserved for the result report; <c>null</c> until it is written.</summary>
     public string? ReportJson { get; init; }
+
+    /// <summary>Order the run belongs to (Step48); <c>null</c> only for learning runs.</summary>
+    public Guid? OrderId { get; init; }
+
+    /// <summary>
+    /// Version of the order this run produced, 1..n for standard runs; composition runs carry the version of their task
+    /// run. <c>null</c> when the run has no order.
+    /// </summary>
+    public int? OrderVersion { get; init; }
 }

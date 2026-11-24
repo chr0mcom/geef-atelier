@@ -6,6 +6,8 @@ using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.OAuth;
+using Geef.Atelier.Core.Domain.Orders;
+using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Tools;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Infrastructure.Persistence.Crew.Knowledge;
@@ -27,6 +29,11 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     public DbSet<FindingEntity> Findings => Set<FindingEntity>();
     public DbSet<EventEntity> Events => Set<EventEntity>();
     public DbSet<RunWarningEntity> RunWarnings => Set<RunWarningEntity>();
+
+    public DbSet<OrderEntity> Orders => Set<OrderEntity>();
+    public DbSet<SourceEntity> Sources => Set<SourceEntity>();
+    public DbSet<OrderSourceEntity> OrderSources => Set<OrderSourceEntity>();
+    public DbSet<RunSourceUsageEntity> RunSourceUsages => Set<RunSourceUsageEntity>();
 
     public DbSet<ReviewerProfile> ReviewerProfiles => Set<ReviewerProfile>();
     public DbSet<ExecutorProfile> ExecutorProfiles => Set<ExecutorProfile>();
@@ -75,5 +82,8 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     internal DbSet<SpecializationPackEntity> SpecializationPacks => Set<SpecializationPackEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
-        => modelBuilder.ApplyConfigurationsFromAssembly(typeof(AtelierDbContext).Assembly);
+    {
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(AtelierDbContext).Assembly);
+        modelBuilder.IgnoreOrdersUntilStep48();
+    }
 }
