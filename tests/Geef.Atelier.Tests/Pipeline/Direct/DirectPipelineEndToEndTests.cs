@@ -25,7 +25,7 @@ public sealed class DirectPipelineEndToEndTests
             sb.Append("[[page ").Append(page).Append("]]\n");
             if (page == 1)
                 sb.Append(FirstPageMarker).Append('\n');
-            for (var line = 1; line <= 20; line++)
+            for (var line = 1; line <= 15; line++)
                 sb.Append($"Page {page}, line {line} of the synthetic harbour report describes routine work at the pier in plain words.\n");
             if (page == 80)
                 sb.Append(LastPageMarker).Append('\n');
@@ -43,6 +43,7 @@ public sealed class DirectPipelineEndToEndTests
         var (run, orderId) = harness.CreateRun("Summarise the attached harbour report for the city council.");
         harness.Sources.Attach(orderId, "harbour-report.pdf", SourceKind.Pdf, EightyPages(), pageCount: 80);
         harness.Script.ExecutorText = Words(120, "Summary");
+        Assert.True(EightyPages().Length <= harness.SourceOptions.FullTextMaxChars, "The synthetic report must fit the full-text limit.");
 
         var outcome = await harness.RunAsync(run);
 
