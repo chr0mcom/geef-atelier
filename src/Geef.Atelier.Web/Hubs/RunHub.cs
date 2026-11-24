@@ -7,7 +7,9 @@ namespace Geef.Atelier.Web.Hubs;
 
 /// <summary>
 /// SignalR hub for live run-status updates, signed-in users only. Group names are derived on the server from the
-/// caller's identity (<see cref="RunUpdateTopics"/>); a caller can never pick another user's group.
+/// caller's identity (<see cref="RunUpdateTopics"/>); a caller can never pick another user's group. The Blazor pages
+/// use the in-process <see cref="IRunUpdateFeed"/> instead. No external clients are known; removal is planned for
+/// stage 8.
 /// </summary>
 [Authorize]
 public sealed class RunHub(IRunService runService) : Hub

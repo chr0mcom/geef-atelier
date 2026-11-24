@@ -174,7 +174,7 @@ internal sealed class WebTestHost : IAsyncDisposable
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseAntiforgery();
-        app.MapHub<RunHub>("/hubs/runs");
+        app.MapRunHub();
         app.MapMcp("/mcp").RequireAuthorization(McpAuthorizationConstants.McpPolicy);
         app.MapAuthEndpoints();
         app.MapStaticAssets();

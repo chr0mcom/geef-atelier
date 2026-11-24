@@ -11,7 +11,8 @@ namespace Geef.Atelier.Web.Notifications;
 /// <summary>
 /// Publishes run-update and dashboard notifications to the in-process <see cref="IRunUpdateFeed"/> (used by the
 /// Blazor pages) and to SignalR clients of <see cref="RunHub"/>. The hub has no client inside the application any
-/// more and stays only until its removal is decided. Run-list updates go only to the owner and to administrators.
+/// more. No external clients are known; removal is planned for stage 8. Run-list updates go only to the owner and to
+/// administrators.
 /// </summary>
 internal sealed class LiveRunNotifier(
     IHubContext<RunHub> hub,
