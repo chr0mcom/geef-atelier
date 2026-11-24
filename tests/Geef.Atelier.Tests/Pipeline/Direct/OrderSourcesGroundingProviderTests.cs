@@ -8,20 +8,26 @@ using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Infrastructure.Pipeline.Direct;
 using Geef.Atelier.Tests.EndToEnd.Fakes;
 using Geef.Atelier.Tests.Fakes;
+using Geef.Atelier.Core.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Tests.Pipeline.Direct;
 
 public sealed class OrderSourcesGroundingProviderTests
 {
+    private static OrderSourcesGroundingProvider Provider(DirectPipelineHarness harness, SourceOptions? options = null) =>
+        new(harness.Services.GetRequiredService<IServiceScopeFactory>(), Options.Create(options ?? new SourceOptions()),
+            NullLogger<OrderSourcesGroundingProvider>.Instance);
+
     [Fact]
     public async Task Careful_mode_passes_the_order_files_in_full_text_to_the_executor()
     {
         var harness = new DirectPipelineHarness();
         var (run, orderId) = harness.CreateRun("Fasse den Bericht sorgfältig zusammen.");
         harness.Sources.Attach(orderId, "bericht.md", SourceKind.Markdown, "Der Hafen meldet 417 Möwen am ersten Morgen.");
-        var provider = new OrderSourcesGroundingProvider(harness.Services.GetRequiredService<IServiceScopeFactory>());
+        var provider = Provider(harness);
         var snapshot = TestCrewSnapshots.Klassik with { GroundingProviders = [SystemCrew.OrderSourcesProfile] };
 
         var runner = AtelierPipelineFactory.Build(
@@ -44,7 +50,7 @@ public sealed class OrderSourcesGroundingProviderTests
     public async Task A_run_without_an_order_gets_no_context()
     {
         var harness = new DirectPipelineHarness();
-        var provider = new OrderSourcesGroundingProvider(harness.Services.GetRequiredService<IServiceScopeFactory>());
+        var provider = Provider(harness);
 
         var result = await provider.EnrichAsync("x", SystemCrew.OrderSourcesProfile, Guid.NewGuid(), CancellationToken.None);
 

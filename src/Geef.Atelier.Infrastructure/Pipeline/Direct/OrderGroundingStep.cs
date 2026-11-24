@@ -55,22 +55,12 @@ internal sealed class OrderGroundingStep(
             ? ordered.FirstOrDefault(i => i.Link.Role == SourceRole.TemplateToRevise && !string.IsNullOrWhiteSpace(i.Source.ExtractedText))
             : null;
 
-        var promptSources = new List<PromptSource>(ordered.Count);
-        var positions = new Dictionary<Guid, int>();
-        foreach (var item in ordered)
-        {
-            if (ReferenceEquals(item, template))
-                continue;
-            var (text, pagesIncluded) = SelectPages(item);
-            var characters = pagesIncluded is null ? item.Source.CharCount : PageMarkerText.CountWithoutMarkers(text);
-            promptSources.Add(new PromptSource(
-                item.Source.Id, $"S{promptSources.Count + 1}", item.Source.FileName, item.Source.Kind,
-                item.Source.PageCount, pagesIncluded, text, characters));
-            positions[item.Source.Id] = item.Link.Position;
-        }
+        var prompt = ordered.ToPromptSources(
+            item => logger.LogWarning("Run {RunId}: page selection of source {SourceId} could not be applied; using all pages.", runId, item.Source.Id),
+            template);
 
-        var bundle = SourceBlockRenderer.Render(promptSources, options);
-        var seed = seedDraft ?? (template is null ? null : PageMarkerText.StripMarkerLines(template.Source.ExtractedText!));
+        var bundle = SourceBlockRenderer.Render(prompt.Sources, options);
+        var seed = seedDraft ?? template?.Source.ExtractedText!.WithoutPageMarkers();
         var constraints = RequestConstraintExtractor.Extract(order.RequestText);
 
         IRunContext context = new RunContext()
@@ -82,7 +72,7 @@ internal sealed class OrderGroundingStep(
         if (seed is not null)
             context = context.Set(AtelierContextKeys.SeedDraft, seed);
 
-        await RecordUsagesAsync(bundle, positions, template, seed, cancellationToken);
+        await RecordUsagesAsync(bundle, prompt.Positions, template, seed, cancellationToken);
         await ReportWarningsAsync(ordered, bundle, cancellationToken);
 
         return new GroundingResult
@@ -92,37 +82,11 @@ internal sealed class OrderGroundingStep(
         };
     }
 
-    private (string Text, string? PagesIncluded) SelectPages(OrderSourceItem item)
-    {
-        var text = item.Source.ExtractedText ?? string.Empty;
-        var selection = item.Link.PageSelection;
-        if (string.IsNullOrWhiteSpace(selection) || item.Source.PageCount is not { } pageCount)
-            return (text, null);
-
-        if (PageSelection.TryParse(selection, pageCount, out var parsed, out _) && parsed is not null)
-            return (parsed.ApplyTo(text), parsed.ToString());
-
-        logger.LogWarning("Run {RunId}: page selection of source {SourceId} could not be applied; using all pages.", runId, item.Source.Id);
-        return (text, null);
-    }
-
     private async Task RecordUsagesAsync(
         OrderSourceBundle bundle, IReadOnlyDictionary<Guid, int> positions, OrderSourceItem? template, string? seed, CancellationToken ct)
     {
         var now = DateTimeOffset.UtcNow;
-        var usages = bundle.Sources.Select(s => new RunSourceUsageEntity
-        {
-            Id = Guid.NewGuid(),
-            RunId = runId,
-            SourceId = s.SourceId,
-            FileName = s.FileName,
-            Mode = bundle.Mode,
-            Target = WriterTarget,
-            CharsIncluded = s.Characters,
-            PagesIncluded = s.PagesIncluded,
-            Position = positions[s.SourceId],
-            CreatedAt = now,
-        }).ToList();
+        var usages = bundle.ToUsages(runId, positions, now);
 
         if (template is not null && seed is not null)
         {

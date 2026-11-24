@@ -53,6 +53,12 @@ public static partial class PageMarkers
         return string.Join('\n', SplitLines(extractedText).Where(line => !TryParseMarker(line, out _)));
     }
 
+    /// <summary>Characters of <paramref name="extractedText"/> without its marker lines, counted as the receipt and the budget count them.</summary>
+    public static int CharCountWithoutPageMarkers(this string extractedText) => StripMarkers(extractedText).Length;
+
+    /// <summary><paramref name="extractedText"/> without its marker lines and surrounding white space.</summary>
+    public static string WithoutPageMarkers(this string extractedText) => StripMarkers(extractedText).Trim();
+
     /// <summary>True when <paramref name="line"/> is exactly a page marker; returns its page number.</summary>
     public static bool TryParseMarker(string line, out int page)
     {

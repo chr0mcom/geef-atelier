@@ -71,7 +71,7 @@ internal sealed class InMemorySourceRepository : ISourceRepository
         {
             Id = Guid.NewGuid(), OwnerUsername = "e2e-user", FileName = fileName, ContentType = "text/plain", Kind = kind,
             SizeBytes = text.Length, Sha256 = new string('0', 64), ExtractedText = text, PageCount = pageCount,
-            CharCount = Geef.Atelier.Infrastructure.Pipeline.Direct.PageMarkerText.CountWithoutMarkers(text),
+            CharCount = text.CharCountWithoutPageMarkers(),
             WordCount = 0, Quality = SourceQuality.Good, Warnings = warnings ?? [], Origin = SourceOrigin.WebUpload,
             CreatedAt = DateTimeOffset.UtcNow,
         };
