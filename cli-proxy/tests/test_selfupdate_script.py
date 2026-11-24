@@ -24,6 +24,13 @@ FAKES = {
         #!/usr/bin/env bash
         printf '%s\n' "$*" >> "$FAKE_DIR/alarms.log"
     """,
+    "git": r"""
+        #!/usr/bin/env bash
+        echo "$*" >> "$FAKE_DIR/git.log"
+        [[ -n ${FAKE_GIT_FAIL:-} ]] && { echo "fatal: not a git repository" >&2; exit 128; }
+        [[ -n ${FAKE_GIT_DIRTY:-} ]] && printf '%s\n' $FAKE_GIT_DIRTY
+        exit 0
+    """,
     "sleep": r"""
         #!/usr/bin/env bash
         exit 0
@@ -934,6 +941,48 @@ def test_smoke_without_key_sends_no_auth_header(sb):
     r = sb.run()
     assert r.returncode == 0, sb.logtext
     assert sb.read("curl.auth") == ""
+
+
+# 6b. Neubau nur aus dem committeten Stand von cli-proxy/
+
+def test_clean_tree_builds_and_checks_only_cli_proxy(sb):
+    sb.set_container(claude="2.1.300")
+    r = sb.run()
+    assert r.returncode == 0, sb.logtext
+    assert f"-C {sb.project} status --porcelain -- cli-proxy" in sb.read("git.log")
+    assert "compose build --no-cache cli-proxy" in sb.docker_log
+    assert "ausgesetzt" not in sb.logtext
+
+
+@pytest.mark.parametrize("extra", [{}, {"FORCE": "1"}])
+def test_dirty_tree_suspends_build_but_syncs_host(sb, extra):
+    sb.set_container(claude="2.1.300")
+    _host_outdated(sb)
+    r = sb.run(FAKE_GIT_DIRTY="M_cli-proxy/app.py ??_cli-proxy/neu.py", **extra)
+    assert r.returncode == 0, sb.logtext
+    assert "Nicht committete Änderungen unter cli-proxy/ (2 Einträge), Image-Neubau ausgesetzt" in sb.logtext
+    assert "Image-Neubau ausgesetzt" in sb.alarms and "nicht committete Änderungen" in sb.alarms
+    assert "compose" not in sb.docker_log and " tag " not in sb.docker_log
+    assert not (sb.state / "blocked-versions").exists()
+    assert "Fertig (Status 0, ausgesetzt)." in sb.logtext
+    _assert_host_synced(sb)
+
+
+def test_unreadable_git_state_suspends_build(sb):
+    sb.set_container(claude="2.1.300")
+    r = sb.run(FAKE_GIT_FAIL="1")
+    assert r.returncode == 0, sb.logtext
+    assert "nicht prüfbar" in sb.logtext and "nicht prüfbar" in sb.alarms
+    assert "compose" not in sb.docker_log
+    assert "Fertig (Status 0, ausgesetzt)." in sb.logtext
+
+
+def test_dirty_tree_is_not_checked_when_nothing_to_update(sb):
+    r = sb.run(FAKE_GIT_DIRTY="M_cli-proxy/app.py")
+    assert r.returncode == 0, sb.logtext
+    assert "Alles aktuell" in sb.logtext
+    assert sb.read("git.log") == ""
+    assert sb.alarms == "" or "ausgesetzt" not in sb.alarms
 
 
 # 7. sourcebar

@@ -6,6 +6,9 @@
 #
 # Ablauf (Container-Teil):
 #   1. Installierte CLI-Versionen im laufenden Container mit `npm view <paket> version` vergleichen. Nichts Neues: weiter mit Schritt 7.
+#   1b. Nur aus dem committeten Stand bauen: Meldet `git -C "$PROJECT_DIR" status --porcelain -- cli-proxy` Änderungen (oder ist der
+#      Git-Stand nicht prüfbar), wird der Image-Neubau diese Nacht ausgesetzt (Logzeile, Telegram-Hinweis, Schlusszeile
+#      „Fertig (Status 0, ausgesetzt)“). Das gilt auch mit FORCE=1. Der Host-Abgleich (Schritt 7) läuft trotzdem.
 #   2. Ruhe abwarten (keine laufenden claude/codex/gemini-Prozesse im Container, höchstens WAIT_QUIET_SECONDS), sonst diese Nacht
 #      den Container-Teil überspringen.
 #   3. Vor dem Build die Image-ID des LAUFENDEN Containers erfassen (`docker inspect -f '{{.Image}}'`) und genau diese ID als
@@ -60,7 +63,7 @@
 #          FORCE=1 scripts/cli-proxy-selfupdate.sh    auch ohne neue Version bauen, nicht auf Ruhe warten, Sperre ignorieren
 #          DRY_RUN=1 scripts/cli-proxy-selfupdate.sh  nur vergleichen und melden (der Host-Abgleich läuft trocken mit)
 #          HOST_ONLY=1 scripts/cli-proxy-selfupdate.sh nur den Host-Abgleich (Schritt 7), Exit-Code = Status des Abgleichs
-# Exit-Code: 0 = alles in Ordnung (auch übersprungene Nächte), 1 = Fehlschlag mit erfolgreichem Rollback, 2 = Rollback gescheitert.
+# Exit-Code: 0 = alles in Ordnung (auch übersprungene und ausgesetzte Nächte), 1 = Fehlschlag mit erfolgreichem Rollback, 2 = Rollback gescheitert.
 # Testbar: Das Skript ist sourcebar (`main` läuft nur bei direktem Aufruf). Per Umgebung überschreibbar: PROJECT_DIR, CONTAINER,
 #          IMAGE, STATE_DIR, LOG, GATEWAY, HOST_NPM_PREFIX, HOST_CODEX_CONFIG, HOST_CODEX_MODELS, SELFUPDATE_PATH (PATH) und
 #          ALARM_CMD (Standard: `hermes send --to telegram`, bekommt den Text als letztes Argument).
@@ -401,12 +404,28 @@ sync_host() {
 }
 
 # Gemeinsamer Ausstieg nach dem Lock: Host-Abgleich (bei DRY_RUN trocken), dann der schlechtere der beiden Status.
+# Optionaler zweiter Parameter: Zusatz für die Schlusszeile (z. B. „ausgesetzt“), ändert den Exit-Code nicht.
 finish() {
-  local rc=${1:-0} hrc=0
+  local rc=${1:-0} label=${2:-} hrc=0
   sync_host || hrc=$?
   (( hrc > rc )) && rc=$hrc
-  log "Fertig (Status $rc)."
+  log "Fertig (Status $rc${label:+, $label})."
   exit "$rc"
+}
+
+# Der Neubau nimmt das Arbeitsverzeichnis als Build-Kontext. Nur ein committeter Stand von cli-proxy/ darf an die Abnehmer
+# (BookForge, Hermes, DMS, Open WebUI) gehen. Rückgabe 0 = sauber; sonst ist der Grund geloggt und gemeldet.
+cli_proxy_tree_clean() {
+  local out
+  if ! out=$(git -C "$PROJECT_DIR" status --porcelain -- cli-proxy 2>&1); then
+    log "Git-Stand von $PROJECT_DIR/cli-proxy nicht prüfbar ($(head -1 <<< "$out")), Image-Neubau ausgesetzt."
+    alarm "Image-Neubau ausgesetzt ($SUMMARY): Git-Stand von cli-proxy/ nicht prüfbar. Der Host-Abgleich läuft weiter, Details $LOG"
+    return 1
+  fi
+  [[ -z $out ]] && return 0
+  log "Nicht committete Änderungen unter cli-proxy/ ($(wc -l <<< "$out") Einträge), Image-Neubau ausgesetzt: $(head -5 <<< "$out" | tr '\n' ' ')"
+  alarm "Image-Neubau ausgesetzt ($SUMMARY): nicht committete Änderungen unter cli-proxy/. Erst committen oder verwerfen, dann baut die nächste Nacht. Der Host-Abgleich läuft weiter, Details $LOG"
+  return 1
 }
 
 busy() {
@@ -534,6 +553,8 @@ main() {
     log "Diese Zielversionen ($TARGET) sind nach einem Fehlschlag gesperrt, überspringe. Entsperren: FORCE=1 oder $BLOCKED löschen."
     finish 0
   fi
+
+  cli_proxy_tree_clean || finish 0 ausgesetzt
 
   if [[ ${FORCE:-0} != 1 ]]; then
     local waited=0
