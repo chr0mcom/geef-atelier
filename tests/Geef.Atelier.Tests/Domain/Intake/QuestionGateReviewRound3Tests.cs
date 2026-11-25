@@ -48,7 +48,19 @@ public sealed class QuestionGateReviewRound3Tests
 
         Assert.Empty(result.Questions);
         Assert.Equal(GateDecision.DroppedLengthKnown, Assert.Single(result.Trace).Decision);
-        Assert.Contains(result.Assumptions, a => a.Text == "Eine kurze, sachliche Reklamation");
+        Assert.Empty(result.Assumptions);
+    }
+
+    [Theory]
+    [InlineData("Schreib eine Einladung zum Sommerfest in 300 Wörtern.", false)]
+    [InlineData("Schreib eine Einladung zum Sommerfest.", true)]
+    public void A_length_guess_of_the_model_is_kept_only_when_the_request_names_no_length(string request, bool kept)
+    {
+        var guess = QuestionGateTests.Ask(GapTopic.Length, "", [], assumption: "Etwa 120 Wörter") with { Resolution = GapResolution.Assume };
+
+        var result = Apply(request, "de", guess);
+
+        Assert.Equal(kept, result.Assumptions.Any(a => a.Text == "Etwa 120 Wörter"));
     }
 
     public static TheoryData<string> BroadOnlyLengths() =>

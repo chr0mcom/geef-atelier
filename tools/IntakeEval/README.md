@@ -15,6 +15,8 @@ dotnet run --project tools/IntakeEval -- shadow --csv shadows.csv [--sample 10]
 | `evaluate` | spielt die Rohantworten durch Parser und Gate und gibt je Tor a–f (und die Warnschwelle e′) für die zurückgehaltene Menge und den Zweitkorpus `passed`, `FAILED` oder `NOT EVALUABLE` aus. Rückgabewert 0 nur, wenn alle Tore bestanden sind. |
 | `shadow` | wertet einen CSV-Export der Tabelle `OrderIntakeShadows` aus: Tore a und f im Schatten und Tor g, dazu eine Stichprobe von Fragen für die Sichtprüfung. Rückgabewert 0 nur, wenn alle messbaren Tore bestanden sind. |
 
+Verlangt das Gateway einen Schlüssel, liest `run` ihn aus der Umgebungsvariablen `INTAKE_EVAL_API_KEY` (nie als Argument übergeben, nie ausgeben).
+
 ## Regeln der Auswertung
 
 - **Kein Tor besteht ohne Daten.** Fehlt ein Ergebnis zu einem Korpuseintrag, gehört ein Ergebnis zu keinem Eintrag, hat ein

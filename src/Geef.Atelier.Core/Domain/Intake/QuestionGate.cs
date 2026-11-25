@@ -110,7 +110,7 @@ public static class QuestionGate
 
         return new QuestionGateResult(
             questions,
-            Assumptions(gaps, decisions, input.RequestText),
+            Assumptions(gaps, decisions, input.RequestText, lengthKnown),
             fromMemory,
             ResearchTopics(output, gaps, decisions, input.RequestText),
             gaps.Select((g, i) => new GateTrace(i, g.Topic, decisions[i])).ToList(),
@@ -224,7 +224,7 @@ public static class QuestionGate
             || LengthRuleGate.MentionsLength(requestText)
             || LengthMentions.InRequest(requestText));
 
-    private static IReadOnlyList<IntakeAssumption> Assumptions(IReadOnlyList<IntakeGap> gaps, IReadOnlyList<GateDecision> decisions, string requestText)
+    private static IReadOnlyList<IntakeAssumption> Assumptions(IReadOnlyList<IntakeGap> gaps, IReadOnlyList<GateDecision> decisions, string requestText, Lazy<bool> lengthKnown)
     {
         var asked = gaps.Where((_, i) => decisions[i] == GateDecision.Asked).Select(g => g.Topic).ToHashSet();
         var drafts = new List<(GapTopic Topic, string Text, AssumptionConfidence Confidence)>();
@@ -236,11 +236,12 @@ public static class QuestionGate
             var text = decisions[i] switch
             {
                 GateDecision.Asked or GateDecision.Derived or GateDecision.FromMemory => null,
+                _ when gap.Topic == GapTopic.Length && lengthKnown.Value => null,
                 GateDecision.DroppedDuplicateTopic when askedTopic => BroadTopics.Contains(gap.Topic) ? given : null,
                 _ when askedTopic && !BroadTopics.Contains(gap.Topic) => null,
                 GateDecision.Assumed when gap.Resolution == GapResolution.Memory => given ?? NotSpecified(gap.Topic),
                 GateDecision.Assumed or GateDecision.ToResearch => given,
-                GateDecision.DroppedLengthKnown or GateDecision.DroppedRevisionRule => given,
+                GateDecision.DroppedRevisionRule => given,
                 _ => given ?? NotSpecified(gap.Topic),
             };
             if (text is not null && drafts.All(d => !string.Equals(d.Text, text, StringComparison.OrdinalIgnoreCase)))

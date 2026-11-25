@@ -38,7 +38,7 @@ internal sealed class EvalRunner(RunSettings settings, TextWriter log)
         log.WriteLine($"{entries.Count} entries to call ({done.Count} already done, cap {settings.MaxCalls}).");
 
         using var http = new HttpClient { Timeout = settings.Timeout + TimeSpan.FromSeconds(30) };
-        var client = new Infrastructure.Llm.OpenAiCompatibleClient(http, settings.Proxy, "intake-eval");
+        var client = new Infrastructure.Llm.OpenAiCompatibleClient(http, settings.Proxy, Environment.GetEnvironmentVariable("INTAKE_EVAL_API_KEY") is { Length: > 0 } key ? key : "intake-eval");
         var clarifier = new LlmClarifier(
             new FixedModelAssignment(new Core.Domain.Crew.Models.ModelCandidate("claude-cli", settings.Model)),
             new ProxyResolver(client), Options.Create(options), NullLogger<LlmClarifier>.Instance, TimeProvider.System);
