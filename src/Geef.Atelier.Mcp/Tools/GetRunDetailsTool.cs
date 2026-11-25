@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Geef.Atelier.Application.Auth;
+using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Mcp.Models;
 using ModelContextProtocol.Server;
@@ -34,7 +35,7 @@ public static class GetRunDetailsTool
             details.Run.Status.ToString(),
             details.Run.CreatedAt,
             details.Run.CreatedByUser,
-            details.Run.BriefingText,
+            BriefingSections.ForViewer(details.Run.BriefingText, details.Run.CreatedByUser, currentUser.Username),
             details.Run.FinalText,
             details.Run.ErrorMessage,
             iterations);

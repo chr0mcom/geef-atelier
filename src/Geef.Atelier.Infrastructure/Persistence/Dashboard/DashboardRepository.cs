@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Application.Dashboard;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
@@ -341,9 +342,10 @@ internal sealed class DashboardRepository(AtelierDbContext db) : IDashboardRepos
 
         return runs.Select(r =>
         {
-            var snippet = r.BriefingText.Length > 80
-                ? r.BriefingText[..77] + "…"
-                : r.BriefingText;
+            var request = BriefingSections.RequestPart(r.BriefingText);
+            var snippet = request.Length > 80
+                ? request[..77] + "…"
+                : request;
             var cost = (r.TotalCostEur ?? (r.CostTotal > 0 ? r.CostTotal : 0m)) + (r.FinalizerCostEur ?? 0m);
             return new ManuscriptCard(
                 r.Id,
@@ -549,7 +551,7 @@ internal sealed class DashboardRepository(AtelierDbContext db) : IDashboardRepos
         entries.AddRange(completed.Select(r => new DayBookEntry(
             DayBookKind.RunCompleted,
             DayBookFormatter.GetVerb(DayBookKind.RunCompleted),
-            r.BriefingText.Length > 40 ? r.BriefingText[..37] + "…" : r.BriefingText,
+            Short(r.BriefingText),
             null,
             r.CompletedAt!.Value)));
 
@@ -565,7 +567,7 @@ internal sealed class DashboardRepository(AtelierDbContext db) : IDashboardRepos
         entries.AddRange(failed.Select(r => new DayBookEntry(
             DayBookKind.RunFailed,
             DayBookFormatter.GetVerb(DayBookKind.RunFailed),
-            r.BriefingText.Length > 40 ? r.BriefingText[..37] + "…" : r.BriefingText,
+            Short(r.BriefingText),
             null,
             r.CompletedAt ?? DateTimeOffset.UtcNow)));
 
@@ -600,5 +602,11 @@ internal sealed class DashboardRepository(AtelierDbContext db) : IDashboardRepos
             .OrderByDescending(e => e.At)
             .Take(12)
             .ToList();
+    }
+
+    private static string Short(string briefing)
+    {
+        var request = BriefingSections.RequestPart(briefing);
+        return request.Length > 40 ? request[..37] + "…" : request;
     }
 }

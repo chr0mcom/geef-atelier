@@ -16,8 +16,10 @@
     /// <summary>The run entity to display as a card.</summary>
     [Parameter, EditorRequired] public RunEntity Run { get; set; } = null!;
 
+    private string Request => Geef.Atelier.Application.Orders.BriefingSections.RequestPart(Run.BriefingText);
+
     private string Snippet =>
-        Run.BriefingText.Length > 60
-            ? Run.BriefingText[..60] + "…"
-            : Run.BriefingText;
+        Request.Length > 60
+            ? Request[..60] + "…"
+            : Request;
 }

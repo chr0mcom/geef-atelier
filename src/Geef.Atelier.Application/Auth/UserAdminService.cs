@@ -1,12 +1,18 @@
 using Geef.Atelier.Application.OAuth;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Persistence;
+using Geef.Atelier.Core.Persistence.Profiles;
 
 namespace Geef.Atelier.Application.Auth;
 
+/// <summary>
+/// Manages accounts. The "About me" profile hangs on the user name, so it goes with the account: it is deleted with the
+/// account, moved on a rename, and a new account never finds an old profile under its name.
+/// </summary>
 internal sealed class UserAdminService(
     IAtelierUserRepository users,
-    IOAuthService oauthService) : IUserAdminService
+    IOAuthService oauthService,
+    IUserProfileRepository profiles) : IUserAdminService
 {
     public Task<IReadOnlyList<AtelierUser>> GetAllUsersAsync(CancellationToken ct)
         => users.GetAllAsync(ct);
@@ -27,6 +33,7 @@ internal sealed class UserAdminService(
             CreatedAt: DateTimeOffset.UtcNow,
             UpdatedAt: DateTimeOffset.UtcNow);
 
+        await profiles.DeleteAsync(username, ct);
         await users.AddAsync(user, ct);
         return user;
     }
@@ -51,6 +58,8 @@ internal sealed class UserAdminService(
         };
 
         await users.UpdateAsync(updated, ct);
+        if (!string.Equals(existing.Username, username, StringComparison.Ordinal))
+            await MoveProfileAsync(existing.Username, username, ct);
 
         if (!isActive && existing.IsActive)
             await oauthService.RevokeAllUserTokensAsync(existing.Username, ct);
@@ -65,5 +74,16 @@ internal sealed class UserAdminService(
 
         await oauthService.RevokeAllUserTokensAsync(existing.Username, ct);
         await users.DeleteAsync(userId, ct);
+        await profiles.DeleteAsync(existing.Username, ct);
+    }
+
+    private async Task MoveProfileAsync(string from, string to, CancellationToken ct)
+    {
+        var profile = await profiles.GetAsync(from, ct);
+        await profiles.DeleteAsync(to, ct);
+        if (profile is null)
+            return;
+        await profiles.UpsertAsync(profile with { Username = to }, ct);
+        await profiles.DeleteAsync(from, ct);
     }
 }
