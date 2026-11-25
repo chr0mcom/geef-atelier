@@ -9,7 +9,7 @@ namespace Geef.Atelier.Mcp.Tools;
 [McpServerToolType]
 public static class GetRunStatusTool
 {
-    [McpServerTool, Description("Gets the current status of a run by its ID, including warnings about sources, checks or models the run had to skip or replace. The field 'outcome' stays empty until the run has ended and everything is saved, including the finishing steps; wait for it rather than for the status. Outcome values: Converged (all checks passed), DeliveredWithOpenPoints (a best text was delivered with open points; this includes status Aborted after a critical finding when a text exists), Failed (no usable text, or the result could not be saved completely), Aborted (cancelled or stopped).")]
+    [McpServerTool, Description(McpToolCatalog.LegacyLeadStart + "get_order_status" + McpToolCatalog.LegacyLeadEnd + "Gets the current status of a run by its ID, including warnings about sources, checks or models the run had to skip or replace. The field 'outcome' stays empty until the run has ended and everything is saved, including the finishing steps; wait for it rather than for the status. Outcome values: Converged (all checks passed), DeliveredWithOpenPoints (a best text was delivered with open points; this includes status Aborted after a critical finding when a text exists), Failed (no usable text, or the result could not be saved completely), Aborted (cancelled or stopped).")]
     public static async Task<RunStatusDto?> GetRunStatus(
         IRunService runService,
         ICurrentUserService currentUser,

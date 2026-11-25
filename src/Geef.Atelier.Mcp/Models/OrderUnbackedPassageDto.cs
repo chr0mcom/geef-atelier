@@ -7,4 +7,6 @@ namespace Geef.Atelier.Mcp.Models;
 /// <param name="Blocking">True when the passage must be fixed or checked before the text is used.</param>
 /// <param name="InstructionFrom">For <c>against_instruction</c>: where the instruction stands – <c>request</c>, <c>answers</c> (the person's answers), <c>about_me</c> (the person's About me details, not this request) or <c>assistant</c> (answers of the AI assistant); otherwise <c>null</c>.</param>
 /// <param name="Note">For <c>differs_from_looked_up</c>: the sentence for the person, as on the web page; otherwise <c>null</c>.</param>
-public sealed record OrderUnbackedPassageDto(string Quote, string Kind, string? Instruction, bool Blocking, string? InstructionFrom = null, string? Note = null);
+/// <param name="FromVersion">The earlier version this passage was flagged for; the passage still stands in this text word for word. <c>null</c> when it was flagged for this version.</param>
+public sealed record OrderUnbackedPassageDto(string Quote, string Kind, string? Instruction, bool Blocking, string? InstructionFrom = null, string? Note = null,
+    int? FromVersion = null);

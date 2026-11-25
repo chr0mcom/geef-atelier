@@ -2,6 +2,7 @@ using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
+using Geef.Atelier.Core.Domain.Profiles;
 using Geef.Atelier.Core.Domain.Sources;
 
 namespace Geef.Atelier.Mcp.Models;
@@ -107,6 +108,54 @@ internal static class OrderWireNames
         FactCheckState.VersionNotChecked => FactCheckVersionNotChecked,
         FactCheckState.Off or FactCheckState.NotShown => FactCheckNotChecked,
         _ => throw new ArgumentOutOfRangeException(nameof(state), state, null),
+    };
+
+    public const string QuickShorter = "shorter";
+    public const string QuickLonger = "longer";
+    public const string QuickMoreFormal = "more_formal";
+    public const string QuickFriendlier = "friendlier";
+    public const string QuickSimpler = "simpler";
+
+    /// <summary>The wire names of the quick changes of <c>revise_order</c>, in the order of the buttons on the web page.</summary>
+    public static IReadOnlyList<string> QuickNames { get; } = [QuickShorter, QuickLonger, QuickMoreFormal, QuickFriendlier, QuickSimpler];
+
+    /// <summary>Wire name of a quick change of <c>revise_order</c>.</summary>
+    public static string ToWire(this RevisionQuick quick) => quick switch
+    {
+        RevisionQuick.Shorter => QuickShorter,
+        RevisionQuick.Longer => QuickLonger,
+        RevisionQuick.MoreFormal => QuickMoreFormal,
+        RevisionQuick.Friendlier => QuickFriendlier,
+        RevisionQuick.Simpler => QuickSimpler,
+        _ => throw new ArgumentOutOfRangeException(nameof(quick), quick, null),
+    };
+
+    /// <summary>
+    /// The quick change of a wire name, ignoring case, surrounding blanks and whether words are joined by <c>_</c>, <c>-</c> or a blank;
+    /// the name of the web button ("Simpler words") counts as well. <c>null</c> for anything unknown.
+    /// </summary>
+    public static RevisionQuick? ParseRevisionQuick(string? wire)
+    {
+        var key = string.Join('_', (wire ?? string.Empty).Trim().ToLowerInvariant()
+            .Split([' ', '-', '_'], StringSplitOptions.RemoveEmptyEntries));
+        return key switch
+        {
+            QuickShorter => RevisionQuick.Shorter,
+            QuickLonger => RevisionQuick.Longer,
+            QuickMoreFormal => RevisionQuick.MoreFormal,
+            QuickFriendlier => RevisionQuick.Friendlier,
+            QuickSimpler or "simpler_words" => RevisionQuick.Simpler,
+            _ => null,
+        };
+    }
+
+    /// <summary>Wire name of the formality of the About me details; <c>null</c> for "it depends".</summary>
+    public static string? ToWire(this Formality formality) => formality switch
+    {
+        Formality.Formal => "formal",
+        Formality.Informal => "informal",
+        Formality.Unset => null,
+        _ => throw new ArgumentOutOfRangeException(nameof(formality), formality, null),
     };
 
     /// <summary>The origin of an answer from its wire name, ignoring case and surrounding blanks; <c>null</c> for anything unknown.</summary>
