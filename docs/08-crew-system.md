@@ -894,8 +894,11 @@ version) and `SeedDraftText` (its delivered text). The order service creates the
 - **Brief:** `RevisionBrief.Compose` adds the change as the line marked "the change to make now" and marks every older line of the
   block as "earlier change: already made in the text – do not make it again, keep it"; the heading says that the newest change wins
   and that the person's words take precedence over the blocks "Assumptions …" and "Not given by the person". `BriefingSections.Parse`
-  passes every change to the fact check as an answer of the person with a short mark ("newest change, version n" / "earlier change,
-  version n; a newer change wins where they differ") before the unchanged words.
+  gives the changes back apart from the answers (`BriefParts.Changes`, the last one as the newest), and the material of the fact check
+  keeps them that way (`FactMaterial.Changes`). Only the checker's prompt writes them under the answers of the person, with a short
+  mark ("newest change, version n" / "earlier change, version n; a newer change wins where they differ", `FactChange.Marked`) before
+  the unchanged words. Quotes are looked up in the words only; the filter first takes the mark out of every quote of the checker
+  (`FactChange.WithoutMarks`), so a quote that is only a mark is no instruction and no stored quote holds the mark.
 - **Writer:** only in the user prompt of the first pass, `DirectWriterPrompts.RevisionInstruction` replaces `SeedInstruction` (for
   providers without document mode through the same replacement "the text in draft.md" → "this text"). The system prompt stays
   bit-identical (hash test); the correction pass is unchanged.
@@ -904,6 +907,12 @@ version) and `SeedDraftText` (its delivered text). The order service creates the
   sentence `FirstRequestNoteFormat`); empty text, remark before the text, the placeholders to fill in, the calculations and the fact
   check run as always. The report is marked `RunReport.Revision`, and "What was checked" names kept rules as rules of the first
   request.
+- **Instructions in the fact check:** in a change run (`FactMaterial.IsRevision`) a finding of kind `Instruction` blocks only when
+  its instruction quote stands in the newest change (also when it stands elsewhere as well). Any other origin that is found (request,
+  answers, About me, assistant, earlier change) gives a hint with `FactFinding.BeforeLastChange`: never blocking, so `Info` in mode
+  `On` and never in the correction. Instruction findings carried over from an earlier version are judged the same way
+  (`FactFindingFilter.ForRevision` in `DirectReportBuilder.EarlierFindings`), and `FactCarryOver.Merge` never makes such a hint
+  blocking again. Other kinds of findings and the first run stay unchanged.
 - **Never lose across versions (`DirectReportBuilder`):** after the run the assembler reads the report of `ParentRunId`. Its open
   findings (passages and source conflicts) go into the new report through `FactCarryOver.Merge`: passages only when their quote still
   stands as whole words, conflicts always, each with `FactFinding.FromVersion` (a finding carried over before keeps the version that
@@ -914,5 +923,8 @@ version) and `SeedDraftText` (its delivered text). The order service creates the
   version and `EarlierPointKind` (including those the earlier version had carried over), together with a fixed sentence
   (`EarlierPointKind.Note`) for its notes and flagged passages that could not be shown. When the earlier version has no report (for
   example "Extra careful"), the fixed sentence `ChecksNotTakenOverFormat` says that its checks were not taken over and not checked
-  again. When the earlier report cannot be read, the report says so in one sentence and the run goes on. Reports of all other runs stay
+  again. When the earlier report cannot be read, the report says so in one sentence and the run goes on. When an earlier version
+  without a readable report was itself shown as "Ready – please check" (`DirectRevision.NeedsCheck`, resolved with
+  `OrderStateResolver`), the report sets `RunReport.EarlierNeedsCheck`; a later version inherits it from the report of its base.
+  `OrderStateResolver.ToRunState` reads it in every fact-check mode as a carried blocking point. Reports of all other runs stay
   bit-identical (`null` is not written).

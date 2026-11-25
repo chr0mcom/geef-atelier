@@ -2431,9 +2431,12 @@ so far nor an open point that still applies.
   already made in the text – do not make it again, keep it". The heading says that the newest change wins where changes differ
   and that the person's words here take precedence over the blocks "Assumptions …" and "Not given by the person". The fact
   checker gets each change as the person's word with a short mark ("newest change, version n" or "earlier change, version n; a
-  newer change wins where they differ") before the unchanged words; its prompt and schema stay the same, and a quote from such a
-  line (with or without the mark) still counts as an answer of the person. Whether the model follows the order this way is **not
-  measured** (gate N).
+  newer change wins where they differ") before the unchanged words; its prompt and schema stay the same. The mark is never a word
+  of the person: the material keeps the changes apart from their mark (`FactMaterial.Changes`), the mark is written out only in
+  the checker's prompt, and in one place (the filter of the fact check) it is taken out of every quote of the checker before the
+  quote is looked up or stored. A quote from such a line still counts as an answer of the person and is stored without the mark;
+  a quote that is only the mark or parts of it is not taken as an instruction of the person. Stored and shown quotes (web, MCP,
+  correction) therefore never hold the mark. Whether the model follows the order this way is **not measured** (gate N).
 - **Writer:** only in the first pass of a change run, `RevisionInstruction` replaces the usual instruction for a seed text (user
   prompt only; system prompt bit for bit the same): carry out only the line marked "the change to make now", keep the earlier
   changes and do not make them again, keep the language unless the change asks for another one, keep the length within ±15 %
@@ -2445,6 +2448,19 @@ so far nor an open point that still applies.
   as it is. "What was checked" names a rule that is kept as a rule of the first request ("Checked automatically against the rules
   of your first request (your change may have replaced them): …"), never as "has the requested length"; no rule checks whether the
   change itself was carried out.
+- **Instructions in the fact check of a change** (second correction round): in a change run a finding against an instruction
+  blocks only when its instruction quote stands in the **newest** change; when it stands there and earlier as well, it counts as
+  the newest. When it comes from the first request, from answers of the person or the assistant during clarification, from the
+  About me details or from an earlier change, the finding stays visible, never blocks (so neither in mode `On` nor in the
+  correction) and carries `beforeLastChange` in the report. The web page shows it under "Please also look at this:" with the
+  instruction ("Asked for: …" or "Your About me details say: …", hidden from anyone but the owner as before) and the sentence
+  "This instruction applied before your latest change; your change may have replaced it."; MCP gives the same sentence in
+  `unbackedPassages[].note` with `blocking = false`. The same applies to instruction findings carried over from an earlier
+  version: they block only when their instruction stands in the newest change; a finding defused this way never blocks again in
+  later versions (also not when a blocking finding with the same words is merged with it). Passages not backed, replaced
+  information (also from what was looked up) and conflicts between sources stay as they are; an instruction from files or from
+  what was looked up is still not taken as an instruction. The first run of an order is unchanged. The checker's prompt and
+  schema are unchanged; whether the model reports such findings is not measured.
 - **Never lose across versions:** open passages of the version before whose quote still stands as whole words, and conflicts
   between sources, are carried over with their origin (`fromVersion`, web "Found in version n."); open points of the writer for
   the version before that the new one does not repeat appear under "Noted for version n – your change may have settled it:"
@@ -2452,7 +2468,9 @@ so far nor an open point that still applies.
   (marked as assumptions: web "Assumed: …", MCP `kind = assumption`, with their version), and for the number of notes and flagged
   passages of the version before that could not be shown, as a fixed sentence. When the base version has no report (for example
   "Extra careful"), the fixed sentence "The checks of version n were not taken over, so anything they left open was not checked
-  again." stands there; it counts as an open point. Carrying over happens only in change runs. Findings of the version before
+  again." stands there; it counts as an open point. On the web these fixed sentences of Atelier do not stand under "your change
+  may have settled it" but under a neutral lead of their own, "About version n:"; MCP gives them in `earlierOpenPoints` with
+  `kind = note`. Carrying over happens only in change runs. Findings of the version before
   whose own check was off or hidden are not carried over; findings already carried over (with their origin) stay and stay visible
   across all versions, also when the fact-check mode was off or hidden in between (findings of the hidden check itself stay
   unseen).
@@ -2469,7 +2487,11 @@ so far nor an open point that still applies.
   is shown as "Ready – please check", as for a blocking finding of its own – the same everywhere (order page, "My work", the
   service, `get_order_status`, `get_order_result`, `list_orders`). **Decided:** only in fact-check mode `On`; in mode `Report` a
   blocking finding of its own ends as "Ready" as well, so the same applies here. The stored report is read; the stored outcome
-  stays unchanged.
+  stays unchanged. **Base without a report:** when the base version had no readable report and was itself shown as "Ready –
+  please check" (for example "Extra careful" that did not finish cleanly), the new version is shown as "Ready – please check"
+  too, whatever the fact-check mode, because nothing of the base was checked again. The source is the same as above (the field
+  `earlierNeedsCheck` of the stored report, read when the state is resolved); a later version inherits it from the report of its
+  base. Older stored runs lack the field and keep their display.
 - **Web:** card "Change something" below the text (owner only, order finished, no run active, switch `On`) with the line "The
   writer is asked to make only this change. “Show changes” then shows what was changed." – nothing checks that nothing else
   changed. When the service answers "A change is already being made.", the words and buttons of the card stay. After a change
@@ -2482,7 +2504,8 @@ so far nor an open point that still applies.
 - **Resume (older path):** "Resume" seeds with the delivered text when the run has one, otherwise with the last iteration as
   before (a fix, no switch).
 - **MCP:** nine order tools, registered one by one: `submit_order`, `answer_order`, `get_order_status`, `get_order_result` (new
-  `latestVersion`, `earlierOpenPoints` with `kind`, `unbackedPassages[].fromVersion`, `assumptionsVersion`), `revise_order`
+  `latestVersion`, `earlierOpenPoints` with `kind` `openPoint`, `assumption` or `note`, `unbackedPassages[].fromVersion`,
+  `unbackedPassages[].note` also for instructions from before the latest change, `assumptionsVersion`), `revise_order`
   (description without the promise that nothing else changes), `export_order` (the same file as the
   web download), `cancel_order`, `list_orders`, `profile` (read only). The older tools are added only with
   `Mcp:LegacyTools = true` (shipped `true`); the five with a successor point to it in their description, their answers are
@@ -2503,7 +2526,7 @@ is changed. This is intended (the text stays on the same basis) and is not chang
 
 **Data model:** migration `Step52Revise`, additive and idempotent: `Runs.RevisionHint text NULL` (`ADD COLUMN IF NOT EXISTS`).
 Nothing else; the report stays schema 2 with appended optional fields (`earlierOpenPoints` with `kind`, `fromVersion`,
-`revision`).
+`revision`, `beforeLastChange` on findings, `earlierNeedsCheck`; the last two are written only when true).
 
 **Switches** (all through the environment without a new image; they are read at start, a change needs a restart of the
 container; `docker-compose.yml` lists its variables one by one and does not pass these through, so set them in the `environment`
@@ -2524,8 +2547,10 @@ requires the base version's `earlierOpenPoints` with their version and the write
 on top of eight real changes and does not count as "with text", N5 requires the state `stopped`; a local N1 case with fewer than
 four paragraphs cannot be judged; gate M compares the export without a version with the text of version 2). Before switching on
 for everyone, real runs must also show that in a chain (shortening, then a local change; two changes that contradict each other)
-the earlier change is not carried out again and the fact checker does not block the newest one – automatic tests only prove what
-reaches the writer and the checker. Cases that cannot be forced on the real
+the earlier change is not carried out again and the fact checker does not block the newest one – automatic tests prove what
+reaches the writer and the checker and that, in the code, an instruction finding from before the newest change does not block,
+not what the models make of it. The plan of gate N does not require a contradiction case of its own (the first request rules out
+what the change asks for). Cases that cannot be forced on the real
 system (second call, cap, a new version failing because of a provider error, a carried blocking point) are proven by Postgres
 and end-to-end tests, among them one over the whole way v1 → v2 (MCP) → v3 (web) failed or stopped, which checks the same state,
 the same shown version and the same open points in every place.
@@ -2536,5 +2561,6 @@ and stored change runs in the new report format: start and migration run without
 "My work", run pages, result, list, export and the MCP tools answer without failing; the new report is read and unknown fields
 are skipped. **What the old image then shows differently:** if the newest version failed, was stopped or is running, it shows no
 text, as before part B, and the export without a version finds none (the earlier version stays stored and can be exported with
-its version); it does not show the points of the version before (`earlierOpenPoints`) or the origin of carried passages, and a
-version with a carried blocking point appears as "Ready". None of this is deleted; it shows again after the next deploy.
+its version); it does not show the points of the version before (`earlierOpenPoints`) or the origin of carried passages, a
+version with a carried blocking point or with `earlierNeedsCheck` appears as "Ready", and a passage against an instruction from
+before the latest change stands among the hints without its sentence. None of this is deleted; it shows again after the next deploy.
