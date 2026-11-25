@@ -1,4 +1,3 @@
-using System.Reflection;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Checks;
@@ -20,16 +19,14 @@ namespace Geef.Atelier.Tests.Orders;
 /// <summary>
 /// The research of an order in its result over the real order service and Postgres: shown from the stored research only when the
 /// delivered run used it, every other status as its sentence, the usage row of the research never listed as a file, and the
-/// sentence about research that did not work shown once. The stored research column is read through a repository that hands the
-/// order out with research, because the column itself belongs to another package of this stage.
+/// sentence about research that did not work shown once. The research is stored in its real column (<c>Orders.ResearchJson</c>,
+/// Step51) through <see cref="IOrderRepository.TrySetResearchAsync"/> and read back by the real repository.
 /// </summary>
 [Collection(EndToEndCollection.Name)]
 [Trait("Category", "EndToEnd")]
 public sealed class OrderServiceResearchResultTests(PostgresFixture postgres)
 {
     private const string User = "e2e-research-result";
-
-    private readonly Dictionary<Guid, string> _research = [];
 
     private static readonly ResearchEntry Entry = OrderResearchLinesTests.Entry();
 
@@ -42,21 +39,18 @@ public sealed class OrderServiceResearchResultTests(PostgresFixture postgres)
             new FactCheckSummary(FactCheckMode.Report, FactCheckScope.Full, FactCheckState.Checked, [], [], [], 1, "m", false, "fact-check-1"),
             null, [], lookedUp);
 
-    private Task<AtelierEndToEndHost> StartAsync() =>
-        AtelierEndToEndHost.StartAsync(postgres, services =>
-        {
-            var registered = services.Last(d => d.ServiceType == typeof(IOrderRepository));
-            services.Remove(registered);
-            services.AddScoped(sp => ResearchStampingRepository.Create(
-                (IOrderRepository)ActivatorUtilities.CreateInstance(sp, registered.ImplementationType!), _research));
-        });
+    private Task<AtelierEndToEndHost> StartAsync() => AtelierEndToEndHost.StartAsync(postgres);
+
+    private static async Task StoreResearchAsync(AtelierEndToEndHost host, Guid orderId, OrderResearch research) =>
+        Assert.True(await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderRepository>()
+            .TrySetResearchAsync(orderId, ResearchJson.Serialize(research), research.At)));
 
     [Fact]
     public async Task Found_research_used_by_the_delivered_run_is_shown_and_its_usage_row_is_no_file()
     {
         await using var host = await StartAsync();
         var (orderId, runId) = await DeliveredAsync(host, Report(lookedUp: true), "Liebe Eltern, der Mindestlohn steigt.");
-        _research[orderId] = ResearchJson.Serialize(OrderResearchLinesTests.Research(ResearchStatus.Found, [Entry]));
+        await StoreResearchAsync(host, orderId, OrderResearchLinesTests.Research(ResearchStatus.Found, [Entry]));
         await AddUsageAsync(host, runId, null, DossierRenderer.FileName, DossierRenderer.UsageTarget, 0);
 
         var result = await ResultAsync(host, orderId);
@@ -74,7 +68,7 @@ public sealed class OrderServiceResearchResultTests(PostgresFixture postgres)
     {
         await using var host = await StartAsync();
         var (orderId, _) = await DeliveredAsync(host, Report(lookedUp: false), "Liebe Eltern.");
-        _research[orderId] = ResearchJson.Serialize(OrderResearchLinesTests.Research(ResearchStatus.Found, [Entry]));
+        await StoreResearchAsync(host, orderId, OrderResearchLinesTests.Research(ResearchStatus.Found, [Entry]));
 
         var result = await ResultAsync(host, orderId);
 
@@ -87,7 +81,7 @@ public sealed class OrderServiceResearchResultTests(PostgresFixture postgres)
     {
         await using var host = await StartAsync();
         var (orderId, runId) = await DeliveredAsync(host, Report(lookedUp: false), "Liebe Eltern.");
-        _research[orderId] = ResearchJson.Serialize(OrderResearchLinesTests.Research(ResearchStatus.Failed, error: "search_failed"));
+        await StoreResearchAsync(host, orderId, OrderResearchLinesTests.Research(ResearchStatus.Failed, error: "search_failed"));
         await AddWarningAsync(host, runId, RunWarningCodes.ResearchFailed, OrderResearchLines.Failed);
         await AddWarningAsync(host, runId, RunWarningCodes.LlmFailover, "Another service answered.");
 
@@ -117,7 +111,7 @@ public sealed class OrderServiceResearchResultTests(PostgresFixture postgres)
     {
         await using var host = await StartAsync();
         var (orderId, runId) = await DeliveredAsync(host, Report(lookedUp: false), null);
-        _research[orderId] = ResearchJson.Serialize(OrderResearchLinesTests.Research(ResearchStatus.Failed, error: "timeout"));
+        await StoreResearchAsync(host, orderId, OrderResearchLinesTests.Research(ResearchStatus.Failed, error: "timeout"));
         await AddWarningAsync(host, runId, RunWarningCodes.ResearchFailed, OrderResearchLines.Failed);
 
         var result = await ResultAsync(host, orderId);
@@ -163,32 +157,4 @@ public sealed class OrderServiceResearchResultTests(PostgresFixture postgres)
             });
             return db.SaveChangesAsync();
         });
-
-    /// <summary>Hands orders out with the research stored for them in the test, as the real column will once it exists.</summary>
-    public class ResearchStampingRepository : DispatchProxy
-    {
-        private IOrderRepository _inner = null!;
-        private IReadOnlyDictionary<Guid, string> _research = null!;
-
-        public static IOrderRepository Create(IOrderRepository inner, IReadOnlyDictionary<Guid, string> research)
-        {
-            var proxy = Create<IOrderRepository, ResearchStampingRepository>();
-            var stamping = (ResearchStampingRepository)(object)proxy;
-            stamping._inner = inner;
-            stamping._research = research;
-            return proxy;
-        }
-
-        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
-        {
-            var result = targetMethod!.Invoke(_inner, args);
-            return targetMethod.Name == nameof(IOrderRepository.GetAsync) && result is Task<OrderEntity?> task ? StampAsync(task) : result;
-        }
-
-        private async Task<OrderEntity?> StampAsync(Task<OrderEntity?> task)
-        {
-            var order = await task;
-            return order is not null && _research.TryGetValue(order.Id, out var json) ? order with { ResearchJson = json } : order;
-        }
-    }
 }
