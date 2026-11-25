@@ -168,11 +168,13 @@ internal sealed class OrderIntakeService(
         var settings = options.Value;
         ClarifierRequest request;
         MemoryFacts facts;
+        IReadOnlyList<string> materialTexts;
         try
         {
             var items = await sources.ListForOrderAsync(order.Id, includeText: true, ct);
             facts = await memory.LoadAsync(order.CreatedByUser ?? string.Empty, ct);
             request = IntakeAnalysis.Request(order.RequestText, items, facts.Profile, settings);
+            materialTexts = items.MaterialTexts();
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
@@ -187,7 +189,9 @@ internal sealed class OrderIntakeService(
             return new Analysis(IntakeRecord.Fallback(status, call.ErrorCode, call.DurationMs, call.Model, settings.BriefMode), 0, false);
         }
 
-        var analysis = IntakeAnalysis.Analyse(order.RequestText, request.Candidates(), output, memory.Resolve(facts, output.TextType), settings.MaxQuestions);
+        var analysis = IntakeAnalysis.Analyse(
+            order.RequestText, request.Candidates(), output, memory.Resolve(facts, output.TextType), settings.MaxQuestions,
+            materialTexts, settings.DropGuessedDateOptions);
         var gate = analysis.Gate;
         var revision = analysis.Revision;
         var record = new IntakeRecord(

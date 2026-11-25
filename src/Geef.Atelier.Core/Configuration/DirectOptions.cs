@@ -40,10 +40,4 @@ public sealed class DirectOptions
 
     /// <summary>Whether a failed fact-check call is tried once more with the next model of the slot.</summary>
     public bool FactCheckFallbackModel { get; set; } = true;
-
-    /// <summary>Whether a passage that is not backed but has a gap to fill in is shown as a hint (<see cref="FactHint.GapSentence"/>).</summary>
-    public bool GapSentenceHint { get; set; }
-
-    /// <summary>Whether a short general closing sentence near the end that is not backed is shown as a hint (<see cref="FactHint.GeneralClosing"/>).</summary>
-    public bool ClosingSentenceHint { get; set; }
 }
