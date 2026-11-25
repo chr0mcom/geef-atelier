@@ -26,14 +26,14 @@ public sealed class RunDetailChangeLinkTests : TestContext
     private readonly Guid _runId = Guid.NewGuid();
     private readonly Guid _orderId = Guid.NewGuid();
 
-    private IRenderedComponent<RunDetail> Render(string? template, Guid? orderId, ReviseMode revise, bool withOptions = true)
+    private IRenderedComponent<RunDetail> Render(string? template, Guid? orderId, ReviseMode revise, bool withOptions = true, string? finalText = "# Text", int version = 1, string viewer = "alice", params string[] roles)
     {
         var snapshot = new CrewSnapshot(CrewSnapshot.CurrentSchemaVersion, template, SystemCrew.DefaultExecutorProfile, [SystemCrew.BriefingFidelityProfile],
             EvaluationStrategy.Parallel, null, Array.Empty<AdvisorProfile>());
         var run = new RunEntity
         {
             Id = _runId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Failed, BriefingText = "Test briefing", ConfigJson = "{}",
-            FinalText = "# Text", CreatedByUser = "alice", OrderId = orderId, OrderVersion = orderId is null ? null : 1,
+            FinalText = finalText, CreatedByUser = "alice", OrderId = orderId, OrderVersion = orderId is null ? null : version,
             CrewSnapshot = System.Text.Json.JsonSerializer.Serialize(snapshot, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }),
         };
         Services.AddSingleton<IRunService>(new SnapshotRunService(new StubRunService(new RunDetails(run, [])), snapshot));
@@ -48,7 +48,9 @@ public sealed class RunDetailChangeLinkTests : TestContext
             Services.AddOptions();
             Services.Configure<OrderOptions>(o => o.Revise = revise);
         }
-        this.AddTestAuthorization().SetAuthorized("alice");
+        var auth = this.AddTestAuthorization().SetAuthorized(viewer);
+        if (roles.Length > 0)
+            auth.SetRoles(roles);
         return RenderComponent<RunDetail>(p => p.Add(c => c.RunId, _runId));
     }
 
@@ -81,6 +83,33 @@ public sealed class RunDetailChangeLinkTests : TestContext
         var cut = Render(SystemCrew.DirectTemplateName, _orderId, ReviseMode.On, withOptions: false);
 
         Assert.Single(cut.FindAll("[data-testid='resume-run-button']"));
+    }
+
+    [Fact]
+    public void A_later_version_without_text_links_to_the_order_page_where_the_earlier_version_can_be_changed()
+    {
+        var cut = Render(SystemCrew.DirectTemplateName, _orderId, ReviseMode.On, finalText: null, version: 2);
+
+        Assert.Single(cut.FindAll("[data-testid='resume-change-link']"));
+        Assert.Empty(cut.FindAll("[data-testid='resume-run-button']"));
+    }
+
+    [Fact]
+    public void A_first_version_without_text_keeps_resume_because_the_order_page_has_nothing_to_change()
+    {
+        var cut = Render(SystemCrew.DirectTemplateName, _orderId, ReviseMode.On, finalText: null, version: 1);
+
+        Assert.Single(cut.FindAll("[data-testid='resume-run-button']"));
+        Assert.Empty(cut.FindAll("[data-testid='resume-change-link']"));
+    }
+
+    [Fact]
+    public void An_administrator_on_someone_elses_run_keeps_resume_because_only_the_owner_can_change_the_text()
+    {
+        var cut = Render(SystemCrew.DirectTemplateName, _orderId, ReviseMode.On, viewer: "admin", roles: "admin");
+
+        Assert.Single(cut.FindAll("[data-testid='resume-run-button']"));
+        Assert.Empty(cut.FindAll("[data-testid='resume-change-link']"));
     }
 
     private sealed class SnapshotRunService(StubRunService inner, CrewSnapshot snapshot) : IRunService
