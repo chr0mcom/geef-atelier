@@ -172,10 +172,11 @@ Alle Antworten wachsen nur um angehängte Felder; Clients ignorieren Felder, die
 
 Etappe 5 hängt an `get_order_result` an (Felder mit dem Wert `null` fehlen auf der Leitung):
 - `latestVersion`: die neueste Fassung des Auftrags. `version` ist die Fassung von `text`, die neueste Fassung mit Text. Während eine neue Fassung geschrieben wird oder wenn sie scheiterte oder gestoppt wurde, ist `latestVersion` höher, `text` die frühere Fassung, und `note` beginnt mit „A new version is being written. Version n stays here until it is ready.“ oder „Version m could not be finished. This is version n.“.
-- `earlierOpenPoints`: `[ { "version": 1, "text": "<offener Punkt des Schreibers für Fassung 1>" } ]` – offene Punkte der Vorversion, die die gezeigte Fassung nicht wiederholt; die Änderung kann sie erledigt haben oder nicht. `null`, wenn es keine gibt.
+- `earlierOpenPoints`: `[ { "version": 1, "text": "<offener Punkt des Schreibers für Fassung 1>", "kind": "openPoint|assumption" } ]` – offene Punkte und Annahmen des Schreibers einer früheren Fassung, die die gezeigte Fassung nicht wiederholt (`openPoint` auch für feste Sätze von Atelier zu Notizen oder Stellen dieser Fassung, die nicht gezeigt werden konnten, oder zu nicht übernommenen Prüfungen einer Fassung ohne Bericht); die Änderung kann sie erledigt haben oder nicht. `null`, wenn es keine gibt.
+- `assumptionsVersion`: bei einer geänderten Fassung mit `assumptions` die Fassung, für die sie notiert wurden (vor den Änderungen; eine Änderung kann sie erledigt oder überholt haben). Sonst `null`.
 - `unbackedPassages[].fromVersion`: die frühere Fassung, für die eine Stelle gemeldet wurde; sie steht noch wörtlich im Text. `null` für Stellen dieser Fassung.
 
-`note` nennt `earlierOpenPoints` unter den zu zeigenden Feldern und bittet, während eine neue Fassung geschrieben wird, mit `get_order_status` zu warten.
+`note` nennt `earlierOpenPoints` unter den zu zeigenden Feldern, sagt bei einer geänderten Fassung, dass die Annahmen für `assumptionsVersion` notiert wurden, und bittet, während eine neue Fassung geschrieben wird, mit `get_order_status` zu warten. In einer geänderten Fassung nennt `checks.checked` die Regeln des ersten Auftrags in eigenen Zeilen („Checked automatically against the rules of your first request (your change may have replaced them): …“ / „Rules of your first request the new version does not keep – …“); eine nicht eingehaltene Regel ist eine Notiz in `openChecks`, nie blockierend.
 
 **Eingabe `revise_order`:** `{ "orderId": "<uuid, Pflicht>", "change": "<Worte der Person, wörtlich|null>", "quick": ["shorter|longer|more_formal|friendlier|simpler"] }` – mindestens `change` oder ein `quick`.
 
@@ -184,7 +185,7 @@ Etappe 5 hängt an `get_order_result` an (Felder mit dem Wert `null` fehlen auf 
 { "orderId": "<uuid>", "state": "queued", "version": 2, "notices": [], "message": "Writing the new version has started. …" }
 ```
 
-Während eine Fassung geschrieben wird, ändert sich nichts: `version` ist die laufende Fassung, `notices` ist `["A change is already being made."]`. Ablehnungen kommen als Werkzeugfehler: „Changing a text is not available yet.“ (`Orders:Revise` für den Besitzer aus), „There is no text to change yet.“, „This order was stopped, so its text cannot be changed.“, die Grenze der Fassungen (`Orders:MaxVersionsPerOrder`) oder der Zeichen (`Orders:RevisionHintMaxChars`), ein unbekannter Schnellknopf oder gar keine Änderung.
+Während eine Fassung geschrieben wird, ändert sich nichts: `version` ist die laufende Fassung, `notices` ist `["A change is already being made."]`. Ändern kann nur die Besitzerin oder der Besitzer des Auftrags; alle anderen (auch Administratoren und der statische Token) bekommen „Order not found.“. Ablehnungen kommen als Werkzeugfehler: „Changing a text is not available yet.“ (`Orders:Revise` für den Besitzer aus), „There is no text to change yet.“, „This order was stopped, so its text cannot be changed.“, die Grenze der Fassungen (`Orders:MaxVersionsPerOrder`) oder der Zeichen (`Orders:RevisionHintMaxChars`), ein unbekannter Schnellknopf oder gar keine Änderung.
 
 **Eingabe `export_order`:** `{ "orderId": "<uuid, Pflicht>", "format": "md|docx|pdf (Standard md)", "version": 2 }` – ohne `version` die Fassung, die `get_order_result` zeigt.
 

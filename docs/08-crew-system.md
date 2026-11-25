@@ -891,16 +891,28 @@ version) and `SeedDraftText` (its delivered text). The order service creates the
 - **Grounding:** the assembler passes `RevisionHint` to `OrderGroundingStep`, which sets the context key
   `AtelierContextKeys.RevisionHint`. The earlier text is only the seed, never material of the fact check. As for any revision, the
   research only returns what is stored.
+- **Brief:** `RevisionBrief.Compose` adds the change as the line marked "the change to make now" and marks every older line of the
+  block as "earlier change: already made in the text – do not make it again, keep it"; the heading says that the newest change wins
+  and that the person's words take precedence over the blocks "Assumptions …" and "Not given by the person". `BriefingSections.Parse`
+  passes every change to the fact check as an answer of the person with a short mark ("newest change, version n" / "earlier change,
+  version n; a newer change wins where they differ") before the unchanged words.
 - **Writer:** only in the user prompt of the first pass, `DirectWriterPrompts.RevisionInstruction` replaces `SeedInstruction` (for
   providers without document mode through the same replacement "the text in draft.md" → "this text"). The system prompt stays
   bit-identical (hash test); the correction pass is unchanged.
-- **Checks:** in a change run the length of the first request is only a note, never blocking (`DeterministicChecksReviewer.Evaluate`,
-  sentence "Because you asked for a change, the length was not corrected."); placeholder, language, term and fact checks run as always.
+- **Checks:** in a change run every rule of the first request (`DraftCheckResult.IsFirstRequestRule`: length, language, no
+  placeholders, forbidden forms, ruled-out and required words) is only a note, never blocking (`DeterministicChecksReviewer.Evaluate`,
+  sentence `FirstRequestNoteFormat`); empty text, remark before the text, the placeholders to fill in, the calculations and the fact
+  check run as always. The report is marked `RunReport.Revision`, and "What was checked" names kept rules as rules of the first
+  request.
 - **Never lose across versions (`DirectReportBuilder`):** after the run the assembler reads the report of `ParentRunId`. Its open
   findings (passages and source conflicts) go into the new report through `FactCarryOver.Merge`: passages only when their quote still
   stands as whole words, conflicts always, each with `FactFinding.FromVersion` (a finding carried over before keeps the version that
-  found it); when the new check reports the same passage, it appears once as its own finding. Findings of an earlier check in `Off` or
-  shadow mode are not carried over. The writer's open points of the earlier version that the new one does not repeat word for word
-  (`SameAssumptionKey`) go to `RunReport.EarlierOpenPoints` with their version (including those the earlier version had carried over).
-  When the earlier report cannot be read, the report says so in one sentence and the run goes on. Reports of all other runs stay
+  found it); when the new check reports the same passage, it appears once as its own finding – unless the new check is `Off` or in
+  shadow mode, then the carried finding comes first. Own findings of an earlier check in `Off` or shadow mode are not carried over;
+  findings it had carried over (with `FromVersion`) always are. The writer's open points and assumptions of the earlier version that
+  the new one does not repeat word for word in the same kind (`SameAssumptionKey`) go to `RunReport.EarlierOpenPoints` with their
+  version and `EarlierPointKind` (including those the earlier version had carried over), together with a fixed sentence
+  (`EarlierPointKind.Note`) for its notes and flagged passages that could not be shown. When the earlier version has no report (for
+  example "Extra careful"), the fixed sentence `ChecksNotTakenOverFormat` says that its checks were not taken over and not checked
+  again. When the earlier report cannot be read, the report says so in one sentence and the run goes on. Reports of all other runs stay
   bit-identical (`null` is not written).

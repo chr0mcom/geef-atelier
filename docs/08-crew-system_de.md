@@ -913,17 +913,27 @@ und `SeedDraftText` (deren ausgelieferter Text). Den Lauf legt der Auftragsdiens
 - **Grounding:** Der Assembler reicht `RevisionHint` an `OrderGroundingStep`; der Schritt setzt den Kontextschlüssel
   `AtelierContextKeys.RevisionHint`. Der frühere Text ist nur Ausgangstext, nie Material des Faktenprüfers. Die Recherche liefert wie
   bei jeder Überarbeitung nur Gespeichertes.
+- **Brief:** `RevisionBrief.Compose` fügt die Änderung als Zeile „the change to make now“ an und markiert jede ältere Zeile des Blocks
+  als „earlier change: already made in the text – do not make it again, keep it“; die Überschrift sagt, dass die neueste Änderung
+  gilt und die Worte der Person den Blöcken „Assumptions …“ und „Not given by the person“ vorgehen. `BriefingSections.Parse` gibt jede
+  Änderung dem Faktenprüfer als Antwort der Person mit kurzer Marke („newest change, version n“ / „earlier change, version n; a newer
+  change wins where they differ“) vor dem unveränderten Wortlaut.
 - **Schreiber:** Nur im Nutzerprompt des ersten Durchgangs ersetzt `DirectWriterPrompts.RevisionInstruction` die `SeedInstruction`
   (für Anbieter ohne Dokumentmodus über dieselbe Ersetzung „the text in draft.md“ → „this text“). Der System-Prompt bleibt bitgleich
   (Hash-Test); Korrekturdurchgang unverändert.
-- **Prüfungen:** Die Längenregel des ersten Auftrags ist im Nachbesserungslauf nur eine Notiz, nie blockierend
-  (`DeterministicChecksReviewer.Evaluate`, Satz „Because you asked for a change, the length was not corrected.“); Platzhalter-, Sprach-,
-  Wort- und Faktenprüfung laufen wie immer.
+- **Prüfungen:** Jede Regel des ersten Auftrags (`DraftCheckResult.IsFirstRequestRule`: Länge, Sprache, keine Platzhalter, verbotene
+  Formen, verbotene und verlangte Wörter) ist im Nachbesserungslauf nur eine Notiz, nie blockierend (`DeterministicChecksReviewer.Evaluate`,
+  Satz `FirstRequestNoteFormat`); leerer Text, Vorrede, Anzeige der Platzhalter, Rechenprüfung und Faktenprüfung laufen wie immer. Der
+  Bericht trägt `RunReport.Revision`, und „What was checked“ nennt eingehaltene Regeln als Regeln des ersten Auftrags.
 - **Nie verlieren über Versionen (`DirectReportBuilder`):** Nach dem Lauf liest der Assembler den Bericht des `ParentRunId`. Dessen
   offene Befunde (Stellen und Quellenwidersprüche) gehen über `FactCarryOver.Merge` in den neuen Bericht: Stellen nur, wenn ihr Zitat
   als ganze Wörter noch dasteht, Widersprüche immer, jeweils mit `FactFinding.FromVersion` (ein schon übernommener Befund behält die
-  Version, die ihn fand); meldet der neue Prüfer dieselbe Stelle, steht sie einmal als eigener Befund. Befunde eines früheren Prüfers in
-  `Off` oder Schattenmodus werden nicht übernommen. Offene Punkte des Schreibers der Vorversion, die die neue nicht wortgleich
-  (`SameAssumptionKey`) wiederholt, stehen in `RunReport.EarlierOpenPoints` mit ihrer Version (auch die von der Vorversion schon
-  übernommenen). Kann der frühere Bericht nicht gelesen werden, steht im Bericht ein Satz dazu; der Lauf geht weiter. Berichte anderer
+  Version, die ihn fand); meldet der neue Prüfer dieselbe Stelle, steht sie einmal als eigener Befund – außer der neue Prüfer ist `Off`
+  oder im Schattenmodus, dann geht der übernommene vor. Eigene Befunde eines früheren Prüfers in `Off` oder Schattenmodus werden nicht
+  übernommen, von ihm schon übernommene (mit `FromVersion`) immer. Offene Punkte und Annahmen des Schreibers der Vorversion, die die neue
+  nicht wortgleich in derselben Art (`SameAssumptionKey`) wiederholt, stehen in `RunReport.EarlierOpenPoints` mit Version und
+  `EarlierPointKind` (auch die von der Vorversion schon übernommenen), dazu ein fester Satz (`EarlierPointKind.Note`) für ihre Notizen und
+  Stellen, die nicht gezeigt werden konnten. Hat die Vorversion keinen Bericht (z. B. „Extra careful“), sagt der feste Satz
+  `ChecksNotTakenOverFormat`, dass ihre Prüfungen nicht übernommen und nicht erneut geprüft wurden. Kann der frühere Bericht nicht gelesen
+  werden, steht im Bericht ein Satz dazu; der Lauf geht weiter. Berichte anderer
   Läufe bleiben bitgleich (`null` wird nicht geschrieben).

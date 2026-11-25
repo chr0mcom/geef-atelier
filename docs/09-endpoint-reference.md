@@ -172,10 +172,11 @@ All answers only ever grow by appended fields; clients ignore fields they do not
 
 Stage 5 appends to `get_order_result` (fields with the value `null` are left out on the wire):
 - `latestVersion`: the newest version of the order. `version` is the version of `text`, the newest version with a text. While a new version is being written, or when it failed or was stopped, `latestVersion` is higher, `text` is the earlier version and `note` begins with "A new version is being written. Version n stays here until it is ready." or "Version m could not be finished. This is version n.".
-- `earlierOpenPoints`: `[ { "version": 1, "text": "<point the writer left open for version 1>" } ]` – open points of the version before that the shown version does not repeat; the change may have settled them, or not. `null` when there are none.
+- `earlierOpenPoints`: `[ { "version": 1, "text": "<point the writer left open for version 1>", "kind": "openPoint|assumption" } ]` – open points and assumptions of the writer for an earlier version that the shown version does not repeat (`openPoint` also for fixed sentences by Atelier about notes or passages of that version that could not be shown, or about checks of a version without a report that were not taken over); the change may have settled them, or not. `null` when there are none.
+- `assumptionsVersion`: for a changed version with `assumptions`, the version they were noted for (before the changes; a change may have settled or overtaken them). `null` otherwise.
 - `unbackedPassages[].fromVersion`: the earlier version a passage was flagged for; it still stands in the text word for word. `null` for passages of this version.
 
-`note` names `earlierOpenPoints` among the fields to show and, while a new version is written, asks to wait with `get_order_status`.
+`note` names `earlierOpenPoints` among the fields to show, says for a changed version that the assumptions were noted for `assumptionsVersion` and, while a new version is written, asks to wait with `get_order_status`. In a changed version `checks.checked` names the rules of the first request on their own lines ("Checked automatically against the rules of your first request (your change may have replaced them): …" / "Rules of your first request the new version does not keep – …"), and a rule that is not kept is a note in `openChecks`, never blocking.
 
 **`revise_order` input:** `{ "orderId": "<uuid, required>", "change": "<the person's words, word for word|null>", "quick": ["shorter|longer|more_formal|friendlier|simpler"] }` – at least `change` or one `quick`.
 
@@ -184,7 +185,7 @@ Stage 5 appends to `get_order_result` (fields with the value `null` are left out
 { "orderId": "<uuid>", "state": "queued", "version": 2, "notices": [], "message": "Writing the new version has started. …" }
 ```
 
-While a version is being written, nothing changes: `version` is the running version and `notices` is `["A change is already being made."]`. Refusals come as a tool error: "Changing a text is not available yet." (`Orders:Revise` off for the owner), "There is no text to change yet.", "This order was stopped, so its text cannot be changed.", the limit of versions (`Orders:MaxVersionsPerOrder`) or of characters (`Orders:RevisionHintMaxChars`), an unknown quick change, or no change at all.
+While a version is being written, nothing changes: `version` is the running version and `notices` is `["A change is already being made."]`. Only the owner of the order can change it; anyone else (also administrators and the static token) gets "Order not found.". Refusals come as a tool error: "Changing a text is not available yet." (`Orders:Revise` off for the owner), "There is no text to change yet.", "This order was stopped, so its text cannot be changed.", the limit of versions (`Orders:MaxVersionsPerOrder`) or of characters (`Orders:RevisionHintMaxChars`), an unknown quick change, or no change at all.
 
 **`export_order` input:** `{ "orderId": "<uuid, required>", "format": "md|docx|pdf (default md)", "version": 2 }` – without `version` the version `get_order_result` shows.
 

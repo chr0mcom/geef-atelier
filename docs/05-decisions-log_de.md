@@ -2517,31 +2517,61 @@ bisherige Text noch ein offener Punkt, der weiter zutrifft.
 
 **Gebaut**
 - **Nachbessern** (`IOrderService.ReviseAsync`, Web „Change something“, MCP `revise_order`): Anweisung als Freitext (1–2.000
-  Zeichen) und/oder Schnellknöpfe (Shorter, Longer, More formal, Friendlier, Simpler words). Bedingungen: eigener Auftrag, nicht
-  gestoppt, kein Lauf aktiv oder gerade endend, eine gezeigte Version mit Text, höchstens 10 Versionen, Schalter `On` für den
+  Zeichen) und/oder Schnellknöpfe (Shorter, Longer, More formal, Friendlier, Simpler words). Bedingungen: Auftrag der Person
+  selbst (nur die Besitzerin oder der Besitzer, auch über MCP; Administratoren und der statische Token ändern keine fremden
+  Aufträge und bekommen dieselbe Antwort wie bei einem unbekannten Auftrag), nicht gestoppt, kein Lauf aktiv oder gerade endend, eine gezeigte Version mit Text, höchstens 10 Versionen, Schalter `On` für den
   Besitzer. Ein zweiter Aufruf während eine Version läuft, ändert nichts und antwortet „A change is already being made.“
   (keine Ausnahme). Keine Klärung, keine neue Recherche (nur Gespeichertes). Der neue Lauf entsteht in einer Transaktion
   (Auftrag gesperrt, Bedingungen erneut geprüft, max+1; eindeutiger Index als zweite Sicherung, beide einzeln per Mutation
   belegt) immer im Direktweg, auch für „Extra careful“-Aufträge, gesät mit dem **ausgelieferten** Text der gezeigten Version.
-  Die Änderung steht im Brief als eigener Block vor dem Profilblock und gilt dem Faktenprüfer als Wort der Person.
+  Die Änderung steht im Brief als eigener Block vor dem Profilblock. Nur die neueste Zeile ist als „the change to make now“
+  markiert; jede frühere als „earlier change: already made in the text – do not make it again, keep it“. Die Überschrift sagt,
+  dass bei Widerspruch die neueste Änderung gilt und dass die Worte der Person hier den Blöcken „Assumptions …“ und „Not given by
+  the person“ vorgehen. Der Faktenprüfer bekommt jede Änderung als Wort der Person mit einer kurzen Marke („newest change,
+  version n“ bzw. „earlier change, version n; a newer change wins where they differ“) vor dem unveränderten Wortlaut; sein Prompt
+  und Schema bleiben gleich, ein Zitat aus einer solchen Zeile (mit oder ohne Marke) zählt weiter als Antwort der Person. Ob das
+  Modell die Reihenfolge so beachtet, ist **nicht gemessen** (Tor N).
 - **Schreiber:** Nur im ersten Durchgang eines Nachbesserungslaufs ersetzt `RevisionInstruction` die bisherige Anweisung zum
-  Ausgangstext (nur Nutzerprompt; System-Prompt bitgleich). Eine verfehlte Längenvorgabe des ersten Auftrags wird im
-  Nachbesserungslauf zur nicht blockierenden Notiz.
+  Ausgangstext (nur Nutzerprompt; System-Prompt bitgleich): nur die als „the change to make now“ markierte Zeile ausführen,
+  frühere Änderungen beibehalten und nicht noch einmal ausführen, Sprache beibehalten, außer die Änderung verlangt eine andere,
+  Länge ±15 %, außer die Änderung verlangt eine andere.
+- **Prüfungen im Nachbesserungslauf:** Keine Regel aus dem ersten Auftrag blockiert (Länge, Sprache, Platzhalterverbot, Listen,
+  Überschriften, Emojis, verbotene und verlangte Wörter), weil die Änderung sie aufheben darf. Hält die neue Fassung eine davon
+  nicht ein, steht eine sichtbare Notiz da („Your first request asked for …; the new version does not keep to it: … Please check
+  whether your change meant this.“). Was immer gilt (leerer Text, Vorrede, Anzeige der Platzhalter, Rechenprüfung,
+  Faktenprüfung), bleibt wie es ist. „What was checked“ nennt eine eingehaltene Regel ausdrücklich als Regel des ersten Auftrags
+  („Checked automatically against the rules of your first request (your change may have replaced them): …“), nie als „has the
+  requested length“; ob die Änderung selbst eingehalten wurde, prüft keine Regel.
 - **Nie verlieren über Versionen:** Offene Stellen der Vorversion, deren Zitat als ganze Wörter noch dasteht, und
   Quellenwidersprüche werden übernommen und tragen ihre Herkunft (`fromVersion`, Web „Found in version n.“); offene Punkte des
   Schreibers der Vorversion, die die neue nicht wiederholt, erscheinen unter „Noted for version n – your change may have settled
-  it:“ (`earlierOpenPoints`). Übernommen wird nur bei Nachbesserungsläufen und nur aus Prüfungen, die sichtbar waren.
+  it:“ (`earlierOpenPoints`). Ebenso gehen Annahmen des Schreibers der Vorversion mit, die die neue Fassung nicht wiederholt
+  (als Annahme gekennzeichnet: Web „Assumed: …“, MCP `kind = assumption`, mit Ursprungsversion), und die Zahl der Notizen und
+  geprüften Stellen der Vorversion, die nicht gezeigt werden konnten, als fester Satz. Hat die Basisversion keinen Bericht (z. B.
+  „Extra careful“), steht dort der feste Satz „The checks of version n were not taken over, so anything they left open was not
+  checked again.“; er zählt als offener Punkt. Übernommen wird nur bei Nachbesserungsläufen. Eigene Befunde einer Vorversion,
+  deren Prüfung aus oder verborgen war, werden nicht übernommen; schon übernommene Befunde (mit Herkunft) bleiben über alle
+  Versionen erhalten und sichtbar, auch wenn der Prüfmodus zwischendurch aus oder verborgen war (Befunde der verborgenen Prüfung
+  selbst bleiben unsichtbar).
+- **Annahmen ab Version 2:** Klärer-Annahmen und „nicht gegebene“ Fakten wurden für Version 1 notiert. Ab einer geänderten
+  Version sagt die Seite das („Noted for version 1 – you had not said this then, so it was assumed. Your change may have settled
+  it:“ bzw. „… you had not given these facts then …“), MCP liefert `assumptionsVersion` und einen Hinweis; nichts wird
+  gelöscht. Annahmen des Schreibers der gezeigten Fassung behalten den bisherigen Satz.
 - **Gezeigte Version:** neueste Version mit Text. Ergebnis, Export ohne Versionsangabe und Listen nehmen sie; der Zustand kommt
   weiter von der neuesten Version. Läuft sie noch: „A new version is being written. Version n stays here until it is ready.“;
   gescheitert oder gestoppt: „Version m could not be finished. This is version n.“ Warnungen einer neuen, nicht fertigen
   Fassung stehen in einem eigenen Block „Warnings for version m“ mit dem Satz, dass sie den gezeigten Text nicht betreffen und
-  dieser vollständig und unverändert ist.
+  dieser unverändert ist.
 - **„Ready – please check“ bei übernommenem blockierendem Punkt:** Trägt eine Nachbesserung eine blockierende Stelle der
   Vorversion offen weiter, wird sie wie bei einem eigenen blockierenden Befund als „Ready – please check“ gezeigt – überall gleich
   (Auftragsseite, „My work“, Dienst, `get_order_status`, `get_order_result`, `list_orders`). **Entschieden:** nur im Prüfmodus
   `On`; im Modus `Report` endet auch ein eigener blockierender Befund als „Ready“, also hier ebenso. Gelesen wird der
   gespeicherte Bericht; der gespeicherte Ausgang bleibt unverändert.
-- **Web:** Karte „Change something“ unter dem Text (nur Besitzer, Auftrag fertig, kein Lauf aktiv, Schalter `On`); Abschnitt
+- **Web:** Karte „Change something“ unter dem Text (nur Besitzer, Auftrag fertig, kein Lauf aktiv, Schalter `On`) mit dem Satz
+  „The writer is asked to make only this change. “Show changes” then shows what was changed.“ – geprüft wird nicht, dass sonst
+  nichts geändert wurde. Antwortet der Dienst „A change is already being made.“, bleiben Text und Knöpfe der Karte erhalten. Nach
+  einer gescheiterten oder gestoppten Änderung bleibt oben auch der Prüfhinweis der gezeigten Fassung, wenn sie offene Punkte
+  hat. Abschnitt
   „Versions“ ab zwei Versionen mit „You asked: …“, Download je Version und „Show changes“ (Absatz-Diff als Klartext). Die frühere
   Fassung bleibt sichtbar, während die neue läuft und wenn sie scheitert. Die Laufseite zeigt bei einem gescheiterten oder
   gestoppten Direktweg-Lauf statt „Resume“ den Link „Change something“ – nur für den Besitzer, nur bei Schalter `On` und nur,
@@ -2549,7 +2579,8 @@ bisherige Text noch ein offener Punkt, der weiter zutrifft.
 - **Fortsetzen (Altpfad):** „Resume“ sät mit dem ausgelieferten Text, wenn der Lauf einen hat, sonst wie bisher mit der letzten
   Iteration (Fehlerbehebung, kein Schalter).
 - **MCP:** neun Auftragswerkzeuge, einzeln registriert: `submit_order`, `answer_order`, `get_order_status`, `get_order_result`
-  (neu `latestVersion`, `earlierOpenPoints`, `unbackedPassages[].fromVersion`), `revise_order`, `export_order` (dieselbe Datei
+  (neu `latestVersion`, `earlierOpenPoints` mit `kind`, `unbackedPassages[].fromVersion`, `assumptionsVersion`), `revise_order`
+  (Beschreibung ohne Zusage, dass sonst nichts geändert wird), `export_order` (dieselbe Datei
   wie der Web-Download), `cancel_order`, `list_orders`, `profile` (nur lesend). Die bisherigen Werkzeuge kommen nur bei
   `Mcp:LegacyTools = true` dazu (ausgeliefert `true`); die fünf mit Nachfolger verweisen in ihrer Beschreibung darauf, ihre
   Antworten sind unverändert. Die längste Wartezeit in Werkzeugbeschreibung und Server-Hinweisen kommt aus
@@ -2557,13 +2588,20 @@ bisherige Text noch ein offener Punkt, der weiter zutrifft.
 
 **Abweichungen und Präzisierungen gegenüber dem Vertrag:** Doppelaufruf antwortet ohne Ausnahme; der Schalter-Override richtet
 sich nach dem Besitzer, nicht nach dem Aufrufer; `fromVersion` behält bei mehrfacher Übernahme die Version, in der der Befund
-gefunden wurde; Befunde einer ausgeschalteten oder verborgenen Prüfung der Vorversion werden nicht übernommen; `list_orders`
-nennt `version` und `wordCount` des gezeigten Texts, `state` der neuesten Fassung. Wie bei `answer_order` dürfen
-Administratoren (auch der statische Token) über MCP fremde Aufträge ändern, exportieren und stoppen; die Weboberfläche bietet
-„Change something“ nur dem Besitzer an.
+gefunden wurde; eigene Befunde einer ausgeschalteten oder verborgenen Prüfung der Vorversion werden nicht übernommen, schon
+übernommene immer; `list_orders` nennt `version` und `wordCount` des gezeigten Texts, `state` der neuesten Fassung. Ändern darf
+nur die Besitzerin oder der Besitzer (Web und MCP); exportieren und stoppen dürfen Administratoren (auch der statische Token)
+über MCP wie bisher im Web. Die Längenregel war im Vertrag die einzige Notiz; jetzt sind alle Regeln des ersten Auftrags Notizen,
+und „Keep the language of the text“ gilt nur, solange die Änderung keine andere Sprache verlangt (Entscheidung nach der
+Prüfung).
+
+**Bewusste Grenze:** Der Brief einer Nachbesserung ist der Brief der gezeigten Version plus Änderung. Er enthält deshalb die
+„About me“-Angaben, die beim ersten Auftrag galten, auch wenn die Person sie inzwischen geändert hat; der Schreiber bekommt sie
+beim Nachbessern erneut. Das ist so gewollt (der Text soll auf derselben Grundlage bleiben) und wird nicht geändert.
 
 **Datenmodell:** Migration `Step52Revise`, additiv und idempotent: `Runs.RevisionHint text NULL` (`ADD COLUMN IF NOT EXISTS`).
-Sonst nichts; der Bericht bleibt Schema 2 mit angehängten, optionalen Feldern (`earlierOpenPoints`, `fromVersion`).
+Sonst nichts; der Bericht bleibt Schema 2 mit angehängten, optionalen Feldern (`earlierOpenPoints` mit `kind`, `fromVersion`,
+`revision`).
 
 **Schalter** (alle per Umgebung ohne neues Image; sie werden beim Start gelesen, ein Wechsel braucht einen Neustart des
 Containers; `docker-compose.yml` zählt ihre Variablen einzeln auf und reicht diese nicht durch, also im `environment` des
@@ -2579,7 +2617,14 @@ Web-Dienstes in einer `docker-compose.override.yml` setzen):
 **V-MCP bestanden:** Neun `get_order_status`-Aufrufe mit `waitSeconds = 50` aus Claude Code gegen die Produktion dauerten je
 rund 50,0–50,2 s, ohne Client- oder Transportfehler. Die Wartezeit bleibt 50 s. **claude.ai ist nicht geprüft.**
 
-**Tore N und M: ausstehend** (am echten Lauf nach Deploy B, Schwellen wie im Vertrag festgelegt). Nicht am echten System
+**Tore N und M: ausstehend** (am echten Lauf nach Deploy B, Schwellen wie im Vertrag festgelegt; nach der Prüfung strenger
+gefasst: N4 verlangt auch die `earlierOpenPoints` der Basis mit Ursprungsversion und die nicht wiederholten Annahmen des
+Schreibers; der Stopp für N5 kommt zu acht echten Nachbesserungen hinzu und zählt nicht zu „mit Text“, N5 verlangt den Zustand
+`stopped`; ein lokaler N1-Fall mit weniger als vier Absätzen ist nicht auswertbar; Tor M vergleicht den Export ohne
+Versionsangabe mit dem Text von Version 2). Vor dem Einschalten für alle ist am echten Lauf außerdem zu beobachten, ob bei
+einer Kette (Kürzung, danach lokale Änderung; zwei sich widersprechende Änderungen) die frühere Änderung nicht erneut ausgeführt
+wird und der Faktenprüfer die neueste nicht blockiert – automatische Tests belegen nur, was beim Schreiber und beim Prüfer
+ankommt. Nicht am echten System
 erzwingbare Fälle (Doppelaufruf, Kappe, gescheiterte neue Version durch Anbieterfehler, übernommener blockierender Punkt) sind
 über Postgres- und Ende-zu-Ende-Tests belegt, darunter ein Test über den ganzen Ablauf v1 → v2 (MCP) → v3 (Web) gescheitert
 bzw. gestoppt, der in allen Anzeigen denselben Zustand, dieselbe gezeigte Version und dieselben offenen Punkte prüft.

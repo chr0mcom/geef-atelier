@@ -2420,31 +2420,61 @@ so far nor an open point that still applies.
 
 **Built**
 - **Changing a text** (`IOrderService.ReviseAsync`, web "Change something", MCP `revise_order`): the change as free text
-  (1–2,000 characters) and/or quick buttons (Shorter, Longer, More formal, Friendlier, Simpler words). Conditions: own order, not
-  stopped, no run active or just ending, a shown version with a text, at most 10 versions, switch `On` for the owner. A second
+  (1–2,000 characters) and/or quick buttons (Shorter, Longer, More formal, Friendlier, Simpler words). Conditions: the person's
+  own order (only its owner, also over MCP; administrators and the static token do not change orders of others and get the same
+  answer as for an unknown order), not stopped, no run active or just ending, a shown version with a text, at most 10 versions, switch `On` for the owner. A second
   call while a version is being written changes nothing and answers "A change is already being made." (no exception). No
   clarification, no new research (stored research only). The new run is created in one transaction (order locked, conditions
   checked again, max+1; a unique index as second safeguard, each proven on its own by mutation), always on the direct path, also
   for "Extra careful" orders, seeded with the **delivered** text of the shown version. The change goes into the brief as a block
-  of its own before the profile block, and the fact checker treats it as the person's word.
+  of its own before the profile block. Only the newest line is marked "the change to make now"; every earlier one "earlier change:
+  already made in the text – do not make it again, keep it". The heading says that the newest change wins where changes differ
+  and that the person's words here take precedence over the blocks "Assumptions …" and "Not given by the person". The fact
+  checker gets each change as the person's word with a short mark ("newest change, version n" or "earlier change, version n; a
+  newer change wins where they differ") before the unchanged words; its prompt and schema stay the same, and a quote from such a
+  line (with or without the mark) still counts as an answer of the person. Whether the model follows the order this way is **not
+  measured** (gate N).
 - **Writer:** only in the first pass of a change run, `RevisionInstruction` replaces the usual instruction for a seed text (user
-  prompt only; system prompt bit for bit the same). A missed length of the first request becomes a note that does not block in a
-  change run.
+  prompt only; system prompt bit for bit the same): carry out only the line marked "the change to make now", keep the earlier
+  changes and do not make them again, keep the language unless the change asks for another one, keep the length within ±15 %
+  unless the change asks for another one.
+- **Checks in a change run:** no rule of the first request blocks (length, language, no placeholders, lists, headings, emojis,
+  ruled-out and required words), because the change may replace it. Where the new version does not keep one, a visible note says
+  so ("Your first request asked for …; the new version does not keep to it: … Please check whether your change meant this.").
+  What always applies (empty text, a remark before the text, the placeholders to fill in, the calculations, the fact check) stays
+  as it is. "What was checked" names a rule that is kept as a rule of the first request ("Checked automatically against the rules
+  of your first request (your change may have replaced them): …"), never as "has the requested length"; no rule checks whether the
+  change itself was carried out.
 - **Never lose across versions:** open passages of the version before whose quote still stands as whole words, and conflicts
   between sources, are carried over with their origin (`fromVersion`, web "Found in version n."); open points of the writer for
   the version before that the new one does not repeat appear under "Noted for version n – your change may have settled it:"
-  (`earlierOpenPoints`). Carrying over happens only in change runs and only from checks that were visible.
+  (`earlierOpenPoints`). The same goes for assumptions of the writer for the version before that the new one does not repeat
+  (marked as assumptions: web "Assumed: …", MCP `kind = assumption`, with their version), and for the number of notes and flagged
+  passages of the version before that could not be shown, as a fixed sentence. When the base version has no report (for example
+  "Extra careful"), the fixed sentence "The checks of version n were not taken over, so anything they left open was not checked
+  again." stands there; it counts as an open point. Carrying over happens only in change runs. Findings of the version before
+  whose own check was off or hidden are not carried over; findings already carried over (with their origin) stay and stay visible
+  across all versions, also when the fact-check mode was off or hidden in between (findings of the hidden check itself stay
+  unseen).
+- **Assumptions from version 2 on:** the clarifier's assumptions and the facts not given were noted for version 1. For a changed
+  version the page says so ("Noted for version 1 – you had not said this then, so it was assumed. Your change may have settled
+  it:" or "… you had not given these facts then …"), MCP gives `assumptionsVersion` and a note; nothing is deleted. Assumptions of
+  the writer of the shown version keep the usual sentence.
 - **Shown version:** the newest version with a text. Result, export without a version and the lists use it; the state still
   comes from the newest version. While it is written: "A new version is being written. Version n stays here until it is
   ready."; failed or stopped: "Version m could not be finished. This is version n." Warnings of a new version that did not
   finish stand in a block of their own, "Warnings for version m", which says that they do not concern the text shown and that
-  this text is complete and unchanged.
+  this text is unchanged.
 - **"Ready – please check" for a carried blocking point:** if a change keeps a blocking passage of the version before open, it
   is shown as "Ready – please check", as for a blocking finding of its own – the same everywhere (order page, "My work", the
   service, `get_order_status`, `get_order_result`, `list_orders`). **Decided:** only in fact-check mode `On`; in mode `Report` a
   blocking finding of its own ends as "Ready" as well, so the same applies here. The stored report is read; the stored outcome
   stays unchanged.
-- **Web:** card "Change something" below the text (owner only, order finished, no run active, switch `On`); section "Versions"
+- **Web:** card "Change something" below the text (owner only, order finished, no run active, switch `On`) with the line "The
+  writer is asked to make only this change. “Show changes” then shows what was changed." – nothing checks that nothing else
+  changed. When the service answers "A change is already being made.", the words and buttons of the card stay. After a change
+  that failed or was stopped, the top of the page also keeps the request to check the shown version when it has open points.
+  Section "Versions"
   from two versions on, with "You asked: …", a download per version and "Show changes" (paragraph diff as plain text). The
   earlier version stays visible while the new one is written and when it fails. For a failed or stopped run of the direct path
   the run page shows the link "Change something" instead of "Resume" – only for the owner, only with the switch `On` and only when
@@ -2452,7 +2482,8 @@ so far nor an open point that still applies.
 - **Resume (older path):** "Resume" seeds with the delivered text when the run has one, otherwise with the last iteration as
   before (a fix, no switch).
 - **MCP:** nine order tools, registered one by one: `submit_order`, `answer_order`, `get_order_status`, `get_order_result` (new
-  `latestVersion`, `earlierOpenPoints`, `unbackedPassages[].fromVersion`), `revise_order`, `export_order` (the same file as the
+  `latestVersion`, `earlierOpenPoints` with `kind`, `unbackedPassages[].fromVersion`, `assumptionsVersion`), `revise_order`
+  (description without the promise that nothing else changes), `export_order` (the same file as the
   web download), `cancel_order`, `list_orders`, `profile` (read only). The older tools are added only with
   `Mcp:LegacyTools = true` (shipped `true`); the five with a successor point to it in their description, their answers are
   unchanged. The longest wait in the tool description and the server instructions comes from `Orders:MaxWaitSeconds`, the same
@@ -2460,12 +2491,19 @@ so far nor an open point that still applies.
 
 **Deviations and refinements of the contract:** a second call answers without an exception; the switch override follows the
 owner, not the caller; `fromVersion` keeps the version in which the finding was found when it is carried over more than once;
-findings of a check of the version before that was off or hidden are not carried over; `list_orders` gives `version` and
-`wordCount` of the shown text and `state` of the newest version. As with `answer_order`, administrators (also the static token)
-can change, export and stop orders of others over MCP; the web interface offers "Change something" only to the owner.
+findings of the version before's own check that was off or hidden are not carried over, findings already carried over always;
+`list_orders` gives `version` and `wordCount` of the shown text and `state` of the newest version. Only the owner may change a
+text (web and MCP); administrators (also the static token) can export and stop orders of others over MCP as before on the web.
+In the contract the length was the only note; now every rule of the first request is a note, and "Keep the language of the text"
+applies only while the change asks for no other language (decided after the review).
+
+**Deliberate limit:** the brief of a change is the brief of the shown version plus the change. It therefore holds the About me
+details that applied to the first request, also when the person has changed them since; the writer gets them again when the text
+is changed. This is intended (the text stays on the same basis) and is not changed.
 
 **Data model:** migration `Step52Revise`, additive and idempotent: `Runs.RevisionHint text NULL` (`ADD COLUMN IF NOT EXISTS`).
-Nothing else; the report stays schema 2 with appended optional fields (`earlierOpenPoints`, `fromVersion`).
+Nothing else; the report stays schema 2 with appended optional fields (`earlierOpenPoints` with `kind`, `fromVersion`,
+`revision`).
 
 **Switches** (all through the environment without a new image; they are read at start, a change needs a restart of the
 container; `docker-compose.yml` lists its variables one by one and does not pass these through, so set them in the `environment`
@@ -2481,7 +2519,13 @@ of the web service in a `docker-compose.override.yml`):
 **V-MCP passed:** nine `get_order_status` calls with `waitSeconds = 50` from Claude Code against production took about
 50.0–50.2 s each, without client or transport errors. The wait stays at 50 s. **claude.ai is not checked.**
 
-**Gates N and M: open** (on real runs after deploy B, thresholds as set in the contract). Cases that cannot be forced on the real
+**Gates N and M: open** (on real runs after deploy B, thresholds as set in the contract; made stricter after the review: N4 also
+requires the base version's `earlierOpenPoints` with their version and the writer's assumptions not repeated; the stop for N5 comes
+on top of eight real changes and does not count as "with text", N5 requires the state `stopped`; a local N1 case with fewer than
+four paragraphs cannot be judged; gate M compares the export without a version with the text of version 2). Before switching on
+for everyone, real runs must also show that in a chain (shortening, then a local change; two changes that contradict each other)
+the earlier change is not carried out again and the fact checker does not block the newest one – automatic tests only prove what
+reaches the writer and the checker. Cases that cannot be forced on the real
 system (second call, cap, a new version failing because of a provider error, a carried blocking point) are proven by Postgres
 and end-to-end tests, among them one over the whole way v1 → v2 (MCP) → v3 (web) failed or stopped, which checks the same state,
 the same shown version and the same open points in every place.
