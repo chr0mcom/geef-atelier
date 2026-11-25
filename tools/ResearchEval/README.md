@@ -85,9 +85,14 @@ Werkzeug und Tests mit demselben Code urteilen; dazu unverändert Wächter, Komm
 
 Die Seitennummerierung `P1…` (Themen in Reihenfolge, je Thema die Treffer, ohne Rohtext entfallen, eine Adresse aus einer
 weiteren Suche behält ihre erste Seite) ist eine einzige Funktion (`ResearchPageNumbering`), die Recherchedienst und Werkzeug
-teilen (`ResearchPagesTests`). Dem Herkunftsfilter gibt das Werkzeug wie der Betrieb Text **und Namen** jeder Datei
-(`ResearchCorpus.FileWords`). Beides kam bei der Integration hinzu; die gespeicherten VR-Zeilen bleiben gültig (die
-zurückgehaltene Menge hatte keine doppelte Adresse und keine Datei; `evaluate` rechnet Filter und Builder nach und besteht weiter).
+teilen (`ResearchPagesTests`). Dem Herkunftsfilter gibt das Werkzeug Text **und Namen** jeder Datei
+(`ResearchCorpus.FileWords`); im Betrieb sucht ein Auftrag mit Datei seit der Prüfrunde 1 gar nicht mehr (`FilesAttached`, D-074),
+das Werkzeug misst solche Aufträge aber weiter wie bisher (nur ein Entwicklungsauftrag hat eine Datei, die zurückgehaltene Menge
+keine). Auch die Sprachregel des Betriebs (nur mit Freitext im Profil) wendet das Werkzeug nicht an; beides kann im Betrieb nur
+weniger senden. Die gespeicherten VR-Zeilen bleiben gültig: `evaluate` rechnet Herkunftsfilter und Builder mit dem Stand nach der
+Prüfrunde 1 nach (Zahlen ab vier Ziffern, Teile, Genitiv, unsichtbare Zeichen, ganze Zahlen, längerer Ausschnitt ersetzt
+kürzeren, sichere Titel) und besteht weiter; keiner der 95 Einträge liegt im Teil, den der neue Schnitt am Satzende wegnimmt.
+Die Nachprüfung (C# und `research_verify.py`) meldet auch einen Ausschnitt, der in einem Wort oder einer Zahl beginnt oder endet.
 
 **Abnahme am echten Lauf (Vertrag 9.1):** Die Audit-Dateien des Recherchedienstes (`Research:AuditDirectory`, nur für Nutzer mit
 Override) prüft dieselbe Nachprüfung: `(cd tools/Eval && python3 -m geef_eval.research_verify --audit <verzeichnis> --out <bericht>)`.

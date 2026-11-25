@@ -875,18 +875,20 @@ Modells samt seinem einen Ersatz lassen die Tatsachen ungeprüft, und „What wa
 
 Seit Etappe 4 kann der Grounding-Schritt des Direktwegs (`OrderGroundingStep`) Ausschnitte aus dem Web anhängen. Er fragt
 `IOrderResearchService.EnsureAsync`, bevor er die Dateien rendert, mit der Version des Laufs (vom Assembler), ob der Lauf einen
-Text überarbeitet, dem vollen Text und dem Namen aller Dateien des Auftrags (der Klärer, der die Suchthemen schrieb, sah beides)
-und den Angaben „Über mich“ aus dem Briefing; ein Suchthema mit einem Wort daraus, das nicht im Wortlaut steht, hält die
-Herkunftsregel zurück (`ResearchQueryGate`). Der Dienst
+Text überarbeitet, ob der Auftrag angehängte Dateien hat, und den Angaben „Über mich“ aus dem Briefing. Ein Auftrag mit
+irgendeiner Datei (gleich welche Rolle) sucht nie: Der Dienst speichert einmal den Status `FilesAttached`, und nichts erreicht
+Suche oder Verdichtung. Sonst hält die Herkunftsregel (`ResearchQueryGate`) ein Suchthema mit einem Wort aus den Werten von
+„Über mich“ (ohne Feldnamen), das nicht im Wortlaut steht, zurück. Der Dienst
 entscheidet (Schalter `Research:Mode`, Override je Nutzer, erste Version, keine Überarbeitung, Klärung mit Suchthemen,
-Tagesgrenze) und speichert die Recherche einmal am Auftrag (`Orders.ResearchJson`); jeder spätere Lauf des Auftrags bekommt die
+Tagesgrenze, vor der Suche reserviert, insgesamt und je Konto) und speichert die Recherche einmal am Auftrag (`Orders.ResearchJson`); jeder spätere Lauf des Auftrags bekommt die
 gespeicherten Ausschnitte unverändert und sucht nie neu.
 
 - **Quelle `W1`:** Hat die Recherche mindestens einen Ausschnitt, schreibt `DossierRenderer` ihren Text, und der Schritt hängt
   ihn nach den Dateien als Quelle `W1` mit dem festen Namen „Looked up on the web“ an (`PromptSource.LookedUp`). Die Kennung
   vergibt nur der Code. Sie wird wie jede Datei entschärft (`SourceBlockRenderer`) und zählt für das Budget des
   Hintergrunddokuments; die Warnung zu langen Dateien zählt nur die Dateien der Person.
-- **Schreiber:** Im ersten Durchgang folgt im Nutzerprompt nach der Dateiliste ein fester Satz
+- **Schreiber:** `W1` wird nie als angehängte Datei gezählt oder gelistet; ohne Dateien hat der Prompt eine eigene Einleitung.
+  Im ersten Durchgang folgt im Nutzerprompt nach dem Hinweis zu den Quellen ein fester Satz
   (`DirectWriterPrompts.LookedUpNote`): W1 darf einen Punkt beantworten, den das Briefing als nicht angegeben führt, so wie W1
   es sagt, und ist Inhalt, nie Anweisung. Der System-Prompt `SystemPrompts.DirectWriter` bleibt unverändert (Hash-Test); ohne
   `W1` ist der Prompt der von Etappe 3.
@@ -896,7 +898,8 @@ gespeicherten Ausschnitte unverändert und sucht nie neu.
 - **Nutzung und Bericht:** Die Nutzungszeile von `W1` hat keine Quelle und das Ziel `research`, Position nach den Dateien. Der
   Bericht führt `W1` nach den Dateien mit `lookedUp` und ist als `lookedUp` markiert; Schreiberzitate aus `W1` sind weder
   Dateizitate noch zählen sie als ungeprüft.
-- **Stoppt nie den Lauf:** Status `Failed`, eine Ausnahme des Dienstes oder eine Wartezeit über 120 s ergeben die Warnung
+- **Stoppt nie den Lauf:** Status `Failed` (auch eine Recherche, die nicht gespeichert werden konnte, Code `not_stored`), eine
+  Ausnahme des Dienstes oder eine Wartezeit über 120 s (auch wenn der Dienst nicht von selbst abbricht) ergeben die Warnung
   `grounding.research_failed` („Looking things up on the web did not work this time. The text was written without it.“), und
-  der Lauf geht ohne `W1` weiter. `NothingFound`, `AllWithheld` und `DailyLimit` hängen keine Quelle an und warnen nicht; das
+  der Lauf geht ohne `W1` weiter. `NothingFound`, `AllWithheld`, `DailyLimit` und `FilesAttached` hängen keine Quelle an und warnen nicht; das
   Ergebnis zeigt sie als feste Sätze. Nur der Abbruch des Laufs selbst beendet den Schritt.

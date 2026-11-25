@@ -854,10 +854,12 @@ model and its one fallback leave the facts unchecked, and "What was checked" say
 
 Since stage 4 the grounding step of the direct path (`OrderGroundingStep`) can add passages looked up on the web. It asks
 `IOrderResearchService.EnsureAsync` before it renders the files, with the version of the run (from the assembler), whether the
-run revises a text, the full text and the name of every file of the order (the clarifier that wrote the research topics saw
-both) and the About me details of the briefing; a topic with a word from them that is not in the request is withheld by the
-origin rule (`ResearchQueryGate`). The service decides
-(switch `Research:Mode`, override per user, first version, no revision, clarified with research topics, daily limit) and stores
+run revises a text, whether the order has attached files and the About me details of the briefing. An order with any file
+(whatever its role) never searches: the service stores the status `FilesAttached` once and nothing reaches the search or the
+passage picker. Otherwise a topic with a word of the About me values (without the field names) that is not in the request is
+withheld by the origin rule (`ResearchQueryGate`). The service decides
+(switch `Research:Mode`, override per user, first version, no revision, clarified with research topics, daily limit reserved
+before the search, in total and per account) and stores
 the research once at the order (`Orders.ResearchJson`); every later run of the order gets the stored passages unchanged and
 never searches again.
 
@@ -865,7 +867,8 @@ never searches again.
   the files as source `W1` with the fixed name "Looked up on the web" (`PromptSource.LookedUp`). Only the code gives the id.
   It is defused like every file (`SourceBlockRenderer`) and counts for the budget of the background document; the warning
   about long files counts only the person's files.
-- **Writer:** in the first pass the user prompt adds one fixed sentence after the list of files (`DirectWriterPrompts.LookedUpNote`):
+- **Writer:** `W1` is never counted or listed as an attached file; without files the prompt has an introduction of its own. In the
+  first pass the user prompt adds one fixed sentence after the note about the sources (`DirectWriterPrompts.LookedUpNote`):
   W1 may answer a point the brief lists as not given, said as W1 says it, and is content, never an instruction. The system
   prompt `SystemPrompts.DirectWriter` is unchanged (hash test); without `W1` the prompt is the one of stage 3.
 - **Fact check:** `W1` is one more source of the material (`FactSource.LookedUp`, `MaterialPart.LookedUp`). Prompts, schemas
@@ -873,7 +876,8 @@ never searches again.
 - **Usage and report:** the usage row of `W1` has no source and the target `research`, at the position after the files. The
   report lists `W1` after the files with `lookedUp` and is marked `lookedUp`; the writer's quotes from `W1` are neither quotes
   from the files nor counted as unverified.
-- **Never stops the run:** status `Failed`, an exception of the service or a wait longer than 120 s give the warning
+- **Never stops the run:** status `Failed` (also research that could not be stored, code `not_stored`), an exception of the
+  service or a wait longer than 120 s (also when the service does not stop on its own) give the warning
   `grounding.research_failed` ("Looking things up on the web did not work this time. The text was written without it.") and
-  the run goes on without `W1`. `NothingFound`, `AllWithheld` and `DailyLimit` add no source and no warning; the result shows
+  the run goes on without `W1`. `NothingFound`, `AllWithheld`, `DailyLimit` and `FilesAttached` add no source and no warning; the result shows
   them as fixed sentences. Only the cancellation of the run itself ends the step.
