@@ -11,9 +11,9 @@
         <h2 id="@TitleId" class="clarify-summary-title">Before writing</h2>
     }
 
-    @if (Clarification.Outcome is { } outcome)
+    @if (Clarification.OutcomeText() is { } outcomeText)
     {
-        <p class="clarify-summary-outcome" data-testid="clarify-summary-outcome">@outcome.ToPlainText()</p>
+        <p class="clarify-summary-outcome" data-testid="clarify-summary-outcome">@outcomeText</p>
     }
 
     @if (!string.IsNullOrWhiteSpace(Clarification.Understanding))
@@ -96,8 +96,9 @@
                 lines.Add(new AnswerLine(question.Text, text ?? "left to me", true, text is null, Who(answer, string.Empty)));
             }
             if (Clarification.RevisionFileName is { } file
-                && Clarification.Answers.Any(a => a.QuestionId == RevisionAnswer.QuestionId && a.OptionId == RevisionAnswer.No))
-                lines.Add(new AnswerLine($"Improve “{file}”?", "No, write something new", false, false, string.Empty));
+                && Clarification.Answers.FirstOrDefault(a => a.QuestionId == RevisionAnswer.QuestionId) is { OptionId: RevisionAnswer.No or RevisionAnswer.Yes } revision)
+                lines.Add(new AnswerLine($"Improve “{file}”?", revision.OptionId == RevisionAnswer.No ? "No, write something new" : "Yes, improve it",
+                    false, false, Who(revision, string.Empty)));
             return lines;
         }
     }

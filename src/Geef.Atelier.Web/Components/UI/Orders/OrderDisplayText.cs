@@ -1,4 +1,5 @@
 using System.Globalization;
+using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Application.Sources;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
@@ -69,9 +70,28 @@ public static class OrderDisplayText
         IntakeOutcome.Asked => "Waiting for your answers.",
         IntakeOutcome.Answered => "You answered before writing started.",
         IntakeOutcome.Skipped => "You started without answering. My assumptions were used.",
-        IntakeOutcome.AutoStarted => "There were no answers within a day, so writing started with my assumptions.",
+        IntakeOutcome.AutoStarted => "There were no answers in time, so writing started with my assumptions.",
         IntakeOutcome.Failed => "Your request could not be read in advance, so writing started with your request as written.",
         _ => outcome.ToString(),
+    };
+
+    /// <summary>Text of a start before the request was read: there were no assumptions, so none were used.</summary>
+    public const string SkippedBeforeReadingText = "You started before your request was read, so writing started with your request as written.";
+
+    /// <summary>Text of a skip when the card showed no assumptions.</summary>
+    public const string SkippedWithoutAssumptionsText = "You started without answering.";
+
+    /// <summary>
+    /// The outcome sentence of <paramref name="clarification"/>, true to what happened: a skip while the request was still being
+    /// read (no questions, no summary, no assumptions) or a skip without assumptions never claims that assumptions were used.
+    /// </summary>
+    public static string? OutcomeText(this ClarificationView clarification) => clarification.Outcome switch
+    {
+        null => null,
+        IntakeOutcome.Skipped when clarification.Assumptions.Count == 0 && clarification.Questions.Count == 0
+                                   && string.IsNullOrWhiteSpace(clarification.Understanding) => SkippedBeforeReadingText,
+        IntakeOutcome.Skipped when clarification.Assumptions.Count == 0 => SkippedWithoutAssumptionsText,
+        { } outcome => outcome.ToPlainText(),
     };
 
     /// <summary>A number with thousands separators, e.g. <c>160,485</c>.</summary>

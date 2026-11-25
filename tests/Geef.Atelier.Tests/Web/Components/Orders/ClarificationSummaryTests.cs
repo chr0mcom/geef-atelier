@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Orders;
 using Bunit;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Web.Components.UI.Orders;
@@ -60,7 +61,7 @@ public sealed class ClarificationSummaryTests : TestContext
     [Theory]
     [InlineData(IntakeOutcome.Clarified, "Nothing needed to be asked")]
     [InlineData(IntakeOutcome.Skipped, "You started without answering")]
-    [InlineData(IntakeOutcome.AutoStarted, "no answers within a day")]
+    [InlineData(IntakeOutcome.AutoStarted, "no answers in time")]
     [InlineData(IntakeOutcome.Failed, "your request as written")]
     public void TheOutcomeIsOnePlainSentence(IntakeOutcome outcome, string expected)
     {
@@ -68,6 +69,40 @@ public sealed class ClarificationSummaryTests : TestContext
 
         Assert.Contains(expected, cut.Find("[data-testid='clarify-summary-outcome']").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='clarify-summary-answer']"));
+    }
+
+    [Fact]
+    public void ASkipWhileTheRequestWasStillReadDoesNotClaimAssumptions()
+    {
+        var clarification = new ClarificationView(IntakeOutcome.Skipped, null, null, null, [], [], [], null, null, null);
+
+        var cut = RenderComponent<ClarificationSummary>(p => p.Add(c => c.Clarification, clarification));
+
+        var text = cut.Find("[data-testid='clarify-summary-outcome']").TextContent;
+        Assert.Equal(OrderDisplayText.SkippedBeforeReadingText, text);
+        Assert.DoesNotContain("assumption", text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ASkipWithoutAssumptionsDoesNotClaimThem()
+    {
+        var cut = RenderComponent<ClarificationSummary>(p => p.Add(c => c.Clarification, OrderTestData.Clarification(assumptions: [], outcome: IntakeOutcome.Skipped)));
+
+        Assert.Equal(OrderDisplayText.SkippedWithoutAssumptionsText, cut.Find("[data-testid='clarify-summary-outcome']").TextContent);
+    }
+
+    [Theory]
+    [InlineData("no", AnswerOrigin.Client, "Improve “rede.docx”? → No, write something new (answered by your assistant)")]
+    [InlineData("yes", AnswerOrigin.Client, "Improve “rede.docx”? → Yes, improve it (answered by your assistant)")]
+    [InlineData("yes", AnswerOrigin.User, "Improve “rede.docx”? → Yes, improve it")]
+    public void TheRevisionAnswerShowsWhoGaveIt(string option, AnswerOrigin origin, string expected)
+    {
+        var clarification = OrderTestData.Clarification(questions: [], answers: [new OrderAnswer("revision", option, null, false, origin)],
+            revisionFileName: "rede.docx", outcome: IntakeOutcome.Answered);
+
+        var cut = RenderComponent<ClarificationSummary>(p => p.Add(c => c.Clarification, clarification));
+
+        Assert.Equal(expected, Assert.Single(cut.FindAll("[data-testid='clarify-summary-answer']")).TextContent);
     }
 
     [Fact]

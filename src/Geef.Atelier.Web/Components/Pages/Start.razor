@@ -20,7 +20,7 @@
 @inject AuthenticationStateProvider AuthProvider
 @inject CircuitDataGate DataGate
 @inject ILogger<Start> Logger
-@inject IServiceProvider ServiceProvider
+@inject IProfileService Profiles
 
 <PageTitle>New — Atelier</PageTitle>
 
@@ -281,11 +281,11 @@
 
     async Task LoadProfileTipAsync()
     {
-        if (_username is not { } user || ServiceProvider.GetService<IProfileService>() is not { } profiles)
+        if (_username is not { } user)
             return;
         try
         {
-            var profile = await DataGate.RunAsync(() => profiles.GetAsync(user));
+            var profile = await DataGate.RunAsync(() => Profiles.GetAsync(user));
             _showProfileTip = profile.IsEmpty;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

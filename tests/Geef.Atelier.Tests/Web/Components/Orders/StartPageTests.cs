@@ -43,6 +43,7 @@ public sealed class StartPageTests : TestContext
         Services.AddSingleton<ISourceIntakeService>(_intake);
         Services.AddSingleton<AntiforgeryStateProvider, FakeAntiforgeryStateProvider>();
         Services.AddScoped<CircuitDataGate>();
+        Services.AddSingleton<IProfileService>(new FakeProfileService());
         Services.AddOptions();
         _auth = this.AddTestAuthorization();
         _auth.SetAuthorized("alice");
@@ -109,11 +110,19 @@ public sealed class StartPageTests : TestContext
     }
 
     [Fact]
-    public void WithoutAProfileServiceThereIsNoTip()
+    public void WithoutAProfileServiceThePageFailsInsteadOfHidingTheTip()
     {
-        var cut = RenderComponent<Start>();
+        using var context = new TestContext();
+        context.Services.AddSingleton<IOrderService>(_orders);
+        context.Services.AddSingleton<ISourceIntakeService>(_intake);
+        context.Services.AddSingleton<AntiforgeryStateProvider, FakeAntiforgeryStateProvider>();
+        context.Services.AddScoped<CircuitDataGate>();
+        context.Services.AddOptions();
+        context.AddTestAuthorization().SetAuthorized("alice");
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
 
-        Assert.Empty(cut.FindAll("[data-testid='start-profile-tip']"));
+        var error = Assert.Throws<InvalidOperationException>(() => context.RenderComponent<Start>());
+        Assert.Contains(nameof(IProfileService), error.Message);
     }
 
     [Fact]
@@ -637,6 +646,7 @@ public sealed class StartPageTests : TestContext
         context.Services.AddSingleton<ISourceIntakeService>(_intake);
         context.Services.AddSingleton<AntiforgeryStateProvider, FakeAntiforgeryStateProvider>();
         context.Services.AddScoped<CircuitDataGate>();
+        context.Services.AddSingleton<IProfileService>(new FakeProfileService());
         context.Services.AddOptions();
         context.AddTestAuthorization().SetAuthorized("alice");
         context.Services.AddSingleton<IJSRuntime, BlockedJsRuntime>();

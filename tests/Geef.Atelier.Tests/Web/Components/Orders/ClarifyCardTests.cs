@@ -47,7 +47,7 @@ public sealed class ClarifyCardTests : TestContext
         else
         {
             Assert.Equal(heading, cut.Find(".clarify-questions-title").TextContent);
-            Assert.Contains("Skipping is fine – I'll go with my assumptions.", cut.Markup);
+            Assert.Contains("Skipping is fine – I'll decide what you leave open and go with my assumptions.", cut.Markup);
         }
         Assert.Equal("Start writing", cut.Find("[data-testid='clarify-start']").TextContent.Trim());
         Assert.Equal("Just start", cut.Find("[data-testid='clarify-just-start']").TextContent.Trim());
@@ -64,7 +64,7 @@ public sealed class ClarifyCardTests : TestContext
     }
 
     [Fact]
-    public void StartWritingWithoutAChoiceLeavesEveryQuestionToAtelier()
+    public void StartWritingWithoutAChoiceSendsNothingSoAtelierDecidesEverything()
     {
         var questions = new[] { OrderTestData.LengthQuestion(), OrderTestData.Question(1), OrderTestData.Question(2, GapTopic.Audience) };
         var (cut, order) = Render(OrderTestData.Clarification(questions: questions));
@@ -74,9 +74,23 @@ public sealed class ClarifyCardTests : TestContext
         var request = Assert.Single(_orders.Answered);
         Assert.Equal(order.OrderId, request.OrderId);
         Assert.Equal("alice", request.RequestingUsername);
-        Assert.Equal(new[] { "length", "q1", "q2" }, request.Answers.Select(a => a.QuestionId));
-        Assert.All(request.Answers, a => Assert.Equal(new OrderAnswer(a.QuestionId, null, null, true, AnswerOrigin.User), a));
+        Assert.Empty(request.Answers);
         Assert.Equal(OrderDisplayState.Queued, Assert.Single(_started).State);
+    }
+
+    [Fact]
+    public void OnlyTheAnsweredQuestionsAreSentTheOpenOnesAreLeftToAtelier()
+    {
+        var questions = new[] { OrderTestData.LengthQuestion(), OrderTestData.Question(1), OrderTestData.Question(2, GapTopic.Audience) };
+        var (cut, _) = Render(OrderTestData.Clarification(questions: questions));
+
+        cut.Find("[data-testid='question-block'][data-id='q2'] [data-testid='question-decide']").Click();
+        cut.Find("[data-testid='question-block'][data-id='length'] [data-id='long']").Click();
+        cut.Find("[data-testid='clarify-start']").Click();
+
+        Assert.Equal(
+            [new OrderAnswer("length", "long", null, false, AnswerOrigin.User), new OrderAnswer("q2", null, null, true, AnswerOrigin.User)],
+            Assert.Single(_orders.Answered).Answers);
     }
 
     [Fact]
@@ -158,15 +172,39 @@ public sealed class ClarifyCardTests : TestContext
     }
 
     [Fact]
-    public void JustStartSkipsTheQuestions()
+    public void JustStartWithoutAnythingDoneSkipsTheQuestions()
     {
         var (cut, order) = Render(OrderTestData.Clarification());
 
-        cut.Find("[data-id='short']").Click();
         cut.Find("[data-testid='clarify-just-start']").Click();
 
         Assert.Equal((order.OrderId, "alice"), Assert.Single(_orders.Skipped));
         Assert.Empty(_orders.Answered);
+        Assert.Single(_started);
+    }
+
+    [Fact]
+    public void JustStartKeepsEverythingThePersonDidAndLeavesTheRestToAtelier()
+    {
+        var questions = new[] { OrderTestData.LengthQuestion(), OrderTestData.Question(1) };
+        var (cut, order) = Render(OrderTestData.Clarification(questions: questions, revisionFileName: "rede.docx"));
+
+        cut.Find("[data-testid='question-block'][data-id='length'] [data-id='short']").Click();
+        cut.Find("[data-testid='clarify-revision-no']").Click();
+        cut.Find("[data-testid='clarify-assumption'][data-id='a1'] [data-testid='clarify-assumption-change']").Click();
+        cut.Find("[data-testid='clarify-assumption'][data-id='a1'] [data-testid='clarify-assumption-input']").Input("Per Sie, eher förmlich");
+        cut.Find("[data-testid='clarify-just-start']").Click();
+
+        Assert.Empty(_orders.Skipped);
+        var request = Assert.Single(_orders.Answered);
+        Assert.Equal((order.OrderId, "alice"), (request.OrderId, request.RequestingUsername));
+        Assert.Equal(
+            [
+                new OrderAnswer("length", "short", null, false, AnswerOrigin.User),
+                new OrderAnswer("a1", null, "Per Sie, eher förmlich", false, AnswerOrigin.User),
+                new OrderAnswer("revision", "no", null, false, AnswerOrigin.User),
+            ],
+            request.Answers);
         Assert.Single(_started);
     }
 

@@ -110,6 +110,30 @@ public sealed class OrderDetailIntakeTests : TestContext
     }
 
     [Fact]
+    public void TheCardActsAsTheSignedInPersonNotAsAnAdministrator()
+    {
+        var order = _orders.Add("alice", OrderTestData.Asking(OrderTestData.Clarification()));
+        var cut = Render(order.OrderId);
+
+        cut.Find("[data-id='short']").Click();
+        cut.Find("[data-testid='clarify-start']").Click();
+
+        var request = Assert.Single(_orders.Answered);
+        Assert.Equal((order.OrderId, "alice"), (request.OrderId, request.RequestingUsername));
+    }
+
+    [Fact]
+    public void JustStartOnTheCardActsAsTheSignedInPerson()
+    {
+        var order = _orders.Add("alice", OrderTestData.Asking(OrderTestData.Clarification()));
+        var cut = Render(order.OrderId);
+
+        cut.Find("[data-testid='clarify-just-start']").Click();
+
+        Assert.Equal((order.OrderId, "alice"), Assert.Single(_orders.Skipped));
+    }
+
+    [Fact]
     public void ANoticeFromTheServiceIsShownAfterTheStart()
     {
         _orders.StartNotices = ["This order has already started."];

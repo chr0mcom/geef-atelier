@@ -78,7 +78,7 @@
                                Answer="@(_answers.GetValueOrDefault(id))"
                                AnswerChanged="a => SetAnswer(id, a)" />
             }
-            <p class="clarify-hint">Skipping is fine – I'll go with my assumptions.</p>
+            <p class="clarify-hint">Skipping is fine – I'll decide what you leave open and go with my assumptions.</p>
         </div>
     }
 
@@ -170,17 +170,23 @@
     string Cap(string? text) =>
         text is null ? string.Empty : text.Length > MaxFreeTextChars ? text[..MaxFreeTextChars] : text;
 
-    /// <summary>The answers "Start writing" sends: every question once (unanswered ones as "decide for me"), changed assumptions and the revision choice.</summary>
+    /// <summary>
+    /// What the person did on the card: the questions they answered (an option, own words or "You decide"), the changed
+    /// assumptions and the revision choice. Open questions are left out; the service treats them as "decide for me". Both start
+    /// buttons send this, so nothing the person did is lost.
+    /// </summary>
     internal IReadOnlyList<OrderAnswer> BuildAnswers()
     {
         var answers = new List<OrderAnswer>();
         foreach (var question in Clarification.Questions)
         {
-            var given = _answers.GetValueOrDefault(question.Id);
-            var freeText = string.IsNullOrWhiteSpace(given?.FreeText) ? null : given.FreeText.Trim();
-            answers.Add(given is { DecideForMe: false } && (given.OptionId is not null || freeText is not null)
-                ? new OrderAnswer(question.Id, given.OptionId, freeText, false, AnswerOrigin.User)
-                : new OrderAnswer(question.Id, null, null, true, AnswerOrigin.User));
+            if (_answers.GetValueOrDefault(question.Id) is not { } given)
+                continue;
+            var freeText = string.IsNullOrWhiteSpace(given.FreeText) || !question.AllowFreeText ? null : given.FreeText.Trim();
+            if (given.DecideForMe)
+                answers.Add(new OrderAnswer(question.Id, null, null, true, AnswerOrigin.User));
+            else if (given.OptionId is not null || freeText is not null)
+                answers.Add(new OrderAnswer(question.Id, given.OptionId, freeText, false, AnswerOrigin.User));
         }
         foreach (var assumption in Clarification.Assumptions)
         {
@@ -197,8 +203,13 @@
     Task StartWritingAsync() =>
         RunAsync(() => Orders.AnswerAsync(new AnswerOrderRequest(OrderId, RequestingUsername, BuildAnswers())));
 
-    Task JustStartAsync() =>
-        RunAsync(() => Orders.SkipClarificationAsync(OrderId, RequestingUsername));
+    Task JustStartAsync()
+    {
+        var answers = BuildAnswers();
+        return answers.Count == 0
+            ? RunAsync(() => Orders.SkipClarificationAsync(OrderId, RequestingUsername))
+            : RunAsync(() => Orders.AnswerAsync(new AnswerOrderRequest(OrderId, RequestingUsername, answers)));
+    }
 
     async Task RunAsync(Func<Task<OrderSubmission>> action)
     {
