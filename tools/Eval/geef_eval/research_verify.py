@@ -10,6 +10,9 @@ Checks per entry, the first failing one is reported:
 - ``url_mismatch``: the page with that raw text has another address.
 - ``range_outside``: the stored range does not lie inside the raw text.
 - ``range_mismatch``: the stored range does not hold the quote.
+- ``word_cut``: the stored range starts or ends inside a word or number of the raw text. Word parts are those of the C#
+  ``DossierBuilder``: letters, decimal digits, the soft hyphen U+00AD and combining marks. A number with separators counts as one:
+  no start or end between ``digit`` and ``[.,] digit`` or between ``digit [.,]`` and ``digit``.
 - ``not_in_page``: the quote is not in the raw text.
 
 Usage (from ``tools/Eval``)::
@@ -30,10 +33,13 @@ import argparse
 import hashlib
 import json
 import sys
+import unicodedata
 from pathlib import Path
 
 TOOL = "research_verify"
 VERSION = 1
+SOFT_HYPHEN = "\u00ad"
+NUMBER_SEPARATORS = frozenset(".,")
 
 
 def collapse(text: str) -> str:
@@ -54,6 +60,22 @@ def utf16_slice(text: str, start: int, length: int) -> str | None:
         return units[start * 2:(start + length) * 2].decode("utf-16-le")
     except UnicodeDecodeError:
         return None
+
+
+def _is_word_part(char: str) -> bool:
+    return char.isalpha() or char.isdecimal() or char == SOFT_HYPHEN or unicodedata.category(char).startswith("M")
+
+
+def cuts_word(text: str, index: int) -> bool:
+    """True when a passage that starts or ends between ``text[index - 1]`` and ``text[index]`` cuts a word or a number apart."""
+    if index <= 0 or index >= len(text):
+        return False
+    before, after = text[index - 1], text[index]
+    if _is_word_part(before) and _is_word_part(after):
+        return True
+    if after in NUMBER_SEPARATORS:
+        return before.isdecimal() and index + 1 < len(text) and text[index + 1].isdecimal()
+    return before in NUMBER_SEPARATORS and after.isdecimal() and index >= 2 and text[index - 2].isdecimal()
 
 
 def check_entry(entry: dict, pages: list[dict]) -> str | None:
@@ -77,6 +99,9 @@ def check_entry(entry: dict, pages: list[dict]) -> str | None:
         return "range_outside"
     if collapse(stored) != quote:
         return "range_mismatch"
+    first = len(raw.encode("utf-16-le")[:start * 2].decode("utf-16-le"))
+    if cuts_word(raw, first) or cuts_word(raw, first + len(stored)):
+        return "word_cut"
     if quote not in collapse(raw):
         return "not_in_page"
     return None

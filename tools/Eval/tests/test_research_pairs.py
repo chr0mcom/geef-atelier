@@ -21,8 +21,9 @@ def orders():
 class FakeAtelier:
     """The four order tools of one measuring user; ``research`` decides what ``lookedUp`` says."""
 
-    def __init__(self, arm, research=True, fact_state="not_checked", questions=0, fail=(), state="delivered"):
+    def __init__(self, arm, research=True, fact_state="not_checked", questions=0, fail=(), state="delivered", looked_by_request=None):
         self.arm, self.research, self.fact_state, self.questions, self.fail, self.state = arm, research, fact_state, questions, set(fail), state
+        self.looked_by_request = looked_by_request or {}
         self.calls = []
         self._orders = {}
 
@@ -43,6 +44,9 @@ class FakeAtelier:
             return {"done": True, "state": self.state}
         if name == "get_order_result":
             looked = {"status": "found", "note": None, "withheld": 0, "entries": [PASSAGE]} if self.research else None
+            for part, other in self.looked_by_request.items():
+                if part in self._orders[arguments["orderId"]]:
+                    looked = other
             return {"state": self.state, "text": f"Text von {self.arm}", "wordCount": 3, "lookedUp": looked,
                     "factCheck": {"state": self.fact_state, "filesCompared": False}}
         raise AssertionError(name)
@@ -55,6 +59,18 @@ def no_codex():
 @pytest.fixture
 def lock(tmp_path):
     return tmp_path / "codex-gesperrt"
+
+
+def facts(invented=None):
+    return json.dumps({"erfunden": invented or {"1": [], "2": []}, "begruendung": "kurz"})
+
+
+def item(fact, passage=None):
+    return {"tatsache": fact, "ausschnitt": passage}
+
+
+def is_facts(prompt):
+    return "<nachgeschlagen>" in prompt
 
 
 def run_all(tmp_path, lock, on=None, off=None, max_submits=16, pgrep=no_codex):
@@ -177,27 +193,36 @@ def on_label(prompt):
     return "1" if prompt.index("Text von on") < prompt.index("Text von off") else "2"
 
 
-def test_the_juror_is_blind_sees_the_passages_and_swaps_the_order(tmp_path, lock):
-    code, prompts, out = judged(tmp_path, lock, lambda n, prompt: verdict(on_label(prompt)))
+def test_the_juror_is_blind_ranks_without_passages_and_swaps_the_order(tmp_path, lock):
+    code, prompts, out = judged(tmp_path, lock, lambda n, prompt: facts() if is_facts(prompt) else verdict(on_label(prompt)))
 
     assert code == 0, out
-    assert len(prompts) == 16
+    assert len(prompts) == 32 == rp.JUDGE_CEILING
+    rankings = [p for p in prompts if not is_facts(p)]
+    findings = [p for p in prompts if is_facts(p)]
+    assert len(rankings) == len(findings) == 16
     for prompt in prompts:
-        assert PASSAGE["quote"] in prompt and "<recherchierbare_themen>" in prompt
-    pairs = [prompts[i:i + 2] for i in range(0, 16, 2)]
-    assert all(on_label(a) != on_label(b) for a, b in pairs)
+        assert "<recherchierbare_themen>" in prompt
+    for prompt in rankings:
+        assert PASSAGE["quote"] not in prompt and PASSAGE["title"] + ")" not in prompt
+        assert "usschnitt" not in prompt and "nachgeschlagen>" not in prompt
+    for prompt in findings:
+        assert f"[1] „{PASSAGE['quote']}“" in prompt
 
     def without_texts(prompt):
         return prompt.replace("Text von on", "T").replace("Text von off", "T")
 
-    assert all(without_texts(a) == without_texts(b) for a, b in pairs)
+    for group in (rankings, findings):
+        pairs = [group[i:i + 2] for i in range(0, 16, 2)]
+        assert all(on_label(a) != on_label(b) for a, b in pairs)
+        assert all(without_texts(a) == without_texts(b) for a, b in pairs)
 
 
 def test_research_that_wins_with_fewer_placeholders_passes_the_gate(tmp_path, lock):
     def reply(n, prompt):
         on = on_label(prompt)
         off = "2" if on == "1" else "1"
-        return verdict(on, placeholders={off: ["[Betrag]"], on: []})
+        return facts() if is_facts(prompt) else verdict(on, placeholders={off: ["[Betrag]"], on: []})
 
     judged(tmp_path, lock, reply)
     out = []
@@ -213,7 +238,8 @@ def test_research_that_wins_with_fewer_placeholders_passes_the_gate(tmp_path, lo
 def test_disagreeing_passes_are_no_wins_and_more_inventions_fail_the_gate(tmp_path, lock):
     def reply(n, prompt):
         on = on_label(prompt)
-        return verdict("1", fabricated={on: ["14,60 Euro"]})
+        off = "2" if on == "1" else "1"
+        return facts({on: [item("14,60 Euro")], off: []}) if is_facts(prompt) else verdict("1")
 
     judged(tmp_path, lock, reply)
     report = rp.evaluate(orders(), rp.PairStore(tmp_path / "r3"))
@@ -229,7 +255,8 @@ def test_without_enough_pairs_or_visible_research_the_gate_is_not_evaluable(tmp_
     assert rp.evaluate(orders(), store)["verdict"] == "not_evaluable"
     assert rp.main(["evaluate", *SETS, "--out-dir", str(tmp_path / "empty"), "--allow-in-repo"], echo=lambda _: None) == 4
 
-    judged(tmp_path, lock, lambda n, prompt: verdict(on_label(prompt)), on=FakeAtelier("on", research=False))
+    code, prompts, _ = judged(tmp_path, lock, lambda n, prompt: verdict(on_label(prompt)), on=FakeAtelier("on", research=False))
+    assert code == 0 and prompts == []
     report = rp.evaluate(orders(), rp.PairStore(tmp_path / "r3"))
     assert report["verdict"] == "not_evaluable"
     assert any("keinem Ergebnis eine Recherche" in p for p in report["problems"])
@@ -249,3 +276,186 @@ def test_results_inside_a_git_tree_are_refused(tmp_path):
     inside = Path(__file__).resolve().parent / "r3-out"
     assert rp.main(["evaluate", *SETS, "--out-dir", str(inside)], echo=lambda _: None) == 2
     assert not inside.exists()
+
+
+def looked(status, entries=()):
+    return {"status": status, "note": None, "withheld": 0, "entries": list(entries)}
+
+
+def winning_reply(n, prompt):
+    """Research wins both passes of every pair and leaves fewer placeholders."""
+    on = on_label(prompt)
+    off = "2" if on == "1" else "1"
+    return facts() if is_facts(prompt) else verdict(on, placeholders={off: ["[Betrag]"], on: []})
+
+
+def on_with(overrides):
+    """Arm on whose research of the orders at the given positions of the pair set differs."""
+    chosen = orders()
+    return FakeAtelier("on", looked_by_request={chosen[i].request: value for i, value in overrides.items()})
+
+
+@pytest.mark.parametrize("value", [looked("failed"), looked("daily_limit"), looked("all_withheld"), looked("nothing_found"),
+                                   looked("files_attached"), looked("not_needed"), looked("found"), None])
+def test_arm_on_without_usable_research_makes_a_pair_invalid(tmp_path, lock, value):
+    code, prompts, out = judged(tmp_path, lock, winning_reply, on=on_with({5: value}))
+    assert code == 0, out
+    assert len(prompts) == 28
+
+    report = rp.evaluate(orders(), rp.PairStore(tmp_path / "r3"))
+
+    assert report["verdict"] == "passed", report["problems"]
+    assert report["valid_pairs"] == 7 and report["delivered_pairs"] == 8 and report["research_seen"] == 7
+    assert rp.PAIR_IDS[5] not in [p["id"] for p in report["pairs"]]
+    assert report["statuses"][5] == {"id": rp.PAIR_IDS[5], "looked_up": {"on": (value or {}).get("status"), "off": None},
+                                     "delivered": True, "counted": False}
+
+
+@pytest.mark.parametrize("broken, verdict_name, valid", [(2, "passed", 6), (3, "not_evaluable", 5), (8, "not_evaluable", 0)])
+def test_the_gate_needs_six_pairs_with_found_research(tmp_path, lock, broken, verdict_name, valid):
+    judged(tmp_path, lock, winning_reply, on=on_with({i: looked("failed") for i in range(8 - broken, 8)}))
+    out = []
+
+    code = rp.main(["evaluate", *SETS, "--out-dir", str(tmp_path / "r3"), "--allow-in-repo"], echo=out.append)
+
+    report = json.loads((tmp_path / "r3" / "r3-gate.json").read_text(encoding="utf-8"))
+    assert report["verdict"] == verdict_name and report["valid_pairs"] == valid
+    assert code == (0 if verdict_name == "passed" else 4)
+    assert any("lookedUp on=failed, off=null" in line for line in out)
+
+
+def exception_reply(n, prompt):
+    """In both passes the text of arm on holds one fact only a passage covers; the text of arm off one fact nothing covers."""
+    on = on_label(prompt)
+    off = "2" if on == "1" else "1"
+    if is_facts(prompt):
+        return facts({on: [item("14,60 Euro je Stunde", 1)], off: [item("Frist bis März")]})
+    return winning_reply(n, prompt)
+
+
+def decide(cases, decision=rp.NOT_INVENTED):
+    return {"confirmations": [{"order": c["order"], "case": c["case"], "fact": c["fact"], "decision": decision} for c in cases]}
+
+
+def test_cases_of_the_verbatim_exception_need_a_hand_decision(tmp_path, lock):
+    judged(tmp_path, lock, exception_reply)
+    store = rp.PairStore(tmp_path / "r3")
+
+    report = rp.evaluate(orders(), store)
+
+    assert report["verdict"] == "not_evaluable"
+    assert report["fabricated_counts"] == {"counting": "strict", "strict": {"on": 8, "off": 8}, "with_exception": {"on": 0, "off": 8}}
+    assert report["parts"]["fabricated"] == {"passed": True, "on": 8, "off": 8}
+    cases = report["exception_cases"]
+    assert len(cases) == 16 and len({(c["order"], c["case"]) for c in cases}) == 16
+    assert cases[0] == {"order": rp.PAIR_IDS[0], "case": "p1-on-1", "arm": "on", "fact": "14,60 Euro je Stunde",
+                        "passage": PASSAGE["quote"], "url": PASSAGE["url"], "decision": None}
+
+    confirmed = rp.evaluate(orders(), store, decide(cases))
+    assert confirmed["verdict"] == "passed", confirmed["problems"]
+    assert confirmed["fabricated_counts"]["counting"] == "confirmed_exception"
+    assert confirmed["parts"]["fabricated"] == {"passed": True, "on": 0, "off": 8}
+
+    against = rp.evaluate(orders(), store, decide(cases, rp.INVENTED))
+    assert against["parts"]["fabricated"] == {"passed": True, "on": 8, "off": 8}
+
+
+def test_strict_counts_until_every_case_is_decided_and_a_defective_file_never_helps(tmp_path, lock):
+    def reply(n, prompt):
+        on = on_label(prompt)
+        off = "2" if on == "1" else "1"
+        return facts({on: [item("14,60 Euro", 1)], off: []}) if is_facts(prompt) else winning_reply(n, prompt)
+
+    judged(tmp_path, lock, reply)
+    store = rp.PairStore(tmp_path / "r3")
+    open_report = rp.evaluate(orders(), store)
+    cases = open_report["exception_cases"]
+    assert open_report["parts"]["fabricated"] == {"passed": False, "on": 8, "off": 0}
+    assert rp.evaluate(orders(), store, decide(cases))["verdict"] == "passed"
+    assert rp.evaluate(orders(), store, decide(cases, rp.INVENTED))["verdict"] == "failed"
+
+    complete = decide(cases)["confirmations"]
+    defective = [
+        {"confirmations": complete[:-1]},
+        {"confirmations": complete + [complete[0]]},
+        {"confirmations": complete + [dict(complete[0], case="p9-on-1")]},
+        {"confirmations": [dict(complete[0], fact="anderer Wortlaut")] + complete[1:]},
+        {"confirmations": [dict(complete[0], decision="ja")] + complete[1:]},
+        {"confirmations": complete + ["x"]},
+        {"entscheidungen": complete},
+    ]
+    for confirmations in defective:
+        report = rp.evaluate(orders(), store, confirmations)
+        assert report["verdict"] == "not_evaluable", confirmations
+        assert report["fabricated_counts"]["counting"] == "strict"
+        assert report["parts"]["fabricated"] == {"passed": False, "on": 8, "off": 0}
+
+
+def test_evaluate_reads_the_confirmation_file(tmp_path, lock):
+    judged(tmp_path, lock, exception_reply)
+    args = ["evaluate", *SETS, "--out-dir", str(tmp_path / "r3"), "--allow-in-repo"]
+    out = []
+    assert rp.main(args, echo=out.append) == 4
+    assert any(line.startswith(f"Ausnahmefall {rp.PAIR_IDS[0]}/p1-on-1 (offen)") for line in out)
+
+    cases = json.loads((tmp_path / "r3" / "r3-gate.json").read_text(encoding="utf-8"))["exception_cases"]
+    path = tmp_path / "confirmations.json"
+    path.write_text(json.dumps(decide(cases), ensure_ascii=False), encoding="utf-8")
+    assert rp.main([*args, "--confirmations", str(path)], echo=lambda _: None) == 0
+
+    path.write_text("{", encoding="utf-8")
+    assert rp.main([*args, "--confirmations", str(path)], echo=lambda _: None) == 2
+    assert rp.main([*args, "--confirmations", str(tmp_path / "missing.json")], echo=lambda _: None) == 2
+
+
+@pytest.mark.parametrize("invented", [
+    {"1": []},
+    {"1": ["14,60 Euro"], "2": []},
+    {"1": [{"tatsache": "x"}], "2": []},
+    {"1": [{"tatsache": " ", "ausschnitt": None}], "2": []},
+    {"1": [{"tatsache": "x", "ausschnitt": 2}], "2": []},
+    {"1": [{"tatsache": "x", "ausschnitt": 0}], "2": []},
+    {"1": [{"tatsache": "x", "ausschnitt": True}], "2": []},
+    {"1": [{"tatsache": "x", "ausschnitt": "1"}], "2": []},
+])
+def test_an_invalid_list_of_invented_facts_is_refused(invented):
+    with pytest.raises(ValueError):
+        rp.validate_facts({"erfunden": invented}, 1)
+
+
+def test_the_judge_cap_counts_both_kinds_of_verdicts(tmp_path, lock):
+    run_all(tmp_path, lock)
+    args = ["judge", *SETS, "--out-dir", str(tmp_path / "r3"), "--codex-lock", str(lock), "--allow-in-repo"]
+    calls = []
+
+    def runner(cmd, prompt, cwd, timeout_s):
+        calls.append(prompt)
+        return claude_json(winning_reply(len(calls), prompt))
+
+    assert rp.main([*args, "--max-judge-calls", "5"], runner=runner, pgrep=no_codex, echo=lambda _: None) == 4
+    assert len(calls) == 5
+    assert rp.main([*args, "--max-judge-calls", "32"], runner=runner, pgrep=no_codex, echo=lambda _: None) == 0
+    assert len(calls) == 32
+
+
+@pytest.mark.parametrize("arms", [{"off": FakeAtelier("off", research=True)}, {"on": FakeAtelier("on", fact_state="checked")}])
+def test_resuming_after_a_configuration_halt_submits_nothing(tmp_path, lock, arms):
+    code, _, _ = run_all(tmp_path, lock, **arms)
+    assert code == 2
+    stored = len(list((tmp_path / "r3" / "outputs").rglob("*.json")))
+
+    code, tools, out = run_all(tmp_path, lock)
+
+    assert code == 2 and "dauerhaft nicht auswertbar" in out[-1]
+    assert all(not t.calls for t in tools.values())
+    assert len(list((tmp_path / "r3" / "outputs").rglob("*.json"))) == stored
+
+
+def test_a_stored_configuration_problem_late_in_the_set_halts_before_the_first_submission(tmp_path, lock):
+    store = rp.PairStore(tmp_path / "r3")
+    last = rp.PAIR_IDS[-1]
+    store.write_json(store.output_path(last, "off"), {"id": last, "arm": "off", "ok": True, "looked_up": looked("failed")})
+
+    code, tools, out = run_all(tmp_path, lock)
+
+    assert code == 2 and last in out[-1] and all(not t.calls for t in tools.values())

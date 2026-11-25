@@ -119,6 +119,36 @@ public sealed class ResearchEvaluationTests : IDisposable
         Assert.Single(missing.MissingRaw);
     }
 
+    [Theory]
+    [InlineData("zulaessig ohne Zustimmung des Vermieters.", 1)]
+    [InlineData("Der Antrag ist unzulaessig ohne Zustimmung des", 0)]
+    [InlineData("5 Monate Frist gelten fuer alle.", 1)]
+    public void A_range_that_starts_or_ends_inside_a_word_or_number_is_a_violation(string quote, int violations)
+    {
+        const string raw = "Der Antrag ist unzulaessig ohne Zustimmung des Vermieters. Es gelten 1,5 Monate Frist gelten fuer alle.";
+        var sha = JsonLines.Sha256(raw);
+        var page = new PageRecord("P1", 1, "https://a.example/", "A", raw, sha);
+        var file = new RunFile("f", "00", [Bare("h-01") with
+        {
+            Pages = [page],
+            Entries = [new EntryRecord("W1.1", 1, quote, page.Url, "A", DateTimeOffset.UnixEpoch, "Exact", sha, raw.IndexOf(quote, StringComparison.Ordinal), quote.Length)],
+        }]);
+
+        Assert.Equal(violations, ResearchEvaluation.Recheck([file]).Violations.Count);
+    }
+
+    [Fact]
+    public void K1_without_entries_is_not_evaluable_even_when_the_independent_check_is_clean()
+    {
+        var empty = new RunFile("holdout.jsonl", "00", []);
+        var clean = new VerificationReport(ResearchEvaluation.VerifierName, 1, [new VerifiedFile("holdout.jsonl", "00", 0, 0)], 0, []);
+
+        var (verdicts, _) = ResearchEvaluation.Evaluate(AllOrders, empty, [], [], clean, Kit, Settings);
+
+        Assert.Equal(("K1 word for word", GateVerdict.NotEvaluable), (verdicts[0].Scope, verdicts[0].Verdict));
+        Assert.Contains("no entries", verdicts[0].Detail, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task A_held_out_order_measured_twice_or_for_another_input_is_not_evaluable()
     {

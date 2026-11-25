@@ -206,3 +206,38 @@ def test_audit_input_that_verifies_nothing_is_never_a_pass(tmp_path):
     wrong.mkdir()
     (wrong / "x.json").write_text(json.dumps({"orderId": "x"}), encoding="utf-8")
     assert rv.main(["--audit", str(wrong), "--out", str(tmp_path / "v.json")]) == 2
+
+
+@pytest.mark.parametrize("raw, quote", [
+    ("Das ist unzulaessig ohne eine Einwilligung der Eltern.", "zulaessig ohne eine Einwilligung der Eltern."),
+    ("Die Eltern geben eine Einwilligungserklaerung ab.", "Die Eltern geben eine Einwilligung"),
+    ("Der Beitrag steigt auf 213 Euro im Jahr.", "13 Euro im Jahr."),
+    ("Der Beitrag betraegt im Jahr 2027 genau.", "Der Beitrag betraegt im Jahr 202"),
+    ("Der Satz liegt bei 13,90 Euro je Stunde.", "90 Euro je Stunde."),
+    ("Der Satz liegt bei 13.90 Euro je Stunde.", ".90 Euro je Stunde."),
+    ("Der Satz liegt bei 13,90 Euro je Stunde.", "Der Satz liegt bei 13"),
+    ("Der Satz liegt bei 13,90 Euro je Stunde.", "Der Satz liegt bei 13,"),
+    ("Die Arbeits\u00adzeit ist hier geregelt.", "zeit ist hier geregelt."),
+    ("Die Arbeits\u00adzeit ist hier geregelt.", "Die Arbeits"),
+    ("Das Cafe\u0301s oeffnen am Montag wieder.", "Das Cafe"),
+    ("Die Zahl 5x gilt hier nicht weiter.", "x gilt hier nicht weiter."),
+])
+def test_a_passage_cut_inside_a_word_or_number_is_a_violation(raw, quote):
+    entry = _entry(raw=raw, quote=quote, start=_utf16_len(raw[:raw.index(quote)]), length=_utf16_len(quote))
+
+    assert rv.check_entry(entry, _line([entry], raw=raw)["pages"]) == "word_cut"
+
+
+@pytest.mark.parametrize("raw, quote", [
+    ("Das ist unzulaessig ohne eine Einwilligung der Eltern.", "unzulaessig ohne eine Einwilligung"),
+    ("Er sagt: „Der Beitrag steigt“, mehr nicht.", "Der Beitrag steigt"),
+    ("Es sind 13, 90 davon sind neu und gut.", "90 davon sind neu und gut."),
+    ("Der Satz gilt seit 2027. Mehr steht dort nicht.", "Der Satz gilt seit 2027"),
+    ("Der Satz gilt seit 2027.5 Seiten folgen noch.", "Seiten folgen noch."),
+    ("Die Ost-West-Achse ist laengst fertig gebaut.", "West-Achse ist laengst fertig gebaut."),
+    ("😀 Der Beitrag steigt auf 13 Euro😀", "Der Beitrag steigt auf 13 Euro"),
+])
+def test_a_passage_with_clean_edges_passes(raw, quote):
+    entry = _entry(raw=raw, quote=quote, start=_utf16_len(raw[:raw.index(quote)]), length=_utf16_len(quote))
+
+    assert rv.check_entry(entry, _line([entry], raw=raw)["pages"]) is None

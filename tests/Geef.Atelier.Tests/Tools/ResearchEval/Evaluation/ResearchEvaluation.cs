@@ -115,7 +115,25 @@ public static partial class ResearchEvaluation
             return "the stored range lies outside the raw text";
         if (Collapse(raw.Substring(entry.Start, entry.Length)) != quote)
             return "the stored range does not hold the quote";
+        if (CutsWordOrNumber(raw, entry.Start) || CutsWordOrNumber(raw, entry.Start + entry.Length))
+            return "the stored range starts or ends inside a word or a number";
         return Collapse(raw).Contains(quote, StringComparison.Ordinal) ? null : "the quote is not in the raw text";
+    }
+
+    /// <summary>
+    /// True when the boundary before <paramref name="index"/> of <paramref name="raw"/> lies inside a word (letters, digits, soft
+    /// hyphen, combining marks on both sides) or inside a number written with a dot or comma between digits.
+    /// </summary>
+    internal static bool CutsWordOrNumber(string raw, int index)
+    {
+        static bool Part(char c) => char.IsLetterOrDigit(c) || c == '\u00AD'
+            || char.GetUnicodeCategory(c) is System.Globalization.UnicodeCategory.NonSpacingMark or System.Globalization.UnicodeCategory.SpacingCombiningMark or System.Globalization.UnicodeCategory.EnclosingMark;
+        static bool Mark(char c) => c is '.' or ',';
+        if (index <= 0 || index >= raw.Length)
+            return false;
+        return (Part(raw[index - 1]) && Part(raw[index]))
+            || (index >= 2 && Mark(raw[index - 1]) && char.IsDigit(raw[index - 2]) && char.IsDigit(raw[index]))
+            || (index + 1 < raw.Length && Mark(raw[index]) && char.IsDigit(raw[index - 1]) && char.IsDigit(raw[index + 1]));
     }
 
     /// <summary>

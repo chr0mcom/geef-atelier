@@ -249,16 +249,21 @@ Mail- und Webadressen nutzen die reservierte Endung `.example`. Ablage
 `tests/Geef.Atelier.Tests/Domain/Checks/Corpus/arithmetic-corpus.jsonl`. Die Läufe geschehen nachts und nur, wenn BookForge nicht
 läuft.
 
-## Recherche: Nachprüfung und Paarvergleich R3 (Etappe 4)
+## Recherche: Nachprüfung, Paarvergleich R3 und Tor R2 (Etappe 4)
 
 **Nachprüfung der Dossier-Einträge** (`geef_eval/research_verify.py`, eigene Implementierung): Jeder Eintrag muss wörtlich in
-seinem gespeicherten Rohtext stehen (nur Leerraum vereinheitlicht, Groß/Klein zählt, Bereich in UTF-16 wie in .NET). Liest die
+seinem gespeicherten Rohtext stehen (nur Leerraum vereinheitlicht, Groß/Klein zählt, Bereich in UTF-16 wie in .NET). Der
+gespeicherte Bereich darf weder in einem Wort noch in einer Zahl beginnen oder enden (Verstoß `word_cut`): Wortteil sind wie im
+`DossierBuilder` Buchstaben, Ziffern, das weiche Trennzeichen U+00AD und kombinierende Zeichen; außerdem darf keine Grenze eine
+Zahl mit Trenner zerteilen (Ziffer, `.` oder `,`, Ziffer). Liest die
 Zeilen von `tools/ResearchEval run` (`--results`) und die Audit-Dateien des Ateliers (`--audit`, Datei oder Verzeichnis, Format
 von `OrderResearchService`). Rückgabe 0 sauber, 1 Verstoß, 2 falscher Aufruf, 4 nichts geprüft.
 
 **Paarvergleich R3** (`geef_eval/research_pairs.py`): acht unberührte Entwicklungsaufträge mit Suchthemen laufen je zweimal
 über MCP durch das laufende Atelier, einmal je Messnutzer: Arm `on` (Recherche an), Arm `off` (aus), beide ohne Faktenprüfung.
-Ein blinder Sonnet-Juror vergleicht je Auftrag beide Texte in zwei Durchgängen mit vertauschter Reihenfolge.
+Ein blinder Sonnet-Juror beurteilt je Auftrag beide Texte mit zwei Arten von Aufrufen, jede in zwei Durchgängen mit
+vertauschter Reihenfolge: `rank` **ohne** nachgeschlagene Ausschnitte (Siege und Platzhalter) und `facts` **mit** den Ausschnitten
+des Arms `on` (erfundene Tatsachen).
 
 ```bash
 cd tools/Eval
@@ -267,25 +272,72 @@ SETS="--intake-results $C/results-20261125.jsonl --corpus $C/intake-corpus.jsonl
 python3 -m geef_eval.research_pairs select $SETS
 python3 -m geef_eval.research_pairs run $SETS --out-dir $EVAL_RESEARCH_DIR/r3 --max-submits 16 --codex-lock <sperrdatei>
 python3 -m geef_eval.research_pairs judge $SETS --out-dir $EVAL_RESEARCH_DIR/r3 --max-judge-calls 32 --codex-lock <sperrdatei>
-python3 -m geef_eval.research_pairs evaluate $SETS --out-dir $EVAL_RESEARCH_DIR/r3
+python3 -m geef_eval.research_pairs evaluate $SETS --out-dir $EVAL_RESEARCH_DIR/r3 [--confirmations <datei.json>]
 ```
 
 | Befehl | Wirkung |
 |---|---|
 | `select` | zeigt die acht Aufträge. Regel: von den 15 nach VR unberührten Entwicklungsaufträgen (`RESERVED_IDS`, gleichlautend im C#-Test `ResearchPagesTests`) die ersten acht nach Kennung **ohne Profil** (über MCP bekommt ein Auftrag kein eigenes Profil; beide Messnutzer schreiben mit ihrem eigenen, gleichen) und **ohne Überarbeitung** (die recherchiert nie). Die Liste steht fest in `PAIR_IDS`; andere Daten ergeben einen Fehler, nie eine andere Menge. |
 | `run` | je Auftrag und Arm genau eine Einreichung (`submit_order`), Fragen werden in beiden Armen gleich übersprungen (`answer_order` mit `skip`; recherchierbare Themen fragt das Atelier nie), dann `get_order_status` bis fertig und `get_order_result`. Welcher Arm zuerst läuft, wechselt je Auftrag. Jeder Versuch zählt und wird nie wiederholt. |
-| `judge` | zwei Urteile je Auftrag mit zwei Texten; der Juror sieht Absicht, Auftrag, Dateien, Themen, die nachgeschlagenen Ausschnitte des Arms `on` (was ein Ausschnitt wörtlich deckt, gilt nicht als erfunden) und die zwei Texte, nie einen Armnamen. Zusatzfrage `platzhalter`: Stellen, an denen eine recherchierbare Tatsache fehlt oder als Platzhalter steht. Ungültiges JSON wird einmal wiederholt und sonst nicht gespeichert. |
-| `evaluate` | Tor R3, schreibt `r3-gate.json`. |
+| `judge` | vier Urteile je Paar, das zählen kann (beide Texte geliefert, Arm `on` mit `found` und mindestens einem Eintrag; andere Paare kosten kein Urteil): zweimal `rank`, zweimal `facts`, Dateien `judgments/<id>/<art>_pass<n>.json`. Der Juror sieht nie einen Armnamen. Ungültiges JSON wird einmal wiederholt und sonst nicht gespeichert. |
+| `evaluate` | Tor R3, schreibt `r3-gate.json` (je Auftrag der `lookedUp`-Status beider Arme unter `statuses`, beide Zählungen unter `fabricated_counts`, die Handfälle unter `exception_cases`). |
 
-**Tor R3** (Vertrag 8, vorab festgelegt): (a) Siege mit Recherche ≥ Siege ohne + 2 (Sieg = beide Durchgänge gleich),
-(b) Summe `erfunden` mit ≤ ohne, (c) Summe `platzhalter` mit < ohne (je Auftrag Mittel der zwei Durchgänge). **Nicht
-auswertbar**, wenn weniger als 7 von 8 Paaren gültig sind (beide Texte geliefert, beide Urteile gültig), eine Ausgabe die
-Arm-Konfiguration verletzt (Arm `off` mit Recherche, ein Arm mit Faktenprüfung), Arm `on` in keinem Ergebnis eine Recherche
-zeigt, eine Zuordnung vom Seed abweicht oder Ausgaben zu fremden Aufträgen im Verzeichnis liegen.
+**Die zwei Juror-Aufrufe:** `rank` sieht Absicht, Auftrag, Dateien, Themen und die zwei Texte, aber keinen Ausschnitt. Er liefert
+Rangfolge, Abstand und `platzhalter` (Stellen, an denen eine recherchierbare Tatsache fehlt oder als Platzhalter steht). Er soll
+beim Ordnen auch Erfundenes beachten; ohne Ausschnitte kann ihm dabei Nachgeschlagenes als erfunden erscheinen, was nur gegen
+Arm `on` wirken kann. `facts` sieht zusätzlich die nummerierten Ausschnitte. Er listet je Text jede Tatsache, die weder Absicht,
+Auftrag noch Dateien decken (**auch** wenn ein Ausschnitt sie deckt), und nennt je Tatsache unter `ausschnitt` die Nummer des
+Ausschnitts, der sie wörtlich deckt, sonst `null`. Ein Text, der Ausschnitte wiedergibt, kann in `facts` als Arm `on`
+erkennbar sein; deshalb entscheidet dieser Aufruf weder Siege noch Platzhalter.
 
-**Schutz:** `--max-submits` (höchstens 16 je Verzeichnis) und `--max-judge-calls` (höchstens 32 Urteile je Verzeichnis) sind
+**Tor R3** (Vertrag 8, vorab festgelegt): (a) Siege mit Recherche ≥ Siege ohne + 2 (Sieg = beide `rank`-Durchgänge gleich),
+(b) Summe `erfunden` mit ≤ ohne, (c) Summe `platzhalter` (aus `rank`) mit < ohne (je Auftrag Mittel der zwei Durchgänge).
+
+**Gültige Paare:** *Technisch vollständig* ist ein Paar, wenn beide Texte geliefert sind und, falls es zählen kann, alle vier
+Urteile vorliegen; mindestens **7 von 8** (`MIN_DELIVERED_PAIRS`). *Gültig* (nur diese gehen in a–c ein) ist ein technisch
+vollständiges Paar, dessen Arm `on` `lookedUp.status = found` mit mindestens einem Eintrag hat; mindestens **6 von 8**
+(`MIN_FOUND_PAIRS`). `failed`, `daily_limit`, `all_withheld`, `nothing_found`, `files_attached`, jeder andere Status, `found`
+ohne Eintrag und `lookedUp = null` machen das Paar ungültig. Beide Schwellen gelten zugleich.
+
+**Zwei Zählungen für `erfunden`** (je Auftrag und Arm das Mittel der zwei `facts`-Durchgänge):
+
+- **streng:** jede gelistete Tatsache zählt.
+- **mit Wortlaut-Ausnahme:** Tatsachen mit Ausschnittnummer zählen nicht, gleich in welchem der zwei Texte sie stehen.
+
+Jede Tatsache, die nur durch die Ausnahme nicht zählt, ist ein **Fall** (je Auftrag, Durchgang, Arm und Listenplatz, z. B.
+`p1-on-2`; dieselbe Aussage in zwei Durchgängen sind zwei Fälle). Jeder Fall ist vor einem `On` von Hand gegen die Absicht zu
+prüfen. Regel:
+
+| Lage | gezählt | Tor |
+|---|---|---|
+| kein Fall | streng (beide Zählungen sind gleich) | nach a–c |
+| mindestens ein Fall ohne gültige Entscheidung oder ein Fehler in der Bestätigungsdatei | streng | `not_evaluable` |
+| alle Fälle gültig entschieden | mit Ausnahme: `not_invented` zählt nicht, `invented` zählt als erfunden | nach a–c |
+
+**Bestätigungsdatei** (`--confirmations`, außerhalb von Git ablegen). `order`, `case` und `fact` werden unverändert aus
+`exception_cases` in `r3-gate.json` übernommen; dort stehen zum Prüfen auch Ausschnitt (`passage`) und Adresse (`url`).
+`not_invented` heißt: von Hand geprüft, die Tatsache verträgt sich mit der Absicht. `invented` heißt: sie widerspricht ihr, ist
+falsch oder veraltet.
+
+```json
+{"confirmations": [
+  {"order": "main-063", "case": "p1-on-2", "fact": "<Wortlaut aus r3-gate.json>", "decision": "not_invented"}
+]}
+```
+
+Weitere Felder (etwa `note`) sind erlaubt. Als Fehler zählen: unbekannter Fall, abweichender Wortlaut, doppelter Eintrag, andere
+Entscheidung, Eintrag, der kein Objekt ist, fehlende Liste `confirmations`. Eine nicht lesbare Datei ergibt Rückgabe 2. Nach neuen
+Urteilen passen alte Bestätigungen nicht mehr.
+
+**Außerdem nicht auswertbar:** eine Ausgabe verletzt die Arm-Konfiguration (Arm `off` mit Recherche, ein Arm mit Faktenprüfung),
+Arm `on` zeigt in keinem Ergebnis eine Recherche mit Fundstellen, eine Zuordnung weicht vom Seed ab oder im Verzeichnis liegen
+Ausgaben zu fremden Aufträgen.
+
+**Schutz:** `--max-submits` (höchstens 16 je Verzeichnis) und `--max-judge-calls` (höchstens 32 Urteile je Verzeichnis:
+8 Paare × 2 Arten × 2 Durchgänge) sind
 Pflicht; vor jeder Einreichung und jedem Urteil hält der Codex-Wächter an (Sperrdatei oder `pgrep -a codex`, Rückgabe 3).
-`run` hält sofort an (Rückgabe 2), wenn eine Ausgabe die Arm-Konfiguration verletzt, und bricht ab (Rückgabe 4), wenn eines
+`run` hält sofort an (Rückgabe 2), wenn eine Ausgabe die Arm-Konfiguration verletzt; liegt eine solche Zeile schon im
+Verzeichnis, endet jeder weitere Aufruf mit Rückgabe 2, ohne etwas einzureichen. `run` bricht außerdem ab (Rückgabe 4), wenn eines
 der ersten drei Paare technisch scheitert oder mehr als ein Paar gescheitert ist. Die MCP-Tokens kommen nur aus
 `EVAL_R3_TOKEN_ON` und `EVAL_R3_TOKEN_OFF` (verschieden, nie geschrieben), die Adresse aus `EVAL_ATELIER_URL`. Das
 Ausgabeverzeichnis muss außerhalb jedes Git-Baums liegen.
@@ -293,5 +345,37 @@ Ausgabeverzeichnis muss außerhalb jedes Git-Baums liegen.
 **Voraussetzung im Betrieb:** zwei Messnutzer mit leerem oder gleichem Profil; über die Umgebung des Web-Containers
 `Research__ModeOverrides__<nutzer-on>=On`, `Research__ModeOverrides__<nutzer-off>=Off` und für beide
 `Direct__FactCheckModeOverrides__<nutzer>=Off` (Nutzernamen nie ins Repository). Kosten: ≤ 16 Klärer- und ≤ 8 Condenser-Aufrufe,
-16–32 Schreiberaufrufe, ≤ 32 Juror-Urteile (Sonnet), 0 Codex, ≤ 32 Tavily-Suchen.
+16–32 Schreiberaufrufe, ≤ 32 Juror-Urteile (Sonnet: 16 `rank` ohne Ausschnitte und 16 `facts` mit Ausschnitten), zusammen
+≤ 88 Claude-Aufrufe, 0 Codex, ≤ 32 Tavily-Suchen. Ungültiges JSON wird je Urteil einmal wiederholt, im ungünstigsten Fall also
+64 CLI-Aufrufe für den Juror.
+
+### Tor R2: der im Code geprüfte Teil (`geef_eval/research_r2.py`)
+
+Eingabe sind die gespeicherten Antworten von `get_order_result` der R2-Aufträge, ein JSON-Objekt je Auftrag (`.json`, `.jsonl`
+oder ein Verzeichnis mit `*.json`). Der Bericht enthält Zitate aus Texten und muss außerhalb jedes Git-Baums liegen.
+
+```bash
+cd tools/Eval
+python3 -m geef_eval.research_r2 --results $EVAL_RESEARCH_DIR/r2/antworten --out $EVAL_RESEARCH_DIR/r2/r2-gate.json
+```
+
+| Teil | Prüfung |
+|---|---|
+| (a) | **im Code:** jeder Auftrag hat `lookedUp` ungleich `null` und einen Status ungleich `not_needed` |
+| (b) | **Handauswertung** (`manual`): 0 Fragen zu recherchierten Themen |
+| (c) | **im Code:** Zahl der `unbackedPassages` mit `kind = not_backed`, deren Zitat eine Zahl oder einen Namen enthält, die oder der in Zitat oder Titel eines `lookedUp`-Eintrags desselben Auftrags vorkommt; bestanden bei ≤ 1 insgesamt, ob blockierend oder nicht |
+| (d) | **Handauswertung** (`manual`): Median `DurationMs` ≤ 60 s (steht nicht in der MCP-Antwort) |
+| (e) | **im Code:** 0 Notizmarker im Text (`<!-- atelier-notes`, Konstante `WriterNotesFormat.StartMarker`, in allen Schreibweisen, die der C#-Code annimmt, und in der entschärften Form) |
+
+Zahl: Ziffernfolge; `.` und `,` zwischen Ziffern werden entfernt (`1.250,50` = `1,250.50` = `125050`), verglichen wird die ganze
+Zahl. Name: großgeschriebenes Wort ab 3 Buchstaben, das nicht am Satzanfang steht (Anfang von Text oder Zeile, nach `.`, `!`,
+`?`; nach Ordnungszahlen und gängigen Abkürzungen wie `Dr.` nicht), verglichen als ganzes Wort mit Groß/Klein. Wo die Stelle im
+Text steht, entscheidet, ob ihr erstes Wort am Satzanfang steht. **Grenze der Regel:** Im Deutschen zählt damit jedes
+Substantiv (auch die Anrede „Sie“/„Ihnen“, wenn es im Eintrag steht). Sie irrt zur strengen Seite; die gezählten Stellen stehen
+mit ihren Treffern im Bericht. Sinngemäße Deckung ohne gleiche Zahl und gleichen Namen erkennt sie nicht.
+
+**Nicht auswertbar:** weniger als 4 Aufträge mit Text, ein Auftrag doppelt, ein Auftrag mit Text, dessen Faktenprüfung nicht für
+diesen Text lief (`factCheck.state` weder `checked` noch `open_points`) oder dem `unbackedPassages` fehlt, oder in keinem Auftrag
+ein `lookedUp`-Eintrag. Rückgabe 0: (a), (c), (e) bestanden (**R2 insgesamt erst mit (b) und (d) von Hand**), 1 ein geprüfter
+Teil nicht bestanden, 2 falscher Aufruf oder unlesbare Eingabe, 4 nicht auswertbar.
 
