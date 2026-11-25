@@ -14,10 +14,13 @@ namespace Geef.Atelier.Mcp.Tools;
 public static class ReviseOrderTool
 {
     public const string ToolDescription =
-        "Changes the text of a finished order and writes it as a new version. Only what the person asks for is changed; everything else stays as it is. " +
+        "Changes the text of a finished order of the person and writes it as a new version. Atelier asks the writer to make only this change; " +
+        "it does not check that nothing else changed, so the person can compare the versions (Show changes in the web app, or export_order with version). " +
+        "Only the person who ordered the text can change it. " +
         "Pass the person's words about the change in change, word for word as they said them: do not rephrase, shorten, translate or add to them, " +
         "and add no changes of your own. For a simple wish you can pass quick instead of change or together with it. " +
-        "Atelier asks no questions and does not look anything up again; the new version is checked like every version. " +
+        "Atelier asks no questions and does not look anything up again. The new version gets the same automatic checks as every version, " +
+        "except that the rules of the first request (such as its length, lists, words or language) only lead to notes, because the change may replace them. " +
         "Then call get_order_status with waitSeconds, and get_order_result when done is true. Until the new version is ready, get_order_result shows the earlier one. " +
         "Earlier versions stay available with export_order. If the change is refused, give the person the answer and do not change the text yourself.";
 
@@ -43,7 +46,8 @@ public static class ReviseOrderTool
         CancellationToken cancellationToken = default)
     {
         var id = McpOrderAccess.ParseOrderId(orderId);
-        var requestingUsername = currentUser.RequestingUsername();
+        if (!currentUser.TryGetOwnUsername(out var requestingUsername))
+            throw new McpException(McpOrderAccess.OrderNotFound);
         _ = await orders.GetAsync(id, requestingUsername, cancellationToken)
             ?? throw new McpException(McpOrderAccess.OrderNotFound);
 

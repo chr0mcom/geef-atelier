@@ -2,6 +2,7 @@ using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.FactCheck;
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Reports;
 using Geef.Atelier.Core.Domain.Sources;
@@ -152,16 +153,44 @@ public sealed class OrderResultEarlierVersionTests
         Assert.Equal(owner.Quote, other.Quote);
     }
 
-    [Fact]
-    public void In_shadow_mode_carried_over_passages_stay_hidden_but_the_earlier_open_points_of_the_writer_are_shown()
+    [Theory]
+    [InlineData(FactCheckState.NotShown)]
+    [InlineData(FactCheckState.Off)]
+    public void With_the_check_off_or_in_shadow_mode_carried_over_passages_stay_visible_and_its_own_stay_hidden(FactCheckState state)
     {
-        var report = Report(open: [Unsupported("in der Aula", fromVersion: 1)], earlier: [new RunReportEarlierPoint(1, "Offen.")],
-            state: FactCheckState.NotShown);
+        var conflict = new FactFinding("f3", FactFindingKind.SourceConflict, null, "Two rooms.", null, "Raum 12", "Raum 14", "notizen.txt", null, false,
+            QuoteMatchKind.NotFound, MaterialPart.Files, MaterialPart.Files, "notizen.txt", FromVersion: 1);
+        var report = Report(open: [Unsupported("in der Aula", fromVersion: 1), Unsupported("am Freitag")], earlier: [new RunReportEarlierPoint(1, "Offen.")],
+            state: state) is var r ? r with { FactCheck = r.FactCheck! with { SourceConflicts = [conflict] } } : null!;
 
         var result = Base().WithReport(report);
 
-        Assert.Empty(result.UnbackedPassages!);
+        var passage = Assert.Single(result.UnbackedPassages!);
+        Assert.Equal(("in der Aula", (int?)1), (passage.Quote, passage.FromVersion));
+        Assert.Single(result.SourceIssues!);
         Assert.Equal([new OrderEarlierPoint(1, "Offen.")], result.EarlierOpenPoints);
+        Assert.True(result.HasOpenPoints());
+        Assert.Contains(OrderCheckLines.FactsNotChecked + OrderCheckLines.FactsEarlierOne, result.Checks!.Checked);
+        Assert.Equal(OrderCheckLines.ToReviewOpenPoints, result.Checks.ToReview);
+    }
+
+    [Fact]
+    public void Assumptions_of_the_writer_for_an_earlier_version_keep_their_kind_and_one_the_clarifier_shows_is_not_repeated()
+    {
+        var report = Report(earlier:
+        [
+            new RunReportEarlierPoint(1, "Die Anmeldefrist ist Freitag.", EarlierPointKind.Assumption),
+            new RunReportEarlierPoint(1, "Die Eltern werden mit Sie angesprochen.", EarlierPointKind.Assumption),
+            new RunReportEarlierPoint(1, "1 more note of the writer could not be shown because it holds a link, an address, or account or access details.", EarlierPointKind.Note),
+        ]);
+
+        var result = (Base() with { Assumptions = [new IntakeAssumption("a1", GapTopic.Tone, "Eltern werden mit Sie angesprochen", AssumptionConfidence.Sure)] })
+            .WithReport(report);
+
+        Assert.Equal(
+            [new OrderEarlierPoint(1, "Die Anmeldefrist ist Freitag.", EarlierPointKind.Assumption),
+             new OrderEarlierPoint(1, "1 more note of the writer could not be shown because it holds a link, an address, or account or access details.", EarlierPointKind.Note)],
+            result.EarlierOpenPoints);
         Assert.True(result.HasOpenPoints());
     }
 }

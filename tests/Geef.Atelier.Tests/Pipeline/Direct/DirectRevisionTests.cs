@@ -62,7 +62,7 @@ public sealed class DirectRevisionTests
         Assert.DoesNotContain(DirectWriterPrompts.SeedInstruction, change, StringComparison.Ordinal);
         Assert.Equal(plain.Replace(DirectWriterPrompts.SeedInstruction, DirectWriterPrompts.RevisionInstruction, StringComparison.Ordinal), change);
         Assert.Equal(
-            "Change the text in draft.md only as the person asks under \"Change requested by the person\". Keep everything else as it is: the same facts, structure and wording. Keep the language of the text. Keep the length within ±15 % unless the change asks for another length.",
+            "Change the text in draft.md only as the person asks in the line marked \"the change to make now\" under \"Change requested by the person\". The earlier changes listed there are already made in the text: keep them and do not make them again. Keep everything else as it is: the same facts, structure and wording. Keep the language of the text unless the change asks for another language. Keep the length within ±15 % unless the change asks for another length.",
             DirectWriterPrompts.RevisionInstruction);
     }
 
@@ -72,7 +72,7 @@ public sealed class DirectRevisionTests
         var prompt = DirectWriterPrompts.FirstPass(Brief, OrderSourceBundle.Empty, documentMode: false, seed: Text, revision: true);
 
         Assert.Contains("<<<TEXT\n" + Text + "\nTEXT>>>", prompt, StringComparison.Ordinal);
-        Assert.Contains("Change this text only as the person asks under \"Change requested by the person\".", prompt, StringComparison.Ordinal);
+        Assert.Contains("Change this text only as the person asks in the line marked \"the change to make now\" under \"Change requested by the person\".", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("draft.md", prompt, StringComparison.Ordinal);
     }
 
@@ -107,27 +107,53 @@ public sealed class DirectRevisionTests
         Assert.Equal("length", note.Metadata!["code"]);
         Assert.Equal(false, note.Metadata["blocking"]);
         Assert.Equal(
-            $"The text has {DraftCheckEvaluator.CountWords(Text)} words; your first request asked for \"max. 10 Wörter\". Because you asked for a change, the length was not corrected.",
+            $"Your first request asked for \"max. 10 Wörter\"; the new version does not keep to it: it has {DraftCheckEvaluator.CountWords(Text)} words. Please check whether your change meant this.",
             note.Message);
     }
 
     [Fact]
-    public async Task In_a_change_every_other_check_still_blocks()
+    public async Task In_a_change_every_rule_of_the_first_request_is_a_note_and_the_checks_that_always_apply_still_block()
     {
         var constraints = OrderConstraints.None with
         {
             Length = AtMostTen,
             ForbidPlaceholders = true,
             ForbidPlaceholdersQuote = "ohne Platzhalter",
-            Language = "de",
+            Language = "en",
+            ForbiddenPatterns = [new PatternRule(ForbiddenPattern.Lists, "keine Aufzählungen")],
+            ForbiddenTerms = [new TermRule("Aula", "nicht \"Aula\"")],
+            RequiredTerms = [new TermRule("Anmeldung", "mit \"Anmeldung\"")],
         };
+        const string draft = "Liebe Eltern, der Elternabend ist am [Datum] in der Aula der Schule, und wir freuen uns sehr auf Sie alle.\n\n- Beginn 19 Uhr\n- Ende 21 Uhr\n\nKosten: 22 + 31 = 60 Euro.";
 
-        var result = await Review("Liebe Eltern, der Elternabend ist am [Datum] in der Aula der Schule, und wir freuen uns sehr auf Sie alle.", constraints, "- (version 2) Simpler words.");
+        var first = await Review(draft, constraints, revisionHint: null);
+        var change = await Review(draft, constraints, "Set the times as a list.");
 
-        Assert.Equal(ReviewDecision.Rejected, result.Decision);
-        var error = Assert.Single(result.Findings, f => f.Severity == FindingSeverity.Error);
-        Assert.Equal(DraftCheckCodes.Placeholders, error.Metadata!["code"]);
-        Assert.Contains(result.Findings, f => f.Severity == FindingSeverity.Info && (string)f.Metadata!["code"] == DraftCheckCodes.Length);
+        Assert.Equal(
+            [DraftCheckCodes.Length, DraftCheckCodes.Language, DraftCheckCodes.Placeholders, DraftCheckCodes.Lists, DraftCheckCodes.ForbiddenTerm, DraftCheckCodes.RequiredTerm, DraftCheckCodes.Arithmetic],
+            first.Findings.Where(f => f.Severity == FindingSeverity.Error).Select(f => (string)f.Metadata!["code"]).ToArray());
+        var error = Assert.Single(change.Findings, f => f.Severity == FindingSeverity.Error);
+        Assert.Equal(DraftCheckCodes.Arithmetic, error.Metadata!["code"]);
+        var notes = change.Findings.Where(f => f.Severity == FindingSeverity.Info && (string)f.Metadata!["code"] != DraftCheckCodes.Preamble).ToList();
+        Assert.Equal(6, notes.Count);
+        Assert.All(notes, n => Assert.Equal(false, n.Metadata!["blocking"]));
+        Assert.All(notes, n => Assert.StartsWith("Your first request asked for ", n.Message, StringComparison.Ordinal));
+        Assert.All(notes, n => Assert.EndsWith("Please check whether your change meant this.", n.Message, StringComparison.Ordinal));
+        Assert.Contains(notes, n => n.Message == "Your first request asked for \"keine Aufzählungen\"; the new version does not keep to it: it uses lists. Please check whether your change meant this.");
+        Assert.Contains(notes, n => n.Message == "Your first request asked for a text in English; the new version does not keep to it: it is in German. Please check whether your change meant this.");
+        Assert.Contains(notes, n => n.Message == "Your first request asked for \"nicht \"Aula\"\"; the new version does not keep to it: it uses \"Aula\". Please check whether your change meant this.");
+        Assert.Contains(notes, n => n.Message == "Your first request asked for \"mit \"Anmeldung\"\"; the new version does not keep to it: it does not contain \"Anmeldung\". Please check whether your change meant this.");
+        Assert.Contains(notes, n => n.Message == "Your first request asked for \"ohne Platzhalter\"; the new version does not keep to it: it has placeholders. Please check whether your change meant this.");
+    }
+
+    [Fact]
+    public void In_a_change_the_placeholders_to_fill_in_and_an_empty_text_stay_as_they_are()
+    {
+        const string draft = "Liebe Eltern, der Elternabend ist am [Datum] in der Aula der Schule.";
+
+        Assert.Equal(DraftCheckEvaluator.Evaluate(draft, OrderConstraints.None), DeterministicChecksReviewer.Evaluate(draft, OrderConstraints.None, revision: true));
+        Assert.Equal(DraftCheckEvaluator.Evaluate("", OrderConstraints.None), DeterministicChecksReviewer.Evaluate("", OrderConstraints.None, revision: true));
+        Assert.True(Assert.Single(DeterministicChecksReviewer.Evaluate("", OrderConstraints.None, revision: true), c => c.Code == DraftCheckCodes.Empty).Blocking);
     }
 
     [Fact]
@@ -150,7 +176,9 @@ public sealed class DirectRevisionTests
         var length = Assert.Single(change.Checks, c => c.Code == DraftCheckCodes.Length);
         Assert.False(length.Passed);
         Assert.False(length.Blocking);
-        Assert.Contains("Because you asked for a change", length.Message, StringComparison.Ordinal);
+        Assert.StartsWith("Your first request asked for \"max. 10 Wörter\"", length.Message, StringComparison.Ordinal);
+        Assert.True(change.Revision);
+        Assert.False(plain.Revision);
     }
 
     [Fact]
@@ -205,6 +233,103 @@ public sealed class DirectRevisionTests
 
         Assert.Empty(report.FactCheck!.Open);
         Assert.Equal(FactCheckState.Checked, report.FactCheck.State);
+    }
+
+    [Theory]
+    [InlineData(FactCheckState.Off)]
+    [InlineData(FactCheckState.NotShown)]
+    public void Findings_an_earlier_version_carried_over_stay_also_when_its_own_check_was_off_or_not_shown(FactCheckState state)
+    {
+        var earlier = Earlier(Checked(state, Office with { FromVersion = 1 }, Gone));
+        var facts = new DirectRunFacts(Mode: FactCheckMode.On, FactRounds: [Round()], Revision: new DirectRevision(2, earlier));
+
+        var report = Build(Text, facts);
+
+        var passage = Assert.Single(report.FactCheck!.Open);
+        Assert.Equal((Office.TextQuote, (int?)1), (passage.TextQuote, passage.FromVersion));
+    }
+
+    [Theory]
+    [InlineData(FactCheckMode.Off, FactCheckState.Off)]
+    [InlineData(FactCheckMode.Shadow, FactCheckState.NotShown)]
+    public void With_the_new_check_off_or_in_shadow_mode_the_findings_of_the_earlier_version_are_kept_with_their_version(FactCheckMode mode, FactCheckState state)
+    {
+        var earlier = Earlier(Checked(FactCheckState.OpenPoints, Office));
+        var shadow = new FactCheckRound(1, mode, FactCheckScope.Full, FactRoundStatus.Checked, [Office with { WhatIsWrong = "Shadow says so too." }], 1, "m", false);
+        var facts = new DirectRunFacts(Mode: mode, FactRounds: mode == FactCheckMode.Off ? [] : [shadow], Revision: new DirectRevision(1, earlier));
+
+        var report = Build(Text, facts);
+
+        Assert.Equal(state, report.FactCheck!.State);
+        var passage = Assert.Single(report.FactCheck.Open);
+        Assert.Equal((1, "Nobody said where to sign up."), (passage.FromVersion, passage.WhatIsWrong));
+        var next = Build(Text, new DirectRunFacts(Mode: FactCheckMode.On, FactRounds: [Round()], Revision: new DirectRevision(2, report)));
+        Assert.Equal(1, Assert.Single(next.FactCheck!.Open).FromVersion);
+    }
+
+    [Fact]
+    public void Assumptions_of_the_writer_for_the_earlier_version_that_this_run_does_not_repeat_are_carried_as_assumptions()
+    {
+        var earlier = DirectReportBuilder.Build(OrderConstraints.None, Text, [], 1, 1, null,
+            new DirectRunFacts(new WriterNotesSplit(Text, new WriterNotes(["Die Anmeldefrist ist Freitag.", "Die Eltern werden gesiezt."], [], []), WriterNotesStatus.Ok)));
+        var notes = new WriterNotesSplit(Text, new WriterNotes(["die Eltern werden gesiezt"], [], []), WriterNotesStatus.Ok);
+
+        var v2 = Build(Text, new DirectRunFacts(notes, Revision: new DirectRevision(1, earlier)));
+        var v3 = Build(Text, new DirectRunFacts(new WriterNotesSplit(Text, WriterNotes.Empty, WriterNotesStatus.Ok), Revision: new DirectRevision(2, v2)));
+
+        Assert.Equal([new RunReportEarlierPoint(1, "Die Anmeldefrist ist Freitag.", EarlierPointKind.Assumption)], v2.EarlierOpenPoints);
+        Assert.Equal([new RunReportEarlierPoint(1, "Die Anmeldefrist ist Freitag.", EarlierPointKind.Assumption),
+                      new RunReportEarlierPoint(2, "die Eltern werden gesiezt", EarlierPointKind.Assumption)], v3.EarlierOpenPoints);
+        Assert.Contains("\"kind\":\"Assumption\"", RunReportJson.Serialize(v2), StringComparison.Ordinal);
+        Assert.Equal(v2.EarlierOpenPoints, RunReportJson.TryParse(RunReportJson.Serialize(v2))!.EarlierOpenPoints);
+    }
+
+    [Fact]
+    public void An_open_point_and_an_assumption_with_the_same_words_are_kept_apart()
+    {
+        var earlier = DirectReportBuilder.Build(OrderConstraints.None, Text, [], 1, 1, null,
+            new DirectRunFacts(new WriterNotesSplit(Text, new WriterNotes(["Der Raum ist offen."], ["Der Raum ist offen."], []), WriterNotesStatus.Ok)));
+        var notes = new WriterNotesSplit(Text, new WriterNotes([], ["Der Raum ist offen."], []), WriterNotesStatus.Ok);
+
+        var report = Build(Text, new DirectRunFacts(notes, Revision: new DirectRevision(1, earlier)));
+
+        Assert.Equal([new RunReportEarlierPoint(1, "Der Raum ist offen.", EarlierPointKind.Assumption)], report.EarlierOpenPoints);
+    }
+
+    [Fact]
+    public void Notes_and_flagged_passages_of_the_earlier_version_that_could_not_be_shown_are_named_once_per_version()
+    {
+        var hidden = new WriterNotes([], [], []) { Hidden = 2 };
+        var v1 = DirectReportBuilder.Build(OrderConstraints.None, Text, [], 1, 1, null,
+            new DirectRunFacts(new WriterNotesSplit(Text, hidden, WriterNotesStatus.Ok))) with
+        {
+            FactCheck = Checked(FactCheckState.OpenPoints) with { NotShown = 1 },
+        };
+        var oneHidden = new WriterNotesSplit(Text, new WriterNotes([], [], []) { Hidden = 1 }, WriterNotesStatus.Ok);
+
+        var v2 = Build(Text, new DirectRunFacts(oneHidden, Revision: new DirectRevision(1, v1)));
+        var v3 = Build(Text, new DirectRunFacts(new WriterNotesSplit(Text, WriterNotes.Empty, WriterNotesStatus.Ok), Revision: new DirectRevision(2, v2)));
+
+        Assert.Equal(
+            [new RunReportEarlierPoint(1, "2 more notes of the writer could not be shown because they hold a link, an address, or account or access details.", EarlierPointKind.Note),
+             new RunReportEarlierPoint(1, "1 flagged passage could not be checked or listed.", EarlierPointKind.Note)],
+            v2.EarlierOpenPoints);
+        Assert.Equal(
+            [.. v2.EarlierOpenPoints!,
+             new RunReportEarlierPoint(2, "1 more note of the writer could not be shown because it holds a link, an address, or account or access details.", EarlierPointKind.Note)],
+            v3.EarlierOpenPoints);
+    }
+
+    [Fact]
+    public void An_earlier_version_without_a_report_leaves_a_fixed_open_point_and_one_that_cannot_be_read_a_note()
+    {
+        var none = Build(Text, new DirectRunFacts(Revision: new DirectRevision(3, null)));
+        var unreadable = Build(Text, new DirectRunFacts(Revision: new DirectRevision(3, null, ReportUnreadable: true)));
+
+        Assert.Equal([new RunReportEarlierPoint(3, "The checks of version 3 were not taken over, so anything they left open was not checked again.", EarlierPointKind.Note)],
+            none.EarlierOpenPoints);
+        Assert.Null(unreadable.EarlierOpenPoints);
+        Assert.Contains(DirectReportBuilder.EarlierReportMissingNote, unreadable.Notes!);
     }
 
     [Fact]

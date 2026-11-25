@@ -85,13 +85,24 @@ public sealed class ReviseOrderToolTests
     }
 
     [Fact]
-    public async Task An_administrator_changes_without_owner_filter()
+    public async Task An_administrator_cannot_change_the_text_of_someone_else_and_gets_the_answer_for_an_unknown_order()
     {
         var id = Owned("bob");
 
+        var ex = await Assert.ThrowsAsync<McpException>(() => ReviseOrderTool.ReviseOrder(_orders, new FakeUser("root", isAdmin: true), id.ToString(), "Make it shorter."));
+
+        Assert.Equal("Order not found.", ex.Message);
+        Assert.Empty(_orders.Revisions);
+    }
+
+    [Fact]
+    public async Task An_administrator_changes_their_own_text_in_their_own_name()
+    {
+        var id = Owned("root");
+
         await ReviseOrderTool.ReviseOrder(_orders, new FakeUser("root", isAdmin: true), id.ToString(), "Make it shorter.");
 
-        Assert.Null(Assert.Single(_orders.Revisions).RequestingUsername);
+        Assert.Equal("root", Assert.Single(_orders.Revisions).RequestingUsername);
     }
 
     [Fact]

@@ -84,3 +84,24 @@ public static class DraftCheckCodes
     /// <summary>Written only by earlier versions; read like a passed <see cref="Arithmetic"/> and never named as "the calculations add up".</summary>
     public const string ArithmeticPartial = "arithmetic.partial";
 }
+
+/// <summary>Helpers on <see cref="DraftCheckResult"/>.</summary>
+public static class DraftCheckResultExtensions
+{
+    /// <summary>
+    /// True for a check of a rule read from the request: length, language, forbidden forms, forbidden and required words, and the
+    /// placeholders when the request rules them out (not the list of placeholders to fill in, which is no rule). In a run that changes an
+    /// earlier version these rules come from the first request and are only notes, because the change may replace them.
+    /// </summary>
+    public static bool IsFirstRequestRule(this DraftCheckResult check)
+    {
+        ArgumentNullException.ThrowIfNull(check);
+        return check.Code switch
+        {
+            DraftCheckCodes.Length or DraftCheckCodes.Language or DraftCheckCodes.Lists or DraftCheckCodes.Headings or DraftCheckCodes.Emojis
+                or DraftCheckCodes.ForbiddenTerm or DraftCheckCodes.RequiredTerm => true,
+            DraftCheckCodes.Placeholders => !(check.Passed && !check.Blocking),
+            _ => false,
+        };
+    }
+}

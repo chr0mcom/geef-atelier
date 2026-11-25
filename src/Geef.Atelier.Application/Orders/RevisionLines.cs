@@ -36,6 +36,25 @@ public static class RevisionLines
     /// <summary>Lead of the open points of an earlier version that the shown version does not repeat: <c>{0}</c> is that version.</summary>
     public const string EarlierPointsLeadFormat = "Noted for version {0} – your change may have settled it:";
 
+    /// <summary>Words before an assumption the writer made for an earlier version, listed with the points noted for that version.</summary>
+    public const string EarlierAssumptionLead = "Assumed: ";
+
+    /// <summary>
+    /// Lead of the assumptions of the clarifier when the shown version changed an earlier one: <c>{0}</c> is the version they were noted
+    /// for, before the person asked for changes.
+    /// </summary>
+    public const string AssumptionsNotedLeadFormat = "Noted for version {0} – you had not said this then, so it was assumed. Your change may have settled it:";
+
+    /// <summary>Like <see cref="AssumptionsNotedLeadFormat"/> for the facts not given: <c>{0}</c> is the version.</summary>
+    public const string NotGivenNotedLeadFormat = "Noted for version {0} – you had not given these facts then, so they were left open instead of assumed. Your change may have given them:";
+
+    /// <summary>Like <see cref="NotGivenNotedLeadFormat"/> when the text was written with passages looked up on the web.</summary>
+    public const string NotGivenNotedLeadLookedUpFormat =
+        "Noted for version {0} – you had not given these facts then, so they were not assumed. Where the pages looked up cover one, the text may use it. Your change may have given them:";
+
+    /// <summary>Second line of the banner after a change could not be finished, when the shown version still has open points.</summary>
+    public const string EarlierStillToCheck = "This version still needs your attention before you use it – see “Open points”.";
+
     /// <summary>Button under the result that opens the change card.</summary>
     public const string ChangeButton = "Change something";
 
@@ -45,8 +64,8 @@ public static class RevisionLines
     /// <summary>Placeholder of the field.</summary>
     public const string ChangeFieldPlaceholder = "For example: The meeting is on 5 May, not 12 May.";
 
-    /// <summary>Line on the card.</summary>
-    public const string OnlyWhatYouAsk = "Only what you ask for is changed. Everything else stays as it is.";
+    /// <summary>Line on the card: it promises only what is done (the writer is asked for this change alone), not that nothing else changes.</summary>
+    public const string OnlyWhatYouAsk = "The writer is asked to make only this change. “Show changes” then shows what was changed.";
 
     /// <summary>Button that starts the change.</summary>
     public const string MakeChangeButton = "Make the change";

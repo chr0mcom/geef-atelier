@@ -81,6 +81,10 @@
             <div class="order-banner order-banner--check" role="status" data-testid="order-banner" data-state="earlier-version">
                 <strong>@(_view.Display.State == OrderDisplayState.Stopped ? "The change was stopped." : "The change could not be finished.")</strong>
                 <span>The earlier version is still here.@(CanChange ? " You can try again with “" + RevisionLines.ChangeButton + "”." : "")</span>
+                @if (_result?.HasOpenPoints() == true)
+                {
+                    <span data-testid="order-banner-check">@RevisionLines.EarlierStillToCheck</span>
+                }
             </div>
         }
         else if (!IsAsking)
@@ -140,10 +144,10 @@
                 </p>
             }
             <OrderResultPanel Result="result" />
-            @if (CanChange)
+            @if (ShowChangeCard)
             {
                 <OrderChangeCard @key="_view.OrderId" OrderId="_view.OrderId" RequestingUsername="@_viewer" MaxChars="OrderSettings.Value.RevisionHintMaxChars"
-                                 StartOpen="OpenChange" OnStarted="ChangeStartedAsync" />
+                                 StartOpen="OpenChange" Draft="_changeDraft" OnDraft="d => _changeDraft = d" OnStarted="ChangeStartedAsync" />
             }
             <OrderChecksPanel Result="result" />
             <OrderOpenPoints Result="result" Language="@OrderLanguage" />
@@ -252,6 +256,7 @@
     string? _actionError;
     string? _intakeNotice;
     string? _changeNotice;
+    OrderChangeDraft? _changeDraft;
     bool _isOwner;
     string? _requestingUser;
     string? _viewer;
@@ -285,6 +290,8 @@
 
     bool EarlierShownAfterChange => _view is { Display.IsFinished: true } && _view.Display.State is OrderDisplayState.Failed or OrderDisplayState.Stopped
         && _result is { Text: not null, Version: int shownVersion, LatestVersion: int latest } && shownVersion < latest;
+
+    bool ShowChangeCard => CanChange || _changeDraft is not null && _isOwner && ResultShown && OrderSettings.Value.ReviseModeFor(_viewer) == ReviseMode.On;
 
     bool CanChange => _isOwner && _view is { Display.IsFinished: true } view && view.State != OrderState.Cancelled && ResultShown
         && !view.Runs.Any(r => r.Status is RunStatus.Pending or RunStatus.Running)

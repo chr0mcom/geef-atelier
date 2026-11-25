@@ -1,14 +1,25 @@
 @using Geef.Atelier.Application.Orders
+@using System.Globalization
 
 @if (Lines.Count > 0 || NotGiven.Count > 0)
 {
     <section class="order-block order-assumptions" aria-labelledby="order-assumptions-title" data-testid="order-assumptions">
         <h2 id="order-assumptions-title">Assumptions</h2>
-        @if (Lines.Count > 0)
+        @if (Noted.Count > 0)
+        {
+            <p data-testid="order-assumptions-noted-lead">@string.Format(CultureInfo.InvariantCulture, RevisionLines.AssumptionsNotedLeadFormat, Result.AssumptionsVersion)</p>
+            <ul>
+                @foreach (var line in Noted)
+                {
+                    <li data-testid="order-assumption" data-noted-for="@Result.AssumptionsVersion" lang="@Language">@line</li>
+                }
+            </ul>
+        }
+        @if (Current.Count > 0)
         {
             <p>You did not say this, so it was assumed:</p>
             <ul>
-                @foreach (var line in Lines)
+                @foreach (var line in Current)
                 {
                     <li data-testid="order-assumption" lang="@Language">@line</li>
                 }
@@ -30,7 +41,9 @@
 @code {
     /// <summary>
     /// The delivered result with the assumptions of the clarifier that nobody corrected and those of the writer; assumptions about
-    /// facts that the writer got only as "not given by the person" are listed apart, because the text was not written with them.
+    /// facts that the writer got only as "not given by the person" are listed apart, because the text was not written with them. When the
+    /// shown version changed an earlier one (<see cref="OrderResult.AssumptionsVersion"/>), the assumptions of the clarifier and the facts not
+    /// given are said to be noted for that version, because the change may have settled them; nothing is left out.
     /// </summary>
     [Parameter, EditorRequired] public OrderResult Result { get; set; } = null!;
 
@@ -39,10 +52,23 @@
 
     IReadOnlyList<string> Lines => Result.AllAssumptions();
 
+    IReadOnlyList<string> Noted => Result.AssumptionsVersion is null ? [] : Lines.Where(IsClarifiers).ToList();
+
+    IReadOnlyList<string> Current => Result.AssumptionsVersion is null ? Lines : Lines.Where(l => !IsClarifiers(l)).ToList();
+
+    bool IsClarifiers(string line) =>
+        (Result.Assumptions ?? []).Any(a => string.Equals(OrderResultRules.SameAssumptionKey(a.Text), OrderResultRules.SameAssumptionKey(line), StringComparison.OrdinalIgnoreCase));
+
     IReadOnlyList<string> NotGiven => Result.NotGivenFacts();
 
     /// <summary>The line above facts that were not given; when the text was written with passages looked up on the web it says they may cover one.</summary>
     public const string NotGivenLeadWithoutLookedUp = "You did not give these facts, so they were left open instead of assumed:";
 
-    string NotGivenLead => Result.UsedLookedUp() ? OrderResearchLines.NotGivenLeadLookedUp : NotGivenLeadWithoutLookedUp;
+    string NotGivenLead => (Result.AssumptionsVersion, Result.UsedLookedUp()) switch
+    {
+        (int noted, true) => string.Format(CultureInfo.InvariantCulture, RevisionLines.NotGivenNotedLeadLookedUpFormat, noted),
+        (int noted, false) => string.Format(CultureInfo.InvariantCulture, RevisionLines.NotGivenNotedLeadFormat, noted),
+        (null, true) => OrderResearchLines.NotGivenLeadLookedUp,
+        _ => NotGivenLeadWithoutLookedUp,
+    };
 }

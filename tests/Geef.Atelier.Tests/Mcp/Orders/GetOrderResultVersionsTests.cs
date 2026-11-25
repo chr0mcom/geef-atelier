@@ -3,6 +3,9 @@ using System.Text.Json;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Orders;
+using Geef.Atelier.Core.Domain.Reports;
+using Geef.Atelier.Core.Domain.Intake;
+using Geef.Atelier.Mcp;
 using Geef.Atelier.Mcp.Models;
 using Geef.Atelier.Mcp.Tools;
 
@@ -50,6 +53,73 @@ public sealed class GetOrderResultVersionsTests
         Assert.Contains("earlierOpenPoints", OrderDtoMappings.ReviewOpenPointsNote, StringComparison.Ordinal);
         Assert.Contains(OrderDtoMappings.EarlierPointsNote, dto.Note);
         Assert.Contains(OrderDtoMappings.UncheckedContentNote, dto.Note);
+    }
+
+    [Fact]
+    public async Task Assumptions_of_the_version_before_come_with_their_kind_and_the_assumptions_of_a_changed_version_with_their_version()
+    {
+        var id = Guid.NewGuid();
+        _orders.AddResult("alice", OrderToolTestData.Result(id, OrderDisplayState.Delivered, V1Text) with
+        {
+            Version = 2,
+            LatestVersion = 2,
+            Assumptions = [new IntakeAssumption("a1", GapTopic.Facts, "Das Treffen ist in Raum A.", AssumptionConfidence.Unsure)],
+            EarlierOpenPoints =
+            [
+                new OrderEarlierPoint(1, "Die Anmeldefrist ist Freitag.", EarlierPointKind.Assumption),
+                new OrderEarlierPoint(1, "The checks of version 1 were not taken over, so anything they left open was not checked again.", EarlierPointKind.Note),
+            ],
+            AssumptionsVersion = 1,
+            FactCheck = FactCheckState.Checked,
+            Checks = ReviewChecks,
+        });
+
+        var dto = await GetOrderResultTool.GetOrderResult(_orders, _alice, id.ToString());
+
+        Assert.Equal(
+            [new OrderEarlierPointDto(1, "Die Anmeldefrist ist Freitag.", "assumption"),
+             new OrderEarlierPointDto(1, "The checks of version 1 were not taken over, so anything they left open was not checked again.", "openPoint")],
+            dto.EarlierOpenPoints!);
+        Assert.Equal(1, dto.AssumptionsVersion);
+        Assert.Contains(string.Format(CultureInfo.InvariantCulture, OrderDtoMappings.AssumptionsVersionNoteFormat, 1), dto.Note);
+        var json = JsonSerializer.Serialize(dto, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.Contains("\"kind\":\"assumption\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"assumptionsVersion\":1", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_first_version_says_nothing_about_the_version_of_its_assumptions()
+    {
+        var id = Guid.NewGuid();
+        _orders.AddResult("alice", OrderToolTestData.Result(id, OrderDisplayState.Delivered, V1Text) with
+        {
+            Version = 1,
+            LatestVersion = 1,
+            Assumptions = [new IntakeAssumption("a1", GapTopic.Facts, "Das Treffen ist in Raum A.", AssumptionConfidence.Unsure)],
+            Checks = ReviewChecks,
+        });
+
+        var dto = await GetOrderResultTool.GetOrderResult(_orders, _alice, id.ToString());
+
+        Assert.Null(dto.AssumptionsVersion);
+        Assert.DoesNotContain("were noted for version", dto.Note ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_description_no_longer_says_that_text_is_empty_while_the_order_is_working()
+    {
+        Assert.DoesNotContain("While the order is still working, text is empty", GetOrderResultTool.ToolDescription, StringComparison.Ordinal);
+        Assert.Contains("text is empty only when the order has no text yet", GetOrderResultTool.ToolDescription, StringComparison.Ordinal);
+        Assert.Contains("When a newer version is being written, failed or was stopped, text is the earlier version", GetOrderResultTool.ToolDescription, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Revise_order_promises_only_what_is_done()
+    {
+        Assert.DoesNotContain("everything else stays as it is", ReviseOrderTool.ToolDescription, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("checked like every version", ReviseOrderTool.ToolDescription, StringComparison.Ordinal);
+        Assert.Contains("it does not check that nothing else changed", ReviseOrderTool.ToolDescription, StringComparison.Ordinal);
+        Assert.DoesNotContain("changes only what was asked", McpServerInstructions.Text, StringComparison.Ordinal);
     }
 
     [Fact]

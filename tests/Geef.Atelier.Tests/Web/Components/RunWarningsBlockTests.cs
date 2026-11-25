@@ -31,8 +31,8 @@ public sealed class RunWarningsBlockTests : TestContext
     [Theory]
     [InlineData(RunStatus.Running, "Version 3 is still being written.", "This does not concern the text above (version 2):")]
     [InlineData(RunStatus.Pending, "Version 3 is still being written.", "This does not concern the text above (version 2):")]
-    [InlineData(RunStatus.Failed, "Version 3 could not be finished.", "They do not concern the text above (version 2), which is complete and unchanged:")]
-    [InlineData(RunStatus.Aborted, "Version 3 could not be finished.", "They do not concern the text above (version 2), which is complete and unchanged:")]
+    [InlineData(RunStatus.Failed, "Version 3 could not be finished.", "They do not concern the text above (version 2), which is unchanged:")]
+    [InlineData(RunStatus.Aborted, "Version 3 could not be finished.", "They do not concern the text above (version 2), which is unchanged:")]
     public void Warnings_of_a_newer_version_than_the_text_shown_name_both_versions(RunStatus status, string start, string end)
     {
         var cut = RenderComponent<RunWarningsBlock>(p => p

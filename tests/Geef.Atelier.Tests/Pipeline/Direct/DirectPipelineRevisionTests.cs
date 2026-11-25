@@ -81,7 +81,7 @@ public sealed class DirectPipelineRevisionTests
         var length = Assert.Single(outcome.Report!.Checks, c => c.Code == DraftCheckCodes.Length);
         Assert.False(length.Passed);
         Assert.False(length.Blocking);
-        Assert.Contains("your first request asked for", length.Message, StringComparison.Ordinal);
+        Assert.StartsWith("Your first request asked for", length.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -159,7 +159,7 @@ public sealed class DirectPipelineRevisionTests
     }
 
     [Fact]
-    public async Task An_earlier_version_without_a_report_gives_no_points_and_no_note()
+    public async Task An_earlier_version_without_a_report_says_that_its_checks_were_not_taken_over()
     {
         var (harness, first) = await FirstVersionAsync();
         var bare = new RunEntity
@@ -172,7 +172,8 @@ public sealed class DirectPipelineRevisionTests
 
         var outcome = await harness.RunAsync(SecondVersion(first));
 
-        Assert.Null(outcome.Report!.EarlierOpenPoints);
+        var point = Assert.Single(outcome.Report!.EarlierOpenPoints!);
+        Assert.Equal(new RunReportEarlierPoint(1, "The checks of version 1 were not taken over, so anything they left open was not checked again.", EarlierPointKind.Note), point);
         Assert.DoesNotContain(DirectReportBuilder.EarlierReportMissingNote, outcome.Report.Notes!);
     }
 }

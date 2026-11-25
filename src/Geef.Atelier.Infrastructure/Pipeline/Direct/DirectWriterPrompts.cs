@@ -22,9 +22,12 @@ internal static class DirectWriterPrompts
     public const string SeedInstruction =
         "Revise the text in draft.md as the request asks. Change as little as possible; keep length within ±15 % unless the request says otherwise.";
 
-    /// <summary>Instruction of the first pass of a run that changes an earlier version; replaces <see cref="SeedInstruction"/> there.</summary>
+    /// <summary>
+    /// Instruction of the first pass of a run that changes an earlier version; replaces <see cref="SeedInstruction"/> there. Only the line
+    /// marked as the change to make now is carried out; the earlier changes of the block are already in the text.
+    /// </summary>
     public const string RevisionInstruction =
-        "Change the text in draft.md only as the person asks under \"Change requested by the person\". Keep everything else as it is: the same facts, structure and wording. Keep the language of the text. Keep the length within ±15 % unless the change asks for another length.";
+        "Change the text in draft.md only as the person asks in the line marked \"the change to make now\" under \"Change requested by the person\". The earlier changes listed there are already made in the text: keep them and do not make them again. Keep everything else as it is: the same facts, structure and wording. Keep the language of the text unless the change asks for another language. Keep the length within ±15 % unless the change asks for another length.";
 
     /// <summary>Sentences that make the writer read the whole background document instead of searching it.</summary>
     public const string ReadCompletelyInstruction =

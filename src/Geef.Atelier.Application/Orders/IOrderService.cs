@@ -66,7 +66,9 @@ public interface IOrderService
 
     /// <summary>
     /// Starts the next version of the order, seeded with the text of the shown version and the change of the person, without questions
-    /// and always on the direct path. Throws <see cref="OrderRevisionException"/> for a change that cannot be made. While a version is
+    /// and always on the direct path. Only the owner of the order may change it: <see cref="ReviseOrderRequest.RequestingUsername"/> must be
+    /// the user who ordered the text (never <c>null</c>, also not for administrators); anyone else gets <see cref="RevisionLines.NotFound"/>, as
+    /// for an order that does not exist. Throws <see cref="OrderRevisionException"/> for a change that cannot be made. While a version is
     /// still being written nothing changes and the answer carries <see cref="RevisionLines.Busy"/>, so that a repeated call is harmless.
     /// </summary>
     Task<OrderRevision> ReviseAsync(ReviseOrderRequest request, CancellationToken ct = default);

@@ -60,7 +60,7 @@ else
             <button type="button" class="btn primary" data-testid="order-change-make" disabled="@_busy" @onclick="MakeChangeAsync">
                 @(_busy ? "Starting…" : RevisionLines.MakeChangeButton)
             </button>
-            <button type="button" class="btn" data-testid="order-change-cancel" disabled="@_busy" @onclick="Close">@RevisionLines.CancelButton</button>
+            <button type="button" class="btn" data-testid="order-change-cancel" disabled="@_busy" @onclick="CancelAsync">@RevisionLines.CancelButton</button>
         </div>
     </section>
 }
@@ -81,6 +81,15 @@ else
     /// <summary>Raised with the answer of the service after a change was started or a change was already being made, so the page can reload.</summary>
     [Parameter] public EventCallback<OrderRevision> OnStarted { get; set; }
 
+    /// <summary>
+    /// What the person entered and could not be made yet because a change was already being made; the card opens with it. The page keeps
+    /// it through <see cref="OnDraft"/>, so that the words and buttons stay while the other version is written.
+    /// </summary>
+    [Parameter] public OrderChangeDraft? Draft { get; set; }
+
+    /// <summary>Raised with the entry that was kept because a change was already being made, and with <c>null</c> once it was made or cancelled.</summary>
+    [Parameter] public EventCallback<OrderChangeDraft?> OnDraft { get; set; }
+
     readonly HashSet<RevisionQuick> _quick = [];
     ElementReference _heading;
     bool _open;
@@ -89,7 +98,14 @@ else
     string _text = string.Empty;
     string? _error;
 
-    protected override void OnInitialized() => _open = StartOpen;
+    protected override void OnInitialized()
+    {
+        _open = StartOpen || Draft is not null;
+        if (Draft is null)
+            return;
+        _text = Cap(Draft.Text);
+        _quick.UnionWith(Draft.Quick);
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -121,6 +137,12 @@ else
         _error = null;
     }
 
+    async Task CancelAsync()
+    {
+        Close();
+        await OnDraft.InvokeAsync(null);
+    }
+
     void Toggle(RevisionQuick quick)
     {
         if (!_quick.Remove(quick))
@@ -147,7 +169,15 @@ else
         {
             var quick = _quick.Order().ToList();
             var revision = await DataGate.RunAsync(() => Orders.ReviseAsync(new ReviseOrderRequest(OrderId, RequestingUsername, words.Length == 0 ? null : words, quick, OrderEntry.Web)));
-            Close();
+            if (revision.Notices.Contains(RevisionLines.Busy, StringComparer.Ordinal))
+            {
+                await OnDraft.InvokeAsync(new OrderChangeDraft(_text, quick));
+            }
+            else
+            {
+                Close();
+                await OnDraft.InvokeAsync(null);
+            }
             await OnStarted.InvokeAsync(revision);
         }
         catch (OrderRevisionException ex)

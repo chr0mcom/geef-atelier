@@ -179,7 +179,8 @@ internal sealed class OrderService(
             UncorrectedAssumptions(order),
             NotGivenFacts: NotGivenFacts(order, run),
             LookedUp: lookedUp,
-            LatestVersion: current.OrderVersion);
+            LatestVersion: current.OrderVersion,
+            AssumptionsVersion: string.IsNullOrWhiteSpace(run.RevisionHint) ? null : FirstVersion(orderRuns));
         var viewer = viewerUsername ?? requestingUsername;
         var showProfile = viewer is not null && string.Equals(viewer, order.CreatedByUser, StringComparison.Ordinal);
         return report is null || !hasText ? result : result.WithReport(report, showProfile);
@@ -321,8 +322,9 @@ internal sealed class OrderService(
     {
         ArgumentNullException.ThrowIfNull(request);
         var options = orderOptions.Value;
-        var order = await GetOwnedAsync(request.OrderId, request.RequestingUsername, ct)
-                    ?? throw new OrderRevisionException(RevisionLines.NotFound);
+        var order = await GetOwnedAsync(request.OrderId, request.RequestingUsername, ct);
+        if (order is null || request.RequestingUsername is null || !string.Equals(order.CreatedByUser, request.RequestingUsername, StringComparison.Ordinal))
+            throw new OrderRevisionException(RevisionLines.NotFound);
         if (options.ReviseModeFor(order.CreatedByUser) != ReviseMode.On)
             throw new OrderRevisionException(RevisionLines.NotAvailable);
 
@@ -519,6 +521,10 @@ internal sealed class OrderService(
             .Where(t => open.Contains(OrderResultRules.AssumptionKey(t)))
             .ToList();
     }
+
+    /// <summary>The first version of the order: the lowest version of its standard runs, 1 when none has one.</summary>
+    private static int FirstVersion(IReadOnlyList<RunEntity> orderRuns) =>
+        orderRuns.Where(r => r.Kind == RunKind.Standard && r.OrderVersion is not null).Select(r => r.OrderVersion!.Value).DefaultIfEmpty(1).Min();
 
     private static IReadOnlyList<IntakeAssumption>? UncorrectedAssumptions(OrderEntity order)
     {

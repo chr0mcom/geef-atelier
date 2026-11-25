@@ -5,6 +5,8 @@ using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Orders;
+using Geef.Atelier.Core.Domain.Reports;
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Web.Components;
 using Geef.Atelier.Web.Components.Pages;
 using Geef.Atelier.Web.Components.UI.Orders;
@@ -91,7 +93,7 @@ public sealed class OrderChangeTests : TestContext
         Assert.Equal("What should change?", cut.Find("label[for='order-change-text']").TextContent);
         Assert.Equal("For example: The meeting is on 5 May, not 12 May.", cut.Find("[data-testid='order-change-text']").GetAttribute("placeholder"));
         Assert.Equal("2000", cut.Find("[data-testid='order-change-text']").GetAttribute("maxlength"));
-        Assert.Equal("Only what you ask for is changed. Everything else stays as it is.", cut.Find("[data-testid='order-change-promise']").TextContent);
+        Assert.Equal("The writer is asked to make only this change. “Show changes” then shows what was changed.", cut.Find("[data-testid='order-change-promise']").TextContent);
         Assert.Equal("Make the change", cut.Find("[data-testid='order-change-make']").TextContent.Trim());
         Assert.Equal("Cancel", cut.Find("[data-testid='order-change-cancel']").TextContent);
         var markup = cut.Markup;
@@ -181,9 +183,80 @@ public sealed class OrderChangeTests : TestContext
         cut.Find("[data-testid='order-change-open']").Click();
         cut.Find("[data-quick='Shorter']").Click();
 
+        cut.Find("[data-testid='order-change-text']").Input("Add the room number.");
         cut.Find("[data-testid='order-change-make']").Click();
 
         cut.WaitForAssertion(() => Assert.Equal(RevisionLines.Busy, cut.Find("[data-testid='order-change-notice']").TextContent));
+        Assert.Equal("Add the room number.", cut.Find("[data-testid='order-change-text']").GetAttribute("value"));
+        Assert.Equal("true", cut.Find("[data-quick='Shorter']").GetAttribute("aria-pressed"));
+        Assert.Single(cut.FindAll("[data-testid='order-change-make']"));
+    }
+
+    [Fact]
+    public void After_a_change_that_could_not_be_finished_the_top_still_asks_to_check_the_version_shown_when_it_has_open_points()
+    {
+        var runs = new[] { RunView(1, RunStatus.Completed, RunOutcome.Converged, 14), RunView(2, RunStatus.Failed, RunOutcome.Failed, null, Asked, 5) };
+        var view = AddOrder(OrderDisplayState.Failed, runs);
+        _orders.SetResult(Result(view, 1, 2, FirstText, string.Format(RevisionLines.NotFinishedFormat, 2, 1)) with
+        {
+            Display = view.Display,
+            Placeholders = ["[Raum]"],
+        });
+
+        var cut = Render(view);
+
+        var banner = cut.Find("[data-testid='order-banner']");
+        Assert.Equal("earlier-version", banner.GetAttribute("data-state"));
+        Assert.Equal(RevisionLines.EarlierStillToCheck, banner.QuerySelector("[data-testid='order-banner-check']")!.TextContent);
+    }
+
+    [Fact]
+    public void Assumptions_of_a_changed_version_are_said_to_be_noted_for_the_first_version_and_none_is_left_out()
+    {
+        var view = Delivered(RunView(2, RunStatus.Completed, RunOutcome.Converged, 13, Asked, 5));
+        _orders.SetResult(Result(view, 2, 2, SecondText) with
+        {
+            Assumptions =
+            [
+                new IntakeAssumption("a1", GapTopic.Formality, "Die Eltern werden mit Sie angesprochen.", AssumptionConfidence.Sure),
+                new IntakeAssumption("a2", GapTopic.Facts, "Das Treffen ist in Raum A.", AssumptionConfidence.Unsure),
+            ],
+            NotGivenFacts = ["Das Treffen ist in Raum A."],
+            WriterAssumptions = ["Die Länge ist etwa eine halbe Seite."],
+            EarlierOpenPoints = [new OrderEarlierPoint(1, "Die Anmeldefrist ist Freitag.", EarlierPointKind.Assumption)],
+            AssumptionsVersion = 1,
+        });
+
+        var cut = Render(view);
+
+        Assert.Equal("Noted for version 1 – you had not said this then, so it was assumed. Your change may have settled it:",
+            cut.Find("[data-testid='order-assumptions-noted-lead']").TextContent);
+        Assert.Equal("Noted for version 1 – you had not given these facts then, so they were left open instead of assumed. Your change may have given them:",
+            cut.Find("[data-testid='order-not-given-lead']").TextContent);
+        Assert.Equal(["Die Eltern werden mit Sie angesprochen.", "Die Länge ist etwa eine halbe Seite."], cut.FindAll("[data-testid='order-assumption']").Select(a => a.TextContent));
+        Assert.Equal("1", cut.FindAll("[data-testid='order-assumption']")[0].GetAttribute("data-noted-for"));
+        Assert.Null(cut.FindAll("[data-testid='order-assumption']")[1].GetAttribute("data-noted-for"));
+        Assert.Equal(["Das Treffen ist in Raum A."], cut.FindAll("[data-testid='order-not-given']").Select(a => a.TextContent));
+        Assert.DoesNotContain("You did not give these facts", cut.Markup);
+        var earlier = cut.Find("[data-testid='order-earlier-point']");
+        Assert.Equal("assumption", earlier.GetAttribute("data-kind"));
+        Assert.Equal("Assumed: Die Anmeldefrist ist Freitag.", earlier.TextContent);
+    }
+
+    [Fact]
+    public void A_first_version_keeps_the_sentences_about_assumptions_as_before()
+    {
+        var view = Delivered();
+        _orders.SetResult(Result(view, 1, 1, FirstText) with
+        {
+            Assumptions = [new IntakeAssumption("a1", GapTopic.Facts, "Das Treffen ist in Raum A.", AssumptionConfidence.Unsure)],
+            NotGivenFacts = ["Das Treffen ist in Raum A."],
+        });
+
+        var cut = Render(view);
+
+        Assert.Equal("You did not give these facts, so they were left open instead of assumed:", cut.Find("[data-testid='order-not-given-lead']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='order-assumptions-noted-lead']"));
     }
 
     [Fact]
@@ -423,7 +496,7 @@ public sealed class OrderChangeTests : TestContext
         var intro = blocks[1].QuerySelector("[data-testid='run-warnings-intro']")!.TextContent;
         Assert.Equal(status == RunStatus.Running
             ? "Version 2 is still being written. So far, not everything went as planned with it. This does not concern the text above (version 1):"
-            : "Version 2 could not be finished. These problems came up while it was written. They do not concern the text above (version 1), which is complete and unchanged:", intro);
+            : "Version 2 could not be finished. These problems came up while it was written. They do not concern the text above (version 1), which is unchanged:", intro);
         Assert.Equal(["The writer could not be reached."], blocks[1].QuerySelectorAll("[data-testid='run-warning']").Select(w => w.TextContent));
         Assert.DoesNotContain("ended without a result", cut.Markup);
         Assert.Equal(2, cut.FindAll("h2[id^='run-warnings-title']").Select(h => h.Id).Distinct().Count());

@@ -68,10 +68,11 @@ public sealed class RevisionBriefTests
                 Assert.True(brief.IndexOf(RevisionBrief.Heading, StringComparison.Ordinal) < brief.IndexOf(BriefingSections.ProfileHeading, StringComparison.Ordinal));
         }
 
-        Assert.Equal([.. before.PersonAnswers, Change2], BriefingSections.Parse(v2).PersonAnswers);
-        Assert.Equal([.. before.PersonAnswers, Change2, Change3], BriefingSections.Parse(v3).PersonAnswers);
+        Assert.Equal([.. before.PersonAnswers, "(newest change, version 2) " + Change2], BriefingSections.Parse(v2).PersonAnswers);
+        Assert.Equal([.. before.PersonAnswers, "(earlier change, version 2; a newer change wins where they differ) " + Change2, "(newest change, version 3) " + Change3],
+            BriefingSections.Parse(v3).PersonAnswers);
         Assert.Single(AllIndexes(v3, RevisionBrief.Heading));
-        Assert.Contains(RevisionBrief.Heading + "\n- (version 2) " + Change2 + "\n- (version 3) " + Change3, v3, StringComparison.Ordinal);
+        Assert.Contains(RevisionBrief.Heading + "\n" + Earlier(2, Change2) + "\n" + Now(3, Change3), v3, StringComparison.Ordinal);
         Assert.StartsWith(original.Contains(BriefingSections.ProfileHeading, StringComparison.Ordinal)
             ? original[..original.IndexOf(BriefingSections.ProfileHeading, StringComparison.Ordinal)].TrimEnd('\n')
             : original, v2, StringComparison.Ordinal);
@@ -84,9 +85,9 @@ public sealed class RevisionBriefTests
 
         var brief = RevisionBrief.Compose(request, Change2, 2);
 
-        Assert.Equal(request + BriefingSections.Separator + RevisionBrief.Heading + "\n- (version 2) " + Change2, brief);
+        Assert.Equal(request + BriefingSections.Separator + RevisionBrief.Heading + "\n" + Now(2, Change2), brief);
         Assert.Equal(request, BriefingSections.RequestPart(brief));
-        Assert.Equal([Change2], BriefingSections.Parse(brief).PersonAnswers);
+        Assert.Equal(["(newest change, version 2) " + Change2], BriefingSections.Parse(brief).PersonAnswers);
         Assert.Equal(brief, BriefingSections.WithoutProfile(brief));
     }
 
@@ -99,8 +100,8 @@ public sealed class RevisionBriefTests
 
         var brief = RevisionBrief.Compose(original, Change2, 2);
 
-        Assert.Equal("Write a note." + BriefingSections.Separator + RevisionBrief.Heading + "\n- (version 2) " + Change2 + "\n\n" + profileBlock, brief);
-        Assert.Equal("Write a note." + BriefingSections.Separator + RevisionBrief.Heading + "\n- (version 2) " + Change2 + "\n\n" + BriefingSections.ProfileHiddenNote,
+        Assert.Equal("Write a note." + BriefingSections.Separator + RevisionBrief.Heading + "\n" + Now(2, Change2) + "\n\n" + profileBlock, brief);
+        Assert.Equal("Write a note." + BriefingSections.Separator + RevisionBrief.Heading + "\n" + Now(2, Change2) + "\n\n" + BriefingSections.ProfileHiddenNote,
             BriefingSections.WithoutProfile(brief));
     }
 
@@ -109,7 +110,7 @@ public sealed class RevisionBriefTests
     {
         var brief = RevisionBrief.Compose("Write a note.", "  First line.\n\nSecond   line.\r\n", 2);
 
-        Assert.EndsWith("- (version 2) First line. Second line.", brief, StringComparison.Ordinal);
+        Assert.EndsWith(Now(2, "First line. Second line."), brief, StringComparison.Ordinal);
         Assert.Throws<ArgumentException>(() => RevisionBrief.Compose("Write a note.", " \n ", 2));
         Assert.Throws<ArgumentOutOfRangeException>(() => RevisionBrief.Compose("Write a note.", Change2, 0));
     }
@@ -151,6 +152,50 @@ public sealed class RevisionBriefTests
         Assert.Null(RevisionBrief.Requested("  "));
         Assert.Equal("Please rewrite: Make the tone more formal.x", RevisionBrief.Requested("Please rewrite: Make the tone more formal.x"));
     }
+
+    [Fact]
+    public void Only_the_newest_change_is_the_one_to_make_now_and_every_earlier_one_is_marked_as_already_made()
+    {
+        var v2 = RevisionBrief.Compose("Write a note.", "Make the text about a third shorter.", 2);
+        var v3 = RevisionBrief.Compose(v2, "Add the room number.", 3);
+        var v4 = RevisionBrief.Compose(v3, "The meeting is on 5 May.", 4);
+
+        Assert.Equal("Write a note." + BriefingSections.Separator + RevisionBrief.Heading + "\n"
+            + "- (version 2, earlier change: already made in the text – do not make it again, keep it) Make the text about a third shorter.\n"
+            + "- (version 3, earlier change: already made in the text – do not make it again, keep it) Add the room number.\n"
+            + "- (version 4, the change to make now) The meeting is on 5 May.", v4);
+        Assert.Single(AllIndexes(v4, "the change to make now"));
+    }
+
+    [Fact]
+    public void The_heading_says_that_the_changes_take_precedence_over_the_assumptions_and_the_facts_not_given()
+    {
+        var composer = new IntakeBriefComposer(Options.Create(new IntakeOptions { BriefMode = BriefMode.AppendAnswers, ContentAssumptions = ContentAssumptionMode.OpenPoints }));
+        var original = composer.Compose(new OrderBriefInput(Order("user-a", Request), IntakeBriefComposerTests.Record(), [], Profile, true)).Text;
+
+        var brief = RevisionBrief.Compose(original, Change2, 2);
+
+        Assert.Contains("takes precedence over the blocks \"Assumptions …\" and \"Not given by the person\"", RevisionBrief.Heading, StringComparison.Ordinal);
+        var heading = brief.IndexOf(RevisionBrief.Heading, StringComparison.Ordinal);
+        Assert.True(heading > brief.IndexOf(IntakeBriefComposer.AssumptionsHeadingStart, StringComparison.Ordinal));
+        Assert.True(heading > brief.IndexOf(IntakeBriefComposer.OpenFactsHeadingStart, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_words_of_the_person_stay_unchanged_after_the_mark_also_when_they_start_with_brackets()
+    {
+        const string words = "(version 9) keep this bracket. The meeting is on 5 May.";
+        var v3 = RevisionBrief.Compose(RevisionBrief.Compose("Write a note.", words, 2), Change3, 3);
+
+        var answers = BriefingSections.Parse(v3).PersonAnswers;
+
+        Assert.Equal("(earlier change, version 2; a newer change wins where they differ) " + words, answers[0]);
+        Assert.Equal("(newest change, version 3) " + Change3, answers[1]);
+    }
+
+    private static string Now(int version, string change) => $"- (version {version}, the change to make now) {change}";
+
+    private static string Earlier(int version, string change) => $"- (version {version}, earlier change: already made in the text – do not make it again, keep it) {change}";
 
     private static List<int> AllIndexes(string text, string value)
     {

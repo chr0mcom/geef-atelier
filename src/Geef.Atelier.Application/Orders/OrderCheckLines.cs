@@ -50,6 +50,22 @@ public static class OrderCheckLines
     public const string FailedRequiredWords = "lacks words you asked for";
     public const string FailedArithmetic = "has a calculation that looks wrong";
 
+    /// <summary>Lead of the rules of the first request a changed version keeps; they are never named as checks of the change.</summary>
+    public const string FirstRequestLead = "Checked automatically against the rules of your first request (your change may have replaced them): the text ";
+
+    /// <summary>Lead of the rules of the first request a changed version does not keep; they are notes, never blocking.</summary>
+    public const string FirstRequestFailedLead =
+        "Rules of your first request the new version does not keep – please check whether your change meant this (see the open points below): the text ";
+
+    public const string FirstPassedLength = "has the length it asked for";
+    public const string FirstPassedLanguage = "is in the language it asked for";
+    public const string FirstPassedRequiredWords = "uses the words it asked for";
+    public const string FirstAvoidsWords = "the words it ruled out";
+    public const string FirstFailedLength = "does not have the length it asked for";
+    public const string FirstFailedLanguage = "is not in the language it asked for";
+    public const string FirstFailedForbiddenWords = "uses words it ruled out";
+    public const string FirstFailedRequiredWords = "lacks words it asked for";
+
     /// <summary>Own line when the calculations of the text were searched and none looked clearly wrong; it never says they are right.</summary>
     public const string ArithmeticSearched =
         "The text was searched for calculations that are clearly wrong, and none was found. Not every calculation can be checked this way.";
@@ -142,7 +158,7 @@ public static class OrderCheckLines
     {
         ArgumentNullException.ThrowIfNull(report);
         var checkedLines = new List<string>();
-        checkedLines.AddRange(Automatic(report.Checks));
+        checkedLines.AddRange(Automatic(report.Checks, report.Revision));
         checkedLines.Add(Facts(report));
         if (report.SourceArithmetic is { } totals && Totals(totals) is { } totalsLine)
             checkedLines.Add(totalsLine);
@@ -168,10 +184,13 @@ public static class OrderCheckLines
         if (report.SourceArithmetic is { IssuesNotListed: > 0 } more)
             sentences.Add(more.IssuesNotListed == 1 ? TotalsNotListedOne : string.Format(TotalsNotListedFormat, more.IssuesNotListed));
 
-        if (report.FactCheck is { State: not (FactCheckState.Off or FactCheckState.NotShown) } factCheck)
+        if (report.FactCheck is { } factCheck)
         {
+            var shown = factCheck.State is not (FactCheckState.Off or FactCheckState.NotShown);
             foreach (var conflict in factCheck.SourceConflicts)
             {
+                if (!shown && conflict.FromVersion is null)
+                    continue;
                 if (string.IsNullOrWhiteSpace(conflict.MaterialQuote) || string.IsNullOrWhiteSpace(conflict.MaterialQuote2)
                     || issues.Any(i => RepeatsTotal(conflict, i)))
                     continue;
@@ -205,7 +224,30 @@ public static class OrderCheckLines
 
     private static bool HasFiles(RunReport report) => report.Sources.Any(s => !s.LookedUp && s.Mode != SourceUsageMode.Excluded);
 
-    private static IEnumerable<string> Automatic(IReadOnlyList<DraftCheckResult> checks)
+    private static IEnumerable<string> Automatic(IReadOnlyList<DraftCheckResult> checks, bool revision)
+    {
+        var always = revision ? checks.Where(c => !c.IsFirstRequestRule()).ToList() : checks;
+        var (passed, failed) = Sort(always, revision: false);
+        if (passed.Count > 0)
+            yield return AutomaticLead + string.Join(AutomaticSeparator, passed) + AutomaticEnd;
+        if (failed.Count > 0)
+            yield return AutomaticFailedLead + string.Join(AutomaticSeparator, failed) + AutomaticEnd;
+
+        if (revision)
+        {
+            var (kept, notKept) = Sort(checks.Where(c => c.IsFirstRequestRule()).ToList(), revision: true);
+            if (kept.Count > 0)
+                yield return FirstRequestLead + string.Join(AutomaticSeparator, kept) + AutomaticEnd;
+            if (notKept.Count > 0)
+                yield return FirstRequestFailedLead + string.Join(AutomaticSeparator, notKept) + AutomaticEnd;
+        }
+
+        var arithmetic = checks.Where(c => c.Code is DraftCheckCodes.Arithmetic or DraftCheckCodes.ArithmeticPartial).ToList();
+        if (arithmetic.Count > 0 && arithmetic.All(c => c.Passed))
+            yield return ArithmeticSearched;
+    }
+
+    private static (List<string> Passed, List<string> Failed) Sort(IReadOnlyList<DraftCheckResult> checks, bool revision)
     {
         var passed = new List<string>();
         var failed = new List<string>();
@@ -222,9 +264,9 @@ public static class OrderCheckLines
 
         Sort(DraftCheckCodes.Empty, PassedNotEmpty, FailedEmpty);
         Sort(DraftCheckCodes.Preamble, PassedStartsDirectly, FailedPreamble);
-        Sort(DraftCheckCodes.Length, PassedLength, FailedLength);
-        Sort(DraftCheckCodes.Language, PassedLanguage, FailedLanguage);
-        Sort(DraftCheckCodes.Placeholders, PassedNoPlaceholders, FailedPlaceholders, c => c.Blocking);
+        Sort(DraftCheckCodes.Length, revision ? FirstPassedLength : PassedLength, revision ? FirstFailedLength : FailedLength);
+        Sort(DraftCheckCodes.Language, revision ? FirstPassedLanguage : PassedLanguage, revision ? FirstFailedLanguage : FailedLanguage);
+        Sort(DraftCheckCodes.Placeholders, PassedNoPlaceholders, FailedPlaceholders, revision ? c => c.IsFirstRequestRule() : c => c.Blocking);
 
         var avoids = new List<string>();
         void Avoid(string code, string what, string failedPhrase)
@@ -241,21 +283,14 @@ public static class OrderCheckLines
         Avoid(DraftCheckCodes.Lists, AvoidsLists, FailedLists);
         Avoid(DraftCheckCodes.Headings, AvoidsHeadings, FailedHeadings);
         Avoid(DraftCheckCodes.Emojis, AvoidsEmojis, FailedEmojis);
-        Avoid(DraftCheckCodes.ForbiddenTerm, AvoidsWords, FailedForbiddenWords);
+        Avoid(DraftCheckCodes.ForbiddenTerm, revision ? FirstAvoidsWords : AvoidsWords, revision ? FirstFailedForbiddenWords : FailedForbiddenWords);
         if (avoids.Count > 0)
             passed.Add(PassedAvoidsLead + JoinWithAnd(avoids));
 
-        Sort(DraftCheckCodes.RequiredTerm, PassedRequiredWords, FailedRequiredWords);
-        var arithmetic = checks.Where(c => c.Code is DraftCheckCodes.Arithmetic or DraftCheckCodes.ArithmeticPartial).ToList();
-        if (arithmetic.Any(c => !c.Passed))
+        Sort(DraftCheckCodes.RequiredTerm, revision ? FirstPassedRequiredWords : PassedRequiredWords, revision ? FirstFailedRequiredWords : FailedRequiredWords);
+        if (checks.Any(c => c.Code is DraftCheckCodes.Arithmetic or DraftCheckCodes.ArithmeticPartial && !c.Passed))
             failed.Add(FailedArithmetic);
-
-        if (passed.Count > 0)
-            yield return AutomaticLead + string.Join(AutomaticSeparator, passed) + AutomaticEnd;
-        if (failed.Count > 0)
-            yield return AutomaticFailedLead + string.Join(AutomaticSeparator, failed) + AutomaticEnd;
-        if (arithmetic.Count > 0 && arithmetic.All(c => c.Passed))
-            yield return ArithmeticSearched;
+        return (passed, failed);
     }
 
     private static string JoinWithAnd(IReadOnlyList<string> items) =>
@@ -264,8 +299,10 @@ public static class OrderCheckLines
     private static string Facts(RunReport report)
     {
         var factCheck = report.FactCheck;
-        if (factCheck is null || factCheck.State is FactCheckState.Off or FactCheckState.NotShown)
+        if (factCheck is null)
             return FactsNotChecked;
+        if (factCheck.State is FactCheckState.Off or FactCheckState.NotShown)
+            return FactsNotChecked + Earlier(factCheck.Open.Count(f => f.FromVersion is not null && !string.IsNullOrWhiteSpace(f.TextQuote)));
         if (factCheck.State == FactCheckState.NotCompleted)
             return FactsNotCompleted + Earlier(factCheck.Open.Count) + NotShown(factCheck.NotShown, factCheck.Open.Count > 0);
         if (factCheck.State == FactCheckState.VersionNotChecked)

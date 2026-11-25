@@ -13,15 +13,18 @@ public static class GetOrderResultTool
     public const string ToolDescription =
         "Returns the finished text of an order, the placeholders the person still has to fill in, checks the text did not pass, " +
         "the files that were used and warnings. Also returns the text when some checks are open (state delivered_with_open_points): " +
-        "then give the person the text together with the open checks. While the order is still working, text is empty; " +
-        "when no text was written (state failed), say so and do not write a replacement yourself. " +
+        "then give the person the text together with the open checks. text is empty only when the order has no text yet: while its first version " +
+        "is still being written, or when it failed or was stopped before any text was written; then say so and do not write a replacement yourself. " +
+        "When a newer version is being written, failed or was stopped, text is the earlier version (see version and latestVersion). " +
         VersionRule + " " + ShowEverythingRule + " " + ContentRule + " " + LookedUpRule;
 
     /// <summary>Which version the text is, while a newer one is being written or after it could not be finished.</summary>
     public const string VersionRule =
         "version is the version of the text. If latestVersion is higher, a newer version is still being written or could not be finished, " +
-        "so text is the earlier version: tell the person what note says. earlierOpenPoints are open points of an earlier version that the change may have settled: " +
-        "show them with their version.";
+        "so text is the earlier version: tell the person what note says. earlierOpenPoints are open points (kind openPoint) and assumptions (kind assumption) " +
+        "the writer noted for an earlier version that the change may have settled: show them with their version. " +
+        "When assumptionsVersion is set, the text is a changed version and assumptions were noted for that earlier version, before the changes: " +
+        "say so and do not present them as facts the person did not give now.";
 
     /// <summary>The sentence of the stage-3 contract (7.5), word for word.</summary>
     public const string ShowEverythingRule =

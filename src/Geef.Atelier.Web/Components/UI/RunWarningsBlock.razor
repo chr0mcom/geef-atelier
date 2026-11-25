@@ -45,7 +45,7 @@
             RunStatus.Pending or RunStatus.Running => string.Format(CultureInfo.InvariantCulture,
                 "Version {0} is still being written. So far, not everything went as planned with it. This does not concern the text above (version {1}):", v, shown),
             _ => string.Format(CultureInfo.InvariantCulture,
-                "Version {0} could not be finished. These problems came up while it was written. They do not concern the text above (version {1}), which is complete and unchanged:", v, shown),
+                "Version {0} could not be finished. These problems came up while it was written. They do not concern the text above (version {1}), which is unchanged:", v, shown),
         },
         _ => Status switch
         {

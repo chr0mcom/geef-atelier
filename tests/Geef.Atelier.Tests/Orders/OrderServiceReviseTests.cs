@@ -46,7 +46,7 @@ public sealed class OrderServiceReviseTests(PostgresFixture postgres)
         Assert.Equal(submission.RunId, run.ParentRunId);
         Assert.Equal(V1Text, run.SeedDraftText);
         Assert.Equal(expectedChange, run.RevisionHint);
-        Assert.Equal("Write an article." + BriefingSections.Separator + RevisionBrief.Heading + "\n- (version 2) " + expectedChange + "\n\n" + ProfileBlock,
+        Assert.Equal("Write an article." + BriefingSections.Separator + RevisionBrief.Heading + "\n- (version 2, the change to make now) " + expectedChange + "\n\n" + ProfileBlock,
             run.BriefingText);
         Assert.Equal(user, run.CreatedByUser);
         Assert.Equal(SystemCrew.DirectTemplateName, run.CrewTemplateName);
@@ -70,6 +70,7 @@ public sealed class OrderServiceReviseTests(PostgresFixture postgres)
         await DeliverAsync(host, delivered.RunId!.Value, "Fresh ideas, fast.");
         await AssertRefusedAsync(host, new(delivered.OrderId, NewUser(), Change, [], OrderEntry.Web), RevisionLines.NotFound);
         await AssertRefusedAsync(host, new(Guid.NewGuid(), user, Change, [], OrderEntry.Web), RevisionLines.NotFound);
+        await AssertRefusedAsync(host, new(delivered.OrderId, null, Change, [], OrderEntry.Web), RevisionLines.NotFound);
         await AssertRefusedAsync(host, new(delivered.OrderId, user, "  \n ", [], OrderEntry.Web), RevisionLines.NoChangeGiven);
         await AssertRefusedAsync(host, new(delivered.OrderId, user, null, [], OrderEntry.Web), RevisionLines.NoChangeGiven);
         await AssertRefusedAsync(host, new(delivered.OrderId, user, new string('x', 2_001), [], OrderEntry.Web),
@@ -180,7 +181,7 @@ public sealed class OrderServiceReviseTests(PostgresFixture postgres)
         var v3Run = await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.Id == v3.RunId));
         Assert.Equal(submission.RunId, v3Run.ParentRunId);
         Assert.Equal(V1Text, v3Run.SeedDraftText);
-        Assert.Contains("- (version 3) Add the room number.", v3Run.BriefingText, StringComparison.Ordinal);
+        Assert.Contains("- (version 3, the change to make now) Add the room number.", v3Run.BriefingText, StringComparison.Ordinal);
         Assert.DoesNotContain("(version 2)", v3Run.BriefingText, StringComparison.Ordinal);
 
         await DeliverAsync(host, v3.RunId!.Value, "Dear team,\n\nthe meeting is on 12 May in room 4.\n\nBest regards", words: 12);
@@ -189,6 +190,7 @@ public sealed class OrderServiceReviseTests(PostgresFixture postgres)
             var result = (await sp.GetRequiredService<IOrderService>().GetResultAsync(submission.OrderId, user))!;
             Assert.Equal((3, 3, OrderDisplayState.Delivered), (result.Version!.Value, result.LatestVersion!.Value, result.Display.State));
             Assert.Equal(v3.RunId, result.RunId);
+            Assert.Equal(1, result.AssumptionsVersion);
             Assert.Contains("room 4", result.Text, StringComparison.Ordinal);
             Assert.Null(result.Note);
             var export = (await sp.GetRequiredService<IOrderExportService>().ExportAsync(submission.OrderId, ExportFormat.Markdown, null, user))!;
@@ -210,6 +212,7 @@ public sealed class OrderServiceReviseTests(PostgresFixture postgres)
             Assert.Equal(9, result.WordCount);
             Assert.Equal((1, 2), (result.Version!.Value, result.LatestVersion!.Value));
             Assert.Equal(submission.RunId, result.RunId);
+            Assert.Null(result.AssumptionsVersion);
             Assert.Equal(note, result.Note);
 
             var exports = sp.GetRequiredService<IOrderExportService>();

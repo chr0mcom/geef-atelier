@@ -1,3 +1,4 @@
+using System.Globalization;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.FactCheck;
@@ -45,6 +46,12 @@ internal static class DirectReportBuilder
 
     /// <summary>Report note when the run changes an earlier version whose report could not be read, so its open points are not repeated.</summary>
     public const string EarlierReportMissingNote = "The open points of the earlier version could not be read, so they are not repeated here.";
+
+    /// <summary>
+    /// Open point for the earlier version when it has no report (for example a text written with "Extra careful"): <c>{0}</c> is that
+    /// version. Its checks were not taken over and the new run does not repeat them.
+    /// </summary>
+    public const string ChecksNotTakenOverFormat = "The checks of version {0} were not taken over, so anything they left open was not checked again.";
 
     /// <summary>
     /// Checks <paramref name="deliveredText"/> again (this also covers a best-effort version), lists its placeholders
@@ -117,40 +124,81 @@ internal static class DirectReportBuilder
             facts.Arithmetic is { } arithmetic ? SourceArithmeticCheck.WithTextUse(arithmetic, deliveredText) : null,
             corrections,
             lookedUp,
-            EarlierPoints(facts.Revision, writerNotes.OpenPoints));
+            EarlierPoints(facts.Revision, writerNotes.OpenPoints, writerNotes.Assumptions),
+            facts.Revision is not null);
     }
 
     /// <summary>
-    /// The writer's open points of the earlier version (<paramref name="revision"/>) that <paramref name="openPoints"/> (those of this run)
-    /// do not repeat word for word (<see cref="OrderResultRules.SameAssumptionKey"/>): first the points the earlier version itself carried
-    /// over, each with the version that noted it, then its own open points with its version; each point once. <c>null</c> when there are
-    /// none or the run changes no earlier version, so that the report of every other run stays as it was.
+    /// What the writer noted for the earlier version (<paramref name="revision"/>) that this run does not repeat in the same kind: first
+    /// what the earlier version itself carried over (each with the version that noted it), then its own open points and its own assumptions
+    /// (<see cref="EarlierPointKind.Assumption"/>), each with its version, and a fixed sentence (<see cref="EarlierPointKind.Note"/>) for its
+    /// notes and flagged passages that could not be shown or listed. A point counts as repeated when this run notes it in the same kind word
+    /// for word (<see cref="OrderResultRules.SameAssumptionKey"/>); each point is carried once, a fixed sentence once per version. When the
+    /// earlier version has no report (it was not written on the direct path, for example with "Extra careful"),
+    /// <see cref="ChecksNotTakenOverFormat"/> says that its checks were not taken over. <c>null</c> when
+    /// there is nothing or the run changes no earlier version, so that the report of every other run stays as it was.
     /// </summary>
-    internal static IReadOnlyList<RunReportEarlierPoint>? EarlierPoints(DirectRevision? revision, IReadOnlyList<string> openPoints)
+    internal static IReadOnlyList<RunReportEarlierPoint>? EarlierPoints(DirectRevision? revision, IReadOnlyList<string> openPoints,
+        IReadOnlyList<string>? assumptions = null)
     {
-        if (revision is not { Version: { } version, Report: { } earlier })
+        if (revision is not { Version: { } version })
             return null;
 
-        var seen = openPoints.Where(p => !string.IsNullOrWhiteSpace(p)).Select(OrderResultRules.SameAssumptionKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var points = (earlier.EarlierOpenPoints ?? [])
-            .Concat((earlier.WriterNotes?.OpenPoints ?? []).Select(p => new RunReportEarlierPoint(version, p)))
-            .Where(p => !string.IsNullOrWhiteSpace(p.Text) && seen.Add(OrderResultRules.SameAssumptionKey(p.Text)))
-            .Select(p => p with { Text = p.Text.Trim() })
-            .ToList();
+        static HashSet<string> Keys(IEnumerable<string>? texts) =>
+            (texts ?? []).Where(t => !string.IsNullOrWhiteSpace(t)).Select(OrderResultRules.SameAssumptionKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var repeatedOpen = Keys(openPoints);
+        var repeatedAssumed = Keys(assumptions);
+        var carried = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var points = new List<RunReportEarlierPoint>();
+        void Add(RunReportEarlierPoint point)
+        {
+            if (string.IsNullOrWhiteSpace(point.Text))
+                return;
+            var key = OrderResultRules.SameAssumptionKey(point.Text);
+            var repeated = point.Kind == EarlierPointKind.Assumption ? repeatedAssumed : repeatedOpen;
+            if (!repeated.Contains(key) && carried.Add(point.Kind == EarlierPointKind.Note ? $"{point.Kind}|{point.Version}|{key}" : $"{point.Kind}|{key}"))
+                points.Add(point with { Text = point.Text.Trim() });
+        }
+
+        if (revision.Report is not { } earlier)
+        {
+            if (!revision.ReportUnreadable)
+                Add(new RunReportEarlierPoint(version, string.Format(CultureInfo.InvariantCulture, ChecksNotTakenOverFormat, version), EarlierPointKind.Note));
+            return points.Count == 0 ? null : points;
+        }
+
+        var notes = earlier.WriterNotes ?? WriterNotes.Empty;
+        foreach (var point in earlier.EarlierOpenPoints ?? [])
+            Add(point);
+        foreach (var point in notes.OpenPoints ?? [])
+            Add(new RunReportEarlierPoint(version, point));
+        foreach (var assumption in notes.Assumptions ?? [])
+            Add(new RunReportEarlierPoint(version, assumption, EarlierPointKind.Assumption));
+        if (notes.Hidden > 0)
+            Add(new RunReportEarlierPoint(version, notes.Hidden == 1
+                ? OrderResultReport.NotesNotShownOne
+                : string.Format(CultureInfo.InvariantCulture, OrderResultReport.NotesNotShownFormat, notes.Hidden), EarlierPointKind.Note));
+        if (earlier.FactCheck is { State: not (FactCheckState.Off or FactCheckState.NotShown), NotShown: > 0 and var notShown })
+            Add(new RunReportEarlierPoint(version, (notShown == 1
+                ? OrderCheckLines.FactsNotShownOnlyOne
+                : string.Format(CultureInfo.InvariantCulture, OrderCheckLines.FactsNotShownOnlyFormat, notShown)).Trim(), EarlierPointKind.Note));
         return points.Count == 0 ? null : points;
     }
 
     /// <summary>
     /// The open findings of the earlier version (<paramref name="revision"/>), passages and source conflicts, each marked with the version
-    /// that found it (<see cref="FactFinding.FromVersion"/>; a finding the earlier version carried over keeps its own). Empty when the run
-    /// changes no earlier version or the earlier fact check was off or not shown.
+    /// that found it (<see cref="FactFinding.FromVersion"/>; a finding the earlier version carried over keeps its own). A finding the earlier
+    /// version carried over is taken also when its own fact check was off or not shown, so that it is never lost over versions; the earlier
+    /// version's own findings only when its fact check was shown (findings of the shadow mode stay unseen). Empty when the run changes no
+    /// earlier version.
     /// </summary>
     internal static IReadOnlyList<FactFinding> EarlierFindings(DirectRevision? revision)
     {
-        if (revision is not { Version: { } version, Report.FactCheck: { State: not (FactCheckState.Off or FactCheckState.NotShown) } earlier })
+        if (revision is not { Version: { } version, Report.FactCheck: { } earlier })
             return [];
+        var shown = earlier.State is not (FactCheckState.Off or FactCheckState.NotShown);
         return (earlier.Open ?? []).Concat(earlier.SourceConflicts ?? [])
-            .Where(f => f is not null)
+            .Where(f => f is not null && (shown || f.FromVersion is not null))
             .Select(f => f with { FromVersion = f.FromVersion ?? version })
             .ToList();
     }
@@ -170,7 +218,9 @@ internal static class DirectReportBuilder
     /// <see cref="FactCheckSummary.Corrected"/> are the blocking findings of the answered rounds before the delivered one whose
     /// passage the delivered text no longer has. In a run that changes an earlier version, the open findings of that version
     /// (<see cref="EarlierFindings"/>) are added last the same way (<see cref="FactCarryOver.Merge"/>: source conflicts always, passages only
-    /// when they stand in the delivered text), marked with their version; a finding this run reports itself is shown once, as its own.
+    /// when they stand in the delivered text), marked with their version; a finding this run reports itself is shown once, as its own. When
+    /// this run's check is off or in shadow mode, the findings of the earlier version come first, so that a finding of the shadow mode never
+    /// hides one carried over.
     /// <c>null</c> without mode and rounds (a run before stage 3).
     /// </summary>
     internal static FactCheckSummary? Summary(DirectRunFacts facts, int? deliveredIteration, string? deliveredText = null)
@@ -191,7 +241,9 @@ internal static class DirectReportBuilder
             ? FactCarryOver.Merge([], answered.OrderByDescending(r => r.Iteration).Select(r => r.Open), text)
             : later.Count == 0 ? delivered!.Open : FactCarryOver.Merge(delivered!.Open, later.Select(r => r.Open), text);
         if (EarlierFindings(facts.Revision) is { Count: > 0 } earlier)
-            open = FactCarryOver.Merge(open, [earlier], text);
+            open = mode is FactCheckMode.Off or FactCheckMode.Shadow
+                ? FactCarryOver.Merge(FactCarryOver.Merge([], [earlier], text), [open], text)
+                : FactCarryOver.Merge(open, [earlier], text);
         var notShown = checkedThis
             ? later.Select(r => r.NotShown).Append(delivered!.NotShown).Max()
             : answered.Select(r => r.NotShown).DefaultIfEmpty(0).Max();

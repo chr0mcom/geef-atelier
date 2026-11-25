@@ -1,5 +1,3 @@
-using System.Text.RegularExpressions;
-
 namespace Geef.Atelier.Application.Orders;
 
 /// <summary>The briefing split back into what the composer put in; lines keep their order, the answer marks are removed.</summary>
@@ -11,7 +9,7 @@ public sealed record BriefParts(string Request, IReadOnlyList<string> PersonAnsw
 /// of the intake (answers, corrections, assumptions) and the profile follow after <see cref="Separator"/>. Briefings that were
 /// not built this way come back unchanged.
 /// </summary>
-public static partial class BriefingSections
+public static class BriefingSections
 {
     /// <summary>Separator between the request and the blocks the composer adds.</summary>
     public const string Separator = "\n\n---\n";
@@ -76,8 +74,9 @@ public static partial class BriefingSections
     /// Splits <paramref name="briefing"/> into the request and the blocks of the composer; a briefing not built by the composer is all
     /// request. Answers keep their question (<c>question → answer</c>); of a correction only the person's words remain, because the
     /// corrected assumption is not something the person said. The lines of the block with the changes the person asked for
-    /// (<see cref="RevisionBrief.Heading"/>) are words of the person too, without their version mark. The summary of a prepared brief
-    /// belongs to no part.
+    /// (<see cref="RevisionBrief.Heading"/>) are words of the person too: each keeps the words of the person unchanged after a short mark
+    /// that says which change is the newest and which are earlier (<see cref="NewestChangeFormat"/>, <see cref="EarlierChangeFormat"/>), so
+    /// that whoever reads them knows the order without the heading. The summary of a prepared brief belongs to no part.
     /// </summary>
     public static BriefParts Parse(string briefing)
     {
@@ -92,6 +91,8 @@ public static partial class BriefingSections
         var open = new List<string>();
         string? profile = null;
         var block = BriefBlock.None;
+        var changes = new List<RevisionChange>();
+        var changesAt = -1;
         var lines = briefing[(request.Length + Separator.Length)..].Split('\n');
         for (var i = 0; i < lines.Length; i++)
         {
@@ -128,18 +129,34 @@ public static partial class BriefingSections
                     open.Add(item.Trim());
                     break;
                 case BriefBlock.Changes:
-                    var change = VersionMark().Replace(item, string.Empty).Trim();
-                    if (change.Length > 0)
-                        person.Add(change);
+                    if (RevisionBrief.ReadLine(line) is { } change)
+                    {
+                        if (changesAt < 0)
+                            changesAt = person.Count;
+                        changes.Add(change);
+                    }
                     break;
             }
         }
+
+        if (changes.Count > 0)
+            person.InsertRange(changesAt, changes.Select((c, i) => Marked(c, newest: i == changes.Count - 1)));
 
         return new BriefParts(request, person, assistant, form, open, string.IsNullOrEmpty(profile) ? null : profile);
     }
 
     private const string ItemStart = "- ";
     private const string AnswerArrow = " → ";
+
+    /// <summary>Mark before the newest change of the person in <see cref="BriefParts.PersonAnswers"/>: <c>{0}</c> is its version.</summary>
+    public const string NewestChangeFormat = "(newest change, version {0}) ";
+
+    /// <summary>Mark before an earlier change of the person in <see cref="BriefParts.PersonAnswers"/>: <c>{0}</c> is its version.</summary>
+    public const string EarlierChangeFormat = "(earlier change, version {0}; a newer change wins where they differ) ";
+
+    private static string Marked(RevisionChange change, bool newest) =>
+        string.Format(System.Globalization.CultureInfo.InvariantCulture, newest ? NewestChangeFormat : EarlierChangeFormat,
+            change.Version?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "?") + change.Words;
 
     private enum BriefBlock { None, Understanding, Answers, Corrections, FormAssumptions, OpenFacts, Changes }
 
@@ -154,9 +171,6 @@ public static partial class BriefingSections
         _ when line == RevisionBrief.Heading => BriefBlock.Changes,
         _ => null,
     };
-
-    [GeneratedRegex(@"^\(version \d+\) ", RegexOptions.CultureInvariant)]
-    private static partial Regex VersionMark();
 
     /// <summary>The briefing as <paramref name="viewer"/> may see it: complete for the owner, <see cref="WithoutProfile"/> for anyone else (also administrators).</summary>
     public static string ForViewer(string briefing, string? owner, string? viewer) =>

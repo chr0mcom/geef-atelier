@@ -1,5 +1,6 @@
 @using Geef.Atelier.Application.Orders
 @using Geef.Atelier.Core.Domain.FactCheck
+@using Geef.Atelier.Core.Domain.Reports
 
 @if (HasContent)
 {
@@ -109,7 +110,10 @@
             <ul class="order-writer-open" data-testid="order-earlier-points" data-version="@earlier.Key">
                 @foreach (var point in earlier)
                 {
-                    <li data-testid="order-earlier-point" lang="@Language">@point.Text</li>
+                    <li data-testid="order-earlier-point" data-kind="@(point.Kind == EarlierPointKind.Assumption ? "assumption" : "open-point")">@if (point.Kind == EarlierPointKind.Assumption)
+                        {
+                            <span class="order-earlier-kind">@RevisionLines.EarlierAssumptionLead</span>
+                        }<span lang="@Language">@point.Text</span></li>
                 }
             </ul>
         }
@@ -144,8 +148,8 @@
 @code {
     /// <summary>
     /// The delivered result with placeholders, open checks, passages of the text that may not be backed or may not follow an
-    /// instruction, problems in the files, open points of the writer, open points of the writer for an earlier version that the shown
-    /// version does not repeat (<see cref="RevisionLines.EarlierPointsLeadFormat"/>) and hints (everything that never blocks, among them
+    /// instruction, problems in the files, open points of the writer, open points and assumptions (<see cref="RevisionLines.EarlierAssumptionLead"/>)
+    /// of the writer for an earlier version that the shown version does not repeat (<see cref="RevisionLines.EarlierPointsLeadFormat"/>) and hints (everything that never blocks, among them
     /// passages the pages looked up say otherwise, with <see cref="OrderResearchLines.DiffersFromLookedUp"/>). A passage carried over from
     /// an earlier version names that version (<see cref="FoundInFormat"/>).
     /// </summary>
