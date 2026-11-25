@@ -127,8 +127,8 @@ public static class LengthMentions
 }
 
 /// <summary>
-/// Content the clarifier must never show the person: links, web or mail addresses, and requests for access data or payment
-/// secrets. The clarifier reads files the person did not write, so its output may carry instructions from them. Only the
+/// Content the clarifier must never show the person: links, web or mail addresses, and access data or payment secrets that the
+/// request of the person does not treat (a request for such a secret never). The clarifier reads files the person did not write, so its output may carry instructions from them. Only the
 /// question, option, assumption or summary is dropped, never the order. Texts are normalized first (NFKC, format characters
 /// removed, odd dots such as <c>[.]</c> or <c>。</c> read as dots).
 /// </summary>

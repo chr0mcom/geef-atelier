@@ -2005,10 +2005,16 @@ Fragen mit Klickantworten oder gar keine; jeder Fehler startet den Auftrag mit d
 - **Gate** (`QuestionGate`, reine Funktion, jede Regel getestet): Profil vor Frage (Sprache, Absender, Signatur,
   Anrede); Recherchierbares wird nie gefragt; Fragen, die die Person nicht beantworten kann oder die wenig ändern,
   werden Annahmen; bei einer Überarbeitung nie Länge, Ton oder Anrede und höchstens eine Frage; die Länge nur aus
-  der festen Vorlage (Deutsch, Englisch; sonst Annahme) und nur, wenn der Wortlaut keine nennt; Frage ≤ 120 Zeichen,
+  der festen Vorlage (Deutsch, Englisch; sonst Annahme) und nur, wenn der Wortlaut keine nennt (eine Länge in Seiten,
+  Sätzen oder als Tweet zählt nur mit Bezug zum Schreibauftrag, etwa „schreib zwei Absätze“, „in drei Sätzen“; „zehn
+  Seiten fehlen“ nicht); eine Modellfrage wird nur unter format, scope oder other und nur dann zur Vorlage, wenn sie
+  ausdrücklich nach der Länge des Textes fragt („Wie lang soll der Beitrag werden?“), nie eine Frage nach einer Dauer
+  oder Menge („Wie lange wohnst du schon dort?“); Frage ≤ 120 Zeichen,
   2–4 Optionen ≤ 60 Zeichen, keine Füllantworten („egal“, „other“), keine Sperrwörter (`JargonBlocklist`, mit
   Pluralformen), keine fremde Sprache; ein Thema, eine Frage; Länge zuerst; höchstens drei. Jede verworfene Frage
-  wird Annahme. Alle Kennungen vergibt das Gate.
+  wird Annahme, außer ihr Thema wird ohnehin gefragt (eine verworfene Doppelfrage setzt nie eine Vermutung neben die
+  Antwort; enge Themen nehmen auch aus anderen Lücken keine Annahme, Sachverhalte und Sonstiges behalten ihre). Alle
+  Kennungen vergibt das Gate.
 - **Ablauf** (`OrderIntakeService`, `OrderIntakeWorker`): atomarer Claim, höchstens zwei Klärungen gleichzeitig,
   ein Wecksignal nach dem Einreichen. Null Fragen starten den Lauf im selben Schritt (`Clarified`), sonst wartet der
   Auftrag mit gespeicherten Fragen. Hängende Klärungen starten nach 60 s Warteschlange oder zwei Versuchen ohne
@@ -2018,9 +2024,14 @@ Fragen mit Klickantworten oder gar keine; jeder Fehler startet den Auftrag mit d
   Live-Warteschlange leer ist, und speichert nur in `OrderIntakeShadows` (höchstens 50 je UTC-Tag).
 - **Beantwortete Länge:** Die Antwort auf die Vorlagenfrage wird eine Längenprüfung „etwa n Wörter“ (±20 %), ohne
   Textparser (`IntakeConstraints.WithAnswers` in `OrderGroundingStep`). Freitext wird nie geparst.
-- **Messung:** `tools/Eval/geef_eval/intake_corpus.py` erzeugt und beschriftet einen synthetischen Korpus,
-  `tools/IntakeEval` misst Klärer und Gate darauf, `IntakeCorpusTests` spielt die gespeicherten Rohantworten ohne
-  Modell erneut durch das Gate.
+- **Messung:** `tools/Eval/geef_eval/intake_corpus.py` erzeugt und beschriftet einen synthetischen Korpus
+  (Rückgabewert 4, solange Einträge fehlen oder unbeschriftet sind), `tools/IntakeEval run` misst Klärer und Gate darauf,
+  `IntakeEval evaluate` und `IntakeCorpusTests` spielen die gespeicherten Rohantworten ohne Modell erneut durch und geben
+  jedem Tor ein Urteil (bestanden, nicht bestanden, nicht auswertbar). Kein Tor besteht ohne Daten: fehlende Einträge,
+  falsche Korpusgrößen, unbeschriftete Einträge oder eine leere zurückgehaltene Menge bzw. ein leerer Zweitkorpus machen
+  alle Tore nicht auswertbar; Latenz und Fehler zählen jeden Versuch; eine Antwort über der Produktionsgrenze oder eine,
+  die sich nicht nachspielen lässt, ist ein Fehler. `IntakeEval shadow` beurteilt die Tore a, f und g aus einem nur
+  lesenden CSV-Export von `OrderIntakeShadows` (siehe `tools/IntakeEval/README.md`).
 
 **Begründung.** In der Messung vom 2026-11-24 fragte ein Agent mit freiem Werkzeugzugang in jedem Fall und brauchte
 dafür zu lange. Ein einzelner strukturierter Aufruf mit kleinem Modell und ein Gate im Code machen die Fragenregel
@@ -2032,7 +2043,8 @@ Gate streng und jede Verwerfung nur eine Annahme mehr.
 - **Brief** (`Intake:BriefMode`, Standard `AppendAnswers`): Der Wortlaut steht vorn und unverändert; nach einem Trenner
   folgen die Antworten der Person (Antworten des KI-Clients sind gekennzeichnet, auch die Antwort auf die
   Überarbeitungs-Vermutung), die korrigierten Annahmen, die angezeigten und nicht korrigierten Annahmen als unverbindliche
-  Vorgaben („use them unless the request or the files say otherwise“) und das Profil. Annahmen werden nie zu einer
+  Vorgaben (die Überschrift sagt, dass Antworten und Korrekturen der Person immer Vorrang haben und die Annahmen nur
+  gelten, wo weder sie noch Wortlaut oder Dateien etwas anderes sagen) und das Profil. Annahmen werden nie zu einer
   blockierenden Prüfung. `PreparedBrief` ergänzt, was der Klärer verstanden hat. Ein Start vor dem Lesen des Auftrags hat
   keine Annahmen, und kein Text behauptet welche.
 - **Antworten** (`answer_order`, Zustand `needs_input`): Herkunft `user` oder `client`, nie `memory`. Eine Frage wird mit
@@ -2046,16 +2058,24 @@ Gate streng und jede Verwerfung nur eine Annahme mehr.
   (`revisionFile`) und kann abgelehnt werden.
 - **Profil** (`UserProfiles`, Migration `Step49Intake`): eine Zeile je Benutzername, nur von der Person selbst unter
   „About me“ bearbeitet. Es geht an den Klärer sowie an Schreiber und Prüfer. Es wird mit dem Konto gelöscht, bei einer
-  Umbenennung mitgezogen, und ein neues Konto findet nie ein altes Profil vor. Laufseiten und `get_run_details` zeigen den
+  Umbenennung mitgezogen, und ein neues Konto findet nie ein altes Profil vor. Konto und Profil ändern sich in einer
+  Datenbanktransaktion (`IAccountStore`); die Läufe, die unter einem gelöschten oder aufgegebenen Namen bleiben, verlieren
+  den Profilblock im gespeicherten Brief (an seiner Stelle steht ein Hinweis). Die Tokens eines Kontos werden vor jeder
+  Änderung widerrufen, auch bei einer Umbenennung. Laufseiten und `get_run_details` zeigen den
   Profilblock nur dem Besitzer; alle anderen, auch Admins, sehen stattdessen einen Hinweis.
 - **Externe Dienste:** Web-, Nachrichten- und Wissenschaftssuche, die Embeddings der Learning-Suche, die Anfrageformung
   und die Verfeinerung bekommen nur den Wortlaut des Auftrags, nie Antworten, Annahmen oder das Profil. Auch
   Learning-Zusammenfassungen nutzen nur den Wortlaut.
-- **Gate, Inhalt:** Fragen, Optionen, Annahmen und die Zusammenfassung mit Links oder Adressen sowie Fragen und Annahmen,
-  die nach Zugangsdaten oder Zahlungsgeheimnissen fragen, werden verworfen; verworfen wird nur die Frage, nie der
-  Auftrag. Die MCP-Hinweise beschreiben diese Felder als aus Auftrag und Dateien abgeleitet, nicht als Anweisungen.
-- **Robustheit:** Ein scheiternder Claim gibt seinen Platz zurück; ein Auftrag, der im Sammellauf dauerhaft scheitert,
-  wird 15 Minuten zurückgestellt, statt die anderen zu blockieren; „Stop“ versucht es erneut (bis zu dreimal), wenn sich
+- **Gate, Inhalt:** Texte werden zuerst normalisiert (NFKC, ohne Formatzeichen, ungewöhnliche Punkte als Punkt gelesen).
+  Fragen, Optionen, Annahmen und die Zusammenfassung werden verworfen, wenn sie einen Link, eine Web- oder Mailadresse,
+  eine IP-Adresse mit Pfad oder einen Markdown-Link enthalten; ein nackter Name wie `Booking.com` oder `Node.js` ist nur
+  erlaubt, wenn er wörtlich im Auftragstext der Person steht, nie wegen einer Datei. Verworfen wird auch, was Passwort,
+  PIN, TAN, Schlüssel, Token, Karten- oder Kontonummer in irgendeiner Form nennt (auch in Zusammensetzungen), außer der
+  Auftrag selbst behandelt das Thema; die Bitte um das Geheimnis selbst wird immer verworfen. Verworfen wird nur das
+  Element, nie der Auftrag. Die MCP-Hinweise beschreiben diese Felder als aus Auftrag und Dateien abgeleitet, nicht als Anweisungen.
+- **Robustheit:** Ein scheiternder Claim gibt seinen Platz zurück; ein Auftrag, der im Sammellauf scheitert, wird
+  15 Minuten zurückgestellt, mit jedem weiteren Fehlschlag doppelt so lange bis höchstens 24 Stunden, sodass keine Zahl
+  defekter Aufträge die jüngeren aushungert; „Stop“ versucht es erneut (bis zu dreimal), wenn sich
   der Zustand im selben Moment geändert hat.
 - **Start des MCP-Hosts:** Der Host startet nicht, wenn ein Werkzeugparameter weder Client-Wert noch SDK-Wert noch
   registrierter Dienst ist (`McpToolBindingCheck`), damit eine fehlende Registrierung nie einen Dienst vom Client füllen
@@ -2063,3 +2083,7 @@ Gate streng und jede Verwerfung nur eine Annahme mehr.
 - **Bekannte Grenze für Etappe 7:** `IMemoryResolution` wendet „Gedächtnis vor Frage“ nur auf die vier Profilthemen an
   (Sprache, Absender, Signatur, Anrede); `IntakeRecord.FromMemory` wird gespeichert, aber nicht gelesen. Gemerkte
   Antworten aus Etappe 7 brauchen beides erweitert.
+- **Bekannte Grenze, Konten:** Läufe und Aufträge hängen am Benutzernamen (älter als Etappe 2). Ein neues Konto mit dem
+  Namen eines gelöschten oder umbenannten Kontos sieht diese alten Läufe und Aufträge mit Wortlaut, Antworten und
+  Ergebnis; nur der Profilblock wird aus ihren Briefen entfernt. Profilwerte im gespeicherten Klärprotokoll
+  (`FromMemory`) bleiben; sie werden nirgends angezeigt.
