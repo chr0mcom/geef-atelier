@@ -389,11 +389,22 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
         }
     }
 
-    public Task<bool> TrySetResearchAsync(Guid orderId, string researchJson, DateTimeOffset at, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+    public async Task<bool> TrySetResearchAsync(Guid orderId, string researchJson, DateTimeOffset at, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(researchJson);
+        var affected = await db.Orders
+            .Where(o => o.Id == orderId && o.ResearchJson == null)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(o => o.ResearchJson, researchJson)
+                .SetProperty(o => o.ResearchAt, at.ToUniversalTime()), ct);
+        return affected > 0;
+    }
 
-    public Task<int> CountResearchSinceAsync(DateTimeOffset since, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+    public Task<int> CountResearchSinceAsync(DateTimeOffset since, CancellationToken ct = default)
+    {
+        var from = since.ToUniversalTime();
+        return db.Orders.AsNoTracking().CountAsync(o => o.ResearchAt != null && o.ResearchAt >= from, ct);
+    }
 
     public async Task<IReadOnlyList<Guid>> ListUnansweredAsync(DateTimeOffset askedBefore, int limit, CancellationToken ct = default)
     {
