@@ -56,9 +56,10 @@ public static class QuestionGate
     /// <summary>
     /// Applies the gate rules gap by gap in fixed order; every decision is recorded in the trace. A question under
     /// <see cref="GapTopic.Format"/>, <see cref="GapTopic.Scope"/> or <see cref="GapTopic.Other"/> that asks for the length of the
-    /// text itself counts as topic <see cref="GapTopic.Length"/>, so that only the template asks for it. A topic that is asked gets no
-    /// assumption from a dropped duplicate or, for narrow topics, from another gap, so that the brief never sets a guess beside the
-    /// answer. Questions, options, assumptions and the summary with links, addresses or secrets are dropped (see
+    /// text itself counts as topic <see cref="GapTopic.Length"/>, so that only the template asks for it. A narrow topic that is asked
+    /// gets no assumption from a dropped duplicate or another gap, so that the brief never sets a guess beside the answer; a broad
+    /// topic (<see cref="GapTopic.Facts"/>, <see cref="GapTopic.Other"/>) covers different matters, so a dropped duplicate keeps the
+    /// assumption the model gave (never a generated "not specified" line). Questions, options, assumptions and the summary with links, addresses or secrets are dropped (see
     /// <see cref="IntakeContentGuard.IsUnsafe"/>; the request of the person decides which bare names and secret topics are fine).
     /// </summary>
     public static QuestionGateResult Apply(QuestionGateInput input)
@@ -235,7 +236,7 @@ public static class QuestionGate
             var text = decisions[i] switch
             {
                 GateDecision.Asked or GateDecision.Derived or GateDecision.FromMemory => null,
-                GateDecision.DroppedDuplicateTopic when askedTopic => null,
+                GateDecision.DroppedDuplicateTopic when askedTopic => BroadTopics.Contains(gap.Topic) ? given : null,
                 _ when askedTopic && !BroadTopics.Contains(gap.Topic) => null,
                 GateDecision.Assumed when gap.Resolution == GapResolution.Memory => given ?? NotSpecified(gap.Topic),
                 GateDecision.Assumed or GateDecision.ToResearch => given,

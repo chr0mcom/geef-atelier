@@ -113,20 +113,25 @@ public static class IntakeContentGuard
     private static readonly Regex OddDot = new(@"\s?[\[\(\{]\s*(?:\.|dot|punkt)\s*[\]\)\}]\s?|[。｡︒]", Options);
     private static readonly Regex Url = new(@"(?:[a-z][a-z0-9+.-]*://|www\.|(?<![\p{L}\p{N}:/])//[\p{L}\p{N}])\S?", Options);
     private static readonly Regex Mail = new(@"[^\s@<>()\[\]]+@[^\s@<>()\[\]]+\.[^\s@<>()\[\]]+", Options);
-    private static readonly Regex MarkdownLink = new(@"\[[^\]\n]*\]\([^)\n]*\)|\[[^\]\n]+\]\[[^\]\n]*\]|^\s*\[[^\]\n]+\]:\s*\S", Options | RegexOptions.Multiline);
+    private static readonly Regex MarkdownLink = new(@"\[[^\]\n]*\]\([^)\n]*\)|\[[^\]\n]+\]\[\s*\d*\s*\]|^\s*\[[^\]\n]+\]:\s*\S", Options | RegexOptions.Multiline);
     private static readonly Regex IpWithPath = new(@"(?<![\p{N}.])\d{1,3}(?:\.\d{1,3}){3}(?:[/\\]|:\d|[?#][\p{L}\p{N}=&])", Options);
     private static readonly Regex Domain = new(
-        @"(?<![\p{L}\p{N}@._-])(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]{0,61}[\p{L}\p{N}])?\.)+(?<tld>\p{L}{2,24}|xn--[a-z0-9-]{1,59})(?![\p{L}\p{N}_-])(?<path>[/\\]|:\d|[?#][\p{L}\p{N}=&])?",
+        @"(?<![\p{L}\p{N}@._-])(?:[\p{L}\p{N}](?:[\p{L}\p{N}-]{0,61}[\p{L}\p{N}])?\.)+(?<tld>\p{L}{2,24}|xn--[a-z0-9-]{1,59})(?![\p{L}\p{N}-])(?<path>[/\\]|:\d|[?#][\p{L}\p{N}=&])?",
         Options);
 
-    private const string SecretInWord =
+    private const string AccessInWord =
         @"passw[oö]rt|kennw[oö]rt|password|passcode|passphrase|passkey|geheimzahl|geheimnummer|zugangsdaten|anmeldedaten|logindaten|" +
-        @"login-daten|zugangscode|sicherheitscode|einmalcode|credential|kartennummer|kontonummer|pinnummer|pincode|tannummer";
+        @"login-daten|zugangscode|sicherheitscode|einmalcode|credential|pinnummer|pincode|tannummer";
 
-    private const string SecretWord =
-        @"otp|cvv|cvc|iban|api[\s-]?keys?|api[\s-]?schlüssel\p{L}*|zugangsschlüssel\p{L}*|private[rnsm]?\s+schlüssel\p{L}*|private\s+keys?|" +
-        @"secret\s+keys?|access\s+tokens?|zugangstokens?|security\s+codes?|login\s+details|(?:credit\s+)?card\s+numbers?|account\s+numbers?|" +
-        @"bankdaten|bank\s+details|pin[\s-]codes?|pin-nummer|tan-nummer|tan-liste";
+    private const string AccessWord =
+        @"otp|api[\s-]?keys?|api[\s-]?schlüssel\p{L}*|zugangsschlüssel\p{L}*|private[rnsm]?\s+schlüssel\p{L}*|private\s+keys?|" +
+        @"secret\s+keys?|access\s+tokens?|zugangstokens?|security\s+codes?|login\s+details|pin[\s-]codes?|pin-nummer|tan-nummer|tan-liste";
+
+    private const string PaymentInWord = @"kartennummer|kontonummer";
+
+    private const string PaymentWord = @"cvv|cvc|iban|(?:credit\s+)?card\s+numbers?|account\s+numbers?|bankdaten|bank\s+details";
+
+    private const string Owner = @"your|yours|my|dein(?:e[nmrs]?)?|ihr(?:e[nmrs]?)?|mein(?:e[nmrs]?)?|euer|eure[nmrs]?";
 
     private const string Ask =
         @"dein|deine|deinen|deinem|deiner|ihr|ihre|ihren|ihrem|ihrer|euer|eure|your|yours|" +
@@ -134,13 +139,20 @@ public static class IntakeContentGuard
         @"lautet|lauten|heißt|heisst|trag\p{L}*|eintrag\p{L}*|ergänz\p{L}*|einfüg\p{L}*|schreib\p{L}*|notier\p{L}*|hinterleg\p{L}*|welche[snmr]?|" +
         @"enter|share|provide|confirm|give|type|tell|need|put|write|add|insert|paste|fill|which|what\s+is|what's|brauche|benötige";
 
-    private static readonly Regex Secret = new(
-        $@"(?:{SecretInWord})|(?<![\p{{L}}\p{{N}}])(?:{SecretWord})(?![\p{{L}}\p{{N}}])",
+    private static readonly Regex AccessSecret = new(
+        $@"(?:{AccessInWord})|(?<![\p{{L}}\p{{N}}])(?:{AccessWord})(?![\p{{L}}\p{{N}}])|(?<![\p{{L}}\p{{N}}])(?:{Owner})\s+(?:[\p{{L}}'’-]+\s+)?pins?(?![\p{{L}}\p{{N}}])",
+        Options);
+
+    private static readonly Regex PaymentSecret = new(
+        $@"(?:{PaymentInWord})|(?<![\p{{L}}\p{{N}}])(?:{PaymentWord})(?![\p{{L}}\p{{N}}])",
         Options);
 
     private static readonly Regex UpperCaseSecret = new(
         @"(?<!\p{Lu})(?:PIN|TAN)s?(?![\p{L}\p{N}])",
         RegexOptions.CultureInvariant);
+
+    [Flags]
+    private enum SecretKinds { None = 0, Access = 1, Payment = 2 }
 
     private static readonly Regex AskWord = new($@"(?<![\p{{L}}\p{{N}}])(?:{Ask})(?![\p{{L}}\p{{N}}])", Options);
 
@@ -188,25 +200,38 @@ public static class IntakeContentGuard
         return false;
     }
 
-    /// <summary>True when <paramref name="text"/> mentions a password, PIN, TAN, key, token, card or account number in any form (also inside compound words such as <c>Firmenkennwort</c>).</summary>
-    public static bool MentionsSecret(string? text)
-    {
-        var normalized = Normalize(text);
-        return normalized.Length > 0 && (Secret.IsMatch(normalized) || UpperCaseSecret.IsMatch(normalized));
-    }
+    /// <summary>
+    /// True when <paramref name="text"/> mentions a password, PIN, TAN, key, token, card or account number in any form (also inside
+    /// compound words such as <c>Firmenkennwort</c>; "pin" in lower case only after an owner word such as "your" or "deine").
+    /// </summary>
+    public static bool MentionsSecret(string? text) => Kinds(text) != SecretKinds.None;
 
     /// <summary>True when <paramref name="text"/> asks for a secret: it mentions one (<see cref="MentionsSecret"/>) together with a word that asks, points to the reader or wants it written down.</summary>
     public static bool AsksForSecret(string? text) => MentionsSecret(text) && AskWord.IsMatch(Normalize(text));
 
     /// <summary>
     /// True when <paramref name="text"/> must not be shown: it has a link or address (<see cref="HasLinkOrAddress"/>), asks for a secret
-    /// (<see cref="AsksForSecret"/>, always), or mentions a secret although the request of the person (<paramref name="requestText"/>)
-    /// does not treat the topic.
+    /// (<see cref="AsksForSecret"/>, always), or mentions a kind of secret that the request of the person (<paramref name="requestText"/>)
+    /// does not treat. The kinds are access data (passwords, PINs, TANs, codes, keys, tokens) and payment or account data (IBAN, card
+    /// and account numbers, bank details); a request about the one never allows the other.
     /// </summary>
     public static bool IsUnsafe(string? text, string? requestText = null) =>
         HasLinkOrAddress(text, requestText)
         || AsksForSecret(text)
-        || (MentionsSecret(text) && !MentionsSecret(requestText));
+        || (Kinds(text) & ~Kinds(requestText)) != SecretKinds.None;
+
+    private static SecretKinds Kinds(string? text)
+    {
+        var normalized = Normalize(text);
+        if (normalized.Length == 0)
+            return SecretKinds.None;
+        var kinds = SecretKinds.None;
+        if (AccessSecret.IsMatch(normalized) || UpperCaseSecret.IsMatch(normalized))
+            kinds |= SecretKinds.Access;
+        if (PaymentSecret.IsMatch(normalized))
+            kinds |= SecretKinds.Payment;
+        return kinds;
+    }
 
     private static HashSet<string> NamesIn(string? requestText)
     {
