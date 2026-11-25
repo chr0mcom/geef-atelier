@@ -20,6 +20,7 @@ using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Persistence.Runs;
 using Geef.Atelier.Infrastructure.Pipeline.Assembly;
+using Geef.Atelier.Infrastructure.Research;
 using Geef.Atelier.Infrastructure.Sources;
 using Geef.Atelier.Infrastructure.Sources.Extraction;
 using Geef.Atelier.Infrastructure.Finalizers;
@@ -83,6 +84,7 @@ builder.Services.AddKnowledge(builder.Configuration);
 builder.Services.AddCrewComposition();
 
 builder.Services.AddGroundingProviders(builder.Configuration);
+builder.Services.AddResearch(builder.Configuration);
 builder.Services.AddLearningSwitch(builder.Configuration);
 
 // Tool execution infrastructure (IToolExecutor + IToolSchemaProvider)
