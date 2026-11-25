@@ -11,8 +11,9 @@ namespace Geef.Atelier.Tools.IntakeEval;
 internal sealed record RunSettings(string CorpusPath, string Proxy, string OutPath, int MaxCalls, int Parallel, string Model, string Split, TimeSpan Timeout);
 
 /// <summary>
-/// Runs the real <see cref="LlmClarifier"/> and <see cref="QuestionGate"/> over a corpus and appends one result line per entry.
-/// Resumable: entries with a result other than a failure are not called again.
+/// Runs the real <see cref="LlmClarifier"/> and <see cref="QuestionGate"/> over a corpus and appends one result line per call.
+/// Resumable: entries with a result other than a failure are not called again; failed calls stay in the file and count in the
+/// latency and failure figures of <see cref="CorpusEvaluation"/>, so repeating a run never improves them.
 /// </summary>
 internal sealed class EvalRunner(RunSettings settings, TextWriter log)
 {
@@ -71,7 +72,8 @@ internal sealed class EvalRunner(RunSettings settings, TextWriter log)
             gate?.Questions.Select(q => new ResultQuestion(q.Id, q.Slot.ToString(), q.Text, q.Options.Select(o => o.Label).ToList())).ToList() ?? [],
             gate?.Trace.Select(t => new ResultTrace(t.GapIndex, t.Topic.ToString(), t.Decision.ToString())).ToList() ?? [],
             gate?.ResearchTopics ?? [],
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            (int)options.Timeout.TotalMilliseconds);
     }
 
     private async Task AppendAsync(EvalResult result, CancellationToken ct)

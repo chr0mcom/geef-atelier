@@ -15,7 +15,10 @@ public sealed record ResultTrace(
     [property: JsonPropertyName("topic")] string Topic,
     [property: JsonPropertyName("decision")] string Decision);
 
-/// <summary>One line of <c>results-*.jsonl</c>: latency, model, raw answer, gate trace and questions of one corpus entry.</summary>
+/// <summary>
+/// One line of <c>results-*.jsonl</c>: latency, model, raw answer, gate trace and questions of one call for a corpus entry, and the
+/// time limit the call ran with (<see cref="TimeoutMs"/>; the evaluation counts an answer over the production limit as a failure).
+/// </summary>
 public sealed record EvalResult(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("corpus")] string Corpus,
@@ -31,4 +34,15 @@ public sealed record EvalResult(
     [property: JsonPropertyName("questions")] IReadOnlyList<ResultQuestion> Questions,
     [property: JsonPropertyName("trace")] IReadOnlyList<ResultTrace> Trace,
     [property: JsonPropertyName("research_topics")] IReadOnlyList<string> ResearchTopics,
-    [property: JsonPropertyName("at")] DateTimeOffset At);
+    [property: JsonPropertyName("at")] DateTimeOffset At,
+    [property: JsonPropertyName("timeout_ms")] int? TimeoutMs = null);
+
+/// <summary>Reading a result file.</summary>
+public static class Results
+{
+    /// <summary>All lines of a result file in their order; a missing file has none.</summary>
+    public static IReadOnlyList<EvalResult> Load(string path) =>
+        File.Exists(path)
+            ? File.ReadLines(path).Where(l => l.TrimStart().StartsWith('{')).Select(l => System.Text.Json.JsonSerializer.Deserialize<EvalResult>(l)!).ToList()
+            : [];
+}
