@@ -62,6 +62,11 @@ public sealed class OrderLookedUpPlainQuoteTests : TestContext
     [InlineData("It grows 2**3 times, then 4** more.")]
     [InlineData("Read **this part**s twice.")]
     [InlineData("a ** b ** c")]
+    [InlineData("src/**/*.ts and docs/**/*.md")]
+    [InlineData("Price (**) and fee (**)")]
+    [InlineData("Account ****1234**** is masked.")]
+    [InlineData("Footnotes [**] and [**] differ.")]
+    [InlineData("Match /**/ or /**/ here.")]
     [InlineData("An odd **mark stays.")]
     [InlineData("C:\\Users\\Name and \\\\server")]
     [InlineData("The pattern \\d+\\.\\d+ matches a version.")]
@@ -86,9 +91,7 @@ public sealed class OrderLookedUpPlainQuoteTests : TestContext
     {
         var quote = string.Concat(Enumerable.Repeat(mark, count)) + " Ein normaler Satz.";
 
-        var shown = quote.ToShownQuote();
-
-        Assert.Contains("Ein normaler Satz.", shown);
+        Assert.Equal(quote, quote.ToShownQuote());
         Assert.Single(Shown(View(quote)));
     }
 

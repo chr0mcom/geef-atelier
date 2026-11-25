@@ -2475,8 +2475,11 @@ Prüfer-, Klärer- und Verdichter-Prompt samt Schema und der System-Prompt des S
 zu verlieren ist schlimmer als eine überflüssige Meldung oder eine Doppelung.
 
 - **(c) Zitate unter „Looked up“ – ausgeliefert.** Die Ergebnisseite entfernt aus einem Zitat nur zwei Zeichenfolgen, die in
-  echten Zitaten vorkamen und reine Formatierung sind: Fett-Paare `**` um Text und den Backslash in einer Listennummer
-  (`1\. `). Alles andere bleibt wörtlich, weil dort ein Zeichen Bedeutung tragen kann. Kein Markdown-Parser (ein erster Entwurf
+  echten Zitaten als Formatierung vorkamen: Fett-Paare `**` um Text (nicht, wenn außen Buchstabe, Ziffer, Schrägstrich oder
+  Stern anliegt oder innen eine Klammer falsch herum steht) und den Backslash zwischen einer Ziffer und einem Punkt, auf den
+  ein Leerzeichen oder das Ende folgt (gedacht für Listennummern wie `1\. `). Alles andere bleibt wörtlich, weil dort ein
+  Zeichen Bedeutung tragen kann. Die Erkennung ist eine Näherung; in seltenen Fällen kann sie Zeichen entfernen, die gemeint
+  waren. Kein Markdown-Parser (ein erster Entwurf
   mit Parser konnte bei tief verschachteltem fremdem Webtext eine Ausnahme werfen und den Sinn verändern). Nur die Anzeige:
   gespeicherter Wortlaut, Material von Schreiber und Prüfer und die MCP-Antwort bleiben unverändert.
 - **(a) Hinweis statt „nicht gedeckt“ – entfernt.** Zwei strukturelle Regeln sollten Befunde an Sätzen mit Lücke und an kurzen

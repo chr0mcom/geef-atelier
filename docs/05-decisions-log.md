@@ -2379,8 +2379,10 @@ an addendum to this entry.
 an assumption is worse than a superfluous message or a repeat.
 
 - **(c) Passages under "Looked up" – ships.** The result page removes from a passage only two sequences that real passages
-  carried and that are pure formatting: pairs of `**` around text and the backslash in a list number (`1\. `). Everything else
-  stays word for word, because there a mark can carry meaning. No Markdown parser (a first version with a parser could throw
+  carried as formatting: pairs of `**` around text (not when a letter, digit, slash or star touches them from outside, or a
+  bracket faces the wrong way inside) and the backslash between a digit and a dot that a blank or the end follows (meant for
+  list numbers such as `1\. `). Everything else stays word for word, because there a mark can carry meaning. The detection is an
+  approximation; in rare cases it can remove marks that were meant. No Markdown parser (a first version with a parser could throw
   on deeply nested foreign web text and could change the meaning). Display only: the stored wording, the material of the writer
   and the fact check and the MCP answer are unchanged.
 - **(a) A hint instead of "not backed" – removed.** Two structural rules were to turn findings on sentences with a gap and on
