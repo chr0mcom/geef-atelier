@@ -22,7 +22,8 @@ using Microsoft.Extensions.Options;
 namespace Geef.Atelier.Infrastructure.Pipeline.Assembly;
 
 /// <summary>
-/// The direct path: <see cref="OrderGroundingStep"/> (the order's files in full text), <see cref="DirectWriterExecutor"/>
+/// The direct path: <see cref="OrderGroundingStep"/> (the order's files in full text and, for the version of the run, the passages looked
+/// up on the web), <see cref="DirectWriterExecutor"/>
 /// and <see cref="DeterministicChecksReviewer"/>, at most two passes. After the run it stores the report
 /// (<c>Runs.ReportJson</c>). Accepts runs of the code-only template <see cref="SystemCrew.DirectTemplateName"/>, also
 /// with a seed draft.
@@ -48,7 +49,7 @@ internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOpti
 
         var grounding = new OrderGroundingStep(
             context.Run.Id, orderId, context.Run.SeedDraftText, context.ScopeFactory, _sourceOptions, context.WarningSink,
-            context.LoggerFactory.CreateLogger<OrderGroundingStep>());
+            context.LoggerFactory.CreateLogger<OrderGroundingStep>(), context.Run.OrderVersion);
         var writer = new DirectWriterExecutor(
             context.Snapshot.Executor, context.LlmClientResolver, context.PricingCatalog, context.CostAccumulator,
             context.WarningSink, context.Run.Id, context.LoggerFactory.CreateLogger<DirectWriterExecutor>(),

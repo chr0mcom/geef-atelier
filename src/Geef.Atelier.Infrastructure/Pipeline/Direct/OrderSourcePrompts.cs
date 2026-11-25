@@ -39,21 +39,28 @@ internal static class OrderSourcePrompts
         return new OrderSourcePromptSet(sources, positions);
     }
 
-    /// <summary>One usage row (target <see cref="OrderGroundingStep.WriterTarget"/>) per source of <paramref name="bundle"/>.</summary>
-    public static List<RunSourceUsageEntity> ToUsages(this OrderSourceBundle bundle, Guid runId, IReadOnlyDictionary<Guid, int> positions, DateTimeOffset now) =>
-        bundle.Sources.Select(s => new RunSourceUsageEntity
+    /// <summary>
+    /// One usage row (target <see cref="OrderGroundingStep.WriterTarget"/>) per file of <paramref name="bundle"/>. The passages looked up on
+    /// the web (<see cref="PromptSource.LookedUp"/>) get a row without source, target <see cref="OrderGroundingStep.ResearchTarget"/> and the
+    /// position after the files.
+    /// </summary>
+    public static List<RunSourceUsageEntity> ToUsages(this OrderSourceBundle bundle, Guid runId, IReadOnlyDictionary<Guid, int> positions, DateTimeOffset now)
+    {
+        var afterFiles = positions.Count == 0 ? 0 : positions.Values.Max() + 1;
+        return bundle.Sources.Select(s => new RunSourceUsageEntity
         {
             Id = Guid.NewGuid(),
             RunId = runId,
-            SourceId = s.SourceId,
+            SourceId = s.LookedUp ? null : s.SourceId,
             FileName = s.FileName,
             Mode = bundle.Mode,
-            Target = OrderGroundingStep.WriterTarget,
+            Target = s.LookedUp ? OrderGroundingStep.ResearchTarget : OrderGroundingStep.WriterTarget,
             CharsIncluded = s.Characters,
             PagesIncluded = s.PagesIncluded,
-            Position = positions[s.SourceId],
+            Position = s.LookedUp ? afterFiles : positions[s.SourceId],
             CreatedAt = now,
         }).ToList();
+    }
 
     private static (string Text, string? PagesIncluded) SelectPages(OrderSourceItem item, Action<OrderSourceItem> selectionNotApplied)
     {

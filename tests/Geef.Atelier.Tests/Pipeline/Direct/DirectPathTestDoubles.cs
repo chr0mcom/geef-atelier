@@ -1,7 +1,10 @@
 using System.Collections.Concurrent;
+using Geef.Atelier.Application.Research;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Orders;
+using Geef.Atelier.Core.Domain.Research;
+using Geef.Atelier.Core.Domain.Writing;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
@@ -156,4 +159,65 @@ internal sealed class RecordingConsultationRepository : IGroundingConsultationRe
         Task.FromResult<IReadOnlyList<GroundingConsultation>>(Created.Where(c => c.RunId == runId).ToList());
 
     public Task UpdateRefinementOutcomeAsync(Guid consultationId, RefinementOutcome outcome, CancellationToken ct) => Task.CompletedTask;
+}
+
+/// <summary>One call of <see cref="IOrderResearchService.EnsureAsync"/> as the grounding step made it.</summary>
+internal sealed record ResearchCall(Guid OrderId, string RequestText, int? OrderVersion, bool Revises, IReadOnlyList<string> FileTexts, string? ProfileText);
+
+/// <summary>
+/// Stand-in for the research service of stage 4: records every call and answers with <see cref="Answer"/> (default: no research). With
+/// <see cref="StoreFirst"/> it behaves like the real service towards the step: the first answer of an order is kept and every later call of
+/// that order gets the kept one, counted as <see cref="NewResearch"/> only once.
+/// </summary>
+internal sealed class ScriptedOrderResearchService : IOrderResearchService
+{
+    private readonly ConcurrentDictionary<Guid, OrderResearch> _stored = new();
+    private int _newResearch;
+
+    public ConcurrentQueue<ResearchCall> Calls { get; } = new();
+
+    public Func<ResearchCall, CancellationToken, Task<OrderResearch?>> Answer { get; set; } = (_, _) => Task.FromResult<OrderResearch?>(null);
+
+    public bool StoreFirst { get; set; }
+
+    public int NewResearch => _newResearch;
+
+    public async Task<OrderResearch?> EnsureAsync(OrderEntity order, int? orderVersion, bool revises, IReadOnlyList<string> fileTexts, string? profileText, CancellationToken ct)
+    {
+        var call = new ResearchCall(order.Id, order.RequestText, orderVersion, revises, fileTexts.ToList(), profileText);
+        Calls.Enqueue(call);
+        if (StoreFirst && _stored.TryGetValue(order.Id, out var stored))
+            return stored;
+
+        var research = await Answer(call, ct);
+        if (research is not null)
+        {
+            Interlocked.Increment(ref _newResearch);
+            if (StoreFirst)
+                _stored.TryAdd(order.Id, research);
+        }
+        return research;
+    }
+
+    /// <summary>Answers every call with <paramref name="research"/>.</summary>
+    public ScriptedOrderResearchService Returning(OrderResearch? research)
+    {
+        Answer = (_, _) => Task.FromResult(research);
+        return this;
+    }
+}
+
+/// <summary>Research results for the tests of stage 4; pages and passages are synthetic.</summary>
+internal static class ResearchSamples
+{
+    public static readonly DateTimeOffset At = new(2026, 11, 28, 9, 30, 0, TimeSpan.Zero);
+
+    public static ResearchEntry Entry(int n, string quote, string url = "https://wages.example/minimum", string title = "Minimum wage 2027") =>
+        new($"W1.{n}", 0, quote, url, title, At, QuoteMatchKind.Exact, new string('a', 64), 0, quote.Length);
+
+    public static OrderResearch Found(params ResearchEntry[] entries) => With(ResearchStatus.Found, entries);
+
+    public static OrderResearch With(ResearchStatus status, IReadOnlyList<ResearchEntry>? entries = null, string? errorCode = null) =>
+        new(OrderResearch.CurrentSchemaVersion, status, ["Mindestlohn 2027 Deutschland"], 0, 0, 1, 0, entries?.Count ?? 0, entries?.Count ?? 0,
+            new Dictionary<ResearchDropReason, int>(), entries ?? [], "claude-sonnet", 1200, errorCode, At);
 }
