@@ -61,4 +61,29 @@ public sealed class RunDetailProfileVisibilityTests : TestContext
         Assert.Contains(BriefingSections.ProfileHiddenNote, cut.Find("[data-testid='run-briefing']").TextContent);
         Assert.Contains("Schreib eine Einladung.", cut.Find("[data-testid='run-briefing']").TextContent);
     }
+
+    [Theory]
+    [InlineData("alice", false)]
+    [InlineData("admin", true)]
+    public void The_heading_shows_only_the_request(string viewer, bool admin)
+    {
+        var cut = Render(viewer, admin);
+
+        Assert.Equal("Schreib eine Einladung.", cut.Find("h1").TextContent.Trim());
+    }
+
+    [Theory]
+    [InlineData("alice", false, true)]
+    [InlineData("admin", true, false)]
+    public void The_opened_grounded_brief_shows_the_profile_only_to_the_owner(string viewer, bool admin, bool seesProfile)
+    {
+        var cut = Render(viewer, admin);
+
+        cut.Find("[data-testid='grounding-brief'] .sub-section-toggle").Click();
+        var grounded = cut.Find("[data-testid='grounding-brief'] .briefing-text").TextContent;
+
+        Assert.Contains("Schreib eine Einladung.", grounded);
+        Assert.Equal(seesProfile, grounded.Contains(Marker, StringComparison.Ordinal));
+        Assert.Equal(!seesProfile, grounded.Contains(BriefingSections.ProfileHiddenNote, StringComparison.Ordinal));
+    }
 }

@@ -159,10 +159,16 @@ public sealed class GetOrderStatusToolTests
             clarification: OrderToolTestData.Clarification() with { RevisionFileName = "rede.docx" }));
 
         var dto = await GetOrderStatusTool.GetOrderStatus(_orders, _alice, OrderToolTestData.Options(), id.ToString(), 50);
-        var plain = await GetOrderStatusTool.GetOrderStatus(_orders, _alice, OrderToolTestData.Options(), id.ToString(), 50);
 
         Assert.Equal("rede.docx", dto.RevisionFile);
-        Assert.Equal("rede.docx", plain.RevisionFile);
+        foreach (var state in new[] { OrderDisplayState.Preparing, OrderDisplayState.Queued, OrderDisplayState.Working, OrderDisplayState.Delivered })
+        {
+            var other = Guid.NewGuid();
+            _orders.Add("alice", OrderToolTestData.View(other, state,
+                clarification: OrderToolTestData.Clarification() with { RevisionFileName = "rede.docx" }));
+            var status = await GetOrderStatusTool.GetOrderStatus(_orders, _alice, OrderToolTestData.Options(), other.ToString(), 0);
+            Assert.Null(status.RevisionFile);
+        }
         var submitted = new OrderSubmission(id, OrderDisplayState.NeedsInput, null, [], OrderToolTestData.Clarification() with { RevisionFileName = "rede.docx" })
             .ToDto([]);
         Assert.Equal("rede.docx", submitted.RevisionFile);
