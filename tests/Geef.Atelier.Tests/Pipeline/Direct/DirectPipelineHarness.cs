@@ -62,6 +62,7 @@ internal sealed class DirectPipelineHarness
         services.AddSingleton<IRunFactCheckModeStore>(FactCheckModes);
         services.AddSingleton<IOptions<DirectOptions>>(_ => Options.Create(DirectOptions));
         services.AddSingleton<IOrderResearchService>(Research);
+        services.AddSingleton<IRunRepository>(Runs);
         Services = services.BuildServiceProvider();
     }
 
@@ -77,6 +78,9 @@ internal sealed class DirectPipelineHarness
     public RecordingRunFactCheckModeStore FactCheckModes { get; } = new();
     public DirectOptions DirectOptions { get; } = new() { FactCheckMode = FactCheckMode.Off, WriterNotes = false };
     public InMemoryRunWarnings Warnings { get; } = new();
+
+    /// <summary>Runs a later run reads back (the earlier version of a change); see <see cref="StoreFinished"/>.</summary>
+    public InMemoryRunReader Runs { get; } = new();
 
     /// <summary>The research of the orders; answers with no research until a test scripts it.</summary>
     public ScriptedOrderResearchService Research { get; } = new();
@@ -124,6 +128,20 @@ internal sealed class DirectPipelineHarness
         await assembler.OnRunFinishedAsync(context, result, CancellationToken.None);
         Reports.Reports.TryGetValue(run.Id, out var json);
         return new DirectRunOutcome(result, RunReportJson.TryParse(json));
+    }
+
+    /// <summary>Stores <paramref name="run"/> as finished with <paramref name="text"/> and the report of <paramref name="outcome"/>, as the orchestrator would.</summary>
+    public RunEntity StoreFinished(RunEntity run, DirectRunOutcome outcome, string? text = null)
+    {
+        Reports.Reports.TryGetValue(run.Id, out var json);
+        var finished = new RunEntity
+        {
+            Id = run.Id, CreatedAt = run.CreatedAt, Status = RunStatus.Completed, BriefingText = run.BriefingText, ConfigJson = run.ConfigJson,
+            CrewTemplateName = run.CrewTemplateName, OrderId = run.OrderId, OrderVersion = run.OrderVersion, SeedDraftText = run.SeedDraftText,
+            ParentRunId = run.ParentRunId, RevisionHint = run.RevisionHint, FinalText = text ?? outcome.Result.Output?.Markdown, ReportJson = json,
+        };
+        Runs.Put(finished);
+        return finished;
     }
 
     public IReadOnlyList<RecordedLlmCall> WriterCalls => Llm.CallsFor(LlmRole.Executor);

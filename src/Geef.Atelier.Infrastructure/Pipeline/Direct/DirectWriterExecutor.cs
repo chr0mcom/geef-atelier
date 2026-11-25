@@ -17,7 +17,8 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 
 /// <summary>
 /// Writer of the direct path. First pass: the request plus the order's files as background document; a CLI provider
-/// writes into <c>draft.md</c> (seeded with a template to revise when there is one). Correction pass: only the
+/// writes into <c>draft.md</c> (seeded with a template to revise when there is one; in a run that changes an earlier version,
+/// marked by <see cref="AtelierContextKeys.RevisionHint"/>, with <see cref="DirectWriterPrompts.RevisionInstruction"/>). Correction pass: only the
 /// blocking findings of the automatic checks and of the fact check of the previous pass, never failures of the checks themselves.
 /// The answer goes through <see cref="IWriterNotesSource"/>: the text without the notes block becomes the draft, the notes go
 /// to <see cref="AtelierContextKeys.WriterNotes"/>; a correction without a block keeps the readable notes of the pass before
@@ -67,7 +68,8 @@ internal sealed class DirectWriterExecutor(
         if (iteration == 1)
         {
             var seed = context.TryGet(AtelierContextKeys.SeedDraft, out var s) && !string.IsNullOrWhiteSpace(s) ? s : null;
-            userPrompt = DirectWriterPrompts.FirstPass(brief, bundle, documentMode, seed, writerNotes, arithmetic);
+            var revision = context.TryGet(AtelierContextKeys.RevisionHint, out var hint) && !string.IsNullOrWhiteSpace(hint);
+            userPrompt = DirectWriterPrompts.FirstPass(brief, bundle, documentMode, seed, writerNotes, arithmetic, revision);
             baseline = seed ?? string.Empty;
         }
         else
