@@ -17,7 +17,9 @@ public static class OrderResultReport
     /// <summary>
     /// Adds what <paramref name="report"/> says to <paramref name="result"/>. Schema 1: only <see cref="OrderResult.Checks"/>, which
     /// say that facts were not checked; the other new fields stay <c>null</c>. Schema 2: the writer's assumptions (without those
-    /// the clarifier already listed or continues word for word and without repeats, <see cref="OrderResultRules.WithoutRepeatedAssumptions"/>),
+    /// the clarifier already listed or continues word for word and without repeats, <see cref="OrderResultRules.WithoutRepeatedAssumptions"/>;
+    /// an assumption that went to the writer only as "not given" (<see cref="OrderResult.NotGivenFacts"/>) removes only a writer's assumption
+    /// with the same wording, as before, never a shorter one it continues),
     /// the writer's open points (those about a listed wrong total also paired with its sentence) and a sentence for notes that could not be shown, the flagged
     /// passages and the contradictions in the material (both only when the fact check is shown, not in shadow mode), the
     /// sentences about the totals of the files, the verified quotes, the state and scope of the fact check and "What was
@@ -67,13 +69,19 @@ public static class OrderResultReport
     public static bool FromLookedUp(this FactFinding finding) =>
         finding.Kind == FactFindingKind.Superseded && finding.MaterialFrom == MaterialPart.LookedUp;
 
-    private static IReadOnlyList<string> WithoutClarifierAssumptions(IReadOnlyList<string> writer, OrderResult result) =>
-        OrderResultRules.WithoutRepeatedAssumptions((result.Assumptions ?? []).Select(a => (a.Text, true))
-                .Concat(writer.Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => (a.Trim(), false)))
+    private static IReadOnlyList<string> WithoutClarifierAssumptions(IReadOnlyList<string> writer, OrderResult result)
+    {
+        var notGiven = (result.NotGivenFacts ?? []).Select(OrderResultRules.AssumptionKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var clarifier = (result.Assumptions ?? []).Select(a => a.Text).ToList();
+        var open = clarifier.Where(t => notGiven.Contains(OrderResultRules.AssumptionKey(t))).Select(OrderResultRules.SameAssumptionKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return OrderResultRules.WithoutRepeatedAssumptions(clarifier.Where(t => !notGiven.Contains(OrderResultRules.AssumptionKey(t))).Select(t => (t, true))
+                .Concat(writer.Where(a => !string.IsNullOrWhiteSpace(a) && !open.Contains(OrderResultRules.SameAssumptionKey(a))).Select(a => (a.Trim(), false)))
                 .ToList())
             .Where(a => !a.Fixed)
             .Select(a => a.Text)
             .ToList();
+    }
 
     /// <summary>
     /// Pairs each open point of the writer that names both the stated and the recalculated figure of a listed wrong total with the

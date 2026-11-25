@@ -134,13 +134,16 @@ public static class OrderResultRules
     /// <summary>
     /// True when <paramref name="longer"/> continues <paramref name="shorter"/> word for word: the <see cref="SameAssumptionKey"/>
     /// of <paramref name="shorter"/> is the beginning of that of <paramref name="longer"/>, and there it is followed by a comma,
-    /// semicolon, colon, opening bracket or a dash between blanks (<see cref="ContinuationMarks"/>). So "Eltern werden mit Sie
-    /// angesprochen, auch im Betreff." continues "Eltern werden mit Sie angesprochen.", but "Eltern werden mit Sie angesprochen und
-    /// geduzt" and "Eltern werden nicht mit Sie angesprochen" do not.
+    /// semicolon or colon with a blank after it, an opening bracket or a dash between blanks (<see cref="ContinuationMarks"/>). So
+    /// "Eltern werden mit Sie angesprochen, auch im Betreff." continues "Eltern werden mit Sie angesprochen.", but "Eltern werden mit
+    /// Sie angesprochen und geduzt", "Eltern werden nicht mit Sie angesprochen" and "Beginn um 19:30 Uhr" after "Beginn um 19" do not.
     /// </summary>
     public static bool ContinuedBy(string? shorter, string? longer) => Continues(SameAssumptionKey(shorter), SameAssumptionKey(longer));
 
-    /// <summary>The marks after which a longer assumption continues a shorter one (<see cref="ContinuedBy"/>); a dash counts only between blanks.</summary>
+    /// <summary>
+    /// The marks after which a longer assumption continues a shorter one (<see cref="ContinuedBy"/>); a comma, semicolon or colon counts
+    /// only with a blank after it (not in <c>5,5</c> or <c>18:30</c>), a dash only between blanks.
+    /// </summary>
     public static IReadOnlySet<char> ContinuationMarks { get; } = new HashSet<char>([',', ';', ':', '(', '-']);
 
     /// <summary>
@@ -212,7 +215,13 @@ public static class OrderResultRules
         var mark = rest.TrimStart();
         if (mark.IsEmpty || !ContinuationMarks.Contains(mark[0]))
             return false;
-        return mark[0] != '-' || (mark.Length < rest.Length && mark.Length > 1 && char.IsWhiteSpace(mark[1]));
+        var blankAfter = mark.Length > 1 && char.IsWhiteSpace(mark[1]);
+        return mark[0] switch
+        {
+            '(' => true,
+            '-' => mark.Length < rest.Length && blankAfter,
+            _ => blankAfter,
+        };
     }
 
     private static IReadOnlyList<OrderUnbackedPassage> Candidates(IReadOnlyList<OrderUnbackedPassage>? passages) =>

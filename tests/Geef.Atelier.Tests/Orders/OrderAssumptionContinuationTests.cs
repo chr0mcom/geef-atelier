@@ -103,6 +103,12 @@ public sealed class OrderAssumptionContinuationTests
     [InlineData("eltern werden geduzt", "Eltern werden geduzt, außer im Betreff", true)]
     [InlineData("Eltern werden", "Eltern werden nicht geduzt, sondern gesiezt", false)]
     [InlineData("Eltern werden geduzt", "Eltern werden geduztx, ja", false)]
+    [InlineData("Das Treffen beginnt um 18", "Das Treffen beginnt um 18:30 Uhr.", false)]
+    [InlineData("Das Budget beträgt 5", "Das Budget beträgt 5,5 Mio. Euro.", false)]
+    [InlineData("Die Gebühr beträgt 12.", "Die Gebühr beträgt 12,50 Euro.", false)]
+    [InlineData("Beginn ist um 19", "Beginn ist um 19:30", false)]
+    [InlineData("Mitbringen: Stifte", "Mitbringen: Stifte;Papier", false)]
+    [InlineData("Mitbringen: Stifte", "Mitbringen: Stifte; Papier", true)]
     public void Only_a_word_for_word_beginning_followed_by_a_punctuation_mark_continues(string shorter, string longer, bool continued)
     {
         Assert.Equal(continued, OrderResultRules.ContinuedBy(shorter, longer));
@@ -169,5 +175,28 @@ public sealed class OrderAssumptionContinuationTests
         Assert.Equal([("Der Ton ist sachlich.", true), ("Der Ton ist sachlich, auch im Gruß.", false)], shown);
         Assert.Equal([("Die Eltern werden gesiezt.", true)],
             OrderResultRules.WithoutRepeatedAssumptions([("Eltern werden gesiezt", false), ("Die Eltern werden gesiezt.", true)]));
+    }
+
+    [Fact]
+    public void A_fact_left_open_never_hides_a_shorter_assumption_of_the_writer()
+    {
+        const string open = "Der Termin ist am Freitag, um 19 Uhr.";
+        var result = (Base(open) with { NotGivenFacts = [open] }).WithReport(Report("Der Termin ist am Freitag."));
+
+        Assert.Equal(["Der Termin ist am Freitag."], result.WriterAssumptions);
+        Assert.Equal(["Der Termin ist am Freitag."], result.AllAssumptions());
+        Assert.Equal([open], result.NotGivenFacts());
+        Assert.Equal(["Der Termin ist am Freitag."], result.ToDto().WriterAssumptions);
+    }
+
+    [Fact]
+    public void A_fact_left_open_with_the_same_words_as_a_writer_assumption_is_shown_once_under_left_open_as_before()
+    {
+        const string open = "Der Termin ist am Freitag.";
+        var result = (Base(open) with { NotGivenFacts = [open] }).WithReport(Report("Der Termin ist am Freitag.", "Der Ton ist freundlich."));
+
+        Assert.Equal(["Der Ton ist freundlich."], result.WriterAssumptions);
+        Assert.Equal(["Der Ton ist freundlich."], result.AllAssumptions());
+        Assert.Equal([open], result.NotGivenFacts());
     }
 }
