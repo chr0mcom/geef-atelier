@@ -57,13 +57,21 @@ internal static class OrderAnswerRules
         var id = answer.QuestionId;
         if (questions.FirstOrDefault(q => q.Id == id) is { } question)
         {
+            if (answer.DecideForMe && (answer.OptionId is not null || answer.FreeText is not null))
+                throw new OrderAnswerException($"The answer to \"{id}\" leaves the question to Atelier and gives an answer at the same time. Send one of them.");
+            if (!answer.DecideForMe && answer.OptionId is null && answer.FreeText is null)
+                throw new OrderAnswerException($"The answer to \"{id}\" is empty. Send optionId, freeText or decideForMe.");
             if (answer.OptionId is { } optionId && question.Options.All(o => o.Id != optionId))
                 throw new OrderAnswerException($"\"{optionId}\" is not an answer option of question \"{id}\".");
+            if (answer.FreeText is not null && !question.AllowFreeText)
+                throw new OrderAnswerException($"Question \"{id}\" takes one of its answer options, not own words.");
             return;
         }
 
         if (assumptions.Any(a => a.Id == id))
         {
+            if (answer.OptionId is not null || answer.DecideForMe)
+                throw new OrderAnswerException($"\"{id}\" is an assumption. To change it, send only the correction as free text.");
             if (answer.FreeText is null)
                 throw new OrderAnswerException($"Please write the correction for \"{id}\" as free text.");
             return;
@@ -71,7 +79,7 @@ internal static class OrderAnswerRules
 
         if (hasRevision && id == RevisionAnswer.QuestionId)
         {
-            if (answer.OptionId is not (RevisionAnswer.Yes or RevisionAnswer.No))
+            if (answer.OptionId is not (RevisionAnswer.Yes or RevisionAnswer.No) || answer.FreeText is not null || answer.DecideForMe)
                 throw new OrderAnswerException($"The answer to \"{RevisionAnswer.QuestionId}\" must be \"{RevisionAnswer.Yes}\" or \"{RevisionAnswer.No}\".");
             return;
         }

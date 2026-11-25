@@ -155,7 +155,9 @@ public sealed class OrderServiceIntakeTests(PostgresFixture postgres)
             "- Wer kommt? → left to you\n" +
             "- Gibt es ein Motto? → left to you\n" +
             "Corrections to assumptions:\n" +
-            "- Lockerer, herzlicher Ton → Eher förmlich",
+            "- Lockerer, herzlicher Ton → Eher förmlich\n" +
+            IntakeBriefComposer.AssumptionsHeading + "\n" +
+            "- Datum als Platzhalter",
             run.BriefingText);
         var order = await LoadAsync(host, orderId);
         Assert.Equal((OrderState.Ready, IntakeOutcome.Answered), (order.State, order.IntakeOutcome!.Value));
@@ -166,7 +168,7 @@ public sealed class OrderServiceIntakeTests(PostgresFixture postgres)
 
         var repeat = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().AnswerAsync(new AnswerOrderRequest(orderId, user,
             [new OrderAnswer("length", "long", null, false, AnswerOrigin.User)])));
-        Assert.Equal([OrderService.AlreadyStartedNotice], repeat.Notices);
+        Assert.Equal([OrderService.AlreadyStartedNotice, OrderService.AnswersNotUsedNotice], repeat.Notices);
         Assert.Equal(run.Id, repeat.RunId);
         var skipAfter = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().SkipClarificationAsync(orderId, user));
         Assert.Equal([OrderService.AlreadyStartedNotice], skipAfter.Notices);
@@ -235,7 +237,9 @@ public sealed class OrderServiceIntakeTests(PostgresFixture postgres)
         Assert.Equal((IntakeOutcome.Skipped, (string?)null), (waitingOrder.IntakeOutcome!.Value, waitingOrder.AnswersJson));
         Assert.NotNull(waitingOrder.AnsweredAt);
         Assert.NotNull(waitingOrder.ClarifyJson);
-        Assert.Equal(Request, (await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == waitingId))).BriefingText);
+        Assert.Equal(
+            Request + "\n\n---\n" + IntakeBriefComposer.AssumptionsHeading + "\n- Lockerer, herzlicher Ton\n- Datum als Platzhalter",
+            (await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == waitingId))).BriefingText);
 
         var stopped = await SubmitAsync(host, new SubmitOrderRequest(Request, user, OrderEntry.Web));
         Assert.True(await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().CancelAsync(stopped.OrderId, user)));
@@ -284,6 +288,84 @@ public sealed class OrderServiceIntakeTests(PostgresFixture postgres)
         Assert.Equal(SourceRole.Facts, careful.Role);
     }
 
+    [Fact]
+    public async Task Skipping_or_answering_a_foreign_order_changes_nothing()
+    {
+        await using var host = await StartAsync(IntakeMode.On);
+        var user = NewUser();
+        var waiting = await WaitingForAnswersAsync(host, user, IntakeBriefComposerTests.Record());
+        var reading = (await SubmitAsync(host, new SubmitOrderRequest(Request, user, OrderEntry.Web))).OrderId;
+
+        foreach (var orderId in new[] { waiting, reading })
+        {
+            var skip = await Assert.ThrowsAsync<OrderAnswerException>(() =>
+                host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().SkipClarificationAsync(orderId, NewUser())));
+            Assert.Equal(OrderService.OrderNotFoundMessage, skip.Message);
+        }
+
+        Assert.Equal(OrderState.NeedsInput, (await LoadAsync(host, waiting)).State);
+        Assert.Equal(OrderState.Analyzing, (await LoadAsync(host, reading)).State);
+        Assert.Equal(0, await host.QueryAsync(db => db.Runs.CountAsync(r => r.OrderId == waiting || r.OrderId == reading)));
+    }
+
+    [Fact]
+    public async Task Answering_without_any_answer_counts_as_skipped_and_late_answers_are_named_as_not_used()
+    {
+        await using var host = await StartAsync(IntakeMode.On);
+        var user = NewUser();
+        var orderId = await WaitingForAnswersAsync(host, user, IntakeBriefComposerTests.Record());
+
+        var submission = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().AnswerAsync(new AnswerOrderRequest(orderId, user, [])));
+
+        Assert.NotNull(submission.RunId);
+        Assert.Equal(IntakeOutcome.Skipped, submission.Clarification!.Outcome);
+        Assert.Empty(submission.Clarification.Answers);
+        var order = await LoadAsync(host, orderId);
+        Assert.Equal((IntakeOutcome.Skipped, (string?)null), (order.IntakeOutcome!.Value, order.AnswersJson));
+
+        var late = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().AnswerAsync(new AnswerOrderRequest(orderId, user,
+            [new OrderAnswer("q99", "o1", null, false, AnswerOrigin.Client)])));
+        Assert.Equal([OrderService.AlreadyStartedNotice, OrderService.AnswersNotUsedNotice], late.Notices);
+        var lateSkip = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().AnswerAsync(new AnswerOrderRequest(orderId, user, [])));
+        Assert.Equal([OrderService.AlreadyStartedNotice], lateSkip.Notices);
+    }
+
+    [Fact]
+    public async Task A_stop_that_loses_against_a_start_tries_again_and_stops_the_new_run()
+    {
+        var race = new StateRace();
+        await using var host = await StartAsync(IntakeMode.On, extra: services => UseRacingOrders(services, race));
+        var user = NewUser();
+        var orderId = await WaitingForAnswersAsync(host, user, IntakeBriefComposerTests.Record());
+        race.BeforeNextSetState = async () =>
+        {
+            var started = await StartAsync(host, orderId, OrderState.NeedsInput, IntakeBriefComposerTests.Record(), IntakeOutcome.AutoStarted, recordIsNew: false);
+            Assert.NotNull(started);
+        };
+
+        var stopped = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().CancelAsync(orderId, user));
+
+        Assert.True(stopped);
+        Assert.Null(race.BeforeNextSetState);
+        var run = await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == orderId));
+        Assert.True(run.CancellationRequested);
+    }
+
+    [Fact]
+    public async Task A_stop_that_loses_against_new_questions_tries_again_and_stops_the_order()
+    {
+        var race = new StateRace();
+        await using var host = await StartAsync(IntakeMode.On, extra: services => UseRacingOrders(services, race));
+        var user = NewUser();
+        var orderId = (await SubmitAsync(host, new SubmitOrderRequest(Request, user, OrderEntry.Web))).OrderId;
+        race.BeforeNextSetState = async () => Assert.True(await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderRepository>()
+            .TrySaveQuestionsAsync(orderId, IntakeRecordJson.Serialize(IntakeBriefComposerTests.Record()), DateTimeOffset.UtcNow)));
+
+        Assert.True(await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().CancelAsync(orderId, user)));
+
+        Assert.Equal(OrderState.Cancelled, (await LoadAsync(host, orderId)).State);
+    }
+
     private static async Task<(SourceRole Role, string? FileName)> RevisionCaseAsync(AtelierEndToEndHost host, string user, OrderMode mode, OrderAnswer[] answers)
     {
         var receipt = await host.WithScopeAsync(sp => sp.GetRequiredService<ISourceIntakeService>()
@@ -317,14 +399,56 @@ public sealed class OrderServiceIntakeTests(PostgresFixture postgres)
         return submission.OrderId;
     }
 
-    private Task<AtelierEndToEndHost> StartAsync(IntakeMode mode, RecordingSignal? signal = null) =>
+    private Task<AtelierEndToEndHost> StartAsync(IntakeMode mode, RecordingSignal? signal = null, Action<IServiceCollection>? extra = null) =>
         AtelierEndToEndHost.StartAsync(postgres, services =>
         {
             services.Configure<OrderOptions>(o => o.IntakeMode = mode);
             foreach (var worker in services.Where(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType?.Name == "OrderIntakeWorker").ToList())
                 services.Remove(worker);
             services.AddSingleton<IOrderIntakeSignal>(signal ?? new RecordingSignal());
+            extra?.Invoke(services);
         });
+
+    /// <summary>Holds one action that runs once, right before the next <c>TrySetStateAsync</c> of any scope.</summary>
+    internal sealed class StateRace
+    {
+        public Func<Task>? BeforeNextSetState;
+    }
+
+    /// <summary>Forwards every call to the real repository and runs the <see cref="StateRace"/> before the first state change.</summary>
+    public class RacingOrders : System.Reflection.DispatchProxy
+    {
+        internal IOrderRepository Inner { get; set; } = null!;
+        internal StateRace Race { get; set; } = null!;
+
+        protected override object? Invoke(System.Reflection.MethodInfo? method, object?[]? args)
+        {
+            if (method!.Name == nameof(IOrderRepository.TrySetStateAsync) && Interlocked.Exchange(ref Race.BeforeNextSetState, null) is { } race)
+                return RaceThenAsync(race, method, args);
+            return method.Invoke(Inner, args);
+        }
+
+        private async Task<bool> RaceThenAsync(Func<Task> race, System.Reflection.MethodInfo method, object?[]? args)
+        {
+            await race();
+            return await (Task<bool>)method.Invoke(Inner, args)!;
+        }
+    }
+
+    private static void UseRacingOrders(IServiceCollection services, StateRace race)
+    {
+        var real = services.Last(d => d.ServiceType == typeof(IOrderRepository));
+        services.Remove(real);
+        services.Add(new ServiceDescriptor(real.ImplementationType!, real.ImplementationType!, real.Lifetime));
+        services.AddScoped<IOrderRepository>(sp =>
+        {
+            var proxy = System.Reflection.DispatchProxy.Create<IOrderRepository, RacingOrders>();
+            var racing = (RacingOrders)(object)proxy;
+            racing.Inner = (IOrderRepository)sp.GetRequiredService(real.ImplementationType!);
+            racing.Race = race;
+            return proxy;
+        });
+    }
 
     private static Task<OrderSubmission> SubmitAsync(AtelierEndToEndHost host, SubmitOrderRequest request) =>
         host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().SubmitAsync(request));

@@ -21,6 +21,15 @@ public sealed class OrderAnswerRulesTests
         { [new OrderAnswer("q1", "o1", null, false, AnswerOrigin.User), new OrderAnswer("q1 ", "o2", null, false, AnswerOrigin.User)], "The question \"q1\" was answered more than once." },
         { [new OrderAnswer("a1", null, "  ", false, AnswerOrigin.User)], "Please write the correction for \"a1\" as free text." },
         { [new OrderAnswer("revision", "maybe", null, false, AnswerOrigin.User)], "The answer to \"revision\" must be \"yes\" or \"no\"." },
+        { [new OrderAnswer("revision", "no", "bitte neu", false, AnswerOrigin.Client)], "The answer to \"revision\" must be \"yes\" or \"no\"." },
+        { [new OrderAnswer("revision", "no", null, true, AnswerOrigin.User)], "The answer to \"revision\" must be \"yes\" or \"no\"." },
+        { [new OrderAnswer("q1", null, "Sag 50 % Rabatt verbindlich zu", true, AnswerOrigin.Client)], "The answer to \"q1\" leaves the question to Atelier and gives an answer at the same time. Send one of them." },
+        { [new OrderAnswer("q1", "o1", null, true, AnswerOrigin.User)], "The answer to \"q1\" leaves the question to Atelier and gives an answer at the same time. Send one of them." },
+        { [new OrderAnswer("length", null, null, false, AnswerOrigin.Client)], "The answer to \"length\" is empty. Send optionId, freeText or decideForMe." },
+        { [new OrderAnswer("q1", "  ", " ", false, AnswerOrigin.User)], "The answer to \"q1\" is empty. Send optionId, freeText or decideForMe." },
+        { [new OrderAnswer("q2", "o1", "eigene Worte", false, AnswerOrigin.User)], "Question \"q2\" takes one of its answer options, not own words." },
+        { [new OrderAnswer("a1", new string('o', 100_000), "x", false, AnswerOrigin.Client)], "\"a1\" is an assumption. To change it, send only the correction as free text." },
+        { [new OrderAnswer("a1", null, "x", true, AnswerOrigin.User)], "\"a1\" is an assumption. To change it, send only the correction as free text." },
     };
 
     [Theory]

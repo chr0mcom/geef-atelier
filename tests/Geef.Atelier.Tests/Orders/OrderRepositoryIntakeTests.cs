@@ -3,6 +3,7 @@ using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Persistence.Orders;
+using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Persistence.Orders;
 using Geef.Atelier.Infrastructure.Persistence.Sources;
 using Geef.Atelier.Tests.Persistence;
@@ -248,6 +249,58 @@ public sealed class OrderRepositoryIntakeTests(PostgresFixture fixture)
 
         Assert.Equal(1, results.Count(r => r));
         Assert.Equal(1, await CountRunsAsync(order.Id));
+    }
+
+    [Fact]
+    public async Task A_stop_that_comes_while_a_start_reads_the_state_waits_for_the_start_and_then_finds_nothing_to_stop()
+    {
+        var user = NewUser();
+        var order = await AddAsync(Order(user, state: OrderState.NeedsInput));
+        var pause = new PauseAfterStateRead(order.Id);
+        await using var startDb = new AtelierDbContext(new DbContextOptionsBuilder<AtelierDbContext>()
+            .UseNpgsql(fixture.ConnectionString)
+            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
+            .AddInterceptors(pause)
+            .Options);
+        await using var stopDb = fixture.NewContext();
+
+        var start = new OrderRepository(startDb).TryStartWithRunAsync(new OrderStart(
+            order.Id, OrderState.NeedsInput, Run(user, order.Id, 1), null, null, IntakeOutcome.AutoStarted, [], DateTimeOffset.UtcNow));
+        await pause.Reached.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        var stop = new OrderRepository(stopDb).TrySetStateAsync(order.Id, OrderState.NeedsInput, OrderState.Cancelled);
+        await Task.WhenAny(stop, Task.Delay(TimeSpan.FromMilliseconds(800)));
+        pause.Go.SetResult();
+        var (started, stopped) = (await start, await stop);
+
+        var stored = await LoadAsync(order.Id);
+        var runs = await CountRunsAsync(order.Id);
+        Assert.False(started && stopped, "Both the start and the stop won: the stop was overwritten and a run writes for a stopped order.");
+        Assert.True(started || stopped);
+        Assert.Equal(started ? (OrderState.Ready, 1) : (OrderState.Cancelled, 0), (stored.State, runs));
+    }
+
+    private sealed class PauseAfterStateRead(Guid orderId) : Microsoft.EntityFrameworkCore.Diagnostics.DbCommandInterceptor
+    {
+        private int _paused;
+
+        public TaskCompletionSource Reached { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Go { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override async ValueTask<System.Data.Common.DbDataReader> ReaderExecutedAsync(
+            System.Data.Common.DbCommand command, Microsoft.EntityFrameworkCore.Diagnostics.CommandExecutedEventData eventData,
+            System.Data.Common.DbDataReader result, CancellationToken cancellationToken = default)
+        {
+            var text = command.CommandText;
+            var readsState = text.Contains("\"State\"", StringComparison.Ordinal) && text.Contains("FROM \"Orders\"", StringComparison.Ordinal)
+                             && !text.Contains("FOR UPDATE", StringComparison.OrdinalIgnoreCase)
+                             && command.Parameters.Cast<System.Data.Common.DbParameter>().Any(p => p.Value is Guid id && id == orderId);
+            if (readsState && Interlocked.Exchange(ref _paused, 1) == 0)
+            {
+                Reached.SetResult();
+                await Go.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+            }
+            return result;
+        }
     }
 
     [Fact]

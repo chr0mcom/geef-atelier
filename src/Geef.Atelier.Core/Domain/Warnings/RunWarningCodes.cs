@@ -56,7 +56,7 @@ public static class IntakeWarningMessages
     public const string Failed = "Questions could not be prepared for this order, so writing started with your request as written.";
 
     /// <summary>Message of <see cref="RunWarningCodes.IntakeUnanswered"/>.</summary>
-    public const string Unanswered = "There were no answers within a day, so writing started with the assumptions shown.";
+    public const string Unanswered = "There were no answers in time, so writing started with the assumptions shown.";
 }
 
 /// <summary>Values of <see cref="RunWarningEntity.Source"/>: the part of the system that reported the warning.</summary>

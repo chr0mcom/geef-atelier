@@ -12,7 +12,11 @@ public sealed record OrderBriefInput(OrderEntity Order, IntakeRecord? Record, IR
 /// <summary>The briefing text and the names of the sections it contains, in order.</summary>
 public sealed record IntakeBrief(string Text, IReadOnlyList<string> Sections);
 
-/// <summary>Builds the run briefing from an order. Stage 1: the request verbatim. Stage 2 (<c>Intake:BriefMode</c>): request plus answers, or a prepared brief.</summary>
+/// <summary>
+/// Builds the run briefing from an order. Stage 1: the request verbatim. Stage 2 (<c>Intake:BriefMode</c>): request plus answers,
+/// corrections and the assumptions shown to the person (as defaults, never as checks), or a prepared brief. The request always
+/// comes first and unchanged; everything else follows after <see cref="BriefingSections.Separator"/>.
+/// </summary>
 public interface IOrderBriefComposer
 {
     /// <summary>The briefing of the next run. Without record, answers and profile exactly the request (stage 1, bit-identical).</summary>
@@ -30,8 +34,12 @@ internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOr
 
     public const string AnswersHeading = "Answers the person gave before writing:";
     public const string CorrectionsHeading = "Corrections to assumptions:";
-    public const string AssumptionsHeading = "Assumptions (not confirmed – treat them as defaults, do not state them as facts):";
+    public const string AssumptionsHeading = "Assumptions shown to the person, not confirmed (use them unless the request or the files say otherwise; never state them as facts):";
+    public const string RevisionQuestion = "Improve the attached file chosen as the text to revise?";
+    public const string RevisionYes = "Yes, improve that file";
+    public const string RevisionNo = "No, write something new and use the file only as material";
     public const string ProfileHeading = "About the person (use only where it fits the text; never invent anything beyond it):";
+    public const string UnderstandingLead = "What will be written: ";
     public const string LeftToYou = "left to you";
     public const string ByAssistant = " (answered by the assistant)";
 
@@ -48,7 +56,7 @@ internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOr
 
         if (prepared && record?.Output is { } output && !string.IsNullOrWhiteSpace(output.Understanding))
         {
-            intake.Add("What will be written: " + OneLine(output.Understanding));
+            intake.Add(UnderstandingLead + OneLine(output.Understanding));
             if (!string.IsNullOrWhiteSpace(output.TextType))
                 intake.Add("Text type: " + OneLine(output.TextType));
             sections.Add(UnderstandingSection);
@@ -58,6 +66,9 @@ internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOr
             .Where(q => answers.ContainsKey(q.Id))
             .Select(q => $"- {OneLine(q.Text)} → {Describe(q, answers[q.Id])}")
             .ToList();
+        if (record?.RevisionSourceId is not null && answers.TryGetValue(RevisionAnswer.QuestionId, out var revision)
+            && revision.OptionId is RevisionAnswer.Yes or RevisionAnswer.No)
+            answerLines.Add($"- {RevisionQuestion} → {(revision.OptionId == RevisionAnswer.No ? RevisionNo : RevisionYes)}{Mark(revision)}");
         if (answerLines.Count > 0)
         {
             intake.Add(AnswersHeading);
@@ -82,7 +93,7 @@ internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOr
             sections.Add(CorrectionsSection);
         }
 
-        if (prepared)
+        if (record?.Output is not null)
         {
             var remaining = (record?.Assumptions ?? []).Where(a => !corrected.Contains(a.Id)).Select(a => "- " + OneLine(a.Text)).ToList();
             if (remaining.Count > 0)
@@ -104,7 +115,7 @@ internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOr
 
         var text = blocks.Count == 0
             ? input.Order.RequestText
-            : input.Order.RequestText + "\n\n---\n" + string.Join("\n\n", blocks);
+            : input.Order.RequestText + BriefingSections.Separator + string.Join("\n\n", blocks);
         return new IntakeBrief(text, sections);
     }
 
@@ -112,7 +123,7 @@ internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOr
     {
         var free = string.IsNullOrWhiteSpace(answer.FreeText) ? null : OneLine(answer.FreeText);
         if (answer.DecideForMe)
-            return free is null ? LeftToYou : $"{LeftToYou} – \"{free}\"";
+            return LeftToYou + Mark(answer);
 
         var label = question.Options.FirstOrDefault(o => o.Id == answer.OptionId)?.Label;
         var value = (label, free) switch

@@ -27,13 +27,29 @@ public sealed class IntakeBriefComposerTests
     }
 
     [Fact]
-    public void A_record_without_answers_and_an_empty_profile_add_nothing_when_answers_are_appended()
+    public void Without_answers_the_assumptions_shown_are_appended_as_defaults_and_an_empty_profile_adds_nothing()
     {
         var emptyProfile = new UserProfileEntity { Username = "user-a", Signature = " ", CreatedAt = T0, UpdatedAt = T0 };
 
         var brief = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), [], emptyProfile));
 
+        Assert.Equal(Request + "\n\n---\n" + Assumptions, brief.Text);
+        Assert.Equal([IntakeBriefComposer.RequestSection, IntakeBriefComposer.AssumptionsSection], brief.Sections);
+        Assert.Contains("use them unless the request or the files say otherwise", IntakeBriefComposer.AssumptionsHeading, StringComparison.Ordinal);
+        Assert.DoesNotContain(IntakeBriefComposer.AnswersHeading, brief.Text, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(BriefMode.AppendAnswers)]
+    [InlineData(BriefMode.PreparedBrief)]
+    public void A_record_of_a_failed_or_skipped_reading_adds_no_assumption(BriefMode mode)
+    {
+        var fallback = IntakeRecord.Fallback(IntakeRecordStatus.Failed, "error", 10, null, mode);
+
+        var brief = Composer(mode).Compose(new OrderBriefInput(TheOrder, fallback, [], null));
+
         Assert.Equal(Request, brief.Text);
+        Assert.DoesNotContain(IntakeRecord.NotCheckedAssumption, brief.Text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -95,7 +111,9 @@ public sealed class IntakeBriefComposerTests
 
         Assert.Contains("- Wie lang soll der Text ungefähr werden? → \"3 Minuten Rede\"\n", text, StringComparison.Ordinal);
         Assert.Contains("- Wer kommt? → left to you\n", text, StringComparison.Ordinal);
-        Assert.EndsWith("- Gibt es ein Motto? → left to you – \"Sommer\"", text, StringComparison.Ordinal);
+        Assert.Contains("- Gibt es ein Motto? → left to you (answered by the assistant)\n", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Sommer\"", text, StringComparison.Ordinal);
+        Assert.EndsWith(Assumptions, text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -117,22 +135,39 @@ public sealed class IntakeBriefComposerTests
             [IntakeBriefComposer.RequestSection, IntakeBriefComposer.UnderstandingSection, IntakeBriefComposer.AnswersSection,
              IntakeBriefComposer.CorrectionsSection, IntakeBriefComposer.AssumptionsSection, IntakeBriefComposer.ProfileSection],
             prepared.Sections);
-        Assert.Equal(appended.Sections, prepared.Sections.Where(s => s is not (IntakeBriefComposer.UnderstandingSection or IntakeBriefComposer.AssumptionsSection)));
+        Assert.Equal(appended.Sections, prepared.Sections.Where(s => s is not IntakeBriefComposer.UnderstandingSection));
 
         var understanding = "What will be written: Eine Einladung zum Sommerfest des Teams.\nText type: Einladung\n";
         var assumptions = IntakeBriefComposer.AssumptionsHeading + "\n- Datum als Platzhalter\n";
         Assert.Contains("---\n" + understanding + IntakeBriefComposer.AnswersHeading, prepared.Text, StringComparison.Ordinal);
         Assert.Contains("- Lockerer, herzlicher Ton → Förmlich\n" + assumptions + "\n", prepared.Text, StringComparison.Ordinal);
-        Assert.Equal(appended.Text, prepared.Text.Replace(understanding, string.Empty, StringComparison.Ordinal).Replace(assumptions, string.Empty, StringComparison.Ordinal));
+        Assert.Contains("- Lockerer, herzlicher Ton → Förmlich\n" + assumptions + "\n", appended.Text, StringComparison.Ordinal);
+        Assert.Equal(appended.Text, prepared.Text.Replace(understanding, string.Empty, StringComparison.Ordinal));
     }
 
     [Fact]
-    public void Answers_without_a_matching_question_and_the_revision_answer_are_not_listed()
+    public void Answers_without_a_matching_question_and_a_revision_answer_without_a_guess_are_not_listed()
     {
         IReadOnlyList<OrderAnswer> answers = [new("q9", "o1", null, false, AnswerOrigin.User), new("revision", "no", null, false, AnswerOrigin.User)];
 
-        Assert.Equal(Request, Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), answers, null)).Text);
+        Assert.Equal(Request + "\n\n---\n" + Assumptions, Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), answers, null)).Text);
     }
+
+    [Theory]
+    [InlineData("no", AnswerOrigin.User, "- Improve the attached file chosen as the text to revise? → No, write something new and use the file only as material\n")]
+    [InlineData("no", AnswerOrigin.Client, "- Improve the attached file chosen as the text to revise? → No, write something new and use the file only as material (answered by the assistant)\n")]
+    [InlineData("yes", AnswerOrigin.Client, "- Improve the attached file chosen as the text to revise? → Yes, improve that file (answered by the assistant)\n")]
+    public void The_revision_answer_is_listed_with_its_origin(string option, AnswerOrigin origin, string expected)
+    {
+        var record = Record() with { RevisionSourceId = Guid.NewGuid() };
+
+        var text = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, record, [new("revision", option, null, false, origin)], null)).Text;
+
+        Assert.Contains(IntakeBriefComposer.AnswersHeading + "\n" + expected, text, StringComparison.Ordinal);
+    }
+
+    private static readonly string Assumptions =
+        IntakeBriefComposer.AssumptionsHeading + "\n- Lockerer, herzlicher Ton\n- Datum als Platzhalter";
 
     private static IntakeBriefComposer Composer(BriefMode mode) =>
         new(Options.Create(new IntakeOptions { BriefMode = mode }));

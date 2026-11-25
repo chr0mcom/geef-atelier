@@ -49,6 +49,8 @@ internal sealed class OrderService(
     internal const string AlreadyStartedNotice = "This order had already started.";
     internal const string StoppedNotice = "This order was stopped.";
     internal const string NeedsAnswersNote = "The order needs your answers first.";
+    internal const string AnswersNotUsedNotice = "Your answers were not used.";
+    internal const int CancelAttempts = 3;
     private static readonly RunStatus[] ActiveStatuses = [RunStatus.Pending, RunStatus.Running];
 
     public async Task<OrderSubmission> SubmitAsync(SubmitOrderRequest request, CancellationToken ct = default)
@@ -215,24 +217,31 @@ internal sealed class OrderService(
         if (order is null)
             return false;
 
-        var current = OrderStateResolver.SelectCurrentRun(await orders.ListRunsAsync(orderId, ct));
-        bool changed;
-        if (current is null)
+        var changed = false;
+        for (var attempt = 1; ; attempt++)
         {
-            changed = order.State is not OrderState.Cancelled
-                      && await orders.TrySetStateAsync(orderId, order.State, OrderState.Cancelled, ct);
-        }
-        else if (!ActiveStatuses.Contains(current.Status))
-        {
-            changed = false;
-        }
-        else if (current.CancellationRequested)
-        {
-            return true;
-        }
-        else
-        {
-            changed = await runs.RequestCancellationAsync(current.Id, ct);
+            var current = OrderStateResolver.SelectCurrentRun(await orders.ListRunsAsync(orderId, ct));
+            if (current is not null)
+            {
+                if (!ActiveStatuses.Contains(current.Status))
+                    break;
+                if (current.CancellationRequested)
+                    return true;
+                changed = await runs.RequestCancellationAsync(current.Id, ct);
+                break;
+            }
+
+            if (order.State is OrderState.Cancelled)
+                break;
+            if (await orders.TrySetStateAsync(orderId, order.State, OrderState.Cancelled, ct))
+            {
+                changed = true;
+                break;
+            }
+
+            if (attempt >= CancelAttempts || await orders.GetAsync(orderId, ct) is not { } reloaded)
+                break;
+            order = reloaded;
         }
 
         if (changed)
@@ -277,14 +286,17 @@ internal sealed class OrderService(
                     ?? throw new OrderAnswerException(OrderNotFoundMessage);
         if (order.State == OrderState.Analyzing)
             throw new OrderAnswerException(StillReadingMessage);
+        var given = request.Answers is { Count: > 0 };
         if (order.State != OrderState.NeedsInput)
-            return await CurrentWithNoticeAsync(order.Id, ct);
+            return await CurrentWithNoticeAsync(order.Id, ct, given);
 
         var record = IntakeRecordJson.TryParse(order.ClarifyJson);
         var answers = OrderAnswerRules.Normalize(record, request.Answers, intakeOptions.Value.MaxFreeTextChars);
-        var runId = await runStarter.TryStartAsync(
-            new RunStartRequest(order, OrderState.NeedsInput, record, answers, IntakeOutcome.Answered, RecordIsNew: false), ct);
-        return runId is null ? await CurrentWithNoticeAsync(order.Id, ct) : await SubmissionAsync(order.Id, [], ct);
+        var start = given
+            ? new RunStartRequest(order, OrderState.NeedsInput, record, answers, IntakeOutcome.Answered, RecordIsNew: false)
+            : new RunStartRequest(order, OrderState.NeedsInput, record, [], IntakeOutcome.Skipped, RecordIsNew: false);
+        var runId = await runStarter.TryStartAsync(start, ct);
+        return runId is null ? await CurrentWithNoticeAsync(order.Id, ct, given) : await SubmissionAsync(order.Id, [], ct);
     }
 
     public async Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default)
@@ -300,7 +312,7 @@ internal sealed class OrderService(
         return runId is null ? await CurrentWithNoticeAsync(order.Id, ct) : await SubmissionAsync(order.Id, [], ct);
     }
 
-    private async Task<OrderSubmission> CurrentWithNoticeAsync(Guid orderId, CancellationToken ct)
+    private async Task<OrderSubmission> CurrentWithNoticeAsync(Guid orderId, CancellationToken ct, bool answersGiven = false)
     {
         var order = await orders.GetAsync(orderId, ct) ?? throw new OrderAnswerException(OrderNotFoundMessage);
         var notice = order.State switch
@@ -309,7 +321,12 @@ internal sealed class OrderService(
             OrderState.Ready => AlreadyStartedNotice,
             _ => null,
         };
-        return await SubmissionAsync(orderId, notice is null ? [] : [notice], ct);
+        var notices = new List<string>();
+        if (notice is not null)
+            notices.Add(notice);
+        if (notice is not null && answersGiven)
+            notices.Add(AnswersNotUsedNotice);
+        return await SubmissionAsync(orderId, notices, ct);
     }
 
     private async Task<OrderSubmission> SubmissionAsync(Guid orderId, IReadOnlyList<string> notices, CancellationToken ct)
