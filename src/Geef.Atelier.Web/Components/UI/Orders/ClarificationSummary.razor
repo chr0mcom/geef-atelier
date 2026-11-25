@@ -96,7 +96,7 @@
                 lines.Add(new AnswerLine(question.Text, text ?? "left to me", true, text is null, Who(answer, string.Empty)));
             }
             if (Clarification.RevisionFileName is { } file
-                && Clarification.Answers.Any(a => a.QuestionId == ClarifyAnswerIds.Revision && a.OptionId == ClarifyAnswerIds.RevisionNo))
+                && Clarification.Answers.Any(a => a.QuestionId == RevisionAnswer.QuestionId && a.OptionId == RevisionAnswer.No))
                 lines.Add(new AnswerLine($"Improve “{file}”?", "No, write something new", false, false, string.Empty));
             return lines;
         }

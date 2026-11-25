@@ -6,10 +6,6 @@ namespace Geef.Atelier.Application.Orders;
 /// <summary>Checks the answers to the questions of an order and completes them; every problem is a plain-English <see cref="OrderAnswerException"/>.</summary>
 internal static class OrderAnswerRules
 {
-    public const string RevisionId = "revision";
-    public const string RevisionYes = "yes";
-    public const string RevisionNo = "no";
-
     /// <summary>
     /// The answers in a fixed order: one per question (questions without an answer count as "decide for me"), then the corrections
     /// of assumptions, then the revision answer. Blank texts and option ids become null; nothing is remembered in stage 2.
@@ -51,7 +47,7 @@ internal static class OrderAnswerRules
             .Select(q => given.TryGetValue(q.Id, out var answer) ? answer : new OrderAnswer(q.Id, null, null, true, origin))
             .ToList();
         result.AddRange(assumptions.Where(a => given.ContainsKey(a.Id)).Select(a => given[a.Id]));
-        if (given.TryGetValue(RevisionId, out var revision))
+        if (given.TryGetValue(RevisionAnswer.QuestionId, out var revision))
             result.Add(revision);
         return result;
     }
@@ -73,10 +69,10 @@ internal static class OrderAnswerRules
             return;
         }
 
-        if (hasRevision && id == RevisionId)
+        if (hasRevision && id == RevisionAnswer.QuestionId)
         {
-            if (answer.OptionId is not (RevisionYes or RevisionNo))
-                throw new OrderAnswerException($"The answer to \"{RevisionId}\" must be \"{RevisionYes}\" or \"{RevisionNo}\".");
+            if (answer.OptionId is not (RevisionAnswer.Yes or RevisionAnswer.No))
+                throw new OrderAnswerException($"The answer to \"{RevisionAnswer.QuestionId}\" must be \"{RevisionAnswer.Yes}\" or \"{RevisionAnswer.No}\".");
             return;
         }
 

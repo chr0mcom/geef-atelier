@@ -91,7 +91,7 @@ internal sealed class OrderRunStarter(
         if (link is null)
             return [];
 
-        var declined = answers.Any(a => a.QuestionId == OrderAnswerRules.RevisionId && string.Equals(a.OptionId, OrderAnswerRules.RevisionNo, StringComparison.Ordinal));
+        var declined = answers.Any(a => a.QuestionId == RevisionAnswer.QuestionId && string.Equals(a.OptionId, RevisionAnswer.No, StringComparison.Ordinal));
         if (declined)
             return link.Role == SourceRole.TemplateToRevise ? [(sourceId, SourceRole.Facts)] : [];
         return order.Mode == OrderMode.Direct && link.Role != SourceRole.TemplateToRevise ? [(sourceId, SourceRole.TemplateToRevise)] : [];

@@ -87,6 +87,19 @@ public sealed record OrderAnswer(
     AnswerOrigin Origin,
     RememberChoice Remember = RememberChoice.No);
 
+/// <summary>Fixed ids of the answer to the revision guess: question <see cref="QuestionId"/>, options <see cref="Yes"/> and <see cref="No"/>.</summary>
+public static class RevisionAnswer
+{
+    /// <summary>Question id of the guess that a file is the text to improve.</summary>
+    public const string QuestionId = "revision";
+
+    /// <summary>Option "yes, improve the file".</summary>
+    public const string Yes = "yes";
+
+    /// <summary>Option "no, write something new instead".</summary>
+    public const string No = "no";
+}
+
 /// <summary>A gap answered from the profile (stage 7: also from remembered answers).</summary>
 public sealed record MemoryAnswer(GapTopic Topic, string Value, string Source);
 

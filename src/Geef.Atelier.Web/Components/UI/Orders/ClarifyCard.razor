@@ -190,7 +190,7 @@
                 answers.Add(new OrderAnswer(assumption.Id, null, correction.Trim(), false, AnswerOrigin.User));
         }
         if (_writeNew && Clarification.RevisionFileName is not null)
-            answers.Add(new OrderAnswer(ClarifyAnswerIds.Revision, ClarifyAnswerIds.RevisionNo, null, false, AnswerOrigin.User));
+            answers.Add(new OrderAnswer(RevisionAnswer.QuestionId, RevisionAnswer.No, null, false, AnswerOrigin.User));
         return answers;
     }
 
