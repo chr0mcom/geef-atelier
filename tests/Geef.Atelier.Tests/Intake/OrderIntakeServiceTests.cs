@@ -328,10 +328,56 @@ public sealed class OrderIntakeServiceTests
         Assert.Equal(3, await Service().StartStuckAsync(Now, CancellationToken.None));
         Assert.DoesNotContain(_starter.Requests, r => r.Order.Id == broken.Id);
 
-        _time.Now = Now + IntakeSweepDeferrals.DeferFor + TimeSpan.FromSeconds(1);
+        _time.Now = Now + IntakeSweepDeferrals.FirstDeferral + TimeSpan.FromSeconds(1);
         _starter.Requests.Clear();
         await Service().StartStuckAsync(_time.Now, CancellationToken.None);
         Assert.Contains(_starter.Requests, r => r.Order.Id == broken.Id);
+    }
+
+    [Fact]
+    public async Task Hundreds_of_older_orders_that_keep_failing_never_starve_a_younger_one()
+    {
+        var broken = Enumerable.Range(0, 300).Select(_ => _orders.Add("A")).ToList();
+        var healthy = _orders.Add("B");
+        _orders.Stuck.AddRange([.. broken.Select(o => o.Id), healthy.Id]);
+        foreach (var order in broken)
+            _starter.ThrowFor.Add(order.Id);
+
+        int? startedInSweep = null;
+        for (var sweep = 0; sweep < 40 && startedInSweep is null; sweep++)
+        {
+            _time.Now = Now + TimeSpan.FromSeconds(60.5 * sweep);
+            _starter.Requests.Clear();
+            await Service().StartStuckAsync(_time.Now, CancellationToken.None);
+            if (_starter.Requests.Any(r => r.Order.Id == healthy.Id))
+                startedInSweep = sweep;
+        }
+
+        Assert.NotNull(startedInSweep);
+        Assert.InRange(startedInSweep!.Value, 15, 31);
+    }
+
+    [Fact]
+    public void The_pause_doubles_with_every_failure_up_to_a_day()
+    {
+        Assert.Equal(TimeSpan.FromMinutes(15), IntakeSweepDeferrals.PauseAfter(1));
+        Assert.Equal(TimeSpan.FromMinutes(30), IntakeSweepDeferrals.PauseAfter(2));
+        Assert.Equal(TimeSpan.FromMinutes(60), IntakeSweepDeferrals.PauseAfter(3));
+        Assert.Equal(TimeSpan.FromHours(16), IntakeSweepDeferrals.PauseAfter(7));
+        Assert.Equal(IntakeSweepDeferrals.MaxDeferral, IntakeSweepDeferrals.PauseAfter(8));
+        Assert.Equal(IntakeSweepDeferrals.MaxDeferral, IntakeSweepDeferrals.PauseAfter(500));
+
+        var time = new ManualTime(Now);
+        var deferrals = new IntakeSweepDeferrals(time);
+        var id = Guid.NewGuid();
+        Assert.Equal(TimeSpan.FromMinutes(15), deferrals.Defer(id));
+        time.Now += TimeSpan.FromMinutes(16);
+        Assert.DoesNotContain(id, deferrals.Active());
+        Assert.Equal(TimeSpan.FromMinutes(30), deferrals.Defer(id));
+        Assert.Contains(id, deferrals.Active());
+        time.Now += TimeSpan.FromMinutes(31) + IntakeSweepDeferrals.MaxDeferral;
+        Assert.DoesNotContain(id, deferrals.Active());
+        Assert.Equal(TimeSpan.FromMinutes(15), deferrals.Defer(id));
     }
 
     [Fact]

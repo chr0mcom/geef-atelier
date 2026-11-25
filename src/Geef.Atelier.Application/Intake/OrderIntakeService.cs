@@ -155,9 +155,9 @@ internal sealed class OrderIntakeService(
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
-                deferrals.Defer(id);
+                var pause = deferrals.Defer(id);
                 logger.LogError("Intake sweep: order {OrderId} could not be started and is left out for {Minutes} minutes: {Error}",
-                    id, (int)IntakeSweepDeferrals.DeferFor.TotalMinutes, ex.ToRedactedLogText());
+                    id, (int)pause.TotalMinutes, ex.ToRedactedLogText());
             }
         }
         return count;
