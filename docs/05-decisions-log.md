@@ -2416,7 +2416,8 @@ V2 and D-072 stay valid.
   and a quadratic run time; there a useful question was lost. Instead of adding notations, the rule now only asks whether the
   material names any date at all. **Deliberate bound:** as soon as any date stands in the material, invented dates stay as well,
   as before the rule. Further limits: the assumption itself may name a guessed date (visible and correctable); the question text
-  is not checked; without any date in the material, options such as "Abschnitt 2.3." or a name such as "Black Friday" that happen
+  is not checked; a weekday abbreviation standing alone, such as "Tue", does not count as a date in the material, so a matching
+  option can be dropped; without any date in the material, options such as "Abschnitt 2.3." or a name such as "Black Friday" that happen
   to look like a calendar day are dropped too. **Gate G-A2 passed:** `IntakeEval evaluate` over the held-out set (32 entries) and
   the second corpus (40): the same verdicts with and without the rule, gates a–f passed (e′ a warning only, as before), the rule
   drops 0 questions and 0 options. The real case from production (read only, no files and no profile, nothing date-like in the

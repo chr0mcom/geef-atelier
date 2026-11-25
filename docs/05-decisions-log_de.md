@@ -2513,7 +2513,8 @@ der System-Prompt des Schreibers bleiben bitgleich (Hash-Tests grün); die gespe
   eine quadratische Laufzeit; dort fiel eine nützliche Rückfrage weg. Statt weiterer Schreibweisen fragt die Regel jetzt nur
   noch, ob überhaupt ein Datum im Material steht. **Bewusste Grenze:** Steht irgendein Datum im Material, bleiben auch erfundene
   Daten stehen, wie vor der Regel. Weitere Grenzen: Die Annahme selbst kann ein geratenes Datum nennen (sichtbar und
-  korrigierbar); der Fragetext wird nicht geprüft; ohne jedes Datum im Material fallen auch Optionen wie „Abschnitt 2.3.“ oder
+  korrigierbar); der Fragetext wird nicht geprüft; eine allein stehende Wochentagsabkürzung wie „Tue“ zählt im Material nicht
+  als Datum, dann kann eine passende Option fallen; ohne jedes Datum im Material fallen auch Optionen wie „Abschnitt 2.3.“ oder
   ein Name wie „Black Friday“, die zufällig wie ein Kalendertag aussehen. **Tor G-A2 bestanden:** `IntakeEval evaluate` über
   die zurückgehaltene Menge (32 Einträge) und den Zweitkorpus (40): mit und ohne Regel gleiche Urteile, Tore a–f bestanden
   (e′ wie bisher nur Warnung), die Regel streicht 0 Fragen und 0 Optionen. Der echte Fall aus dem Bestand (nur lesend, ohne
