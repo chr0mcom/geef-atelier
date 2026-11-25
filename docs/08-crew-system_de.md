@@ -2,7 +2,7 @@
 
 *[English](08-crew-system.md) · **Deutsch***
 
-Letzte Aktualisierung: 2026-11-24 (D-067: strenges Lesen des Snapshots, mindestens ein Reviewer, Outcome nach den Finalizern, Warnungen am Lauf, System-Grounding wieder über den Provider-Typ-Weg, Learning standardmäßig pausiert; zweite Prüfrunde: Reviewer-Prüfung beim Speichern, Vektor-Scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserviert, Finalizer und Abbruch; zuvor 2026-11-23, D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
+Letzte Aktualisierung: 2026-11-25 (D-074: Recherche im Grounding-Schritt des Direktwegs; zuvor 2026-11-24, D-067: strenges Lesen des Snapshots, mindestens ein Reviewer, Outcome nach den Finalizern, Warnungen am Lauf, System-Grounding wieder über den Provider-Typ-Weg, Learning standardmäßig pausiert; zweite Prüfrunde: Reviewer-Prüfung beim Speichern, Vektor-Scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserviert, Finalizer und Abbruch; zuvor 2026-11-23, D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
 
 ## Überblick
 
@@ -875,7 +875,9 @@ Modells samt seinem einen Ersatz lassen die Tatsachen ungeprüft, und „What wa
 
 Seit Etappe 4 kann der Grounding-Schritt des Direktwegs (`OrderGroundingStep`) Ausschnitte aus dem Web anhängen. Er fragt
 `IOrderResearchService.EnsureAsync`, bevor er die Dateien rendert, mit der Version des Laufs (vom Assembler), ob der Lauf einen
-Text überarbeitet, dem vollen Text aller Dateien des Auftrags und den Angaben „Über mich“ aus dem Briefing. Der Dienst
+Text überarbeitet, dem vollen Text und dem Namen aller Dateien des Auftrags (der Klärer, der die Suchthemen schrieb, sah beides)
+und den Angaben „Über mich“ aus dem Briefing; ein Suchthema mit einem Wort daraus, das nicht im Wortlaut steht, hält die
+Herkunftsregel zurück (`ResearchQueryGate`). Der Dienst
 entscheidet (Schalter `Research:Mode`, Override je Nutzer, erste Version, keine Überarbeitung, Klärung mit Suchthemen,
 Tagesgrenze) und speichert die Recherche einmal am Auftrag (`Orders.ResearchJson`); jeder spätere Lauf des Auftrags bekommt die
 gespeicherten Ausschnitte unverändert und sucht nie neu.

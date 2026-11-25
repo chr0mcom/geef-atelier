@@ -2188,22 +2188,95 @@ code of stage 2 reads and writes around it), no `Down()` in production. Before t
   change texts).
 - Total waiting time including the correction round measured.
 
-## D-074 — Stage 4: research (2026-11-25, draft)
+## D-074 — Stage 4: research (2026-11-25)
 
-**Status:** being built (packages F1–F5). Shipped with `Research:Mode = Off`; the measuring user gets `On` through the
-environment. `On` for everybody only after gate R3, in a commit of its own. This entry covers the direct path (package F3);
-the results of the pre-tests VT/VR, Tavily usage and the gates are added when they exist.
+**Status:** implemented (core, service with Tavily and persistence, direct path, result on the web and over MCP, measuring tools
+VT/VR and R3). Pre-tests VT and VR **passed**. Shipped with `Research:Mode = Off` (code and `appsettings.json`); the measuring
+user gets `On` only through the environment (`Research__ModeOverrides__<user>=On`, no user name in the repository; test
+`ShippedResearchSettingsTests`). `On` for everybody only after gate R3, in a commit of its own.
 
 **Decision.** What the result shows as "looked up" is a passage that the code found word for word in the fetched page text,
-with page and date – nothing more.
+with page and date – nothing more. Better to look up less than to show something unchecked.
 
-- **Only the first run of a clarified order researches**, never a revision, never `submit_request` without clarification; the
-  research is stored at the order (`Orders.ResearchJson`, migration Step51) and every later run uses it unchanged.
-- **Passages as source `W1`** after the files, for the writer and the fact check, never for the recalculation of totals. The
-  writer's system prompt and the fact check's prompts, schemas and version stay unchanged (hash tests); the writer's user
-  prompt gets one fixed sentence only when `W1` is there.
-- **Never stops the run:** every failure of the research ends as a status with the warning `grounding.research_failed`; the
-  text is written without `W1`. The grounding step waits at most 120 s for the research.
-- **Report:** `W1` is listed after the files and the report is marked `lookedUp` (schema stays 2, fields left out while false).
+- **When:** only the first run of a clarified order on the direct path (version 1, no text to revise, clarification `Ok` with
+  research topics, switch `On` globally or for the person who ordered), never a revision, never "Extra careful", never
+  `submit_request` without clarification. The research is stored at the order (`Orders.ResearchJson`); every later run uses it
+  unchanged and never searches again. Every research that ran is stored, a failed one included (conditional write; whoever
+  loses reads the stored one).
+- **Origin rule for topics** (`ResearchQueryGate`, no word list): Tavily gets at most four topics of the clarifier, never the
+  request, answers, profile or files. A topic with a word from a file's text, a **file name** or the profile that is not exactly
+  so in the person's request is withheld; so are variants (accents, ß/ss, spelled-out umlauts), shared word starts of five
+  characters or more, numbers of five digits or more across separators, and links, addresses, access or account data
+  (`IntakeContentGuard`). The rule only errs on the safe side; a withheld topic is assumed as before and reported visibly.
+- **Tavily:** exactly one search per topic (`basic`, three results, raw content on, Tavily answer off), up to four in parallel,
+  20 s, **never repeated**. Only the raw page text is used (cut to 6,000 characters), never Tavily's snippet or answer. The
+  Atelier server fetches none of the addresses itself. Daily limit of 50 researching orders (UTC).
+- **Picking passages:** one call in slot `GroundingRefiner` (Sonnet today), schema `pick_passages` without length limits, proxy
+  failover off, 60 s, no second try. It sees **only** the topics sent and the pages (tags defused), nothing of the order, and
+  picks passages; there is no statement of the model's own.
+- **Dossier = verbatim passages** (`DossierBuilder`): every proposal is searched in the raw text (identical, or normalised only
+  in white space and quotes, never approximate); stored is the page's original passage with its position and the SHA-256 of
+  the raw text. Dropped and counted: not on the page, too short (fewer than five words), unsafe (links, addresses, access or
+  account data), duplicate, over the limits (three per page, four per topic, twelve in total), unknown page, over 600
+  characters (never cut).
+- **In the run:** the passages go as source `W1` ("Looked up on the web") after the files to writer and fact check, never to the
+  recalculation of totals. The writer's system prompt and the fact check's prompts, schemas and version stay unchanged (hash
+  tests; measurement V2 stays valid); the writer's user prompt gets one fixed sentence only when `W1` is there. An instruction
+  from `W1` never blocks. The report lists `W1` with `lookedUp` (schema stays 2).
+- **What the person sees:** section "Looked up" with passage, page (a link only for `http`/`https`, `nofollow noopener
+  noreferrer`) and date under the fixed subline "… not that it is true or that the text uses it"; every non-success (nothing
+  found, failure, daily limit, withheld) as a fixed sentence; the fact line names "the pages looked up" only when they were in
+  the material; origin in a contradiction is "the pages looked up", never "your file". Web and MCP (`get_order_result.lookedUp`,
+  marked as content of other websites) say the same; the failure sentence appears only once.
+- **Never stops the run:** every failure ends as a status with the warning `grounding.research_failed`; the text is written
+  without `W1`. The grounding step waits at most 120 s. One log line per research names counts, status, duration and model,
+  never topics, passages or addresses. Raw texts are not stored; only for the acceptance `Research:AuditDirectory` (empty by
+  default) writes raw text and entries for users with an override (mode 0600); the directory is deleted afterwards.
+- **Migration Step51** (nullable, additive, idempotent): `Orders.ResearchJson`, `Orders.ResearchAt`. No index, no data
+  migration, no `Sources` row for the dossier.
 
-**Way back:** `Research__Mode=Off` without a new image; stored research stays and is shown only for runs that used it.
+**Deviations from the overall plan:** a dossier entry is the verbatim page passage, not a model "statement" (not checkable); no
+second way through the CLI's web search (no raw text); no fetching of addresses; research only in version 1; `On` for everybody
+only after the paired measurement R3.
+
+**Switches:** `Research:Mode` (`Off|On`, shipped `Off`), `Research:ModeOverrides` (user → mode, environment only),
+`Research:DailyOrderCap` (50), `Research:AuditDirectory` (empty). Limits: `MaxSearches` 4, `ResultsPerSearch` 3,
+`RawCharsPerPage` 6,000, `SearchTimeout` 20 s, `CondenseTimeout` 60 s, `MaxEntries` 12. Whoever changes prompt or schema of the
+passage picker measures VR again (`tools/ResearchEval`); the fact check prompt stays unchanged (test).
+
+**Pre-tests (2026-11-25, synthetic corpus, at night, 0 Codex calls):**
+- **VT (Tavily probe): passed.** 3 of 3 requests with 2xx, 6 of 9 results with raw text, median 1.5 s. The answer carries no
+  usage figure (only query, response time, request id): **Tavily credit use unknown**; 0.001 USD per `basic` search according to
+  the configuration.
+- **VR (dossier, held-out set of 9 orders): passed.**
+  - K1 verbatim: **0 violations** over all 95 stored entries (development and held-out), independent Python check
+    (`research_verify.py`, case-sensitive) and own recheck.
+  - Validity 8 of 8 picker answers (required ≥ 95 %); yield 7 of 9 orders with at least one entry (77.8 %, required ≥ 70 %);
+    relevance 34 of 35 entries help with their topic (97.1 %, required ≥ 80 %, blind Opus juror); median 5.0 s per order for
+    search and picking (required ≤ 60 s).
+  - Reported: 17 topics sent, 1 withheld, 17 searches without failure, 42 pages with raw text, 41 proposals, 35 entries;
+    dropped 1 over the limit, 5 unsafe (12.2 %). Development set (no verdict): 12 of 12 with entries, 28 searches, 60 entries.
+  - Limits: 9 orders are a plausibility gate, K1 is hard. The corpus has hardly any files (1 of 36 orders with topics); the
+    origin rule acted once there, its effect is shown by tests (property test, end-to-end counter-checks).
+
+**Gates after the deploy (fixed beforehand, none passes without data):**
+- **R2 (acceptance measurement):** 5 orders of the measuring user (3 web, 2 MCP), fact check `Report`: each with research status
+  ≠ `NotNeeded`, 0 questions about researched topics, at most 1 `unsupported` finding against a spot covered by `W1`, median
+  ≤ 60 s, 0 note markers in the text. Failing (c) → research stays `Off` for everybody.
+- **R3 (effect, `tools/Eval/geef_eval/research_pairs.py`):** 8 untouched development orders, two measuring users (with/without
+  research, both without fact check), blind Sonnet juror in two swapped passes: wins with ≥ wins without + 2, sum of
+  `erfunden` with ≤ without, placeholders for researchable facts with < without; not evaluable below 7 valid pairs. Passed →
+  `On` for everybody; otherwise it stays `Off` and the measuring user keeps `On`.
+
+**Counter-checks at integration:** over the real wiring neither a profile name nor an answer of the person nor a word of a file
+name reaches Tavily or the passage picker; address and title of a page stay content in the prompt. The file name was missing
+from the origin rule at first (the clarifier sees it) and was added. Remaining, on purpose: words of the person's request may go
+into a topic (the person wrote them); if the person changes the profile between clarification and start, the rule checks
+against the new profile; a page's address is in the writer's prompt and might appear in the text as a source.
+
+**Cost:** per researched order one Sonnet call and at most four Tavily searches (22.5 % of the corpus orders had research
+topics); daily limit ≤ 200 searches.
+
+**Way back:** `Research__Mode=Off` without a new image; stored research stays and is shown only for runs that used it. Code:
+previous web image; Step51 is nullable, the code of stage 3 ignores the columns; no `Down()` in production. The template
+`direct` does not change; running runs may stay.

@@ -2,7 +2,7 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-11-24 (D-067: strict snapshot reading, at least one reviewer, outcome after finalizers, run warnings, system grounding back on the provider-type path, learning paused by default; second review round: reviewer check on save, vector scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserved, finalizers and cancellation; before that 2026-11-23, D-066/12: explicit model_domain, one assignment rule; D-066/10–11: codex aliases, host sync, availability only as reported by the live catalog; before that 2026-11-22, D-066: model matrix — system profiles and model matrix section rewritten; before that 2026-06-04, D-059)
+Last updated: 2026-11-25 (D-074: research in the grounding step of the direct path; before that 2026-11-24, D-067: strict snapshot reading, at least one reviewer, outcome after finalizers, run warnings, system grounding back on the provider-type path, learning paused by default; second review round: reviewer check on save, vector scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserved, finalizers and cancellation; before that 2026-11-23, D-066/12: explicit model_domain, one assignment rule; D-066/10–11: codex aliases, host sync, availability only as reported by the live catalog; before that 2026-11-22, D-066: model matrix — system profiles and model matrix section rewritten; before that 2026-06-04, D-059)
 
 ## Overview
 
@@ -854,7 +854,9 @@ model and its one fallback leave the facts unchecked, and "What was checked" say
 
 Since stage 4 the grounding step of the direct path (`OrderGroundingStep`) can add passages looked up on the web. It asks
 `IOrderResearchService.EnsureAsync` before it renders the files, with the version of the run (from the assembler), whether the
-run revises a text, the full text of every file of the order and the About me details of the briefing. The service decides
+run revises a text, the full text and the name of every file of the order (the clarifier that wrote the research topics saw
+both) and the About me details of the briefing; a topic with a word from them that is not in the request is withheld by the
+origin rule (`ResearchQueryGate`). The service decides
 (switch `Research:Mode`, override per user, first version, no revision, clarified with research topics, daily limit) and stores
 the research once at the order (`Orders.ResearchJson`); every later run of the order gets the stored passages unchanged and
 never searches again.
