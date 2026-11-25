@@ -57,6 +57,47 @@ public sealed class ResearchQueryGateTests
     public void A_number_from_a_file_is_withheld_in_any_spelling(string topic, string file) =>
         AssertWithheld(Select(topic, file: file));
 
+    [Theory]
+    [InlineData("Mietminderung Wohnung 1250", "Kaltmiete: 1.250")]
+    [InlineData("Mietminderung Wohnung 1.250", "Kaltmiete 1250")]
+    [InlineData("tax class net salary 4850 monthly", "Gehalt: 4.850 brutto")]
+    [InlineData("Mietminderung 1250 Euro", "Kaltmiete 1.250,00")]
+    [InlineData("Mietminderung 1.250,00 Euro", "Kaltmiete 1250")]
+    [InlineData("Zuschuss 3.200", "Bonus 3200,00")]
+    public void Four_digit_and_marked_numbers_are_withheld_in_any_spelling(string topic, string profile) =>
+        AssertWithheld(Select(topic, profile: profile));
+
+    [Theory]
+    [InlineData("Meier Insolvenz", "Mei\u00ADer")]
+    [InlineData("Meier Insolvenz", "Mei\u200Ber")]
+    [InlineData("Schmidt Arbeitsrecht", "ArztbriefSchmidt")]
+    [InlineData("Blue Sky Labs Förderung", "BlueSkyLabs")]
+    [InlineData("Wolfs Kanzlei Bewertungen", "Name: Kim Wolf")]
+    public void Invisible_characters_camel_case_parts_and_a_genitive_do_not_hide_a_word(string topic, string profile) =>
+        AssertWithheld(Select(topic, request: "Schreib eine kurze Nachricht.", profile: profile));
+
+    [Fact]
+    public void A_topic_in_another_language_than_the_order_is_withheld_only_with_the_language_given()
+    {
+        const string topic = "notice period for the flat";
+        Assert.Empty(ResearchQueryGate.Select([topic], Request, [], null, 4, "de").Sent);
+        Assert.Equal([topic], ResearchQueryGate.Select([topic], Request, [], null, 4, "en").Sent);
+        Assert.Equal([topic], ResearchQueryGate.Select([topic], Request, [], null, 4).Sent);
+        Assert.Equal(["Kündigungsfrist Mietwohnung"], ResearchQueryGate.Select(["Kündigungsfrist Mietwohnung"], Request, [], null, 4, "de-DE").Sent);
+        Assert.Equal(["consumer rights refund deadline"], ResearchQueryGate.Select(["consumer rights refund deadline"], Request, [], null, 4, "de").Sent);
+    }
+
+    [Theory]
+    [InlineData("notice period for the flat", "en")]
+    [InlineData("Kündigungsfrist der Wohnung", "de")]
+    [InlineData("Mietrecht für Mieter", "de")]
+    [InlineData("Mietrecht Frist", null)]
+    [InlineData("Mindestlohn 2026", null)]
+    [InlineData("consumer rights refund deadline", null)]
+    [InlineData("the Kündigungsfrist", null)]
+    public void The_language_of_a_topic_is_only_named_when_it_is_certain(string topic, string? expected) =>
+        Assert.Equal(expected, ResearchQueryGate.TopicLanguage(topic));
+
     [Fact]
     public void A_number_the_request_holds_is_sent() =>
         AssertSent(Select("ISO 27001 Anforderungen", request: "Merkblatt zu ISO 27001 für das Team", file: "Audit nach ISO 27001 im März"),
