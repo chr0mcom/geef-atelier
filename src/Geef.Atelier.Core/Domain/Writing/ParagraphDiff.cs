@@ -1,12 +1,15 @@
-namespace Geef.Atelier.Infrastructure.Finalizers;
+namespace Geef.Atelier.Core.Domain.Writing;
 
-/// <summary>Paragraph-level LCS diff between two texts.</summary>
-internal static class ParagraphDiff
+/// <summary>Paragraph-level LCS diff between two texts; a paragraph is a block between blank lines, trimmed.</summary>
+public static class ParagraphDiff
 {
+    /// <summary>Whether a paragraph stayed, was removed from the original or was added in the new text.</summary>
     public enum Op { Equal, Delete, Insert }
 
+    /// <summary>One paragraph of the diff.</summary>
     public sealed record Chunk(Op Op, string Text);
 
+    /// <summary>The paragraphs of <paramref name="original"/> and <paramref name="transformed"/> in the order of the diff.</summary>
     public static IReadOnlyList<Chunk> Compute(string original, string transformed)
     {
         var a = SplitParagraphs(original);

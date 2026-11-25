@@ -5,6 +5,7 @@ using Geef.Atelier.Application.Providers;
 using Geef.Atelier.Core.Domain.Crew.Finalizers;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Core.Domain.Warnings;
+using Geef.Atelier.Core.Domain.Writing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
