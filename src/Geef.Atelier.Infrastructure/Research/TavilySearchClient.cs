@@ -149,12 +149,21 @@ internal sealed class TavilySearchClient(
 /// <summary>Text helpers of the web search.</summary>
 internal static class TavilyTextExtensions
 {
+    private static readonly HashSet<string> Abbreviations = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "ca", "bzw", "vgl", "ggf", "evtl", "inkl", "exkl", "zzgl", "abzgl", "Nr", "Dr", "Prof", "Hr", "Fr", "St", "Str", "Abs", "Art",
+        "Mio", "Mrd", "Tsd", "max", "min", "Mr", "Mrs", "Ms", "vs", "approx", "No", "Jr", "Sr", "Inc", "Ltd", "Co", "Bd", "Jh", "Tel",
+    };
+
     /// <summary>
     /// <paramref name="text"/> when it has at most <paramref name="maxChars"/> characters. A longer text is cut back to the last safe end
-    /// within the first <paramref name="maxChars"/> characters: a line break, or a <c>.</c>, <c>!</c> or <c>?</c> followed by white
-    /// space, where a dot right after a digit never counts (a number such as <c>1.250</c> or a date such as <c>1. Mai</c>). Without
-    /// such an end the cut falls on the last white space that does not stand between digits, and without that the text is empty; a
-    /// cut never ends inside a word or a number.
+    /// within the first <paramref name="maxChars"/> characters that keeps at least half of them: a line break before a line that does
+    /// not go on in lower case, a <c>.</c>, <c>!</c> or <c>?</c> followed by white space, or <c>。</c>, <c>！</c> or <c>？</c>. A dot
+    /// right after a digit (<c>1.250</c>, <c>1. Mai</c>), after a single letter or a known abbreviation (<c>ca.</c>, <c>z.B.</c>), or
+    /// before a word in lower case or a digit never counts. Without such an end the cut falls on the last white space that does not
+    /// stand between digits, then after the last comma, semicolon, colon or closing bracket (also the full-width ones of Chinese and
+    /// Japanese) that does not stand between digits, and only without any of these is the text empty; a cut never ends inside a word
+    /// or a number.
     /// </summary>
     public static string Cut(this string text, int maxChars)
     {
@@ -163,9 +172,10 @@ internal static class TavilyTextExtensions
         if (text.Length <= maxChars)
             return text;
 
-        for (var i = maxChars - 1; i >= 0; i--)
+        var half = (maxChars + 1) / 2;
+        for (var i = maxChars - 1; i >= half; i--)
         {
-            if (text[i] is '\n' or '\r')
+            if (text[i] is '\n' or '\r' && text.LineEndsAt(i))
                 return text[..i].TrimEnd();
             if (text.EndsSentenceAt(i))
                 return text[..(i + 1)];
@@ -175,12 +185,40 @@ internal static class TavilyTextExtensions
             if (char.IsWhiteSpace(text[i]) && !(char.IsDigit(text[i - 1]) && i + 1 < text.Length && char.IsDigit(text[i + 1])))
                 return text[..i].TrimEnd();
         }
+        for (var i = maxChars - 1; i > 0; i--)
+        {
+            if (text[i] is '\u3001' or '\uFF0C' or '\uFF1B' or '\uFF1A' or '\u300D' or '\u300F' or '\uFF09'
+                || text[i] is ',' or ';' or ':' or ')' && !(char.IsDigit(text[i - 1]) && char.IsDigit(text[i + 1])))
+                return text[..(i + 1)];
+        }
         return string.Empty;
     }
 
-    private static bool EndsSentenceAt(this string text, int index) =>
-        text[index] is '.' or '!' or '?'
-        && index + 1 < text.Length
-        && char.IsWhiteSpace(text[index + 1])
-        && !(text[index] == '.' && index > 0 && char.IsDigit(text[index - 1]));
+    private static bool LineEndsAt(this string text, int index)
+    {
+        var next = index + 1;
+        while (next < text.Length && char.IsWhiteSpace(text[next]))
+            next++;
+        return next >= text.Length || !char.IsLower(text[next]);
+    }
+
+    private static bool EndsSentenceAt(this string text, int index)
+    {
+        if (text[index] is '\u3002' or '\uFF01' or '\uFF1F')
+            return true;
+        if (text[index] is not ('.' or '!' or '?') || index + 1 >= text.Length || !char.IsWhiteSpace(text[index + 1]))
+            return false;
+        if (text[index] != '.')
+            return true;
+        var next = index + 1;
+        while (next < text.Length && char.IsWhiteSpace(text[next]))
+            next++;
+        if (next < text.Length && (char.IsLower(text[next]) || char.IsDigit(text[next])))
+            return false;
+        var start = index;
+        while (start > 0 && (char.IsLetterOrDigit(text[start - 1]) || text[start - 1] == '.'))
+            start--;
+        var word = text[start..index];
+        return word.Length == 0 || (!char.IsDigit(word[^1]) && word.Count(char.IsLetter) > 1 && !word.Contains('.') && !Abbreviations.Contains(word));
+    }
 }

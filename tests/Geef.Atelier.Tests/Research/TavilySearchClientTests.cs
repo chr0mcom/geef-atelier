@@ -215,12 +215,50 @@ public sealed class TavilySearchClientTests
 
     [Theory]
     [InlineData("Zeile eins ohne Punkt\nZeile zwei mit 1.500 Euro", 36, "Zeile eins ohne Punkt")]
-    [InlineData("Erster Satz. Frist bis zum 1. Mai und danach 1.250,00 Euro", 50, "Erster Satz.")]
-    [InlineData("Frage? Antwort folgt hier mit 12,5 Prozent", 33, "Frage?")]
+    [InlineData("Erster Satz mit Inhalt. Frist bis zum 1. Mai und danach 1.250,00 Euro", 44, "Erster Satz mit Inhalt.")]
+    [InlineData("Erster Satz. Frist bis zum 1. Mai und danach 1.250,00 Euro", 50, "Erster Satz. Frist bis zum 1. Mai und danach")]
+    [InlineData("Eine Frage hier? Antwort folgt mit 12,5 Prozent", 30, "Eine Frage hier?")]
+    [InlineData("Frage? Antwort folgt hier mit 12,5 Prozent", 33, "Frage? Antwort folgt hier mit")]
     [InlineData("ohne Satzende aber mit Wörtern 1 250 000 Euro", 35, "ohne Satzende aber mit Wörtern")]
     [InlineData("Kurz.", 10, "Kurz.")]
     public void The_cut_ends_at_a_sentence_or_line_end_never_inside_a_word_or_number(string text, int max, string expected) =>
         Assert.Equal(expected, text.Cut(max));
+
+    [Theory]
+    [InlineData("Menu\n")]
+    [InlineData("Welcome. ")]
+    public void An_early_sentence_or_line_end_never_throws_away_most_of_the_page(string start)
+    {
+        var text = start + string.Concat(Enumerable.Repeat("the fee for the permit rose again and ", 400));
+
+        var cut = text.Cut(6000);
+
+        Assert.True(cut.Length >= 3000, $"kept {cut.Length}");
+        Assert.True(char.IsWhiteSpace(text[cut.Length]));
+    }
+
+    [Theory]
+    [InlineData("Der erste Satz steht hier. Frist ca. Mitte Mai für alle Leute", 46, "Der erste Satz steht hier.")]
+    [InlineData("Der erste Satz steht hier. Gebühren, z.B. Pässe, kosten", 48, "Der erste Satz steht hier.")]
+    [InlineData("Der erste Satz steht hier. Antwort von Dr. Beispiel heute", 50, "Der erste Satz steht hier.")]
+    [InlineData("Der erste Satz steht hier. Siehe Seite drei. weiter geht es", 50, "Der erste Satz steht hier.")]
+    [InlineData("Der erste Satz steht hier.\nDie Gebühr stieg im\nletzten Jahr deutlich an", 50, "Der erste Satz steht hier.")]
+    [InlineData("Der erste Satz steht hier.\nZweite Zeile ohne Punkt\nDritte Zeile folgt", 52, "Der erste Satz steht hier.\nZweite Zeile ohne Punkt")]
+    public void An_abbreviation_or_a_line_that_goes_on_in_lower_case_is_no_end(string text, int max, string expected) =>
+        Assert.Equal(expected, text.Cut(max));
+
+    [Fact]
+    public void Chinese_text_without_spaces_is_cut_at_its_full_stop_and_a_long_token_at_a_comma()
+    {
+        var chinese = string.Concat(Enumerable.Repeat("今天的天气很好我们去公园散步。", 10));
+        Assert.Equal(chinese[..(chinese.LastIndexOf('。', 99) + 1)], chinese.Cut(100));
+
+        var token = string.Concat(Enumerable.Repeat("abcdefghij,", 10));
+        Assert.Equal(token[..(token.LastIndexOf(',', 59) + 1)], token.Cut(60));
+
+        Assert.Equal(string.Empty, new string('x', 100).Cut(60));
+        Assert.Equal(string.Empty, ("1,500" + new string('x', 100)).Cut(3));
+    }
 
     [Theory]
     [InlineData("https://trusted.example@evil.example/x")]
