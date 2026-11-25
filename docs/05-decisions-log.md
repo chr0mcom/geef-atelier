@@ -2367,3 +2367,70 @@ the clarifier reliably names research topics.
 **Observed during acceptance:** the fact checker also reports sentences with placeholders and polite closing sentences as not
 backed; the clarifier once offered guessed dates as options although its prompt forbids it; quotes show formatting characters of
 the source page.
+
+## D-075 — Stage 5, part A: four findings from real runs (2026-11-25)
+
+**Status:** part A integrated, not shipped. (b), (c) and (d) go out with deploy A; (a) is built and measured but is **not**
+shipped, not even switched off. No migration, zero model calls. Part B (changing a text, MCP contract) follows as an addendum to
+this entry.
+
+**Guiding rule.** A new version changes only what the person asks for, and nothing known is lost on the way. For part A this
+means: never claim more than was checked, and never lose anything silently. The prompts and schemas of the fact checker, the
+clarifier and the condenser and the writer's system prompt stay bit for bit the same (hash tests green); the stored measurements
+V2 and D-072 stay valid.
+
+- **(a) Hint instead of "not backed" – not shipped.** Two purely structural rules in the fact-check filter were built that turn
+  an `unsupported` finding into a hint that does not block: **rule P** (sentence with a gap, a placeholder right after a colon,
+  every figure outside the gap in the material) and **rule C** (a short closing sentence without figures in a short paragraph of
+  its own among the last three). Measurement (gate G-A1, offline):
+  - **V2 part** (as reported by the package): 0 of 44 kept `unsupported` findings turned into hints, no planted mistake
+    affected; hits dev 33/33, holdout 17/17, question c 2/2 per set, `Kept` 39/21, blocking findings on clean texts unchanged.
+  - **R2 part: failed.** Over the stored answers of 5 orders with 11 flagged passages the rules turned **5** passages into
+    hints (P 2, C 3). A blind reviewer, who recorded the verdict before seeing which passages the rules picked, judged **3** of
+    them to be claims (P: 0 of 2 confirmed as gap sentences; C: 2 of 3 confirmed as stock phrases); 0 were allowed.
+  - **Consequence:** the code of (a) is not in deploy A; its scaffolding (hint kinds, switches `Direct:GapSentenceHint` and
+    `Direct:ClosingSentenceHint`, hint sentences, field `Hint`) has been removed. **Rule P is not to be proposed again in this
+    form:** the filter already drops findings *inside* a placeholder; what the checker still flags in a sentence with a gap is
+    almost always the claim around the gap.
+  - **Conditions for proposing rule C again:** (1) the whole paragraph contains no placeholder; (2) an honest sentence for the
+    person saying that the line comes neither from the request nor from the files (no labelling as a "stock phrase", no "not a
+    mistake" in MCP); (3) fresh, blindly confirmed data the rule was not shaped on, with 0 claims among the passages turned into
+    hints (without any hit: "not evaluable"); (4) not automatically for correction mode (`FactCheckMode = On`): first, planted
+    cases of the form "short invented line alone at the end" go into the corpus.
+- **(b) Guessed dates in the gate** (switch `Intake:DropGuessedDateOptions`, shipped `false`). After the existing form rules the
+  gate drops every answer option with a calendar element that stands neither in the request nor in the whole file texts: a
+  numeric date, a month name next to a figure, a weekday as a whole word. The names come from the `CultureInfo` calendars (de,
+  en, fr, es, it and the language of the order), not from a maintained word list; a full date brings its weekday. If fewer than
+  two options remain, the question becomes a visible assumption like any dropped question (`GateDecision.DroppedGuessedDate`).
+  The rule only drops; it never lets through a question the form rules drop. Durations and amounts ("1 to 3 years"), "you may",
+  a month on its own and length templates stay. **Gate G-A2 passed:** `IntakeEval evaluate` over the held-out set (32 entries)
+  and the second corpus (40) gives byte-identical output with and without the rule, gates a–f passed (e′ a warning only, as
+  before), 0 shown options with a calendar element. The real case from production (read only, no files): without the rule
+  exactly the stored question; with the rule all three guessed options are dropped and the question becomes an assumption.
+  **Limits:** the assumption itself may name a guessed date (visible and correctable); the question text is not checked; English
+  abbreviations without a full stop in the material are not recognised (a matching option would then be dropped).
+- **(c) Quotes under "Looked up" without Markdown marks** (display only, no switch). `SafeMarkdown.ToPlainText` through the same
+  pipeline, one line; numbers of numbered lists stay. If the figures of the plain text differ from those of the quote, or the
+  plain text would be empty, the quote is shown unchanged. The stored wording, the material of writer and fact checker and MCP
+  `lookedUp.entries[].quote` stay word for word. **Gate G-A3 (c) passed:** R2 entries 21, of them 3 with formatting marks, 3
+  converted, 0 fallbacks, 0 figure differences; over all 49 stored quotes 7 with formatting marks, all converted, afterwards 0
+  marks and 0 figure differences.
+- **(d) Assumptions that another continues word for word appear once** (display only, the same on the web and over MCP). An
+  assumption also counts as repeated when its key (`SameAssumptionKey`) is the beginning of the key of another one and there
+  `, ; : (` or a dash between blanks follows; the longest one is shown where the first stood. An assumption of the clarifier (it
+  has an id) is never removed, not even when an assumption of the writer with the same words came first; if the writer's one is
+  longer, both stay. Assumptions that say the same in other words stay twice, because only a person can tell. (d) had been built
+  in two packages; one version was kept after checking it against both test sets and a comparison over 200,000 random lists (the
+  same continuation relation; in the order the callers use, the same assumptions shown). **Gate G-A3 (d):** over all 32 stored
+  results with text and report (196 shown assumptions) the rule merges **0** assumptions; there was nothing for the independent
+  reviewer to decide. The rule therefore changes nothing in the existing data; the repeats observed in stage 4 are rewordings
+  and deliberately stay twice.
+
+**Switches:** `Intake:DropGuessedDateOptions` (bool, shipped `false`, through the environment without a new image). (c) and (d)
+have no switch. The switches of (a) no longer exist.
+
+**Way back:** deploy A is a web image only, without a migration; the way back is the previous image. The switch takes effect
+at once through the environment.
+
+> **Open – to be completed after the separate step:** the position of `Intake:DropGuessedDateOptions` for deploy A (decided
+> after the gates) and the confirmation of the R2 result of (a) by the client.

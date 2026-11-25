@@ -2463,3 +2463,70 @@ eine neue, größere Auftragsmenge, bei der der Klärer verlässlich Suchthemen 
 **Beobachtungen aus der Abnahme:** Der Faktenprüfer meldet auch Sätze mit Platzhaltern und höfliche Schlusssätze als
 ungedeckt; der Klärer bot einmal geratene Daten als Antworten an, obwohl sein Prompt das verbietet; Zitate zeigen
 Formatzeichen der Quellseite.
+
+## D-075 — Etappe 5, Teil A: vier Befunde aus echten Läufen (2026-11-25)
+
+**Status:** Teil A integriert, nicht ausgeliefert. (b), (c) und (d) gehen mit Deploy A; (a) ist gebaut und gemessen, wird aber
+**nicht** ausgeliefert, auch nicht abgeschaltet. Keine Migration, null Modellaufrufe. Teil B (Nachbessern, MCP-Vertrag) folgt
+als Zusatz zu diesem Eintrag.
+
+**Leitsatz.** Eine neue Version ändert nur, was die Person verlangt, und nichts Bekanntes geht dabei verloren. Für Teil A heißt
+das: nie mehr behaupten, als geprüft wurde, und nichts still verlieren. Prüfer-, Klärer- und Verdichter-Prompt samt Schema und
+der System-Prompt des Schreibers bleiben bitgleich (Hash-Tests grün); die gespeicherten Messungen V2 und D-072 bleiben gültig.
+
+- **(a) Hinweis statt „nicht gedeckt“ – nicht ausgeliefert.** Gebaut waren zwei rein strukturelle Regeln im Filter des
+  Faktenprüfers, die einen `unsupported`-Befund zum nicht blockierenden Hinweis machen: **Regel P** (Satz mit Lücke, Platzhalter
+  direkt nach einem Doppelpunkt, jede Ziffer außerhalb der Lücke im Material) und **Regel C** (kurzer, ziffernfreier
+  Schlusssatz in einem eigenen kurzen Absatz unter den letzten drei). Messung (Tor G-A1, offline):
+  - **V2-Teil** (laut Paketbericht): 0 von 44 behaltenen `unsupported`-Befunden umgestuft, kein gepflanzter Fehler betroffen;
+    Treffer dev 33/33, holdout 17/17, Frage c 2/2 je Menge, `Kept` 39/21, blockierend auf sauberen Texten unverändert.
+  - **R2-Teil: verfehlt.** Über die gespeicherten Antworten von 5 Aufträgen mit 11 gemeldeten Stellen stuften die Regeln
+    **5** Stellen um (P 2, C 3). Ein blinder Prüfer, der sein Urteil vor der Zuordnung festhielt, bewertete **3** davon als
+    Aussagen (P 0 von 2 als Lückensatz bestätigt, C 2 von 3 als Floskel bestätigt); erlaubt waren 0.
+  - **Folge:** Der Code von (a) ist nicht in Deploy A; die Hülle dazu (Hinweisarten, Schalter `Direct:GapSentenceHint` und
+    `Direct:ClosingSentenceHint`, Hinweissätze, Feld `Hint`) ist entfernt. **Regel P wird in dieser Form nicht erneut
+    vorgelegt:** Der Filter verwirft Befunde *in* einem Platzhalter schon heute; was der Prüfer an einem Satz mit Lücke
+    danach noch meldet, ist fast immer die Aussage um die Lücke herum.
+  - **Bedingungen für eine etwaige Wiedervorlage von Regel C:** (1) der ganze Absatz enthält keinen Platzhalter; (2) ein
+    ehrlicher Satz für die Person, der sagt, dass die Zeile weder aus dem Auftrag noch aus den Dateien stammt (keine Einordnung
+    als „Floskel“, kein „not a mistake“ im MCP); (3) frische, blind bestätigte Daten, an denen die Regel nicht geformt wurde,
+    mit 0 Aussagen unter den umgestuften Stellen (ohne Treffer „nicht auswertbar“); (4) nicht automatisch für den
+    Korrekturmodus (`FactCheckMode = On`): vorher kommen gepflanzte Fälle „kurze erfundene Zeile allein am Ende“ in den
+    Korpus.
+- **(b) Geratene Daten im Gate** (Schalter `Intake:DropGuessedDateOptions`, ausgeliefert `false`). Nach den bisherigen
+  Formregeln streicht das Gate jede Antwortoption mit einem Kalenderelement, das weder im Wortlaut noch in den ganzen
+  Dateitexten steht: Ziffern-Datum, Monatsname neben einer Ziffer, Wochentag als ganzes Wort. Die Namen kommen aus den
+  Kalendern von `CultureInfo` (de, en, fr, es, it und die Auftragssprache), keine gepflegte Wortliste; ein volles Datum bringt
+  seinen Wochentag mit. Bleiben weniger als zwei Optionen, wird die Frage wie jede gestrichene zur sichtbaren Annahme
+  (`GateDecision.DroppedGuessedDate`). Die Regel streicht nur, sie gibt nie eine sonst gestrichene Frage frei. Dauern und
+  Mengen („1 bis 3 Jahre“), „you may“, ein Monat allein und Längenvorlagen bleiben. **Tor G-A2 bestanden:** `IntakeEval
+  evaluate` über die zurückgehaltene Menge (32 Einträge) und den Zweitkorpus (40) ist mit und ohne Regel bytegleich, Tore a–f
+  bestanden (e′ wie bisher nur Warnung), 0 gezeigte Optionen mit Kalenderelement. Der echte Fall aus dem Bestand (nur lesend,
+  ohne Dateien): ohne Regel genau die gespeicherte Frage, mit Regel fallen alle drei geratenen Optionen, die Frage wird zur
+  Annahme. **Grenzen:** Die Annahme selbst kann ein geratenes Datum nennen (sichtbar und korrigierbar); der Fragetext wird
+  nicht geprüft; englische Abkürzungen ohne Punkt im Material werden nicht erkannt (dann fiele eine passende Option).
+- **(c) Zitate unter „Looked up“ ohne Markdown-Zeichen** (nur Anzeige, kein Schalter). `SafeMarkdown.ToPlainText` über
+  dieselbe Pipeline, eine Zeile; Nummern nummerierter Listen bleiben. Weicht die Ziffernfolge des Klartexts von der des
+  Zitats ab oder wäre er leer, wird das Zitat unverändert gezeigt. Gespeicherter Wortlaut, Material von Schreiber und Prüfer
+  und MCP `lookedUp.entries[].quote` bleiben wörtlich. **Tor G-A3 (c) bestanden:** R2-Einträge 21, davon 3 mit
+  Formatzeichen, 3 umgewandelt, 0 Rückfälle, 0 Ziffernabweichungen; über alle 49 gespeicherten Zitate 7 mit Formatzeichen,
+  alle umgewandelt, danach 0 Formatzeichen, 0 Ziffernabweichungen.
+- **(d) Annahmen, die eine andere wortgleich fortsetzt, erscheinen einmal** (nur Anzeige, Web und MCP gleich). Eine Annahme
+  gilt zusätzlich als wiederholt, wenn ihr Schlüssel (`SameAssumptionKey`) Anfang des Schlüssels einer anderen ist und dort
+  `, ; : (` oder ein Strich zwischen Leerzeichen folgt; gezeigt wird die längste an der Stelle der ersten. Eine Annahme des
+  Klärers (sie hat eine Kennung) wird nie entfernt, auch nicht, wenn vorher eine gleichlautende des Schreibers stand; ist die
+  des Schreibers länger, bleiben beide. Sinngleich Umformuliertes bleibt doppelt, weil nur ein Mensch das beurteilen kann.
+  (d) war in zwei Paketen gebaut; behalten ist eine Fassung, abgeglichen an beiden Testmengen und einem Vergleich über
+  200.000 zufällige Listen (gleiche Fortsetzungsrelation, in der Reihenfolge der Aufrufer gleiche gezeigte Annahmen).
+  **Tor G-A3 (d):** Über alle 32 gespeicherten Ergebnisse mit Text und Bericht (196 gezeigte Annahmen) legt die Regel **0**
+  Annahmen zusammen; es gab nichts für den unabhängigen Prüfer zu entscheiden. Die Regel ändert am Bestand also nichts; die
+  in Etappe 4 beobachteten Doppelungen sind Umformulierungen und bleiben bewusst doppelt.
+
+**Schalter:** `Intake:DropGuessedDateOptions` (bool, ausgeliefert `false`, per Umgebung ohne neues Image). (c) und (d) haben
+keinen Schalter. Die Schalter von (a) gibt es nicht mehr.
+
+**Rückweg:** Deploy A ist ein reines Web-Image ohne Migration; Rückweg ist das vorherige Image. Der Schalter wirkt sofort per
+Umgebung.
+
+> **Offen – wird nach dem eigenen Schritt ergänzt:** Schalterstellung von `Intake:DropGuessedDateOptions` für Deploy A
+> (Entscheidung nach den Toren) und die Bestätigung des R2-Ergebnisses von (a) durch den Auftraggeber.
