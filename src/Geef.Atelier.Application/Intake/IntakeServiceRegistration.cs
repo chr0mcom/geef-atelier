@@ -12,6 +12,7 @@ public static class IntakeServiceRegistration
         services.AddOptions();
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IOrderIntakeSignal, ChannelOrderIntakeSignal>();
+        services.TryAddSingleton<IntakeSweepDeferrals>();
         services.TryAddScoped<IMemoryResolution, ProfileMemoryResolution>();
         services.TryAddScoped<IOrderIntakeService, OrderIntakeService>();
         return services;

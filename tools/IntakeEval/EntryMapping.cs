@@ -52,23 +52,11 @@ internal static class EntryMapping
         UpdatedAt = DateTimeOffset.UnixEpoch,
     };
 
-    public static ClarifierRequest Request(this CorpusEntry entry, IntakeOptions options)
-    {
-        var profile = entry.Profile();
-        return new ClarifierRequest(
-            entry.Request,
-            IntakeExcerpts.Build(entry.Sources(), options),
-            profile is null ? null : ProfilePrompt.Render(profile),
-            RevisionDetector.MentionsRevision(entry.Request));
-    }
+    public static ClarifierRequest Request(this CorpusEntry entry, IntakeOptions options) =>
+        IntakeAnalysis.Request(entry.Request, entry.Sources(), entry.Profile(), options);
 
-    public static QuestionGateResult Gate(this CorpusEntry entry, ClarifierRequest request, ClarifierOutput output, IntakeOptions options)
-    {
-        var known = Memory.Resolve(new MemoryFacts(entry.Profile()), output.TextType);
-        var candidates = request.Files.Select(f => new RevisionCandidate(f.Number, f.SourceId, f.FileName)).ToList();
-        var revision = RevisionDetector.Choose(entry.Request, candidates, output.RevisionFileNumber, output.IsRevision);
-        return QuestionGate.Apply(new QuestionGateInput(output, entry.Request, candidates.Count > 0, revision is not null, known, options.MaxQuestions));
-    }
+    public static IntakeAnalysisResult Gate(this CorpusEntry entry, ClarifierRequest request, ClarifierOutput output, IntakeOptions options) =>
+        IntakeAnalysis.Analyse(entry.Request, request.Candidates(), output, Memory.Resolve(new MemoryFacts(entry.Profile()), output.TextType), options.MaxQuestions);
 
     private static SourceKind Kind(string kind) => kind.ToLowerInvariant() switch
     {

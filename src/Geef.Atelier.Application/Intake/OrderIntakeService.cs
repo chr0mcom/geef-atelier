@@ -29,7 +29,8 @@ internal sealed class OrderIntakeService(
     IOrderNotifier notifier,
     IOptions<IntakeOptions> options,
     ILogger<OrderIntakeService> logger,
-    TimeProvider time) : IOrderIntakeService
+    TimeProvider time,
+    IntakeSweepDeferrals deferrals) : IOrderIntakeService
 {
     /// <summary>Error code when sources or profile could not be loaded.</summary>
     public const string PrepareFailedCode = "prepare_failed";
@@ -105,22 +106,20 @@ internal sealed class OrderIntakeService(
     public async Task<int> StartStuckAsync(DateTimeOffset now, CancellationToken ct)
     {
         var settings = options.Value;
-        var ids = await orders.ListStuckIntakesAsync(now - settings.ClaimLease, now - settings.QueueTimeout, settings.MaxAttempts, SweepBatch, ct);
-        var count = 0;
-        foreach (var id in ids)
+        var deferred = deferrals.Active();
+        var ids = await orders.ListStuckIntakesAsync(now - settings.ClaimLease, now - settings.QueueTimeout, settings.MaxAttempts, SweepBatch + deferred.Count, ct);
+        return await SweepEachAsync(ids, deferred, async id =>
         {
             var order = await orders.GetAsync(id, ct);
             if (order is not { State: OrderState.Analyzing })
-                continue;
+                return false;
             var code = order.IntakeAttempts >= settings.MaxAttempts ? AttemptsExhaustedCode : QueueTimeoutCode;
             var record = IntakeRecord.Fallback(IntakeRecordStatus.QueueTimeout, code, 0, null, settings.BriefMode);
-            if (await starter.TryStartAsync(new RunStartRequest(order, OrderState.Analyzing, record, [], IntakeOutcome.Failed, true), ct) is not null)
-            {
-                count++;
-                logger.LogWarning("Intake of order {OrderId} did not finish ({Code}); it started with the request as written.", id, code);
-            }
-        }
-        return count;
+            if (await starter.TryStartAsync(new RunStartRequest(order, OrderState.Analyzing, record, [], IntakeOutcome.Failed, true), ct) is null)
+                return false;
+            logger.LogWarning("Intake of order {OrderId} did not finish ({Code}); it started with the request as written.", id, code);
+            return true;
+        }, ct);
     }
 
     public async Task<int> AutoStartUnansweredAsync(DateTimeOffset now, CancellationToken ct)
@@ -129,17 +128,36 @@ internal sealed class OrderIntakeService(
         if (after <= TimeSpan.Zero)
             return 0;
 
-        var count = 0;
-        foreach (var id in await orders.ListUnansweredAsync(now - after, SweepBatch, ct))
+        var deferred = deferrals.Active();
+        var ids = await orders.ListUnansweredAsync(now - after, SweepBatch + deferred.Count, ct);
+        return await SweepEachAsync(ids, deferred, async id =>
         {
             var order = await orders.GetAsync(id, ct);
             if (order is not { State: OrderState.NeedsInput })
-                continue;
+                return false;
             var record = IntakeRecordJson.TryParse(order.ClarifyJson);
-            if (await starter.TryStartAsync(new RunStartRequest(order, OrderState.NeedsInput, record, [], IntakeOutcome.AutoStarted, false), ct) is not null)
+            if (await starter.TryStartAsync(new RunStartRequest(order, OrderState.NeedsInput, record, [], IntakeOutcome.AutoStarted, false), ct) is null)
+                return false;
+            logger.LogInformation("Order {OrderId} got no answers in time and started with the assumptions.", id);
+            return true;
+        }, ct);
+    }
+
+    private async Task<int> SweepEachAsync(IReadOnlyList<Guid> ids, IReadOnlySet<Guid> deferred, Func<Guid, Task<bool>> start, CancellationToken ct)
+    {
+        var count = 0;
+        foreach (var id in ids.Where(i => !deferred.Contains(i)).Take(SweepBatch))
+        {
+            try
             {
-                count++;
-                logger.LogInformation("Order {OrderId} got no answers in time and started with the assumptions.", id);
+                if (await start(id))
+                    count++;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                deferrals.Defer(id);
+                logger.LogError("Intake sweep: order {OrderId} could not be started and is left out for {Minutes} minutes: {Error}",
+                    id, (int)IntakeSweepDeferrals.DeferFor.TotalMinutes, ex.ToRedactedLogText());
             }
         }
         return count;
@@ -149,16 +167,12 @@ internal sealed class OrderIntakeService(
     {
         var settings = options.Value;
         ClarifierRequest request;
-        IReadOnlyList<RevisionCandidate> candidates;
         MemoryFacts facts;
         try
         {
             var items = await sources.ListForOrderAsync(order.Id, includeText: true, ct);
             facts = await memory.LoadAsync(order.CreatedByUser ?? string.Empty, ct);
-            var files = IntakeExcerpts.Build(items, settings);
-            candidates = files.Select(f => new RevisionCandidate(f.Number, f.SourceId, f.FileName)).ToList();
-            var profileBlock = facts.Profile is null ? null : ProfilePrompt.Render(facts.Profile);
-            request = new ClarifierRequest(order.RequestText, files, profileBlock, RevisionDetector.MentionsRevision(order.RequestText));
+            request = IntakeAnalysis.Request(order.RequestText, items, facts.Profile, settings);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
@@ -173,16 +187,16 @@ internal sealed class OrderIntakeService(
             return new Analysis(IntakeRecord.Fallback(status, call.ErrorCode, call.DurationMs, call.Model, settings.BriefMode), 0, false);
         }
 
-        var known = memory.Resolve(facts, output.TextType);
-        var revision = RevisionDetector.Choose(order.RequestText, candidates, output.RevisionFileNumber, output.IsRevision);
-        var gate = QuestionGate.Apply(new QuestionGateInput(output, order.RequestText, candidates.Count > 0, revision is not null, known, settings.MaxQuestions));
+        var analysis = IntakeAnalysis.Analyse(order.RequestText, request.Candidates(), output, memory.Resolve(facts, output.TextType), settings.MaxQuestions);
+        var gate = analysis.Gate;
+        var revision = analysis.Revision;
         var record = new IntakeRecord(
             IntakeRecord.CurrentSchemaVersion,
             IntakeRecordStatus.Ok,
             call.Model,
             call.DurationMs,
             null,
-            output,
+            analysis.Output,
             gate.Trace,
             gate.Questions,
             gate.Assumptions,

@@ -110,8 +110,7 @@ public sealed class IntakeCorpusTests(ITestOutputHelper output)
         };
         var known = Memory.Resolve(new MemoryFacts(profile), output.TextType);
         var files = (item.Files ?? []).Select((f, i) => new RevisionCandidate(i + 1, Guid.Empty, f.Name)).ToList();
-        var revision = RevisionDetector.Choose(item.Request, files, output.RevisionFileNumber, output.IsRevision);
-        var gate = QuestionGate.Apply(new QuestionGateInput(output, item.Request, files.Count > 0, revision is not null, known, 3));
+        var gate = IntakeAnalysis.Analyse(item.Request, files, output, known, 3).Gate;
         return new Replay(item, result, output, gate);
     }
 

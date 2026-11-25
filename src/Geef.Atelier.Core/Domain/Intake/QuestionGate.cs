@@ -6,18 +6,21 @@ namespace Geef.Atelier.Core.Domain.Intake;
 public sealed record QuestionGateInput(
     ClarifierOutput Output,
     string RequestText,
-    bool HasFiles,
     bool RevisionDetected,
     IReadOnlyDictionary<GapTopic, MemoryAnswer> Known,
     int MaxQuestions);
 
-/// <summary>What is left after the gate: the questions to show, the assumptions, the profile answers, the research topics and the trace.</summary>
+/// <summary>
+/// What is left after the gate: the questions to show, the assumptions, the profile answers, the research topics, the trace
+/// and the summary of the request (<see cref="Understanding"/>, empty when the model's summary must not be shown).
+/// </summary>
 public sealed record QuestionGateResult(
     IReadOnlyList<ClarifyQuestion> Questions,
     IReadOnlyList<IntakeAssumption> Assumptions,
     IReadOnlyList<MemoryAnswer> FromMemory,
     IReadOnlyList<string> ResearchTopics,
-    IReadOnlyList<GateTrace> Trace);
+    IReadOnlyList<GateTrace> Trace,
+    string Understanding);
 
 /// <summary>Enforces the question rule in code: few, short, plain questions with clickable answers. Pure function.</summary>
 public static class QuestionGate
@@ -48,11 +51,15 @@ public static class QuestionGate
     private static readonly HashSet<GapTopic> ProfileTopics = [GapTopic.Language, GapTopic.Sender, GapTopic.Signature, GapTopic.Formality];
     private static readonly HashSet<GapTopic> RevisionTopics = [GapTopic.Length, GapTopic.Tone, GapTopic.Formality];
 
-    /// <summary>Applies the gate rules gap by gap in fixed order; every decision is recorded in the trace.</summary>
+    /// <summary>
+    /// Applies the gate rules gap by gap in fixed order; every decision is recorded in the trace. A question about the length
+    /// counts as topic <see cref="GapTopic.Length"/> whatever topic the model gave it, so that only the template asks for it.
+    /// Questions, options, assumptions and the summary with links, addresses or requests for access data are dropped.
+    /// </summary>
     public static QuestionGateResult Apply(QuestionGateInput input)
     {
         var output = input.Output;
-        var gaps = output.Gaps;
+        var gaps = output.Gaps.Select(AsLengthGap).ToList();
         var language = (output.Language ?? string.Empty).Trim().ToLowerInvariant();
         var revision = input.RevisionDetected || output.IsRevision;
         var lengthKnown = new Lazy<bool>(() => LengthInRequest(input.RequestText));
@@ -100,8 +107,12 @@ public static class QuestionGate
             Assumptions(gaps, decisions),
             fromMemory,
             ResearchTopics(output, gaps, decisions),
-            gaps.Select((g, i) => new GateTrace(i, g.Topic, decisions[i])).ToList());
+            gaps.Select((g, i) => new GateTrace(i, g.Topic, decisions[i])).ToList(),
+            IntakeContentGuard.HasLinkOrAddress(output.Understanding) ? string.Empty : output.Understanding ?? string.Empty);
     }
+
+    private static IntakeGap AsLengthGap(IntakeGap gap) =>
+        gap.Topic != GapTopic.Length && LengthMentions.AsksForLength(gap.Question) ? gap with { Topic = GapTopic.Length } : gap;
 
     /// <summary>Plain English name of a topic, used in generated assumptions.</summary>
     public static string Label(this GapTopic topic) => topic switch
@@ -164,6 +175,8 @@ public static class QuestionGate
 
         if (CheckForm(gap.Question, language) is { } rejected)
             return (rejected, null);
+        if (Unsafe(gap.Question!))
+            return (GateDecision.DroppedUnsafeContent, null);
 
         var proposed = gap.Question!;
         var options = proposed.Options.Select((o, i) => new QuestionOption($"o{i + 1}", o.Trim())).ToList();
@@ -194,9 +207,16 @@ public static class QuestionGate
         return null;
     }
 
+    private static bool Unsafe(ProposedQuestion question) =>
+        IntakeContentGuard.IsUnsafe(question.Text)
+        || question.Options.Any(IntakeContentGuard.HasLinkOrAddress)
+        || IntakeContentGuard.AsksForSecret($"{question.Text}\n{string.Join('\n', question.Options)}");
+
     private static bool LengthInRequest(string requestText) =>
         !string.IsNullOrWhiteSpace(requestText)
-        && (RequestConstraintExtractor.Extract(requestText).Length is not null || LengthRuleGate.MentionsLength(requestText));
+        && (RequestConstraintExtractor.Extract(requestText).Length is not null
+            || LengthRuleGate.MentionsLength(requestText)
+            || LengthMentions.InRequest(requestText));
 
     private static IReadOnlyList<IntakeAssumption> Assumptions(IReadOnlyList<IntakeGap> gaps, IReadOnlyList<GateDecision> decisions)
     {
@@ -204,7 +224,7 @@ public static class QuestionGate
         for (var i = 0; i < gaps.Count; i++)
         {
             var gap = gaps[i];
-            var given = string.IsNullOrWhiteSpace(gap.Assumption) ? null : gap.Assumption.Trim();
+            var given = string.IsNullOrWhiteSpace(gap.Assumption) || IntakeContentGuard.IsUnsafe(gap.Assumption) ? null : gap.Assumption.Trim();
             var text = decisions[i] switch
             {
                 GateDecision.Asked or GateDecision.Derived or GateDecision.FromMemory => null,
@@ -227,7 +247,7 @@ public static class QuestionGate
 
     private static IReadOnlyList<string> ResearchTopics(ClarifierOutput output, IReadOnlyList<IntakeGap> gaps, IReadOnlyList<GateDecision> decisions)
     {
-        var topics = output.ResearchTopics.Select(t => t?.Trim() ?? string.Empty).Where(t => t.Length > 0).ToList();
+        var topics = output.ResearchTopics.Select(t => t?.Trim() ?? string.Empty).Where(t => t.Length > 0 && !IntakeContentGuard.IsUnsafe(t)).ToList();
         if (topics.Count == 0)
         {
             for (var i = 0; i < gaps.Count; i++)
@@ -235,7 +255,7 @@ public static class QuestionGate
                 if (decisions[i] != GateDecision.ToResearch)
                     continue;
                 var question = gaps[i].Question?.Text?.Trim();
-                var topic = string.IsNullOrEmpty(question) ? gaps[i].Topic.Label() : $"{gaps[i].Topic.Label()}: {question}";
+                var topic = string.IsNullOrEmpty(question) || IntakeContentGuard.IsUnsafe(question) ? gaps[i].Topic.Label() : $"{gaps[i].Topic.Label()}: {question}";
                 topics.Add(topic.Length > MaxResearchTopicChars ? topic[..MaxResearchTopicChars].TrimEnd() : topic);
             }
         }

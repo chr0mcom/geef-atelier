@@ -110,6 +110,7 @@ public enum GateDecision
     DroppedUserCannotKnow = 5, DroppedLowImpact = 6, DroppedRevisionRule = 7, DroppedLengthKnown = 8,
     DroppedLengthSure = 9, DroppedLengthNoTemplate = 10, DroppedTooLong = 11, DroppedJargon = 12,
     DroppedBadOptions = 13, DroppedLanguageMismatch = 14, DroppedDuplicateTopic = 15, DroppedOverLimit = 16,
+    DroppedUnsafeContent = 17,
 }
 
 /// <summary>One entry of the gate trace: the gap by its position in the clarifier output and the decision.</summary>

@@ -39,7 +39,7 @@ public sealed class QuestionGateTests
         int maxQuestions = 3,
         IReadOnlyList<string>? research = null) =>
         QuestionGate.Apply(new QuestionGateInput(
-            Output(gaps, language, isRevision, research: research), request, false, revisionDetected, known ?? Nothing, maxQuestions));
+            Output(gaps, language, isRevision, research: research), request, revisionDetected, known ?? Nothing, maxQuestions));
 
     private static GateDecision Only(QuestionGateResult result) => Assert.Single(result.Trace).Decision;
 
@@ -224,7 +224,7 @@ public sealed class QuestionGateTests
     {
         var gaps = new[] { Ask(GapTopic.Length, "", []) };
         var result = QuestionGate.Apply(new QuestionGateInput(
-            Output(gaps, "en", scale: LengthScale.LongForm), "Write a report about our year.", false, false, Nothing, 3));
+            Output(gaps, "en", scale: LengthScale.LongForm), "Write a report about our year.", false, Nothing, 3));
 
         var question = Assert.Single(result.Questions);
         Assert.Equal(QuestionTemplates.EnglishLengthQuestion, question.Text);
@@ -494,7 +494,7 @@ public sealed class QuestionGateTests
                 (LengthScale)random.Next(3), gaps, []);
             var request = random.Next(6) == 0 ? "Bitte etwa 200 Wörter." : "Schreib etwas.";
 
-            var result = QuestionGate.Apply(new QuestionGateInput(output, request, false, random.Next(10) == 0, Nothing, random.Next(0, 6)));
+            var result = QuestionGate.Apply(new QuestionGateInput(output, request, random.Next(10) == 0, Nothing, random.Next(0, 6)));
 
             Assert.True(result.Questions.Count <= QuestionGate.HardMaxQuestions);
             Assert.Equal(gaps.Count, result.Trace.Count);

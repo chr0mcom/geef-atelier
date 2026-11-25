@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Geef.Atelier.Application.Intake;
-using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Sources;
 
 namespace Geef.Atelier.Infrastructure.Intake;
@@ -64,10 +63,6 @@ internal static partial class ClarifierPrompts
 
     [GeneratedRegex("<(/?)(request|files|file|about_the_person)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex OwnTag();
-
-    /// <summary>The user prompt with the default excerpt sizes.</summary>
-    public static string User(ClarifierRequest request) =>
-        User(request, new IntakeOptions().ExcerptHeadChars, new IntakeOptions().ExcerptTailChars);
 
     /// <summary>The user prompt; <paramref name="headChars"/> and <paramref name="tailChars"/> describe how truncated excerpts were cut.</summary>
     public static string User(ClarifierRequest request, int headChars, int tailChars)

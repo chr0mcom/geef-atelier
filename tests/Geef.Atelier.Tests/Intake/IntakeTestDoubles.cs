@@ -27,6 +27,7 @@ internal sealed class IntakeOrders : IOrderRepository
     public List<Guid> Stuck { get; } = [];
     public List<Guid> Unanswered { get; } = [];
     public HashSet<Guid> ClaimRefused { get; } = [];
+    public HashSet<Guid> ClaimThrows { get; } = [];
     public bool SaveQuestionsResult { get; set; } = true;
     public ConcurrentQueue<(Guid OrderId, DateTimeOffset Now, DateTimeOffset StaleBefore, int MaxAttempts)> Claims { get; } = new();
     public ConcurrentQueue<(DateTimeOffset StaleBefore, int MaxAttempts, int Limit)> CandidateQueries { get; } = new();
@@ -63,6 +64,8 @@ internal sealed class IntakeOrders : IOrderRepository
     public Task<bool> TryClaimForIntakeAsync(Guid orderId, DateTimeOffset now, DateTimeOffset staleBefore, int maxAttempts, CancellationToken ct = default)
     {
         Claims.Enqueue((orderId, now, staleBefore, maxAttempts));
+        if (ClaimThrows.Contains(orderId))
+            throw new InvalidOperationException("The connection was closed.");
         lock (Candidates)
         {
             if (ClaimRefused.Contains(orderId) || !Candidates.Remove(orderId))
@@ -169,10 +172,13 @@ internal sealed class RecordingRunStarter : IOrderRunStarter
 {
     public ConcurrentQueue<RunStartRequest> Requests { get; } = new();
     public bool Refuse { get; set; }
+    public HashSet<Guid> ThrowFor { get; } = [];
 
     public Task<Guid?> TryStartAsync(RunStartRequest request, CancellationToken ct)
     {
         Requests.Enqueue(request);
+        if (ThrowFor.Contains(request.Order.Id))
+            throw new InvalidOperationException("The crew of this order cannot be resolved.");
         return Task.FromResult<Guid?>(Refuse ? null : Guid.NewGuid());
     }
 }
@@ -193,10 +199,13 @@ internal sealed class RecordingOrderNotifier : IOrderNotifier
 internal sealed class FixedMemory(MemoryFacts? facts = null, IReadOnlyDictionary<GapTopic, MemoryAnswer>? known = null) : IMemoryResolution
 {
     public List<string> Loaded { get; } = [];
+    public Exception? Throw { get; set; }
 
     public Task<MemoryFacts> LoadAsync(string username, CancellationToken ct = default)
     {
         Loaded.Add(username);
+        if (Throw is not null)
+            throw Throw;
         return Task.FromResult(facts ?? new MemoryFacts(null));
     }
 

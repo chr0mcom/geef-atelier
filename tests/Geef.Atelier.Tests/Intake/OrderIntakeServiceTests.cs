@@ -23,10 +23,13 @@ public sealed class OrderIntakeServiceTests
     private readonly ManualTime _time = new(Now);
     private IntakeOptions _options = new();
     private FixedMemory _memory = new();
+    private readonly IntakeSweepDeferrals _deferrals;
+
+    public OrderIntakeServiceTests() => _deferrals = new IntakeSweepDeferrals(_time);
 
     private OrderIntakeService Service() => new(
         _orders, _sources, _shadows, _memory, _clarifier, _starter, _notifier, Options.Create(_options),
-        NullLogger<OrderIntakeService>.Instance, _time);
+        NullLogger<OrderIntakeService>.Instance, _time, _deferrals);
 
     private static ClarifierOutput OutputWith(params IntakeGap[] gaps) => QuestionGateTests.Output(gaps);
 
@@ -104,7 +107,7 @@ public sealed class OrderIntakeServiceTests
         _clarifier.Delay = TimeSpan.FromSeconds(30);
         var service = new OrderIntakeService(
             _orders, _sources, _shadows, _memory, _clarifier, _starter, _notifier, Options.Create(_options),
-            NullLogger<OrderIntakeService>.Instance, TimeProvider.System);
+            NullLogger<OrderIntakeService>.Instance, TimeProvider.System, new IntakeSweepDeferrals(TimeProvider.System));
 
         var watch = System.Diagnostics.Stopwatch.StartNew();
         var result = await service.ProcessAsync(order.Id, CancellationToken.None);
@@ -271,6 +274,117 @@ public sealed class OrderIntakeServiceTests
         Assert.Equal(IntakeShadowStatuses.SkippedCap, Assert.Single(_shadows.Completed).Status);
         Assert.Empty(_clarifier.Requests);
         Assert.Equal(new DateTimeOffset(2026, 11, 25, 0, 0, 0, TimeSpan.Zero), Assert.Single(_shadows.CountQueries));
+    }
+
+    [Fact]
+    public async Task When_the_profile_cannot_be_loaded_the_order_still_starts_with_the_request_as_written()
+    {
+        var order = _orders.Add("Schreib eine Einladung.");
+        _memory = new FixedMemory { Throw = new InvalidOperationException("db down") };
+
+        var result = await Service().ProcessAsync(order.Id, CancellationToken.None);
+
+        Assert.Equal(IntakeProcessResult.StartedAfterFailure, result);
+        var start = Assert.Single(_starter.Requests);
+        Assert.Equal((OrderState.Analyzing, IntakeOutcome.Failed), (start.Expected, start.Outcome));
+        Assert.Equal((IntakeRecordStatus.Failed, OrderIntakeService.PrepareFailedCode), (start.Record!.Status, start.Record.ErrorCode));
+        Assert.Empty(_clarifier.Requests);
+    }
+
+    [Fact]
+    public async Task The_profile_goes_to_the_clarifier_and_a_question_it_answers_is_not_asked()
+    {
+        var profile = new Geef.Atelier.Core.Domain.Profiles.UserProfileEntity
+        {
+            Username = "intake-user", FreeText = "PROFILMARKER Kiefernweg", Formality = Geef.Atelier.Core.Domain.Profiles.Formality.Formal,
+            CreatedAt = Now, UpdatedAt = Now,
+        };
+        var memory = new ProfileMemoryResolution(new SingleProfile(profile));
+        var service = new OrderIntakeService(_orders, _sources, _shadows, memory, _clarifier, _starter, _notifier, Options.Create(_options),
+            NullLogger<OrderIntakeService>.Instance, _time, _deferrals);
+        var order = _orders.Add("Schreib eine Einladung zum Sommerfest, etwa 150 Wörter.");
+        _clarifier.Enqueue(OutputWith(QuestionGateTests.Ask(GapTopic.Formality, "Sollen die Gäste geduzt werden?", ["Ja", "Nein"])));
+
+        var result = await service.ProcessAsync(order.Id, CancellationToken.None);
+
+        Assert.Contains("PROFILMARKER Kiefernweg", Assert.Single(_clarifier.Requests).ProfileBlock, StringComparison.Ordinal);
+        Assert.Equal(IntakeProcessResult.Started, result);
+        Assert.Empty(Assert.Single(_starter.Requests).Record!.Questions);
+    }
+
+    [Fact]
+    public async Task A_stuck_order_that_keeps_failing_neither_blocks_the_younger_ones_nor_fills_the_batch()
+    {
+        var broken = _orders.Add("A");
+        var younger = Enumerable.Range(0, OrderIntakeService.SweepBatch + 2).Select(_ => _orders.Add("B")).ToList();
+        _orders.Stuck.AddRange([broken.Id, .. younger.Select(o => o.Id)]);
+        _starter.ThrowFor.Add(broken.Id);
+
+        Assert.Equal(OrderIntakeService.SweepBatch - 1, await Service().StartStuckAsync(Now, CancellationToken.None));
+        Assert.Equal(OrderIntakeService.SweepBatch, _starter.Requests.Count);
+
+        _orders.Stuck.RemoveAll(id => younger.Take(OrderIntakeService.SweepBatch - 1).Any(o => o.Id == id));
+        _starter.Requests.Clear();
+        Assert.Equal(3, await Service().StartStuckAsync(Now, CancellationToken.None));
+        Assert.DoesNotContain(_starter.Requests, r => r.Order.Id == broken.Id);
+
+        _time.Now = Now + IntakeSweepDeferrals.DeferFor + TimeSpan.FromSeconds(1);
+        _starter.Requests.Clear();
+        await Service().StartStuckAsync(_time.Now, CancellationToken.None);
+        Assert.Contains(_starter.Requests, r => r.Order.Id == broken.Id);
+    }
+
+    [Fact]
+    public async Task An_unanswered_order_that_keeps_failing_does_not_stop_the_others()
+    {
+        var broken = _orders.Add("A", OrderState.NeedsInput);
+        var other = _orders.Add("B", OrderState.NeedsInput);
+        _orders.Unanswered.AddRange([broken.Id, other.Id]);
+        _starter.ThrowFor.Add(broken.Id);
+
+        Assert.Equal(1, await Service().AutoStartUnansweredAsync(Now, CancellationToken.None));
+        Assert.Contains(_starter.Requests, r => r.Order.Id == other.Id);
+
+        _starter.Requests.Clear();
+        await Service().AutoStartUnansweredAsync(Now, CancellationToken.None);
+        Assert.DoesNotContain(_starter.Requests, r => r.Order.Id == broken.Id);
+    }
+
+    [Fact]
+    public async Task Cancelling_the_sweep_is_passed_on()
+    {
+        var order = _orders.Add("A");
+        _orders.Stuck.Add(order.Id);
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+        _starter.ThrowFor.Add(order.Id);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new CancellingStarterService(this).RunAsync(cts.Token));
+    }
+
+    private sealed class CancellingStarterService(OrderIntakeServiceTests test)
+    {
+        public Task<int> RunAsync(CancellationToken ct)
+        {
+            var starter = new ThrowingCancelStarter();
+            var service = new OrderIntakeService(test._orders, test._sources, test._shadows, test._memory, test._clarifier, starter, test._notifier,
+                Options.Create(test._options), NullLogger<OrderIntakeService>.Instance, test._time, test._deferrals);
+            return service.StartStuckAsync(Now, ct);
+        }
+    }
+
+    private sealed class ThrowingCancelStarter : Geef.Atelier.Application.Orders.IOrderRunStarter
+    {
+        public Task<Guid?> TryStartAsync(Geef.Atelier.Application.Orders.RunStartRequest request, CancellationToken ct) =>
+            Task.FromException<Guid?>(new OperationCanceledException(ct));
+    }
+
+    private sealed class SingleProfile(Geef.Atelier.Core.Domain.Profiles.UserProfileEntity profile) : Geef.Atelier.Core.Persistence.Profiles.IUserProfileRepository
+    {
+        public Task<Geef.Atelier.Core.Domain.Profiles.UserProfileEntity?> GetAsync(string username, CancellationToken ct = default) =>
+            Task.FromResult<Geef.Atelier.Core.Domain.Profiles.UserProfileEntity?>(username == profile.Username ? profile : null);
+        public Task UpsertAsync(Geef.Atelier.Core.Domain.Profiles.UserProfileEntity p, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<bool> DeleteAsync(string username, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     [Fact]

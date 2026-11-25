@@ -63,7 +63,7 @@ internal sealed class EvalRunner(RunSettings settings, TextWriter log)
     {
         var request = entry.Request(options);
         var call = await clarifier.ClarifyAsync(request, ct);
-        var gate = call.Output is { } output ? entry.Gate(request, output, options) : null;
+        var gate = call.Output is { } output ? entry.Gate(request, output, options).Gate : null;
         return new EvalResult(
             entry.Id, entry.Corpus, entry.Category, entry.Lang, entry.Split(), call.Status.ToString(), call.Model, call.DurationMs, call.ErrorCode,
             call.RawJson,
