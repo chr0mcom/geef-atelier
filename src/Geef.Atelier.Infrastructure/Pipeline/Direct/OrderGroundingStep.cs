@@ -1,9 +1,13 @@
+using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Checks;
+using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Warnings;
+using Geef.Atelier.Core.Domain.Writing;
 using Geef.Atelier.Core.Persistence.Orders;
+using Geef.Atelier.Core.Persistence.Runs;
 using Geef.Atelier.Core.Persistence.Sources;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Sdk.Context;
@@ -11,6 +15,7 @@ using Geef.Sdk.Providers;
 using Geef.Sdk.Results;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 
@@ -19,7 +24,10 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 /// background document (<see cref="SourceBlockRenderer"/>), reads the constraints from the request in the person's own
 /// words and records which file went into the writer's prompt in which form (<c>RunSourceUsages</c>). A file with the
 /// role <see cref="SourceRole.TemplateToRevise"/> becomes the seed draft instead of a source, unless the run already
-/// carries a seed draft. Warnings of the files become run warnings.
+/// carries a seed draft. Warnings of the files become run warnings. For the checks of stage 3 it builds the material of the
+/// fact check (<see cref="AtelierContextKeys.FactMaterial"/>), fixes the fact-check mode of the run for every run alike (never by
+/// difficulty, length or count) and stores it, and recalculates the totals in the files when <see cref="DirectOptions.SourceArithmetic"/>
+/// is on. <see cref="DirectOptions"/> and <see cref="IRunFactCheckModeStore"/> come from the scope.
 /// </summary>
 internal sealed class OrderGroundingStep(
     Guid runId,
@@ -61,26 +69,99 @@ internal sealed class OrderGroundingStep(
             template);
 
         var bundle = SourceBlockRenderer.Render(prompt.Sources, options);
-        var seed = seedDraft ?? template?.Source.ExtractedText!.WithoutPageMarkers();
+        var templateText = seedDraft is null ? template?.Source.ExtractedText!.WithoutPageMarkers() : null;
+        var seed = seedDraft ?? templateText;
         var constraints = Constraints(order);
+
+        var direct = Direct();
+        var files = FactFiles(prompt.Sources, template, templateText);
+        var material = Material(input, files, direct);
+        var mode = Mode(direct, order.CreatedByUser);
+        var arithmetic = direct.SourceArithmetic ? SourceArithmeticCheck.Check(files.Select(f => (f.Id, f.FileName, f.Text)).ToList()) : null;
 
         IRunContext context = new RunContext()
             .Set(AtelierContextKeys.GroundedBrief, input)
             .Set(AtelierContextKeys.OrderSources, bundle)
-            .Set(AtelierContextKeys.OrderConstraints, constraints);
+            .Set(AtelierContextKeys.OrderConstraints, constraints)
+            .Set(AtelierContextKeys.FactMaterial, material)
+            .Set(AtelierContextKeys.FactCheckMode, mode);
         if (bundle.ContextDocument.Length > 0)
             context = context.Set(AtelierContextKeys.GroundingContext, bundle.ContextDocument);
         if (seed is not null)
-            context = context.Set(AtelierContextKeys.SeedDraft, seed);
+            context = context.Set(AtelierContextKeys.SeedDraft, WriterNotesFormat.Defuse(seed));
+        if (arithmetic is not null)
+            context = context.Set(AtelierContextKeys.SourceArithmetic, arithmetic);
 
+        await StoreModeAsync(mode, cancellationToken);
         await RecordUsagesAsync(bundle, prompt.Positions, template, seed, cancellationToken);
         await ReportWarningsAsync(ordered, bundle, cancellationToken);
 
         return new GroundingResult
         {
             Context = context,
-            Notes = [$"order-sources files={bundle.Sources.Count} chars={bundle.TotalChars} mode={bundle.Mode} template={(template is not null)}"],
+            Notes =
+            [
+                $"order-sources files={bundle.Sources.Count} chars={bundle.TotalChars} mode={bundle.Mode} template={(template is not null)}",
+                $"fact-check mode={mode} scope={material.Scope} material_chars={material.TotalChars}"
+                    + (arithmetic is null ? string.Empty : $" totals={arithmetic.TotalsFound} totals_off={arithmetic.Issues.Count}"),
+            ],
         };
+    }
+
+    /// <summary>Id of the text to revise in the material of the fact check.</summary>
+    public const string TemplateSourceId = "S0";
+
+    /// <summary>
+    /// The files of the material: the files given to the writer in their order, and before them the text to revise as
+    /// <see cref="TemplateSourceId"/> when the run revises a file of the order (never an earlier version of the text itself).
+    /// </summary>
+    internal static IReadOnlyList<FactSource> FactFiles(IReadOnlyList<PromptSource> sources, OrderSourceItem? template, string? templateText)
+    {
+        var files = new List<FactSource>(sources.Count + 1);
+        if (template is not null && templateText is not null)
+            files.Add(new FactSource(TemplateSourceId, template.Source.FileName, templateText));
+        files.AddRange(sources.Select(s => new FactSource(s.Id, s.FileName, s.Text)));
+        return files;
+    }
+
+    /// <summary>
+    /// Everything the text may rely on: request, answers of the person and of the assistant and the profile, read back from the
+    /// frozen briefing (<see cref="BriefingSections.Parse"/>), and the files. Assumptions and the writer's notes are never part of it.
+    /// Above <see cref="DirectOptions.FactCheckMaxMaterialChars"/> the scope is <see cref="FactCheckScope.WithoutFiles"/>; the file map
+    /// is always there, so that the check can also narrow the scope once it knows the length of the text.
+    /// </summary>
+    internal static FactMaterial Material(string briefing, IReadOnlyList<FactSource> files, DirectOptions options)
+    {
+        var parts = BriefingSections.Parse(briefing);
+        var map = files.Count == 0 ? null : string.Join('\n', files.Select(f => $"{f.Id} \"{f.FileName.Replace('"', '\'')}\" — {f.Text.Length} characters"));
+        var full = new FactMaterial(parts.Request, parts.PersonAnswers, parts.AssistantAnswers, parts.Profile, files, FactCheckScope.Full, map);
+        return full.TotalChars > options.FactCheckMaxMaterialChars ? full with { Scope = FactCheckScope.WithoutFiles } : full;
+    }
+
+    /// <summary>The fact-check mode of the run: the override of the person who ordered the text, otherwise the global switch. Every run gets one.</summary>
+    internal static FactCheckMode Mode(DirectOptions options, string? user) =>
+        user is not null && options.FactCheckModeOverrides is { } overrides && overrides.TryGetValue(user, out var mode) ? mode : options.FactCheckMode;
+
+    private DirectOptions Direct()
+    {
+        using var scope = scopes.CreateScope();
+        return scope.ServiceProvider.GetService<IOptions<DirectOptions>>()?.Value ?? new DirectOptions();
+    }
+
+    private async Task StoreModeAsync(FactCheckMode mode, CancellationToken ct)
+    {
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            if (scope.ServiceProvider.GetService<IRunFactCheckModeStore>() is { } store)
+                await store.SetAsync(runId, mode, ct);
+            else
+                logger.LogWarning("Run {RunId}: no store for the fact-check mode is registered; mode {Mode} was not recorded.", runId, mode);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogError("Run {RunId}: the fact-check mode could not be recorded: {Error}", runId, ex.ToRedactedLogText());
+        }
     }
 
     /// <summary>

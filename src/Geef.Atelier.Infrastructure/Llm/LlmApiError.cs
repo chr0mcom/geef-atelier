@@ -17,6 +17,12 @@ internal static class LlmApiError
     /// <summary>cli-proxy: the requested CLI is unavailable and failover was switched off (HTTP 503).</summary>
     public const string BackendUnavailableCode = "backend_unavailable";
 
+    /// <summary>
+    /// cli-proxy: the CLI process ran into the time limit the caller sent in <c>x-cli-proxy-timeout-seconds</c> and was ended
+    /// together with its child processes (HTTP 504). Neither a breaker failure nor a failover.
+    /// </summary>
+    public const string CliTimeoutCode = "cli_timeout";
+
     /// <summary>Attaches <paramref name="code"/> to <paramref name="exception"/> when there is one.</summary>
     public static HttpRequestException WithErrorCode(this HttpRequestException exception, string? code)
     {

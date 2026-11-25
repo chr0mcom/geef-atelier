@@ -2037,3 +2037,153 @@ uses the same corpus; the held-out set is therefore no longer untouched for futu
 
 **Follow-up:** after the first 30 clarified real orders their questions are reviewed again. Way back without a new image: set
 `Orders__IntakeMode=Off` in the environment of the web service; the worker still finishes orders left in `Analyzing` or `NeedsInput`.
+
+## D-073 — Stage 3: honest writing (2026-11-25, draft)
+
+**Status:** implemented (writer notes, brief split, fact check, recalculation of the totals in the files, "What was checked",
+report schema 2, migration Step50, web and MCP). Shipped with `Direct:FactCheckMode = Report`, **although gate V2 did not
+pass** – as a documented deviation (section "Pre-tests"). `On` for everybody only after gate Q4 and the conditions below,
+in a commit of its own.
+
+**Decision.** The direct path says what it assumed, checked and changed, and claims nothing it could not check.
+
+- **Brief split** (`Intake:ContentAssumptions = OpenPoints`): the clarifier's assumptions about facts of the case (`Facts`,
+  `Date`, `Sender`, `Signature`, `Other`) no longer reach the writer as instructions but under "Not given by the person
+  (never state these as facts …)". Assumptions about the form stay instructions. Without a shown card the heading no longer
+  says "shown to the person" (side finding, no switch).
+- **Block at the end of the file** (`Direct:WriterNotes`): the writer appends `<!-- atelier-notes {JSON} -->` with its own
+  assumptions, open points and quotes from the files. The code removes it before checks, storage, export and display
+  (`WriterNotesFormat.Split`); sources are defused so that a file can never end the text early.
+- **Fact check for every standard order** (`SourceFactCheckReviewer`, profile `source-fact-check`, slot `FactReviewer`,
+  today Codex Astra): the template `direct` now has two reviewers (`deterministic-checks`, `source-fact-check`). There is no
+  selection by difficulty, length or daily quota. "Not checked" only comes from the switch `Off`, from `Shadow` or from a
+  failure of the fallback model too; every reason is said honestly under "What was checked".
+  - Three questions: facts the material does not back (including invented ways to reply), broken instructions, errors of
+    the material itself (contradictions, wrong totals, replaced or dropped information).
+  - Material is the request, the answers of the person and of the client, the profile and the files (for a revision the
+    text to revise as `S0`), **never** assumptions or notes. Above 150,000 characters (material and text) it checks without
+    the content of the files and says so.
+  - A finding only counts with a word-for-word quote the code verifies (`FactFindingFilter`). Where an instruction comes
+    from and whether a finding blocks follow from where the quote stands, never from the model: request, the person's
+    answers and the profile block, the client's answers are hints, contradictions in the files never block and are always
+    shown.
+  - Round 2 only looks at its own findings again: what is still there word for word stays open without a call; for the
+    rest exactly one `recheck_facts` call.
+  - Print mode with `response_format`, proxy failover off. When the model cannot be reached (unavailable, limit, time
+    limit), **one** attempt follows with the next candidate of the slot that is neither the writer's model nor from the
+    provider that failed nor paid per token (today Sonnet). If that fails too, the SDK isolates the reviewer, the existing
+    warning appears, the text is delivered, the report says "could not be completed".
+  - Modes (`Direct:FactCheckMode`): `Off` makes no call; `Shadow` checks and stores, shows nothing; `Report` checks and shows,
+    never changes the text (findings `Warning`); `On` also corrects once (blocking → `Error`). `Direct:FactCheckModeOverrides`
+    sets the mode per user (measuring user `On`), only through the environment.
+- **Recalculation of the totals in the files without a model** (`Direct:SourceArithmetic`): totals and calculations in the
+  files are recalculated; the person learns about a mismatch with both figures and which one the text uses. Never
+  blocking, never silent. A wrong written calculation in the text itself blocks.
+- **"What was checked"** always stands right below the text: lines only for checks that ran, what was changed after the
+  check, whether the person needs to look at something, and the fixed end "They do not prove that everything in the text
+  is right." Only `OrderCheckLines` builds the sentences; web and MCP (`checks`) say the same, the display rules (order of
+  the passages, three quotes per file) live only in `OrderResultRules`. The page never shows the model's own words, only
+  fixed sentences and verbatim quotes. Without files the fact line says "compared with your request and your answers",
+  never "and your files".
+- **Report schema 2** (`Runs.ReportJson`, additive): notes of the delivered round, only quotes found word for word in their
+  file (the rest is counted), state and scope of the fact check with calls and model, totals with their use in the text,
+  `Corrections` (blocking in round 1, gone in the delivered version). Old reports (schema 1) stay readable and show "Facts
+  were not checked."
+- **Migration Step50** (nullable, additive, idempotent): `Findings.Category`, `Code`, `Quote`; `Runs.FactCheckMode`. No data
+  migration, no index (there is no cap that would need to count).
+- **Delivered version:** no own selection; the SDK rule (fewest rejections, newest on a tie) fits two rounds and two
+  reviewers (test `DirectDeliveryRuleTests`).
+
+**Measurement and gates:** V1 (block), V2 (calibration of the fact check, held-out set), V3 (recalculation) before the merges;
+then gates Q1–Q8 with the measuring user on production. Whoever changes prompt or schema of the fact check measures again
+(`tools/FactCheckEval`).
+
+**Cost:** per direct-path order one Codex call per checked wording: one without a correction, two when any check (facts,
+length, language …) led to a correction, in `Report` as in `On` (since the first review round every changed wording is
+checked in full); when Codex is down one Sonnet call instead.
+If the quota is not enough in the long run, the operating switch decides, never a selection in code.
+
+**Way back:** switches through the environment without a new image (`Direct__FactCheckMode=Off`, `Direct__WriterNotes=false`,
+`Intake__ContentAssumptions=Defaults`, `Direct__SourceArithmetic=false`). Code: previous web image; Step50 stays (nullable, the
+code of stage 2 reads and writes around it), no `Down()` in production. Before that no direct-path run may be `Pending` or
+`Running`: stage-3 snapshots contain the reviewer `source-fact-check`, which the code of stage 2 does not know.
+
+**Pre-tests (2026-11-25):**
+- **V1 (block at the end of the file):** result A, 15 of 15 runs without damage → `Direct:WriterNotes = true`.
+- **V3 (recalculation):** passed → `Direct:SourceArithmetic = true`.
+- **V2 (calibration of the fact check): not passed.** Validity is **83.3 %** (10 of 12 calls for 10 texts; required
+  ≥ 95 %, below 90 % the gate is formally not even evaluable), **p90 latency 164 s** (required ≤ 120 s). The cause are
+  hanging Codex calls: **3 of 31** calls over both sets did not answer before the limit of that time (180 s); two of the
+  three texts (`fc-06/base`, `fc-14/base`) were repeated and then answered within seconds, the third (`fc-15/base`, development
+  set) was never repeated. The cause of the hang is **unknown**; with this sample the true rate lies roughly
+  between 3 % and 25 %. The quality criteria passed: 17 of 17 hits, 0.20 blocking findings per clean text (required
+  ≤ 0.25), 80 % of the clean texts without a blocking finding (required ≥ 75 %), no reported source conflicts without a faulty
+  source, the mandatory parents' evening case passed. These figures rest on **10 synthetic texts**; 0.20 is one finding.
+  The development set is **incomplete**: 19 of its 22 texts were called (`fc-15/planted`, `fc-16/base` and `fc-16/planted`
+  never ran, both bases have faulty files), 18 answered; the 0.38 below and any recount rest on this subset.
+- **Deviation:** `Report` (checks and shows, never changes the text) is shipped anyway, on the decision of an independent
+  adviser. This softens the gate; it is acceptable because only operating criteria failed, `Report` changes no text and the
+  failure path is honest ("The fact check could not be completed."). `Shadow` would not help (the hang happens there too),
+  nor would a repeat run (with about 10 % hangs a run of ten passes by chance with about 35 % probability). The operator can
+  switch back to `Shadow` or `Off`.
+- **Contract branches not executed (also a deviation):** neither "check parser and schema" (validity) nor the probe with
+  `reasoning_effort: low` or a lower material limit (latency) were run: no answer arrived in the hangs, so parser and schema
+  are not involved, and the successful calls were fast (median about 14 s, longest 86 s).
+- `FactCheckCorpusTests` pins the result: never "passed", the shortfall only in validity and latency, the quality figures of
+  both sets as a lower bound (hits of questions a and b, blocking findings on clean texts and beyond the planted mistakes,
+  question c, conflicts without a faulty file) and the number of kept findings exactly; a filter that loses a hit, drops
+  source conflicts or adds a false alarm turns it red (checked by mutation: a filter dropping every source conflict fails it).
+
+**Time limits and hangs (conditions of the adviser):**
+- Time limit of the checking model **90 s** (`Direct:FactCheckTimeout`, before 180 s), of the fallback model **60 s**
+  (`Direct:FactCheckFallbackTimeout`); both configurable, a test pins the shipped values. With 90 s, "p90 ≤ 120 s" holds
+  **by construction** – that is **no evidence** of a faster check.
+- On a hang: no second Codex attempt (shared quota), exactly one attempt with the fallback model, otherwise "check not
+  completed". An aborted check starts **no correction round** (a failed reviewer does not block convergence; end-to-end
+  test).
+- The Atelier sends its limit to the gateway (header `x-cli-proxy-timeout-seconds`, 5 s below). The gateway ends the CLI
+  process with its child processes before the Atelier gives up, and also when a caller disconnects. Before, an aborted
+  Codex process ran on until the gateway's own cap and used quota of another production system. Such a time-out opens no
+  breaker and starts no failover; the Atelier never retries requests with this limit at the HTTP level.
+- Every hang is logged as a structured line of its own (call, model, duration, limit, run, round, fallback yes/no), without
+  content.
+- **Deliberate deviation from the adviser:** he advised storing Codex sessions to find the cause. That is not done: the
+  sessions would contain the users' requests, files and texts, and the gateway is stateless on purpose (Codex runs with
+  `--ephemeral`). The cause is searched through the log lines (clustering by model, duration, time of day) and, if needed,
+  a separate test with synthetic texts.
+- **Effect on waiting time:** about one order in ten gets the fallback checker or no check and waits up to 150 s longer
+  (90 s + 60 s).
+
+**First review round (2026-11-25):**
+- "What was checked" names a check as met only when it ran and passed; a check that ran and failed is named as not met.
+- Every changed wording is checked in full (any reason, also in `Report`); the recheck no longer replaces a full check. A
+  model that hung is not called again in the same run. A delivered text no check saw says so ("The facts of this version of
+  the text were not checked …", MCP `version_not_checked`); earlier findings appear only when their passage still stands in
+  the text.
+- The content guard never drops a finding: an unsafe reason is replaced by a fixed sentence, the quote of the text stays;
+  unsafe material passages and unsafe notes of the writer are replaced or counted visibly ("1 more note … could not be
+  shown").
+- Recalculation of the files stays silent on deductions, payments made, balances, taxes, amounts per person, quantities and
+  totals that only match their last items; the sentence promises only what was recalculated. V3 still passes.
+- Large files: the sentence says the facts were not checked, only the instructions.
+- Contradictions name where each side stands (request, answers, About me details, a file).
+
+**Third review round (2026-11-25):**
+- The recalculation never claims that calculations or files are right. It reports only clear mismatches, asking the person to
+  check them, and otherwise says at most that it looked for clearly wrong calculations or totals and found none, adding that
+  not every calculation can be checked this way. The distinction "all checked" against "partly checked" is gone; earlier
+  reports read the same way.
+- In a later clause after a total only words of shares (pro, je, jeweils, per, each) are harmless; words of deductions,
+  discounts, subsidies, down payments and taxes make the total unclear there too, and it is not mentioned.
+- An earlier finding is dropped only when a kept passage of the same kind contains it wholly; contradictions count as the same
+  only at word boundaries and with the same files. A contradiction about a wrong total is dropped only when its passages
+  differ in nothing but figures and total words. When an earlier version is delivered, findings of later rounds are added.
+- When an account is deleted or renamed, the stored start input in the events (`PipelineStartedEvent.Input`) loses the About
+  me block too, as does every other event text with the block or the details; runs cleaned before are cleaned again.
+
+**Conditions before `On`** (in addition to gate Q4):
+- Cause of the hangs found, **or** at most 1 hang in at least 60 real calls.
+- The fallback model measured against the same quality criteria (it checks about one order in ten).
+- Development set relabelled and false alarms counted again (0.38 per clean text there, above 0.25; in `On` false alarms
+  change texts).
+- Total waiting time including the correction round measured.

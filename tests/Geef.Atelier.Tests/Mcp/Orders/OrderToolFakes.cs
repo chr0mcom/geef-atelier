@@ -99,6 +99,7 @@ internal sealed class FakeOrderService : IOrderService
     public List<SubmitOrderRequest> Submitted { get; } = [];
     public List<(Guid OrderId, string? RequestingUsername, OrderDisplayState? KnownState, TimeSpan MaxWait)> Waits { get; } = [];
     public List<(Guid OrderId, string? RequestingUsername)> Gets { get; } = [];
+    public List<(Guid OrderId, string? RequestingUsername, string? ViewerUsername)> ResultReads { get; } = [];
     public List<AnswerOrderRequest> Answers { get; } = [];
     public List<(Guid OrderId, string? RequestingUsername)> Skips { get; } = [];
 
@@ -142,6 +143,12 @@ internal sealed class FakeOrderService : IOrderService
 
     public Task<OrderResult?> GetResultAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) =>
         Task.FromResult(Visible(orderId, requestingUsername) && _results.TryGetValue(orderId, out var result) ? result : null);
+
+    public Task<OrderResult?> GetResultAsync(Guid orderId, string? requestingUsername, string? viewerUsername, CancellationToken ct = default)
+    {
+        ResultReads.Add((orderId, requestingUsername, viewerUsername));
+        return GetResultAsync(orderId, requestingUsername, ct);
+    }
 
     public Task<IReadOnlyList<OrderListItem>> ListAsync(string? ownerUsername, int limit = 50, CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<OrderListItem>>([]);

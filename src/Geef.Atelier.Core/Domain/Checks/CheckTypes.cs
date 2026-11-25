@@ -75,4 +75,12 @@ public static class DraftCheckCodes
     public const string Emojis = "pattern.emojis";
     public const string ForbiddenTerm = "term.forbidden";
     public const string RequiredTerm = "term.required";
+    /// <summary>
+    /// Written calculations in the text: failed when one is clearly wrong; passed only means that none of those recalculated was
+    /// clearly wrong, never that the calculations are right.
+    /// </summary>
+    public const string Arithmetic = "arithmetic";
+
+    /// <summary>Written only by earlier versions; read like a passed <see cref="Arithmetic"/> and never named as "the calculations add up".</summary>
+    public const string ArithmeticPartial = "arithmetic.partial";
 }

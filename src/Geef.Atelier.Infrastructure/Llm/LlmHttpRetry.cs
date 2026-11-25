@@ -26,4 +26,24 @@ internal static class LlmHttpRetry
                && sent.Headers.TryGetValues(OpenAiCompatibleClient.FailoverHeader, out var values)
                && values.Contains(OpenAiCompatibleClient.FailoverOff, StringComparer.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// True when <paramref name="request"/> carries a time limit for the CLI process (<see cref="OpenAiCompatibleClient.TimeoutHeader"/>).
+    /// Such a caller decides itself what follows a failed answer (the fact check: one call of another model, never a second call of
+    /// the same one); a retry of an answered request in the <c>HttpClient</c> would start the CLI once more.
+    /// </summary>
+    public static bool HasCliTimeLimit(this HttpRequestMessage? request) =>
+        request is not null && request.Headers.Contains(OpenAiCompatibleClient.TimeoutHeader);
+
+    /// <summary>
+    /// Whether the <c>HttpClient</c> may retry an attempt that ended with <paramref name="response"/>: never an answer to a request
+    /// with a CLI time limit (so the cli-proxy's <c>504 cli_timeout</c>, its answer to a run that hung, is never retried), never
+    /// the answers of <see cref="IsAnswerForCallerWithoutFailover"/>; otherwise the usual transient rules decide.
+    /// Without an answer (<paramref name="response"/> is null, after an exception) the result is true even for a request with a CLI
+    /// time limit, because the request is only known from the answer: if, for example, the connection breaks after the request was
+    /// sent, the transient rules may retry it and the CLI may start again within the caller's own time limit.
+    /// A call that runs into the caller's own limit is cancelled by the caller's token and never retried.
+    /// </summary>
+    public static bool MayRetry(HttpResponseMessage? response) =>
+        !(response?.RequestMessage).HasCliTimeLimit() && !response.IsAnswerForCallerWithoutFailover();
 }

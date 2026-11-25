@@ -8,8 +8,10 @@ import logging
 import os
 import re
 import time
+from contextlib import aclosing
 from pathlib import Path
 
+import cli_process
 import failover
 import policy
 from cli_errors import RESULT_CHARS, claude_failure_detail, clip_redacted
@@ -371,7 +373,7 @@ async def complete_document(
     context_document holds large background context (grounding + advisor notes); it is
     offloaded to context.md when oversized (see workspace.materialize_context).
     """
-    async with _semaphore:
+    async with cli_process.slot(_semaphore, "claude CLI (document mode)"):
         return await _run_claude_document(
             system_prompt, user_instruction, document, workspace_path, model, max_tokens,
             context_document, reasoning_effort=reasoning_effort,
@@ -399,7 +401,7 @@ async def complete_with_usage(
     With `system_prompt` set the call runs in lean mode (see _run_claude_lean): the caller's
     system prompt REPLACES the Claude Code agent prompt. Without it the argv is unchanged.
     """
-    async with _semaphore:
+    async with cli_process.slot(_semaphore, "claude CLI"):
         if system_prompt is not None:
             async with ephemeral_dir() as workspace:
                 return await _run_claude_lean(
@@ -418,7 +420,7 @@ async def complete_agentic_file(
     CLI's prompt-injection refusal of the "reply with raw tool-call JSON" protocol. Returns the
     raw decision.json text (parsed by the caller via tool_use_parser.parse_decision) plus usage.
     """
-    async with _semaphore:
+    async with cli_process.slot(_semaphore, "claude CLI (agentic file mode)"):
         async with ephemeral_dir() as workspace:
             return await _run_claude_decision(
                 instruction, model, workspace, reasoning_effort=reasoning_effort)
@@ -446,19 +448,17 @@ async def _run_claude_decision(
 
     env = policy.agent_env(current_home())
 
-    proc = await asyncio.create_subprocess_exec(
+    proc = await cli_process.spawn(
         *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         cwd=str(workspace_path),
         env=env,
     )
-    try:
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
-    except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()
-        raise RuntimeError(f"claude CLI (agentic file mode) timed out after {CLI_TIMEOUT_SECONDS}s")
+    stdout, stderr = await cli_process.communicate(
+        proc, None, CLI_TIMEOUT_SECONDS,
+        lambda: RuntimeError(f"claude CLI (agentic file mode) timed out after {CLI_TIMEOUT_SECONDS}s"),
+        "claude CLI (agentic file mode)")
 
     if proc.returncode != 0:
         # The CLI reports the human-readable cause in the JSON "result" field. Since CLI
@@ -496,9 +496,11 @@ async def stream(
     Yields ("delta", text) for each token chunk and finally ("usage", UsageParts).
     The semaphore is held for the whole stream to respect subscription rate limits.
     """
-    async with _semaphore:
-        async for event in _stream_claude(prompt, model, max_tokens, reasoning_effort=reasoning_effort):
-            yield event
+    async with cli_process.slot(_semaphore, "claude CLI (stream)"):
+        async with aclosing(_stream_claude(
+                prompt, model, max_tokens, reasoning_effort=reasoning_effort)) as events:
+            async for event in events:
+                yield event
 
 
 async def _stream_claude(
@@ -517,7 +519,7 @@ async def _stream_claude(
     args += _effort_args(reasoning_effort)
 
     env = policy.agent_env(current_home())
-    proc = await asyncio.create_subprocess_exec(
+    proc = await cli_process.spawn(
         *args,
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
@@ -533,11 +535,13 @@ async def _stream_claude(
             proc.stdin.close()
 
     feeder = asyncio.create_task(_feed())
+    stderr = cli_process.StderrDrain(proc.stderr)
     emitted = False
     final_text = ""
     usage = UsageParts()
+    completed = False
     try:
-        async with asyncio.timeout(CLI_TIMEOUT_SECONDS):
+        async with asyncio.timeout(cli_process.timeout(CLI_TIMEOUT_SECONDS)):
             async for raw_line in proc.stdout:
                 line = raw_line.decode(errors="replace").strip()
                 if not line:
@@ -564,23 +568,30 @@ async def _stream_claude(
                             f"{clip_redacted(str(ev.get('result', '')), RESULT_CHARS)}"
                         )
                     final_text, usage = _extract_result_and_usage(ev, "")
-        await feeder
-        await proc.wait()
-        if proc.returncode not in (0, None):
-            err = (await proc.stderr.read()).decode(errors="replace").strip()
-            raise RuntimeError(
-                f"claude CLI (stream) exited with code {proc.returncode}: {clip_redacted(err, 200)}")
+            # Inside the time limit too: a helper that keeps stderr open must not hold the
+            # stream beyond it.
+            await feeder
+            await proc.wait()
+            if proc.returncode not in (0, None):
+                err = (await stderr.tail()).decode(errors="replace").strip()
+                raise RuntimeError(
+                    f"claude CLI (stream) exited with code {proc.returncode}: {clip_redacted(err, 200)}")
+        completed = True
         # No partial deltas were emitted (older CLI / no partial support) — emit the final text once.
         if not emitted and final_text:
             yield ("delta", final_text)
         yield ("usage", usage)
     except TimeoutError:
+        if cli_process.caller_limited():
+            raise cli_process.caller_timeout("claude CLI (stream)") from None
         raise RuntimeError(f"claude CLI (stream) timed out after {CLI_TIMEOUT_SECONDS} seconds")
     finally:
         feeder.cancel()
-        if proc.returncode is None:
-            proc.kill()
-            await proc.wait()
+        try:
+            if not completed:
+                await cli_process.stop(proc)
+        finally:
+            await stderr.close()
 
 
 async def _run_claude_document(
@@ -632,19 +643,17 @@ async def _run_claude_document(
 
     env = policy.agent_env(current_home())
 
-    proc = await asyncio.create_subprocess_exec(
+    proc = await cli_process.spawn(
         *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         cwd=str(workspace_path),
         env=env,
     )
-    try:
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
-    except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()  # reap the killed process so it does not linger as a zombie
-        raise RuntimeError(f"claude CLI (document mode) timed out after {CLI_TIMEOUT_SECONDS}s")
+    stdout, stderr = await cli_process.communicate(
+        proc, None, CLI_TIMEOUT_SECONDS,
+        lambda: RuntimeError(f"claude CLI (document mode) timed out after {CLI_TIMEOUT_SECONDS}s"),
+        "claude CLI (document mode)")
 
     if proc.returncode != 0:
         # The cause fields (subtype, is_error, result, api_error_status) follow the long usage
@@ -772,7 +781,7 @@ async def _exec_print(
     """Run a `claude -p --output-format json` argv with the prompt on stdin."""
     env = policy.agent_env(current_home())
 
-    proc = await asyncio.create_subprocess_exec(
+    proc = await cli_process.spawn(
         *args,
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
@@ -780,13 +789,10 @@ async def _exec_print(
         env=env,
         **({"cwd": str(cwd)} if cwd is not None else {}),
     )
-    try:
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(input=prompt.encode("utf-8")), timeout=CLI_TIMEOUT_SECONDS)
-    except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()  # reap the killed process so it does not linger as a zombie
-        raise RuntimeError(f"claude CLI timed out after {CLI_TIMEOUT_SECONDS} seconds")
+    stdout, stderr = await cli_process.communicate(
+        proc, prompt.encode("utf-8"), CLI_TIMEOUT_SECONDS,
+        lambda: RuntimeError(f"claude CLI timed out after {CLI_TIMEOUT_SECONDS} seconds"),
+        "claude CLI")
 
     raw = stdout.decode(errors="replace").strip()
 

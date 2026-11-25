@@ -1,3 +1,4 @@
+using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
@@ -55,6 +56,51 @@ internal static class OrderWireNames
         AnswerOrigin.Client => OriginClient,
         AnswerOrigin.Memory => OriginMemory,
         _ => throw new ArgumentOutOfRangeException(nameof(origin), origin, null),
+    };
+
+    public const string PassageNotBacked = "not_backed";
+    public const string PassageAgainstInstruction = "against_instruction";
+    public const string PassageReplacedInFiles = "replaced_in_files";
+
+    /// <summary>Kind of a flagged passage of the text. A contradiction between files is never a passage (it is a source issue), so it throws.</summary>
+    public static string ToWire(this FactFindingKind kind) => kind switch
+    {
+        FactFindingKind.Unsupported => PassageNotBacked,
+        FactFindingKind.Instruction => PassageAgainstInstruction,
+        FactFindingKind.Superseded => PassageReplacedInFiles,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
+    };
+
+    public const string FactCheckChecked = "checked";
+    public const string FactCheckOpenPoints = "open_points";
+    public const string FactCheckNotCompleted = "not_completed";
+    public const string FactCheckNotChecked = "not_checked";
+    public const string FactCheckVersionNotChecked = "version_not_checked";
+
+    public const string InstructionFromRequest = "request";
+    public const string InstructionFromAnswers = "answers";
+    public const string InstructionFromAboutMe = "about_me";
+    public const string InstructionFromAssistant = "assistant";
+
+    /// <summary>Where an instruction stands, as in <see cref="OrderUnbackedPassageDto.InstructionFrom"/>.</summary>
+    public static string ToWire(this InstructionOrigin origin) => origin switch
+    {
+        InstructionOrigin.Stated => InstructionFromRequest,
+        InstructionOrigin.Answered => InstructionFromAnswers,
+        InstructionOrigin.Memory => InstructionFromAboutMe,
+        InstructionOrigin.Client => InstructionFromAssistant,
+        _ => throw new ArgumentOutOfRangeException(nameof(origin), origin, null),
+    };
+
+    /// <summary>State of the fact check; a check that was switched off or only ran in the background is <c>not_checked</c>, as the web page says.</summary>
+    public static string ToWire(this FactCheckState state) => state switch
+    {
+        FactCheckState.Checked => FactCheckChecked,
+        FactCheckState.OpenPoints => FactCheckOpenPoints,
+        FactCheckState.NotCompleted => FactCheckNotCompleted,
+        FactCheckState.VersionNotChecked => FactCheckVersionNotChecked,
+        FactCheckState.Off or FactCheckState.NotShown => FactCheckNotChecked,
+        _ => throw new ArgumentOutOfRangeException(nameof(state), state, null),
     };
 
     /// <summary>The origin of an answer from its wire name, ignoring case and surrounding blanks; <c>null</c> for anything unknown.</summary>

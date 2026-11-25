@@ -1,6 +1,7 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
@@ -68,7 +69,15 @@ public sealed record OrderView(
     IReadOnlyList<RunWarningEntity> Warnings,
     ClarificationView? Clarification = null);
 
-/// <summary>The delivered text of an order with what the person should check before using it.</summary>
+/// <summary>
+/// The delivered text of an order with what the person should check before using it. The fields after <see cref="Assumptions"/>
+/// come from a report of schema 2 and are <c>null</c> for older results, except <see cref="Checks"/>, which every result with a
+/// report and a text has (for schema 1 it says that facts were not checked). <see cref="FactCheckScope"/> says whether the fact
+/// check saw the content of the files. <see cref="NotesNotShown"/> is the fixed sentence about notes of the writer that could not be
+/// shown (they hold a link, an address, or account or access details); <see cref="NotGivenFacts"/> are the assumptions of the
+/// clarifier about facts that went to the writer only as "not given by the person" (never stated as facts), shown apart from the
+/// assumptions that were used.
+/// </summary>
 public sealed record OrderResult(
     Guid OrderId,
     OrderDisplay Display,
@@ -81,7 +90,35 @@ public sealed record OrderResult(
     IReadOnlyList<OrderSourceUsageView> SourcesUsed,
     IReadOnlyList<RunWarningEntity> Warnings,
     string? Note,
-    IReadOnlyList<IntakeAssumption>? Assumptions = null);
+    IReadOnlyList<IntakeAssumption>? Assumptions = null,
+    IReadOnlyList<string>? WriterAssumptions = null,
+    IReadOnlyList<string>? WriterOpenPoints = null,
+    IReadOnlyList<OrderUnbackedPassage>? UnbackedPassages = null,
+    IReadOnlyList<string>? SourceIssues = null,
+    IReadOnlyList<OrderSourceQuoteView>? SourceQuotes = null,
+    FactCheckState? FactCheck = null,
+    OrderChecksView? Checks = null,
+    FactCheckScope? FactCheckScope = null,
+    string? NotesNotShown = null,
+    IReadOnlyList<string>? NotGivenFacts = null);
+
+/// <summary>A passage the writer quoted from a file, verified against that file.</summary>
+public sealed record OrderSourceQuoteView(string FileName, string Quote);
+
+/// <summary>
+/// A passage of the text the fact check found not backed, against an instruction or using replaced information;
+/// <see cref="Instruction"/> is the instruction quoted from the material and <see cref="Origin"/> where it stands (the request, the
+/// person's answers, the About me details or the assistant's answers). An instruction from the About me details is <c>null</c> for
+/// anyone but the owner of the order.
+/// </summary>
+public sealed record OrderUnbackedPassage(string Quote, FactFindingKind Kind, string? Instruction, bool Blocking, InstructionOrigin? Origin = null);
+
+/// <summary>
+/// What the person reads under "What was checked" (web) and in <c>checks</c> (MCP); plain English, built only by
+/// <see cref="OrderCheckLines"/>. Shown in this order: <see cref="Checked"/>, <see cref="Changed"/>, <see cref="ToReview"/>,
+/// <see cref="Limits"/>. <see cref="Changed"/> may quote a passage of an earlier version of the text.
+/// </summary>
+public sealed record OrderChecksView(IReadOnlyList<string> Checked, IReadOnlyList<string> Changed, string ToReview, string Limits);
 
 /// <summary>An order as listed in "My work".</summary>
 public sealed record OrderListItem(Guid OrderId, string Title, OrderDisplay Display, OrderMode Mode, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, int SourceCount, int? WordCount);

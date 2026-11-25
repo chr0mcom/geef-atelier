@@ -189,3 +189,62 @@ Betrieb:
   `tests/Geef.Atelier.Tests/Intake/Corpus/intake-corpus.jsonl` und `intake-corpus-second.jsonl`.
 - Der Lauf geschieht nachts und nur, wenn BookForge nicht läuft (geteiltes Claude-Kontingent).
 - Der Auftraggeber prüft 20 Einträge stichprobenartig und entfernt widersprüchliche.
+
+## Faktenprüfer- und Rechenkorpus (`geef_eval/factcheck_corpus.py`)
+
+Zweck: synthetische Korpora für die Vorversuche der Etappe 3. V2 eicht den Faktenprüfer an Texten mit bekannten Fehlern und an
+sauberen Texten, V3 misst die Rechenprüfung der Quellen (`SourceArithmeticCheck`). Das Messwerkzeug ist `tools/FactCheckEval`
+(.NET, getrennt gebaut, siehe dessen README).
+
+```bash
+cd tools/Eval
+python3 -m geef_eval.factcheck_corpus generate --corpus factcheck-corpus.jsonl --max-calls 16 [--model sonnet]
+python3 -m geef_eval.factcheck_corpus label --corpus factcheck-corpus.jsonl --max-calls 16 [--model opus]
+python3 -m geef_eval.factcheck_corpus plant --corpus factcheck-corpus.jsonl --max-calls 16 [--model sonnet]
+python3 -m geef_eval.factcheck_corpus arithmetic --out arithmetic-corpus.jsonl --max-calls 12 [--model sonnet]
+python3 -m geef_eval.factcheck_corpus stats --corpus factcheck-corpus.jsonl
+```
+
+| Befehl | Wirkung |
+|---|---|
+| `generate` | ein Sonnet-Aufruf je Grundlage, 16 feste Plätze: 8 kurze (120–600 Wörter) und 4 lange (mindestens 1.500 Wörter; der Vertrag nannte 2.000, die Untergrenze wurde vor dem ersten Prüferlauf gesenkt, weil der Generator die 2.000 nicht zuverlässig erreichte) gewöhnliche (8 `de`, 4 `en`, darunter 2 Überarbeitungen mit Ausgangstext als Quelle `S0` und 2 mit Profil und `no_gos`) und 4 mit fehlerhafter Quelle: der feste **Elternabend-Nachbau** (Notizen von Hand, falsche Summe 9 + 6 + 4 = „17 €“, verschobener Termin, der Zahlungsfrist bleibt, verworfener Raum, interne Notiz, Allergiehinweis; das Modell schreibt nur den sauberen Brief), widersprüchliche Beträge in zwei Dateien, überholter Beschluss im Protokoll, falsche Zwischensumme in einer Tabelle. Jede Antwort liefert Auftrag, Antworten, Profil, Dateien und einen **sauberen Text** nur aus dem Material; Quellenfehler werden als wörtliche Zitate geliefert und geprüft |
+| `label` | unabhängiger Opus-Aufruf je Grundlage: markiert Aussagen des sauberen Texts, die das Material nicht deckt, mit wörtlichem Zitat (mindestens fünf Wörter). Ein markierter Text gilt als fehlerhaft und behält die Markierungen als erwartete Fehler. Der Generator sieht die Beschriftung nie |
+| `plant` | Sonnet-Aufruf je Grundlage: 2–4 Fehler in einer Kopie (geänderte Zahl, Datum oder Name; erfundene Tatsache; erfundener Rückmeldeweg; behauptete Anlage oder Handlung; verletzte Vorgabe; verwendete verworfene Angabe; still übernommene oder korrigierte Summe). Jeder eingefügte Wortlaut muss wörtlich in der Kopie und darf nicht im sauberen Text stehen; der Elternabend braucht einen erfundenen Rückmeldeweg. Sonst wird die Antwort verworfen und beim nächsten Lauf neu angefragt |
+| `arithmetic` | 60 Ausschnitte, je 5 je Sonnet-Aufruf: 30 mit gepflanzt falscher Summe, 15 mit richtiger Rechnung, 15 mit Zahlen ohne Rechnung (Datum, Hausnummer, Uhrzeit, Telefonnummer, Preis ohne Summe); Formen Rechnung, Liste, Satz, Tabelle, Notizen; `de` und `en`. Der Code rechnet jede Spur nach (Posten ergeben die richtige Summe, die angegebene weicht bei gepflanzten ab und stimmt bei sauberen); ein Ausschnitt mit falscher Spur wird verworfen und bleibt offen |
+| `stats` | zählt Grundlagen je Größe, Sprache, Art, Teilung, Beschriftung, Fehlerart und die bisher verbrauchten Aufrufe (beim Rechenkorpus Form, Sprache, gepflanzt, Teilung) |
+
+`--max-calls` ist Pflicht. Jeder Aufrufversuch steht in `<datei>.calls.log` (JSON-Zeilen mit Bezeichnung, Modell, Erfolg,
+Fehler, ohne Texte; bewusst nicht `*.jsonl`, damit kein Korpus-Glob sie erfasst) und zählt gegen die feste Kappe des Korpus über alle Läufe: 60 für den Faktenprüfer-Korpus (16 × 3 plus Wiederholungen), 12 für den
+Rechenkorpus. Eine ungültige Antwort wird einmal wiederholt, solange die Kappe reicht. Rückgabewerte wie beim Klärer-Korpus:
+3 beim Nutzungslimit, 4 solange Grundlagen oder Ausschnitte fehlen (auch wenn die Kappe verbraucht ist).
+
+Formate (JSONL, UTF-8): Faktenprüfer-Grundlage
+
+```json
+{"id": "fc-13", "size": "short", "lang": "de", "kind": "faulty_source", "case": "elternabend",
+ "request": "…", "answers": [], "profile": null,
+ "files": [{"id": "S1", "name": "notizen-elternabend.txt", "text": "…"}],
+ "source_errors": [{"kind": "wrong_total", "quote": "Gesamt pro Kind: 17 €", "quote_2": null, "stated": "17"}],
+ "clean_text": "…", "generator_model": "sonnet",
+ "labels": [{"quote": "…", "why": "…"}], "label_model": "opus",
+ "planted_text": "…", "plants": [{"kind": "invented_contact", "inserted": "…"}], "plant_model": "sonnet"}
+```
+
+Rechenausschnitt (`trace` ist `null` bei Zahlen ohne Rechnung; `ops` leer heißt: alle Posten addiert):
+
+```json
+{"id": "ar-01", "lang": "de", "form": "list", "text": "…", "planted": true,
+ "trace": {"total_line": "Summe: 62 €", "items": ["22 €", "31 €", "19 €"], "ops": [], "stated": "62", "correct": "72"},
+ "generator_model": "sonnet"}
+```
+
+Teilung: Der Faktenprüfer-Korpus hält die Grundlagen `fc-02`, `fc-04`, `fc-06`, `fc-10` und `fc-14` fest zurück (kurz und lang,
+eine Überarbeitung, ein Profil, eine fehlerhafte Quelle); alle anderen gehören zur Entwicklungsmenge, der Elternabend immer. Die
+Liste steht gleichlautend in `factcheck_corpus.HELD_OUT_IDS` und `FactCheckCorpus.HeldOutIds` und wurde vor dem ersten Prüferlauf
+festgelegt: Die Hash-Teilung über den Auftrag (Vertrag) hatte nur eine Grundlage zurückgehalten, das Tor braucht mindestens drei
+saubere und drei fehlerhafte Texte. Der Rechenkorpus teilt weiter 70/30 über SHA-256 des Ausschnitts. Beide Korpora sind
+synthetisch und dürfen ins öffentliche Git; Rufnummern in den Texten sind nachträglich auf Nullen gesetzt (etwa `0170 0000000`),
+Mail- und Webadressen nutzen die reservierte Endung `.example`. Ablage
+`tests/Geef.Atelier.Tests/FactCheck/Corpus/factcheck-corpus.jsonl` und
+`tests/Geef.Atelier.Tests/Domain/Checks/Corpus/arithmetic-corpus.jsonl`. Die Läufe geschehen nachts und nur, wenn BookForge nicht
+läuft.

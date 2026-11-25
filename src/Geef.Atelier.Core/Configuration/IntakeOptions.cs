@@ -69,4 +69,7 @@ public sealed class IntakeOptions
 
     /// <summary>Longest free-text answer or assumption correction.</summary>
     public int MaxFreeTextChars { get; set; } = 500;
+
+    /// <summary>How assumptions about facts of the case (<see cref="GapTopicKinds.IsContent"/>) reach the writer.</summary>
+    public ContentAssumptionMode ContentAssumptions { get; set; } = ContentAssumptionMode.OpenPoints;
 }

@@ -41,6 +41,19 @@ public sealed class GetOrderResultToolTests
     }
 
     [Fact]
+    public async Task An_administrator_reads_without_owner_filter_but_with_the_own_name_as_viewer()
+    {
+        var id = Guid.NewGuid();
+        _orders.AddResult("root", OrderToolTestData.Result(id, OrderDisplayState.Delivered, Text));
+
+        await GetOrderResultTool.GetOrderResult(_orders, new FakeUser("root", isAdmin: true), id.ToString());
+        await Assert.ThrowsAsync<McpException>(() => GetOrderResultTool.GetOrderResult(_orders, _alice, Guid.NewGuid().ToString()));
+
+        Assert.Equal((id, (string?)null, (string?)"root"), _orders.ResultReads[0]);
+        Assert.Equal(("alice", "alice"), (_orders.ResultReads[1].RequestingUsername, _orders.ResultReads[1].ViewerUsername));
+    }
+
+    [Fact]
     public async Task The_assumptions_of_the_writer_come_with_the_result()
     {
         var id = Guid.NewGuid();

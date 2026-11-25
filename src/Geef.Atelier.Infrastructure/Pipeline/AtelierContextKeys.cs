@@ -1,5 +1,7 @@
 using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Core.Domain.FactCheck;
+using Geef.Atelier.Core.Domain.Writing;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Pipeline.Direct;
 using Geef.Sdk.Context;
@@ -58,4 +60,16 @@ internal static class AtelierContextKeys
     /// the attached files were read in full; read by the direct-path report.
     /// </summary>
     public static readonly ContextKey<ReadEvidence> ReadEvidence = new("geef:atelier:read-evidence");
+
+    /// <summary>Set by <c>DirectWriterExecutor</c> after each writing pass: the text split from the writer's notes.</summary>
+    public static readonly ContextKey<WriterNotesSplit> WriterNotes = new("geef:atelier:writer-notes");
+
+    /// <summary>Injected by <c>OrderGroundingStep</c> on the direct path: everything the text may rely on, for the fact check.</summary>
+    public static readonly ContextKey<FactMaterial> FactMaterial = new("geef:atelier:fact-material");
+
+    /// <summary>Injected by <c>OrderGroundingStep</c> on the direct path: the fact-check mode of the run.</summary>
+    public static readonly ContextKey<FactCheckMode> FactCheckMode = new("geef:atelier:fact-check-mode");
+
+    /// <summary>Injected by <c>OrderGroundingStep</c> on the direct path: totals in the files that were recalculated.</summary>
+    public static readonly ContextKey<SourceArithmeticResult> SourceArithmetic = new("geef:atelier:source-arithmetic");
 }

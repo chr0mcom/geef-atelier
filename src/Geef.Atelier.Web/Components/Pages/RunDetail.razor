@@ -223,7 +223,7 @@
                 }
                 <IterationPanel
                     Iteration="iwf.Iteration"
-                    Findings="iwf.Findings"
+                    Findings="ProfileCopies.ForViewer(iwf.Findings, _details.Run.BriefingText, _details.Run.CreatedByUser, _viewerName)"
                     IsLast="@(idx == _details.Iterations.Count - 1)"
                     ResolvedMap="resolvedMap" />
                 <IterationCostBlock Iteration="iwf.Iteration" />

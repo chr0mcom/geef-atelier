@@ -120,8 +120,10 @@
         @if (_result is { Text: not null } result && _view.Display.HasText)
         {
             <OrderResultPanel Result="result" />
-            <OrderOpenPoints Result="result" />
-            <OrderSourcesUsed Sources="result.SourcesUsed" />
+            <OrderChecksPanel Result="result" />
+            <OrderOpenPoints Result="result" Language="@OrderLanguage" />
+            <OrderAssumptions Result="result" Language="@OrderLanguage" />
+            <OrderSourcesUsed Sources="result.SourcesUsed" Quotes="result.SourceQuotes" Language="@OrderLanguage" />
             @if (!string.IsNullOrWhiteSpace(result.Note))
             {
                 <p class="order-note" data-testid="order-note">@result.Note</p>
@@ -138,7 +140,7 @@
 
                 @if (StartedClarification is { } summary)
                 {
-                    <ClarificationSummary Clarification="summary" Inline="true" />
+                    <ClarificationSummary Clarification="summary" Inline="true" OnlyCorrectedAssumptions="AssumptionsShownAbove" />
                 }
 
                 <h3>Steps</h3>
@@ -163,7 +165,14 @@
                 @if (_result is { } checks && _view.Display.IsFinished)
                 {
                     <h3>Automatic checks</h3>
-                    <p data-testid="order-how-checks">@(checks.OpenChecks.Count(c => c.Blocking) switch { 0 => "All automatic checks passed.", 1 => "One check is still open – see “Open points”.", var n => $"{n} checks are still open – see “Open points”." })</p>
+                    @if (checks.Checks is not null)
+                    {
+                        <p data-testid="order-how-checks">See “What was checked” below your text.</p>
+                    }
+                    else
+                    {
+                        <p data-testid="order-how-checks">@(checks.OpenChecks.Count(c => c.Blocking) switch { 0 => "All automatic checks passed.", 1 => "One check is still open – see “Open points”.", var n => $"{n} checks are still open – see “Open points”." })</p>
+                    }
                 }
 
                 @if (_view.Runs.Count > 0)
@@ -200,6 +209,7 @@
     string? _actionError;
     string? _intakeNotice;
     string? _requestingUser;
+    string? _viewer;
     DateTimeOffset _loadedAt = DateTimeOffset.UtcNow;
     IDisposable? _subscription;
     IJSObjectReference? _titleModule;
@@ -218,6 +228,11 @@
         : _view.Display.ShownState() == OrderDisplayState.NeedsInput
             ? $"{OrderDisplayState.NeedsInput.ToLabel()} – {Shorten(_view.Title, 40)} — Atelier"
             : $"{_view.Display.ShownState().ToLabel()} · {Shorten(_view.Title, 40)} — Atelier";
+
+    bool AssumptionsShownAbove => _result is { Text: not null } shown && _view is { Display.HasText: true }
+        && (shown.AllAssumptions().Count > 0 || shown.NotGivenFacts().Count > 0);
+
+    string? OrderLanguage => string.IsNullOrWhiteSpace(_view?.Clarification?.Language) ? null : _view.Clarification.Language;
 
     bool IsReading => _view is { State: OrderState.Analyzing, Display.State: OrderDisplayState.Preparing };
 
@@ -247,6 +262,7 @@
             _unknownUser = true;
             return;
         }
+        _viewer = auth.User.Identity?.Name;
 
         await LoadAsync();
         if (_disposed)
@@ -318,7 +334,7 @@
         {
             var view = await Orders.GetAsync(OrderId, _requestingUser);
             var result = view is { Display.HasText: true }
-                ? await Orders.GetResultAsync(OrderId, _requestingUser)
+                ? await Orders.GetResultAsync(OrderId, _requestingUser, _viewer)
                 : null;
             _view = view;
             _result = result;

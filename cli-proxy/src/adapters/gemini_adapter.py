@@ -7,6 +7,8 @@ import os
 import shutil
 from typing import Any
 
+import cli_process
+
 from .base import CliAdapter
 from .utils import format_messages as _format_messages, build_openai_response_from_parts as _build_openai_response_from_parts
 
@@ -31,13 +33,13 @@ class GeminiAdapter(CliAdapter):
         if os.path.isdir(auth_volume):
             env["HOME"] = auth_volume
 
-        proc = await asyncio.create_subprocess_exec(
+        proc = await cli_process.spawn(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+        stdout, stderr = await cli_process.communicate(proc, None, 300, asyncio.TimeoutError, "gemini CLI")
 
         if proc.returncode != 0:
             raise RuntimeError(f"gemini exited {proc.returncode}: {stderr.decode()[:500]}")

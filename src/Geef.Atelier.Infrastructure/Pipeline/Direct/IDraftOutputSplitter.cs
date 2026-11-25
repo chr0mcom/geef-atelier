@@ -4,8 +4,9 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 internal sealed record DraftOutput(string Text, string? Trailer);
 
 /// <summary>
-/// Splits the writer's answer. Stage 1 delivers the text only (<see cref="IdentityDraftOutputSplitter"/>); stage 3
-/// adds a JSON block at the end of the answer that a splitter removes from the text.
+/// Splits the writer's answer. Stage 1 delivers the text only (<see cref="IdentityDraftOutputSplitter"/>); since stage 3 the
+/// writer gets an <see cref="IWriterNotesSource"/>, and <see cref="TrailerNotesSource"/> removes the notes block at the end of the
+/// answer from the text.
 /// </summary>
 internal interface IDraftOutputSplitter
 {

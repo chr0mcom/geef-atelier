@@ -17,6 +17,9 @@ internal sealed class OpenAiCompatibleClient(
     /// <summary>Value of <see cref="FailoverHeader"/> on a request that must not be failed over.</summary>
     internal const string FailoverOff = "off";
 
+    /// <summary>Request header with the time limit of the CLI process in seconds (<see cref="LlmRequest.ProxyTimeoutSeconds"/>).</summary>
+    internal const string TimeoutHeader = "x-cli-proxy-timeout-seconds";
+
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken)
     {
         // null  → keyless provider (e.g. Ollama): skip auth header entirely
@@ -34,6 +37,8 @@ internal sealed class OpenAiCompatibleClient(
             httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
         if (request.DisableFailover)
             httpRequest.Headers.Add(FailoverHeader, FailoverOff);
+        if (request.ProxyTimeoutSeconds is { } seconds)
+            httpRequest.Headers.Add(TimeoutHeader, seconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
         httpRequest.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
         using var response = await httpClient.SendAsync(httpRequest, cancellationToken);

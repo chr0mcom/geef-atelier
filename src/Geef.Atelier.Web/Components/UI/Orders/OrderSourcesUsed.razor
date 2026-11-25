@@ -1,15 +1,28 @@
 @using Geef.Atelier.Application.Orders
 
-@if (Sources.Count > 0)
+@if (Entries.Count > 0)
 {
     <section class="order-block order-sources-used" aria-labelledby="order-sources-used-title" data-testid="order-sources-used">
         <h2 id="order-sources-used-title">From your files</h2>
+        @if (Entries.Any(e => e.Quotes.Count > 0))
+        {
+            <p class="order-sources-caveat" data-testid="order-sources-caveat">@QuotesCaveat</p>
+        }
         <ul>
-            @foreach (var source in Sources)
+            @foreach (var entry in Entries)
             {
                 <li data-testid="order-source-used">
-                    <span class="order-source-name">@source.FileName</span>
-                    <span class="order-source-meta">@Describe(source)</span>
+                    <div class="order-source-head">
+                        <span class="order-source-name">@entry.FileName</span>
+                        @if (entry.Meta is { } meta)
+                        {
+                            <span class="order-source-meta">@meta</span>
+                        }
+                    </div>
+                    @foreach (var quote in entry.Quotes)
+                    {
+                        <blockquote class="order-source-quote" data-testid="order-source-quote" lang="@Language">@quote</blockquote>
+                    }
                 </li>
             }
         </ul>
@@ -17,8 +30,33 @@
 }
 
 @code {
+    /// <summary>The fixed line under the heading whenever a quote is shown: a quote proves the file was read, nothing more.</summary>
+    public const string QuotesCaveat = "Shows the file was read and quoted — not that every statement is backed.";
+
+    /// <summary>Quotes shown per file at most (<see cref="OrderResultRules.MaxQuotesPerFile"/>).</summary>
+    public const int MaxQuotesPerFile = OrderResultRules.MaxQuotesPerFile;
+
     /// <summary>How each file went into the text.</summary>
     [Parameter, EditorRequired] public IReadOnlyList<OrderSourceUsageView> Sources { get; set; } = [];
+
+    /// <summary>Passages the writer quoted from the files, already verified against them; <c>null</c> for older results.</summary>
+    [Parameter] public IReadOnlyList<OrderSourceQuoteView>? Quotes { get; set; }
+
+    /// <summary>Language of the order (<c>lang</c> of the quotes); <c>null</c> when unknown.</summary>
+    [Parameter] public string? Language { get; set; }
+
+    sealed record Entry(string FileName, string? Meta, IReadOnlyList<string> Quotes);
+
+    IReadOnlyList<Entry> Entries
+    {
+        get
+        {
+            var meta = Sources.GroupBy(s => s.FileName, StringComparer.Ordinal).ToDictionary(g => g.Key, g => Describe(g.First()), StringComparer.Ordinal);
+            return OrderResultRules.QuotesByFile(Sources, Quotes)
+                .Select(f => new Entry(f.FileName, meta.GetValueOrDefault(f.FileName), f.Quotes))
+                .ToList();
+        }
+    }
 
     static string Describe(OrderSourceUsageView source)
     {

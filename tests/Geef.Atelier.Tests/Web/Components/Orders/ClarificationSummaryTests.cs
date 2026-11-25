@@ -116,4 +116,19 @@ public sealed class ClarificationSummaryTests : TestContext
         Assert.Empty(cut.FindAll("h2"));
         Assert.Contains("clarify-summary--inline", cut.Find("[data-testid='clarify-summary']").ClassList);
     }
+
+    [Fact]
+    public void BelowAResultWithItsOwnAssumptionsOnlyTheChangedOnesAreRepeated()
+    {
+        var clarification = OrderTestData.Clarification(
+            answers: [new OrderAnswer("a2", null, "Samstag im Innenhof", false, AnswerOrigin.User)],
+            outcome: IntakeOutcome.Answered);
+
+        var cut = RenderComponent<ClarificationSummary>(p => p.Add(c => c.Clarification, clarification).Add(c => c.Inline, true).Add(c => c.OnlyCorrectedAssumptions, true));
+
+        var assumption = Assert.Single(cut.FindAll("[data-testid='clarify-summary-assumption']"));
+        Assert.Contains("Samstag im Innenhof", assumption.TextContent);
+        Assert.Contains("Assumptions you changed:", cut.Markup);
+        Assert.DoesNotContain("Lockerer, herzlicher Ton", cut.Markup);
+    }
 }

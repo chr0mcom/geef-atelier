@@ -9,9 +9,11 @@ import re
 import shutil
 import tempfile
 import time
+from contextlib import aclosing
 from pathlib import Path
 from typing import Any
 
+import cli_process
 import policy
 from cli_errors import clip_redacted, codex_failure_detail
 from usage import UsageParts
@@ -353,7 +355,7 @@ async def complete_document(
     context_document holds large background context (grounding + advisor notes); it is
     offloaded to context.md when oversized (see workspace.materialize_context).
     """
-    async with _semaphore:
+    async with cli_process.slot(_semaphore, "codex CLI (document mode)"):
         return await _run_codex_document(
             system_prompt, user_instruction, document, workspace_path, model, max_tokens,
             context_document, reasoning_effort=reasoning_effort,
@@ -376,7 +378,7 @@ async def complete_with_usage(
     prompt: str, model: str | None, max_tokens: int | None, *, reasoning_effort: str | None = None
 ) -> tuple[str, UsageParts]:
     """Like complete(), but also returns the real token usage reported by the CLI."""
-    async with _semaphore:
+    async with cli_process.slot(_semaphore, "codex CLI"):
         return await _run_codex(prompt, model, max_tokens, reasoning_effort=reasoning_effort)
 
 
@@ -393,7 +395,7 @@ async def complete_agentic_file(
     Authoring decision.json is a normal workspace-write action the CLI performs without
     objection; the proxy reads the file back and returns standard OpenAI tool_calls.
     Without this, the claude→codex failover is useless for every agentic consumer."""
-    async with _semaphore:
+    async with cli_process.slot(_semaphore, "codex CLI (agentic file mode)"):
         async with ephemeral_dir() as workspace:
             return await _run_codex_decision(
                 instruction, model, workspace, reasoning_effort=reasoning_effort)
@@ -430,7 +432,7 @@ async def _run_codex_decision(
 
     env = {**os.environ, "HOME": CODEX_HOME}
 
-    proc = await asyncio.create_subprocess_exec(
+    proc = await cli_process.spawn(
         *args,
         stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
@@ -438,12 +440,10 @@ async def _run_codex_decision(
         cwd=str(workspace_path),
         env=env,
     )
-    try:
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
-    except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()
-        raise RuntimeError(f"codex CLI (agentic file mode) timed out after {CLI_TIMEOUT_SECONDS}s")
+    stdout, stderr = await cli_process.communicate(
+        proc, None, CLI_TIMEOUT_SECONDS,
+        lambda: RuntimeError(f"codex CLI (agentic file mode) timed out after {CLI_TIMEOUT_SECONDS}s"),
+        "codex CLI (agentic file mode)")
 
     stdout_txt = stdout.decode(errors="replace")
     if proc.returncode != 0:
@@ -470,9 +470,11 @@ async def stream(
     codex exec --json emits the agent message as a completed item rather than token-level
     deltas, so output is emitted as one (or few) delta chunks; usage comes from turn.completed.
     """
-    async with _semaphore:
-        async for event in _stream_codex(prompt, model, max_tokens, reasoning_effort=reasoning_effort):
-            yield event
+    async with cli_process.slot(_semaphore, "codex CLI (stream)"):
+        async with aclosing(_stream_codex(
+                prompt, model, max_tokens, reasoning_effort=reasoning_effort)) as events:
+            async for event in events:
+                yield event
 
 
 async def _stream_codex(
@@ -485,7 +487,7 @@ async def _stream_codex(
     args.append("-")
 
     env = {**os.environ, "HOME": CODEX_HOME}
-    proc = await asyncio.create_subprocess_exec(
+    proc = await cli_process.spawn(
         *args,
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
@@ -501,10 +503,12 @@ async def _stream_codex(
             proc.stdin.close()
 
     feeder = asyncio.create_task(_feed())
+    stderr = cli_process.StderrDrain(proc.stderr)
     usage = UsageParts()
     emitted_text = ""
+    completed = False
     try:
-        async with asyncio.timeout(CLI_TIMEOUT_SECONDS):
+        async with asyncio.timeout(cli_process.timeout(CLI_TIMEOUT_SECONDS)):
             async for raw_line in proc.stdout:
                 line = raw_line.decode(errors="replace").strip()
                 if not line:
@@ -537,20 +541,27 @@ async def _stream_codex(
                         cached_tokens=cached,
                         reasoning_tokens=reasoning,
                     )
-        await feeder
-        await proc.wait()
-        if proc.returncode not in (0, None):
-            err = (await proc.stderr.read()).decode(errors="replace").strip()
-            raise RuntimeError(
-                f"codex CLI (stream) exited with code {proc.returncode}: {clip_redacted(err, 200)}")
+            # Inside the time limit too: a helper that keeps stderr open must not hold the
+            # stream beyond it.
+            await feeder
+            await proc.wait()
+            if proc.returncode not in (0, None):
+                err = (await stderr.tail()).decode(errors="replace").strip()
+                raise RuntimeError(
+                    f"codex CLI (stream) exited with code {proc.returncode}: {clip_redacted(err, 200)}")
+        completed = True
         yield ("usage", usage)
     except TimeoutError:
+        if cli_process.caller_limited():
+            raise cli_process.caller_timeout("codex CLI (stream)") from None
         raise RuntimeError(f"codex CLI (stream) timed out after {CLI_TIMEOUT_SECONDS} seconds")
     finally:
         feeder.cancel()
-        if proc.returncode is None:
-            proc.kill()
-            await proc.wait()
+        try:
+            if not completed:
+                await cli_process.stop(proc)
+        finally:
+            await stderr.close()
 
 
 async def _run_codex_document(
@@ -599,19 +610,17 @@ async def _run_codex_document(
 
     env = {**os.environ, "HOME": CODEX_HOME}
 
-    proc = await asyncio.create_subprocess_exec(
+    proc = await cli_process.spawn(
         *args,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         cwd=str(workspace_path),
         env=env,
     )
-    try:
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=CLI_TIMEOUT_SECONDS)
-    except asyncio.TimeoutError:
-        proc.kill()
-        await proc.wait()  # reap the killed process so it does not linger as a zombie
-        raise RuntimeError(f"codex CLI (document mode) timed out after {CLI_TIMEOUT_SECONDS}s")
+    stdout, stderr = await cli_process.communicate(
+        proc, None, CLI_TIMEOUT_SECONDS,
+        lambda: RuntimeError(f"codex CLI (document mode) timed out after {CLI_TIMEOUT_SECONDS}s"),
+        "codex CLI (document mode)")
 
     if proc.returncode != 0:
         raise RuntimeError(
@@ -666,20 +675,17 @@ async def _run_codex(
 
         env = {**os.environ, "HOME": CODEX_HOME}
 
-        proc = await asyncio.create_subprocess_exec(
+        proc = await cli_process.spawn(
             *args,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
         )
-        try:
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(input=prompt.encode("utf-8")), timeout=CLI_TIMEOUT_SECONDS)
-        except asyncio.TimeoutError:
-            proc.kill()
-            await proc.wait()  # reap the killed process so it does not linger as a zombie
-            raise RuntimeError(f"codex CLI timed out after {CLI_TIMEOUT_SECONDS} seconds")
+        stdout, stderr = await cli_process.communicate(
+            proc, prompt.encode("utf-8"), CLI_TIMEOUT_SECONDS,
+            lambda: RuntimeError(f"codex CLI timed out after {CLI_TIMEOUT_SECONDS} seconds"),
+            "codex CLI")
 
         if proc.returncode != 0:
             raise RuntimeError(
@@ -739,8 +745,8 @@ async def generate_image(prompt: str, size: str | None = None) -> tuple[bytes, U
     At most CODEX_IMAGE_MAX_CONCURRENT image jobs run at once, and each of them also holds one
     regular codex slot, so images can never starve text calls of both.
     """
-    async with _image_semaphore:
-        async with _semaphore:
+    async with cli_process.slot(_image_semaphore, "codex CLI (image)"):
+        async with cli_process.slot(_semaphore, "codex CLI (image)"):
             return await _run_codex_image(prompt, size)
 
 
@@ -759,7 +765,7 @@ async def _run_codex_image(prompt: str, size: str | None) -> tuple[bytes, UsageP
             "codex", "exec", "--json", "--ephemeral", "--skip-git-repo-check",
             "--sandbox", "workspace-write", "-C", str(workspace), instruction,
         ]
-        proc = await asyncio.create_subprocess_exec(
+        proc = await cli_process.spawn(
             *args,
             stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
@@ -767,15 +773,12 @@ async def _run_codex_image(prompt: str, size: str | None) -> tuple[bytes, UsageP
             cwd=str(workspace),
             env={**os.environ, "HOME": CODEX_HOME},
         )
-        try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=IMAGE_TIMEOUT_SECONDS)
-        except BaseException as exc:  # timeout, or the request was cancelled (e.g. shutdown)
-            if proc.returncode is None:
-                proc.kill()
-            await asyncio.shield(proc.wait())  # reap it: no zombie, no run that keeps burning quota
-            if isinstance(exc, asyncio.TimeoutError):
-                raise RuntimeError(f"codex CLI (image) timed out after {IMAGE_TIMEOUT_SECONDS}s") from None
-            raise
+        # On a timeout or a cancellation the whole process group ends: the image job's helpers
+        # must not keep burning quota either.
+        stdout, stderr = await cli_process.communicate(
+            proc, None, IMAGE_TIMEOUT_SECONDS,
+            lambda: RuntimeError(f"codex CLI (image) timed out after {IMAGE_TIMEOUT_SECONDS}s"),
+            "codex CLI (image)")
 
     stdout_txt = stdout.decode(errors="replace")
     thread_id = _parse_thread_id(stdout_txt)

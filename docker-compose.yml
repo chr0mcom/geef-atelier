@@ -73,6 +73,8 @@ services:
     pull_policy: never
     container_name: geef-atelier-cli-proxy
     restart: unless-stopped
+    # An init process as PID 1 reaps helpers of killed CLI runs; uvicorn as PID 1 leaves them as zombies.
+    init: true
     environment:
       # 6 statt 2 (2026-07-02): cli-proxy wird inzwischen von Geef + Hermes + DMS-Worker +
       # Wartungsläufen geteilt; bei 2 halten lange Hermes-Agent-Turns (Slot = gesamte

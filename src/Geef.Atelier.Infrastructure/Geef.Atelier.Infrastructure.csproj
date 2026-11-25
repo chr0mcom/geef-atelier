@@ -34,6 +34,7 @@
     <InternalsVisibleTo Include="Geef.Atelier.Tests" />
     <InternalsVisibleTo Include="Geef.Atelier.Web" />
     <InternalsVisibleTo Include="IntakeEval" />
+    <InternalsVisibleTo Include="FactCheckEval" />
   </ItemGroup>
 
 </Project>

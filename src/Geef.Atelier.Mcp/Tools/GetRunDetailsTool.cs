@@ -25,7 +25,7 @@ public static class GetRunDetailsTool
             .Select(i => new IterationDto(
                 i.Iteration.IterationNumber,
                 i.Iteration.ArtifactText,
-                i.Findings.Select(f => new FindingDto(
+                ProfileCopies.ForViewer(i.Findings, details.Run.BriefingText, details.Run.CreatedByUser, currentUser.Username).Select(f => new FindingDto(
                     f.ReviewerName,
                     f.Severity.ToString(),
                     f.Message)).ToList()))

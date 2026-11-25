@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Sources;
+using Geef.Atelier.Core.Domain.Writing;
 
 namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 
@@ -9,8 +10,8 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 /// <c>&lt;source&gt;</c> tag with its page markers. The mode follows <see cref="SourceBudgetPlanner.Classify"/>, the same rule
 /// as on the start page and in the order service: above <see cref="SourceOptions.FullTextMaxChars"/> characters a
 /// <c>&lt;source-map&gt;</c> precedes the files; its line numbers are exact (1-based) for the rendered document,
-/// because the cli-proxy writes the document unchanged to <c>context.md</c>. Tag-like text inside files and file names
-/// is defused so that a file cannot close its own tag.
+/// because the cli-proxy writes the document unchanged to <c>context.md</c>. Tag-like text and the start of the writer's notes
+/// block inside files and file names are defused so that a file can neither close its own tag nor end the text early.
 /// </summary>
 internal static partial class SourceBlockRenderer
 {
@@ -79,8 +80,12 @@ internal static partial class SourceBlockRenderer
         return new OrderSourceBundle(sources, mode, string.Join('\n', map.Concat(body)), total);
     }
 
-    /// <summary>Defuses tag-like text (<c>&lt;source</c>, <c>&lt;/sources</c>, <c>&lt;source-map</c> …) by replacing its angle bracket.</summary>
-    public static string Defuse(string text) => TagStart().Replace(text, "‹$1$2");
+    /// <summary>
+    /// Defuses tag-like text (<c>&lt;source</c>, <c>&lt;/sources</c>, <c>&lt;source-map</c> …) by replacing its angle bracket, and the start
+    /// of the writer's notes block (<see cref="WriterNotesFormat.Defuse"/>), so that a file can neither close its own tag nor end the text
+    /// early. Both keep the length of the line, so the line numbers of the map stay exact.
+    /// </summary>
+    public static string Defuse(string text) => WriterNotesFormat.Defuse(TagStart().Replace(text, "‹$1$2"));
 
     private static string OpenTag(PromptSource source)
     {

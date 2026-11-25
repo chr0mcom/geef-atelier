@@ -1,7 +1,11 @@
 using System.Data.Common;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Checks;
+using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Profiles;
+using Geef.Atelier.Core.Domain.Reports;
+using Geef.Atelier.Core.Domain.Writing;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Persistence.Profiles;
 using Microsoft.EntityFrameworkCore;
@@ -85,6 +89,103 @@ public sealed class AccountStoreTests(PostgresFixture fixture)
         Assert.Contains(BriefingSections.ProfileHiddenNote, stripped, StringComparison.Ordinal);
         Assert.Equal(Briefing(), await BriefingOfAsync(beaRun));
         Assert.NotNull(await ProfileOfAsync(bea));
+    }
+
+    [Fact]
+    public async Task Deleting_an_account_also_removes_what_the_fact_check_copied_from_the_profile_into_report_and_findings()
+    {
+        var alex = Name("alex");
+        var user = await SeedAsync(alex);
+        var runId = await RunAsync(alex);
+        var fromProfile = new FactFinding("f1", FactFindingKind.Instruction, "Wir freuen uns sehr auf Sie!", "Breaks: " + Marker,
+            "Name: " + Marker, null, null, null, InstructionOrigin.Memory, true, QuoteMatchKind.Exact);
+        var report = new RunReport(2, RunReport.DirectKind, OrderConstraints.None, [], [], [], 1, 1, null, [], WriterNotesStatus.Off, WriterNotes.Empty, [], 0,
+            new FactCheckSummary(FactCheckMode.Report, FactCheckScope.Full, FactCheckState.OpenPoints, [fromProfile], [], [], 1, "m", false, "fact-check-1"), null, []);
+        var findingId = Guid.NewGuid();
+        await using (var db = fixture.NewContext())
+        {
+            var iterationId = Guid.NewGuid();
+            db.Iterations.Add(new IterationEntity { Id = iterationId, RunId = runId, IterationNumber = 1, ArtifactText = "Wir freuen uns sehr auf Sie!", CreatedAt = DateTimeOffset.UtcNow });
+            db.Findings.Add(new FindingEntity
+            {
+                Id = findingId, IterationId = iterationId, ReviewerName = "source-fact-check", Severity = FindingSeverity.Minor,
+                Message = "Breaks: " + Marker, CreatedAt = DateTimeOffset.UtcNow, Category = FactFindingMetadata.FindingCategory, Quote = "Name: " + Marker,
+            });
+            db.Events.Add(new EventEntity
+            {
+                Id = 0, RunId = runId, EventType = "EvaluationApprovedEvent", CreatedAt = DateTimeOffset.UtcNow,
+                PayloadJson = Geef.Atelier.Tests.Orders.ProfileCopiesTests.EventPayload("Breaks: " + Marker, "Name: " + Marker, "Name: " + Marker),
+            });
+            await db.SaveChangesAsync();
+            var json = RunReportJson.Serialize(report);
+            await db.Runs.Where(r => r.Id == runId).ExecuteUpdateAsync(u => u.SetProperty(r => r.ReportJson, json));
+        }
+
+        await using (var db = fixture.NewContext())
+            await Store(db).DeleteAsync(user, CancellationToken.None);
+
+        await using (var db = fixture.NewContext())
+        {
+            var run = await db.Runs.AsNoTracking().SingleAsync(r => r.Id == runId);
+            Assert.DoesNotContain(Marker, run.ReportJson!, StringComparison.Ordinal);
+            Assert.Equal("Wir freuen uns sehr auf Sie!", Assert.Single(RunReportJson.TryParse(run.ReportJson)!.FactCheck!.Open).TextQuote);
+            var finding = await db.Findings.AsNoTracking().SingleAsync(f => f.Id == findingId);
+            Assert.Equal((ProfileCopies.HiddenReason, ProfileCopies.HiddenPassage), (finding.Message, finding.Quote));
+            var stored = await db.Events.AsNoTracking().SingleAsync(e => e.RunId == runId);
+            Assert.DoesNotContain(Marker, stored.PayloadJson, StringComparison.Ordinal);
+            Assert.Contains(ProfileCopies.HiddenReason, stored.PayloadJson, StringComparison.Ordinal);
+        }
+    }
+
+    private async Task AddEventsAsync(Guid runId, IEnumerable<string> payloads)
+    {
+        await using var db = fixture.NewContext();
+        foreach (var payload in payloads)
+            db.Events.Add(new EventEntity { Id = 0, RunId = runId, EventType = "SdkEvent", CreatedAt = DateTimeOffset.UtcNow, PayloadJson = payload });
+        await db.SaveChangesAsync();
+    }
+
+    private async Task<IReadOnlyList<string>> EventsOfAsync(Guid runId)
+    {
+        await using var db = fixture.NewContext();
+        return await db.Events.AsNoTracking().Where(e => e.RunId == runId).Select(e => e.PayloadJson).ToListAsync();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Deleting_or_renaming_removes_the_briefing_from_every_stored_sdk_event_also_of_runs_cleaned_before(bool rename)
+    {
+        var alex = Name("alex");
+        var user = await SeedAsync(alex);
+        var runId = await RunAsync(alex);
+        var cleanedBefore = await RunAsync(alex);
+        await using (var db = fixture.NewContext())
+        {
+            var without = BriefingSections.WithoutProfile(Briefing());
+            await db.Runs.Where(r => r.Id == cleanedBefore).ExecuteUpdateAsync(u => u.SetProperty(r => r.BriefingText, without));
+        }
+        var payloads = Geef.Atelier.Tests.Orders.ProfileCopiesTests.SdkEventPayloads(Briefing(), "Name: " + Marker);
+        await AddEventsAsync(runId, payloads);
+        await AddEventsAsync(cleanedBefore, payloads);
+        Assert.All(await EventsOfAsync(cleanedBefore), p => Assert.Contains(Marker, p, StringComparison.Ordinal));
+
+        await using (var db = fixture.NewContext())
+        {
+            if (rename)
+                await Store(db).UpdateAsync(user with { Username = Name("alexandra") }, alex, CancellationToken.None);
+            else
+                await Store(db).DeleteAsync(user, CancellationToken.None);
+        }
+
+        foreach (var run in new[] { runId, cleanedBefore })
+        {
+            var stored = await EventsOfAsync(run);
+            Assert.Equal(payloads.Count, stored.Count);
+            Assert.All(stored, p => Assert.DoesNotContain(Marker, p, StringComparison.Ordinal));
+            Assert.Contains(stored, p => p.Contains(Request, StringComparison.Ordinal) && p.Contains("\"Input\"", StringComparison.Ordinal));
+            Assert.DoesNotContain(Marker, await BriefingOfAsync(run), StringComparison.Ordinal);
+        }
     }
 
     [Fact]

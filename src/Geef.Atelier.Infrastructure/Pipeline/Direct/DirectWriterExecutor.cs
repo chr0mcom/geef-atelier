@@ -4,7 +4,9 @@ using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Warnings;
+using Geef.Atelier.Core.Domain.Writing;
 using Geef.Atelier.Infrastructure.Llm;
+using Geef.Atelier.Infrastructure.Pipeline.Direct.FactCheck;
 using Geef.Sdk.Context;
 using Geef.Sdk.Providers;
 using Geef.Sdk.Results;
@@ -16,7 +18,10 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 /// <summary>
 /// Writer of the direct path. First pass: the request plus the order's files as background document; a CLI provider
 /// writes into <c>draft.md</c> (seeded with a template to revise when there is one). Correction pass: only the
-/// blocking findings of the automatic checks of the previous pass, never failures of the checks themselves.
+/// blocking findings of the automatic checks and of the fact check of the previous pass, never failures of the checks themselves.
+/// The answer goes through <see cref="IWriterNotesSource"/>: the text without the notes block becomes the draft, the notes go
+/// to <see cref="AtelierContextKeys.WriterNotes"/>; a correction without a block keeps the readable notes of the pass before
+/// (<see cref="WriterNotesStatus.CarriedOver"/>), an unreadable block becomes a run warning.
 /// An empty or unchanged answer is never accepted: the call is repeated once; if the first pass still has no text the
 /// run stops with <see cref="DirectPathException.WriterReturnedNoText"/>, a correction pass keeps the previous text.
 /// In document mode the call asks the cli-proxy not to fail over (another CLI cannot edit the same files); the
@@ -33,7 +38,7 @@ internal sealed class DirectWriterExecutor(
     IRunWarningSink warningSink,
     Guid runId,
     ILogger logger,
-    IDraftOutputSplitter splitter) : IExecutionStep
+    IWriterNotesSource notesSource) : IExecutionStep
 {
     /// <summary>Warning shown when the writer most likely searched the files instead of reading them.</summary>
     public const string PartialReadWarning = "Some of your files may not have been read in full.";
@@ -53,19 +58,22 @@ internal sealed class DirectWriterExecutor(
         var documentMode = ModelNameNormalizer.IsCliProvider(profile.Provider);
         var systemPrompt = DirectWriterPrompts.SystemPrompt(profile.SystemPrompt, documentMode);
 
+        var writerNotes = notesSource.AsksForBlock;
+        var arithmetic = writerNotes && context.TryGet(AtelierContextKeys.SourceArithmetic, out var totals) && totals is not null ? totals.Issues : [];
+
         string userPrompt;
         string baseline;
         string? previous = null;
         if (iteration == 1)
         {
             var seed = context.TryGet(AtelierContextKeys.SeedDraft, out var s) && !string.IsNullOrWhiteSpace(s) ? s : null;
-            userPrompt = DirectWriterPrompts.FirstPass(brief, bundle, documentMode, seed);
+            userPrompt = DirectWriterPrompts.FirstPass(brief, bundle, documentMode, seed, writerNotes, arithmetic);
             baseline = seed ?? string.Empty;
         }
         else
         {
             previous = context.GetRequired(AtelierContextKeys.CurrentDraft);
-            userPrompt = DirectWriterPrompts.Correction(brief, bundle, BlockingProblems(context), documentMode, previous);
+            userPrompt = DirectWriterPrompts.Correction(brief, bundle, BlockingProblems(context), documentMode, previous, writerNotes, arithmetic);
             baseline = previous;
         }
 
@@ -82,29 +90,42 @@ internal sealed class DirectWriterExecutor(
         };
 
         var response = await CompleteAndRecordAsync(client, request, iteration, cancellationToken);
-        var text = response is null ? string.Empty : splitter.Split(response.Text).Text;
+        var split = await SplitAsync(response, brief, cancellationToken);
         var notes = new List<string>();
+        var earlier = context.TryGet(AtelierContextKeys.WriterNotes, out var e) ? e : null;
+        var fresh = true;
 
-        if (IsNoText(text, baseline))
+        if (IsNoText(split.Text, baseline))
         {
             LogNoText(response, model, iteration, attempt: 1);
             response = await CompleteAndRecordAsync(
                 client, request with { UserPrompt = userPrompt + DirectWriterPrompts.RetryReminder(documentMode) }, iteration, cancellationToken);
-            text = response is null ? string.Empty : splitter.Split(response.Text).Text;
+            split = await SplitAsync(response, brief, cancellationToken);
 
-            if (IsNoText(text, baseline))
+            if (IsNoText(split.Text, baseline))
             {
                 LogNoText(response, model, iteration, attempt: 2);
                 if (previous is null)
                     throw new DirectPathException(DirectPathException.WriterReturnedNoText);
-                text = previous;
+                split = earlier is null
+                    ? new WriterNotesSplit(previous, WriterNotes.Empty, writerNotes ? WriterNotesStatus.Absent : WriterNotesStatus.Off)
+                    : CarryOver(earlier, previous);
+                fresh = false;
                 notes.Add("correction returned no usable text twice; previous text kept");
             }
         }
 
+        if (fresh && split.Status == WriterNotesStatus.Absent && earlier is { Status: WriterNotesStatus.Ok or WriterNotesStatus.CarriedOver })
+            split = CarryOver(earlier, split.Text);
+        if (fresh && split.Status == WriterNotesStatus.Unreadable)
+            await warningSink.ReportAsync(runId, RunWarningSources.Llm, RunWarningCodes.WriterNotesUnreadable, WriterNotesWarningMessages.Unreadable, iteration, cancellationToken);
+        if (writerNotes)
+            notes.Add($"writer-notes status={split.Status} assumptions={split.Notes.Assumptions.Count} open_points={split.Notes.OpenPoints.Count} quotes={split.Notes.Quotes.Count}");
+
         var usage = response?.TokenUsage ?? new LlmTokenUsage { InputTokens = 0, OutputTokens = 0 };
         var updated = context
-            .Set(AtelierContextKeys.CurrentDraft, text)
+            .Set(AtelierContextKeys.CurrentDraft, split.Text)
+            .Set(AtelierContextKeys.WriterNotes, split)
             .Set(AtelierContextKeys.TokenUsage, usage);
 
         if (iteration == 1 && documentMode && bundle.Mode == SourceUsageMode.FullText && bundle.ContextDocument.Length > 0)
@@ -127,21 +148,38 @@ internal sealed class DirectWriterExecutor(
     }
 
     /// <summary>
-    /// Messages of the blocking findings of the automatic checks in the previous pass. Findings of other reviewers and
-    /// reports about checks that could not run are never passed on.
+    /// The problems of the previous pass the correction must fix: messages of the blocking findings of the automatic checks, and
+    /// for blocking findings of the fact check a fixed sentence built from their metadata (<see cref="DirectWriterPrompts.FactProblem"/>).
+    /// Findings of other reviewers, findings that do not block (hints, shadow mode, source conflicts) and reports about checks that
+    /// could not run are never passed on.
     /// </summary>
     internal static IReadOnlyList<string> BlockingProblems(IRunContext context)
     {
         if (!context.TryGet(GeefKeys.IterationHistory, out var history) || history is null || history.Records.Count == 0)
             return [];
 
-        return history.Records[^1].EvaluationResult.AllFindings
-            .Where(f => f.Severity is FindingSeverity.Error or FindingSeverity.Critical
-                        && f.Category == DeterministicChecksReviewer.FindingCategory)
-            .Select(f => f.Message)
+        var forbidPlaceholders = context.TryGet(AtelierContextKeys.OrderConstraints, out var constraints) && constraints is { ForbidPlaceholders: true };
+        return history.Records[^1].EvaluationResult.Reviews
+            .Where(r => r.Decision != ReviewDecision.Failed)
+            .SelectMany(r => r.Findings)
+            .Where(f => f.Severity is FindingSeverity.Error or FindingSeverity.Critical)
+            .Select(f => f.Category switch
+            {
+                DeterministicChecksReviewer.FindingCategory => f.Message,
+                SourceFactCheckReviewer.FindingCategory => DirectWriterPrompts.FactProblem(f.Metadata, f.Message, forbidPlaceholders),
+                _ => null,
+            })
+            .OfType<string>()
             .Distinct(StringComparer.Ordinal)
             .ToList();
     }
+
+    private async Task<WriterNotesSplit> SplitAsync(LlmResponse? response, string brief, CancellationToken ct) =>
+        await notesSource.SplitAsync(response?.Text ?? string.Empty, brief, ct);
+
+    /// <summary>The notes of an earlier pass for <paramref name="text"/>, a pass without its own block; readable notes become <see cref="WriterNotesStatus.CarriedOver"/>.</summary>
+    private static WriterNotesSplit CarryOver(WriterNotesSplit earlier, string text) =>
+        earlier with { Text = text, Status = earlier.Status is WriterNotesStatus.Ok or WriterNotesStatus.CarriedOver ? WriterNotesStatus.CarriedOver : earlier.Status };
 
     /// <summary>True when <paramref name="text"/> is blank or, ignoring surrounding white space, equals what the writer was given.</summary>
     internal static bool IsNoText(string? text, string baseline) =>

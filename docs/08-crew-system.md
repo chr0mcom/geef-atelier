@@ -795,3 +795,57 @@ than 25 % ("at most 100 words" from 126 words, "at least 200 words" below 150); 
 the length is the only blocking problem, the instruction to the writer ends with "Keep everything else unchanged."
 The rate of false blocks is measured on synthetic, independently labelled requests
 (`tests/Geef.Atelier.Tests/Domain/Checks/Corpus/`, `LengthCorpusTests`).
+
+## Template `direct`: two reviewers (D-073)
+
+The code-only template `direct` (`SystemCrew.DirectTemplate`, not in template lists) runs the writer once and corrects at
+most once (`MaxIterations: 2`). Since stage 3 it has two reviewers, both injected at pipeline build time by
+`DirectPipelineAssembler`:
+
+| Reviewer | Profile | Model | What it does |
+|---|---|---|---|
+| Automatic checks | `deterministic-checks` | none | `DraftCheckEvaluator`: not empty, no remark before the text, length, language, placeholders, forbidden patterns and words, required words, written calculations. Blocking failures → `Error`, the rest `Info`. |
+| Fact check | `source-fact-check` | slot `FactReviewer` (today Codex Astra, never the writer's family) | `SourceFactCheckReviewer`: compares the facts of the text with the request, the answers, the profile and the files (`FactCheckPrompts`, version `fact-check-1`). |
+
+The fact check runs for every order of the direct path; only `Direct:FactCheckMode = Off`, `Shadow` or a failure of the
+model and its one fallback leave the facts unchecked, and "What was checked" says so.
+
+- **Material** comes from the grounding step (`AtelierContextKeys.FactMaterial`): request, answers of the person and of
+  the client, profile and files, for a revision the text to revise as `S0`. Assumptions and the writer's notes are never
+  material. Above `Direct:FactCheckMaxMaterialChars` (150,000 characters of material and text) the check gets the file map
+  instead of the content.
+- **Filter of the code** (`FactFindingFilter`): a finding stays only with a word-for-word quote; whether it blocks follows from
+  where its quotes stand (request, the person's answers and profile block; the client's answers are hints; contradictions
+  in the files never block). A reason that names a link, an address or account or access details never drops the finding:
+  the reason is replaced by a fixed sentence, the quote of the text stays (an invented IBAN is exactly what the person must
+  see); unsafe passages of the material are replaced the same way. "Covered word for word" needs whole words.
+- **Every wording is checked in full.** A text changed for any reason (fact finding, length, language …) gets a full
+  `check_facts` again, with the same fallback rules; only a wording an earlier round already checked word for word takes over
+  that round's findings without a call. `recheck_facts` is no longer called (prompt and schema stay unchanged in the code).
+  A model that ran into its time limit is not called again in the same run. The report knows which wording was checked
+  (`FactCheckRound.TextHash`); a delivered text no check saw is `VersionNotChecked` ("The facts of this version of the text
+  were not checked …"), and earlier findings are shown only when their passage still stands in it.
+- **No finding is lost between rounds** (`FactCarryOver`): after every full check, the findings of all earlier answered rounds
+  whose passage still stands in the text word for word (whole words) stay open with their blocking effect, and every source
+  conflict stays (a correction does not change the files). Only repetitions are dropped: a passage that lies wholly inside a
+  kept passage of the same kind (for an instruction, against the same instruction), or a conflict whose two passages contain
+  each other as whole words and that names the same files; a passage that only overlaps another is shown as well. No limit
+  applies, ids are given anew. When an earlier version is delivered as the best one, the findings of the later answered rounds
+  are added the same way (conflicts always, passages only when they stand in the delivered text, unlisted ones counted). So in `On` a blocking
+  passage that the second check does not flag again still rejects. Flagged passages an earlier check could not list stay
+  counted. Quotes are widened to whole words, so an unchanged passage never counts as "removed"; without a check of the
+  delivered wording, "Removed or replaced" adds that the statement may still be in the text in other words.
+- **Modes:** `Report` (shipped) → findings `Warning`, decision `Approved`, the text is never changed; `On` → blocking findings
+  `Error` and `Rejected`, the writer gets fixed sentences; `Shadow` → `Info` with metadata `shadow`, nothing shown.
+- **Fallback:** when the model cannot be reached, one more attempt with the next candidate of `FactReviewer` that is neither
+  the writer's model nor from the provider that failed nor paid per token (`FactCheckModelFallback`, today Sonnet). The
+  gateway's own failover stays off. Calls, model and fallback are in the report (`factCheck`), never shown as a warning.
+- **Persistence:** findings keep `Category = fact-check`, `Code` (`fact.unsupported`, `fact.instruction`, `fact.superseded`,
+  `fact.source_conflict`) and `Quote`; `Runs.FactCheckMode` holds the mode of the run (migration Step50). When an account is
+  deleted or renamed, its runs lose every copy of the About me details: the block in the briefing, the briefing in the stored
+  events (`PipelineStartedEvent.Input` and any other text of an event that holds the block or the details word for word) and
+  what the fact check copied into report, findings and events. Runs cleaned by an earlier version are cleaned again with the
+  details still held in their events.
+- **Recalculation never says "right":** the check of written calculations in the text and of totals in the files names only
+  what looks clearly wrong and asks the person to check it; otherwise "What was checked" says at most that nothing clearly
+  wrong was found and that not every calculation can be checked this way. Earlier reports read the same way.

@@ -2123,3 +2123,158 @@ künftige Promptänderungen damit nicht mehr unberührt.
 **Nachkontrolle:** Die Fragen echter Aufträge werden mit `tools/IntakeEval` und dem Auftragsbestand nach den ersten 30
 geklärten Aufträgen erneut gesichtet. Rückweg ohne neues Image: `Orders__IntakeMode=Off` in der Umgebung des Webdienstes setzen; offene Aufträge im
 Zustand `Analyzing` oder `NeedsInput` arbeitet der Worker weiter ab.
+
+## D-073 — Etappe 3: Ehrlich schreiben (2026-11-25, Entwurf)
+
+**Status:** umgesetzt (Schreiber-Notizen, Brief-Trennung, Faktenprüfer, Rechenprüfung der Quellen, „What was checked“,
+Bericht Schema 2, Migration Step50, Web und MCP). Ausgeliefert wird `Direct:FactCheckMode = Report`, **obwohl Tor V2 nicht
+bestanden ist** – als dokumentierte Abweichung (Abschnitt „Vorversuche“). `On` für alle erst nach Tor Q4 und den
+Bedingungen unten, in einem eigenen Commit.
+
+**Entscheidung.** Der Direktweg sagt, was er angenommen, geprüft und geändert hat, und behauptet nichts, was er nicht
+prüfen konnte.
+
+- **Brief-Trennung** (`Intake:ContentAssumptions = OpenPoints`): Annahmen des Klärers zu Sachverhalten (`Facts`, `Date`,
+  `Sender`, `Signature`, `Other`) gehen nicht mehr als Vorgabe an den Schreiber, sondern unter „Not given by the person
+  (never state these as facts …)“. Formannahmen bleiben Vorgaben. Ohne gezeigte Karte heißt die Überschrift nicht mehr
+  „shown to the person“ (Nebenbefund, ohne Schalter).
+- **Block am Dateiende** (`Direct:WriterNotes`): Der Schreiber hängt `<!-- atelier-notes {JSON} -->` mit eigenen Annahmen,
+  offenen Punkten und wörtlichen Belegstellen an. Der Code trennt ihn vor Prüfung, Ablage, Export und Anzeige ab
+  (`WriterNotesFormat.Split`); Quellen werden entschärft, damit eine Datei den Text nie vorzeitig beendet.
+- **Faktenprüfer bei jedem Standardauftrag** (`SourceFactCheckReviewer`, Profil `source-fact-check`, Slot `FactReviewer`,
+  heute Codex Astra): Die Vorlage `direct` hat jetzt zwei Prüfer (`deterministic-checks`, `source-fact-check`). Es gibt
+  keine Auswahl nach Schwierigkeit, Länge oder Tageskontingent. „Nicht geprüft“ entsteht nur durch den Schalter `Off`,
+  durch `Shadow` oder durch einen Ausfall auch des Ersatzmodells; jeder Grund steht ehrlich in „What was checked“.
+  - Drei Fragen: nicht gedeckte Tatsachen (auch erfundene Rückmeldewege), verletzte Vorgaben, Fehler des Materials
+    selbst (Widersprüche, Rechenfehler, verworfene oder ersetzte Angaben).
+  - Material sind Wortlaut, Antworten von Person und Client, Profil und Dateien (bei einer Überarbeitung der Ausgangstext
+    als `S0`), **nie** Annahmen oder Notizen. Über 150.000 Zeichen (Material und Text) prüft er ohne Dateiinhalt und sagt das.
+  - Ein Befund zählt nur mit wörtlichem Zitat, das der Code nachprüft (`FactFindingFilter`). Herkunft einer Vorgabe und
+    ob ein Befund blockiert, folgen aus der Fundstelle, nie aus dem Modell: Wortlaut, Antwort der Person und Profil
+    blockieren, Antworten des Clients sind Hinweise, Widersprüche der Dateien blockieren nie und werden immer gezeigt.
+  - Runde 2 prüft nur die eigenen Befunde nach: Was wörtlich noch dasteht, bleibt ohne Aufruf offen; für den Rest
+    genau ein Aufruf `recheck_facts`.
+  - Druckmodus mit `response_format`, Proxy-Failover aus. Kann das Modell nicht erreicht werden (nicht verfügbar, Limit,
+    Zeitüberschreitung), folgt **ein** Versuch mit dem nächsten Kandidaten des Slots, der weder das Schreibermodell noch
+    vom gescheiterten Anbieter noch bezahlt ist (heute Sonnet). Scheitert auch das, isoliert das SDK den Prüfer, die
+    bestehende Warnung erscheint, der Text wird geliefert, der Bericht sagt „could not be completed“.
+  - Stufen (`Direct:FactCheckMode`): `Off` ruft nicht; `Shadow` prüft und speichert, zeigt nichts; `Report` prüft und
+    zeigt, ändert den Text nicht (Befunde `Warning`); `On` korrigiert zusätzlich einmal (blockierend → `Error`).
+    `Direct:FactCheckModeOverrides` setzt den Modus je Nutzer (Messnutzer `On`), nur über die Umgebung.
+- **Rechenprüfung der Quellen ohne Modell** (`Direct:SourceArithmetic`): Summen und Rechnungen in Dateien werden
+  nachgerechnet; eine Abweichung erfährt die Person mit beiden Zahlen und welche der Text nutzt. Nie blockierend, nie
+  still. Eine falsche ausgeschriebene Rechnung im Text selbst blockiert.
+- **„What was checked“** steht immer direkt unter dem Text: Prüfzeilen nur für gelaufene Prüfungen, was nach der Prüfung
+  geändert wurde, ob die Person etwas ansehen muss, und der feste Schluss „They do not prove that everything in the text
+  is right.“ Die Sätze baut nur `OrderCheckLines`; Web und MCP (`checks`) sagen dasselbe, die Anzeigeregeln (Reihenfolge
+  der Stellen, drei Zitate je Datei) stehen nur in `OrderResultRules`. Die Oberfläche zeigt nie den Modelltext des
+  Prüfers, nur feste Sätze und wörtliche Zitate. Ohne Dateien heißt die Faktenzeile „compared with your request and your
+  answers“, nie „and your files“.
+- **Bericht Schema 2** (`Runs.ReportJson`, additiv): Notizen der ausgelieferten Runde, nur wörtlich in ihrer Datei
+  gefundene Zitate (der Rest wird gezählt), Zustand und Umfang der Faktenprüfung samt Aufrufen und Modell, Rechenprüfung
+  mit Textbezug, `Corrections` (in Runde 1 blockierend, in der gelieferten Fassung weg). Alte Berichte (Schema 1) bleiben
+  lesbar und zeigen „Facts were not checked.“
+- **Migration Step50** (nullable, additiv, idempotent): `Findings.Category`, `Code`, `Quote`; `Runs.FactCheckMode`.
+  Keine Datenmigration, kein Index (es gibt keine Kappe, die zählen müsste).
+- **Ausgelieferte Fassung:** keine eigene Auswahl; die SDK-Regel (wenigste Ablehnungen, bei Gleichstand die jüngste)
+  ist bei zwei Runden und zwei Prüfern sachgerecht (Test `DirectDeliveryRuleTests`).
+
+**Messung und Tore:** V1 (Block), V2 (Eichung des Prüfers, zurückgehaltene Menge), V3 (Rechenprüfung) vor den Merges;
+danach die Tore Q1–Q8 mit dem Messnutzer über die Produktion. Wer Prompt oder Schema des Faktenprüfers ändert, misst neu
+(`tools/FactCheckEval`).
+
+**Kosten:** je Direktweg-Auftrag ein Codex-Aufruf je geprüfter Fassung: einer ohne Korrektur, zwei, wenn irgendeine
+Prüfung (Tatsachen, Länge, Sprache …) eine Korrektur auslöste, in `Report` wie in `On` (seit der ersten Prüfrunde wird jede
+geänderte Fassung voll geprüft); bei Codex-Ausfall ein Sonnet-Aufruf. Reicht das Kontingent dauerhaft nicht, entscheidet der Betriebsschalter, nie eine Auswahl im Code.
+
+**Rückweg:** Schalter über die Umgebung ohne neues Image (`Direct__FactCheckMode=Off`, `Direct__WriterNotes=false`,
+`Intake__ContentAssumptions=Defaults`, `Direct__SourceArithmetic=false`). Code: vorheriges Web-Image; Step50 bleibt (nullable,
+der Code von Etappe 2 liest und schreibt unverändert), kein `Down()` in Produktion. Vorher darf kein Direktweg-Lauf
+`Pending` oder `Running` sein: E3-Snapshots enthalten den Prüfer `source-fact-check`, den der Code von Etappe 2 nicht kennt.
+
+**Vorversuche (2026-11-25):**
+- **V1 (Block am Dateiende):** Ergebnis A, 15 von 15 Läufen ohne Beschädigung → `Direct:WriterNotes = true`.
+- **V3 (Rechenprüfung):** bestanden → `Direct:SourceArithmetic = true`.
+- **V2 (Eichung des Faktenprüfers): nicht bestanden.** Die Gültigkeit liegt bei **83,3 %** (10 von 12 Aufrufen für 10
+  Texte; verlangt ≥ 95 %, unter 90 % gilt das Tor formal sogar als nicht auswertbar), das **p90 der Latenz bei 164 s**
+  (verlangt ≤ 120 s). Ursache sind hängende Codex-Aufrufe: **3 von 31** Aufrufen über beide Mengen antworteten nicht vor
+  der damaligen Grenze von 180 s; zwei der drei Texte (`fc-06/base`, `fc-14/base`) wurden wiederholt und antworteten dann in
+  Sekunden, der dritte (`fc-15/base`, Entwicklungsmenge) wurde nie wiederholt. Die Ursache des Hängers ist
+  **unbekannt**; die wahre Hängerquote liegt bei dieser Stichprobe etwa zwischen 3 % und 25 %. Die Qualitätskriterien sind
+  bestanden: Treffer 17 von 17, 0,20 blockierende Befunde je sauberem Text (verlangt ≤ 0,25), 80 % saubere Texte ohne
+  blockierenden Befund (verlangt ≥ 75 %), keine gemeldeten Quellenwidersprüche ohne fehlerhafte Quelle, Pflichtfall Elternabend
+  bestanden. Diese Zahlen beruhen auf **10 synthetischen Texten**; 0,20 ist ein einziger Befund. Die Entwicklungsmenge ist
+  **unvollständig**: 19 ihrer 22 Texte wurden aufgerufen (`fc-15/planted`, `fc-16/base` und `fc-16/planted` liefen nie,
+  beide Grundlagen haben fehlerhafte Dateien), 18 beantwortet; die 0,38 unten und jede Neuzählung beruhen auf dieser Teilmenge.
+- **Abweichung:** Ausgeliefert wird trotzdem `Report` (prüft und zeigt, ändert den Text nie), nach Entscheidung eines
+  unabhängigen Beraters. Das ist eine Aufweichung des Tors, vertretbar, weil nur Betriebskriterien verfehlt sind, `Report`
+  keinen Text ändert und der Ausfallpfad ehrlich ist („The fact check could not be completed.“). `Shadow` hülfe nicht
+  (der Hänger tritt dort genauso auf), ein Wiederholungslauf auch nicht (bei rund 10 % Hängern besteht ein Zehnerlauf mit
+  etwa 35 % Wahrscheinlichkeit zufällig). Der Betreiber kann per Schalter auf `Shadow` oder `Off` zurück.
+- **Nicht ausgeführte Vertragszweige (ebenfalls Abweichung):** Weder „Parser und Schema prüfen“ (Gültigkeit) noch die
+  Probe mit `reasoning_effort: low` bzw. die Senkung der Materialgrenze (Latenz) wurden ausgeführt: Bei den Hängern kam
+  keine Antwort an, Parser und Schema sind nicht beteiligt, und die erfolgreichen Aufrufe waren schnell (Median rund 14 s,
+  längster 86 s).
+- `FactCheckCorpusTests` hält das Ergebnis fest: nie „bestanden“, die Verfehlung nur bei Gültigkeit und Latenz, die
+  Qualitätswerte beider Mengen als Untergrenze (Treffer der Fragen a und b, blockierende Befunde auf sauberen Texten und
+  jenseits der gepflanzten Fehler, Frage c, Widersprüche ohne fehlerhafte Datei) und die Zahl der behaltenen Befunde genau;
+  ein Filter, der einen Treffer verliert, Quellenwidersprüche verwirft oder einen Fehlalarm hinzufügt, macht ihn rot (per
+  Mutation geprüft: ein Filter, der jeden Quellenwiderspruch verwirft, lässt ihn scheitern).
+
+**Zeitgrenzen und Hänger (Auflagen des Beraters):**
+- Zeitgrenze des Prüfmodells **90 s** (`Direct:FactCheckTimeout`, vorher 180 s), des Ersatzmodells **60 s**
+  (`Direct:FactCheckFallbackTimeout`); beide konfigurierbar, die ausgelieferten Werte hält ein Test fest. Mit 90 s ist
+  „p90 ≤ 120 s“ **per Konstruktion** erfüllt – das ist **kein Nachweis** schnellerer Prüfung.
+- Beim Hänger: kein zweiter Codex-Versuch (geteiltes Kontingent), genau ein Versuch mit dem Ersatzmodell, sonst „Prüfung
+  nicht abgeschlossen“. Eine abgebrochene Prüfung löst **keine Korrekturrunde** aus (ein ausgefallener Prüfer blockiert
+  die Konvergenz nicht; Ende-zu-Ende-Test).
+- Das Atelier schickt dem Gateway seine Grenze mit (Header `x-cli-proxy-timeout-seconds`, 5 s darunter). Das Gateway
+  beendet den CLI-Prozess samt Kindprozessen, bevor das Atelier aufgibt; ebenso, wenn ein Aufrufer die Verbindung trennt.
+  Vorher lief ein abgebrochener Codex-Prozess bis zur Obergrenze des Gateways weiter und verbrauchte Kontingent eines
+  anderen Produktivsystems. Eine solche Zeitüberschreitung öffnet keinen Breaker und löst keinen Failover aus; das
+  Atelier wiederholt Anfragen mit dieser Grenze nie auf HTTP-Ebene.
+- Jeder Hänger erscheint als eigene strukturierte Logzeile (Aufruf, Modell, Dauer, Grenze, Lauf, Runde, Ersatz ja/nein),
+  ohne Inhalte.
+- **Bewusste Abweichung vom Berater:** Er riet, Codex-Sitzungen zu speichern, um die Ursache zu finden. Das geschieht
+  nicht: Die Sitzungen enthielten Aufträge, Dateien und Texte der Nutzer, und das Gateway ist bewusst zustandslos (Codex
+  läuft mit `--ephemeral`). Die Ursache wird über die Logzeilen (Häufung nach Modell, Dauer, Tageszeit) und, falls nötig,
+  einen eigenen Versuch mit synthetischen Texten gesucht.
+- **Folgen für die Wartezeit:** Etwa jeder zehnte Auftrag bekommt den Ersatzprüfer oder keine Prüfung und wartet bis zu
+  150 s länger (90 s + 60 s).
+
+**Erste Prüfrunde (2026-11-25):**
+- „What was checked“ nennt eine Prüfung nur als erfüllt, wenn sie lief und bestand; eine gelaufene, nicht bestandene
+  Prüfung steht als nicht erfüllt da.
+- Jede geänderte Fassung wird voll geprüft (aus jedem Grund, auch in `Report`); die Nachprüfung ersetzt keine volle Prüfung
+  mehr. Ein Modell, das hing, wird im selben Lauf nicht erneut gerufen. Ein ausgelieferter Text, den keine Prüfung sah, sagt
+  das („The facts of this version of the text were not checked …“, MCP `version_not_checked`); frühere Befunde erscheinen
+  nur, wenn ihre Stelle noch im Text steht.
+- Der Inhaltsschutz verwirft nie einen Befund: Eine unsichere Begründung wird durch einen festen Satz ersetzt, das Zitat aus
+  dem Text bleibt; unsichere Materialstellen und unsichere Notizen des Schreibers werden ersetzt bzw. sichtbar gezählt
+  („1 more note … could not be shown“).
+- Die Rechenprüfung der Dateien schweigt bei Abzügen, Anzahlungen, Salden, Steuern, Beträgen pro Person, Mengenangaben und
+  Summen, die nur zu ihren letzten Posten passen; der Satz verspricht nur das Nachgerechnete. V3 besteht weiter.
+- Große Dateien: Der Satz sagt, dass Tatsachen nicht geprüft wurden, nur die Vorgaben.
+- Widersprüche nennen die Herkunft beider Seiten (Auftrag, Antworten, About-me-Angaben, eine Datei).
+
+**Dritte Prüfrunde (2026-11-25):**
+- Die Rechenprüfung behauptet nie, dass Rechnungen oder Dateien stimmen. Sie meldet nur eindeutige Abweichungen mit der
+  Bitte, sie zu prüfen, und sagt sonst höchstens, dass nach eindeutig falschen Rechnungen bzw. Summen gesucht und keine
+  gefunden wurde, mit dem Zusatz, dass nicht jede Rechnung so prüfbar ist. Damit entfällt die Unterscheidung „alle geprüft“
+  gegen „teilweise geprüft“; alte Berichte lesen sich genauso.
+- Im Nachsatz hinter einer Summe sind nur Anteilswörter (pro, je, jeweils, per, each) unschädlich; Abzugs-, Rabatt-,
+  Zuschuss-, Anzahlungs- und Steuerwörter machen die Summe auch dort unklar, sie bleibt dann unerwähnt.
+- Ein früherer Befund entfällt nur, wenn eine behaltene Stelle gleicher Art ihn ganz enthält; Widersprüche gelten nur an
+  Wortgrenzen und bei gleichen Dateien als dieselben. Ein Widerspruch zu einer falschen Summe entfällt nur, wenn sich seine
+  Zitate außer in Beträgen und Summenwörtern in nichts unterscheiden. Wird eine frühere Fassung ausgeliefert, kommen Befunde
+  späterer Runden dazu.
+- Beim Löschen oder Umbenennen eines Kontos verliert auch der gespeicherte Startauftrag in den Ereignissen
+  (`PipelineStartedEvent.Input`) den About-me-Block, ebenso jeder andere Ereignistext mit dem Block oder den Angaben; früher
+  bereinigte Läufe werden nachbereinigt.
+
+**Bedingungen vor `On`** (zusätzlich zu Tor Q4):
+- Ursache der Hänger gefunden, **oder** höchstens 1 Hänger in mindestens 60 echten Aufrufen.
+- Das Ersatzmodell an denselben Qualitätskriterien gemessen (es prüft etwa jeden zehnten Auftrag).
+- Entwicklungsmenge neu beschriftet und Fehlalarme neu gezählt (dort 0,38 je sauberem Text, über 0,25; in `On` ändern
+  Fehlalarme Texte).
+- Gesamtwartezeit einschließlich Korrekturrunde gemessen.

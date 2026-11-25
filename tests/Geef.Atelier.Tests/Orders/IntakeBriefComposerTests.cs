@@ -8,7 +8,10 @@ using static Geef.Atelier.Tests.Orders.OrderTestData;
 
 namespace Geef.Atelier.Tests.Orders;
 
-/// <summary><see cref="IntakeBriefComposer"/>: bit-identical without input, both modes, and the reduction from the prepared brief to the appended answers.</summary>
+/// <summary>
+/// <see cref="IntakeBriefComposer"/>: bit-identical without input, both modes, and the reduction from the prepared brief to the appended answers.
+/// The tests of stage 2 run with <see cref="ContentAssumptionMode.Defaults"/> and a shown card, where the brief must stay bit-identical.
+/// </summary>
 public sealed class IntakeBriefComposerTests
 {
     private const string Request = "Schreib eine Einladung zum Sommerfest.\nBitte mit Anmeldung.";
@@ -20,7 +23,7 @@ public sealed class IntakeBriefComposerTests
     {
         foreach (var mode in Enum.GetValues<BriefMode>())
         {
-            var brief = Composer(mode).Compose(new OrderBriefInput(TheOrder, null, [], null));
+            var brief = Composer(mode).Compose(new OrderBriefInput(TheOrder, null, [], null, AssumptionsShown: true));
             Assert.Equal(Request, brief.Text);
             Assert.Equal([IntakeBriefComposer.RequestSection], brief.Sections);
         }
@@ -31,7 +34,7 @@ public sealed class IntakeBriefComposerTests
     {
         var emptyProfile = new UserProfileEntity { Username = "user-a", Signature = " ", CreatedAt = T0, UpdatedAt = T0 };
 
-        var brief = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), [], emptyProfile));
+        var brief = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), [], emptyProfile, AssumptionsShown: true));
 
         Assert.Equal(Request + "\n\n---\n" + Assumptions, brief.Text);
         Assert.Equal([IntakeBriefComposer.RequestSection, IntakeBriefComposer.AssumptionsSection], brief.Sections);
@@ -47,7 +50,7 @@ public sealed class IntakeBriefComposerTests
     {
         var fallback = IntakeRecord.Fallback(IntakeRecordStatus.Failed, "error", 10, null, mode);
 
-        var brief = Composer(mode).Compose(new OrderBriefInput(TheOrder, fallback, [], null));
+        var brief = Composer(mode).Compose(new OrderBriefInput(TheOrder, fallback, [], null, AssumptionsShown: true));
 
         Assert.Equal(Request, brief.Text);
         Assert.DoesNotContain(IntakeRecord.NotCheckedAssumption, brief.Text, StringComparison.Ordinal);
@@ -65,7 +68,7 @@ public sealed class IntakeBriefComposerTests
             new("a2", null, "Am 12. Juli", false, AnswerOrigin.Client),
         ];
 
-        var brief = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), answers, Profile()));
+        var brief = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), answers, Profile(), AssumptionsShown: true));
 
         Assert.Equal(
             Request + "\n\n---\n" +
@@ -93,7 +96,7 @@ public sealed class IntakeBriefComposerTests
     [Fact]
     public void Only_the_profile_adds_one_section_after_the_request()
     {
-        var brief = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, null, [], Profile()));
+        var brief = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, null, [], Profile(), AssumptionsShown: true));
 
         Assert.Equal(Request + "\n\n---\n" + IntakeBriefComposer.ProfileHeading + "\nName: Anna Beispiel\nAddress the readers: informally", brief.Text);
     }
@@ -108,7 +111,7 @@ public sealed class IntakeBriefComposerTests
             new("q2", null, "Sommer", true, AnswerOrigin.Client),
         ];
 
-        var text = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), answers, null)).Text;
+        var text = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), answers, null, AssumptionsShown: true)).Text;
 
         Assert.Contains("- Wie lang soll der Text ungefähr werden? → \"3 Minuten Rede\"\n", text, StringComparison.Ordinal);
         Assert.Contains("- Wer kommt? → left to you\n", text, StringComparison.Ordinal);
@@ -127,7 +130,7 @@ public sealed class IntakeBriefComposerTests
             new("q2", null, null, true, AnswerOrigin.User),
             new("a1", null, "Förmlich", false, AnswerOrigin.User),
         ];
-        var input = new OrderBriefInput(TheOrder, Record(), answers, Profile());
+        var input = new OrderBriefInput(TheOrder, Record(), answers, Profile(), AssumptionsShown: true);
 
         var appended = Composer(BriefMode.AppendAnswers).Compose(input);
         var prepared = Composer(BriefMode.PreparedBrief).Compose(input);
@@ -151,7 +154,7 @@ public sealed class IntakeBriefComposerTests
     {
         IReadOnlyList<OrderAnswer> answers = [new("q9", "o1", null, false, AnswerOrigin.User), new("revision", "no", null, false, AnswerOrigin.User)];
 
-        Assert.Equal(Request + "\n\n---\n" + Assumptions, Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), answers, null)).Text);
+        Assert.Equal(Request + "\n\n---\n" + Assumptions, Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), answers, null, AssumptionsShown: true)).Text);
     }
 
     [Theory]
@@ -162,16 +165,106 @@ public sealed class IntakeBriefComposerTests
     {
         var record = Record() with { RevisionSourceId = Guid.NewGuid() };
 
-        var text = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, record, [new("revision", option, null, false, origin)], null)).Text;
+        var text = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, record, [new("revision", option, null, false, origin)], null, AssumptionsShown: true)).Text;
 
         Assert.Contains(IntakeBriefComposer.AnswersHeading + "\n" + expected, text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Open_points_list_a_fact_assumption_as_not_given_and_keep_the_tone_as_a_default()
+    {
+        var record = Record() with
+        {
+            Assumptions =
+            [
+                new IntakeAssumption("a1", GapTopic.Tone, "Sachlicher, bestimmter Ton", AssumptionConfidence.Sure),
+                new IntakeAssumption("a2", GapTopic.Facts, "Fotos des Schadens liegen als Anlage bei", AssumptionConfidence.Unsure),
+            ],
+        };
+
+        var brief = Composer(BriefMode.AppendAnswers, ContentAssumptionMode.OpenPoints)
+            .Compose(new OrderBriefInput(TheOrder, record, [], null, AssumptionsShown: true));
+
+        Assert.Equal(
+            Request + "\n\n---\n" +
+            IntakeBriefComposer.AssumptionsHeading + "\n- Sachlicher, bestimmter Ton\n" +
+            IntakeBriefComposer.OpenFactsHeading + "\n- Fotos des Schadens liegen als Anlage bei",
+            brief.Text);
+        Assert.Equal([IntakeBriefComposer.RequestSection, IntakeBriefComposer.AssumptionsSection, IntakeBriefComposer.OpenFactsSection], brief.Sections);
+        var defaults = brief.Text[brief.Text.IndexOf(IntakeBriefComposer.AssumptionsHeading, StringComparison.Ordinal)..brief.Text.IndexOf(IntakeBriefComposer.OpenFactsHeading, StringComparison.Ordinal)];
+        Assert.DoesNotContain("Fotos", defaults, StringComparison.Ordinal);
+        Assert.Equal(
+            "Not given by the person (never state these as facts in the text; where the text needs one of them, write a placeholder in square brackets or leave it out):",
+            IntakeBriefComposer.OpenFactsHeading);
+    }
+
+    public static TheoryData<GapTopic> AllTopics()
+    {
+        var data = new TheoryData<GapTopic>();
+        foreach (var topic in Enum.GetValues<GapTopic>())
+            data.Add(topic);
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(AllTopics))]
+    public void Every_topic_goes_either_to_the_defaults_or_to_the_open_facts(GapTopic topic)
+    {
+        var record = Record() with { Assumptions = [new IntakeAssumption("a1", topic, "Annahme zum Thema", AssumptionConfidence.Sure)] };
+
+        var text = Composer(BriefMode.AppendAnswers, ContentAssumptionMode.OpenPoints)
+            .Compose(new OrderBriefInput(TheOrder, record, [], null, AssumptionsShown: true)).Text;
+
+        var expected = topic.IsContent() ? IntakeBriefComposer.OpenFactsHeading : IntakeBriefComposer.AssumptionsHeading;
+        Assert.Equal(Request + "\n\n---\n" + expected + "\n- Annahme zum Thema", text);
+    }
+
+    [Fact]
+    public void A_corrected_fact_assumption_appears_only_as_a_correction()
+    {
+        IReadOnlyList<OrderAnswer> answers = [new("a2", null, "Am 12. Juli", false, AnswerOrigin.User)];
+
+        var text = Composer(BriefMode.AppendAnswers, ContentAssumptionMode.OpenPoints)
+            .Compose(new OrderBriefInput(TheOrder, Record(), answers, null, AssumptionsShown: true)).Text;
+
+        Assert.Equal(
+            Request + "\n\n---\n" +
+            IntakeBriefComposer.CorrectionsHeading + "\n- Datum als Platzhalter → Am 12. Juli\n" +
+            IntakeBriefComposer.AssumptionsHeading + "\n- Lockerer, herzlicher Ton",
+            text);
+        Assert.DoesNotContain(IntakeBriefComposer.OpenFactsHeadingStart, text, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(ContentAssumptionMode.Defaults)]
+    [InlineData(ContentAssumptionMode.OpenPoints)]
+    public void Assumptions_the_person_never_saw_are_never_called_shown_to_the_person(ContentAssumptionMode content)
+    {
+        var text = Composer(BriefMode.AppendAnswers, content).Compose(new OrderBriefInput(TheOrder, Record(), [], null)).Text;
+
+        Assert.DoesNotContain("shown to the person", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(IntakeBriefComposer.AssumptionsHeadingStart, text, StringComparison.Ordinal);
+        Assert.Contains(IntakeBriefComposer.AssumptionsNotShownHeading + "\n- Lockerer, herzlicher Ton", text, StringComparison.Ordinal);
+        Assert.Equal(
+            "Assumptions made before writing; the person has not seen them (use them only where neither the request nor the files say otherwise; never state them as facts):",
+            IntakeBriefComposer.AssumptionsNotShownHeading);
+        Assert.Equal(content == ContentAssumptionMode.OpenPoints, text.Contains(IntakeBriefComposer.OpenFactsHeading + "\n- Datum als Platzhalter", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Shown_and_not_shown_differ_only_in_the_heading()
+    {
+        var shown = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), [], null, AssumptionsShown: true)).Text;
+        var hidden = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), [], null, AssumptionsShown: false)).Text;
+
+        Assert.Equal(shown.Replace(IntakeBriefComposer.AssumptionsHeading, IntakeBriefComposer.AssumptionsNotShownHeading, StringComparison.Ordinal), hidden);
     }
 
     private static readonly string Assumptions =
         IntakeBriefComposer.AssumptionsHeading + "\n- Lockerer, herzlicher Ton\n- Datum als Platzhalter";
 
-    private static IntakeBriefComposer Composer(BriefMode mode) =>
-        new(Options.Create(new IntakeOptions { BriefMode = mode }));
+    private static IntakeBriefComposer Composer(BriefMode mode, ContentAssumptionMode content = ContentAssumptionMode.Defaults) =>
+        new(Options.Create(new IntakeOptions { BriefMode = mode, ContentAssumptions = content }));
 
     private static UserProfileEntity Profile() => new()
     {

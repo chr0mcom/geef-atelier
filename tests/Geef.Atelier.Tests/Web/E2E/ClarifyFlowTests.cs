@@ -71,6 +71,49 @@ public sealed class ClarifyFlowTests(PlaywrightFixture pw, PostgresFixture pg) :
         }
     }
 
+    /// <summary>
+    /// The brand in the top bar looks like a name, not like a link (no underline, no link blue), and the heading of the card
+    /// takes the focus for screen readers without showing a frame around it.
+    /// </summary>
+    [Fact]
+    public async Task TheBrandIsNoBlueLinkAndTheFocusedCardTitleHasNoFrame()
+    {
+        var order = _orders.Add(User, OrderTestData.Asking(OrderTestData.Clarification(questions: [OrderTestData.LengthQuestion()])));
+        var page = await pw.Browser.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{_host!.BaseUrl}/orders/{order.OrderId}");
+            await page.Locator("[data-testid='clarify-card']").WaitForAsync(new LocatorWaitForOptions { Timeout = 15_000 });
+            await WaitForAsync(page, "document.activeElement && document.activeElement.id === 'clarify-card-title'");
+
+            var brand = await page.EvaluateAsync<string[]>("""
+                () => {
+                    const brand = document.querySelector('.nav-brand');
+                    const style = getComputedStyle(brand);
+                    return [style.textDecorationLine, style.color, getComputedStyle(brand.parentElement).color];
+                }
+                """);
+            Assert.Equal("none", brand[0]);
+            Assert.NotEqual("rgb(0, 0, 238)", brand[1]);
+            Assert.Equal(brand[2], brand[1]);
+
+            var focus = await page.EvaluateAsync<string[]>("""
+                () => {
+                    const heading = document.activeElement;
+                    return [heading.id, heading.getAttribute('tabindex'), getComputedStyle(heading).outlineStyle, String(heading.matches(':focus'))];
+                }
+                """);
+            Assert.Equal("clarify-card-title", focus[0]);
+            Assert.Equal("-1", focus[1]);
+            Assert.Equal("none", focus[2]);
+            Assert.Equal("true", focus[3]);
+        }
+        finally
+        {
+            await page.CloseAsync();
+        }
+    }
+
     [Fact]
     public async Task SkipAndStartNowEndsTheWait()
     {

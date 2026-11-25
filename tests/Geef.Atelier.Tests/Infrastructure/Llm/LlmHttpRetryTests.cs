@@ -43,4 +43,28 @@ public sealed class LlmHttpRetryTests
         Assert.False(((HttpResponseMessage?)null).IsAnswerForCallerWithoutFailover());
         Assert.False(new HttpResponseMessage(HttpStatusCode.BadGateway).IsAnswerForCallerWithoutFailover());
     }
+
+    [Theory]
+    [InlineData(HttpStatusCode.GatewayTimeout)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    [InlineData((HttpStatusCode)429)]
+    [InlineData(HttpStatusCode.BadGateway)]
+    public void A_request_with_a_cli_time_limit_is_never_retried(HttpStatusCode status)
+    {
+        var answer = Answer(status, failoverOff: true);
+        answer.RequestMessage!.Headers.Add(OpenAiCompatibleClient.TimeoutHeader, "85");
+
+        Assert.False(LlmHttpRetry.MayRetry(answer));
+        Assert.True(answer.RequestMessage.HasCliTimeLimit());
+    }
+
+    [Fact]
+    public void Without_a_time_limit_the_retry_rules_stay_as_before()
+    {
+        Assert.True(LlmHttpRetry.MayRetry(Answer(HttpStatusCode.GatewayTimeout, failoverOff: true)));
+        Assert.True(LlmHttpRetry.MayRetry(null));
+        Assert.True(LlmHttpRetry.MayRetry(new HttpResponseMessage(HttpStatusCode.GatewayTimeout)));
+        Assert.False(LlmHttpRetry.MayRetry(Answer(HttpStatusCode.BadGateway, failoverOff: true)));
+        Assert.True(LlmHttpRetry.MayRetry(Answer(HttpStatusCode.BadGateway, failoverOff: false)));
+    }
 }

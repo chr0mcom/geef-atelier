@@ -19,27 +19,30 @@ public sealed class BriefingSectionsTests
         Username = "user-a", DisplayName = "Anna Beispiel", FreeText = Marker, CreatedAt = T0, UpdatedAt = T0,
     };
 
-    public static TheoryData<BriefMode, bool, bool, bool> Combinations()
+    public static TheoryData<BriefMode, bool, bool, bool, ContentAssumptionMode, bool> Combinations()
     {
-        var data = new TheoryData<BriefMode, bool, bool, bool>();
+        var data = new TheoryData<BriefMode, bool, bool, bool, ContentAssumptionMode, bool>();
         foreach (var mode in Enum.GetValues<BriefMode>())
             foreach (var record in new[] { false, true })
                 foreach (var answers in new[] { false, true })
                     foreach (var profile in new[] { false, true })
-                        data.Add(mode, record, answers, profile);
+                        foreach (var content in Enum.GetValues<ContentAssumptionMode>())
+                            foreach (var shown in new[] { false, true })
+                                data.Add(mode, record, answers, profile, content, shown);
         return data;
     }
 
     [Theory]
     [MemberData(nameof(Combinations))]
-    public void The_request_part_of_every_composed_briefing_is_exactly_the_request(BriefMode mode, bool withRecord, bool withAnswers, bool withProfile)
+    public void The_request_part_of_every_composed_briefing_is_exactly_the_request(
+        BriefMode mode, bool withRecord, bool withAnswers, bool withProfile, ContentAssumptionMode content, bool shown)
     {
-        var composer = new IntakeBriefComposer(Options.Create(new IntakeOptions { BriefMode = mode }));
+        var composer = new IntakeBriefComposer(Options.Create(new IntakeOptions { BriefMode = mode, ContentAssumptions = content }));
         IReadOnlyList<OrderAnswer> answers = withAnswers
-            ? [new("length", "short", null, false, AnswerOrigin.User), new("a2", null, "Am 12. Juli", false, AnswerOrigin.Client)]
+            ? [new("length", "short", null, false, AnswerOrigin.User), new("a1", null, "Eher förmlich", false, AnswerOrigin.Client)]
             : [];
         var brief = composer.Compose(new OrderBriefInput(Order("user-a", Request), withRecord ? IntakeBriefComposerTests.Record() : null, answers,
-            withProfile ? Profile : null));
+            withProfile ? Profile : null, shown));
 
         Assert.Equal(Request, BriefingSections.RequestPart(brief.Text));
         Assert.DoesNotContain(Marker, BriefingSections.RequestPart(brief.Text), StringComparison.Ordinal);
@@ -54,12 +57,13 @@ public sealed class BriefingSectionsTests
     {
         var composer = new IntakeBriefComposer(Options.Create(new IntakeOptions()));
         var brief = composer.Compose(new OrderBriefInput(Order("user-a", Request), IntakeBriefComposerTests.Record(),
-            [new("length", "short", null, false, AnswerOrigin.User)], Profile)).Text;
+            [new("length", "short", null, false, AnswerOrigin.User)], Profile, AssumptionsShown: true)).Text;
 
         var hidden = BriefingSections.WithoutProfile(brief);
 
         Assert.Contains(IntakeBriefComposer.AnswersHeading, hidden, StringComparison.Ordinal);
         Assert.Contains(IntakeBriefComposer.AssumptionsHeading, hidden, StringComparison.Ordinal);
+        Assert.Contains(IntakeBriefComposer.OpenFactsHeading, hidden, StringComparison.Ordinal);
         Assert.DoesNotContain(IntakeBriefComposer.ProfileHeading, hidden, StringComparison.Ordinal);
     }
 

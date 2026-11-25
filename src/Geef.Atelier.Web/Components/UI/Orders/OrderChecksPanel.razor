@@ -1,0 +1,36 @@
+@using Geef.Atelier.Application.Orders
+
+@if (Result.Checks is { } checks)
+{
+    <section class="order-block order-checks@(NeedsReview(checks) ? " order-checks--review" : "")" aria-labelledby="order-checks-title" data-testid="order-checks">
+        <h2 id="order-checks-title">@OrderCheckLines.Heading</h2>
+        @if (checks.Checked.Count > 0)
+        {
+            <ul class="order-checks-list" data-testid="order-checks-checked">
+                @foreach (var line in checks.Checked)
+                {
+                    <li data-testid="order-checks-line">@line</li>
+                }
+            </ul>
+        }
+        @if (checks.Changed.Count > 0)
+        {
+            <p class="order-checks-changed-lead">@OrderCheckLines.ChangedHeading</p>
+            <ul class="order-checks-list order-checks-changed" data-testid="order-checks-changed">
+                @foreach (var line in checks.Changed)
+                {
+                    <li data-testid="order-checks-change">@line</li>
+                }
+            </ul>
+        }
+        <p class="order-checks-review" data-testid="order-checks-review" data-open="@(NeedsReview(checks) ? "true" : "false")">@checks.ToReview</p>
+        <p class="order-checks-limits" data-testid="order-checks-limits">@checks.Limits</p>
+    </section>
+}
+
+@code {
+    /// <summary>The delivered result; its <see cref="OrderResult.Checks"/> are shown under "What was checked", directly below the text. Nothing is shown without them, so the page never claims a check it does not know about.</summary>
+    [Parameter, EditorRequired] public OrderResult Result { get; set; } = null!;
+
+    static bool NeedsReview(OrderChecksView checks) => checks.ToReview != OrderCheckLines.ToReviewNothing;
+}

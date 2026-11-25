@@ -17,6 +17,12 @@ public static partial class DraftCheckEvaluator
     /// </summary>
     public const int BlockingDeviationPercent = 25;
 
+    /// <summary>Wrong calculations of the text named in the message at most; the rest are only counted.</summary>
+    public const int MaxCalculationsNamed = 3;
+
+    /// <summary>Message of a passed calculation check: it found no clearly wrong calculation and never says that the calculations are right.</summary>
+    public const string NoWrongCalculationFound = "No calculation in the text was found to be clearly wrong. Not every calculation can be checked this way.";
+
     /// <summary>Added to the length finding when it is the only blocking problem.</summary>
     public const string KeepEverythingElse = "Keep everything else unchanged.";
 
@@ -119,7 +125,28 @@ public static partial class DraftCheckEvaluator
                     $"The text does not contain \"{rule.Term}\", which the request asks for (\"{rule.Quote}\"). Add it where it fits naturally.", rule.Quote));
         }
 
+        if (CheckCalculations(text) is { } calculations)
+            results.Add(calculations);
+
         return KeepRestWhenOnlyLengthFails(results);
+    }
+
+    /// <summary>
+    /// Written calculations in the text (<c>22 + 31 + 19 = 72</c>). A clearly wrong result is blocking because the form is
+    /// unambiguous, and the message asks to check it. The check never says that calculations are right: when it recalculated some
+    /// and found none clearly wrong, the result passes with <see cref="NoWrongCalculationFound"/>, which says that not every
+    /// calculation can be checked; a text without a recalculated calculation gets no result.
+    /// </summary>
+    private static DraftCheckResult? CheckCalculations(string text)
+    {
+        var (found, issues) = SourceArithmeticCheck.ExpressionsIn(text);
+        if (issues.Count == 0)
+            return found == 0 ? null : new DraftCheckResult(DraftCheckCodes.Arithmetic, true, true, NoWrongCalculationFound, null);
+
+        var wrong = string.Join("; ", issues.Take(MaxCalculationsNamed).Select(i => $"\"{i.Quote}\" should be {i.Items[0]} = {i.Computed}"))
+            + (issues.Count > MaxCalculationsNamed ? $"; and {issues.Count - MaxCalculationsNamed} more" : string.Empty);
+        return new DraftCheckResult(DraftCheckCodes.Arithmetic, false, true,
+            $"A calculation in the text looks wrong: {wrong}. Please check it and correct the result or the figures so that the calculation is right.", issues[0].Quote);
     }
 
     /// <summary>

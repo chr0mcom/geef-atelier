@@ -21,6 +21,10 @@ internal sealed class FindingConfiguration : IEntityTypeConfiguration<FindingEnt
 
         builder.Property(f => f.Message).IsRequired();
 
+        builder.Property(f => f.Category).HasMaxLength(60).IsRequired(false);
+        builder.Property(f => f.Code).HasMaxLength(60).IsRequired(false);
+        builder.Property(f => f.Quote).HasColumnType("text").IsRequired(false);
+
         // Explicit FK so EF Core orders inserts correctly (Step29 added DB constraint).
         builder.HasOne<IterationEntity>()
             .WithMany()

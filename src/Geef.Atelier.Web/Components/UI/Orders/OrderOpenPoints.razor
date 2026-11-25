@@ -1,6 +1,7 @@
 @using Geef.Atelier.Application.Orders
+@using Geef.Atelier.Core.Domain.FactCheck
 
-@if (Result.Placeholders.Count > 0 || Result.OpenChecks.Count > 0)
+@if (HasContent)
 {
     <section class="order-block order-open-points" aria-labelledby="order-open-points-title" data-testid="order-open-points">
         <h2 id="order-open-points-title">Open points</h2>
@@ -24,7 +25,78 @@
                 }
             </ul>
         }
-        @if (Result.OpenChecks.Any(c => !c.Blocking))
+        @if (Result.BlockingPassages(FactFindingKind.Unsupported) is { Count: > 0 } unbacked)
+        {
+            <p>These passages may not be backed by your request or your files. Please check them:</p>
+            <ul class="order-passages" data-testid="order-unbacked">
+                @foreach (var passage in unbacked)
+                {
+                    <li data-testid="order-passage" data-kind="not-backed"><q class="order-quote" lang="@Language">@passage.Quote</q></li>
+                }
+            </ul>
+        }
+        @if (Result.BlockingPassages(FactFindingKind.Instruction) is { Count: > 0 } against)
+        {
+            <p>@(against.Any(ProfileHidden) ? "These passages may not follow what was asked for:" : "These passages may not follow what you asked for:")</p>
+            <ul class="order-passages" data-testid="order-against-instruction">
+                @foreach (var passage in against)
+                {
+                    <li data-testid="order-passage" data-kind="against-instruction">
+                        <q class="order-quote" lang="@Language">@passage.Quote</q>
+                        @if (passage.Origin == InstructionOrigin.Memory)
+                        {
+                            @if (!string.IsNullOrWhiteSpace(passage.Instruction))
+                            {
+                                <span class="order-passage-asked" data-origin="about-me">Your About me details say: “<span lang="@Language">@passage.Instruction</span>”</span>
+                            }
+                            else
+                            {
+                                <span class="order-passage-asked" data-origin="about-me">This may go against the About me details of the person who ordered the text; they are hidden here.</span>
+                            }
+                        }
+                        else if (!string.IsNullOrWhiteSpace(passage.Instruction))
+                        {
+                            <span class="order-passage-asked">You asked: “<span lang="@Language">@passage.Instruction</span>”</span>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+        @if (Result.BlockingPassages(FactFindingKind.Superseded) is { Count: > 0 } replaced)
+        {
+            <p>This passage uses something your files replace or drop:</p>
+            <ul class="order-passages" data-testid="order-replaced">
+                @foreach (var passage in replaced)
+                {
+                    <li data-testid="order-passage" data-kind="replaced-in-files"><q class="order-quote" lang="@Language">@passage.Quote</q></li>
+                }
+            </ul>
+        }
+        @if (SourceIssues.Count > 0)
+        {
+            <p>Please check these figures and statements in what you gave:</p>
+            <ul class="order-source-issues" data-testid="order-source-issues">
+                @foreach (var issue in SourceIssues)
+                {
+                    <li data-testid="order-source-issue">@issue</li>
+                }
+            </ul>
+        }
+        @if (WriterOpenPoints.Count > 0 || !string.IsNullOrWhiteSpace(Result.NotesNotShown))
+        {
+            <p>Still open:</p>
+            <ul class="order-writer-open" data-testid="order-writer-open">
+                @foreach (var point in WriterOpenPoints)
+                {
+                    <li data-testid="order-writer-open-point" lang="@Language">@point</li>
+                }
+                @if (!string.IsNullOrWhiteSpace(Result.NotesNotShown))
+                {
+                    <li data-testid="order-notes-not-shown">@Result.NotesNotShown</li>
+                }
+            </ul>
+        }
+        @if (Result.OpenChecks.Any(c => !c.Blocking) || Hints.Count > 0)
         {
             <p>Please also look at this:</p>
             <ul class="order-hints">
@@ -32,12 +104,46 @@
                 {
                     <li data-testid="order-hint" data-code="@check.Code">@check.Message</li>
                 }
+                @foreach (var passage in Hints)
+                {
+                    <li data-testid="order-hint" data-kind="@KindKey(passage.Kind)">
+                        <q class="order-quote" lang="@Language">@passage.Quote</q>
+                        @if (!string.IsNullOrWhiteSpace(passage.Instruction))
+                        {
+                            <span class="order-passage-asked">Asked for: “<span lang="@Language">@passage.Instruction</span>”</span>
+                        }
+                    </li>
+                }
             </ul>
         }
     </section>
 }
 
 @code {
-    /// <summary>The delivered result with placeholders, open checks and hints (open checks that never block).</summary>
+    /// <summary>
+    /// The delivered result with placeholders, open checks, passages of the text that may not be backed or may not follow an
+    /// instruction, problems in the files, open points of the writer and hints (everything that never blocks).
+    /// </summary>
     [Parameter, EditorRequired] public OrderResult Result { get; set; } = null!;
+
+    /// <summary>Language of the order (<c>lang</c> of quoted passages and of the writer's open points); <c>null</c> when unknown.</summary>
+    [Parameter] public string? Language { get; set; }
+
+    IReadOnlyList<OrderUnbackedPassage> Hints => Result.HintPassages();
+
+    IReadOnlyList<string> SourceIssues => Result.SourceIssues.Shown() ?? [];
+
+    IReadOnlyList<string> WriterOpenPoints => Result.WriterOpenPoints.Shown() ?? [];
+
+    bool HasContent => Result.HasOpenPoints();
+
+    static bool ProfileHidden(OrderUnbackedPassage passage) => passage.Origin == InstructionOrigin.Memory && string.IsNullOrWhiteSpace(passage.Instruction);
+
+    static string KindKey(FactFindingKind kind) => kind switch
+    {
+        FactFindingKind.Unsupported => "not-backed",
+        FactFindingKind.Instruction => "against-instruction",
+        FactFindingKind.Superseded => "replaced-in-files",
+        _ => "other",
+    };
 }

@@ -47,6 +47,19 @@ public static class RunWarningCodes
 
     /// <summary>Nobody answered the questions in time; writing started with the assumptions (<see cref="IntakeWarningMessages.Unanswered"/>).</summary>
     public const string IntakeUnanswered = "intake.unanswered";
+
+    /// <summary>The fact check used the next model of its slot after the first one failed. Only for the log and the report, never shown as a warning.</summary>
+    public const string FactCheckFallbackModel = "factcheck.fallback_model";
+
+    /// <summary>The block with the writer's assumptions could not be read (<see cref="WriterNotesWarningMessages.Unreadable"/>).</summary>
+    public const string WriterNotesUnreadable = "writer.notes_unreadable";
+}
+
+/// <summary>Plain English messages of the warnings about the writer's notes.</summary>
+public static class WriterNotesWarningMessages
+{
+    /// <summary>Message of <see cref="RunWarningCodes.WriterNotesUnreadable"/>.</summary>
+    public const string Unreadable = "The list of assumptions could not be read, so it is not shown.";
 }
 
 /// <summary>Plain English messages of the intake warnings.</summary>
@@ -82,4 +95,7 @@ public static class RunWarningSources
 
     /// <summary>The intake that clarifies an order before its first run.</summary>
     public const string Intake = "intake";
+
+    /// <summary>The fact check of the direct path.</summary>
+    public const string FactCheck = "fact-check";
 }

@@ -66,7 +66,7 @@ public sealed class PipelineAssemblerSelectorTests
         var harness = new DirectPipelineHarness();
         var run = Run();
 
-        var error = Assert.Throws<DirectPathException>(() => new DirectPipelineAssembler(Options.Create(new SourceOptions())).Assemble(harness.Context(run)));
+        var error = Assert.Throws<DirectPathException>(() => new DirectPipelineAssembler(Options.Create(new SourceOptions()), Options.Create(new DirectOptions())).Assemble(harness.Context(run)));
 
         Assert.Equal(DirectPathException.NoOrder, error.Message);
     }

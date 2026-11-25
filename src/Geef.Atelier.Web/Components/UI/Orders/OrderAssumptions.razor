@@ -1,0 +1,43 @@
+@using Geef.Atelier.Application.Orders
+
+@if (Lines.Count > 0 || NotGiven.Count > 0)
+{
+    <section class="order-block order-assumptions" aria-labelledby="order-assumptions-title" data-testid="order-assumptions">
+        <h2 id="order-assumptions-title">Assumptions</h2>
+        @if (Lines.Count > 0)
+        {
+            <p>You did not say this, so it was assumed:</p>
+            <ul>
+                @foreach (var line in Lines)
+                {
+                    <li data-testid="order-assumption" lang="@Language">@line</li>
+                }
+            </ul>
+        }
+        @if (NotGiven.Count > 0)
+        {
+            <p>You did not give these facts, so they were left open instead of assumed:</p>
+            <ul>
+                @foreach (var line in NotGiven)
+                {
+                    <li data-testid="order-not-given" lang="@Language">@line</li>
+                }
+            </ul>
+        }
+    </section>
+}
+
+@code {
+    /// <summary>
+    /// The delivered result with the assumptions of the clarifier that nobody corrected and those of the writer; assumptions about
+    /// facts that the writer got only as "not given by the person" are listed apart, because the text was not written with them.
+    /// </summary>
+    [Parameter, EditorRequired] public OrderResult Result { get; set; } = null!;
+
+    /// <summary>Language of the order (<c>lang</c> of the listed assumptions); <c>null</c> when unknown.</summary>
+    [Parameter] public string? Language { get; set; }
+
+    IReadOnlyList<string> Lines => Result.AllAssumptions();
+
+    IReadOnlyList<string> NotGiven => Result.NotGivenFacts();
+}

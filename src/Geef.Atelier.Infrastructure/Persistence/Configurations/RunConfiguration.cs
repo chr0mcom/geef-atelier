@@ -77,6 +77,7 @@ internal sealed class RunConfiguration : IEntityTypeConfiguration<RunEntity>
 
         builder.Property(r => r.OrderId).IsRequired(false);
         builder.Property(r => r.OrderVersion).IsRequired(false);
+        builder.Property(r => r.FactCheckMode).HasMaxLength(20).IsRequired(false);
         builder.HasIndex(r => new { r.OrderId, r.OrderVersion }, "IX_Runs_OrderId_OrderVersion");
         builder.HasIndex(r => new { r.OrderId, r.OrderVersion }, "UX_Runs_OrderId_OrderVersion_Standard")
             .IsUnique()

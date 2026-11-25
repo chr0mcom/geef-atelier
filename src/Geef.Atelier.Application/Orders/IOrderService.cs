@@ -25,6 +25,14 @@ public interface IOrderService
     /// <summary>Returns the delivered text with placeholders, open checks, used sources and warnings, or <c>null</c> when the order is unknown or foreign.</summary>
     Task<OrderResult?> GetResultAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default);
 
+    /// <summary>
+    /// Like <see cref="GetResultAsync(Guid, string?, CancellationToken)"/>; <paramref name="requestingUsername"/> is the owner filter
+    /// (<c>null</c> for administrators), <paramref name="viewerUsername"/> the user name of whoever looks at the result, also for an
+    /// administrator. Passages from the About me details are shown only when the viewer ordered the text.
+    /// </summary>
+    Task<OrderResult?> GetResultAsync(Guid orderId, string? requestingUsername, string? viewerUsername, CancellationToken ct = default) =>
+        GetResultAsync(orderId, requestingUsername, ct);
+
     /// <summary>Lists orders newest activity first. <paramref name="ownerUsername"/> = null lists all users (admin view).</summary>
     Task<IReadOnlyList<OrderListItem>> ListAsync(string? ownerUsername, int limit = 50, CancellationToken ct = default);
 

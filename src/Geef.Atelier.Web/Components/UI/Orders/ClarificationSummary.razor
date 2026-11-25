@@ -35,11 +35,11 @@
         </ul>
     }
 
-    @if (Clarification.Assumptions.Count > 0)
+    @if (ShownAssumptions.Count > 0)
     {
-        <p class="clarify-summary-label">Assumptions:</p>
+        <p class="clarify-summary-label">@(OnlyCorrectedAssumptions ? "Assumptions you changed:" : "Assumptions:")</p>
         <ul class="clarify-summary-list">
-            @foreach (var assumption in Clarification.Assumptions)
+            @foreach (var assumption in ShownAssumptions)
             {
                 <li data-testid="clarify-summary-assumption" data-id="@assumption.Id">
                     @if (Correction(assumption.Id) is { } correction)
@@ -65,6 +65,12 @@
 
     /// <summary>True inside "How it was made": a small heading in the style of that section.</summary>
     [Parameter] public bool Inline { get; set; }
+
+    /// <summary>True when the page already lists the uncorrected assumptions under the text ("Assumptions"); then only the corrected ones are shown here.</summary>
+    [Parameter] public bool OnlyCorrectedAssumptions { get; set; }
+
+    IReadOnlyList<IntakeAssumption> ShownAssumptions =>
+        OnlyCorrectedAssumptions ? Clarification.Assumptions.Where(a => Correction(a.Id) is not null).ToList() : Clarification.Assumptions;
 
     string TitleId => Inline ? "clarify-summary-inline-title" : "clarify-summary-title";
 

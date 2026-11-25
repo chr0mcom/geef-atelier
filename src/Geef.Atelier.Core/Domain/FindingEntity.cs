@@ -9,4 +9,13 @@ public sealed record FindingEntity
     public required FindingSeverity Severity { get; init; }
     public required string Message { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
+
+    /// <summary>Category of the finding as the reviewer set it (<c>deterministic-check</c>, <c>fact-check</c>, …); <c>null</c> for findings before Step50.</summary>
+    public string? Category { get; init; }
+
+    /// <summary>Machine-readable code of the finding (metadata <c>code</c>, such as <c>fact.unsupported</c> or <c>length</c>); <c>null</c> when it has none.</summary>
+    public string? Code { get; init; }
+
+    /// <summary>The passage of the text the finding is about, word for word (metadata <c>quote</c>); <c>null</c> when it has none.</summary>
+    public string? Quote { get; init; }
 }

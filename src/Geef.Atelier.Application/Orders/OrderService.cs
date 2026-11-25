@@ -137,7 +137,10 @@ internal sealed class OrderService(
         return order is null ? null : await BuildViewAsync(order, ct);
     }
 
-    public async Task<OrderResult?> GetResultAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default)
+    public Task<OrderResult?> GetResultAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) =>
+        GetResultAsync(orderId, requestingUsername, requestingUsername, ct);
+
+    public async Task<OrderResult?> GetResultAsync(Guid orderId, string? requestingUsername, string? viewerUsername, CancellationToken ct = default)
     {
         var order = await GetOwnedAsync(orderId, requestingUsername, ct);
         if (order is null)
@@ -154,7 +157,7 @@ internal sealed class OrderService(
         var warnings = await warningRepository.ListByRunAsync(current.Id, ct);
         var hasText = !string.IsNullOrWhiteSpace(current.FinalText);
 
-        return new OrderResult(
+        var result = new OrderResult(
             orderId,
             display,
             current.Id,
@@ -166,7 +169,11 @@ internal sealed class OrderService(
             usages.Select(u => new OrderSourceUsageView(u.FileName, u.Mode, u.CharsIncluded, u.PagesIncluded)).ToList(),
             warnings,
             NoteFor(display),
-            UncorrectedAssumptions(order));
+            UncorrectedAssumptions(order),
+            NotGivenFacts: NotGivenFacts(order, current));
+        var viewer = viewerUsername ?? requestingUsername;
+        var showProfile = viewer is not null && string.Equals(viewer, order.CreatedByUser, StringComparison.Ordinal);
+        return report is null || !hasText ? result : result.WithReport(report, showProfile);
     }
 
     public async Task<IReadOnlyList<OrderListItem>> ListAsync(string? ownerUsername, int limit = 50, CancellationToken ct = default)
@@ -417,6 +424,23 @@ internal sealed class OrderService(
             record?.RevisionSourceId is { } sourceId ? linked.FirstOrDefault(i => i.Source.Id == sourceId)?.Source.FileName : null,
             order.QuestionsAskedAt,
             order.QuestionsAskedAt is { } asked && after > TimeSpan.Zero ? asked + after : null);
+    }
+
+    /// <summary>
+    /// The uncorrected assumptions of the clarifier that the run's briefing lists as not given by the person (facts of the case
+    /// under <c>Intake:ContentAssumptions = OpenPoints</c>); the writer never got them as facts. <c>null</c> without such a block.
+    /// </summary>
+    private static IReadOnlyList<string>? NotGivenFacts(OrderEntity order, RunEntity run)
+    {
+        var open = BriefingSections.Parse(run.BriefingText ?? string.Empty).OpenFacts
+            .Select(OrderResultRules.AssumptionKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (open.Count == 0)
+            return null;
+        return (UncorrectedAssumptions(order) ?? [])
+            .Select(a => a.Text)
+            .Where(t => open.Contains(OrderResultRules.AssumptionKey(t)))
+            .ToList();
     }
 
     private static IReadOnlyList<IntakeAssumption>? UncorrectedAssumptions(OrderEntity order)

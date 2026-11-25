@@ -10,10 +10,35 @@ from __future__ import annotations
 import json
 import time
 import uuid
+from contextlib import aclosing
 from typing import Any, AsyncIterator
+
+import anyio
+from fastapi.responses import StreamingResponse
 
 from openai_format import usage_info
 from usage import UsageParts
+
+
+class ClosingStreamingResponse(StreamingResponse):
+    """A StreamingResponse that closes its body iterator when the response ends, however it ends.
+
+    When a caller stops reading and then disconnects, the response is cancelled while it is
+    sending, that is while every generator below it is suspended at a ``yield``. Nobody would
+    close them: their ``finally`` blocks, and with them the end of the CLI and the release of its
+    slot, would wait for the garbage collector. Closing a finished iterator does nothing, so a
+    caller that reads to the end notices nothing. Each generator in the chain closes the one it
+    reads from (``aclosing``). The close is shielded from the cancellation that ends the response.
+    """
+
+    async def __call__(self, scope, receive, send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            close = getattr(self.body_iterator, "aclose", None)
+            if close is not None:
+                with anyio.CancelScope(shield=True):
+                    await close()
 
 
 def _sse(obj: dict) -> bytes:
@@ -49,19 +74,20 @@ async def sse_response(
     usage_parts = UsageParts()
     emitted_tool_calls = False
     try:
-        async for kind, payload in event_iter:
-            if kind == "delta" and payload:
-                yield _sse(_chunk(chunk_id, created, model, {"content": payload}))
-            elif kind == "tool_calls" and payload:
-                # Agentic tool use: emit the tool calls as a delta (OpenAI streaming shape).
-                emitted_tool_calls = True
-                yield _sse(_chunk(chunk_id, created, model, {"tool_calls": payload}))
-            elif kind == "refusal" and payload:
-                # Structured-output failure after retry — the SSE counterpart of
-                # make_refusal_response (delta.refusal per OpenAI streaming shape).
-                yield _sse(_chunk(chunk_id, created, model, {"refusal": payload}))
-            elif kind == "usage" and isinstance(payload, UsageParts):
-                usage_parts = payload
+        async with aclosing(event_iter) as events:
+            async for kind, payload in events:
+                if kind == "delta" and payload:
+                    yield _sse(_chunk(chunk_id, created, model, {"content": payload}))
+                elif kind == "tool_calls" and payload:
+                    # Agentic tool use: emit the tool calls as a delta (OpenAI streaming shape).
+                    emitted_tool_calls = True
+                    yield _sse(_chunk(chunk_id, created, model, {"tool_calls": payload}))
+                elif kind == "refusal" and payload:
+                    # Structured-output failure after retry — the SSE counterpart of
+                    # make_refusal_response (delta.refusal per OpenAI streaming shape).
+                    yield _sse(_chunk(chunk_id, created, model, {"refusal": payload}))
+                elif kind == "usage" and isinstance(payload, UsageParts):
+                    usage_parts = payload
     except Exception as exc:  # noqa: BLE001 — surface mid-stream failures to the client
         # Headers are already sent (HTTP 200), so the only way to report a late error is
         # in-band: emit an error event, then terminate the stream.

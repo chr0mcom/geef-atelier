@@ -3,10 +3,12 @@ using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Reports;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Core.Persistence.Orders;
+using Geef.Atelier.Core.Persistence.Runs;
 using Geef.Atelier.Core.Persistence.Sources;
 using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Llm;
@@ -27,6 +29,8 @@ namespace Geef.Atelier.Tests.Pipeline.Direct;
 /// <c>OnRunFinishedAsync</c>) against the recording fake of the end-to-end scaffold. The writer talks to the fake over
 /// the real <see cref="OpenAiCompatibleClient"/>, so the recorded request bodies are the wire format the cli-proxy gets.
 /// Orders, sources, usages and reports live in memory until the persistence of stage 1 is merged.
+/// <see cref="DirectOptions"/> start like the end-to-end host (fact check off, no writer notes) and reach both the assembler and
+/// the scope of the grounding step; change them before <see cref="RunAsync"/>.
 /// </summary>
 internal sealed class DirectPipelineHarness
 {
@@ -53,6 +57,8 @@ internal sealed class DirectPipelineHarness
         services.AddSingleton<ISourceRepository>(Sources);
         services.AddSingleton<IRunReportWriter>(Reports);
         services.AddSingleton<IGroundingConsultationRepository>(Consultations);
+        services.AddSingleton<IRunFactCheckModeStore>(FactCheckModes);
+        services.AddSingleton<IOptions<DirectOptions>>(_ => Options.Create(DirectOptions));
         Services = services.BuildServiceProvider();
     }
 
@@ -65,6 +71,8 @@ internal sealed class DirectPipelineHarness
     public InMemorySourceRepository Sources { get; } = new();
     public RecordingRunReportWriter Reports { get; } = new();
     public RecordingConsultationRepository Consultations { get; } = new();
+    public RecordingRunFactCheckModeStore FactCheckModes { get; } = new();
+    public DirectOptions DirectOptions { get; } = new() { FactCheckMode = FactCheckMode.Off, WriterNotes = false };
     public InMemoryRunWarnings Warnings { get; } = new();
 
     /// <summary>Value of <c>x-cli-proxy-failover</c> per LLM request, in order (<c>null</c> = header not sent).</summary>
@@ -101,7 +109,7 @@ internal sealed class DirectPipelineHarness
     /// <summary>Builds and runs the pipeline, then lets the assembler store the report, like the orchestrator.</summary>
     public async Task<DirectRunOutcome> RunAsync(RunEntity run)
     {
-        var assembler = new DirectPipelineAssembler(Options.Create(SourceOptions));
+        var assembler = new DirectPipelineAssembler(Options.Create(SourceOptions), Options.Create(DirectOptions));
         var context = Context(run);
         var result = await assembler.Assemble(context).RunAsync(run.BriefingText, CancellationToken.None);
         await assembler.OnRunFinishedAsync(context, result, CancellationToken.None);

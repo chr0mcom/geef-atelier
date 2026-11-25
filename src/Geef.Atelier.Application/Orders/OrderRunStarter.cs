@@ -36,7 +36,7 @@ internal sealed class OrderRunStarter(
         var resolved = await crewService.ResolveOrderSnapshotAsync(order.Mode, order.CrewTemplateName, null, linked.Count > 0, ct);
 
         var now = time.GetUtcNow();
-        var briefing = briefComposer.Compose(new OrderBriefInput(order, request.Record, answers, profile)).Text;
+        var briefing = briefComposer.Compose(new OrderBriefInput(order, request.Record, answers, profile, AssumptionsShown: request.Expected == OrderState.NeedsInput)).Text;
         var run = resolved.ToFirstRun(order, briefing, now);
         var start = new OrderStart(
             order.Id,

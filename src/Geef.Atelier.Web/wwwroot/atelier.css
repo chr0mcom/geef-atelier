@@ -266,6 +266,8 @@ h1[tabindex="-1"]:focus { outline: none; }
   gap: 12px;
   cursor: pointer;
   user-select: none;
+  color: inherit;
+  text-decoration: none;
 }
 .nav-brand .wordmark {
   font-family: var(--font-display);
@@ -4560,7 +4562,7 @@ textarea.form-control {
   letter-spacing: -0.01em;
 }
 .clarify-title:focus { outline: none; }
-.clarify-title:focus-visible { outline: 2px solid var(--hero); outline-offset: 4px; border-radius: 4px; }
+.clarify-title:focus-visible { outline: none; }
 .clarify-lead { margin: 0 0 6px; font-size: 13px; color: var(--ink-3); }
 .clarify-understanding-text {
   margin: 0;
@@ -4789,4 +4791,82 @@ textarea.form-control {
   .nav-right { justify-self: end; display: flex; align-items: center; gap: 8px; min-width: 0; }
   .nav-links { grid-column: 1 / -1; grid-row: 2; flex-wrap: wrap; margin: 0 -12px; }
   .user-menu-dd { right: 16px; }
+}
+
+/* ---- Honest result: what was checked, assumptions, open points, quotes ----
+   "What was checked" hangs directly under the paper sheet like an inspection
+   slip; its first line says whether the person has to look at something.
+   The lines get neutral dots, never ticks: a line can also say that a check
+   did not run, and a tick would promise more than was checked. */
+.order-checks {
+  border-left: 3px solid var(--hairline-strong);
+  border-radius: 4px 10px 10px 4px;
+  display: grid;
+  gap: 2px;
+}
+.order-checks--review { border-left-color: var(--sv-major); }
+.order-block .order-checks-review {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.order-checks-list { list-style: none; padding-left: 0; }
+.order-block .order-checks-list { padding-left: 0; }
+.order-checks-list li {
+  position: relative;
+  padding-left: 18px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.order-checks-list li::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 0.6em;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--ink-3);
+}
+.order-checks-changed li::before {
+  top: 0.7em;
+  width: 8px;
+  height: 1px;
+  border-radius: 0;
+}
+.order-block .order-checks-changed-lead { margin-top: 12px; }
+.order-block .order-checks-limits {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--hairline-soft);
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.order-passages,
+.order-source-issues,
+.order-writer-open,
+.order-assumptions ul,
+.order-hints { overflow-wrap: anywhere; }
+.order-quote {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--ink);
+  quotes: "“" "”" "‘" "’";
+}
+.order-passage-asked { display: block; font-size: 13px; color: var(--ink-3); }
+
+.order-sources-used > ul > li { display: grid; gap: 4px; }
+.order-block .order-sources-caveat { margin: 0 0 10px; font-size: 13px; color: var(--ink-3); }
+.order-source-quote {
+  margin: 2px 0 2px 2px;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid var(--hairline);
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink);
+  overflow-wrap: anywhere;
 }

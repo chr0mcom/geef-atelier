@@ -6,16 +6,22 @@ using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Application.Orders;
 
-/// <summary>What the briefing of the next run is built from.</summary>
-public sealed record OrderBriefInput(OrderEntity Order, IntakeRecord? Record, IReadOnlyList<OrderAnswer> Answers, UserProfileEntity? Profile);
+/// <summary>
+/// What the briefing of the next run is built from. <see cref="AssumptionsShown"/> is true only when the person saw the card with
+/// the assumptions before the start (the run starts from <see cref="OrderState.NeedsInput"/>).
+/// </summary>
+public sealed record OrderBriefInput(OrderEntity Order, IntakeRecord? Record, IReadOnlyList<OrderAnswer> Answers, UserProfileEntity? Profile, bool AssumptionsShown = false);
 
 /// <summary>The briefing text and the names of the sections it contains, in order.</summary>
 public sealed record IntakeBrief(string Text, IReadOnlyList<string> Sections);
 
 /// <summary>
 /// Builds the run briefing from an order. Stage 1: the request verbatim. Stage 2 (<c>Intake:BriefMode</c>): request plus answers,
-/// corrections and the assumptions shown to the person (as defaults, never as checks), or a prepared brief. The request always
-/// comes first and unchanged; everything else follows after <see cref="BriefingSections.Separator"/>.
+/// corrections and the assumptions of the intake (as defaults, never as checks), or a prepared brief. Stage 3
+/// (<c>Intake:ContentAssumptions</c>): assumptions about facts of the case are listed as not given by the person instead of as
+/// defaults. The assumptions are called shown to the person only when the card was really shown
+/// (<see cref="OrderBriefInput.AssumptionsShown"/>). The request always comes first and unchanged; everything else follows after
+/// <see cref="BriefingSections.Separator"/>.
 /// </summary>
 public interface IOrderBriefComposer
 {
@@ -31,11 +37,16 @@ internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOr
     public const string CorrectionsSection = "corrections";
     public const string AssumptionsSection = "assumptions";
     public const string ProfileSection = "profile";
+    public const string OpenFactsSection = "open-facts";
 
     public const string AnswersHeading = "Answers the person gave before writing:";
     public const string CorrectionsHeading = "Corrections to assumptions:";
     public const string AssumptionsHeadingStart = "Assumptions shown to the person, not confirmed";
     public const string AssumptionsHeading = AssumptionsHeadingStart + " (the answers and corrections of the person above always take precedence; use the assumptions only where neither they nor the request or the files say otherwise; never state them as facts):";
+    public const string AssumptionsNotShownHeadingStart = "Assumptions made before writing; the person has not seen them";
+    public const string AssumptionsNotShownHeading = AssumptionsNotShownHeadingStart + " (use them only where neither the request nor the files say otherwise; never state them as facts):";
+    public const string OpenFactsHeadingStart = "Not given by the person";
+    public const string OpenFactsHeading = OpenFactsHeadingStart + " (never state these as facts in the text; where the text needs one of them, write a placeholder in square brackets or leave it out):";
     public const string RevisionQuestion = "Improve the attached file chosen as the text to revise?";
     public const string RevisionYes = "Yes, improve that file";
     public const string RevisionNo = "No, write something new and use the file only as material";
@@ -96,12 +107,21 @@ internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOr
 
         if (record?.Output is not null)
         {
-            var remaining = (record?.Assumptions ?? []).Where(a => !corrected.Contains(a.Id)).Select(a => "- " + OneLine(a.Text)).ToList();
-            if (remaining.Count > 0)
+            var remaining = (record?.Assumptions ?? []).Where(a => !corrected.Contains(a.Id)).ToList();
+            var openFacts = options.Value.ContentAssumptions == ContentAssumptionMode.OpenPoints;
+            var form = remaining.Where(a => !openFacts || !a.Topic.IsContent()).Select(a => "- " + OneLine(a.Text)).ToList();
+            var open = openFacts ? remaining.Where(a => a.Topic.IsContent()).Select(a => "- " + OneLine(a.Text)).ToList() : [];
+            if (form.Count > 0)
             {
-                intake.Add(AssumptionsHeading);
-                intake.AddRange(remaining);
+                intake.Add(input.AssumptionsShown ? AssumptionsHeading : AssumptionsNotShownHeading);
+                intake.AddRange(form);
                 sections.Add(AssumptionsSection);
+            }
+            if (open.Count > 0)
+            {
+                intake.Add(OpenFactsHeading);
+                intake.AddRange(open);
+                sections.Add(OpenFactsSection);
             }
         }
 

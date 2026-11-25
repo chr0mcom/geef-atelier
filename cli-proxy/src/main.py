@@ -9,9 +9,10 @@ import shutil
 import time
 import uuid
 from datetime import datetime, timezone
-from contextlib import asynccontextmanager
+from contextlib import aclosing, asynccontextmanager
 
 import claude_adapter
+import cli_process
 import codex_adapter
 import failover
 import policy
@@ -34,9 +35,10 @@ from openai_format import (
     usage_info,
 )
 from structured import build_response_format_instruction, validate_and_extract
-from streaming import sse_response
+from streaming import ClosingStreamingResponse, sse_response
 from usage import UsageParts
 from cli_errors import EmptyResultError, is_empty_document_result
+from disconnect_guard import DisconnectGuard
 from errors import OpenAIError, install_error_handlers
 from provider_sync import ProviderConfigSync
 from tool_use_parser import (
@@ -137,7 +139,8 @@ _inflight = 0
 @app.middleware("http")
 async def _request_context(request: Request, call_next):
     """Attach x-request-id, openai-processing-ms and informational rate-limit headers."""
-    request_id = request.headers.get("x-request-id") or f"req_{uuid.uuid4().hex}"
+    request_id = (request.headers.get("x-request-id") or getattr(request.state, "request_id", None)
+                  or f"req_{uuid.uuid4().hex}")
     start = time.monotonic()
     response = await call_next(request)
     response.headers["x-request-id"] = request_id
@@ -145,6 +148,11 @@ async def _request_context(request: Request, call_next):
     response.headers["x-ratelimit-limit-requests"] = str(_TOTAL_CONCURRENCY)
     response.headers["x-ratelimit-remaining-requests"] = str(max(0, _TOTAL_CONCURRENCY - _inflight))
     return response
+
+
+# Outermost: cancels a request whose caller disconnected, so its CLI process group is ended
+# (see disconnect_guard.py). Added after _request_context so that it wraps it.
+app.add_middleware(DisconnectGuard)
 
 
 @asynccontextmanager
@@ -209,6 +217,36 @@ def _check_auth(request: Request) -> None:
             "Invalid API key provided.",
             status_code=401, type="authentication_error", code="invalid_api_key",
         )
+
+
+def _begin_timeout(request: Request) -> None:
+    """Start the caller's time limit of this request (`x-cli-proxy-timeout-seconds`), capped by
+    CLI_TIMEOUT_SECONDS. Without the header (or with a value at or above the cap) nothing changes."""
+    try:
+        seconds = cli_process.parse_timeout(request.headers.get(cli_process.TIMEOUT_HEADER))
+    except ValueError as exc:
+        raise OpenAIError(str(exc), status_code=400, code="invalid_header",
+                          param=cli_process.TIMEOUT_HEADER) from exc
+    cli_process.set_deadline(seconds, CLI_TIMEOUT_SECONDS)
+
+
+#: Hard cap of one CLI run (both adapters read the same variable); the caller's limit can only shorten it.
+CLI_TIMEOUT_SECONDS = codex_adapter.CLI_TIMEOUT_SECONDS
+
+
+def _caller_timeout(target: str, exc: cli_process.CallerTimeoutError) -> OpenAIError:
+    """504 `cli_timeout` for a CLI run stopped at the caller's own limit.
+
+    Not a backend fault: it is counted in /health in fields of its own (`caller_timeouts`), moves
+    no breaker, leaves the picture of real faults alone, and the request is not handed over -- the
+    caller has stopped waiting."""
+    failover.record_caller_timeout(target, str(exc))
+    trace = cli_process.current_trace()
+    log.warning("caller time limit reached, CLI process group stopped | request_id=%s | backend=%s | after=%.1fs",
+                trace.request_id if trace else "-", target,
+                time.monotonic() - trace.started if trace else 0.0)
+    return OpenAIError(str(exc), status_code=504, type="api_error", code="cli_timeout",
+                       headers={"x-cli-proxy-provider": target})
 
 
 def _begin_request(req: ChatCompletionRequest) -> None:
@@ -814,14 +852,21 @@ async def _complete_with_failover(
     for index, target in enumerate(order):
         if failover.cli_of(target) == dead_cli:
             continue
+        finished = False
         try:
             resp = await _call_backend(_retarget(req, backend, target), target)
+            finished = True
+        except cli_process.CallerTimeoutError as exc:
+            finished = True
+            raise _caller_timeout(target, exc) from exc
         except EmptyResultError as exc:
+            finished = True
             error = _empty_result_error(backend, target)
             failover.record_empty_result(target, error.message)
             log.error("%s document mode produced no text (%s)", target, exc)
             raise error from exc
         except (RuntimeError, OSError) as exc:
+            finished = True
             reason = failover.classify(exc)
             failover.record_failure(target, reason, str(exc))
             log.error("%s CLI call failed (%s): %s", target, reason, exc)
@@ -831,7 +876,8 @@ async def _complete_with_failover(
                 raise HTTPException(status_code=502, detail=str(exc)) from exc
             continue
         finally:
-            if req.document_mode:
+            # A run cut short by the caller's disconnect (cancellation) is no finished attempt.
+            if req.document_mode and finished:
                 failover.record_document_attempt(target)
         failover.record_success(target)
         response.headers["x-cli-proxy-provider"] = target
@@ -939,8 +985,9 @@ def _stream_completion(
             yield ("usage", parts)
         else:
             adapter = claude_adapter if cli == "claude" else codex_adapter
-            async for ev in adapter.stream(prompt, cli_model, max_tokens, **effort):
-                yield ev
+            async with aclosing(adapter.stream(prompt, cli_model, max_tokens, **effort)) as events:
+                async for ev in events:
+                    yield ev
 
     async def _events():
         dead_cli: str | None = None
@@ -953,9 +1000,13 @@ def _stream_completion(
             _bind_account(target)
             emitted = False
             try:
-                async for ev in _serve(target, target_req):
-                    emitted = True
-                    yield ev
+                async with aclosing(_serve(target, target_req)) as events:
+                    async for ev in events:
+                        emitted = True
+                        yield ev
+            except cli_process.CallerTimeoutError as exc:
+                _caller_timeout(target, exc)
+                raise
             except (RuntimeError, OSError) as exc:
                 reason = failover.classify(exc)
                 failover.record_failure(target, reason, str(exc))
@@ -973,7 +1024,7 @@ def _stream_completion(
                 failover.record_failover(primary, target)
             return
 
-    return StreamingResponse(
+    return ClosingStreamingResponse(
         sse_response(req.model, _events(), include_usage=include_usage),
         media_type="text/event-stream",
         headers={
@@ -997,6 +1048,7 @@ async def cli_chat_completions(
     """Generic endpoint: routes to the CLI adapter configured for provider_name."""
     _check_auth(http_request)
     _begin_request(req)
+    _begin_timeout(http_request)
     if req.stream:
         raise HTTPException(
             status_code=400,
@@ -1029,6 +1081,8 @@ async def cli_chat_completions(
     try:
         result = await adapter.execute(config, req.model_dump())
         return JSONResponse(result)
+    except cli_process.CallerTimeoutError as exc:
+        raise _caller_timeout(provider_name, exc) from exc
     except Exception as exc:
         log.error("CLI adapter error for %s: %s", provider_name, exc)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
@@ -1080,6 +1134,7 @@ async def claude_completions(req: ChatCompletionRequest, http_request: Request, 
     claude is faulted (auth/limit/transport); see failover.py."""
     _check_auth(http_request)
     _begin_request(req)
+    _begin_timeout(http_request)
     allow_failover = _failover_allowed(http_request)
     if req.stream:
         return _stream_completion(req, "claude", allow_failover)
@@ -1093,6 +1148,7 @@ async def codex_completions(req: ChatCompletionRequest, http_request: Request, r
     codex is faulted (auth/limit/transport); see failover.py."""
     _check_auth(http_request)
     _begin_request(req)
+    _begin_timeout(http_request)
     req = await _resolve_codex_alias(req)
     allow_failover = _failover_allowed(http_request)
     if req.stream:
@@ -1162,10 +1218,13 @@ async def codex_image_generations(
     breaker: an image fault says nothing about whether text completions work."""
     _check_auth(http_request)
     _validate_image_request(req)
+    _begin_timeout(http_request)
     _take_image_slot()
     async with _inflight_guard():
         try:
             png, parts = await codex_adapter.generate_image(req.prompt, req.size)
+        except cli_process.CallerTimeoutError as exc:
+            raise _caller_timeout("codex", exc) from exc
         except codex_adapter.NoImageError as exc:
             log.warning("codex image generation produced no image: %s", exc)
             raise OpenAIError(str(exc), status_code=400, code="image_generation_failed") from exc
@@ -1200,6 +1259,7 @@ async def chat_completions(req: ChatCompletionRequest, http_request: Request, re
     )
     _check_auth(http_request)
     _begin_request(req)
+    _begin_timeout(http_request)
     backend = _route_model(req.model)
     if backend == "codex":
         req = await _resolve_codex_alias(req)

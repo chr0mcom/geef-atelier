@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Models;
+using Geef.Atelier.Infrastructure.Pipeline.Direct.FactCheck;
 
 namespace Geef.Atelier.Tests.EndToEnd.Fakes;
 
@@ -65,6 +66,38 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
     /// <summary>True for a request of the clarifier (structured output or forced tool named <see cref="ClarifierSchemaName"/>).</summary>
     public static bool IsClarifierCall(RecordedLlmCall call) => IsClarifierBody(call.RawBody);
 
+    /// <summary>Fact-check answer once the queue is empty: no findings.</summary>
+    public const string DefaultFactCheckJson = """{"findings":[]}""";
+
+    /// <summary>Recheck answer once the queue is empty: no results (every asked finding counts as unclear).</summary>
+    public const string DefaultRecheckJson = """{"results":[]}""";
+
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(string? Json, int Status, string? Code)> _factCheckAnswers = new();
+    private readonly System.Collections.Concurrent.ConcurrentQueue<string> _recheckAnswers = new();
+
+    /// <summary>Queues the JSON content of the next <c>check_facts</c> answer.</summary>
+    public void EnqueueFactCheckJson(string json) => _factCheckAnswers.Enqueue((json, 200, null));
+
+    /// <summary>Queues the JSON content of the next <c>recheck_facts</c> answer.</summary>
+    public void EnqueueRecheckJson(string json) => _recheckAnswers.Enqueue(json);
+
+    /// <summary>Queues an error answer (cli-proxy error envelope with <paramref name="code"/>, without <c>Retry-After</c>) for the next <c>check_facts</c> call.</summary>
+    public void EnqueueFactCheckError(int status, string code = "scripted") => _factCheckAnswers.Enqueue((null, status, code));
+
+    private const int HangStatus = -1;
+
+    /// <summary>Queues a <c>check_facts</c> call that never answers: it waits until the caller gives up (its own time limit).</summary>
+    public void EnqueueFactCheckHang() => _factCheckAnswers.Enqueue((null, HangStatus, null));
+
+    /// <summary>The value of <c>x-cli-proxy-timeout-seconds</c> of every <c>check_facts</c> call, in order (<c>null</c> without the header).</summary>
+    public System.Collections.Concurrent.ConcurrentQueue<string?> FactCheckTimeoutHeaders { get; } = new();
+
+    /// <summary>True for a <c>check_facts</c> request (structured output named <see cref="FactCheckSchema.CheckName"/>).</summary>
+    public static bool IsFactCheckCall(RecordedLlmCall call) => SchemaName(call.RawBody) == FactCheckSchema.CheckName;
+
+    /// <summary>True for a <c>recheck_facts</c> request (structured output named <see cref="FactCheckSchema.RecheckName"/>).</summary>
+    public static bool IsRecheckCall(RecordedLlmCall call) => SchemaName(call.RawBody) == FactCheckSchema.RecheckName;
+
     /// <summary>Input tokens reported for executor answers; <c>null</c> keeps the default estimate (prompt characters / 4).</summary>
     public int? ExecutorPromptTokens { get; set; }
 
@@ -82,6 +115,24 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
 
         if (IsClarifierBody(body))
             return await ClarifierAsync(call, cancellationToken);
+
+        switch (SchemaName(body))
+        {
+            case FactCheckSchema.CheckName:
+                FactCheckTimeoutHeaders.Enqueue(request.Headers.TryGetValues("x-cli-proxy-timeout-seconds", out var limits) ? limits.Single() : null);
+                var (factJson, factStatus, factCode) = _factCheckAnswers.TryDequeue(out var fact) ? fact : (DefaultFactCheckJson, 200, null);
+                if (factStatus == HangStatus)
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                    throw new OperationCanceledException(cancellationToken);
+                }
+                return factCode is not null
+                    ? PlainError(factStatus, factCode)
+                    : Json(Envelope(call, new JsonObject { ["role"] = "assistant", ["content"] = factJson }, "stop"));
+            case FactCheckSchema.RecheckName:
+                var recheckJson = _recheckAnswers.TryDequeue(out var recheck) ? recheck : DefaultRecheckJson;
+                return Json(Envelope(call, new JsonObject { ["role"] = "assistant", ["content"] = recheckJson }, "stop"));
+        }
 
         if (call.Role == LlmRole.Executor && _executorAnswers.TryDequeue(out var answer))
         {
@@ -124,6 +175,30 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
             return true;
         return root.TryGetProperty("tools", out var tools) && tools.ValueKind == JsonValueKind.Array
             && tools.EnumerateArray().Any(t => t.TryGetProperty("function", out var fn) && fn.TryGetProperty("name", out var n) && n.GetString() == ClarifierSchemaName);
+    }
+
+    private static string? SchemaName(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body) || !body.Contains("response_format", StringComparison.Ordinal))
+            return null;
+        using var doc = JsonDocument.Parse(body);
+        return doc.RootElement.TryGetProperty("response_format", out var format) && format.ValueKind == JsonValueKind.Object
+            && format.TryGetProperty("json_schema", out var schema) && schema.ValueKind == JsonValueKind.Object
+            && schema.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String
+                ? name.GetString()
+                : null;
+    }
+
+    private static HttpResponseMessage PlainError(int status, string code)
+    {
+        var payload = new JsonObject
+        {
+            ["error"] = new JsonObject { ["message"] = $"E2E scripted error {code}.", ["type"] = "api_error", ["code"] = code },
+        };
+        return new HttpResponseMessage((HttpStatusCode)status)
+        {
+            Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json"),
+        };
     }
 
     private static HttpResponseMessage ErrorEnvelope(int status, string code)

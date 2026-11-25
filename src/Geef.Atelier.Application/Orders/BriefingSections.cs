@@ -1,5 +1,9 @@
 namespace Geef.Atelier.Application.Orders;
 
+/// <summary>The briefing split back into what the composer put in; lines keep their order, the answer marks are removed.</summary>
+public sealed record BriefParts(string Request, IReadOnlyList<string> PersonAnswers, IReadOnlyList<string> AssistantAnswers,
+    IReadOnlyList<string> FormAssumptions, IReadOnlyList<string> OpenFacts, string? Profile);
+
 /// <summary>
 /// Reads the parts of a briefing built by <see cref="IOrderBriefComposer"/>: the request comes first and unchanged, the blocks
 /// of the intake (answers, corrections, assumptions) and the profile follow after <see cref="Separator"/>. Briefings that were
@@ -21,6 +25,8 @@ public static class BriefingSections
         IntakeBriefComposer.AnswersHeading,
         IntakeBriefComposer.CorrectionsHeading,
         IntakeBriefComposer.AssumptionsHeadingStart,
+        IntakeBriefComposer.AssumptionsNotShownHeadingStart,
+        IntakeBriefComposer.OpenFactsHeadingStart,
         IntakeBriefComposer.ProfileHeading,
         IntakeBriefComposer.UnderstandingLead,
     ];
@@ -62,6 +68,81 @@ public static class BriefingSections
             before = before[..^4].TrimEnd('\n');
         return before + "\n\n" + ProfileHiddenNote;
     }
+
+    /// <summary>
+    /// Splits <paramref name="briefing"/> into the request and the blocks of the composer; a briefing not built by the composer is all
+    /// request. Answers keep their question (<c>question → answer</c>); of a correction only the person's words remain, because the
+    /// corrected assumption is not something the person said. The summary of a prepared brief belongs to no part.
+    /// </summary>
+    public static BriefParts Parse(string briefing)
+    {
+        briefing ??= string.Empty;
+        var request = RequestPart(briefing);
+        if (request.Length == briefing.Length)
+            return new BriefParts(briefing, [], [], [], [], null);
+
+        var person = new List<string>();
+        var assistant = new List<string>();
+        var form = new List<string>();
+        var open = new List<string>();
+        string? profile = null;
+        var block = BriefBlock.None;
+        var lines = briefing[(request.Length + Separator.Length)..].Split('\n');
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            if (line == IntakeBriefComposer.ProfileHeading)
+            {
+                profile = string.Join('\n', lines.Skip(i + 1)).Trim();
+                break;
+            }
+            if (BlockOf(line) is { } next)
+            {
+                block = next;
+                continue;
+            }
+            if (!line.StartsWith(ItemStart, StringComparison.Ordinal))
+                continue;
+
+            var item = line[ItemStart.Length..];
+            switch (block)
+            {
+                case BriefBlock.Answers or BriefBlock.Corrections:
+                    var byAssistant = item.EndsWith(IntakeBriefComposer.ByAssistant, StringComparison.Ordinal);
+                    if (byAssistant)
+                        item = item[..^IntakeBriefComposer.ByAssistant.Length];
+                    if (block == BriefBlock.Corrections && item.IndexOf(AnswerArrow, StringComparison.Ordinal) is var arrow and >= 0)
+                        item = item[(arrow + AnswerArrow.Length)..];
+                    if (!string.IsNullOrWhiteSpace(item))
+                        (byAssistant ? assistant : person).Add(item.Trim());
+                    break;
+                case BriefBlock.FormAssumptions:
+                    form.Add(item.Trim());
+                    break;
+                case BriefBlock.OpenFacts:
+                    open.Add(item.Trim());
+                    break;
+            }
+        }
+
+        return new BriefParts(request, person, assistant, form, open, string.IsNullOrEmpty(profile) ? null : profile);
+    }
+
+    private const string ItemStart = "- ";
+    private const string AnswerArrow = " → ";
+
+    private enum BriefBlock { None, Understanding, Answers, Corrections, FormAssumptions, OpenFacts }
+
+    private static BriefBlock? BlockOf(string line) => line switch
+    {
+        _ when line == IntakeBriefComposer.AnswersHeading => BriefBlock.Answers,
+        _ when line == IntakeBriefComposer.CorrectionsHeading => BriefBlock.Corrections,
+        _ when line.StartsWith(IntakeBriefComposer.AssumptionsHeadingStart, StringComparison.Ordinal)
+               || line.StartsWith(IntakeBriefComposer.AssumptionsNotShownHeadingStart, StringComparison.Ordinal) => BriefBlock.FormAssumptions,
+        _ when line.StartsWith(IntakeBriefComposer.OpenFactsHeadingStart, StringComparison.Ordinal) => BriefBlock.OpenFacts,
+        _ when line.StartsWith(IntakeBriefComposer.UnderstandingLead, StringComparison.Ordinal) => BriefBlock.Understanding,
+        _ => null,
+    };
 
     /// <summary>The briefing as <paramref name="viewer"/> may see it: complete for the owner, <see cref="WithoutProfile"/> for anyone else (also administrators).</summary>
     public static string ForViewer(string briefing, string? owner, string? viewer) =>

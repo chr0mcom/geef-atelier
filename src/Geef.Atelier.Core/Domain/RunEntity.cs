@@ -118,4 +118,10 @@ public sealed class RunEntity
     /// run. <c>null</c> when the run has no order.
     /// </summary>
     public int? OrderVersion { get; init; }
+
+    /// <summary>
+    /// Fact-check mode the run was checked with (<c>Off|Shadow|Report|On</c>, Step50); <c>null</c> for runs before stage 3 and for
+    /// runs outside the direct path.
+    /// </summary>
+    public string? FactCheckMode { get; init; }
 }

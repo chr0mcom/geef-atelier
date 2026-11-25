@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Dashboard;
+using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Notifications;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Sdk.Context;
@@ -24,6 +25,8 @@ internal sealed class PostgresEventSink(
         ReferenceHandler = ReferenceHandler.IgnoreCycles,
         WriteIndented    = false
     };
+
+    private const int FindingColumnChars = 60;
 
     private volatile IRunContext? _lastExecutionContext;
 
@@ -208,11 +211,23 @@ internal sealed class PostgresEventSink(
                 ReviewerName = finding.ReviewerName,
                 Severity     = finding.Severity.ToAtelierSeverity(),
                 Message      = finding.Message,
-                CreatedAt    = DateTimeOffset.UtcNow
+                CreatedAt    = DateTimeOffset.UtcNow,
+                Category     = Bounded(finding.Category, FindingColumnChars),
+                Code         = Bounded(MetadataText(finding, FactFindingMetadata.Code), FindingColumnChars),
+                Quote        = MetadataText(finding, FactFindingMetadata.Quote),
             }, ct);
         }
         await db.SaveChangesAsync(ct);
     }
+
+
+    private static string? MetadataText(Geef.Sdk.Results.Finding finding, string key) =>
+        finding.Metadata is not null && finding.Metadata.TryGetValue(key, out var value) && value?.ToString() is { Length: > 0 } text
+            ? text
+            : null;
+
+    private static string? Bounded(string? value, int max) =>
+        value is null ? null : value.Length <= max ? value : value[..max];
 
     /// <summary>
     /// The SDK publishes no evaluation event for the iteration that ends a non-converged run (stop on max

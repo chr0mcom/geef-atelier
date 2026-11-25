@@ -815,3 +815,58 @@ Wörter“ ab 126 Wörtern, „mindestens 200 Wörter“ unter 150); eine kleine
 Länge der einzige blockierende Befund, endet die Anweisung an den Schreiber mit „Keep everything else unchanged.“ Die
 Falsch-Blockier-Rate wird an synthetischen, unabhängig beschrifteten Aufträgen gemessen
 (`tests/Geef.Atelier.Tests/Domain/Checks/Corpus/`, `LengthCorpusTests`).
+
+## Vorlage `direct`: zwei Prüfer (D-073)
+
+Die Vorlage `direct` existiert nur im Code (`SystemCrew.DirectTemplate`, in keiner Vorlagenliste). Der Schreiber schreibt
+einmal und korrigiert höchstens einmal (`MaxIterations: 2`). Seit Etappe 3 hat sie zwei Prüfer, beide setzt
+`DirectPipelineAssembler` beim Bau der Pipeline ein:
+
+| Prüfer | Profil | Modell | Was er tut |
+|---|---|---|---|
+| Automatische Prüfungen | `deterministic-checks` | keins | `DraftCheckEvaluator`: nicht leer, keine Vorrede, Länge, Sprache, Platzhalter, verbotene Formen und Wörter, verlangte Wörter, ausgeschriebene Rechnungen. Blockierendes → `Error`, Rest `Info`. |
+| Faktenprüfung | `source-fact-check` | Slot `FactReviewer` (heute Codex Astra, nie die Familie des Schreibers) | `SourceFactCheckReviewer`: vergleicht die Tatsachen im Text mit Wortlaut, Antworten, Profil und Dateien (`FactCheckPrompts`, Version `fact-check-1`). |
+
+Die Faktenprüfung läuft bei jedem Auftrag des Direktwegs. Nur `Direct:FactCheckMode = Off`, `Shadow` oder ein Ausfall des
+Modells samt seinem einen Ersatz lassen die Tatsachen ungeprüft, und „What was checked“ sagt das.
+
+- **Material** kommt aus dem Grounding (`AtelierContextKeys.FactMaterial`): Wortlaut, Antworten der Person und des Clients,
+  Profil und Dateien, bei einer Überarbeitung der Ausgangstext als `S0`. Annahmen und Notizen des Schreibers sind nie
+  Material. Über `Direct:FactCheckMaxMaterialChars` (150.000 Zeichen Material und Text) bekommt die Prüfung die Dateikarte
+  statt des Inhalts.
+- **Filter des Codes** (`FactFindingFilter`): Ein Befund bleibt nur mit wörtlichem Zitat; ob er blockiert, folgt aus der
+  Fundstelle (Wortlaut, Antworten der Person und Profil blockieren; Antworten des Clients sind Hinweise; Widersprüche der
+  Dateien blockieren nie). Eine Begründung mit Link, Adresse, Konto- oder Zugangsdaten verwirft den Befund nie: Die Begründung
+  wird durch einen festen Satz ersetzt, das Zitat aus dem Text bleibt (eine erfundene IBAN muss die Person sehen); unsichere
+  Materialstellen werden ebenso ersetzt. „Wörtlich gedeckt“ verlangt ganze Wörter.
+- **Jede Fassung wird voll geprüft.** Ein aus beliebigem Grund geänderter Text (Faktenbefund, Länge, Sprache …) bekommt
+  erneut ein volles `check_facts` mit denselben Ersatzregeln; nur eine Fassung, die eine frühere Runde schon wortgleich
+  geprüft hat, übernimmt deren Befunde ohne Aufruf. `recheck_facts` wird nicht mehr aufgerufen (Prompt und Schema bleiben im
+  Code unverändert). Ein Modell, das in seine Zeitgrenze lief, wird im selben Lauf nicht erneut gerufen. Der Bericht kennt die
+  geprüfte Fassung (`FactCheckRound.TextHash`); ein ausgelieferter Text, den keine Prüfung sah, ist `VersionNotChecked` („The
+  facts of this version of the text were not checked …“), und frühere Befunde erscheinen nur, wenn ihre Stelle noch darin steht.
+- **Kein Befund geht zwischen Runden verloren** (`FactCarryOver`): Nach jeder vollen Prüfung bleiben die Befunde aller früher
+  beantworteten Runden offen, deren Stelle noch wörtlich (ganze Wörter) im Text steht, mit ihrer Blockierwirkung, und jeder
+  Quellenwiderspruch bleibt (eine Korrektur ändert die Dateien nicht). Entdoppelt werden nur Wiederholungen: eine Stelle, die
+  ganz in einer behaltenen Stelle gleicher Art liegt (bei Vorgaben gegen dieselbe Vorgabe), bzw. ein Widerspruch, dessen beide
+  Materialstellen einander an Wortgrenzen enthalten und der dieselben Dateien nennt; eine nur überlappende Stelle wird
+  zusätzlich gezeigt. Keine Kappe, IDs neu. Wird eine frühere Fassung als die beste ausgeliefert, kommen die Befunde späterer
+  beantworteter Runden auf dieselbe Weise dazu (Widersprüche immer, Stellen nur, wenn sie im ausgelieferten Text stehen, nicht
+  gelistete mitgezählt). In `On` lehnt eine
+  blockierende Stelle, die die zweite Prüfung nicht erneut meldet, deshalb weiter ab. Nicht gelistete Stellen früherer Prüfungen
+  bleiben gezählt. Zitate werden auf ganze Wörter erweitert, damit eine unveränderte Stelle nie als „entfernt“ gilt; ohne
+  Prüfung der ausgelieferten Fassung ergänzt „Removed or replaced“, dass die Aussage umformuliert noch enthalten sein kann.
+- **Stufen:** `Report` (ausgeliefert) → Befunde `Warning`, Urteil `Approved`, der Text wird nie geändert; `On` → blockierende
+  Befunde `Error` und `Rejected`, der Schreiber bekommt feste Sätze; `Shadow` → `Info` mit Metadatum `shadow`, nichts sichtbar.
+- **Ersatzmodell:** Ist das Modell nicht erreichbar, folgt ein Versuch mit dem nächsten Kandidaten von `FactReviewer`, der
+  weder das Schreibermodell noch vom gescheiterten Anbieter noch bezahlt ist (`FactCheckModelFallback`, heute Sonnet). Das
+  Failover des Gateways bleibt aus. Aufrufe, Modell und Ersatz stehen im Bericht (`factCheck`), nie als Warnung.
+- **Persistenz:** Befunde behalten `Category = fact-check`, `Code` (`fact.unsupported`, `fact.instruction`, `fact.superseded`,
+  `fact.source_conflict`) und `Quote`; `Runs.FactCheckMode` hält den Modus des Laufs (Migration Step50). Wird ein Konto gelöscht
+  oder umbenannt, verlieren seine Läufe jede Kopie der About-me-Angaben: den Block im Auftrag, den Auftrag in den gespeicherten
+  Ereignissen (`PipelineStartedEvent.Input` und jeder andere Text eines Ereignisses, der den Block oder die Angaben wörtlich
+  enthält) und was die Faktenprüfung in Bericht, Befunde und Ereignisse kopiert hat. Läufe, die eine frühere Version schon
+  bereinigt hat, werden mit den Angaben aus ihren Ereignissen erneut bereinigt.
+- **Die Rechenprüfung sagt nie „stimmt“:** Die Prüfung ausgeschriebener Rechnungen im Text und der Summen in den Dateien nennt
+  nur, was eindeutig falsch aussieht, und bittet die Person, es zu prüfen; sonst sagt „What was checked“ höchstens, dass nichts
+  eindeutig Falsches gefunden wurde und dass nicht jede Rechnung so prüfbar ist. Frühere Berichte lesen sich ebenso.

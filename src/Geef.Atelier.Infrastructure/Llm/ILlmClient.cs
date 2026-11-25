@@ -96,6 +96,13 @@ public sealed record LlmRequest
     /// CLI. Null or blank = the field is not sent, so the request stays exactly as before.
     /// </summary>
     public string? ReasoningEffort { get; init; }
+
+    /// <summary>
+    /// Optional time limit in whole seconds for the CLI process behind the cli-proxy (request header
+    /// <c>x-cli-proxy-timeout-seconds</c>). The proxy ends the process and its child processes when it runs out and answers
+    /// HTTP 504 <c>cli_timeout</c>. Null = no header, so the request stays exactly as before. Other providers ignore it.
+    /// </summary>
+    public int? ProxyTimeoutSeconds { get; init; }
 }
 
 /// <summary>

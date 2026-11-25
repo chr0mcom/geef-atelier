@@ -7,6 +7,8 @@ import os
 import shutil
 from typing import Any
 
+import cli_process
+
 from .base import CliAdapter
 from .utils import format_messages as _format_messages, build_openai_response_from_parts as _build_openai_response_from_parts
 
@@ -40,14 +42,14 @@ class GenericAdapter(CliAdapter):
             if env_val:
                 env[env_key] = env_val
 
-        proc = await asyncio.create_subprocess_exec(
+        proc = await cli_process.spawn(
             *cmd,
             stdin=asyncio.subprocess.PIPE if stdin_data else None,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(input=stdin_data), timeout=300)
+        stdout, stderr = await cli_process.communicate(proc, stdin_data, 300, asyncio.TimeoutError, f"{binary} CLI")
 
         if proc.returncode != 0:
             raise RuntimeError(f"{binary} exited {proc.returncode}: {stderr.decode()[:500]}")

@@ -4,6 +4,7 @@ using Geef.Atelier.Application.Sources;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Models;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Persistence.Orders;
@@ -42,7 +43,10 @@ public sealed class OrderServiceTests(PostgresFixture postgres)
         Assert.Equal(SystemCrew.DirectTemplateName, snapshot.TemplateName);
         Assert.Equal(SystemCrew.DirectWriterProfile.Name, snapshot.Executor.Name);
         Assert.False(string.IsNullOrWhiteSpace(snapshot.Executor.Model));
-        Assert.Equal([SystemCrew.DeterministicChecksProfile.Name], snapshot.Reviewers.Select(r => r.Name));
+        Assert.Equal([SystemCrew.DeterministicChecksProfile.Name, SystemCrew.SourceFactCheckProfile.Name], snapshot.Reviewers.Select(r => r.Name));
+        var factCheck = snapshot.Reviewers.Single(r => r.Name == SystemCrew.SourceFactCheckProfile.Name);
+        Assert.False(CliRoute.IsSameModel(factCheck.Model, snapshot.Executor.Model));
+        Assert.NotEqual(CliRoute.FamilyOf(snapshot.Executor.Provider, snapshot.Executor.Model), CliRoute.FamilyOf(factCheck.Provider, factCheck.Model));
         Assert.Equal(2, snapshot.ConvergenceOverride!.MaxIterations);
 
         var order = await host.QueryAsync(db => db.Orders.AsNoTracking().SingleAsync(o => o.Id == submission.OrderId));

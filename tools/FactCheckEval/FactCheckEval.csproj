@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>FactCheckEval</AssemblyName>
+    <RootNamespace>Geef.Atelier.Tools.FactCheckEval</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Geef.Atelier.Core/Geef.Atelier.Core.csproj" />
+    <ProjectReference Include="../../src/Geef.Atelier.Application/Geef.Atelier.Application.csproj" />
+    <ProjectReference Include="../../src/Geef.Atelier.Infrastructure/Geef.Atelier.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup Label="Measurement code shared with the tests (tests/Geef.Atelier.Tests/FactCheck/Evaluation), so that tool and tests judge with the same code">
+    <Compile Include="../../tests/Geef.Atelier.Tests/FactCheck/Evaluation/*.cs" LinkBase="Evaluation" />
+  </ItemGroup>
+</Project>

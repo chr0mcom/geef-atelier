@@ -125,6 +125,7 @@ class _BackendState:
     __slots__ = ("consecutive_failures", "open_until", "last_reason", "last_error",
                  "last_error_detail", "last_failure_at", "failover_count", "tripped",
                  "last_success_at", "empty_results", "last_empty_result_at",
+                 "caller_timeouts", "last_caller_timeout_at", "last_caller_timeout_error",
                  "recent_empty_results", "recent_document_attempts")
 
     def __init__(self) -> None:
@@ -133,6 +134,9 @@ class _BackendState:
         self.last_reason: str | None = None
         self.last_error: str | None = None
         self.last_error_detail: str | None = None
+        self.caller_timeouts = 0
+        self.last_caller_timeout_at: float | None = None
+        self.last_caller_timeout_error: str | None = None
         self.empty_results = 0
         self.last_empty_result_at: float | None = None
         self.recent_empty_results: deque[float] = deque(maxlen=_MAX_RECENT_EVENTS)
@@ -217,8 +221,9 @@ def record_success(backend: str) -> None:
 
 def record_failure(backend: str, reason: str, error: str) -> None:
     """Record a failure. Only failover-worthy reasons move the breaker: a malformed request is
-    not evidence that the backend is unhealthy. Empty document-mode results never come here
-    (see `record_empty_result`)."""
+    not evidence that the backend is unhealthy. Empty document-mode results and runs stopped at
+    the caller's own limit never come here (see `record_empty_result`,
+    `record_caller_timeout`)."""
     st = _state(backend)
     st.last_reason = reason
     st.last_error = error[:_MAX_ERROR_CHARS]
@@ -264,6 +269,19 @@ def record_empty_result(backend: str, error: str) -> None:
     st.recent_empty_results.append(now)
     _prune(st.recent_empty_results, now)
     log.info("Empty document-mode result of %s (not a breaker failure) | %s", backend, error)
+
+
+def record_caller_timeout(backend: str, error: str) -> None:
+    """Record a run of `backend` that was stopped at the caller's own time limit.
+
+    Counted and reported only (`caller_timeouts`, `last_caller_timeout_at`,
+    `last_caller_timeout_error`). Any caller can cause it with a tiny limit, so it leaves the
+    breaker and the `last_reason`/`last_error` picture of real faults (which the FAILOVER log
+    line quotes) as they are."""
+    st = _state(backend)
+    st.caller_timeouts += 1
+    st.last_caller_timeout_at = time.time()
+    st.last_caller_timeout_error = error[:_MAX_ERROR_CHARS]
 
 
 def _empty_result_view(st: _BackendState) -> dict:
@@ -335,6 +353,11 @@ def snapshot() -> dict:
             # api_error_status), up to 2000 characters; `last_error` keeps its 500-char cut.
             "last_error_detail": st.last_error_detail,
             "last_failure_at": st.last_failure_at,
+            # Runs stopped at the caller's own limit (header x-cli-proxy-timeout-seconds), since
+            # start. Display only: no backend fault, so the fields above stay untouched.
+            "caller_timeouts": st.caller_timeouts,
+            "last_caller_timeout_at": st.last_caller_timeout_at,
+            "last_caller_timeout_error": st.last_caller_timeout_error,
             # Proof of life for external monitors: a process restart clears the breaker
             # state (tripped=False) WITHOUT any real success -- the watch cron must not
             # read that as recovery. It closes an alarm card only when a success is

@@ -935,6 +935,21 @@ public static class SystemCrew
         MaxTokens: 0,
         IsSystem: true);
 
+    /// <summary>
+    /// Fact check of the direct path against the request, the answers, the profile and the files; the implementation and its
+    /// versioned prompt are injected at pipeline build time, this entry only registers the profile and its model slot.
+    /// </summary>
+    public static readonly ReviewerProfile SourceFactCheckProfile = new(
+        Name: "source-fact-check",
+        DisplayName: "Fact check",
+        Description: "Compares the facts in the text with the request, the answers, the profile and the files. Injected at pipeline build time.",
+        SystemPrompt: "Source fact check -- injected at pipeline build time.",
+        Provider: ModelMatrix.Primary(ModelSlot.FactReviewer).Provider,
+        Model: ModelMatrix.Primary(ModelSlot.FactReviewer).Model,
+        MaxTokens: 8192,
+        IsSystem: true,
+        ModelSlot: ModelSlot.FactReviewer);
+
     /// <summary>Passes the files attached to an order in full text (careful mode).</summary>
     public static readonly GroundingProviderProfile OrderSourcesProfile = new(
         Name: "order-sources",
@@ -952,9 +967,9 @@ public static class SystemCrew
     public static readonly CrewTemplate DirectTemplate = new(
         Name: DirectTemplateName,
         DisplayName: "Direct",
-        Description: "One writing pass with all files in full text, automatic checks without a model, at most one correction.",
+        Description: "One writing pass with all files in full text, automatic checks without a model and a fact check by a model of another family, at most one correction.",
         ExecutorProfileName: DirectWriterProfile.Name,
-        ReviewerProfileNames: [DeterministicChecksProfile.Name],
+        ReviewerProfileNames: [DeterministicChecksProfile.Name, SourceFactCheckProfile.Name],
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 2, AbortOnCritical: false, DetectRegression: false, StagnationThreshold: 2),
         AdvisorProfileNames: [],
@@ -975,6 +990,7 @@ public static class SystemCrew
         new Dictionary<string, ReviewerProfile>
         {
             [DeterministicChecksProfile.Name] = DeterministicChecksProfile,
+            [SourceFactCheckProfile.Name] = SourceFactCheckProfile,
         };
 
     /// <summary>Crew templates that exist only in code, indexed by name.</summary>

@@ -206,6 +206,9 @@ class TestHealthFields:
         for name in ("claude", "codex"):
             assert backends[name]["last_error_detail"] is None
             assert backends[name]["empty_results"] == 0
+            assert backends[name]["caller_timeouts"] == 0
+            assert backends[name]["last_caller_timeout_at"] is None
+            assert backends[name]["last_caller_timeout_error"] is None
 
     def test_existing_fields_are_unchanged(self, client: TestClient) -> None:
         body = client.get("/health").json()
@@ -220,6 +223,7 @@ class TestHealthFields:
             "last_error_detail", "empty_results",
             "last_empty_result_at", "empty_results_recent", "document_requests_recent",
             "empty_result_rate", "empty_result_alert",
+            "caller_timeouts", "last_caller_timeout_at", "last_caller_timeout_error",
         }
 
     def test_detail_is_redacted_and_longer_than_last_error(self) -> None:

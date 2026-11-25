@@ -91,7 +91,10 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
     /// migrations) and verifies that no migration is pending. The orchestrator stays held until
     /// <see cref="ReleaseOrchestrator"/> or <see cref="SubmitAsync"/>. The intake is off (<c>Orders:IntakeMode=Off</c>) so that
     /// orders run exactly as in stage 1 and no clarifier call lands in <see cref="Llm"/>; intake tests switch it on in
-    /// <paramref name="configureServices"/>, which runs last and may replace registrations for a single test.
+    /// <paramref name="configureServices"/>, which runs last and may replace registrations for a single test. The switches of stage 3
+    /// are off as well (<c>Direct:FactCheckMode=Off</c>, <c>Direct:WriterNotes=false</c>, <c>Intake:ContentAssumptions=Defaults</c>),
+    /// so the direct path runs as in stage 2 unless a test configures <c>DirectOptions</c> or
+    /// <c>IntakeOptions</c> there.
     /// </summary>
     public static async Task<AtelierEndToEndHost> StartAsync(PostgresFixture postgres, Action<IServiceCollection>? configureServices = null)
     {
@@ -128,6 +131,9 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
             web.UseSetting("Sources:StorageRoot", Path.Combine(keyDirectory, "sources"));
             web.UseSetting("Logging:LogLevel:Default", "Warning");
             web.UseSetting("Orders:IntakeMode", "Off");
+            web.UseSetting("Direct:FactCheckMode", "Off");
+            web.UseSetting("Direct:WriterNotes", "false");
+            web.UseSetting("Intake:ContentAssumptions", "Defaults");
 
             web.ConfigureTestServices(services =>
             {

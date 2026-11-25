@@ -4,6 +4,7 @@ using Geef.Atelier.Application.OAuth;
 using Geef.Atelier.Application.Profiles;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Persistence;
+using Geef.Atelier.Core.Persistence.Runs;
 using Geef.Atelier.Application.Pricing;
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
@@ -17,6 +18,7 @@ using Geef.Atelier.Infrastructure.Pricing;
 using Geef.Atelier.Infrastructure.Knowledge;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
+using Geef.Atelier.Infrastructure.Persistence.Runs;
 using Geef.Atelier.Infrastructure.Pipeline.Assembly;
 using Geef.Atelier.Infrastructure.Sources;
 using Geef.Atelier.Infrastructure.Sources.Extraction;
@@ -61,7 +63,7 @@ builder.Services.AddLlmClient(builder.Configuration)
         options.CircuitBreaker.SamplingDuration    = TimeSpan.FromMinutes(60);
         options.Retry.MaxRetryAttempts             = 2;
         options.Retry.ShouldHandle = args => ValueTask.FromResult(
-            !args.Outcome.Result.IsAnswerForCallerWithoutFailover()
+            LlmHttpRetry.MayRetry(args.Outcome.Result)
             && Microsoft.Extensions.Http.Resilience.HttpClientResiliencePredicates.IsTransient(args.Outcome));
     });
 
@@ -109,6 +111,8 @@ builder.Services.PostConfigure<SourceOptions>(o =>
 });
 builder.Services.Configure<OrderOptions>(builder.Configuration.GetSection(OrderOptions.SectionName));
 builder.Services.Configure<IntakeOptions>(builder.Configuration.GetSection(IntakeOptions.SectionName));
+builder.Services.Configure<DirectOptions>(builder.Configuration.GetSection(DirectOptions.SectionName));
+builder.Services.AddSingleton<IRunFactCheckModeStore, RunFactCheckModeStore>();
 builder.Services.AddSources(builder.Configuration);
 builder.Services.AddProfiles();
 builder.Services.AddOrderIntakeServices();
