@@ -5,7 +5,8 @@ order: ``.json`` files, ``.jsonl`` files or directories (their ``*.json`` files)
 
 Checked here:
 
-- (a) every order has ``lookedUp`` and its status is not ``not_needed``.
+- (a) every order has ``lookedUp`` and its status is neither ``not_needed`` nor ``files_attached`` (an order with files never
+  searches, so it says nothing about the research).
 - (c) passages the fact check flagged as ``not_backed`` although the research covers them: the passage's quote holds a number or a
   name that stands in the quote or title of a ``lookedUp`` entry of the same order. At most :data:`MAX_COVERED_UNBACKED` in total.
   A number is a run of digits; ``.`` and ``,`` between digits are removed (``1.000`` = ``1,000`` = ``1000``); numbers are compared
@@ -49,6 +50,7 @@ MAX_COVERED_UNBACKED = 1
 MIN_NAME_CHARS = 3
 NOT_BACKED = "not_backed"
 NOT_NEEDED = "not_needed"
+FILES_ATTACHED = "files_attached"
 CHECK_RAN = frozenset({"checked", "open_points"})
 MANUAL = {
     "b": "0 Fragen zu recherchierten Themen: von Hand an den Rückfragen der Aufträge prüfen",
@@ -135,7 +137,7 @@ def evaluate(results: list[dict]) -> dict:
         entries = (looked or {}).get("entries") or []
         entry_total += len(entries)
         orders.append({"orderId": order_id, "looked_up": status, "entries": len(entries)})
-        if looked is None or status in (None, NOT_NEEDED):
+        if looked is None or status in (None, NOT_NEEDED, FILES_ATTACHED):
             without_research.append(order_id)
         text = str(result.get("text") or "")
         if count := len(NOTES_MARKER_RE.findall(text)):

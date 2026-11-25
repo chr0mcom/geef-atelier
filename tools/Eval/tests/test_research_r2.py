@@ -81,7 +81,7 @@ def test_entries_of_another_order_cover_nothing():
     assert r2.evaluate(results)["parts"]["c"]["count"] == 0
 
 
-@pytest.mark.parametrize("change", [{"status": None}, {"status": "not_needed", "entries": []}])
+@pytest.mark.parametrize("change", [{"status": None}, {"status": "not_needed", "entries": []}, {"status": "files_attached", "entries": []}])
 def test_every_order_needs_research(change):
     report = r2.evaluate(five(**change))
 

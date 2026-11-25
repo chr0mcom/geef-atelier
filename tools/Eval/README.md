@@ -361,7 +361,7 @@ python3 -m geef_eval.research_r2 --results $EVAL_RESEARCH_DIR/r2/antworten --out
 
 | Teil | Prüfung |
 |---|---|
-| (a) | **im Code:** jeder Auftrag hat `lookedUp` ungleich `null` und einen Status ungleich `not_needed` |
+| (a) | **im Code:** jeder Auftrag hat `lookedUp` ungleich `null` und einen Status ungleich `not_needed` und `files_attached` (R2-Aufträge daher ohne Dateien) |
 | (b) | **Handauswertung** (`manual`): 0 Fragen zu recherchierten Themen |
 | (c) | **im Code:** Zahl der `unbackedPassages` mit `kind = not_backed`, deren Zitat eine Zahl oder einen Namen enthält, die oder der in Zitat oder Titel eines `lookedUp`-Eintrags desselben Auftrags vorkommt; bestanden bei ≤ 1 insgesamt, ob blockierend oder nicht |
 | (d) | **Handauswertung** (`manual`): Median `DurationMs` ≤ 60 s (steht nicht in der MCP-Antwort) |
