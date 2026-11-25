@@ -19,21 +19,38 @@ Thresholds (contract 8, fixed in advance, taken over word for word):
 - **N5** start v3 and stop it → result and export show v2 with the sentence.
 - Not evaluable: fewer than 6 of 8 with a text; export missing.
 
+Decisions of the client that come on top of the contract (each one stricter):
+
+- The 8 changes are 8 real changes with a text to write; the stop of N5 is a case of its own **in addition** and never counts as
+  "with a text". At least 6 of the 8 real changes need a newer version with a text.
+- N4 also covers the whole chain: every entry of ``earlierOpenPoints`` of the base appears in the new version under ``openPoints``
+  or under ``earlierOpenPoints`` with its original version (and its kind). Every assumption of the writer of the base
+  (``writerAssumptions``) that the new version does not repeat under ``writerAssumptions`` stands under its ``earlierOpenPoints``
+  with ``kind`` ``assumption`` and the version of the base. ``kind`` of an entry is ``openPoint`` (also when absent) or
+  ``assumption``. An assumption (an entry of kind ``assumption`` or one of the writer of the base) is also kept when the new
+  version shows it as an assumption: under ``writerAssumptions`` or among the assumptions of the clarifier (``assumptions[].text``).
+  An entry of kind ``openPoint`` is not kept by an assumption.
+- N5 needs ``state`` ``stopped``; a change that failed on its own does not show that stopping works.
+- A local case whose base text has fewer than 4 paragraphs is not evaluable for N1 (with ``paragraphs − 2`` such a text could
+  be rewritten almost or completely).
+
 How this tool reads them (its own code, independent of the C# ``ParagraphDiff``): a paragraph is a block between blank lines,
 compared after collapsing white space, case and quote marks unchanged; unchanged paragraphs are the longest common subsequence of
 both lists. A word is a run of characters between white space with at least one letter or digit. A quote "stands in" a text when
 it stands there as whole words after normalising white space, invisible characters, quote marks and dashes, ignoring case (as the
 Atelier's ``QuoteVerifier`` does). A passage of v1 appears in v2 when a passage of v2 (of any kind) contains its quote. A point of
-the writer appears in v2 under ``openPoints`` or under ``earlierOpenPoints`` with the version of v1, compared without case, closing
-punctuation and one leading article. Placeholders are text in square brackets (2 to 80 characters, one line), except links,
-images, check boxes and footnotes.
+the writer appears in v2 under ``openPoints`` or under ``earlierOpenPoints`` (kind ``openPoint``) with the version of v1; points
+and assumptions are compared without case, closing punctuation and one leading article. Placeholders are text in square brackets
+(2 to 80 characters, one line), except links, images, check boxes and footnotes.
 
 Never passed without data: a case counts only with readable snapshots of the planned order, a base with a text and, after a change,
 a text of a newer version. A criterion with no such case (Shorter, Longer, the first local case, every tone case) is not
 evaluable, as is N4 when a case with a text lacks the fact check (``factCheck.state`` other than ``checked`` or ``open_points``) or
-one of its lists, N2/N3 when the fact check did not run, N5 without ``latestVersion`` or without the export, and the whole gate
-when the plan does not have the composition of the contract (3 local with the expected detail on the first, 2 tone, 1 Shorter,
-1 Longer, 1 stop; 5 web and 3 MCP; 4 orders).
+one of its lists (``openPoints``, ``writerAssumptions``; an absent ``earlierOpenPoints`` means none, an unreadable one is not
+evaluable), N1 with a local base of fewer than 4 paragraphs, N2/N3 when the fact check did not run, N5 without ``latestVersion``
+or without the export, and the whole gate when the plan does not have this composition: 8 real changes (at least 3 local with the
+expected detail on the first, 2 tone, 1 Shorter, 1 Longer; the eighth is one more of these four kinds and has to pass the
+thresholds of its kind) plus 1 stop; of the 8 real changes 5 web and 3 MCP, at 4 orders, and the stop at one of these orders.
 
 Snapshots and the report hold texts of real orders: the output directory must be outside every Git tree.
 
@@ -51,6 +68,8 @@ Plan (JSON, outside Git; the order of the cases decides which local case is the 
       {"case": "stop", "kind": "stop", "order": "<orderId>", "channel": "web", "base": "v2", "new": "after-stop",
        "stopped_version": 3}
     ]}
+
+(shortened: a complete plan has 8 changes and the stop)
 
 ``kind`` is ``local``, ``tone``, ``shorter``, ``longer`` or ``stop``; ``channel`` ``web`` or ``mcp``.
 
@@ -77,12 +96,18 @@ from .cli import inside_git_worktree
 from .mcp import McpError
 from .mcp_contract import ContractClient, SignInError, connect
 
-KINDS = {"local": 3, "tone": 2, "shorter": 1, "longer": 1, "stop": 1}
+STOP_KIND = "stop"
+MIN_KINDS = {"local": 3, "tone": 2, "shorter": 1, "longer": 1}
 CHANNELS = {"web": 5, "mcp": 3}
 ORDER_COUNT = 4
-CASE_COUNT = 8
+CHANGE_COUNT = 8
 MIN_WITH_TEXT = 6
 MAX_CHANGED_PARAGRAPHS = 2
+MIN_LOCAL_PARAGRAPHS = 4
+STOPPED_STATE = "stopped"
+KIND_OPEN_POINT = "openPoint"
+KIND_ASSUMPTION = "assumption"
+EARLIER_KINDS = frozenset({KIND_OPEN_POINT, KIND_ASSUMPTION})
 WORD_TOLERANCE = 0.15
 SHORTER_RANGE = (0.40, 0.85)
 LONGER_RANGE = (1.15, 1.60)
@@ -266,15 +291,20 @@ def plan_problems(cases: list[dict]) -> list[str]:
     """Where the plan differs from the data of gate N (contract 8)."""
     problems = []
     kinds = Counter(c["kind"] for c in cases)
-    if unknown := sorted(set(kinds) - set(KINDS)):
+    if unknown := sorted(set(kinds) - set(MIN_KINDS) - {STOP_KIND}):
         problems.append(f"unbekannte Art: {', '.join(unknown)}")
-    if any(kinds.get(k, 0) != n for k, n in KINDS.items()) or len(cases) != CASE_COUNT:
-        problems.append(f"Plan hat {dict(kinds)}, Tor N verlangt {KINDS} ({CASE_COUNT} Nachbesserungen)")
-    channels = Counter(c["channel"] for c in cases)
+    changes = [c for c in cases if c["kind"] != STOP_KIND]
+    if len(changes) != CHANGE_COUNT or kinds.get(STOP_KIND, 0) != 1 or any(kinds.get(k, 0) < n for k, n in MIN_KINDS.items()):
+        problems.append(f"Plan hat {dict(kinds)}, Tor N verlangt {CHANGE_COUNT} echte Nachbesserungen (mindestens {MIN_KINDS}) "
+                        f"und zusätzlich genau 1 stop")
+    channels = Counter(c["channel"] for c in changes)
     if dict(channels) != CHANNELS:
-        problems.append(f"Plan hat Wege {dict(channels)}, Tor N verlangt {CHANNELS}")
-    if (orders := len({c["order"].lower() for c in cases})) != ORDER_COUNT:
-        problems.append(f"Plan hat {orders} Aufträge, Tor N verlangt {ORDER_COUNT} frische")
+        problems.append(f"Plan hat Wege {dict(channels)} bei den echten Nachbesserungen, Tor N verlangt {CHANNELS}")
+    orders = {c["order"].lower() for c in changes}
+    if len(orders) != ORDER_COUNT:
+        problems.append(f"Plan hat {len(orders)} Aufträge, Tor N verlangt {ORDER_COUNT} frische")
+    if any(c["order"].lower() not in orders for c in cases if c["kind"] == STOP_KIND):
+        problems.append("Stopp-Fall gehört zu keinem Auftrag der echten Nachbesserungen")
     local = [c for c in cases if c["kind"] == "local"]
     if local and not str(local[0].get("expect") or "").strip():
         problems.append(f"erster lokaler Fall {local[0]['case']} ohne expect (neue Angabe, wörtlich)")
@@ -320,44 +350,84 @@ def _fact_check_ran(result: dict) -> bool:
     return isinstance(check, dict) and check.get("state") in CHECK_RAN and isinstance(result.get("unbackedPassages"), list)
 
 
+def _earlier_entries(result: dict) -> list[tuple[int, str, str]] | None:
+    """``earlierOpenPoints`` as (version, kind, text); absent means none (the server leaves null out), ``None`` when unreadable."""
+    value = result.get("earlierOpenPoints")
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        return None
+    entries = []
+    for item in value:
+        if not isinstance(item, dict):
+            return None
+        version, text = item.get("version"), item.get("text")
+        kind = KIND_OPEN_POINT if item.get("kind") is None else item["kind"]
+        if not isinstance(version, int) or isinstance(version, bool) or not isinstance(text, str) or not text.strip() \
+                or not isinstance(kind, str) or kind not in EARLIER_KINDS:
+            return None
+        entries.append((version, kind, text))
+    return entries
+
+
+def _clarifier_assumptions(result: dict) -> list[str] | None:
+    """The texts of ``assumptions`` (those of the clarifier); absent means none, ``None`` when unreadable."""
+    value = result.get("assumptions")
+    if value is None:
+        return []
+    if not isinstance(value, list) or not all(isinstance(a, dict) and isinstance(a.get("text"), str) for a in value):
+        return None
+    return [a["text"] for a in value]
+
+
 def keep_check(base: dict, new: dict) -> dict:
     """N4 for one change: what of the base is missing in the new version; ``problems`` when a list needed for it is absent."""
+    lost = {"lost_passages": [], "lost_points": [], "lost_earlier_points": [], "lost_assumptions": [], "unlisted_placeholders": []}
     problems = []
     for name, result in (("Ausgangsfassung", base), ("neue Fassung", new)):
         if not _fact_check_ran(result):
             problems.append(f"{name}: Faktenprüfung lief nicht oder unbackedPassages fehlt "
                             f"({(result.get('factCheck') or {}).get('state') if isinstance(result.get('factCheck'), dict) else None})")
-        if not isinstance(result.get("openPoints"), list):
-            problems.append(f"{name}: openPoints fehlt")
+        for field in ("openPoints", "writerAssumptions"):
+            if not isinstance(result.get(field), list):
+                problems.append(f"{name}: {field} fehlt")
+        if _earlier_entries(result) is None:
+            problems.append(f"{name}: earlierOpenPoints nicht lesbar (Liste aus version, text und wahlweise kind "
+                            f"{KIND_OPEN_POINT} oder {KIND_ASSUMPTION})")
+    if _clarifier_assumptions(new) is None:
+        problems.append("neue Fassung: assumptions nicht lesbar (Liste von Objekten mit text)")
     if not isinstance(new.get("placeholders"), list):
         problems.append("neue Fassung: placeholders fehlt")
     if problems:
-        return {"problems": problems, "lost_passages": [], "lost_points": [], "unlisted_placeholders": [], "notes": []}
+        return {"problems": problems, **lost, "notes": []}
 
     new_text = _text(new)
     new_quotes = [normalize_quote(p.get("quote")) for p in new["unbackedPassages"] if isinstance(p, dict)]
-    lost_passages = []
     for passage in base["unbackedPassages"]:
         quote = passage.get("quote") if isinstance(passage, dict) else None
         if stands_in(new_text, quote) and not any(normalize_quote(quote) in q for q in new_quotes):
-            lost_passages.append(str(quote))
+            lost["lost_passages"].append(str(quote))
     base_version = _version(base)
-    earlier = new.get("earlierOpenPoints") if isinstance(new.get("earlierOpenPoints"), list) else []
-    kept = {point_key(p) for p in new["openPoints"]}
-    carried = {point_key(e.get("text")) for e in earlier if isinstance(e, dict) and e.get("version") == base_version}
-    lost_points = [str(p) for p in base["openPoints"] if point_key(p) not in kept | carried]
+    open_keys = {point_key(p) for p in new["openPoints"]}
+    assumption_keys = {point_key(a) for a in [*new["writerAssumptions"], *_clarifier_assumptions(new)]}
+    carried = {(version, kind, point_key(text)) for version, kind, text in _earlier_entries(new)}
+    lost["lost_points"] = [str(p) for p in base["openPoints"]
+                           if point_key(p) not in open_keys and (base_version, KIND_OPEN_POINT, point_key(p)) not in carried]
+    lost["lost_earlier_points"] = [{"version": version, "kind": kind, "text": text}
+                                   for version, kind, text in _earlier_entries(base)
+                                   if point_key(text) not in open_keys and (version, kind, point_key(text)) not in carried
+                                   and not (kind == KIND_ASSUMPTION and point_key(text) in assumption_keys)]
+    lost["lost_assumptions"] = [str(a) for a in base["writerAssumptions"]
+                                if point_key(a) and point_key(a) not in assumption_keys
+                                and (base_version, KIND_ASSUMPTION, point_key(a)) not in carried]
     listed = set(str(p) for p in new["placeholders"])
-    unlisted = [p for p in find_placeholders(new_text) if p not in listed]
+    lost["unlisted_placeholders"] = [p for p in find_placeholders(new_text) if p not in listed]
 
     notes = []
     new_issues = {normalize_quote(i) for i in new.get("sourceIssues") or []}
     if missing := [i for i in base.get("sourceIssues") or [] if normalize_quote(i) not in new_issues]:
         notes.append(f"{len(missing)} Quellenhinweise der Ausgangsfassung fehlen in der neuen (nicht Teil von N4)")
-    new_assumptions = {point_key(a) for a in new.get("writerAssumptions") or []}
-    if missing := [a for a in base.get("writerAssumptions") or [] if point_key(a) not in new_assumptions]:
-        notes.append(f"{len(missing)} Annahmen des Schreibers der Ausgangsfassung fehlen in der neuen (nicht Teil von N4)")
-    return {"problems": [], "lost_passages": lost_passages, "lost_points": lost_points, "unlisted_placeholders": unlisted,
-            "notes": notes}
+    return {"problems": [], **lost, "notes": notes}
 
 
 def _export_text(snapshot: dict) -> tuple[str | None, str | None]:
@@ -408,6 +478,9 @@ def analyse_stop(case: dict, base: dict, new: dict) -> dict:
     elif latest != stopped or not isinstance(base_version, int) or not latest > base_version:
         problems.append(f"latestVersion {latest!r} passt nicht zur gestoppten Version {stopped!r} (gezeigte Fassung "
                         f"{base_version!r})")
+    if new_result.get("state") != STOPPED_STATE:
+        failures.append(f"Zustand {new_result.get('state')!r} statt {STOPPED_STATE!r}: dass der Stopp gewirkt hat, ist nicht "
+                        "belegt")
     if shown != base_version:
         failures.append(f"Ergebnis zeigt Version {shown!r} statt {base_version!r}")
     if collapse(_text(new_result)) != collapse(_text(base_result)):
@@ -459,10 +532,11 @@ def evaluate(cases: list[dict], root: Path) -> dict:
                     row["change"] = analyse_change(case, base, new)
         rows.append(row)
 
-    with_text = sum(1 for r in rows if r["has_text"])
+    changes = [r for r in rows if r["kind"] != STOP_KIND]
+    with_text = sum(1 for r in changes if r["has_text"])
     if with_text < MIN_WITH_TEXT:
-        problems.append(f"nur {with_text} von {len(rows)} mit Text (mindestens {MIN_WITH_TEXT} von {CASE_COUNT})")
-    changes = [r for r in rows if r["kind"] != "stop"]
+        problems.append(f"nur {with_text} von {len(changes)} echten Nachbesserungen mit Text (mindestens {MIN_WITH_TEXT} von "
+                        f"{CHANGE_COUNT}; der Stopp zählt nicht)")
     usable = [r for r in changes if r["has_text"]]
 
     n1 = _sub([r for r in changes if r["kind"] == "local"])
@@ -474,6 +548,9 @@ def evaluate(cases: list[dict], root: Path) -> dict:
     for row in (r for r in locals_ if r["has_text"]):
         change = row["change"]
         para, ratio = change["paragraphs"], change["words"]["ratio"]
+        if para["old"] < MIN_LOCAL_PARAGRAPHS:
+            n1["problems"].append(f"{row['case']}: Ausgangstext hat nur {para['old']} Absätze (mindestens {MIN_LOCAL_PARAGRAPHS}), "
+                                  "die Absatzschwelle belegt nichts")
         if para["unchanged"] < para["old"] - MAX_CHANGED_PARAGRAPHS:
             n1["failures"].append(f"{row['case']}: {para['unchanged']} von {para['old']} Absätzen unverändert "
                                   f"(mindestens {para['old'] - MAX_CHANGED_PARAGRAPHS})")
@@ -527,6 +604,10 @@ def evaluate(cases: list[dict], root: Path) -> dict:
         n4["problems"] += [f"{row['case']}: {p}" for p in keep["problems"]]
         n4["failures"] += [f"{row['case']}: offene Stelle der Vorversion fehlt: „{q}“" for q in keep["lost_passages"]]
         n4["failures"] += [f"{row['case']}: Punkt des Schreibers der Vorversion fehlt: „{p}“" for p in keep["lost_points"]]
+        n4["failures"] += [f"{row['case']}: {'Annahme' if e['kind'] == KIND_ASSUMPTION else 'offener Punkt'} aus Version "
+                           f"{e['version']} (earlierOpenPoints der Vorversion) fehlt: „{e['text']}“"
+                           for e in keep["lost_earlier_points"]]
+        n4["failures"] += [f"{row['case']}: Annahme des Schreibers der Vorversion fehlt: „{a}“" for a in keep["lost_assumptions"]]
         n4["failures"] += [f"{row['case']}: Platzhalter nicht in placeholders: {p}" for p in keep["unlisted_placeholders"]]
 
     stops = [r for r in rows if r["kind"] == "stop"]
@@ -563,8 +644,8 @@ def evaluate(cases: list[dict], root: Path) -> dict:
         follow_up.append(FOLLOW_UP["instruction"])
     if verdict == "passed":
         follow_up.append(FOLLOW_UP["passed"])
-    return {"gate": "N", "verdict": verdict, "halt": halt, "problems": problems, "with_text": with_text, "parts": parts,
-            "cases": rows, "follow_up": follow_up}
+    return {"gate": "N", "verdict": verdict, "halt": halt, "problems": problems, "with_text": with_text, "changes": len(changes),
+            "parts": parts, "cases": rows, "follow_up": follow_up}
 
 
 def _print_report(report: dict, echo: Callable[[str], None]) -> None:
@@ -591,7 +672,7 @@ def _print_report(report: dict, echo: Callable[[str], None]) -> None:
         echo(f"nicht auswertbar: {problem}")
     for line in report["follow_up"]:
         echo(line)
-    echo(f"Tor N: {report['verdict']} ({report['with_text']} von {len(report['cases'])} mit Text)")
+    echo(f"Tor N: {report['verdict']} ({report['with_text']} von {report['changes']} echten Nachbesserungen mit Text)")
 
 
 def main(argv: list[str] | None = None, *, connector: Callable[[Path | None], ContractClient] = connect,

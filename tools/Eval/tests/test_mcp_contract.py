@@ -360,6 +360,40 @@ def test_vmcp_is_not_evaluable_without_a_real_long_call(calls, needle):
     assert any(needle in p for p in report["problems"]), report["problems"]
 
 
+def md_call(seq, text, **arguments):
+    return call(seq, "export_order", {"orderId": A, "format": "md", **arguments}, md_export(text))
+
+
+def test_gate_m_fails_when_the_export_without_version_holds_the_old_text():
+    report = mc.evaluate_gate_m(contract_tools(), gate_m_calls(c9=md_call(9, "Text eins")))
+    assert report["verdict"] == "failed"
+    assert report["failures"] == ["export_order md ohne version (#9) weicht vom Text der Version 2 aus get_order_result ab"]
+
+
+def test_gate_m_checks_every_later_export_without_version_also_with_the_default_format():
+    rows = gate_m_calls() + [call(15, "export_order", {"orderId": A}, md_export("Text eins"))]
+    report = mc.evaluate_gate_m(contract_tools(), rows)
+    assert report["verdict"] == "failed"
+    assert any("#15" in f for f in report["failures"])
+
+
+def test_gate_m_md_step_needs_an_export_without_version():
+    report = mc.evaluate_gate_m(contract_tools(), gate_m_calls(c9=md_call(9, "Text eins", version=1)))
+    assert report["verdict"] == "not_evaluable", report["failures"]
+    assert report["steps"]["export_order_md"] == {"found": False}
+    rows = gate_m_calls() + [md_call(15, "Text eins", version=1)]
+    assert mc.evaluate_gate_m(contract_tools(), rows)["verdict"] == "passed"
+
+
+def test_gate_m_export_comparison_forgives_only_line_ends_and_outer_white_space():
+    shown = call(8, "get_order_result", {"orderId": A},
+                 {"orderId": A, "state": "delivered", "text": "Eins\n\nzwei", "version": 2, "latestVersion": 2})
+    rows = gate_m_calls(c8=shown, c9=md_call(9, "Eins\r\n\r\nzwei\r\n"))
+    assert mc.evaluate_gate_m(contract_tools(), rows)["verdict"] == "passed"
+    rows = gate_m_calls(c8=shown, c9=md_call(9, "Eins\n\nzwei und mehr"))
+    assert mc.evaluate_gate_m(contract_tools(), rows)["verdict"] == "failed"
+
+
 def write_lines(path, rows):
     path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
 

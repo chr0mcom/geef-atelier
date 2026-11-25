@@ -11,10 +11,12 @@ The tool never submits, answers, changes or cancels an order and never calls a m
 
 **Gate M** (contract 8, fixed in advance): ``submit_order`` (an order with a question) → ``answer_order`` → ``get_order_status`` →
 ``get_order_result`` → ``revise_order`` → ``get_order_result`` (``version`` 2) → ``export_order`` md and docx → ``list_orders`` →
-``profile`` → ``cancel_order`` (second order): every call without an error, tool list as in 4.4. Not evaluable when the token or
-connection is missing; here also when the transcript or tool list is missing or unreadable, when an answer cannot be read (for
-example cut short in the session file), when the first order never asked a question, when ``cancel_order`` changed nothing, or
-when the client is not Claude Code.
+``profile`` → ``cancel_order`` (second order): every call without an error, tool list as in 4.4. Decision of the client on top:
+the md step is an export **without** ``version``, and every md export of that order without ``version`` after that
+``get_order_result`` holds the same text as its version 2 (after :func:`same_text`), otherwise the gate fails. Not evaluable when
+the token or connection is missing; here also when the transcript or tool list is missing or unreadable, when an answer cannot be
+read (for example cut short in the session file), when the first order never asked a question, when ``cancel_order`` changed
+nothing, or when the client is not Claude Code.
 
 **V-MCP** (contract 3.2, fixed in advance): all ``get_order_status`` calls with ``waitSeconds=50`` take at most 55 s without a
 client or transport error → 50 s stays; an error on a long call or a long call over 55 s → ``Orders:MaxWaitSeconds`` 25 s. Not
@@ -422,6 +424,21 @@ def _decode(value: object) -> bytes | None:
         return None
 
 
+def same_text(left: str, right: str) -> bool:
+    """Equal after dropping a byte order mark, unifying line ends and trimming; nothing else is forgiven."""
+    def normal(text: str) -> str:
+        return text.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n").strip()
+
+    return normal(left) == normal(right)
+
+
+def _is_current_md_export(call: dict) -> bool:
+    """An ``export_order`` as Markdown (also the default format) without a version: it must give what the result shows."""
+    arguments = call.get("arguments") or {}
+    return call.get("tool") == "export_order" and arguments.get("version") is None \
+        and str(arguments.get("format") or "md").lower() == "md"
+
+
 def _export_problem(call: dict) -> str | None:
     response = call.get("response")
     if not isinstance(response, dict):
@@ -525,10 +542,18 @@ def evaluate_gate_m(tools: list[dict] | None, calls: list[dict], legacy: bool = 
     cursor = int(result_2["seq"]) if result_2 else 0
     for fmt in ("md", "docx"):
         export = first("export_order", cursor,
-                       lambda c, f=fmt: for_a(c) and str(arg(c, "format") or "").lower() == f) if cursor else None
+                       lambda c, f=fmt: for_a(c) and str(arg(c, "format") or "").lower() == f
+                       and (f != "md" or arg(c, "version") is None)) if cursor else None
         steps[f"export_order_{fmt}"] = {"found": export is not None}
         if export is not None and (problem := _export_problem(export)):
             failures.append(f"export_order {fmt}: {problem}")
+    if result_2 is not None:
+        for export in (c for c in ok if int(c.get("seq") or 0) > cursor and for_a(c) and _is_current_md_export(c)):
+            response = export.get("response")
+            text = response.get("text") if isinstance(response, dict) else None
+            if isinstance(text, str) and not same_text(text, result_2["response"]["text"]):
+                failures.append(f"export_order md ohne version (#{export.get('seq')}) weicht vom Text der Version "
+                                f"{REVISED_VERSION} aus get_order_result ab")
 
     listed = first("list_orders", cursor) if cursor else None
     steps["list_orders"] = {"found": listed is not None}

@@ -26,11 +26,11 @@ BASE = [para(i) for i in range(1, 9)]
 
 
 def result(order, version, text, *, unbacked=None, points=None, placeholders=None, fact="open_points", latest=None,
-           earlier=None, **extra):
+           earlier=None, assumptions=None, **extra):
     value = {"orderId": order, "state": "delivered_with_open_points", "text": text, "wordCount": rc.count_words(text),
              "version": version, "placeholders": rc.find_placeholders(text) if placeholders is None else placeholders,
              "factCheck": {"state": fact, "filesCompared": False}, "unbackedPassages": unbacked or [],
-             "openPoints": points or [], "writerAssumptions": [], "sourceIssues": []}
+             "openPoints": points or [], "writerAssumptions": assumptions or [], "sourceIssues": []}
     if latest is not None:
         value["latestVersion"] = latest
     if earlier is not None:
@@ -60,16 +60,18 @@ def plan_cases():
         {"case": "tone-friendly", "kind": "tone", "order": O2, "channel": "mcp", "base": "v2", "new": "v3"},
         {"case": "shorter", "kind": "shorter", "order": O3, "channel": "web", "base": "v2", "new": "v3"},
         {"case": "longer", "kind": "longer", "order": O4, "channel": "mcp", "base": "v1", "new": "v2"},
+        {"case": "local-chain", "kind": "local", "order": O1, "channel": "web", "base": "v3", "new": "v4"},
         {"case": "stop", "kind": "stop", "order": O4, "channel": "web", "base": "v2", "new": "after-stop",
          "stopped_version": 3},
     ]
 
 
 def scenario(root, override=None):
-    """A passing data set of 8 synthetic changes; ``override`` replaces single snapshots: key ``(order, label)``."""
+    """A passing data set of 8 synthetic changes and the stop; ``override`` replaces single snapshots: key ``(order, label)``."""
     o1_v1 = BASE[:2] + ["Absatz 3 Der Termin ist am 12. Mai im Gruppenraum"] + BASE[3:]
     o1_v2 = BASE[:2] + ["Absatz 3 Der Termin ist am 5. Mai im Gruppenraum"] + BASE[3:]
     o1_v3 = [p.replace("Wort", "Begriff") if i in (0, 4) else p for i, p in enumerate(o1_v2)]
+    o1_v4 = o1_v3[:5] + [o1_v3[5] + " Bis bald."] + o1_v3[6:]
     o2_v1 = list(BASE)
     o2_v2 = BASE[:4] + [BASE[4] + " Bitte bringt eine Schere mit."] + BASE[5:]
     o2_v3 = [p.replace("Wort", "Ausdruck") for p in o2_v2]
@@ -85,6 +87,9 @@ def scenario(root, override=None):
                                                              "blocking": True}], points=["Uhrzeit fehlt"]),
         (O1, "v3"): result(O1, 3, text_of(o1_v3), unbacked=[{"quote": "Absatz 2 Wort2x0 Wort2x1 Wort2x2", "kind": "not_backed",
                                                              "blocking": True}], points=[],
+                           earlier=[{"version": 2, "text": "Uhrzeit fehlt."}]),
+        (O1, "v4"): result(O1, 4, text_of(o1_v4), unbacked=[{"quote": "Absatz 2 Wort2x0 Wort2x1 Wort2x2", "kind": "not_backed",
+                                                             "blocking": True}],
                            earlier=[{"version": 2, "text": "Uhrzeit fehlt."}]),
         (O2, "v1"): result(O2, 1, text_of(o2_v1), unbacked=[{"quote": "Wort9x1 gibt es nicht", "kind": "not_backed",
                                                              "blocking": True}]),
@@ -161,6 +166,7 @@ def test_passing_scenario(tmp_path):
     report = run(tmp_path)
     assert report["verdict"] == "passed", (report["problems"], {k: (v["failures"], v["problems"]) for k, v in report["parts"].items()})
     assert report["with_text"] == 8
+    assert report["changes"] == 8
     assert not report["halt"]
     assert report["follow_up"] == [rc.FOLLOW_UP["passed"]]
 
@@ -231,7 +237,7 @@ def test_shorter_must_land_between_40_and_85_percent(tmp_path, words, verdict):
 def test_longer_must_land_between_115_and_160_percent(tmp_path):
     report = run(tmp_path, override={(O4, "v2"): rc_result(O4, 2, BASE + [para(i) for i in range(9, 15)]),
                               (O4, "after-stop"): rc_result(O4, 2, BASE + [para(i) for i in range(9, 15)], latest=3,
-                                                            note="Version 3 could not be finished. This is version 2.")})
+                                                            state="stopped", note="Version 3 could not be finished. This is version 2.")})
     assert report["parts"]["N3"]["verdict"] == "failed"
 
 
@@ -252,7 +258,7 @@ def test_failed_change_shows_the_base_version_and_counts_without_text(tmp_path):
 
 
 def test_fewer_than_six_with_text_is_not_evaluable(tmp_path):
-    report = run(tmp_path, override={(O1, "v3"): None, (O2, "v3"): None, (O3, "v3"): None})
+    report = run(tmp_path, override={(O1, "v4"): None, (O2, "v3"): None, (O3, "v3"): None})
     assert report["with_text"] == 5
     assert report["verdict"] == "not_evaluable"
     assert any("nur 5 von 8" in p for p in report["problems"])
@@ -301,31 +307,207 @@ def test_n4_without_open_points_list_is_not_evaluable(tmp_path):
     assert report["parts"]["N4"]["verdict"] == "not_evaluable"
 
 
-def test_source_issues_and_writer_assumptions_are_only_notes(tmp_path):
+def test_source_issues_are_only_notes(tmp_path):
     base = rc_result(O3, 1, BASE, sourceIssues=["Summe falsch"])
-    base["writerAssumptions"] = ["Du-Form"]
     report = run(tmp_path, override={(O3, "v1"): base})
     row = next(r for r in report["cases"] if r["case"] == "local-delete")
-    assert len(row["change"]["keep"]["notes"]) == 2
+    assert len(row["change"]["keep"]["notes"]) == 1
     assert report["parts"]["N4"]["verdict"] == "passed"
+
+
+POINT = "Der Ort ist offen."
+
+
+@pytest.mark.parametrize("v3_fields,verdict", [
+    ({}, "failed"),
+    ({"earlier": [{"version": 1, "text": POINT}]}, "passed"),
+    ({"earlier": [{"version": 1, "text": "ort ist offen", "kind": "openPoint"}]}, "passed"),
+    ({"points": [POINT]}, "passed"),
+    ({"earlier": [{"version": 2, "text": POINT}]}, "failed"),
+    ({"earlier": [{"version": 1, "text": POINT, "kind": "assumption"}]}, "failed"),
+])
+def test_n4_keeps_earlier_open_points_through_the_chain(tmp_path, v3_fields, verdict):
+    """v1 notes a point, v2 carries it as an earlier point of version 1, v3 has to keep it with that version."""
+    data = scenario(tmp_path)
+    o2_v1, o2_v2, o2_v3 = (data[(O2, label)] for label in ("v1", "v2", "v3"))
+    o2_v1["openPoints"] = [POINT]
+    o2_v2["earlierOpenPoints"] = [{"version": 1, "text": POINT}]
+    o2_v3.update({"earlierOpenPoints": v3_fields.get("earlier"), "openPoints": v3_fields.get("points", [])})
+    for label, res in (("v1", o2_v1), ("v2", o2_v2), ("v3", o2_v3)):
+        write(tmp_path, O2, label, res)
+    report = rc.evaluate(plan_cases(), tmp_path)
+    assert report["parts"]["N4"]["verdict"] == verdict, report["parts"]["N4"]
+    assert report["halt"] == (verdict == "failed")
+    if verdict == "failed":
+        assert any(f.startswith("tone-friendly: offener Punkt aus Version 1") for f in report["parts"]["N4"]["failures"])
+
+
+ASSUMPTION = "Die Anmeldefrist ist Freitag."
+
+
+@pytest.mark.parametrize("v2_fields,verdict", [
+    ({}, "failed"),
+    ({"writerAssumptions": [ASSUMPTION]}, "passed"),
+    ({"writerAssumptions": ["Anmeldefrist ist Freitag"]}, "passed"),
+    ({"writerAssumptions": ["Die Anmeldefrist ist Montag."]}, "failed"),
+    ({"earlierOpenPoints": [{"version": 1, "text": ASSUMPTION, "kind": "assumption"}]}, "passed"),
+    ({"earlierOpenPoints": [{"version": 1, "text": ASSUMPTION}]}, "failed"),
+    ({"earlierOpenPoints": [{"version": 2, "text": ASSUMPTION, "kind": "assumption"}]}, "failed"),
+    ({"openPoints": [ASSUMPTION]}, "failed"),
+])
+def test_n4_keeps_writer_assumptions_of_the_base(tmp_path, v2_fields, verdict):
+    base = rc_result(O3, 1, BASE, assumptions=[ASSUMPTION])
+    new = rc_result(O3, 2, BASE[:5] + BASE[6:])
+    new.update(v2_fields)
+    carried_on = rc_result(O3, 3, [para(i, n=6) for i in range(1, 8)], assumptions=new["writerAssumptions"],
+                           earlier=new.get("earlierOpenPoints"), points=new["openPoints"])
+    report = run(tmp_path, override={(O3, "v1"): base, (O3, "v2"): new, (O3, "v3"): carried_on})
+    lost = [f for f in report["parts"]["N4"]["failures"] if f.startswith("local-delete: Annahme des Schreibers")]
+    assert bool(lost) == (verdict == "failed"), report["parts"]["N4"]
+    assert report["parts"]["N4"]["verdict"] == verdict, report["parts"]["N4"]
+
+
+def test_n4_open_point_of_the_base_is_not_kept_as_an_assumption(tmp_path):
+    base = rc_result(O3, 1, BASE, points=[POINT])
+    new = rc_result(O3, 2, BASE[:5] + BASE[6:], earlier=[{"version": 1, "text": POINT, "kind": "assumption"}])
+    report = run(tmp_path, override={(O3, "v1"): base, (O3, "v2"): new})
+    assert any(f.startswith("local-delete: Punkt des Schreibers") for f in report["parts"]["N4"]["failures"])
+
+
+def test_n4_keeps_a_carried_assumption_in_the_next_version(tmp_path):
+    entry = {"version": 1, "text": ASSUMPTION, "kind": "assumption"}
+    base = rc_result(O3, 1, BASE, assumptions=[ASSUMPTION])
+    new = rc_result(O3, 2, BASE[:5] + BASE[6:], earlier=[entry])
+    report = run(tmp_path, override={(O3, "v1"): base, (O3, "v2"): new})
+    assert any(f.startswith("shorter: Annahme aus Version 1") for f in report["parts"]["N4"]["failures"])
+    third = rc_result(O3, 3, [para(i, n=6) for i in range(1, 8)], earlier=[entry])
+    write(tmp_path, O3, "v3", third)
+    assert rc.evaluate(plan_cases(), tmp_path)["parts"]["N4"]["verdict"] == "passed"
+
+
+def clarifier(text):
+    return [{"id": "a1", "text": text, "unsure": False}]
+
+
+@pytest.mark.parametrize("kind,v3_fields,verdict", [
+    ("assumption", {"writerAssumptions": ["Anmeldefrist ist Freitag"]}, "passed"),
+    ("assumption", {"assumptions": clarifier(ASSUMPTION)}, "passed"),
+    ("assumption", {"assumptions": clarifier("Die Anmeldefrist ist Montag.")}, "failed"),
+    ("assumption", {}, "failed"),
+    ("openPoint", {"openPoints": [ASSUMPTION]}, "passed"),
+    ("openPoint", {"writerAssumptions": [ASSUMPTION]}, "failed"),
+    ("openPoint", {"assumptions": clarifier(ASSUMPTION)}, "failed"),
+])
+def test_n4_earlier_entry_repeated_in_its_own_kind_is_kept(tmp_path, kind, v3_fields, verdict):
+    """The product no longer carries an earlier entry that the new version shows again in the same kind."""
+    data = scenario(tmp_path)
+    v2, v3 = data[(O2, "v2")], data[(O2, "v3")]
+    v2["earlierOpenPoints"] = [{"version": 1, "text": ASSUMPTION, "kind": kind}]
+    v3.update(v3_fields)
+    write(tmp_path, O2, "v2", v2)
+    write(tmp_path, O2, "v3", v3)
+    report = rc.evaluate(plan_cases(), tmp_path)
+    assert report["parts"]["N4"]["verdict"] == verdict, report["parts"]["N4"]
+
+
+def test_n4_writer_assumption_of_the_base_shown_by_the_clarifier_is_kept(tmp_path):
+    base = rc_result(O3, 1, BASE, assumptions=[ASSUMPTION])
+    new = rc_result(O3, 2, BASE[:5] + BASE[6:])
+    new["assumptions"] = clarifier("Anmeldefrist ist Freitag")
+    third = rc_result(O3, 3, [para(i, n=6) for i in range(1, 8)])
+    report = run(tmp_path, override={(O3, "v1"): base, (O3, "v2"): new, (O3, "v3"): third})
+    assert report["parts"]["N4"]["verdict"] == "passed", report["parts"]["N4"]
+
+
+@pytest.mark.parametrize("field,value", [
+    ("assumptions", ["nur ein Satz"]),
+    ("writerAssumptions", None),
+    ("earlierOpenPoints", "kaputt"),
+    ("earlierOpenPoints", [{"version": "1", "text": "x"}]),
+    ("earlierOpenPoints", [{"version": 1, "text": "x", "kind": "something"}]),
+])
+def test_n4_with_unreadable_lists_is_not_evaluable(tmp_path, field, value):
+    res = rc_result(O3, 2, BASE[:5] + BASE[6:])
+    res[field] = value
+    report = run(tmp_path, override={(O3, "v2"): res})
+    assert report["parts"]["N4"]["verdict"] == "not_evaluable", report["parts"]["N4"]
+    assert report["verdict"] == "not_evaluable"
+
+
+def test_the_stop_does_not_count_as_a_change_with_text(tmp_path):
+    report = run(tmp_path, override={(O1, "v4"): None, (O2, "v3"): None, (O3, "v3"): None})
+    assert report["parts"]["N5"]["verdict"] == "passed"
+    assert report["with_text"] == 5
+    assert report["verdict"] == "not_evaluable"
+    assert any("nur 5 von 8 echten" in p for p in report["problems"])
+
+
+def test_six_of_eight_real_changes_with_text_plus_the_stop_are_evaluable(tmp_path):
+    o2_v2 = BASE[:4] + [BASE[4] + " Bitte bringt eine Schere mit."] + BASE[5:]
+    report = run(tmp_path, override={(O1, "v4"): None, (O2, "v3"): rc_result(O2, 2, o2_v2)})
+    assert report["with_text"] == 6
+    assert report["problems"] == []
+    assert report["verdict"] == "passed", report["parts"]
+
+
+def test_plan_with_the_stop_as_one_of_eight_is_not_evaluable(tmp_path):
+    cases = [c for c in plan_cases() if c["case"] != "local-chain"]
+    cases[-1]["channel"] = "web"
+    cases[1]["channel"] = "web"
+    scenario(tmp_path)
+    report = rc.evaluate(cases, tmp_path)
+    assert any("8 echte Nachbesserungen" in p for p in report["problems"])
+    assert report["verdict"] == "not_evaluable"
+
+
+def test_channel_of_the_stop_is_free_but_its_order_is_not(tmp_path):
+    cases = plan_cases()
+    cases[-1]["channel"] = "mcp"
+    assert rc.plan_problems(cases) == []
+    cases[-1]["order"] = "55555555-5555-4555-8555-555555555555"
+    assert any("Stopp-Fall gehört zu keinem Auftrag" in p for p in rc.plan_problems(cases))
+
+
+@pytest.mark.parametrize("state", ["failed", "delivered_with_open_points", None])
+def test_n5_needs_the_state_stopped(tmp_path, state):
+    o4_v2 = BASE + [para(9), para(10)]
+    report = run(tmp_path, override={(O4, "after-stop"): rc_result(O4, 2, o4_v2, latest=3, state=state,
+                                                            note="Version 3 could not be finished. This is version 2.")})
+    assert report["parts"]["N5"]["verdict"] == "failed"
+    assert len(report["parts"]["N5"]["failures"]) == 1 and "statt 'stopped'" in report["parts"]["N5"]["failures"][0]
+    assert report["halt"]
+
+
+@pytest.mark.parametrize("count,rewritten,verdict", [(2, 2, "not_evaluable"), (3, 2, "not_evaluable"), (4, 2, "passed")])
+def test_local_case_with_fewer_than_four_paragraphs_is_not_evaluable(tmp_path, count, rewritten, verdict):
+    old = [para(i) for i in range(1, count + 1)]
+    new = [p.replace("Wort", "Neu") if i < rewritten else p for i, p in enumerate(old)]
+    cases = plan_cases()
+    short = next(c for c in cases if c["case"] == "local-chain")
+    short.update(base="short", new="short-new")
+    report = run(tmp_path, cases, override={(O1, "short"): rc_result(O1, 3, old), (O1, "short-new"): rc_result(O1, 4, new)})
+    assert report["parts"]["N1"]["verdict"] == verdict, report["parts"]["N1"]
+    assert report["verdict"] == verdict
+    if verdict == "not_evaluable":
+        assert any(f"nur {count} Absätze" in p for p in report["parts"]["N1"]["problems"])
 
 
 def test_stop_without_sentence_halts(tmp_path):
     o4_v2 = BASE + [para(9), para(10)]
-    report = run(tmp_path, override={(O4, "after-stop"): rc_result(O4, 2, o4_v2, latest=3)})
+    report = run(tmp_path, override={(O4, "after-stop"): rc_result(O4, 2, o4_v2, latest=3, state="stopped")})
     assert report["parts"]["N5"]["verdict"] == "failed"
     assert report["halt"]
 
 
 def test_stop_showing_the_stopped_version_halts(tmp_path):
-    report = run(tmp_path, override={(O4, "after-stop"): rc_result(O4, 3, BASE, latest=3,
+    report = run(tmp_path, override={(O4, "after-stop"): rc_result(O4, 3, BASE, latest=3, state="stopped",
                                                             note="Version 3 could not be finished. This is version 2.")})
     assert any("zeigt Version 3" in f for f in report["parts"]["N5"]["failures"])
 
 
 def test_stop_without_latest_version_is_not_evaluable(tmp_path):
     o4_v2 = BASE + [para(9), para(10)]
-    report = run(tmp_path, override={(O4, "after-stop"): rc_result(O4, 2, o4_v2,
+    report = run(tmp_path, override={(O4, "after-stop"): rc_result(O4, 2, o4_v2, state="stopped",
                                                             note="Version 3 could not be finished. This is version 2.")})
     assert report["parts"]["N5"]["verdict"] == "not_evaluable"
     assert report["verdict"] == "not_evaluable"
@@ -404,7 +586,7 @@ def test_main_evaluate_writes_report_and_returns_zero(tmp_path):
 
 
 def test_main_returns_one_on_halt_and_four_when_not_evaluable(tmp_path):
-    scenario(tmp_path, override={(O4, "after-stop"): rc_result(O4, 2, BASE + [para(9), para(10)], latest=3)})
+    scenario(tmp_path, override={(O4, "after-stop"): rc_result(O4, 2, BASE + [para(9), para(10)], latest=3, state="stopped")})
     plan = tmp_path / "plan.json"
     plan.write_text(json.dumps({"cases": plan_cases()}), encoding="utf-8")
     assert rc.main(["evaluate", "--plan", str(plan), "--out-dir", str(tmp_path)], echo=lambda _: None) == 1
