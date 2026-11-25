@@ -255,7 +255,8 @@ läuft.
 seinem gespeicherten Rohtext stehen (nur Leerraum vereinheitlicht, Groß/Klein zählt, Bereich in UTF-16 wie in .NET). Der
 gespeicherte Bereich darf weder in einem Wort noch in einer Zahl beginnen oder enden (Verstoß `word_cut`): Wortteil sind wie im
 `DossierBuilder` Buchstaben, Ziffern, das weiche Trennzeichen U+00AD und kombinierende Zeichen; außerdem darf keine Grenze eine
-Zahl mit Trenner zerteilen (Ziffer, `.` oder `,`, Ziffer). Liest die
+Zahl mit Trenner zerteilen (Ziffer, `.` oder `,`, Ziffer) und keine Zahl mit Leerzeichen oder Apostroph als Tausendertrenner
+(1–3 Ziffern, Leerzeichen/schmales Leerzeichen/`'`/`’`, genau drei Ziffern: `1 500`, `4'850`). Liest die
 Zeilen von `tools/ResearchEval run` (`--results`) und die Audit-Dateien des Ateliers (`--audit`, Datei oder Verzeichnis, Format
 von `OrderResearchService`). Rückgabe 0 sauber, 1 Verstoß, 2 falscher Aufruf, 4 nichts geprüft.
 
@@ -356,26 +357,37 @@ oder ein Verzeichnis mit `*.json`). Der Bericht enthält Zitate aus Texten und m
 
 ```bash
 cd tools/Eval
-python3 -m geef_eval.research_r2 --results $EVAL_RESEARCH_DIR/r2/antworten --out $EVAL_RESEARCH_DIR/r2/r2-gate.json
+python3 -m geef_eval.research_r2 --results $EVAL_RESEARCH_DIR/r2/antworten --out $EVAL_RESEARCH_DIR/r2/r2-gate.json \
+  [--confirmations $EVAL_RESEARCH_DIR/r2/bestaetigungen.json]
 ```
 
 | Teil | Prüfung |
 |---|---|
 | (a) | **im Code:** jeder Auftrag hat `lookedUp` ungleich `null` und einen Status ungleich `not_needed` und `files_attached` (R2-Aufträge daher ohne Dateien) |
 | (b) | **Handauswertung** (`manual`): 0 Fragen zu recherchierten Themen |
-| (c) | **im Code:** Zahl der `unbackedPassages` mit `kind = not_backed`, deren Zitat eine Zahl oder einen Namen enthält, die oder der in Zitat oder Titel eines `lookedUp`-Eintrags desselben Auftrags vorkommt; bestanden bei ≤ 1 insgesamt, ob blockierend oder nicht |
+| (c) | **im Code und von Hand:** Zahl der `unbackedPassages` mit `kind = not_backed`, die die Recherche deckt; bestanden bei ≤ 1 insgesamt, ob blockierend oder nicht. Im Code zählt eine Stelle, deren Zitat eine Zahl enthält, die in Zitat oder Titel eines `lookedUp`-Eintrags desselben Auftrags vorkommt, in englischen Texten auch ein Name. In deutschen Texten ist eine Stelle, die ohne gemeinsame Zahl nur einen Namen mit einem Eintrag teilt, ein **Fall für die Bestätigungsdatei** |
 | (d) | **Handauswertung** (`manual`): Median `DurationMs` ≤ 60 s (steht nicht in der MCP-Antwort) |
 | (e) | **im Code:** 0 Notizmarker im Text (`<!-- atelier-notes`, Konstante `WriterNotesFormat.StartMarker`, in allen Schreibweisen, die der C#-Code annimmt, und in der entschärften Form) |
 
 Zahl: Ziffernfolge; `.` und `,` zwischen Ziffern werden entfernt (`1.250,50` = `1,250.50` = `125050`), verglichen wird die ganze
-Zahl. Name: großgeschriebenes Wort ab 3 Buchstaben, das nicht am Satzanfang steht (Anfang von Text oder Zeile, nach `.`, `!`,
-`?`; nach Ordnungszahlen und gängigen Abkürzungen wie `Dr.` nicht), verglichen als ganzes Wort mit Groß/Klein. Wo die Stelle im
-Text steht, entscheidet, ob ihr erstes Wort am Satzanfang steht. **Grenze der Regel:** Im Deutschen zählt damit jedes
-Substantiv (auch die Anrede „Sie“/„Ihnen“, wenn es im Eintrag steht). Sie irrt zur strengen Seite; die gezählten Stellen stehen
-mit ihren Treffern im Bericht. Sinngemäße Deckung ohne gleiche Zahl und gleichen Namen erkennt sie nicht.
+Zahl; Datumsangaben zählen über ihre Ziffern. Eine Zahl mit Leerzeichen oder Apostroph vor Dreiergruppen (`1 500`, `4'850`)
+zählt zusammengesetzt und in ihren Teilen (strenge Seite). Name: großgeschriebenes Wort ab 3 Buchstaben, das nicht am Satzanfang
+steht (Anfang von Text oder Zeile, nach `.`, `!`, `?`; nach Ordnungszahlen und gängigen Abkürzungen wie `Dr.` nicht), verglichen
+als ganzes Wort mit Groß/Klein; wo die Stelle im Text steht, entscheidet, ob ihr erstes Wort am Satzanfang steht. Sprache eines
+Textes: Deutsch, außer er enthält mehr englische als deutsche Funktionswörter (feste Listen im Code); im Zweifel also Deutsch und
+damit Handauswertung.
 
-**Nicht auswertbar:** weniger als 4 Aufträge mit Text, ein Auftrag doppelt, ein Auftrag mit Text, dessen Faktenprüfung nicht für
-diesen Text lief (`factCheck.state` weder `checked` noch `open_points`) oder dem `unbackedPassages` fehlt, oder in keinem Auftrag
-ein `lookedUp`-Eintrag. Rückgabe 0: (a), (c), (e) bestanden (**R2 insgesamt erst mit (b) und (d) von Hand**), 1 ein geprüfter
+**Namen im Deutschen von Hand:** Im Deutschen ist jedes Substantiv großgeschrieben, ein gemeinsames großgeschriebenes Wort belegt
+also nichts. Jede solche Stelle steht im Bericht als Fall (`orderId`, `case` = `n<Position in unbackedPassages>`, Zitat, gemeinsame
+Wörter). Eine Person entscheidet je Fall, ob der Eintrag die Stelle deckt, und trägt das in die Bestätigungsdatei ein:
+`{"confirmations": [{"order": "<orderId>", "case": "n2", "quote": "<Zitat wörtlich>", "decision": "covered" | "not_covered"}]}`.
+`covered` zählt für (c), `not_covered` nicht. Solange ein Fall offen ist oder die Datei einen Fehler hat (unbekannter Fall,
+anderer Wortlaut, ungültige Entscheidung, doppelt), ist das Ergebnis `not_evaluable`. Sinngemäße Deckung ohne gemeinsame Zahl und
+ohne gemeinsamen Namen erkennt die Regel nicht.
+
+**Nicht auswertbar:** weniger als 4 Aufträge mit Text, **weniger als 4 Aufträge mit `lookedUp.status = found` und mindestens
+einem Eintrag** (sonst hätte (c) kaum Daten), ein Auftrag doppelt, ein Auftrag mit Text, dessen Faktenprüfung nicht für diesen
+Text lief (`factCheck.state` weder `checked` noch `open_points`) oder dem `unbackedPassages` fehlt, ein offener Fall oder ein
+Fehler der Bestätigungsdatei. Rückgabe 0: (a), (c), (e) bestanden (**R2 insgesamt erst mit (b) und (d) von Hand**), 1 ein geprüfter
 Teil nicht bestanden, 2 falscher Aufruf oder unlesbare Eingabe, 4 nicht auswertbar.
 

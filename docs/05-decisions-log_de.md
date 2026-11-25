@@ -2306,7 +2306,8 @@ Ausschnitt mit Seite und Datum – nicht mehr. Lieber weniger nachschlagen als e
   ausgeschriebene Umlaute), gemeinsame Wortanfänge ab fünf Zeichen, CamelCase- und Buchstabe/Ziffer-Teile
   (`ArztbriefSchmidt`), der Genitiv auf -s (`Wolfs`), Wörter mit unsichtbaren Zeichen (weiches Trennzeichen, Nullbreite – wie im
   `QuoteVerifier` entfernt) und Zahlen ab vier Ziffern oder mit Punkt/Komma zwischen Ziffern, über Schreibweisen hinweg und auch
-  ohne Nachkommanullen (`1.250,00` = `1250`); dazu Links, Adressen und Zugangs- oder Kontodaten (`IntakeContentGuard`). **Sprachregel:**
+  ohne Nachkommanullen (`1.250,00` = `1250`; auch Apostroph und schmales Leerzeichen zwischen Ziffern trennen: `4'850`,
+  `4’850`); dazu Links, Adressen und Zugangs- oder Kontodaten (`IntakeContentGuard`). **Sprachregel:**
   Hat das Profil Freitext oder „Never do this“ und ist die Sprache eines Themas sicher eine andere als die des Auftrags
   (Funktionswörter oder ä/ö/ü/ß nur einer Sprache), wird es zurückgehalten. Die Regel irrt nur zur sicheren Seite; ein
   zurückgehaltenes Thema wird wie vorher angenommen und sichtbar gemeldet. **Bewusste Grenzen:** Übersetzungen ohne
@@ -2315,8 +2316,12 @@ Ausschnitt mit Seite und Datum – nicht mehr. Lieber weniger nachschlagen als e
   Person ihr Profil zwischen Klärung und Start, gilt das Profil des Briefings.
 - **Tavily:** je Thema genau eine Suche (`basic`, drei Treffer, Rohtext an, Tavily-Antwort aus), bis zu vier parallel, 20 s,
   **nie wiederholt**. Verwendet wird nur der Rohtext der Seite, nie Tavilys Ausschnitt oder Antwort. Ein längerer Rohtext wird
-  auf 6.000 Zeichen und dann **auf das letzte sichere Satz- oder Zeilenende zurück** gekürzt (Punkt nach einer Ziffer zählt
-  nicht; ohne Satzende an der letzten Leerstelle, die nicht zwischen Ziffern steht; sonst bleibt die Seite weg). Treffer mit
+  auf 6.000 Zeichen und dann **auf das letzte sichere Satz- oder Zeilenende zurück** gekürzt, **das mindestens die Hälfte
+  erhält** (Prüfrunde 2: Punkt nach einer Ziffer, nach einem einzelnen Buchstaben oder einer bekannten Abkürzung wie `ca.`/`Dr.`/
+  `z.B.` oder vor einem kleingeschriebenen Wort oder einer Ziffer zählt nicht, ebenso wenig ein Zeilenumbruch vor einer klein
+  weitergehenden Zeile; `。！？` beenden einen Satz). Ohne solches Ende an der letzten Leerstelle, die nicht zwischen Ziffern
+  steht, danach hinter dem letzten Komma, Semikolon, Doppelpunkt oder der letzten schließenden Klammer (auch in voller Breite),
+  die nicht zwischen Ziffern stehen; erst ohne all das bleibt die Seite weg. Treffer mit
   Benutzerangaben in der Adresse oder über 500 Zeichen Adresse werden verworfen. Der Atelier-Server ruft keine der Adressen
   selbst ab. **Tagesgrenze:** Jede Suche wird vor dem Start atomar reserviert (Advisory-Lock, `Orders.ResearchAt` = Zeit der
   Reservierung): höchstens 50 Aufträge je UTC-Tag insgesamt und 20 je Konto (`DailyOrderCapPerUser`); abgebrochene Suchen
@@ -2327,7 +2332,9 @@ Ausschnitt mit Seite und Datum – nicht mehr. Lieber weniger nachschlagen als e
   Auftrag, und wählt Ausschnitte aus; eine eigene Aussage des Modells gibt es nicht.
 - **Dossier = wörtliche Ausschnitte** (`DossierBuilder`): Jeder Vorschlag wird im Rohtext gesucht (wortgleich oder nur im
   Leerraum/Anführungszeichen normalisiert, nie näherungsweise); gespeichert wird der Originalausschnitt der Seite mit Lage und
-  SHA-256 des Rohtexts. Ein Eintrag beginnt und endet nie in einem Wort oder einer Zahl (`1,5`, `1.250`). Verworfen und gezählt
+  SHA-256 des Rohtexts. Ein Eintrag beginnt und endet nie in einem Wort oder einer Zahl (`1,5`, `1.250`, seit Prüfrunde 2 auch
+  `1 500`, `4'850`, `1’250’000`: Leerzeichen oder Apostroph zwischen ein bis drei Ziffern und genau drei Ziffern gehören zur
+  Zahl; die unabhängige Nachprüfung `research_verify.py` meldet so einen Schnitt ebenfalls). Verworfen und gezählt
   werden: nicht auf der Seite, zu kurz (unter fünf Wörtern), unsicher (Links, Adressen, Zugangs- oder Kontodaten), doppelt (ein
   späterer, längerer Ausschnitt ersetzt einen früheren, den er enthält), über den Grenzen (drei je Seite, vier je Thema, zwölf
   insgesamt), unbekannte Seite, über 600 Zeichen (nie gekürzt). Ein unsicherer Seitentitel wird durch den Host ersetzt (auch
@@ -2336,7 +2343,8 @@ Ausschnitt mit Seite und Datum – nicht mehr. Lieber weniger nachschlagen als e
   nie an die Nachrechnung der Summen. System-Prompt des Schreibers sowie Prompts, Schemata und Version des Faktenprüfers bleiben
   unverändert (Hash-Tests; Messung V2 bleibt gültig); der Nutzerprompt des Schreibers bekommt nur mit `W1` einen festen Satz
   und zählt `W1` nie als angehängte Datei (ohne Dateien eine eigene Einleitung). Eine Vorgabe aus `W1` blockiert nie. Ein
-  `superseded`-Befund, dessen Materialzitat aus `W1` stammt, blockiert nie, wird nie „your files“ genannt und geht nie als „die
+  `superseded`-Befund, dessen Materialzitat aus `W1` stammt, blockiert nie, verdrängt nie einen anderen Befund an derselben
+  Textstelle (er belegt keinen Bereich; Prüfrunde 2), wird nie „your files“ genannt und geht nie als „die
   Dateien sagen“ in den Korrektursatz; er erscheint als Hinweis mit dem Satz „The pages looked up say otherwise – please check
   which is right.“ (Web: `data-kind="differs-from-looked-up"`, MCP: `kind = differs_from_looked_up` mit `note`), auch aus älteren
   Berichten; Prüfer-Prompt und -Schema bleiben unverändert. Kann die Recherche nicht gespeichert werden, läuft der Text ohne
@@ -2344,11 +2352,15 @@ Ausschnitt mit Seite und Datum – nicht mehr. Lieber weniger nachschlagen als e
   gesucht. Der Bericht führt `W1` mit `lookedUp` (Schema bleibt 2).
 - **Was die Person sieht:** Abschnitt „Looked up“ mit Ausschnitt, Seite (nur `http`/`https` als Link, `nofollow noopener
   noreferrer`) und Datum unter der festen Unterzeile „… not that it is true or that the text uses it“; jeder Nicht-Erfolg
-  (nichts gefunden, Fehler, Tagesgrenze, zurückgehalten, Dateien angehängt) als fester Satz; die Faktenzeile nennt „the pages
+  (nichts gefunden, Fehler, Tagesgrenze, zurückgehalten, Dateien angehängt) als fester Satz; der Satz zu zurückgehaltenen Themen
+  nennt keine Ursache („… so that no private details could reach a search engine.“), weil ein Thema auch wegen eines Links, von
+  Kontodaten oder seiner Sprache zurückgehalten wird und nur die Zahl gespeichert ist; die Faktenzeile nennt „the pages
   looked up“ nur, wenn sie im Material waren; Herkunft im Widerspruchssatz „the pages looked up“, nie „your file“, und die
   Überschrift der Materialprobleme lautet dann ohne „in what you gave“. Web und MCP (`get_order_result.lookedUp`, als Inhalt
-  fremder Seiten gekennzeichnet) sagen dasselbe; der Fehlersatz erscheint nur einmal. Der Ergebnistext (`MarkdownView`) zeigt
-  Links nur für `http`, `https` und `mailto` und lädt keine Bilder (nur ihr Alternativtext bleibt).
+  fremder Seiten gekennzeichnet) sagen dasselbe; der Fehlersatz erscheint nur einmal. Der Ergebnistext (`MarkdownView`) nutzt
+  die eine Markdown-Konfiguration des Ateliers (`SafeMarkdown`, aus `main`): Erweiterungen einzeln gewählt, ohne „Generic
+  Attributes“, `{…}` wird also nie ein Attribut (kein `on*`, `style`, `ping`) und ein Platzhalter wie `{Name}` bleibt sichtbar;
+  eingebettetes HTML aus; Links nur für `http`, `https` und `mailto`; keine Bilder geladen (nur ihr Alternativtext bleibt).
 - **Stoppt nie den Lauf:** Jeder Fehler endet als Status mit der Warnung `grounding.research_failed`; der Text entsteht ohne
   `W1`. Der Grounding-Schritt wartet höchstens 120 s, auch wenn der Dienst nicht von selbst abbricht. Eine Logzeile je Recherche nennt nur Zahlen, Status, Dauer und Modell,
   nie Themen, Ausschnitte oder Adressen. Rohtexte werden nicht gespeichert; nur zur Abnahme schreibt `Research:AuditDirectory`
@@ -2388,15 +2400,28 @@ kein Zweitweg über die Websuche der CLI (liefert keinen Rohtext); kein eigener 
     (Herkunftsregel und `DossierBuilder` werden nachgerechnet, die neue Nachprüfung mit Wortgrenzen ergibt 0 Verstöße):
     **weiter bestanden**, alle Zahlen gleich. Die Verdichtung sah in VR das etwas längere Seitenende; ihre Eingabe ist also nicht
     bitgleich mit dem Betrieb, das Ergebnis bleibt aussagekräftig, weil keine Fundstelle aus dem weggeschnittenen Teil stammt.
+  - **Folge der Prüfrunde 2 für VR (nur gelesen, offline auf den gespeicherten Dateien, kein neuer Aufruf):** 101 der 120
+    gespeicherten Seiten sind 6.000 UTF-16-Einheiten lang, also gekürzt (die 92 oben zählten Codepunkte). Der Schnitt mit
+    Halbe-Länge-Regel, ohne Abkürzungen als Satzende und mit Komma-Rückfall nimmt ihnen 0 bis 470 Zeichen am Ende (Median 45 in
+    der Entwicklungsmenge, 57 in der zurückgehaltenen; das unbekannte Zeichen nach Stelle 6.000 einmal als Buchstabe, einmal als
+    Leerzeichen angenommen); **keine Seite wird leer oder behält weniger als die Hälfte, keiner der 95 Einträge liegt im
+    weggeschnittenen Teil.** `research_verify.py` mit der Tausendertrenner-Regel: 0 Verstöße über 95 Einträge. `ResearchEval
+    evaluate` mit dem neuen Code (gespeicherter und neu erzeugter Prüfbericht): **weiter bestanden**, alle Zahlen gleich.
 
 **Tore nach dem Deploy (vorab festgelegt, keines besteht ohne Daten):**
 - **R2 (Abnahme-Messung):** 5 Aufträge des Messnutzers **ohne Dateien** (3 Web, 2 MCP), Faktenprüfer `Report`: (a) jeder mit
   Recherche-Status ≠ `NotNeeded` und ≠ `FilesAttached`, (b) 0 Fragen zu recherchierten Themen, (c) höchstens 1
   `unsupported`-Befund gegen eine von `W1` gedeckte Stelle, (d) Median ≤ 60 s, (e) 0 Notizmarker im Text. (a), (c) und (e)
-  prüft `tools/Eval/geef_eval/research_r2.py` auf den gespeicherten `get_order_result`-Antworten (c: Zitat enthält eine Zahl
-  oder einen großgeschriebenen Namen, die/der in einem Eintrag steht – irrt zur strengen Seite, im Deutschen zählt jedes
-  Substantiv); (b) und (d) sind **Handauswertung**. Nicht auswertbar unter 4 Aufträgen mit Text. Nicht bestanden bei (c) →
-  Recherche bleibt für alle `Off`.
+  prüft `tools/Eval/geef_eval/research_r2.py` auf den gespeicherten `get_order_result`-Antworten; (b) und (d) sind
+  **Handauswertung**. **(c), vorab festgelegt (Prüfrunde 2):** Eine gemeldete Stelle zählt im Code, wenn ihr Zitat eine Zahl
+  enthält (Datumsangaben über ihre Ziffern; `1 500`/`4'850` zusammengesetzt und in Teilen), die in Zitat oder Titel eines
+  Eintrags desselben Auftrags steht; in einem englischen Text auch ein großgeschriebener Name, der nicht am Satzanfang steht. Im
+  Deutschen ist jedes Substantiv großgeschrieben; eine Stelle, die nur ein großgeschriebenes Wort mit einem Eintrag teilt, ist
+  deshalb ein **Fall für eine Person**: Sie steht im Bericht und wird in einer Bestätigungsdatei entschieden (`--confirmations`,
+  je Fall `covered` oder `not_covered`, Zitat wörtlich wiederholt); `covered` zählt. Solange ein Fall offen ist oder die Datei
+  einen Fehler hat, ist R2 `not_evaluable`. Ein Text gilt als deutsch, außer er enthält mehr englische als deutsche
+  Funktionswörter. **Nicht auswertbar** unter 4 Aufträgen mit Text und unter **4 von 5 Aufträgen mit Status `found` und
+  mindestens einem Eintrag**. Nicht bestanden bei (c) → Recherche bleibt für alle `Off`.
 - **R3 (Wirkung, `tools/Eval/geef_eval/research_pairs.py`):** 8 unberührte Entwicklungsaufträge ohne Dateien, zwei Messnutzer
   (mit/ohne Recherche, beide ohne Faktenprüfung), blinder Sonnet-Juror, je Auftrag zwei Aufrufarten in je zwei vertauschten
   Durchgängen: `rank` **ohne** nachgeschlagene Ausschnitte entscheidet Siege und Platzhalter; `facts` mit den nummerierten

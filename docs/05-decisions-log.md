@@ -2214,7 +2214,8 @@ with page and date – nothing more. Better to look up less than to show somethi
   word from the profile that is not exactly so in the person's request is withheld; so are variants (accents, ß/ss, spelled-out
   umlauts), shared word starts of five characters or more, camel-case and letter/digit parts (`ArztbriefSchmidt`), the genitive
   in -s (`Wolfs`), words with invisible characters (soft hyphen, zero width – removed as in `QuoteVerifier`) and numbers of four
-  digits or more or with a dot or comma between digits, across spellings and without closing zeros (`1.250,00` = `1250`); and
+  digits or more or with a dot or comma between digits, across spellings and without closing zeros (`1.250,00` = `1250`; an
+  apostrophe or a thin space between digits is a separator as well: `4'850`, `4’850`); and
   links, addresses, access or account data (`IntakeContentGuard`). **Language rule:** when the profile has free text or "Never do
   this" and the language of a topic is certainly another than the order's (function words or ä/ö/ü/ß of one language only), the
   topic is withheld. The rule only errs on the safe side; a withheld topic is assumed as before and reported visibly. **Known
@@ -2224,8 +2225,11 @@ with page and date – nothing more. Better to look up less than to show somethi
   counts.
 - **Tavily:** exactly one search per topic (`basic`, three results, raw content on, Tavily answer off), up to four in parallel,
   20 s, **never repeated**. Only the raw page text is used, never Tavily's snippet or answer. A longer raw text is cut to 6,000
-  characters and then **back to the last safe sentence or line end** (a dot after a digit does not count; without a sentence
-  end at the last space not between digits; otherwise the page is left out). Results with user information in the address or an
+  characters and then **back to the last safe sentence or line end that keeps at least half of them** (review round 2: a dot
+  after a digit, after a single letter or a known abbreviation such as `ca.`/`Dr.`/`z.B.`, or before a word in lower case or a
+  digit does not count, nor does a line break before a line that goes on in lower case; `。！？` end a sentence). Without such an
+  end the cut falls on the last space not between digits, then after the last comma, semicolon, colon or closing bracket not
+  between digits (full-width ones too); only without any of these is the page left out. Results with user information in the address or an
   address over 500 characters are dropped. The Atelier server fetches none of the addresses itself. **Daily limit:** every search
   is reserved atomically before it starts (advisory lock, `Orders.ResearchAt` = time of the reservation): at most 50 orders per
   UTC day in total and 20 per account (`DailyOrderCapPerUser`); cancelled searches count, a repeat of the same order counts once.
@@ -2236,7 +2240,9 @@ with page and date – nothing more. Better to look up less than to show somethi
   picks passages; there is no statement of the model's own.
 - **Dossier = verbatim passages** (`DossierBuilder`): every proposal is searched in the raw text (identical, or normalised only
   in white space and quotes, never approximate); stored is the page's original passage with its position and the SHA-256 of
-  the raw text. An entry never starts or ends inside a word or a number (`1,5`, `1.250`). Dropped and counted: not on the page,
+  the raw text. An entry never starts or ends inside a word or a number (`1,5`, `1.250`, and since review round 2 also `1 500`,
+  `4'850`, `1’250’000`: a space or an apostrophe between one to three digits and exactly three digits belongs to the number; the
+  independent check `research_verify.py` flags such a cut as well). Dropped and counted: not on the page,
   too short (fewer than five words), unsafe (links, addresses, access or account data), duplicate (a later, longer passage
   replaces an earlier one it holds), over the limits (three per page, four per topic, twelve in total), unknown page, over 600
   characters (never cut). An unsafe page title is replaced by the host (also when old entries are shown or rendered); in the
@@ -2245,7 +2251,8 @@ with page and date – nothing more. Better to look up less than to show somethi
   recalculation of totals. The writer's system prompt and the fact check's prompts, schemas and version stay unchanged (hash
   tests; measurement V2 stays valid); the writer's user prompt gets one fixed sentence only when `W1` is there and never counts
   `W1` as an attached file (without files it gets an introduction of its own). An instruction from `W1` never blocks. A
-  `superseded` finding whose material quote comes from `W1` never blocks, is never called "your files" and never goes into the
+  `superseded` finding whose material quote comes from `W1` never blocks, never takes the place of another finding at the same
+  passage of the text (it occupies no range; review round 2), is never called "your files" and never goes into the
   correction as "the files say"; it is shown as a hint with the sentence "The pages looked up say otherwise – please check which
   is right." (web: `data-kind="differs-from-looked-up"`, MCP: `kind = differs_from_looked_up` with `note`), also from earlier
   reports; prompt and schema of the fact check stay unchanged. Research that cannot be stored is not used: the text is written
@@ -2253,11 +2260,15 @@ with page and date – nothing more. Better to look up less than to show somethi
   searched. The report lists `W1` with `lookedUp` (schema stays 2).
 - **What the person sees:** section "Looked up" with passage, page (a link only for `http`/`https`, `nofollow noopener
   noreferrer`) and date under the fixed subline "… not that it is true or that the text uses it"; every non-success (nothing
-  found, failure, daily limit, withheld, files attached) as a fixed sentence; the fact line names "the pages looked up" only when
+  found, failure, daily limit, withheld, files attached) as a fixed sentence; the sentence about withheld topics names no cause
+  ("… so that no private details could reach a search engine."), because a topic is also withheld for a link, account details or
+  its language and only the number is stored; the fact line names "the pages looked up" only when
   they were in the material; origin in a contradiction is "the pages looked up", never "your file", and the heading of the
   problems in the material then drops "in what you gave". Web and MCP (`get_order_result.lookedUp`, marked as content of other
-  websites) say the same; the failure sentence appears only once. The result text (`MarkdownView`) shows links only for
-  `http`, `https` and `mailto` and loads no images (only their alternative text stays).
+  websites) say the same; the failure sentence appears only once. The result text (`MarkdownView`) uses the one Markdown
+  configuration of the Atelier (`SafeMarkdown`, from `main`): extensions listed one by one without generic attributes, so
+  `{…}` never becomes an attribute (no `on*`, `style`, `ping`) and a placeholder such as `{Name}` stays visible; raw HTML off;
+  links only for `http`, `https` and `mailto`; no images loaded (only their alternative text stays).
 - **Never stops the run:** every failure ends as a status with the warning `grounding.research_failed`; the text is written
   without `W1`. The grounding step waits at most 120 s, also when the service does not stop on its own. One log line per research names counts, status, duration and model,
   never topics, passages or addresses. Raw texts are not stored; only for the acceptance `Research:AuditDirectory` (empty by
@@ -2295,14 +2306,27 @@ passage picker measures VR again (`tools/ResearchEval`); the fact check prompt s
     `DossierBuilder` recomputed, the new check with word boundaries finds 0 violations): **still passed**, all figures equal. The
     passage picker saw the slightly longer page end in VR, so its input is not bit-identical with production; the result stays
     meaningful because no passage came from the removed part.
+  - **Effect of review round 2 on VR (read only, offline on the stored files, no new call):** 101 of the 120 stored pages
+    are 6,000 UTF-16 units long, i.e. were cut (the 92 above counted code points). The cut with the half-length rule, without
+    abbreviations as sentence ends and with the comma fallback takes 0 to 470 characters off their end (median 45 in the
+    development set, 57 in the held-out set; the unknown character after position 6,000 assumed both as a letter and as a
+    space); **no page becomes empty or keeps less than half, none of the 95 entries lies in the removed part.**
+    `research_verify.py` with the thousands-separator rule: 0 violations over 95 entries. `ResearchEval evaluate` with the new
+    code (stored and new verification report): **still passed**, all figures equal.
 
 **Gates after the deploy (fixed beforehand, none passes without data):**
 - **R2 (acceptance measurement):** 5 orders of the measuring user **without files** (3 web, 2 MCP), fact check `Report`: (a) each
   with research status ≠ `NotNeeded` and ≠ `FilesAttached`, (b) 0 questions about researched topics, (c) at most 1
   `unsupported` finding against a spot covered by `W1`, (d) median ≤ 60 s, (e) 0 note markers in the text. (a), (c) and (e) are
-  checked by `tools/Eval/geef_eval/research_r2.py` on the stored `get_order_result` answers (c: the quote holds a number or a
-  capitalised name found in an entry – errs on the strict side, in German every noun counts); (b) and (d) are **evaluated by
-  hand**. Not evaluable below 4 orders with text. Failing (c) → research stays `Off` for everybody.
+  checked by `tools/Eval/geef_eval/research_r2.py` on the stored `get_order_result` answers; (b) and (d) are **evaluated by
+  hand**. **(c), fixed beforehand (review round 2):** a flagged passage counts in code when its quote holds a number (dates by
+  their digits; `1 500`/`4'850` joined and in parts) found in the quote or title of an entry of the same order; in an English
+  text also a capitalised name not at a sentence start. In a German text every noun is capitalised, so a passage that shares
+  only a capitalised word with an entry is a **case for a person**: listed in the report and decided in a confirmation file
+  (`--confirmations`, per case `covered` or `not_covered`, the quote repeated word for word); `covered` counts. While a case is
+  open or the file has a defect, R2 is `not_evaluable`. A text is German unless it holds more English than German function
+  words. **Not evaluable** below 4 orders with text and below **4 of 5 orders with status `found` and at least one entry**.
+  Failing (c) → research stays `Off` for everybody.
 - **R3 (effect, `tools/Eval/geef_eval/research_pairs.py`):** 8 untouched development orders without files, two measuring users
   (with/without research, both without fact check), blind Sonnet juror, per order two kinds of calls in two swapped passes each:
   `rank` **without** passages decides wins and placeholders; `facts` with the numbered passages of arm on lists invented facts
