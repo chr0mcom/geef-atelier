@@ -3,6 +3,7 @@
 <div class="md @Class">@_rendered</div>
 
 @code {
+    /// <summary>The Markdown to show; links only for http, https and mailto, no images loaded (<see cref="MarkdownSafety"/>).</summary>
     [Parameter, EditorRequired] public string? Markdown { get; set; }
     [Parameter] public string? Class { get; set; }
 
@@ -16,5 +17,5 @@
     MarkupString _rendered;
 
     protected override void OnParametersSet() =>
-        _rendered = (MarkupString)Markdig.Markdown.ToHtml(Markdown ?? string.Empty, Pipeline);
+        _rendered = (MarkupString)Markdown.ToSafeHtml(Pipeline);
 }
