@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using AngleSharp.Dom;
 using Bunit;
 using Bunit.TestDoubles;
@@ -15,15 +14,11 @@ namespace Geef.Atelier.Tests.Web.Components.Orders;
 
 /// <summary>
 /// The texts of the clarification are for people who know nothing about how Atelier works inside: none of them
-/// contains a word of <see cref="JargonBlocklist.Terms"/>. The questions themselves come from the model and the gate
-/// and are removed before the check.
+/// contains a word of <see cref="JargonBlocklist.Terms"/>. The check is <see cref="JargonBlocklist.Contains"/>, the same one the
+/// gate uses. The questions themselves come from the model and the gate and are removed before the check.
 /// </summary>
 public sealed class ClarifyWordingTests : TestContext
 {
-    private static readonly Regex Blocked = new(
-        @"(?<![\p{L}\p{N}])(" + string.Join('|', JargonBlocklist.Terms.Select(Regex.Escape)) + @")(?![\p{L}\p{N}])",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-
     private readonly FakeOrderService _orders = new();
 
     public ClarifyWordingTests()
@@ -39,9 +34,10 @@ public sealed class ClarifyWordingTests : TestContext
     [Fact]
     public void TheMatcherFindsBlockedWords()
     {
-        Assert.Matches(Blocked, "Pick a template");
-        Assert.Matches(Blocked, "Wer ist die Zielgruppe?");
-        Assert.DoesNotMatch(Blocked, "Start writing");
+        Assert.True(JargonBlocklist.Contains("Pick a template"));
+        Assert.True(JargonBlocklist.Contains("Wer ist die Zielgruppe?"));
+        Assert.True(JargonBlocklist.Contains("Start writing\nNone of the prompts"));
+        Assert.False(JargonBlocklist.Contains("Start writing"));
     }
 
     [Fact]
@@ -80,8 +76,8 @@ public sealed class ClarifyWordingTests : TestContext
     private static void AssertPlain(INodeList nodes)
     {
         var text = string.Join("\n", nodes.Select(VisibleText));
-        var hit = Blocked.Match(text);
-        Assert.False(hit.Success, $"Insider word “{hit.Value}” in: {text}");
+        var hits = JargonBlocklist.Terms.Where(t => text.Contains(t, StringComparison.OrdinalIgnoreCase)).ToList();
+        Assert.False(JargonBlocklist.Contains(text), $"Insider word ({string.Join(", ", hits)}) in: {text}");
     }
 
     private static string VisibleText(INode node)
