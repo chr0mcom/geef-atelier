@@ -10,6 +10,7 @@ using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Orders;
 using Geef.Atelier.Core.Persistence.Sources;
+using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Infrastructure.Pipeline.Direct;
 using Geef.Atelier.Infrastructure.Pipeline.Direct.FactCheck;
 using Geef.Atelier.Core.Domain.FactCheck;
@@ -26,7 +27,8 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Assembly;
 /// up on the web), <see cref="DirectWriterExecutor"/>
 /// and <see cref="DeterministicChecksReviewer"/>, at most two passes. After the run it stores the report
 /// (<c>Runs.ReportJson</c>). Accepts runs of the code-only template <see cref="SystemCrew.DirectTemplateName"/>, also
-/// with a seed draft.
+/// with a seed draft. A run that changes an earlier version (<see cref="RunEntity.RevisionHint"/>) passes the change to the grounding
+/// step, and its report also reads the report of that version (<see cref="RunEntity.ParentRunId"/>, <see cref="EarlierVersionAsync"/>).
 /// </summary>
 internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOptions, IOptions<DirectOptions> directOptions) : IPipelineAssembler
 {
@@ -49,7 +51,7 @@ internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOpti
 
         var grounding = new OrderGroundingStep(
             context.Run.Id, orderId, context.Run.SeedDraftText, context.ScopeFactory, _sourceOptions, context.WarningSink,
-            context.LoggerFactory.CreateLogger<OrderGroundingStep>(), context.Run.OrderVersion);
+            context.LoggerFactory.CreateLogger<OrderGroundingStep>(), context.Run.OrderVersion, revisionHint: context.Run.RevisionHint);
         var writer = new DirectWriterExecutor(
             context.Snapshot.Executor, context.LlmClientResolver, context.PricingCatalog, context.CostAccumulator,
             context.WarningSink, context.Run.Id, context.LoggerFactory.CreateLogger<DirectWriterExecutor>(),
@@ -108,10 +110,41 @@ internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOpti
         }
 
         var delivered = result.ToDeliveredOutcome();
-        var facts = Facts(context, result, delivered.Iteration);
+        var facts = Facts(context, result, delivered.Iteration) with { Revision = await EarlierVersionAsync(context, ct) };
         var report = DirectReportBuilder.Build(constraints, text, usages, delivered.Iteration, result.TotalIterations, evidence, facts);
 
         await context.RunServices.GetRequiredService<IRunReportWriter>().WriteAsync(context.Run.Id, RunReportJson.Serialize(report), ct);
+    }
+
+    /// <summary>
+    /// The earlier version a run changes, read from the run of <see cref="RunEntity.ParentRunId"/>; <c>null</c> for a run that is no
+    /// change (<see cref="RunEntity.RevisionHint"/> blank). A run that is gone gives no version; a stored report that cannot be read, or
+    /// a failed read, is marked <see cref="DirectRevision.ReportUnreadable"/> and never ends the run.
+    /// </summary>
+    internal static async Task<DirectRevision?> EarlierVersionAsync(PipelineAssemblyContext context, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(context.Run.RevisionHint))
+            return null;
+        if (context.Run.ParentRunId is not { } parentId)
+            return new DirectRevision(null, null);
+
+        try
+        {
+            await using var scope = context.ScopeFactory.CreateAsyncScope();
+            if (await scope.ServiceProvider.GetRequiredService<IRunRepository>().GetByIdAsync(parentId, ct) is not { } parent)
+                return new DirectRevision(null, null);
+            if (string.IsNullOrWhiteSpace(parent.ReportJson))
+                return new DirectRevision(parent.OrderVersion, null);
+            return RunReportJson.TryParse(parent.ReportJson) is { } report
+                ? new DirectRevision(parent.OrderVersion, report)
+                : new DirectRevision(parent.OrderVersion, null, ReportUnreadable: true);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            context.LoggerFactory.CreateLogger<DirectPipelineAssembler>().LogError(
+                "Run {RunId}: the report of the earlier version could not be read: {Error}", context.Run.Id, ex.ToRedactedLogText());
+            return new DirectRevision(null, null, ReportUnreadable: true);
+        }
     }
 
     /// <summary>
