@@ -1989,7 +1989,7 @@ beschriftet hat (Entwicklungsmenge, zurückgehaltene Menge und eine zweite Menge
 
 ## D-071 — Etappe 2: Klären vor dem Lauf (2026-11-25)
 
-**Status:** umgesetzt (Paket Q2 der Etappe 2: Klärer, Gate, Worker, Messwerkzeug), ausgeliefert mit
+**Status:** umgesetzt (Etappe 2: Klärer, Gate, Worker, Messwerkzeug, Auftragsdienst, Profil, Web und MCP), ausgeliefert mit
 `Orders:IntakeMode = Shadow`. `On` folgt erst in einem eigenen Commit, wenn die Abnahmetore aus Korpusmessung
 und Schattenbetrieb erfüllt sind.
 
@@ -2026,3 +2026,40 @@ Fragen mit Klickantworten oder gar keine; jeder Fehler startet den Auftrag mit d
 dafür zu lange. Ein einzelner strukturierter Aufruf mit kleinem Modell und ein Gate im Code machen die Fragenregel
 überprüfbar, statt sie dem Modell zu überlassen. Annehmen ist billiger als eine überflüssige Frage, deshalb ist das
 Gate streng und jede Verwerfung nur eine Annahme mehr.
+
+**Weitere Entscheidungen der Etappe 2 (Auftragsdienst, Profil, Web, MCP; Review-Runde 1).**
+
+- **Brief** (`Intake:BriefMode`, Standard `AppendAnswers`): Der Wortlaut steht vorn und unverändert; nach einem Trenner
+  folgen die Antworten der Person (Antworten des KI-Clients sind gekennzeichnet, auch die Antwort auf die
+  Überarbeitungs-Vermutung), die korrigierten Annahmen, die angezeigten und nicht korrigierten Annahmen als unverbindliche
+  Vorgaben („use them unless the request or the files say otherwise“) und das Profil. Annahmen werden nie zu einer
+  blockierenden Prüfung. `PreparedBrief` ergänzt, was der Klärer verstanden hat. Ein Start vor dem Lesen des Auftrags hat
+  keine Annahmen, und kein Text behauptet welche.
+- **Antworten** (`answer_order`, Zustand `needs_input`): Herkunft `user` oder `client`, nie `memory`. Eine Frage wird mit
+  einer Option, eigenen Worten (nur wo erlaubt) oder „entscheide du“ beantwortet, nie mit zweien davon; eine leere
+  Antwort wird abgelehnt; Annahmen nehmen nur eine Korrektur als Freitext. Offene Fragen gelten als „entscheide du“. Ohne
+  jede Antwort gilt der Auftrag als übersprungen, auch bei „Just start“ im Web, das alles mitschickt, was die Person schon
+  getan hat. Antworten, die nach dem Start ankommen, werden als nicht verwendet gemeldet.
+- **Überarbeitung:** Eine Datei wird nur dann zum Ausgangstext, wenn der Auftrag ein Überarbeitungsverb enthält **und**
+  der Klärer eine Überarbeitung erkennt, auch bei genau einer Datei. Ohne Urteil des Klärers (Fehler, aus, Überspringen
+  während des Lesens) ändert keine Datei ihre Rolle, wie in Etappe 1. Die Vermutung steht in Web und MCP
+  (`revisionFile`) und kann abgelehnt werden.
+- **Profil** (`UserProfiles`, Migration `Step49Intake`): eine Zeile je Benutzername, nur von der Person selbst unter
+  „About me“ bearbeitet. Es geht an den Klärer sowie an Schreiber und Prüfer. Es wird mit dem Konto gelöscht, bei einer
+  Umbenennung mitgezogen, und ein neues Konto findet nie ein altes Profil vor. Laufseiten und `get_run_details` zeigen den
+  Profilblock nur dem Besitzer; alle anderen, auch Admins, sehen stattdessen einen Hinweis.
+- **Externe Dienste:** Web-, Nachrichten- und Wissenschaftssuche, die Embeddings der Learning-Suche, die Anfrageformung
+  und die Verfeinerung bekommen nur den Wortlaut des Auftrags, nie Antworten, Annahmen oder das Profil. Auch
+  Learning-Zusammenfassungen nutzen nur den Wortlaut.
+- **Gate, Inhalt:** Fragen, Optionen, Annahmen und die Zusammenfassung mit Links oder Adressen sowie Fragen und Annahmen,
+  die nach Zugangsdaten oder Zahlungsgeheimnissen fragen, werden verworfen; verworfen wird nur die Frage, nie der
+  Auftrag. Die MCP-Hinweise beschreiben diese Felder als aus Auftrag und Dateien abgeleitet, nicht als Anweisungen.
+- **Robustheit:** Ein scheiternder Claim gibt seinen Platz zurück; ein Auftrag, der im Sammellauf dauerhaft scheitert,
+  wird 15 Minuten zurückgestellt, statt die anderen zu blockieren; „Stop“ versucht es erneut (bis zu dreimal), wenn sich
+  der Zustand im selben Moment geändert hat.
+- **Start des MCP-Hosts:** Der Host startet nicht, wenn ein Werkzeugparameter weder Client-Wert noch SDK-Wert noch
+  registrierter Dienst ist (`McpToolBindingCheck`), damit eine fehlende Registrierung nie einen Dienst vom Client füllen
+  lässt.
+- **Bekannte Grenze für Etappe 7:** `IMemoryResolution` wendet „Gedächtnis vor Frage“ nur auf die vier Profilthemen an
+  (Sprache, Absender, Signatur, Anrede); `IntakeRecord.FromMemory` wird gespeichert, aber nicht gelesen. Gemerkte
+  Antworten aus Etappe 7 brauchen beides erweitert.

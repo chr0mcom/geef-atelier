@@ -1913,7 +1913,7 @@ are far off.
 
 ## D-071 — Stage 2: clarify before the run (2026-11-25)
 
-**Status:** implemented (package Q2 of stage 2: clarifier, gate, worker, measuring tool), shipped with
+**Status:** implemented (stage 2: clarifier, gate, worker, measuring tool, order service, profile, web and MCP), shipped with
 `Orders:IntakeMode = Shadow`. `On` follows in a separate commit once the acceptance gates of the corpus measurement and
 the shadow operation are met.
 
@@ -1948,3 +1948,36 @@ or none; every failure starts the order with the request as written.
 too long doing so. One structured call on a small model plus a gate in code make the question rule verifiable instead of
 leaving it to the model. Assuming is cheaper than a needless question, so the gate is strict and every rejection only
 costs one more assumption.
+
+**Further decisions of stage 2 (order service, profile, web, MCP; review round 1).**
+
+- **Briefing** (`Intake:BriefMode`, default `AppendAnswers`): the request stays first and unchanged; after a separator
+  follow the answers of the person (answers of the AI client are marked as such, also the answer to the revision guess),
+  the corrected assumptions, the assumptions shown and not corrected as non-binding defaults ("use them unless the request
+  or the files say otherwise") and the profile. Assumptions never become a blocking check. `PreparedBrief` adds what the
+  clarifier understood. A start before the request was read has no assumptions and no text claims any.
+- **Answers** (`answer_order`, state `needs_input`): origin `user` or `client`, never `memory`; a question is answered by
+  an option, own words (only where allowed) or "decide for me", never by two of them; an empty answer is refused;
+  assumptions take only a correction as free text. Open questions count as "decide for me". Without any answer the order
+  counts as skipped, also for "Just start" in the web, which sends everything the person already did. Answers that arrive
+  after the start are reported as not used.
+- **Revision:** a file becomes the text to revise only when the request uses a revision verb **and** the clarifier judges
+  it a revision, also with a single file. Without the clarifier's judgement (failure, off, skip while reading) no file
+  changes its role, as in stage 1. The guess is shown in web and MCP (`revisionFile`) and can be turned down.
+- **Profile** (`UserProfiles`, migration `Step49Intake`): one row per user name, edited only by the person under "About me".
+  It goes to the clarifier and to writer and reviewers. It is deleted with the account, moved when the account is
+  renamed, and a new account never finds an old profile. Run pages and `get_run_details` show the profile block only to
+  the owner; everybody else, administrators included, sees a note instead.
+- **Outside services:** web, news and academic search, the embeddings of the learning search, the query shaping and the
+  refinement get only the request as written, never answers, assumptions or the profile. Learning summaries also use only
+  the request.
+- **Gate, content:** questions, options, assumptions and the summary that contain links or addresses, and questions or
+  assumptions that ask for access data or payment secrets, are dropped; only the question is dropped, never the order.
+  The MCP instructions describe these fields as derived from request and files, not as instructions.
+- **Robustness:** a failing claim gives its slot back; one order that keeps failing in a sweep is left out for 15 minutes
+  instead of blocking the others; "Stop" tries again (up to three times) when the state changed at the same moment.
+- **MCP host start:** the host does not start when a tool parameter is neither a client value, an SDK value nor a
+  registered service (`McpToolBindingCheck`), so that a missing registration can never let a client fill a service.
+- **Known limit for stage 7:** `IMemoryResolution` applies "memory before question" only to the four profile topics
+  (language, sender, signature, form of address); `IntakeRecord.FromMemory` is stored but not read. Remembered answers of
+  stage 7 need both to be extended.
