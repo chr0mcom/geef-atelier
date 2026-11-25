@@ -75,9 +75,11 @@ internal static class DirectWriterPrompts
     /// totals in the files that do not add up (<paramref name="arithmetic"/>) before the instruction to write. Without
     /// <paramref name="writerNotes"/> the prompt is the one of stage 2 and <paramref name="arithmetic"/> is not used. When the bundle
     /// holds the passages looked up on the web, <see cref="LookedUpNote"/> follows the note about the files; otherwise the prompt is unchanged.
+    /// With <paramref name="revision"/> (a run that changes an earlier version) and a <paramref name="seed"/>, <see cref="RevisionInstruction"/>
+    /// takes the place of <see cref="SeedInstruction"/>; everything else stays the same.
     /// </summary>
     public static string FirstPass(string brief, OrderSourceBundle bundle, bool documentMode, string? seed, bool writerNotes = false,
-        IReadOnlyList<SourceArithmeticIssue>? arithmetic = null)
+        IReadOnlyList<SourceArithmeticIssue>? arithmetic = null, bool revision = false)
     {
         var sb = new StringBuilder();
         AppendRequest(sb, brief);
@@ -87,15 +89,16 @@ internal static class DirectWriterPrompts
 
         if (seed is not null)
         {
+            var instruction = revision ? RevisionInstruction : SeedInstruction;
             sb.Append('\n');
             if (documentMode)
             {
-                sb.Append(SeedInstruction).Append('\n');
+                sb.Append(instruction).Append('\n');
             }
             else
             {
                 sb.Append("The text to revise:\n<<<TEXT\n").Append(DefuseMarker(WriterNotesFormat.Defuse(seed), "TEXT>>>")).Append("\nTEXT>>>\n\n");
-                sb.Append(SeedInstruction.Replace("the text in draft.md", "this text", StringComparison.Ordinal)).Append('\n');
+                sb.Append(instruction.Replace("the text in draft.md", "this text", StringComparison.Ordinal)).Append('\n');
             }
         }
 
