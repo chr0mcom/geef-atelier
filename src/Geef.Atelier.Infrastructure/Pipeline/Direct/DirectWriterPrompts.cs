@@ -69,7 +69,8 @@ internal static class DirectWriterPrompts
     /// <summary>
     /// User prompt of the first pass; with <paramref name="writerNotes"/> it asks for the notes block after the text and names the
     /// totals in the files that do not add up (<paramref name="arithmetic"/>) before the instruction to write. Without
-    /// <paramref name="writerNotes"/> the prompt is the one of stage 2 and <paramref name="arithmetic"/> is not used.
+    /// <paramref name="writerNotes"/> the prompt is the one of stage 2 and <paramref name="arithmetic"/> is not used. When the bundle
+    /// holds the passages looked up on the web, <see cref="LookedUpNote"/> follows the note about the files; otherwise the prompt is unchanged.
     /// </summary>
     public static string FirstPass(string brief, OrderSourceBundle bundle, bool documentMode, string? seed, bool writerNotes = false,
         IReadOnlyList<SourceArithmeticIssue>? arithmetic = null)
@@ -77,6 +78,8 @@ internal static class DirectWriterPrompts
         var sb = new StringBuilder();
         AppendRequest(sb, brief);
         sb.Append(SourcesNote(bundle, documentMode));
+        if (bundle.Sources.Any(s => s.LookedUp))
+            sb.Append(LookedUpNote).Append('\n');
 
         if (seed is not null)
         {
