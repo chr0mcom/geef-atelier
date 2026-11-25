@@ -46,11 +46,15 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
     private readonly WebApplicationFactory<Program> _factory;
     private readonly OrchestratorGate _gate;
     private readonly string _keyDirectory;
+    private readonly string _connectionString;
+    private readonly string _serverConnectionString;
 
     private AtelierEndToEndHost(
         WebApplicationFactory<Program> factory,
         OrchestratorGate gate,
         string keyDirectory,
+        string connectionString,
+        string serverConnectionString,
         LlmTrafficRecorder llm,
         ScriptedLlmEndpoint script,
         FakeTavilyEndpoint tavily,
@@ -59,6 +63,8 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
         _factory = factory;
         _gate = gate;
         _keyDirectory = keyDirectory;
+        _connectionString = connectionString;
+        _serverConnectionString = serverConnectionString;
         Llm = llm;
         Script = script;
         Tavily = tavily;
@@ -162,7 +168,7 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
             });
         });
 
-        var host = new AtelierEndToEndHost(factory, gate, keyDirectory, llm, script, tavily, external);
+        var host = new AtelierEndToEndHost(factory, gate, keyDirectory, connectionString, postgres.ConnectionString, llm, script, tavily, external);
         await host.EnsureMigratedAsync();
         return host;
     }
@@ -253,10 +259,16 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
         return doc.RootElement.Clone();
     }
 
+    /// <summary>
+    /// Stops the application, then closes the pooled connections of its database and drops it. Npgsql keeps idle connections
+    /// of every connection string for minutes; with one database per host the shared container would otherwise run out of
+    /// connections (<c>53300: too many clients</c>) in a long end-to-end collection.
+    /// </summary>
     public async ValueTask DisposeAsync()
     {
         _gate.Release();
         await _factory.DisposeAsync();
+        await DropDatabaseAsync();
         try
         {
             Directory.Delete(_keyDirectory, recursive: true);
@@ -279,6 +291,24 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
             .ToList();
         return dataLines.LastOrDefault()
                ?? throw new InvalidOperationException($"No JSON-RPC payload in MCP response: {raw}");
+    }
+
+    private async Task DropDatabaseAsync()
+    {
+        await using (var connection = new NpgsqlConnection(_connectionString))
+            NpgsqlConnection.ClearPool(connection);
+
+        var databaseName = new NpgsqlConnectionStringBuilder(_connectionString).Database;
+        try
+        {
+            await using var server = new NpgsqlConnection(_serverConnectionString);
+            await server.OpenAsync();
+            await using var command = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{databaseName}\" WITH (FORCE)", server);
+            await command.ExecuteNonQueryAsync();
+        }
+        catch (NpgsqlException)
+        {
+        }
     }
 
     private async Task EnsureMigratedAsync()
