@@ -1,18 +1,18 @@
 using Geef.Atelier.Application.OAuth;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Persistence;
-using Geef.Atelier.Core.Persistence.Profiles;
 
 namespace Geef.Atelier.Application.Auth;
 
 /// <summary>
-/// Manages accounts. The "About me" profile hangs on the user name, so it goes with the account: it is deleted with the
-/// account, moved on a rename, and a new account never finds an old profile under its name.
+/// Manages accounts. The "About me" profile hangs on the user name, so it goes with the account (see <see cref="IAccountStore"/>).
+/// The tokens of an account are revoked before anything else changes, so a failure later never leaves a deactivated, renamed or
+/// deleted account with working tokens.
 /// </summary>
 internal sealed class UserAdminService(
     IAtelierUserRepository users,
     IOAuthService oauthService,
-    IUserProfileRepository profiles) : IUserAdminService
+    IAccountStore accounts) : IUserAdminService
 {
     public Task<IReadOnlyList<AtelierUser>> GetAllUsersAsync(CancellationToken ct)
         => users.GetAllAsync(ct);
@@ -33,8 +33,7 @@ internal sealed class UserAdminService(
             CreatedAt: DateTimeOffset.UtcNow,
             UpdatedAt: DateTimeOffset.UtcNow);
 
-        await profiles.DeleteAsync(username, ct);
-        await users.AddAsync(user, ct);
+        await accounts.AddAsync(user, ct);
         return user;
     }
 
@@ -57,13 +56,11 @@ internal sealed class UserAdminService(
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
-        await users.UpdateAsync(updated, ct);
-        if (!string.Equals(existing.Username, username, StringComparison.Ordinal))
-            await MoveProfileAsync(existing.Username, username, ct);
-
-        if (!isActive && existing.IsActive)
+        var renamed = !string.Equals(existing.Username, username, StringComparison.Ordinal);
+        if (renamed || (!isActive && existing.IsActive))
             await oauthService.RevokeAllUserTokensAsync(existing.Username, ct);
 
+        await accounts.UpdateAsync(updated, existing.Username, ct);
         return updated;
     }
 
@@ -73,17 +70,6 @@ internal sealed class UserAdminService(
             ?? throw new InvalidOperationException($"User '{userId}' not found.");
 
         await oauthService.RevokeAllUserTokensAsync(existing.Username, ct);
-        await users.DeleteAsync(userId, ct);
-        await profiles.DeleteAsync(existing.Username, ct);
-    }
-
-    private async Task MoveProfileAsync(string from, string to, CancellationToken ct)
-    {
-        var profile = await profiles.GetAsync(from, ct);
-        await profiles.DeleteAsync(to, ct);
-        if (profile is null)
-            return;
-        await profiles.UpsertAsync(profile with { Username = to }, ct);
-        await profiles.DeleteAsync(from, ct);
+        await accounts.DeleteAsync(existing, ct);
     }
 }

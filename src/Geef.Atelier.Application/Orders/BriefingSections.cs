@@ -10,7 +10,10 @@ public static class BriefingSections
     /// <summary>Separator between the request and the blocks the composer adds.</summary>
     public const string Separator = "\n\n---\n";
 
-    /// <summary>Line shown instead of the profile block to someone who is not the owner of the order.</summary>
+    /// <summary>Heading that starts the profile block.</summary>
+    public const string ProfileHeading = IntakeBriefComposer.ProfileHeading;
+
+    /// <summary>Line shown instead of the profile block to someone who is not the owner of the order, and after the account of the owner is gone.</summary>
     public const string ProfileHiddenNote = "(The writer also got the About me details of the person who ordered this text. They are hidden here.)";
 
     private static readonly string[] BlockStarts =
