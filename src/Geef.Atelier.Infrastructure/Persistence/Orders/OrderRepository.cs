@@ -389,6 +389,12 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
         }
     }
 
+    public Task<bool> TrySetResearchAsync(Guid orderId, string researchJson, DateTimeOffset at, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
+    public Task<int> CountResearchSinceAsync(DateTimeOffset since, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
     public async Task<IReadOnlyList<Guid>> ListUnansweredAsync(DateTimeOffset askedBefore, int limit, CancellationToken ct = default)
     {
         if (limit <= 0)

@@ -93,4 +93,10 @@ public interface IOrderRepository
 
     /// <summary>NeedsInput orders whose questions were asked before <paramref name="askedBefore"/>, oldest first.</summary>
     Task<IReadOnlyList<Guid>> ListUnansweredAsync(DateTimeOffset askedBefore, int limit, CancellationToken ct = default);
+
+    /// <summary>Stores the research of the order with <paramref name="at"/> only while the order has none; false when research was already stored.</summary>
+    Task<bool> TrySetResearchAsync(Guid orderId, string researchJson, DateTimeOffset at, CancellationToken ct = default);
+
+    /// <summary>Number of orders whose research was stored at or after <paramref name="since"/>.</summary>
+    Task<int> CountResearchSinceAsync(DateTimeOffset since, CancellationToken ct = default);
 }

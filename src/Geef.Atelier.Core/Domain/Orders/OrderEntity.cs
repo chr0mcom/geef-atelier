@@ -36,6 +36,12 @@ public sealed record OrderEntity
 
     /// <summary>When the questions were answered, skipped or the order started on its own.</summary>
     public DateTimeOffset? AnsweredAt { get; init; }
+
+    /// <summary>The research of the order (<c>OrderResearch</c> as JSON), set once by the first run that did research.</summary>
+    public string? ResearchJson { get; init; }
+
+    /// <summary>When <see cref="ResearchJson"/> was set; counts toward the daily limit of the research.</summary>
+    public DateTimeOffset? ResearchAt { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }
 }

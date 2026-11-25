@@ -59,6 +59,21 @@ internal sealed class InMemoryOrderRepository : IOrderRepository
     public Task<bool> TrySaveQuestionsAsync(Guid orderId, string clarifyJson, DateTimeOffset at, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<bool> TryStartWithRunAsync(OrderStart start, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<IReadOnlyList<Guid>> ListUnansweredAsync(DateTimeOffset askedBefore, int limit, CancellationToken ct = default) => throw new NotImplementedException();
+
+    public Task<bool> TrySetResearchAsync(Guid orderId, string researchJson, DateTimeOffset at, CancellationToken ct = default)
+    {
+        while (_orders.TryGetValue(orderId, out var order))
+        {
+            if (order.ResearchJson is not null)
+                return Task.FromResult(false);
+            if (_orders.TryUpdate(orderId, order with { ResearchJson = researchJson, ResearchAt = at }, order))
+                return Task.FromResult(true);
+        }
+        return Task.FromResult(false);
+    }
+
+    public Task<int> CountResearchSinceAsync(DateTimeOffset since, CancellationToken ct = default) =>
+        Task.FromResult(_orders.Values.Count(o => o.ResearchAt is { } at && at >= since));
 }
 
 /// <summary>Sources, order links and run usages in memory; only the members the direct path uses are implemented.</summary>

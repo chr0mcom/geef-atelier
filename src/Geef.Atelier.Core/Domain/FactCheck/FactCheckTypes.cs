@@ -15,11 +15,14 @@ public enum FactFindingKind { Unsupported = 0, Instruction = 1, Superseded = 2, 
 /// <summary>Where an instruction stands in the material; decided from the passage found, never by the model.</summary>
 public enum InstructionOrigin { Stated = 0, Answered = 1, Memory = 2, Client = 3 }
 
-/// <summary>Parts of the material.</summary>
-public enum MaterialPart { Request = 0, PersonAnswers = 1, AssistantAnswers = 2, Profile = 3, Files = 4 }
+/// <summary>Parts of the material; <see cref="LookedUp"/> is the research of the order (source <c>W1</c>).</summary>
+public enum MaterialPart { Request = 0, PersonAnswers = 1, AssistantAnswers = 2, Profile = 3, Files = 4, LookedUp = 5 }
 
-/// <summary>A file of the material; <see cref="Id"/> is <c>S1…</c>, or <c>S0</c> for the text to revise.</summary>
-public sealed record FactSource(string Id, string FileName, string Text);
+/// <summary>
+/// A file of the material; <see cref="Id"/> is <c>S1…</c>, or <c>S0</c> for the text to revise. <see cref="LookedUp"/> marks the
+/// passages looked up on the web (<c>W1</c>), which are not a file of the person.
+/// </summary>
+public sealed record FactSource(string Id, string FileName, string Text, bool LookedUp = false);
 
 /// <summary>Everything the text may rely on. Assumptions and the writer's notes are deliberately not part of it.</summary>
 public sealed record FactMaterial(string Request, IReadOnlyList<string> PersonAnswers, IReadOnlyList<string> AssistantAnswers, string? Profile,

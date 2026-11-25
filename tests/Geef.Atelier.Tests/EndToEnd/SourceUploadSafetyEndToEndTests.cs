@@ -112,5 +112,11 @@ public sealed class SourceUploadSafetyEndToEndTests(PostgresFixture postgres)
 
         public Task<IReadOnlyList<Guid>> ListUnansweredAsync(DateTimeOffset askedBefore, int limit, CancellationToken ct = default) =>
             inner.ListUnansweredAsync(askedBefore, limit, ct);
+
+        public Task<bool> TrySetResearchAsync(Guid orderId, string researchJson, DateTimeOffset at, CancellationToken ct = default) =>
+            inner.TrySetResearchAsync(orderId, researchJson, at, ct);
+
+        public Task<int> CountResearchSinceAsync(DateTimeOffset since, CancellationToken ct = default) =>
+            inner.CountResearchSinceAsync(since, ct);
     }
 }

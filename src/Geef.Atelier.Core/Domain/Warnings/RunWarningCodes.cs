@@ -53,6 +53,9 @@ public static class RunWarningCodes
 
     /// <summary>The block with the writer's assumptions could not be read (<see cref="WriterNotesWarningMessages.Unreadable"/>).</summary>
     public const string WriterNotesUnreadable = "writer.notes_unreadable";
+
+    /// <summary>Looking things up on the web failed; the text was written without it (message <c>OrderResearchLines.Failed</c>).</summary>
+    public const string ResearchFailed = "grounding.research_failed";
 }
 
 /// <summary>Plain English messages of the warnings about the writer's notes.</summary>
