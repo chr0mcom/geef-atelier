@@ -87,7 +87,17 @@ public static class OrderStateResolver
     /// <see cref="RunEntity.FinalText"/>; <c>null</c> when no run has a text. While a newer version is written, or after it could not
     /// be finished, the version before stays shown.
     /// </summary>
-    public static RunEntity? SelectShownRun(IReadOnlyList<RunEntity> runsOfOrder) => throw new NotImplementedException();
+    public static RunEntity? SelectShownRun(IReadOnlyList<RunEntity> runsOfOrder)
+    {
+        ArgumentNullException.ThrowIfNull(runsOfOrder);
+
+        return runsOfOrder
+            .Where(r => r.Kind == RunKind.Standard && !string.IsNullOrWhiteSpace(r.FinalText))
+            .OrderByDescending(r => r.OrderVersion ?? 0)
+            .ThenByDescending(r => r.CreatedAt)
+            .ThenByDescending(r => r.Id)
+            .FirstOrDefault();
+    }
 
     /// <summary>
     /// Extracts the parts of <paramref name="run"/> that the resolver needs; a text exists when <see cref="RunEntity.FinalText"/>

@@ -9,6 +9,24 @@ public static class RevisionLines
     /// <summary>Answer while changing a text is switched off for the person.</summary>
     public const string NotAvailable = "Changing a text is not available yet.";
 
+    /// <summary>Refusal of a change without the person's words and without a quick button.</summary>
+    public const string NoChangeGiven = "Please write what should change or choose one of the buttons.";
+
+    /// <summary>Refusal of a change that is too long: <c>{0}</c> its characters, <c>{1}</c> the limit.</summary>
+    public const string TooLongFormat = "Your change is too long ({0:N0} characters, the limit is {1:N0}). Please shorten it.";
+
+    /// <summary>Refusal when the order has the most versions: <c>{0}</c> is that number.</summary>
+    public const string TooManyVersionsFormat = "This order already has {0} versions, the most one order can have. Please start a new order for further changes.";
+
+    /// <summary>Refusal when the order has no text yet that could be changed.</summary>
+    public const string NothingToChange = "There is no text to change yet.";
+
+    /// <summary>Refusal for a stopped order.</summary>
+    public const string Stopped = "This order was stopped, so its text cannot be changed.";
+
+    /// <summary>Refusal for an order that does not exist or belongs to someone else.</summary>
+    public const string NotFound = "This order was not found.";
+
     /// <summary>Shown with the earlier version while the new one is written: <c>{0}</c> is the shown version.</summary>
     public const string StillWritingFormat = "A new version is being written. Version {0} stays here until it is ready.";
 

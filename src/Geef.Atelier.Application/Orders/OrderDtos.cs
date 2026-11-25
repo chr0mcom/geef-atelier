@@ -153,8 +153,12 @@ public sealed record OrderUnbackedPassage(string Quote, FactFindingKind Kind, st
 /// </summary>
 public sealed record OrderChecksView(IReadOnlyList<string> Checked, IReadOnlyList<string> Changed, string ToReview, string Limits);
 
-/// <summary>An order as listed in "My work".</summary>
-public sealed record OrderListItem(Guid OrderId, string Title, OrderDisplay Display, OrderMode Mode, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, int SourceCount, int? WordCount);
+/// <summary>
+/// An order as listed in "My work". <see cref="WordCount"/> and <see cref="Version"/> are those of the shown version (the newest with a
+/// text); the display state is that of the current run. Without a text the version is that of the current run.
+/// </summary>
+public sealed record OrderListItem(Guid OrderId, string Title, OrderDisplay Display, OrderMode Mode, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, int SourceCount, int? WordCount,
+    int? Version = null);
 
 /// <summary>Raised for problems the person can fix (empty request, too many files, budget exceeded, foreign source). The message is plain English for the UI and MCP.</summary>
 public sealed class OrderSubmissionException(string message) : InvalidOperationException(message);

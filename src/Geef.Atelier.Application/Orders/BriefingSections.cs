@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace Geef.Atelier.Application.Orders;
 
 /// <summary>The briefing split back into what the composer put in; lines keep their order, the answer marks are removed.</summary>
@@ -9,7 +11,7 @@ public sealed record BriefParts(string Request, IReadOnlyList<string> PersonAnsw
 /// of the intake (answers, corrections, assumptions) and the profile follow after <see cref="Separator"/>. Briefings that were
 /// not built this way come back unchanged.
 /// </summary>
-public static class BriefingSections
+public static partial class BriefingSections
 {
     /// <summary>Separator between the request and the blocks the composer adds.</summary>
     public const string Separator = "\n\n---\n";
@@ -29,6 +31,7 @@ public static class BriefingSections
         IntakeBriefComposer.OpenFactsHeadingStart,
         IntakeBriefComposer.ProfileHeading,
         IntakeBriefComposer.UnderstandingLead,
+        RevisionBrief.Heading,
     ];
 
     /// <summary>
@@ -72,7 +75,9 @@ public static class BriefingSections
     /// <summary>
     /// Splits <paramref name="briefing"/> into the request and the blocks of the composer; a briefing not built by the composer is all
     /// request. Answers keep their question (<c>question → answer</c>); of a correction only the person's words remain, because the
-    /// corrected assumption is not something the person said. The summary of a prepared brief belongs to no part.
+    /// corrected assumption is not something the person said. The lines of the block with the changes the person asked for
+    /// (<see cref="RevisionBrief.Heading"/>) are words of the person too, without their version mark. The summary of a prepared brief
+    /// belongs to no part.
     /// </summary>
     public static BriefParts Parse(string briefing)
     {
@@ -122,6 +127,11 @@ public static class BriefingSections
                 case BriefBlock.OpenFacts:
                     open.Add(item.Trim());
                     break;
+                case BriefBlock.Changes:
+                    var change = VersionMark().Replace(item, string.Empty).Trim();
+                    if (change.Length > 0)
+                        person.Add(change);
+                    break;
             }
         }
 
@@ -131,7 +141,7 @@ public static class BriefingSections
     private const string ItemStart = "- ";
     private const string AnswerArrow = " → ";
 
-    private enum BriefBlock { None, Understanding, Answers, Corrections, FormAssumptions, OpenFacts }
+    private enum BriefBlock { None, Understanding, Answers, Corrections, FormAssumptions, OpenFacts, Changes }
 
     private static BriefBlock? BlockOf(string line) => line switch
     {
@@ -141,8 +151,12 @@ public static class BriefingSections
                || line.StartsWith(IntakeBriefComposer.AssumptionsNotShownHeadingStart, StringComparison.Ordinal) => BriefBlock.FormAssumptions,
         _ when line.StartsWith(IntakeBriefComposer.OpenFactsHeadingStart, StringComparison.Ordinal) => BriefBlock.OpenFacts,
         _ when line.StartsWith(IntakeBriefComposer.UnderstandingLead, StringComparison.Ordinal) => BriefBlock.Understanding,
+        _ when line == RevisionBrief.Heading => BriefBlock.Changes,
         _ => null,
     };
+
+    [GeneratedRegex(@"^\(version \d+\) ", RegexOptions.CultureInvariant)]
+    private static partial Regex VersionMark();
 
     /// <summary>The briefing as <paramref name="viewer"/> may see it: complete for the owner, <see cref="WithoutProfile"/> for anyone else (also administrators).</summary>
     public static string ForViewer(string briefing, string? owner, string? viewer) =>

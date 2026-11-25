@@ -42,3 +42,17 @@ public sealed class OrderOptions
     /// <summary>Most versions of one order; no change is started beyond it.</summary>
     public int MaxVersionsPerOrder { get; set; } = 10;
 }
+
+/// <summary>Helpers on <see cref="OrderOptions"/>.</summary>
+public static class OrderOptionsExtensions
+{
+    /// <summary>
+    /// Whether changing a text is on for orders of <paramref name="owner"/>: the entry of <see cref="OrderOptions.ReviseOverrides"/> for
+    /// that user name, otherwise <see cref="OrderOptions.Revise"/>.
+    /// </summary>
+    public static ReviseMode ReviseModeFor(this OrderOptions options, string? owner)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return owner is not null && options.ReviseOverrides is { } overrides && overrides.TryGetValue(owner, out var mode) ? mode : options.Revise;
+    }
+}
