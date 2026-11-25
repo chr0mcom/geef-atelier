@@ -248,3 +248,50 @@ Mail- und Webadressen nutzen die reservierte Endung `.example`. Ablage
 `tests/Geef.Atelier.Tests/FactCheck/Corpus/factcheck-corpus.jsonl` und
 `tests/Geef.Atelier.Tests/Domain/Checks/Corpus/arithmetic-corpus.jsonl`. Die Läufe geschehen nachts und nur, wenn BookForge nicht
 läuft.
+
+## Recherche: Nachprüfung und Paarvergleich R3 (Etappe 4)
+
+**Nachprüfung der Dossier-Einträge** (`geef_eval/research_verify.py`, eigene Implementierung): Jeder Eintrag muss wörtlich in
+seinem gespeicherten Rohtext stehen (nur Leerraum vereinheitlicht, Groß/Klein zählt, Bereich in UTF-16 wie in .NET). Liest die
+Zeilen von `tools/ResearchEval run` (`--results`) und die Audit-Dateien des Ateliers (`--audit`, Datei oder Verzeichnis, Format
+von `OrderResearchService`). Rückgabe 0 sauber, 1 Verstoß, 2 falscher Aufruf, 4 nichts geprüft.
+
+**Paarvergleich R3** (`geef_eval/research_pairs.py`): acht unberührte Entwicklungsaufträge mit Suchthemen laufen je zweimal
+über MCP durch das laufende Atelier, einmal je Messnutzer: Arm `on` (Recherche an), Arm `off` (aus), beide ohne Faktenprüfung.
+Ein blinder Sonnet-Juror vergleicht je Auftrag beide Texte in zwei Durchgängen mit vertauschter Reihenfolge.
+
+```bash
+cd tools/Eval
+C=../../tests/Geef.Atelier.Tests/Intake/Corpus
+SETS="--intake-results $C/results-20261125.jsonl --corpus $C/intake-corpus.jsonl --corpus $C/intake-corpus-second.jsonl"
+python3 -m geef_eval.research_pairs select $SETS
+python3 -m geef_eval.research_pairs run $SETS --out-dir $EVAL_RESEARCH_DIR/r3 --max-submits 16 --codex-lock <sperrdatei>
+python3 -m geef_eval.research_pairs judge $SETS --out-dir $EVAL_RESEARCH_DIR/r3 --max-judge-calls 32 --codex-lock <sperrdatei>
+python3 -m geef_eval.research_pairs evaluate $SETS --out-dir $EVAL_RESEARCH_DIR/r3
+```
+
+| Befehl | Wirkung |
+|---|---|
+| `select` | zeigt die acht Aufträge. Regel: von den 15 nach VR unberührten Entwicklungsaufträgen (`RESERVED_IDS`, gleichlautend im C#-Test `ResearchPagesTests`) die ersten acht nach Kennung **ohne Profil** (über MCP bekommt ein Auftrag kein eigenes Profil; beide Messnutzer schreiben mit ihrem eigenen, gleichen) und **ohne Überarbeitung** (die recherchiert nie). Die Liste steht fest in `PAIR_IDS`; andere Daten ergeben einen Fehler, nie eine andere Menge. |
+| `run` | je Auftrag und Arm genau eine Einreichung (`submit_order`), Fragen werden in beiden Armen gleich übersprungen (`answer_order` mit `skip`; recherchierbare Themen fragt das Atelier nie), dann `get_order_status` bis fertig und `get_order_result`. Welcher Arm zuerst läuft, wechselt je Auftrag. Jeder Versuch zählt und wird nie wiederholt. |
+| `judge` | zwei Urteile je Auftrag mit zwei Texten; der Juror sieht Absicht, Auftrag, Dateien, Themen, die nachgeschlagenen Ausschnitte des Arms `on` (was ein Ausschnitt wörtlich deckt, gilt nicht als erfunden) und die zwei Texte, nie einen Armnamen. Zusatzfrage `platzhalter`: Stellen, an denen eine recherchierbare Tatsache fehlt oder als Platzhalter steht. Ungültiges JSON wird einmal wiederholt und sonst nicht gespeichert. |
+| `evaluate` | Tor R3, schreibt `r3-gate.json`. |
+
+**Tor R3** (Vertrag 8, vorab festgelegt): (a) Siege mit Recherche ≥ Siege ohne + 2 (Sieg = beide Durchgänge gleich),
+(b) Summe `erfunden` mit ≤ ohne, (c) Summe `platzhalter` mit < ohne (je Auftrag Mittel der zwei Durchgänge). **Nicht
+auswertbar**, wenn weniger als 7 von 8 Paaren gültig sind (beide Texte geliefert, beide Urteile gültig), eine Ausgabe die
+Arm-Konfiguration verletzt (Arm `off` mit Recherche, ein Arm mit Faktenprüfung), Arm `on` in keinem Ergebnis eine Recherche
+zeigt, eine Zuordnung vom Seed abweicht oder Ausgaben zu fremden Aufträgen im Verzeichnis liegen.
+
+**Schutz:** `--max-submits` (höchstens 16 je Verzeichnis) und `--max-judge-calls` (höchstens 32 Urteile je Verzeichnis) sind
+Pflicht; vor jeder Einreichung und jedem Urteil hält der Codex-Wächter an (Sperrdatei oder `pgrep -a codex`, Rückgabe 3).
+`run` hält sofort an (Rückgabe 2), wenn eine Ausgabe die Arm-Konfiguration verletzt, und bricht ab (Rückgabe 4), wenn eines
+der ersten drei Paare technisch scheitert oder mehr als ein Paar gescheitert ist. Die MCP-Tokens kommen nur aus
+`EVAL_R3_TOKEN_ON` und `EVAL_R3_TOKEN_OFF` (verschieden, nie geschrieben), die Adresse aus `EVAL_ATELIER_URL`. Das
+Ausgabeverzeichnis muss außerhalb jedes Git-Baums liegen.
+
+**Voraussetzung im Betrieb:** zwei Messnutzer mit leerem oder gleichem Profil; über die Umgebung des Web-Containers
+`Research__ModeOverrides__<nutzer-on>=On`, `Research__ModeOverrides__<nutzer-off>=Off` und für beide
+`Direct__FactCheckModeOverrides__<nutzer>=Off` (Nutzernamen nie ins Repository). Kosten: ≤ 16 Klärer- und ≤ 8 Condenser-Aufrufe,
+16–32 Schreiberaufrufe, ≤ 32 Juror-Urteile (Sonnet), 0 Codex, ≤ 32 Tavily-Suchen.
+

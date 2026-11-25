@@ -83,5 +83,15 @@ Werkzeug und Tests mit demselben Code urteilen; dazu unverändert Wächter, Komm
 `tests/Geef.Atelier.Tests/FactCheck/Evaluation/` und die Korpustypen aus `tools/IntakeEval/CorpusEntry.cs`. Tests:
 `dotnet test --filter "FullyQualifiedName~ResearchEvalTool"` und `python3 -m pytest tools/Eval/tests/test_research_verify.py`.
 
-Die Seitennummerierung `P1…` (Themen in Reihenfolge, je Thema die Treffer, ohne Rohtext entfallen) bildet das Werkzeug selbst
-(`ResearchPages.From`), weil der Recherchedienst sie intern baut; nummeriert F2 anders, ist hier anzugleichen.
+Die Seitennummerierung `P1…` (Themen in Reihenfolge, je Thema die Treffer, ohne Rohtext entfallen, eine Adresse aus einer
+weiteren Suche behält ihre erste Seite) ist eine einzige Funktion (`ResearchPageNumbering`), die Recherchedienst und Werkzeug
+teilen (`ResearchPagesTests`). Dem Herkunftsfilter gibt das Werkzeug wie der Betrieb Text **und Namen** jeder Datei
+(`ResearchCorpus.FileWords`). Beides kam bei der Integration hinzu; die gespeicherten VR-Zeilen bleiben gültig (die
+zurückgehaltene Menge hatte keine doppelte Adresse und keine Datei; `evaluate` rechnet Filter und Builder nach und besteht weiter).
+
+**Abnahme am echten Lauf (Vertrag 9.1):** Die Audit-Dateien des Recherchedienstes (`Research:AuditDirectory`, nur für Nutzer mit
+Override) prüft dieselbe Nachprüfung: `(cd tools/Eval && python3 -m geef_eval.research_verify --audit <verzeichnis> --out <bericht>)`.
+Danach das Verzeichnis löschen.
+
+**R3 (Paarvergleich mit/ohne Recherche)** liegt nicht hier, sondern in `tools/Eval/geef_eval/research_pairs.py` (siehe
+`tools/Eval/README.md`).
