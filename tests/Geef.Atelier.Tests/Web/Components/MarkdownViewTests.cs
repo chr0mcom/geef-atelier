@@ -5,7 +5,7 @@ namespace Geef.Atelier.Tests.Web.Components;
 
 /// <summary>
 /// <see cref="MarkdownView"/> shows text written by a model that may carry words of other web pages: links only for http, https and
-/// mailto, every other link as its plain text, and no image is ever loaded.
+/// mailto, every other link as its plain text, no image is ever loaded, and text in braces never becomes an attribute.
 /// </summary>
 public sealed class MarkdownViewTests : TestContext
 {
@@ -67,6 +67,49 @@ public sealed class MarkdownViewTests : TestContext
         Assert.Empty(cut.FindAll("img"));
         Assert.Equal("https://amt.example/", cut.Find("a").GetAttribute("href"));
         Assert.Equal("logo", cut.Find("a").TextContent);
+    }
+
+    [Theory]
+    [InlineData("Hello **world**{onmouseover=\"alert(1)\"}")]
+    [InlineData("<https://amt.example>{onfocus=alert(1) autofocus=true tabindex=0}")]
+    [InlineData("## Offer {#x onclick=alert(1)}")]
+    [InlineData("[ok](https://amt.example){onclick=\"alert(1)\"}")]
+    public void Braces_never_become_an_event_handler(string markdown)
+    {
+        var cut = Render(markdown);
+
+        foreach (var element in cut.Find(".md").QuerySelectorAll("*"))
+        {
+            Assert.DoesNotContain(element.Attributes, a => a.Name.StartsWith("on", StringComparison.OrdinalIgnoreCase));
+            Assert.Null(element.GetAttribute("autofocus"));
+        }
+    }
+
+    [Theory]
+    [InlineData("*hi*{style=\"background:url(https://evil.example/p?d=1);display:block\"}")]
+    [InlineData("[docs](https://amt.example){style=\"position:fixed;inset:0;opacity:0\"}")]
+    [InlineData("[docs](https://amt.example){ping=\"https://evil.example/p\"}")]
+    public void Braces_never_become_a_style_or_a_ping(string markdown)
+    {
+        var cut = Render(markdown);
+
+        foreach (var element in cut.Find(".md").QuerySelectorAll("*"))
+        {
+            Assert.Null(element.GetAttribute("style"));
+            Assert.Null(element.GetAttribute("ping"));
+        }
+    }
+
+    [Fact]
+    public void A_placeholder_in_braces_is_shown_word_for_word()
+    {
+        var cut = Render("Sehr geehrte Frau {Name}\n\n## Offer {draft}\n\nBetrag: **{Betrag}**");
+
+        var text = cut.Find(".md").TextContent;
+        Assert.Contains("Sehr geehrte Frau {Name}", text, StringComparison.Ordinal);
+        Assert.Contains("Offer {draft}", cut.Find("h2").TextContent, StringComparison.Ordinal);
+        Assert.Equal("{Betrag}", cut.Find("strong").TextContent);
+        Assert.Null(cut.Find("p").GetAttribute("name"));
     }
 
     [Fact]
