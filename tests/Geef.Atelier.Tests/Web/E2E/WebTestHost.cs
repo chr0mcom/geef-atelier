@@ -3,7 +3,9 @@ using System.Net;
 using System.Net.Sockets;
 using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Crew.Knowledge;
+using Geef.Atelier.Application.Crew.TemplateStudio;
 using Geef.Atelier.Application.Orders;
+using Geef.Atelier.Application.Profiles;
 using Geef.Atelier.Application.Sources;
 using Geef.Atelier.Application.OAuth;
 using Geef.Atelier.Application.Runs;
@@ -16,6 +18,7 @@ using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Tests.Llm;
 using Geef.Atelier.Tests.Persistence;
 using Geef.Atelier.Tests.Web.Components.Orders;
+using Geef.Atelier.Tests.Web.Components.Profile;
 using Geef.Atelier.Web.Auth;
 using Geef.Atelier.Web.Components;
 using Geef.Atelier.Web.Endpoints;
@@ -106,6 +109,9 @@ internal sealed class WebTestHost : IAsyncDisposable
         builder.Services.AddScoped<IKnowledgeService, NoOpKnowledgeService>();
         builder.Services.TryAddSingleton<IOrderService, FakeOrderService>();
         builder.Services.TryAddSingleton<ISourceIntakeService, FakeSourceIntakeService>();
+        builder.Services.TryAddSingleton<IProfileService, FakeProfileService>();
+        builder.Services.TryAddScoped<ICurrentUserService, HttpContextCurrentUserService>();
+        builder.Services.TryAddScoped<ITemplateStudioService, UnavailableTemplateStudioService>();
 
         // Orchestrator: fast polling for tests
         builder.Services.Configure<OrchestratorOptions>(o =>
