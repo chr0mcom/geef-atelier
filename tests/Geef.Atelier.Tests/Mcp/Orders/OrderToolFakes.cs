@@ -102,10 +102,14 @@ internal sealed class FakeOrderService : IOrderService
     public List<(Guid OrderId, string? RequestingUsername, string? ViewerUsername)> ResultReads { get; } = [];
     public List<AnswerOrderRequest> Answers { get; } = [];
     public List<(Guid OrderId, string? RequestingUsername)> Skips { get; } = [];
+    public List<ReviseOrderRequest> Revisions { get; } = [];
 
     public Func<AnswerOrderRequest, OrderSubmission>? OnAnswer { get; set; }
     public Func<Guid, OrderSubmission>? OnSkip { get; set; }
     public Exception? AnswerException { get; set; }
+
+    public Func<ReviseOrderRequest, OrderRevision>? OnRevise { get; set; }
+    public Exception? ReviseException { get; set; }
 
     public Func<SubmitOrderRequest, OrderSubmission>? OnSubmit { get; set; }
     public Exception? SubmitException { get; set; }
@@ -189,6 +193,14 @@ internal sealed class FakeOrderService : IOrderService
             throw AnswerException;
         return Task.FromResult(OnAnswer?.Invoke(request)
             ?? new OrderSubmission(request.OrderId, OrderDisplayState.Queued, Guid.NewGuid(), []));
+    }
+
+    public Task<OrderRevision> ReviseAsync(ReviseOrderRequest request, CancellationToken ct = default)
+    {
+        Revisions.Add(request);
+        if (ReviseException is not null)
+            throw ReviseException;
+        return Task.FromResult(OnRevise?.Invoke(request) ?? new OrderRevision(request.OrderId, OrderDisplayState.Queued, Guid.NewGuid(), null, []));
     }
 
     public Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default)

@@ -312,6 +312,9 @@ internal sealed class OrderService(
         return runId is null ? await CurrentWithNoticeAsync(order.Id, ct, given) : await SubmissionAsync(order.Id, [], ct);
     }
 
+    public Task<OrderRevision> ReviseAsync(ReviseOrderRequest request, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
     public async Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default)
     {
         var order = await GetOwnedAsync(orderId, requestingUsername, ct)

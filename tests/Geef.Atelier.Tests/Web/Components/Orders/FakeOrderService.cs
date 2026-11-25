@@ -30,6 +30,9 @@ internal sealed class FakeOrderService : IOrderService
     public ConcurrentQueue<IReadOnlyList<OrderSourceSelection>> Checked { get; } = new();
     public ConcurrentQueue<AnswerOrderRequest> Answered { get; } = new();
     public ConcurrentQueue<(Guid OrderId, string? RequestingUsername)> Skipped { get; } = new();
+    public ConcurrentQueue<ReviseOrderRequest> Revised { get; } = new();
+    public Exception? ReviseError { get; set; }
+    public Func<ReviseOrderRequest, OrderRevision>? OnRevise { get; set; }
     public Exception? AnswerError { get; set; }
     public Exception? SkipError { get; set; }
     public IReadOnlyList<string> StartNotices { get; set; } = [];
@@ -195,6 +198,14 @@ internal sealed class FakeOrderService : IOrderService
         {
             Leave();
         }
+    }
+
+    public Task<OrderRevision> ReviseAsync(ReviseOrderRequest request, CancellationToken ct = default)
+    {
+        Revised.Enqueue(request);
+        if (ReviseError is not null)
+            throw ReviseError;
+        return Task.FromResult(OnRevise?.Invoke(request) ?? new OrderRevision(request.OrderId, OrderDisplayState.Queued, Guid.NewGuid(), null, []));
     }
 
     public async Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default)

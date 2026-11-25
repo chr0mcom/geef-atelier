@@ -63,4 +63,11 @@ public interface IOrderService
     /// with the assumptions. Idempotent like <see cref="AnswerAsync"/>.
     /// </summary>
     Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default);
+
+    /// <summary>
+    /// Starts the next version of the order, seeded with the text of the shown version and the change of the person, without questions
+    /// and always on the direct path. Throws <see cref="OrderRevisionException"/> for a change that cannot be made. While a version is
+    /// still being written nothing changes and the answer carries <see cref="RevisionLines.Busy"/>, so that a repeated call is harmless.
+    /// </summary>
+    Task<OrderRevision> ReviseAsync(ReviseOrderRequest request, CancellationToken ct = default);
 }
