@@ -160,7 +160,15 @@
             }
         }
 
-        <RunWarningsBlock Warnings="Warnings" Status="_view.CurrentRun?.Status" HasText="_view.Display.HasText" />
+        @if (_result is { Text: not null, Version: int shownWarningsVersion, LatestVersion: int newWarningsVersion } && shownWarningsVersion < newWarningsVersion)
+        {
+            <RunWarningsBlock Warnings="ShownVersionWarnings" Status="ShownRunStatus" HasText="true" Version="shownWarningsVersion" />
+            <RunWarningsBlock Warnings="NewVersionWarnings" Status="_view.CurrentRun?.Status" HasText="false" Version="newWarningsVersion" ShownVersion="shownWarningsVersion" />
+        }
+        else
+        {
+            <RunWarningsBlock Warnings="Warnings" Status="_view.CurrentRun?.Status" HasText="_view.Display.HasText" />
+        }
 
         <details class="order-how" data-testid="order-how-made">
             <summary>How it was made</summary>
@@ -259,6 +267,14 @@
 
     IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity> Warnings =>
         (_result is { Warnings.Count: > 0 } r ? r.Warnings : _view?.Warnings ?? []).WithoutShownResearchWarning(ResultShown ? _result!.LookedUp : null);
+
+    IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity> ShownVersionWarnings =>
+        (_result?.Warnings ?? []).WithoutShownResearchWarning(_result?.LookedUp);
+
+    IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity> NewVersionWarnings =>
+        (_view?.Warnings ?? []).WithoutShownResearchWarning(_result?.LookedUp);
+
+    RunStatus ShownRunStatus => _view?.Runs.LastOrDefault(r => r.RunId == _result?.RunId)?.Status ?? RunStatus.Completed;
 
     bool ResultShown => _result is { Text: not null } && _view is not null;
 

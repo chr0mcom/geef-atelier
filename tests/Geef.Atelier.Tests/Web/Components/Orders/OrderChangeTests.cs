@@ -397,4 +397,61 @@ public sealed class OrderChangeTests : TestContext
         Assert.Equal("3 paragraphs without changes", cut.Find("[data-testid='order-diff-same'] summary").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='order-diff-added'], [data-testid='order-diff-removed']"));
     }
+
+    [Theory]
+    [InlineData(OrderDisplayState.Failed, RunStatus.Failed, RunOutcome.Failed)]
+    [InlineData(OrderDisplayState.Stopped, RunStatus.Aborted, RunOutcome.Aborted)]
+    [InlineData(OrderDisplayState.Working, RunStatus.Running, null)]
+    public void Warnings_of_a_new_version_say_which_version_they_concern_and_never_hide_those_of_the_text_shown(
+        OrderDisplayState state, RunStatus status, RunOutcome? outcome)
+    {
+        var runs = new[] { RunView(1, RunStatus.Completed, RunOutcome.Converged, 14), RunView(2, status, outcome, null, Asked, 5) };
+        var newWarning = Warning(runs[1].RunId, "The writer could not be reached.");
+        var shownWarning = Warning(runs[0].RunId, "Some pages of bill.pdf have no text.");
+        var view = _orders.Add("alice", OrderTestData.View(state, hasText: false) with { Runs = runs, CurrentRun = runs[1], Warnings = [newWarning] });
+        var note = OrderTestData.IsFinished(state) ? string.Format(RevisionLines.NotFinishedFormat, 2, 1) : string.Format(RevisionLines.StillWritingFormat, 1);
+        _orders.SetResult(Result(view, 1, 2, FirstText, note) with { Display = view.Display, Warnings = [shownWarning] });
+
+        var cut = Render(view);
+
+        var blocks = cut.FindAll("[data-testid='run-warnings']");
+        Assert.Equal(["1", "2"], blocks.Select(b => b.GetAttribute("data-version")));
+        Assert.Equal("Warnings for version 1", blocks[0].QuerySelector("h2")!.TextContent);
+        Assert.Equal("The result is ready, but not everything went as planned. Please keep this in mind when you use it.", blocks[0].QuerySelector("[data-testid='run-warnings-intro']")!.TextContent);
+        Assert.Equal(["Some pages of bill.pdf have no text."], blocks[0].QuerySelectorAll("[data-testid='run-warning']").Select(w => w.TextContent));
+        Assert.Equal("Warnings for version 2", blocks[1].QuerySelector("h2")!.TextContent);
+        var intro = blocks[1].QuerySelector("[data-testid='run-warnings-intro']")!.TextContent;
+        Assert.Equal(status == RunStatus.Running
+            ? "Version 2 is still being written. So far, not everything went as planned with it. This does not concern the text above (version 1):"
+            : "Version 2 could not be finished. These problems came up while it was written. They do not concern the text above (version 1), which is complete and unchanged:", intro);
+        Assert.Equal(["The writer could not be reached."], blocks[1].QuerySelectorAll("[data-testid='run-warning']").Select(w => w.TextContent));
+        Assert.DoesNotContain("ended without a result", cut.Markup);
+        Assert.Equal(2, cut.FindAll("h2[id^='run-warnings-title']").Select(h => h.Id).Distinct().Count());
+        Assert.Contains("12. Mai", cut.Find("[data-testid='order-result']").TextContent);
+    }
+
+    [Fact]
+    public void A_single_version_keeps_the_warnings_block_as_before()
+    {
+        var view = Delivered();
+        var warning = Warning(view.Runs[0].RunId, "Some pages of bill.pdf have no text.");
+        _orders.SetResult(Result(view, 1, 1, FirstText) with { Warnings = [warning] });
+
+        var cut = Render(view);
+
+        var block = cut.Find("[data-testid='run-warnings']");
+        Assert.Null(block.GetAttribute("data-version"));
+        Assert.Equal("Warnings", block.QuerySelector("h2")!.TextContent);
+        Assert.Equal("run-warnings-title", block.QuerySelector("h2")!.Id);
+    }
+
+    private static Geef.Atelier.Core.Domain.Warnings.RunWarningEntity Warning(Guid runId, string message) => new()
+    {
+        Id = Guid.NewGuid(),
+        RunId = runId,
+        Source = Geef.Atelier.Core.Domain.Warnings.RunWarningSources.Grounding,
+        Code = Geef.Atelier.Core.Domain.Warnings.RunWarningCodes.GroundingProviderSkipped,
+        Message = message,
+        CreatedAt = OrderTestData.Start,
+    };
 }
