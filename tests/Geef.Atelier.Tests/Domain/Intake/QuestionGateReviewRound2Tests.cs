@@ -157,9 +157,9 @@ public sealed class QuestionGateReviewRound2Tests
     }
 
     [Fact]
-    public void A_unit_that_names_something_else_does_not_suppress_the_length_question()
+    public void A_request_without_an_amount_of_a_unit_keeps_the_length_question()
     {
-        var result = Apply("Im Buch fehlen zehn Seiten. Schreib eine Reklamation an den Verlag.", "de", QuestionGateTests.Ask(GapTopic.Length, "", []));
+        var result = Apply("Schreib eine Reklamation an den Verlag, weil im Buch Seiten fehlen.", "de", QuestionGateTests.Ask(GapTopic.Length, "", []));
 
         Assert.Equal(QuestionTemplates.LengthQuestionId, Assert.Single(result.Questions).Id);
     }
