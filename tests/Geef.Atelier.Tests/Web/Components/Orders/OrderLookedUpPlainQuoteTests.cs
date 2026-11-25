@@ -58,6 +58,8 @@ public sealed class OrderLookedUpPlainQuoteTests : TestContext
     [InlineData("- [x] Antrag gestellt\n- [ ] Bescheid erhalten")]
     [InlineData("Siehe [die Tabelle](https://wages.example/a).")]
     [InlineData("2**3 and 4**5 are powers.")]
+    [InlineData("It grows 2**3 times, then 4** more.")]
+    [InlineData("Read **this part**s twice.")]
     [InlineData("a ** b ** c")]
     [InlineData("An odd **mark stays.")]
     [InlineData("C:\\Users\\Name and \\\\server")]
