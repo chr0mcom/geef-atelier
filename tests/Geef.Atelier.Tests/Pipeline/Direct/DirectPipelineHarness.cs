@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Geef.Atelier.Application.Research;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
@@ -28,7 +29,8 @@ namespace Geef.Atelier.Tests.Pipeline.Direct;
 /// Runs the direct path as the orchestrator does (<see cref="DirectPipelineAssembler"/> → SDK runner →
 /// <c>OnRunFinishedAsync</c>) against the recording fake of the end-to-end scaffold. The writer talks to the fake over
 /// the real <see cref="OpenAiCompatibleClient"/>, so the recorded request bodies are the wire format the cli-proxy gets.
-/// Orders, sources, usages and reports live in memory until the persistence of stage 1 is merged.
+/// Orders, sources, usages and reports live in memory until the persistence of stage 1 is merged. The research of stage 4 is
+/// <see cref="Research"/>, which finds nothing unless a test scripts it.
 /// <see cref="DirectOptions"/> start like the end-to-end host (fact check off, no writer notes) and reach both the assembler and
 /// the scope of the grounding step; change them before <see cref="RunAsync"/>.
 /// </summary>
@@ -59,6 +61,7 @@ internal sealed class DirectPipelineHarness
         services.AddSingleton<IGroundingConsultationRepository>(Consultations);
         services.AddSingleton<IRunFactCheckModeStore>(FactCheckModes);
         services.AddSingleton<IOptions<DirectOptions>>(_ => Options.Create(DirectOptions));
+        services.AddSingleton<IOrderResearchService>(Research);
         Services = services.BuildServiceProvider();
     }
 
@@ -75,6 +78,9 @@ internal sealed class DirectPipelineHarness
     public DirectOptions DirectOptions { get; } = new() { FactCheckMode = FactCheckMode.Off, WriterNotes = false };
     public InMemoryRunWarnings Warnings { get; } = new();
 
+    /// <summary>The research of the orders; answers with no research until a test scripts it.</summary>
+    public ScriptedOrderResearchService Research { get; } = new();
+
     /// <summary>Value of <c>x-cli-proxy-failover</c> per LLM request, in order (<c>null</c> = header not sent).</summary>
     public ConcurrentQueue<string?> FailoverHeaders { get; } = new();
 
@@ -89,17 +95,20 @@ internal sealed class DirectPipelineHarness
         Advisors: Array.Empty<AdvisorProfile>(),
         CrewDomain: SystemCrew.DirectTemplate.Domain);
 
-    /// <summary>Creates a run with an order for <paramref name="request"/>.</summary>
-    public (RunEntity Run, Guid OrderId) CreateRun(string request, string? seedDraft = null)
+    /// <summary>
+    /// Creates a run with an order for <paramref name="request"/>; with <paramref name="orderId"/> a further run (version
+    /// <paramref name="orderVersion"/>) of that order.
+    /// </summary>
+    public (RunEntity Run, Guid OrderId) CreateRun(string request, string? seedDraft = null, int orderVersion = 1, Guid? orderId = null)
     {
         var runId = Guid.NewGuid();
-        var order = Orders.Add(request, runId);
+        var id = orderId ?? Orders.Add(request, runId).Id;
         var run = new RunEntity
         {
             Id = runId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Running, BriefingText = request, ConfigJson = "{}",
-            CrewTemplateName = SystemCrew.DirectTemplateName, OrderId = order.Id, OrderVersion = 1, SeedDraftText = seedDraft,
+            CrewTemplateName = SystemCrew.DirectTemplateName, OrderId = id, OrderVersion = orderVersion, SeedDraftText = seedDraft,
         };
-        return (run, order.Id);
+        return (run, id);
     }
 
     public PipelineAssemblyContext Context(RunEntity run) => new(

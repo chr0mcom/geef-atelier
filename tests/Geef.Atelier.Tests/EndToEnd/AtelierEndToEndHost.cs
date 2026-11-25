@@ -94,7 +94,7 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
     /// <paramref name="configureServices"/>, which runs last and may replace registrations for a single test. The switches of stage 3
     /// are off as well (<c>Direct:FactCheckMode=Off</c>, <c>Direct:WriterNotes=false</c>, <c>Intake:ContentAssumptions=Defaults</c>),
     /// so the direct path runs as in stage 2 unless a test configures <c>DirectOptions</c> or
-    /// <c>IntakeOptions</c> there.
+    /// <c>IntakeOptions</c> there. The research of stage 4 is off too (<c>Research:Mode=Off</c>); research tests switch it on there.
     /// </summary>
     public static async Task<AtelierEndToEndHost> StartAsync(PostgresFixture postgres, Action<IServiceCollection>? configureServices = null)
     {
@@ -134,6 +134,7 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
             web.UseSetting("Direct:FactCheckMode", "Off");
             web.UseSetting("Direct:WriterNotes", "false");
             web.UseSetting("Intake:ContentAssumptions", "Defaults");
+            web.UseSetting("Research:Mode", "Off");
 
             web.ConfigureTestServices(services =>
             {

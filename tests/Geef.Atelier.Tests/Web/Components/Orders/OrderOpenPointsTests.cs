@@ -19,7 +19,7 @@ public sealed class OrderOpenPointsTests : TestContext
         "These passages may not be backed by your request or your files. Please check them:",
         "These passages may not follow what you asked for:",
         "This passage uses something your files replace or drop:",
-        "Please check these figures and statements in what you gave:",
+        "Please check these figures and statements:",
         "Still open:",
         "Please also look at this:",
     ];
@@ -65,6 +65,33 @@ public sealed class OrderOpenPointsTests : TestContext
         Assert.Equal(HonestResultData.ClientQuote, client.QuerySelector("q")!.TextContent);
         Assert.Contains(HonestResultData.ClientInstruction, client.TextContent);
         Assert.DoesNotContain(HonestResultData.ClientQuote, cut.Find("[data-testid='order-against-instruction']").TextContent);
+    }
+
+    [Fact]
+    public void WithoutThePagesLookedUpTheProblemsInTheMaterialAreWhatThePersonGave()
+    {
+        var cut = Render(Full() with { LookedUp = null });
+
+        Assert.Contains("Please check these figures and statements in what you gave:", cut.FindAll("[data-testid='order-open-points'] > p").Select(e => e.TextContent));
+    }
+
+    [Fact]
+    public void APassageThePagesLookedUpSayOtherwiseIsAHintWithItsOwnSentenceNeverAMatterOfTheFiles()
+    {
+        const string quote = "Der Jahresbeitrag beträgt 30 Euro.";
+        var result = OrderTestData.Result(OrderTestData.View(OrderDisplayState.DeliveredWithOpenPoints)) with
+        {
+            UnbackedPassages = [new OrderUnbackedPassage(quote, FactFindingKind.Superseded, null, false, null, LookedUp: true)],
+        };
+
+        var cut = Render(result);
+
+        var hint = cut.Find("[data-testid='order-hint']");
+        Assert.Equal("differs-from-looked-up", hint.GetAttribute("data-kind"));
+        Assert.Equal(quote, hint.QuerySelector("q")!.TextContent);
+        Assert.Equal(OrderResearchLines.DiffersFromLookedUp, hint.QuerySelector("[data-testid='order-hint-looked-up']")!.TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='order-replaced']"));
+        Assert.DoesNotContain("your files", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -151,5 +178,44 @@ public sealed class OrderOpenPointsTests : TestContext
 
         Assert.Equal(OrderResultReport.NotesNotShownOne, cut.Find("[data-testid='order-notes-not-shown']").TextContent);
         Assert.Contains("Still open:", cut.Markup);
+    }
+
+    [Fact]
+    public void AnOpenPointOfTheWriterAboutAWrongTotalIsShownWithItsSentenceAndNotAgainUnderStillOpen()
+    {
+        const string onTotal = "In den Notizen ergeben 22 + 31 + 19 zusammen 72, als Summe steht dort aber 62; der Betrag ist offen gelassen.";
+        var result = Full() with
+        {
+            WriterOpenPoints = [onTotal, HonestResultData.WriterOpenPoint],
+            SourceIssueNotes = [new OrderSourceIssueNote(HonestResultData.SourceIssue, onTotal)],
+        };
+
+        var cut = Render(result);
+
+        var issues = cut.FindAll("[data-testid='order-source-issue']");
+        var note = Assert.Single(issues[0].QuerySelectorAll("[data-testid='order-source-issue-note']"));
+        Assert.Equal(OrderOpenPoints.WriterNoteLead + " " + onTotal, note.TextContent.Trim());
+        Assert.Equal("de", note.QuerySelector("[lang]")!.GetAttribute("lang"));
+        Assert.StartsWith(HonestResultData.SourceIssue, issues[0].TextContent.Trim(), StringComparison.Ordinal);
+        Assert.Empty(issues[1].QuerySelectorAll("[data-testid='order-source-issue-note']"));
+        Assert.Equal(new[] { HonestResultData.WriterOpenPoint }, cut.FindAll("[data-testid='order-writer-open-point']").Select(e => e.TextContent));
+        Assert.Single(cut.FindAll("li"), li => li.TextContent.Contains(onTotal, StringComparison.Ordinal));
+        HonestResultData.AssertPlain(cut.Nodes);
+    }
+
+    [Fact]
+    public void WhenEveryOpenPointOfTheWriterIsShownWithATotalThereIsNoStillOpenGroup()
+    {
+        const string onTotal = "Summe 62 statt 72.";
+        var result = Full() with
+        {
+            WriterOpenPoints = [onTotal],
+            SourceIssueNotes = [new OrderSourceIssueNote(HonestResultData.SourceIssue, onTotal)],
+        };
+
+        var cut = Render(result);
+
+        Assert.DoesNotContain("Still open:", cut.Markup, StringComparison.Ordinal);
+        Assert.Single(cut.FindAll("[data-testid='order-source-issue-note']"));
     }
 }

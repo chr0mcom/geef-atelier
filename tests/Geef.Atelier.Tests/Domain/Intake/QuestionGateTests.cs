@@ -125,6 +125,17 @@ public sealed class QuestionGateTests
     }
 
     [Fact]
+    public void A_research_gap_without_a_question_and_without_topics_of_the_model_gives_no_topic_that_is_only_its_name()
+    {
+        var gap = new IntakeGap(GapTopic.Facts, GapResolution.Research, false, true, GapImpact.High, null, AssumptionConfidence.Unsure, null);
+
+        var result = Apply([gap]);
+
+        Assert.Equal(GateDecision.ToResearch, Only(result));
+        Assert.Empty(result.ResearchTopics);
+    }
+
+    [Fact]
     public void The_research_topics_of_the_model_are_kept_and_not_extended()
     {
         var result = Apply([Gap(GapTopic.Facts, GapResolution.Research)], research: ["Gründungsjahr Muster GmbH"]);

@@ -1,4 +1,7 @@
 using Geef.Atelier.Core.Domain.FactCheck;
+using Geef.Atelier.Core.Domain.Research;
+using Geef.Atelier.Core.Domain.Warnings;
+using Geef.Atelier.Core.Domain.Writing;
 
 namespace Geef.Atelier.Application.Orders;
 
@@ -71,18 +74,63 @@ public static class OrderResultRules
 
     /// <summary>
     /// The assumptions the text was written with: those of the clarifier nobody corrected, then those of the writer, without blank
-    /// lines. Assumptions about facts that went to the writer only as "not given by the person" (<see cref="NotGivenFacts"/>) are
-    /// not among them.
+    /// lines and without repeats (<see cref="SameAssumptionKey"/>; the first wording is kept). Assumptions about facts that went to
+    /// the writer only as "not given by the person" (<see cref="NotGivenFacts"/>) are not among them.
     /// </summary>
     public static IReadOnlyList<string> AllAssumptions(this OrderResult result)
     {
         var notGiven = (result.NotGivenFacts ?? []).Select(AssumptionKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         return (result.Assumptions ?? []).Select(a => a.Text)
             .Where(t => !notGiven.Contains(AssumptionKey(t)))
             .Concat(result.WriterAssumptions ?? [])
-            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Where(t => !string.IsNullOrWhiteSpace(t) && seen.Add(SameAssumptionKey(t)))
             .ToList();
     }
+
+    /// <summary>
+    /// The key by which two assumptions count as the same and only the first is shown: the text normalized as quotes are (blanks,
+    /// quote marks, dashes), without closing punctuation, compared without case, and without one leading article
+    /// (<see cref="LeadingArticles"/>), so "Die Eltern werden mit Sie angesprochen." repeats "Eltern werden mit Sie angesprochen".
+    /// Any other difference in wording keeps both, because only a person can tell whether they say the same.
+    /// </summary>
+    public static string SameAssumptionKey(string? text)
+    {
+        var key = QuoteVerifier.Normalize(text ?? string.Empty).Trim().TrimEnd('.', '!', '?', ';', ':', '…').Trim();
+        var space = key.IndexOf(' ');
+        return space > 0 && LeadingArticles.Contains(key[..space]) ? key[(space + 1)..] : key;
+    }
+
+    /// <summary>Articles that may stand before an assumption without changing what it says (German and English), compared without case.</summary>
+    public static IReadOnlySet<string> LeadingArticles { get; } =
+        new HashSet<string>(["der", "die", "das", "the"], StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// True when the delivered text was written with passages looked up on the web: the result shows found entries, which
+    /// <see cref="OrderResearchLines.Build"/> allows only when the delivered run had them in its material.
+    /// </summary>
+    public static bool UsedLookedUp(this OrderResult result) => result.LookedUp is { Status: ResearchStatus.Found, Entries.Count: > 0 };
+
+    /// <summary>
+    /// <paramref name="warnings"/> without the warning about research that did not work when <paramref name="lookedUp"/> already says
+    /// so under "Looked up", so the person reads the sentence once; otherwise unchanged.
+    /// </summary>
+    public static IReadOnlyList<RunWarningEntity> WithoutShownResearchWarning(this IReadOnlyList<RunWarningEntity> warnings, OrderLookedUpView? lookedUp) =>
+        lookedUp is { Status: ResearchStatus.Failed, Note: not null }
+            ? warnings.Where(w => !string.Equals(w.Code, RunWarningCodes.ResearchFailed, StringComparison.Ordinal)).ToList()
+            : warnings;
+
+    /// <summary>The open points of the writer shown under "Still open": those not shown with the sentence about a total they repeat (<see cref="OrderResult.SourceIssueNotes"/>).</summary>
+    public static IReadOnlyList<string> WriterOpenPointsOnTheirOwn(this OrderResult result)
+    {
+        var issues = (result.SourceIssues.Shown() ?? []).ToHashSet(StringComparer.Ordinal);
+        var attached = (result.SourceIssueNotes ?? []).Where(n => issues.Contains(n.Issue)).Select(n => n.Note).ToHashSet(StringComparer.Ordinal);
+        return (result.WriterOpenPoints.Shown() ?? []).Where(p => !attached.Contains(p)).ToList();
+    }
+
+    /// <summary>The open points of the writer shown with the sentence <paramref name="issue"/> of <see cref="OrderResult.SourceIssues"/>.</summary>
+    public static IReadOnlyList<string> NotesOn(this OrderResult result, string issue) =>
+        (result.SourceIssueNotes ?? []).Where(n => string.Equals(n.Issue, issue, StringComparison.Ordinal)).Select(n => n.Note).ToList();
 
     /// <summary>The assumptions of the clarifier about facts that the writer got only as "not given by the person", without blank lines.</summary>
     public static IReadOnlyList<string> NotGivenFacts(this OrderResult result) =>

@@ -104,6 +104,9 @@ internal sealed class IntakeOrders : IOrderRepository
     public Task<Guid> LinkLegacyRunAsync(Guid runId, OrderEntry entry, CancellationToken ct = default) => throw new NotSupportedException();
     public Task TouchAsync(Guid orderId, DateTimeOffset at, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<bool> DeleteAsync(Guid orderId, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<bool> TrySetResearchAsync(Guid orderId, string researchJson, DateTimeOffset? at, CancellationToken ct = default) => throw new NotSupportedException("The intake never does research.");
+    public Task<int> CountResearchSinceAsync(DateTimeOffset since, CancellationToken ct = default) => throw new NotSupportedException("The intake never does research.");
+    public Task<bool> TryReserveResearchAsync(Guid orderId, string? user, DateTimeOffset at, DateTimeOffset since, int dailyCap, int userCap, CancellationToken ct = default) => throw new NotSupportedException("The intake never does research.");
 }
 
 /// <summary>Shadow rows in memory.</summary>

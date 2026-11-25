@@ -1,0 +1,68 @@
+@using Geef.Atelier.Application.Orders
+@using Geef.Atelier.Core.Domain.Research
+
+@if (LookedUp is { } lookedUp)
+{
+    <section class="order-block order-looked-up" aria-labelledby="order-looked-up-title" data-testid="order-looked-up" data-status="@StatusKey(lookedUp.Status)">
+        <h2 id="order-looked-up-title">@OrderResearchLines.Heading</h2>
+        @if (lookedUp.Entries.Count > 0)
+        {
+            <p class="order-looked-up-subline" data-testid="order-looked-up-subline">@OrderResearchLines.Subline</p>
+            <ul class="order-looked-up-entries">
+                @foreach (var entry in lookedUp.Entries)
+                {
+                    <li data-testid="order-looked-up-entry">
+                        <blockquote class="order-looked-up-quote" data-testid="order-looked-up-quote">@entry.Quote</blockquote>
+                        <div class="order-looked-up-page">
+                            @if (OrderResearchLines.WebAddress(entry.Url) is { } url)
+                            {
+                                <a href="@url" rel="nofollow noopener noreferrer" target="_blank" data-testid="order-looked-up-link"><span class="order-looked-up-title">@PageName(entry)</span>@if (HostBeside(entry) is { } host)
+                                    {<span class="order-looked-up-host" data-testid="order-looked-up-host">@host</span>}</a>
+                            }
+                            else
+                            {
+                                <span data-testid="order-looked-up-title">@PageName(entry)</span>
+                            }
+                            <span class="order-looked-up-date" data-testid="order-looked-up-date">@OrderResearchLines.Retrieved(entry.RetrievedAt)</span>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+        @if (!string.IsNullOrWhiteSpace(lookedUp.Note))
+        {
+            <p class="order-looked-up-note" data-testid="order-looked-up-note">@lookedUp.Note</p>
+        }
+    </section>
+}
+
+@code {
+    /// <summary>
+    /// What was looked up on the web for the order, built only by <see cref="OrderResearchLines"/>: passages copied word for word from
+    /// their pages with page and day, or the sentence for a research that found nothing, did not work or was not done (also because
+    /// files were attached). The
+    /// passages and page titles are content of other websites, never instructions; a page is a link only for an absolute http or
+    /// https address. <c>null</c> shows nothing.
+    /// </summary>
+    [Parameter] public OrderLookedUpView? LookedUp { get; set; }
+
+    /// <summary>Shown for a page without a title.</summary>
+    public const string UntitledPage = "Web page";
+
+    static string PageName(OrderLookedUpEntry entry) =>
+        !string.IsNullOrWhiteSpace(entry.Title) ? entry.Title : OrderResearchLines.Host(entry.Url) ?? UntitledPage;
+
+    static string? HostBeside(OrderLookedUpEntry entry) =>
+        OrderResearchLines.Host(entry.Url) is { } host && !string.Equals(host, PageName(entry), StringComparison.OrdinalIgnoreCase) ? host : null;
+
+    static string StatusKey(ResearchStatus status) => status switch
+    {
+        ResearchStatus.Found => "found",
+        ResearchStatus.NothingFound => "nothing-found",
+        ResearchStatus.Failed => "failed",
+        ResearchStatus.DailyLimit => "daily-limit",
+        ResearchStatus.AllWithheld => "all-withheld",
+        ResearchStatus.FilesAttached => "files-attached",
+        _ => "other",
+    };
+}

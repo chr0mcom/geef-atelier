@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Models;
 using Geef.Atelier.Infrastructure.Pipeline.Direct.FactCheck;
+using Geef.Atelier.Infrastructure.Research;
 
 namespace Geef.Atelier.Tests.EndToEnd.Fakes;
 
@@ -22,7 +23,7 @@ internal enum ReviewerVerdict
 /// Scriptable stand-in for the cli-proxy's OpenAI-compatible <c>/v1/{cli}/chat/completions</c> endpoint
 /// (and OpenRouter's, which shares the format). It records every request and answers each role plausibly:
 /// the executor returns a draft, reviewers call <c>submit_review</c>, the grounding refiner keeps every
-/// source, the query extractor returns a search query.
+/// source, the query extractor returns a search query, the research condenser (<c>pick_passages</c>) picks no passage unless scripted.
 /// </summary>
 internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
 {
@@ -98,6 +99,23 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
     /// <summary>True for a <c>recheck_facts</c> request (structured output named <see cref="FactCheckSchema.RecheckName"/>).</summary>
     public static bool IsRecheckCall(RecordedLlmCall call) => SchemaName(call.RawBody) == FactCheckSchema.RecheckName;
 
+    /// <summary>Answer of the research condenser once the queue is empty: no passage.</summary>
+    public const string DefaultPassagesJson = """{"passages":[]}""";
+
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(string? Json, int Status, string? Code)> _passagesAnswers = new();
+
+    /// <summary>Queues the JSON content of the next <c>pick_passages</c> answer.</summary>
+    public void EnqueuePassagesJson(string json) => _passagesAnswers.Enqueue((json, 200, null));
+
+    /// <summary>Queues an error answer (cli-proxy error envelope with <paramref name="code"/>) for the next <c>pick_passages</c> call.</summary>
+    public void EnqueuePassagesError(int status, string code = "scripted") => _passagesAnswers.Enqueue((null, status, code));
+
+    /// <summary>When set, answers every <c>pick_passages</c> call whose queue is empty from the recorded request (for example with the page ids it names).</summary>
+    public Func<RecordedLlmCall, string>? PassagesResponder { get; set; }
+
+    /// <summary>True for a request of the research condenser (structured output named <see cref="DossierSchema.Name"/>).</summary>
+    public static bool IsPassagesCall(RecordedLlmCall call) => SchemaName(call.RawBody) == DossierSchema.Name;
+
     /// <summary>Input tokens reported for executor answers; <c>null</c> keeps the default estimate (prompt characters / 4).</summary>
     public int? ExecutorPromptTokens { get; set; }
 
@@ -132,6 +150,13 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
             case FactCheckSchema.RecheckName:
                 var recheckJson = _recheckAnswers.TryDequeue(out var recheck) ? recheck : DefaultRecheckJson;
                 return Json(Envelope(call, new JsonObject { ["role"] = "assistant", ["content"] = recheckJson }, "stop"));
+            case DossierSchema.Name:
+                var (passagesJson, passagesStatus, passagesCode) = _passagesAnswers.TryDequeue(out var passages)
+                    ? passages
+                    : (PassagesResponder?.Invoke(call) ?? DefaultPassagesJson, 200, null);
+                return passagesCode is not null
+                    ? PlainError(passagesStatus, passagesCode)
+                    : Json(Envelope(call, new JsonObject { ["role"] = "assistant", ["content"] = passagesJson }, "stop"));
         }
 
         if (call.Role == LlmRole.Executor && _executorAnswers.TryDequeue(out var answer))

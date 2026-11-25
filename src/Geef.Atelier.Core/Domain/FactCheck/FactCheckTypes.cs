@@ -15,11 +15,14 @@ public enum FactFindingKind { Unsupported = 0, Instruction = 1, Superseded = 2, 
 /// <summary>Where an instruction stands in the material; decided from the passage found, never by the model.</summary>
 public enum InstructionOrigin { Stated = 0, Answered = 1, Memory = 2, Client = 3 }
 
-/// <summary>Parts of the material.</summary>
-public enum MaterialPart { Request = 0, PersonAnswers = 1, AssistantAnswers = 2, Profile = 3, Files = 4 }
+/// <summary>Parts of the material; <see cref="LookedUp"/> is the research of the order (source <c>W1</c>).</summary>
+public enum MaterialPart { Request = 0, PersonAnswers = 1, AssistantAnswers = 2, Profile = 3, Files = 4, LookedUp = 5 }
 
-/// <summary>A file of the material; <see cref="Id"/> is <c>S1…</c>, or <c>S0</c> for the text to revise.</summary>
-public sealed record FactSource(string Id, string FileName, string Text);
+/// <summary>
+/// A file of the material; <see cref="Id"/> is <c>S1…</c>, or <c>S0</c> for the text to revise. <see cref="LookedUp"/> marks the
+/// passages looked up on the web (<c>W1</c>), which are not a file of the person.
+/// </summary>
+public sealed record FactSource(string Id, string FileName, string Text, bool LookedUp = false);
 
 /// <summary>Everything the text may rely on. Assumptions and the writer's notes are deliberately not part of it.</summary>
 public sealed record FactMaterial(string Request, IReadOnlyList<string> PersonAnswers, IReadOnlyList<string> AssistantAnswers, string? Profile,
@@ -67,7 +70,9 @@ public sealed record FactFilterResult(IReadOnlyList<FactFinding> Findings, IRead
 /// <summary>
 /// Checks proposed findings against the text and the material without an AI model (contract stage 3, 4.3). Whether a
 /// finding stays, where an instruction comes from and whether a finding blocks follow from where its quotes are found,
-/// never from what the model says about them.
+/// never from what the model says about them. A finding about replaced information whose replacing passage stands in the pages
+/// looked up on the web (<see cref="MaterialPart.LookedUp"/>) never blocks and never takes the place of another finding at the same
+/// passage of the text (D-074).
 /// </summary>
 public static class FactFindingFilter
 {
@@ -101,6 +106,7 @@ public static class FactFindingFilter
         var kept = new List<FactFinding>();
         var trace = new List<FactFilterTrace>();
         var ranges = new List<(int Start, int End)>();
+        var hintRanges = new List<(int Start, int End)>();
         var conflicts = new List<(string A, string B)>();
         var blocking = 0;
 
@@ -111,7 +117,7 @@ public static class FactFindingFilter
                 ? (FactFilterDecision.DroppedTooShort, (FactFinding?)null)
                 : finding.Kind == FactFindingKind.SourceConflict
                     ? DecideConflict(finding, draft, material, parts, conflicts)
-                    : DecideTextFinding(finding, draft, normalizedDraft, material, parts, ranges, blocking);
+                    : DecideTextFinding(finding, draft, normalizedDraft, material, parts, ranges, hintRanges, blocking);
 
             if (decision == FactFilterDecision.Kept && result is not null)
             {
@@ -126,7 +132,7 @@ public static class FactFindingFilter
     }
 
     private static (FactFilterDecision, FactFinding?) DecideTextFinding(ProposedFactFinding finding, string draft, string normalizedDraft,
-        FactMaterial material, List<MaterialSlice> parts, List<(int Start, int End)> ranges, int blocking)
+        FactMaterial material, List<MaterialSlice> parts, List<(int Start, int End)> ranges, List<(int Start, int End)> hintRanges, int blocking)
     {
         var quote = finding.TextQuote?.Trim() ?? string.Empty;
         if (IsTooShort(quote))
@@ -158,15 +164,16 @@ public static class FactFindingFilter
 
         var reason = Reason(finding.WhatIsWrong, material);
 
+        var slice = finding.Kind == FactFindingKind.Superseded ? FindMaterial(finding.MaterialQuote, parts) : null;
+        var isHint = slice?.Part == MaterialPart.LookedUp;
         var range = (Start: match.Start, End: match.Start + Math.Max(1, match.Length));
-        if (ranges.Any(r => r.Start < range.End && range.Start < r.End))
+        if (ranges.Any(r => r.Start < range.End && range.Start < r.End) || isHint && hintRanges.Any(r => r.Start < range.End && range.Start < r.End))
             return (FactFilterDecision.DroppedDuplicate, null);
 
         string? materialFile = null;
         MaterialPart? materialFrom = null;
         if (finding.Kind == FactFindingKind.Superseded)
         {
-            var slice = FindMaterial(finding.MaterialQuote, parts);
             if (slice is null)
                 return (FactFilterDecision.DroppedMaterialQuoteNotFound, null);
             materialFile = slice.FileName;
@@ -176,12 +183,13 @@ public static class FactFindingFilter
         var isBlocking = finding.Kind switch
         {
             FactFindingKind.Instruction => origin is InstructionOrigin.Stated or InstructionOrigin.Answered or InstructionOrigin.Memory,
+            FactFindingKind.Superseded => materialFrom != MaterialPart.LookedUp,
             _ => true,
         };
         if (isBlocking && blocking >= MaxBlocking)
             return (FactFilterDecision.DroppedOverLimit, null);
 
-        ranges.Add(range);
+        (isHint ? hintRanges : ranges).Add(range);
         var excerpt = QuoteVerifier.ExcerptWholeWords(draft, match);
         return (FactFilterDecision.Kept, new FactFinding(string.Empty, finding.Kind, excerpt.Length > 0 ? excerpt : quote,
             reason, Trimmed(finding.InstructionQuote), SafeQuote(finding.MaterialQuote, material), SafeQuote(finding.MaterialQuote2, material),
@@ -238,7 +246,7 @@ public static class FactFindingFilter
             return (InstructionOrigin.Memory, null);
         if (In(MaterialPart.AssistantAnswers))
             return (InstructionOrigin.Client, null);
-        if (In(MaterialPart.Files))
+        if (In(MaterialPart.Files) || In(MaterialPart.LookedUp))
             return (null, FactFilterDecision.DroppedInstructionFromFile);
         return (null, FactFilterDecision.DroppedInstructionNotFound);
     }
@@ -320,7 +328,10 @@ internal sealed record MaterialSlice(MaterialPart Part, string Text, string? Fil
 /// <summary>Helpers on <see cref="FactMaterial"/>.</summary>
 internal static class FactMaterialExtensions
 {
-    /// <summary>Every part of the material in the order request, answers of the person, answers of the assistant, profile, files, file map.</summary>
+    /// <summary>
+    /// Every part of the material in the order request, answers of the person, answers of the assistant, profile, files, file map. A
+    /// source marked <see cref="FactSource.LookedUp"/> is <see cref="MaterialPart.LookedUp"/>, never one of the person's files.
+    /// </summary>
     public static IEnumerable<MaterialSlice> Parts(this FactMaterial material)
     {
         yield return new MaterialSlice(MaterialPart.Request, material.Request ?? string.Empty, null);
@@ -331,7 +342,7 @@ internal static class FactMaterialExtensions
         if (!string.IsNullOrEmpty(material.Profile))
             yield return new MaterialSlice(MaterialPart.Profile, material.Profile, null);
         foreach (var file in material.Files ?? [])
-            yield return new MaterialSlice(MaterialPart.Files, file.Text ?? string.Empty, file.FileName);
+            yield return new MaterialSlice(file.LookedUp ? MaterialPart.LookedUp : MaterialPart.Files, file.Text ?? string.Empty, file.FileName);
         if (!string.IsNullOrEmpty(material.FileMap))
             yield return new MaterialSlice(MaterialPart.Files, material.FileMap, null);
     }
@@ -440,7 +451,8 @@ public static class FactCarryOver
     /// <paramref name="draft"/> as whole words keeps its blocking effect, with the quote as it stands now; a source conflict
     /// always stays, because a correction of the text does not change the material (without a passage when its passage is gone).
     /// Only a repetition is dropped: a passage finding whose passage lies wholly inside the passage of one already kept of the same
-    /// kind (for an instruction, also against the same instruction), which then blocks when either blocks, or a source conflict
+    /// kind (for an instruction, also against the same instruction; for replaced information, also from the same side of the material,
+    /// the pages looked up or not), which then blocks when either blocks, or a source conflict
     /// whose two passages contain each other as whole words and that names the same files. A passage that only overlaps a kept one
     /// is shown as well. No limit applies; ids are given anew (<c>f1…</c>).
     /// </summary>
@@ -477,7 +489,8 @@ public static class FactCarryOver
                     continue;
                 var twin = kept.FindIndex(k => k.Finding.Kind == carried.Kind && k.Range is { } other
                     && other.Start <= range.Start && range.Start + range.Length <= other.Start + other.Length
-                    && (carried.Kind != FactFindingKind.Instruction || SameInstruction(k.Finding, carried)));
+                    && (carried.Kind != FactFindingKind.Instruction || SameInstruction(k.Finding, carried))
+                    && (carried.Kind != FactFindingKind.Superseded || (k.Finding.MaterialFrom == MaterialPart.LookedUp) == (carried.MaterialFrom == MaterialPart.LookedUp)));
                 if (twin >= 0)
                 {
                     if (carried.Blocking && !kept[twin].Finding.Blocking)
@@ -560,7 +573,7 @@ public sealed record FactCheckSummary(FactCheckMode Mode, FactCheckScope Scope, 
 public static class FactFindingMetadata
 {
     public const string Code = "code", Id = "id", Kind = "kind", Quote = "quote", Instruction = "instruction", Material = "material", Material2 = "material2",
-        MaterialFile = "materialFile", Origin = "origin", Blocking = "blocking", Mode = "mode";
+        MaterialFile = "materialFile", Origin = "origin", Blocking = "blocking", Mode = "mode", MaterialFrom = "materialFrom";
     public const string UnsupportedCode = "fact.unsupported", InstructionCode = "fact.instruction", SupersededCode = "fact.superseded", SourceConflictCode = "fact.source_conflict";
 
     /// <summary>Category of every finding of the fact check (<c>Finding.Category</c>, <c>Findings.Category</c>).</summary>

@@ -2187,3 +2187,170 @@ code of stage 2 reads and writes around it), no `Down()` in production. Before t
 - Development set relabelled and false alarms counted again (0.38 per clean text there, above 0.25; in `On` false alarms
   change texts).
 - Total waiting time including the correction round measured.
+
+## D-074 — Stage 4: research (2026-11-25)
+
+**Status:** implemented (core, service with Tavily and persistence, direct path, result on the web and over MCP, measuring tools
+VT/VR and R3). Pre-tests VT and VR **passed**. Shipped with `Research:Mode = Off` (code and `appsettings.json`); the measuring
+user gets `On` only through the environment (`Research__ModeOverrides__<user>=On`, no user name in the repository; test
+`ShippedResearchSettingsTests`). `On` for everybody only after gate R3, in a commit of its own.
+
+**Decision.** What the result shows as "looked up" is a passage that the code found word for word in the fetched page text,
+with page and date – nothing more. Better to look up less than to show something unchecked.
+
+- **When:** only the first run of a clarified order on the direct path (version 1, no text to revise, clarification `Ok` with
+  research topics, switch `On` globally or for the person who ordered), never a revision, never "Extra careful", never
+  `submit_request` without clarification. **Never with an attached file** (review round 1, structural instead of a word filter):
+  when the order has any file – whatever its role, a text to revise included – nothing goes to Tavily or to the passage picker.
+  The status `FilesAttached` (`files_attached`) is stored once with the sentence "No web search was done because you attached
+  files, so nothing from them can reach a search engine." on the web and over MCP; every later run shows it and never uses stored
+  entries for such an order. Researchable gaps stay as without research ("not given", not assumed); no text claims anything was
+  looked up. Without research topics there is no status. The research is stored at the order (`Orders.ResearchJson`); every later run uses it
+  unchanged and never searches again. Every research that ran is stored, a failed one included (conditional write; whoever
+  loses reads the stored one).
+- **Origin rule for topics** (`ResearchQueryGate`, no word list): Tavily gets at most four topics of the clarifier, never the
+  request, answers or profile (there are never files at this point, see above). The rule checks against the **values** of the
+  profile in the briefing, without the fixed field names and without the formality words (`ProfilePrompt.Values`). A topic with a
+  word from the profile that is not exactly so in the person's request is withheld; so are variants (accents, ß/ss, spelled-out
+  umlauts), shared word starts of five characters or more, camel-case and letter/digit parts (`ArztbriefSchmidt`), the genitive
+  in -s (`Wolfs`), words with invisible characters (soft hyphen, zero width – removed as in `QuoteVerifier`) and numbers of four
+  digits or more or with a dot or comma between digits, across spellings and without closing zeros (`1.250,00` = `1250`; an
+  apostrophe or a thin space between digits is a separator as well: `4'850`, `4’850`); and
+  links, addresses, access or account data (`IntakeContentGuard`). **Language rule:** when the profile has free text or "Never do
+  this" and the language of a topic is certainly another than the order's (function words or ä/ö/ü/ß of one language only), the
+  topic is withheld. The rule only errs on the safe side; a withheld topic is assumed as before and reported visibly. **Known
+  limits, on purpose:** translations without a language signal (topics of bare terms such as "breast cancer sick leave"),
+  synonyms, the stem of a compound ("Insolvenz" from "Privatinsolvenz"), two-letter names, names written apart or together
+  without capitals, homoglyphs; if the person changes the profile between clarification and start, the profile of the briefing
+  counts.
+- **Tavily:** exactly one search per topic (`basic`, three results, raw content on, Tavily answer off), up to four in parallel,
+  20 s, **never repeated**. Only the raw page text is used, never Tavily's snippet or answer. A longer raw text is cut to 6,000
+  characters and then **back to the last safe sentence or line end that keeps at least half of them** (review round 2: a dot
+  after a digit, after a single letter or a known abbreviation such as `ca.`/`Dr.`/`z.B.`, or before a word in lower case or a
+  digit does not count, nor does a line break before a line that goes on in lower case; `。！？` end a sentence). Without such an
+  end the cut falls on the last space not between digits, then after the last comma, semicolon, colon or closing bracket not
+  between digits (full-width ones too); only without any of these is the page left out. Results with user information in the address or an
+  address over 500 characters are dropped. The Atelier server fetches none of the addresses itself. **Daily limit:** every search
+  is reserved atomically before it starts (advisory lock, `Orders.ResearchAt` = time of the reservation): at most 50 orders per
+  UTC day in total and 20 per account (`DailyOrderCapPerUser`); cancelled searches count, a repeat of the same order counts once.
+  `FilesAttached`, "withheld" and "daily limit" reserve nothing. Remaining: deleting an order lowers the count (each attempt costs
+  a whole order).
+- **Picking passages:** one call in slot `GroundingRefiner` (Sonnet today), schema `pick_passages` without length limits, proxy
+  failover off, 60 s, no second try. It sees **only** the topics sent and the pages (tags defused), nothing of the order, and
+  picks passages; there is no statement of the model's own.
+- **Dossier = verbatim passages** (`DossierBuilder`): every proposal is searched in the raw text (identical, or normalised only
+  in white space and quotes, never approximate); stored is the page's original passage with its position and the SHA-256 of
+  the raw text. An entry never starts or ends inside a word or a number (`1,5`, `1.250`, and since review round 2 also `1 500`,
+  `4'850`, `1’250’000`: a space or an apostrophe between one to three digits and exactly three digits belongs to the number; the
+  independent check `research_verify.py` flags such a cut as well). Dropped and counted: not on the page,
+  too short (fewer than five words), unsafe (links, addresses, access or account data), duplicate (a later, longer passage
+  replaces an earlier one it holds), over the limits (three per page, four per topic, twelve in total), unknown page, over 600
+  characters (never cut). An unsafe page title is replaced by the host (also when old entries are shown or rendered); in the
+  material of writer and fact check the address stands without query and fragment.
+- **In the run:** the passages go as source `W1` ("Looked up on the web") after the files to writer and fact check, never to the
+  recalculation of totals. The writer's system prompt and the fact check's prompts, schemas and version stay unchanged (hash
+  tests; measurement V2 stays valid); the writer's user prompt gets one fixed sentence only when `W1` is there and never counts
+  `W1` as an attached file (without files it gets an introduction of its own). An instruction from `W1` never blocks. A
+  `superseded` finding whose material quote comes from `W1` never blocks, never takes the place of another finding at the same
+  passage of the text (it occupies no range; review round 2), is never called "your files" and never goes into the
+  correction as "the files say"; it is shown as a hint with the sentence "The pages looked up say otherwise – please check which
+  is right." (web: `data-kind="differs-from-looked-up"`, MCP: `kind = differs_from_looked_up` with `note`), also from earlier
+  reports; prompt and schema of the fact check stay unchanged. Research that cannot be stored is not used: the text is written
+  without `W1` (status `Failed`, code `not_stored`, warning). A topic that is only the name of a kind of gap ("Facts") is never
+  searched. The report lists `W1` with `lookedUp` (schema stays 2).
+- **What the person sees:** section "Looked up" with passage, page (a link only for `http`/`https`, `nofollow noopener
+  noreferrer`) and date under the fixed subline "… not that it is true or that the text uses it"; every non-success (nothing
+  found, failure, daily limit, withheld, files attached) as a fixed sentence; the sentence about withheld topics names no cause
+  ("… so that no private details could reach a search engine."), because a topic is also withheld for a link, account details or
+  its language and only the number is stored; the fact line names "the pages looked up" only when
+  they were in the material; origin in a contradiction is "the pages looked up", never "your file", and the heading of the
+  problems in the material then drops "in what you gave". Web and MCP (`get_order_result.lookedUp`, marked as content of other
+  websites) say the same; the failure sentence appears only once. The result text (`MarkdownView`) uses the one Markdown
+  configuration of the Atelier (`SafeMarkdown`, from `main`): extensions listed one by one without generic attributes, so
+  `{…}` never becomes an attribute (no `on*`, `style`, `ping`) and a placeholder such as `{Name}` stays visible; raw HTML off;
+  links only for `http`, `https` and `mailto`; no images loaded (only their alternative text stays).
+- **Never stops the run:** every failure ends as a status with the warning `grounding.research_failed`; the text is written
+  without `W1`. The grounding step waits at most 120 s, also when the service does not stop on its own. One log line per research names counts, status, duration and model,
+  never topics, passages or addresses. Raw texts are not stored; only for the acceptance `Research:AuditDirectory` (empty by
+  default) writes raw text and entries for users with an override (mode 0600); the directory is deleted afterwards.
+- **Migration Step51** (nullable, additive, idempotent): `Orders.ResearchJson`, `Orders.ResearchAt`. No index, no data
+  migration, no `Sources` row for the dossier.
+
+**Deviations from the overall plan:** a dossier entry is the verbatim page passage, not a model "statement" (not checkable); no
+second way through the CLI's web search (no raw text); no fetching of addresses; research only in version 1; `On` for everybody
+only after the paired measurement R3.
+
+**Switches:** `Research:Mode` (`Off|On`, shipped `Off`), `Research:ModeOverrides` (user → mode, environment only),
+`Research:DailyOrderCap` (50), `Research:DailyOrderCapPerUser` (20), `Research:AuditDirectory` (empty). Limits: `MaxSearches` 4, `ResultsPerSearch` 3,
+`RawCharsPerPage` 6,000, `SearchTimeout` 20 s, `CondenseTimeout` 60 s, `MaxEntries` 12. Whoever changes prompt or schema of the
+passage picker measures VR again (`tools/ResearchEval`); the fact check prompt stays unchanged (test).
+
+**Pre-tests (2026-11-25, synthetic corpus, in the afternoon between 15:06 and 15:09 UTC, 0 Codex calls):**
+- **VT (Tavily probe): passed.** 3 of 3 requests with 2xx, 6 of 9 results with raw text, median 1.5 s. The answer carries no
+  usage figure (only query, response time, request id): **Tavily credit use unknown**; 0.001 USD per `basic` search according to
+  the configuration.
+- **VR (dossier, held-out set of 9 orders): passed.**
+  - K1 verbatim: **0 violations** over all 95 stored entries (development and held-out), independent Python check
+    (`research_verify.py`, case-sensitive) and own recheck.
+  - Validity 8 of 8 picker answers (required ≥ 95 %); yield 7 of 9 orders with at least one entry (77.8 %, required ≥ 70 %);
+    relevance 34 of 35 entries help with their topic (97.1 %, required ≥ 80 %, blind Opus juror); median 5.0 s per order for
+    search and picking (required ≤ 60 s).
+  - Reported: 17 topics sent, 1 withheld, 17 searches without failure, 42 pages with raw text, 41 proposals, 35 entries;
+    dropped 1 over the limit, 5 unsafe (12.2 %). Development set (no verdict): 12 of 12 with entries, 28 searches, 60 entries.
+  - Limits: 9 orders are a plausibility gate, K1 is hard. The corpus has hardly any files (1 of 36 orders with topics, not in
+    the held-out set); the origin rule acted once there, its effect is shown by tests (property test, end-to-end
+    counter-checks). The language rule and "no search with a file" are not part of the measuring tool; both can only send less.
+  - **Effect of review round 1 on VR (read only, no new measurement):** 92 of the 120 stored pages were cut at 6,000 characters;
+    the new cut would take 1 to 470 characters off their end. **None of the 95 entries lies in that rest**, no VR address has
+    user information or over 500 characters. `ResearchEval evaluate` with the new code on the same files (origin rule and
+    `DossierBuilder` recomputed, the new check with word boundaries finds 0 violations): **still passed**, all figures equal. The
+    passage picker saw the slightly longer page end in VR, so its input is not bit-identical with production; the result stays
+    meaningful because no passage came from the removed part.
+  - **Effect of review round 2 on VR (read only, offline on the stored files, no new call):** 101 of the 120 stored pages
+    are 6,000 UTF-16 units long, i.e. were cut (the 92 above counted code points). The cut with the half-length rule, without
+    abbreviations as sentence ends and with the comma fallback takes 0 to 470 characters off their end (median 45 in the
+    development set, 57 in the held-out set; the unknown character after position 6,000 assumed both as a letter and as a
+    space); **no page becomes empty or keeps less than half, none of the 95 entries lies in the removed part.**
+    `research_verify.py` with the thousands-separator rule: 0 violations over 95 entries. `ResearchEval evaluate` with the new
+    code (stored and new verification report): **still passed**, all figures equal.
+
+**Gates after the deploy (fixed beforehand, none passes without data):**
+- **R2 (acceptance measurement):** 5 orders of the measuring user **without files** (3 web, 2 MCP), fact check `Report`: (a) each
+  with research status ≠ `NotNeeded` and ≠ `FilesAttached`, (b) 0 questions about researched topics, (c) at most 1
+  `unsupported` finding against a spot covered by `W1`, (d) median ≤ 60 s, (e) 0 note markers in the text. (a), (c) and (e) are
+  checked by `tools/Eval/geef_eval/research_r2.py` on the stored `get_order_result` answers; (b) and (d) are **evaluated by
+  hand**. **(c), fixed beforehand (review round 2):** a flagged passage counts in code when its quote holds a number (dates by
+  their digits; `1 500`/`4'850` joined and in parts) found in the quote or title of an entry of the same order; in an English
+  text also a capitalised name not at a sentence start. In a German text every noun is capitalised, so a passage that shares
+  only a capitalised word with an entry is a **case for a person**: listed in the report and decided in a confirmation file
+  (`--confirmations`, per case `covered` or `not_covered`, the quote repeated word for word); `covered` counts. While a case is
+  open or the file has a defect, R2 is `not_evaluable`. A text is German unless it holds more English than German function
+  words. **Not evaluable** below 4 orders with text and below **4 of 5 orders with status `found` and at least one entry**.
+  Failing (c) → research stays `Off` for everybody.
+- **R3 (effect, `tools/Eval/geef_eval/research_pairs.py`):** 8 untouched development orders without files, two measuring users
+  (with/without research, both without fact check), blind Sonnet juror, per order two kinds of calls in two swapped passes each:
+  `rank` **without** passages decides wins and placeholders; `facts` with the numbered passages of arm on lists invented facts
+  and names for each the passage that covers it word for word. Gate: (a) wins with ≥ wins without + 2, (b) sum of `erfunden`
+  with ≤ without, (c) placeholders for researchable facts with < without (per order the mean of both passes). **Validity (fixed
+  beforehand):** at least 7 of 8 pairs technically complete and at least **6 of 8 valid** – only pairs whose arm on has `found`
+  with at least one entry; `failed`, `daily_limit`, `all_withheld`, `nothing_found`, `files_attached` or no research make a pair
+  invalid; otherwise `not_evaluable`. The status per pair is in the output. **Invented facts are counted twice:** strictly (every
+  fact) and with the verbatim exception (without those a passage covers word for word). Every fact that is left out only by the
+  exception is listed and checked by hand against the intent before any `On`; while such a case lacks a valid decision in the
+  confirmation file (`--confirmations`, per case `not_invented` or `invented`), the strict count applies and the gate is
+  `not_evaluable`. Cap 32 juror verdicts (16 `rank` + 16 `facts`). After a configuration halt `run` submits nothing more.
+  Passed → `On` for everybody; otherwise it stays `Off` and the measuring user keeps `On`.
+
+**Counter-checks at integration:** over the real wiring neither a profile name nor an answer of the person reaches Tavily or
+the passage picker; with an attached file no request goes out in any run (not even a translated file word or the file name);
+address and title of a page stay content in the prompt. This removes the file parts of security findings M1/M2 of review
+round 1 and the file-name finding of the integration. Remaining, on purpose: words of the person's request may go into a topic
+(the person wrote them); the profile of the briefing counts; a page's address (without query and fragment) is in the writer's
+prompt and might appear in the text as a source.
+
+**Cost:** per researched order one Sonnet call and at most four Tavily searches (22.5 % of the corpus orders had research
+topics); daily limit ≤ 200 searches, ≤ 80 per account.
+
+**Way back:** `Research__Mode=Off` without a new image; stored research stays and is shown only for runs that used it. Code:
+previous web image; Step51 is nullable, the code of stage 3 ignores the columns; no `Down()` in production. The template
+`direct` does not change; running runs may stay.

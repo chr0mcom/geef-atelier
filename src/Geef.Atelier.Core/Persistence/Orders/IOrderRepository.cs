@@ -93,4 +93,23 @@ public interface IOrderRepository
 
     /// <summary>NeedsInput orders whose questions were asked before <paramref name="askedBefore"/>, oldest first.</summary>
     Task<IReadOnlyList<Guid>> ListUnansweredAsync(DateTimeOffset askedBefore, int limit, CancellationToken ct = default);
+
+    /// <summary>
+    /// Stores the research of the order only while the order has none; false when research was already stored. <c>ResearchAt</c>
+    /// keeps the time of the reservation (<see cref="TryReserveResearchAsync"/>) and is set to <paramref name="at"/> only when it is
+    /// empty and <paramref name="at"/> is given.
+    /// </summary>
+    Task<bool> TrySetResearchAsync(Guid orderId, string researchJson, DateTimeOffset? at, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reserves a search for the order before it starts, in one step that no other reservation can interleave with: sets
+    /// <c>ResearchAt</c> to <paramref name="at"/> while the order has no stored research, fewer than <paramref name="dailyCap"/> other
+    /// orders and fewer than <paramref name="userCap"/> other orders of <paramref name="user"/> hold a reservation in the day that starts
+    /// at <paramref name="since"/>. False when a limit is reached or the order is unknown or already has research. A reservation stays when
+    /// the search is cancelled, so cancelled searches count; a second reservation of the same order does not count it twice.
+    /// </summary>
+    Task<bool> TryReserveResearchAsync(Guid orderId, string? user, DateTimeOffset at, DateTimeOffset since, int dailyCap, int userCap, CancellationToken ct = default);
+
+    /// <summary>Number of orders with a reservation (<c>ResearchAt</c>) at or after <paramref name="since"/>.</summary>
+    Task<int> CountResearchSinceAsync(DateTimeOffset since, CancellationToken ct = default);
 }

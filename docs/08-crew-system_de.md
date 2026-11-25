@@ -2,7 +2,7 @@
 
 *[English](08-crew-system.md) · **Deutsch***
 
-Letzte Aktualisierung: 2026-11-24 (D-067: strenges Lesen des Snapshots, mindestens ein Reviewer, Outcome nach den Finalizern, Warnungen am Lauf, System-Grounding wieder über den Provider-Typ-Weg, Learning standardmäßig pausiert; zweite Prüfrunde: Reviewer-Prüfung beim Speichern, Vektor-Scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserviert, Finalizer und Abbruch; zuvor 2026-11-23, D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
+Letzte Aktualisierung: 2026-11-25 (D-074: Recherche im Grounding-Schritt des Direktwegs; zuvor 2026-11-24, D-067: strenges Lesen des Snapshots, mindestens ein Reviewer, Outcome nach den Finalizern, Warnungen am Lauf, System-Grounding wieder über den Provider-Typ-Weg, Learning standardmäßig pausiert; zweite Prüfrunde: Reviewer-Prüfung beim Speichern, Vektor-Scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserviert, Finalizer und Abbruch; zuvor 2026-11-23, D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
 
 ## Überblick
 
@@ -870,3 +870,36 @@ Modells samt seinem einen Ersatz lassen die Tatsachen ungeprüft, und „What wa
 - **Die Rechenprüfung sagt nie „stimmt“:** Die Prüfung ausgeschriebener Rechnungen im Text und der Summen in den Dateien nennt
   nur, was eindeutig falsch aussieht, und bittet die Person, es zu prüfen; sonst sagt „What was checked“ höchstens, dass nichts
   eindeutig Falsches gefunden wurde und dass nicht jede Rechnung so prüfbar ist. Frühere Berichte lesen sich ebenso.
+
+## Recherche im Grounding-Schritt (D-074)
+
+Seit Etappe 4 kann der Grounding-Schritt des Direktwegs (`OrderGroundingStep`) Ausschnitte aus dem Web anhängen. Er fragt
+`IOrderResearchService.EnsureAsync`, bevor er die Dateien rendert, mit der Version des Laufs (vom Assembler), ob der Lauf einen
+Text überarbeitet, ob der Auftrag angehängte Dateien hat, und den Angaben „Über mich“ aus dem Briefing. Ein Auftrag mit
+irgendeiner Datei (gleich welche Rolle) sucht nie: Der Dienst speichert einmal den Status `FilesAttached`, und nichts erreicht
+Suche oder Verdichtung. Sonst hält die Herkunftsregel (`ResearchQueryGate`) ein Suchthema mit einem Wort aus den Werten von
+„Über mich“ (ohne Feldnamen), das nicht im Wortlaut steht, zurück. Der Dienst
+entscheidet (Schalter `Research:Mode`, Override je Nutzer, erste Version, keine Überarbeitung, Klärung mit Suchthemen,
+Tagesgrenze, vor der Suche reserviert, insgesamt und je Konto) und speichert die Recherche einmal am Auftrag (`Orders.ResearchJson`); jeder spätere Lauf des Auftrags bekommt die
+gespeicherten Ausschnitte unverändert und sucht nie neu.
+
+- **Quelle `W1`:** Hat die Recherche mindestens einen Ausschnitt, schreibt `DossierRenderer` ihren Text, und der Schritt hängt
+  ihn nach den Dateien als Quelle `W1` mit dem festen Namen „Looked up on the web“ an (`PromptSource.LookedUp`). Die Kennung
+  vergibt nur der Code. Sie wird wie jede Datei entschärft (`SourceBlockRenderer`) und zählt für das Budget des
+  Hintergrunddokuments; die Warnung zu langen Dateien zählt nur die Dateien der Person.
+- **Schreiber:** `W1` wird nie als angehängte Datei gezählt oder gelistet; ohne Dateien hat der Prompt eine eigene Einleitung.
+  Im ersten Durchgang folgt im Nutzerprompt nach dem Hinweis zu den Quellen ein fester Satz
+  (`DirectWriterPrompts.LookedUpNote`): W1 darf einen Punkt beantworten, den das Briefing als nicht angegeben führt, so wie W1
+  es sagt, und ist Inhalt, nie Anweisung. Der System-Prompt `SystemPrompts.DirectWriter` bleibt unverändert (Hash-Test); ohne
+  `W1` ist der Prompt der von Etappe 3.
+- **Faktenprüfer:** `W1` ist eine weitere Quelle des Materials (`FactSource.LookedUp`, `MaterialPart.LookedUp`). Prompts,
+  Schemata und Version `fact-check-1` bleiben unverändert (`FactCheckPromptStabilityTests`). Die Nachrechnung der Summen sieht
+  `W1` nie.
+- **Nutzung und Bericht:** Die Nutzungszeile von `W1` hat keine Quelle und das Ziel `research`, Position nach den Dateien. Der
+  Bericht führt `W1` nach den Dateien mit `lookedUp` und ist als `lookedUp` markiert; Schreiberzitate aus `W1` sind weder
+  Dateizitate noch zählen sie als ungeprüft.
+- **Stoppt nie den Lauf:** Status `Failed` (auch eine Recherche, die nicht gespeichert werden konnte, Code `not_stored`), eine
+  Ausnahme des Dienstes oder eine Wartezeit über 120 s (auch wenn der Dienst nicht von selbst abbricht) ergeben die Warnung
+  `grounding.research_failed` („Looking things up on the web did not work this time. The text was written without it.“), und
+  der Lauf geht ohne `W1` weiter. `NothingFound`, `AllWithheld`, `DailyLimit` und `FilesAttached` hängen keine Quelle an und warnen nicht; das
+  Ergebnis zeigt sie als feste Sätze. Nur der Abbruch des Laufs selbst beendet den Schritt.

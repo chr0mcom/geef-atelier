@@ -7,8 +7,9 @@ using Geef.Atelier.Core.Domain.Writing;
 
 namespace Geef.Atelier.Core.Domain.Reports;
 
-/// <summary>A source as listed in a run report.</summary>
-public sealed record RunReportSource(Guid? SourceId, string FileName, SourceUsageMode Mode, int Characters);
+/// <summary>A source as listed in a run report; <see cref="LookedUp"/> marks the passages looked up on the web (<c>W1</c>).</summary>
+public sealed record RunReportSource(Guid? SourceId, string FileName, SourceUsageMode Mode, int Characters,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool LookedUp = false);
 
 /// <summary>A passage the writer quoted from a file, as the code found it in that file.</summary>
 public sealed record RunReportQuote(Guid? SourceId, string SourceLabel, string FileName, string Quote, QuoteMatchKind Match);
@@ -21,7 +22,8 @@ public sealed record RunReportCorrection(string Code, string? QuoteBefore);
 /// fields. <see cref="ReadEvidence"/> is the input-token comparison of the first writing pass (null when it could
 /// not be judged); <see cref="Notes"/> are plain-English remarks for the person, such as files that were searched
 /// rather than read in full. Schema 2 adds the writer's notes, the verified quotes, the fact check, the recalculated totals
-/// of the files and the corrections after the checks.
+/// of the files and the corrections after the checks. <see cref="LookedUp"/> says that the passages looked up on the web (<c>W1</c>) were
+/// part of the material of the run.
 /// </summary>
 public sealed record RunReport(
     int SchemaVersion,
@@ -40,7 +42,8 @@ public sealed record RunReport(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int UnverifiedQuotes = 0,
     FactCheckSummary? FactCheck = null,
     SourceArithmeticResult? SourceArithmetic = null,
-    IReadOnlyList<RunReportCorrection>? Corrections = null)
+    IReadOnlyList<RunReportCorrection>? Corrections = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool LookedUp = false)
 {
     public const int CurrentSchemaVersion = 2;
     public const string DirectKind = "direct";

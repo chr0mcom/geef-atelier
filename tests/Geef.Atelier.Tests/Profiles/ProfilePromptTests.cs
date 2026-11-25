@@ -56,5 +56,40 @@ public sealed class ProfilePromptTests
             ProfilePrompt.Render(profile));
     }
 
+    [Fact]
+    public void The_values_of_a_rendered_block_come_back_without_field_names_and_without_the_formality()
+    {
+        var profile = Profile() with
+        {
+            DisplayName = "Anna Beispiel",
+            Role = "Teamleitung",
+            Organization = "Beispiel GmbH",
+            Formality = Formality.Formal,
+            Language = "de",
+            Signature = "Viele Grüße\nAnna",
+            NoGos = "Keine Gender-Doppelformen",
+            FreeText = "Name: steht auch hier\nzweite Zeile",
+        };
+
+        var values = ProfilePrompt.Values(ProfilePrompt.Render(profile));
+
+        Assert.Equal(["Anna Beispiel", "Teamleitung", "Beispiel GmbH", "de", "Viele Grüße\nAnna", "Keine Gender-Doppelformen", "Name: steht auch hier\nzweite Zeile"],
+            values.Values);
+        Assert.True(values.HasFreeText);
+        Assert.DoesNotContain("formally", values.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Preferred", values.Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Only_formality_and_language_give_no_free_text_and_a_block_without_labels_keeps_every_line()
+    {
+        var values = ProfilePrompt.Values(ProfilePrompt.Render(Profile() with { Formality = Formality.Informal, Language = "en" }));
+        Assert.Equal(["en"], values.Values);
+        Assert.False(values.HasFreeText);
+
+        Assert.Equal(["Ich heiße Oberhuber.\nAus Kassel."], ProfilePrompt.Values("Ich heiße Oberhuber.\nAus Kassel.").Values);
+        Assert.Empty(ProfilePrompt.Values(null).Values);
+    }
+
     private static UserProfileEntity Profile() => new() { Username = "user-a", CreatedAt = T0, UpdatedAt = T0 };
 }

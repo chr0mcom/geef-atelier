@@ -212,6 +212,8 @@ internal sealed class SourceFactCheckReviewer(
         Add(metadata, FactFindingMetadata.MaterialFile, finding.MaterialFile);
         if (finding.Origin is { } origin)
             metadata[FactFindingMetadata.Origin] = origin.ToString();
+        if (finding.MaterialFrom is { } from)
+            metadata[FactFindingMetadata.MaterialFrom] = from.ToString();
         if (mode == FactCheckMode.Shadow)
             metadata[ShadowKey] = true;
 

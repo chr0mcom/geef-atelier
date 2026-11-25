@@ -389,6 +389,45 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
         }
     }
 
+    public async Task<bool> TrySetResearchAsync(Guid orderId, string researchJson, DateTimeOffset? at, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(researchJson);
+        var when = at?.ToUniversalTime();
+        var affected = await db.Orders
+            .Where(o => o.Id == orderId && o.ResearchJson == null)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(o => o.ResearchJson, researchJson)
+                .SetProperty(o => o.ResearchAt, o => o.ResearchAt ?? when), ct);
+        return affected > 0;
+    }
+
+    /// <summary>Key of the transaction lock that puts the reservations of searches in a row.</summary>
+    internal const string ResearchLockKey = "geef-atelier-research-reservation";
+
+    public async Task<bool> TryReserveResearchAsync(Guid orderId, string? user, DateTimeOffset at, DateTimeOffset since, int dailyCap, int userCap, CancellationToken ct = default)
+    {
+        var owner = user ?? string.Empty;
+        var now = at.ToUniversalTime();
+        var from = since.ToUniversalTime();
+        var to = from.AddDays(1);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({ResearchLockKey}, 0))", ct);
+        var affected = await db.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE "Orders" SET "ResearchAt" = {now}
+            WHERE "Id" = {orderId} AND "ResearchJson" IS NULL
+              AND (SELECT count(*) FROM "Orders" WHERE "ResearchAt" >= {from} AND "ResearchAt" < {to} AND "Id" <> {orderId}) < {dailyCap}
+              AND (SELECT count(*) FROM "Orders" WHERE "ResearchAt" >= {from} AND "ResearchAt" < {to} AND "Id" <> {orderId} AND COALESCE("CreatedByUser", '') = {owner}) < {userCap}
+            """, ct);
+        await transaction.CommitAsync(ct);
+        return affected > 0;
+    }
+
+    public Task<int> CountResearchSinceAsync(DateTimeOffset since, CancellationToken ct = default)
+    {
+        var from = since.ToUniversalTime();
+        return db.Orders.AsNoTracking().CountAsync(o => o.ResearchAt != null && o.ResearchAt >= from, ct);
+    }
+
     public async Task<IReadOnlyList<Guid>> ListUnansweredAsync(DateTimeOffset askedBefore, int limit, CancellationToken ct = default)
     {
         if (limit <= 0)

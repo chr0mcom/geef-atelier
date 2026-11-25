@@ -2278,3 +2278,175 @@ der Code von Etappe 2 liest und schreibt unverändert), kein `Down()` in Produkt
 - Entwicklungsmenge neu beschriftet und Fehlalarme neu gezählt (dort 0,38 je sauberem Text, über 0,25; in `On` ändern
   Fehlalarme Texte).
 - Gesamtwartezeit einschließlich Korrekturrunde gemessen.
+
+## D-074 — Etappe 4: Recherche (2026-11-25)
+
+**Status:** umgesetzt (Kern, Dienst mit Tavily und Persistenz, Einbau in den Direktweg, Ergebnis in Web und MCP, Messwerkzeuge
+VT/VR und R3). Vorversuche VT und VR **bestanden**. Ausgeliefert mit `Research:Mode = Off` (Code und `appsettings.json`); der
+Messnutzer bekommt `On` nur über die Umgebung (`Research__ModeOverrides__<nutzer>=On`, kein Nutzername im Repository; Test
+`ShippedResearchSettingsTests`). `On` für alle erst nach Tor R3, in einem eigenen Commit.
+
+**Entscheidung.** Was im Ergebnis als „nachgeschlagen“ steht, ist ein vom Code wörtlich im abgerufenen Seitentext gefundener
+Ausschnitt mit Seite und Datum – nicht mehr. Lieber weniger nachschlagen als etwas Ungeprüftes zeigen.
+
+- **Wann:** nur der erste Lauf eines geklärten Auftrags im Direktweg (Version 1, kein Ausgangstext, Klärung `Ok` mit
+  Suchthemen, Schalter `On` global oder für den Auftraggeber), nie eine Überarbeitung, nie „Extra careful“, nie
+  `submit_request` ohne Klärung. **Nie mit angehängter Datei** (Prüfrunde 1, strukturell statt Wortfilter): Hat der Auftrag
+  irgendeine Datei – gleich welche Rolle, auch eine Überarbeitungsvorlage –, geht weder an Tavily noch an die Verdichtung
+  etwas. Gespeichert wird einmal der Status `FilesAttached` (`files_attached`) mit dem Satz „No web search was done because you
+  attached files, so nothing from them can reach a search engine.“ in Web und MCP; jeder Folgelauf zeigt ihn und nutzt für
+  einen solchen Auftrag nie gespeicherte Einträge. Recherchierbare Lücken bleiben wie ohne Recherche („not given“, nicht
+  angenommen), kein Text behauptet, es sei nachgeschlagen worden. Ohne Suchthemen gibt es keinen Status. Die Recherche liegt am Auftrag (`Orders.ResearchJson`); jeder spätere Lauf nutzt sie
+  unverändert und sucht nie neu. Jede gelaufene Recherche wird gespeichert, auch eine gescheiterte (bedingtes Setzen, wer
+  verliert, liest die gespeicherte).
+- **Herkunftsregel für Suchthemen** (`ResearchQueryGate`, ohne Wortliste): Tavily bekommt höchstens vier Themen des Klärers, nie
+  Wortlaut, Antworten oder Profil (Dateien gibt es dabei nie, siehe oben). Geprüft wird gegen die **Werte** des Profils im
+  Briefing, ohne die festen Feldnamen und ohne die Anredeformel (`ProfilePrompt.Values`). Ein Thema mit einem Wort aus dem
+  Profil, das nicht genau so im Wortlaut der Person steht, wird zurückgehalten; ebenso Varianten (Akzente, ß/ss,
+  ausgeschriebene Umlaute), gemeinsame Wortanfänge ab fünf Zeichen, CamelCase- und Buchstabe/Ziffer-Teile
+  (`ArztbriefSchmidt`), der Genitiv auf -s (`Wolfs`), Wörter mit unsichtbaren Zeichen (weiches Trennzeichen, Nullbreite – wie im
+  `QuoteVerifier` entfernt) und Zahlen ab vier Ziffern oder mit Punkt/Komma zwischen Ziffern, über Schreibweisen hinweg und auch
+  ohne Nachkommanullen (`1.250,00` = `1250`; auch Apostroph und schmales Leerzeichen zwischen Ziffern trennen: `4'850`,
+  `4’850`); dazu Links, Adressen und Zugangs- oder Kontodaten (`IntakeContentGuard`). **Sprachregel:**
+  Hat das Profil Freitext oder „Never do this“ und ist die Sprache eines Themas sicher eine andere als die des Auftrags
+  (Funktionswörter oder ä/ö/ü/ß nur einer Sprache), wird es zurückgehalten. Die Regel irrt nur zur sicheren Seite; ein
+  zurückgehaltenes Thema wird wie vorher angenommen und sichtbar gemeldet. **Bewusste Grenzen:** Übersetzungen ohne
+  Sprachsignal (reine Fachwort-Themen wie „breast cancer sick leave“), Synonyme, Grundwörter von Komposita („Insolvenz“ aus
+  „Privatinsolvenz“), Namen mit zwei Zeichen, getrennt/zusammen geschriebene Namen ohne Großbuchstaben, Homoglyphen; ändert die
+  Person ihr Profil zwischen Klärung und Start, gilt das Profil des Briefings.
+- **Tavily:** je Thema genau eine Suche (`basic`, drei Treffer, Rohtext an, Tavily-Antwort aus), bis zu vier parallel, 20 s,
+  **nie wiederholt**. Verwendet wird nur der Rohtext der Seite, nie Tavilys Ausschnitt oder Antwort. Ein längerer Rohtext wird
+  auf 6.000 Zeichen und dann **auf das letzte sichere Satz- oder Zeilenende zurück** gekürzt, **das mindestens die Hälfte
+  erhält** (Prüfrunde 2: Punkt nach einer Ziffer, nach einem einzelnen Buchstaben oder einer bekannten Abkürzung wie `ca.`/`Dr.`/
+  `z.B.` oder vor einem kleingeschriebenen Wort oder einer Ziffer zählt nicht, ebenso wenig ein Zeilenumbruch vor einer klein
+  weitergehenden Zeile; `。！？` beenden einen Satz). Ohne solches Ende an der letzten Leerstelle, die nicht zwischen Ziffern
+  steht, danach hinter dem letzten Komma, Semikolon, Doppelpunkt oder der letzten schließenden Klammer (auch in voller Breite),
+  die nicht zwischen Ziffern stehen; erst ohne all das bleibt die Seite weg. Treffer mit
+  Benutzerangaben in der Adresse oder über 500 Zeichen Adresse werden verworfen. Der Atelier-Server ruft keine der Adressen
+  selbst ab. **Tagesgrenze:** Jede Suche wird vor dem Start atomar reserviert (Advisory-Lock, `Orders.ResearchAt` = Zeit der
+  Reservierung): höchstens 50 Aufträge je UTC-Tag insgesamt und 20 je Konto (`DailyOrderCapPerUser`); abgebrochene Suchen
+  zählen, eine Wiederholung desselben Auftrags zählt einmal. `FilesAttached`, „zurückgehalten“ und „Tagesgrenze“ reservieren
+  nichts. Verbleibend: Das Löschen eines Auftrags senkt den Zähler (der Schaden ist je Versuch ein ganzer Auftrag).
+- **Verdichtung:** ein Aufruf im Slot `GroundingRefiner` (heute Sonnet), Schema `pick_passages` ohne Längengrenzen, Proxy-Failover
+  aus, 60 s, kein zweiter Versuch. Er sieht **nur** die gesendeten Themen und die Seiten (Tags entschärft), nie etwas vom
+  Auftrag, und wählt Ausschnitte aus; eine eigene Aussage des Modells gibt es nicht.
+- **Dossier = wörtliche Ausschnitte** (`DossierBuilder`): Jeder Vorschlag wird im Rohtext gesucht (wortgleich oder nur im
+  Leerraum/Anführungszeichen normalisiert, nie näherungsweise); gespeichert wird der Originalausschnitt der Seite mit Lage und
+  SHA-256 des Rohtexts. Ein Eintrag beginnt und endet nie in einem Wort oder einer Zahl (`1,5`, `1.250`, seit Prüfrunde 2 auch
+  `1 500`, `4'850`, `1’250’000`: Leerzeichen oder Apostroph zwischen ein bis drei Ziffern und genau drei Ziffern gehören zur
+  Zahl; die unabhängige Nachprüfung `research_verify.py` meldet so einen Schnitt ebenfalls). Verworfen und gezählt
+  werden: nicht auf der Seite, zu kurz (unter fünf Wörtern), unsicher (Links, Adressen, Zugangs- oder Kontodaten), doppelt (ein
+  späterer, längerer Ausschnitt ersetzt einen früheren, den er enthält), über den Grenzen (drei je Seite, vier je Thema, zwölf
+  insgesamt), unbekannte Seite, über 600 Zeichen (nie gekürzt). Ein unsicherer Seitentitel wird durch den Host ersetzt (auch
+  beim Anzeigen und Rendern alter Einträge); im Schreiber- und Prüfer-Material steht die Adresse ohne Query und Fragment.
+- **Im Lauf:** Die Ausschnitte gehen als Quelle `W1` („Looked up on the web“) nach den Dateien an Schreiber und Faktenprüfer,
+  nie an die Nachrechnung der Summen. System-Prompt des Schreibers sowie Prompts, Schemata und Version des Faktenprüfers bleiben
+  unverändert (Hash-Tests; Messung V2 bleibt gültig); der Nutzerprompt des Schreibers bekommt nur mit `W1` einen festen Satz
+  und zählt `W1` nie als angehängte Datei (ohne Dateien eine eigene Einleitung). Eine Vorgabe aus `W1` blockiert nie. Ein
+  `superseded`-Befund, dessen Materialzitat aus `W1` stammt, blockiert nie, verdrängt nie einen anderen Befund an derselben
+  Textstelle (er belegt keinen Bereich; Prüfrunde 2), wird nie „your files“ genannt und geht nie als „die
+  Dateien sagen“ in den Korrektursatz; er erscheint als Hinweis mit dem Satz „The pages looked up say otherwise – please check
+  which is right.“ (Web: `data-kind="differs-from-looked-up"`, MCP: `kind = differs_from_looked_up` mit `note`), auch aus älteren
+  Berichten; Prüfer-Prompt und -Schema bleiben unverändert. Kann die Recherche nicht gespeichert werden, läuft der Text ohne
+  `W1` weiter (Status `Failed`, Code `not_stored`, Warnung). Ein Thema, das nur der Name einer Lückenart ist („Facts“), wird nie
+  gesucht. Der Bericht führt `W1` mit `lookedUp` (Schema bleibt 2).
+- **Was die Person sieht:** Abschnitt „Looked up“ mit Ausschnitt, Seite (nur `http`/`https` als Link, `nofollow noopener
+  noreferrer`) und Datum unter der festen Unterzeile „… not that it is true or that the text uses it“; jeder Nicht-Erfolg
+  (nichts gefunden, Fehler, Tagesgrenze, zurückgehalten, Dateien angehängt) als fester Satz; der Satz zu zurückgehaltenen Themen
+  nennt keine Ursache („… so that no private details could reach a search engine.“), weil ein Thema auch wegen eines Links, von
+  Kontodaten oder seiner Sprache zurückgehalten wird und nur die Zahl gespeichert ist; die Faktenzeile nennt „the pages
+  looked up“ nur, wenn sie im Material waren; Herkunft im Widerspruchssatz „the pages looked up“, nie „your file“, und die
+  Überschrift der Materialprobleme lautet dann ohne „in what you gave“. Web und MCP (`get_order_result.lookedUp`, als Inhalt
+  fremder Seiten gekennzeichnet) sagen dasselbe; der Fehlersatz erscheint nur einmal. Der Ergebnistext (`MarkdownView`) nutzt
+  die eine Markdown-Konfiguration des Ateliers (`SafeMarkdown`, aus `main`): Erweiterungen einzeln gewählt, ohne „Generic
+  Attributes“, `{…}` wird also nie ein Attribut (kein `on*`, `style`, `ping`) und ein Platzhalter wie `{Name}` bleibt sichtbar;
+  eingebettetes HTML aus; Links nur für `http`, `https` und `mailto`; keine Bilder geladen (nur ihr Alternativtext bleibt).
+- **Stoppt nie den Lauf:** Jeder Fehler endet als Status mit der Warnung `grounding.research_failed`; der Text entsteht ohne
+  `W1`. Der Grounding-Schritt wartet höchstens 120 s, auch wenn der Dienst nicht von selbst abbricht. Eine Logzeile je Recherche nennt nur Zahlen, Status, Dauer und Modell,
+  nie Themen, Ausschnitte oder Adressen. Rohtexte werden nicht gespeichert; nur zur Abnahme schreibt `Research:AuditDirectory`
+  (Standard leer) für Nutzer mit Override Rohtext und Einträge (Rechte 0600), danach wird das Verzeichnis gelöscht.
+- **Migration Step51** (nullable, additiv, idempotent): `Orders.ResearchJson`, `Orders.ResearchAt`. Kein Index, keine
+  Datenmigration, keine `Sources`-Zeile für das Dossier.
+
+**Abweichungen vom Gesamtplan:** Dossier-Eintrag ist der wörtliche Seitenausschnitt, keine Modell-„Aussage“ (nicht prüfbar);
+kein Zweitweg über die Websuche der CLI (liefert keinen Rohtext); kein eigener Abruf von Adressen; Recherche nur in Version 1;
+`On` für alle erst nach dem Paarvergleich R3.
+
+**Schalter:** `Research:Mode` (`Off|On`, ausgeliefert `Off`), `Research:ModeOverrides` (Nutzer → Modus, nur über die Umgebung),
+`Research:DailyOrderCap` (50), `Research:DailyOrderCapPerUser` (20), `Research:AuditDirectory` (leer). Grenzen: `MaxSearches` 4, `ResultsPerSearch` 3,
+`RawCharsPerPage` 6.000, `SearchTimeout` 20 s, `CondenseTimeout` 60 s, `MaxEntries` 12. Wer Prompt oder Schema der Verdichtung
+ändert, misst VR neu (`tools/ResearchEval`); der Prüfer-Prompt bleibt unverändert (Test).
+
+**Vorversuche (2026-11-25, synthetischer Korpus, nachmittags zwischen 15:06 und 15:09 UTC, 0 Codex-Aufrufe):**
+- **VT (Tavily-Probe): bestanden.** 3 von 3 Anfragen mit 2xx, 6 von 9 Treffern mit Rohtext, Median 1,5 s. Die Antwort enthält
+  keine Verbrauchsangabe (nur Anfrage, Antwortzeit, Anfragekennung): **Kreditverbrauch von Tavily unbekannt**; laut
+  Konfiguration 0,001 USD je `basic`-Suche.
+- **VR (Dossier, zurückgehaltene Menge von 9 Aufträgen): bestanden.**
+  - K1 wörtlich: **0 Verstöße** über alle 95 gespeicherten Einträge (Entwicklung und zurückgehalten), unabhängige
+    Python-Nachprüfung (`research_verify.py`, Groß/Klein unterschieden) und eigene Nachrechnung.
+  - Gültigkeit 8 von 8 Verdichtungsantworten (verlangt ≥ 95 %); Ausbeute 7 von 9 Aufträgen mit mindestens einem Eintrag (77,8 %,
+    verlangt ≥ 70 %); Relevanz 34 von 35 Einträgen helfen beim Thema (97,1 %, verlangt ≥ 80 %, blinder Opus-Juror); Median
+    5,0 s je Auftrag für Suche und Verdichtung (verlangt ≤ 60 s).
+  - Berichtet: 17 Themen gesendet, 1 zurückgehalten, 17 Suchen ohne Fehlschlag, 42 Seiten mit Rohtext, 41 Vorschläge, 35
+    Einträge; verworfen 1 über der Grenze, 5 unsicher (12,2 %). Entwicklungsmenge (ohne Urteil): 12 von 12 mit Einträgen, 28
+    Suchen, 60 Einträge.
+  - Grenzen: 9 Aufträge sind ein Plausibilitätstor, K1 ist hart. Der Korpus hat kaum Dateien (1 von 36 Aufträgen mit
+    Themen, nicht in der zurückgehaltenen Menge); die Herkunftsregel wirkte dort nur einmal, ihre Wirkung belegen Tests
+    (Eigenschaftstest, Ende-zu-Ende-Gegenproben). Die Sprachregel und die Regel „mit Datei keine Suche“ sind nicht Teil des
+    Messwerkzeugs; beide können nur weniger senden.
+  - **Folge der Prüfrunde 1 für VR (nur gelesen, keine neue Messung):** 92 der 120 gespeicherten Seiten waren auf 6.000 Zeichen
+    gekürzt; der neue Schnitt nähme ihnen 1 bis 470 Zeichen am Ende. **Keiner der 95 Einträge liegt in diesem Rest**, keine
+    VR-Adresse hat Benutzerangaben oder über 500 Zeichen. `ResearchEval evaluate` mit dem neuen Code auf denselben Dateien
+    (Herkunftsregel und `DossierBuilder` werden nachgerechnet, die neue Nachprüfung mit Wortgrenzen ergibt 0 Verstöße):
+    **weiter bestanden**, alle Zahlen gleich. Die Verdichtung sah in VR das etwas längere Seitenende; ihre Eingabe ist also nicht
+    bitgleich mit dem Betrieb, das Ergebnis bleibt aussagekräftig, weil keine Fundstelle aus dem weggeschnittenen Teil stammt.
+  - **Folge der Prüfrunde 2 für VR (nur gelesen, offline auf den gespeicherten Dateien, kein neuer Aufruf):** 101 der 120
+    gespeicherten Seiten sind 6.000 UTF-16-Einheiten lang, also gekürzt (die 92 oben zählten Codepunkte). Der Schnitt mit
+    Halbe-Länge-Regel, ohne Abkürzungen als Satzende und mit Komma-Rückfall nimmt ihnen 0 bis 470 Zeichen am Ende (Median 45 in
+    der Entwicklungsmenge, 57 in der zurückgehaltenen; das unbekannte Zeichen nach Stelle 6.000 einmal als Buchstabe, einmal als
+    Leerzeichen angenommen); **keine Seite wird leer oder behält weniger als die Hälfte, keiner der 95 Einträge liegt im
+    weggeschnittenen Teil.** `research_verify.py` mit der Tausendertrenner-Regel: 0 Verstöße über 95 Einträge. `ResearchEval
+    evaluate` mit dem neuen Code (gespeicherter und neu erzeugter Prüfbericht): **weiter bestanden**, alle Zahlen gleich.
+
+**Tore nach dem Deploy (vorab festgelegt, keines besteht ohne Daten):**
+- **R2 (Abnahme-Messung):** 5 Aufträge des Messnutzers **ohne Dateien** (3 Web, 2 MCP), Faktenprüfer `Report`: (a) jeder mit
+  Recherche-Status ≠ `NotNeeded` und ≠ `FilesAttached`, (b) 0 Fragen zu recherchierten Themen, (c) höchstens 1
+  `unsupported`-Befund gegen eine von `W1` gedeckte Stelle, (d) Median ≤ 60 s, (e) 0 Notizmarker im Text. (a), (c) und (e)
+  prüft `tools/Eval/geef_eval/research_r2.py` auf den gespeicherten `get_order_result`-Antworten; (b) und (d) sind
+  **Handauswertung**. **(c), vorab festgelegt (Prüfrunde 2):** Eine gemeldete Stelle zählt im Code, wenn ihr Zitat eine Zahl
+  enthält (Datumsangaben über ihre Ziffern; `1 500`/`4'850` zusammengesetzt und in Teilen), die in Zitat oder Titel eines
+  Eintrags desselben Auftrags steht; in einem englischen Text auch ein großgeschriebener Name, der nicht am Satzanfang steht. Im
+  Deutschen ist jedes Substantiv großgeschrieben; eine Stelle, die nur ein großgeschriebenes Wort mit einem Eintrag teilt, ist
+  deshalb ein **Fall für eine Person**: Sie steht im Bericht und wird in einer Bestätigungsdatei entschieden (`--confirmations`,
+  je Fall `covered` oder `not_covered`, Zitat wörtlich wiederholt); `covered` zählt. Solange ein Fall offen ist oder die Datei
+  einen Fehler hat, ist R2 `not_evaluable`. Ein Text gilt als deutsch, außer er enthält mehr englische als deutsche
+  Funktionswörter. **Nicht auswertbar** unter 4 Aufträgen mit Text und unter **4 von 5 Aufträgen mit Status `found` und
+  mindestens einem Eintrag**. Nicht bestanden bei (c) → Recherche bleibt für alle `Off`.
+- **R3 (Wirkung, `tools/Eval/geef_eval/research_pairs.py`):** 8 unberührte Entwicklungsaufträge ohne Dateien, zwei Messnutzer
+  (mit/ohne Recherche, beide ohne Faktenprüfung), blinder Sonnet-Juror, je Auftrag zwei Aufrufarten in je zwei vertauschten
+  Durchgängen: `rank` **ohne** nachgeschlagene Ausschnitte entscheidet Siege und Platzhalter; `facts` mit den nummerierten
+  Ausschnitten des Arms on listet erfundene Tatsachen und nennt je Tatsache den Ausschnitt, der sie wörtlich deckt. Tor: (a)
+  Siege mit ≥ Siege ohne + 2, (b) Summe `erfunden` mit ≤ ohne, (c) Platzhalter für recherchierbare Fakten mit < ohne (je
+  Auftrag Mittel der zwei Durchgänge). **Gültigkeit (vorab festgelegt):** mindestens 7 von 8 Paaren technisch vollständig und
+  mindestens **6 von 8 gültig** – nur Paare, deren Arm on `found` mit mindestens einem Eintrag hat; `failed`, `daily_limit`,
+  `all_withheld`, `nothing_found`, `files_attached` oder keine Recherche machen ein Paar ungültig; sonst `not_evaluable`. Der
+  Status je Paar steht in der Ausgabe. **Erfundenes wird zweimal gezählt:** streng (jede Tatsache) und mit Wortlaut-Ausnahme
+  (ohne die von einem Ausschnitt wörtlich gedeckten). Jede Tatsache, die nur durch die Ausnahme nicht zählt, wird gelistet und
+  vor einem `On` von Hand gegen die Absicht geprüft; solange ein solcher Fall ohne gültige Entscheidung in der
+  Bestätigungsdatei (`--confirmations`, je Fall `not_invented` oder `invented`) ist, zählt streng und das Tor ist
+  `not_evaluable`. Kappe 32 Juror-Urteile (16 `rank` + 16 `facts`). Nach einem Konfigurationshalt reicht `run` nichts mehr ein.
+  Bestanden → `On` für alle; sonst bleibt `Off`, der Messnutzer behält `On`.
+
+**Gegenproben bei der Integration:** Über die echte Verdrahtung erreicht weder ein Profilname noch eine Antwort der Person
+Tavily oder die Verdichtung; mit angehängter Datei geht in keinem Lauf eine Anfrage hinaus (auch nicht ein übersetztes
+Dateiwort oder der Dateiname); Adresse und Titel einer Seite bleiben im Prompt Inhalt. Damit entfallen die Datei-Teile der
+Sicherheitsbefunde M1/M2 der Prüfrunde 1 und der Dateiname-Fund der Integration. Verbleibend, bewusst: Wörter aus dem Wortlaut
+der Person dürfen in ein Suchthema (sie hat sie selbst geschrieben); es gilt das Profil des Briefings; die Adresse einer Seite
+(ohne Query und Fragment) steht im Schreiber-Prompt und könnte im Text als Quelle erscheinen.
+
+**Kosten:** je recherchiertem Auftrag ein Sonnet-Aufruf und höchstens vier Tavily-Suchen (im Korpus hatten 22,5 % der Aufträge
+Suchthemen); Tagesgrenze ≤ 200 Suchen, je Konto ≤ 80.
+
+**Rückweg:** `Research__Mode=Off` ohne neues Image; gespeicherte Recherchen bleiben und erscheinen nur bei Läufen, die sie
+nutzten. Code: vorheriges Web-Image; Step51 ist nullable, der Code von Etappe 3 ignoriert die Spalten; kein `Down()` in
+Produktion. Die Vorlage `direct` ändert sich nicht; laufende Läufe dürfen bleiben.

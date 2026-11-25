@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>ResearchEval</AssemblyName>
+    <RootNamespace>Geef.Atelier.Tools.ResearchEval</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Geef.Atelier.Core/Geef.Atelier.Core.csproj" />
+    <ProjectReference Include="../../src/Geef.Atelier.Application/Geef.Atelier.Application.csproj" />
+    <ProjectReference Include="../../src/Geef.Atelier.Infrastructure/Geef.Atelier.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup Label="Measurement code shared with the tests (tests/Geef.Atelier.Tests/Tools/ResearchEval/Evaluation), so that tool and tests judge with the same code">
+    <Compile Include="../../tests/Geef.Atelier.Tests/Tools/ResearchEval/Evaluation/*.cs" LinkBase="Evaluation" />
+  </ItemGroup>
+  <ItemGroup Label="Reused unchanged: call guards, command line, gate results and gateway routes of FactCheckEval; corpus records of IntakeEval">
+    <Compile Include="../../tests/Geef.Atelier.Tests/FactCheck/Evaluation/CallGuards.cs" LinkBase="Shared" />
+    <Compile Include="../../tests/Geef.Atelier.Tests/FactCheck/Evaluation/CommandLine.cs" LinkBase="Shared" />
+    <Compile Include="../../tests/Geef.Atelier.Tests/FactCheck/Evaluation/EvalBasics.cs" LinkBase="Shared" />
+    <Compile Include="../../tests/Geef.Atelier.Tests/FactCheck/Evaluation/GatewayResolver.cs" LinkBase="Shared" />
+    <Compile Include="../IntakeEval/CorpusEntry.cs" LinkBase="Shared" />
+  </ItemGroup>
+</Project>
