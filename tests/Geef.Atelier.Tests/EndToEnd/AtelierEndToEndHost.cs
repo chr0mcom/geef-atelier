@@ -83,8 +83,9 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
     /// <summary>
     /// Creates an isolated database, boots the application through <c>Program</c> (which runs the
     /// migrations) and verifies that no migration is pending. The orchestrator stays held until
-    /// <see cref="ReleaseOrchestrator"/> or <see cref="SubmitAsync"/>. <paramref name="configureServices"/> runs last and
-    /// may replace registrations for a single test.
+    /// <see cref="ReleaseOrchestrator"/> or <see cref="SubmitAsync"/>. The intake is off (<c>Orders:IntakeMode=Off</c>) so that
+    /// orders run exactly as in stage 1 and no clarifier call lands in <see cref="Llm"/>; intake tests switch it on in
+    /// <paramref name="configureServices"/>, which runs last and may replace registrations for a single test.
     /// </summary>
     public static async Task<AtelierEndToEndHost> StartAsync(PostgresFixture postgres, Action<IServiceCollection>? configureServices = null)
     {
@@ -120,6 +121,7 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
             web.UseSetting("Finalizer:ExportPath", Path.Combine(keyDirectory, "exports"));
             web.UseSetting("Sources:StorageRoot", Path.Combine(keyDirectory, "sources"));
             web.UseSetting("Logging:LogLevel:Default", "Warning");
+            web.UseSetting("Orders:IntakeMode", "Off");
 
             web.ConfigureTestServices(services =>
             {
@@ -216,14 +218,24 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
     /// </summary>
     public async Task<JsonElement> CallMcpToolAsync(string toolName, object arguments)
     {
+        var root = await PostMcpAsync("tools/call", new { name = toolName, arguments });
+        if (root.TryGetProperty("error", out var error))
+            throw new InvalidOperationException($"MCP call '{toolName}' returned an error: {error}");
+
+        var result = root.GetProperty("result");
+        if (result.TryGetProperty("isError", out var isError) && isError.ValueKind == JsonValueKind.True)
+            throw new InvalidOperationException($"MCP tool '{toolName}' reported an error: {result}");
+
+        var text = result.GetProperty("content")[0].GetProperty("text").GetString() ?? "null";
+        using var toolDoc = JsonDocument.Parse(text);
+        return toolDoc.RootElement.Clone();
+    }
+
+    /// <summary>Sends one JSON-RPC request to the real <c>/mcp</c> endpoint with the static bearer token and returns the whole response object.</summary>
+    public async Task<JsonElement> PostMcpAsync(string method, object? parameters = null)
+    {
         using var client = _factory.CreateClient();
-        var payload = JsonSerializer.Serialize(new
-        {
-            jsonrpc = "2.0",
-            id = 1,
-            method = "tools/call",
-            @params = new { name = toolName, arguments },
-        });
+        var payload = JsonSerializer.Serialize(new { jsonrpc = "2.0", id = 1, method, @params = parameters ?? new { } });
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
         {
@@ -235,21 +247,10 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
         using var response = await client.SendAsync(request);
         var raw = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"MCP call '{toolName}' failed with {(int)response.StatusCode}: {raw}");
+            throw new InvalidOperationException($"MCP request '{method}' failed with {(int)response.StatusCode}: {raw}");
 
-        var json = ExtractJsonRpcPayload(raw);
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-        if (root.TryGetProperty("error", out var error))
-            throw new InvalidOperationException($"MCP call '{toolName}' returned an error: {error}");
-
-        var result = root.GetProperty("result");
-        if (result.TryGetProperty("isError", out var isError) && isError.ValueKind == JsonValueKind.True)
-            throw new InvalidOperationException($"MCP tool '{toolName}' reported an error: {result}");
-
-        var text = result.GetProperty("content")[0].GetProperty("text").GetString() ?? "null";
-        using var toolDoc = JsonDocument.Parse(text);
-        return toolDoc.RootElement.Clone();
+        using var doc = JsonDocument.Parse(ExtractJsonRpcPayload(raw));
+        return doc.RootElement.Clone();
     }
 
     public async ValueTask DisposeAsync()
