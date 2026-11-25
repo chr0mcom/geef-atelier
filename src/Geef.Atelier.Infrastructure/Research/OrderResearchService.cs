@@ -98,7 +98,7 @@ internal sealed class OrderResearchService(
                 return (state.End(ResearchStatus.Failed, SearchCode(outcomes), time, started), [], skipped);
 
             var retrievedAt = time.GetUtcNow();
-            var pages = Pages(outcomes);
+            var pages = outcomes.Select(o => o.Hits).ToList().ToResearchPages();
             state.Pages = pages.Count;
             if (pages.Count == 0)
                 return (state.End(ResearchStatus.NothingFound, null, time, started), pages, skipped);
@@ -162,22 +162,6 @@ internal sealed class OrderResearchService(
         outcomes.All(o => o.ErrorCode == NoKeyCode) ? NoKeyCode
         : outcomes.All(o => o.ErrorCode == TimeoutCode) ? TimeoutCode
         : SearchFailedCode;
-
-    private static List<ResearchPage> Pages(IReadOnlyList<TavilySearchOutcome> outcomes)
-    {
-        var pages = new List<ResearchPage>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        for (var topic = 0; topic < outcomes.Count; topic++)
-        {
-            foreach (var hit in outcomes[topic].Hits)
-            {
-                if (string.IsNullOrWhiteSpace(hit.RawContent) || !seen.Add(hit.Url))
-                    continue;
-                pages.Add(new ResearchPage($"P{pages.Count + 1}", topic + 1, hit.Url, hit.Title, hit.RawContent));
-            }
-        }
-        return pages;
-    }
 
     private async Task<bool?> StoreAsync(Guid orderId, OrderResearch research, CancellationToken ct)
     {

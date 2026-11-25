@@ -50,20 +50,12 @@ public sealed record ResearchKit(
 public static class ResearchPages
 {
     /// <summary>
-    /// Pages <c>P1…</c> in the order of the topics and, per topic, of the results; results without raw text are left out. The
-    /// numbering follows contract stage 4, 4.4; when the research service of F2 numbers differently, this is the place to align.
+    /// The pages exactly as the research service numbers them (<c>ResearchPageNumbering</c>): <c>P1…</c> in the order of the topics
+    /// and, per topic, of the results; results without raw text are left out and an address found again keeps its first page.
     /// </summary>
-    public static IReadOnlyList<ResearchPage> From(IReadOnlyList<IReadOnlyList<(string Url, string Title, string? RawText)>> resultsPerTopic)
-    {
-        var pages = new List<ResearchPage>();
-        for (var topic = 0; topic < resultsPerTopic.Count; topic++)
-        {
-            foreach (var (url, title, raw) in resultsPerTopic[topic])
-            {
-                if (!string.IsNullOrWhiteSpace(raw))
-                    pages.Add(new ResearchPage($"P{pages.Count + 1}", topic + 1, url, title, raw));
-            }
-        }
-        return pages;
-    }
+    public static IReadOnlyList<ResearchPage> From(IReadOnlyList<IReadOnlyList<(string Url, string Title, string? RawText)>> resultsPerTopic) =>
+        resultsPerTopic
+            .Select(hits => (IReadOnlyList<TavilyHit>)hits.Select(h => new TavilyHit(h.Url, h.Title, h.RawText)).ToList())
+            .ToList()
+            .ToResearchPages();
 }
