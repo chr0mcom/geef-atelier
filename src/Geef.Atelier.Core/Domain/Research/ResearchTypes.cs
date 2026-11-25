@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Geef.Atelier.Core.Domain.Writing;
 
 namespace Geef.Atelier.Core.Domain.Research;
@@ -30,12 +32,67 @@ public sealed record OrderResearch(int SchemaVersion, ResearchStatus Status, IRe
     public const int CurrentSchemaVersion = 1;
 }
 
-/// <summary>JSON form of <see cref="OrderResearch"/>.</summary>
+/// <summary>JSON form (camelCase, enums as text) of <see cref="OrderResearch"/>.</summary>
 public static class ResearchJson
 {
-    /// <summary>Serializes <paramref name="research"/>.</summary>
-    public static string Serialize(OrderResearch research) => throw new NotImplementedException();
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Converters = { new JsonStringEnumConverter() },
+    };
 
-    /// <summary>Parses stored research; <c>null</c> for null, blank or unreadable JSON.</summary>
-    public static OrderResearch? TryParse(string? json) => throw new NotImplementedException();
+    /// <summary>Serializes <paramref name="research"/>.</summary>
+    public static string Serialize(OrderResearch research)
+    {
+        ArgumentNullException.ThrowIfNull(research);
+        return JsonSerializer.Serialize(research, JsonOptions);
+    }
+
+    /// <summary>
+    /// Parses stored research; <c>null</c> for null, blank or unreadable JSON. Unknown fields are ignored, missing lists become empty,
+    /// and entries without a passage are left out.
+    /// </summary>
+    public static OrderResearch? TryParse(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+
+        OrderResearch? research;
+        try
+        {
+            research = JsonSerializer.Deserialize<OrderResearch>(json, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+
+        if (research is null)
+            return null;
+
+        return research with
+        {
+            TopicsSent = (research.TopicsSent ?? []).Where(t => !string.IsNullOrWhiteSpace(t)).ToList(),
+            Dropped = research.Dropped ?? new Dictionary<ResearchDropReason, int>(),
+            Entries = (research.Entries ?? [])
+                .Where(e => e is not null && !string.IsNullOrWhiteSpace(e.Quote))
+                .Select(e => e with
+                {
+                    Id = e.Id ?? string.Empty,
+                    Url = e.Url ?? string.Empty,
+                    Title = e.Title ?? string.Empty,
+                    RawSha256 = e.RawSha256 ?? string.Empty,
+                })
+                .ToList(),
+        };
+    }
 }
