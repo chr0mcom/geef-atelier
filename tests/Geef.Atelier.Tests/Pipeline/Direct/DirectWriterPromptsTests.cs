@@ -237,6 +237,20 @@ public sealed class DirectWriterPromptsTests
     }
 
     [Fact]
+    public void Replaced_information_from_the_pages_looked_up_never_goes_to_the_correction_as_what_the_files_say()
+    {
+        var fromPages = DirectWriterPrompts.FactProblem(
+            Meta(FactFindingMetadata.SupersededCode, "Jahresbeitrag 30 Euro", (FactFindingMetadata.Material, "Jahresbeitrag 35 Euro"),
+                (FactFindingMetadata.MaterialFrom, "LookedUp")), "Old figure.", false);
+        var fromFiles = DirectWriterPrompts.FactProblem(
+            Meta(FactFindingMetadata.SupersededCode, "Jahresbeitrag 30 Euro", (FactFindingMetadata.Material, "Jahresbeitrag 35 Euro"),
+                (FactFindingMetadata.MaterialFrom, "Files")), "Old figure.", false);
+
+        Assert.Null(fromPages);
+        Assert.StartsWith("This passage uses something your files replace or drop", fromFiles, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_file_passage_in_the_correction_is_marked_as_quoted_content_and_cannot_close_its_quotes()
     {
         var superseded = DirectWriterPrompts.FactProblem(

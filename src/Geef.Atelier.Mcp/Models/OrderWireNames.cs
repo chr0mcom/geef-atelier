@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
@@ -61,6 +62,11 @@ internal static class OrderWireNames
     public const string PassageNotBacked = "not_backed";
     public const string PassageAgainstInstruction = "against_instruction";
     public const string PassageReplacedInFiles = "replaced_in_files";
+    public const string PassageDiffersFromLookedUp = "differs_from_looked_up";
+
+    /// <summary>Kind of a shown passage: <see cref="PassageDiffersFromLookedUp"/> for one the pages looked up say otherwise, otherwise its <see cref="FactFindingKind"/>.</summary>
+    public static string ToWire(this OrderUnbackedPassage passage) =>
+        passage.LookedUp ? PassageDiffersFromLookedUp : passage.Kind.ToWire();
 
     /// <summary>Kind of a flagged passage of the text. A contradiction between files is never a passage (it is a source issue), so it throws.</summary>
     public static string ToWire(this FactFindingKind kind) => kind switch

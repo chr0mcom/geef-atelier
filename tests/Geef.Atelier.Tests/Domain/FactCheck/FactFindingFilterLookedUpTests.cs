@@ -41,15 +41,31 @@ public sealed class FactFindingFilterLookedUpTests
         var finding = Assert.Single(result.Findings);
         Assert.Equal(MaterialPart.LookedUp, finding.MaterialFrom);
         Assert.Equal(DossierRenderer.FileName, finding.MaterialFile);
+        Assert.False(finding.Blocking);
     }
 
     [Fact]
-    public void The_same_source_without_the_mark_stays_a_file()
+    public void The_same_source_without_the_mark_stays_a_file_and_blocks()
     {
         var result = Apply(new ProposedFactFinding(FactFindingKind.Superseded, "Für Rückfragen steht die Leitung gern zur Verfügung.",
             "Uses an old figure.", null, "ab dem 1. Januar 2026 brutto 13,90 Euro", null), lookedUp: false);
 
-        Assert.Equal(MaterialPart.Files, Assert.Single(result.Findings).MaterialFrom);
+        var finding = Assert.Single(result.Findings);
+        Assert.Equal(MaterialPart.Files, finding.MaterialFrom);
+        Assert.True(finding.Blocking);
+    }
+
+    [Fact]
+    public void A_carried_finding_from_the_pages_never_merges_into_one_from_the_files()
+    {
+        var fromFiles = Assert.Single(Apply(new ProposedFactFinding(FactFindingKind.Superseded, "Für Rückfragen steht die Leitung gern zur Verfügung.",
+            "Uses an old figure.", null, "laut alter Liste 12,41 Euro je Stunde", null)).Findings);
+        var fromPages = Assert.Single(Apply(new ProposedFactFinding(FactFindingKind.Superseded, "Für Rückfragen steht die Leitung gern zur Verfügung.",
+            "Uses an old figure.", null, "ab dem 1. Januar 2026 brutto 13,90 Euro", null)).Findings);
+
+        var merged = FactCarryOver.Merge([fromPages], [[fromFiles]], Draft);
+
+        Assert.Equal([(MaterialPart.LookedUp, false), (MaterialPart.Files, true)], merged.Select(f => (f.MaterialFrom!.Value, f.Blocking)));
     }
 
     [Fact]

@@ -309,7 +309,7 @@ public sealed class GetOrderResultHonestyTests
             names.SkipWhile(n => n != "assumptions").ToList());
         Assert.Equal(["checked", "changed", "toReview", "limits"], root.GetProperty("checks").EnumerateObject().Select(p => p.Name));
         Assert.Equal(["state", "filesCompared"], root.GetProperty("factCheck").EnumerateObject().Select(p => p.Name));
-        Assert.Equal(["quote", "kind", "instruction", "blocking", "instructionFrom"], root.GetProperty("unbackedPassages")[0].EnumerateObject().Select(p => p.Name));
+        Assert.Equal(["quote", "kind", "instruction", "blocking", "instructionFrom", "note"], root.GetProperty("unbackedPassages")[0].EnumerateObject().Select(p => p.Name));
         Assert.Equal(["file", "quote"], root.GetProperty("sourceQuotes")[0].EnumerateObject().Select(p => p.Name));
         Assert.Equal("open_points", root.GetProperty("factCheck").GetProperty("state").GetString());
         Assert.Equal("not_backed", root.GetProperty("unbackedPassages")[0].GetProperty("kind").GetString());

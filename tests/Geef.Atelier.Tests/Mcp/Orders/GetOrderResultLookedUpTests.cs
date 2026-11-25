@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Geef.Atelier.Application.Orders;
+using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Research;
@@ -26,6 +27,38 @@ public sealed class GetOrderResultLookedUpTests
         var id = Guid.NewGuid();
         _orders.AddResult("alice", OrderToolTestData.Result(id, OrderDisplayState.Delivered, "Liebe Eltern, der Mindestlohn steigt.") with { LookedUp = lookedUp });
         return await GetOrderResultTool.GetOrderResult(_orders, _alice, id.ToString());
+    }
+
+    [Fact]
+    public async Task Files_attached_reaches_the_client_with_its_own_status_and_sentence()
+    {
+        var dto = await GetAsync(new OrderLookedUpView(ResearchStatus.FilesAttached, OrderResearchLines.FilesAttached, 0, []));
+
+        Assert.Equal(("files_attached", OrderResearchLines.FilesAttached), (dto.LookedUp!.Status, dto.LookedUp.Note));
+        Assert.Empty(dto.LookedUp.Entries);
+    }
+
+    [Fact]
+    public async Task A_passage_the_pages_looked_up_say_otherwise_is_a_hint_with_its_own_kind_and_sentence()
+    {
+        var id = Guid.NewGuid();
+        _orders.AddResult("alice", OrderToolTestData.Result(id, OrderDisplayState.DeliveredWithOpenPoints, "Der Jahresbeitrag beträgt 30 Euro.") with
+        {
+            UnbackedPassages =
+            [
+                new OrderUnbackedPassage("Der Jahresbeitrag beträgt 30 Euro.", FactFindingKind.Superseded, null, false, null, LookedUp: true),
+                new OrderUnbackedPassage("Die Anmeldung endet am Freitag.", FactFindingKind.Superseded, null, true),
+            ],
+        });
+
+        var dto = await GetOrderResultTool.GetOrderResult(_orders, _alice, id.ToString());
+
+        Assert.Equal(
+            [
+                new OrderUnbackedPassageDto("Die Anmeldung endet am Freitag.", "replaced_in_files", null, true),
+                new OrderUnbackedPassageDto("Der Jahresbeitrag beträgt 30 Euro.", "differs_from_looked_up", null, false, null, OrderResearchLines.DiffersFromLookedUp),
+            ],
+            dto.UnbackedPassages);
     }
 
     [Fact]

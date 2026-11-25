@@ -141,4 +141,23 @@ public sealed class OrderResultDuplicatesTests
         Assert.Empty(result.SourceIssueNotes!);
         Assert.Equal([WriterOnTotal, WriterOther], result.WriterOpenPointsOnTheirOwn());
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Replaced_information_from_the_pages_looked_up_is_a_hint_also_in_an_earlier_report(bool storedAsBlocking)
+    {
+        var fromPages = new FactFinding("f1", FactFindingKind.Superseded, "Der Jahresbeitrag beträgt 30 Euro.", "Old figure.", null,
+            "Jahresbeitrag 35 Euro", null, "Looked up on the web", null, storedAsBlocking, QuoteMatchKind.Exact, MaterialPart.LookedUp);
+        var fromFiles = fromPages with { Id = "f2", TextQuote = "Die Anmeldung endet am Freitag.", MaterialFrom = MaterialPart.Files, MaterialFile = "notizen.txt", Blocking = true };
+        var report = Report(Notes()) with
+        {
+            FactCheck = new FactCheckSummary(FactCheckMode.Report, FactCheckScope.Full, FactCheckState.OpenPoints, [fromPages, fromFiles], [], [], 1, "m", false, "fact-check-1"),
+        };
+
+        var passages = Base().WithReport(report).UnbackedPassages!;
+
+        Assert.Equal([(true, false), (false, true)], passages.Select(p => (p.LookedUp, p.Blocking)));
+        Assert.Equal(["Die Anmeldung endet am Freitag."], Base().WithReport(report).BlockingPassages(FactFindingKind.Superseded).Select(p => p.Quote));
+    }
 }

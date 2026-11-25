@@ -19,7 +19,7 @@ public sealed class OrderOpenPointsTests : TestContext
         "These passages may not be backed by your request or your files. Please check them:",
         "These passages may not follow what you asked for:",
         "This passage uses something your files replace or drop:",
-        "Please check these figures and statements in what you gave:",
+        "Please check these figures and statements:",
         "Still open:",
         "Please also look at this:",
     ];
@@ -65,6 +65,33 @@ public sealed class OrderOpenPointsTests : TestContext
         Assert.Equal(HonestResultData.ClientQuote, client.QuerySelector("q")!.TextContent);
         Assert.Contains(HonestResultData.ClientInstruction, client.TextContent);
         Assert.DoesNotContain(HonestResultData.ClientQuote, cut.Find("[data-testid='order-against-instruction']").TextContent);
+    }
+
+    [Fact]
+    public void WithoutThePagesLookedUpTheProblemsInTheMaterialAreWhatThePersonGave()
+    {
+        var cut = Render(Full() with { LookedUp = null });
+
+        Assert.Contains("Please check these figures and statements in what you gave:", cut.FindAll("[data-testid='order-open-points'] > p").Select(e => e.TextContent));
+    }
+
+    [Fact]
+    public void APassageThePagesLookedUpSayOtherwiseIsAHintWithItsOwnSentenceNeverAMatterOfTheFiles()
+    {
+        const string quote = "Der Jahresbeitrag beträgt 30 Euro.";
+        var result = OrderTestData.Result(OrderTestData.View(OrderDisplayState.DeliveredWithOpenPoints)) with
+        {
+            UnbackedPassages = [new OrderUnbackedPassage(quote, FactFindingKind.Superseded, null, false, null, LookedUp: true)],
+        };
+
+        var cut = Render(result);
+
+        var hint = cut.Find("[data-testid='order-hint']");
+        Assert.Equal("differs-from-looked-up", hint.GetAttribute("data-kind"));
+        Assert.Equal(quote, hint.QuerySelector("q")!.TextContent);
+        Assert.Equal(OrderResearchLines.DiffersFromLookedUp, hint.QuerySelector("[data-testid='order-hint-looked-up']")!.TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='order-replaced']"));
+        Assert.DoesNotContain("your files", cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]

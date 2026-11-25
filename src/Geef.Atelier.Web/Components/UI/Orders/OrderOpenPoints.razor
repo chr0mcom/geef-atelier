@@ -74,7 +74,7 @@
         }
         @if (SourceIssues.Count > 0)
         {
-            <p>Please check these figures and statements in what you gave:</p>
+            <p>@(Result.UsedLookedUp() ? SourceIssuesLeadWithLookedUp : SourceIssuesLead)</p>
             <ul class="order-source-issues" data-testid="order-source-issues">
                 @foreach (var issue in SourceIssues)
                 {
@@ -112,9 +112,13 @@
                 }
                 @foreach (var passage in Hints)
                 {
-                    <li data-testid="order-hint" data-kind="@KindKey(passage.Kind)">
+                    <li data-testid="order-hint" data-kind="@KindKey(passage)">
                         <q class="order-quote" lang="@Language">@passage.Quote</q>
-                        @if (!string.IsNullOrWhiteSpace(passage.Instruction))
+                        @if (passage.LookedUp)
+                        {
+                            <span class="order-passage-asked" data-testid="order-hint-looked-up">@OrderResearchLines.DiffersFromLookedUp</span>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(passage.Instruction))
                         {
                             <span class="order-passage-asked">Asked for: “<span lang="@Language">@passage.Instruction</span>”</span>
                         }
@@ -128,7 +132,8 @@
 @code {
     /// <summary>
     /// The delivered result with placeholders, open checks, passages of the text that may not be backed or may not follow an
-    /// instruction, problems in the files, open points of the writer and hints (everything that never blocks).
+    /// instruction, problems in the files, open points of the writer and hints (everything that never blocks, among them passages
+    /// the pages looked up say otherwise, with <see cref="OrderResearchLines.DiffersFromLookedUp"/>).
     /// </summary>
     [Parameter, EditorRequired] public OrderResult Result { get; set; } = null!;
 
@@ -141,12 +146,20 @@
 
     IReadOnlyList<string> WriterOpenPoints => Result.WriterOpenPointsOnTheirOwn();
 
+    /// <summary>Lead of the problems in the material when the text was written without the pages looked up.</summary>
+    public const string SourceIssuesLead = "Please check these figures and statements in what you gave:";
+
+    /// <summary>Lead of the problems in the material when the pages looked up were part of it; each sentence names where it stands.</summary>
+    public const string SourceIssuesLeadWithLookedUp = "Please check these figures and statements:";
+
     /// <summary>Words before an open point of the writer shown with the sentence about the same wrong total.</summary>
     public const string WriterNoteLead = "The writer noted:";
 
     bool HasContent => Result.HasOpenPoints();
 
     static bool ProfileHidden(OrderUnbackedPassage passage) => passage.Origin == InstructionOrigin.Memory && string.IsNullOrWhiteSpace(passage.Instruction);
+
+    static string KindKey(OrderUnbackedPassage passage) => passage.LookedUp ? "differs-from-looked-up" : KindKey(passage.Kind);
 
     static string KindKey(FactFindingKind kind) => kind switch
     {

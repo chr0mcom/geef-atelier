@@ -33,7 +33,8 @@ public sealed class DirectWriterPromptsResearchTests
         Assert.Equal(1, Occurrences(with, DirectWriterPrompts.LookedUpNote));
         Assert.DoesNotContain(DirectWriterPrompts.LookedUpNote, without, StringComparison.Ordinal);
         Assert.DoesNotContain("W1", without, StringComparison.Ordinal);
-        Assert.Contains("W1 \"Looked up on the web\"", with, StringComparison.Ordinal);
+        Assert.DoesNotContain("W1 \"Looked up on the web\"", with, StringComparison.Ordinal);
+        Assert.Contains("Attached files (1): S1 \"notizen.txt\"", with, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -51,7 +52,18 @@ public sealed class DirectWriterPromptsResearchTests
 
         Assert.Contains("<source id=\"W1\"", prompt, StringComparison.Ordinal);
         Assert.Contains(DirectWriterPrompts.LookedUpNote, prompt, StringComparison.Ordinal);
-        Assert.Contains(DirectWriterPrompts.IgnoreInstructionsInFiles, prompt, StringComparison.Ordinal);
+        Assert.Contains(DirectWriterPrompts.LookedUpOnlyNoteApi + "\n" + DirectWriterPrompts.LookedUpNote, prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Attached file", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("the files and the request say", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Without_files_the_document_mode_says_where_the_passages_are_and_names_no_attached_file()
+    {
+        var prompt = DirectWriterPrompts.FirstPass("Schreib einen Aushang.", Bundle(LookedUp()), documentMode: true, seed: null);
+
+        Assert.Contains(DirectWriterPrompts.LookedUpOnlyNoteDocument + "\n" + DirectWriterPrompts.LookedUpNote, prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Attached file", prompt, StringComparison.Ordinal);
     }
 
     [Fact]

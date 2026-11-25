@@ -113,10 +113,11 @@ internal static class OrderDtoMappings
         OrderResultRules.ShownPassages(passages)
             .Select(p => new OrderUnbackedPassageDto(
                 p.Quote,
-                p.Kind.ToWire(),
+                p.ToWire(),
                 p.Kind == FactFindingKind.Instruction && !string.IsNullOrWhiteSpace(p.Instruction) ? p.Instruction : null,
                 p.Blocking,
-                p.Kind == FactFindingKind.Instruction ? p.Origin?.ToWire() : null))
+                p.Kind == FactFindingKind.Instruction ? p.Origin?.ToWire() : null,
+                p.LookedUp ? OrderResearchLines.DiffersFromLookedUp : null))
             .ToList();
 
     /// <summary>The verified quotes as the web page shows them (<see cref="OrderResultRules.QuotesByFile(OrderResult)"/>), one entry per quote.</summary>

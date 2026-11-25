@@ -70,7 +70,8 @@ public sealed record FactFilterResult(IReadOnlyList<FactFinding> Findings, IRead
 /// <summary>
 /// Checks proposed findings against the text and the material without an AI model (contract stage 3, 4.3). Whether a
 /// finding stays, where an instruction comes from and whether a finding blocks follow from where its quotes are found,
-/// never from what the model says about them.
+/// never from what the model says about them. A finding about replaced information whose replacing passage stands in the pages
+/// looked up on the web (<see cref="MaterialPart.LookedUp"/>) never blocks (D-074).
 /// </summary>
 public static class FactFindingFilter
 {
@@ -179,6 +180,7 @@ public static class FactFindingFilter
         var isBlocking = finding.Kind switch
         {
             FactFindingKind.Instruction => origin is InstructionOrigin.Stated or InstructionOrigin.Answered or InstructionOrigin.Memory,
+            FactFindingKind.Superseded => materialFrom != MaterialPart.LookedUp,
             _ => true,
         };
         if (isBlocking && blocking >= MaxBlocking)
@@ -446,7 +448,8 @@ public static class FactCarryOver
     /// <paramref name="draft"/> as whole words keeps its blocking effect, with the quote as it stands now; a source conflict
     /// always stays, because a correction of the text does not change the material (without a passage when its passage is gone).
     /// Only a repetition is dropped: a passage finding whose passage lies wholly inside the passage of one already kept of the same
-    /// kind (for an instruction, also against the same instruction), which then blocks when either blocks, or a source conflict
+    /// kind (for an instruction, also against the same instruction; for replaced information, also from the same side of the material,
+    /// the pages looked up or not), which then blocks when either blocks, or a source conflict
     /// whose two passages contain each other as whole words and that names the same files. A passage that only overlaps a kept one
     /// is shown as well. No limit applies; ids are given anew (<c>f1…</c>).
     /// </summary>
@@ -483,7 +486,8 @@ public static class FactCarryOver
                     continue;
                 var twin = kept.FindIndex(k => k.Finding.Kind == carried.Kind && k.Range is { } other
                     && other.Start <= range.Start && range.Start + range.Length <= other.Start + other.Length
-                    && (carried.Kind != FactFindingKind.Instruction || SameInstruction(k.Finding, carried)));
+                    && (carried.Kind != FactFindingKind.Instruction || SameInstruction(k.Finding, carried))
+                    && (carried.Kind != FactFindingKind.Superseded || (k.Finding.MaterialFrom == MaterialPart.LookedUp) == (carried.MaterialFrom == MaterialPart.LookedUp)));
                 if (twin >= 0)
                 {
                     if (carried.Blocking && !kept[twin].Finding.Blocking)
@@ -566,7 +570,7 @@ public sealed record FactCheckSummary(FactCheckMode Mode, FactCheckScope Scope, 
 public static class FactFindingMetadata
 {
     public const string Code = "code", Id = "id", Kind = "kind", Quote = "quote", Instruction = "instruction", Material = "material", Material2 = "material2",
-        MaterialFile = "materialFile", Origin = "origin", Blocking = "blocking", Mode = "mode";
+        MaterialFile = "materialFile", Origin = "origin", Blocking = "blocking", Mode = "mode", MaterialFrom = "materialFrom";
     public const string UnsupportedCode = "fact.unsupported", InstructionCode = "fact.instruction", SupersededCode = "fact.superseded", SourceConflictCode = "fact.source_conflict";
 
     /// <summary>Category of every finding of the fact check (<c>Finding.Category</c>, <c>Findings.Category</c>).</summary>

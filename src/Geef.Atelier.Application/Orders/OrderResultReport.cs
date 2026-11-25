@@ -48,7 +48,7 @@ public static class OrderResultReport
                 ? factCheck!.Open
                     .Where(f => f.Kind != FactFindingKind.SourceConflict && !string.IsNullOrWhiteSpace(f.TextQuote))
                     .Select(f => new OrderUnbackedPassage(f.TextQuote!.Trim(), f.Kind,
-                        f.Origin == InstructionOrigin.Memory && !showProfile ? null : f.InstructionQuote, f.Blocking, f.Origin))
+                        f.Origin == InstructionOrigin.Memory && !showProfile ? null : f.InstructionQuote, f.Blocking && !f.FromLookedUp(), f.Origin, f.FromLookedUp()))
                     .ToList()
                 : [],
             SourceIssues = OrderCheckLines.SourceIssueSentences(report, showProfile),
@@ -59,6 +59,13 @@ public static class OrderResultReport
         };
         return filled with { Checks = OrderCheckLines.Build(report, filled.HasOpenPoints()) };
     }
+
+    /// <summary>
+    /// True for a finding that uses replaced information where the replacing passage stands in the pages looked up on the web; such a
+    /// finding is a hint, also in reports written before that rule.
+    /// </summary>
+    public static bool FromLookedUp(this FactFinding finding) =>
+        finding.Kind == FactFindingKind.Superseded && finding.MaterialFrom == MaterialPart.LookedUp;
 
     private static IReadOnlyList<string> WithoutClarifierAssumptions(IReadOnlyList<string> writer, OrderResult result)
     {
