@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>ResearchEval</AssemblyName>
+    <RootNamespace>Geef.Atelier.Tools.ResearchEval</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Geef.Atelier.Core/Geef.Atelier.Core.csproj" />
+    <ProjectReference Include="../../src/Geef.Atelier.Application/Geef.Atelier.Application.csproj" />
+    <ProjectReference Include="../../src/Geef.Atelier.Infrastructure/Geef.Atelier.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

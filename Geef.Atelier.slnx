@@ -13,5 +13,6 @@
     <Project Path="tools/FactCheckEval/FactCheckEval.csproj" />
     <Project Path="tools/HashPassword/HashPassword.csproj" />
     <Project Path="tools/IntakeEval/IntakeEval.csproj" />
+    <Project Path="tools/ResearchEval/ResearchEval.csproj" />
   </Folder>
 </Solution>
