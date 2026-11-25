@@ -3,19 +3,37 @@ using Markdig.Renderers;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 
-namespace Geef.Atelier.Web.Components.UI;
+namespace Geef.Atelier.Infrastructure.Markup;
 
 /// <summary>
-/// Renders Markdown written by a model (and possibly carrying words of other web pages) so that nothing in it acts on its own: links
-/// stay links only for <see cref="AllowedSchemes"/>, every other link keeps just its text, and no image is loaded (an image keeps
-/// just its alternative text).
+/// The only Markdown configuration of the Atelier. Texts come from models and may carry words of uploaded files or web pages, so
+/// the extensions are listed one by one: generic attributes (<c>{...}</c> becomes HTML attributes, including event handlers, and
+/// placeholders such as <c>{Name}</c> disappear), media links, custom containers, diagrams and mathematics stay off.
 /// </summary>
-public static class MarkdownSafety
+public static class SafeMarkdown
 {
-    /// <summary>Schemes a link may have; anything else, relative addresses included, is shown as plain text.</summary>
+    /// <summary>Schemes a link may have in <see cref="ToSafeHtml"/>; anything else, relative addresses included, is shown as plain text.</summary>
     public static IReadOnlySet<string> AllowedSchemes { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "http", "https", "mailto" };
 
-    /// <summary>The HTML of <paramref name="markdown"/> under <paramref name="pipeline"/> after the rules of <see cref="MarkdownSafety"/>.</summary>
+    /// <summary>Adds the extensions that are safe for texts nobody has reviewed.</summary>
+    public static MarkdownPipelineBuilder UseSafeExtensions(this MarkdownPipelineBuilder builder) =>
+        builder
+            .UsePipeTables()
+            .UseGridTables()
+            .UseTaskLists()
+            .UseListExtras()
+            .UseEmphasisExtras()
+            .UseAutoLinks()
+            .UseFootnotes()
+            .UseDefinitionLists()
+            .UseAbbreviations()
+            .UseAutoIdentifiers();
+
+    /// <summary>
+    /// The HTML of <paramref name="markdown"/> in which nothing acts on its own: links stay links only for
+    /// <see cref="AllowedSchemes"/>, every other link keeps just its text, and no image is loaded (an image keeps just its
+    /// alternative text). The pipeline must disable raw HTML.
+    /// </summary>
     public static string ToSafeHtml(this string? markdown, MarkdownPipeline pipeline)
     {
         var document = Markdown.Parse(markdown ?? string.Empty, pipeline);

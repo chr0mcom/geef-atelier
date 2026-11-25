@@ -1,6 +1,7 @@
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
+using Geef.Atelier.Infrastructure.Markup;
 using Markdig;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
@@ -10,7 +11,7 @@ namespace Geef.Atelier.Infrastructure.Finalizers.FormatConverters;
 internal static class MarkdownToDocxConverter
 {
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
-        .UseAdvancedExtensions()
+        .UseSafeExtensions()
         .Build();
 
     public static byte[] Convert(string markdown, string title = "")

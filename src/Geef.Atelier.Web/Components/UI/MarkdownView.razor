@@ -1,15 +1,16 @@
+@using Geef.Atelier.Infrastructure.Markup
 @using Markdig
 
 <div class="md @Class">@_rendered</div>
 
 @code {
-    /// <summary>The Markdown to show; links only for http, https and mailto, no images loaded (<see cref="MarkdownSafety"/>).</summary>
+    /// <summary>The Markdown to show; links only for http, https and mailto, no images loaded (<see cref="SafeMarkdown"/>).</summary>
     [Parameter, EditorRequired] public string? Markdown { get; set; }
     [Parameter] public string? Class { get; set; }
 
     static readonly MarkdownPipeline Pipeline =
         new MarkdownPipelineBuilder()
-            .UseAdvancedExtensions()
+            .UseSafeExtensions()
             .UseSoftlineBreakAsHardlineBreak()
             .DisableHtml()
             .Build();
