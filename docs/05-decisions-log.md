@@ -2435,3 +2435,90 @@ at once through the environment.
 **Decision after the gates:** deploy A ships with `Intake:DropGuessedDateOptions = true` (G-A2 passed). The R2 result of (a)
 comes from a blind review: the reviewer judged all flagged passages without knowing which ones the rules had downgraded; the
 verdict was stored before the key was opened, and it stands: (a) does not ship.
+
+### Addendum to D-075 — Stage 5, part B: changing a text and the full MCP contract (2026-11-25)
+
+**Status:** part B integrated, not shipped. It ships with `Orders:Revise = Off` (override `On` only for the measuring user, only
+through the environment); gates N and M are **still open**. Only when both have passed does a separate commit set
+`Orders:Revise = On`. The prompts and schemas of the fact checker, the clarifier and the condenser and the writer's system prompt
+stay bit for bit the same (hash tests green).
+
+**Guiding rule.** A new version changes only what the person asks for, and nothing known is lost on the way – neither the text
+so far nor an open point that still applies.
+
+**Built**
+- **Changing a text** (`IOrderService.ReviseAsync`, web "Change something", MCP `revise_order`): the change as free text
+  (1–2,000 characters) and/or quick buttons (Shorter, Longer, More formal, Friendlier, Simpler words). Conditions: own order, not
+  stopped, no run active or just ending, a shown version with a text, at most 10 versions, switch `On` for the owner. A second
+  call while a version is being written changes nothing and answers "A change is already being made." (no exception). No
+  clarification, no new research (stored research only). The new run is created in one transaction (order locked, conditions
+  checked again, max+1; a unique index as second safeguard, each proven on its own by mutation), always on the direct path, also
+  for "Extra careful" orders, seeded with the **delivered** text of the shown version. The change goes into the brief as a block
+  of its own before the profile block, and the fact checker treats it as the person's word.
+- **Writer:** only in the first pass of a change run, `RevisionInstruction` replaces the usual instruction for a seed text (user
+  prompt only; system prompt bit for bit the same). A missed length of the first request becomes a note that does not block in a
+  change run.
+- **Never lose across versions:** open passages of the version before whose quote still stands as whole words, and conflicts
+  between sources, are carried over with their origin (`fromVersion`, web "Found in version n."); open points of the writer for
+  the version before that the new one does not repeat appear under "Noted for version n – your change may have settled it:"
+  (`earlierOpenPoints`). Carrying over happens only in change runs and only from checks that were visible.
+- **Shown version:** the newest version with a text. Result, export without a version and the lists use it; the state still
+  comes from the newest version. While it is written: "A new version is being written. Version n stays here until it is
+  ready."; failed or stopped: "Version m could not be finished. This is version n." Warnings of a new version that did not
+  finish stand in a block of their own, "Warnings for version m", which says that they do not concern the text shown and that
+  this text is complete and unchanged.
+- **"Ready – please check" for a carried blocking point:** if a change keeps a blocking passage of the version before open, it
+  is shown as "Ready – please check", as for a blocking finding of its own – the same everywhere (order page, "My work", the
+  service, `get_order_status`, `get_order_result`, `list_orders`). **Decided:** only in fact-check mode `On`; in mode `Report` a
+  blocking finding of its own ends as "Ready" as well, so the same applies here. The stored report is read; the stored outcome
+  stays unchanged.
+- **Web:** card "Change something" below the text (owner only, order finished, no run active, switch `On`); section "Versions"
+  from two versions on, with "You asked: …", a download per version and "Show changes" (paragraph diff as plain text). The
+  earlier version stays visible while the new one is written and when it fails. For a failed or stopped run of the direct path
+  the run page shows the link "Change something" instead of "Resume" – only for the owner, only with the switch `On` and only when
+  the order page can offer the change; otherwise "Resume" stays.
+- **Resume (older path):** "Resume" seeds with the delivered text when the run has one, otherwise with the last iteration as
+  before (a fix, no switch).
+- **MCP:** nine order tools, registered one by one: `submit_order`, `answer_order`, `get_order_status`, `get_order_result` (new
+  `latestVersion`, `earlierOpenPoints`, `unbackedPassages[].fromVersion`), `revise_order`, `export_order` (the same file as the
+  web download), `cancel_order`, `list_orders`, `profile` (read only). The older tools are added only with
+  `Mcp:LegacyTools = true` (shipped `true`); the five with a successor point to it in their description, their answers are
+  unchanged. The longest wait in the tool description and the server instructions comes from `Orders:MaxWaitSeconds`, the same
+  value that limits the wait.
+
+**Deviations and refinements of the contract:** a second call answers without an exception; the switch override follows the
+owner, not the caller; `fromVersion` keeps the version in which the finding was found when it is carried over more than once;
+findings of a check of the version before that was off or hidden are not carried over; `list_orders` gives `version` and
+`wordCount` of the shown text and `state` of the newest version. As with `answer_order`, administrators (also the static token)
+can change, export and stop orders of others over MCP; the web interface offers "Change something" only to the owner.
+
+**Data model:** migration `Step52Revise`, additive and idempotent: `Runs.RevisionHint text NULL` (`ADD COLUMN IF NOT EXISTS`).
+Nothing else; the report stays schema 2 with appended optional fields (`earlierOpenPoints`, `fromVersion`).
+
+**Switches** (all through the environment without a new image; they are read at start, a change needs a restart of the
+container; `docker-compose.yml` lists its variables one by one and does not pass these through, so set them in the `environment`
+of the web service in a `docker-compose.override.yml`):
+
+| Switch | Shipped | Effect "off" |
+|---|---|---|
+| `Orders:Revise` / `Orders:ReviseOverrides:<user>` | `Off`, override only for the measuring user | no "Change something", "Resume" on the run page as before; `revise_order` stays listed and answers "Changing a text is not available yet."; stored versions stay visible |
+| `Orders:RevisionHintMaxChars`, `Orders:MaxVersionsPerOrder` | 2,000, 10 | – |
+| `Mcp:LegacyTools` | `true` | only the nine order tools (planned for stage 8) |
+| `Orders:MaxWaitSeconds` | 50 | limit and texts change together |
+
+**V-MCP passed:** nine `get_order_status` calls with `waitSeconds = 50` from Claude Code against production took about
+50.0–50.2 s each, without client or transport errors. The wait stays at 50 s. **claude.ai is not checked.**
+
+**Gates N and M: open** (on real runs after deploy B, thresholds as set in the contract). Cases that cannot be forced on the real
+system (second call, cap, a new version failing because of a provider error, a carried blocking point) are proven by Postgres
+and end-to-end tests, among them one over the whole way v1 → v2 (MCP) → v3 (web) failed or stopped, which checks the same state,
+the same shown version and the same open points in every place.
+
+**Way back:** the previous image (state of deploy A). Before that, no change run may be `Pending|Running`. `Step52` is additive;
+the column stays, no `Down()` in production. Checked without a deploy with the code of part A against a database with `Step52`
+and stored change runs in the new report format: start and migration run without errors (no pending migration); order page,
+"My work", run pages, result, list, export and the MCP tools answer without failing; the new report is read and unknown fields
+are skipped. **What the old image then shows differently:** if the newest version failed, was stopped or is running, it shows no
+text, as before part B, and the export without a version finds none (the earlier version stays stored and can be exported with
+its version); it does not show the points of the version before (`earlierOpenPoints`) or the origin of carried passages, and a
+version with a carried blocking point appears as "Ready". None of this is deleted; it shows again after the next deploy.
