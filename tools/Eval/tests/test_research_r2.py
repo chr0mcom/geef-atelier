@@ -33,22 +33,123 @@ def test_five_clean_orders_pass_the_checked_parts_and_b_and_d_stay_manual():
     assert sorted(report["manual"]) == ["b", "d"] and "b" not in report["parts"] and "d" not in report["parts"]
 
 
+ENGLISH_TEXT = "Hello all,\nthe fee is new and it will be the same for you."
+
+
 @pytest.mark.parametrize("quote, covered", [
     ("der Satz liegt bei 1250,50 Euro", True),
     ("der Satz liegt bei 1,250.50 Dollar", True),
     ("der Satz liegt bei 250 Münzen", False),
     ("der Satz liegt bei 50 Münzen", False),
-    ("so sagt es der Verband dazu", True),
-    ("bei uns in Musterstadt ist das so", True),
-    ("Verband und so weiter", False),
-    ("das gilt auch in waldhof und musterstadt", False),
-    ("das gilt in Waldhofen und anderswo", False),
     ("wir treffen uns bald wieder", False),
 ])
-def test_a_flagged_passage_counts_when_an_entry_holds_its_number_or_name(quote, covered):
+def test_a_flagged_passage_counts_in_code_when_an_entry_holds_its_number(quote, covered):
     report = r2.evaluate(five(passages=[flagged(quote)]))
 
     assert report["parts"]["c"]["count"] == int(covered)
+    assert report["parts"]["c"]["cases"] == []
+
+
+@pytest.mark.parametrize("quote, covered", [
+    ("the fee is 1250,50 a year", True),
+    ("so says the Verband about it", True),
+    ("here in Musterstadt it is so", True),
+    ("Verband and so on", False),
+    ("this holds in waldhof and musterstadt", False),
+    ("this holds in Waldhofen and elsewhere", False),
+    ("we meet again soon", False),
+])
+def test_in_an_english_text_a_name_of_an_entry_counts_in_code(quote, covered):
+    report = r2.evaluate(five(passages=[flagged(quote)], text=ENGLISH_TEXT))
+
+    assert report["orders"][0]["language"] == "en"
+    assert report["parts"]["c"]["count"] == int(covered)
+    assert report["parts"]["c"]["cases"] == []
+
+
+@pytest.mark.parametrize("quote, names", [
+    ("so sagt es der Verband dazu", ["Verband"]),
+    ("bei uns in Musterstadt ist das so", ["Musterstadt"]),
+])
+def test_in_a_german_text_a_shared_capitalised_word_is_a_case_for_a_person(quote, names):
+    report = r2.evaluate(five(passages=[flagged(quote)]))
+
+    assert report["orders"][0]["language"] == "de"
+    assert report["automated_verdict"] == "not_evaluable"
+    assert report["parts"]["c"]["count"] == 0 and report["parts"]["c"]["open_cases"] == 1
+    assert report["parts"]["c"]["cases"] == [{"orderId": "o-1", "case": "n1", "quote": quote, "names": names, "decision": None}]
+    assert any("nicht von Hand entschieden" in p for p in report["problems"])
+
+
+def confirm(*entries):
+    return {"confirmations": [dict(zip(("order", "case", "quote", "decision"), e)) for e in entries]}
+
+
+def test_decided_cases_count_only_when_covered():
+    quote = "so sagt es der Verband dazu"
+    second = "bei uns in Musterstadt ist das so"
+    passages = [flagged(quote), flagged("ohne Treffer hier"), flagged(second)]
+
+    report = r2.evaluate(five(passages=passages), confirm(("o-1", "n1", quote, "covered"), ("o-1", "n3", second, "not_covered")))
+    assert report["automated_verdict"] == "passed" and report["parts"]["c"]["count"] == 1
+
+    report = r2.evaluate(five(passages=passages), confirm(("o-1", "n1", quote, "covered"), ("o-1", "n3", second, "covered")))
+    assert report["automated_verdict"] == "failed" and report["parts"]["c"]["count"] == 2
+
+
+def test_a_number_settles_a_german_passage_in_code_without_a_case():
+    report = r2.evaluate(five(passages=[flagged("laut Verband sind es 1.250,50 Euro")]))
+
+    assert report["parts"]["c"]["count"] == 1 and report["parts"]["c"]["cases"] == []
+
+
+@pytest.mark.parametrize("confirmations, problem", [
+    ({"x": []}, "ohne Liste"),
+    (confirm(("o-1", "n9", "so sagt es der Verband dazu", "covered")), "unbekanntem Fall"),
+    (confirm(("o-1", "n1", "so sagt es der Verband", "covered")), "Wortlaut"),
+    (confirm(("o-1", "n1", "so sagt es der Verband dazu", "maybe")), "gültige Entscheidung"),
+    (confirm(("o-1", "n1", "so sagt es der Verband dazu", "covered"), ("o-1", "n1", "so sagt es der Verband dazu", "covered")), "doppelt"),
+])
+def test_a_defect_of_the_confirmation_file_is_not_evaluable(confirmations, problem):
+    report = r2.evaluate(five(passages=[flagged("so sagt es der Verband dazu")]), confirmations)
+
+    assert report["automated_verdict"] == "not_evaluable"
+    assert any(problem in p for p in report["problems"]), report["problems"]
+
+
+def test_the_language_of_a_text_is_german_unless_english_function_words_win():
+    assert r2.language(ENGLISH_TEXT) == "en"
+    assert r2.language("Hallo zusammen,\nder Beitrag ist neu.") == "de"
+    assert r2.language("") == "de"
+    assert r2.language("Termin: Montag") == "de"
+
+
+def test_numbers_with_a_space_or_an_apostrophe_between_groups_count_joined_and_in_parts():
+    assert {"1500", "1", "500"} <= r2.numbers("es sind 1 500 Euro")
+    assert "4850" in r2.numbers("es sind 4'850 Franken") and "4850" in r2.numbers("es sind 4\u2019850 Franken")
+    assert "2020500" not in r2.numbers("seit 2020 500 neue")
+    assert r2.numbers("1.250,50 und 1,250.50") == {"125050"}
+
+
+@pytest.mark.parametrize("statuses, evaluable", [
+    (["found", "failed", "failed", "daily_limit", "all_withheld"], False),
+    (["found", "found", "found", "failed", "nothing_found"], False),
+    (["found", "found", "found", "found", "failed"], True),
+])
+def test_c_needs_four_orders_with_found_research_and_an_entry(statuses, evaluable):
+    results = [result(order=f"o-{n}", status=status, entries=(ENTRY,) if status == "found" else ())
+               for n, status in enumerate(statuses, start=1)]
+
+    report = r2.evaluate(results)
+
+    assert (report["automated_verdict"] != "not_evaluable") == evaluable, report["problems"]
+    assert evaluable or any("mindestens 4" in p and "found" in p for p in report["problems"])
+
+
+def test_found_without_an_entry_does_not_count_as_found():
+    results = [result(order=f"o-{n}") for n in range(1, 4)] + [result(order=f"o-{n}", entries=()) for n in (4, 5)]
+
+    assert r2.evaluate(results)["automated_verdict"] == "not_evaluable"
 
 
 def test_where_the_passage_stands_decides_whether_its_first_word_starts_a_sentence():
@@ -111,7 +212,7 @@ def test_the_marker_is_the_constant_of_the_writer_notes_format():
     (five(fact="not_checked"), "Faktenprüfung lief nicht"),
     (five(fact="not_completed"), "Faktenprüfung lief nicht"),
     (five(fact="version_not_checked"), "Faktenprüfung lief nicht"),
-    ([result(order=f"o-{n}", status="failed", entries=[]) for n in range(1, 6)], "keine Daten"),
+    ([result(order=f"o-{n}", status="failed", entries=[]) for n in range(1, 6)], "zu wenig Daten"),
 ])
 def test_without_data_the_checked_parts_are_not_evaluable(results, problem):
     report = r2.evaluate(results)
@@ -137,6 +238,20 @@ def run_main(tmp_path, *paths):
     out = []
     argv = [arg for p in paths for arg in ("--results", str(p))] + ["--out", str(tmp_path / "out" / "r2.json"), "--allow-in-repo"]
     return r2.main(argv, echo=out.append), out
+
+
+def test_confirmations_are_read_from_a_file(tmp_path):
+    quote = "so sagt es der Verband dazu"
+    path = tmp_path / "a.jsonl"
+    path.write_text("".join(json.dumps(a, ensure_ascii=False) + "\n" for a in five(passages=[flagged(quote)])), encoding="utf-8")
+    assert run_main(tmp_path, path)[0] == 4
+
+    confirmations = tmp_path / "c.json"
+    confirmations.write_text(json.dumps(confirm(("o-1", "n1", quote, "not_covered")), ensure_ascii=False), encoding="utf-8")
+    out = []
+    argv = ["--results", str(path), "--confirmations", str(confirmations), "--out", str(tmp_path / "out" / "r2.json"), "--allow-in-repo"]
+    assert r2.main(argv, echo=out.append) == 0, out
+    assert any("Fall o-1/n1 (not_covered)" in line for line in out)
 
 
 def test_answers_are_read_from_a_directory_and_from_jsonl(tmp_path):
