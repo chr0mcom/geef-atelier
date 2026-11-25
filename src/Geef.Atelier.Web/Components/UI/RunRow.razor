@@ -53,9 +53,11 @@
 
     string RunId => Run.Id.ToString("N")[..8].ToUpperInvariant();
 
-    string Title => Run.BriefingText.Length > 80
-        ? Run.BriefingText[..80] + "…"
-        : Run.BriefingText;
+    string Request => Geef.Atelier.Application.Orders.BriefingSections.RequestPart(Run.BriefingText);
+
+    string Title => Request.Length > 80
+        ? Request[..80] + "…"
+        : Request;
 
     string ProgressLabel => $"Status: {Run.Status}";
 

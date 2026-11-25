@@ -1,0 +1,146 @@
+@using Geef.Atelier.Core.Domain.Intake
+
+<fieldset class="question-block" data-testid="question-block" data-id="@Question.Id">
+    <legend class="question-text" id="@TextId" lang="@Language" data-testid="question-text">@Question.Text</legend>
+
+    <div class="question-options" role="radiogroup" aria-labelledby="@TextId">
+        @for (var i = 0; i < Question.Options.Count; i++)
+        {
+            var index = i;
+            var option = Question.Options[index];
+            var chosen = option.Id == ChosenOptionId;
+            <button type="button"
+                    role="radio"
+                    class="question-option@(chosen ? " is-chosen" : "")"
+                    aria-checked="@(chosen ? "true" : "false")"
+                    tabindex="@(index == FocusIndex ? 0 : -1)"
+                    lang="@Language"
+                    data-testid="question-option"
+                    data-id="@option.Id"
+                    @ref="_optionRefs[index]"
+                    @onclick="() => ChooseAsync(index)"
+                    @onkeydown="e => KeyAsync(e, index)">@option.Label</button>
+        }
+    </div>
+
+    <div class="question-extra">
+        <button type="button"
+                class="question-decide@(IsDecide ? " is-chosen" : "")"
+                aria-pressed="@(IsDecide ? "true" : "false")"
+                data-testid="question-decide"
+                @onclick="DecideAsync">You decide</button>
+        @if (Question.AllowFreeText && !_freeOpen)
+        {
+            <button type="button" class="question-free-toggle" aria-expanded="false" data-testid="question-free-toggle" @onclick="OpenFreeText">+ Add your own words (optional)</button>
+        }
+    </div>
+
+    @if (Question.AllowFreeText && _freeOpen)
+    {
+        <div class="question-free">
+            <label class="question-free-label" for="@FreeId">Your own words (optional)</label>
+            <textarea id="@FreeId"
+                      class="question-free-text"
+                      rows="2"
+                      maxlength="@MaxFreeTextChars"
+                      lang="@Language"
+                      data-testid="question-free-text"
+                      value="@FreeText"
+                      @oninput="FreeTextChangedAsync"></textarea>
+            <span class="question-free-count@(FreeText.Length >= MaxFreeTextChars ? " is-full" : "")" aria-live="polite" data-testid="question-free-count">@FreeText.Length / @MaxFreeTextChars</span>
+        </div>
+    }
+</fieldset>
+
+@code {
+    /// <summary>The question to show.</summary>
+    [Parameter, EditorRequired] public ClarifyQuestion Question { get; set; } = null!;
+
+    /// <summary>Language of the question (ISO 639-1), set as <c>lang</c>.</summary>
+    [Parameter] public string? Language { get; set; }
+
+    /// <summary>The current answer; null while nothing is chosen.</summary>
+    [Parameter] public OrderAnswer? Answer { get; set; }
+
+    /// <summary>Raised when the person chooses an option, "You decide" or types own words.</summary>
+    [Parameter] public EventCallback<OrderAnswer?> AnswerChanged { get; set; }
+
+    /// <summary>Most characters of the own words.</summary>
+    [Parameter] public int MaxFreeTextChars { get; set; } = 500;
+
+    ElementReference[] _optionRefs = [];
+    bool _freeOpen;
+
+    string TextId => $"question-{Question.Id}-text";
+
+    string FreeId => $"question-{Question.Id}-free";
+
+    string? ChosenOptionId => Answer is { DecideForMe: false } a ? a.OptionId : null;
+
+    bool IsDecide => Answer?.DecideForMe == true;
+
+    string FreeText => Answer is { DecideForMe: false, FreeText: { } text } ? text : string.Empty;
+
+    int FocusIndex => Question.Options.ToList().FindIndex(o => o.Id == ChosenOptionId) is var i and >= 0 ? i : 0;
+
+    protected override void OnParametersSet()
+    {
+        if (_optionRefs.Length != Question.Options.Count)
+            _optionRefs = new ElementReference[Question.Options.Count];
+        if (FreeText.Length > 0)
+            _freeOpen = true;
+    }
+
+    Task ChooseAsync(int index) =>
+        RaiseAsync(new OrderAnswer(Question.Id, Question.Options[index].Id, Normalize(FreeText), false, AnswerOrigin.User));
+
+    async Task KeyAsync(KeyboardEventArgs e, int index)
+    {
+        var count = Question.Options.Count;
+        int? next = e.Key switch
+        {
+            "ArrowRight" or "ArrowDown" => (index + 1) % count,
+            "ArrowLeft" or "ArrowUp" => (index - 1 + count) % count,
+            "Home" => 0,
+            "End" => count - 1,
+            _ => null,
+        };
+        if (next is not { } target)
+            return;
+        await ChooseAsync(target);
+        try
+        {
+            await _optionRefs[target].FocusAsync();
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException or InvalidOperationException)
+        {
+        }
+    }
+
+    Task DecideAsync()
+    {
+        _freeOpen = false;
+        return RaiseAsync(IsDecide ? null : new OrderAnswer(Question.Id, null, null, true, AnswerOrigin.User));
+    }
+
+    void OpenFreeText() => _freeOpen = true;
+
+    Task FreeTextChangedAsync(ChangeEventArgs e)
+    {
+        var text = e.Value?.ToString() ?? string.Empty;
+        if (text.Length > MaxFreeTextChars)
+            text = text[..MaxFreeTextChars];
+        var option = ChosenOptionId;
+        return RaiseAsync(option is null && string.IsNullOrWhiteSpace(text)
+            ? null
+            : new OrderAnswer(Question.Id, option, text, false, AnswerOrigin.User));
+    }
+
+    async Task RaiseAsync(OrderAnswer? answer)
+    {
+        Answer = answer;
+        await AnswerChanged.InvokeAsync(answer);
+    }
+
+    static string? Normalize(string text) => string.IsNullOrEmpty(text) ? null : text;
+}

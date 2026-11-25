@@ -11,6 +11,7 @@
 @inject IRunUpdateFeed LiveUpdates
 @inject CircuitDataGate DataGate
 @using Geef.Atelier.Application.Runs
+@using Geef.Atelier.Application.Orders
 @using Geef.Atelier.Application.Crew.Knowledge
 @using Geef.Atelier.Core.Domain
 @using Geef.Atelier.Core.Domain.Crew
@@ -71,8 +72,8 @@
                         Iteration @_details.Iterations.Count of 3
                     </span>
                 </div>
-                <h1>@Truncate(_details.Run.BriefingText, 100)</h1>
-                <div class="briefing-block">@_details.Run.BriefingText</div>
+                <h1>@Truncate(BriefingSections.RequestPart(_details.Run.BriefingText), 100)</h1>
+                <div class="briefing-block" data-testid="run-briefing">@ShownBriefing</div>
                 @if (_details.Run.ErrorMessage is not null)
                 {
                     <div class="error-banner" style="margin-top:18px;max-width:600px" role="alert">
@@ -194,8 +195,8 @@
         @if (_details is not null && _viewModel is not null)
         {
             <GroundingSection
-                Briefing="@_details.Run.BriefingText"
-                GroundedBrief="@_viewModel.GroundedBrief"
+                Briefing="@ShownBriefing"
+                GroundedBrief="@BriefingSections.ForViewer(_viewModel.GroundedBrief, _details.Run.CreatedByUser, _viewerName)"
                 BeforeFirstAdvisors="@_viewModel.GroundingAdvisors"
                 GroundingConsultations="@_viewModel.GroundingConsultations"
                 RunAttachmentDocumentIds="_runAttachmentDocumentIds" />
@@ -309,11 +310,14 @@
     KnowledgeDocument? _promoteCandidate;
     string? _promoteError;
     string? _requestingUser;
+    string? _viewerName;
     bool _unknownUser;
     bool _showResumeDialog;
     bool _showDeleteModal;
 
     string _shortId => RunId.ToString("N")[..8].ToUpperInvariant();
+
+    string ShownBriefing => _details is null ? string.Empty : BriefingSections.ForViewer(_details.Run.BriefingText, _details.Run.CreatedByUser, _viewerName);
 
     protected override async Task OnInitializedAsync()
     {
@@ -324,6 +328,7 @@
             _unknownUser = true;
             return;
         }
+        _viewerName = auth.User.Identity?.Name;
 
         await LoadAsync();
         if (_disposed)

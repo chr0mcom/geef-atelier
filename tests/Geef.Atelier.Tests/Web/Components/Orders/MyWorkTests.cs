@@ -259,5 +259,11 @@ public sealed class MyWorkTests : TestContext
         public Task<OrderView?> WaitForChangeAsync(Guid orderId, string? requestingUsername, OrderDisplayState? knownState, TimeSpan maxWait, CancellationToken ct = default) => inner.WaitForChangeAsync(orderId, requestingUsername, knownState, maxWait, ct);
         public Task<bool> CancelAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) => inner.CancelAsync(orderId, requestingUsername, ct);
         public Task<bool> DeleteAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) => inner.DeleteAsync(orderId, requestingUsername, ct);
+
+        public Task<OrderSubmission> AnswerAsync(AnswerOrderRequest request, CancellationToken ct = default) =>
+            throw new NotImplementedException();
+
+        public Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) =>
+            throw new NotImplementedException();
     }
 }

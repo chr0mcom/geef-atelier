@@ -11,6 +11,7 @@ public static class McpServiceExtensions
             .AddMcpServer(o => o.ServerInstructions = McpServerInstructions.Text)
             .WithHttpTransport(o => o.Stateless = true)
             .WithToolsFromAssembly(typeof(McpAssemblyMarker).Assembly);
+        services.AddHostedService<McpToolBindingCheck>();
         return services;
     }
 }

@@ -2,6 +2,7 @@ using System.Data;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Persistence.Orders;
@@ -13,6 +14,7 @@ namespace Geef.Atelier.Infrastructure.Persistence.Orders;
 internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider? timeProvider = null) : IOrderRepository
 {
     private const string SourceForeignKey = "FK_OrderSources_Sources_SourceId";
+    private const string FirstRunIndex = "UX_Runs_OrderId_OrderVersion_Standard";
 
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -272,6 +274,140 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
         await tx.CommitAsync(ct);
         return affected > 0;
     }
+
+    public async Task<IReadOnlyList<Guid>> ListIntakeCandidatesAsync(DateTimeOffset staleBefore, int maxAttempts, int limit, CancellationToken ct = default)
+    {
+        if (limit <= 0)
+            return [];
+
+        return await ClaimableForIntake(staleBefore, maxAttempts)
+            .OrderBy(o => o.CreatedAt)
+            .ThenBy(o => o.Id)
+            .Select(o => o.Id)
+            .Take(limit)
+            .ToListAsync(ct);
+    }
+
+    public async Task<bool> TryClaimForIntakeAsync(Guid orderId, DateTimeOffset now, DateTimeOffset staleBefore, int maxAttempts, CancellationToken ct = default)
+    {
+        var affected = await ClaimableForIntake(staleBefore, maxAttempts)
+            .Where(o => o.Id == orderId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(o => o.ClaimedAt, now)
+                .SetProperty(o => o.IntakeStartedAt, now)
+                .SetProperty(o => o.IntakeAttempts, o => o.IntakeAttempts + 1), ct);
+        return affected > 0;
+    }
+
+    public async Task<IReadOnlyList<Guid>> ListStuckIntakesAsync(DateTimeOffset staleBefore, DateTimeOffset unclaimedBefore, int maxAttempts, int limit, CancellationToken ct = default)
+    {
+        if (limit <= 0)
+            return [];
+
+        return await db.Orders.AsNoTracking()
+            .Where(o => o.State == OrderState.Analyzing
+                        && ((o.IntakeAttempts >= maxAttempts && (o.ClaimedAt == null || o.ClaimedAt < staleBefore))
+                            || (o.ClaimedAt == null && o.CreatedAt < unclaimedBefore)))
+            .OrderBy(o => o.CreatedAt)
+            .ThenBy(o => o.Id)
+            .Select(o => o.Id)
+            .Take(limit)
+            .ToListAsync(ct);
+    }
+
+    public async Task<bool> TrySaveQuestionsAsync(Guid orderId, string clarifyJson, DateTimeOffset at, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(clarifyJson);
+        var affected = await db.Orders
+            .Where(o => o.Id == orderId && o.State == OrderState.Analyzing)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(o => o.State, OrderState.NeedsInput)
+                .SetProperty(o => o.ClarifyJson, clarifyJson)
+                .SetProperty(o => o.IntakeOutcome, IntakeOutcome.Asked)
+                .SetProperty(o => o.IntakeFinishedAt, at)
+                .SetProperty(o => o.QuestionsAskedAt, at)
+                .SetProperty(o => o.UpdatedAt, at), ct);
+        return affected > 0;
+    }
+
+    public async Task<bool> TryStartWithRunAsync(OrderStart start, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(start);
+        ArgumentNullException.ThrowIfNull(start.Run);
+        ArgumentNullException.ThrowIfNull(start.RoleChanges);
+        if (start.Run.OrderId != start.OrderId || start.Run.OrderVersion != 1 || start.Run.Kind != RunKind.Standard)
+            throw new ArgumentException("The first run must be a standard run of the order with version 1.", nameof(start));
+
+        try
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            if (!await LockOrderAsync(start.OrderId, ct))
+                return false;
+
+            var state = await db.Orders.AsNoTracking().Where(o => o.Id == start.OrderId).Select(o => o.State).SingleAsync(ct);
+            if (state != start.Expected)
+                return false;
+            if (await db.Runs.AnyAsync(r => r.OrderId == start.OrderId && r.Kind == RunKind.Standard && r.OrderVersion == 1, ct))
+                return false;
+
+            var fromAnalyzing = start.Expected == OrderState.Analyzing;
+            var fromNeedsInput = start.Expected == OrderState.NeedsInput;
+            await db.Orders
+                .Where(o => o.Id == start.OrderId)
+                .ExecuteUpdateAsync(s =>
+                {
+                    s.SetProperty(o => o.State, OrderState.Ready);
+                    s.SetProperty(o => o.IntakeOutcome, start.Outcome);
+                    s.SetProperty(o => o.UpdatedAt, start.At);
+                    if (start.ClarifyJson is not null)
+                        s.SetProperty(o => o.ClarifyJson, start.ClarifyJson);
+                    if (start.AnswersJson is not null)
+                        s.SetProperty(o => o.AnswersJson, start.AnswersJson);
+                    if (fromAnalyzing)
+                        s.SetProperty(o => o.IntakeFinishedAt, start.At);
+                    if (fromNeedsInput)
+                        s.SetProperty(o => o.AnsweredAt, start.At);
+                }, ct);
+
+            foreach (var (sourceId, role) in start.RoleChanges)
+                await db.OrderSources
+                    .Where(l => l.OrderId == start.OrderId && l.SourceId == sourceId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(l => l.Role, role), ct);
+
+            db.Runs.Add(start.Run);
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+            return true;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: FirstRunIndex })
+        {
+            return false;
+        }
+        finally
+        {
+            db.ChangeTracker.Clear();
+        }
+    }
+
+    public async Task<IReadOnlyList<Guid>> ListUnansweredAsync(DateTimeOffset askedBefore, int limit, CancellationToken ct = default)
+    {
+        if (limit <= 0)
+            return [];
+
+        return await db.Orders.AsNoTracking()
+            .Where(o => o.State == OrderState.NeedsInput && o.QuestionsAskedAt != null && o.QuestionsAskedAt < askedBefore)
+            .OrderBy(o => o.QuestionsAskedAt)
+            .ThenBy(o => o.Id)
+            .Select(o => o.Id)
+            .Take(limit)
+            .ToListAsync(ct);
+    }
+
+    private IQueryable<OrderEntity> ClaimableForIntake(DateTimeOffset staleBefore, int maxAttempts) =>
+        db.Orders.Where(o =>
+            o.State == OrderState.Analyzing
+            && o.IntakeAttempts < maxAttempts
+            && (o.ClaimedAt == null || o.ClaimedAt < staleBefore));
 
     internal static string LegacyRequestText(RunEntity run)
     {

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Checks;
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Warnings;
@@ -27,6 +28,11 @@ internal sealed class FakeOrderService : IOrderService
     public ConcurrentQueue<string?> DeletedFor { get; } = new();
     public ConcurrentQueue<string?> ListedFor { get; } = new();
     public ConcurrentQueue<IReadOnlyList<OrderSourceSelection>> Checked { get; } = new();
+    public ConcurrentQueue<AnswerOrderRequest> Answered { get; } = new();
+    public ConcurrentQueue<(Guid OrderId, string? RequestingUsername)> Skipped { get; } = new();
+    public Exception? AnswerError { get; set; }
+    public Exception? SkipError { get; set; }
+    public IReadOnlyList<string> StartNotices { get; set; } = [];
     public Func<IReadOnlyList<OrderSourceSelection>, SourceSelectionCheck> CheckSources { get; set; } = _ => new SourceSelectionCheck(0, SourceBudgetClass.FullText, null);
     public Exception? SubmitError { get; set; }
     public Exception? GetError { get; set; }
@@ -175,6 +181,51 @@ internal sealed class FakeOrderService : IOrderService
         }
     }
 
+    public async Task<OrderSubmission> AnswerAsync(AnswerOrderRequest request, CancellationToken ct = default)
+    {
+        await EnterAsync();
+        try
+        {
+            Answered.Enqueue(request);
+            if (AnswerError is not null)
+                throw AnswerError;
+            return Start(request.OrderId, request.RequestingUsername, IntakeOutcome.Answered, request.Answers);
+        }
+        finally
+        {
+            Leave();
+        }
+    }
+
+    public async Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default)
+    {
+        await EnterAsync();
+        try
+        {
+            Skipped.Enqueue((orderId, requestingUsername));
+            if (SkipError is not null)
+                throw SkipError;
+            return Start(orderId, requestingUsername, IntakeOutcome.Skipped, []);
+        }
+        finally
+        {
+            Leave();
+        }
+    }
+
+    private OrderSubmission Start(Guid orderId, string? requestingUsername, IntakeOutcome outcome, IReadOnlyList<OrderAnswer> answers)
+    {
+        if (!Owns(orderId, requestingUsername))
+            throw new InvalidOperationException("Unknown order.");
+        var (_, current) = _orders[orderId];
+        if (current.Display.State is not (OrderDisplayState.Preparing or OrderDisplayState.NeedsInput))
+            return new OrderSubmission(orderId, current.Display.State, current.CurrentRun?.RunId, ["This order has already started."], current.Clarification);
+        var queued = OrderTestData.View(OrderDisplayState.Queued, orderId: orderId, title: current.Title, requestText: current.RequestText, mode: current.Mode)
+            with { Clarification = current.Clarification is { } c ? c with { Outcome = outcome, Answers = answers } : null };
+        Update(orderId, _ => queued);
+        return new OrderSubmission(orderId, OrderDisplayState.Queued, queued.CurrentRun?.RunId, StartNotices, queued.Clarification);
+    }
+
     private async Task EnterAsync()
     {
         Interlocked.Increment(ref _calls);
@@ -271,6 +322,43 @@ internal static class OrderTestData
         string? note = null) =>
         new(view.OrderId, view.Display, view.CurrentRun?.RunId, view.CurrentRun?.Version, text, 17,
             placeholders ?? [], openChecks ?? [], sourcesUsed ?? [], view.Warnings, note);
+
+    public static OrderView Analyzing(Guid? orderId = null, string title = "Invitation to the summer party") =>
+        View(OrderDisplayState.Preparing, orderId: orderId, title: title, requestText: "Schreib eine Einladung zum Sommerfest.") with { State = OrderState.Analyzing };
+
+    public static OrderView Asking(ClarificationView clarification, Guid? orderId = null, string title = "Invitation to the summer party") =>
+        View(OrderDisplayState.NeedsInput, orderId: orderId, title: title, requestText: "Schreib eine Einladung zum Sommerfest.") with
+        {
+            State = OrderState.NeedsInput,
+            Clarification = clarification,
+        };
+
+    public static ClarifyQuestion LengthQuestion() =>
+        new("length", GapTopic.Length, "Wie lang soll der Text ungefähr werden?",
+            [new("short", "Kurz (etwa 150 Wörter)"), new("medium", "Mittel (etwa 400 Wörter)"), new("long", "Lang (etwa 800 Wörter)")],
+            null, true, true);
+
+    public static ClarifyQuestion Question(int number, GapTopic slot = GapTopic.Date, params string[] options) =>
+        new($"q{number}", slot, $"Frage {number}: Wann findet das Fest statt?",
+            (options.Length == 0 ? ["Am Freitag", "Am Samstag"] : options).Select((label, i) => new QuestionOption($"o{i + 1}", label)).ToList(),
+            null, true, false);
+
+    public static ClarificationView Clarification(
+        IReadOnlyList<ClarifyQuestion>? questions = null,
+        IReadOnlyList<IntakeAssumption>? assumptions = null,
+        IReadOnlyList<OrderAnswer>? answers = null,
+        IntakeOutcome? outcome = IntakeOutcome.Asked,
+        string? revisionFileName = null,
+        DateTimeOffset? autoStartAt = null,
+        string language = "de") =>
+        new(outcome, "Einladung", language, "Eine Einladung zum Sommerfest des Teams, locker und herzlich.",
+            assumptions ?? [new IntakeAssumption("a1", GapTopic.Tone, "Lockerer, herzlicher Ton", AssumptionConfidence.Unsure),
+                            new IntakeAssumption("a2", GapTopic.Date, "Datum und Ort als Platzhalter", AssumptionConfidence.Sure)],
+            questions ?? [LengthQuestion()],
+            answers ?? [],
+            revisionFileName,
+            Start,
+            autoStartAt);
 
     public static OrderSourceView Source(string fileName = "notes.md", int chars = 2_362, int? pages = null) =>
         new(Guid.NewGuid(), fileName, pages is null ? SourceKind.Markdown : SourceKind.Pdf, pages, chars, SourceQuality.Good, null, []);

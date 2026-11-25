@@ -2,6 +2,7 @@ using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
+using Geef.Atelier.Mcp.Models;
 using Geef.Atelier.Mcp.Tools;
 using ModelContextProtocol;
 
@@ -37,6 +38,31 @@ public sealed class GetOrderResultToolTests
         Assert.Equal("full_text", dto.SourcesUsed[1].Mode);
         Assert.Equal("Page 3 of offer.pdf has no text.", Assert.Single(dto.Warnings).Message);
         Assert.Contains("placeholders", dto.Note);
+    }
+
+    [Fact]
+    public async Task The_assumptions_of_the_writer_come_with_the_result()
+    {
+        var id = Guid.NewGuid();
+        _orders.AddResult("alice", OrderToolTestData.Result(id, OrderDisplayState.Delivered, Text,
+            assumptions: [OrderToolTestData.ToneAssumption, OrderToolTestData.DateAssumption]));
+
+        var dto = await GetOrderResultTool.GetOrderResult(_orders, _alice, id.ToString());
+
+        Assert.Equal(
+            new[] { new AssumptionDto("a1", "Freundlicher, sachlicher Ton", false), new AssumptionDto("a2", "Neuer Liefertermin als Platzhalter", true) },
+            dto.Assumptions!);
+    }
+
+    [Fact]
+    public async Task An_order_without_clarification_has_no_assumptions()
+    {
+        var id = Guid.NewGuid();
+        _orders.AddResult("alice", OrderToolTestData.Result(id, OrderDisplayState.Delivered, Text));
+
+        var dto = await GetOrderResultTool.GetOrderResult(_orders, _alice, id.ToString());
+
+        Assert.Null(dto.Assumptions);
     }
 
     [Fact]

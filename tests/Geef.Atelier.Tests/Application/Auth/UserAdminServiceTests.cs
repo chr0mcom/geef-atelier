@@ -12,7 +12,7 @@ public sealed class UserAdminServiceTests
     {
         var repo  = new InMemoryAtelierUserRepository();
         var (oauthSvc, _, _, _, _, _) = OAuthServiceFactory.Create();
-        var svc   = new UserAdminService(repo, oauthSvc);
+        var svc   = new UserAdminService(repo, oauthSvc, new InMemoryAccountStore(repo, new InMemoryUserProfileRepository()));
         return (svc, repo);
     }
 
@@ -129,7 +129,7 @@ public sealed class UserAdminServiceTests
     {
         var repo = new InMemoryAtelierUserRepository();
         var (oauthSvc, _, _, _, _, _) = OAuthServiceFactory.Create();
-        var svc = new UserAdminService(repo, oauthSvc);
+        var svc = new UserAdminService(repo, oauthSvc, new InMemoryAccountStore(repo, new InMemoryUserProfileRepository()));
 
         var user = repo.Seed("alice", "pw", isActive: true);
 
@@ -150,5 +150,118 @@ public sealed class UserAdminServiceTests
 
         var tokensAfter = await oauthSvc.GetActiveTokensForUserAsync("alice", CancellationToken.None);
         Assert.Empty(tokensAfter);
+    }
+
+    [Fact]
+    public async Task Deleting_an_account_deletes_its_profile_so_a_new_account_with_the_name_starts_empty()
+    {
+        var repo = new InMemoryAtelierUserRepository();
+        var profiles = new InMemoryUserProfileRepository();
+        var (oauthSvc, _, _, _, _, _) = OAuthServiceFactory.Create();
+        var svc = new UserAdminService(repo, oauthSvc, new InMemoryAccountStore(repo, profiles));
+        var alex = await svc.CreateUserAsync("alex", "pw", null, CancellationToken.None);
+        await profiles.UpsertAsync(InMemoryUserProfileRepository.Profile("alex", "private note"));
+        await profiles.UpsertAsync(InMemoryUserProfileRepository.Profile("bea", "other"));
+
+        await svc.DeleteUserAsync(alex.UserId, CancellationToken.None);
+
+        Assert.Null(await profiles.GetAsync("alex"));
+        Assert.NotNull(await profiles.GetAsync("bea"));
+
+        await profiles.UpsertAsync(InMemoryUserProfileRepository.Profile("carl", "left over"));
+        await svc.CreateUserAsync("carl", "pw", null, CancellationToken.None);
+        Assert.Null(await profiles.GetAsync("carl"));
+    }
+
+    [Fact]
+    public async Task Renaming_an_account_moves_its_profile_and_drops_one_left_under_the_new_name()
+    {
+        var repo = new InMemoryAtelierUserRepository();
+        var profiles = new InMemoryUserProfileRepository();
+        var (oauthSvc, _, _, _, _, _) = OAuthServiceFactory.Create();
+        var svc = new UserAdminService(repo, oauthSvc, new InMemoryAccountStore(repo, profiles));
+        var alex = await svc.CreateUserAsync("alex", "pw", null, CancellationToken.None);
+        await profiles.UpsertAsync(InMemoryUserProfileRepository.Profile("alex", "mine"));
+        await profiles.UpsertAsync(InMemoryUserProfileRepository.Profile("alexandra", "stale"));
+
+        await svc.UpdateUserAsync(alex.UserId, "alexandra", null, null, true, CancellationToken.None);
+
+        Assert.Null(await profiles.GetAsync("alex"));
+        Assert.Equal("mine", (await profiles.GetAsync("alexandra"))!.FreeText);
+
+        var bea = await svc.CreateUserAsync("bea", "pw", null, CancellationToken.None);
+        await profiles.UpsertAsync(InMemoryUserProfileRepository.Profile("beatrice", "stale"));
+        await svc.UpdateUserAsync(bea.UserId, "beatrice", null, null, true, CancellationToken.None);
+        Assert.Null(await profiles.GetAsync("beatrice"));
+    }
+
+    private static async Task IssueTokenAsync(IOAuthService oauthSvc, string username)
+    {
+        var reg = await oauthSvc.RegisterClientAsync(new ClientRegistrationRequest("App", ["https://example.com/cb"], null, null), CancellationToken.None);
+        var challenge = OAuthCrypto.Sha256Base64Url("verifier1234567890123456789012345");
+        var code = await oauthSvc.CreateAuthorizationCodeAsync(reg.ClientId, username, "https://example.com/cb", "mcp:full", challenge, "S256", CancellationToken.None);
+        await oauthSvc.ExchangeAuthorizationCodeAsync(code, reg.ClientId, "https://example.com/cb", "verifier1234567890123456789012345", CancellationToken.None);
+        Assert.NotEmpty(await oauthSvc.GetActiveTokensForUserAsync(username, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Renaming_an_account_revokes_the_tokens_issued_for_the_old_name()
+    {
+        var repo = new InMemoryAtelierUserRepository();
+        var (oauthSvc, _, _, _, _, _) = OAuthServiceFactory.Create();
+        var svc = new UserAdminService(repo, oauthSvc, new InMemoryAccountStore(repo, new InMemoryUserProfileRepository()));
+        var alice = repo.Seed("alice", "pw");
+        await IssueTokenAsync(oauthSvc, "alice");
+
+        await svc.UpdateUserAsync(alice.UserId, "alicia", null, null, true, CancellationToken.None);
+
+        Assert.Empty(await oauthSvc.GetActiveTokensForUserAsync("alice", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task The_tokens_are_revoked_before_the_account_and_profile_change_so_a_failure_there_leaves_none_valid()
+    {
+        var repo = new InMemoryAtelierUserRepository();
+        var profiles = new InMemoryUserProfileRepository();
+        var store = new InMemoryAccountStore(repo, profiles);
+        var (oauthSvc, _, _, _, _, _) = OAuthServiceFactory.Create();
+        var svc = new UserAdminService(repo, oauthSvc, store);
+        var alice = repo.Seed("alice", "pw", isActive: true);
+        await profiles.UpsertAsync(InMemoryUserProfileRepository.Profile("alice", "mine"));
+        await IssueTokenAsync(oauthSvc, "alice");
+
+        store.FailNext = true;
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            svc.UpdateUserAsync(alice.UserId, "alicia", null, null, isActive: false, CancellationToken.None));
+
+        Assert.Empty(await oauthSvc.GetActiveTokensForUserAsync("alice", CancellationToken.None));
+        Assert.True((await repo.FindByUserIdAsync(alice.UserId, CancellationToken.None))!.IsActive);
+
+        await svc.UpdateUserAsync(alice.UserId, "alicia", null, null, isActive: false, CancellationToken.None);
+        var stored = await repo.FindByUserIdAsync(alice.UserId, CancellationToken.None);
+        Assert.Equal(("alicia", false), (stored!.Username, stored.IsActive));
+        Assert.Null(await profiles.GetAsync("alice"));
+        Assert.Equal("mine", (await profiles.GetAsync("alicia"))!.FreeText);
+    }
+
+    [Fact]
+    public async Task A_delete_that_fails_after_the_revocation_can_be_repeated()
+    {
+        var repo = new InMemoryAtelierUserRepository();
+        var profiles = new InMemoryUserProfileRepository();
+        var store = new InMemoryAccountStore(repo, profiles);
+        var (oauthSvc, _, _, _, _, _) = OAuthServiceFactory.Create();
+        var svc = new UserAdminService(repo, oauthSvc, store);
+        var alice = repo.Seed("alice", "pw");
+        await profiles.UpsertAsync(InMemoryUserProfileRepository.Profile("alice", "mine"));
+        await IssueTokenAsync(oauthSvc, "alice");
+
+        store.FailNext = true;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => svc.DeleteUserAsync(alice.UserId, CancellationToken.None));
+        Assert.Empty(await oauthSvc.GetActiveTokensForUserAsync("alice", CancellationToken.None));
+
+        await svc.DeleteUserAsync(alice.UserId, CancellationToken.None);
+        Assert.Null(await repo.FindByUserIdAsync(alice.UserId, CancellationToken.None));
+        Assert.Null(await profiles.GetAsync("alice"));
     }
 }

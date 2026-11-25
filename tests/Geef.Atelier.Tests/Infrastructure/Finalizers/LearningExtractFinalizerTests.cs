@@ -40,13 +40,13 @@ public sealed class LearningExtractFinalizerTests
         CurrentText:    "Final output text.",
         RunCompletedAt: DateTimeOffset.UtcNow);
 
-    private static RunEntity MakeRun(Guid id, RunKind kind = RunKind.Standard, string user = "alice") =>
+    private static RunEntity MakeRun(Guid id, RunKind kind = RunKind.Standard, string user = "alice", string briefing = "Briefing text for the run") =>
         new RunEntity
         {
             Id              = id,
             CreatedAt       = DateTimeOffset.UtcNow,
             Status          = RunStatus.Completed,
-            BriefingText    = "Briefing text for the run",
+            BriefingText    = briefing,
             ConfigJson      = "{}",
             CreatedByUser   = user,
             Kind            = kind,
@@ -198,6 +198,32 @@ public sealed class LearningExtractFinalizerTests
     }
 
     [Fact]
+    public async Task The_lesson_facts_and_the_learning_run_get_only_the_request_never_answers_or_the_profile()
+    {
+        const string request = "Schreib eine Einladung zum Sommerfest.";
+        var runId = Guid.NewGuid();
+        var run = MakeRun(runId, briefing:
+            request + Geef.Atelier.Application.Orders.BriefingSections.Separator +
+            "Answers the person gave before writing:\n- Wer kommt? → ANTWORT-MARKER-LX\n\n" +
+            Geef.Atelier.Application.Orders.BriefingSections.ProfileHeading + "\nName: PROFIL-MARKER-LX");
+        var learningRepo = new CapturingLearningRepository([]);
+        var runService = new CapturingRunService();
+        var executor = MakeExecutor(new StubRunRepository(run, new RunDetails(run, [MakeIter(runId, 1), MakeIter(runId, 2)])), learningRepo, runService);
+
+        await executor.ExecuteAsync(MakeProfile(minIterations: 2), MakeContext(runId), default);
+
+        var facts = learningRepo.Created!.StructuredFactsJson;
+        var learningBriefing = runService.Submitted!.BriefingText;
+        Assert.Contains(request, facts, StringComparison.Ordinal);
+        Assert.Contains(request, learningBriefing, StringComparison.Ordinal);
+        foreach (var marker in new[] { "PROFIL-MARKER-LX", "ANTWORT-MARKER-LX" })
+        {
+            Assert.DoesNotContain(marker, facts, StringComparison.Ordinal);
+            Assert.DoesNotContain(marker, learningBriefing, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public async Task ThresholdHitViaMajorFinding_OneIterWithMajor_CreatesEntryAndFiresSubmit()
     {
         var runId       = Guid.NewGuid();
@@ -304,10 +330,12 @@ public sealed class LearningExtractFinalizerTests
     {
         public bool CreateCalled { get; private set; }
         public bool SetLearningRunIdCalled { get; private set; }
+        public LearningEntry? Created { get; private set; }
 
         public Task<LearningEntry> CreateAsync(LearningEntry entry, float[] embedding, CancellationToken ct = default)
         {
             CreateCalled = true;
+            Created = entry;
             return Task.FromResult(entry);
         }
 
@@ -378,10 +406,12 @@ public sealed class LearningExtractFinalizerTests
             Task.FromResult<IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity>>([]);
 
         public bool SubmitCalled { get; private set; }
+        public SubmitRunRequest? Submitted { get; private set; }
 
         public Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken cancellationToken = default)
         {
             SubmitCalled = true;
+            Submitted = request;
             return Task.FromResult(Guid.NewGuid());
         }
 

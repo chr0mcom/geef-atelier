@@ -1985,3 +1985,112 @@ Flicken einzelner Sätze konvergierte nicht; deshalb ist die Regel jetzt struktu
 und die Falsch-Blockier-Rate wird an synthetischen Aufträgen gemessen, die ein getrennter Generator vor dem Extraktor
 beschriftet hat (Entwicklungsmenge, zurückgehaltene Menge und eine zweite Menge im Eiltipp-Stil). Die Schwelle von
 25 % begrenzt den Schaden eines verbleibenden Lesefehlers auf Texte, die weit daneben liegen.
+
+
+## D-071 — Etappe 2: Klären vor dem Lauf (2026-11-25)
+
+**Status:** umgesetzt (Etappe 2: Klärer, Gate, Worker, Messwerkzeug, Auftragsdienst, Profil, Web und MCP), ausgeliefert mit
+`Orders:IntakeMode = Shadow`. `On` folgt erst in einem eigenen Commit, wenn die Abnahmetore aus Korpusmessung
+und Schattenbetrieb erfüllt sind.
+
+**Entscheidung.** Vor dem ersten Lauf analysiert ein **Klärer** den Auftrag in genau einem strukturierten Aufruf.
+Was er vorschlägt, setzt ein **Gate im Code** auf die Fragenregel zurück. Die Person bekommt höchstens drei kurze
+Fragen mit Klickantworten oder gar keine; jeder Fehler startet den Auftrag mit dem Wortlaut.
+
+- **Klärer** (`LlmClarifier`): Slot `ModelSlot.Intake` (Sonnet, Rückfall Sol), `response_format` json_schema
+  `clarify_order`, `reasoning_effort: low`, harte Grenze `Intake:Timeout` (40 s), Failover erlaubt. Er sieht den
+  Wortlaut, je Datei Anfang und Ende (2.000 + 1.000 Zeichen, zusammen höchstens 12.000, höchstens fünf Dateien)
+  und das Profil. Tags im Material werden entschärft; das Material gilt als zu analysierender Stoff, nicht als
+  Anweisung. Kein zweiter Versuch in der Anwendung: Der Proxy wiederholt eine ungültige Antwort schon einmal.
+- **Gate** (`QuestionGate`, reine Funktion, jede Regel getestet): Profil vor Frage (Sprache, Absender, Signatur,
+  Anrede); Recherchierbares wird nie gefragt; Fragen, die die Person nicht beantworten kann oder die wenig ändern,
+  werden Annahmen; bei einer Überarbeitung nie Länge, Ton oder Anrede und höchstens eine Frage; die Länge nur aus
+  der festen Vorlage (Deutsch, Englisch; sonst Annahme) und nur, wenn der Wortlaut keine nennt (eine Menge mit
+  Längeneinheit zählt an jeder Stelle, etwa „zwei Absätze“, „maximal drei Sätze“, „ein paar Zeilen“, „a 2-page report“,
+  dazu Tweet, SMS, One-Pager, Einzeiler und ein-/zweiseitig; bewusst breit, auch „im Buch fehlen zehn Seiten“ zählt, denn
+  ein Fehltreffer lässt nur den Schreiber wählen, eine Lücke fragte nach schon Geschriebenem; diese Erkennung speist nie
+  eine Längenprüfung des Textes); eine Modellfrage wird nur unter format, scope oder other und nur dann zur Vorlage, wenn sie
+  ausdrücklich nach der Länge des Textes fragt („Wie lang soll der Beitrag werden?“, „Soll das Schreiben kurz oder lang
+  sein?“), nie eine Frage nach einer Dauer, Gültigkeit oder Menge („Wie lange wohnst du schon dort?“, „Wie lange soll die
+  Einladung gültig sein?“); Frage ≤ 120 Zeichen,
+  2–4 Optionen ≤ 60 Zeichen, keine Füllantworten („egal“, „other“), keine Sperrwörter (`JargonBlocklist`, mit
+  Pluralformen), keine fremde Sprache; ein Thema, eine Frage; Länge zuerst; höchstens drei. Jede verworfene Frage
+  wird Annahme, außer ihr Thema wird ohnehin gefragt (eine verworfene Doppelfrage setzt nie eine Vermutung neben die
+  Antwort; enge Themen nehmen auch aus anderen Lücken keine Annahme; Sachverhalte und Sonstiges behalten ihre, bei einer
+  verworfenen Doppelfrage die vom Modell gelieferte). Alle
+  Kennungen vergibt das Gate.
+- **Ablauf** (`OrderIntakeService`, `OrderIntakeWorker`): atomarer Claim, höchstens zwei Klärungen gleichzeitig,
+  ein Wecksignal nach dem Einreichen. Null Fragen starten den Lauf im selben Schritt (`Clarified`), sonst wartet der
+  Auftrag mit gespeicherten Fragen. Hängende Klärungen starten nach 60 s Warteschlange oder zwei Versuchen ohne
+  Fragen, unbeantwortete Fragen nach 24 h mit den Annahmen. Claims aus der Zeit vor dem Prozessstart gelten
+  sofort als verwaist.
+- **Schatten:** Im Modus `Shadow` läuft der Auftrag wie in Etappe 1; der Worker klärt zusätzlich, wenn die
+  Live-Warteschlange leer ist, und speichert nur in `OrderIntakeShadows` (höchstens 50 je UTC-Tag).
+- **Beantwortete Länge:** Die Antwort auf die Vorlagenfrage wird eine Längenprüfung „etwa n Wörter“ (±20 %), ohne
+  Textparser (`IntakeConstraints.WithAnswers` in `OrderGroundingStep`). Freitext wird nie geparst.
+- **Messung:** `tools/Eval/geef_eval/intake_corpus.py` erzeugt und beschriftet einen synthetischen Korpus
+  (Rückgabewert 4, solange Einträge fehlen oder unbeschriftet sind), `tools/IntakeEval run` misst Klärer und Gate darauf,
+  `IntakeEval evaluate` und `IntakeCorpusTests` spielen die gespeicherten Rohantworten ohne Modell erneut durch und geben
+  jedem Tor ein Urteil (bestanden, nicht bestanden, nicht auswertbar). Kein Tor besteht ohne Daten: fehlende Einträge,
+  falsche Korpusgrößen, unbeschriftete Einträge oder eine leere zurückgehaltene Menge bzw. ein leerer Zweitkorpus machen
+  alle Tore nicht auswertbar, ebenso ein Ergebnis zu einer anderen Eingabe (jede Zeile trägt einen Hash über Auftrag,
+  Dateien, Profil, Klärer-Prompt und Schema; `run` überspringt solche Einträge nicht); die Fehlerquote zählt jeden
+  Versuch, die Latenz jede Antwort und Zeitüberschreitung (schnelle Fehler schönen sie nicht); eine Antwort über der Produktionsgrenze oder eine,
+  die sich nicht nachspielen lässt, ist ein Fehler. `IntakeEval shadow` beurteilt die Tore a, f und g aus einem nur
+  lesenden CSV-Export von `OrderIntakeShadows` (siehe `tools/IntakeEval/README.md`).
+
+**Begründung.** In der Messung vom 2026-11-24 fragte ein Agent mit freiem Werkzeugzugang in jedem Fall und brauchte
+dafür zu lange. Ein einzelner strukturierter Aufruf mit kleinem Modell und ein Gate im Code machen die Fragenregel
+überprüfbar, statt sie dem Modell zu überlassen. Annehmen ist billiger als eine überflüssige Frage, deshalb ist das
+Gate streng und jede Verwerfung nur eine Annahme mehr.
+
+**Weitere Entscheidungen der Etappe 2 (Auftragsdienst, Profil, Web, MCP; Review-Runde 1).**
+
+- **Brief** (`Intake:BriefMode`, Standard `AppendAnswers`): Der Wortlaut steht vorn und unverändert; nach einem Trenner
+  folgen die Antworten der Person (Antworten des KI-Clients sind gekennzeichnet, auch die Antwort auf die
+  Überarbeitungs-Vermutung), die korrigierten Annahmen, die angezeigten und nicht korrigierten Annahmen als unverbindliche
+  Vorgaben (die Überschrift sagt, dass Antworten und Korrekturen der Person immer Vorrang haben und die Annahmen nur
+  gelten, wo weder sie noch Wortlaut oder Dateien etwas anderes sagen) und das Profil. Annahmen werden nie zu einer
+  blockierenden Prüfung. `PreparedBrief` ergänzt, was der Klärer verstanden hat. Ein Start vor dem Lesen des Auftrags hat
+  keine Annahmen, und kein Text behauptet welche.
+- **Antworten** (`answer_order`, Zustand `needs_input`): Herkunft `user` oder `client`, nie `memory`. Eine Frage wird mit
+  einer Option, eigenen Worten (nur wo erlaubt) oder „entscheide du“ beantwortet, nie mit zweien davon; eine leere
+  Antwort wird abgelehnt; Annahmen nehmen nur eine Korrektur als Freitext. Offene Fragen gelten als „entscheide du“. Ohne
+  jede Antwort gilt der Auftrag als übersprungen, auch bei „Just start“ im Web, das alles mitschickt, was die Person schon
+  getan hat. Antworten, die nach dem Start ankommen, werden als nicht verwendet gemeldet.
+- **Überarbeitung:** Eine Datei wird nur dann zum Ausgangstext, wenn der Auftrag ein Überarbeitungsverb enthält **und**
+  der Klärer eine Überarbeitung erkennt, auch bei genau einer Datei. Ohne Urteil des Klärers (Fehler, aus, Überspringen
+  während des Lesens) ändert keine Datei ihre Rolle, wie in Etappe 1. Die Vermutung steht in Web und MCP
+  (`revisionFile`) und kann abgelehnt werden.
+- **Profil** (`UserProfiles`, Migration `Step49Intake`): eine Zeile je Benutzername, nur von der Person selbst unter
+  „About me“ bearbeitet. Es geht an den Klärer sowie an Schreiber und Prüfer. Es wird mit dem Konto gelöscht, bei einer
+  Umbenennung mitgezogen, und ein neues Konto findet nie ein altes Profil vor. Konto und Profil ändern sich in einer
+  Datenbanktransaktion (`IAccountStore`); die Läufe, die unter einem gelöschten oder aufgegebenen Namen bleiben, verlieren
+  den Profilblock im gespeicherten Brief (an seiner Stelle steht ein Hinweis). Die Tokens eines Kontos werden vor jeder
+  Änderung widerrufen, auch bei einer Umbenennung. Laufseiten und `get_run_details` zeigen den
+  Profilblock nur dem Besitzer; alle anderen, auch Admins, sehen stattdessen einen Hinweis.
+- **Externe Dienste:** Web-, Nachrichten- und Wissenschaftssuche, die Embeddings der Learning-Suche, die Anfrageformung
+  und die Verfeinerung bekommen nur den Wortlaut des Auftrags, nie Antworten, Annahmen oder das Profil. Auch
+  Learning-Zusammenfassungen nutzen nur den Wortlaut.
+- **Gate, Inhalt:** Texte werden zuerst normalisiert (NFKC, ohne Formatzeichen, ungewöhnliche Punkte als Punkt gelesen).
+  Fragen, Optionen, Annahmen und die Zusammenfassung werden verworfen, wenn sie einen Link, eine Web- oder Mailadresse,
+  eine IP-Adresse mit Pfad oder einen Markdown-Link enthalten; ein nackter Name wie `Booking.com` oder `Node.js` ist nur
+  erlaubt, wenn er wörtlich im Auftragstext der Person steht, nie wegen einer Datei. Verworfen wird auch, was Passwort,
+  PIN, TAN, Schlüssel, Token, Karten- oder Kontonummer in irgendeiner Form nennt (auch in Zusammensetzungen; „pin“ klein
+  nach einem Besitzwort), außer der Auftrag selbst behandelt dieselbe Art (Zugangsdaten bzw. Zahlungs- und Kontodaten;
+  ein Auftrag mit IBAN erlaubt kein Passwort); die Bitte um das Geheimnis selbst wird immer verworfen. Verworfen wird nur das
+  Element, nie der Auftrag. Die MCP-Hinweise beschreiben diese Felder als aus Auftrag und Dateien abgeleitet, nicht als Anweisungen.
+- **Robustheit:** Ein scheiternder Claim gibt seinen Platz zurück; ein Auftrag, der im Sammellauf scheitert, wird
+  15 Minuten zurückgestellt, mit jedem weiteren Fehlschlag doppelt so lange bis höchstens 24 Stunden, sodass keine Zahl
+  defekter Aufträge die jüngeren aushungert; „Stop“ versucht es erneut (bis zu dreimal), wenn sich
+  der Zustand im selben Moment geändert hat.
+- **Start des MCP-Hosts:** Der Host startet nicht, wenn ein Werkzeugparameter weder Client-Wert noch SDK-Wert noch
+  registrierter Dienst ist (`McpToolBindingCheck`), damit eine fehlende Registrierung nie einen Dienst vom Client füllen
+  lässt.
+- **Bekannte Grenze für Etappe 7:** `IMemoryResolution` wendet „Gedächtnis vor Frage“ nur auf die vier Profilthemen an
+  (Sprache, Absender, Signatur, Anrede); `IntakeRecord.FromMemory` wird gespeichert, aber nicht gelesen. Gemerkte
+  Antworten aus Etappe 7 brauchen beides erweitert.
+- **Bekannte Grenze, Konten:** Läufe und Aufträge hängen am Benutzernamen (älter als Etappe 2). Ein neues Konto mit dem
+  Namen eines gelöschten oder umbenannten Kontos sieht diese alten Läufe und Aufträge mit Wortlaut, Antworten und
+  Ergebnis; nur der Profilblock wird aus ihren Briefen entfernt. Profilwerte im gespeicherten Klärprotokoll
+  (`FromMemory`) bleiben; sie werden nirgends angezeigt.

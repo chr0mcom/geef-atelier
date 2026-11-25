@@ -15,6 +15,14 @@
     <ProjectReference Include="..\..\src\Geef.Atelier.Web\Geef.Atelier.Web.csproj" />
   </ItemGroup>
 
+  <ItemGroup Label="Evaluation code of tools/IntakeEval, compiled in so that the tests judge with the same code as the tool">
+    <Compile Include="..\..\tools\IntakeEval\CorpusEntry.cs" Link="Intake\IntakeEval\CorpusEntry.cs" />
+    <Compile Include="..\..\tools\IntakeEval\EvalResult.cs" Link="Intake\IntakeEval\EvalResult.cs" />
+    <Compile Include="..\..\tools\IntakeEval\EntryMapping.cs" Link="Intake\IntakeEval\EntryMapping.cs" />
+    <Compile Include="..\..\tools\IntakeEval\CorpusEvaluation.cs" Link="Intake\IntakeEval\CorpusEvaluation.cs" />
+    <Compile Include="..\..\tools\IntakeEval\ShadowEvaluation.cs" Link="Intake\IntakeEval\ShadowEvaluation.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" />
     <PackageReference Include="bunit" />

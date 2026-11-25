@@ -46,11 +46,15 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
     private readonly WebApplicationFactory<Program> _factory;
     private readonly OrchestratorGate _gate;
     private readonly string _keyDirectory;
+    private readonly string _connectionString;
+    private readonly string _serverConnectionString;
 
     private AtelierEndToEndHost(
         WebApplicationFactory<Program> factory,
         OrchestratorGate gate,
         string keyDirectory,
+        string connectionString,
+        string serverConnectionString,
         LlmTrafficRecorder llm,
         ScriptedLlmEndpoint script,
         FakeTavilyEndpoint tavily,
@@ -59,6 +63,8 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
         _factory = factory;
         _gate = gate;
         _keyDirectory = keyDirectory;
+        _connectionString = connectionString;
+        _serverConnectionString = serverConnectionString;
         Llm = llm;
         Script = script;
         Tavily = tavily;
@@ -83,8 +89,9 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
     /// <summary>
     /// Creates an isolated database, boots the application through <c>Program</c> (which runs the
     /// migrations) and verifies that no migration is pending. The orchestrator stays held until
-    /// <see cref="ReleaseOrchestrator"/> or <see cref="SubmitAsync"/>. <paramref name="configureServices"/> runs last and
-    /// may replace registrations for a single test.
+    /// <see cref="ReleaseOrchestrator"/> or <see cref="SubmitAsync"/>. The intake is off (<c>Orders:IntakeMode=Off</c>) so that
+    /// orders run exactly as in stage 1 and no clarifier call lands in <see cref="Llm"/>; intake tests switch it on in
+    /// <paramref name="configureServices"/>, which runs last and may replace registrations for a single test.
     /// </summary>
     public static async Task<AtelierEndToEndHost> StartAsync(PostgresFixture postgres, Action<IServiceCollection>? configureServices = null)
     {
@@ -120,6 +127,7 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
             web.UseSetting("Finalizer:ExportPath", Path.Combine(keyDirectory, "exports"));
             web.UseSetting("Sources:StorageRoot", Path.Combine(keyDirectory, "sources"));
             web.UseSetting("Logging:LogLevel:Default", "Warning");
+            web.UseSetting("Orders:IntakeMode", "Off");
 
             web.ConfigureTestServices(services =>
             {
@@ -160,7 +168,7 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
             });
         });
 
-        var host = new AtelierEndToEndHost(factory, gate, keyDirectory, llm, script, tavily, external);
+        var host = new AtelierEndToEndHost(factory, gate, keyDirectory, connectionString, postgres.ConnectionString, llm, script, tavily, external);
         await host.EnsureMigratedAsync();
         return host;
     }
@@ -216,30 +224,7 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
     /// </summary>
     public async Task<JsonElement> CallMcpToolAsync(string toolName, object arguments)
     {
-        using var client = _factory.CreateClient();
-        var payload = JsonSerializer.Serialize(new
-        {
-            jsonrpc = "2.0",
-            id = 1,
-            method = "tools/call",
-            @params = new { name = toolName, arguments },
-        });
-
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
-        {
-            Content = new StringContent(payload, Encoding.UTF8, "application/json"),
-        };
-        request.Headers.Accept.ParseAdd("application/json, text/event-stream");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", McpToken);
-
-        using var response = await client.SendAsync(request);
-        var raw = await response.Content.ReadAsStringAsync();
-        if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"MCP call '{toolName}' failed with {(int)response.StatusCode}: {raw}");
-
-        var json = ExtractJsonRpcPayload(raw);
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
+        var root = await PostMcpAsync("tools/call", new { name = toolName, arguments });
         if (root.TryGetProperty("error", out var error))
             throw new InvalidOperationException($"MCP call '{toolName}' returned an error: {error}");
 
@@ -252,10 +237,38 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
         return toolDoc.RootElement.Clone();
     }
 
+    /// <summary>Sends one JSON-RPC request to the real <c>/mcp</c> endpoint with the static bearer token and returns the whole response object.</summary>
+    public async Task<JsonElement> PostMcpAsync(string method, object? parameters = null)
+    {
+        using var client = _factory.CreateClient();
+        var payload = JsonSerializer.Serialize(new { jsonrpc = "2.0", id = 1, method, @params = parameters ?? new { } });
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
+        {
+            Content = new StringContent(payload, Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Accept.ParseAdd("application/json, text/event-stream");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", McpToken);
+
+        using var response = await client.SendAsync(request);
+        var raw = await response.Content.ReadAsStringAsync();
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException($"MCP request '{method}' failed with {(int)response.StatusCode}: {raw}");
+
+        using var doc = JsonDocument.Parse(ExtractJsonRpcPayload(raw));
+        return doc.RootElement.Clone();
+    }
+
+    /// <summary>
+    /// Stops the application, then closes the pooled connections of its database and drops it. Npgsql keeps idle connections
+    /// of every connection string for minutes; with one database per host the shared container would otherwise run out of
+    /// connections (<c>53300: too many clients</c>) in a long end-to-end collection.
+    /// </summary>
     public async ValueTask DisposeAsync()
     {
         _gate.Release();
         await _factory.DisposeAsync();
+        await DropDatabaseAsync();
         try
         {
             Directory.Delete(_keyDirectory, recursive: true);
@@ -278,6 +291,24 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
             .ToList();
         return dataLines.LastOrDefault()
                ?? throw new InvalidOperationException($"No JSON-RPC payload in MCP response: {raw}");
+    }
+
+    private async Task DropDatabaseAsync()
+    {
+        await using (var connection = new NpgsqlConnection(_connectionString))
+            NpgsqlConnection.ClearPool(connection);
+
+        var databaseName = new NpgsqlConnectionStringBuilder(_connectionString).Database;
+        try
+        {
+            await using var server = new NpgsqlConnection(_serverConnectionString);
+            await server.OpenAsync();
+            await using var command = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{databaseName}\" WITH (FORCE)", server);
+            await command.ExecuteNonQueryAsync();
+        }
+        catch (NpgsqlException)
+        {
+        }
     }
 
     private async Task EnsureMigratedAsync()

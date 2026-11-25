@@ -4,9 +4,15 @@ using Geef.Atelier.Core.Persistence;
 
 namespace Geef.Atelier.Application.Auth;
 
+/// <summary>
+/// Manages accounts. The "About me" profile hangs on the user name, so it goes with the account (see <see cref="IAccountStore"/>).
+/// The tokens of an account are revoked before anything else changes, so a failure later never leaves a deactivated, renamed or
+/// deleted account with working tokens.
+/// </summary>
 internal sealed class UserAdminService(
     IAtelierUserRepository users,
-    IOAuthService oauthService) : IUserAdminService
+    IOAuthService oauthService,
+    IAccountStore accounts) : IUserAdminService
 {
     public Task<IReadOnlyList<AtelierUser>> GetAllUsersAsync(CancellationToken ct)
         => users.GetAllAsync(ct);
@@ -27,7 +33,7 @@ internal sealed class UserAdminService(
             CreatedAt: DateTimeOffset.UtcNow,
             UpdatedAt: DateTimeOffset.UtcNow);
 
-        await users.AddAsync(user, ct);
+        await accounts.AddAsync(user, ct);
         return user;
     }
 
@@ -50,11 +56,11 @@ internal sealed class UserAdminService(
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
-        await users.UpdateAsync(updated, ct);
-
-        if (!isActive && existing.IsActive)
+        var renamed = !string.Equals(existing.Username, username, StringComparison.Ordinal);
+        if (renamed || (!isActive && existing.IsActive))
             await oauthService.RevokeAllUserTokensAsync(existing.Username, ct);
 
+        await accounts.UpdateAsync(updated, existing.Username, ct);
         return updated;
     }
 
@@ -64,6 +70,6 @@ internal sealed class UserAdminService(
             ?? throw new InvalidOperationException($"User '{userId}' not found.");
 
         await oauthService.RevokeAllUserTokensAsync(existing.Username, ct);
-        await users.DeleteAsync(userId, ct);
+        await accounts.DeleteAsync(existing, ct);
     }
 }

@@ -42,4 +42,17 @@ public interface IOrderService
     /// Throws <see cref="OrderStillWorkingException"/> while a run of the order is still working.
     /// </summary>
     Task<bool> DeleteAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default);
+
+    /// <summary>
+    /// Stores the answers of an order that waits for them and starts its first run in the same transaction. Questions without an
+    /// answer count as "decide for me". Throws <see cref="OrderAnswerException"/> for invalid answers. When the order no longer waits
+    /// (already started, stopped), nothing changes and the current state is returned with a notice, so that a repeated call is harmless.
+    /// </summary>
+    Task<OrderSubmission> AnswerAsync(AnswerOrderRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Starts the order without (further) questions: while it is being analysed with the request as written, while it waits for answers
+    /// with the assumptions. Idempotent like <see cref="AnswerAsync"/>.
+    /// </summary>
+    Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default);
 }

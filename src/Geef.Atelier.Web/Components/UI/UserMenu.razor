@@ -13,18 +13,16 @@
             @if (_open)
             {
                 <div class="user-menu-dd" role="menu">
-                    <div class="item coming-soon" title="Coming soon" role="menuitem" aria-disabled="true">
-                        <IconUser Size="14" />
-                        Profile
-                    </div>
-
-                    <div class="sep" role="separator"></div>
-
                     <div class="item theme-section" role="group" aria-label="Theme">
                         <ThemeSwitcher />
                     </div>
 
                     <div class="sep" role="separator"></div>
+
+                    <a href="/about-me" class="item" role="menuitem" data-testid="menu-about-me">
+                        <IconUser Size="14" />
+                        About me
+                    </a>
 
                     <a href="/account/connected-clients" class="item" role="menuitem" data-testid="menu-connected-clients">
                         <IconLayers Size="14" />

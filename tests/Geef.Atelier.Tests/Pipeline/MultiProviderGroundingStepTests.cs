@@ -1,4 +1,5 @@
 using Geef.Atelier.Application.Crew.Grounding;
+using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Sdk.Context;
@@ -88,6 +89,37 @@ public sealed class MultiProviderGroundingStepTests
         await step.RunAsync("briefing", CancellationToken.None);
 
         Assert.Equal(["first", "second"], callOrder);
+    }
+
+    [Fact]
+    public async Task Providers_get_only_the_request_never_answers_assumptions_or_profile()
+    {
+        const string request = "Schreib eine Pressemitteilung zum neuen Standort.";
+        var briefing = request + Geef.Atelier.Application.Orders.BriefingSections.Separator +
+            "Answers the person gave before writing:\n- Wer liest? → Presse\n" +
+            IntakeBriefComposer.AssumptionsHeading + "\n- Datum offen\n\n" +
+            "About the person (use only where it fits the text; never invent anything beyond it):\nName: PROFIL-MARKER-7Q2";
+        var seen = new List<string>();
+        var step = new MultiProviderGroundingStep(
+            new PassThroughGroundingStep("inner"), [MakeProfile("rec")], new StubGroundingProviderFactory([new RecordingProvider("rec", seen)]), Guid.NewGuid(),
+            NullLogger<MultiProviderGroundingStep>.Instance, new Geef.Atelier.Tests.Fakes.InMemoryRunWarnings());
+
+        var result = await step.RunAsync(briefing, CancellationToken.None);
+
+        Assert.Equal([request], seen);
+        Assert.True(result.Context.TryGet(AtelierContextKeys.GroundedBrief, out var grounded));
+        Assert.Contains("PROFIL-MARKER-7Q2", grounded);
+    }
+
+    private sealed class RecordingProvider(string providerType, List<string> seen) : IGroundingProvider
+    {
+        public string ProviderType => providerType;
+
+        public Task<DomainGroundingResult> EnrichAsync(string briefingText, GroundingProviderProfile profile, Guid runId, CancellationToken ct)
+        {
+            seen.Add(briefingText);
+            return Task.FromResult(new DomainGroundingResult(profile.Name, "found", [], 0, null));
+        }
     }
 
     // --- helpers ---

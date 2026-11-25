@@ -180,4 +180,31 @@ public sealed class DashboardRepositoryTests(PostgresFixture fixture)
         Assert.NotNull(openrouterRow);
         Assert.True(openrouterRow!.RequestCount >= 1);
     }
+
+    [Fact]
+    public async Task Cards_and_the_day_book_show_only_the_request_never_answers_or_the_profile()
+    {
+        const string request = "Kurzer Gruß ans Team.";
+        var briefing = request + Geef.Atelier.Application.Orders.BriefingSections.Separator +
+            "Answers the person gave before writing:\n- Wer? → ANTWORT-MARKER-DB\n\n" +
+            Geef.Atelier.Application.Orders.BriefingSections.ProfileHeading + "\nName: PROFIL-MARKER-DB";
+        await using var db = fixture.NewContext();
+        var user = $"dash-req-{Guid.NewGuid():N}";
+        foreach (var status in new[] { "Completed", "Failed" })
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                @"INSERT INTO ""Runs"" (""Id"",""BriefingText"",""ConfigJson"",""Status"",""CreatedAt"",""CompletedAt"",""CreatedByUser"",""FinalText"",""WordCount"",""TokensTotal"",""CostTotal"")
+                  VALUES ({0},{1},{2}::jsonb,{3},NOW()-INTERVAL '1 minute',NOW(),{4},{5},2,0,0)",
+                Guid.NewGuid(), briefing, "{}", status, user, "hello world");
+        }
+        var repo = new DashboardRepository(db);
+
+        var card = Assert.Single(await repo.GetManuscriptsAsync(user, CancellationToken.None));
+        var book = (await repo.GetDayBookAsync(user, false, DashboardScope.My, CancellationToken.None))
+            .Where(e => e.Kind is DayBookKind.RunCompleted or DayBookKind.RunFailed).ToList();
+
+        Assert.Equal(request, card.BriefingSnippet);
+        Assert.Equal(2, book.Count);
+        Assert.All(book, e => Assert.Equal(request, e.Subject));
+    }
 }

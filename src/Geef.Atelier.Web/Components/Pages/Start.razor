@@ -3,6 +3,7 @@
 @attribute [Authorize]
 @implements IAsyncDisposable
 @using Geef.Atelier.Application.Orders
+@using Geef.Atelier.Application.Profiles
 @using Geef.Atelier.Application.Sources
 @using Geef.Atelier.Core.Configuration
 @using Geef.Atelier.Core.Domain.Orders
@@ -19,6 +20,7 @@
 @inject AuthenticationStateProvider AuthProvider
 @inject CircuitDataGate DataGate
 @inject ILogger<Start> Logger
+@inject IProfileService Profiles
 
 <PageTitle>New — Atelier</PageTitle>
 
@@ -39,6 +41,11 @@
               placeholder="Just describe it. For example: Write a short, friendly email to a customer about a two-week delivery delay."
               @bind="_request"
               @bind:event="oninput"></textarea>
+
+    @if (_showProfileTip)
+    {
+        <p class="start-profile-tip" data-testid="start-profile-tip">Tip: tell us once about yourself under <a href="/about-me">About me</a> – it is used in every text.</p>
+    }
 
     <div class="start-drop" data-upload-zone data-testid="start-drop">
         <input type="file" id="start-file-input" class="start-file-input" multiple
@@ -129,6 +136,7 @@
     IJSObjectReference? _handle;
     DotNetObjectReference<Start>? _self;
     bool _disposed;
+    bool _showProfileTip;
 
     int MaxFiles => SourceSettings.Value.MaxFilesPerOrder;
 
@@ -235,6 +243,7 @@
         var auth = await AuthProvider.GetAuthenticationStateAsync();
         var name = auth.User.Identity?.Name;
         _username = string.IsNullOrWhiteSpace(name) ? null : name;
+        await LoadProfileTipAsync();
         if (From is { } orderId)
         {
             if (!auth.User.TryGetOwnerFilter(out _requestingUser))
@@ -268,6 +277,21 @@
         if (_disposed)
             await ReleaseScriptAsync();
         StateHasChanged();
+    }
+
+    async Task LoadProfileTipAsync()
+    {
+        if (_username is not { } user)
+            return;
+        try
+        {
+            var profile = await DataGate.RunAsync(() => Profiles.GetAsync(user));
+            _showProfileTip = profile.IsEmpty;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogDebug(ex, "Loading the profile for the start page tip failed");
+        }
     }
 
     async Task PrefillAsync(Guid orderId)

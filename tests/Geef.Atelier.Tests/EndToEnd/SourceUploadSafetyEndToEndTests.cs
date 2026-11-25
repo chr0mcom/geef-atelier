@@ -95,5 +95,22 @@ public sealed class SourceUploadSafetyEndToEndTests(PostgresFixture postgres)
         public Task TouchAsync(Guid orderId, DateTimeOffset at, CancellationToken ct = default) => inner.TouchAsync(orderId, at, ct);
 
         public Task<bool> DeleteAsync(Guid orderId, CancellationToken ct = default) => inner.DeleteAsync(orderId, ct);
+
+        public Task<IReadOnlyList<Guid>> ListIntakeCandidatesAsync(DateTimeOffset staleBefore, int maxAttempts, int limit, CancellationToken ct = default) =>
+            inner.ListIntakeCandidatesAsync(staleBefore, maxAttempts, limit, ct);
+
+        public Task<bool> TryClaimForIntakeAsync(Guid orderId, DateTimeOffset now, DateTimeOffset staleBefore, int maxAttempts, CancellationToken ct = default) =>
+            inner.TryClaimForIntakeAsync(orderId, now, staleBefore, maxAttempts, ct);
+
+        public Task<IReadOnlyList<Guid>> ListStuckIntakesAsync(DateTimeOffset staleBefore, DateTimeOffset unclaimedBefore, int maxAttempts, int limit, CancellationToken ct = default) =>
+            inner.ListStuckIntakesAsync(staleBefore, unclaimedBefore, maxAttempts, limit, ct);
+
+        public Task<bool> TrySaveQuestionsAsync(Guid orderId, string clarifyJson, DateTimeOffset at, CancellationToken ct = default) =>
+            inner.TrySaveQuestionsAsync(orderId, clarifyJson, at, ct);
+
+        public Task<bool> TryStartWithRunAsync(OrderStart start, CancellationToken ct = default) => inner.TryStartWithRunAsync(start, ct);
+
+        public Task<IReadOnlyList<Guid>> ListUnansweredAsync(DateTimeOffset askedBefore, int limit, CancellationToken ct = default) =>
+            inner.ListUnansweredAsync(askedBefore, limit, ct);
     }
 }

@@ -81,6 +81,7 @@ public sealed class ModelParserTests
         Assert.Equal(0, (int)ModelSlot.Executor);
         Assert.Equal(9, (int)ModelSlot.TransformCondense);
         Assert.Equal(11, (int)ModelSlot.Helper);
+        Assert.Equal(12, (int)ModelSlot.Intake);
         Assert.Equal(0, (int)ModelDomain.General);
         Assert.Equal(6, (int)ModelDomain.Technical);
     }

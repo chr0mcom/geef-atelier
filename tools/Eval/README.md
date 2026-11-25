@@ -140,3 +140,52 @@ cd tools/Eval && python3 -m pytest -q
 ```
 
 Die Tests laufen vollständig offline mit Attrappen; kein Test ruft ein Modell auf.
+
+## Klärer-Korpus (`geef_eval/intake_corpus.py`)
+
+Zweck: ein synthetischer Korpus, mit dem sich messen lässt, ob der Klärer (die Rückfragen vor dem Schreiben) die
+richtigen Fragen stellt. Jeder Eintrag ist eine erfundene Person mit verborgener, vollständiger Absicht (`intent`) und
+einem Auftrag (`request`) in ihren eigenen Worten. Das Messwerkzeug selbst ist `tools/IntakeEval` (.NET, getrennt gebaut).
+
+```bash
+cd tools/Eval
+python3 -m geef_eval.intake_corpus generate --out intake-corpus.jsonl --second 0 [--max-calls N] [--model sonnet]
+python3 -m geef_eval.intake_corpus generate --out intake-corpus-second.jsonl --main 0 --second 40
+python3 -m geef_eval.intake_corpus label --corpus intake-corpus.jsonl [--max-calls N] [--model opus]
+python3 -m geef_eval.intake_corpus stats --corpus intake-corpus.jsonl
+```
+
+| Befehl | Wirkung |
+|---|---|
+| `generate` | ein Sonnet-Aufruf je Eintrag; Hauptkorpus 120 (`sparse` 50, `complete` 40, `revision` 10, `researchable` 10, `profile_covered` 10; etwa 70 % `de`, 30 % `en`, dazu genau 4 × `fr` als Gegenprobe), Zweitkorpus 40 im Eiltipp-Stil (Kleinschreibung, Tippfehler, halbe Sätze). Die Belegung folgt deterministisch aus Index und `--seed`; ein abgebrochener Lauf macht mit demselben Befehl genau dort weiter |
+| `label` | zweiter, unabhängiger Aufruf mit Opus: sieht Auftrag, Dateien, Profil und Absicht (nie die Generator-Angaben) und beschriftet je Thema `necessary_ask`, `acceptable_ask` oder `forbidden_ask`; schreibt `labels`, `label_note`, `label_model` atomar in dieselbe Datei und überspringt beschriftete Einträge |
+| `stats` | zählt je Korpus, Kategorie, Sprache, Teilung (`dev`/`holdout`) und Beschriftungsstand |
+
+`--max-calls` kappt die Zahl der Modellaufrufe je Lauf. Ungültige Antworten werden nicht geschrieben und beim nächsten
+Lauf erneut versucht; ein Nutzungslimit beendet den Lauf mit Meldung und Rückgabewert 3. Fehlen nach `generate` noch
+Einträge oder sind nach `label` noch Einträge unbeschriftet (Abbruch, `--max-calls`, verworfene Antworten), endet der
+Befehl mit Rückgabewert 4: Der Korpus ist dann unvollständig und für `tools/IntakeEval evaluate` nicht auswertbar.
+
+Eintragsformat (JSONL, eine Zeile je Eintrag, UTF-8 ohne ASCII-Escapes):
+
+```json
+{"id": "main-017", "corpus": "main", "category": "sparse", "lang": "de",
+ "request": "…", "files": [{"name": "brief.txt", "kind": "text", "text": "…", "pages": null}],
+ "profile": null, "intent": "…", "generator_model": "sonnet",
+ "labels": {"length": "necessary_ask", "audience": "forbidden_ask"}, "label_note": "…", "label_model": "opus"}
+```
+
+`files[].kind` ist `text`, `markdown`, `pdf` oder `docx` (nur Etikett, der Inhalt ist Klartext). `profile` ist `null` oder
+`{display_name, role, organization, formality (unset|formal|informal), language, signature, no_gos, free_text}`.
+Themen: `length`, `audience`, `purpose`, `tone`, `formality`, `language`, `sender`, `signature`, `facts`, `format`,
+`date`, `scope`, `other`. `labels` fehlt, solange der Eintrag nicht beschriftet ist.
+
+Teilung 70/30: `split(request)` bildet SHA-256 über die UTF-8-Bytes des Auftrags; erstes Byte `% 10 < 7` ergibt `dev`,
+sonst `holdout` (wie `LengthCorpusTests.InDevelopmentSet` im C#-Test). Die Teilung wird nicht im Eintrag gespeichert.
+
+Betrieb:
+
+- Der Korpus ist synthetisch (alle Personen und Firmen erfunden) und darf ins öffentliche Git. Ablage:
+  `tests/Geef.Atelier.Tests/Intake/Corpus/intake-corpus.jsonl` und `intake-corpus-second.jsonl`.
+- Der Lauf geschieht nachts und nur, wenn BookForge nicht läuft (geteiltes Claude-Kontingent).
+- Der Auftraggeber prüft 20 Einträge stichprobenartig und entfernt widersprüchliche.

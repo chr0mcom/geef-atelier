@@ -53,6 +53,7 @@ public static class ModelSlotExtensions
         ModelSlot.TransformRewrite => "Transform finalizer that rewrites voice or tone.",
         ModelSlot.TransformCondense => "Transform finalizer that condenses (summary, takeaways, glossary).",
         ModelSlot.Composer => "Composes crews from task descriptions.",
+        ModelSlot.Intake => "Prepares an order before writing: what is missing and what to ask.",
         _ => "Lightweight filtering or classification.",
     };
 }

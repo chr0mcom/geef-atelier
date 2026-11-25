@@ -1909,3 +1909,104 @@ not converge, so the rule is now structural and favours precision over recall, a
 synthetic requests labelled by a separate generator before the extractor saw them (development set, held-out set and
 a second set in a hasty typing style). The 25 % threshold limits the damage of any remaining misreading to texts that
 are far off.
+
+
+## D-071 — Stage 2: clarify before the run (2026-11-25)
+
+**Status:** implemented (stage 2: clarifier, gate, worker, measuring tool, order service, profile, web and MCP), shipped with
+`Orders:IntakeMode = Shadow`. `On` follows in a separate commit once the acceptance gates of the corpus measurement and
+the shadow operation are met.
+
+**Decision.** Before the first run a **clarifier** analyses the order in exactly one structured call. A **gate in code**
+brings its proposals back to the question rule. The person gets at most three short questions with clickable answers,
+or none; every failure starts the order with the request as written.
+
+- **Clarifier** (`LlmClarifier`): slot `ModelSlot.Intake` (Sonnet, fallback Sol), `response_format` json_schema
+  `clarify_order`, `reasoning_effort: low`, hard limit `Intake:Timeout` (40 s), failover allowed. It sees the request,
+  the start and end of every file (2,000 + 1,000 characters, at most 12,000 together and five files) and the profile.
+  Tags in the material are defused; the material is something to analyse, never an instruction. No second attempt in
+  the application: the proxy already repeats an invalid answer once.
+- **Gate** (`QuestionGate`, pure function, every rule tested): profile before question (language, sender, signature,
+  form of address); anything researchable is never asked; questions the person cannot answer or that change little
+  become assumptions; a revision never asks about length, tone or form of address and asks at most one question; the
+  length only from the fixed template (German, English; otherwise an assumption) and only when the request names none
+  (an amount with a unit of length counts wherever it stands, e.g. "two paragraphs", "keep it to three sentences",
+  "a few lines", "a 2-page report", and so do tweet, SMS, one-pager and one-liner; deliberately broad, "ten pages are
+  missing" counts too, because a false hit only lets the writer choose while a miss would ask for something already
+  written; this detection never feeds a length check of the text); a model question becomes the template only under
+  format, scope or other and only when it asks for the length of the text itself ("How long should the post be?", "Do you want a
+  short or a long version?"), never a question about a duration, a validity or an amount ("How long have you worked there?",
+  "How long should the reply window be?");
+  question ≤ 120 characters, 2–4 options ≤ 60 characters, no filler answers ("other", "egal"), no blocked words
+  (`JargonBlocklist`, including plurals), no other language; one topic, one question; length first; at most three.
+  Every dropped question becomes an assumption, except when its topic is asked anyway (a dropped duplicate never sets a
+  guess beside the answer; narrow topics also take no assumption from another gap; facts and other keep theirs, from a dropped duplicate the one
+  the model gave). The gate
+  assigns all ids.
+- **Flow** (`OrderIntakeService`, `OrderIntakeWorker`): atomic claim, at most two clarifications at a time, a wake-up
+  signal after submitting. Zero questions start the run in the same step (`Clarified`); otherwise the order waits with
+  its questions stored. Stuck clarifications start without questions after 60 s in the queue or two attempts,
+  unanswered questions after 24 h with the assumptions. Claims from before the process start count as abandoned at once.
+- **Shadow:** in `Shadow` mode the order runs as in stage 1; the worker also clarifies while the live queue is empty and
+  stores the result only in `OrderIntakeShadows` (at most 50 per UTC day).
+- **Answered length:** the answer to the template question becomes a length check "about n words" (±20 %) without the
+  text parser (`IntakeConstraints.WithAnswers` in `OrderGroundingStep`). Free text is never parsed.
+- **Measurement:** `tools/Eval/geef_eval/intake_corpus.py` generates and labels a synthetic corpus (exit code 4 while
+  entries are missing or unlabelled), `tools/IntakeEval run` measures clarifier and gate on it, `IntakeEval evaluate` and
+  `IntakeCorpusTests` replay the stored raw answers without a model and give every gate a verdict (passed, failed, not
+  evaluable). No gate passes without data: missing entries, wrong corpus sizes, unlabelled entries or an empty held-out set
+  or second corpus make every gate not evaluable, and so does a result for another input (every line carries a hash of
+  request, files, profile, clarifier prompt and schema; `run` never skips such entries); the failure rate counts every
+  attempt, the latency every answer and time-out (fast failures never improve it); an answer over the production
+  limit or one that cannot be replayed is a failure. `IntakeEval shadow` judges gates a, f and g from a read-only CSV
+  export of `OrderIntakeShadows` (see `tools/IntakeEval/README.md`).
+
+**Rationale.** In the measurement of 2026-11-24 an agent with free tool access asked questions in every case and took
+too long doing so. One structured call on a small model plus a gate in code make the question rule verifiable instead of
+leaving it to the model. Assuming is cheaper than a needless question, so the gate is strict and every rejection only
+costs one more assumption.
+
+**Further decisions of stage 2 (order service, profile, web, MCP; review round 1).**
+
+- **Briefing** (`Intake:BriefMode`, default `AppendAnswers`): the request stays first and unchanged; after a separator
+  follow the answers of the person (answers of the AI client are marked as such, also the answer to the revision guess),
+  the corrected assumptions, the assumptions shown and not corrected as non-binding defaults (the heading says that the
+  answers and corrections of the person always take precedence and the assumptions apply only where neither they nor the
+  request or the files say otherwise) and the profile. Assumptions never become a blocking check. `PreparedBrief` adds what the
+  clarifier understood. A start before the request was read has no assumptions and no text claims any.
+- **Answers** (`answer_order`, state `needs_input`): origin `user` or `client`, never `memory`; a question is answered by
+  an option, own words (only where allowed) or "decide for me", never by two of them; an empty answer is refused;
+  assumptions take only a correction as free text. Open questions count as "decide for me". Without any answer the order
+  counts as skipped, also for "Just start" in the web, which sends everything the person already did. Answers that arrive
+  after the start are reported as not used.
+- **Revision:** a file becomes the text to revise only when the request uses a revision verb **and** the clarifier judges
+  it a revision, also with a single file. Without the clarifier's judgement (failure, off, skip while reading) no file
+  changes its role, as in stage 1. The guess is shown in web and MCP (`revisionFile`) and can be turned down.
+- **Profile** (`UserProfiles`, migration `Step49Intake`): one row per user name, edited only by the person under "About me".
+  It goes to the clarifier and to writer and reviewers. It is deleted with the account, moved when the account is
+  renamed, and a new account never finds an old profile. Account and profile change in one database transaction
+  (`IAccountStore`); the runs that stay under a deleted or given-up name lose the profile block in their stored briefing
+  (a note takes its place). The tokens of an account are revoked before anything changes, also on a rename. Run pages and `get_run_details` show the profile block only to
+  the owner; everybody else, administrators included, sees a note instead.
+- **Outside services:** web, news and academic search, the embeddings of the learning search, the query shaping and the
+  refinement get only the request as written, never answers, assumptions or the profile. Learning summaries also use only
+  the request.
+- **Gate, content:** texts are normalized first (NFKC, format characters removed, odd dots read as dots). Questions,
+  options, assumptions and the summary are dropped when they contain a link, a web or mail address, an IP address with a
+  path or a Markdown link; a bare name such as `Booking.com` or `Node.js` is fine only when it stands literally in the
+  request of the person, never because of a file. They are also dropped when they mention a password, PIN, TAN, key,
+  token, card or account number in any form (also inside compound words; lower-case "pin" after an owner word) unless the
+  request itself treats the same kind (access data, or payment and account data; a request with an IBAN allows no
+  password); a
+  request for the secret itself is always dropped. Only the element is dropped, never the order.
+  The MCP instructions describe these fields as derived from request and files, not as instructions.
+- **Robustness:** a failing claim gives its slot back; an order that keeps failing in a sweep is left out for 15 minutes,
+  doubled with every further failure up to 24 hours, so that no number of broken orders starves the younger ones; "Stop" tries again (up to three times) when the state changed at the same moment.
+- **MCP host start:** the host does not start when a tool parameter is neither a client value, an SDK value nor a
+  registered service (`McpToolBindingCheck`), so that a missing registration can never let a client fill a service.
+- **Known limit for stage 7:** `IMemoryResolution` applies "memory before question" only to the four profile topics
+  (language, sender, signature, form of address); `IntakeRecord.FromMemory` is stored but not read. Remembered answers of
+  stage 7 need both to be extended.
+- **Known limit, accounts:** runs and orders hang on the user name (older than stage 2). A new account with the name of a
+  deleted or renamed one sees those old runs and orders with request, answers and result; only the profile block is
+  removed from their briefings. Profile values in the stored clarifier record (`FromMemory`) stay; they are shown nowhere.

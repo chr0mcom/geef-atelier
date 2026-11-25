@@ -1,5 +1,8 @@
+using Geef.Atelier.Application.Orders;
+using Geef.Atelier.Mcp.Models;
 using System.Diagnostics;
 using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Mcp.Tools;
 using ModelContextProtocol;
@@ -121,7 +124,98 @@ public sealed class GetOrderStatusToolTests
 
         Assert.Equal(wire, dto.State);
         Assert.Equal(done, dto.Done);
-        Assert.Equal(done ? 0 : 10, dto.NextCheckSeconds);
+        Assert.Equal(done || state == OrderDisplayState.NeedsInput ? 0 : 10, dto.NextCheckSeconds);
+    }
+
+    [Fact]
+    public async Task An_order_that_needs_answers_answers_at_once_with_the_questions_and_no_next_check()
+    {
+        var id = Guid.NewGuid();
+        _orders.Add("alice", OrderToolTestData.View(id, OrderDisplayState.NeedsInput, step: "Your answers", clarification: OrderToolTestData.Clarification()));
+
+        var dto = await GetOrderStatusTool.GetOrderStatus(_orders, _alice, OrderToolTestData.Options(), id.ToString(), 50);
+
+        Assert.Empty(_orders.Waits);
+        Assert.Equal("needs_input", dto.State);
+        Assert.False(dto.Done);
+        Assert.Equal(0, dto.NextCheckSeconds);
+        Assert.Null(dto.RunId);
+        Assert.Equal("Eine kurze Mail an einen Kunden über eine Lieferverzögerung.", dto.Understanding);
+        Assert.Equal("de", dto.Language);
+        Assert.Equal(["a1", "a2"], dto.Assumptions!.Select(a => a.Id));
+        Assert.Equal([false, true], dto.Assumptions!.Select(a => a.Unsure));
+        Assert.Equal(["length", "q1"], dto.Questions!.Select(q => q.Id));
+        Assert.Equal(["length", "audience"], dto.Questions!.Select(q => q.Topic));
+        Assert.Equal(["o1", "o2"], dto.Questions![1].Options.Select(o => o.Id));
+        Assert.StartsWith("Before writing, Atelier has 2 short questions.", dto.Message);
+        Assert.Contains("answer_order", dto.Message);
+    }
+
+    [Fact]
+    public async Task The_revision_guess_reaches_the_client_with_the_questions()
+    {
+        var id = Guid.NewGuid();
+        _orders.Add("alice", OrderToolTestData.View(id, OrderDisplayState.NeedsInput,
+            clarification: OrderToolTestData.Clarification() with { RevisionFileName = "rede.docx" }));
+
+        var dto = await GetOrderStatusTool.GetOrderStatus(_orders, _alice, OrderToolTestData.Options(), id.ToString(), 50);
+
+        Assert.Equal("rede.docx", dto.RevisionFile);
+        foreach (var state in new[] { OrderDisplayState.Preparing, OrderDisplayState.Queued, OrderDisplayState.Working, OrderDisplayState.Delivered })
+        {
+            var other = Guid.NewGuid();
+            _orders.Add("alice", OrderToolTestData.View(other, state,
+                clarification: OrderToolTestData.Clarification() with { RevisionFileName = "rede.docx" }));
+            var status = await GetOrderStatusTool.GetOrderStatus(_orders, _alice, OrderToolTestData.Options(), other.ToString(), 0);
+            Assert.Null(status.RevisionFile);
+        }
+        var submitted = new OrderSubmission(id, OrderDisplayState.NeedsInput, null, [], OrderToolTestData.Clarification() with { RevisionFileName = "rede.docx" })
+            .ToDto([]);
+        Assert.Equal("rede.docx", submitted.RevisionFile);
+        var started = new OrderSubmission(id, OrderDisplayState.Queued, Guid.NewGuid(), [], OrderToolTestData.Clarification() with { RevisionFileName = "rede.docx" })
+            .ToDto([]);
+        Assert.Null(started.RevisionFile);
+    }
+
+    [Fact]
+    public async Task A_status_wait_from_preparing_ends_with_the_questions()
+    {
+        var id = Guid.NewGuid();
+        _orders.Add("alice", OrderToolTestData.View(id, OrderDisplayState.Preparing, step: "Reading your request"));
+        _orders.ViewAfterWait = OrderToolTestData.View(id, OrderDisplayState.NeedsInput, clarification: OrderToolTestData.Clarification());
+
+        var dto = await GetOrderStatusTool.GetOrderStatus(_orders, _alice, OrderToolTestData.Options(), id.ToString(), 25);
+
+        Assert.Equal(OrderDisplayState.Preparing, Assert.Single(_orders.Waits).KnownState);
+        Assert.Equal("needs_input", dto.State);
+        Assert.Equal(2, dto.Questions!.Count);
+    }
+
+    [Theory]
+    [InlineData(OrderDisplayState.Preparing)]
+    [InlineData(OrderDisplayState.Queued)]
+    [InlineData(OrderDisplayState.Working)]
+    [InlineData(OrderDisplayState.Delivered)]
+    public async Task Questions_understanding_and_message_appear_only_while_the_order_needs_answers(OrderDisplayState state)
+    {
+        var id = Guid.NewGuid();
+        _orders.Add("alice", OrderToolTestData.View(id, state, clarification: OrderToolTestData.Clarification(outcome: IntakeOutcome.Answered)));
+
+        var dto = await GetOrderStatusTool.GetOrderStatus(_orders, _alice, OrderToolTestData.Options(), id.ToString(), 0);
+
+        Assert.Null(dto.Questions);
+        Assert.Null(dto.Understanding);
+        Assert.Null(dto.Assumptions);
+        Assert.Null(dto.Language);
+        Assert.Null(dto.Message);
+    }
+
+    [Fact]
+    public void The_description_names_needs_input_and_answer_order()
+    {
+        Assert.Contains("needs_input", GetOrderStatusTool.ToolDescription);
+        Assert.Contains("answer_order", GetOrderStatusTool.ToolDescription);
+        Assert.DoesNotContain("reserved", GetOrderStatusTool.ToolDescription);
     }
 
     [Fact]

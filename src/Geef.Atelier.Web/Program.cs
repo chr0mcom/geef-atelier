@@ -1,5 +1,7 @@
 using Geef.Atelier.Application.Auth;
+using Geef.Atelier.Application.Intake;
 using Geef.Atelier.Application.OAuth;
+using Geef.Atelier.Application.Profiles;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Application.Pricing;
@@ -10,6 +12,7 @@ using Geef.Atelier.Infrastructure.Configuration;
 using Geef.Atelier.Infrastructure.Embeddings;
 using Geef.Atelier.Infrastructure.Composition;
 using Geef.Atelier.Infrastructure.Grounding;
+using Geef.Atelier.Infrastructure.Intake;
 using Geef.Atelier.Infrastructure.Pricing;
 using Geef.Atelier.Infrastructure.Knowledge;
 using Geef.Atelier.Infrastructure.Llm;
@@ -105,7 +108,11 @@ builder.Services.PostConfigure<SourceOptions>(o =>
         o.ExtractionWorkerAssembly = typeof(Program).Assembly.Location;
 });
 builder.Services.Configure<OrderOptions>(builder.Configuration.GetSection(OrderOptions.SectionName));
+builder.Services.Configure<IntakeOptions>(builder.Configuration.GetSection(IntakeOptions.SectionName));
 builder.Services.AddSources(builder.Configuration);
+builder.Services.AddProfiles();
+builder.Services.AddOrderIntakeServices();
+builder.Services.AddOrderIntake();
 builder.Services.AddOrderExport();
 builder.Services.AddRequestTimeouts();
 builder.Services.AddPipelineAssemblers();

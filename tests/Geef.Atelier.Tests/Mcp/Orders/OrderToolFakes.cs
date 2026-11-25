@@ -4,6 +4,7 @@ using Geef.Atelier.Application.Sources;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Checks;
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Warnings;
@@ -23,6 +24,27 @@ internal static class OrderToolTestData
     public static IOptions<OrderOptions> Options(int maxWaitSeconds = 50, OrderMode legacyMode = OrderMode.Direct) =>
         Microsoft.Extensions.Options.Options.Create(new OrderOptions { MaxWaitSeconds = maxWaitSeconds, LegacySubmitDefaultMode = legacyMode });
 
+    public static IOptions<IntakeOptions> Intake(int submitWaitSeconds = 30) =>
+        Microsoft.Extensions.Options.Options.Create(new IntakeOptions { SubmitWaitSeconds = submitWaitSeconds });
+
+    public static readonly ClarifyQuestion LengthQuestion = new(
+        "length", GapTopic.Length, "Wie lang soll der Text ungefähr werden?",
+        [new QuestionOption("short", "Kurz (etwa 150 Wörter)"), new QuestionOption("medium", "Mittel (etwa 400 Wörter)"), new QuestionOption("long", "Lang (etwa 800 Wörter)")],
+        null, true, true);
+
+    public static readonly ClarifyQuestion AudienceQuestion = new(
+        "q1", GapTopic.Audience, "Wer bekommt die Mail?",
+        [new QuestionOption("o1", "Ein einzelner Kunde"), new QuestionOption("o2", "Alle Kunden")],
+        "o1", false, false);
+
+    public static readonly IntakeAssumption ToneAssumption = new("a1", GapTopic.Tone, "Freundlicher, sachlicher Ton", AssumptionConfidence.Sure);
+    public static readonly IntakeAssumption DateAssumption = new("a2", GapTopic.Date, "Neuer Liefertermin als Platzhalter", AssumptionConfidence.Unsure);
+
+    public static ClarificationView Clarification(IReadOnlyList<ClarifyQuestion>? questions = null, IntakeOutcome? outcome = IntakeOutcome.Asked) =>
+        new(outcome, "email", "de", "Eine kurze Mail an einen Kunden über eine Lieferverzögerung.",
+            [ToneAssumption, DateAssumption], questions ?? [LengthQuestion, AudienceQuestion], [], null,
+            DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(24));
+
     public static bool IsFinished(OrderDisplayState state) =>
         state is OrderDisplayState.Delivered or OrderDisplayState.DeliveredWithOpenPoints or OrderDisplayState.Failed or OrderDisplayState.Stopped;
 
@@ -34,7 +56,8 @@ internal static class OrderToolTestData
         Guid? runId = null,
         int? version = 1,
         RunOutcome? outcome = null,
-        IReadOnlyList<RunWarningEntity>? warnings = null)
+        IReadOnlyList<RunWarningEntity>? warnings = null,
+        ClarificationView? clarification = null)
     {
         var now = DateTimeOffset.UtcNow;
         var display = new OrderDisplay(state, HasText: state is OrderDisplayState.Delivered or OrderDisplayState.DeliveredWithOpenPoints, IsFinished(state));
@@ -45,7 +68,8 @@ internal static class OrderToolTestData
             orderId, "Synthetic order", "Write a short note.", OrderMode.Direct, OrderEntry.Mcp, OrderState.Ready, display,
             now, now, run, run is null ? [] : [run], [],
             new OrderProgress([], step, elapsed ?? TimeSpan.FromSeconds(12)),
-            warnings ?? []);
+            warnings ?? [],
+            clarification);
     }
 
     public static OrderResult Result(
@@ -56,11 +80,12 @@ internal static class OrderToolTestData
         IReadOnlyList<DraftCheckResult>? openChecks = null,
         IReadOnlyList<OrderSourceUsageView>? sourcesUsed = null,
         IReadOnlyList<RunWarningEntity>? warnings = null,
-        string? note = null) =>
+        string? note = null,
+        IReadOnlyList<IntakeAssumption>? assumptions = null) =>
         new(orderId,
             new OrderDisplay(state, !string.IsNullOrWhiteSpace(text), IsFinished(state)),
             Guid.NewGuid(), 1, text, text is null ? null : text.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length,
-            placeholders ?? [], openChecks ?? [], sourcesUsed ?? [], warnings ?? [], note);
+            placeholders ?? [], openChecks ?? [], sourcesUsed ?? [], warnings ?? [], note, assumptions);
 
     public static RunWarningEntity Warning(string code, string message) =>
         new() { Id = Guid.NewGuid(), RunId = Guid.NewGuid(), Source = "test", Code = code, Message = message, CreatedAt = DateTimeOffset.UtcNow };
@@ -74,6 +99,12 @@ internal sealed class FakeOrderService : IOrderService
     public List<SubmitOrderRequest> Submitted { get; } = [];
     public List<(Guid OrderId, string? RequestingUsername, OrderDisplayState? KnownState, TimeSpan MaxWait)> Waits { get; } = [];
     public List<(Guid OrderId, string? RequestingUsername)> Gets { get; } = [];
+    public List<AnswerOrderRequest> Answers { get; } = [];
+    public List<(Guid OrderId, string? RequestingUsername)> Skips { get; } = [];
+
+    public Func<AnswerOrderRequest, OrderSubmission>? OnAnswer { get; set; }
+    public Func<Guid, OrderSubmission>? OnSkip { get; set; }
+    public Exception? AnswerException { get; set; }
 
     public Func<SubmitOrderRequest, OrderSubmission>? OnSubmit { get; set; }
     public Exception? SubmitException { get; set; }
@@ -143,6 +174,24 @@ internal sealed class FakeOrderService : IOrderService
     public Task<bool> CancelAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) => Task.FromResult(false);
 
     public Task<bool> DeleteAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) => Task.FromResult(false);
+
+    public Task<OrderSubmission> AnswerAsync(AnswerOrderRequest request, CancellationToken ct = default)
+    {
+        Answers.Add(request);
+        if (AnswerException is not null)
+            throw AnswerException;
+        return Task.FromResult(OnAnswer?.Invoke(request)
+            ?? new OrderSubmission(request.OrderId, OrderDisplayState.Queued, Guid.NewGuid(), []));
+    }
+
+    public Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default)
+    {
+        Skips.Add((orderId, requestingUsername));
+        if (AnswerException is not null)
+            throw AnswerException;
+        return Task.FromResult(OnSkip?.Invoke(orderId)
+            ?? new OrderSubmission(orderId, OrderDisplayState.Queued, Guid.NewGuid(), []));
+    }
 
     private bool Visible(Guid orderId, string? requestingUsername) =>
         _orders.TryGetValue(orderId, out var entry) && (requestingUsername is null || entry.Owner == requestingUsername);

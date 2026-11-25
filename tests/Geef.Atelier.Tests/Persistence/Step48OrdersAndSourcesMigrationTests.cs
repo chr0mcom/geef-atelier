@@ -22,6 +22,7 @@ namespace Geef.Atelier.Tests.Persistence;
 public sealed class Step48OrdersAndSourcesMigrationTests : IAsyncLifetime
 {
     private const string Step47 = "20261124120000_Step47EngineHonesty";
+    private const string Step48 = "20261125120000_Step48OrdersAndSources";
 
     private static readonly DateTimeOffset T0 = new(2026, 6, 1, 8, 0, 0, TimeSpan.Zero);
 
@@ -109,7 +110,7 @@ public sealed class Step48OrdersAndSourcesMigrationTests : IAsyncLifetime
     {
         await MigrateToStep47AndSeedChainsAsync();
         await using (var db = NewContext())
-            await db.Database.MigrateAsync();
+            await db.GetService<IMigrator>().MigrateAsync(Step48);
 
         await using (var db = NewContext())
         {
@@ -130,6 +131,11 @@ public sealed class Step48OrdersAndSourcesMigrationTests : IAsyncLifetime
 
             await RunUpAsync(db);
             await AssertSchemaAsync(db);
+        }
+
+        await using (var db = NewContext())
+        {
+            await db.Database.MigrateAsync();
             await AssertChainsMigratedAsync(db);
         }
     }

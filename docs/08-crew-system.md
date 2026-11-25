@@ -72,6 +72,7 @@ A profile states its **role**; the crew states its **domain**; the system picks 
   - Warnings are logged on skipped primaries and fallbacks.
 
 - **Always current (D-066/10):** the matrix names family aliases (`claude-opus-latest`, `gpt-sol-latest`, `gpt-astra-latest`). The cli-proxy resolves the codex aliases to the newest listed model of the line, so a new release of an existing line needs no code change; run snapshots keep the concrete id. The nightly `scripts/cli-proxy-selfupdate.sh` keeps container and host CLIs current and moves the host codex default to the newest Sol.
+- **Intake slot (D-071):** `ModelSlot.Intake` (Sonnet → Sol) clarifies an order before writing; it is assigned with `AssignAsync(ModelSlot.Intake, General)` and no profile may carry it (`AllowedSlots` unchanged, not in the composer catalog).
 - **Composer settings** are whitelisted (`CrewPartSettingsPolicy`); inline `rest-api` grounding and inline `ExternalSink` finalizers are critical.
 
 The table and rationale are in D-066 and `reports/2026-11-22-modellrecherche.md`.

@@ -1,5 +1,6 @@
 using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Application.Grounding;
+using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Persistence.Crew;
@@ -21,6 +22,9 @@ namespace Geef.Atelier.Infrastructure.Pipeline;
 /// except for the system profiles in <see cref="GroundingPathSelection.ProviderTypePathSystemProfiles"/>,
 /// which always take the legacy path (also when an older run snapshot still carries their tool name).
 /// A provider that fails is skipped and recorded as a run warning.
+/// Providers, their query shaping and the refinement get only the request as the person wrote it
+/// (<see cref="BriefingSections.RequestPart"/>), never the answers, assumptions or profile the briefing also carries: those
+/// are for the writer and the reviewers, not for outside search services.
 /// </summary>
 internal sealed class MultiProviderGroundingStep(
     IGroundingStep inner,
@@ -36,6 +40,7 @@ internal sealed class MultiProviderGroundingStep(
     public async Task<SdkGroundingResult> RunAsync(string input, CancellationToken cancellationToken)
     {
         var innerResult = await inner.RunAsync(input, cancellationToken);
+        var query = BriefingSections.RequestPart(input);
 
         var enrichedBlocks = new List<string>(providers.Count);
         foreach (var profile in providers)
@@ -50,7 +55,7 @@ internal sealed class MultiProviderGroundingStep(
                     : factory.Create(profile.ProviderType);
 
                 var result = await LlmResilience.ExecuteAsync(
-                    ct => provider.EnrichAsync(input, profile, runId, ct), cancellationToken);
+                    ct => provider.EnrichAsync(query, profile, runId, ct), cancellationToken);
 
                 var finalResult = result;
                 RefinementOutcome? refinementOutcome = null;
@@ -60,7 +65,7 @@ internal sealed class MultiProviderGroundingStep(
                     var config = new GroundingRefinementConfig(
                         binding, profile.RefinementMode, profile.RefinementInstructions);
                     var (refined, outcome) = await LlmResilience.ExecuteAsync(
-                        ct => refiner.RefineAsync(result, input, config, profile.Name, runId, ct), cancellationToken);
+                        ct => refiner.RefineAsync(result, query, config, profile.Name, runId, ct), cancellationToken);
                     finalResult = refined;
                     refinementOutcome = outcome;
                 }

@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Orders;
 using System.Text;
 using System.Text.Json;
 using Geef.Atelier.Application.Crew.Finalizers;
@@ -155,7 +156,7 @@ internal sealed class LearningExtractFinalizerExecutor(
             // orchestrator polls for Pending runs, so no blocking wait is needed.
             try
             {
-                var briefing = BuildLearningBriefing(entry, run.BriefingText);
+                var briefing = BuildLearningBriefing(entry, BriefingSections.RequestPart(run.BriefingText));
                 var learningRunId = await runService.SubmitRunAsync(
                     new SubmitRunRequest(
                         BriefingText:     briefing,
@@ -210,7 +211,7 @@ internal sealed class LearningExtractFinalizerExecutor(
         var sb = new StringBuilder();
         sb.AppendLine($"domain: {run.CrewTemplateName ?? "unknown"}");
         sb.AppendLine($"iterations: {details.Iterations.Count}");
-        sb.AppendLine($"briefing_summary: {Truncate(run.BriefingText, 400)}");
+        sb.AppendLine($"briefing_summary: {Truncate(BriefingSections.RequestPart(run.BriefingText), 400)}");
         sb.AppendLine($"final_text_preview: {Truncate(details.Run.FinalText ?? "", 400)}");
         sb.AppendLine("findings:");
         foreach (var f in allFindings.OrderBy(f => f.Severity))

@@ -1,5 +1,7 @@
 using System.Globalization;
+using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Application.Sources;
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
 
@@ -60,6 +62,37 @@ public static class OrderDisplayText
     /// <summary>True for states in which the order is still being worked on.</summary>
     public static bool IsBusy(this OrderDisplayState state) =>
         state is OrderDisplayState.Preparing or OrderDisplayState.NeedsInput or OrderDisplayState.Queued or OrderDisplayState.Working;
+
+    /// <summary>One plain sentence on how the questions before writing ended, for the summary of a started order.</summary>
+    public static string ToPlainText(this IntakeOutcome outcome) => outcome switch
+    {
+        IntakeOutcome.Clarified => "Nothing needed to be asked, so writing started right away.",
+        IntakeOutcome.Asked => "Waiting for your answers.",
+        IntakeOutcome.Answered => "You answered before writing started.",
+        IntakeOutcome.Skipped => "You started without answering. My assumptions were used.",
+        IntakeOutcome.AutoStarted => "There were no answers in time, so writing started with my assumptions.",
+        IntakeOutcome.Failed => "Your request could not be read in advance, so writing started with your request as written.",
+        _ => outcome.ToString(),
+    };
+
+    /// <summary>Text of a start before the request was read: there were no assumptions, so none were used.</summary>
+    public const string SkippedBeforeReadingText = "You started before your request was read, so writing started with your request as written.";
+
+    /// <summary>Text of a skip when the card showed no assumptions.</summary>
+    public const string SkippedWithoutAssumptionsText = "You started without answering.";
+
+    /// <summary>
+    /// The outcome sentence of <paramref name="clarification"/>, true to what happened: a skip while the request was still being
+    /// read (no questions, no summary, no assumptions) or a skip without assumptions never claims that assumptions were used.
+    /// </summary>
+    public static string? OutcomeText(this ClarificationView clarification) => clarification.Outcome switch
+    {
+        null => null,
+        IntakeOutcome.Skipped when clarification.Assumptions.Count == 0 && clarification.Questions.Count == 0
+                                   && string.IsNullOrWhiteSpace(clarification.Understanding) => SkippedBeforeReadingText,
+        IntakeOutcome.Skipped when clarification.Assumptions.Count == 0 => SkippedWithoutAssumptionsText,
+        { } outcome => outcome.ToPlainText(),
+    };
 
     /// <summary>A number with thousands separators, e.g. <c>160,485</c>.</summary>
     public static string Grouped(this int value) => value.ToString("N0", Culture);

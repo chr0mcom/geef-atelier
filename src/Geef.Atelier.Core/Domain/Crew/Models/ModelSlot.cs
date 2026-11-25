@@ -42,4 +42,7 @@ public enum ModelSlot
 
     /// <summary>Lightweight filtering or classification helper.</summary>
     Helper = 11,
+
+    /// <summary>Prepares an order before writing: what is missing and what to ask.</summary>
+    Intake = 12,
 }

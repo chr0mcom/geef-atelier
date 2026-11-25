@@ -54,18 +54,38 @@ public sealed class GetRunDetailsMcpOwnerCheckTests
         Assert.Equal(runId.ToString(), result!.RunId);
     }
 
+    [Fact]
+    public async Task GetRunDetails_AsAdminOfAForeignRun_HidesTheProfileBlock()
+    {
+        var runId = Guid.NewGuid();
+        const string marker = "PROFILMARKER Kiefernweg";
+        var briefing = "Schreib etwas." + Geef.Atelier.Application.Orders.BriefingSections.Separator
+            + Geef.Atelier.Application.Orders.IntakeBriefComposer.ProfileHeading + "\nAnything else: " + marker;
+        var details = MakeDetails(runId, "alice", briefing);
+        var service = new OwnerFilteredRunService(details, ownerUsername: "alice");
+
+        var admin = await GetRunDetailsTool.GetRunDetails(service, new FakeUser("admin", isAdmin: true), runId.ToString());
+        var owner = await GetRunDetailsTool.GetRunDetails(service, new FakeUser("alice", isAdmin: false), runId.ToString());
+        var adminOwner = await GetRunDetailsTool.GetRunDetails(service, new FakeUser("alice", isAdmin: true), runId.ToString());
+
+        Assert.DoesNotContain(marker, admin!.BriefingText);
+        Assert.EndsWith(Geef.Atelier.Application.Orders.BriefingSections.ProfileHiddenNote, admin.BriefingText);
+        Assert.Contains(marker, owner!.BriefingText);
+        Assert.Contains(marker, adminOwner!.BriefingText);
+    }
+
     // ---------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------
 
-    private static RunDetails MakeDetails(Guid runId, string createdByUser) =>
+    private static RunDetails MakeDetails(Guid runId, string createdByUser, string briefing = "briefing") =>
         new RunDetails(
             new RunEntity
             {
                 Id           = runId,
                 CreatedAt    = DateTimeOffset.UtcNow,
                 Status       = RunStatus.Completed,
-                BriefingText = "briefing",
+                BriefingText = briefing,
                 ConfigJson   = "{}",
                 CreatedByUser = createdByUser,
             },
