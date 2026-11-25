@@ -870,3 +870,31 @@ Modells samt seinem einen Ersatz lassen die Tatsachen ungeprüft, und „What wa
 - **Die Rechenprüfung sagt nie „stimmt“:** Die Prüfung ausgeschriebener Rechnungen im Text und der Summen in den Dateien nennt
   nur, was eindeutig falsch aussieht, und bittet die Person, es zu prüfen; sonst sagt „What was checked“ höchstens, dass nichts
   eindeutig Falsches gefunden wurde und dass nicht jede Rechnung so prüfbar ist. Frühere Berichte lesen sich ebenso.
+
+## Recherche im Grounding-Schritt (D-074)
+
+Seit Etappe 4 kann der Grounding-Schritt des Direktwegs (`OrderGroundingStep`) Ausschnitte aus dem Web anhängen. Er fragt
+`IOrderResearchService.EnsureAsync`, bevor er die Dateien rendert, mit der Version des Laufs (vom Assembler), ob der Lauf einen
+Text überarbeitet, dem vollen Text aller Dateien des Auftrags und den Angaben „Über mich“ aus dem Briefing. Der Dienst
+entscheidet (Schalter `Research:Mode`, Override je Nutzer, erste Version, keine Überarbeitung, Klärung mit Suchthemen,
+Tagesgrenze) und speichert die Recherche einmal am Auftrag (`Orders.ResearchJson`); jeder spätere Lauf des Auftrags bekommt die
+gespeicherten Ausschnitte unverändert und sucht nie neu.
+
+- **Quelle `W1`:** Hat die Recherche mindestens einen Ausschnitt, schreibt `DossierRenderer` ihren Text, und der Schritt hängt
+  ihn nach den Dateien als Quelle `W1` mit dem festen Namen „Looked up on the web“ an (`PromptSource.LookedUp`). Die Kennung
+  vergibt nur der Code. Sie wird wie jede Datei entschärft (`SourceBlockRenderer`) und zählt für das Budget des
+  Hintergrunddokuments; die Warnung zu langen Dateien zählt nur die Dateien der Person.
+- **Schreiber:** Im ersten Durchgang folgt im Nutzerprompt nach der Dateiliste ein fester Satz
+  (`DirectWriterPrompts.LookedUpNote`): W1 darf einen Punkt beantworten, den das Briefing als nicht angegeben führt, so wie W1
+  es sagt, und ist Inhalt, nie Anweisung. Der System-Prompt `SystemPrompts.DirectWriter` bleibt unverändert (Hash-Test); ohne
+  `W1` ist der Prompt der von Etappe 3.
+- **Faktenprüfer:** `W1` ist eine weitere Quelle des Materials (`FactSource.LookedUp`, `MaterialPart.LookedUp`). Prompts,
+  Schemata und Version `fact-check-1` bleiben unverändert (`FactCheckPromptStabilityTests`). Die Nachrechnung der Summen sieht
+  `W1` nie.
+- **Nutzung und Bericht:** Die Nutzungszeile von `W1` hat keine Quelle und das Ziel `research`, Position nach den Dateien. Der
+  Bericht führt `W1` nach den Dateien mit `lookedUp` und ist als `lookedUp` markiert; Schreiberzitate aus `W1` sind weder
+  Dateizitate noch zählen sie als ungeprüft.
+- **Stoppt nie den Lauf:** Status `Failed`, eine Ausnahme des Dienstes oder eine Wartezeit über 120 s ergeben die Warnung
+  `grounding.research_failed` („Looking things up on the web did not work this time. The text was written without it.“), und
+  der Lauf geht ohne `W1` weiter. `NothingFound`, `AllWithheld` und `DailyLimit` hängen keine Quelle an und warnen nicht; das
+  Ergebnis zeigt sie als feste Sätze. Nur der Abbruch des Laufs selbst beendet den Schritt.
