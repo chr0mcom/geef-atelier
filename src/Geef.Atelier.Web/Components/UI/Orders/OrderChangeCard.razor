@@ -1,0 +1,167 @@
+@using Geef.Atelier.Application.Orders
+@using Geef.Atelier.Core.Domain.Orders
+@inject IOrderService Orders
+@inject CircuitDataGate DataGate
+@inject ILogger<OrderChangeCard> Logger
+
+@if (!_open)
+{
+    <div class="order-change-entry">
+        <button type="button" class="btn" data-testid="order-change-open" @onclick="Open">@RevisionLines.ChangeButton</button>
+    </div>
+}
+else
+{
+    <section class="clarify-card order-change" aria-labelledby="order-change-title" data-testid="order-change-card">
+        <h2 id="order-change-title" class="order-change-title" tabindex="-1" @ref="_heading">@RevisionLines.ChangeButton</h2>
+
+        <div class="question-options" role="group" aria-label="Quick changes" data-testid="order-change-quick-list">
+            @foreach (var quick in Enum.GetValues<RevisionQuick>())
+            {
+                var chosen = _quick.Contains(quick);
+                <button type="button"
+                        class="question-option@(chosen ? " is-chosen" : "")"
+                        aria-pressed="@(chosen ? "true" : "false")"
+                        disabled="@_busy"
+                        data-testid="order-change-quick"
+                        data-quick="@quick"
+                        @onclick="() => Toggle(quick)">@quick.Label()</button>
+            }
+        </div>
+
+        <div class="question-free">
+            <label class="question-free-label order-change-label" for="order-change-text">@RevisionLines.ChangeFieldLabel</label>
+            <textarea id="order-change-text"
+                      class="question-free-text"
+                      rows="3"
+                      maxlength="@MaxChars"
+                      placeholder="@RevisionLines.ChangeFieldPlaceholder"
+                      disabled="@_busy"
+                      data-testid="order-change-text"
+                      value="@_text"
+                      @oninput="e => _text = Cap(e.Value?.ToString())"></textarea>
+            @if (_text.Length > MaxChars * 9 / 10)
+            {
+                <span class="question-free-count@(_text.Length >= MaxChars ? " is-full" : "")" aria-live="polite" data-testid="order-change-count">@_text.Length / @MaxChars</span>
+            }
+        </div>
+
+        <p class="order-change-promise" data-testid="order-change-promise">@RevisionLines.OnlyWhatYouAsk</p>
+
+        @if (_error is not null)
+        {
+            <div class="order-banner order-banner--failed" role="alert" data-testid="order-change-error">
+                <strong>That did not work.</strong>
+                <span>@_error</span>
+            </div>
+        }
+
+        <div class="clarify-actions">
+            <button type="button" class="btn primary" data-testid="order-change-make" disabled="@_busy" @onclick="MakeChangeAsync">
+                @(_busy ? "Starting…" : RevisionLines.MakeChangeButton)
+            </button>
+            <button type="button" class="btn" data-testid="order-change-cancel" disabled="@_busy" @onclick="Close">@RevisionLines.CancelButton</button>
+        </div>
+    </section>
+}
+
+@code {
+    /// <summary>The order whose shown version is changed.</summary>
+    [Parameter, EditorRequired] public Guid OrderId { get; set; }
+
+    /// <summary>User name of the signed-in person; the service accepts a change only from the owner of the order.</summary>
+    [Parameter] public string? RequestingUsername { get; set; }
+
+    /// <summary>Most characters of the person's own words.</summary>
+    [Parameter] public int MaxChars { get; set; } = 2_000;
+
+    /// <summary>Opens the card right away (link "Change something" from another page).</summary>
+    [Parameter] public bool StartOpen { get; set; }
+
+    /// <summary>Raised with the answer of the service after a change was started or a change was already being made, so the page can reload.</summary>
+    [Parameter] public EventCallback<OrderRevision> OnStarted { get; set; }
+
+    readonly HashSet<RevisionQuick> _quick = [];
+    ElementReference _heading;
+    bool _open;
+    bool _focus;
+    bool _busy;
+    string _text = string.Empty;
+    string? _error;
+
+    protected override void OnInitialized() => _open = StartOpen;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focus || !_open)
+            return;
+        _focus = false;
+        try
+        {
+            await _heading.FocusAsync();
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException or InvalidOperationException)
+        {
+            Logger.LogDebug(ex, "Moving the focus to the change card failed");
+        }
+    }
+
+    void Open()
+    {
+        _open = true;
+        _focus = true;
+        _error = null;
+    }
+
+    void Close()
+    {
+        _open = false;
+        _quick.Clear();
+        _text = string.Empty;
+        _error = null;
+    }
+
+    void Toggle(RevisionQuick quick)
+    {
+        if (!_quick.Remove(quick))
+            _quick.Add(quick);
+    }
+
+    string Cap(string? text) =>
+        text is null ? string.Empty : text.Length > MaxChars ? text[..MaxChars] : text;
+
+    async Task MakeChangeAsync()
+    {
+        if (_busy)
+            return;
+        var words = _text.Trim();
+        if (words.Length == 0 && _quick.Count == 0)
+        {
+            _error = RevisionLines.NoChangeGiven;
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            var quick = _quick.Order().ToList();
+            var revision = await DataGate.RunAsync(() => Orders.ReviseAsync(new ReviseOrderRequest(OrderId, RequestingUsername, words.Length == 0 ? null : words, quick, OrderEntry.Web)));
+            Close();
+            await OnStarted.InvokeAsync(revision);
+        }
+        catch (OrderRevisionException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Changing order {OrderId} failed", OrderId);
+            _error = "Something went wrong on our side. Your words are still here. Try again in a moment.";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

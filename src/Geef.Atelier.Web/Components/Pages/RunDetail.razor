@@ -10,11 +10,14 @@
 @inject AuthenticationStateProvider AuthProvider
 @inject IRunUpdateFeed LiveUpdates
 @inject CircuitDataGate DataGate
+@inject IServiceProvider ServiceProvider
 @using Geef.Atelier.Application.Runs
 @using Geef.Atelier.Application.Orders
 @using Geef.Atelier.Application.Crew.Knowledge
 @using Geef.Atelier.Core.Domain
 @using Geef.Atelier.Core.Domain.Crew
+@using Geef.Atelier.Core.Configuration
+@using Microsoft.Extensions.DependencyInjection
 @using Geef.Atelier.Core.Domain.Crew.Advisors
 @using Geef.Atelier.Core.Domain.Crew.Finalizers
 @using Geef.Atelier.Core.Domain.Crew.Knowledge
@@ -124,7 +127,11 @@
                 @if (_details.Run.Status is RunStatus.Aborted or RunStatus.Failed)
                 {
                     <div class="actions">
-                        @if (_canResume)
+                        @if (ChangeOrderId is Guid changeOrderId)
+                        {
+                            <a class="btn secondary" href="@($"/orders/{changeOrderId}?change=1")" data-testid="resume-change-link">@RevisionLines.ChangeButton</a>
+                        }
+                        else if (_canResume)
                         {
                             <button class="btn secondary" data-testid="resume-run-button"
                                     @onclick="OpenResumeDialog">
@@ -316,6 +323,16 @@
     bool _showDeleteModal;
 
     string _shortId => RunId.ToString("N")[..8].ToUpperInvariant();
+
+    /// <summary>
+    /// The order of a run of the direct path whose owner may change texts: such a run is changed on the order page ("Change something"),
+    /// never resumed here; <c>null</c> otherwise.
+    /// </summary>
+    Guid? ChangeOrderId => _details?.Run is { OrderId: Guid orderId } run
+        && _snapshot?.TemplateName == SystemCrew.DirectTemplateName
+        && ServiceProvider.GetService<Microsoft.Extensions.Options.IOptions<OrderOptions>>()?.Value.ReviseModeFor(run.CreatedByUser) == ReviseMode.On
+            ? orderId
+            : null;
 
     string ShownBriefing => _details is null ? string.Empty : BriefingSections.ForViewer(_details.Run.BriefingText, _details.Run.CreatedByUser, _viewerName);
 

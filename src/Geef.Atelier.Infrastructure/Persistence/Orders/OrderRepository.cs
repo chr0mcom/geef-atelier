@@ -193,7 +193,10 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
             .ToList();
     }
 
-    /// <summary>Slim copies of runs for lists and checks: <see cref="RunEntity.FinalText"/> is <see cref="TextMarker"/> when a text exists.</summary>
+    /// <summary>
+    /// Slim copies of runs for lists and checks: <see cref="RunEntity.FinalText"/> is <see cref="TextMarker"/> when a text exists; the
+    /// report is loaded only for a change of an earlier version (<see cref="RunEntity.RevisionHint"/> set), whose display state depends on it.
+    /// </summary>
     private static IQueryable<RunEntity> SlimRuns(IQueryable<RunEntity> runs) =>
         runs.Select(r => new RunEntity
         {
@@ -209,6 +212,8 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
             Outcome = r.Outcome,
             OrderId = r.OrderId,
             OrderVersion = r.OrderVersion,
+            RevisionHint = r.RevisionHint,
+            ReportJson = r.RevisionHint != null ? r.ReportJson : null,
         });
 
     public async Task<IReadOnlyList<RunEventRow>> ListRunEventsAsync(Guid runId, CancellationToken ct = default)

@@ -31,7 +31,7 @@
             <ul class="order-passages" data-testid="order-unbacked">
                 @foreach (var passage in unbacked)
                 {
-                    <li data-testid="order-passage" data-kind="not-backed"><q class="order-quote" lang="@Language">@passage.Quote</q></li>
+                    <li data-testid="order-passage" data-kind="not-backed"><q class="order-quote" lang="@Language">@passage.Quote</q>@FoundIn(passage)</li>
                 }
             </ul>
         }
@@ -58,6 +58,7 @@
                         {
                             <span class="order-passage-asked">You asked: “<span lang="@Language">@passage.Instruction</span>”</span>
                         }
+                        @FoundIn(passage)
                     </li>
                 }
             </ul>
@@ -68,7 +69,7 @@
             <ul class="order-passages" data-testid="order-replaced">
                 @foreach (var passage in replaced)
                 {
-                    <li data-testid="order-passage" data-kind="replaced-in-files"><q class="order-quote" lang="@Language">@passage.Quote</q></li>
+                    <li data-testid="order-passage" data-kind="replaced-in-files"><q class="order-quote" lang="@Language">@passage.Quote</q>@FoundIn(passage)</li>
                 }
             </ul>
         }
@@ -102,6 +103,16 @@
                 }
             </ul>
         }
+        @foreach (var earlier in Result.ShownEarlierPoints().GroupBy(p => p.Version))
+        {
+            <p data-testid="order-earlier-lead">@string.Format(System.Globalization.CultureInfo.InvariantCulture, RevisionLines.EarlierPointsLeadFormat, earlier.Key)</p>
+            <ul class="order-writer-open" data-testid="order-earlier-points" data-version="@earlier.Key">
+                @foreach (var point in earlier)
+                {
+                    <li data-testid="order-earlier-point" lang="@Language">@point.Text</li>
+                }
+            </ul>
+        }
         @if (Result.OpenChecks.Any(c => !c.Blocking) || Hints.Count > 0)
         {
             <p>Please also look at this:</p>
@@ -122,6 +133,7 @@
                         {
                             <span class="order-passage-asked">Asked for: “<span lang="@Language">@passage.Instruction</span>”</span>
                         }
+                        @FoundIn(passage)
                     </li>
                 }
             </ul>
@@ -132,8 +144,10 @@
 @code {
     /// <summary>
     /// The delivered result with placeholders, open checks, passages of the text that may not be backed or may not follow an
-    /// instruction, problems in the files, open points of the writer and hints (everything that never blocks, among them passages
-    /// the pages looked up say otherwise, with <see cref="OrderResearchLines.DiffersFromLookedUp"/>).
+    /// instruction, problems in the files, open points of the writer, open points of the writer for an earlier version that the shown
+    /// version does not repeat (<see cref="RevisionLines.EarlierPointsLeadFormat"/>) and hints (everything that never blocks, among them
+    /// passages the pages looked up say otherwise, with <see cref="OrderResearchLines.DiffersFromLookedUp"/>). A passage carried over from
+    /// an earlier version names that version (<see cref="FoundInFormat"/>).
     /// </summary>
     [Parameter, EditorRequired] public OrderResult Result { get; set; } = null!;
 
@@ -155,7 +169,14 @@
     /// <summary>Words before an open point of the writer shown with the sentence about the same wrong total.</summary>
     public const string WriterNoteLead = "The writer noted:";
 
+    /// <summary>Note on a passage carried over from an earlier version: <c>{0}</c> is that version.</summary>
+    public const string FoundInFormat = "Found in version {0}.";
+
     bool HasContent => Result.HasOpenPoints();
+
+    static RenderFragment? FoundIn(OrderUnbackedPassage passage) => passage.FromVersion is int version
+        ? @<span class="order-passage-from" data-testid="order-passage-from">@string.Format(System.Globalization.CultureInfo.InvariantCulture, FoundInFormat, version)</span>
+        : null;
 
     static bool ProfileHidden(OrderUnbackedPassage passage) => passage.Origin == InstructionOrigin.Memory && string.IsNullOrWhiteSpace(passage.Instruction);
 
