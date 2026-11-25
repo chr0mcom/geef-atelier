@@ -140,11 +140,10 @@ public sealed record OrderSourceQuoteView(string FileName, string Quote);
 /// person's answers, the About me details or the assistant's answers). An instruction from the About me details is <c>null</c> for
 /// anyone but the owner of the order. <see cref="LookedUp"/> marks a passage that the pages looked up on the web say otherwise
 /// (<see cref="FactFindingKind.Superseded"/> with the replacing passage in the research): it never blocks and is never called a
-/// matter of the person's files. <see cref="Hint"/> says why a passage that is not backed is only a hint (<see cref="FactHint"/>);
-/// <see cref="FromVersion"/> is the earlier version the passage was carried over from.
+/// matter of the person's files. <see cref="FromVersion"/> is the earlier version the passage was carried over from.
 /// </summary>
 public sealed record OrderUnbackedPassage(string Quote, FactFindingKind Kind, string? Instruction, bool Blocking, InstructionOrigin? Origin = null, bool LookedUp = false,
-    FactHint? Hint = null, int? FromVersion = null);
+    int? FromVersion = null);
 
 /// <summary>
 /// What the person reads under "What was checked" (web) and in <c>checks</c> (MCP); plain English, built only by

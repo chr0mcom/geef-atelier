@@ -17,12 +17,6 @@ public static class OrderResultRules
     /// <summary>Quotes shown per file at most.</summary>
     public const int MaxQuotesPerFile = 3;
 
-    /// <summary>Sentence shown with a passage of <see cref="FactHint.GapSentence"/>, on the web and in MCP.</summary>
-    public const string GapSentenceNote = "This sentence has a gap to fill in. Please read the whole sentence when you fill it.";
-
-    /// <summary>Sentence shown with a passage of <see cref="FactHint.GeneralClosing"/>, on the web and in MCP.</summary>
-    public const string GeneralClosingNote = "A general closing sentence your request did not ask for. Please check that it fits.";
-
     /// <summary>Order of the blocking passages: not backed, against an instruction, replaced in the files.</summary>
     public static IReadOnlyList<FactFindingKind> BlockingPassageOrder { get; } =
         [FactFindingKind.Unsupported, FactFindingKind.Instruction, FactFindingKind.Superseded];
