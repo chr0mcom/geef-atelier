@@ -22,8 +22,12 @@ public sealed record GateResult(string Gate, string Scope, GateVerdict Verdict, 
 /// <summary>A stored clarifier answer replayed through the current parser and gate; <see cref="Gate"/> is null when it cannot be replayed.</summary>
 public sealed record Replay(CorpusEntry Entry, EvalResult Answer, ClarifierOutput? Output, QuestionGateResult? Gate);
 
-/// <summary>Figures over every call line (every attempt, also repeated ones): gates a and f.</summary>
-public sealed record CallFigures(int Calls, int Entries, int Retries, int Failures, double FailureRate, double MedianMs, double P90Ms, int OverProductionLimit, int Unreplayable);
+/// <summary>
+/// Figures over every call line (every attempt, also repeated ones): gates a and f. The latency (<see cref="MedianMs"/>,
+/// <see cref="P90Ms"/>) covers only answers (<c>Ok</c>) and time-outs (<see cref="Timed"/> lines), so that fast failures never make
+/// it look better; the failure rate covers every line.
+/// </summary>
+public sealed record CallFigures(int Calls, int Entries, int Retries, int Failures, double FailureRate, int Timed, double MedianMs, double P90Ms, int OverProductionLimit, int Unreplayable);
 
 /// <summary>Figures over the last successful, replayable answer of each entry: gates b to e′.</summary>
 public sealed record QuestionFigures(
@@ -46,9 +50,10 @@ public sealed record QuestionFigures(
 
 /// <summary>
 /// Replays the stored answers of <c>IntakeEval run</c> and judges the acceptance gates of contract stage 2, 6.6 for the held-out set
-/// and the second corpus. No gate passes without data: missing or unknown entries, wrong corpus sizes, unlabelled entries or an empty
-/// part make every gate "not evaluable"; an answer that is <c>Ok</c> but cannot be replayed or took longer than the production limit
-/// counts as a failure; latency and failure rate count every attempt, so repeating a run never improves them.
+/// and the second corpus. No gate passes without data: missing or unknown entries, results made for another input (see
+/// <see cref="InputHash"/>), wrong corpus sizes, unlabelled entries or an empty part make every gate "not evaluable"; an answer that
+/// is <c>Ok</c> but cannot be replayed or took longer than the production limit counts as a failure; the failure rate counts every
+/// attempt and the latency every answer and time-out, so repeating a run never improves them.
 /// </summary>
 public static class CorpusEvaluation
 {
@@ -106,10 +111,52 @@ public static class CorpusEvaluation
         || replay.Answer.DurationMs > productionLimit.TotalMilliseconds
         || replay.Gate is null;
 
-    /// <summary>Gates a and f over every line, retries included.</summary>
+    /// <summary>
+    /// Fingerprint of everything the clarifier was given for <paramref name="entry"/>: system prompt, schema and the user prompt
+    /// (request, file excerpts, profile, revision note), built with the default <see cref="IntakeOptions"/> like the measuring run.
+    /// </summary>
+    public static string InputHash(CorpusEntry entry) => entry.InputHash(new IntakeOptions());
+
+    /// <summary>
+    /// Ids of the entries that <c>IntakeEval run</c> does not call again: the last result made for the current input of the entry is
+    /// <c>Ok</c> or <c>Invalid</c>. Results for another input (changed request, files, profile, prompt or schema) never count.
+    /// </summary>
+    public static IReadOnlySet<string> Answered(IReadOnlyList<CorpusEntry> corpus, IReadOnlyList<EvalResult> lines)
+    {
+        var current = corpus.GroupBy(e => e.Id, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Last(), StringComparer.Ordinal);
+        var hashes = new Dictionary<string, string>(StringComparer.Ordinal);
+        return lines
+            .Where(l => current.TryGetValue(l.Id, out var entry) && SameInput(entry, l, hashes))
+            .GroupBy(l => l.Id, StringComparer.Ordinal)
+            .Where(g => g.Last().Status is nameof(IntakeRecordStatus.Ok) or nameof(IntakeRecordStatus.Invalid))
+            .Select(g => g.Key)
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    /// <summary>Lines of <paramref name="lines"/> that were made for another input than the current corpus entry with the same id.</summary>
+    public static IReadOnlyList<EvalResult> OtherInput(IReadOnlyList<CorpusEntry> corpus, IReadOnlyList<EvalResult> lines)
+    {
+        var current = corpus.GroupBy(e => e.Id, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Last(), StringComparer.Ordinal);
+        var hashes = new Dictionary<string, string>(StringComparer.Ordinal);
+        return lines.Where(l => current.TryGetValue(l.Id, out var entry) && !SameInput(entry, l, hashes)).ToList();
+    }
+
+    private static bool SameInput(CorpusEntry entry, EvalResult line, Dictionary<string, string> hashes)
+    {
+        if (!hashes.TryGetValue(entry.Id, out var hash))
+            hashes[entry.Id] = hash = InputHash(entry);
+        return string.Equals(line.InputHash, hash, StringComparison.Ordinal)
+            && line.Corpus == entry.Corpus && line.Category == entry.Category && line.Lang == entry.Lang && line.Split == entry.Split();
+    }
+
+    /// <summary>Gates a and f over every line, retries included; the latency only over answers and time-outs.</summary>
     public static CallFigures Calls(IReadOnlyList<Replay> lines, TimeSpan productionLimit)
     {
-        var durations = lines.Select(r => (double)r.Answer.DurationMs).Order().ToList();
+        var durations = lines
+            .Where(r => r.Answer.Status is nameof(IntakeRecordStatus.Ok) or nameof(IntakeRecordStatus.TimedOut))
+            .Select(r => (double)r.Answer.DurationMs)
+            .Order()
+            .ToList();
         var failures = lines.Count(r => IsFailure(r, productionLimit));
         var entries = lines.Select(r => r.Answer.Id).Distinct(StringComparer.Ordinal).Count();
         return new CallFigures(
@@ -118,6 +165,7 @@ public static class CorpusEvaluation
             lines.Count - entries,
             failures,
             lines.Count == 0 ? 0 : (double)failures / lines.Count,
+            durations.Count,
             Percentile(durations, 0.5),
             Percentile(durations, 0.9),
             lines.Count(r => r.Answer.Status == nameof(IntakeRecordStatus.Ok) && r.Answer.DurationMs > productionLimit.TotalMilliseconds),
@@ -192,6 +240,10 @@ public static class CorpusEvaluation
         var unknown = answered.Where(id => !ids.Contains(id)).Order(StringComparer.Ordinal).ToList();
         if (unknown.Count > 0)
             problems.Add($"{unknown.Count} results belong to no corpus entry ({string.Join(", ", unknown.Take(5))}{(unknown.Count > 5 ? ", …" : string.Empty)})");
+        var other = OtherInput(corpus, lines).Select(l => l.Id).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+        if (other.Count > 0)
+            problems.Add($"{other.Count} entries have results made for another input (request, files, profile, clarifier prompt or schema changed, " +
+                $"or no input hash); start a new result file ({string.Join(", ", other.Take(5))}{(other.Count > 5 ? ", …" : string.Empty)})");
         return problems;
     }
 
@@ -240,8 +292,8 @@ public static class CorpusEvaluation
 
         return
         [
-            Result("a", calls.Calls > 0, calls.MedianMs <= MaxMedianMs && calls.P90Ms <= MaxP90Ms,
-                $"median {calls.MedianMs / 1000:0.0} s, p90 {calls.P90Ms / 1000:0.0} s over {callDetail}"),
+            Result("a", calls.Timed > 0, calls.MedianMs <= MaxMedianMs && calls.P90Ms <= MaxP90Ms,
+                $"median {calls.MedianMs / 1000:0.0} s, p90 {calls.P90Ms / 1000:0.0} s over {calls.Timed} answers and time-outs of {callDetail}"),
             Result("b", q.Answered > 0, q.MeanQuestions <= MaxMeanQuestions && q.MaxQuestions <= QuestionGate.HardMaxQuestions,
                 $"mean {q.MeanQuestions:0.00} questions, at most {q.MaxQuestions}, over {q.Answered} answered entries"),
             Result("c", q.CompleteAnswered > 0, q.CompleteAskedRate <= MaxCompleteAskedRate && q.CompleteMaxQuestions <= 1,

@@ -12,8 +12,9 @@ internal sealed record RunSettings(string CorpusPath, string Proxy, string OutPa
 
 /// <summary>
 /// Runs the real <see cref="LlmClarifier"/> and <see cref="QuestionGate"/> over a corpus and appends one result line per call.
-/// Resumable: entries with a result other than a failure are not called again; failed calls stay in the file and count in the
-/// latency and failure figures of <see cref="CorpusEvaluation"/>, so repeating a run never improves them.
+/// Resumable: entries whose last result for the current input is not a failure are not called again; failed calls stay in the file
+/// and count in the figures of <see cref="CorpusEvaluation"/>, so repeating a run never improves them. Results made for another
+/// input (changed request, files, profile, prompt or schema) are never taken as done; they leave the file not evaluable.
 /// </summary>
 internal sealed class EvalRunner(RunSettings settings, TextWriter log)
 {
@@ -23,8 +24,13 @@ internal sealed class EvalRunner(RunSettings settings, TextWriter log)
     public async Task<int> RunAsync(CancellationToken ct)
     {
         var options = new IntakeOptions { Timeout = settings.Timeout };
-        var done = Done(settings.OutPath);
-        var entries = Corpus.Load(settings.CorpusPath)
+        var corpus = Corpus.Load(settings.CorpusPath);
+        var previous = Results.Load(settings.OutPath);
+        var done = CorpusEvaluation.Answered(corpus, previous);
+        var stale = CorpusEvaluation.OtherInput(corpus, previous).Select(l => l.Id).Distinct(StringComparer.Ordinal).Count();
+        if (stale > 0)
+            log.WriteLine($"Warning: {stale} entries in {settings.OutPath} have results for another input; they are called again, but the file stays not evaluable. Use a new --out file.");
+        var entries = corpus
             .Where(e => settings.Split == "all" || e.Split() == settings.Split)
             .Where(e => !done.Contains(e.Id))
             .Take(settings.MaxCalls)
@@ -73,7 +79,8 @@ internal sealed class EvalRunner(RunSettings settings, TextWriter log)
             gate?.Trace.Select(t => new ResultTrace(t.GapIndex, t.Topic.ToString(), t.Decision.ToString())).ToList() ?? [],
             gate?.ResearchTopics ?? [],
             DateTimeOffset.UtcNow,
-            (int)options.Timeout.TotalMilliseconds);
+            (int)options.Timeout.TotalMilliseconds,
+            entry.InputHash(options));
     }
 
     private async Task AppendAsync(EvalResult result, CancellationToken ct)
@@ -87,18 +94,5 @@ internal sealed class EvalRunner(RunSettings settings, TextWriter log)
         {
             _write.Release();
         }
-    }
-
-    private static HashSet<string> Done(string path)
-    {
-        if (!File.Exists(path))
-            return [];
-        return File.ReadLines(path)
-            .Where(l => l.TrimStart().StartsWith('{'))
-            .Select(l => JsonSerializer.Deserialize<EvalResult>(l)!)
-            .GroupBy(r => r.Id)
-            .Where(g => g.Last().Status is nameof(IntakeRecordStatus.Ok) or nameof(IntakeRecordStatus.Invalid))
-            .Select(g => g.Key)
-            .ToHashSet(StringComparer.Ordinal);
     }
 }

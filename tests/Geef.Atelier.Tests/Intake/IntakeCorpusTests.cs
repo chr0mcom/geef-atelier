@@ -109,7 +109,7 @@ public sealed class IntakeCorpusTests(ITestOutputHelper output)
     private static EvalResult Line(CorpusEntry entry, string status = "Ok", int durationMs = 10_000, string? raw = "") =>
         new(entry.Id, entry.Corpus, entry.Category, entry.Lang, entry.Split(), status, "model", durationMs, null,
             raw == string.Empty ? (entry.Category == "sparse" ? AskLength : NoGaps) : raw,
-            0, [], [], [], DateTimeOffset.UnixEpoch, 40_000);
+            0, [], [], [], DateTimeOffset.UnixEpoch, 40_000, CorpusEvaluation.InputHash(entry));
 
     private static List<EvalResult> GoodLines(IReadOnlyList<CorpusEntry> corpus) => corpus.Select(e => Line(e)).ToList();
 
@@ -196,7 +196,11 @@ public sealed class IntakeCorpusTests(ITestOutputHelper output)
         Assert.DoesNotContain(verdicts, v => v.Verdict == GateVerdict.Passed);
     }
 
-    public static TheoryData<string> BrokenData() => ["missing result", "unknown result", "too few main entries", "too few second entries", "unlabelled", "no second corpus", "empty held-out"];
+    public static TheoryData<string> BrokenData() =>
+    [
+        "missing result", "unknown result", "too few main entries", "too few second entries", "unlabelled", "no second corpus", "empty held-out",
+        "no input hash", "other request", "other profile", "other category", "other language",
+    ];
 
     [Theory]
     [MemberData(nameof(BrokenData))]
@@ -226,6 +230,21 @@ public sealed class IntakeCorpusTests(ITestOutputHelper output)
             case "no second corpus":
                 corpus.RemoveAll(e => e.Corpus == "second");
                 lines.RemoveAll(l => l.Corpus == "second");
+                break;
+            case "no input hash":
+                lines[5] = lines[5] with { InputHash = null };
+                break;
+            case "other request":
+                corpus[5] = corpus[5] with { Request = corpus[5].Request + " Bitte freundlich." };
+                break;
+            case "other profile":
+                corpus[5] = corpus[5] with { Profile = new CorpusProfile("Alex Muster", null, null, null, null, null, null, null) };
+                break;
+            case "other category":
+                lines[5] = lines[5] with { Category = "researchable" };
+                break;
+            case "other language":
+                lines[5] = lines[5] with { Lang = "en" };
                 break;
         }
 
@@ -298,5 +317,118 @@ public sealed class IntakeCorpusTests(ITestOutputHelper output)
         Assert.Equal(0.5, questions.RawQuestionDropRate);
         Assert.Equal(0.5, questions.ForbiddenAskRate);
         Assert.Equal(0.5, questions.NecessaryHitRate);
+    }
+
+    [Fact]
+    public void Results_of_another_corpus_with_the_same_ids_are_not_evaluable_and_are_called_again()
+    {
+        var corpusA = FullCorpus();
+        var corpusB = corpusA.Select(e => e with { Request = e.Request.Replace("Verein", "Chor", StringComparison.Ordinal) }).ToList();
+        var lines = GoodLines(corpusA);
+
+        Assert.All(CorpusEvaluation.Verdicts(corpusB, lines, Limit), v => Assert.Equal(GateVerdict.NotEvaluable, v.Verdict));
+        Assert.Contains(CorpusEvaluation.Problems(corpusB, lines), p => p.Contains("another input", StringComparison.Ordinal));
+        Assert.Equal(corpusA.Count, CorpusEvaluation.OtherInput(corpusB, lines).Count);
+        Assert.Empty(CorpusEvaluation.Answered(corpusB, lines));
+        Assert.Equal(corpusA.Count, CorpusEvaluation.Answered(corpusA, lines).Count);
+    }
+
+    [Fact]
+    public void The_input_hash_follows_request_files_and_profile()
+    {
+        var entry = new CorpusEntry("main-001", "main", "sparse", "de", "Schreib eine Einladung.", null, null, null);
+        var withFile = entry with { Files = [new CorpusFile("notiz.txt", "text", "Das Fest beginnt um 18 Uhr.", null)] };
+        var withProfile = entry with { Profile = new CorpusProfile("Alex Muster", null, null, null, "de", null, null, null) };
+
+        var hashes = new[] { entry, withFile, withProfile, entry with { Request = "Schreib eine Absage." } }.Select(CorpusEvaluation.InputHash).ToList();
+
+        Assert.Equal(CorpusEvaluation.InputHash(entry), CorpusEvaluation.InputHash(entry with { Labels = new Dictionary<string, string> { ["length"] = "necessary_ask" } }));
+        Assert.Equal(4, hashes.Distinct(StringComparer.Ordinal).Count());
+        Assert.Matches("^[0-9a-f]{64}$", hashes[0]);
+    }
+
+    [Fact]
+    public void Only_the_last_result_for_the_current_input_decides_whether_run_calls_an_entry_again()
+    {
+        var corpus = FullCorpus();
+        var entry = corpus[0];
+        var stale = Line(entry) with { InputHash = new string('0', 64) };
+
+        Assert.DoesNotContain(entry.Id, CorpusEvaluation.Answered(corpus, [stale]));
+        Assert.Contains(entry.Id, CorpusEvaluation.Answered(corpus, [stale, Line(entry)]));
+        Assert.Contains(entry.Id, CorpusEvaluation.Answered(corpus, [Line(entry, "Invalid", 5_000, null)]));
+        Assert.DoesNotContain(entry.Id, CorpusEvaluation.Answered(corpus, [Line(entry), Line(entry, "TimedOut", 40_000, null)]));
+        Assert.Contains(entry.Id, CorpusEvaluation.Answered(corpus, [Line(entry), stale]));
+    }
+
+    [Fact]
+    public void Fast_failures_never_improve_gate_a()
+    {
+        var corpus = FullCorpus();
+        var slow = corpus.Select(e => Line(e, durationMs: 30_000)).ToList();
+        var withFastFailures = corpus.SelectMany(e => new[] { Line(e, "Failed", 200, null), Line(e, "Failed", 200, null) }).Concat(slow).ToList();
+
+        var before = CorpusEvaluation.Verdicts(corpus, slow, Limit);
+        var after = CorpusEvaluation.Verdicts(corpus, withFastFailures, Limit);
+
+        foreach (var scope in new[] { CorpusEvaluation.HeldOut, CorpusEvaluation.Second })
+        {
+            Assert.Equal(GateVerdict.Failed, Verdict(before, "a", scope).Verdict);
+            Assert.Equal(GateVerdict.Failed, Verdict(after, "a", scope).Verdict);
+            Assert.Equal(GateVerdict.Failed, Verdict(after, "f", scope).Verdict);
+        }
+    }
+
+    [Fact]
+    public void The_latency_counts_answers_and_time_outs_but_no_other_failure()
+    {
+        var entry = new CorpusEntry("main-001", "main", "sparse", "de", "Schreib einen Text.", null, null, null);
+        EvalResult L(string status, int ms, string? raw) =>
+            new(entry.Id, "main", "sparse", "de", "dev", status, "m", ms, null, raw, 0, [], [], [], DateTimeOffset.UnixEpoch, 40_000);
+        var lines = new[]
+        {
+            CorpusEvaluation.ReplayOne(entry, L("Ok", 10_000, NoGaps)),
+            CorpusEvaluation.ReplayOne(entry, L("TimedOut", 40_000, null)),
+            CorpusEvaluation.ReplayOne(entry, L("Failed", 100, null)),
+            CorpusEvaluation.ReplayOne(entry, L("Invalid", 300, null)),
+            CorpusEvaluation.ReplayOne(entry, L("QueueTimeout", 50, null)),
+        };
+
+        var calls = CorpusEvaluation.Calls(lines, Limit);
+
+        Assert.Equal((5, 2, 4), (calls.Calls, calls.Timed, calls.Failures));
+        Assert.Equal(25_000, calls.MedianMs);
+    }
+
+    [Fact]
+    public void Only_failed_calls_without_time_outs_leave_gate_a_not_evaluable()
+    {
+        var corpus = FullCorpus();
+        var lines = corpus.Select(e => Line(e, "Failed", 200, null)).ToList();
+
+        var verdicts = CorpusEvaluation.Verdicts(corpus, lines, Limit);
+
+        Assert.Equal(GateVerdict.NotEvaluable, Verdict(verdicts, "a", CorpusEvaluation.Second).Verdict);
+        Assert.Equal(GateVerdict.Failed, Verdict(verdicts, "f", CorpusEvaluation.Second).Verdict);
+    }
+
+    [Fact]
+    public void The_help_offers_no_production_limit_for_shadow_because_it_has_none()
+    {
+        var program = File.ReadAllText(Path.Combine(RepositoryRoot(), "tools", "IntakeEval", "Program.cs"));
+        var shadowUsage = program.Split('\n').Single(l => l.TrimStart().StartsWith("IntakeEval shadow", StringComparison.Ordinal));
+
+        Assert.DoesNotContain("--production-timeout-seconds", shadowUsage, StringComparison.Ordinal);
+        Assert.Contains("--production-timeout-seconds", program, StringComparison.Ordinal);
+    }
+
+    private static string RepositoryRoot()
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "tools", "IntakeEval", "Program.cs")))
+                return dir.FullName;
+        }
+        throw new DirectoryNotFoundException("tools/IntakeEval/Program.cs not found above the test output.");
     }
 }

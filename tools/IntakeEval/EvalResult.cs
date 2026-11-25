@@ -16,8 +16,10 @@ public sealed record ResultTrace(
     [property: JsonPropertyName("decision")] string Decision);
 
 /// <summary>
-/// One line of <c>results-*.jsonl</c>: latency, model, raw answer, gate trace and questions of one call for a corpus entry, and the
-/// time limit the call ran with (<see cref="TimeoutMs"/>; the evaluation counts an answer over the production limit as a failure).
+/// One line of <c>results-*.jsonl</c>: latency, model, raw answer, gate trace and questions of one call for a corpus entry, the
+/// time limit the call ran with (<see cref="TimeoutMs"/>; the evaluation counts an answer over the production limit as a failure)
+/// and the fingerprint of the input (<see cref="InputHash"/>, see <see cref="CorpusEvaluation.InputHash"/>; a result for another
+/// input makes the file not evaluable).
 /// </summary>
 public sealed record EvalResult(
     [property: JsonPropertyName("id")] string Id,
@@ -35,7 +37,8 @@ public sealed record EvalResult(
     [property: JsonPropertyName("trace")] IReadOnlyList<ResultTrace> Trace,
     [property: JsonPropertyName("research_topics")] IReadOnlyList<string> ResearchTopics,
     [property: JsonPropertyName("at")] DateTimeOffset At,
-    [property: JsonPropertyName("timeout_ms")] int? TimeoutMs = null);
+    [property: JsonPropertyName("timeout_ms")] int? TimeoutMs = null,
+    [property: JsonPropertyName("input_hash")] string? InputHash = null);
 
 /// <summary>Reading a result file.</summary>
 public static class Results

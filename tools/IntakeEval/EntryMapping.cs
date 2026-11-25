@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Geef.Atelier.Application.Intake;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Intake;
@@ -5,6 +7,7 @@ using Geef.Atelier.Core.Domain.Profiles;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Persistence.Profiles;
 using Geef.Atelier.Core.Persistence.Sources;
+using Geef.Atelier.Infrastructure.Intake;
 
 namespace Geef.Atelier.Tools.IntakeEval;
 
@@ -54,6 +57,13 @@ internal static class EntryMapping
 
     public static ClarifierRequest Request(this CorpusEntry entry, IntakeOptions options) =>
         IntakeAnalysis.Request(entry.Request, entry.Sources(), entry.Profile(), options);
+
+    public static string InputHash(this CorpusEntry entry, IntakeOptions options)
+    {
+        var prompt = string.Join('\0', ClarifierPrompts.System, ClarifierSchema.Name, ClarifierSchema.Json,
+            ClarifierPrompts.User(entry.Request(options), options.ExcerptHeadChars, options.ExcerptTailChars));
+        return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(prompt)));
+    }
 
     public static IntakeAnalysisResult Gate(this CorpusEntry entry, ClarifierRequest request, ClarifierOutput output, IntakeOptions options) =>
         IntakeAnalysis.Analyse(entry.Request, request.Candidates(), output, Memory.Resolve(new MemoryFacts(entry.Profile()), output.TextType), options.MaxQuestions);

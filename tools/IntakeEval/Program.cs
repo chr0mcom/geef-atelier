@@ -7,11 +7,12 @@ const string Usage = """
                           [--model <name>] [--split all|dev|holdout] [--timeout-seconds 40]
            IntakeEval evaluate --corpus <main.jsonl> --second <second.jsonl> --results <results.jsonl>
                           [--production-timeout-seconds 40]
-           IntakeEval shadow --csv <shadows.csv> [--production-timeout-seconds 40] [--sample 10]
+           IntakeEval shadow --csv <shadows.csv> [--sample 10]
 
     run       Runs the real clarifier and question gate over a synthetic corpus and appends one JSON line per call
-              (latency, model, raw answer, gate trace, questions, time limit). Resumable: entries with status Ok or
-              Invalid are skipped; failed calls stay in the file and count in the evaluation.
+              (latency, model, raw answer, gate trace, questions, time limit, input hash). Resumable: entries whose
+              last result for the current input is Ok or Invalid are skipped; failed calls stay in the file and count
+              in the evaluation. Results for another input are called again and leave the file not evaluable.
               Example: --proxy http://cli-proxy:8090/v1/claude
     evaluate  Replays the stored answers and prints passed / FAILED / NOT EVALUABLE for gates a to f (and the warning e')
               on the held-out set and the second corpus. Exit code 0 only when every gate passed.

@@ -11,7 +11,7 @@ dotnet run --project tools/IntakeEval -- shadow --csv shadows.csv [--sample 10]
 
 | Befehl | Wirkung |
 |---|---|
-| `run` | ruft den echten Klärer und das Gate je Eintrag und hängt je Aufruf eine Zeile an (Dauer, Modell, Rohantwort, Gate-Spur, Fragen, Zeitgrenze `timeout_ms`). Fortsetzbar: Einträge mit `Ok` oder `Invalid` werden übersprungen; gescheiterte Aufrufe bleiben in der Datei. |
+| `run` | ruft den echten Klärer und das Gate je Eintrag und hängt je Aufruf eine Zeile an (Dauer, Modell, Rohantwort, Gate-Spur, Fragen, Zeitgrenze `timeout_ms`, Eingabe-Hash `input_hash`). Fortsetzbar: Einträge, deren letztes Ergebnis zur aktuellen Eingabe `Ok` oder `Invalid` ist, werden übersprungen; gescheiterte Aufrufe bleiben in der Datei. Ergebnisse zu einer anderen Eingabe werden nie übersprungen (Warnung im Protokoll); die Datei bleibt dann aber nicht auswertbar, also eine neue `--out`-Datei nehmen. |
 | `evaluate` | spielt die Rohantworten durch Parser und Gate und gibt je Tor a–f (und die Warnschwelle e′) für die zurückgehaltene Menge und den Zweitkorpus `passed`, `FAILED` oder `NOT EVALUABLE` aus. Rückgabewert 0 nur, wenn alle Tore bestanden sind. |
 | `shadow` | wertet einen CSV-Export der Tabelle `OrderIntakeShadows` aus: Tore a und f im Schatten und Tor g, dazu eine Stichprobe von Fragen für die Sichtprüfung. Rückgabewert 0 nur, wenn alle messbaren Tore bestanden sind. |
 
@@ -19,15 +19,21 @@ dotnet run --project tools/IntakeEval -- shadow --csv shadows.csv [--sample 10]
 
 - **Kein Tor besteht ohne Daten.** Fehlt ein Ergebnis zu einem Korpuseintrag, gehört ein Ergebnis zu keinem Eintrag, hat ein
   Korpus nicht die Sollgröße (120 Haupt, 40 Zweit), ist ein Eintrag unbeschriftet oder ist die zurückgehaltene Menge oder der
-  Zweitkorpus leer, sind alle Tore „nicht auswertbar“. Der Test `IntakeCorpusTests` schlägt dann fehl, sobald eine
+  Zweitkorpus leer oder wurde ein Ergebnis für eine andere Eingabe erzeugt, sind alle Tore „nicht auswertbar“. Die Eingabe ist
+  der SHA-256 über Systemprompt, Schema und Nutzerprompt des Klärers (Auftrag, Dateiauszüge, Profil, Überarbeitungshinweis);
+  ändert sich einer davon, passen alte Ergebnisse nicht mehr, auch wenn die Id gleich bleibt. Kategorie, Sprache und Teilmenge
+  der Zeile müssen ebenfalls zum Eintrag passen; eine Zeile ohne Hash ist nicht zuzuordnen. Der Test `IntakeCorpusTests` schlägt dann fehl, sobald eine
   Ergebnisdatei `results-*.jsonl` im Testordner liegt.
-- **Latenz (a) und Fehlerquote (f)** zählen jeden Aufruf, auch Wiederholungen; die Ausgabe nennt ihre Zahl. Als Fehler gilt
+- **Latenz (a)** zählt jede Antwort (`Ok`) und jede Zeitüberschreitung, auch Wiederholungen; andere Fehlschläge haben keine
+  Latenz, damit schnelle Fehler den Median nicht schönen. **Fehlerquote (f)** zählt jeden Aufruf; die Ausgabe nennt die Zahl
+  der Wiederholungen. Als Fehler gilt
   jeder Aufruf, der nicht `Ok` ist, eine `Ok`-Antwort über der Produktionsgrenze (`--production-timeout-seconds`, Standard wie
   `Intake:Timeout`) und eine `Ok`-Antwort, die sich nicht nachspielen lässt.
 - **Fragenkennzahlen (b–e′)** nutzen je Eintrag die letzte erfolgreiche Antwort; Einträge ohne solche Antwort zählen nie als
   „keine Frage“.
-- **Schatten:** `SkippedCap` und `Pending` bleiben draußen und werden gezählt. Eine gescheiterte Vorbereitung
-  (`prepare_failed`, gespeichert mit Dauer 0) zählt als Fehler, nie als Latenz. Eine fehlende Fragenzahl zählt nie als 0.
+- **Schatten:** `SkippedCap` und `Pending` bleiben draußen und werden gezählt. Latenz haben nur `Done` und `TimedOut`;
+  `Failed` (auch eine gescheiterte Vorbereitung, `prepare_failed`) zählt als Fehler, nie als Latenz. `shadow` kennt keine
+  Produktionsgrenze, die Zeitgrenze stand schon beim Lauf fest. Eine fehlende Fragenzahl zählt nie als 0.
   Tor g braucht mindestens 30 abgeschlossene Aufträge oder eine Woche; die Sichtprüfung von zehn Fragen bleibt immer einer
   Person überlassen.
 
