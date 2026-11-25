@@ -72,4 +72,10 @@ internal static class AtelierContextKeys
 
     /// <summary>Injected by <c>OrderGroundingStep</c> on the direct path: totals in the files that were recalculated.</summary>
     public static readonly ContextKey<SourceArithmeticResult> SourceArithmetic = new("geef:atelier:source-arithmetic");
+
+    /// <summary>
+    /// Injected by <c>OrderGroundingStep</c> on the direct path for a run that changes an earlier version: the change the person asked
+    /// for (<c>RunEntity.RevisionHint</c>). Its presence makes the writer use <c>DirectWriterPrompts.RevisionInstruction</c>.
+    /// </summary>
+    public static readonly ContextKey<string> RevisionHint = new("geef:atelier:revision-hint");
 }
