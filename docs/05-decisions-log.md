@@ -2397,7 +2397,7 @@ V2 and D-072 stay valid.
     mistake" in MCP); (3) fresh, blindly confirmed data the rule was not shaped on, with 0 claims among the passages turned into
     hints (without any hit: "not evaluable"); (4) not automatically for correction mode (`FactCheckMode = On`): first, planted
     cases of the form "short invented line alone at the end" go into the corpus.
-- **(b) Guessed dates in the gate** (switch `Intake:DropGuessedDateOptions`, shipped `false`). After the existing form rules the
+- **(b) Guessed dates in the gate** (switch `Intake:DropGuessedDateOptions`, shipped `true` after G-A2). After the existing form rules the
   gate drops every answer option with a calendar element that stands neither in the request nor in the whole file texts: a
   numeric date, a month name next to a figure, a weekday as a whole word. The names come from the `CultureInfo` calendars (de,
   en, fr, es, it and the language of the order), not from a maintained word list; a full date brings its weekday. If fewer than
@@ -2426,11 +2426,12 @@ V2 and D-072 stay valid.
   reviewer to decide. The rule therefore changes nothing in the existing data; the repeats observed in stage 4 are rewordings
   and deliberately stay twice.
 
-**Switches:** `Intake:DropGuessedDateOptions` (bool, shipped `false`, through the environment without a new image). (c) and (d)
+**Switches:** `Intake:DropGuessedDateOptions` (bool, shipped `true`, can be turned off through the environment without a new image). (c) and (d)
 have no switch. The switches of (a) no longer exist.
 
 **Way back:** deploy A is a web image only, without a migration; the way back is the previous image. The switch takes effect
 at once through the environment.
 
-> **Open – to be completed after the separate step:** the position of `Intake:DropGuessedDateOptions` for deploy A (decided
-> after the gates) and the confirmation of the R2 result of (a) by the client.
+**Decision after the gates:** deploy A ships with `Intake:DropGuessedDateOptions = true` (G-A2 passed). The R2 result of (a)
+comes from a blind review: the reviewer judged all flagged passages without knowing which ones the rules had downgraded; the
+verdict was stored before the key was opened, and it stands: (a) does not ship.

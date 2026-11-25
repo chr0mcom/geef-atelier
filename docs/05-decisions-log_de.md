@@ -2493,7 +2493,7 @@ der System-Prompt des Schreibers bleiben bitgleich (Hash-Tests grün); die gespe
     mit 0 Aussagen unter den umgestuften Stellen (ohne Treffer „nicht auswertbar“); (4) nicht automatisch für den
     Korrekturmodus (`FactCheckMode = On`): vorher kommen gepflanzte Fälle „kurze erfundene Zeile allein am Ende“ in den
     Korpus.
-- **(b) Geratene Daten im Gate** (Schalter `Intake:DropGuessedDateOptions`, ausgeliefert `false`). Nach den bisherigen
+- **(b) Geratene Daten im Gate** (Schalter `Intake:DropGuessedDateOptions`, ausgeliefert `true` nach G-A2). Nach den bisherigen
   Formregeln streicht das Gate jede Antwortoption mit einem Kalenderelement, das weder im Wortlaut noch in den ganzen
   Dateitexten steht: Ziffern-Datum, Monatsname neben einer Ziffer, Wochentag als ganzes Wort. Die Namen kommen aus den
   Kalendern von `CultureInfo` (de, en, fr, es, it und die Auftragssprache), keine gepflegte Wortliste; ein volles Datum bringt
@@ -2522,11 +2522,13 @@ der System-Prompt des Schreibers bleiben bitgleich (Hash-Tests grün); die gespe
   Annahmen zusammen; es gab nichts für den unabhängigen Prüfer zu entscheiden. Die Regel ändert am Bestand also nichts; die
   in Etappe 4 beobachteten Doppelungen sind Umformulierungen und bleiben bewusst doppelt.
 
-**Schalter:** `Intake:DropGuessedDateOptions` (bool, ausgeliefert `false`, per Umgebung ohne neues Image). (c) und (d) haben
+**Schalter:** `Intake:DropGuessedDateOptions` (bool, ausgeliefert `true`, per Umgebung ohne neues Image abschaltbar). (c) und (d) haben
 keinen Schalter. Die Schalter von (a) gibt es nicht mehr.
 
 **Rückweg:** Deploy A ist ein reines Web-Image ohne Migration; Rückweg ist das vorherige Image. Der Schalter wirkt sofort per
 Umgebung.
 
-> **Offen – wird nach dem eigenen Schritt ergänzt:** Schalterstellung von `Intake:DropGuessedDateOptions` für Deploy A
-> (Entscheidung nach den Toren) und die Bestätigung des R2-Ergebnisses von (a) durch den Auftraggeber.
+**Entscheidung nach den Toren:** Deploy A wird mit `Intake:DropGuessedDateOptions = true` ausgeliefert (G-A2 bestanden).
+Das R2-Ergebnis von (a) stammt aus einer blinden Prüfung: Der Prüfer bewertete alle markierten Stellen, ohne zu wissen,
+welche die Regeln umgestuft hatten; sein Urteil wurde gespeichert, bevor er den Schlüssel sah, und es bleibt dabei: (a)
+wird nicht ausgeliefert.
