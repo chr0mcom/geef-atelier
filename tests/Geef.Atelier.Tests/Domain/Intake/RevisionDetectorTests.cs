@@ -59,10 +59,27 @@ public sealed class RevisionDetectorTests
         Assert.Null(RevisionDetector.Choose("Überarbeite den Brief.", [], 1, true));
     }
 
-    [Fact]
-    public void With_one_file_that_file_is_chosen()
+    [Theory]
+    [InlineData("Überarbeite den Brief.", null)]
+    [InlineData("Überarbeite den Brief.", 1)]
+    [InlineData("Please proofread and polish the attached letter.", null)]
+    [InlineData("Kürze den angehängten Text auf die Hälfte.", 1)]
+    [InlineData("Improve the attached cover letter, keep its length.", null)]
+    public void With_one_file_that_file_is_chosen_when_verb_and_model_agree(string request, int? choice)
     {
-        Assert.Equal(Letter, RevisionDetector.Choose("Überarbeite den Brief.", [Letter], null, false));
+        Assert.Equal(Letter, RevisionDetector.Choose(request, [Letter], choice, true));
+    }
+
+    [Theory]
+    [InlineData("Schreib eine E-Mail an mein Team, wie wir unsere Meetings verbessern können. Meine Notizen hängen an.")]
+    [InlineData("Write a proposal to improve our onboarding. My notes are attached.")]
+    [InlineData("Write a cover letter for the Video Edit position. The job ad is attached.")]
+    [InlineData("Schreib auf Basis der Datei eine Pressemitteilung, dass wir die Öffnungszeiten kürzen.")]
+    [InlineData("Überarbeite den Brief.")]
+    public void With_one_file_nothing_is_chosen_without_the_models_judgement(string request)
+    {
+        Assert.Null(RevisionDetector.Choose(request, [Letter], null, false));
+        Assert.Null(RevisionDetector.Choose(request, [Letter], 1, false));
     }
 
     [Fact]

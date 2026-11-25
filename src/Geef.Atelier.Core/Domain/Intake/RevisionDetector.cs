@@ -37,14 +37,18 @@ public static class RevisionDetector
     public static bool MentionsRevision(string requestText) =>
         !string.IsNullOrWhiteSpace(requestText) && Patterns.Any(p => p.IsMatch(requestText));
 
-    /// <summary>The file to revise: requires a revision verb in the request; with one file that file, with several the model's choice when valid, otherwise none.</summary>
+    /// <summary>
+    /// The file to revise: requires a revision verb in the request <b>and</b> the clarifier's judgement that the request is a
+    /// revision; then with one file that file, with several the model's choice when valid, otherwise none. Words such as
+    /// "improve" or "kürzen" are common in new texts, so the verb alone never makes a file the template.
+    /// </summary>
     public static RevisionCandidate? Choose(string requestText, IReadOnlyList<RevisionCandidate> files, int? modelChoice, bool modelSaysRevision)
     {
-        if (files.Count == 0 || !MentionsRevision(requestText))
+        if (files.Count == 0 || !modelSaysRevision || !MentionsRevision(requestText))
             return null;
         if (files.Count == 1)
             return files[0];
-        if (!modelSaysRevision || modelChoice is not { } number)
+        if (modelChoice is not { } number)
             return null;
         var matches = files.Where(f => f.FileNumber == number).ToList();
         return matches.Count == 1 ? matches[0] : null;
