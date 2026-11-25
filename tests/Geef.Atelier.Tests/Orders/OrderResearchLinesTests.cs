@@ -64,7 +64,7 @@ public sealed class OrderResearchLinesTests
     [InlineData(ResearchStatus.NothingFound, "Some facts were looked up on the web, but no page gave a usable passage. The text does not rely on the web.")]
     [InlineData(ResearchStatus.Failed, "Looking things up on the web did not work this time. The text was written without it.")]
     [InlineData(ResearchStatus.DailyLimit, "Nothing was looked up on the web today because the daily limit was reached. The text was written without it.")]
-    [InlineData(ResearchStatus.AllWithheld, "Nothing was looked up on the web, because the search could have contained details from your About me details.")]
+    [InlineData(ResearchStatus.AllWithheld, "Nothing was looked up on the web, so that no private details could reach a search engine.")]
     [InlineData(ResearchStatus.FilesAttached, "No web search was done because you attached files, so nothing from them can reach a search engine.")]
     public void Every_status_without_entries_shows_its_sentence_word_for_word_whether_or_not_the_text_used_the_research(ResearchStatus status, string sentence)
     {
@@ -79,11 +79,18 @@ public sealed class OrderResearchLinesTests
     }
 
     [Fact]
+    public void The_withheld_sentences_name_no_cause_because_a_link_or_account_details_count_as_well()
+    {
+        Assert.DoesNotContain("About me", OrderResearchLines.AllWithheld, StringComparison.Ordinal);
+        Assert.DoesNotContain("About me", OrderResearchLines.SomeWithheld, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Withheld_topics_beside_entries_add_their_sentence_and_count()
     {
         var view = OrderResearchLines.Build(Research(ResearchStatus.Found, [Entry()], withheld: 2), true)!;
 
-        Assert.Equal("Some details were not looked up, because the search could have contained details from your About me details.", view.Note);
+        Assert.Equal("Some details were not looked up, so that no private details could reach a search engine.", view.Note);
         Assert.Equal(2, view.Withheld);
         Assert.Single(view.Entries);
     }

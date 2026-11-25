@@ -19,8 +19,12 @@ public static class OrderResearchLines
     public const string NothingFound = "Some facts were looked up on the web, but no page gave a usable passage. The text does not rely on the web.";
     public const string Failed = "Looking things up on the web did not work this time. The text was written without it.";
     public const string DailyLimit = "Nothing was looked up on the web today because the daily limit was reached. The text was written without it.";
-    public const string AllWithheld = "Nothing was looked up on the web, because the search could have contained details from your About me details.";
-    public const string SomeWithheld = "Some details were not looked up, because the search could have contained details from your About me details.";
+    /// <summary>
+    /// Said when every topic was withheld. Neutral on purpose: a topic is withheld for a word of the About me details, for a topic in
+    /// another language than the order, or for a link, an address, or account or access details, and only the number is stored.
+    /// </summary>
+    public const string AllWithheld = "Nothing was looked up on the web, so that no private details could reach a search engine.";
+    public const string SomeWithheld = "Some details were not looked up, so that no private details could reach a search engine.";
     public const string FilesAttached = "No web search was done because you attached files, so nothing from them can reach a search engine.";
 
     public const string FactsComparedLeadLookedUp = "Facts in the text were compared with your request, your answers, your files and the pages looked up.";
