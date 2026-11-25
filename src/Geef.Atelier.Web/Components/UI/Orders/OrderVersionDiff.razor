@@ -1,0 +1,83 @@
+@using Geef.Atelier.Application.Orders
+@using Geef.Atelier.Core.Domain.Writing
+
+<div class="order-diff" data-testid="order-diff">
+    <p class="order-diff-lead" data-testid="order-diff-lead">@string.Format(System.Globalization.CultureInfo.InvariantCulture, CompareFormat, BeforeVersion)</p>
+    @if (Groups.All(g => g.Op == ParagraphDiff.Op.Equal))
+    {
+        <p class="order-diff-none" data-testid="order-diff-none">@NoChange</p>
+    }
+    @foreach (var group in Groups)
+    {
+        @switch (group.Op)
+        {
+            case ParagraphDiff.Op.Equal:
+                <details class="order-diff-same" data-testid="order-diff-same">
+                    <summary>@(group.Texts.Count == 1 ? "1 paragraph without changes" : $"{group.Texts.Count} paragraphs without changes")</summary>
+                    @foreach (var text in group.Texts)
+                    {
+                        <p class="order-diff-text" lang="@Language">@text</p>
+                    }
+                </details>
+                break;
+            case ParagraphDiff.Op.Insert:
+                @foreach (var text in group.Texts)
+                {
+                    <div class="order-diff-chunk order-diff-chunk--added" data-testid="order-diff-added">
+                        <span class="order-diff-mark">@RevisionLines.Added</span>
+                        <p class="order-diff-text" lang="@Language">@text</p>
+                    </div>
+                }
+                break;
+            default:
+                @foreach (var text in group.Texts)
+                {
+                    <div class="order-diff-chunk order-diff-chunk--removed" data-testid="order-diff-removed">
+                        <span class="order-diff-mark">@RevisionLines.Removed</span>
+                        <p class="order-diff-text" lang="@Language">@text</p>
+                    </div>
+                }
+                break;
+        }
+    }
+</div>
+
+@code {
+    /// <summary>The text of the version before, as written (Markdown, shown as plain text).</summary>
+    [Parameter, EditorRequired] public string Before { get; set; } = string.Empty;
+
+    /// <summary>The text of the version shown in the list, as written.</summary>
+    [Parameter, EditorRequired] public string After { get; set; } = string.Empty;
+
+    /// <summary>The number of the version before.</summary>
+    [Parameter, EditorRequired] public int BeforeVersion { get; set; }
+
+    /// <summary>Language of the order (<c>lang</c> of the paragraphs); <c>null</c> when unknown.</summary>
+    [Parameter] public string? Language { get; set; }
+
+    /// <summary>First line of the comparison: <c>{0}</c> is the version before.</summary>
+    public const string CompareFormat = "Compared with version {0}:";
+
+    /// <summary>Shown when both versions have the same paragraphs.</summary>
+    public const string NoChange = "No paragraph was changed.";
+
+    IReadOnlyList<(ParagraphDiff.Op Op, IReadOnlyList<string> Texts)> Groups { get; set; } = [];
+
+    protected override void OnParametersSet()
+    {
+        var groups = new List<(ParagraphDiff.Op Op, IReadOnlyList<string> Texts)>();
+        foreach (var chunk in ParagraphDiff.Compute(Before ?? string.Empty, After ?? string.Empty))
+        {
+            if (groups.Count > 0 && groups[^1].Op == chunk.Op)
+                ((List<string>)groups[^1].Texts).Add(chunk.Text);
+            else
+                groups.Add((chunk.Op, new List<string> { chunk.Text }));
+        }
+        for (var i = 0; i + 1 < groups.Count; i++)
+        {
+            if (groups[i].Op == ParagraphDiff.Op.Insert && groups[i + 1].Op == ParagraphDiff.Op.Delete)
+                (groups[i], groups[i + 1]) = (groups[i + 1], groups[i]);
+        }
+        Groups = groups;
+    }
+}

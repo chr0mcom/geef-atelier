@@ -353,7 +353,8 @@ public static partial class DraftCheckEvaluator
     private static string Format(int? value) =>
         value?.ToString("N0", CultureInfo.InvariantCulture) ?? "?";
 
-    private static string LanguageName(string code) => code switch
+    /// <summary>The English name of a language code the checks know (<c>de</c>, <c>en</c>); any other code as it is.</summary>
+    public static string LanguageName(string code) => code switch
     {
         "de" => "German",
         "en" => "English",

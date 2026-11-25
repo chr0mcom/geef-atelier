@@ -1,9 +1,10 @@
+@using System.Globalization
 @using Geef.Atelier.Core.Domain.Warnings
 
 @if (Warnings is { Count: > 0 })
 {
-    <section class="run-warnings" role="status" aria-labelledby="run-warnings-title" data-testid="run-warnings">
-        <h2 id="run-warnings-title" class="run-warnings-title">Warnings</h2>
+    <section class="run-warnings" role="status" aria-labelledby="@TitleId" data-testid="run-warnings" data-version="@Version">
+        <h2 id="@TitleId" class="run-warnings-title">@Title</h2>
         <p class="run-warnings-intro" data-testid="run-warnings-intro">@Intro</p>
         <ul class="run-warnings-list">
             @foreach (var warning in Warnings)
@@ -24,14 +25,37 @@
     /// <summary>True when the task has a result text.</summary>
     [Parameter] public bool HasText { get; set; }
 
-    string Intro => Status switch
+    /// <summary>The version of an order these warnings belong to; null outside orders with several versions.</summary>
+    [Parameter] public int? Version { get; set; }
+
+    /// <summary>
+    /// The version whose text the page shows. When it differs from <see cref="Version"/>, the warnings belong to a newer version that is
+    /// still being written or could not be finished, and the introduction says that they do not concern the text shown.
+    /// </summary>
+    [Parameter] public int? ShownVersion { get; set; }
+
+    string TitleId => Version is int v ? $"run-warnings-title-v{v}" : "run-warnings-title";
+
+    string Title => Version is int v ? $"Warnings for version {v}" : "Warnings";
+
+    string Intro => (Version, ShownVersion) switch
     {
-        RunStatus.Pending or RunStatus.Running =>
-            "This task is still working. So far, not everything went as planned:",
-        RunStatus.Completed or RunStatus.Failed or RunStatus.Aborted when HasText =>
-            "The result is ready, but not everything went as planned. Please keep this in mind when you use it.",
-        RunStatus.Completed or RunStatus.Failed or RunStatus.Aborted =>
-            "The task ended without a result. These problems came up along the way:",
-        _ => "Not everything went as planned:",
+        (int v, int shown) when v != shown => Status switch
+        {
+            RunStatus.Pending or RunStatus.Running => string.Format(CultureInfo.InvariantCulture,
+                "Version {0} is still being written. So far, not everything went as planned with it. This does not concern the text above (version {1}):", v, shown),
+            _ => string.Format(CultureInfo.InvariantCulture,
+                "Version {0} could not be finished. These problems came up while it was written. They do not concern the text above (version {1}), which is unchanged:", v, shown),
+        },
+        _ => Status switch
+        {
+            RunStatus.Pending or RunStatus.Running =>
+                "This task is still working. So far, not everything went as planned:",
+            RunStatus.Completed or RunStatus.Failed or RunStatus.Aborted when HasText =>
+                "The result is ready, but not everything went as planned. Please keep this in mind when you use it.",
+            RunStatus.Completed or RunStatus.Failed or RunStatus.Aborted =>
+                "The task ended without a result. These problems came up along the way:",
+            _ => "Not everything went as planned:",
+        },
     };
 }

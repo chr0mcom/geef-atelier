@@ -14,6 +14,19 @@ public sealed record RunReportSource(Guid? SourceId, string FileName, SourceUsag
 /// <summary>A passage the writer quoted from a file, as the code found it in that file.</summary>
 public sealed record RunReportQuote(Guid? SourceId, string SourceLabel, string FileName, string Quote, QuoteMatchKind Match);
 
+/// <summary>
+/// What an entry of <see cref="RunReport.EarlierOpenPoints"/> is: an open point or an assumption of the writer, or a fixed sentence by
+/// Atelier about what of that version could not be shown or taken over (<see cref="Note"/>), which counts as an open point.
+/// </summary>
+public enum EarlierPointKind { OpenPoint = 0, Assumption = 1, Note = 2 }
+
+/// <summary>
+/// An open point or an assumption (<see cref="Kind"/>) of the writer for the earlier <see cref="Version"/> of the order that this version
+/// does not repeat, or a fixed sentence about what of that version could not be shown or taken over.
+/// </summary>
+public sealed record RunReportEarlierPoint(int Version, string Text,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] EarlierPointKind Kind = EarlierPointKind.OpenPoint);
+
 /// <summary>A problem found in round 1 and gone in the delivered version: a check code or a fact finding with its round-1 quote.</summary>
 public sealed record RunReportCorrection(string Code, string? QuoteBefore);
 
@@ -23,7 +36,11 @@ public sealed record RunReportCorrection(string Code, string? QuoteBefore);
 /// not be judged); <see cref="Notes"/> are plain-English remarks for the person, such as files that were searched
 /// rather than read in full. Schema 2 adds the writer's notes, the verified quotes, the fact check, the recalculated totals
 /// of the files and the corrections after the checks. <see cref="LookedUp"/> says that the passages looked up on the web (<c>W1</c>) were
-/// part of the material of the run.
+/// part of the material of the run. <see cref="EarlierOpenPoints"/> are the open points and assumptions of the writer for the version this
+/// run changed that it does not repeat (never dropped). <see cref="Revision"/> says that the run changed an earlier version, so that the
+/// rules read from the first request were only notes. <see cref="EarlierNeedsCheck"/> says that the version this run changed was shown as
+/// "Ready – please check" and its checks could not be taken over (it had no readable report), or that its report says so of the version
+/// before it: nothing of it was checked again, so this version is shown the same way (<see cref="Orders.OrderStateResolver"/>).
 /// </summary>
 public sealed record RunReport(
     int SchemaVersion,
@@ -43,7 +60,10 @@ public sealed record RunReport(
     FactCheckSummary? FactCheck = null,
     SourceArithmeticResult? SourceArithmetic = null,
     IReadOnlyList<RunReportCorrection>? Corrections = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool LookedUp = false)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool LookedUp = false,
+    IReadOnlyList<RunReportEarlierPoint>? EarlierOpenPoints = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Revision = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool EarlierNeedsCheck = false)
 {
     public const int CurrentSchemaVersion = 2;
     public const string DirectKind = "direct";

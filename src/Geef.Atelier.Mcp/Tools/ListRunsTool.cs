@@ -11,7 +11,7 @@ namespace Geef.Atelier.Mcp.Tools;
 [McpServerToolType]
 public static class ListRunsTool
 {
-    [McpServerTool, Description("Lists recent runs (the technical log entries; one order can have several runs), optionally filtered by status. Non-admin users always see only their own runs. For orders started with submit_order or submit_request, use get_order_status and get_order_result with the orderId.")]
+    [McpServerTool, Description(McpToolCatalog.LegacyLeadStart + "list_orders" + McpToolCatalog.LegacyLeadEnd + "Lists recent runs (the technical log entries; one order can have several runs), optionally filtered by status. Non-admin users always see only their own runs. For orders started with submit_order or submit_request, use get_order_status and get_order_result with the orderId.")]
     public static async Task<IReadOnlyList<RunSummaryDto>> ListRuns(
         IRunService runService,
         ICurrentUserService currentUser,

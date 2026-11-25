@@ -265,5 +265,8 @@ public sealed class MyWorkTests : TestContext
 
         public Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) =>
             throw new NotImplementedException();
+
+        public Task<OrderRevision> ReviseAsync(ReviseOrderRequest request, CancellationToken ct = default) =>
+            throw new NotImplementedException();
     }
 }

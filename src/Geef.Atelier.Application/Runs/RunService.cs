@@ -224,7 +224,11 @@ internal sealed class RunService(
             throw new RunNotResumableException(RunNotResumableException.NotPreparedMessage);
 
         string? seedDraftText = null;
-        if (options.UseSeedDraft && details.Iterations.Count > 0)
+        if (options.UseSeedDraft && !string.IsNullOrWhiteSpace(details.Run.FinalText))
+        {
+            seedDraftText = details.Run.FinalText;
+        }
+        else if (options.UseSeedDraft && details.Iterations.Count > 0)
         {
             seedDraftText = details.Iterations
                 .OrderByDescending(i => i.Iteration.IterationNumber)

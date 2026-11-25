@@ -102,10 +102,19 @@ internal sealed class FakeOrderService : IOrderService
     public List<(Guid OrderId, string? RequestingUsername, string? ViewerUsername)> ResultReads { get; } = [];
     public List<AnswerOrderRequest> Answers { get; } = [];
     public List<(Guid OrderId, string? RequestingUsername)> Skips { get; } = [];
+    public List<ReviseOrderRequest> Revisions { get; } = [];
+    public List<(Guid OrderId, string? RequestingUsername)> Cancels { get; } = [];
+    public List<(string? OwnerUsername, int Limit)> Lists { get; } = [];
+    public List<(string Owner, OrderListItem Item)> ListItems { get; } = [];
+    public Func<Guid, bool>? OnCancel { get; set; }
+    public OrderView? ViewAfterCancel { get; set; }
 
     public Func<AnswerOrderRequest, OrderSubmission>? OnAnswer { get; set; }
     public Func<Guid, OrderSubmission>? OnSkip { get; set; }
     public Exception? AnswerException { get; set; }
+
+    public Func<ReviseOrderRequest, OrderRevision>? OnRevise { get; set; }
+    public Exception? ReviseException { get; set; }
 
     public Func<SubmitOrderRequest, OrderSubmission>? OnSubmit { get; set; }
     public Exception? SubmitException { get; set; }
@@ -150,8 +159,12 @@ internal sealed class FakeOrderService : IOrderService
         return GetResultAsync(orderId, requestingUsername, ct);
     }
 
-    public Task<IReadOnlyList<OrderListItem>> ListAsync(string? ownerUsername, int limit = 50, CancellationToken ct = default) =>
-        Task.FromResult<IReadOnlyList<OrderListItem>>([]);
+    public Task<IReadOnlyList<OrderListItem>> ListAsync(string? ownerUsername, int limit = 50, CancellationToken ct = default)
+    {
+        Lists.Add((ownerUsername, limit));
+        return Task.FromResult<IReadOnlyList<OrderListItem>>(
+            ListItems.Where(i => ownerUsername is null || i.Owner == ownerUsername).Select(i => i.Item).Take(limit).ToList());
+    }
 
     public async Task<OrderView?> WaitForChangeAsync(Guid orderId, string? requestingUsername, OrderDisplayState? knownState, TimeSpan maxWait, CancellationToken ct = default)
     {
@@ -178,7 +191,14 @@ internal sealed class FakeOrderService : IOrderService
         return Visible(orderId, requestingUsername) ? _orders[orderId].View : null;
     }
 
-    public Task<bool> CancelAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) => Task.FromResult(false);
+    public Task<bool> CancelAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default)
+    {
+        Cancels.Add((orderId, requestingUsername));
+        var changed = Visible(orderId, requestingUsername) && (OnCancel?.Invoke(orderId) ?? false);
+        if (changed && ViewAfterCancel is not null)
+            _orders[orderId] = (_orders[orderId].Owner, ViewAfterCancel);
+        return Task.FromResult(changed);
+    }
 
     public Task<bool> DeleteAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) => Task.FromResult(false);
 
@@ -189,6 +209,14 @@ internal sealed class FakeOrderService : IOrderService
             throw AnswerException;
         return Task.FromResult(OnAnswer?.Invoke(request)
             ?? new OrderSubmission(request.OrderId, OrderDisplayState.Queued, Guid.NewGuid(), []));
+    }
+
+    public Task<OrderRevision> ReviseAsync(ReviseOrderRequest request, CancellationToken ct = default)
+    {
+        Revisions.Add(request);
+        if (ReviseException is not null)
+            throw ReviseException;
+        return Task.FromResult(OnRevise?.Invoke(request) ?? new OrderRevision(request.OrderId, OrderDisplayState.Queued, Guid.NewGuid(), null, []));
     }
 
     public Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default)

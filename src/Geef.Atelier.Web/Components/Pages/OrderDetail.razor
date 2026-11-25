@@ -15,6 +15,7 @@
 @inject ILogger<OrderDetail> Logger
 @inject IJSRuntime JS
 @inject IOptions<IntakeOptions> IntakeSettings
+@inject IOptions<OrderOptions> OrderSettings
 
 <PageTitle>@TabTitle</PageTitle>
 
@@ -75,9 +76,25 @@
             </div>
         }
 
-        @if (!IsAsking)
+        @if (EarlierShownAfterChange)
+        {
+            <div class="order-banner order-banner--check" role="status" data-testid="order-banner" data-state="earlier-version">
+                <strong>@(_view.Display.State == OrderDisplayState.Stopped ? "The change was stopped." : "The change could not be finished.")</strong>
+                <span>The earlier version is still here.@(CanChange ? " You can try again with “" + RevisionLines.ChangeButton + "”." : "")</span>
+                @if (_result?.HasOpenPoints() == true)
+                {
+                    <span data-testid="order-banner-check">@RevisionLines.EarlierStillToCheck</span>
+                }
+            </div>
+        }
+        else if (!IsAsking)
         {
             <OrderStatusBanner OrderId="_view.OrderId" Display="_view.Display" />
+        }
+
+        @if (_changeNotice is not null)
+        {
+            <p class="order-note" role="status" data-testid="order-change-notice">@_changeNotice</p>
         }
 
         <p class="clarify-live" aria-live="polite" data-testid="order-intake-status">@IntakeStatus</p>
@@ -117,21 +134,45 @@
             </OrderProgressSteps>
         }
 
-        @if (_result is { Text: not null } result && _view.Display.HasText)
+        @if (_result is { Text: not null } result)
         {
+            @if (VersionCount > 1)
+            {
+                <p class="order-version-now@(NoteInStrip ? " is-earlier" : "")" role="status" data-testid="order-version-now">
+                    <span>@(NoteInStrip ? result.Note : $"This is version {result.Version}, the newest.")</span>
+                    <a href="@($"/orders/{_view.OrderId}#order-versions")" data-testid="order-versions-link">See all versions</a>
+                </p>
+            }
             <OrderResultPanel Result="result" />
+            @if (ShowChangeCard)
+            {
+                <OrderChangeCard @key="_view.OrderId" OrderId="_view.OrderId" RequestingUsername="@_viewer" MaxChars="OrderSettings.Value.RevisionHintMaxChars"
+                                 StartOpen="OpenChange" Draft="_changeDraft" OnDraft="d => _changeDraft = d" OnStarted="ChangeStartedAsync" />
+            }
             <OrderChecksPanel Result="result" />
             <OrderOpenPoints Result="result" Language="@OrderLanguage" />
             <OrderAssumptions Result="result" Language="@OrderLanguage" />
             <OrderLookedUp LookedUp="result.LookedUp" />
             <OrderSourcesUsed Sources="result.SourcesUsed" Quotes="result.SourceQuotes" Language="@OrderLanguage" />
-            @if (!string.IsNullOrWhiteSpace(result.Note))
+            @if (VersionCount > 1)
+            {
+                <OrderVersions OrderId="_view.OrderId" Runs="_view.Runs" ShownVersion="result.Version" RequestingUsername="@_requestingUser" Language="@OrderLanguage" />
+            }
+            @if (!NoteInStrip && !string.IsNullOrWhiteSpace(result.Note))
             {
                 <p class="order-note" data-testid="order-note">@result.Note</p>
             }
         }
 
-        <RunWarningsBlock Warnings="Warnings" Status="_view.CurrentRun?.Status" HasText="_view.Display.HasText" />
+        @if (_result is { Text: not null, Version: int shownWarningsVersion, LatestVersion: int newWarningsVersion } && shownWarningsVersion < newWarningsVersion)
+        {
+            <RunWarningsBlock Warnings="ShownVersionWarnings" Status="ShownRunStatus" HasText="true" Version="shownWarningsVersion" />
+            <RunWarningsBlock Warnings="NewVersionWarnings" Status="_view.CurrentRun?.Status" HasText="false" Version="newWarningsVersion" ShownVersion="shownWarningsVersion" />
+        }
+        else
+        {
+            <RunWarningsBlock Warnings="Warnings" Status="_view.CurrentRun?.Status" HasText="_view.Display.HasText" />
+        }
 
         <details class="order-how" data-testid="order-how-made">
             <summary>How it was made</summary>
@@ -201,6 +242,11 @@
 @code {
     [Parameter] public Guid OrderId { get; set; }
 
+    /// <summary><c>?change=1</c> opens the card "Change something" when a change is possible; any other value is ignored.</summary>
+    [SupplyParameterFromQuery(Name = "change")] public string? ChangeQuery { get; set; }
+
+    bool OpenChange => ChangeQuery is "1" or "true";
+
     OrderView? _view;
     OrderResult? _result;
     bool _loaded;
@@ -209,6 +255,9 @@
     bool _stopping;
     string? _actionError;
     string? _intakeNotice;
+    string? _changeNotice;
+    OrderChangeDraft? _changeDraft;
+    bool _isOwner;
     string? _requestingUser;
     string? _viewer;
     DateTimeOffset _loadedAt = DateTimeOffset.UtcNow;
@@ -224,7 +273,29 @@
     IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity> Warnings =>
         (_result is { Warnings.Count: > 0 } r ? r.Warnings : _view?.Warnings ?? []).WithoutShownResearchWarning(ResultShown ? _result!.LookedUp : null);
 
-    bool ResultShown => _result is { Text: not null } && _view is { Display.HasText: true };
+    IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity> ShownVersionWarnings =>
+        (_result?.Warnings ?? []).WithoutShownResearchWarning(_result?.LookedUp);
+
+    IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity> NewVersionWarnings =>
+        (_view?.Warnings ?? []).WithoutShownResearchWarning(_result?.LookedUp);
+
+    RunStatus ShownRunStatus => _view?.Runs.LastOrDefault(r => r.RunId == _result?.RunId)?.Status ?? RunStatus.Completed;
+
+    bool ResultShown => _result is { Text: not null } && _view is not null;
+
+    int VersionCount => _view?.Runs.Where(r => r.Kind == RunKind.Standard && r.Version is not null).Select(r => r.Version).Distinct().Count() ?? 0;
+
+    bool NoteInStrip => VersionCount > 1 && _result is { Text: not null, Version: int shownVersion, LatestVersion: int latest } shown && shownVersion < latest
+        && !string.IsNullOrWhiteSpace(shown.Note);
+
+    bool EarlierShownAfterChange => _view is { Display.IsFinished: true } && _view.Display.State is OrderDisplayState.Failed or OrderDisplayState.Stopped
+        && _result is { Text: not null, Version: int shownVersion, LatestVersion: int latest } && shownVersion < latest;
+
+    bool ShowChangeCard => CanChange || _changeDraft is not null && _isOwner && ResultShown && OrderSettings.Value.ReviseModeFor(_viewer) == ReviseMode.On;
+
+    bool CanChange => _isOwner && _view is { Display.IsFinished: true } view && view.State != OrderState.Cancelled && ResultShown
+        && !view.Runs.Any(r => r.Status is RunStatus.Pending or RunStatus.Running)
+        && OrderSettings.Value.ReviseModeFor(_viewer) == ReviseMode.On;
 
     string TabTitle => _view is null
         ? "Your text — Atelier"
@@ -232,7 +303,7 @@
             ? $"{OrderDisplayState.NeedsInput.ToLabel()} – {Shorten(_view.Title, 40)} — Atelier"
             : $"{_view.Display.ShownState().ToLabel()} · {Shorten(_view.Title, 40)} — Atelier";
 
-    bool AssumptionsShownAbove => _result is { Text: not null } shown && _view is { Display.HasText: true }
+    bool AssumptionsShownAbove => _result is { Text: not null } shown && _view is not null
         && (shown.AllAssumptions().Count > 0 || shown.NotGivenFacts().Count > 0);
 
     string? OrderLanguage => string.IsNullOrWhiteSpace(_view?.Clarification?.Language) ? null : _view.Clarification.Language;
@@ -268,6 +339,8 @@
         _viewer = auth.User.Identity?.Name;
 
         await LoadAsync();
+        _isOwner = _view is not null && !string.IsNullOrWhiteSpace(_viewer)
+            && (_requestingUser is not null || await IsViewerOwnerAsync());
         if (_disposed)
             return;
         IDisposable? subscription = null;
@@ -336,11 +409,13 @@
         try
         {
             var view = await Orders.GetAsync(OrderId, _requestingUser);
-            var result = view is { Display.HasText: true }
+            var result = view is not null && (view.Display.HasText || view.Runs.Count(r => r.Kind == RunKind.Standard && r.Version is not null) > 1)
                 ? await Orders.GetResultAsync(OrderId, _requestingUser, _viewer)
                 : null;
             _view = view;
             _result = result;
+            if (view is { Display.IsFinished: true })
+                _changeNotice = null;
             _loadedAt = DateTimeOffset.UtcNow;
             _loadFailed = false;
         }
@@ -354,6 +429,25 @@
 
     async Task ReloadAsync()
     {
+        await LoadAsync();
+    }
+
+    async Task<bool> IsViewerOwnerAsync()
+    {
+        try
+        {
+            return await DataGate.RunAsync(() => Orders.GetAsync(OrderId, _viewer)) is not null;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Checking the owner of order {OrderId} failed", OrderId);
+            return false;
+        }
+    }
+
+    async Task ChangeStartedAsync(OrderRevision revision)
+    {
+        _changeNotice = revision.Notices.Count > 0 ? string.Join(" ", revision.Notices) : null;
         await LoadAsync();
     }
 

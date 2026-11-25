@@ -62,6 +62,7 @@ internal sealed class RunConfiguration : IEntityTypeConfiguration<RunEntity>
 
         builder.Property(r => r.ParentRunId).IsRequired(false);
         builder.Property(r => r.SeedDraftText).IsRequired(false);
+        builder.Property(r => r.RevisionHint).HasColumnType("text").IsRequired(false);
         builder.HasIndex(r => r.ParentRunId).HasDatabaseName("IX_Runs_ParentRunId");
 
         builder.Property(r => r.WordCount).IsRequired(false);

@@ -85,7 +85,7 @@ internal static partial class FactCheckPrompts
     {
         prompt.Append("<material>\n");
         prompt.Append("<request>").Append(Defuse(m.Request.Trim())).Append("</request>\n");
-        prompt.Append("<answers_by_person>").Append(Lines(m.PersonAnswers)).Append("</answers_by_person>\n");
+        prompt.Append("<answers_by_person>").Append(Lines([.. m.PersonAnswers, .. (m.Changes ?? []).Select(c => c.Marked)])).Append("</answers_by_person>\n");
         prompt.Append("<answers_by_assistant>").Append(Lines(m.AssistantAnswers)).Append("</answers_by_assistant>\n");
         prompt.Append("<about_the_person>").Append(string.IsNullOrWhiteSpace(m.Profile) ? NoneValue : Defuse(m.Profile.Trim())).Append("</about_the_person>\n");
         AppendFiles(prompt, m);

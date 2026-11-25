@@ -4893,3 +4893,79 @@ textarea.form-control {
 .order-looked-up-date { color: var(--ink-3); }
 .order-block .order-looked-up-note { margin: 8px 0 0; color: var(--ink-2); }
 .order-issue-note { display: block; margin-top: 4px; font-size: 13px; color: var(--ink-3); }
+
+/* ---- Changing a text and its versions ----
+   The change card reuses the question card (accent edge, pill buttons, text
+   field). The version strip sits right above the paper sheet and says which
+   version is shown; the list of versions shows the changes as plain
+   paragraphs: unchanged ones folded away, added and removed ones marked with
+   a word and an edge in the colours of "done" and "problem". */
+.order-change-entry { display: flex; flex-wrap: wrap; gap: 10px; }
+.order-change-title { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 22px; letter-spacing: -0.01em; }
+.order-change-title:focus,
+.order-change-title:focus-visible { outline: none; }
+.order-change-label { font-size: 13px; color: var(--ink-2); }
+.order-change-promise { margin: 0; font-size: 13px; color: var(--ink-3); }
+
+.order-version-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.order-version-now span { flex: 1 1 240px; min-width: 0; }
+.order-version-now.is-earlier span { color: var(--ink); font-weight: 500; }
+.order-version-now a { color: var(--ink-3); text-decoration: underline; text-underline-offset: 2px; }
+
+.order-version-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.order-block .order-version-list { padding-left: 0; }
+.order-version { display: grid; gap: 6px; padding: 12px 0; border-top: 1px solid var(--hairline-soft); min-width: 0; }
+.order-version:first-child { border-top: 0; padding-top: 4px; }
+.order-version-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.order-version-line { color: var(--ink); font-weight: 500; }
+.order-version-shown {
+  font-size: 12px;
+  color: var(--ink-2);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.order-block .order-version-asked { margin: 0; color: var(--ink-2); overflow-wrap: anywhere; }
+.order-version-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.order-version-actions .order-download-menu { right: auto; left: 0; }
+.order-block .order-version-loading { margin: 0; color: var(--ink-3); }
+.order-block .order-version-error { margin: 0; color: var(--sv-critical); }
+
+.order-diff { display: grid; gap: 8px; min-width: 0; }
+.order-block .order-diff-lead,
+.order-block .order-diff-none { margin: 4px 0 0; font-size: 13px; color: var(--ink-3); }
+.order-diff-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.55; }
+.order-block .order-diff-text { margin: 0; color: inherit; }
+.order-diff-same { color: var(--ink-3); font-size: 13px; }
+.order-diff-same > summary { cursor: pointer; }
+.order-diff-same[open] { display: grid; gap: 6px; }
+.order-diff-chunk {
+  display: grid;
+  gap: 2px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--hairline-strong);
+  border-radius: 0 6px 6px 0;
+  min-width: 0;
+}
+.order-diff-mark { font-size: 12px; font-weight: 600; }
+.order-diff-chunk--added { border-left-color: var(--st-completed); background: color-mix(in oklch, var(--st-completed) 9%, var(--surface)); color: var(--ink); }
+.order-diff-chunk--added .order-diff-mark { color: color-mix(in oklch, var(--st-completed) 70%, var(--ink)); }
+.order-diff-chunk--removed { border-left-color: var(--sv-critical); background: color-mix(in oklch, var(--sv-critical) 7%, var(--surface)); color: var(--ink-2); }
+.order-diff-chunk--removed .order-diff-mark { color: color-mix(in oklch, var(--sv-critical) 70%, var(--ink)); }
+.order-diff-chunk--removed .order-diff-text { text-decoration: line-through; text-decoration-color: color-mix(in oklch, var(--sv-critical) 55%, transparent); }
+
+.order-passage-from { display: block; font-size: 12px; color: var(--ink-3); }
+
+@media (max-width: 640px) {
+  .order-change .clarify-actions .btn { flex: 1 1 auto; }
+  .order-change .question-option { flex: 0 1 auto; }
+  .order-version-actions .order-download-menu { min-width: 0; width: max-content; max-width: calc(100vw - 48px); }
+}

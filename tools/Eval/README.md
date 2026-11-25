@@ -391,3 +391,107 @@ Text lief (`factCheck.state` weder `checked` noch `open_points`) oder dem `unbac
 Fehler der Bestätigungsdatei. Rückgabe 0: (a), (c), (e) bestanden (**R2 insgesamt erst mit (b) und (d) von Hand**), 1 ein geprüfter
 Teil nicht bestanden, 2 falscher Aufruf oder unlesbare Eingabe, 4 nicht auswertbar.
 
+
+## Etappe 5: Nachbessern (Tor N), MCP-Vertrag (Tor M) und 50-Sekunden-Aufruf (V-MCP)
+
+Beide Werkzeuge reichen **nie** einen Auftrag ein, beantworten, ändern oder stoppen keinen und rufen kein Modell auf. Sie lesen
+nur, was das Atelier zeigt (`tools/list`, `get_order_result`, `export_order`) oder was Claude Code mitgeschnitten hat. Alles, was
+sie schreiben (Schnappschüsse, Mitschnitte, Berichte), enthält Texte echter Aufträge und muss außerhalb jedes Git-Baums liegen;
+sonst brechen sie mit Rückgabe 2 ab. Anmeldung wie beim Smoke-Skript (`--env-file` im Format von `docs/ops/atelier-smoke.md`,
+Modus 600/400, mit `ATELIER_SMOKE_BASE_URL`) oder `EVAL_ATELIER_URL` und `EVAL_ATELIER_TOKEN`. Tokens und Passwörter werden nie
+geschrieben oder ausgegeben.
+
+### Tor N (`geef_eval/revise_check.py`)
+
+```bash
+cd tools/Eval
+python3 -m geef_eval.revise_check snapshot --order <orderId> --label v1 --out-dir $EVAL_N_DIR [--env-file <datei>]
+# … Nachbesserung im Web oder über MCP, warten bis fertig …
+python3 -m geef_eval.revise_check snapshot --order <orderId> --label v2 --out-dir $EVAL_N_DIR
+python3 -m geef_eval.revise_check evaluate --plan $EVAL_N_DIR/plan.json --out-dir $EVAL_N_DIR
+```
+
+`snapshot` speichert die Antwort von `get_order_result` und `export_order` (Markdown, ohne Version) unter
+`snapshots/<orderId>/<label>.json` und überschreibt nie. Offene Stellen und Schreiberpunkte einer Version zeigt nur
+`get_order_result`, solange sie die gezeigte ist: den Schnappschuss der Ausgangsfassung **vor** der Nachbesserung ziehen. Für
+N5 nach dem Stopp von v3 einen Schnappschuss (etwa `after-stop`) ziehen; er enthält den Export ohne Versionsangabe.
+
+Der Plan (JSON, außerhalb von Git) nennt die 9 Fälle in fester Reihenfolge, Format im Kopf des Moduls: **8 echte
+Nachbesserungen** (mindestens 3 × `local`, der erste mit `expect`, der neuen Angabe wörtlich, 2 × `tone`, je 1 × `shorter` und
+`longer`; die achte ist eine weitere dieser vier Arten und muss deren Schwellen bestehen) **und zusätzlich** 1 × `stop` (mit
+`stopped_version`). Von den 8 echten Nachbesserungen laufen 5 über `web` und 3 über `mcp`, verteilt auf 4 Aufträge; der Stopp
+gehört zu einem davon. Weicht der Plan davon ab, ist das Tor nicht auswertbar. Für die lokalen Fälle Ausgangstexte mit
+mindestens 4 Absätzen wählen.
+
+| Teil | Schwelle (Vertrag 8, wörtlich) |
+|---|---|
+| N1 | unveränderte Absätze ≥ Absätze(v1) − 2, Wörter ±15 %, im ersten Fall steht die neue Angabe wörtlich im Text |
+| N2 | ±15 %, neue `not_backed` mit Zitat nicht in v1 ≤ 1 zusammen |
+| N3 | Kürzer 40–85 %, Länger 115–160 %, Länger: neue `not_backed` ≤ 1 |
+| N4 | jede offene Stelle von v1, deren Zitat in v2 steht, und jeder offene Schreiberpunkt von v1 erscheint in v2; jeder Platzhalter im v2-Text steht in `placeholders` |
+| N5 | v3 starten und stoppen → Ergebnis und Export zeigen v2 mit Satz |
+
+**Vorgaben des Auftraggebers zusätzlich zum Vertrag (jede strenger):**
+
+- Der Stopp zählt nie als „mit Text“: mindestens 6 der 8 echten Nachbesserungen brauchen eine neue Fassung mit Text.
+- N4 deckt die ganze Versionskette ab: Jeder Eintrag aus `earlierOpenPoints` der Ausgangsfassung steht in der neuen Fassung
+  unter `openPoints` oder unter `earlierOpenPoints` mit seiner ursprünglichen Version (und seiner Art). Jede Annahme des
+  Schreibers der Ausgangsfassung (`writerAssumptions`), die die neue Fassung nicht unter `writerAssumptions` wiederholt, steht
+  unter ihren `earlierOpenPoints` mit `kind` `assumption` und der Version der Ausgangsfassung. `kind` ist `openPoint` (auch wenn
+  das Feld fehlt), `assumption` oder `note` (ein fester Satz von Atelier über diese Version). Eine Annahme (Eintrag der Art
+  `assumption` oder Schreiber-Annahme der Ausgangsfassung) gilt auch als erhalten, wenn die neue Fassung sie als Annahme zeigt:
+  unter `writerAssumptions` oder unter den Annahmen des Klärers (`assumptions[].text`). Ein Eintrag der Art `openPoint` ist durch
+  eine Annahme nicht erhalten. Ein Eintrag der Art `note` gilt nur als erhalten, wenn er unter `earlierOpenPoints` mit seiner
+  Version und der Art `note` steht, nie durch einen offenen Punkt oder eine Annahme.
+- N5 verlangt `state` `stopped`; eine von selbst gescheiterte Fassung (`failed`) verfehlt N5.
+- Ein lokaler Fall, dessen Ausgangstext weniger als 4 Absätze hat, ist für N1 nicht auswertbar.
+
+Eigene Lesart, unabhängig vom C#-`ParagraphDiff`: Absatz = Block zwischen Leerzeilen, verglichen nach Zusammenfassen des
+Leerraums; unverändert = längste gemeinsame Teilfolge. Wort = Folge zwischen Leerraum mit mindestens einem Buchstaben oder einer
+Ziffer. Ein Zitat „steht“ im Text als ganze Wörter nach Vereinheitlichung von Leerraum, unsichtbaren Zeichen, Anführungszeichen
+und Strichen, ohne Groß/Klein. Eine Stelle von v1 erscheint in v2, wenn eine Stelle von v2 (gleich welcher Art) ihr Zitat
+enthält; ein Schreiberpunkt unter `openPoints` oder unter `earlierOpenPoints` (Art `openPoint`) mit der Version von v1. Punkte
+und Annahmen werden ohne Groß/Klein, Schlusszeichen und einen führenden Artikel verglichen. Fehlende Quellenhinweise stehen nur
+als Hinweis im Bericht (nicht Teil von N4).
+
+**Nicht auswertbar:** weniger als 6 der 8 echten Nachbesserungen mit Text, Export fehlt, ein Kriterium ohne Fall mit Text
+(Kürzer, Länger, der erste lokale Fall, alle Ton-Fälle), N2/N3/N4 ohne gelaufene Faktenprüfung (`factCheck.state` weder
+`checked` noch `open_points`) oder ohne die nötige Liste (`openPoints`, `writerAssumptions`; fehlendes `earlierOpenPoints`
+heißt „keine“, ein unlesbares ist nicht auswertbar), N1 mit einem lokalen Ausgangstext unter 4 Absätzen, N5 ohne
+`latestVersion`, die neue Angabe stand schon in v1, ein Schnappschuss fehlt, ist unlesbar oder gehört zu einem anderen
+Auftrag. Ein Fall zählt als „mit Text“, wenn nach der Nachbesserung ein Text einer neueren Version gezeigt wird; der
+Stopp-Fall zählt dabei nicht. Ein verfehltes N4 oder N5 heißt **Halt** und macht das Tor `failed`, auch wenn anderswo Daten
+fehlen. Bericht `revise-gate.json`; Rückgabe 0 bestanden, 1 verfehlt, 2 falscher Aufruf, 3 Anmeldung gescheitert, 4 nicht
+auswertbar.
+
+### Tor M und V-MCP (`geef_eval/mcp_contract.py`)
+
+```bash
+cd tools/Eval
+python3 -m geef_eval.mcp_contract tools --out $EVAL_M_DIR/tools.json [--env-file <datei>]
+python3 -m geef_eval.mcp_contract import --session ~/.claude/projects/<ordner>/<sitzung>.jsonl --server <name> \
+  --out $EVAL_M_DIR/transcript.jsonl
+python3 -m geef_eval.mcp_contract evaluate --tools $EVAL_M_DIR/tools.json --transcript $EVAL_M_DIR/transcript.jsonl \
+  --out $EVAL_M_DIR/m-gate.json [--legacy true|false]
+python3 -m geef_eval.mcp_contract vmcp --transcript $EVAL_VMCP_DIR/transcript.jsonl --out $EVAL_VMCP_DIR/vmcp-gate.json
+```
+
+`tools` liest nur `tools/list`. `import` übernimmt aus einer Claude-Code-Sitzungsdatei alle Aufrufe `mcp__<name>__…` als
+Mitschnitt (eine JSON-Zeile je Aufruf mit Werkzeug, Argumenten, Beginn, Dauer = protokolliertes Ergebnis minus protokollierter
+Aufruf, also eher zu lang, Fehler und Antwort). Beide Tore nennen Claude Code als Client; ein Mitschnitt aus einer anderen Quelle
+ist nicht auswertbar.
+
+- **Werkzeugliste (4.4):** genau die neun Auftragswerkzeuge, mit `--legacy true` (ausgeliefert) zusätzlich die 19 bisherigen;
+  Parameter von `revise_order` (nur `orderId` Pflicht, `quick` Liste, Beschreibung nennt `get_order_status`), `export_order`
+  (`version` wahlweise, `format` nur md/docx/pdf), `list_orders` (`limit` wahlweise), `profile` ohne Parameter und mit
+  „About me“ in der Beschreibung; die fünf Altwerkzeuge mit Nachfolger beginnen mit „Older tool, kept for now: use … instead.“
+- **Tor M:** Kette für Auftrag A `submit_order` (mit `needs_input`) → `answer_order` → `get_order_status` → `get_order_result`
+  → `revise_order` (`version` 2, `notices`) → `get_order_result` (`version` 2) → `export_order` md **ohne `version`** (Inhalt =
+  `text` der Datei; jeder md-Export ohne `version` nach diesem `get_order_result` ist textgleich mit dessen Version 2, verglichen
+  nach Entfernen der BOM, Vereinheitlichen der Zeilenenden und Trimmen, sonst `failed`) und docx
+  (ZIP), dazu `list_orders` (mit A, alle Felder), `profile` und `cancel_order` an einem zweiten Auftrag (`changed`). Jeder
+  Fehler eines Auftragswerkzeugs lässt das Tor scheitern; fehlende Schritte, keine Rückfrage, `changed = false`, eine
+  unlesbare (etwa gekürzte) Antwort oder ein Aufruf ohne Ergebnis machen es nicht auswertbar.
+- **V-MCP:** alle `get_order_status` mit `waitSeconds=50` ≤ 55 s ohne Fehler → 50 s bleibt (Rückgabe 0); Fehler oder > 55 s bei
+  einem langen Aufruf → `Orders:MaxWaitSeconds` 25 s (Rückgabe 1). Nicht auswertbar (4) ohne langen Aufruf, wenn keiner
+  mindestens 45 s wartete (der lange Aufruf wurde nicht geprüft), bei Fehlern oder fehlenden Ergebnissen anderer Aufrufe.

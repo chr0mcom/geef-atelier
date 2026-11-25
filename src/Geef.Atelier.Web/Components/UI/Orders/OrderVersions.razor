@@ -1,0 +1,168 @@
+@using System.Globalization
+@using System.Text
+@using Geef.Atelier.Application.Orders
+@using Geef.Atelier.Core.Domain
+@inject IOrderExportService Exports
+@inject CircuitDataGate DataGate
+@inject ILogger<OrderVersions> Logger
+
+<section id="order-versions" class="order-block order-versions" aria-labelledby="order-versions-title" data-testid="order-versions">
+    <h2 id="order-versions-title">@RevisionLines.VersionsHeading</h2>
+    <ol class="order-version-list">
+        @foreach (var run in Listed)
+        {
+            var version = run.Version!.Value;
+            var before = BaseOf(version);
+            var open = _expanded.Contains(version);
+            <li class="order-version@(version == ShownVersion ? " is-shown" : "")" data-testid="order-version" data-version="@version">
+                <div class="order-version-head">
+                    <span class="order-version-line" data-testid="order-version-line">@Line(run)</span>
+                    @if (version == ShownVersion)
+                    {
+                        <span class="order-version-shown" data-testid="order-version-shown">@ShownLabel</span>
+                    }
+                </div>
+                @if (!string.IsNullOrWhiteSpace(run.ChangeRequested))
+                {
+                    <p class="order-version-asked" data-testid="order-version-asked">@string.Format(CultureInfo.InvariantCulture, RevisionLines.YouAskedFormat, run.ChangeRequested)</p>
+                }
+                @if (HasText(run))
+                {
+                    <div class="order-version-actions">
+                        @if (before is int)
+                        {
+                            <button type="button" class="clarify-link" aria-expanded="@(open ? "true" : "false")" data-testid="order-version-toggle"
+                                    @onclick="() => ToggleAsync(version)">@(open ? RevisionLines.HideChanges : RevisionLines.ShowChanges)</button>
+                        }
+                        <details class="order-download" data-testid="order-version-download">
+                            <summary class="btn small">@RevisionLines.Download</summary>
+                            <div class="order-download-menu">
+                                <a href="@ExportHref(version, "docx")" download data-testid="order-version-download-docx">Word</a>
+                                <a href="@ExportHref(version, "pdf")" download data-testid="order-version-download-pdf">PDF</a>
+                                <a href="@ExportHref(version, "md")" download data-testid="order-version-download-md">Markdown</a>
+                            </div>
+                        </details>
+                    </div>
+                }
+                @if (open && before is int earlier)
+                {
+                    @if (_loading.Contains(version))
+                    {
+                        <p class="order-version-loading" role="status" data-testid="order-version-loading">Loading the changes…</p>
+                    }
+                    else if (_texts.GetValueOrDefault(version) is { } after && _texts.GetValueOrDefault(earlier) is { } older)
+                    {
+                        <OrderVersionDiff Before="@older" After="@after" BeforeVersion="earlier" Language="@Language" />
+                    }
+                    else
+                    {
+                        <p class="order-version-error" role="alert" data-testid="order-version-error">@LoadFailed</p>
+                    }
+                }
+            </li>
+        }
+    </ol>
+</section>
+
+@code {
+    /// <summary>The order whose versions are listed.</summary>
+    [Parameter, EditorRequired] public Guid OrderId { get; set; }
+
+    /// <summary>The runs of the order; versions are the standard runs with a version number.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<OrderRunView> Runs { get; set; } = [];
+
+    /// <summary>The version shown above the list; <c>null</c> when no text is shown.</summary>
+    [Parameter] public int? ShownVersion { get; set; }
+
+    /// <summary>Owner filter of the signed-in person; null for administrators.</summary>
+    [Parameter] public string? RequestingUsername { get; set; }
+
+    /// <summary>Language of the order (<c>lang</c> of the compared paragraphs); <c>null</c> when unknown.</summary>
+    [Parameter] public string? Language { get; set; }
+
+    /// <summary>Mark of the version shown above.</summary>
+    public const string ShownLabel = "Shown above";
+
+    /// <summary>Shown when the texts for the comparison could not be loaded.</summary>
+    public const string LoadFailed = "The changes could not be loaded. Try again in a moment.";
+
+    /// <summary>Word count part of a version that is still being written.</summary>
+    public const string BeingWritten = "being written";
+
+    /// <summary>Word count part of a version that was stopped.</summary>
+    public const string WasStopped = "stopped";
+
+    /// <summary>Word count part of a version that ended without a text.</summary>
+    public const string NotFinished = "could not be finished";
+
+    readonly HashSet<int> _expanded = [];
+    readonly HashSet<int> _loading = [];
+    readonly Dictionary<int, string?> _texts = [];
+
+    IReadOnlyList<OrderRunView> Listed => Runs
+        .Where(r => r.Kind == RunKind.Standard && r.Version is not null)
+        .GroupBy(r => r.Version!.Value)
+        .Select(g => g.OrderByDescending(r => r.CreatedAt).First())
+        .OrderByDescending(r => r.Version)
+        .ToList();
+
+    bool HasText(OrderRunView run) => run.WordCount is > 0 || run.Version == ShownVersion;
+
+    int? BaseOf(int version) => Listed.Where(r => r.Version < version && HasText(r)).Select(r => r.Version).FirstOrDefault();
+
+    static string Line(OrderRunView run)
+    {
+        var tail = run switch
+        {
+            { WordCount: int words and > 0 } => $"{words.Grouped()} words",
+            { Status: RunStatus.Pending or RunStatus.Running } => BeingWritten,
+            { Status: RunStatus.Aborted } or { Outcome: RunOutcome.Aborted } => WasStopped,
+            _ => NotFinished,
+        };
+        return string.Format(CultureInfo.InvariantCulture, RevisionLines.VersionLineFormat, run.Version, run.CreatedAt.ToListDate(), tail);
+    }
+
+    string ExportHref(int version, string format) => $"/orders/{OrderId}/export/{format}?version={version}";
+
+    async Task ToggleAsync(int version)
+    {
+        if (!_expanded.Remove(version))
+        {
+            _expanded.Add(version);
+            await LoadAsync(version);
+        }
+    }
+
+    async Task LoadAsync(int version)
+    {
+        if (BaseOf(version) is not int earlier)
+            return;
+        var missing = new[] { version, earlier }.Where(v => _texts.GetValueOrDefault(v) is null).ToList();
+        if (missing.Count == 0)
+            return;
+        _loading.Add(version);
+        try
+        {
+            foreach (var v in missing)
+                _texts[v] = await TextAsync(v);
+        }
+        finally
+        {
+            _loading.Remove(version);
+        }
+    }
+
+    async Task<string?> TextAsync(int version)
+    {
+        try
+        {
+            var export = await DataGate.RunAsync(() => Exports.ExportAsync(OrderId, ExportFormat.Markdown, version, RequestingUsername));
+            return export is null ? null : Encoding.UTF8.GetString(export.Content);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Loading version {Version} of order {OrderId} failed", version, OrderId);
+            return null;
+        }
+    }
+}

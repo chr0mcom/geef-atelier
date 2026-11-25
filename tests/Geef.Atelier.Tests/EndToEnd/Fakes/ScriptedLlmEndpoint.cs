@@ -46,6 +46,19 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
     /// <summary>Queues an error answer for the next executor call: the cli-proxy error envelope with <paramref name="code"/>.</summary>
     public void EnqueueExecutorError(int status, string code) => _executorAnswers.Enqueue((null, status, code));
 
+    private readonly System.Collections.Concurrent.ConcurrentQueue<ExecutorHold> _executorHolds = new();
+
+    /// <summary>
+    /// Holds the next executor call open until the test answers it through the returned handle or the caller gives up; a held call
+    /// is served before the queued executor answers.
+    /// </summary>
+    public ExecutorHold HoldNextExecutor()
+    {
+        var hold = new ExecutorHold();
+        _executorHolds.Enqueue(hold);
+        return hold;
+    }
+
     /// <summary>Name of the response schema by which the clarifier call is recognised.</summary>
     public const string ClarifierSchemaName = "clarify_order";
 
@@ -157,6 +170,14 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
                 return passagesCode is not null
                     ? PlainError(passagesStatus, passagesCode)
                     : Json(Envelope(call, new JsonObject { ["role"] = "assistant", ["content"] = passagesJson }, "stop"));
+        }
+
+        if (call.Role == LlmRole.Executor && _executorHolds.TryDequeue(out var hold))
+        {
+            var (heldText, heldStatus, heldCode) = await hold.WaitAsync(cancellationToken);
+            return heldCode is not null
+                ? ErrorEnvelope(heldStatus, heldCode)
+                : Json(Envelope(call, new JsonObject { ["role"] = "assistant", ["content"] = heldText }, "stop", ExecutorPromptTokens));
         }
 
         if (call.Role == LlmRole.Executor && _executorAnswers.TryDequeue(out var answer))

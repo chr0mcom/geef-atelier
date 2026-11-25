@@ -4,6 +4,7 @@ using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
+using Geef.Atelier.Core.Domain.Reports;
 using Geef.Atelier.Core.Domain.Research;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Warnings;
@@ -84,8 +85,11 @@ public sealed record OrderView(
 /// assumptions that were used. <see cref="LookedUp"/> is the research of the order as the person sees it (built only by
 /// <see cref="OrderResearchLines"/>), <c>null</c> when there is nothing to show. <see cref="SourceIssueNotes"/> pairs open points of
 /// the writer with the sentence of <see cref="SourceIssues"/> about the same wrong total, so the web page shows them together;
-/// <see cref="WriterOpenPoints"/> still holds every open point. <see cref="LatestVersion"/> and <see cref="EarlierOpenPoints"/> are
-/// reserved for changes to a delivered text; nothing sets them yet, so they are always <c>null</c>.
+/// <see cref="WriterOpenPoints"/> still holds every open point. <see cref="LatestVersion"/> is the version of the current run (higher than
+/// <see cref="Version"/> while a change is being written or after it could not be finished); <see cref="EarlierOpenPoints"/> is what the
+/// writer noted for an earlier version that the shown version does not repeat. <see cref="AssumptionsVersion"/> is set when the shown
+/// version changed an earlier one: <see cref="Assumptions"/> and <see cref="NotGivenFacts"/> were noted for that version, before the person
+/// asked for changes, and a change may have settled or overtaken them.
 /// </summary>
 public sealed record OrderResult(
     Guid OrderId,
@@ -113,10 +117,14 @@ public sealed record OrderResult(
     OrderLookedUpView? LookedUp = null,
     IReadOnlyList<OrderSourceIssueNote>? SourceIssueNotes = null,
     int? LatestVersion = null,
-    IReadOnlyList<OrderEarlierPoint>? EarlierOpenPoints = null);
+    IReadOnlyList<OrderEarlierPoint>? EarlierOpenPoints = null,
+    int? AssumptionsVersion = null);
 
-/// <summary>Reserved for an open point of the writer noted for an earlier <see cref="Version"/>; nothing creates one yet.</summary>
-public sealed record OrderEarlierPoint(int Version, string Text);
+/// <summary>
+/// Something the writer noted for an earlier <see cref="Version"/> that the shown version does not repeat: an open point (also a fixed
+/// sentence about what of that version could not be shown or taken over) or an assumption (<see cref="Kind"/>).
+/// </summary>
+public sealed record OrderEarlierPoint(int Version, string Text, EarlierPointKind Kind = EarlierPointKind.OpenPoint);
 
 /// <summary>An open point of the writer (<see cref="Note"/>, in the language of the text) about the wrong total named by the sentence <see cref="Issue"/>.</summary>
 public sealed record OrderSourceIssueNote(string Issue, string Note);
@@ -139,11 +147,12 @@ public sealed record OrderSourceQuoteView(string FileName, string Quote);
 /// person's answers, the About me details or the assistant's answers). An instruction from the About me details is <c>null</c> for
 /// anyone but the owner of the order. <see cref="LookedUp"/> marks a passage that the pages looked up on the web say otherwise
 /// (<see cref="FactFindingKind.Superseded"/> with the replacing passage in the research): it never blocks and is never called a
-/// matter of the person's files. <see cref="FromVersion"/> is reserved for a passage carried over from an earlier version; nothing
-/// sets it yet, so it is always <c>null</c>.
+/// matter of the person's files. <see cref="FromVersion"/> is the version that found a passage carried over from an earlier version.
+/// <see cref="BeforeLastChange"/> marks a passage against an instruction from before the latest change the person asked for: it never blocks
+/// and is shown with <see cref="RevisionLines.BeforeLastChangeNote"/>.
 /// </summary>
 public sealed record OrderUnbackedPassage(string Quote, FactFindingKind Kind, string? Instruction, bool Blocking, InstructionOrigin? Origin = null, bool LookedUp = false,
-    int? FromVersion = null);
+    int? FromVersion = null, bool BeforeLastChange = false);
 
 /// <summary>
 /// What the person reads under "What was checked" (web) and in <c>checks</c> (MCP); plain English, built only by
@@ -152,8 +161,12 @@ public sealed record OrderUnbackedPassage(string Quote, FactFindingKind Kind, st
 /// </summary>
 public sealed record OrderChecksView(IReadOnlyList<string> Checked, IReadOnlyList<string> Changed, string ToReview, string Limits);
 
-/// <summary>An order as listed in "My work".</summary>
-public sealed record OrderListItem(Guid OrderId, string Title, OrderDisplay Display, OrderMode Mode, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, int SourceCount, int? WordCount);
+/// <summary>
+/// An order as listed in "My work". <see cref="WordCount"/> and <see cref="Version"/> are those of the shown version (the newest with a
+/// text); the display state is that of the current run. Without a text the version is that of the current run.
+/// </summary>
+public sealed record OrderListItem(Guid OrderId, string Title, OrderDisplay Display, OrderMode Mode, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, int SourceCount, int? WordCount,
+    int? Version = null);
 
 /// <summary>Raised for problems the person can fix (empty request, too many files, budget exceeded, foreign source). The message is plain English for the UI and MCP.</summary>
 public sealed class OrderSubmissionException(string message) : InvalidOperationException(message);

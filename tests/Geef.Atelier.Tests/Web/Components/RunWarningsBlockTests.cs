@@ -28,6 +28,43 @@ public sealed class RunWarningsBlockTests : TestContext
             Assert.DoesNotContain("finished", intro);
     }
 
+    [Theory]
+    [InlineData(RunStatus.Running, "Version 3 is still being written.", "This does not concern the text above (version 2):")]
+    [InlineData(RunStatus.Pending, "Version 3 is still being written.", "This does not concern the text above (version 2):")]
+    [InlineData(RunStatus.Failed, "Version 3 could not be finished.", "They do not concern the text above (version 2), which is unchanged:")]
+    [InlineData(RunStatus.Aborted, "Version 3 could not be finished.", "They do not concern the text above (version 2), which is unchanged:")]
+    public void Warnings_of_a_newer_version_than_the_text_shown_name_both_versions(RunStatus status, string start, string end)
+    {
+        var cut = RenderComponent<RunWarningsBlock>(p => p
+            .Add(c => c.Warnings, [Warning()])
+            .Add(c => c.Status, status)
+            .Add(c => c.HasText, false)
+            .Add(c => c.Version, 3)
+            .Add(c => c.ShownVersion, 2));
+
+        var intro = cut.Find("[data-testid='run-warnings-intro']").TextContent;
+        Assert.StartsWith(start, intro);
+        Assert.EndsWith(end, intro);
+        Assert.DoesNotContain("without a result", intro);
+        Assert.Equal("Warnings for version 3", cut.Find("h2").TextContent);
+        Assert.Equal("run-warnings-title-v3", cut.Find("h2").Id);
+        Assert.Equal("run-warnings-title-v3", cut.Find("section").GetAttribute("aria-labelledby"));
+    }
+
+    [Fact]
+    public void The_same_version_as_the_text_shown_keeps_the_usual_introduction()
+    {
+        var cut = RenderComponent<RunWarningsBlock>(p => p
+            .Add(c => c.Warnings, [Warning()])
+            .Add(c => c.Status, RunStatus.Completed)
+            .Add(c => c.HasText, true)
+            .Add(c => c.Version, 2)
+            .Add(c => c.ShownVersion, 2));
+
+        Assert.StartsWith("The result is ready", cut.Find("[data-testid='run-warnings-intro']").TextContent);
+        Assert.Equal("Warnings for version 2", cut.Find("h2").TextContent);
+    }
+
     private static RunWarningEntity Warning() => new()
     {
         Id = Guid.NewGuid(),

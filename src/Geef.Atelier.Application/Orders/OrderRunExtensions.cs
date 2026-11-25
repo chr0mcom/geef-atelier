@@ -8,7 +8,7 @@ using Geef.Atelier.Core.Domain.Warnings;
 
 namespace Geef.Atelier.Application.Orders;
 
-/// <summary>What every first run of an order shares, whether it starts at submission or after the intake.</summary>
+/// <summary>What every run of an order shares, whether it is the first (at submission or after the intake) or a change of a delivered text.</summary>
 internal static class OrderRunExtensions
 {
     private static readonly JsonSerializerOptions SnapshotJsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
@@ -52,6 +52,31 @@ internal static class OrderRunExtensions
         Kind = RunKind.Standard,
         OrderId = order.Id,
         OrderVersion = 1,
+    };
+
+    /// <summary>
+    /// The pending standard run that changes <paramref name="baseRun"/> (the shown version) into <paramref name="version"/>: seeded with
+    /// its delivered text, carrying the change of the person in <see cref="RunEntity.RevisionHint"/> and the briefing with the change
+    /// block. The version is checked again when the run is stored.
+    /// </summary>
+    public static RunEntity ToRevisionRun(this ResolvedCrewSnapshot resolved, OrderEntity order, RunEntity baseRun, string briefing, string change, int version, DateTimeOffset now) => new()
+    {
+        Id = Guid.NewGuid(),
+        CreatedAt = now,
+        Status = RunStatus.Pending,
+        BriefingText = briefing,
+        ConfigJson = "{}",
+        CreatedByUser = order.CreatedByUser,
+        CrewTemplateName = resolved.Snapshot.TemplateName,
+        CrewSnapshot = JsonSerializer.Serialize(resolved.Snapshot, SnapshotJsonOptions),
+        TokensTotal = 0,
+        CostTotal = 0m,
+        Kind = RunKind.Standard,
+        OrderId = order.Id,
+        OrderVersion = version,
+        ParentRunId = baseRun.Id,
+        SeedDraftText = baseRun.FinalText,
+        RevisionHint = change,
     };
 
     /// <summary>Stores one plain-English warning per model that could not be assigned as planned.</summary>

@@ -136,14 +136,22 @@ public static class OrderResultRules
     public static IReadOnlyList<string> NotGivenFacts(this OrderResult result) =>
         (result.NotGivenFacts ?? []).Where(t => !string.IsNullOrWhiteSpace(t)).ToList();
 
-    /// <summary>True when "Open points" has something to show: placeholders, open checks, flagged passages, problems in the files, open points of the writer or notes that could not be shown.</summary>
+    /// <summary>
+    /// True when "Open points" has something to show: placeholders, open checks, flagged passages, problems in the files, open points of
+    /// the writer, open points of the writer for the version before (<see cref="ShownEarlierPoints"/>) or notes that could not be shown.
+    /// </summary>
     public static bool HasOpenPoints(this OrderResult result) =>
         result.Placeholders.Count > 0
         || result.OpenChecks.Count > 0
         || Candidates(result.UnbackedPassages).Count > 0
         || (result.SourceIssues.Shown()?.Count ?? 0) > 0
         || (result.WriterOpenPoints.Shown()?.Count ?? 0) > 0
+        || result.ShownEarlierPoints().Count > 0
         || !string.IsNullOrWhiteSpace(result.NotesNotShown);
+
+    /// <summary>The open points of the writer for the version before that the shown version does not repeat, without blank ones, in their order.</summary>
+    public static IReadOnlyList<OrderEarlierPoint> ShownEarlierPoints(this OrderResult result) =>
+        (result.EarlierOpenPoints ?? []).Where(p => !string.IsNullOrWhiteSpace(p.Text)).ToList();
 
     /// <summary>The key two assumption texts are compared by: one line, without surrounding blanks and closing punctuation.</summary>
     public static string AssumptionKey(string? text) =>

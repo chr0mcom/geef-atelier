@@ -19,10 +19,14 @@ public static class OrderResultReport
     /// say that facts were not checked; the other new fields stay <c>null</c>. Schema 2: the writer's assumptions (without those
     /// the clarifier already listed, compared by <see cref="OrderResultRules.SameAssumptionKey"/>), the writer's open points (those
     /// about a listed wrong total also paired with its sentence) and a sentence for notes that could not be shown, the flagged
-    /// passages and the contradictions in the material (both only when the fact check is shown, not in shadow mode), the
+    /// passages and the contradictions in the material (both only when the fact check is shown, not in shadow mode; those carried over from
+    /// an earlier version always), the
     /// sentences about the totals of the files, the verified quotes, the state and scope of the fact check and "What was
     /// checked". The state is never "checked" (nothing found) when flagged passages could not be listed. Passages from the About me
-    /// details are shown only when <paramref name="showProfile"/> is true (the owner).
+    /// details are shown only when <paramref name="showProfile"/> is true (the owner); this holds for passages carried over from an
+    /// earlier version as for new ones. A passage carried over keeps that version (<see cref="OrderUnbackedPassage.FromVersion"/>), and
+    /// what the writer noted for an earlier version (<see cref="OrderResult.EarlierOpenPoints"/>) is taken without blank entries and
+    /// without assumptions the clarifier's assumptions already show; both stay <c>null</c> for reports without them.
     /// </summary>
     public static OrderResult WithReport(this OrderResult result, RunReport report, bool showProfile = true)
     {
@@ -44,11 +48,12 @@ public static class OrderResultReport
                 1 => NotesNotShownOne,
                 var n => string.Format(NotesNotShownFormat, n),
             },
-            UnbackedPassages = shown
-                ? factCheck!.Open
-                    .Where(f => f.Kind != FactFindingKind.SourceConflict && !string.IsNullOrWhiteSpace(f.TextQuote))
+            UnbackedPassages = factCheck is not null
+                ? factCheck.Open
+                    .Where(f => f.Kind != FactFindingKind.SourceConflict && !string.IsNullOrWhiteSpace(f.TextQuote) && (shown || f.FromVersion is not null))
                     .Select(f => new OrderUnbackedPassage(f.TextQuote!.Trim(), f.Kind,
-                        f.Origin == InstructionOrigin.Memory && !showProfile ? null : f.InstructionQuote, f.Blocking && !f.FromLookedUp(), f.Origin, f.FromLookedUp()))
+                        f.Origin == InstructionOrigin.Memory && !showProfile ? null : f.InstructionQuote, f.Blocking && !f.FromLookedUp() && !f.BeforeLastChange, f.Origin,
+                        f.FromLookedUp(), f.FromVersion, f.Kind == FactFindingKind.Instruction && f.BeforeLastChange))
                     .ToList()
                 : [],
             SourceIssues = OrderCheckLines.SourceIssueSentences(report, showProfile),
@@ -56,6 +61,7 @@ public static class OrderResultReport
             SourceQuotes = (report.SourceQuotes ?? []).Select(q => new OrderSourceQuoteView(q.FileName, q.Quote)).ToList(),
             FactCheck = factCheck is { State: FactCheckState.Checked, NotShown: > 0 } ? FactCheckState.OpenPoints : factCheck?.State,
             FactCheckScope = factCheck?.Scope,
+            EarlierOpenPoints = EarlierPoints(report, result),
         };
         return filled with { Checks = OrderCheckLines.Build(report, filled.HasOpenPoints()) };
     }
@@ -66,6 +72,15 @@ public static class OrderResultReport
     /// </summary>
     public static bool FromLookedUp(this FactFinding finding) =>
         finding.Kind == FactFindingKind.Superseded && finding.MaterialFrom == MaterialPart.LookedUp;
+
+    private static IReadOnlyList<OrderEarlierPoint>? EarlierPoints(RunReport report, OrderResult result)
+    {
+        var clarifier = (result.Assumptions ?? []).Select(a => Key(a.Text)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return report.EarlierOpenPoints?
+            .Where(p => !string.IsNullOrWhiteSpace(p.Text) && !(p.Kind == EarlierPointKind.Assumption && clarifier.Contains(Key(p.Text))))
+            .Select(p => new OrderEarlierPoint(p.Version, p.Text.Trim(), p.Kind))
+            .ToList();
+    }
 
     private static IReadOnlyList<string> WithoutClarifierAssumptions(IReadOnlyList<string> writer, OrderResult result)
     {

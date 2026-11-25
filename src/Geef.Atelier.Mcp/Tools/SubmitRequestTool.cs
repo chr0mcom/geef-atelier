@@ -21,8 +21,9 @@ namespace Geef.Atelier.Mcp.Tools;
 public static class SubmitRequestTool
 {
     public const string ToolDescription =
-        "Older interface: submits a writing task and returns its runId (use get_run_status and get_run_result) plus the orderId " +
-        "(also usable with get_order_status and get_order_result). Prefer submit_order for new work. " +
+        McpToolCatalog.LegacyLeadStart + "submit_order" + McpToolCatalog.LegacyLeadEnd +
+        "Submits a writing task and returns its runId (use get_run_status and get_run_result) plus the orderId " +
+        "(also usable with get_order_status and get_order_result). " +
         "Never asks follow-up questions. Without crewTemplate or customCrew it uses the standard direct path; " +
         "with them it uses the slower path with several review rounds and the given team.";
 

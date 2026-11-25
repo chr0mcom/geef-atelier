@@ -32,7 +32,9 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 /// is on. <see cref="DirectOptions"/> and <see cref="IRunFactCheckModeStore"/> come from the scope. Before the files are rendered it asks
 /// <see cref="IOrderResearchService"/> for the research of the order (<paramref name="orderVersion"/> is the version of the run); an order
 /// with attached files never searches. Passages found on the web follow as source <see cref="DossierRenderer.SourceId"/> for the writer and
-/// the fact check, never for the totals. A failed research is a warning, never the end of the run.
+/// the fact check, never for the totals. A failed research is a warning, never the end of the run. For a run that changes an earlier
+/// version (<paramref name="revisionHint"/>, the change the person asked for) it sets <see cref="AtelierContextKeys.RevisionHint"/>; the
+/// earlier text is only the seed draft, never part of the material.
 /// </summary>
 internal sealed class OrderGroundingStep(
     Guid runId,
@@ -43,7 +45,8 @@ internal sealed class OrderGroundingStep(
     IRunWarningSink warnings,
     ILogger<OrderGroundingStep> logger,
     int? orderVersion = null,
-    TimeSpan? researchWaitLimit = null) : IGroundingStep
+    TimeSpan? researchWaitLimit = null,
+    string? revisionHint = null) : IGroundingStep
 {
     /// <summary>Target of the usages written by this step.</summary>
     public const string WriterTarget = "writer";
@@ -108,6 +111,9 @@ internal sealed class OrderGroundingStep(
             context = context.Set(AtelierContextKeys.SeedDraft, WriterNotesFormat.Defuse(seed));
         if (arithmetic is not null)
             context = context.Set(AtelierContextKeys.SourceArithmetic, arithmetic);
+        var revision = !string.IsNullOrWhiteSpace(revisionHint);
+        if (revision)
+            context = context.Set(AtelierContextKeys.RevisionHint, revisionHint!.Trim());
 
         await StoreModeAsync(mode, cancellationToken);
         await RecordUsagesAsync(bundle, prompt.Positions, template, seed, cancellationToken);
@@ -121,6 +127,8 @@ internal sealed class OrderGroundingStep(
             $"fact-check mode={mode} scope={material.Scope} material_chars={material.TotalChars}"
                 + (arithmetic is null ? string.Empty : $" totals={arithmetic.TotalsFound} totals_off={arithmetic.Issues.Count}"),
         };
+        if (revision)
+            notes.Add($"revision version={orderVersion?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "?"} seed_chars={seed?.Length ?? 0} change_chars={revisionHint!.Trim().Length}");
         if (research.Status is { } status)
             notes.Add($"research status={status} entries={(lookedUp is null ? 0 : research.Research!.Entries.Count)}" + (research.Failed && research.Research is null ? " error=exception" : string.Empty));
 
@@ -192,8 +200,8 @@ internal sealed class OrderGroundingStep(
     }
 
     /// <summary>
-    /// Everything the text may rely on: request, answers of the person and of the assistant and the profile, read back from the
-    /// frozen briefing (<see cref="BriefingSections.Parse"/>), and the files. Assumptions and the writer's notes are never part of it.
+    /// Everything the text may rely on: request, answers of the person and of the assistant, the changes the person asked for and the
+    /// profile, read back from the frozen briefing (<see cref="BriefingSections.Parse"/>), and the files. Assumptions and the writer's notes are never part of it.
     /// Above <see cref="DirectOptions.FactCheckMaxMaterialChars"/> the scope is <see cref="FactCheckScope.WithoutFiles"/>; the file map
     /// is always there, so that the check can also narrow the scope once it knows the length of the text.
     /// </summary>
@@ -201,7 +209,7 @@ internal sealed class OrderGroundingStep(
     {
         var parts = BriefingSections.Parse(briefing);
         var map = files.Count == 0 ? null : string.Join('\n', files.Select(f => $"{f.Id} \"{f.FileName.Replace('"', '\'')}\" — {f.Text.Length} characters"));
-        var full = new FactMaterial(parts.Request, parts.PersonAnswers, parts.AssistantAnswers, parts.Profile, files, FactCheckScope.Full, map);
+        var full = new FactMaterial(parts.Request, parts.PersonAnswers, parts.AssistantAnswers, parts.Profile, files, FactCheckScope.Full, map, parts.Changes);
         return full.TotalChars > options.FactCheckMaxMaterialChars ? full with { Scope = FactCheckScope.WithoutFiles } : full;
     }
 

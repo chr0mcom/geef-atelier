@@ -22,6 +22,13 @@ internal static class DirectWriterPrompts
     public const string SeedInstruction =
         "Revise the text in draft.md as the request asks. Change as little as possible; keep length within ±15 % unless the request says otherwise.";
 
+    /// <summary>
+    /// Instruction of the first pass of a run that changes an earlier version; replaces <see cref="SeedInstruction"/> there. Only the line
+    /// marked as the change to make now is carried out; the earlier changes of the block are already in the text.
+    /// </summary>
+    public const string RevisionInstruction =
+        "Change the text in draft.md only as the person asks in the line marked \"the change to make now\" under \"Change requested by the person\". The earlier changes listed there are already made in the text: keep them and do not make them again. Keep everything else as it is: the same facts, structure and wording. Keep the language of the text unless the change asks for another language. Keep the length within ±15 % unless the change asks for another length.";
+
     /// <summary>Sentences that make the writer read the whole background document instead of searching it.</summary>
     public const string ReadCompletelyInstruction =
         "If it is in context.md: Read context.md completely, in sections, until the end of the file, before you write. Do not rely on searching alone.";
@@ -71,9 +78,11 @@ internal static class DirectWriterPrompts
     /// totals in the files that do not add up (<paramref name="arithmetic"/>) before the instruction to write. Without
     /// <paramref name="writerNotes"/> the prompt is the one of stage 2 and <paramref name="arithmetic"/> is not used. When the bundle
     /// holds the passages looked up on the web, <see cref="LookedUpNote"/> follows the note about the files; otherwise the prompt is unchanged.
+    /// With <paramref name="revision"/> (a run that changes an earlier version) and a <paramref name="seed"/>, <see cref="RevisionInstruction"/>
+    /// takes the place of <see cref="SeedInstruction"/>; everything else stays the same.
     /// </summary>
     public static string FirstPass(string brief, OrderSourceBundle bundle, bool documentMode, string? seed, bool writerNotes = false,
-        IReadOnlyList<SourceArithmeticIssue>? arithmetic = null)
+        IReadOnlyList<SourceArithmeticIssue>? arithmetic = null, bool revision = false)
     {
         var sb = new StringBuilder();
         AppendRequest(sb, brief);
@@ -83,15 +92,16 @@ internal static class DirectWriterPrompts
 
         if (seed is not null)
         {
+            var instruction = revision ? RevisionInstruction : SeedInstruction;
             sb.Append('\n');
             if (documentMode)
             {
-                sb.Append(SeedInstruction).Append('\n');
+                sb.Append(instruction).Append('\n');
             }
             else
             {
                 sb.Append("The text to revise:\n<<<TEXT\n").Append(DefuseMarker(WriterNotesFormat.Defuse(seed), "TEXT>>>")).Append("\nTEXT>>>\n\n");
-                sb.Append(SeedInstruction.Replace("the text in draft.md", "this text", StringComparison.Ordinal)).Append('\n');
+                sb.Append(instruction.Replace("the text in draft.md", "this text", StringComparison.Ordinal)).Append('\n');
             }
         }
 

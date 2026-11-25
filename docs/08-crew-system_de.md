@@ -2,7 +2,7 @@
 
 *[English](08-crew-system.md) · **Deutsch***
 
-Letzte Aktualisierung: 2026-11-25 (D-074: Recherche im Grounding-Schritt des Direktwegs; zuvor 2026-11-24, D-067: strenges Lesen des Snapshots, mindestens ein Reviewer, Outcome nach den Finalizern, Warnungen am Lauf, System-Grounding wieder über den Provider-Typ-Weg, Learning standardmäßig pausiert; zweite Prüfrunde: Reviewer-Prüfung beim Speichern, Vektor-Scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserviert, Finalizer und Abbruch; zuvor 2026-11-23, D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
+Letzte Aktualisierung: 2026-11-25 (D-075 Teil B: Nachbesserungslauf im Direktweg; D-074: Recherche im Grounding-Schritt des Direktwegs; zuvor 2026-11-24, D-067: strenges Lesen des Snapshots, mindestens ein Reviewer, Outcome nach den Finalizern, Warnungen am Lauf, System-Grounding wieder über den Provider-Typ-Weg, Learning standardmäßig pausiert; zweite Prüfrunde: Reviewer-Prüfung beim Speichern, Vektor-Scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserviert, Finalizer und Abbruch; zuvor 2026-11-23, D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
 
 ## Überblick
 
@@ -903,3 +903,49 @@ gespeicherten Ausschnitte unverändert und sucht nie neu.
   `grounding.research_failed` („Looking things up on the web did not work this time. The text was written without it.“), und
   der Lauf geht ohne `W1` weiter. `NothingFound`, `AllWithheld`, `DailyLimit` und `FilesAttached` hängen keine Quelle an und warnen nicht; das
   Ergebnis zeigt sie als feste Sätze. Nur der Abbruch des Laufs selbst beendet den Schritt.
+
+## Nachbesserungslauf im Direktweg (D-075, Teil B)
+
+Ein Lauf, der eine frühere Version des Auftrags ändert („Change something“, `revise_order`), läuft immer über den Direktweg. Er
+trägt `RunEntity.RevisionHint` (die Änderung der Person samt Sätzen der Schnellknöpfe), `ParentRunId` (Lauf der gezeigten Version)
+und `SeedDraftText` (deren ausgelieferter Text). Den Lauf legt der Auftragsdienst an; der Direktweg macht daraus Folgendes:
+
+- **Grounding:** Der Assembler reicht `RevisionHint` an `OrderGroundingStep`; der Schritt setzt den Kontextschlüssel
+  `AtelierContextKeys.RevisionHint`. Der frühere Text ist nur Ausgangstext, nie Material des Faktenprüfers. Die Recherche liefert wie
+  bei jeder Überarbeitung nur Gespeichertes.
+- **Brief:** `RevisionBrief.Compose` fügt die Änderung als Zeile „the change to make now“ an und markiert jede ältere Zeile des Blocks
+  als „earlier change: already made in the text – do not make it again, keep it“; die Überschrift sagt, dass die neueste Änderung
+  gilt und die Worte der Person den Blöcken „Assumptions …“ und „Not given by the person“ vorgehen. `BriefingSections.Parse` gibt die
+  Änderungen getrennt von den Antworten zurück (`BriefParts.Changes`, die letzte als neueste), und das Material des Faktenprüfers
+  hält sie so (`FactMaterial.Changes`). Nur der Prompt des Prüfers schreibt sie unter die Antworten der Person, mit kurzer Marke
+  („newest change, version n“ / „earlier change, version n; a newer change wins where they differ“, `FactChange.Marked`) vor dem
+  unveränderten Wortlaut. Nachgeschlagen werden Zitate nur in den Worten; der Filter nimmt die Marke vorher aus jedem Zitat des
+  Prüfers (`FactChange.WithoutMarks`), sodass ein reines Marken-Zitat keine Vorgabe ist und kein gespeichertes Zitat die Marke trägt.
+- **Schreiber:** Nur im Nutzerprompt des ersten Durchgangs ersetzt `DirectWriterPrompts.RevisionInstruction` die `SeedInstruction`
+  (für Anbieter ohne Dokumentmodus über dieselbe Ersetzung „the text in draft.md“ → „this text“). Der System-Prompt bleibt bitgleich
+  (Hash-Test); Korrekturdurchgang unverändert.
+- **Prüfungen:** Jede Regel des ersten Auftrags (`DraftCheckResult.IsFirstRequestRule`: Länge, Sprache, keine Platzhalter, verbotene
+  Formen, verbotene und verlangte Wörter) ist im Nachbesserungslauf nur eine Notiz, nie blockierend (`DeterministicChecksReviewer.Evaluate`,
+  Satz `FirstRequestNoteFormat`); leerer Text, Vorrede, Anzeige der Platzhalter, Rechenprüfung und Faktenprüfung laufen wie immer. Der
+  Bericht trägt `RunReport.Revision`, und „What was checked“ nennt eingehaltene Regeln als Regeln des ersten Auftrags.
+- **Vorgaben im Faktenprüfer:** Im Nachbesserungslauf (`FactMaterial.IsRevision`) blockiert ein Befund der Art `Instruction` nur,
+  wenn sein Vorgabenzitat in der neuesten Änderung steht (auch wenn es zugleich anderswo steht). Jeder andere gefundene Ursprung
+  (Auftrag, Antworten, „About me“, Assistent, frühere Änderung) ergibt einen Hinweis mit `FactFinding.BeforeLastChange`: nie
+  blockierend, also im Modus `On` `Info` und nie im Korrekturauftrag. Übernommene Vorgaben-Befunde einer Vorversion werden ebenso
+  bewertet (`FactFindingFilter.ForRevision` in `DirectReportBuilder.EarlierFindings`), und `FactCarryOver.Merge` macht einen solchen
+  Hinweis nie wieder blockierend. Andere Befundarten und der erste Lauf bleiben unverändert.
+- **Nie verlieren über Versionen (`DirectReportBuilder`):** Nach dem Lauf liest der Assembler den Bericht des `ParentRunId`. Dessen
+  offene Befunde (Stellen und Quellenwidersprüche) gehen über `FactCarryOver.Merge` in den neuen Bericht: Stellen nur, wenn ihr Zitat
+  als ganze Wörter noch dasteht, Widersprüche immer, jeweils mit `FactFinding.FromVersion` (ein schon übernommener Befund behält die
+  Version, die ihn fand); meldet der neue Prüfer dieselbe Stelle, steht sie einmal als eigener Befund – außer der neue Prüfer ist `Off`
+  oder im Schattenmodus, dann geht der übernommene vor. Eigene Befunde eines früheren Prüfers in `Off` oder Schattenmodus werden nicht
+  übernommen, von ihm schon übernommene (mit `FromVersion`) immer. Offene Punkte und Annahmen des Schreibers der Vorversion, die die neue
+  nicht wortgleich in derselben Art (`SameAssumptionKey`) wiederholt, stehen in `RunReport.EarlierOpenPoints` mit Version und
+  `EarlierPointKind` (auch die von der Vorversion schon übernommenen), dazu ein fester Satz (`EarlierPointKind.Note`) für ihre Notizen und
+  Stellen, die nicht gezeigt werden konnten. Hat die Vorversion keinen Bericht (z. B. „Extra careful“), sagt der feste Satz
+  `ChecksNotTakenOverFormat`, dass ihre Prüfungen nicht übernommen und nicht erneut geprüft wurden. Kann der frühere Bericht nicht gelesen
+  werden, steht im Bericht ein Satz dazu; der Lauf geht weiter. Wurde eine Vorversion ohne lesbaren Bericht selbst als „Ready – please
+  check“ gezeigt (`DirectRevision.NeedsCheck`, bestimmt mit `OrderStateResolver`), setzt der Bericht `RunReport.EarlierNeedsCheck`; eine
+  spätere Version erbt es aus dem Bericht ihrer Basis. `OrderStateResolver.ToRunState` liest es in jedem Prüfmodus als übernommenen
+  blockierenden Punkt. Berichte anderer
+  Läufe bleiben bitgleich (`null` wird nicht geschrieben).

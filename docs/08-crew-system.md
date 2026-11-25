@@ -2,7 +2,7 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-11-25 (D-074: research in the grounding step of the direct path; before that 2026-11-24, D-067: strict snapshot reading, at least one reviewer, outcome after finalizers, run warnings, system grounding back on the provider-type path, learning paused by default; second review round: reviewer check on save, vector scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserved, finalizers and cancellation; before that 2026-11-23, D-066/12: explicit model_domain, one assignment rule; D-066/10–11: codex aliases, host sync, availability only as reported by the live catalog; before that 2026-11-22, D-066: model matrix — system profiles and model matrix section rewritten; before that 2026-06-04, D-059)
+Last updated: 2026-11-25 (D-075 part B: change run on the direct path; D-074: research in the grounding step of the direct path; before that 2026-11-24, D-067: strict snapshot reading, at least one reviewer, outcome after finalizers, run warnings, system grounding back on the provider-type path, learning paused by default; second review round: reviewer check on save, vector scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserved, finalizers and cancellation; before that 2026-11-23, D-066/12: explicit model_domain, one assignment rule; D-066/10–11: codex aliases, host sync, availability only as reported by the live catalog; before that 2026-11-22, D-066: model matrix — system profiles and model matrix section rewritten; before that 2026-06-04, D-059)
 
 ## Overview
 
@@ -881,3 +881,50 @@ never searches again.
   `grounding.research_failed` ("Looking things up on the web did not work this time. The text was written without it.") and
   the run goes on without `W1`. `NothingFound`, `AllWithheld`, `DailyLimit` and `FilesAttached` add no source and no warning; the result shows
   them as fixed sentences. Only the cancellation of the run itself ends the step.
+
+## Change run on the direct path (D-075, part B)
+
+A run that changes an earlier version of the order ("Change something", `revise_order`) always uses the direct path. It carries
+`RunEntity.RevisionHint` (the person's change including the sentences of the quick buttons), `ParentRunId` (the run of the shown
+version) and `SeedDraftText` (its delivered text). The order service creates the run; the direct path does the following:
+
+- **Grounding:** the assembler passes `RevisionHint` to `OrderGroundingStep`, which sets the context key
+  `AtelierContextKeys.RevisionHint`. The earlier text is only the seed, never material of the fact check. As for any revision, the
+  research only returns what is stored.
+- **Brief:** `RevisionBrief.Compose` adds the change as the line marked "the change to make now" and marks every older line of the
+  block as "earlier change: already made in the text – do not make it again, keep it"; the heading says that the newest change wins
+  and that the person's words take precedence over the blocks "Assumptions …" and "Not given by the person". `BriefingSections.Parse`
+  gives the changes back apart from the answers (`BriefParts.Changes`, the last one as the newest), and the material of the fact check
+  keeps them that way (`FactMaterial.Changes`). Only the checker's prompt writes them under the answers of the person, with a short
+  mark ("newest change, version n" / "earlier change, version n; a newer change wins where they differ", `FactChange.Marked`) before
+  the unchanged words. Quotes are looked up in the words only; the filter first takes the mark out of every quote of the checker
+  (`FactChange.WithoutMarks`), so a quote that is only a mark is no instruction and no stored quote holds the mark.
+- **Writer:** only in the user prompt of the first pass, `DirectWriterPrompts.RevisionInstruction` replaces `SeedInstruction` (for
+  providers without document mode through the same replacement "the text in draft.md" → "this text"). The system prompt stays
+  bit-identical (hash test); the correction pass is unchanged.
+- **Checks:** in a change run every rule of the first request (`DraftCheckResult.IsFirstRequestRule`: length, language, no
+  placeholders, forbidden forms, ruled-out and required words) is only a note, never blocking (`DeterministicChecksReviewer.Evaluate`,
+  sentence `FirstRequestNoteFormat`); empty text, remark before the text, the placeholders to fill in, the calculations and the fact
+  check run as always. The report is marked `RunReport.Revision`, and "What was checked" names kept rules as rules of the first
+  request.
+- **Instructions in the fact check:** in a change run (`FactMaterial.IsRevision`) a finding of kind `Instruction` blocks only when
+  its instruction quote stands in the newest change (also when it stands elsewhere as well). Any other origin that is found (request,
+  answers, About me, assistant, earlier change) gives a hint with `FactFinding.BeforeLastChange`: never blocking, so `Info` in mode
+  `On` and never in the correction. Instruction findings carried over from an earlier version are judged the same way
+  (`FactFindingFilter.ForRevision` in `DirectReportBuilder.EarlierFindings`), and `FactCarryOver.Merge` never makes such a hint
+  blocking again. Other kinds of findings and the first run stay unchanged.
+- **Never lose across versions (`DirectReportBuilder`):** after the run the assembler reads the report of `ParentRunId`. Its open
+  findings (passages and source conflicts) go into the new report through `FactCarryOver.Merge`: passages only when their quote still
+  stands as whole words, conflicts always, each with `FactFinding.FromVersion` (a finding carried over before keeps the version that
+  found it); when the new check reports the same passage, it appears once as its own finding – unless the new check is `Off` or in
+  shadow mode, then the carried finding comes first. Own findings of an earlier check in `Off` or shadow mode are not carried over;
+  findings it had carried over (with `FromVersion`) always are. The writer's open points and assumptions of the earlier version that
+  the new one does not repeat word for word in the same kind (`SameAssumptionKey`) go to `RunReport.EarlierOpenPoints` with their
+  version and `EarlierPointKind` (including those the earlier version had carried over), together with a fixed sentence
+  (`EarlierPointKind.Note`) for its notes and flagged passages that could not be shown. When the earlier version has no report (for
+  example "Extra careful"), the fixed sentence `ChecksNotTakenOverFormat` says that its checks were not taken over and not checked
+  again. When the earlier report cannot be read, the report says so in one sentence and the run goes on. When an earlier version
+  without a readable report was itself shown as "Ready – please check" (`DirectRevision.NeedsCheck`, resolved with
+  `OrderStateResolver`), the report sets `RunReport.EarlierNeedsCheck`; a later version inherits it from the report of its base.
+  `OrderStateResolver.ToRunState` reads it in every fact-check mode as a carried blocking point. Reports of all other runs stay
+  bit-identical (`null` is not written).

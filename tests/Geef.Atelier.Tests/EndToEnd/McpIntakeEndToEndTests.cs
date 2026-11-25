@@ -320,6 +320,9 @@ public sealed class McpIntakeEndToEndTests(PostgresFixture postgres)
         public Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default) =>
             StartAsync(orderId, requestingUsername, [], IntakeOutcome.Skipped, ct);
 
+        public Task<OrderRevision> ReviseAsync(ReviseOrderRequest request, CancellationToken ct = default) =>
+            inner.ReviseAsync(request, ct);
+
         private async Task<OrderSubmission> StartAsync(Guid orderId, string? requestingUsername, IReadOnlyList<OrderAnswer> answers, IntakeOutcome outcome, CancellationToken ct)
         {
             if (!intake.Orders.TryGetValue(orderId, out var pending) || !Visible(pending, requestingUsername))
