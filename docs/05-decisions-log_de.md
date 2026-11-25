@@ -2005,15 +2005,19 @@ Fragen mit Klickantworten oder gar keine; jeder Fehler startet den Auftrag mit d
 - **Gate** (`QuestionGate`, reine Funktion, jede Regel getestet): Profil vor Frage (Sprache, Absender, Signatur,
   Anrede); Recherchierbares wird nie gefragt; Fragen, die die Person nicht beantworten kann oder die wenig ändern,
   werden Annahmen; bei einer Überarbeitung nie Länge, Ton oder Anrede und höchstens eine Frage; die Länge nur aus
-  der festen Vorlage (Deutsch, Englisch; sonst Annahme) und nur, wenn der Wortlaut keine nennt (eine Länge in Seiten,
-  Sätzen oder als Tweet zählt nur mit Bezug zum Schreibauftrag, etwa „schreib zwei Absätze“, „in drei Sätzen“; „zehn
-  Seiten fehlen“ nicht); eine Modellfrage wird nur unter format, scope oder other und nur dann zur Vorlage, wenn sie
-  ausdrücklich nach der Länge des Textes fragt („Wie lang soll der Beitrag werden?“), nie eine Frage nach einer Dauer
-  oder Menge („Wie lange wohnst du schon dort?“); Frage ≤ 120 Zeichen,
+  der festen Vorlage (Deutsch, Englisch; sonst Annahme) und nur, wenn der Wortlaut keine nennt (eine Menge mit
+  Längeneinheit zählt an jeder Stelle, etwa „zwei Absätze“, „maximal drei Sätze“, „ein paar Zeilen“, „a 2-page report“,
+  dazu Tweet, SMS, One-Pager, Einzeiler und ein-/zweiseitig; bewusst breit, auch „im Buch fehlen zehn Seiten“ zählt, denn
+  ein Fehltreffer lässt nur den Schreiber wählen, eine Lücke fragte nach schon Geschriebenem; diese Erkennung speist nie
+  eine Längenprüfung des Textes); eine Modellfrage wird nur unter format, scope oder other und nur dann zur Vorlage, wenn sie
+  ausdrücklich nach der Länge des Textes fragt („Wie lang soll der Beitrag werden?“, „Soll das Schreiben kurz oder lang
+  sein?“), nie eine Frage nach einer Dauer, Gültigkeit oder Menge („Wie lange wohnst du schon dort?“, „Wie lange soll die
+  Einladung gültig sein?“); Frage ≤ 120 Zeichen,
   2–4 Optionen ≤ 60 Zeichen, keine Füllantworten („egal“, „other“), keine Sperrwörter (`JargonBlocklist`, mit
   Pluralformen), keine fremde Sprache; ein Thema, eine Frage; Länge zuerst; höchstens drei. Jede verworfene Frage
   wird Annahme, außer ihr Thema wird ohnehin gefragt (eine verworfene Doppelfrage setzt nie eine Vermutung neben die
-  Antwort; enge Themen nehmen auch aus anderen Lücken keine Annahme, Sachverhalte und Sonstiges behalten ihre). Alle
+  Antwort; enge Themen nehmen auch aus anderen Lücken keine Annahme; Sachverhalte und Sonstiges behalten ihre, bei einer
+  verworfenen Doppelfrage die vom Modell gelieferte). Alle
   Kennungen vergibt das Gate.
 - **Ablauf** (`OrderIntakeService`, `OrderIntakeWorker`): atomarer Claim, höchstens zwei Klärungen gleichzeitig,
   ein Wecksignal nach dem Einreichen. Null Fragen starten den Lauf im selben Schritt (`Clarified`), sonst wartet der
@@ -2029,7 +2033,9 @@ Fragen mit Klickantworten oder gar keine; jeder Fehler startet den Auftrag mit d
   `IntakeEval evaluate` und `IntakeCorpusTests` spielen die gespeicherten Rohantworten ohne Modell erneut durch und geben
   jedem Tor ein Urteil (bestanden, nicht bestanden, nicht auswertbar). Kein Tor besteht ohne Daten: fehlende Einträge,
   falsche Korpusgrößen, unbeschriftete Einträge oder eine leere zurückgehaltene Menge bzw. ein leerer Zweitkorpus machen
-  alle Tore nicht auswertbar; Latenz und Fehler zählen jeden Versuch; eine Antwort über der Produktionsgrenze oder eine,
+  alle Tore nicht auswertbar, ebenso ein Ergebnis zu einer anderen Eingabe (jede Zeile trägt einen Hash über Auftrag,
+  Dateien, Profil, Klärer-Prompt und Schema; `run` überspringt solche Einträge nicht); die Fehlerquote zählt jeden
+  Versuch, die Latenz jede Antwort und Zeitüberschreitung (schnelle Fehler schönen sie nicht); eine Antwort über der Produktionsgrenze oder eine,
   die sich nicht nachspielen lässt, ist ein Fehler. `IntakeEval shadow` beurteilt die Tore a, f und g aus einem nur
   lesenden CSV-Export von `OrderIntakeShadows` (siehe `tools/IntakeEval/README.md`).
 
@@ -2070,8 +2076,9 @@ Gate streng und jede Verwerfung nur eine Annahme mehr.
   Fragen, Optionen, Annahmen und die Zusammenfassung werden verworfen, wenn sie einen Link, eine Web- oder Mailadresse,
   eine IP-Adresse mit Pfad oder einen Markdown-Link enthalten; ein nackter Name wie `Booking.com` oder `Node.js` ist nur
   erlaubt, wenn er wörtlich im Auftragstext der Person steht, nie wegen einer Datei. Verworfen wird auch, was Passwort,
-  PIN, TAN, Schlüssel, Token, Karten- oder Kontonummer in irgendeiner Form nennt (auch in Zusammensetzungen), außer der
-  Auftrag selbst behandelt das Thema; die Bitte um das Geheimnis selbst wird immer verworfen. Verworfen wird nur das
+  PIN, TAN, Schlüssel, Token, Karten- oder Kontonummer in irgendeiner Form nennt (auch in Zusammensetzungen; „pin“ klein
+  nach einem Besitzwort), außer der Auftrag selbst behandelt dieselbe Art (Zugangsdaten bzw. Zahlungs- und Kontodaten;
+  ein Auftrag mit IBAN erlaubt kein Passwort); die Bitte um das Geheimnis selbst wird immer verworfen. Verworfen wird nur das
   Element, nie der Auftrag. Die MCP-Hinweise beschreiben diese Felder als aus Auftrag und Dateien abgeleitet, nicht als Anweisungen.
 - **Robustheit:** Ein scheiternder Claim gibt seinen Platz zurück; ein Auftrag, der im Sammellauf scheitert, wird
   15 Minuten zurückgestellt, mit jedem weiteren Fehlschlag doppelt so lange bis höchstens 24 Stunden, sodass keine Zahl

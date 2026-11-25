@@ -1930,14 +1930,18 @@ or none; every failure starts the order with the request as written.
   form of address); anything researchable is never asked; questions the person cannot answer or that change little
   become assumptions; a revision never asks about length, tone or form of address and asks at most one question; the
   length only from the fixed template (German, English; otherwise an assumption) and only when the request names none
-  (a length in pages, sentences or as a tweet counts only when it belongs to the writing task, e.g. "write two
-  paragraphs", "in three sentences"; "ten pages are missing" does not); a model question becomes the template only under
-  format, scope or other and only when it asks for the length of the text itself ("How long should the post be?"), never
-  a question about a duration or an amount ("How long have you worked there?");
+  (an amount with a unit of length counts wherever it stands, e.g. "two paragraphs", "keep it to three sentences",
+  "a few lines", "a 2-page report", and so do tweet, SMS, one-pager and one-liner; deliberately broad, "ten pages are
+  missing" counts too, because a false hit only lets the writer choose while a miss would ask for something already
+  written; this detection never feeds a length check of the text); a model question becomes the template only under
+  format, scope or other and only when it asks for the length of the text itself ("How long should the post be?", "Do you want a
+  short or a long version?"), never a question about a duration, a validity or an amount ("How long have you worked there?",
+  "How long should the reply window be?");
   question ≤ 120 characters, 2–4 options ≤ 60 characters, no filler answers ("other", "egal"), no blocked words
   (`JargonBlocklist`, including plurals), no other language; one topic, one question; length first; at most three.
   Every dropped question becomes an assumption, except when its topic is asked anyway (a dropped duplicate never sets a
-  guess beside the answer; narrow topics also take no assumption from another gap, facts and other keep theirs). The gate
+  guess beside the answer; narrow topics also take no assumption from another gap; facts and other keep theirs, from a dropped duplicate the one
+  the model gave). The gate
   assigns all ids.
 - **Flow** (`OrderIntakeService`, `OrderIntakeWorker`): atomic claim, at most two clarifications at a time, a wake-up
   signal after submitting. Zero questions start the run in the same step (`Clarified`); otherwise the order waits with
@@ -1951,7 +1955,9 @@ or none; every failure starts the order with the request as written.
   entries are missing or unlabelled), `tools/IntakeEval run` measures clarifier and gate on it, `IntakeEval evaluate` and
   `IntakeCorpusTests` replay the stored raw answers without a model and give every gate a verdict (passed, failed, not
   evaluable). No gate passes without data: missing entries, wrong corpus sizes, unlabelled entries or an empty held-out set
-  or second corpus make every gate not evaluable; latency and failures count every attempt; an answer over the production
+  or second corpus make every gate not evaluable, and so does a result for another input (every line carries a hash of
+  request, files, profile, clarifier prompt and schema; `run` never skips such entries); the failure rate counts every
+  attempt, the latency every answer and time-out (fast failures never improve it); an answer over the production
   limit or one that cannot be replayed is a failure. `IntakeEval shadow` judges gates a, f and g from a read-only CSV
   export of `OrderIntakeShadows` (see `tools/IntakeEval/README.md`).
 
@@ -1989,7 +1995,9 @@ costs one more assumption.
   options, assumptions and the summary are dropped when they contain a link, a web or mail address, an IP address with a
   path or a Markdown link; a bare name such as `Booking.com` or `Node.js` is fine only when it stands literally in the
   request of the person, never because of a file. They are also dropped when they mention a password, PIN, TAN, key,
-  token, card or account number in any form (also inside compound words) unless the request itself treats that topic; a
+  token, card or account number in any form (also inside compound words; lower-case "pin" after an owner word) unless the
+  request itself treats the same kind (access data, or payment and account data; a request with an IBAN allows no
+  password); a
   request for the secret itself is always dropped. Only the element is dropped, never the order.
   The MCP instructions describe these fields as derived from request and files, not as instructions.
 - **Robustness:** a failing claim gives its slot back; an order that keeps failing in a sweep is left out for 15 minutes,
