@@ -73,6 +73,9 @@ SUCCESSORS = {"submit_request": "submit_order", "get_run_status": "get_order_sta
               "cancel_run": "cancel_order", "list_runs": "list_orders"}
 LEGACY_PREFIX = "Older tool, kept for now: use "
 LIST_ORDER_FIELDS = ("orderId", "title", "state", "version", "updatedAt", "wordCount")
+# The server leaves out fields whose value is null (MCP serializer), so an order without a text has no wordCount and, before
+# its first version, no version; these two may be missing, the others never.
+LIST_ORDER_REQUIRED = ("orderId", "title", "state", "updatedAt")
 EXPORT_FORMATS = frozenset({"md", "docx", "pdf"})
 DOCX_MAGIC = b"PK\x03\x04"
 REVISED_VERSION = 2
@@ -536,8 +539,11 @@ def evaluate_gate_m(tools: list[dict] | None, calls: list[dict], legacy: bool = 
         else:
             if not any(_order_id(r) == order_a for r in rows):
                 failures.append("list_orders: Auftrag A fehlt")
-            if incomplete := [r.get("orderId") for r in rows if any(k not in r for k in LIST_ORDER_FIELDS)]:
-                failures.append(f"list_orders: {len(incomplete)} Einträge ohne alle Felder {', '.join(LIST_ORDER_FIELDS)}")
+            if incomplete := [r.get("orderId") for r in rows if any(k not in r for k in LIST_ORDER_REQUIRED)]:
+                failures.append(f"list_orders: {len(incomplete)} Einträge ohne alle Felder {', '.join(LIST_ORDER_REQUIRED)}")
+            row_a = next((r for r in rows if _order_id(r) == order_a), None)
+            if row_a is not None and any(k not in row_a for k in LIST_ORDER_FIELDS):
+                failures.append(f"list_orders: Auftrag A (mit Text) ohne alle Felder {', '.join(LIST_ORDER_FIELDS)}")
     profile = first("profile")
     steps["profile"] = {"found": profile is not None}
     if profile is not None and not isinstance(profile.get("response"), (dict, type(None))):

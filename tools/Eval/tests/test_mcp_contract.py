@@ -295,6 +295,24 @@ def test_gate_m_is_not_evaluable_without_data(replace, needle):
     assert any(needle in p for p in report["problems"]), report["problems"]
 
 
+def test_gate_m_accepts_list_rows_without_the_null_fields_the_server_leaves_out():
+    rows = gate_m_calls(c12=call(12, "list_orders", {"limit": 10}, [
+        {"orderId": B, "title": "Zweiter", "state": "preparing", "updatedAt": "x"},
+        {"orderId": A, "title": "Rundbrief", "state": "delivered", "version": 2, "updatedAt": "x", "wordCount": 2}]))
+    assert mc.evaluate_gate_m(contract_tools(), rows)["verdict"] == "passed"
+
+    without_words = gate_m_calls(c12=call(12, "list_orders", {"limit": 10}, [
+        {"orderId": A, "title": "Rundbrief", "state": "delivered", "version": 2, "updatedAt": "x"}]))
+    report = mc.evaluate_gate_m(contract_tools(), without_words)
+    assert report["verdict"] == "failed"
+    assert any("Auftrag A (mit Text)" in f for f in report["failures"])
+
+    without_state = gate_m_calls(c12=call(12, "list_orders", {"limit": 10}, [
+        {"orderId": B, "title": "Zweiter", "updatedAt": "x"},
+        {"orderId": A, "title": "Rundbrief", "state": "delivered", "version": 2, "updatedAt": "x", "wordCount": 2}]))
+    assert mc.evaluate_gate_m(contract_tools(), without_state)["verdict"] == "failed"
+
+
 def test_gate_m_needs_claude_code_and_a_tool_list():
     python_rows = [dict(row, source="python") for row in gate_m_calls()]
     assert mc.evaluate_gate_m(contract_tools(), python_rows)["verdict"] == "not_evaluable"
