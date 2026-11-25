@@ -1,3 +1,4 @@
+using Geef.Atelier.Infrastructure.Markup;
 using Markdig;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
@@ -10,7 +11,7 @@ namespace Geef.Atelier.Infrastructure.Finalizers.FormatConverters;
 internal static class MarkdownToPdfConverter
 {
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
-        .UseAdvancedExtensions()
+        .UseSafeExtensions()
         .Build();
 
     static MarkdownToPdfConverter()

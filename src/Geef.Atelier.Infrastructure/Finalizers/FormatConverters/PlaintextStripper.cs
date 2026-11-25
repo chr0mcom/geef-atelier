@@ -1,3 +1,4 @@
+using Geef.Atelier.Infrastructure.Markup;
 using Markdig;
 using Markdig.Renderers;
 using Markdig.Syntax;
@@ -9,7 +10,7 @@ namespace Geef.Atelier.Infrastructure.Finalizers.FormatConverters;
 internal static class PlaintextStripper
 {
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
-        .UseAdvancedExtensions()
+        .UseSafeExtensions()
         .Build();
 
     public static string Strip(string markdown)

@@ -1,3 +1,4 @@
+using Geef.Atelier.Infrastructure.Markup;
 using Markdig;
 
 namespace Geef.Atelier.Infrastructure.Finalizers.FormatConverters;
@@ -5,12 +6,13 @@ namespace Geef.Atelier.Infrastructure.Finalizers.FormatConverters;
 internal static class MarkdownToHtmlConverter
 {
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
-        .UseAdvancedExtensions()
+        .UseSafeExtensions()
+        .DisableHtml()
         .Build();
 
     public static string Convert(string markdown, string title = "")
     {
-        var body = Markdown.ToHtml(markdown, Pipeline);
+        var body = markdown.ToSafeHtml(Pipeline);
         var escapedTitle = System.Web.HttpUtility.HtmlEncode(string.IsNullOrWhiteSpace(title) ? "Document" : title);
         return $$"""
             <!DOCTYPE html>

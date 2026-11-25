@@ -1,3 +1,4 @@
+using Geef.Atelier.Infrastructure.Markup;
 using Markdig;
 using Microsoft.AspNetCore.Components;
 
@@ -8,7 +9,7 @@ public static class MarkdownRenderer
 {
     // No raw HTML passthrough — disables inline HTML blocks from being passed to output.
     private static readonly MarkdownPipeline SafePipeline = new MarkdownPipelineBuilder()
-        .UseAdvancedExtensions()
+        .UseSafeExtensions()
         .DisableHtml()
         .Build();
 
