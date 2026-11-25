@@ -2,7 +2,7 @@
 
 *[English](09-endpoint-reference.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-25 (Etappe 4: `lookedUp` in `get_order_result`, Server-Hinweis zu im Web nachgeschlagenen Stellen; Etappe 3: `checks`, `factCheck`, `unbackedPassages`, `sourceIssues`, `openPoints`, `writerAssumptions`, `sourceQuotes` in `get_order_result`, Server-Hinweise zum Zeigen; Etappe 2: `answer_order`, `needs_input` mit Fragen in `submit_order`/`get_order_status`, `assumptions` in `get_order_result`, neue Server-Hinweise; Etappe 1: Auftrags-Werkzeuge `submit_order`, `get_order_status`, `get_order_result`, `submit_request` als Hülle mit `orderId`, Server-Hinweise, `list_learnings` nur für Admins; D-067: `warnings` und `outcome` in `get_run_status`/`get_run_result`, Ergebnis erst nach `outcome` lesen; `/hubs/runs` bleibt bis Etappe 8; `/hubs/runs` nur für Angemeldete; Editoren nur für Admins und `/access-denied`; Learning standardmäßig pausiert; zuvor 2026-05-22, D-054: Tool list_learnings ergänzt; providerType um learning-retrieval erweitert)*
+*Letzte Aktualisierung: 2026-11-25 (Etappe 5: `revise_order`, `export_order`, `cancel_order`, `list_orders`, `profile`, `latestVersion`, `earlierOpenPoints`, `fromVersion`, ältere Werkzeuge hinter `Mcp:LegacyTools`; Etappe 4: `lookedUp` in `get_order_result`, Server-Hinweis zu im Web nachgeschlagenen Stellen; Etappe 3: `checks`, `factCheck`, `unbackedPassages`, `sourceIssues`, `openPoints`, `writerAssumptions`, `sourceQuotes` in `get_order_result`, Server-Hinweise zum Zeigen; Etappe 2: `answer_order`, `needs_input` mit Fragen in `submit_order`/`get_order_status`, `assumptions` in `get_order_result`, neue Server-Hinweise; Etappe 1: Auftrags-Werkzeuge `submit_order`, `get_order_status`, `get_order_result`, `submit_request` als Hülle mit `orderId`, Server-Hinweise, `list_learnings` nur für Admins; D-067: `warnings` und `outcome` in `get_run_status`/`get_run_result`, Ergebnis erst nach `outcome` lesen; `/hubs/runs` bleibt bis Etappe 8; `/hubs/runs` nur für Angemeldete; Editoren nur für Admins und `/access-denied`; Learning standardmäßig pausiert; zuvor 2026-05-22, D-054: Tool list_learnings ergänzt; providerType um learning-retrieval erweitert)*
 
 Alle HTTP-Endpunkte von Geef.Atelier, die extern erreichbar sind — MCP, OAuth 2.1
 sowie die Web-UI-/Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`.
@@ -167,6 +167,41 @@ Etappe 4 hängt `lookedUp` an (`null`, wenn für den Auftrag nichts im Web nachg
 Wartet der Auftrag nicht mehr (schon gestartet, gestoppt, fertig), ändert sich nichts: Die Antwort hat den aktuellen Zustand und den Hinweis des Dienstes in `message` („Your answers were not used.“, wenn der Aufruf Antworten enthielt), ein wiederholter Aufruf schadet also nicht.
 
 Alle Antworten wachsen nur um angehängte Felder; Clients ignorieren Felder, die sie nicht kennen.
+
+#### Etappe 5: `revise_order`, `export_order`, `cancel_order`, `list_orders`, `profile`
+
+Etappe 5 hängt an `get_order_result` an (Felder mit dem Wert `null` fehlen auf der Leitung):
+- `latestVersion`: die neueste Fassung des Auftrags. `version` ist die Fassung von `text`, die neueste Fassung mit Text. Während eine neue Fassung geschrieben wird oder wenn sie scheiterte oder gestoppt wurde, ist `latestVersion` höher, `text` die frühere Fassung, und `note` beginnt mit „A new version is being written. Version n stays here until it is ready.“ oder „Version m could not be finished. This is version n.“.
+- `earlierOpenPoints`: `[ { "version": 1, "text": "<offener Punkt des Schreibers für Fassung 1>" } ]` – offene Punkte der Vorversion, die die gezeigte Fassung nicht wiederholt; die Änderung kann sie erledigt haben oder nicht. `null`, wenn es keine gibt.
+- `unbackedPassages[].fromVersion`: die frühere Fassung, für die eine Stelle gemeldet wurde; sie steht noch wörtlich im Text. `null` für Stellen dieser Fassung.
+
+`note` nennt `earlierOpenPoints` unter den zu zeigenden Feldern und bittet, während eine neue Fassung geschrieben wird, mit `get_order_status` zu warten.
+
+**Eingabe `revise_order`:** `{ "orderId": "<uuid, Pflicht>", "change": "<Worte der Person, wörtlich|null>", "quick": ["shorter|longer|more_formal|friendlier|simpler"] }` – mindestens `change` oder ein `quick`.
+
+**Ausgabe `revise_order`:**
+```json
+{ "orderId": "<uuid>", "state": "queued", "version": 2, "notices": [], "message": "Writing the new version has started. …" }
+```
+
+Während eine Fassung geschrieben wird, ändert sich nichts: `version` ist die laufende Fassung, `notices` ist `["A change is already being made."]`. Ablehnungen kommen als Werkzeugfehler: „Changing a text is not available yet.“ (`Orders:Revise` für den Besitzer aus), „There is no text to change yet.“, „This order was stopped, so its text cannot be changed.“, die Grenze der Fassungen (`Orders:MaxVersionsPerOrder`) oder der Zeichen (`Orders:RevisionHintMaxChars`), ein unbekannter Schnellknopf oder gar keine Änderung.
+
+**Eingabe `export_order`:** `{ "orderId": "<uuid, Pflicht>", "format": "md|docx|pdf (Standard md)", "version": 2 }` – ohne `version` die Fassung, die `get_order_result` zeigt.
+
+**Ausgabe `export_order`:**
+```json
+{ "fileName": "<titel>-v2.docx", "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "contentBase64": "<vollständige Datei>", "text": "<Markdown, nur bei md>" }
+```
+
+Die Datei ist dieselbe, die `GET /orders/{id}/export/{format}?version=n` liefert. Fehler: „Unknown format …“, „version must be 1 or higher …“, „This order has no text to download yet.“, „Version n of this order has no text to download.“.
+
+**Eingabe `cancel_order`:** `{ "orderId": "<uuid, Pflicht>" }` – **Ausgabe:** `{ "orderId": "<uuid>", "state": "<Zustand nach dem Aufruf>", "changed": true, "message": "<Klartext>" }`; `changed` ist falsch, wenn nichts vorbereitet oder geschrieben wurde.
+
+**Eingabe `list_orders`:** `{ "limit": 20 }` (1 bis 50) – **Ausgabe:** `[ { "orderId": "<uuid>", "title": "<Anfang des Auftrags>", "state": "delivered", "version": 2, "updatedAt": "2026-11-29T08:15:00+00:00", "wordCount": 180 } ]`; nur eigene Aufträge, auch für Administratoren; `version` und `wordCount` gehören zum gezeigten Text und fehlen ohne Text.
+
+**Eingabe `profile`:** keine – **Ausgabe:** `{ "name", "role", "organization", "formality": "formal|informal|null", "language", "signature", "neverDo", "notes", "isEmpty", "updatedAt", "note" }`, die eigenen Angaben unter „About me“, nur lesend.
+
+Jedes Werkzeug der Etappe 5 antwortet bei unbekanntem oder fremdem Auftrag `Order not found.`, bevor es irgendetwas anderes prüft. `tools/list` enthält die neun Auftragswerkzeuge und, solange `Mcp:LegacyTools` `true` ist, die älteren Werkzeuge; `submit_request`, `get_run_status`, `get_run_result`, `cancel_run` und `list_runs` beginnen ihre Beschreibung mit „Older tool, kept for now: use … instead.“, mit unveränderten Antworten. Die längste Wartezeit, die `get_order_status` und die Server-Hinweise nennen, ist `Orders:MaxWaitSeconds`.
 
 #### `submit_request` (Hülle über Aufträge)
 

@@ -2,7 +2,7 @@
 
 *[Deutsch](09-endpoint-reference_de.md) · **English***
 
-*Last updated: 2026-11-25 (stage 4: `lookedUp` in `get_order_result`, server instruction on passages looked up on the web; stage 3: `checks`, `factCheck`, `unbackedPassages`, `sourceIssues`, `openPoints`, `writerAssumptions`, `sourceQuotes` in `get_order_result`, server instructions on showing them; stage 2: `answer_order`, `needs_input` with questions in `submit_order`/`get_order_status`, `assumptions` in `get_order_result`, new server instructions; stage 1: order tools `submit_order`, `get_order_status`, `get_order_result`, `submit_request` as a shell with `orderId`, server instructions, `list_learnings` admin only; D-067: `warnings` and `outcome` in `get_run_status`/`get_run_result`, reading the result after `outcome`; `/hubs/runs` stays until stage 8; `/hubs/runs` only for signed-in users; admin-only editors and `/access-denied`; learning paused by default; before that 2026-05-22, D-054: `list_learnings` tool added; `providerType` updated to include `learning-retrieval`)*
+*Last updated: 2026-11-25 (stage 5: `revise_order`, `export_order`, `cancel_order`, `list_orders`, `profile`, `latestVersion`, `earlierOpenPoints`, `fromVersion`, older tools behind `Mcp:LegacyTools`; stage 4: `lookedUp` in `get_order_result`, server instruction on passages looked up on the web; stage 3: `checks`, `factCheck`, `unbackedPassages`, `sourceIssues`, `openPoints`, `writerAssumptions`, `sourceQuotes` in `get_order_result`, server instructions on showing them; stage 2: `answer_order`, `needs_input` with questions in `submit_order`/`get_order_status`, `assumptions` in `get_order_result`, new server instructions; stage 1: order tools `submit_order`, `get_order_status`, `get_order_result`, `submit_request` as a shell with `orderId`, server instructions, `list_learnings` admin only; D-067: `warnings` and `outcome` in `get_run_status`/`get_run_result`, reading the result after `outcome`; `/hubs/runs` stays until stage 8; `/hubs/runs` only for signed-in users; admin-only editors and `/access-denied`; learning paused by default; before that 2026-05-22, D-054: `list_learnings` tool added; `providerType` updated to include `learning-retrieval`)*
 
 All externally reachable HTTP endpoints of Geef.Atelier — MCP, OAuth 2.1
 and the web-UI/account endpoints. Base URL: `https://geef.stefan-bechtel.de`.
@@ -167,6 +167,41 @@ Stage 4 appends `lookedUp` (`null` when nothing was looked up on the web for the
 When the order no longer waits (already started, stopped, done), nothing changes: the answer has the current state and the service's notice in `message` ("Your answers were not used." when answers came with the call), so a repeated call is harmless.
 
 All answers only ever grow by appended fields; clients ignore fields they do not know.
+
+#### Stage 5: `revise_order`, `export_order`, `cancel_order`, `list_orders`, `profile`
+
+Stage 5 appends to `get_order_result` (fields with the value `null` are left out on the wire):
+- `latestVersion`: the newest version of the order. `version` is the version of `text`, the newest version with a text. While a new version is being written, or when it failed or was stopped, `latestVersion` is higher, `text` is the earlier version and `note` begins with "A new version is being written. Version n stays here until it is ready." or "Version m could not be finished. This is version n.".
+- `earlierOpenPoints`: `[ { "version": 1, "text": "<point the writer left open for version 1>" } ]` – open points of the version before that the shown version does not repeat; the change may have settled them, or not. `null` when there are none.
+- `unbackedPassages[].fromVersion`: the earlier version a passage was flagged for; it still stands in the text word for word. `null` for passages of this version.
+
+`note` names `earlierOpenPoints` among the fields to show and, while a new version is written, asks to wait with `get_order_status`.
+
+**`revise_order` input:** `{ "orderId": "<uuid, required>", "change": "<the person's words, word for word|null>", "quick": ["shorter|longer|more_formal|friendlier|simpler"] }` – at least `change` or one `quick`.
+
+**`revise_order` output:**
+```json
+{ "orderId": "<uuid>", "state": "queued", "version": 2, "notices": [], "message": "Writing the new version has started. …" }
+```
+
+While a version is being written, nothing changes: `version` is the running version and `notices` is `["A change is already being made."]`. Refusals come as a tool error: "Changing a text is not available yet." (`Orders:Revise` off for the owner), "There is no text to change yet.", "This order was stopped, so its text cannot be changed.", the limit of versions (`Orders:MaxVersionsPerOrder`) or of characters (`Orders:RevisionHintMaxChars`), an unknown quick change, or no change at all.
+
+**`export_order` input:** `{ "orderId": "<uuid, required>", "format": "md|docx|pdf (default md)", "version": 2 }` – without `version` the version `get_order_result` shows.
+
+**`export_order` output:**
+```json
+{ "fileName": "<title>-v2.docx", "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "contentBase64": "<complete file>", "text": "<Markdown, only for md>" }
+```
+
+The file is the one `GET /orders/{id}/export/{format}?version=n` returns. Errors: "Unknown format …", "version must be 1 or higher …", "This order has no text to download yet.", "Version n of this order has no text to download.".
+
+**`cancel_order` input:** `{ "orderId": "<uuid, required>" }` – **output:** `{ "orderId": "<uuid>", "state": "<state after the call>", "changed": true, "message": "<plain English>" }`; `changed` is false when nothing was being prepared or written.
+
+**`list_orders` input:** `{ "limit": 20 }` (1 to 50) – **output:** `[ { "orderId": "<uuid>", "title": "<beginning of the request>", "state": "delivered", "version": 2, "updatedAt": "2026-11-29T08:15:00+00:00", "wordCount": 180 } ]`; only the caller's own orders, also for administrators; `version` and `wordCount` are those of the shown text and are left out without a text.
+
+**`profile` input:** none – **output:** `{ "name", "role", "organization", "formality": "formal|informal|null", "language", "signature", "neverDo", "notes", "isEmpty", "updatedAt", "note" }`, the caller's own About me details, read only.
+
+Every tool of stage 5 answers `Order not found.` for an unknown or foreign order before checking anything else. `tools/list` holds the nine order tools and, while `Mcp:LegacyTools` is `true`, the older tools; `submit_request`, `get_run_status`, `get_run_result`, `cancel_run` and `list_runs` begin their description with "Older tool, kept for now: use … instead.", with unchanged answers. The longest wait named in `get_order_status` and in the server instructions is `Orders:MaxWaitSeconds`.
 
 #### `submit_request` (shell over orders)
 
