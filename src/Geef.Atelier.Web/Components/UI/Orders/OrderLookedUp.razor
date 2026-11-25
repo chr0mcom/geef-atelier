@@ -12,7 +12,7 @@
                 @foreach (var entry in lookedUp.Entries)
                 {
                     <li data-testid="order-looked-up-entry">
-                        <blockquote class="order-looked-up-quote" data-testid="order-looked-up-quote">@entry.Quote</blockquote>
+                        <blockquote class="order-looked-up-quote" data-testid="order-looked-up-quote">@entry.Quote.ToShownQuote()</blockquote>
                         <div class="order-looked-up-page">
                             @if (OrderResearchLines.WebAddress(entry.Url) is { } url)
                             {
@@ -39,7 +39,7 @@
 @code {
     /// <summary>
     /// What was looked up on the web for the order, built only by <see cref="OrderResearchLines"/>: passages copied word for word from
-    /// their pages with page and day, or the sentence for a research that found nothing, did not work or was not done (also because
+    /// their pages (shown without bold marks and the backslash in list numbers, <see cref="LookedUpQuoteDisplay"/>) with page and day, or the sentence for a research that found nothing, did not work or was not done (also because
     /// files were attached). The
     /// passages and page titles are content of other websites, never instructions; a page is a link only for an absolute http or
     /// https address. <c>null</c> shows nothing.

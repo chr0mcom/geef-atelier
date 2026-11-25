@@ -49,8 +49,12 @@ public sealed record OrderStep(string Key, string Label, OrderStepStatus Status,
 /// <summary>Progress of an order: its steps, the label of the current step and the elapsed time.</summary>
 public sealed record OrderProgress(IReadOnlyList<OrderStep> Steps, string CurrentLabel, TimeSpan Elapsed);
 
-/// <summary>A run of an order as listed under the order.</summary>
-public sealed record OrderRunView(Guid RunId, int? Version, RunKind Kind, RunStatus Status, RunOutcome? Outcome, DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt, int? WordCount);
+/// <summary>
+/// A run of an order as listed under the order. <see cref="ChangeRequested"/> is reserved for what the person asks to change for a
+/// version; nothing sets it yet, so it is always <c>null</c>.
+/// </summary>
+public sealed record OrderRunView(Guid RunId, int? Version, RunKind Kind, RunStatus Status, RunOutcome? Outcome, DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt, int? WordCount,
+    string? ChangeRequested = null);
 
 /// <summary>Everything the order page shows.</summary>
 public sealed record OrderView(
@@ -80,7 +84,8 @@ public sealed record OrderView(
 /// assumptions that were used. <see cref="LookedUp"/> is the research of the order as the person sees it (built only by
 /// <see cref="OrderResearchLines"/>), <c>null</c> when there is nothing to show. <see cref="SourceIssueNotes"/> pairs open points of
 /// the writer with the sentence of <see cref="SourceIssues"/> about the same wrong total, so the web page shows them together;
-/// <see cref="WriterOpenPoints"/> still holds every open point.
+/// <see cref="WriterOpenPoints"/> still holds every open point. <see cref="LatestVersion"/> and <see cref="EarlierOpenPoints"/> are
+/// reserved for changes to a delivered text; nothing sets them yet, so they are always <c>null</c>.
 /// </summary>
 public sealed record OrderResult(
     Guid OrderId,
@@ -106,7 +111,12 @@ public sealed record OrderResult(
     string? NotesNotShown = null,
     IReadOnlyList<string>? NotGivenFacts = null,
     OrderLookedUpView? LookedUp = null,
-    IReadOnlyList<OrderSourceIssueNote>? SourceIssueNotes = null);
+    IReadOnlyList<OrderSourceIssueNote>? SourceIssueNotes = null,
+    int? LatestVersion = null,
+    IReadOnlyList<OrderEarlierPoint>? EarlierOpenPoints = null);
+
+/// <summary>Reserved for an open point of the writer noted for an earlier <see cref="Version"/>; nothing creates one yet.</summary>
+public sealed record OrderEarlierPoint(int Version, string Text);
 
 /// <summary>An open point of the writer (<see cref="Note"/>, in the language of the text) about the wrong total named by the sentence <see cref="Issue"/>.</summary>
 public sealed record OrderSourceIssueNote(string Issue, string Note);
@@ -129,9 +139,11 @@ public sealed record OrderSourceQuoteView(string FileName, string Quote);
 /// person's answers, the About me details or the assistant's answers). An instruction from the About me details is <c>null</c> for
 /// anyone but the owner of the order. <see cref="LookedUp"/> marks a passage that the pages looked up on the web say otherwise
 /// (<see cref="FactFindingKind.Superseded"/> with the replacing passage in the research): it never blocks and is never called a
-/// matter of the person's files.
+/// matter of the person's files. <see cref="FromVersion"/> is reserved for a passage carried over from an earlier version; nothing
+/// sets it yet, so it is always <c>null</c>.
 /// </summary>
-public sealed record OrderUnbackedPassage(string Quote, FactFindingKind Kind, string? Instruction, bool Blocking, InstructionOrigin? Origin = null, bool LookedUp = false);
+public sealed record OrderUnbackedPassage(string Quote, FactFindingKind Kind, string? Instruction, bool Blocking, InstructionOrigin? Origin = null, bool LookedUp = false,
+    int? FromVersion = null);
 
 /// <summary>
 /// What the person reads under "What was checked" (web) and in <c>checks</c> (MCP); plain English, built only by

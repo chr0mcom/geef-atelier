@@ -2463,3 +2463,44 @@ eine neue, größere Auftragsmenge, bei der der Klärer verlässlich Suchthemen 
 **Beobachtungen aus der Abnahme:** Der Faktenprüfer meldet auch Sätze mit Platzhaltern und höfliche Schlusssätze als
 ungedeckt; der Klärer bot einmal geratene Daten als Antworten an, obwohl sein Prompt das verbietet; Zitate zeigen
 Formatzeichen der Quellseite.
+
+## D-075 — Etappe 5, Teil A: Befunde aus echten Läufen (2026-11-25)
+
+**Status:** Von vier vorgesehenen Änderungen wird **eine** ausgeliefert: (c). (a), (b) und (d) wurden gebaut, gemessen und
+geprüft und sind wieder entfernt, nicht nur abgeschaltet. Keine Migration, kein Schalter, keine zusätzlichen Modellaufrufe.
+Prüfer-, Klärer- und Verdichter-Prompt samt Schema und der System-Prompt des Schreibers sind unverändert. Teil B
+(Nachbessern, MCP-Vertrag) folgt als Zusatz zu diesem Eintrag.
+
+**Leitsatz.** Was nicht nachweislich nützt, kommt wieder heraus. Fehlerrichtung: Eine Meldung, Rückfrage oder Annahme still
+zu verlieren ist schlimmer als eine überflüssige Meldung oder eine Doppelung.
+
+- **(c) Zitate unter „Looked up“ – ausgeliefert.** Die Ergebnisseite entfernt aus einem Zitat nur zwei Zeichenfolgen, die in
+  echten Zitaten als Formatierung vorkamen: Fett-Paare `**` um Text (nicht, wenn außen Buchstabe, Ziffer, Schrägstrich oder
+  Stern anliegt oder innen eine Klammer falsch herum steht) und den Backslash zwischen einer Ziffer und einem Punkt, auf den
+  ein Leerzeichen oder das Ende folgt (gedacht für Listennummern wie `1\. `). Alles andere bleibt wörtlich, weil dort ein
+  Zeichen Bedeutung tragen kann. Die Erkennung ist eine Näherung; in seltenen Fällen kann sie Zeichen entfernen, die gemeint
+  waren. Kein Markdown-Parser (ein erster Entwurf
+  mit Parser konnte bei tief verschachteltem fremdem Webtext eine Ausnahme werfen und den Sinn verändern). Nur die Anzeige:
+  gespeicherter Wortlaut, Material von Schreiber und Prüfer und die MCP-Antwort bleiben unverändert.
+- **(a) Hinweis statt „nicht gedeckt“ – entfernt.** Zwei strukturelle Regeln sollten Befunde an Sätzen mit Lücke und an kurzen
+  Schlusssätzen zu nicht blockierenden Hinweisen machen. Im Nachspiel gespeicherter Prüferantworten war kein gepflanzter
+  Fehler betroffen; über gespeicherte Antworten zu echten Aufträgen stuften die Regeln aber 5 Stellen um, von denen ein blinder
+  Prüfer 3 als echte Aussagen bewertete (erlaubt: 0). Die Lückenregel wird in dieser Form nicht erneut vorgelegt. Eine
+  Schlusssatzregel bräuchte: Absatz ohne Platzhalter, einen ehrlichen Satz (die Zeile stammt weder aus Auftrag noch
+  Dateien), frische blind bestätigte Daten mit 0 Aussagen und eine eigene Entscheidung für den Korrekturmodus.
+- **(b) Geratene Daten im Gate – entfernt.** Das Gate sollte Antwortoptionen mit erfundenem Datum oder Wochentag streichen.
+  Eine erste Fassung verglich die Daten mit dem Material und verlor dabei nützliche Rückfragen (Bereiche, Aufzählungen,
+  übliche Schreibweisen). Die vereinfachte Fassung griff nur noch, wenn nirgends etwas Datumsartiges stand, und war damit in
+  den meisten realen Fällen wirkungslos; zudem scheiterte ihr Musteraufbau für zahlreiche Auftragssprachen mit einer
+  Ausnahme. Belegt war ein einziger Anlassfall aus einem eigenen Messauftrag. Das Verbot geratener Daten bleibt Sache des
+  Klärer-Prompts; ob er es einhält, zeigt die Sichtung echter Rückfragen (D-072).
+- **(d) Fortgesetzte Annahmen einmal zeigen – entfernt.** Über alle gespeicherten Ergebnisse hätte die Regel 0 Annahmen
+  zusammengelegt, brauchte aber mehrere Korrekturen an Randfällen, in denen eine Angabe verschwunden wäre.
+
+**Lehre.** Bei allen drei entfernten Regeln lag der belegte Nutzen bei null oder bei einem Einzelfall, die Fehlerrichtung aber
+beim stillen Verlieren. Vor dem Bau gehört deshalb die Frage, wie oft der Fall in gespeicherten Daten vorkommt.
+
+**Reservierte Felder.** Einige Felder für Teil B (frühere Versionen eines Ergebnisses) sind schon angelegt; in diesem Stand
+setzt sie niemand, sie werden nicht geschrieben und nicht ausgegeben.
+
+**Rückweg:** Deploy A ist ein reines Web-Image ohne Migration; Rückweg ist das vorherige Image.

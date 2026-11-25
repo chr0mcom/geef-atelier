@@ -2367,3 +2367,43 @@ the clarifier reliably names research topics.
 **Observed during acceptance:** the fact checker also reports sentences with placeholders and polite closing sentences as not
 backed; the clarifier once offered guessed dates as options although its prompt forbids it; quotes show formatting characters of
 the source page.
+
+## D-075 — Stage 5, part A: findings from real runs (2026-11-25)
+
+**Status:** of four planned changes **one** ships: (c). (a), (b) and (d) were built, measured and reviewed and are removed
+again, not merely switched off. No migration, no switch, no additional model calls. The prompts and schemas of the fact check,
+the clarifier and the condenser and the writer's system prompt are unchanged. Part B (revising, the MCP contract) follows as
+an addendum to this entry.
+
+**Guiding rule.** What does not demonstrably help is taken out again. Error direction: silently losing a message, a question or
+an assumption is worse than a superfluous message or a repeat.
+
+- **(c) Passages under "Looked up" – ships.** The result page removes from a passage only two sequences that real passages
+  carried as formatting: pairs of `**` around text (not when a letter, digit, slash or star touches them from outside, or a
+  bracket faces the wrong way inside) and the backslash between a digit and a dot that a blank or the end follows (meant for
+  list numbers such as `1\. `). Everything else stays word for word, because there a mark can carry meaning. The detection is an
+  approximation; in rare cases it can remove marks that were meant. No Markdown parser (a first version with a parser could throw
+  on deeply nested foreign web text and could change the meaning). Display only: the stored wording, the material of the writer
+  and the fact check and the MCP answer are unchanged.
+- **(a) A hint instead of "not backed" – removed.** Two structural rules were to turn findings on sentences with a gap and on
+  short closing sentences into non-blocking hints. In the replay of stored checker answers no planted mistake was affected;
+  over stored answers to real orders, however, the rules downgraded 5 passages of which a blind reviewer judged 3 to be real
+  statements (allowed: 0). The gap rule will not be proposed again in this form. A closing-sentence rule would need: a
+  paragraph without a placeholder, an honest sentence (the line comes neither from the request nor from the files), fresh
+  blind-confirmed data with 0 statements, and a separate decision for the correcting mode.
+- **(b) Guessed dates in the gate – removed.** The gate was to drop answer options with an invented date or weekday. A first
+  version compared the dates with the material and lost useful questions on the way (ranges, lists, common notations). The
+  simplified version only acted when nothing date-like stood anywhere, which made it ineffective in most real cases; its
+  pattern construction also failed with an exception for many order languages. A single motivating case was on record, from one
+  of our own measurement orders. Forbidding guessed dates stays the job of the clarifier prompt; whether it complies shows in
+  the review of real questions (D-072).
+- **(d) Showing continued assumptions once – removed.** Over all stored results the rule would have merged 0 assumptions, yet it
+  needed several corrections for edge cases in which a statement would have disappeared.
+
+**Lesson.** For all three removed rules the proven benefit was zero or a single case, while the error direction was silent
+loss. So before building, the question is how often the case occurs in stored data.
+
+**Reserved fields.** Some fields for part B (earlier versions of a result) already exist; in this state nothing sets them, they
+are not written and not returned.
+
+**Way back:** deploy A is a web image only, without a migration; the way back is the previous image.
