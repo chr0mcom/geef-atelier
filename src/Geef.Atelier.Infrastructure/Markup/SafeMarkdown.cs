@@ -1,7 +1,4 @@
-using System.Globalization;
-using System.Text;
 using Markdig;
-using Markdig.Extensions.Abbreviations;
 using Markdig.Renderers;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
@@ -61,86 +58,9 @@ public static class SafeMarkdown
         return writer.ToString();
     }
 
-    /// <summary>
-    /// The plain text of <paramref name="markdown"/> on one line, parsed with the same <paramref name="pipeline"/> as
-    /// <see cref="ToSafeHtml"/>: emphasis, bullets, heading marks and escapes are gone, the words stay. A link keeps its text, an
-    /// image its alternative text, code its content; the number of an item in a numbered list stays (<c>2.</c>), so no figure is
-    /// lost; link definitions and footnote marks are left out. Blanks and line breaks become one space. Only for
-    /// display; stored texts keep their wording.
-    /// </summary>
-    public static string ToPlainText(this string? markdown, MarkdownPipeline pipeline)
-    {
-        if (string.IsNullOrWhiteSpace(markdown))
-            return string.Empty;
-        var builder = new StringBuilder(markdown.Length);
-        AppendBlock(builder, Markdown.Parse(markdown, pipeline));
-        return string.Join(' ', builder.ToString().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-    }
-
     /// <summary>True when <paramref name="url"/> is an absolute address with one of <see cref="AllowedSchemes"/>.</summary>
     public static bool IsAllowed(string? url) =>
         !string.IsNullOrWhiteSpace(url) && Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri) && AllowedSchemes.Contains(uri.Scheme);
-
-    private static void AppendBlock(StringBuilder builder, Block block)
-    {
-        switch (block)
-        {
-            case LinkReferenceDefinitionGroup or LinkReferenceDefinition or ThematicBreakBlock:
-                return;
-            case ListItemBlock { Parent: ListBlock { IsOrdered: true } list } item:
-                builder.Append(' ').Append(item.Order.ToString(CultureInfo.InvariantCulture)).Append(list.OrderedDelimiter).Append(' ');
-                break;
-            case LeafBlock { Inline: { } inline }:
-                builder.Append(' ');
-                AppendInline(builder, inline);
-                builder.Append(' ');
-                return;
-            case LeafBlock leaf:
-                builder.Append(' ').Append(leaf.Lines.ToString()).Append(' ');
-                return;
-        }
-        if (block is ContainerBlock container)
-        {
-            foreach (var child in container)
-                AppendBlock(builder, child);
-        }
-    }
-
-    private static void AppendInline(StringBuilder builder, Inline inline)
-    {
-        switch (inline)
-        {
-            case LiteralInline literal:
-                builder.Append(literal.Content.AsSpan());
-                return;
-            case CodeInline code:
-                builder.Append(code.Content);
-                return;
-            case AutolinkInline autolink:
-                builder.Append(autolink.Url);
-                return;
-            case HtmlEntityInline entity:
-                builder.Append(entity.Transcoded.AsSpan());
-                return;
-            case AbbreviationInline abbreviation:
-                builder.Append(abbreviation.Abbreviation.Label);
-                return;
-            case HtmlInline html:
-                builder.Append(html.Tag);
-                return;
-            case LineBreakInline:
-                builder.Append(' ');
-                return;
-            case DelimiterInline delimiter:
-                builder.Append(delimiter.ToLiteral());
-                break;
-        }
-        if (inline is ContainerInline container)
-        {
-            foreach (var child in container)
-                AppendInline(builder, child);
-        }
-    }
 
     private static void Unwrap(ContainerInline link)
     {

@@ -72,7 +72,4 @@ public sealed class IntakeOptions
 
     /// <summary>How assumptions about facts of the case (<see cref="GapTopicKinds.IsContent"/>) reach the writer.</summary>
     public ContentAssumptionMode ContentAssumptions { get; set; } = ContentAssumptionMode.OpenPoints;
-
-    /// <summary>Whether the gate drops answer options with a date, month or weekday that the request and the files do not name (<see cref="GateDecision.DroppedGuessedDate"/>).</summary>
-    public bool DropGuessedDateOptions { get; set; }
 }

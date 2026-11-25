@@ -2,18 +2,13 @@ using Geef.Atelier.Core.Domain.Checks;
 
 namespace Geef.Atelier.Core.Domain.Intake;
 
-/// <summary>
-/// Input of <see cref="QuestionGate.Apply"/>. <see cref="MaterialTexts"/> are the texts of the files of the order; with
-/// <see cref="DropGuessedDates"/> an option naming a date, month or weekday that neither the request nor these texts name is dropped.
-/// </summary>
+/// <summary>Input of <see cref="QuestionGate.Apply"/>.</summary>
 public sealed record QuestionGateInput(
     ClarifierOutput Output,
     string RequestText,
     bool RevisionDetected,
     IReadOnlyDictionary<GapTopic, MemoryAnswer> Known,
-    int MaxQuestions,
-    IReadOnlyList<string>? MaterialTexts = null,
-    bool DropGuessedDates = false);
+    int MaxQuestions);
 
 /// <summary>
 /// What is left after the gate: the questions to show, the assumptions, the profile answers, the research topics, the trace
@@ -66,10 +61,6 @@ public static class QuestionGate
     /// topic (<see cref="GapTopic.Facts"/>, <see cref="GapTopic.Other"/>) covers different matters, so a dropped duplicate keeps the
     /// assumption the model gave (never a generated "not specified" line). Questions, options, assumptions and the summary with links, addresses or secrets are dropped (see
     /// <see cref="IntakeContentGuard.IsUnsafe"/>; the request of the person decides which bare names and secret topics are fine).
-    /// With <see cref="QuestionGateInput.DropGuessedDates"/> an option of a question that passed the form rules is dropped when it names a
-    /// calendar element (<see cref="CalendarMentions"/>) that neither the request nor the file texts name; with fewer than
-    /// <see cref="MinOptions"/> options left the question becomes its assumption (<see cref="GateDecision.DroppedGuessedDate"/>). The rule only
-    /// removes options and questions, it never lets a question through that the other rules drop.
     /// </summary>
     public static QuestionGateResult Apply(QuestionGateInput input)
     {
@@ -78,14 +69,13 @@ public static class QuestionGate
         var language = (output.Language ?? string.Empty).Trim().ToLowerInvariant();
         var revision = input.RevisionDetected || output.IsRevision;
         var lengthKnown = new Lazy<bool>(() => LengthInRequest(input.RequestText));
-        var namedDates = new Lazy<IReadOnlySet<string>>(() => NamedCalendarElements(input, language));
         var decisions = new GateDecision[gaps.Count];
         var candidates = new List<(int Index, ClarifyQuestion Question)>();
         var fromMemory = new List<MemoryAnswer>();
 
         for (var i = 0; i < gaps.Count; i++)
         {
-            var (decision, question) = Decide(gaps[i], input, language, revision, lengthKnown, namedDates);
+            var (decision, question) = Decide(gaps[i], input, language, revision, lengthKnown);
             decisions[i] = decision;
             if (question is not null)
                 candidates.Add((i, question));
@@ -152,7 +142,7 @@ public static class QuestionGate
     public static string NotSpecified(GapTopic topic) => $"{topic.Label()}: not specified – the writer decides";
 
     private static (GateDecision Decision, ClarifyQuestion? Question) Decide(
-        IntakeGap gap, QuestionGateInput input, string language, bool revision, Lazy<bool> lengthKnown, Lazy<IReadOnlySet<string>> namedDates)
+        IntakeGap gap, QuestionGateInput input, string language, bool revision, Lazy<bool> lengthKnown)
     {
         if (ProfileTopics.Contains(gap.Topic) && input.Known.ContainsKey(gap.Topic))
             return (GateDecision.FromMemory, null);
@@ -196,16 +186,6 @@ public static class QuestionGate
         if (CheckForm(proposed, language) is { } rejected)
             return (rejected, null);
 
-        if (input.DropGuessedDates)
-        {
-            var withoutGuesses = WithoutGuessedDates(proposed!, language, namedDates.Value);
-            if (withoutGuesses.Options.Count < MinOptions)
-                return (GateDecision.DroppedGuessedDate, null);
-            if (CheckForm(withoutGuesses, language) is { } rejectedAfterDates)
-                return (rejectedAfterDates, null);
-            proposed = withoutGuesses;
-        }
-
         var options = proposed!.Options.Select((o, i) => new QuestionOption($"o{i + 1}", o.Trim())).ToList();
         var defaultId = proposed.DefaultIndex is { } index && index >= 0 && index < options.Count ? options[index].Id : null;
         return (GateDecision.Asked, new ClarifyQuestion(string.Empty, gap.Topic, proposed.Text.Trim(), options, defaultId, proposed.AllowFreeText, false));
@@ -222,24 +202,6 @@ public static class QuestionGate
         var defaultIndex = kept.FindIndex(o => o.Index == question.DefaultIndex);
         return question with { Options = kept.Select(o => o.Text).ToList(), DefaultIndex = defaultIndex < 0 ? null : defaultIndex };
     }
-
-    private static ProposedQuestion WithoutGuessedDates(ProposedQuestion question, string language, IReadOnlySet<string> named)
-    {
-        var kept = question.Options
-            .Select((text, index) => (Text: text, Index: index))
-            .Where(o => CalendarMentions.Find(o.Text ?? string.Empty, language).All(named.Contains))
-            .ToList();
-        if (kept.Count == question.Options.Count)
-            return question;
-        var defaultIndex = kept.FindIndex(o => o.Index == question.DefaultIndex);
-        return question with { Options = kept.Select(o => o.Text).ToList(), DefaultIndex = defaultIndex < 0 ? null : defaultIndex };
-    }
-
-    private static IReadOnlySet<string> NamedCalendarElements(QuestionGateInput input, string language) =>
-        (input.MaterialTexts ?? [])
-            .Prepend(input.RequestText)
-            .SelectMany(text => CalendarMentions.Find(text ?? string.Empty, language))
-            .ToHashSet(StringComparer.Ordinal);
 
     private static GateDecision? CheckForm(ProposedQuestion? question, string language)
     {

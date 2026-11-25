@@ -71,49 +71,6 @@ public sealed class IntakeCorpusTests(ITestOutputHelper output)
         }
     }
 
-    [Fact]
-    public void The_guessed_date_rule_leaves_every_gate_and_every_shown_question_of_the_stored_results_unchanged()
-    {
-        var directory = CorpusDirectory();
-        var corpus = new[] { MainCorpus, SecondCorpus }
-            .Select(name => Path.Combine(directory, name))
-            .Where(File.Exists)
-            .SelectMany(Corpus.Load)
-            .ToList();
-        var resultFiles = Directory.Exists(directory) ? Directory.GetFiles(directory, "results-*.jsonl").Order().ToList() : [];
-        Assert.NotEmpty(resultFiles);
-
-        foreach (var file in resultFiles)
-        {
-            var lines = Results.Load(file);
-            var before = CorpusEvaluation.Verdicts(corpus, lines, Limit);
-            var after = CorpusEvaluation.Verdicts(corpus, lines, Limit, dropGuessedDates: true);
-            foreach (var verdict in after)
-                output.WriteLine($"{Path.GetFileName(file)} with guessed-date rule {verdict}");
-            Assert.Equal(before, after);
-            Assert.All(after.Where(v => v.Gate != "e'"), v => Assert.Equal(GateVerdict.Passed, v.Verdict));
-
-            var byId = corpus.ToDictionary(e => e.Id, StringComparer.Ordinal);
-            var dropped = 0;
-            var datedOptions = 0;
-            foreach (var line in lines)
-            {
-                var plain = CorpusEvaluation.ReplayOne(byId[line.Id], line);
-                var ruled = CorpusEvaluation.ReplayOne(byId[line.Id], line, dropGuessedDates: true);
-                Assert.Equal(Shown(plain.Gate), Shown(ruled.Gate));
-                dropped += ruled.Gate?.Trace.Count(t => t.Decision == GateDecision.DroppedGuessedDate) ?? 0;
-                datedOptions += plain.Gate?.Questions.Sum(q => q.Options.Count(o => CalendarMentions.Find(o.Label, plain.Output?.Language).Count > 0)) ?? 0;
-            }
-            output.WriteLine($"{Path.GetFileName(file)}: {dropped} questions dropped for a guessed date, {datedOptions} shown options with a calendar element.");
-            Assert.Equal(0, dropped);
-            Assert.Equal(0, datedOptions);
-        }
-
-        static string Shown(QuestionGateResult? gate) => gate is null
-            ? "-"
-            : string.Join(" || ", gate.Questions.Select(q => $"{q.Id}:{q.Text}:{q.DefaultOptionId}:{string.Join(" | ", q.Options.Select(o => $"{o.Id}={o.Label}"))}"));
-    }
-
     private static readonly (string Corpus, string Category, int Count)[] Plan =
     [
         ("main", "sparse", 50), ("main", "complete", 40), ("main", "revision", 10), ("main", "researchable", 10), ("main", "profile_covered", 10),

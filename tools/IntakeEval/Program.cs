@@ -6,7 +6,7 @@ const string Usage = """
     Usage: IntakeEval run --corpus <file.jsonl> --proxy <url> --out <results.jsonl> [--max-calls N] [--parallel 2]
                           [--model <name>] [--split all|dev|holdout] [--timeout-seconds 40]
            IntakeEval evaluate --corpus <main.jsonl> --second <second.jsonl> --results <results.jsonl>
-                          [--production-timeout-seconds 40] [--drop-guessed-dates false|true]
+                          [--production-timeout-seconds 40]
            IntakeEval shadow --csv <shadows.csv> [--sample 10]
 
     run       Runs the real clarifier and question gate over a synthetic corpus and appends one JSON line per call
@@ -15,9 +15,7 @@ const string Usage = """
               in the evaluation. Results for another input are called again and leave the file not evaluable.
               Example: --proxy http://cli-proxy:8090/v1/claude
     evaluate  Replays the stored answers and prints passed / FAILED / NOT EVALUABLE for gates a to f (and the warning e')
-              on the held-out set and the second corpus. Exit code 0 only when every gate passed. With
-              --drop-guessed-dates true the gate drops answer options naming a date, month or weekday that the request
-              and the files do not name (Intake:DropGuessedDateOptions); the stored answers stay valid.
+              on the held-out set and the second corpus. Exit code 0 only when every gate passed.
     shadow    Reads a CSV export of OrderIntakeShadows (see README.md) and prints gates a, f and g of the shadow mode
               and a sample of questions for the visual check. Exit code 0 only when every measurable gate passed.
     """;
@@ -53,7 +51,7 @@ if (args[0] == "evaluate")
     }
     var corpusEntries = Corpus.Load(mainPath).Concat(Corpus.Load(secondPath)).ToList();
     var lines = Results.Load(resultsPath);
-    var verdicts = CorpusEvaluation.Verdicts(corpusEntries, lines, productionLimit, bool.Parse(values.GetValueOrDefault("drop-guessed-dates", "false")));
+    var verdicts = CorpusEvaluation.Verdicts(corpusEntries, lines, productionLimit);
     foreach (var verdict in verdicts)
         Console.WriteLine(verdict);
     return verdicts.Where(v => v.Gate != "e'").All(v => v.Verdict == GateVerdict.Passed) ? 0 : 1;

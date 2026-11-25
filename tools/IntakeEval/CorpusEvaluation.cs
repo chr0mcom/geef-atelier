@@ -93,18 +93,15 @@ public static class CorpusEvaluation
     private static readonly HashSet<GateDecision> FormDrops =
         [GateDecision.DroppedTooLong, GateDecision.DroppedBadOptions, GateDecision.DroppedJargon, GateDecision.DroppedLanguageMismatch];
 
-    /// <summary>
-    /// Replays one stored answer with the same mapping as the measuring run; <paramref name="dropGuessedDates"/> switches on the gate rule
-    /// <see cref="IntakeOptions.DropGuessedDateOptions"/>, which does not change the clarifier input.
-    /// </summary>
-    public static Replay ReplayOne(CorpusEntry entry, EvalResult answer, bool dropGuessedDates = false)
+    /// <summary>Replays one stored answer with the same mapping as the measuring run.</summary>
+    public static Replay ReplayOne(CorpusEntry entry, EvalResult answer)
     {
         if (answer.Status != nameof(IntakeRecordStatus.Ok) || answer.Raw is null)
             return new Replay(entry, answer, null, null);
         var output = ClarifierOutputParser.Parse(answer.Raw);
         if (output is null)
             return new Replay(entry, answer, null, null);
-        var options = new IntakeOptions { DropGuessedDateOptions = dropGuessedDates };
+        var options = new IntakeOptions();
         return new Replay(entry, answer, output, entry.Gate(entry.Request(options), output, options).Gate);
     }
 
@@ -251,12 +248,10 @@ public static class CorpusEvaluation
     }
 
     /// <summary>
-    /// The verdict of gates a to f (and the warning e′) for the held-out set and the second corpus, replayed with or without the gate
-    /// rule <see cref="IntakeOptions.DropGuessedDateOptions"/>. With any of <see cref="Problems"/>, every gate is
-    /// <see cref="GateVerdict.NotEvaluable"/>.
+    /// The verdict of gates a to f (and the warning e′) for the held-out set and the second corpus. With any of
+    /// <see cref="Problems"/>, every gate is <see cref="GateVerdict.NotEvaluable"/>.
     /// </summary>
-    public static IReadOnlyList<GateResult> Verdicts(
-        IReadOnlyList<CorpusEntry> corpus, IReadOnlyList<EvalResult> lines, TimeSpan productionLimit, bool dropGuessedDates = false)
+    public static IReadOnlyList<GateResult> Verdicts(IReadOnlyList<CorpusEntry> corpus, IReadOnlyList<EvalResult> lines, TimeSpan productionLimit)
     {
         var problems = Problems(corpus, lines);
         var gates = new[] { "a", "b", "c", "d", "e", "e'", "f" };
@@ -267,7 +262,7 @@ public static class CorpusEvaluation
         }
 
         var byId = corpus.ToDictionary(e => e.Id, StringComparer.Ordinal);
-        var replays = lines.Select(l => ReplayOne(byId[l.Id], l, dropGuessedDates)).ToList();
+        var replays = lines.Select(l => ReplayOne(byId[l.Id], l)).ToList();
         var results = new List<GateResult>();
         foreach (var (scope, inScope) in new (string, Func<CorpusEntry, bool>)[]
         {

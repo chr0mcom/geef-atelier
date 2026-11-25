@@ -55,8 +55,8 @@ public enum FactFilterDecision
 /// A finding after the code checked it. Ids are <c>f1…</c>, given by the filter. <see cref="TextQuote"/> is null only for a source
 /// conflict the text does not use. <see cref="MaterialFrom"/> and <see cref="Material2From"/> say in which part of the material the
 /// code found <see cref="MaterialQuote"/> and <see cref="MaterialQuote2"/>, <see cref="Material2File"/> the file of the second quote
-/// (<c>null</c> in reports written before they were kept). <see cref="FromVersion"/> is the version of the order whose report the
-/// finding was carried over from (<c>null</c> for findings of the run itself).
+/// (<c>null</c> in reports written before they were kept). <see cref="FromVersion"/> is reserved for a finding carried over from the
+/// report of an earlier version; nothing sets it yet, so it is always <c>null</c> and never written.
 /// </summary>
 public sealed record FactFinding(string Id, FactFindingKind Kind, string? TextQuote, string WhatIsWrong, string? InstructionQuote,
     string? MaterialQuote, string? MaterialQuote2, string? MaterialFile, InstructionOrigin? Origin, bool Blocking, QuoteMatchKind Match,
