@@ -100,6 +100,9 @@ public sealed class OrderAssumptionContinuationTests
     [InlineData("Der Ton ist freundlich.", "Freundlicher Ton, aber sachlich.", false)]
     [InlineData("Der Ton ist freundlich.", "Der Ton ist freundlich.", false)]
     [InlineData("", "Der Ton ist freundlich, aber sachlich.", false)]
+    [InlineData("eltern werden geduzt", "Eltern werden geduzt, außer im Betreff", true)]
+    [InlineData("Eltern werden", "Eltern werden nicht geduzt, sondern gesiezt", false)]
+    [InlineData("Eltern werden geduzt", "Eltern werden geduztx, ja", false)]
     public void Only_a_word_for_word_beginning_followed_by_a_punctuation_mark_continues(string shorter, string longer, bool continued)
     {
         Assert.Equal(continued, OrderResultRules.ContinuedBy(shorter, longer));
@@ -144,5 +147,27 @@ public sealed class OrderAssumptionContinuationTests
             ["Eltern werden mit Sie angesprochen, auch im Betreff.", "Der Ton ist freundlich.", "Der Ton ist freundlich, aber sachlich.",
                 "Die Rückmeldung erfolgt bis Freitag: per Zettel."],
             mcp);
+    }
+
+    [Fact]
+    public void Two_different_continuations_of_one_assumption_are_both_shown_the_longest_where_the_shorter_stood()
+    {
+        var result = Shown(["Freundlicher Ton."], "Eltern werden gesiezt.", "Der Brief ist kurz.", "Eltern werden gesiezt – außer im Betreff.",
+            "Eltern werden gesiezt, auch in der Anrede und im Gruß.");
+
+        Assert.Equal(
+            ["Freundlicher Ton.", "Eltern werden gesiezt, auch in der Anrede und im Gruß.", "Der Brief ist kurz.", "Eltern werden gesiezt – außer im Betreff."],
+            result.AllAssumptions());
+    }
+
+    [Fact]
+    public void An_assumption_of_the_clarifier_is_never_left_out_also_when_a_writer_assumption_with_the_same_words_came_first()
+    {
+        var shown = OrderResultRules.WithoutRepeatedAssumptions(
+            [("Der Ton ist sachlich.", false), ("Der Ton ist sachlich, auch im Gruß.", false), ("Der Ton ist sachlich.", true)]);
+
+        Assert.Equal([("Der Ton ist sachlich.", true), ("Der Ton ist sachlich, auch im Gruß.", false)], shown);
+        Assert.Equal([("Die Eltern werden gesiezt.", true)],
+            OrderResultRules.WithoutRepeatedAssumptions([("Eltern werden gesiezt", false), ("Die Eltern werden gesiezt.", true)]));
     }
 }

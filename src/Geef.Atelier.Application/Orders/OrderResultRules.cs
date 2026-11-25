@@ -91,7 +91,8 @@ public static class OrderResultRules
 
     /// <summary>
     /// <paramref name="assumptions"/> in their order without blank lines and without repeats: of two with the same
-    /// <see cref="SameAssumptionKey"/> the first wording is kept; one that another continues word for word
+    /// <see cref="SameAssumptionKey"/> the first wording is kept, unless only the later one is marked <c>Fixed</c>, which then takes the
+    /// place of the first; one that another continues word for word
     /// (<see cref="ContinuedBy"/>) is left out and the longer one is shown where the first of them stood. One marked
     /// <c>Fixed</c> (an assumption of the clarifier, which has an id) is never left out for a longer one, so a longer assumption of
     /// the writer then stays beside it. Any other difference in wording keeps both, because only a person can tell whether they say
@@ -99,8 +100,19 @@ public static class OrderResultRules
     /// </summary>
     public static IReadOnlyList<(string Text, bool Fixed)> WithoutRepeatedAssumptions(IReadOnlyList<(string Text, bool Fixed)> assumptions)
     {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var unique = assumptions.Where(a => !string.IsNullOrWhiteSpace(a.Text) && seen.Add(SameAssumptionKey(a.Text))).ToList();
+        var unique = new List<(string Text, bool Fixed)>();
+        var at = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var assumption in assumptions.Where(a => !string.IsNullOrWhiteSpace(a.Text)))
+        {
+            var key = SameAssumptionKey(assumption.Text);
+            if (!at.TryGetValue(key, out var index))
+            {
+                at[key] = unique.Count;
+                unique.Add(assumption);
+            }
+            else if (assumption.Fixed && !unique[index].Fixed)
+                unique[index] = assumption;
+        }
         var keys = unique.Select(a => SameAssumptionKey(a.Text)).ToList();
         var place = Enumerable.Range(0, unique.Count).ToArray();
         var left = new bool[unique.Count];
