@@ -483,6 +483,10 @@ public sealed class OrderResearchServiceTests
                 Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(file));
 
             using var json = JsonDocument.Parse(await File.ReadAllTextAsync(file));
+            Assert.Equal(["orderId", "at", "status", "topicsSent", "pages", "entries", "dropped"], json.RootElement.EnumerateObject().Select(p => p.Name));
+            Assert.Equal(["id", "topic", "url", "title", "rawText", "rawSha256"], json.RootElement.GetProperty("pages")[0].EnumerateObject().Select(p => p.Name));
+            Assert.Equal(["id", "topic", "quote", "url", "title", "retrievedAt", "match", "rawSha256", "start", "length"],
+                json.RootElement.GetProperty("entries")[0].EnumerateObject().Select(p => p.Name));
             var pages = json.RootElement.GetProperty("pages").EnumerateArray().ToList();
             Assert.Equal([PageA, PageB], pages.Select(p => p.GetProperty("rawText").GetString()));
             var entries = json.RootElement.GetProperty("entries").EnumerateArray().ToList();

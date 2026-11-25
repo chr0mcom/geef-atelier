@@ -127,3 +127,82 @@ def test_several_files_are_checked_together_and_bad_input_is_refused(tmp_path):
     broken.write_text("{not json\n", encoding="utf-8")
     assert rv.main(["--results", str(broken), "--out", str(tmp_path / "x.json")]) == 2
     assert rv.main(["--results", str(tmp_path / "missing.jsonl"), "--out", str(tmp_path / "x.json")]) == 2
+
+
+def _audit(entries, raw=RAW, order="0f1e2d3c4b5a69788796a5b4c3d2e1f0"):
+    """An audit file exactly as the research service writes it (camelCase, one object per research, indented)."""
+    sha = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    return {
+        "orderId": "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0", "at": "2026-11-28T09:15:00+00:00", "status": 1,
+        "topicsSent": ["Mindestlohn 2027"],
+        "pages": [{"id": "P1", "topic": 1, "url": URL, "title": "Mindestlohn", "rawText": raw, "rawSha256": sha}],
+        "entries": [{"id": e["id"], "topic": 1, "quote": e["quote"], "url": e["url"], "title": "Mindestlohn",
+                     "retrievedAt": "2026-11-28T09:14:58+00:00", "match": 1, "rawSha256": e["raw_sha256"],
+                     "start": e["start"], "length": e["length"]} for e in entries],
+        "dropped": {"NotInPage": 1},
+    }
+
+
+def _write_audit(folder, audit, name="0f1e2d3c4b5a69788796a5b4c3d2e1f0-20261128091500000.json"):
+    folder.mkdir(exist_ok=True)
+    path = folder / name
+    path.write_text(json.dumps(audit, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def test_an_audit_directory_of_atelier_is_checked_by_the_same_rules(tmp_path):
+    folder = tmp_path / "audit"
+    good = _write_audit(folder, _audit([_entry()]))
+    _write_audit(folder, _audit([_entry(id="W1.2", quote=QUOTE.replace("13,90", "14,90"))]), "b-20261128091600000.json")
+    (folder / "notes.txt").write_text("not an audit", encoding="utf-8")
+    out = tmp_path / "verify.json"
+
+    code = rv.main(["--audit", str(folder), "--out", str(out)])
+
+    report = json.loads(out.read_text(encoding="utf-8"))
+    assert code == 1
+    assert report["entries"] == 2
+    assert [f["kind"] for f in report["files"]] == ["audit", "audit"]
+    assert report["files"][0] == {"path": str(good), "sha256": hashlib.sha256(good.read_bytes()).hexdigest(), "lines": 1,
+                                  "entries": 1, "kind": "audit"}
+    assert report["violations"] == [{"file": str(folder / "b-20261128091600000.json"), "line": 1,
+                                     "order": "0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0", "entry": "W1.2", "reason": "range_mismatch"}]
+
+
+def test_a_clean_audit_file_passes_and_a_tampered_raw_text_does_not(tmp_path):
+    audit = _audit([_entry()])
+    clean = _write_audit(tmp_path / "a", audit)
+    assert rv.main(["--audit", str(clean), "--out", str(tmp_path / "v1.json")]) == 0
+
+    audit["pages"][0]["rawText"] = RAW.replace("13,90", "13,99")
+    audit["pages"][0]["rawSha256"] = hashlib.sha256(audit["pages"][0]["rawText"].encode("utf-8")).hexdigest()
+    tampered = _write_audit(tmp_path / "b", audit)
+    assert rv.main(["--audit", str(tampered), "--out", str(tmp_path / "v2.json")]) == 1
+    assert json.loads((tmp_path / "v2.json").read_text(encoding="utf-8"))["violations"][0]["reason"] == "page_missing"
+
+
+def test_audit_and_result_files_are_reported_together(tmp_path):
+    results = _write(tmp_path, [_line([_entry()])])
+    audit = _write_audit(tmp_path / "audit", _audit([_entry()]))
+    out = tmp_path / "verify.json"
+
+    assert rv.main(["--results", str(results), "--audit", str(audit), "--out", str(out)]) == 0
+    report = json.loads(out.read_text(encoding="utf-8"))
+    assert [f.get("kind", "results") for f in report["files"]] == ["results", "audit"]
+    assert report["entries"] == 2
+
+
+def test_audit_input_that_verifies_nothing_is_never_a_pass(tmp_path):
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    assert rv.main(["--audit", str(empty), "--out", str(tmp_path / "v.json")]) == 4
+    assert rv.main(["--out", str(tmp_path / "v.json")]) == 2
+    assert rv.main(["--audit", str(tmp_path / "missing"), "--out", str(tmp_path / "v.json")]) == 2
+
+    no_entries = _write_audit(tmp_path / "n", _audit([]))
+    assert rv.main(["--audit", str(no_entries), "--out", str(tmp_path / "v.json")]) == 4
+
+    wrong = tmp_path / "w"
+    wrong.mkdir()
+    (wrong / "x.json").write_text(json.dumps({"orderId": "x"}), encoding="utf-8")
+    assert rv.main(["--audit", str(wrong), "--out", str(tmp_path / "v.json")]) == 2
