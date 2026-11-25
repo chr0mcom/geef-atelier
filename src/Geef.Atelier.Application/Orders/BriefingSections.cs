@@ -17,7 +17,7 @@ public static class BriefingSections
     [
         IntakeBriefComposer.AnswersHeading,
         IntakeBriefComposer.CorrectionsHeading,
-        IntakeBriefComposer.AssumptionsHeading,
+        IntakeBriefComposer.AssumptionsHeadingStart,
         IntakeBriefComposer.ProfileHeading,
         IntakeBriefComposer.UnderstandingLead,
     ];

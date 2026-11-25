@@ -35,7 +35,8 @@ public sealed class IntakeBriefComposerTests
 
         Assert.Equal(Request + "\n\n---\n" + Assumptions, brief.Text);
         Assert.Equal([IntakeBriefComposer.RequestSection, IntakeBriefComposer.AssumptionsSection], brief.Sections);
-        Assert.Contains("use them unless the request or the files say otherwise", IntakeBriefComposer.AssumptionsHeading, StringComparison.Ordinal);
+        Assert.Contains("the answers and corrections of the person above always take precedence", IntakeBriefComposer.AssumptionsHeading, StringComparison.Ordinal);
+        Assert.Contains("never state them as facts", IntakeBriefComposer.AssumptionsHeading, StringComparison.Ordinal);
         Assert.DoesNotContain(IntakeBriefComposer.AnswersHeading, brief.Text, StringComparison.Ordinal);
     }
 

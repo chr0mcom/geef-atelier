@@ -34,7 +34,8 @@ internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOr
 
     public const string AnswersHeading = "Answers the person gave before writing:";
     public const string CorrectionsHeading = "Corrections to assumptions:";
-    public const string AssumptionsHeading = "Assumptions shown to the person, not confirmed (use them unless the request or the files say otherwise; never state them as facts):";
+    public const string AssumptionsHeadingStart = "Assumptions shown to the person, not confirmed";
+    public const string AssumptionsHeading = AssumptionsHeadingStart + " (the answers and corrections of the person above always take precedence; use the assumptions only where neither they nor the request or the files say otherwise; never state them as facts):";
     public const string RevisionQuestion = "Improve the attached file chosen as the text to revise?";
     public const string RevisionYes = "Yes, improve that file";
     public const string RevisionNo = "No, write something new and use the file only as material";

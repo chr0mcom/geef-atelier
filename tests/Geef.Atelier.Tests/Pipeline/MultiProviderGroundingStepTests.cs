@@ -1,4 +1,5 @@
 using Geef.Atelier.Application.Crew.Grounding;
+using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Sdk.Context;
@@ -96,7 +97,7 @@ public sealed class MultiProviderGroundingStepTests
         const string request = "Schreib eine Pressemitteilung zum neuen Standort.";
         var briefing = request + Geef.Atelier.Application.Orders.BriefingSections.Separator +
             "Answers the person gave before writing:\n- Wer liest? → Presse\n" +
-            "Assumptions shown to the person, not confirmed (use them unless the request or the files say otherwise; never state them as facts):\n- Datum offen\n\n" +
+            IntakeBriefComposer.AssumptionsHeading + "\n- Datum offen\n\n" +
             "About the person (use only where it fits the text; never invent anything beyond it):\nName: PROFIL-MARKER-7Q2";
         var seen = new List<string>();
         var step = new MultiProviderGroundingStep(
