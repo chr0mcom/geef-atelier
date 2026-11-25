@@ -1,0 +1,111 @@
+using Bunit;
+using Bunit.TestDoubles;
+using Geef.Atelier.Application.Runs;
+using Geef.Atelier.Core.Configuration;
+using Geef.Atelier.Core.Domain;
+using Geef.Atelier.Core.Domain.Crew;
+using Geef.Atelier.Core.Domain.Crew.Advisors;
+using Geef.Atelier.Core.Domain.Warnings;
+using Geef.Atelier.Core.Persistence;
+using Geef.Atelier.Tests.Fakes;
+using Geef.Atelier.Web.Components;
+using Geef.Atelier.Web.Components.Pages;
+using Geef.Atelier.Web.Notifications;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Application_IKnowledgeService = Geef.Atelier.Application.Crew.Knowledge.IKnowledgeService;
+
+namespace Geef.Atelier.Tests.Web.Components.Orders;
+
+/// <summary>
+/// A failed or stopped run of the direct path that belongs to an order is changed on the order page, not resumed: the run page links to
+/// "Change something" there while changing is switched on for the owner; otherwise, and for other runs, "Resume" stays.
+/// </summary>
+public sealed class RunDetailChangeLinkTests : TestContext
+{
+    private readonly Guid _runId = Guid.NewGuid();
+    private readonly Guid _orderId = Guid.NewGuid();
+
+    private IRenderedComponent<RunDetail> Render(string? template, Guid? orderId, ReviseMode revise, bool withOptions = true)
+    {
+        var snapshot = new CrewSnapshot(CrewSnapshot.CurrentSchemaVersion, template, SystemCrew.DefaultExecutorProfile, [SystemCrew.BriefingFidelityProfile],
+            EvaluationStrategy.Parallel, null, Array.Empty<AdvisorProfile>());
+        var run = new RunEntity
+        {
+            Id = _runId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Failed, BriefingText = "Test briefing", ConfigJson = "{}",
+            FinalText = "# Text", CreatedByUser = "alice", OrderId = orderId, OrderVersion = orderId is null ? null : 1,
+            CrewSnapshot = System.Text.Json.JsonSerializer.Serialize(snapshot, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }),
+        };
+        Services.AddSingleton<IRunService>(new SnapshotRunService(new StubRunService(new RunDetails(run, [])), snapshot));
+        Services.AddScoped<CircuitDataGate>();
+        Services.AddSingleton<IRunUpdateFeed>(sp => new InProcessRunUpdateFeed(sp.GetRequiredService<IServiceScopeFactory>(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<InProcessRunUpdateFeed>.Instance));
+        Services.AddSingleton<IRunArtifactRepository>(new StubArtifactRepository([]));
+        Services.AddSingleton<Application_IKnowledgeService>(new NoOpKnowledgeService());
+        Services.AddSingleton(typeof(ILogger<>), typeof(Microsoft.Extensions.Logging.Abstractions.NullLogger<>));
+        if (withOptions)
+        {
+            Services.AddOptions();
+            Services.Configure<OrderOptions>(o => o.Revise = revise);
+        }
+        this.AddTestAuthorization().SetAuthorized("alice");
+        return RenderComponent<RunDetail>(p => p.Add(c => c.RunId, _runId));
+    }
+
+    [Fact]
+    public void A_direct_run_of_an_order_links_to_change_something_on_the_order_page()
+    {
+        var cut = Render(SystemCrew.DirectTemplateName, _orderId, ReviseMode.On);
+
+        var link = cut.Find("[data-testid='resume-change-link']");
+        Assert.Equal("Change something", link.TextContent);
+        Assert.Equal($"/orders/{_orderId}?change=1", link.GetAttribute("href"));
+        Assert.Empty(cut.FindAll("[data-testid='resume-run-button']"));
+    }
+
+    [Theory]
+    [InlineData(true, ReviseMode.Off, true)]
+    [InlineData(false, ReviseMode.On, true)]
+    [InlineData(true, ReviseMode.On, false)]
+    public void Otherwise_resume_stays(bool direct, ReviseMode revise, bool withOrder)
+    {
+        var cut = Render(direct ? SystemCrew.DirectTemplateName : "klassik", withOrder ? _orderId : null, revise);
+
+        Assert.Single(cut.FindAll("[data-testid='resume-run-button']"));
+        Assert.Empty(cut.FindAll("[data-testid='resume-change-link']"));
+    }
+
+    [Fact]
+    public void Without_order_settings_resume_stays()
+    {
+        var cut = Render(SystemCrew.DirectTemplateName, _orderId, ReviseMode.On, withOptions: false);
+
+        Assert.Single(cut.FindAll("[data-testid='resume-run-button']"));
+    }
+
+    private sealed class SnapshotRunService(StubRunService inner, CrewSnapshot snapshot) : IRunService
+    {
+        public Task<Guid> SubmitRunAsync(SubmitRunRequest request, CancellationToken ct = default) => inner.SubmitRunAsync(request, ct);
+
+        public Task<IReadOnlyList<RunWarningEntity>> ListRunWarningsAsync(Guid runId, string? requestingUsername, CancellationToken ct = default) =>
+            inner.ListRunWarningsAsync(runId, requestingUsername, ct);
+
+        public Task<RunEntity?> GetRunAsync(Guid id, string? user, CancellationToken ct = default) => inner.GetRunAsync(id, user, ct);
+
+        public Task<IReadOnlyList<RunEntity>> ListRunsAsync(int limit = 20, RunStatus? statusFilter = null, string? requestingUsername = null, CancellationToken ct = default) =>
+            inner.ListRunsAsync(limit, statusFilter, requestingUsername, ct);
+
+        public Task<bool> CancelRunAsync(Guid id, string? user, CancellationToken ct = default) => inner.CancelRunAsync(id, user, ct);
+
+        public Task<RunDetails?> GetRunDetailsAsync(Guid id, string? user, CancellationToken ct = default) => inner.GetRunDetailsAsync(id, user, ct);
+
+        public async Task<RunWithGroundingViewModel?> GetRunWithGroundingAsync(Guid id, string? user, CancellationToken ct = default) =>
+            (await inner.GetRunWithGroundingAsync(id, user, ct))! with { Snapshot = snapshot };
+
+        public Task<WelcomeStats> GetWelcomeStatsAsync(string? user, CancellationToken ct = default) => inner.GetWelcomeStatsAsync(user, ct);
+
+        public Task<Guid> ResumeRunAsync(ResumeOptions options, string? user, CancellationToken ct = default) => inner.ResumeRunAsync(options, user, ct);
+
+        public Task<bool> DeleteRunAsync(Guid runId, string? requestingUsername, CancellationToken ct = default) => inner.DeleteRunAsync(runId, requestingUsername, ct);
+    }
+}
