@@ -2187,3 +2187,23 @@ code of stage 2 reads and writes around it), no `Down()` in production. Before t
 - Development set relabelled and false alarms counted again (0.38 per clean text there, above 0.25; in `On` false alarms
   change texts).
 - Total waiting time including the correction round measured.
+
+## D-074 — Stage 4: research (2026-11-25, draft)
+
+**Status:** being built (packages F1–F5). Shipped with `Research:Mode = Off`; the measuring user gets `On` through the
+environment. `On` for everybody only after gate R3, in a commit of its own. This entry covers the direct path (package F3);
+the results of the pre-tests VT/VR, Tavily usage and the gates are added when they exist.
+
+**Decision.** What the result shows as "looked up" is a passage that the code found word for word in the fetched page text,
+with page and date – nothing more.
+
+- **Only the first run of a clarified order researches**, never a revision, never `submit_request` without clarification; the
+  research is stored at the order (`Orders.ResearchJson`, migration Step51) and every later run uses it unchanged.
+- **Passages as source `W1`** after the files, for the writer and the fact check, never for the recalculation of totals. The
+  writer's system prompt and the fact check's prompts, schemas and version stay unchanged (hash tests); the writer's user
+  prompt gets one fixed sentence only when `W1` is there.
+- **Never stops the run:** every failure of the research ends as a status with the warning `grounding.research_failed`; the
+  text is written without `W1`. The grounding step waits at most 120 s for the research.
+- **Report:** `W1` is listed after the files and the report is marked `lookedUp` (schema stays 2, fields left out while false).
+
+**Way back:** `Research__Mode=Off` without a new image; stored research stays and is shown only for runs that used it.

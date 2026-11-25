@@ -38,7 +38,9 @@ internal static class DirectReportBuilder
     /// Checks <paramref name="deliveredText"/> again (this also covers a best-effort version), lists its placeholders
     /// and the files used by the writer, and adds the read evidence of the first pass and, from <paramref name="facts"/>, the
     /// writer's notes with the quotes found word for word in their files, the fact check of the delivered round, the totals of
-    /// the files and what was corrected after round 1.
+    /// the files and what was corrected after round 1. The passages looked up on the web (usage target
+    /// <see cref="OrderGroundingStep.ResearchTarget"/>) follow the files as a source marked <see cref="RunReportSource.LookedUp"/>, and the
+    /// report is marked <see cref="RunReport.LookedUp"/>; the writer's quotes from them are neither quotes from the files nor unverified.
     /// </summary>
     public static RunReport Build(
         OrderConstraints constraints,
@@ -55,7 +57,12 @@ internal static class DirectReportBuilder
             .Where(u => u.Target == OrderGroundingStep.WriterTarget)
             .OrderBy(u => u.Position)
             .Select(u => new RunReportSource(u.SourceId, u.FileName, u.Mode, u.CharsIncluded))
+            .Concat(usages
+                .Where(u => u.Target == OrderGroundingStep.ResearchTarget)
+                .OrderBy(u => u.Position)
+                .Select(u => new RunReportSource(null, u.FileName, u.Mode, u.CharsIncluded, LookedUp: true)))
             .ToList();
+        var lookedUp = sources.Any(s => s.LookedUp) || (facts.Sources ?? []).Any(s => s.LookedUp);
 
         var notes = new List<string>();
         if (readEvidence is { ReadInFull: false })
@@ -90,7 +97,8 @@ internal static class DirectReportBuilder
             unverified,
             factCheck,
             facts.Arithmetic is { } arithmetic ? SourceArithmeticCheck.WithTextUse(arithmetic, deliveredText) : null,
-            corrections);
+            corrections,
+            lookedUp);
     }
 
     /// <summary>
@@ -174,7 +182,11 @@ internal static class DirectReportBuilder
             .Select(code => new RunReportCorrection(code, null));
     }
 
-    /// <summary>The writer's quotes found word for word (<see cref="QuoteMatch.IsVerbatim"/>) in the file they name, in the file's own wording; the rest is only counted.</summary>
+    /// <summary>
+    /// The writer's quotes found word for word (<see cref="QuoteMatch.IsVerbatim"/>) in the file they name, in the file's own wording; the rest
+    /// is only counted. A quote from the passages looked up on the web is left out: it is no file of the person, and every passage stands in
+    /// the research of the order anyway.
+    /// </summary>
     private static (IReadOnlyList<RunReportQuote> Quotes, int Unverified) VerifiedQuotes(
         IReadOnlyList<WriterQuote> quotes, IReadOnlyList<PromptSource> sources, FactMaterial? material)
     {
@@ -185,6 +197,8 @@ internal static class DirectReportBuilder
             var id = quote.SourceId?.Trim() ?? string.Empty;
             var source = sources.FirstOrDefault(s => string.Equals(s.Id, id, StringComparison.OrdinalIgnoreCase));
             var file = source is null ? material?.Files.FirstOrDefault(f => string.Equals(f.Id, id, StringComparison.OrdinalIgnoreCase)) : null;
+            if (source is { LookedUp: true } || file is { LookedUp: true })
+                continue;
             var text = source?.Text ?? file?.Text;
             var match = text is null || string.IsNullOrWhiteSpace(quote.Quote) ? null : QuoteVerifier.Find(text, quote.Quote.Trim(), allowApproximate: false);
             if (match is not { IsVerbatim: true })

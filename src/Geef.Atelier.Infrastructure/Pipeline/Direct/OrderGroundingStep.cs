@@ -1,8 +1,10 @@
 using Geef.Atelier.Application.Orders;
+using Geef.Atelier.Application.Research;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Intake;
+using Geef.Atelier.Core.Domain.Research;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Domain.Writing;
@@ -27,7 +29,10 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 /// carries a seed draft. Warnings of the files become run warnings. For the checks of stage 3 it builds the material of the
 /// fact check (<see cref="AtelierContextKeys.FactMaterial"/>), fixes the fact-check mode of the run for every run alike (never by
 /// difficulty, length or count) and stores it, and recalculates the totals in the files when <see cref="DirectOptions.SourceArithmetic"/>
-/// is on. <see cref="DirectOptions"/> and <see cref="IRunFactCheckModeStore"/> come from the scope.
+/// is on. <see cref="DirectOptions"/> and <see cref="IRunFactCheckModeStore"/> come from the scope. Before the files are rendered it asks
+/// <see cref="IOrderResearchService"/> for the research of the order (<paramref name="orderVersion"/> is the version of the run); passages
+/// found on the web follow the files as source <see cref="DossierRenderer.SourceId"/> for the writer and the fact check, never for the
+/// totals. A failed research is a warning, never the end of the run.
 /// </summary>
 internal sealed class OrderGroundingStep(
     Guid runId,
@@ -36,10 +41,17 @@ internal sealed class OrderGroundingStep(
     IServiceScopeFactory scopes,
     SourceOptions options,
     IRunWarningSink warnings,
-    ILogger<OrderGroundingStep> logger) : IGroundingStep
+    ILogger<OrderGroundingStep> logger,
+    int? orderVersion = null) : IGroundingStep
 {
     /// <summary>Target of the usages written by this step.</summary>
     public const string WriterTarget = "writer";
+
+    /// <summary>Target of the usage row of the passages looked up on the web; the row has no source.</summary>
+    public const string ResearchTarget = DossierRenderer.UsageTarget;
+
+    /// <summary>Longest wait for the research; the research service keeps its own, shorter limits.</summary>
+    public static readonly TimeSpan ResearchWaitLimit = TimeSpan.FromSeconds(120);
 
     /// <summary>Message of <see cref="DirectWarningCodes.SourcesOverBudget"/>.</summary>
     public const string OverBudgetMessage =
@@ -68,14 +80,18 @@ internal sealed class OrderGroundingStep(
             item => logger.LogWarning("Run {RunId}: page selection of source {SourceId} could not be applied; using all pages.", runId, item.Source.Id),
             template);
 
-        var bundle = SourceBlockRenderer.Render(prompt.Sources, options);
+        var revises = seedDraft is not null || ordered.Any(i => i.Link.Role == SourceRole.TemplateToRevise);
+        var research = await ResearchAsync(order, revises, ordered, BriefingSections.Parse(input).Profile, cancellationToken);
+        var lookedUp = LookedUpSource(research);
+
+        var bundle = SourceBlockRenderer.Render(lookedUp is null ? prompt.Sources : [.. prompt.Sources, lookedUp], options);
         var templateText = seedDraft is null ? template?.Source.ExtractedText!.WithoutPageMarkers() : null;
         var seed = seedDraft ?? templateText;
         var constraints = Constraints(order);
 
         var direct = Direct();
         var files = FactFiles(prompt.Sources, template, templateText);
-        var material = Material(input, files, direct);
+        var material = Material(input, lookedUp is null ? files : [.. files, LookedUpFact(lookedUp)], direct);
         var mode = Mode(direct, order.CreatedByUser);
         var arithmetic = direct.SourceArithmetic ? SourceArithmeticCheck.Check(files.Select(f => (f.Id, f.FileName, f.Text)).ToList()) : null;
 
@@ -95,18 +111,68 @@ internal sealed class OrderGroundingStep(
         await StoreModeAsync(mode, cancellationToken);
         await RecordUsagesAsync(bundle, prompt.Positions, template, seed, cancellationToken);
         await ReportWarningsAsync(ordered, bundle, cancellationToken);
+        if (research.Failed)
+            await warnings.ReportAsync(runId, RunWarningSources.Grounding, RunWarningCodes.ResearchFailed, OrderResearchLines.Failed, ct: cancellationToken);
 
-        return new GroundingResult
+        var notes = new List<string>
         {
-            Context = context,
-            Notes =
-            [
-                $"order-sources files={bundle.Sources.Count} chars={bundle.TotalChars} mode={bundle.Mode} template={(template is not null)}",
-                $"fact-check mode={mode} scope={material.Scope} material_chars={material.TotalChars}"
-                    + (arithmetic is null ? string.Empty : $" totals={arithmetic.TotalsFound} totals_off={arithmetic.Issues.Count}"),
-            ],
+            $"order-sources files={bundle.Sources.Count(s => !s.LookedUp)} chars={bundle.TotalChars} mode={bundle.Mode} template={(template is not null)}",
+            $"fact-check mode={mode} scope={material.Scope} material_chars={material.TotalChars}"
+                + (arithmetic is null ? string.Empty : $" totals={arithmetic.TotalsFound} totals_off={arithmetic.Issues.Count}"),
         };
+        if (research.Status is { } status)
+            notes.Add($"research status={status} entries={(lookedUp is null ? 0 : research.Research!.Entries.Count)}" + (research.Failed && research.Research is null ? " error=exception" : string.Empty));
+
+        return new GroundingResult { Context = context, Notes = notes };
     }
+
+    /// <summary>The research of the run: <see cref="Status"/> is <c>null</c> when there is none; <see cref="Failed"/> means the run goes on without it.</summary>
+    internal sealed record RunResearch(OrderResearch? Research, ResearchStatus? Status, bool Failed)
+    {
+        public static RunResearch None { get; } = new(null, null, false);
+    }
+
+    /// <summary>
+    /// Asks <see cref="IOrderResearchService"/> (when one is registered) for the research of the order, with the full text of every file of
+    /// the order and the About me details of the briefing, so that the service can keep their words out of the searches. An exception or a
+    /// wait longer than <see cref="ResearchWaitLimit"/> counts as <see cref="ResearchStatus.Failed"/>; only the cancellation of the run itself
+    /// ends the step.
+    /// </summary>
+    private async Task<RunResearch> ResearchAsync(
+        Core.Domain.Orders.OrderEntity order, bool revises, IReadOnlyList<OrderSourceItem> items, string? profile, CancellationToken ct)
+    {
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        limit.CancelAfter(ResearchWaitLimit);
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            if (scope.ServiceProvider.GetService<IOrderResearchService>() is not { } service)
+                return RunResearch.None;
+
+            var fileTexts = items.Select(i => i.Source.ExtractedText ?? string.Empty).Where(t => t.Length > 0).ToList();
+            var research = await service.EnsureAsync(order, orderVersion, revises, fileTexts, profile, limit.Token);
+            return research is null ? RunResearch.None : new RunResearch(research, research.Status, research.Status == ResearchStatus.Failed);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            logger.LogError("Run {RunId}: the research of the order failed; the text is written without it: {Error}", runId, ex.ToRedactedLogText());
+            return new RunResearch(null, ResearchStatus.Failed, true);
+        }
+    }
+
+    /// <summary>The source <see cref="DossierRenderer.SourceId"/> with the passages of <paramref name="research"/>; <c>null</c> without passages.</summary>
+    internal static PromptSource? LookedUpSource(RunResearch research)
+    {
+        if (research.Research is not { Entries.Count: > 0 } found)
+            return null;
+        var text = DossierRenderer.Render(found);
+        return text.Length == 0
+            ? null
+            : new PromptSource(Guid.Empty, DossierRenderer.SourceId, DossierRenderer.FileName, SourceKind.Text, null, null, text, text.Length, LookedUp: true);
+    }
+
+    /// <summary>The passages looked up on the web as part of the material of the fact check, marked as such.</summary>
+    internal static FactSource LookedUpFact(PromptSource source) => new(source.Id, source.FileName, source.Text, LookedUp: true);
 
     /// <summary>Id of the text to revise in the material of the fact check.</summary>
     public const string TemplateSourceId = "S0";
@@ -215,7 +281,7 @@ internal sealed class OrderGroundingStep(
 
     private async Task ReportWarningsAsync(IReadOnlyList<OrderSourceItem> items, OrderSourceBundle bundle, CancellationToken ct)
     {
-        if (bundle.TotalChars > options.MapMaxChars)
+        if (bundle.Sources.Where(s => !s.LookedUp).Sum(s => s.Characters) > options.MapMaxChars)
             await warnings.ReportAsync(runId, RunWarningSources.Grounding, DirectWarningCodes.SourcesOverBudget, OverBudgetMessage, ct: ct);
 
         foreach (var item in items)

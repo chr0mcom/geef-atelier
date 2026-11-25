@@ -2278,3 +2278,25 @@ der Code von Etappe 2 liest und schreibt unverändert), kein `Down()` in Produkt
 - Entwicklungsmenge neu beschriftet und Fehlalarme neu gezählt (dort 0,38 je sauberem Text, über 0,25; in `On` ändern
   Fehlalarme Texte).
 - Gesamtwartezeit einschließlich Korrekturrunde gemessen.
+
+## D-074 — Etappe 4: Recherche (2026-11-25, Entwurf)
+
+**Status:** im Bau (Pakete F1–F5). Ausgeliefert mit `Research:Mode = Off`; der Messnutzer bekommt `On` über die Umgebung.
+`On` für alle erst nach Tor R3, in einem eigenen Commit. Dieser Eintrag beschreibt den Direktweg (Paket F3); die Ergebnisse
+der Vorversuche VT/VR, der Tavily-Verbrauch und die Tore kommen hinzu, sobald sie vorliegen.
+
+**Entscheidung.** Was im Ergebnis als „nachgeschlagen“ steht, ist ein vom Code wörtlich im abgerufenen Seitentext gefundener
+Ausschnitt mit Seite und Datum – nicht mehr.
+
+- **Nur der erste Lauf eines geklärten Auftrags recherchiert**, nie eine Überarbeitung, nie `submit_request` ohne Klärung; die
+  Recherche liegt am Auftrag (`Orders.ResearchJson`, Migration Step51), und jeder spätere Lauf nutzt sie unverändert.
+- **Ausschnitte als Quelle `W1`** nach den Dateien, für Schreiber und Faktenprüfer, nie für die Nachrechnung der Summen.
+  System-Prompt des Schreibers sowie Prompts, Schemata und Version des Faktenprüfers bleiben unverändert (Hash-Tests); der
+  Nutzerprompt des Schreibers bekommt nur mit `W1` einen festen Satz.
+- **Stoppt nie den Lauf:** Jeder Fehler der Recherche endet als Status mit der Warnung `grounding.research_failed`; der Text
+  entsteht ohne `W1`. Der Grounding-Schritt wartet höchstens 120 s auf die Recherche.
+- **Bericht:** `W1` steht nach den Dateien, der Bericht ist als `lookedUp` markiert (Schema bleibt 2, Felder fehlen, solange
+  sie falsch sind).
+
+**Rückweg:** `Research__Mode=Off` ohne neues Image; gespeicherte Recherchen bleiben und erscheinen nur bei Läufen, die sie
+nutzten.

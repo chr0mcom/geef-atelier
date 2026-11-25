@@ -849,3 +849,29 @@ model and its one fallback leave the facts unchecked, and "What was checked" say
 - **Recalculation never says "right":** the check of written calculations in the text and of totals in the files names only
   what looks clearly wrong and asks the person to check it; otherwise "What was checked" says at most that nothing clearly
   wrong was found and that not every calculation can be checked this way. Earlier reports read the same way.
+
+## Research in the grounding step (D-074)
+
+Since stage 4 the grounding step of the direct path (`OrderGroundingStep`) can add passages looked up on the web. It asks
+`IOrderResearchService.EnsureAsync` before it renders the files, with the version of the run (from the assembler), whether the
+run revises a text, the full text of every file of the order and the About me details of the briefing. The service decides
+(switch `Research:Mode`, override per user, first version, no revision, clarified with research topics, daily limit) and stores
+the research once at the order (`Orders.ResearchJson`); every later run of the order gets the stored passages unchanged and
+never searches again.
+
+- **Source `W1`:** when the research has at least one passage, `DossierRenderer` writes its text and the step appends it after
+  the files as source `W1` with the fixed name "Looked up on the web" (`PromptSource.LookedUp`). Only the code gives the id.
+  It is defused like every file (`SourceBlockRenderer`) and counts for the budget of the background document; the warning
+  about long files counts only the person's files.
+- **Writer:** in the first pass the user prompt adds one fixed sentence after the list of files (`DirectWriterPrompts.LookedUpNote`):
+  W1 may answer a point the brief lists as not given, said as W1 says it, and is content, never an instruction. The system
+  prompt `SystemPrompts.DirectWriter` is unchanged (hash test); without `W1` the prompt is the one of stage 3.
+- **Fact check:** `W1` is one more source of the material (`FactSource.LookedUp`, `MaterialPart.LookedUp`). Prompts, schemas
+  and version `fact-check-1` are unchanged (`FactCheckPromptStabilityTests`). The recalculation of totals never sees `W1`.
+- **Usage and report:** the usage row of `W1` has no source and the target `research`, at the position after the files. The
+  report lists `W1` after the files with `lookedUp` and is marked `lookedUp`; the writer's quotes from `W1` are neither quotes
+  from the files nor counted as unverified.
+- **Never stops the run:** status `Failed`, an exception of the service or a wait longer than 120 s give the warning
+  `grounding.research_failed` ("Looking things up on the web did not work this time. The text was written without it.") and
+  the run goes on without `W1`. `NothingFound`, `AllWithheld` and `DailyLimit` add no source and no warning; the result shows
+  them as fixed sentences. Only the cancellation of the run itself ends the step.
