@@ -1,4 +1,5 @@
 using Geef.Atelier.Application.Crew.Models;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Models;
 using Geef.Atelier.Infrastructure.Llm;
@@ -25,7 +26,7 @@ internal sealed class ProxyResolver(ILlmClient client) : ILlmClientResolver
         throw new NotSupportedException("The intake measurement uses profiles only.");
 
     public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens) =>
-        (client, model, maxTokens ?? 1_500);
+        (client, model, maxTokens ?? new IntakeOptions().MaxTokens);
 
     public bool SupportsAgenticTools(string providerName) => false;
 

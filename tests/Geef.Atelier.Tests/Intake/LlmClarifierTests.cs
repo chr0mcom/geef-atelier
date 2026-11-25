@@ -102,7 +102,7 @@ public sealed class LlmClarifierTests
         Assert.Equal("Einladung", result.Output!.TextType);
         Assert.Equal(ClarifierOutputParserTests.Valid, result.RawJson);
         Assert.Equal([(ModelSlot.Intake, ModelDomain.General)], assignments.Calls);
-        Assert.Equal([(Provider, Model, (int?)1_500)], resolver.Profiles);
+        Assert.Equal([(Provider, Model, (int?)8_192)], resolver.Profiles);
 
         var (request, body) = Assert.Single(handler.Requests);
         Assert.False(request.Headers.Contains(OpenAiCompatibleClient.FailoverHeader));
@@ -110,7 +110,7 @@ public sealed class LlmClarifierTests
         var root = json.RootElement;
         Assert.Equal(Model, root.GetProperty("model").GetString());
         Assert.Equal("low", root.GetProperty("reasoning_effort").GetString());
-        Assert.Equal(1_500, root.GetProperty("max_tokens").GetInt32());
+        Assert.Equal(8_192, root.GetProperty("max_tokens").GetInt32());
         var format = root.GetProperty("response_format");
         Assert.Equal("json_schema", format.GetProperty("type").GetString());
         Assert.Equal(ClarifierSchema.Name, format.GetProperty("json_schema").GetProperty("name").GetString());
