@@ -16,6 +16,7 @@ public static class ListOrdersTool
 
     public const string ToolDescription =
         "Lists the person's own orders, newest activity first, with orderId, title (the beginning of their request), state, version, updatedAt and wordCount. " +
+        "version and wordCount are those of the text get_order_result shows; state is that of the newest version, which may still be in progress or may not have been finished. " +
         "Use the orderId with get_order_result, revise_order, export_order or cancel_order.";
 
     [McpServerTool(ReadOnly = true), Description(ToolDescription)]
