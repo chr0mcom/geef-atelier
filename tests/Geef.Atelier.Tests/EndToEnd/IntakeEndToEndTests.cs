@@ -11,6 +11,7 @@ using Geef.Atelier.Tests.EndToEnd.Fakes;
 using Geef.Atelier.Tests.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Tests.EndToEnd;
 
@@ -41,6 +42,9 @@ public sealed class IntakeEndToEndTests(PostgresFixture postgres)
 
     private const string AskResearchable =
         """{"topic":"facts","resolution":"ask","user_can_know":true,"web_researchable":true,"impact":"high","assumption":"Gegründet vor einigen Jahren","confidence":"unsure","question":{"text":"Wann wurde die Firma gegründet?","options":["Vor 1990","Nach 1990"]}}""";
+
+    private const string AskReopening =
+        """{"topic":"date","resolution":"ask","user_can_know":true,"web_researchable":false,"impact":"high","assumption":"Wieder geöffnet ab Montag, 4. Januar 2027","confidence":"unsure","question":{"text":"Ab wann ist das Büro wieder geöffnet?","options":["Montag, 4. Januar 2027","Dienstag, 5. Januar 2027"],"default_option":0,"allow_free_text":true}}""";
 
     private static Task<AtelierEndToEndHost> StartAsync(PostgresFixture postgres, IntakeMode mode, TimeSpan? timeout = null) =>
         AtelierEndToEndHost.StartAsync(postgres, services =>
@@ -223,5 +227,25 @@ public sealed class IntakeEndToEndTests(PostgresFixture postgres)
 
         Assert.Empty(ClarifierCalls(host));
         Assert.Empty(await host.QueryAsync(db => db.OrderIntakeShadows.AsNoTracking().ToListAsync()));
+    }
+
+    [Fact]
+    public async Task The_shipped_date_rule_reaches_the_gate_and_turns_guessed_days_into_an_assumption()
+    {
+        await using var host = await StartAsync(postgres, IntakeMode.On);
+        Assert.True(await host.WithScopeAsync(sp => Task.FromResult(sp.GetRequiredService<IOptions<IntakeOptions>>().Value.DropGuessedDateOptions)));
+        host.Script.EnqueueClarifierJson(Clarify(AskReopening));
+        host.Script.ExecutorText = Words(150);
+
+        var submission = await host.SubmitOrderAsync(new SubmitOrderRequest(
+            "Schreib eine kurze Mail an die Mieter: Das Büro ist über die Feiertage geschlossen.", "e2e-intake", OrderEntry.Web));
+        await host.WaitForOrderFinishedAsync(submission.OrderId);
+
+        var order = await host.QueryAsync(db => db.Orders.AsNoTracking().SingleAsync(o => o.Id == submission.OrderId));
+        var record = IntakeRecordJson.TryParse(order.ClarifyJson)!;
+        Assert.Empty(record.Questions);
+        Assert.Equal(GateDecision.DroppedBadOptions, Assert.Single(record.Trace).Decision);
+        Assert.Contains(record.Assumptions, a => a.Text == "Wieder geöffnet ab Montag, 4. Januar 2027");
+        Assert.Null(order.QuestionsAskedAt);
     }
 }

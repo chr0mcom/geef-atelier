@@ -174,7 +174,7 @@ internal sealed class OrderIntakeService(
             var items = await sources.ListForOrderAsync(order.Id, includeText: true, ct);
             facts = await memory.LoadAsync(order.CreatedByUser ?? string.Empty, ct);
             request = IntakeAnalysis.Request(order.RequestText, items, facts.Profile, settings);
-            materialTexts = items.MaterialTexts();
+            materialTexts = items.MaterialTexts(request);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {

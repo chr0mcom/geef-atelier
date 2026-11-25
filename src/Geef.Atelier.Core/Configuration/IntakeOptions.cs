@@ -73,6 +73,9 @@ public sealed class IntakeOptions
     /// <summary>How assumptions about facts of the case (<see cref="GapTopicKinds.IsContent"/>) reach the writer.</summary>
     public ContentAssumptionMode ContentAssumptions { get; set; } = ContentAssumptionMode.OpenPoints;
 
-    /// <summary>Whether the gate drops answer options with a date, month or weekday that the request and the files do not name (<see cref="GateDecision.DroppedGuessedDate"/>).</summary>
+    /// <summary>
+    /// Whether the gate drops answer options naming a calendar day when nothing in the request, the files or the About me details looks
+    /// like a date (<see cref="QuestionGate.Apply"/>). Read at start; a change needs a restart.
+    /// </summary>
     public bool DropGuessedDateOptions { get; set; }
 }

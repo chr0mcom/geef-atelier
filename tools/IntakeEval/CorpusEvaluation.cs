@@ -29,6 +29,13 @@ public sealed record Replay(CorpusEntry Entry, EvalResult Answer, ClarifierOutpu
 /// </summary>
 public sealed record CallFigures(int Calls, int Entries, int Retries, int Failures, double FailureRate, int Timed, double MedianMs, double P90Ms, int OverProductionLimit, int Unreplayable);
 
+/// <summary>
+/// What the gate rule <see cref="IntakeOptions.DropGuessedDateOptions"/> takes away, counted by replaying every answer with and without
+/// it: <see cref="Questions"/> asked without the rule and dropped with it, <see cref="Options"/> answer options it removed from questions
+/// that stay. The rule writes no decision of its own into the trace, so only this comparison tells its drops apart.
+/// </summary>
+public sealed record DateRuleFigures(int Questions, int Options);
+
 /// <summary>Figures over the last successful, replayable answer of each entry: gates b to e′.</summary>
 public sealed record QuestionFigures(
     int Answered,
@@ -106,6 +113,23 @@ public static class CorpusEvaluation
             return new Replay(entry, answer, null, null);
         var options = new IntakeOptions { DropGuessedDateOptions = dropGuessedDates };
         return new Replay(entry, answer, output, entry.Gate(entry.Request(options), output, options).Gate);
+    }
+
+    /// <summary>The questions and answer options the date rule drops in <paramref name="lines"/> (<see cref="DateRuleFigures"/>).</summary>
+    public static DateRuleFigures DateRuleEffect(IReadOnlyList<CorpusEntry> corpus, IReadOnlyList<EvalResult> lines)
+    {
+        var byId = corpus.GroupBy(e => e.Id, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Last(), StringComparer.Ordinal);
+        int questions = 0, options = 0;
+        foreach (var line in lines.Where(l => byId.ContainsKey(l.Id)))
+        {
+            var plain = ReplayOne(byId[line.Id], line).Gate;
+            var ruled = ReplayOne(byId[line.Id], line, dropGuessedDates: true).Gate;
+            if (plain is null || ruled is null)
+                continue;
+            questions += plain.Trace.Zip(ruled.Trace).Count(t => !FormDrops.Contains(t.First.Decision) && FormDrops.Contains(t.Second.Decision));
+            options += plain.Questions.Join(ruled.Questions, q => q.Text, q => q.Text, (p, r) => p.Options.Count - r.Options.Count, StringComparer.Ordinal).Sum();
+        }
+        return new DateRuleFigures(questions, options);
     }
 
     /// <summary>True when the line counts as a failure: not <c>Ok</c>, longer than <paramref name="productionLimit"/> or not replayable.</summary>

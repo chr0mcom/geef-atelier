@@ -68,7 +68,7 @@ internal static class EntryMapping
     public static IntakeAnalysisResult Gate(this CorpusEntry entry, ClarifierRequest request, ClarifierOutput output, IntakeOptions options) =>
         IntakeAnalysis.Analyse(
             entry.Request, request.Candidates(), output, Memory.Resolve(new MemoryFacts(entry.Profile()), output.TextType), options.MaxQuestions,
-            entry.Sources().MaterialTexts(), options.DropGuessedDateOptions);
+            entry.Sources().MaterialTexts(request), options.DropGuessedDateOptions);
 
     private static SourceKind Kind(string kind) => kind.ToLowerInvariant() switch
     {

@@ -18,9 +18,12 @@ public static class IntakeAnalysis
     public static ClarifierRequest Request(string requestText, IReadOnlyList<OrderSourceItem> items, UserProfileEntity? profile, IntakeOptions options) =>
         new(requestText, IntakeExcerpts.Build(items, options), profile is null ? null : ProfilePrompt.Render(profile), RevisionDetector.MentionsRevision(requestText));
 
-    /// <summary>The whole extracted texts of the files of an order, as the question gate compares answer options with them.</summary>
-    public static IReadOnlyList<string> MaterialTexts(this IReadOnlyList<OrderSourceItem> items) =>
-        items.Select(i => i.Source.ExtractedText).OfType<string>().Where(t => t.Length > 0).ToList();
+    /// <summary>
+    /// The material of the person besides the request that the question gate looks through for dates: the whole extracted texts of the
+    /// files of an order (not the excerpts of the prompt) and the About me details of <paramref name="request"/>.
+    /// </summary>
+    public static IReadOnlyList<string> MaterialTexts(this IReadOnlyList<OrderSourceItem> items, ClarifierRequest request) =>
+        items.Select(i => i.Source.ExtractedText).Append(request.ProfileBlock).OfType<string>().Where(t => t.Length > 0).ToList();
 
     /// <summary>The files of a clarifier input that could be the text to revise, with their numbers in the prompt.</summary>
     public static IReadOnlyList<RevisionCandidate> Candidates(this ClarifierRequest request) =>
@@ -28,9 +31,9 @@ public static class IntakeAnalysis
 
     /// <summary>
     /// Chooses the file to revise (<see cref="RevisionDetector.Choose"/>) and applies the <see cref="QuestionGate"/>; the returned
-    /// output carries the summary as the gate allows it to be shown. <paramref name="materialTexts"/> are the whole extracted texts of
-    /// the files (not the excerpts of the prompt); with <paramref name="dropGuessedDates"/> the gate drops answer options naming a date,
-    /// month or weekday that neither the request nor these texts name.
+    /// output carries the summary as the gate allows it to be shown. <paramref name="materialTexts"/> are the material besides the
+    /// request (<see cref="MaterialTexts"/>); with <paramref name="dropGuessedDates"/> the gate drops answer options naming a calendar day
+    /// when nothing in the request or this material looks like a date.
     /// </summary>
     public static IntakeAnalysisResult Analyse(
         string requestText,

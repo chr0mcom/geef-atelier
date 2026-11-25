@@ -6,174 +6,98 @@ using System.Text.RegularExpressions;
 namespace Geef.Atelier.Core.Domain.Intake;
 
 /// <summary>
-/// Finds calendar elements in a text without an AI model: dates written with digits (<c>12.5.</c>, <c>12.5.2027</c>, <c>2027-05-12</c>,
-/// <c>05/12/2027</c>), month names next to a digit (<c>5. Mai</c>, <c>May 5</c>, <c>Mai 2027</c>; a month name alone never counts) and
-/// weekday names as whole words. The names come from the calendars of German, English, French, Spanish, Italian and the language of the
-/// order, never from a kept word list. Durations and amounts (<c>1 bis 3 Jahre</c>, <c>2 Seiten</c>) are no calendar elements.
+/// Tells without an AI model whether a text names a date. Two readings on purpose: the material of the person is read generously
+/// (<see cref="AnyDateLike"/>), an answer option strictly (<see cref="NamesCalendarDay"/>). Single dates are never compared, so a date
+/// that stands anywhere in the material keeps every option. The month and weekday names come from the calendars of German, English,
+/// French, Spanish, Italian and the language of the order, never from a kept word list. All patterns run in linear time
+/// (<see cref="RegexOptions.NonBacktracking"/>), also over whole file texts.
 /// </summary>
-public static partial class CalendarMentions
+public static class CalendarMentions
 {
+    private const string Day = "(?:0?[1-9]|[12][0-9]|3[01])";
+    private const string Month = "(?:0?[1-9]|1[0-2])";
+    private const string Year = "(?:[12][0-9]{3})";
+    private const string Blank = "[ \u00a0]?";
+    private const string Ordinal = @"(?:\.|st|nd|rd|th|er|e|º|°)?";
+
     private static readonly string[] CalendarLanguages = ["de", "en", "fr", "es", "it"];
 
-    private static readonly ConcurrentDictionary<string, CalendarNames> NamesByLanguage = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, Patterns> PatternsByLanguage = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// The calendar elements of <paramref name="text"/> in one form, so that the same date written in the request, a file or an answer
-    /// option compares equal whatever the language or notation: a day of a month as <c>--MM-DD</c>, a month of a year as <c>YYYY-MM</c>
-    /// (a full date gives both) and a weekday as its English name (<c>Saturday</c>). A full date also gives its weekday, so that an option
-    /// naming the weekday of a date of the request counts as named there. <paramref name="language"/> is the language of the order and may
-    /// be <c>null</c>.
+    /// True when any of <paramref name="texts"/> holds something that could be a date, read generously: digits as a day and month in
+    /// any usual notation (<c>12.5.</c>, <c>12.05</c>, <c>12. 05. 2027</c>, <c>5/12</c>, <c>05/2027</c>, <c>2027-05-12</c>), a month name
+    /// or abbreviation next to a digit (<c>5. Dez.</c>, <c>Sep 5</c>, <c>3 al 7 de mayo</c>), a month name alone in the spelling of its
+    /// calendar (<c>Mai</c>, <c>December</c>, <c>mars</c>; the lower-case English words <c>may</c> and <c>march</c> do not count) and a
+    /// weekday name at the start of a word (<c>Samstagnachmittag</c>, <c>samstags</c>, <c>Fridays</c>). In doubt it says yes.
     /// </summary>
-    public static IReadOnlyList<string> Find(string text, string? language)
+    public static bool AnyDateLike(IEnumerable<string?> texts, string? language)
     {
-        if (string.IsNullOrWhiteSpace(text))
-            return [];
-
-        var names = NamesByLanguage.GetOrAdd(Key(language), CalendarNames.Build);
-        var found = new List<string>();
-
-        foreach (Match match in DottedDate().Matches(text))
-            AddDate(found, Number(match, "day"), Number(match, "month"), Year(match));
-        foreach (Match match in IsoDate().Matches(text))
-            AddDate(found, Number(match, "day"), Number(match, "month"), Year(match));
-        foreach (Match match in SlashDate().Matches(text))
-        {
-            var first = Number(match, "first");
-            var second = Number(match, "second");
-            var year = Year(match);
-            AddDate(found, first, second, year);
-            AddDate(found, second, first, year);
-        }
-
-        foreach (Match match in names.DayMonth.Matches(text))
-            AddDate(found, Number(match, "day"), names.Month(match), Year(match));
-        foreach (Match match in names.MonthDay.Matches(text))
-            AddDate(found, Number(match, "day"), names.Month(match), Year(match));
-        foreach (Match match in names.MonthYear.Matches(text))
-            AddMonthOfYear(found, names.Month(match), Year(match));
-        foreach (Match match in names.Weekday.Matches(text))
-        {
-            if (names.WeekdayOf(match) is { } day)
-                Add(found, day.ToString());
-        }
-
-        return found;
+        var patterns = For(language);
+        return texts
+            .Where(text => !string.IsNullOrWhiteSpace(text))
+            .Select(text => Nfc(text!))
+            .Any(text => patterns.Material.IsMatch(text) || patterns.MonthAlone.IsMatch(text));
     }
 
-    private static string Key(string? language)
+    /// <summary>
+    /// True when <paramref name="option"/> names a calendar day, read strictly: a date with digits and a closing point or year
+    /// (<c>12.5.</c>, <c>12.05.2027</c>, <c>2027-05-12</c>, <c>05/12/2027</c>), a month name next to a digit (<c>5. Mai</c>,
+    /// <c>May 5</c>, <c>Mai 2027</c>) or a weekday name as a whole word. Durations, amounts and lengths (<c>1 bis 3 Jahre</c>,
+    /// <c>12,50 Euro</c>, <c>2 Seiten</c>), a month name alone and version numbers (<c>1.2.3</c>) do not count.
+    /// </summary>
+    public static bool NamesCalendarDay(string? option, string? language) =>
+        !string.IsNullOrWhiteSpace(option) && For(language).Option.IsMatch(Nfc(option));
+
+    private static string Nfc(string text) => text.IsNormalized(NormalizationForm.FormC) ? text : text.Normalize(NormalizationForm.FormC);
+
+    private static Patterns For(string? language)
     {
         var key = (language ?? string.Empty).Trim().ToLowerInvariant();
         var dash = key.IndexOfAny(['-', '_']);
-        return dash > 0 ? key[..dash] : key;
+        return PatternsByLanguage.GetOrAdd(dash > 0 ? key[..dash] : key, Patterns.Build);
     }
 
-    private static void AddDate(List<string> found, int day, int month, int? year)
+    private sealed class Patterns(Regex material, Regex monthAlone, Regex option)
     {
-        if (month is < 1 or > 12 || day is < 1 or > 31)
-            return;
-        Add(found, $"--{month:00}-{day:00}");
-        if (year is not ({ } y and >= 1 and <= 9999))
-            return;
-        AddMonthOfYear(found, month, y);
-        if (day <= DateTime.DaysInMonth(y, month))
-            Add(found, new DateOnly(y, month, day).DayOfWeek.ToString());
-    }
+        private const RegexOptions Linear = RegexOptions.NonBacktracking | RegexOptions.CultureInvariant;
 
-    private static void AddMonthOfYear(List<string> found, int month, int? year)
-    {
-        if (month is >= 1 and <= 12 && year is >= 1 and <= 9999)
-            Add(found, $"{year:0000}-{month:00}");
-    }
+        public Regex Material { get; } = material;
 
-    private static void Add(List<string> found, string element)
-    {
-        if (!found.Contains(element, StringComparer.Ordinal))
-            found.Add(element);
-    }
+        public Regex MonthAlone { get; } = monthAlone;
 
-    private static int Number(Match match, string group) =>
-        match.Groups[group] is { Success: true } g && int.TryParse(g.ValueSpan, NumberStyles.None, CultureInfo.InvariantCulture, out var value) ? value : 0;
+        public Regex Option { get; } = option;
 
-    private static int? Year(Match match)
-    {
-        var group = match.Groups["year"];
-        if (!group.Success || !int.TryParse(group.ValueSpan, NumberStyles.None, CultureInfo.InvariantCulture, out var year))
-            return null;
-        return group.Length == 2 ? 2000 + year : year;
-    }
-
-    private static string Folded(string name)
-    {
-        var decomposed = name.Trim().ToLowerInvariant().Normalize(NormalizationForm.FormD);
-        var builder = new StringBuilder(decomposed.Length);
-        foreach (var c in decomposed)
+        public static Patterns Build(string language)
         {
-            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
-                builder.Append(c);
-        }
-        return builder.ToString().Normalize(NormalizationForm.FormC);
-    }
-
-    [GeneratedRegex(@"(?<![\d.,])(?<day>\d{1,2})\.(?<month>\d{1,2})\.(?:(?<year>\d{4}|\d{2})(?![\d.,]\d)(?!\d)|(?!\d))", RegexOptions.CultureInvariant)]
-    private static partial Regex DottedDate();
-
-    [GeneratedRegex(@"(?<![\d\-])(?<year>\d{4})-(?<month>\d{1,2})-(?<day>\d{1,2})(?!\d)", RegexOptions.CultureInvariant)]
-    private static partial Regex IsoDate();
-
-    [GeneratedRegex(@"(?<![\d/])(?<first>\d{1,2})/(?<second>\d{1,2})/(?<year>\d{4}|\d{2})(?![\d/])", RegexOptions.CultureInvariant)]
-    private static partial Regex SlashDate();
-
-    private sealed class CalendarNames(
-        Dictionary<string, int> months,
-        Dictionary<string, DayOfWeek> weekdays,
-        Regex dayMonth,
-        Regex monthDay,
-        Regex monthYear,
-        Regex weekday)
-    {
-        private const RegexOptions Options = RegexOptions.IgnoreCase | RegexOptions.CultureInvariant;
-
-        public Regex DayMonth { get; } = dayMonth;
-
-        public Regex MonthDay { get; } = monthDay;
-
-        public Regex MonthYear { get; } = monthYear;
-
-        public Regex Weekday { get; } = weekday;
-
-        public int Month(Match match) => months.GetValueOrDefault(Folded(match.Groups["month"].Value));
-
-        public DayOfWeek? WeekdayOf(Match match) =>
-            weekdays.TryGetValue(Folded(match.Groups["weekday"].Value), out var day) ? day : null;
-
-        public static CalendarNames Build(string language)
-        {
-            var months = new Dictionary<string, int>(StringComparer.Ordinal);
-            var weekdays = new Dictionary<string, DayOfWeek>(StringComparer.Ordinal);
-            var monthSpellings = new HashSet<string>(StringComparer.Ordinal);
-            var weekdaySpellings = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var culture in Cultures(language))
+            var months = new HashSet<string>(StringComparer.Ordinal);
+            var abbreviations = new HashSet<string>(StringComparer.Ordinal);
+            var weekdays = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var format in Cultures(language).Select(c => c.DateTimeFormat))
             {
-                var format = culture.DateTimeFormat;
-                for (var i = 0; i < 12; i++)
-                {
-                    AddName(months, monthSpellings, format.MonthNames[i], i + 1);
-                    AddName(months, monthSpellings, format.MonthGenitiveNames[i], i + 1);
-                    if (format.AbbreviatedMonthNames[i].Trim().EndsWith('.'))
-                        AddName(months, monthSpellings, format.AbbreviatedMonthNames[i], i + 1);
-                }
-                for (var i = 0; i < 7; i++)
-                    AddName(weekdays, weekdaySpellings, format.DayNames[i], (DayOfWeek)i);
+                foreach (var name in format.MonthNames.Concat(format.MonthGenitiveNames))
+                    Add(months, name);
+                foreach (var name in format.AbbreviatedMonthNames.Concat(format.AbbreviatedMonthGenitiveNames))
+                    Add(abbreviations, name);
+                foreach (var name in format.DayNames)
+                    Add(weekdays, name);
             }
 
-            var month = Alternation(monthSpellings);
-            return new CalendarNames(
-                months,
-                weekdays,
-                new Regex($@"(?<![\p{{L}}\d])(?<day>\d{{1,2}})(?:\.|er|st|nd|rd|th|º|°)?\s*(?:de\s+|of\s+)?(?<month>{month})(?!\p{{L}})(?:\s*,?\s*(?:de\s+)?(?<year>\d{{4}})(?!\d))?", Options),
-                new Regex($@"(?<!\p{{L}})(?<month>{month})\.?\s+(?<day>\d{{1,2}})(?:st|nd|rd|th)?(?!\d)(?:\s*,?\s*(?<year>\d{{4}})(?!\d))?", Options),
-                new Regex($@"(?<!\p{{L}})(?<month>{month})\.?\s*,?\s*(?:de\s+|of\s+)?(?<year>\d{{4}})(?!\d)", Options),
-                new Regex($@"(?<!\p{{L}})(?<weekday>{Alternation(weekdaySpellings)})s?(?!\p{{L}})", Options));
+            var anyMonth = Alternation(months.Concat(abbreviations));
+            var spelledMonth = Alternation(months.SelectMany(AsWritten));
+            var spelledShortMonth = Alternation(abbreviations.SelectMany(AsWritten));
+            var weekday = Alternation(weekdays);
+            var material =
+                $@"\b{Day}{Blank}[./]{Blank}{Month}\b|\b{Month}{Blank}[./-]{Blank}{Year}\b|\b{Year}{Blank}[-/.]{Blank}{Month}\b|\b{Day}-{Month}-[0-9]{{2,4}}\b" +
+                $@"|[0-9]{Ordinal}\s?(?:de\s|of\s)?(?:{anyMonth})\b|\b(?:{anyMonth})\b\.?\s?[0-9]|\b(?:{weekday})";
+            var option =
+                $@"\b{Day}\.{Month}\.(?:[0-9]{{4}}|[0-9]{{2}})?(?:[^0-9]|$)|\b{Year}-{Month}-{Day}\b|\b[0-9]{{1,2}}/[0-9]{{1,2}}/(?:[0-9]{{4}}|[0-9]{{2}})\b" +
+                $@"|\b[0-9]{{1,2}}{Ordinal}\s?(?:de\s|of\s)?(?-i:{spelledMonth}|(?:{spelledShortMonth})\.)(?:[^\p{{L}}]|$)" +
+                $@"|(?-i:\b(?:{spelledMonth})\b|\b(?:{spelledShortMonth})\.)\s?[0-9]|\b(?:{weekday})s?\b";
+            return new Patterns(
+                new Regex(material, Linear | RegexOptions.IgnoreCase),
+                new Regex($@"\b(?:{spelledMonth})\b", Linear),
+                new Regex(option, Linear | RegexOptions.IgnoreCase));
         }
 
         private static IEnumerable<CultureInfo> Cultures(string language)
@@ -194,18 +118,34 @@ public static partial class CalendarMentions
             }
         }
 
-        private static void AddName<T>(Dictionary<string, T> names, HashSet<string> spellings, string name, T value)
+        private static void Add(HashSet<string> names, string name)
         {
-            var trimmed = name.Trim();
-            var folded = Folded(trimmed);
-            if (folded.Count(char.IsLetter) < 3)
+            var trimmed = name.Trim().TrimEnd('.').Normalize(NormalizationForm.FormC);
+            if (trimmed.Count(char.IsLetter) < 3)
                 return;
-            names.TryAdd(folded, value);
-            spellings.Add(trimmed.Normalize(NormalizationForm.FormC));
-            spellings.Add(folded);
+            names.Add(trimmed);
+            names.Add(WithoutAccents(trimmed));
         }
 
-        private static string Alternation(IEnumerable<string> spellings) =>
-            string.Join('|', spellings.OrderByDescending(s => s.Length).ThenBy(s => s, StringComparer.Ordinal).Select(Regex.Escape));
+        private static IEnumerable<string> AsWritten(string name)
+        {
+            yield return name;
+            if (char.IsLower(name[0]))
+                yield return char.ToUpperInvariant(name[0]) + name[1..];
+        }
+
+        private static string WithoutAccents(string name)
+        {
+            var builder = new StringBuilder(name.Length);
+            foreach (var c in name.Normalize(NormalizationForm.FormD))
+            {
+                if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                    builder.Append(c);
+            }
+            return builder.ToString().Normalize(NormalizationForm.FormC);
+        }
+
+        private static string Alternation(IEnumerable<string> names) =>
+            string.Join('|', names.Distinct(StringComparer.Ordinal).OrderByDescending(n => n.Length).ThenBy(n => n, StringComparer.Ordinal).Select(Regex.Escape));
     }
 }

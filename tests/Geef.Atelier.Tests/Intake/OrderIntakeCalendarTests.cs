@@ -1,6 +1,10 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using Geef.Atelier.Application.Intake;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Intake;
+using Geef.Atelier.Core.Domain.Profiles;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Tests.Domain.Intake;
 using Geef.Atelier.Tests.Pipeline.Direct;
@@ -10,8 +14,9 @@ using Microsoft.Extensions.Options;
 namespace Geef.Atelier.Tests.Intake;
 
 /// <summary>
-/// The order intake hands the whole file texts and the switch <see cref="IntakeOptions.DropGuessedDateOptions"/> to the gate: a date in
-/// the middle of a long file (outside the excerpt of the clarifier) keeps its options, a date nowhere in the order drops them.
+/// The order intake hands the whole file texts, the About me details and the switch <see cref="IntakeOptions.DropGuessedDateOptions"/>
+/// to the gate: a date in the middle of a long file (outside the excerpt of the clarifier) or in the About me details keeps the
+/// options, nothing date-like anywhere in the order drops them.
 /// </summary>
 public sealed class OrderIntakeCalendarTests
 {
@@ -25,8 +30,8 @@ public sealed class OrderIntakeCalendarTests
     private readonly RecordingRunStarter _starter = new();
     private readonly ManualTime _time = new(Now);
 
-    private OrderIntakeService Service(bool drop) => new(
-        _orders, _sources, new IntakeShadows(), new FixedMemory(), _clarifier, _starter, new RecordingOrderNotifier(),
+    private OrderIntakeService Service(bool drop, MemoryFacts? facts = null) => new(
+        _orders, _sources, new IntakeShadows(), new FixedMemory(facts), _clarifier, _starter, new RecordingOrderNotifier(),
         Options.Create(new IntakeOptions { DropGuessedDateOptions = drop }), NullLogger<OrderIntakeService>.Instance, _time,
         new IntakeSweepDeferrals(_time));
 
@@ -65,7 +70,7 @@ public sealed class OrderIntakeCalendarTests
 
         var record = Assert.Single(_starter.Requests).Record!;
         Assert.Empty(record.Questions);
-        Assert.Contains(record.Trace, t => t.Decision == GateDecision.DroppedGuessedDate);
+        Assert.Contains(record.Trace, t => t.Decision == GateDecision.DroppedBadOptions);
         Assert.Contains(record.Assumptions, a => a.Text == "Termin offen");
     }
 
@@ -79,5 +84,46 @@ public sealed class OrderIntakeCalendarTests
 
         var record = IntakeRecordJson.TryParse(Assert.Single(_orders.SavedQuestions).Json);
         Assert.Equal(2, Assert.Single(record!.Questions).Options.Count);
+    }
+
+    [Fact]
+    public async Task A_weekday_in_the_about_me_details_keeps_the_options()
+    {
+        var order = _orders.Add(Request);
+        _clarifier.Enqueue(DateQuestion());
+        var profile = new UserProfileEntity
+        {
+            Username = "e2e", DisplayName = "Alex Muster", FreeText = "Sprechzeiten montags bis donnerstags.",
+            CreatedAt = Now, UpdatedAt = Now,
+        };
+
+        Assert.Equal(IntakeProcessResult.AskedQuestions, await Service(drop: true, new MemoryFacts(profile)).ProcessAsync(order.Id, CancellationToken.None));
+
+        var record = IntakeRecordJson.TryParse(Assert.Single(_orders.SavedQuestions).Json);
+        Assert.Equal(2, Assert.Single(record!.Questions).Options.Count);
+    }
+
+    private enum PreviousImageDecision
+    {
+        Asked, Derived, FromMemory, ToResearch, Assumed, DroppedUserCannotKnow, DroppedLowImpact, DroppedRevisionRule, DroppedLengthKnown,
+        DroppedLengthSure, DroppedLengthNoTemplate, DroppedTooLong, DroppedJargon, DroppedBadOptions, DroppedLanguageMismatch,
+        DroppedDuplicateTopic, DroppedOverLimit, DroppedUnsafeContent,
+    }
+
+    private sealed record PreviousImageTrace(int GapIndex, GapTopic Topic, PreviousImageDecision Decision);
+
+    [Fact]
+    public async Task The_previous_image_reads_the_record_of_a_question_the_date_rule_dropped()
+    {
+        var order = _orders.Add(Request);
+        _clarifier.Enqueue(DateQuestion());
+        await Service(drop: true).ProcessAsync(order.Id, CancellationToken.None);
+        var json = IntakeRecordJson.Serialize(Assert.Single(_starter.Requests).Record!);
+
+        var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, Converters = { new JsonStringEnumConverter() } };
+        var trace = JsonNode.Parse(json)!["trace"]!.Deserialize<List<PreviousImageTrace>>(options)!;
+
+        Assert.Equal(PreviousImageDecision.DroppedBadOptions, Assert.Single(trace).Decision);
+        Assert.Equal(Enum.GetNames<PreviousImageDecision>(), Enum.GetNames<GateDecision>());
     }
 }
