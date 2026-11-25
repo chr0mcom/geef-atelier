@@ -277,7 +277,8 @@ public static class ResearchQueryGate
             yield return Number.Of(digits.ToString(), marked, lastMark);
     }
 
-    private static bool IsNumberSeparator(char c) => c is ' ' or '.' or ',' or '/' or '-' or ' ' or ' ';
+    private static bool IsNumberSeparator(char c) => c is ' ' or '.' or ',' or '/' or '-' or '\'' or '\u2019' or '\u02BC' or '\u2032' or '\u066C'
+        or '\u00A0' or '\u202F' or '\u2009' or '\u2007' or '\u2008';
 
     private static IEnumerable<string> Keys(string word)
     {

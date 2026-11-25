@@ -221,6 +221,12 @@ def test_audit_input_that_verifies_nothing_is_never_a_pass(tmp_path):
     ("Die Arbeits\u00adzeit ist hier geregelt.", "Die Arbeits"),
     ("Das Cafe\u0301s oeffnen am Montag wieder.", "Das Cafe"),
     ("Die Zahl 5x gilt hier nicht weiter.", "x gilt hier nicht weiter."),
+    ("The fee for the permit is 1 500 euros in total.", "The fee for the permit is 1"),
+    ("The fee for the permit is 1 500 euros in total.", "500 euros in total."),
+    ("The fee for the permit is 1\u202f500 euros in total.", "The fee for the permit is 1"),
+    ("Die Gebuehr betraegt 4'850 Franken im Jahr.", "Die Gebuehr betraegt 4"),
+    ("Die Gebuehr betraegt 4\u2019850 Franken im Jahr.", "850 Franken im Jahr."),
+    ("Der Preis betraegt 1'250'000 Franken.", "Der Preis betraegt 1'250"),
 ])
 def test_a_passage_cut_inside_a_word_or_number_is_a_violation(raw, quote):
     entry = _entry(raw=raw, quote=quote, start=_utf16_len(raw[:raw.index(quote)]), length=_utf16_len(quote))
@@ -236,6 +242,9 @@ def test_a_passage_cut_inside_a_word_or_number_is_a_violation(raw, quote):
     ("Der Satz gilt seit 2027.5 Seiten folgen noch.", "Seiten folgen noch."),
     ("Die Ost-West-Achse ist laengst fertig gebaut.", "West-Achse ist laengst fertig gebaut."),
     ("😀 Der Beitrag steigt auf 13 Euro😀", "Der Beitrag steigt auf 13 Euro"),
+    ("Since 2020 500 new permits were granted.", "500 new permits were granted."),
+    ("The city granted 12 permits 345 days later.", "The city granted 12 permits"),
+    ("The fee for the permit is 1 500 euros in total.", "The fee for the permit is 1 500 euros"),
 ])
 def test_a_passage_with_clean_edges_passes(raw, quote):
     entry = _entry(raw=raw, quote=quote, start=_utf16_len(raw[:raw.index(quote)]), length=_utf16_len(quote))

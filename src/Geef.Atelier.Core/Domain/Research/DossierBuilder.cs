@@ -135,7 +135,8 @@ internal static class ResearchTextExtensions
 
     /// <summary>
     /// The range <paramref name="start"/>–<paramref name="end"/> of <paramref name="text"/> widened so that it never starts or ends inside
-    /// a number written with a dot or a comma between digits (<c>1,5</c>, <c>1.250,00</c>): such a number is taken whole.
+    /// a number written with a dot or a comma between digits (<c>1,5</c>, <c>1.250,00</c>) or with a space or an apostrophe before a
+    /// group of exactly three digits (<c>1 500</c>, <c>4'850</c>, <c>1’250’000</c>): such a number is taken whole.
     /// </summary>
     public static (int Start, int End) WholeNumbers(this string text, int start, int end)
     {
@@ -157,7 +158,27 @@ internal static class ResearchTextExtensions
     }
 
     private static bool JoinsDigits(this string text, int index) =>
-        index > 0 && index + 1 < text.Length && (text[index] is '.' or ',') && char.IsDigit(text[index - 1]) && char.IsDigit(text[index + 1]);
+        index > 0 && index + 1 < text.Length && char.IsDigit(text[index - 1]) && char.IsDigit(text[index + 1])
+        && (text[index] is '.' or ',' || (text[index].IsGroupSeparator() && text.DigitsBefore(index) <= 3 && text.DigitsAfter(index) == 3));
+
+    private static bool IsGroupSeparator(this char c) =>
+        c is ' ' or '\'' or '\u2019' or '\u02BC' or '\u00A0' or '\u202F' or '\u2009' or '\u2007' or '\u2008';
+
+    private static int DigitsBefore(this string text, int index)
+    {
+        var count = 0;
+        while (index - 1 - count >= 0 && char.IsDigit(text[index - 1 - count]))
+            count++;
+        return count;
+    }
+
+    private static int DigitsAfter(this string text, int index)
+    {
+        var count = 0;
+        while (index + 1 + count < text.Length && char.IsDigit(text[index + 1 + count]))
+            count++;
+        return count;
+    }
 
     /// <summary>Number of runs of letters and digits.</summary>
     public static int WordCount(this string text)

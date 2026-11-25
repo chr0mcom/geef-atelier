@@ -122,16 +122,30 @@ public static partial class ResearchEvaluation
 
     /// <summary>
     /// True when the boundary before <paramref name="index"/> of <paramref name="raw"/> lies inside a word (letters, digits, soft
-    /// hyphen, combining marks on both sides) or inside a number written with a dot or comma between digits.
+    /// hyphen, combining marks on both sides) or inside a number written with a dot or comma between digits or with a space or an
+    /// apostrophe before a group of exactly three digits (<c>1 500</c>, <c>4'850</c>).
     /// </summary>
     internal static bool CutsWordOrNumber(string raw, int index)
     {
         static bool Part(char c) => char.IsLetterOrDigit(c) || c == '\u00AD'
             || char.GetUnicodeCategory(c) is System.Globalization.UnicodeCategory.NonSpacingMark or System.Globalization.UnicodeCategory.SpacingCombiningMark or System.Globalization.UnicodeCategory.EnclosingMark;
         static bool Mark(char c) => c is '.' or ',';
+        static bool Group(string text, int at)
+        {
+            if (at <= 0 || at + 1 >= text.Length || text[at] is not (' ' or '\'' or '\u2019' or '\u02BC' or '\u00A0' or '\u202F' or '\u2009' or '\u2007' or '\u2008'))
+                return false;
+            var before = 0;
+            while (at - 1 - before >= 0 && char.IsDigit(text[at - 1 - before]))
+                before++;
+            var after = 0;
+            while (at + 1 + after < text.Length && char.IsDigit(text[at + 1 + after]))
+                after++;
+            return before is >= 1 and <= 3 && after == 3;
+        }
         if (index <= 0 || index >= raw.Length)
             return false;
         return (Part(raw[index - 1]) && Part(raw[index]))
+            || Group(raw, index) || Group(raw, index - 1)
             || (index >= 2 && Mark(raw[index - 1]) && char.IsDigit(raw[index - 2]) && char.IsDigit(raw[index]))
             || (index + 1 < raw.Length && Mark(raw[index]) && char.IsDigit(raw[index - 1]) && char.IsDigit(raw[index + 1]));
     }

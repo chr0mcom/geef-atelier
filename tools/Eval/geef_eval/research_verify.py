@@ -40,6 +40,7 @@ TOOL = "research_verify"
 VERSION = 1
 SOFT_HYPHEN = "\u00ad"
 NUMBER_SEPARATORS = frozenset(".,")
+GROUP_SEPARATORS = frozenset(" '\u2019\u02bc\u00a0\u202f\u2009\u2007\u2008")
 
 
 def collapse(text: str) -> str:
@@ -66,12 +67,30 @@ def _is_word_part(char: str) -> bool:
     return char.isalpha() or char.isdecimal() or char == SOFT_HYPHEN or unicodedata.category(char).startswith("M")
 
 
+def _joins_groups(text: str, at: int) -> bool:
+    """True when ``text[at]`` is a space or an apostrophe between a run of one to three digits and a group of exactly three."""
+    if at <= 0 or at + 1 >= len(text) or text[at] not in GROUP_SEPARATORS:
+        return False
+    before = 0
+    while at - 1 - before >= 0 and text[at - 1 - before].isdecimal():
+        before += 1
+    after = 0
+    while at + 1 + after < len(text) and text[at + 1 + after].isdecimal():
+        after += 1
+    return 1 <= before <= 3 and after == 3
+
+
 def cuts_word(text: str, index: int) -> bool:
-    """True when a passage that starts or ends between ``text[index - 1]`` and ``text[index]`` cuts a word or a number apart."""
+    """True when a passage that starts or ends between ``text[index - 1]`` and ``text[index]`` cuts a word or a number apart.
+
+    A number is also one when a space or an apostrophe separates groups of three digits (``1 500``, ``4'850``).
+    """
     if index <= 0 or index >= len(text):
         return False
     before, after = text[index - 1], text[index]
     if _is_word_part(before) and _is_word_part(after):
+        return True
+    if _joins_groups(text, index) or _joins_groups(text, index - 1):
         return True
     if after in NUMBER_SEPARATORS:
         return before.isdecimal() and index + 1 < len(text) and text[index + 1].isdecimal()

@@ -123,9 +123,14 @@ public sealed class ResearchEvaluationTests : IDisposable
     [InlineData("zulaessig ohne Zustimmung des Vermieters.", 1)]
     [InlineData("Der Antrag ist unzulaessig ohne Zustimmung des", 0)]
     [InlineData("5 Monate Frist gelten fuer alle.", 1)]
+    [InlineData("Die Gebuehr betraegt 4", 1)]
+    [InlineData("850 Franken im Jahr.", 1)]
+    [InlineData("Die Gebuehr betraegt 4'850 Franken", 0)]
+    [InlineData("Seit 2020 500 neue Antraege.", 0)]
     public void A_range_that_starts_or_ends_inside_a_word_or_number_is_a_violation(string quote, int violations)
     {
-        const string raw = "Der Antrag ist unzulaessig ohne Zustimmung des Vermieters. Es gelten 1,5 Monate Frist gelten fuer alle.";
+        const string raw = "Der Antrag ist unzulaessig ohne Zustimmung des Vermieters. Es gelten 1,5 Monate Frist gelten fuer alle. "
+            + "Die Gebuehr betraegt 4'850 Franken im Jahr. Seit 2020 500 neue Antraege.";
         var sha = JsonLines.Sha256(raw);
         var page = new PageRecord("P1", 1, "https://a.example/", "A", raw, sha);
         var file = new RunFile("f", "00", [Bare("h-01") with

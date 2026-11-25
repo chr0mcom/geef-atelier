@@ -64,6 +64,14 @@ public sealed class ResearchQueryGateTests
     [InlineData("Mietminderung 1250 Euro", "Kaltmiete 1.250,00")]
     [InlineData("Mietminderung 1.250,00 Euro", "Kaltmiete 1250")]
     [InlineData("Zuschuss 3.200", "Bonus 3200,00")]
+    [InlineData("Mietminderung Wohnung 4850", "Kaltmiete 4'850")]
+    [InlineData("Mietminderung Wohnung 4850", "Kaltmiete 4\u2019850")]
+    [InlineData("Mietminderung Wohnung 4'850", "Kaltmiete 4850")]
+    [InlineData("Mietminderung Wohnung 4850", "Kaltmiete 4\u02BC850")]
+    [InlineData("Mietminderung Wohnung 4850", "Kaltmiete 4\u2009850")]
+    [InlineData("Mietminderung Wohnung 4850", "Kaltmiete 4\u202F850")]
+    [InlineData("Mietminderung Wohnung 4850", "Kaltmiete 4\u00A0850")]
+    [InlineData("Mietminderung Wohnung 1250000", "Kaufpreis 1'250'000.00")]
     public void Four_digit_and_marked_numbers_are_withheld_in_any_spelling(string topic, string profile) =>
         AssertWithheld(Select(topic, profile: profile));
 

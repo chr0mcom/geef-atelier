@@ -215,6 +215,23 @@ public sealed class DossierBuilderTests
         Assert.Equal("1,5 million euros on schools each year.", Assert.Single(entries).Quote);
     }
 
+    [Theory]
+    [InlineData("The fee for the permit is 1 500 euros in total.", "The fee for the permit is 1", "The fee for the permit is 1 500")]
+    [InlineData("The fee for the permit is 1\u202F500 euros in total.", "The fee for the permit is 1", "The fee for the permit is 1\u202F500")]
+    [InlineData("Die Gebühr für die Genehmigung beträgt 4'850 Franken.", "Die Gebühr für die Genehmigung beträgt 4", "Die Gebühr für die Genehmigung beträgt 4'850")]
+    [InlineData("Die Gebühr für die Genehmigung beträgt 1\u2019250\u2019000 Franken.", "Die Gebühr für die Genehmigung beträgt 1\u2019250", "Die Gebühr für die Genehmigung beträgt 1\u2019250\u2019000")]
+    [InlineData("Since 2020 500 new permits were granted in the city.", "500 new permits were granted in the city.", "500 new permits were granted in the city.")]
+    [InlineData("The city granted 12 permits 345 days after the change.", "The city granted 12 permits 345 days after the change.", "The city granted 12 permits 345 days after the change.")]
+    public void A_number_with_a_space_or_an_apostrophe_between_groups_of_three_digits_is_taken_whole(string raw, string quote, string expected)
+    {
+        var page = new ResearchPage("P1", 1, "https://stadt.example/gebuehr", "Gebühr", raw);
+
+        var (entries, _) = DossierBuilder.Build([new ProposedPassage(1, "P1", quote)], [page], Request, 12, At);
+
+        var entry = Assert.Single(entries);
+        Assert.Equal(expected, raw.Substring(entry.Start, entry.Length));
+    }
+
     [Fact]
     public void An_unsafe_title_is_kept_as_the_host_of_the_page()
     {
