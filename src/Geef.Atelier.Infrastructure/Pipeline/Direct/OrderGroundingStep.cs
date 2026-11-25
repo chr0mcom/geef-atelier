@@ -30,9 +30,9 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Direct;
 /// fact check (<see cref="AtelierContextKeys.FactMaterial"/>), fixes the fact-check mode of the run for every run alike (never by
 /// difficulty, length or count) and stores it, and recalculates the totals in the files when <see cref="DirectOptions.SourceArithmetic"/>
 /// is on. <see cref="DirectOptions"/> and <see cref="IRunFactCheckModeStore"/> come from the scope. Before the files are rendered it asks
-/// <see cref="IOrderResearchService"/> for the research of the order (<paramref name="orderVersion"/> is the version of the run); passages
-/// found on the web follow the files as source <see cref="DossierRenderer.SourceId"/> for the writer and the fact check, never for the
-/// totals. A failed research is a warning, never the end of the run.
+/// <see cref="IOrderResearchService"/> for the research of the order (<paramref name="orderVersion"/> is the version of the run); an order
+/// with attached files never searches. Passages found on the web follow as source <see cref="DossierRenderer.SourceId"/> for the writer and
+/// the fact check, never for the totals. A failed research is a warning, never the end of the run.
 /// </summary>
 internal sealed class OrderGroundingStep(
     Guid runId,
@@ -42,7 +42,8 @@ internal sealed class OrderGroundingStep(
     SourceOptions options,
     IRunWarningSink warnings,
     ILogger<OrderGroundingStep> logger,
-    int? orderVersion = null) : IGroundingStep
+    int? orderVersion = null,
+    TimeSpan? researchWaitLimit = null) : IGroundingStep
 {
     /// <summary>Target of the usages written by this step.</summary>
     public const string WriterTarget = "writer";
@@ -133,28 +134,24 @@ internal sealed class OrderGroundingStep(
     }
 
     /// <summary>
-    /// Asks <see cref="IOrderResearchService"/> (when one is registered) for the research of the order, with the full text and the name of
-    /// every file of the order (the clarifier that wrote the topics saw both) and the About me details of the briefing, so that the service
-    /// can keep their words out of the searches. An exception or a
-    /// wait longer than <see cref="ResearchWaitLimit"/> counts as <see cref="ResearchStatus.Failed"/>; only the cancellation of the run itself
-    /// ends the step.
+    /// Asks <see cref="IOrderResearchService"/> (when one is registered) for the research of the order, saying whether the order has
+    /// attached files (then nothing is searched) and with the About me details of the briefing, so that the service can keep their
+    /// words out of the searches. An exception or a wait longer than <see cref="ResearchWaitLimit"/> (or the limit given to the step)
+    /// counts as <see cref="ResearchStatus.Failed"/>, also when the service does not stop on its own; only the cancellation of the run
+    /// itself ends the step.
     /// </summary>
     private async Task<RunResearch> ResearchAsync(
         Core.Domain.Orders.OrderEntity order, bool revises, IReadOnlyList<OrderSourceItem> items, string? profile, CancellationToken ct)
     {
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        limit.CancelAfter(ResearchWaitLimit);
+        limit.CancelAfter(researchWaitLimit ?? ResearchWaitLimit);
         try
         {
             await using var scope = scopes.CreateAsyncScope();
             if (scope.ServiceProvider.GetService<IOrderResearchService>() is not { } service)
                 return RunResearch.None;
 
-            var fileTexts = items.Select(i => i.Source.ExtractedText ?? string.Empty)
-                .Concat(items.Select(i => i.Source.FileName ?? string.Empty))
-                .Where(t => t.Length > 0)
-                .ToList();
-            var research = await service.EnsureAsync(order, orderVersion, revises, fileTexts, profile, limit.Token);
+            var research = await service.EnsureAsync(order, orderVersion, revises, items.Count > 0, profile, limit.Token).WaitAsync(limit.Token);
             return research is null ? RunResearch.None : new RunResearch(research, research.Status, research.Status == ResearchStatus.Failed);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)

@@ -33,8 +33,14 @@ public sealed class ResearchOptions
     /// <summary>Entries kept in the research of an order at most.</summary>
     public int MaxEntries { get; set; } = 12;
 
-    /// <summary>Orders that may do research per UTC day; later orders get the daily-limit status without a search.</summary>
+    /// <summary>
+    /// Orders that may search per UTC day; later orders get the daily-limit status without a search. The search is reserved before it
+    /// starts, so a cancelled search counts as well.
+    /// </summary>
     public int DailyOrderCap { get; set; } = 50;
+
+    /// <summary>Orders of one account that may search per UTC day, within <see cref="DailyOrderCap"/>.</summary>
+    public int DailyOrderCapPerUser { get; set; } = 20;
 
     /// <summary>Local directory for raw texts and entries during the acceptance; empty writes nothing.</summary>
     public string? AuditDirectory { get; set; }

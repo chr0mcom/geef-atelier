@@ -63,13 +63,13 @@ internal sealed class InMemoryOrderRepository : IOrderRepository
     public Task<bool> TryStartWithRunAsync(OrderStart start, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<IReadOnlyList<Guid>> ListUnansweredAsync(DateTimeOffset askedBefore, int limit, CancellationToken ct = default) => throw new NotImplementedException();
 
-    public Task<bool> TrySetResearchAsync(Guid orderId, string researchJson, DateTimeOffset at, CancellationToken ct = default)
+    public Task<bool> TrySetResearchAsync(Guid orderId, string researchJson, DateTimeOffset? at, CancellationToken ct = default)
     {
         while (_orders.TryGetValue(orderId, out var order))
         {
             if (order.ResearchJson is not null)
                 return Task.FromResult(false);
-            if (_orders.TryUpdate(orderId, order with { ResearchJson = researchJson, ResearchAt = at }, order))
+            if (_orders.TryUpdate(orderId, order with { ResearchJson = researchJson, ResearchAt = order.ResearchAt ?? at }, order))
                 return Task.FromResult(true);
         }
         return Task.FromResult(false);
@@ -77,6 +77,20 @@ internal sealed class InMemoryOrderRepository : IOrderRepository
 
     public Task<int> CountResearchSinceAsync(DateTimeOffset since, CancellationToken ct = default) =>
         Task.FromResult(_orders.Values.Count(o => o.ResearchAt is { } at && at >= since));
+
+    public Task<bool> TryReserveResearchAsync(Guid orderId, string? user, DateTimeOffset at, DateTimeOffset since, int dailyCap, int userCap, CancellationToken ct = default)
+    {
+        lock (_orders)
+        {
+            if (!_orders.TryGetValue(orderId, out var order) || order.ResearchJson is not null)
+                return Task.FromResult(false);
+            var others = _orders.Values.Where(o => o.Id != orderId && o.ResearchAt is { } r && r >= since && r < since.AddDays(1)).ToList();
+            if (others.Count >= dailyCap || others.Count(o => (o.CreatedByUser ?? string.Empty) == (user ?? string.Empty)) >= userCap)
+                return Task.FromResult(false);
+            _orders[orderId] = order with { ResearchAt = at };
+            return Task.FromResult(true);
+        }
+    }
 }
 
 /// <summary>Sources, order links and run usages in memory; only the members the direct path uses are implemented.</summary>
@@ -162,7 +176,7 @@ internal sealed class RecordingConsultationRepository : IGroundingConsultationRe
 }
 
 /// <summary>One call of <see cref="IOrderResearchService.EnsureAsync"/> as the grounding step made it.</summary>
-internal sealed record ResearchCall(Guid OrderId, string RequestText, int? OrderVersion, bool Revises, IReadOnlyList<string> FileTexts, string? ProfileText);
+internal sealed record ResearchCall(Guid OrderId, string RequestText, int? OrderVersion, bool Revises, bool HasFiles, string? ProfileText);
 
 /// <summary>
 /// Stand-in for the research service of stage 4: records every call and answers with <see cref="Answer"/> (default: no research). With
@@ -182,9 +196,9 @@ internal sealed class ScriptedOrderResearchService : IOrderResearchService
 
     public int NewResearch => _newResearch;
 
-    public async Task<OrderResearch?> EnsureAsync(OrderEntity order, int? orderVersion, bool revises, IReadOnlyList<string> fileTexts, string? profileText, CancellationToken ct)
+    public async Task<OrderResearch?> EnsureAsync(OrderEntity order, int? orderVersion, bool revises, bool hasFiles, string? profileText, CancellationToken ct)
     {
-        var call = new ResearchCall(order.Id, order.RequestText, orderVersion, revises, fileTexts.ToList(), profileText);
+        var call = new ResearchCall(order.Id, order.RequestText, orderVersion, revises, hasFiles, profileText);
         Calls.Enqueue(call);
         if (StoreFirst && _stored.TryGetValue(order.Id, out var stored))
             return stored;

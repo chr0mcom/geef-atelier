@@ -116,10 +116,10 @@ internal sealed class ResearchOrders : IOrderRepository
     public int Sets;
     public int Counts;
 
-    /// <summary>Number returned by the daily count in addition to the stored orders.</summary>
+    /// <summary>Reservations of other orders counted in addition to the stored orders, by the daily count and the reservation.</summary>
     public int ExtraCount { get; set; }
 
-    /// <summary>Thrown by the daily count when set.</summary>
+    /// <summary>Thrown by the reservation when set.</summary>
     public Exception? CountFailure { get; set; }
 
     /// <summary>Thrown by the write when set.</summary>
@@ -142,7 +142,7 @@ internal sealed class ResearchOrders : IOrderRepository
         return Task.FromResult(Find(orderId));
     }
 
-    public Task<bool> TrySetResearchAsync(Guid orderId, string researchJson, DateTimeOffset at, CancellationToken ct = default)
+    public Task<bool> TrySetResearchAsync(Guid orderId, string researchJson, DateTimeOffset? at, CancellationToken ct = default)
     {
         Interlocked.Increment(ref Sets);
         BeforeSet?.Invoke(orderId);
@@ -152,18 +152,30 @@ internal sealed class ResearchOrders : IOrderRepository
         {
             if (order.ResearchJson is not null)
                 return Task.FromResult(false);
-            if (_orders.TryUpdate(orderId, order with { ResearchJson = researchJson, ResearchAt = at }, order))
+            if (_orders.TryUpdate(orderId, order with { ResearchJson = researchJson, ResearchAt = order.ResearchAt ?? at }, order))
                 return Task.FromResult(true);
         }
         return Task.FromResult(false);
     }
 
-    public Task<int> CountResearchSinceAsync(DateTimeOffset since, CancellationToken ct = default)
+    public Task<int> CountResearchSinceAsync(DateTimeOffset since, CancellationToken ct = default) =>
+        Task.FromResult(ExtraCount + _orders.Values.Count(o => o.ResearchAt is { } at && at >= since));
+
+    public Task<bool> TryReserveResearchAsync(Guid orderId, string? user, DateTimeOffset at, DateTimeOffset since, int dailyCap, int userCap, CancellationToken ct = default)
     {
         Interlocked.Increment(ref Counts);
         if (CountFailure is { } failure)
             throw failure;
-        return Task.FromResult(ExtraCount + _orders.Values.Count(o => o.ResearchAt is { } at && at >= since));
+        lock (_orders)
+        {
+            if (!_orders.TryGetValue(orderId, out var order) || order.ResearchJson is not null)
+                return Task.FromResult(false);
+            var others = _orders.Values.Where(o => o.Id != orderId && o.ResearchAt is { } r && r >= since && r < since.AddDays(1)).ToList();
+            if (ExtraCount + others.Count >= dailyCap || others.Count(o => (o.CreatedByUser ?? string.Empty) == (user ?? string.Empty)) >= userCap)
+                return Task.FromResult(false);
+            _orders[orderId] = order with { ResearchAt = at };
+            return Task.FromResult(true);
+        }
     }
 
     public Task CreateWithFirstRunAsync(OrderEntity order, IReadOnlyList<OrderSourceEntity> sources, RunEntity run, CancellationToken ct = default) => throw new NotSupportedException();

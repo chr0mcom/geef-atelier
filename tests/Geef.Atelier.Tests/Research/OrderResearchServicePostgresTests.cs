@@ -40,8 +40,8 @@ public sealed class OrderResearchServicePostgresTests(PostgresFixture fixture)
         await using var db2 = fixture.NewContext();
 
         var results = await Task.WhenAll(
-            Service(db1, Search(), Condenser("first")).EnsureAsync(order, 1, false, [], null, CancellationToken.None),
-            Service(db2, Search(), Condenser("second")).EnsureAsync(order, 1, false, [], null, CancellationToken.None));
+            Service(db1, Search(), Condenser("first")).EnsureAsync(order, 1, false, false, null, CancellationToken.None),
+            Service(db2, Search(), Condenser("second")).EnsureAsync(order, 1, false, false, null, CancellationToken.None));
 
         var stored = await LoadAsync(order.Id);
         Assert.NotNull(stored.ResearchJson);
@@ -50,17 +50,18 @@ public sealed class OrderResearchServicePostgresTests(PostgresFixture fixture)
 
         await using var db3 = fixture.NewContext();
         var later = Search();
-        var again = await Service(db3, later, Condenser("third")).EnsureAsync(stored, 2, false, [], null, CancellationToken.None);
+        var again = await Service(db3, later, Condenser("third")).EnsureAsync(stored, 2, false, false, null, CancellationToken.None);
         Assert.Equal(stored.ResearchJson, ResearchJson.Serialize(again!));
         Assert.Empty(later.Queries);
     }
 
     [Fact]
-    public async Task The_daily_limit_counts_the_research_stored_today()
+    public async Task The_daily_limit_counts_the_searches_reserved_today()
     {
         await using var probe = fixture.NewContext();
         var today = new DateTimeOffset(DateTime.UtcNow.Date, TimeSpan.Zero);
-        var already = await new OrderRepository(probe).CountResearchSinceAsync(today);
+        var repository = new OrderRepository(probe);
+        var already = await repository.CountResearchSinceAsync(today) - await repository.CountResearchSinceAsync(today.AddDays(1));
         var options = new ResearchOptions { Mode = ResearchMode.On, DailyOrderCap = already + 1 };
 
         var first = await AddAsync(Order(NewUser()) with { ClarifyJson = Clarify(Topic) });
@@ -68,8 +69,8 @@ public sealed class OrderResearchServicePostgresTests(PostgresFixture fixture)
         await using var db = fixture.NewContext();
         var search = Search();
 
-        var a = await Service(db, search, Condenser("m"), options).EnsureAsync(first, 1, false, [], null, CancellationToken.None);
-        var b = await Service(db, search, Condenser("m"), options).EnsureAsync(second, 1, false, [], null, CancellationToken.None);
+        var a = await Service(db, search, Condenser("m"), options).EnsureAsync(first, 1, false, false, null, CancellationToken.None);
+        var b = await Service(db, search, Condenser("m"), options).EnsureAsync(second, 1, false, false, null, CancellationToken.None);
 
         Assert.Equal(ResearchStatus.Found, a!.Status);
         Assert.Equal(ResearchStatus.DailyLimit, b!.Status);

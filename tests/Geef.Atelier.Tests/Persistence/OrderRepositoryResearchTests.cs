@@ -7,7 +7,8 @@ namespace Geef.Atelier.Tests.Persistence;
 
 /// <summary>
 /// The research methods of <see cref="OrderRepository"/> against real Postgres: the research of an order is stored once (the first
-/// writer wins, a second call changes nothing) and the daily count covers exactly the orders stored at or after its start.
+/// writer wins, a second call changes nothing), the daily count covers exactly the orders reserved at or after its start, and a
+/// reservation never passes the daily limit or the limit per account, also when reservations come at the same time.
 /// </summary>
 [Collection("Postgres")]
 [Trait("Category", "Integration")]
@@ -103,6 +104,70 @@ public sealed class OrderRepositoryResearchTests(PostgresFixture fixture)
 
         Assert.Equal(1, await repository.CountResearchSinceAsync(day) - await repository.CountResearchSinceAsync(day.AddTicks(TimeSpan.TicksPerMillisecond)));
     }
+
+    [Fact]
+    public async Task Simultaneous_reservations_never_pass_the_daily_limit()
+    {
+        var day = FarDay(2051);
+        var orders = new List<OrderEntity>();
+        for (var i = 0; i < 10; i++)
+            orders.Add(await AddAsync(Order(NewUser())));
+
+        var results = await Task.WhenAll(orders.Select(async order =>
+        {
+            await using var db = fixture.NewContext();
+            return await new OrderRepository(db).TryReserveResearchAsync(order.Id, order.CreatedByUser, day.AddHours(1), day, 4, 100);
+        }));
+
+        Assert.Equal(4, results.Count(r => r));
+        await using var check = fixture.NewContext();
+        var repository = new OrderRepository(check);
+        Assert.Equal(4, await repository.CountResearchSinceAsync(day) - await repository.CountResearchSinceAsync(day.AddDays(1)));
+    }
+
+    [Fact]
+    public async Task The_limit_per_account_holds_within_the_daily_limit()
+    {
+        var day = FarDay(2061);
+        var user = NewUser();
+        var mine = new[] { await AddAsync(Order(user)), await AddAsync(Order(user)), await AddAsync(Order(user)) };
+        var other = await AddAsync(Order(NewUser()));
+        await using var db = fixture.NewContext();
+        var repository = new OrderRepository(db);
+
+        var results = new List<bool>();
+        foreach (var order in mine)
+            results.Add(await repository.TryReserveResearchAsync(order.Id, user, day.AddMinutes(1), day, 100, 2));
+
+        Assert.Equal([true, true, false], results);
+        Assert.True(await repository.TryReserveResearchAsync(other.Id, other.CreatedByUser, day.AddMinutes(2), day, 100, 2));
+        Assert.Null((await LoadAsync(mine[2].Id)).ResearchAt);
+    }
+
+    [Fact]
+    public async Task A_reservation_stays_counts_once_per_order_and_is_kept_when_the_research_is_stored()
+    {
+        var day = FarDay(2071);
+        var order = await AddAsync(Order(NewUser()));
+        var stored = await AddAsync(Order(NewUser()));
+        var reservedAt = day.AddHours(2);
+        await using var db = fixture.NewContext();
+        var repository = new OrderRepository(db);
+        Assert.True(await repository.TrySetResearchAsync(stored.Id, First, null));
+
+        Assert.True(await repository.TryReserveResearchAsync(order.Id, order.CreatedByUser, reservedAt, day, 1, 1));
+        Assert.True(await repository.TryReserveResearchAsync(order.Id, order.CreatedByUser, reservedAt.AddMinutes(1), day, 1, 1));
+        Assert.False(await repository.TryReserveResearchAsync(stored.Id, stored.CreatedByUser, reservedAt, day, 100, 100));
+        Assert.False(await repository.TryReserveResearchAsync(Guid.NewGuid(), null, reservedAt, day, 100, 100));
+        Assert.Equal(1, await repository.CountResearchSinceAsync(day) - await repository.CountResearchSinceAsync(day.AddDays(1)));
+
+        Assert.True(await repository.TrySetResearchAsync(order.Id, First, null));
+        Assert.Equal(reservedAt.AddMinutes(1), (await LoadAsync(order.Id)).ResearchAt!.Value, TimeSpan.FromMilliseconds(1));
+        Assert.Null((await LoadAsync(stored.Id)).ResearchAt);
+    }
+
+    private static DateTimeOffset FarDay(int year) =>
+        new DateTimeOffset(year, 1, 1, 0, 0, 0, TimeSpan.Zero).AddDays(Random.Shared.Next(0, 3_000));
 
     private async Task<OrderEntity> AddAsync(OrderEntity order)
     {

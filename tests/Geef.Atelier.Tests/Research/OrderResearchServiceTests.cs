@@ -3,6 +3,7 @@ using System.Text.Json;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
+using Geef.Atelier.Core.Domain.Profiles;
 using Geef.Atelier.Core.Domain.Research;
 using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Llm;
@@ -74,8 +75,8 @@ public sealed class OrderResearchServiceTests
         ClarifyJson = clarify, ResearchJson = researchJson, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
     };
 
-    private static Task<OrderResearch?> Ensure(Setup s, OrderEntity order, int? version = 1, bool revises = false, IReadOnlyList<string>? files = null, string? profile = null) =>
-        s.Service.EnsureAsync(s.Orders.Put(order), version, revises, files ?? [], profile, CancellationToken.None);
+    private static Task<OrderResearch?> Ensure(Setup s, OrderEntity order, int? version = 1, bool revises = false, bool files = false, string? profile = null) =>
+        s.Service.EnsureAsync(s.Orders.Put(order), version, revises, files, profile, CancellationToken.None);
 
     private static void AssertNothingHappened(Setup s, OrderResearch? result)
     {
@@ -112,7 +113,8 @@ public sealed class OrderResearchServiceTests
 
         var stored = s.Orders.Find(order.Id)!;
         Assert.Equal(ResearchJson.Serialize(result), stored.ResearchJson);
-        Assert.Equal(result.At, stored.ResearchAt);
+        Assert.NotNull(stored.ResearchAt);
+        Assert.True(stored.ResearchAt <= result.At);
     }
 
     [Fact]
@@ -192,7 +194,7 @@ public sealed class OrderResearchServiceTests
         foreach (var (version, revises) in new (int?, bool)[] { (1, false), (2, false), (3, true), (null, false) })
         {
             var later = Create();
-            var again = await later.Service.EnsureAsync(later.Orders.Put(stored), version, revises, [], null, CancellationToken.None);
+            var again = await later.Service.EnsureAsync(later.Orders.Put(stored), version, revises, false, null, CancellationToken.None);
 
             Assert.Equal(ResearchJson.Serialize(research!), ResearchJson.Serialize(again!));
             Assert.Empty(later.Search.Queries);
@@ -236,12 +238,12 @@ public sealed class OrderResearchServiceTests
     }
 
     [Fact]
-    public async Task Topics_with_words_from_files_or_profile_are_withheld_and_never_searched()
+    public async Task Topics_with_words_from_the_profile_are_withheld_and_never_searched()
     {
         var s = Create();
         var order = Order(Clarify(IntakeRecordStatus.Ok, "Firma Kranichsteiner Mindestlohn", "Tarif Oberhuber Mindestlohn"));
 
-        var result = await Ensure(s, order, files: ["Vertrag der Firma Kranichsteiner GmbH."], profile: "Ich heiße Oberhuber.");
+        var result = await Ensure(s, order, profile: "Organization: Kranichsteiner GmbH\nAnything else: Ich heiße Oberhuber.");
 
         Assert.Equal(ResearchStatus.AllWithheld, result!.Status);
         Assert.Equal(2, result.Withheld);
@@ -253,11 +255,125 @@ public sealed class OrderResearchServiceTests
     }
 
     [Fact]
+    public async Task The_field_names_of_the_profile_never_withhold_a_topic()
+    {
+        var s = Create();
+        string[] topics = ["notice period when moving out of a flat in England", "bank holidays in the UK 2026", "consumer rights online order refund deadline", "Signaturgesetz Pflicht"];
+        var profile = ProfilePrompt.Render(new UserProfileEntity
+        {
+            Username = User, Formality = Formality.Formal, Language = "de", Signature = "Viele Grüße", CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
+        });
+
+        var result = await Ensure(s, Order(Clarify(IntakeRecordStatus.Ok, topics)), profile: profile);
+
+        Assert.Equal(0, result!.Withheld);
+        Assert.Equal(topics.Order(StringComparer.Ordinal), s.Search.Queries.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task With_free_text_in_the_profile_a_topic_in_another_language_than_the_order_is_withheld()
+    {
+        var s = Create();
+        var clarify = IntakeRecordJson.Serialize(IntakeRecord.Fallback(IntakeRecordStatus.Ok, null, 1, "m", BriefMode.AppendAnswers) with
+        {
+            Output = new ClarifierOutput("Aushang", "de", "Ein Aushang.", false, null, LengthScale.Standard, [], [TopicA, "sick leave rules for the employer"]),
+            ResearchTopics = [TopicA, "sick leave rules for the employer"],
+        });
+
+        var withFreeText = await Ensure(s, Order(clarify), profile: "Anything else: Ich bin seit Mai krankgeschrieben.");
+        var withoutFreeText = await Ensure(Create(), Order(clarify), profile: "Role: Teamleitung");
+
+        Assert.Equal([TopicA], withFreeText!.TopicsSent);
+        Assert.Equal(1, withFreeText.Withheld);
+        Assert.Equal(0, withoutFreeText!.Withheld);
+    }
+
+    [Fact]
+    public async Task An_order_with_files_never_searches_and_stores_files_attached_for_every_run()
+    {
+        var s = Create();
+        var order = Order(Clarify(IntakeRecordStatus.Ok, TopicA, TopicB));
+
+        var result = await Ensure(s, order, files: true);
+
+        Assert.Equal((ResearchStatus.FilesAttached, 0, 0, 0), (result!.Status, result.Searches, result.Withheld, result.Entries.Count));
+        Assert.Empty(result.TopicsSent);
+        Assert.Empty(s.Search.Queries);
+        Assert.Empty(s.Condenser.Calls);
+        Assert.Equal(0, s.Orders.Counts);
+        var stored = s.Orders.Find(order.Id)!;
+        Assert.Equal(ResearchJson.Serialize(result), stored.ResearchJson);
+        Assert.Null(stored.ResearchAt);
+
+        foreach (var (version, revises) in new (int?, bool)[] { (2, false), (3, true), (null, false) })
+        {
+            var later = Create();
+            var again = await later.Service.EnsureAsync(later.Orders.Put(stored), version, revises, true, null, CancellationToken.None);
+            Assert.Equal(ResearchJson.Serialize(result), ResearchJson.Serialize(again!));
+            Assert.Empty(later.Search.Queries);
+            Assert.Equal((0, 0), (later.Orders.Sets, later.Orders.Counts));
+        }
+    }
+
+    [Fact]
+    public async Task Stored_passages_are_never_used_for_an_order_with_files()
+    {
+        var first = Order(Clarify(IntakeRecordStatus.Ok, TopicA));
+        var found = await Ensure(Create(), first);
+        var order = first with { ResearchJson = ResearchJson.Serialize(found!) };
+        var later = Create();
+
+        var result = await Ensure(later, order, version: 2, files: true);
+
+        Assert.Equal(ResearchStatus.Found, found!.Status);
+        Assert.Equal(ResearchStatus.FilesAttached, result!.Status);
+        Assert.Empty(result.Entries);
+        Assert.Empty(later.Search.Queries);
+        Assert.Equal(ResearchJson.Serialize(found), later.Orders.Find(order.Id)!.ResearchJson);
+    }
+
+    [Fact]
+    public async Task An_order_with_files_but_without_topics_gets_nothing()
+    {
+        var s = Create();
+
+        Assert.Null(await Ensure(s, Order(Clarify(IntakeRecordStatus.Ok)), files: true));
+        Assert.Empty(s.Search.Queries);
+        Assert.Equal(0, s.Orders.Sets);
+    }
+
+    [Fact]
+    public async Task A_topic_that_is_only_the_name_of_a_kind_of_gap_is_never_searched()
+    {
+        var s = Create();
+
+        var result = await Ensure(s, Order(Clarify(IntakeRecordStatus.Ok, "Facts", "other details", TopicA)));
+        var none = await Ensure(Create(), Order(Clarify(IntakeRecordStatus.Ok, "Facts", "Date")));
+
+        Assert.Equal([TopicA], s.Search.Queries);
+        Assert.Equal([TopicA], result!.TopicsSent);
+        Assert.Null(none);
+    }
+
+    [Fact]
+    public async Task The_limit_per_account_stops_the_search_within_the_daily_limit()
+    {
+        var s = Create(On(o => o.DailyOrderCapPerUser = 1));
+
+        var first = await Ensure(s, Order(Clarify(IntakeRecordStatus.Ok, TopicA)));
+        var second = await Ensure(s, Order(Clarify(IntakeRecordStatus.Ok, TopicA)));
+        var other = await Ensure(s, Order(Clarify(IntakeRecordStatus.Ok, TopicA), user: "writer-b"));
+
+        Assert.Equal([ResearchStatus.Found, ResearchStatus.DailyLimit, ResearchStatus.Found], new[] { first!.Status, second!.Status, other!.Status });
+        Assert.Equal(2, s.Search.Queries.Count);
+    }
+
+    [Fact]
     public async Task Some_withheld_topics_leave_the_others_searched()
     {
         var s = Create();
 
-        var result = await Ensure(s, Order(Clarify(IntakeRecordStatus.Ok, "Firma Kranichsteiner Mindestlohn", TopicA)), files: ["Firma Kranichsteiner"]);
+        var result = await Ensure(s, Order(Clarify(IntakeRecordStatus.Ok, "Firma Kranichsteiner Mindestlohn", TopicA)), profile: "Organization: Firma Kranichsteiner");
 
         Assert.Equal(ResearchStatus.Found, result!.Status);
         Assert.Equal(1, result.Withheld);
@@ -392,14 +508,15 @@ public sealed class OrderResearchServiceTests
     }
 
     [Fact]
-    public async Task A_failing_write_still_gives_this_run_the_research()
+    public async Task A_failing_write_lets_the_run_go_on_without_the_passages_as_failed()
     {
         var s = Create();
         s.Orders.SetFailure = new InvalidOperationException("database down");
 
         var result = await Ensure(s, Order(Clarify(IntakeRecordStatus.Ok, TopicA)));
 
-        Assert.Equal(ResearchStatus.Found, result!.Status);
+        Assert.Equal((ResearchStatus.Failed, OrderResearchService.NotStoredCode), (result!.Status, result.ErrorCode));
+        Assert.Empty(result.Entries);
         Assert.Contains(s.Log.Entries, e => e.Message.Contains("stored failed", StringComparison.Ordinal));
     }
 
@@ -425,8 +542,9 @@ public sealed class OrderResearchServiceTests
         var order = s.Orders.Put(Order(Clarify(IntakeRecordStatus.Ok, TopicA)));
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => s.Service.EnsureAsync(order, 1, false, [], null, cts.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => s.Service.EnsureAsync(order, 1, false, false, null, cts.Token));
         Assert.Null(s.Orders.Find(order.Id)!.ResearchJson);
+        Assert.NotNull(s.Orders.Find(order.Id)!.ResearchAt);
     }
 
     [Fact]
@@ -563,11 +681,11 @@ public sealed class OrderResearchServiceTests
         await using var provider = services.BuildServiceProvider();
         var service = provider.CreateScope().ServiceProvider.GetRequiredService<Geef.Atelier.Application.Research.IOrderResearchService>();
 
-        var order = orders.Put(Order(Clarify(IntakeRecordStatus.Ok, TopicA, TopicB, $"Mindestlohn {FileSentinel}")) with
+        var order = orders.Put(Order(Clarify(IntakeRecordStatus.Ok, TopicA, TopicB, $"Mindestlohn {ProfileSentinel}")) with
         {
             RequestText = Request + " " + RequestSentinel,
         });
-        var result = await service.EnsureAsync(order, 1, false, [$"Datei über {FileSentinel} und {ProfileSentinel}."], $"Profil: {ProfileSentinel}", CancellationToken.None);
+        var result = await service.EnsureAsync(order, 1, false, false, $"Name: {ProfileSentinel}\nAnything else: {FileSentinel}", CancellationToken.None);
 
         Assert.Equal(ResearchStatus.Found, result!.Status);
         Assert.Equal(1, result.Withheld);

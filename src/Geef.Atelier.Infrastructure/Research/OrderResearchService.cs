@@ -5,6 +5,7 @@ using Geef.Atelier.Application.Research;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
+using Geef.Atelier.Core.Domain.Profiles;
 using Geef.Atelier.Core.Domain.Research;
 using Geef.Atelier.Core.Persistence.Orders;
 using Microsoft.Extensions.Logging;
@@ -17,10 +18,14 @@ namespace Geef.Atelier.Infrastructure.Research;
 /// found word for word and stores the result once per order. Every failure ends as a status with <see cref="OrderResearch.ErrorCode"/>.
 /// </summary>
 /// <remarks>
-/// Only the topics that <see cref="ResearchQueryGate"/> lets go reach the search, and the passage picker sees nothing but these topics and
-/// the pages. Searches run in parallel, each once. Every research that ran is stored, a failed one included, so that no later run of the
-/// order searches again; the write is conditional, and whoever loses reads the stored research. One log line per research names counts,
-/// duration and model only, never topics, passages or addresses.
+/// An order with attached files never searches (<see cref="ResearchStatus.FilesAttached"/>). Otherwise only the topics that
+/// <see cref="ResearchQueryGate"/> lets go reach the search: it gets the values of the About me details without their field names
+/// (<see cref="ProfilePrompt.Values"/>) and, when those hold free text, the language of the order. The passage picker sees nothing but
+/// these topics and the pages. A search is reserved before it starts (<see cref="IOrderRepository.TryReserveResearchAsync"/>, daily
+/// limit in total and per account). Searches run in parallel, each once. Every research that ran is stored, a failed one included, so
+/// that no later run of the order searches again; the write is conditional, and whoever loses reads the stored research. Research that
+/// cannot be stored is not used: the run goes on as failed, without passages. One log line per research names counts, duration and
+/// model only, never topics, passages or addresses.
 /// </remarks>
 internal sealed class OrderResearchService(
     IOrderRepository orders,
@@ -40,12 +45,18 @@ internal sealed class OrderResearchService(
 
     private static readonly JsonSerializerOptions AuditJson = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
-    public async Task<OrderResearch?> EnsureAsync(OrderEntity order, int? orderVersion, bool revises, IReadOnlyList<string> fileTexts, string? profileText, CancellationToken ct)
+    /// <summary>Error code of research that ran but could not be stored; the run goes on without it.</summary>
+    public const string NotStoredCode = "not_stored";
+
+    public async Task<OrderResearch?> EnsureAsync(OrderEntity order, int? orderVersion, bool revises, bool hasFiles, string? profileText, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(order);
         var settings = options.Value;
         if (ModeFor(settings, order.CreatedByUser) == ResearchMode.Off)
             return null;
+
+        if (hasFiles)
+            return await FilesAttachedAsync(order, ct);
 
         if (order.ResearchJson is not null)
             return Stored(order);
@@ -54,10 +65,11 @@ internal sealed class OrderResearchService(
             return null;
 
         var record = IntakeRecordJson.TryParse(order.ClarifyJson);
-        if (record is not { Status: IntakeRecordStatus.Ok } || record.ResearchTopics.Count == 0)
+        var topics = Topics(record);
+        if (topics.Count == 0)
             return null;
 
-        var run = await ResearchAsync(order, record.ResearchTopics, fileTexts ?? [], profileText, settings, ct);
+        var run = await ResearchAsync(order, topics, profileText, record!.Output?.Language, settings, ct);
         if (run is null)
             return null;
 
@@ -66,17 +78,57 @@ internal sealed class OrderResearchService(
         Log(order.Id, research, skipped, stored);
         if (stored == false)
             return await ReadStoredAsync(order.Id, ct);
+        if (stored is null)
+            return Unstored(research);
 
         if (HasAudit(settings, order.CreatedByUser))
             WriteAudit(settings.AuditDirectory!, order.Id, research, pages);
         return research;
     }
 
+    /// <summary>
+    /// The research topics of a clarified order that may be looked up: those of the record, without a topic that is nothing but the
+    /// name of a kind of gap (such a topic says nothing to search for).
+    /// </summary>
+    internal static IReadOnlyList<string> Topics(IntakeRecord? record) =>
+        record is { Status: IntakeRecordStatus.Ok }
+            ? record.ResearchTopics
+                .Where(t => !string.IsNullOrWhiteSpace(t) && !Enum.GetValues<GapTopic>().Any(g => string.Equals(g.Label(), t.Trim(), StringComparison.OrdinalIgnoreCase)))
+                .ToList()
+            : [];
+
+    /// <summary>
+    /// An order with attached files never searches (D-074): nothing of a file can reach the search or the passage picker. When the order
+    /// has research topics, the status <see cref="ResearchStatus.FilesAttached"/> is stored once, so that every run of the order shows
+    /// it; stored research of another status is not used for such an order.
+    /// </summary>
+    private async Task<OrderResearch?> FilesAttachedAsync(OrderEntity order, CancellationToken ct)
+    {
+        var stored = order.ResearchJson is null ? null : Stored(order);
+        if (stored is { Status: ResearchStatus.FilesAttached })
+            return stored;
+        if (Topics(IntakeRecordJson.TryParse(order.ClarifyJson)).Count == 0)
+            return null;
+
+        var research = new OrderResearch(OrderResearch.CurrentSchemaVersion, ResearchStatus.FilesAttached, [], 0, 0, 0, 0, 0, 0,
+            new Dictionary<ResearchDropReason, int>(), [], null, 0, null, time.GetUtcNow());
+        if (order.ResearchJson is null && await StoreAsync(order.Id, research, ct) == false
+            && await ReadStoredAsync(order.Id, ct) is { Status: ResearchStatus.FilesAttached } other)
+            return other;
+        return research;
+    }
+
+    /// <summary>Research that could not be stored: the run goes on without its passages, as failed, so a warning says so.</summary>
+    private static OrderResearch Unstored(OrderResearch research) =>
+        research with { Status = ResearchStatus.Failed, Entries = [], ErrorCode = NotStoredCode };
+
     private async Task<(OrderResearch Research, IReadOnlyList<ResearchPage> Pages, int Skipped)?> ResearchAsync(
-        OrderEntity order, IReadOnlyList<string> topics, IReadOnlyList<string> fileTexts, string? profileText, ResearchOptions settings, CancellationToken ct)
+        OrderEntity order, IReadOnlyList<string> topics, string? profileText, string? orderLanguage, ResearchOptions settings, CancellationToken ct)
     {
         var started = time.GetTimestamp();
-        var selection = ResearchQueryGate.Select(topics, order.RequestText, fileTexts, profileText, Math.Max(0, settings.MaxSearches));
+        var profile = ProfilePrompt.Values(profileText);
+        var selection = ResearchQueryGate.Select(topics, order.RequestText, [], profile.Text, Math.Max(0, settings.MaxSearches),
+            profile.HasFreeText ? orderLanguage : null);
         var state = new State(selection);
         try
         {
@@ -85,7 +137,7 @@ internal sealed class OrderResearchService(
 
             var now = time.GetUtcNow();
             var dayStart = new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero);
-            if (await orders.CountResearchSinceAsync(dayStart, ct) >= settings.DailyOrderCap)
+            if (!await orders.TryReserveResearchAsync(order.Id, order.CreatedByUser, now, dayStart, settings.DailyOrderCap, settings.DailyOrderCapPerUser, ct))
                 return (state.End(ResearchStatus.DailyLimit, null, time, started), [], 0);
 
             var outcomes = await Task.WhenAll(selection.Sent.Select(topic => SearchOnceAsync(topic, settings.ResultsPerSearch, ct)));
@@ -167,7 +219,7 @@ internal sealed class OrderResearchService(
     {
         try
         {
-            return await orders.TrySetResearchAsync(orderId, ResearchJson.Serialize(research), research.At, ct);
+            return await orders.TrySetResearchAsync(orderId, ResearchJson.Serialize(research), null, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -175,7 +227,7 @@ internal sealed class OrderResearchService(
         }
         catch (Exception ex)
         {
-            logger.LogWarning("Research of order {OrderId} could not be stored ({Error}); this run uses it unstored.", orderId, ex.GetType().Name);
+            logger.LogWarning("Research of order {OrderId} could not be stored ({Error}); the run goes on without it.", orderId, ex.GetType().Name);
             return null;
         }
     }

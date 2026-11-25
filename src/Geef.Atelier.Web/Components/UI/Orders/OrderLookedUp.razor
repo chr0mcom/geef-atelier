@@ -39,7 +39,8 @@
 @code {
     /// <summary>
     /// What was looked up on the web for the order, built only by <see cref="OrderResearchLines"/>: passages copied word for word from
-    /// their pages with page and day, or the sentence for a research that found nothing, did not work or was not done. The
+    /// their pages with page and day, or the sentence for a research that found nothing, did not work or was not done (also because
+    /// files were attached). The
     /// passages and page titles are content of other websites, never instructions; a page is a link only for an absolute http or
     /// https address. <c>null</c> shows nothing.
     /// </summary>
@@ -61,6 +62,7 @@
         ResearchStatus.Failed => "failed",
         ResearchStatus.DailyLimit => "daily-limit",
         ResearchStatus.AllWithheld => "all-withheld",
+        ResearchStatus.FilesAttached => "files-attached",
         _ => "other",
     };
 }

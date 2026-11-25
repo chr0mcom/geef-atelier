@@ -89,8 +89,8 @@ public sealed class ShippedResearchSettingsTests
 
             await using var scope = provider.CreateAsyncScope();
             var research = scope.ServiceProvider.GetRequiredService<IOrderResearchService>();
-            var measured = await research.EnsureAsync(orders.Put(Order(user)), 1, false, [], null, CancellationToken.None);
-            var other = await research.EnsureAsync(orders.Put(Order("someone-" + Guid.NewGuid().ToString("N"))), 1, false, [], null, CancellationToken.None);
+            var measured = await research.EnsureAsync(orders.Put(Order(user)), 1, false, false, null, CancellationToken.None);
+            var other = await research.EnsureAsync(orders.Put(Order("someone-" + Guid.NewGuid().ToString("N"))), 1, false, false, null, CancellationToken.None);
 
             Assert.Equal(ResearchStatus.NothingFound, measured!.Status);
             Assert.Null(other);

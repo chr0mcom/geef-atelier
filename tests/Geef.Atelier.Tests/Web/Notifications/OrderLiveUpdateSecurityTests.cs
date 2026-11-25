@@ -282,8 +282,9 @@ public sealed class OrderLiveUpdateSecurityTests : IAsyncDisposable
         public Task<bool> TrySaveQuestionsAsync(Guid orderId, string clarifyJson, DateTimeOffset at, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<bool> TryStartWithRunAsync(OrderStart start, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<IReadOnlyList<Guid>> ListUnansweredAsync(DateTimeOffset askedBefore, int limit, CancellationToken ct = default) => throw new NotImplementedException();
-        public Task<bool> TrySetResearchAsync(Guid orderId, string researchJson, DateTimeOffset at, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<bool> TrySetResearchAsync(Guid orderId, string researchJson, DateTimeOffset? at, CancellationToken ct = default) => throw new NotImplementedException();
         public Task<int> CountResearchSinceAsync(DateTimeOffset since, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<bool> TryReserveResearchAsync(Guid orderId, string? user, DateTimeOffset at, DateTimeOffset since, int dailyCap, int userCap, CancellationToken ct = default) => throw new NotImplementedException();
     }
 
     private sealed class InertDashboardService : IDashboardService

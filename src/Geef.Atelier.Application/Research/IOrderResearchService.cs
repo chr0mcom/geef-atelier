@@ -9,7 +9,9 @@ public interface IOrderResearchService
     /// <summary>
     /// Returns the stored research of <paramref name="order"/>, or does new research when the first run of the order allows it
     /// (<paramref name="orderVersion"/> 1, no text to revise, mode on, clarified with research topics) and stores it; <c>null</c> when
-    /// there is none and none is needed. Never throws for failures of the research itself: they end as a status.
+    /// there is none and none is needed. An order with attached files (<paramref name="hasFiles"/>, any role) never searches and gets
+    /// <see cref="ResearchStatus.FilesAttached"/> when it has research topics. <paramref name="profileText"/> is the About me block of the
+    /// briefing. Never throws for failures of the research itself: they end as a status.
     /// </summary>
-    Task<OrderResearch?> EnsureAsync(OrderEntity order, int? orderVersion, bool revises, IReadOnlyList<string> fileTexts, string? profileText, CancellationToken ct);
+    Task<OrderResearch?> EnsureAsync(OrderEntity order, int? orderVersion, bool revises, bool hasFiles, string? profileText, CancellationToken ct);
 }

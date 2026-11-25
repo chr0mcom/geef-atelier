@@ -19,20 +19,25 @@ public static class OrderResearchLines
     public const string NothingFound = "Some facts were looked up on the web, but no page gave a usable passage. The text does not rely on the web.";
     public const string Failed = "Looking things up on the web did not work this time. The text was written without it.";
     public const string DailyLimit = "Nothing was looked up on the web today because the daily limit was reached. The text was written without it.";
-    public const string AllWithheld = "Nothing was looked up on the web, because the search would have contained details from your files or your About me details.";
-    public const string SomeWithheld = "Some details were not looked up, because the search would have contained details from your files or your About me details.";
+    public const string AllWithheld = "Nothing was looked up on the web, because the search could have contained details from your About me details.";
+    public const string SomeWithheld = "Some details were not looked up, because the search could have contained details from your About me details.";
+    public const string FilesAttached = "No web search was done because you attached files, so nothing from them can reach a search engine.";
 
     public const string FactsComparedLeadLookedUp = "Facts in the text were compared with your request, your answers, your files and the pages looked up.";
     public const string FactsComparedLeadLookedUpNoFiles = "Facts in the text were compared with your request, your answers and the pages looked up.";
 
     public const string NotGivenLeadLookedUp = "You did not give these facts, so they were not assumed. Where the pages looked up cover one, the text may use it:";
 
+    /// <summary>Said with a passage of the text that the pages looked up say otherwise; a hint, never a matter of the person's files.</summary>
+    public const string DiffersFromLookedUp = "The pages looked up say otherwise – please check which is right.";
+
     /// <summary>Origin of a passage of the material found in the research, in the sentence about a contradiction.</summary>
     public const string FromLookedUp = "the pages looked up";
 
     /// <summary>
     /// The research as the person sees it: <c>null</c> without research, for <see cref="ResearchStatus.NotNeeded"/>, and for found entries
-    /// when the delivered run did not use them (<paramref name="deliveredRunLookedUp"/>); every other status shows its sentence. Found
+    /// when the delivered run did not use them (<paramref name="deliveredRunLookedUp"/>); every other status shows its sentence. The title
+    /// of an entry is <see cref="ResearchAddress.SafeTitle"/>, also for research stored before that rule. Found
     /// research without an entry shows the sentence of <see cref="ResearchStatus.NothingFound"/>, so that it never stays silent; topics
     /// that were withheld add <see cref="SomeWithheld"/> to entries and to that sentence.
     /// </summary>
@@ -43,7 +48,7 @@ public static class OrderResearchLines
 
         var entries = (research.Entries ?? [])
             .Where(e => !string.IsNullOrWhiteSpace(e.Quote))
-            .Select(e => new OrderLookedUpEntry(e.Quote.Trim(), WebAddress(e.Url), (e.Title ?? string.Empty).Trim(), e.RetrievedAt))
+            .Select(e => new OrderLookedUpEntry(e.Quote.Trim(), WebAddress(e.Url), ResearchAddress.SafeTitle(e.Title, e.Url), e.RetrievedAt))
             .ToList();
         var withheld = Math.Max(0, research.Withheld);
         var some = withheld > 0 ? SomeWithheld : null;
@@ -56,6 +61,7 @@ public static class OrderResearchLines
             ResearchStatus.Failed => new OrderLookedUpView(ResearchStatus.Failed, Failed, withheld, []),
             ResearchStatus.DailyLimit => new OrderLookedUpView(ResearchStatus.DailyLimit, DailyLimit, withheld, []),
             ResearchStatus.AllWithheld => new OrderLookedUpView(ResearchStatus.AllWithheld, AllWithheld, withheld, []),
+            ResearchStatus.FilesAttached => new OrderLookedUpView(ResearchStatus.FilesAttached, FilesAttached, 0, []),
             _ => null,
         };
     }
@@ -64,24 +70,14 @@ public static class OrderResearchLines
     public static string Retrieved(DateTimeOffset retrievedAt) =>
         string.Format(CultureInfo.InvariantCulture, RetrievedFormat, retrievedAt.UtcDateTime.ToString(RetrievedDateFormat, CultureInfo.InvariantCulture));
 
-    /// <summary>The host of an absolute http or https address without a leading <c>www.</c>; <c>null</c> for anything else.</summary>
-    public static string? Host(string? url) =>
-        WebAddress(url) is { } address && Uri.TryCreate(address, UriKind.Absolute, out var uri)
-            ? uri.IdnHost.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? uri.IdnHost[4..] : uri.IdnHost
-            : null;
+    /// <summary>The host of an address kept by <see cref="WebAddress"/>, without a leading <c>www.</c>; <c>null</c> for anything else.</summary>
+    public static string? Host(string? url) => ResearchAddress.Host(url);
 
-    /// <summary><paramref name="url"/> trimmed when it is an absolute http or https address with a host; otherwise <c>null</c>, so it is never a link.</summary>
-    public static string? WebAddress(string? url)
-    {
-        var trimmed = url?.Trim();
-        return !string.IsNullOrEmpty(trimmed)
-            && Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
-            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
-            && !string.IsNullOrEmpty(uri.Host)
-            && string.IsNullOrEmpty(uri.UserInfo)
-            ? trimmed
-            : null;
-    }
+    /// <summary>
+    /// <paramref name="url"/> trimmed when it is an absolute http or https address with a host, without user information and at most
+    /// <see cref="ResearchAddress.MaxChars"/> characters long (<see cref="ResearchAddress.Acceptable"/>); otherwise <c>null</c>, so it is never a link.
+    /// </summary>
+    public static string? WebAddress(string? url) => ResearchAddress.Acceptable(url);
 
     private static string Join(string first, string? second) => second is null ? first : first + " " + second;
 }

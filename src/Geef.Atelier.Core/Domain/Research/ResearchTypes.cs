@@ -4,8 +4,8 @@ using Geef.Atelier.Core.Domain.Writing;
 
 namespace Geef.Atelier.Core.Domain.Research;
 
-/// <summary>How the research of an order ended.</summary>
-public enum ResearchStatus { NotNeeded = 0, Found = 1, NothingFound = 2, Failed = 3, DailyLimit = 4, AllWithheld = 5 }
+/// <summary>How the research of an order ended; <see cref="FilesAttached"/>: the order has attached files, so nothing was searched.</summary>
+public enum ResearchStatus { NotNeeded = 0, Found = 1, NothingFound = 2, Failed = 3, DailyLimit = 4, AllWithheld = 5, FilesAttached = 6 }
 
 /// <summary>Why a passage proposed by the model or by the parser did not become an entry; the first matching rule decides.</summary>
 public enum ResearchDropReason { NotInPage = 0, TooShort = 1, Unsafe = 2, Duplicate = 3, OverLimit = 4, UnknownPage = 5, OverlongQuote = 6 }

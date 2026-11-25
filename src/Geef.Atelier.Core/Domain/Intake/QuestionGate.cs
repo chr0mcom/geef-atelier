@@ -279,7 +279,9 @@ public static class QuestionGate
                 if (decisions[i] != GateDecision.ToResearch)
                     continue;
                 var question = gaps[i].Question?.Text?.Trim();
-                var topic = string.IsNullOrEmpty(question) || IntakeContentGuard.IsUnsafe(question, requestText) ? gaps[i].Topic.Label() : $"{gaps[i].Topic.Label()}: {question}";
+                if (string.IsNullOrEmpty(question) || IntakeContentGuard.IsUnsafe(question, requestText))
+                    continue;
+                var topic = $"{gaps[i].Topic.Label()}: {question}";
                 topics.Add(topic.Length > MaxResearchTopicChars ? topic[..MaxResearchTopicChars].TrimEnd() : topic);
             }
         }

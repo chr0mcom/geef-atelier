@@ -33,20 +33,21 @@ public sealed partial class ResearchEndToEndTests
     }
 
     [Fact]
-    public async Task A_word_that_only_stands_in_a_file_name_never_reaches_Tavily()
+    public async Task An_order_with_a_file_never_searches_so_neither_its_name_nor_a_translation_reaches_Tavily()
     {
         var tavily = new TavilyStub();
         await using var host = await StartWithServiceAsync(postgres, tavily);
-        host.Script.EnqueueClarifierJson(Clarify($"\"{Confidential} Kartonagen Firmengeschichte\", \"{Topic}\""));
+        host.Script.EnqueueClarifierJson(Clarify($"\"{Confidential} Kartonagen Firmengeschichte\", \"breast cancer sick leave employer rights\", \"{Topic}\""));
         host.Script.PassagesResponder = call => Picks((1, FirstPage(call), Passage));
-        var file = await TextFileAsync(host, $"angebot-{Confidential.ToLowerInvariant()}-kartonagen.txt", "Bitte die Preise im Angebot prüfen.");
+        var file = await TextFileAsync(host, $"angebot-{Confidential.ToLowerInvariant()}-kartonagen.txt", "Diagnose: Brustkrebs, Chemotherapie ab Mai.");
 
         var orderId = await SubmitAsync(host, sources: [file]);
 
         var research = await StoredResearchAsync(host, orderId);
-        Assert.Equal((ResearchStatus.Found, 1), (research!.Status, research.Withheld));
-        Assert.Equal([Topic], research.TopicsSent);
-        Assert.Equal(Topic, JsonDocument.Parse(Assert.Single(tavily.Bodies)).RootElement.GetProperty("query").GetString());
+        Assert.Equal(ResearchStatus.FilesAttached, research!.Status);
+        Assert.Empty(research.TopicsSent);
+        Assert.Empty(tavily.Bodies);
+        Assert.DoesNotContain(host.Llm.Calls, ScriptedLlmEndpoint.IsPassagesCall);
         AssertNeverLeft(host, tavily, Confidential);
     }
 

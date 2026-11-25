@@ -49,6 +49,7 @@ public sealed class OrderGroundingStepResearchTests
         public DirectOptions Options { get; } = new();
         public SourceOptions SourceOptions { get; } = new();
         public bool RegisterResearch { get; set; } = true;
+        public TimeSpan? WaitLimit { get; set; }
         public Guid RunId { get; } = Guid.NewGuid();
 
         public OrderGroundingStep Step(Guid orderId, string? seedDraft = null, int? version = 1)
@@ -61,7 +62,7 @@ public sealed class OrderGroundingStepResearchTests
             if (RegisterResearch)
                 services.AddSingleton<IOrderResearchService>(Research);
             return new OrderGroundingStep(RunId, orderId, seedDraft, services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
-                SourceOptions, Warnings, NullLogger<OrderGroundingStep>.Instance, version);
+                SourceOptions, Warnings, NullLogger<OrderGroundingStep>.Instance, version, WaitLimit);
         }
     }
 
@@ -136,7 +137,7 @@ public sealed class OrderGroundingStepResearchTests
     }
 
     [Fact]
-    public async Task The_service_gets_version_full_file_texts_file_names_and_the_about_me_details()
+    public async Task The_service_gets_version_whether_files_are_attached_and_the_about_me_details()
     {
         var setup = new Setup();
         var order = setup.Orders.Add(Request);
@@ -149,7 +150,7 @@ public sealed class OrderGroundingStepResearchTests
 
         var call = Assert.Single(setup.Research.Calls);
         Assert.Equal((order.Id, 3, false), (call.OrderId, call.OrderVersion, call.Revises));
-        Assert.Equal([longText, Notes, "lagerordnung.pdf", "notizen.txt"], call.FileTexts);
+        Assert.True(call.HasFiles);
         Assert.Equal(BriefingSections.Parse(briefing).Profile, call.ProfileText);
         Assert.Contains("Lager Nord GmbH", call.ProfileText, StringComparison.Ordinal);
     }
@@ -275,6 +276,34 @@ public sealed class OrderGroundingStepResearchTests
 
         Assert.True(OrderGroundingStep.ResearchWaitLimit > research.SearchTimeout + research.CondenseTimeout);
         Assert.True(OrderGroundingStep.ResearchWaitLimit <= TimeSpan.FromMinutes(2));
+    }
+
+    [Fact]
+    public async Task A_research_that_hangs_and_ignores_the_cancellation_ends_at_the_limit_as_failed_and_the_run_goes_on()
+    {
+        var setup = new Setup { WaitLimit = TimeSpan.FromMilliseconds(300) };
+        var never = new TaskCompletionSource<OrderResearch?>();
+        setup.Research.Answer = (_, _) => never.Task;
+        var order = setup.Orders.Add(Request);
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+
+        var result = await setup.Step(order.Id).RunAsync(Request, CancellationToken.None);
+
+        Assert.InRange(watch.Elapsed, TimeSpan.FromMilliseconds(250), TimeSpan.FromSeconds(10));
+        Assert.DoesNotContain(result.Context.GetRequired(AtelierContextKeys.OrderSources).Sources, s => s.LookedUp);
+        Assert.Contains(result.Notes, n => n.StartsWith("research status=Failed", StringComparison.Ordinal));
+        Assert.Contains(setup.Warnings.All, w => w.Code == RunWarningCodes.ResearchFailed);
+    }
+
+    [Fact]
+    public async Task The_cancellation_of_the_run_still_ends_the_step_while_the_research_hangs()
+    {
+        var setup = new Setup { WaitLimit = TimeSpan.FromMinutes(5) };
+        setup.Research.Answer = (_, _) => new TaskCompletionSource<OrderResearch?>().Task;
+        var order = setup.Orders.Add(Request);
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => setup.Step(order.Id).RunAsync(Request, cts.Token));
     }
 
     [Fact]

@@ -112,7 +112,7 @@ public sealed partial class ResearchEndToEndTests(PostgresFixture postgres)
 
         var call = Assert.Single(research.Calls);
         Assert.Equal((1, false), (call.OrderVersion, call.Revises));
-        Assert.Equal(["Aushang ans schwarze Brett im Lager.", "notizen.txt"], call.FileTexts.Select(t => t.Trim()));
+        Assert.True(call.HasFiles);
 
         var writer = Assert.Single(host.Llm.CallsFor(LlmRole.Executor));
         var input = WriterInput(writer);
@@ -307,21 +307,32 @@ public sealed partial class ResearchEndToEndTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Case2_a_topic_with_a_word_from_the_files_never_reaches_Tavily()
+    public async Task Case2_with_an_attached_file_nothing_is_searched_in_any_run_and_the_result_says_why()
     {
         var tavily = new TavilyStub();
         await using var host = await StartWithServiceAsync(postgres, tavily);
-        host.Script.EnqueueClarifierJson(Clarify("\"Lagerhalle Hartmannsdorf Öffnungszeiten\""));
+        host.Script.EnqueueClarifierJson(Clarify($"\"Lagerhalle Hartmannsdorf Öffnungszeiten\", \"{Topic}\""));
+        host.Script.PassagesResponder = call => Picks((1, FirstPage(call), Passage));
         var file = await TextFileAsync(host, "dienstplan.txt", "Dienstplan Lagerhalle Hartmannsdorf, Frühschicht ab 6 Uhr.");
 
         var orderId = await SubmitAsync(host, sources: [file]);
+        var next = await NextRunAsync(host, orderId);
 
         Assert.Empty(tavily.Bodies);
         Assert.DoesNotContain(host.Llm.Calls, ScriptedLlmEndpoint.IsPassagesCall);
         var research = await StoredResearchAsync(host, orderId);
-        Assert.Equal(ResearchStatus.AllWithheld, research!.Status);
-        Assert.Equal(1, research.Withheld);
-        Assert.DoesNotContain("W1", WriterInput(Assert.Single(host.Llm.CallsFor(LlmRole.Executor))), StringComparison.Ordinal);
+        Assert.Equal((ResearchStatus.FilesAttached, 0, 0), (research!.Status, research.Withheld, research.Searches));
+        Assert.All(host.Llm.CallsFor(LlmRole.Executor), call => Assert.DoesNotContain("W1", WriterInput(call), StringComparison.Ordinal));
+        Assert.False((await ReportAsync(host, next.Id)).LookedUp);
+
+        var result = await host.CallMcpToolAsync("get_order_result", new { orderId });
+        var lookedUp = result.GetProperty("lookedUp");
+        Assert.Equal(("files_attached", OrderResearchLines.FilesAttached), (lookedUp.GetProperty("status").GetString(), lookedUp.GetProperty("note").GetString()));
+        Assert.Empty(lookedUp.GetProperty("entries").EnumerateArray());
+        var text = result.ToString();
+        Assert.DoesNotContain(OrderResearchLines.FactsComparedLeadLookedUp, text, StringComparison.Ordinal);
+        Assert.DoesNotContain(OrderResearchLines.NotGivenLeadLookedUp, text, StringComparison.Ordinal);
+        Assert.DoesNotContain("pages looked up", text, StringComparison.Ordinal);
     }
 
     [Fact]
