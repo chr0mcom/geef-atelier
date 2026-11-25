@@ -83,6 +83,13 @@ public static class OrderStateResolver
     }
 
     /// <summary>
+    /// Picks the version that is shown: the standard run with the highest <see cref="RunEntity.OrderVersion"/> that has a
+    /// <see cref="RunEntity.FinalText"/>; <c>null</c> when no run has a text. While a newer version is written, or after it could not
+    /// be finished, the version before stays shown.
+    /// </summary>
+    public static RunEntity? SelectShownRun(IReadOnlyList<RunEntity> runsOfOrder) => throw new NotImplementedException();
+
+    /// <summary>
     /// Extracts the parts of <paramref name="run"/> that the resolver needs; a text exists when <see cref="RunEntity.FinalText"/>
     /// is not blank. A run that ended less than <see cref="FinishingWindow"/> before <paramref name="now"/> is still finishing
     /// while it has no outcome, and so is a completed composition (its writing run follows).

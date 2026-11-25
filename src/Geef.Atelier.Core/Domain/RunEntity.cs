@@ -80,6 +80,12 @@ public sealed class RunEntity
     public string? SeedDraftText { get; init; }
 
     /// <summary>
+    /// What the person asked to change for this version of the order, as sent to the writer (their words and the sentences of the
+    /// quick buttons). <c>null</c> for runs that are no change.
+    /// </summary>
+    public string? RevisionHint { get; init; }
+
+    /// <summary>
     /// Word count of <see cref="FinalText"/>, computed once when the pipeline completes.
     /// Null for runs before Step25 migration or when <see cref="FinalText"/> is null/empty.
     /// </summary>

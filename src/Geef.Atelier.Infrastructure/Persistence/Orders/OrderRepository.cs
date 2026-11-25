@@ -71,6 +71,9 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
         }
     }
 
+    public Task<(RevisionStart Result, int? Version)> TryAddRevisionRunAsync(Guid orderId, Guid baseRunId, RunEntity run, int maxVersions, CancellationToken ct = default) =>
+        throw new NotImplementedException();
+
     public async Task<int> AddRunAsync(Guid orderId, RunEntity run, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(run);

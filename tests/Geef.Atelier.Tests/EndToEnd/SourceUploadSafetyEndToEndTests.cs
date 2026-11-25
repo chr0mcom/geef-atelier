@@ -77,6 +77,8 @@ public sealed class SourceUploadSafetyEndToEndTests(PostgresFixture postgres)
         public Task CreateAsync(OrderEntity order, IReadOnlyList<OrderSourceEntity> sources, CancellationToken ct = default) => inner.CreateAsync(order, sources, ct);
 
         public Task<int> AddRunAsync(Guid orderId, RunEntity run, CancellationToken ct = default) => inner.AddRunAsync(orderId, run, ct);
+        public Task<(RevisionStart Result, int? Version)> TryAddRevisionRunAsync(Guid orderId, Guid baseRunId, RunEntity run, int maxVersions, CancellationToken ct = default) =>
+            inner.TryAddRevisionRunAsync(orderId, baseRunId, run, maxVersions, ct);
 
         public Task<OrderEntity?> GetAsync(Guid orderId, CancellationToken ct = default) => inner.GetAsync(orderId, ct);
 

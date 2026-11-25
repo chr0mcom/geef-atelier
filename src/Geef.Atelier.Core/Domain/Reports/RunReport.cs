@@ -14,6 +14,9 @@ public sealed record RunReportSource(Guid? SourceId, string FileName, SourceUsag
 /// <summary>A passage the writer quoted from a file, as the code found it in that file.</summary>
 public sealed record RunReportQuote(Guid? SourceId, string SourceLabel, string FileName, string Quote, QuoteMatchKind Match);
 
+/// <summary>An open point of the writer for the earlier <see cref="Version"/> of the order that this version does not repeat.</summary>
+public sealed record RunReportEarlierPoint(int Version, string Text);
+
 /// <summary>A problem found in round 1 and gone in the delivered version: a check code or a fact finding with its round-1 quote.</summary>
 public sealed record RunReportCorrection(string Code, string? QuoteBefore);
 
@@ -23,7 +26,8 @@ public sealed record RunReportCorrection(string Code, string? QuoteBefore);
 /// not be judged); <see cref="Notes"/> are plain-English remarks for the person, such as files that were searched
 /// rather than read in full. Schema 2 adds the writer's notes, the verified quotes, the fact check, the recalculated totals
 /// of the files and the corrections after the checks. <see cref="LookedUp"/> says that the passages looked up on the web (<c>W1</c>) were
-/// part of the material of the run.
+/// part of the material of the run. <see cref="EarlierOpenPoints"/> are the open points of the writer for the version this run changed
+/// that it does not repeat (never dropped).
 /// </summary>
 public sealed record RunReport(
     int SchemaVersion,
@@ -43,7 +47,8 @@ public sealed record RunReport(
     FactCheckSummary? FactCheck = null,
     SourceArithmeticResult? SourceArithmetic = null,
     IReadOnlyList<RunReportCorrection>? Corrections = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool LookedUp = false)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool LookedUp = false,
+    IReadOnlyList<RunReportEarlierPoint>? EarlierOpenPoints = null)
 {
     public const int CurrentSchemaVersion = 2;
     public const string DirectKind = "direct";

@@ -23,6 +23,12 @@ public sealed record OrderStart(
     DateTimeOffset At);
 
 /// <summary>
+/// Outcome of <see cref="IOrderRepository.TryAddRevisionRunAsync"/>: the run was added, or why not (a run of the order is pending or
+/// running, the base run is no longer the shown version, the order has the most versions, it was stopped, or it does not exist).
+/// </summary>
+public enum RevisionStart { Created = 0, Busy = 1, BaseNotShown = 2, TooManyVersions = 3, Cancelled = 4, NotFound = 5 }
+
+/// <summary>
 /// Persistence of orders and their link to runs. Every write that changes an order together with a run is one transaction; a
 /// write that fails leaves nothing behind in the shared context, so that trying again does not add the first attempt twice.
 /// </summary>
@@ -40,6 +46,13 @@ public interface IOrderRepository
 
     /// <summary>Adds a run as the next version (max version + 1, inside the transaction) and returns the version. Composition runs keep the version passed in <paramref name="run"/>.</summary>
     Task<int> AddRunAsync(Guid orderId, RunEntity run, CancellationToken ct = default);
+
+    /// <summary>
+    /// In one transaction: locks the order, checks again that it is not stopped, that no run of it is pending or running, that
+    /// <paramref name="baseRunId"/> is still the shown version and that it has fewer than <paramref name="maxVersions"/> versions, then
+    /// adds <paramref name="run"/> as the next version (max version + 1). Returns the version only for <see cref="RevisionStart.Created"/>.
+    /// </summary>
+    Task<(RevisionStart Result, int? Version)> TryAddRevisionRunAsync(Guid orderId, Guid baseRunId, RunEntity run, int maxVersions, CancellationToken ct = default);
 
     /// <summary>Returns the order, or <c>null</c> when it does not exist.</summary>
     Task<OrderEntity?> GetAsync(Guid orderId, CancellationToken ct = default);
