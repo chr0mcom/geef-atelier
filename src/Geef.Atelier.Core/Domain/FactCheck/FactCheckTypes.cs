@@ -241,7 +241,7 @@ public static class FactFindingFilter
             return (InstructionOrigin.Memory, null);
         if (In(MaterialPart.AssistantAnswers))
             return (InstructionOrigin.Client, null);
-        if (In(MaterialPart.Files))
+        if (In(MaterialPart.Files) || In(MaterialPart.LookedUp))
             return (null, FactFilterDecision.DroppedInstructionFromFile);
         return (null, FactFilterDecision.DroppedInstructionNotFound);
     }
@@ -323,7 +323,10 @@ internal sealed record MaterialSlice(MaterialPart Part, string Text, string? Fil
 /// <summary>Helpers on <see cref="FactMaterial"/>.</summary>
 internal static class FactMaterialExtensions
 {
-    /// <summary>Every part of the material in the order request, answers of the person, answers of the assistant, profile, files, file map.</summary>
+    /// <summary>
+    /// Every part of the material in the order request, answers of the person, answers of the assistant, profile, files, file map. A
+    /// source marked <see cref="FactSource.LookedUp"/> is <see cref="MaterialPart.LookedUp"/>, never one of the person's files.
+    /// </summary>
     public static IEnumerable<MaterialSlice> Parts(this FactMaterial material)
     {
         yield return new MaterialSlice(MaterialPart.Request, material.Request ?? string.Empty, null);
@@ -334,7 +337,7 @@ internal static class FactMaterialExtensions
         if (!string.IsNullOrEmpty(material.Profile))
             yield return new MaterialSlice(MaterialPart.Profile, material.Profile, null);
         foreach (var file in material.Files ?? [])
-            yield return new MaterialSlice(MaterialPart.Files, file.Text ?? string.Empty, file.FileName);
+            yield return new MaterialSlice(file.LookedUp ? MaterialPart.LookedUp : MaterialPart.Files, file.Text ?? string.Empty, file.FileName);
         if (!string.IsNullOrEmpty(material.FileMap))
             yield return new MaterialSlice(MaterialPart.Files, material.FileMap, null);
     }

@@ -1,6 +1,13 @@
+using System.Globalization;
+using System.Text;
+
 namespace Geef.Atelier.Core.Domain.Research;
 
 /// <summary>Text of the source <see cref="SourceId"/> that carries the research of an order into the prompts of writer and fact check.</summary>
+/// <remarks>
+/// Every passage, title and address stands on its own line, so no line of a page can look like a page marker or a tag line of its own;
+/// tag-like text and the start of the writer's notes are defused where the run renders its sources.
+/// </remarks>
 public static class DossierRenderer
 {
     public const string SourceId = "W1";
@@ -20,5 +27,20 @@ public static class DossierRenderer
     public const string PageFormat = "Page: {0} – {1}";
 
     /// <summary>The text of the source; empty when the research has no entries.</summary>
-    public static string Render(OrderResearch research) => throw new NotImplementedException();
+    public static string Render(OrderResearch research)
+    {
+        if (research?.Entries is not { Count: > 0 } entries)
+            return string.Empty;
+
+        var builder = new StringBuilder();
+        builder.Append(string.Format(CultureInfo.InvariantCulture, HeaderFormat, research.At.UtcDateTime.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
+        foreach (var entry in entries.Where(e => e is not null))
+        {
+            builder.Append("\n\n");
+            builder.Append(string.Format(CultureInfo.InvariantCulture, EntryFormat, entry.Id.CollapseWhiteSpace(), entry.Quote.CollapseWhiteSpace()));
+            builder.Append('\n');
+            builder.Append(string.Format(CultureInfo.InvariantCulture, PageFormat, entry.Title.CleanTitle(), entry.Url.CollapseWhiteSpace()));
+        }
+        return builder.ToString();
+    }
 }
