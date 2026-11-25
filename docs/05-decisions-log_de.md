@@ -2494,26 +2494,48 @@ der System-Prompt des Schreibers bleiben bitgleich (Hash-Tests grün); die gespe
     Korrekturmodus (`FactCheckMode = On`): vorher kommen gepflanzte Fälle „kurze erfundene Zeile allein am Ende“ in den
     Korpus.
 - **(b) Geratene Daten im Gate** (Schalter `Intake:DropGuessedDateOptions`, ausgeliefert `true` nach G-A2). Nach den bisherigen
-  Formregeln streicht das Gate jede Antwortoption mit einem Kalenderelement, das weder im Wortlaut noch in den ganzen
-  Dateitexten steht: Ziffern-Datum, Monatsname neben einer Ziffer, Wochentag als ganzes Wort. Die Namen kommen aus den
-  Kalendern von `CultureInfo` (de, en, fr, es, it und die Auftragssprache), keine gepflegte Wortliste; ein volles Datum bringt
-  seinen Wochentag mit. Bleiben weniger als zwei Optionen, wird die Frage wie jede gestrichene zur sichtbaren Annahme
-  (`GateDecision.DroppedGuessedDate`). Die Regel streicht nur, sie gibt nie eine sonst gestrichene Frage frei. Dauern und
-  Mengen („1 bis 3 Jahre“), „you may“, ein Monat allein und Längenvorlagen bleiben. **Tor G-A2 bestanden:** `IntakeEval
-  evaluate` über die zurückgehaltene Menge (32 Einträge) und den Zweitkorpus (40) ist mit und ohne Regel bytegleich, Tore a–f
-  bestanden (e′ wie bisher nur Warnung), 0 gezeigte Optionen mit Kalenderelement. Der echte Fall aus dem Bestand (nur lesend,
-  ohne Dateien): ohne Regel genau die gespeicherte Frage, mit Regel fallen alle drei geratenen Optionen, die Frage wird zur
-  Annahme. **Grenzen:** Die Annahme selbst kann ein geratenes Datum nennen (sichtbar und korrigierbar); der Fragetext wird
-  nicht geprüft; englische Abkürzungen ohne Punkt im Material werden nicht erkannt (dann fiele eine passende Option).
-- **(c) Zitate unter „Looked up“ ohne Markdown-Zeichen** (nur Anzeige, kein Schalter). `SafeMarkdown.ToPlainText` über
-  dieselbe Pipeline, eine Zeile; Nummern nummerierter Listen bleiben. Weicht die Ziffernfolge des Klartexts von der des
-  Zitats ab oder wäre er leer, wird das Zitat unverändert gezeigt. Gespeicherter Wortlaut, Material von Schreiber und Prüfer
-  und MCP `lookedUp.entries[].quote` bleiben wörtlich. **Tor G-A3 (c) bestanden:** R2-Einträge 21, davon 3 mit
-  Formatzeichen, 3 umgewandelt, 0 Rückfälle, 0 Ziffernabweichungen; über alle 49 gespeicherten Zitate 7 mit Formatzeichen,
-  alle umgewandelt, danach 0 Formatzeichen, 0 Ziffernabweichungen.
+  Formregeln streicht das Gate Antwortoptionen, die einen Kalendertag nennen, **nur wenn im gesamten Material der Person nichts
+  Datumsartiges steht**: Wortlaut, ganze Dateitexte, About me und bekannte Antworten aus dem Profil. Einzelne Daten werden
+  nicht verglichen. Das Material wird bewusst großzügig gelesen (im Zweifel „enthält ein Datum“, dann bleibt alles):
+  Zifferndaten in jeder üblichen Schreibweise, auch ohne Schlusspunkt und mit Leerzeichen, ISO und mit Schrägstrich;
+  Monatsnamen und -abkürzungen neben einer Ziffer (auch in Bereichen und mit Ordinalzahl), ausgeschriebene Monatsnamen allein in
+  der Schreibweise ihres Kalenders (das kleingeschriebene englische „may“/„march“ zählt nur neben einer Ziffer); Wochentage auch
+  als Wortanfang („Samstagnachmittag“, „samstags“). Die Optionsseite bleibt streng: Datum mit Ziffern und Schlusspunkt oder
+  Jahr, ISO, Schrägstrich mit Jahr, Monatsname neben einer Ziffer, Wochentag als ganzes Wort; Dauern, Mengen, Längenvorlagen und
+  ein Monat allein zählen nicht. Die Namen kommen aus den Kalendern von `CultureInfo` (de, en, fr, es, it und die
+  Auftragssprache), keine gepflegte Wortliste; Texte werden vorher nach NFC normalisiert. Alle Muster laufen in linearer Zeit
+  (`RegexOptions.NonBacktracking`, Test über 1 Mio. Zeichen). Bleiben weniger als zwei Optionen, wird die Frage wie jede
+  gestrichene zur sichtbaren Annahme. Im Verlauf steht dafür der vorhandene Wert `DroppedBadOptions` (kein neuer Wert, damit
+  das vorherige Image gespeicherte Aufträge weiter lesen kann); die Messung zählt die Streichungen durch Vergleich mit und ohne
+  Regel (`IntakeEval evaluate` nennt Modus und Zahl). Die Regel streicht nur, sie gibt nie eine sonst gestrichene Frage frei.
+  **Warum vereinfacht:** Die erste Fassung verglich einzelne Daten (einheitliche Form, abgeleitete Wochentage). Die Prüfung
+  fand übliche Schreibweisen, Bereiche und Aufzählungen, bei denen ein im Auftrag genanntes Datum nicht wiedererkannt wurde, und
+  eine quadratische Laufzeit; dort fiel eine nützliche Rückfrage weg. Statt weiterer Schreibweisen fragt die Regel jetzt nur
+  noch, ob überhaupt ein Datum im Material steht. **Bewusste Grenze:** Steht irgendein Datum im Material, bleiben auch erfundene
+  Daten stehen, wie vor der Regel. Weitere Grenzen: Die Annahme selbst kann ein geratenes Datum nennen (sichtbar und
+  korrigierbar); der Fragetext wird nicht geprüft; ohne jedes Datum im Material fallen auch Optionen wie „Abschnitt 2.3.“ oder
+  ein Name wie „Black Friday“, die zufällig wie ein Kalendertag aussehen. **Tor G-A2 bestanden:** `IntakeEval evaluate` über
+  die zurückgehaltene Menge (32 Einträge) und den Zweitkorpus (40): mit und ohne Regel gleiche Urteile, Tore a–f bestanden
+  (e′ wie bisher nur Warnung), die Regel streicht 0 Fragen und 0 Optionen. Der echte Fall aus dem Bestand (nur lesend, ohne
+  Dateien und Profil, im Auftrag nichts Datumsartiges): ohne Regel genau die gespeicherte Frage, mit Regel fallen alle drei
+  geratenen Optionen, die Frage wird zur Annahme. Ein synthetischer Eintrag im Test hält fest, dass die Regel im
+  Messwerkzeug wirklich greift.
+- **(c) Zitate unter „Looked up“ ohne Fett-Zeichen und Escapes** (nur Anzeige, kein Schalter). Entfernt wird nur, was in den
+  echten Zitaten vorkam und reine Formatierung ist: paarige `**` um Text (nicht zwischen Buchstaben oder Ziffern, nicht um
+  Leerraum) und ein Backslash vor einem Satzzeichen (`1\.`). Alles andere bleibt wörtlich, auch Aufzählungszeichen, `#`, `>`,
+  `~~`, Tabellen und Links, weil dort ein Zeichen Sinn tragen kann (Minus, gestrichener Preis). Kein Markdown-Parser im
+  Anzeigeweg, lineare Laufzeit, keine Ausnahme. **Warum vereinfacht:** Die erste Fassung wandelte über den Markdown-Parser in
+  Klartext; die Prüfung fand Sinnänderungen (Minus, gestrichener Preis, Linkdefinition) und eine Ausnahme bei tiefer
+  Schachtelung. Im Bestand kamen nur Fett-Zeichen, Escapes und ein Aufzählungszeichen vor, keine Links. Gespeicherter
+  Wortlaut, Material von Schreiber und Prüfer und MCP `lookedUp.entries[].quote` bleiben wörtlich. **Tor G-A3 (c) bestanden:**
+  R2-Einträge 21, davon 3 mit Fett-Zeichen oder Escape, alle 3 umgewandelt, danach 0 davon; über alle 49 gespeicherten Zitate
+  7 mit solchen Zeichen, alle umgewandelt, danach 0; 0 Ziffernabweichungen, 0 Änderungen an anderen Zitaten. Ein Zitat behält
+  bewusst sein Aufzählungszeichen.
 - **(d) Annahmen, die eine andere wortgleich fortsetzt, erscheinen einmal** (nur Anzeige, Web und MCP gleich). Eine Annahme
   gilt zusätzlich als wiederholt, wenn ihr Schlüssel (`SameAssumptionKey`) Anfang des Schlüssels einer anderen ist und dort
-  `, ; : (` oder ein Strich zwischen Leerzeichen folgt; gezeigt wird die längste an der Stelle der ersten. Eine Annahme des
+  `, ; :` mit Leerraum danach, `(` oder ein Strich zwischen Leerzeichen folgt (also nicht `18:30` oder `5,5` nach `18` bzw. `5`);
+  gezeigt wird die längste an der Stelle der ersten. Ein Fakt, der nur als „nicht gegeben“ an den Schreiber ging, verdrängt
+  eine kürzere Annahme des Schreibers nicht; bei gleichem Wortlaut steht er wie bisher nur unter „nicht gegeben“. Eine Annahme des
   Klärers (sie hat eine Kennung) wird nie entfernt, auch nicht, wenn vorher eine gleichlautende des Schreibers stand; ist die
   des Schreibers länger, bleiben beide. Sinngleich Umformuliertes bleibt doppelt, weil nur ein Mensch das beurteilen kann.
   (d) war in zwei Paketen gebaut; behalten ist eine Fassung, abgeglichen an beiden Testmengen und einem Vergleich über
@@ -2522,11 +2544,15 @@ der System-Prompt des Schreibers bleiben bitgleich (Hash-Tests grün); die gespe
   Annahmen zusammen; es gab nichts für den unabhängigen Prüfer zu entscheiden. Die Regel ändert am Bestand also nichts; die
   in Etappe 4 beobachteten Doppelungen sind Umformulierungen und bleiben bewusst doppelt.
 
-**Schalter:** `Intake:DropGuessedDateOptions` (bool, ausgeliefert `true`, per Umgebung ohne neues Image abschaltbar). (c) und (d) haben
+**Schalter:** `Intake:DropGuessedDateOptions` (bool, ausgeliefert `true`). Er wird beim Start gelesen; ein Wechsel braucht einen
+Neustart des Containers, aber kein neues Image. `docker-compose.yml` reicht `Intake__DropGuessedDateOptions` nicht durch (die
+Datei zählt ihre Variablen einzeln auf); ein Eintrag nur in `.env` bewirkt daher nichts. Weg: die Variable im
+`environment` des Web-Dienstes in einer `docker-compose.override.yml` setzen und den Container neu erstellen. (c) und (d) haben
 keinen Schalter. Die Schalter von (a) gibt es nicht mehr.
 
-**Rückweg:** Deploy A ist ein reines Web-Image ohne Migration; Rückweg ist das vorherige Image. Der Schalter wirkt sofort per
-Umgebung.
+**Rückweg:** Deploy A ist ein reines Web-Image ohne Migration; erster Rückweg ist der Schalter, sonst das vorherige Image. Weil
+die Regel keinen neuen Wert in den gespeicherten Verlauf schreibt, liest das vorherige Image auch die Aufträge, bei denen sie
+gegriffen hat (Test mit dem Wertebestand des vorherigen Images).
 
 **Entscheidung nach den Toren:** Deploy A wird mit `Intake:DropGuessedDateOptions = true` ausgeliefert (G-A2 bestanden).
 Das R2-Ergebnis von (a) stammt aus einer blinden Prüfung: Der Prüfer bewertete alle markierten Stellen, ohne zu wissen,
