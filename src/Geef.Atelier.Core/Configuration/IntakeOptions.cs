@@ -51,7 +51,7 @@ public sealed class IntakeOptions
     public int ExcerptTotalChars { get; set; } = 12_000;
 
     /// <summary>
-    /// Output limit of the clarifier call; a safety cap, not a target. The largest answer the schema allows (8 gaps, each with
+    /// Output limit of the clarifier call; a safety cap, not a target. The largest answer the parser keeps (8 gaps, each with
     /// question and six options, about 3,500 tokens) plus reasoning on effort low must fit, because a cut-off answer is invalid
     /// JSON and the order would start without clarification. Only the tokens actually written count; the gateway routes of the
     /// CLIs do not pass the limit on at all.

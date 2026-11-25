@@ -39,6 +39,14 @@ public sealed class QuestionGateDeferralOptionTests
     [InlineData("Nachfüllen und Pflege")]
     [InlineData("Ersatz des beschädigten Artikels")]
     [InlineData("Not fixed yet")]
+    [InlineData("Ich schreibe als Mieter")]
+    [InlineData("Ich trage die Kosten")]
+    [InlineData("Ich gebe die Wohnung zurück")]
+    [InlineData("I'll give a full refund")]
+    [InlineData("I will write on behalf of the team")]
+    [InlineData("Je donne ma démission")]
+    [InlineData("No placeholders")]
+    [InlineData("Ohne Platzhalter")]
     public void A_real_answer_stays(string option) => Assert.False(JargonBlocklist.IsDeferralOption(option), option);
 
     [Fact]

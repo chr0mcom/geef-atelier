@@ -34,10 +34,12 @@ public static class JargonBlocklist
     public static bool Contains(string text) => !string.IsNullOrEmpty(text) && TermPattern.IsMatch(text);
 
     private static readonly Regex Deferral = new(
-        @"\bplatzhalter|\bplaceholder|\bi(?:'ll| will) (?:\w+ )?(?:add|type|paste|fill|give|list|upload|send|share|provide|write)\b|" +
-        @"\bich\b[^|]{0,60}?\b(?:füge|lade|hänge|schreibe|trage|nenne|tippe|ergänze|sende|schicke|fülle)\b|" +
-        @"\b(?:füge|lade|hänge|schreibe|trage|nenne|tippe|ergänze|sende|schicke|fülle) ich\b|" +
-        @"\bje (?:vais )?(?:donne|donner|ajoute|ajouter|précise|préciser|envoie|envoyer|colle|coller)\b",
+        @"(?<!\b(?:no|keine|ohne|without) )\b(?:platzhalter|placeholder)|" +
+        @"\bi(?:'ll| will) (?:\w+ )?(?:add|type|paste|fill|list|upload)\b|" +
+        @"\bi(?:'ll| will) (?:\w+ )?(?:give|send|share|provide|write)\b(?=[^|]*\b(?:later|them|these|details|myself|here)\b)|" +
+        @"\bich\b[^|]{0,60}?\b(?:füge|lade|hänge|tippe|nenne|ergänze)\b|\b(?:füge|lade|hänge|tippe|nenne|ergänze) ich\b|" +
+        @"^(?=[^|]*\b(?:gleich|selbst|später|hier|dazu|nachher|chat)\b)[^|]*(?:\bich\b[^|]{0,60}?\b(?:schreibe|trage|sende|schicke|fülle|gebe)\b|\b(?:schreibe|trage|sende|schicke|fülle|gebe) ich\b)|" +
+        @"\bje (?:vais )?(?:donne|donner|ajoute|ajouter|précise|préciser|envoie|envoyer|colle|coller)\b(?=[^|]*(?:\b(?:mes|les|détails|plus tard|après|ici)\b|moi-même))",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     /// <summary>
