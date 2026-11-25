@@ -3,6 +3,8 @@ using Bunit.TestDoubles;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
+using Geef.Atelier.Core.Domain.Research;
+using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Web.Components;
 using Geef.Atelier.Web.Components.Pages;
 using Geef.Atelier.Web.Notifications;
@@ -45,7 +47,7 @@ public sealed class OrderDetailResultTests : TestContext
         var cut = RenderFull();
 
         var markup = cut.Markup;
-        var positions = new[] { "order-result", "order-checks", "order-open-points", "order-assumptions", "order-sources-used", "order-how-made" }
+        var positions = new[] { "order-result", "order-checks", "order-open-points", "order-assumptions", "order-looked-up", "order-sources-used", "order-how-made" }
             .Select(id => markup.IndexOf($"data-testid=\"{id}\"", StringComparison.Ordinal))
             .ToList();
         Assert.All(positions, p => Assert.True(p >= 0));
@@ -93,7 +95,52 @@ public sealed class OrderDetailResultTests : TestContext
     {
         var cut = RenderFull();
 
-        foreach (var id in new[] { "order-checks", "order-open-points", "order-assumptions", "order-sources-used", "order-how-checks" })
+        foreach (var id in new[] { "order-checks", "order-open-points", "order-assumptions", "order-looked-up", "order-sources-used", "order-how-checks" })
             HonestResultData.AssertPlain(cut.Find($"[data-testid='{id}']").ChildNodes);
+    }
+
+    private static RunWarningEntity Warning(string code, string message) => new()
+    {
+        Id = Guid.NewGuid(), RunId = Guid.NewGuid(), Source = RunWarningSources.Grounding, Code = code, Message = message, CreatedAt = DateTimeOffset.UtcNow,
+    };
+
+    [Fact]
+    public void ResearchThatDidNotWorkIsToldOnceUnderLookedUpAndNotAgainAmongTheWarnings()
+    {
+        var failed = new OrderLookedUpView(ResearchStatus.Failed, OrderResearchLines.Failed, 0, []);
+        var cut = RenderFull(r => r with
+        {
+            LookedUp = failed,
+            Warnings = [Warning(RunWarningCodes.ResearchFailed, OrderResearchLines.Failed), Warning(RunWarningCodes.LlmFailover, "Another service answered.")],
+        });
+
+        Assert.Single(Occurrences(cut.Markup, OrderResearchLines.Failed));
+        Assert.Equal(OrderResearchLines.Failed, cut.Find("[data-testid='order-looked-up-note']").TextContent);
+        Assert.Contains("Another service answered.", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WithoutTheLookedUpSentenceTheWarningAboutResearchStays()
+    {
+        var cut = RenderFull(r => r with { LookedUp = null, Warnings = [Warning(RunWarningCodes.ResearchFailed, OrderResearchLines.Failed)] });
+
+        Assert.Empty(cut.FindAll("[data-testid='order-looked-up']"));
+        Assert.Single(Occurrences(cut.Markup, OrderResearchLines.Failed));
+    }
+
+    [Fact]
+    public void TheLookedUpLinkLeavesThePageSafely()
+    {
+        var cut = RenderFull();
+
+        var link = cut.Find("[data-testid='order-looked-up-link']");
+        Assert.Equal(HonestResultData.LookedUpUrl, link.GetAttribute("href"));
+        Assert.Equal("nofollow noopener noreferrer", link.GetAttribute("rel"));
+    }
+
+    private static IEnumerable<int> Occurrences(string text, string part)
+    {
+        for (var i = text.IndexOf(part, StringComparison.Ordinal); i >= 0; i = text.IndexOf(part, i + part.Length, StringComparison.Ordinal))
+            yield return i;
     }
 }

@@ -78,7 +78,9 @@ public sealed record OrderView(
 /// shown (they hold a link, an address, or account or access details); <see cref="NotGivenFacts"/> are the assumptions of the
 /// clarifier about facts that went to the writer only as "not given by the person" (never stated as facts), shown apart from the
 /// assumptions that were used. <see cref="LookedUp"/> is the research of the order as the person sees it (built only by
-/// <see cref="OrderResearchLines"/>), <c>null</c> when there is nothing to show.
+/// <see cref="OrderResearchLines"/>), <c>null</c> when there is nothing to show. <see cref="SourceIssueNotes"/> pairs open points of
+/// the writer with the sentence of <see cref="SourceIssues"/> about the same wrong total, so the web page shows them together;
+/// <see cref="WriterOpenPoints"/> still holds every open point.
 /// </summary>
 public sealed record OrderResult(
     Guid OrderId,
@@ -103,7 +105,11 @@ public sealed record OrderResult(
     FactCheckScope? FactCheckScope = null,
     string? NotesNotShown = null,
     IReadOnlyList<string>? NotGivenFacts = null,
-    OrderLookedUpView? LookedUp = null);
+    OrderLookedUpView? LookedUp = null,
+    IReadOnlyList<OrderSourceIssueNote>? SourceIssueNotes = null);
+
+/// <summary>An open point of the writer (<see cref="Note"/>, in the language of the text) about the wrong total named by the sentence <see cref="Issue"/>.</summary>
+public sealed record OrderSourceIssueNote(string Issue, string Note);
 
 /// <summary>A passage looked up on the web, word for word from its page; <see cref="Url"/> is <c>null</c> unless it is an absolute http or https address.</summary>
 public sealed record OrderLookedUpEntry(string Quote, string? Url, string Title, DateTimeOffset RetrievedAt);

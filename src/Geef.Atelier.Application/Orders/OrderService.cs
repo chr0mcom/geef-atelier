@@ -8,6 +8,7 @@ using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Reports;
+using Geef.Atelier.Core.Domain.Research;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Notifications;
@@ -154,8 +155,11 @@ internal sealed class OrderService(
 
         var report = current.ReportJson is null ? null : RunReportJson.TryParse(current.ReportJson);
         var usages = await sources.ListRunUsagesAsync(current.Id, ct);
-        var warnings = await warningRepository.ListByRunAsync(current.Id, ct);
         var hasText = !string.IsNullOrWhiteSpace(current.FinalText);
+        var lookedUp = !hasText || string.IsNullOrWhiteSpace(order.ResearchJson)
+            ? null
+            : OrderResearchLines.Build(ResearchJson.TryParse(order.ResearchJson), report?.LookedUp == true);
+        var warnings = (await warningRepository.ListByRunAsync(current.Id, ct)).WithoutShownResearchWarning(lookedUp);
 
         var result = new OrderResult(
             orderId,
@@ -166,11 +170,13 @@ internal sealed class OrderService(
             hasText ? current.WordCount : null,
             report?.Placeholders ?? [],
             report?.Checks.Where(c => !c.Passed).ToList() ?? [],
-            usages.Select(u => new OrderSourceUsageView(u.FileName, u.Mode, u.CharsIncluded, u.PagesIncluded)).ToList(),
+            usages.Where(u => !string.Equals(u.Target, DossierRenderer.UsageTarget, StringComparison.Ordinal))
+                .Select(u => new OrderSourceUsageView(u.FileName, u.Mode, u.CharsIncluded, u.PagesIncluded)).ToList(),
             warnings,
             NoteFor(display),
             UncorrectedAssumptions(order),
-            NotGivenFacts: NotGivenFacts(order, current));
+            NotGivenFacts: NotGivenFacts(order, current),
+            LookedUp: lookedUp);
         var viewer = viewerUsername ?? requestingUsername;
         var showProfile = viewer is not null && string.Equals(viewer, order.CreatedByUser, StringComparison.Ordinal);
         return report is null || !hasText ? result : result.WithReport(report, showProfile);

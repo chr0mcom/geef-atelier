@@ -9,7 +9,7 @@ using Microsoft.Playwright;
 namespace Geef.Atelier.Tests.Web.E2E;
 
 /// <summary>
-/// The finished order page in a real browser: "What was checked", "Open points", "Assumptions" and "From your files" are
+/// The finished order page in a real browser: "What was checked", "Open points", "Assumptions", "Looked up" and "From your files" are
 /// visible below the text in that order, and the page fits a phone screen without sideways scrolling. The order service is an
 /// in-memory fake with a result that has every field of stage 3 filled.
 /// </summary>
@@ -18,7 +18,7 @@ public sealed class ResultHonestyFlowTests(PlaywrightFixture pw, PostgresFixture
 {
     private const string User = "test-user";
 
-    private static readonly string[] Blocks = ["order-result", "order-checks", "order-open-points", "order-assumptions", "order-sources-used"];
+    private static readonly string[] Blocks = ["order-result", "order-checks", "order-open-points", "order-assumptions", "order-looked-up", "order-sources-used"];
 
     private readonly FakeOrderService _orders = new();
     private WebTestHost? _host;

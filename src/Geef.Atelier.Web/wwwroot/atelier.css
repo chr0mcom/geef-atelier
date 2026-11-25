@@ -4870,3 +4870,26 @@ textarea.form-control {
   color: var(--ink);
   overflow-wrap: anywhere;
 }
+
+/* "Looked up": passages copied word for word from web pages, with their page and day. Page text and addresses can be long
+   without spaces, so everything wraps anywhere and nothing scrolls sideways on a phone. */
+.order-looked-up { overflow-wrap: anywhere; }
+.order-block .order-looked-up-subline { margin: 0 0 10px; font-size: 13px; color: var(--ink-3); }
+.order-block .order-looked-up-entries { list-style: none; padding-left: 0; gap: 12px; }
+.order-looked-up-entries > li { display: grid; gap: 4px; min-width: 0; }
+.order-looked-up-quote {
+  margin: 2px 0 2px 2px;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid var(--hairline);
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.order-looked-up-page { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 13px; color: var(--ink-2); min-width: 0; }
+.order-looked-up-page a { color: var(--ink-2); overflow-wrap: anywhere; min-width: 0; }
+.order-looked-up-host { margin-left: 6px; color: var(--ink-3); }
+.order-looked-up-date { color: var(--ink-3); }
+.order-block .order-looked-up-note { margin: 8px 0 0; color: var(--ink-2); }
+.order-issue-note { display: block; margin-top: 4px; font-size: 13px; color: var(--ink-3); }

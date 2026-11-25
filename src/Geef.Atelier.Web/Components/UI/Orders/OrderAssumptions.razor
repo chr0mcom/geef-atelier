@@ -16,7 +16,7 @@
         }
         @if (NotGiven.Count > 0)
         {
-            <p>You did not give these facts, so they were left open instead of assumed:</p>
+            <p data-testid="order-not-given-lead">@NotGivenLead</p>
             <ul>
                 @foreach (var line in NotGiven)
                 {
@@ -40,4 +40,9 @@
     IReadOnlyList<string> Lines => Result.AllAssumptions();
 
     IReadOnlyList<string> NotGiven => Result.NotGivenFacts();
+
+    /// <summary>The line above facts that were not given; when the text was written with passages looked up on the web it says they may cover one.</summary>
+    public const string NotGivenLeadWithoutLookedUp = "You did not give these facts, so they were left open instead of assumed:";
+
+    string NotGivenLead => Result.UsedLookedUp() ? OrderResearchLines.NotGivenLeadLookedUp : NotGivenLeadWithoutLookedUp;
 }

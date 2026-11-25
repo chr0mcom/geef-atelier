@@ -123,6 +123,7 @@
             <OrderChecksPanel Result="result" />
             <OrderOpenPoints Result="result" Language="@OrderLanguage" />
             <OrderAssumptions Result="result" Language="@OrderLanguage" />
+            <OrderLookedUp LookedUp="result.LookedUp" />
             <OrderSourcesUsed Sources="result.SourcesUsed" Quotes="result.SourceQuotes" Language="@OrderLanguage" />
             @if (!string.IsNullOrWhiteSpace(result.Note))
             {
@@ -221,7 +222,9 @@
     TimeSpan Elapsed => _view is null ? TimeSpan.Zero : _view.Progress.Elapsed + (DateTimeOffset.UtcNow - _loadedAt);
 
     IReadOnlyList<Geef.Atelier.Core.Domain.Warnings.RunWarningEntity> Warnings =>
-        _result is { Warnings.Count: > 0 } r ? r.Warnings : _view?.Warnings ?? [];
+        (_result is { Warnings.Count: > 0 } r ? r.Warnings : _view?.Warnings ?? []).WithoutShownResearchWarning(ResultShown ? _result!.LookedUp : null);
+
+    bool ResultShown => _result is { Text: not null } && _view is { Display.HasText: true };
 
     string TabTitle => _view is null
         ? "Your text — Atelier"

@@ -1,3 +1,4 @@
+using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Reports;
 using Geef.Atelier.Core.Domain.Writing;
@@ -16,7 +17,8 @@ public static class OrderResultReport
     /// <summary>
     /// Adds what <paramref name="report"/> says to <paramref name="result"/>. Schema 1: only <see cref="OrderResult.Checks"/>, which
     /// say that facts were not checked; the other new fields stay <c>null</c>. Schema 2: the writer's assumptions (without those
-    /// the clarifier already listed), the writer's open points and a sentence for notes that could not be shown, the flagged
+    /// the clarifier already listed, compared by <see cref="OrderResultRules.SameAssumptionKey"/>), the writer's open points (those
+    /// about a listed wrong total also paired with its sentence) and a sentence for notes that could not be shown, the flagged
     /// passages and the contradictions in the material (both only when the fact check is shown, not in shadow mode), the
     /// sentences about the totals of the files, the verified quotes, the state and scope of the fact check and "What was
     /// checked". The state is never "checked" (nothing found) when flagged passages could not be listed. Passages from the About me
@@ -50,6 +52,7 @@ public static class OrderResultReport
                     .ToList()
                 : [],
             SourceIssues = OrderCheckLines.SourceIssueSentences(report, showProfile),
+            SourceIssueNotes = NotesOnTotals(report, notes.OpenPoints),
             SourceQuotes = (report.SourceQuotes ?? []).Select(q => new OrderSourceQuoteView(q.FileName, q.Quote)).ToList(),
             FactCheck = factCheck is { State: FactCheckState.Checked, NotShown: > 0 } ? FactCheckState.OpenPoints : factCheck?.State,
             FactCheckScope = factCheck?.Scope,
@@ -69,5 +72,24 @@ public static class OrderResultReport
         return kept;
     }
 
-    private static string Key(string? text) => QuoteVerifier.Normalize(text ?? string.Empty).Trim().TrimEnd('.', '!', '?', ';', ':').Trim();
+    /// <summary>
+    /// Pairs each open point of the writer that names both the stated and the recalculated figure of a listed wrong total with the
+    /// sentence about that total (the first such total); the point is not dropped, only shown with that sentence.
+    /// </summary>
+    private static IReadOnlyList<OrderSourceIssueNote> NotesOnTotals(RunReport report, IReadOnlyList<string> openPoints)
+    {
+        var issues = report.SourceArithmetic?.Issues ?? [];
+        var notes = new List<OrderSourceIssueNote>();
+        foreach (var point in openPoints.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.Ordinal))
+        {
+            var issue = issues.FirstOrDefault(i =>
+                !string.IsNullOrWhiteSpace(i.Stated) && !string.IsNullOrWhiteSpace(i.Computed)
+                && SourceArithmeticCheck.NamesFigure(point, i.Stated) && SourceArithmeticCheck.NamesFigure(point, i.Computed));
+            if (issue is not null)
+                notes.Add(new OrderSourceIssueNote(OrderCheckLines.TotalSentence(issue), point));
+        }
+        return notes;
+    }
+
+    private static string Key(string? text) => OrderResultRules.SameAssumptionKey(text);
 }
