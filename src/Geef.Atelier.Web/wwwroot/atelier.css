@@ -4778,3 +4778,15 @@ textarea.form-control {
   .about-me { padding: 24px 16px 64px; }
   .about-group { padding: 16px; }
 }
+
+/* ---- Top nav on phones: brand and user on the first line, links below ---- */
+@media (max-width: 640px) {
+  .nav {
+    grid-template-columns: auto 1fr;
+    gap: 6px 12px;
+    padding: 10px 16px;
+  }
+  .nav-right { justify-self: end; display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .nav-links { grid-column: 1 / -1; grid-row: 2; flex-wrap: wrap; margin: 0 -12px; }
+  .user-menu-dd { right: 16px; }
+}

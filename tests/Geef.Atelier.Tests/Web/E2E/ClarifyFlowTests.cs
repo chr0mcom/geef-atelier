@@ -92,10 +92,7 @@ public sealed class ClarifyFlowTests(PlaywrightFixture pw, PostgresFixture pg) :
         }
     }
 
-    /// <summary>
-    /// The top navigation of the site is wider than a phone screen on every page (found here, not caused by the card);
-    /// it is hidden for this check so that it measures the order page with the card alone.
-    /// </summary>
+    /// <summary>The order page with the card and the top navigation fits a phone screen without sideways scrolling.</summary>
     [Fact]
     public async Task TheCardFitsAPhoneScreenWithoutSidewaysScrolling()
     {
@@ -115,8 +112,6 @@ public sealed class ClarifyFlowTests(PlaywrightFixture pw, PostgresFixture pg) :
             await page.Locator("[data-testid='clarify-card']").WaitForAsync(new LocatorWaitForOptions { Timeout = 15_000 });
             await page.ClickAsync("[data-testid='clarify-assumption-change'] >> nth=0");
             await page.ClickAsync("[data-testid='question-free-toggle'] >> nth=0");
-
-            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = "nav.nav { display: none !important; }" });
 
             var overflow = await page.EvaluateAsync<int>("document.documentElement.scrollWidth - document.documentElement.clientWidth");
             var wide = await page.EvaluateAsync<string>(WideElementsScript, "body");
