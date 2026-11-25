@@ -2,13 +2,18 @@ using Geef.Atelier.Core.Domain.Checks;
 
 namespace Geef.Atelier.Core.Domain.Intake;
 
-/// <summary>Input of <see cref="QuestionGate.Apply"/>.</summary>
+/// <summary>
+/// Input of <see cref="QuestionGate.Apply"/>. <see cref="MaterialTexts"/> are the texts of the files of the order; with
+/// <see cref="DropGuessedDates"/> an option naming a date, month or weekday that neither the request nor these texts name is dropped.
+/// </summary>
 public sealed record QuestionGateInput(
     ClarifierOutput Output,
     string RequestText,
     bool RevisionDetected,
     IReadOnlyDictionary<GapTopic, MemoryAnswer> Known,
-    int MaxQuestions);
+    int MaxQuestions,
+    IReadOnlyList<string>? MaterialTexts = null,
+    bool DropGuessedDates = false);
 
 /// <summary>
 /// What is left after the gate: the questions to show, the assumptions, the profile answers, the research topics, the trace

@@ -29,7 +29,7 @@ public sealed record FactCheckKit(
         FactCheckSchema.CheckJson,
         FactCheckPrompts.User,
         FactCheckOutputParser.ParseCheck,
-        FactFindingFilter.Apply,
+        (proposed, draft, material) => FactFindingFilter.Apply(proposed, draft, material),
         (haystack, quote) => QuoteVerifier.Find(haystack, quote, allowApproximate: true) is { IsFound: true } m ? (m.Start, m.Length) : null,
         SourceArithmeticCheck.Check);
 

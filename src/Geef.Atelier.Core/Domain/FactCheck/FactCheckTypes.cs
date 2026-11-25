@@ -55,11 +55,14 @@ public enum FactFilterDecision
 /// A finding after the code checked it. Ids are <c>f1…</c>, given by the filter. <see cref="TextQuote"/> is null only for a source
 /// conflict the text does not use. <see cref="MaterialFrom"/> and <see cref="Material2From"/> say in which part of the material the
 /// code found <see cref="MaterialQuote"/> and <see cref="MaterialQuote2"/>, <see cref="Material2File"/> the file of the second quote
-/// (<c>null</c> in reports written before they were kept).
+/// (<c>null</c> in reports written before they were kept). <see cref="Hint"/> says why a finding that is not backed is shown as a
+/// hint and never blocks; <see cref="FromVersion"/> is the version of the order whose report the finding was carried over from
+/// (<c>null</c> for findings of the run itself).
 /// </summary>
 public sealed record FactFinding(string Id, FactFindingKind Kind, string? TextQuote, string WhatIsWrong, string? InstructionQuote,
     string? MaterialQuote, string? MaterialQuote2, string? MaterialFile, InstructionOrigin? Origin, bool Blocking, QuoteMatchKind Match,
-    MaterialPart? MaterialFrom = null, MaterialPart? Material2From = null, string? Material2File = null);
+    MaterialPart? MaterialFrom = null, MaterialPart? Material2From = null, string? Material2File = null, FactHint? Hint = null,
+    int? FromVersion = null);
 
 /// <summary>Decision of the filter for the proposed finding at <see cref="Index"/>.</summary>
 public sealed record FactFilterTrace(int Index, FactFilterDecision Decision);
@@ -96,8 +99,11 @@ public static class FactFindingFilter
 
     private const int MaxPlaceholderChars = 200;
 
-    /// <summary>Applies the rules in their fixed order; every decision lands in the trace.</summary>
-    public static FactFilterResult Apply(IReadOnlyList<ProposedFactFinding> proposed, string draft, FactMaterial material)
+    /// <summary>
+    /// Applies the rules in their fixed order; every decision lands in the trace. <paramref name="rules"/> names the hint rules applied
+    /// after all others (<see cref="FactHintRules"/>).
+    /// </summary>
+    public static FactFilterResult Apply(IReadOnlyList<ProposedFactFinding> proposed, string draft, FactMaterial material, FactHintRules rules = default)
     {
         draft ??= string.Empty;
         proposed ??= [];

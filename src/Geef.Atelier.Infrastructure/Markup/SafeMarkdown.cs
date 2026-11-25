@@ -58,6 +58,13 @@ public static class SafeMarkdown
         return writer.ToString();
     }
 
+    /// <summary>
+    /// The plain text of <paramref name="markdown"/> on one line, parsed with the same <paramref name="pipeline"/> as
+    /// <see cref="ToSafeHtml"/>: emphasis, list markers, headings and escapes are gone, the words stay. Only for display; stored texts
+    /// keep their wording.
+    /// </summary>
+    public static string ToPlainText(this string? markdown, MarkdownPipeline pipeline) => throw new NotImplementedException();
+
     /// <summary>True when <paramref name="url"/> is an absolute address with one of <see cref="AllowedSchemes"/>.</summary>
     public static bool IsAllowed(string? url) =>
         !string.IsNullOrWhiteSpace(url) && Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri) && AllowedSchemes.Contains(uri.Scheme);
