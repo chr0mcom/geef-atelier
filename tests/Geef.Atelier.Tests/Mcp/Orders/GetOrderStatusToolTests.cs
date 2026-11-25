@@ -1,3 +1,5 @@
+using Geef.Atelier.Application.Orders;
+using Geef.Atelier.Mcp.Models;
 using System.Diagnostics;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Intake;
@@ -147,6 +149,26 @@ public sealed class GetOrderStatusToolTests
         Assert.Equal(["o1", "o2"], dto.Questions![1].Options.Select(o => o.Id));
         Assert.StartsWith("Before writing, Atelier has 2 short questions.", dto.Message);
         Assert.Contains("answer_order", dto.Message);
+    }
+
+    [Fact]
+    public async Task The_revision_guess_reaches_the_client_with_the_questions()
+    {
+        var id = Guid.NewGuid();
+        _orders.Add("alice", OrderToolTestData.View(id, OrderDisplayState.NeedsInput,
+            clarification: OrderToolTestData.Clarification() with { RevisionFileName = "rede.docx" }));
+
+        var dto = await GetOrderStatusTool.GetOrderStatus(_orders, _alice, OrderToolTestData.Options(), id.ToString(), 50);
+        var plain = await GetOrderStatusTool.GetOrderStatus(_orders, _alice, OrderToolTestData.Options(), id.ToString(), 50);
+
+        Assert.Equal("rede.docx", dto.RevisionFile);
+        Assert.Equal("rede.docx", plain.RevisionFile);
+        var submitted = new OrderSubmission(id, OrderDisplayState.NeedsInput, null, [], OrderToolTestData.Clarification() with { RevisionFileName = "rede.docx" })
+            .ToDto([]);
+        Assert.Equal("rede.docx", submitted.RevisionFile);
+        var started = new OrderSubmission(id, OrderDisplayState.Queued, Guid.NewGuid(), [], OrderToolTestData.Clarification() with { RevisionFileName = "rede.docx" })
+            .ToDto([]);
+        Assert.Null(started.RevisionFile);
     }
 
     [Fact]

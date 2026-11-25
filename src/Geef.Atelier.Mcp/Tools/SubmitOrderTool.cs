@@ -17,7 +17,7 @@ public static class SubmitOrderTool
     public const string ToolDescription =
         "Starts a writing order. Pass the person's request in their own words; do not rewrite or expand it. " +
         "Optionally attach files (JSON array of {filename, contentType, contentBase64}; PDF, Word, Markdown or text). " +
-        "Waits up to 30 seconds while Atelier reads the request. " +
+        "Waits a short while for Atelier to read the request. " +
         "If Atelier needs to know something only the person can tell, the answer has state needs_input and up to three short questions with answer options: " +
         "ask the person, then call answer_order. " +
         "Otherwise the order is already being written: call get_order_status with waitSeconds, then get_order_result. " +

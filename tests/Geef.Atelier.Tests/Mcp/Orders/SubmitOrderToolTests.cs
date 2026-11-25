@@ -186,7 +186,8 @@ public sealed class SubmitOrderToolTests
     {
         Assert.Contains("in their own words; do not rewrite or expand it", SubmitOrderTool.ToolDescription);
         Assert.Contains("get_order_status with waitSeconds", SubmitOrderTool.ToolDescription);
-        Assert.Contains("Waits up to 30 seconds while Atelier reads the request.", SubmitOrderTool.ToolDescription);
+        Assert.Contains("Waits a short while for Atelier to read the request.", SubmitOrderTool.ToolDescription);
+        Assert.DoesNotContain("30 seconds", SubmitOrderTool.ToolDescription);
         Assert.Contains("state needs_input and up to three short questions with answer options: ask the person, then call answer_order.", SubmitOrderTool.ToolDescription);
     }
 

@@ -18,7 +18,8 @@ public static class AnswerOrderTool
         "\"user\" if the person gave the answer, \"client\" if you took it from the conversation yourself. " +
         "Use decideForMe when the person leaves a question to Atelier. " +
         "To correct an assumption, pass its id (a1, …) with the correction as freeText. " +
-        "Call with skip=true to start at once with Atelier's assumptions. " +
+        "If the order shows revisionFile, Atelier will improve that file; to write something new instead pass questionId \"revision\" with optionId \"no\". " +
+        "Call with skip=true, or without answers, to start at once with Atelier's assumptions. " +
         "Questions are asked only once, before writing; never during it.";
 
     public const string AnswerOrSkipMessage = "Either answer or skip, not both.";

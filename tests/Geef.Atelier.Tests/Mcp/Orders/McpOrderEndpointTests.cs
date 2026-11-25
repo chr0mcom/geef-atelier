@@ -84,7 +84,9 @@ public sealed class McpOrderEndpointTests(PostgresFixture pg) : IAsyncLifetime
         Assert.Contains("origin", Required(item));
         Assert.Contains("boolean", Types(fields.GetProperty("decideForMe")));
         Assert.Contains("\"client\"", fields.GetProperty("origin").GetProperty("description").GetString());
-        Assert.Contains("500 characters", fields.GetProperty("freeText").GetProperty("description").GetString());
+        Assert.Contains("the error names the limit", fields.GetProperty("freeText").GetProperty("description").GetString());
+        Assert.DoesNotContain("500", fields.GetProperty("freeText").GetProperty("description").GetString());
+        Assert.Contains("\"revision\"", fields.GetProperty("questionId").GetProperty("description").GetString());
     }
 
     [Fact]

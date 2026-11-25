@@ -56,7 +56,8 @@ internal static class OrderDtoMappings
             clarification?.Assumptions.Select(a => a.ToDto()).ToList(),
             needsInput ? Questions(view.Clarification) : null,
             clarification?.Language,
-            needsInput ? NeedsInputMessage(Questions(view.Clarification).Count) : null);
+            needsInput ? NeedsInputMessage(Questions(view.Clarification).Count) : null,
+            clarification?.RevisionFileName);
     }
 
     public static OrderResultDto ToDto(this OrderResult result) =>
@@ -122,7 +123,8 @@ internal static class OrderDtoMappings
             clarification?.Understanding,
             clarification?.Assumptions.Select(a => a.ToDto()).ToList(),
             questions,
-            clarification?.Language);
+            clarification?.Language,
+            needsInput ? clarification?.RevisionFileName : null);
     }
 
     private static IReadOnlyList<QuestionDto> Questions(ClarificationView? clarification) =>
