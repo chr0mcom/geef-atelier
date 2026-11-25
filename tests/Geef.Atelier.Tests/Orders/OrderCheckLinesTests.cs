@@ -470,4 +470,116 @@ public sealed class OrderCheckLinesTests
         Assert.True(sentences.Count > 30);
         Assert.All(sentences, s => Assert.False(JargonBlocklist.Contains(s.Text), s.Name));
     }
+
+    private static readonly RunReportSource LookedUpSource = new(null, "Looked up on the web", SourceUsageMode.FullText, 900, LookedUp: true);
+
+    [Theory]
+    [InlineData(true, false, "Facts in the text were compared with your request, your answers and your files. Nothing was found that they do not back.")]
+    [InlineData(false, false, "Facts in the text were compared with your request and your answers. Nothing was found that they do not back.")]
+    [InlineData(true, true, "Facts in the text were compared with your request, your answers, your files and the pages looked up. Nothing was found that they do not back.")]
+    [InlineData(false, true, "Facts in the text were compared with your request, your answers and the pages looked up. Nothing was found that they do not back.")]
+    public void The_line_about_the_facts_has_four_versions_and_names_the_pages_looked_up_only_when_the_run_had_them(bool files, bool lookedUp, string expected)
+    {
+        IReadOnlyList<RunReportSource> sources = (files ? new[] { File } : []).Concat(lookedUp ? new[] { LookedUpSource } : []).ToList();
+        var report = Report(factCheck: Facts(FactCheckState.Checked), sources: sources) with { LookedUp = lookedUp };
+
+        Assert.Contains(expected, OrderCheckLines.Build(report, hasOpenPoints: false).Checked);
+    }
+
+    [Fact]
+    public void The_line_about_the_facts_with_the_pages_looked_up_keeps_the_count_of_passages()
+    {
+        var report = Report(factCheck: Facts(FactCheckState.OpenPoints, open: [Unbacked]), sources: [File, LookedUpSource]) with { LookedUp = true };
+
+        Assert.Contains(OrderResearchLines.FactsComparedLeadLookedUp + OrderCheckLines.FactsOpenOne, OrderCheckLines.Build(report, hasOpenPoints: true).Checked);
+    }
+
+    [Fact]
+    public void The_pages_looked_up_never_count_as_files_of_the_person()
+    {
+        var report = Report(factCheck: Facts(FactCheckState.Checked), sources: [LookedUpSource]) with { LookedUp = true };
+
+        var view = OrderCheckLines.Build(report, hasOpenPoints: false);
+
+        Assert.Contains(OrderResearchLines.FactsComparedLeadLookedUpNoFiles + OrderCheckLines.FactsNothingFound, view.Checked);
+        Assert.DoesNotContain(OrderCheckLines.Contradictions, view.Checked);
+        Assert.False(OrderCheckLines.ComparedFiles(report));
+    }
+
+    [Fact]
+    public void Without_the_pages_in_the_run_no_line_mentions_them_even_if_an_old_source_is_marked()
+    {
+        var view = OrderCheckLines.Build(Report(factCheck: Facts(FactCheckState.Checked), sources: [File]), hasOpenPoints: false);
+
+        Assert.DoesNotContain(view.Checked, l => l.Contains(OrderResearchLines.FromLookedUp, StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(MaterialPart.LookedUp, MaterialPart.LookedUp, "The pages looked up say “Mindestlohn 13,90 €” and also “Mindestlohn 12,82 €”.")]
+    [InlineData(MaterialPart.Files, MaterialPart.LookedUp, "Your file \"plan.txt\" says “Mindestlohn 13,90 €”, but the pages looked up say “Mindestlohn 12,82 €”.")]
+    [InlineData(MaterialPart.LookedUp, MaterialPart.Request, "The pages looked up say “Mindestlohn 13,90 €”, but your request says “Mindestlohn 12,82 €”.")]
+    public void A_contradiction_with_the_pages_looked_up_names_them_and_never_a_file(MaterialPart first, MaterialPart second, string expected)
+    {
+        var conflict = Conflict2("Mindestlohn 13,90 €", first, "Mindestlohn 12,82 €", second,
+            first == MaterialPart.Files ? "plan.txt" : first == MaterialPart.LookedUp ? "Looked up on the web" : null,
+            second == MaterialPart.Files ? "plan.txt" : second == MaterialPart.LookedUp ? "Looked up on the web" : null);
+
+        var sentence = Assert.Single(OrderCheckLines.SourceIssueSentences(Report(factCheck: Facts(FactCheckState.Checked, open: [conflict]))));
+
+        Assert.Equal(expected, sentence);
+        Assert.DoesNotContain("Looked up on the web", sentence, StringComparison.Ordinal);
+    }
+
+    private const string CostLine = "Bastelkosten: Papier 22 €, Farben 31 €, Kleber 19 €, zusammen 62 €";
+
+    private static SourceArithmeticIssue CostIssue()
+    {
+        var result = SourceArithmeticCheck.Check([("S1", "notizen.txt", "Treffen am Freitag\n- " + CostLine + "\n- Plätzchen ohne Nüsse")]);
+        return Assert.Single(result.Issues);
+    }
+
+    [Fact]
+    public void A_contradiction_between_the_items_and_the_total_inside_the_passage_of_a_wrong_total_is_told_once()
+    {
+        var issue = CostIssue();
+        Assert.Contains("zusammen 62 €", issue.Quote, StringComparison.Ordinal);
+        var conflict = Conflict2("Papier 22 €, Farben 31 €, Kleber 19 €", MaterialPart.Files, "zusammen 62 €", MaterialPart.Files, "notizen.txt", "notizen.txt");
+        var swapped = Conflict2("zusammen 62 €", MaterialPart.Files, "Papier 22 €, Farben 31 €, Kleber 19 €", MaterialPart.Files, "notizen.txt", "notizen.txt");
+
+        foreach (var finding in new[] { conflict, swapped })
+        {
+            var sentences = OrderCheckLines.SourceIssueSentences(Report(arithmetic: new SourceArithmeticResult(1, [issue]), factCheck: Facts(FactCheckState.Checked, open: [finding])));
+
+            Assert.Equal([OrderCheckLines.TotalSentence(issue)], sentences);
+            Assert.StartsWith("Your file \"notizen.txt\" gives 62 € as the total, but 22 € + 31 € + 19 € = 72 €.", sentences[0], StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
+    [InlineData("Kleber 19 €", "zusammen 62 €")]
+    [InlineData("Papier 22 €, Farben 31 €, Kleber 19 €, Porto 5 €", "zusammen 62 €")]
+    [InlineData("Papier 22 €, Farben 31 €, Kleber 19 €", "zusammen 62 € am Montag")]
+    [InlineData("Papier 22 €, Farben 31 €, Kleber 19 €", "Summe 62 €")]
+    public void A_contradiction_that_says_more_than_the_wrong_total_is_still_shown_beside_it(string items, string total)
+    {
+        var issue = new SourceArithmeticIssue("S1", "notizen.txt", ArithmeticForm.SentenceTotal,
+            "Bastelkosten: Papier 22 €, Farben 31 €, Kleber 19 €, Porto 5 €, zusammen 62 € am Montag", ["22 €", "31 €", "19 €"], "62 €", "72 €", TotalUseInText.Neither);
+        var conflict = Conflict2(items, MaterialPart.Files, total, MaterialPart.Files, "notizen.txt", "notizen.txt");
+
+        var sentences = OrderCheckLines.SourceIssueSentences(Report(arithmetic: new SourceArithmeticResult(1, [issue]), factCheck: Facts(FactCheckState.Checked, open: [conflict])));
+
+        Assert.Equal(2, sentences.Count);
+        Assert.Contains(sentences, s => s.Contains(items, StringComparison.Ordinal) && s.Contains(total, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_same_passages_from_the_pages_looked_up_or_another_file_are_still_shown_beside_the_total()
+    {
+        var issue = CostIssue();
+        var web = Conflict2("Papier 22 €, Farben 31 €, Kleber 19 €", MaterialPart.LookedUp, "zusammen 62 €", MaterialPart.Files, "Looked up on the web", "notizen.txt");
+        var other = Conflict2("Papier 22 €, Farben 31 €, Kleber 19 €", MaterialPart.Files, "zusammen 62 €", MaterialPart.Files, "budget.txt", "notizen.txt");
+
+        Assert.Equal(2, OrderCheckLines.SourceIssueSentences(Report(arithmetic: new SourceArithmeticResult(1, [issue]), factCheck: Facts(FactCheckState.Checked, open: [web]))).Count);
+        Assert.Equal(2, OrderCheckLines.SourceIssueSentences(Report(arithmetic: new SourceArithmeticResult(1, [issue]), factCheck: Facts(FactCheckState.Checked, open: [other]))).Count);
+    }
 }

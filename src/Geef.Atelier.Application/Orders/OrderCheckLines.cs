@@ -2,6 +2,7 @@ using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Reports;
 using Geef.Atelier.Core.Domain.Sources;
+using Geef.Atelier.Core.Domain.Writing;
 
 namespace Geef.Atelier.Application.Orders;
 
@@ -10,7 +11,9 @@ namespace Geef.Atelier.Application.Orders;
 /// material (4.6). A check is named as met only when it ran and passed; a check that ran and did not pass is named as not met; a
 /// check that did not run is not named. The recalculation of the text and of the files never says that calculations or totals are
 /// right: it names only what looks clearly wrong (asking to check it) and otherwise at most that nothing clearly wrong was found,
-/// adding that not every calculation can be checked; this holds for earlier reports as well. Web and MCP use only these sentences.
+/// adding that not every calculation can be checked; this holds for earlier reports as well. The line about the facts names the
+/// pages looked up on the web only when the delivered run had them in its material (<see cref="RunReport.LookedUp"/>), and those
+/// pages never count as files. Web and MCP use only these sentences.
 /// </summary>
 public static class OrderCheckLines
 {
@@ -161,17 +164,7 @@ public static class OrderCheckLines
         ArgumentNullException.ThrowIfNull(report);
         var sentences = new List<string>();
         var issues = report.SourceArithmetic?.Issues ?? [];
-        foreach (var issue in issues)
-        {
-            var items = string.Join(ItemSeparator, issue.Items);
-            var use = issue.UseInText switch
-            {
-                TotalUseInText.Computed => string.Format(TotalTextUsesFormat, issue.Computed),
-                TotalUseInText.Stated => string.Format(TotalTextUsesFormat, issue.Stated),
-                _ => TotalTextSilent,
-            };
-            sentences.Add(string.Format(TotalMismatchFormat, issue.FileName, issue.Stated, items, issue.Computed) + use);
-        }
+        sentences.AddRange(issues.Select(TotalSentence));
         if (report.SourceArithmetic is { IssuesNotListed: > 0 } more)
             sentences.Add(more.IssuesNotListed == 1 ? TotalsNotListedOne : string.Format(TotalsNotListedFormat, more.IssuesNotListed));
 
@@ -188,6 +181,20 @@ public static class OrderCheckLines
         return sentences.Distinct(StringComparer.Ordinal).ToList();
     }
 
+    /// <summary>The sentence about a total in a file that looks wrong, as <see cref="SourceIssueSentences"/> lists it.</summary>
+    public static string TotalSentence(SourceArithmeticIssue issue)
+    {
+        ArgumentNullException.ThrowIfNull(issue);
+        var items = string.Join(ItemSeparator, issue.Items);
+        var use = issue.UseInText switch
+        {
+            TotalUseInText.Computed => string.Format(TotalTextUsesFormat, issue.Computed),
+            TotalUseInText.Stated => string.Format(TotalTextUsesFormat, issue.Stated),
+            _ => TotalTextSilent,
+        };
+        return string.Format(TotalMismatchFormat, issue.FileName, issue.Stated, items, issue.Computed) + use;
+    }
+
     /// <summary>True when the fact check ran on the delivered text with the content of at least one file.</summary>
     public static bool ComparedFiles(RunReport report) =>
         report.FactCheck is { State: FactCheckState.Checked or FactCheckState.OpenPoints, Scope: FactCheckScope.Full } && HasFiles(report);
@@ -196,7 +203,7 @@ public static class OrderCheckLines
     public static bool FactsFullyChecked(RunReport report) =>
         report.FactCheck is { State: FactCheckState.Checked or FactCheckState.OpenPoints, Scope: FactCheckScope.Full, NotShown: 0 };
 
-    private static bool HasFiles(RunReport report) => report.Sources.Any(s => s.Mode != SourceUsageMode.Excluded);
+    private static bool HasFiles(RunReport report) => report.Sources.Any(s => !s.LookedUp && s.Mode != SourceUsageMode.Excluded);
 
     private static IEnumerable<string> Automatic(IReadOnlyList<DraftCheckResult> checks)
     {
@@ -277,7 +284,13 @@ public static class OrderCheckLines
             } + notShown;
         }
 
-        var lead = HasFiles(report) ? FactsComparedLead : FactsComparedLeadNoFiles;
+        var lead = (HasFiles(report), report.LookedUp) switch
+        {
+            (true, true) => OrderResearchLines.FactsComparedLeadLookedUp,
+            (false, true) => OrderResearchLines.FactsComparedLeadLookedUpNoFiles,
+            (true, false) => FactsComparedLead,
+            _ => FactsComparedLeadNoFiles,
+        };
         var found = open switch
         {
             0 when factCheck.NotShown == 0 => FactsNothingFound,
@@ -319,7 +332,10 @@ public static class OrderCheckLines
     /// True only when <paramref name="conflict"/> says nothing beyond <paramref name="issue"/>: both of its passages stand in the
     /// file of the total, one names the stated total (and at most the items) and the other only items or the computed total, the
     /// figures compared as whole amounts, and the two passages differ in nothing but their figures and total words (a date, a
-    /// day or any other word makes them a contradiction of their own). In any doubt both are shown.
+    /// day or any other word makes them a contradiction of their own). Also when both passages stand word for word inside the
+    /// passage of the total in the file, one holds nothing but the stated total (and total words) and the other every item of the
+    /// total and no other figure: then the two passages can only disagree about that total, which its own sentence already
+    /// names. In any doubt both are shown.
     /// </summary>
     private static bool RepeatsTotal(FactFinding conflict, SourceArithmeticIssue issue)
     {
@@ -333,8 +349,20 @@ public static class OrderCheckLines
             && SourceArithmeticCheck.NamesOnly(stated, issue.Items.Append(issue.Stated))
             && SourceArithmeticCheck.NamesOnly(items, issue.Items.Append(issue.Computed));
         return SourceArithmeticCheck.WordsBesideFigures(conflict.MaterialQuote).SequenceEqual(SourceArithmeticCheck.WordsBesideFigures(conflict.MaterialQuote2), StringComparer.Ordinal)
-            && (Pair(conflict.MaterialQuote, conflict.MaterialQuote2) || Pair(conflict.MaterialQuote2, conflict.MaterialQuote));
+            && (Pair(conflict.MaterialQuote, conflict.MaterialQuote2) || Pair(conflict.MaterialQuote2, conflict.MaterialQuote))
+            || InsideTotal(conflict.MaterialQuote, conflict.MaterialQuote2, issue) || InsideTotal(conflict.MaterialQuote2, conflict.MaterialQuote, issue);
     }
+
+    private static bool InsideTotal(string? stated, string? items, SourceArithmeticIssue issue) =>
+        !string.IsNullOrWhiteSpace(stated) && !string.IsNullOrWhiteSpace(items) && !string.IsNullOrWhiteSpace(issue.Quote)
+        && QuoteVerifier.ContainsWholeWords(issue.Quote, stated)
+        && QuoteVerifier.ContainsWholeWords(issue.Quote, items)
+        && SourceArithmeticCheck.NamesFigure(stated, issue.Stated)
+        && SourceArithmeticCheck.NamesOnly(stated, [issue.Stated])
+        && SourceArithmeticCheck.WordsBesideFigures(stated).Count == 0
+        && issue.Items.Count > 0
+        && issue.Items.All(item => SourceArithmeticCheck.NamesFigure(items, item))
+        && SourceArithmeticCheck.NamesOnly(items, issue.Items.Append(issue.Computed));
 
     private static string ConflictSentence(FactFinding conflict, bool showProfile)
     {
@@ -364,6 +392,7 @@ public static class OrderCheckLines
         MaterialPart.PersonAnswers => FromPersonAnswers,
         MaterialPart.AssistantAnswers => FromAssistantAnswers,
         MaterialPart.Profile => showProfile ? FromProfile : FromProfileHidden,
+        MaterialPart.LookedUp => OrderResearchLines.FromLookedUp,
         _ => string.IsNullOrWhiteSpace(fileName) ? FromFiles : string.Format(FromFileFormat, fileName),
     };
 
