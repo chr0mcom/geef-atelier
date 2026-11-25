@@ -51,6 +51,46 @@ public sealed class RunServiceResumeTests
     }
 
     [Fact]
+    public async Task ResumeRunAsync_SeedMode_PrefersTheDeliveredTextOverTheLastIteration()
+    {
+        var parentId  = Guid.NewGuid();
+        var iteration = MakeIteration(parentId, 2, "draft before the last corrections");
+        var parent    = MakeRunWithText(parentId, RunStatus.Failed, "alice", "delivered text with open points");
+        var capturing = new CapturingPersistenceService();
+        var svc       = MakeService(capturing, new SingleDetailsRepository(parent, [iteration]));
+
+        await svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: true, MaxIterationsOverride: null), "alice");
+
+        Assert.Equal("delivered text with open points", capturing.LastSeedDraftText);
+    }
+
+    [Fact]
+    public async Task ResumeRunAsync_SeedMode_DeliveredTextWithoutIterations_IsTheSeed()
+    {
+        var parentId  = Guid.NewGuid();
+        var parent    = MakeRunWithText(parentId, RunStatus.Aborted, "alice", "stopped, last text");
+        var capturing = new CapturingPersistenceService();
+        var svc       = MakeService(capturing, new SingleDetailsRepository(parent, []));
+
+        await svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: true, MaxIterationsOverride: null), "alice");
+
+        Assert.Equal("stopped, last text", capturing.LastSeedDraftText);
+    }
+
+    [Fact]
+    public async Task ResumeRunAsync_CleanRetry_IgnoresTheDeliveredText()
+    {
+        var parentId  = Guid.NewGuid();
+        var parent    = MakeRunWithText(parentId, RunStatus.Failed, "alice", "delivered text");
+        var capturing = new CapturingPersistenceService();
+        var svc       = MakeService(capturing, new SingleDetailsRepository(parent, []));
+
+        await svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: false, MaxIterationsOverride: null), "alice");
+
+        Assert.Null(capturing.LastSeedDraftText);
+    }
+
+    [Fact]
     public async Task ResumeRunAsync_SeedMode_NoIterations_SeedDraftIsNull()
     {
         var parentId  = Guid.NewGuid();
@@ -234,6 +274,14 @@ public sealed class RunServiceResumeTests
             Id = id, CreatedAt = DateTimeOffset.UtcNow, Status = status,
             BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = createdByUser,
             CrewSnapshot = TestCrewSnapshots.KlassikJson,
+        };
+
+    private static RunEntity MakeRunWithText(Guid id, RunStatus status, string? createdByUser, string finalText) =>
+        new RunEntity
+        {
+            Id = id, CreatedAt = DateTimeOffset.UtcNow, Status = status,
+            BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = createdByUser,
+            CrewSnapshot = TestCrewSnapshots.KlassikJson, FinalText = finalText,
         };
 
     private static RunEntity MakeRunWithSnapshot(Guid id, RunStatus status, string? createdByUser, string? snapshotJson) =>

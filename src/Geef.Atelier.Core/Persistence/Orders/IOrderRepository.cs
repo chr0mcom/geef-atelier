@@ -5,8 +5,11 @@ using Geef.Atelier.Core.Domain.Sources;
 
 namespace Geef.Atelier.Core.Persistence.Orders;
 
-/// <summary>An order with its current run and the number of linked sources, for lists.</summary>
-public sealed record OrderListRow(OrderEntity Order, RunEntity? CurrentRun, int SourceCount);
+/// <summary>
+/// An order with its current run, the run of its shown version (the newest standard run with a text, see
+/// <see cref="OrderStateResolver.SelectShownRun"/>; <c>null</c> without a text) and the number of linked sources, for lists.
+/// </summary>
+public sealed record OrderListRow(OrderEntity Order, RunEntity? CurrentRun, int SourceCount, RunEntity? ShownRun = null);
 
 /// <summary>A pipeline event of a run as needed for the progress display.</summary>
 public sealed record RunEventRow(string EventType, int? Iteration, DateTimeOffset At);
@@ -50,7 +53,9 @@ public interface IOrderRepository
     /// <summary>
     /// In one transaction: locks the order, checks again that it is not stopped, that no run of it is pending or running, that
     /// <paramref name="baseRunId"/> is still the shown version and that it has fewer than <paramref name="maxVersions"/> versions, then
-    /// adds <paramref name="run"/> as the next version (max version + 1). Returns the version only for <see cref="RevisionStart.Created"/>.
+    /// adds <paramref name="run"/> as the next version (max version + 1). A version already set in <paramref name="run"/> must be that
+    /// next version, otherwise the order changed in the meantime and the answer is <see cref="RevisionStart.BaseNotShown"/>. Returns the
+    /// version only for <see cref="RevisionStart.Created"/>; for any other outcome nothing is stored.
     /// </summary>
     Task<(RevisionStart Result, int? Version)> TryAddRevisionRunAsync(Guid orderId, Guid baseRunId, RunEntity run, int maxVersions, CancellationToken ct = default);
 
@@ -61,8 +66,8 @@ public interface IOrderRepository
     Task<IReadOnlyList<RunEntity>> ListRunsAsync(Guid orderId, CancellationToken ct = default);
 
     /// <summary>
-    /// Lists orders newest activity first; <paramref name="ownerUsername"/> = null lists all users. The current run of a row is
-    /// a slim copy for the list (status, outcome, kind, version, times, word count); its <see cref="RunEntity.FinalText"/>
+    /// Lists orders newest activity first; <paramref name="ownerUsername"/> = null lists all users. The current and the shown run of a
+    /// row are slim copies for the list (status, outcome, kind, version, times, word count); their <see cref="RunEntity.FinalText"/>
     /// only tells whether a text exists, and briefing, configuration, crew snapshot and report are left empty.
     /// </summary>
     Task<IReadOnlyList<OrderListRow>> ListAsync(string? ownerUsername, int limit, CancellationToken ct = default);

@@ -153,30 +153,33 @@ internal sealed class OrderService(
         if (current is null)
             return new OrderResult(orderId, display, null, null, null, null, [], [], [], [], NoteFor(display), UncorrectedAssumptions(order));
 
-        var report = current.ReportJson is null ? null : RunReportJson.TryParse(current.ReportJson);
-        var usages = await sources.ListRunUsagesAsync(current.Id, ct);
-        var hasText = !string.IsNullOrWhiteSpace(current.FinalText);
+        var shown = OrderStateResolver.SelectShownRun(orderRuns);
+        var run = shown ?? current;
+        var report = run.ReportJson is null ? null : RunReportJson.TryParse(run.ReportJson);
+        var usages = await sources.ListRunUsagesAsync(run.Id, ct);
+        var hasText = !string.IsNullOrWhiteSpace(run.FinalText);
         var lookedUp = !hasText || string.IsNullOrWhiteSpace(order.ResearchJson)
             ? null
             : OrderResearchLines.Build(ResearchJson.TryParse(order.ResearchJson), report?.LookedUp == true);
-        var warnings = (await warningRepository.ListByRunAsync(current.Id, ct)).WithoutShownResearchWarning(lookedUp);
+        var warnings = (await warningRepository.ListByRunAsync(run.Id, ct)).WithoutShownResearchWarning(lookedUp);
 
         var result = new OrderResult(
             orderId,
             display,
-            current.Id,
-            current.OrderVersion,
-            hasText ? current.FinalText : null,
-            hasText ? current.WordCount : null,
+            run.Id,
+            run.OrderVersion,
+            hasText ? run.FinalText : null,
+            hasText ? run.WordCount : null,
             report?.Placeholders ?? [],
             report?.Checks.Where(c => !c.Passed).ToList() ?? [],
             usages.Where(u => !string.Equals(u.Target, DossierRenderer.UsageTarget, StringComparison.Ordinal))
                 .Select(u => new OrderSourceUsageView(u.FileName, u.Mode, u.CharsIncluded, u.PagesIncluded)).ToList(),
             warnings,
-            NoteFor(display),
+            ShownNote(display, current, shown),
             UncorrectedAssumptions(order),
-            NotGivenFacts: NotGivenFacts(order, current),
-            LookedUp: lookedUp);
+            NotGivenFacts: NotGivenFacts(order, run),
+            LookedUp: lookedUp,
+            LatestVersion: current.OrderVersion);
         var viewer = viewerUsername ?? requestingUsername;
         var showProfile = viewer is not null && string.Equals(viewer, order.CreatedByUser, StringComparison.Ordinal);
         return report is null || !hasText ? result : result.WithReport(report, showProfile);
@@ -191,6 +194,7 @@ internal sealed class OrderService(
         return rows.Select(r =>
         {
             var display = OrderStateResolver.Resolve(r.Order.State, r.CurrentRun?.ToRunState(time.GetUtcNow()));
+            var listed = r.ShownRun ?? (display.HasText ? r.CurrentRun : null);
             return new OrderListItem(
                 r.Order.Id,
                 r.Order.RequestText.ToOrderTitle(),
@@ -199,7 +203,8 @@ internal sealed class OrderService(
                 r.Order.CreatedAt,
                 r.Order.UpdatedAt,
                 r.SourceCount,
-                display.HasText ? r.CurrentRun?.WordCount : null);
+                listed?.WordCount,
+                (listed ?? r.CurrentRun)?.OrderVersion);
         }).ToList();
     }
 
@@ -312,8 +317,71 @@ internal sealed class OrderService(
         return runId is null ? await CurrentWithNoticeAsync(order.Id, ct, given) : await SubmissionAsync(order.Id, [], ct);
     }
 
-    public Task<OrderRevision> ReviseAsync(ReviseOrderRequest request, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+    public async Task<OrderRevision> ReviseAsync(ReviseOrderRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var options = orderOptions.Value;
+        var order = await GetOwnedAsync(request.OrderId, request.RequestingUsername, ct)
+                    ?? throw new OrderRevisionException(RevisionLines.NotFound);
+        if (options.ReviseModeFor(order.CreatedByUser) != ReviseMode.On)
+            throw new OrderRevisionException(RevisionLines.NotAvailable);
+
+        var words = request.Change?.Trim() ?? string.Empty;
+        if (words.Length > options.RevisionHintMaxChars)
+            throw new OrderRevisionException(string.Format(CultureInfo.InvariantCulture, RevisionLines.TooLongFormat, words.Length, options.RevisionHintMaxChars));
+        var change = RevisionBrief.Change(words, request.Quick ?? []);
+        if (change.Length == 0)
+            throw new OrderRevisionException(RevisionLines.NoChangeGiven);
+        if (order.State == OrderState.Cancelled)
+            throw new OrderRevisionException(RevisionLines.Stopped);
+
+        var orderRuns = await orders.ListRunsAsync(order.Id, ct);
+        var now = time.GetUtcNow();
+        var current = OrderStateResolver.SelectCurrentRun(orderRuns);
+        if (orderRuns.Any(r => ActiveStatuses.Contains(r.Status)) || current?.ToRunState(now).Finishing == true)
+            return await BusyAsync(order, ct);
+
+        var shown = OrderStateResolver.SelectShownRun(orderRuns)
+                    ?? throw new OrderRevisionException(RevisionLines.NothingToChange);
+        var next = orderRuns.Where(r => r.Kind == RunKind.Standard).Max(r => r.OrderVersion ?? 0) + 1;
+        if (next > options.MaxVersionsPerOrder)
+            throw new OrderRevisionException(TooManyVersions(options));
+
+        var linked = await sources.ListForOrderAsync(order.Id, includeText: false, ct);
+        var resolved = await crewService.ResolveOrderSnapshotAsync(OrderMode.Direct, null, null, linked.Count > 0, ct);
+        var briefing = RevisionBrief.Compose(shown.BriefingText ?? string.Empty, change, next);
+        var run = resolved.ToRevisionRun(order, shown, briefing, change, next, now);
+
+        var (result, version) = await orders.TryAddRevisionRunAsync(order.Id, shown.Id, run, options.MaxVersionsPerOrder, ct);
+        switch (result)
+        {
+            case RevisionStart.Created:
+                break;
+            case RevisionStart.Busy or RevisionStart.BaseNotShown:
+                return await BusyAsync(order, ct);
+            case RevisionStart.TooManyVersions:
+                throw new OrderRevisionException(TooManyVersions(options));
+            case RevisionStart.Cancelled:
+                throw new OrderRevisionException(RevisionLines.Stopped);
+            default:
+                throw new OrderRevisionException(RevisionLines.NotFound);
+        }
+
+        await warningSink.ReportAssignmentWarningsAsync(run.Id, resolved.Warnings);
+        await NotifyAsync(order.Id);
+        logger.LogInformation("Order {OrderId} gets version {Version} as a change of version {BaseVersion} ({Entry}).", order.Id, version, shown.OrderVersion, request.Entry);
+        return new OrderRevision(order.Id, OrderDisplayState.Queued, run.Id, version, []);
+    }
+
+    private async Task<OrderRevision> BusyAsync(OrderEntity order, CancellationToken ct)
+    {
+        var current = OrderStateResolver.SelectCurrentRun(await orders.ListRunsAsync(order.Id, ct));
+        var display = OrderStateResolver.Resolve(order.State, current?.ToRunState(time.GetUtcNow()));
+        return new OrderRevision(order.Id, display.State, current?.Id, current?.OrderVersion, [RevisionLines.Busy]);
+    }
+
+    private static string TooManyVersions(OrderOptions options) =>
+        string.Format(CultureInfo.InvariantCulture, RevisionLines.TooManyVersionsFormat, options.MaxVersionsPerOrder);
 
     public async Task<OrderSubmission> SkipClarificationAsync(Guid orderId, string? requestingUsername, CancellationToken ct = default)
     {
@@ -465,7 +533,8 @@ internal sealed class OrderService(
     }
 
     private static OrderRunView ToRunView(RunEntity run) =>
-        new(run.Id, run.OrderVersion, run.Kind, run.Status, run.Outcome, run.CreatedAt, run.StartedAt, run.CompletedAt, run.WordCount);
+        new(run.Id, run.OrderVersion, run.Kind, run.Status, run.Outcome, run.CreatedAt, run.StartedAt, run.CompletedAt, run.WordCount,
+            RevisionBrief.Requested(run.RevisionHint));
 
     private async Task<SourcePlan> PlanSourcesAsync(IReadOnlyList<OrderSourceSelection> selections, string owner, SourceOptions options, CancellationToken ct)
     {
@@ -532,6 +601,19 @@ internal sealed class OrderService(
         {
             logger.LogWarning(ex, "Live update for order {OrderId} failed.", orderId);
         }
+    }
+
+    /// <summary>
+    /// The note of a result: when the shown version is not the current one, the sentence that the new version is still being written
+    /// or could not be finished; otherwise the note of the display state.
+    /// </summary>
+    private static string? ShownNote(OrderDisplay display, RunEntity current, RunEntity? shown)
+    {
+        if (shown is null || shown.Id == current.Id)
+            return NoteFor(display);
+        return display.IsFinished
+            ? string.Format(CultureInfo.InvariantCulture, RevisionLines.NotFinishedFormat, current.OrderVersion, shown.OrderVersion)
+            : string.Format(CultureInfo.InvariantCulture, RevisionLines.StillWritingFormat, shown.OrderVersion);
     }
 
     private static string? NoteFor(OrderDisplay display) => display.State switch

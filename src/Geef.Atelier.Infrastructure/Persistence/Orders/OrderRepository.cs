@@ -71,8 +71,53 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
         }
     }
 
-    public Task<(RevisionStart Result, int? Version)> TryAddRevisionRunAsync(Guid orderId, Guid baseRunId, RunEntity run, int maxVersions, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+    public async Task<(RevisionStart Result, int? Version)> TryAddRevisionRunAsync(Guid orderId, Guid baseRunId, RunEntity run, int maxVersions, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        if (run.OrderId is { } given && given != orderId)
+            throw new ArgumentException("The run belongs to another order.", nameof(run));
+        if (run.Kind != RunKind.Standard)
+            throw new ArgumentException("A change of a text is a standard run.", nameof(run));
+
+        try
+        {
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            if (!await LockOrderAsync(orderId, ct))
+                return (RevisionStart.NotFound, null);
+
+            var state = await db.Orders.AsNoTracking().Where(o => o.Id == orderId).Select(o => o.State).SingleAsync(ct);
+            if (state == OrderState.Cancelled)
+                return (RevisionStart.Cancelled, null);
+
+            var runs = await SlimRuns(db.Runs.AsNoTracking().Where(r => r.OrderId == orderId)).ToListAsync(ct);
+            if (runs.Any(r => r.Status is RunStatus.Pending or RunStatus.Running))
+                return (RevisionStart.Busy, null);
+            if (OrderStateResolver.SelectShownRun(runs)?.Id != baseRunId)
+                return (RevisionStart.BaseNotShown, null);
+
+            var version = runs.Where(r => r.Kind == RunKind.Standard).Max(r => r.OrderVersion ?? 0) + 1;
+            if (version > maxVersions)
+                return (RevisionStart.TooManyVersions, null);
+            if (run.OrderVersion is { } expected && expected != version)
+                return (RevisionStart.BaseNotShown, null);
+
+            var entry = db.Runs.Add(run);
+            entry.Property(r => r.OrderId).CurrentValue = orderId;
+            entry.Property(r => r.OrderVersion).CurrentValue = version;
+            await db.SaveChangesAsync(ct);
+            await TouchInTransactionAsync(orderId, _time.GetUtcNow(), ct);
+            await tx.CommitAsync(ct);
+            return (RevisionStart.Created, version);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: FirstRunIndex })
+        {
+            return (RevisionStart.Busy, null);
+        }
+        finally
+        {
+            db.ChangeTracker.Clear();
+        }
+    }
 
     public async Task<int> AddRunAsync(Guid orderId, RunEntity run, CancellationToken ct = default)
     {
@@ -131,24 +176,7 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
             return [];
 
         var ids = orders.Select(o => o.Id).ToList();
-        var runs = await db.Runs.AsNoTracking()
-            .Where(r => r.OrderId != null && ids.Contains(r.OrderId.Value))
-            .Select(r => new RunEntity
-            {
-                Id = r.Id,
-                CreatedAt = r.CreatedAt,
-                Status = r.Status,
-                BriefingText = string.Empty,
-                ConfigJson = string.Empty,
-                CompletedAt = r.CompletedAt,
-                FinalText = r.FinalText == null || r.FinalText.Trim() == string.Empty ? null : TextMarker,
-                WordCount = r.WordCount,
-                Kind = r.Kind,
-                Outcome = r.Outcome,
-                OrderId = r.OrderId,
-                OrderVersion = r.OrderVersion,
-            })
-            .ToListAsync(ct);
+        var runs = await SlimRuns(db.Runs.AsNoTracking().Where(r => r.OrderId != null && ids.Contains(r.OrderId.Value))).ToListAsync(ct);
         var counts = await db.OrderSources.AsNoTracking()
             .Where(l => ids.Contains(l.OrderId))
             .GroupBy(l => l.OrderId)
@@ -157,12 +185,31 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
 
         var runsByOrder = runs.ToLookup(r => r.OrderId!.Value);
         return orders
-            .Select(o => new OrderListRow(
-                o,
-                OrderStateResolver.SelectCurrentRun(runsByOrder[o.Id].ToList()),
-                counts.GetValueOrDefault(o.Id)))
+            .Select(o =>
+            {
+                var ofOrder = runsByOrder[o.Id].ToList();
+                return new OrderListRow(o, OrderStateResolver.SelectCurrentRun(ofOrder), counts.GetValueOrDefault(o.Id), OrderStateResolver.SelectShownRun(ofOrder));
+            })
             .ToList();
     }
+
+    /// <summary>Slim copies of runs for lists and checks: <see cref="RunEntity.FinalText"/> is <see cref="TextMarker"/> when a text exists.</summary>
+    private static IQueryable<RunEntity> SlimRuns(IQueryable<RunEntity> runs) =>
+        runs.Select(r => new RunEntity
+        {
+            Id = r.Id,
+            CreatedAt = r.CreatedAt,
+            Status = r.Status,
+            BriefingText = string.Empty,
+            ConfigJson = string.Empty,
+            CompletedAt = r.CompletedAt,
+            FinalText = r.FinalText == null || r.FinalText.Trim() == string.Empty ? null : TextMarker,
+            WordCount = r.WordCount,
+            Kind = r.Kind,
+            Outcome = r.Outcome,
+            OrderId = r.OrderId,
+            OrderVersion = r.OrderVersion,
+        });
 
     public async Task<IReadOnlyList<RunEventRow>> ListRunEventsAsync(Guid runId, CancellationToken ct = default)
     {
