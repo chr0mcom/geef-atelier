@@ -3,9 +3,15 @@ using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
 using Geef.Atelier.Application.Crew.Models;
+using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Models;
+using Geef.Atelier.Core.Domain.Orders;
+using Geef.Atelier.Core.Domain.Research;
+using Geef.Atelier.Core.Domain.Sources;
+using Geef.Atelier.Core.Persistence.Orders;
 using Geef.Atelier.Infrastructure.Llm;
+using Geef.Atelier.Infrastructure.Research;
 using Microsoft.Extensions.Logging;
 
 namespace Geef.Atelier.Tests.Research;
@@ -90,4 +96,123 @@ internal sealed class RecordingLogger<T> : ILogger<T>
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
         _entries.Enqueue((logLevel, formatter(state, exception) + (exception is null ? string.Empty : "\n" + exception)));
+}
+
+/// <summary>A clock that stands still at <paramref name="now"/>; elapsed time still runs on the system timer.</summary>
+internal sealed class FixedClock(DateTimeOffset now) : TimeProvider
+{
+    public override DateTimeOffset GetUtcNow() => now;
+}
+
+/// <summary>
+/// Orders in memory with only the members the research uses; the research methods behave like the real ones (conditional write,
+/// count from an instant) unless a test replaces them.
+/// </summary>
+internal sealed class ResearchOrders : IOrderRepository
+{
+    private readonly ConcurrentDictionary<Guid, OrderEntity> _orders = new();
+
+    public int Gets;
+    public int Sets;
+    public int Counts;
+
+    /// <summary>Number returned by the daily count in addition to the stored orders.</summary>
+    public int ExtraCount { get; set; }
+
+    /// <summary>Thrown by the daily count when set.</summary>
+    public Exception? CountFailure { get; set; }
+
+    /// <summary>Thrown by the write when set.</summary>
+    public Exception? SetFailure { get; set; }
+
+    /// <summary>Runs before the write, for example to let another run store first.</summary>
+    public Action<Guid>? BeforeSet { get; set; }
+
+    public OrderEntity Put(OrderEntity order)
+    {
+        _orders[order.Id] = order;
+        return order;
+    }
+
+    public OrderEntity? Find(Guid id) => _orders.TryGetValue(id, out var order) ? order : null;
+
+    public Task<OrderEntity?> GetAsync(Guid orderId, CancellationToken ct = default)
+    {
+        Interlocked.Increment(ref Gets);
+        return Task.FromResult(Find(orderId));
+    }
+
+    public Task<bool> TrySetResearchAsync(Guid orderId, string researchJson, DateTimeOffset at, CancellationToken ct = default)
+    {
+        Interlocked.Increment(ref Sets);
+        BeforeSet?.Invoke(orderId);
+        if (SetFailure is { } failure)
+            throw failure;
+        while (_orders.TryGetValue(orderId, out var order))
+        {
+            if (order.ResearchJson is not null)
+                return Task.FromResult(false);
+            if (_orders.TryUpdate(orderId, order with { ResearchJson = researchJson, ResearchAt = at }, order))
+                return Task.FromResult(true);
+        }
+        return Task.FromResult(false);
+    }
+
+    public Task<int> CountResearchSinceAsync(DateTimeOffset since, CancellationToken ct = default)
+    {
+        Interlocked.Increment(ref Counts);
+        if (CountFailure is { } failure)
+            throw failure;
+        return Task.FromResult(ExtraCount + _orders.Values.Count(o => o.ResearchAt is { } at && at >= since));
+    }
+
+    public Task CreateWithFirstRunAsync(OrderEntity order, IReadOnlyList<OrderSourceEntity> sources, RunEntity run, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task CreateAsync(OrderEntity order, IReadOnlyList<OrderSourceEntity> sources, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<int> AddRunAsync(Guid orderId, RunEntity run, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<RunEntity>> ListRunsAsync(Guid orderId, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<OrderListRow>> ListAsync(string? ownerUsername, int limit, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<RunEventRow>> ListRunEventsAsync(Guid runId, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<bool> TrySetStateAsync(Guid orderId, OrderState expected, OrderState next, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<(Guid OrderId, int? Version)?> GetLinkForRunAsync(Guid runId, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<Guid> LinkLegacyRunAsync(Guid runId, OrderEntry entry, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task TouchAsync(Guid orderId, DateTimeOffset at, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<bool> DeleteAsync(Guid orderId, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<Guid>> ListIntakeCandidatesAsync(DateTimeOffset staleBefore, int maxAttempts, int limit, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<bool> TryClaimForIntakeAsync(Guid orderId, DateTimeOffset now, DateTimeOffset staleBefore, int maxAttempts, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<Guid>> ListStuckIntakesAsync(DateTimeOffset staleBefore, DateTimeOffset unclaimedBefore, int maxAttempts, int limit, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<bool> TrySaveQuestionsAsync(Guid orderId, string clarifyJson, DateTimeOffset at, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<bool> TryStartWithRunAsync(OrderStart start, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<Guid>> ListUnansweredAsync(DateTimeOffset askedBefore, int limit, CancellationToken ct = default) => throw new NotSupportedException();
+}
+
+/// <summary>Search stand-in: answers per topic and records every topic searched.</summary>
+internal sealed class FakeSearch(Func<string, TavilySearchOutcome>? answer = null) : ITavilySearchClient
+{
+    private readonly ConcurrentQueue<string> _queries = new();
+
+    public IReadOnlyList<string> Queries => _queries.ToList();
+
+    public TimeSpan Delay { get; set; }
+
+    public async Task<TavilySearchOutcome> SearchAsync(string query, int maxResults, CancellationToken ct)
+    {
+        _queries.Enqueue(query);
+        if (Delay > TimeSpan.Zero)
+            await Task.Delay(Delay, ct);
+        return (answer ?? (_ => new([], null, 1)))(query);
+    }
+}
+
+/// <summary>Passage-picker stand-in: returns a fixed outcome and records what it was given.</summary>
+internal sealed class FakeCondenser(Func<IReadOnlyList<string>, IReadOnlyList<ResearchPage>, CondenseOutcome> answer) : IDossierCondenser
+{
+    private readonly ConcurrentQueue<(IReadOnlyList<string> Topics, IReadOnlyList<ResearchPage> Pages)> _calls = new();
+
+    public IReadOnlyList<(IReadOnlyList<string> Topics, IReadOnlyList<ResearchPage> Pages)> Calls => _calls.ToList();
+
+    public Task<CondenseOutcome> CondenseAsync(IReadOnlyList<string> topics, IReadOnlyList<ResearchPage> pages, CancellationToken ct)
+    {
+        _calls.Enqueue((topics, pages));
+        return Task.FromResult(answer(topics, pages));
+    }
 }
