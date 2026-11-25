@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Geef.Atelier.Core.Configuration;
+using Geef.Atelier.Core.Domain.Research;
 using Geef.Atelier.Infrastructure.Grounding;
 using Microsoft.Extensions.Options;
 
@@ -11,7 +12,9 @@ namespace Geef.Atelier.Infrastructure.Research;
 /// <summary>
 /// One <c>POST search</c> per topic over the named client <see cref="HttpClientName"/> (no retry handler): <c>search_depth</c> basic,
 /// raw page text on, Tavily's own answer off. Uses only <c>url</c>, <c>title</c> and <c>raw_content</c> of a result, cut to
-/// <see cref="ResearchOptions.RawCharsPerPage"/>; results without raw text or without an http or https address are left out.
+/// <see cref="ResearchOptions.RawCharsPerPage"/> (<see cref="TavilyTextExtensions.Cut"/>); results without raw text and results whose
+/// address is not acceptable by <see cref="ResearchAddress.Acceptable"/> (no http or https address, user information, longer than
+/// <see cref="ResearchAddress.MaxChars"/>) are left out.
 /// </summary>
 internal sealed class TavilySearchClient(
     IHttpClientFactory httpClientFactory,
@@ -69,12 +72,14 @@ internal sealed class TavilySearchClient(
             {
                 if (hits.Count >= Math.Max(1, maxResults))
                     break;
-                if (result is null || !IsWebAddress(result.Url) || string.IsNullOrWhiteSpace(result.RawContent))
+                var address = ResearchAddress.Acceptable(result?.Url);
+                var raw = string.IsNullOrWhiteSpace(result?.RawContent) ? string.Empty : result.RawContent.Cut(settings.RawCharsPerPage);
+                if (result is null || address is null || string.IsNullOrWhiteSpace(raw))
                 {
                     skipped++;
                     continue;
                 }
-                hits.Add(new TavilyHit(result.Url!.Trim(), result.Title ?? string.Empty, result.RawContent.Cut(settings.RawCharsPerPage)));
+                hits.Add(new TavilyHit(address, result.Title ?? string.Empty, raw));
             }
 
             return new TavilySearchOutcome(hits, null, Elapsed(started)) { Skipped = skipped };
@@ -97,11 +102,8 @@ internal sealed class TavilySearchClient(
         }
     }
 
-    /// <summary>True for an absolute <c>http</c> or <c>https</c> address.</summary>
-    internal static bool IsWebAddress(string? url) =>
-        Uri.TryCreate(url?.Trim(), UriKind.Absolute, out var uri)
-        && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
-        && !string.IsNullOrEmpty(uri.Host);
+    /// <summary>True for an address the research keeps (<see cref="ResearchAddress.Acceptable"/>).</summary>
+    internal static bool IsWebAddress(string? url) => ResearchAddress.Acceptable(url) is not null;
 
     private static SearchResponse? Parse(string json)
     {
@@ -147,16 +149,38 @@ internal sealed class TavilySearchClient(
 /// <summary>Text helpers of the web search.</summary>
 internal static class TavilyTextExtensions
 {
-    /// <summary>The first <paramref name="maxChars"/> characters of <paramref name="text"/>, never ending inside a surrogate pair.</summary>
+    /// <summary>
+    /// <paramref name="text"/> when it has at most <paramref name="maxChars"/> characters. A longer text is cut back to the last safe end
+    /// within the first <paramref name="maxChars"/> characters: a line break, or a <c>.</c>, <c>!</c> or <c>?</c> followed by white
+    /// space, where a dot right after a digit never counts (a number such as <c>1.250</c> or a date such as <c>1. Mai</c>). Without
+    /// such an end the cut falls on the last white space that does not stand between digits, and without that the text is empty; a
+    /// cut never ends inside a word or a number.
+    /// </summary>
     public static string Cut(this string text, int maxChars)
     {
         if (maxChars <= 0)
             return string.Empty;
         if (text.Length <= maxChars)
             return text;
-        var cut = maxChars;
-        if (char.IsHighSurrogate(text[cut - 1]))
-            cut--;
-        return text[..cut];
+
+        for (var i = maxChars - 1; i >= 0; i--)
+        {
+            if (text[i] is '\n' or '\r')
+                return text[..i].TrimEnd();
+            if (text.EndsSentenceAt(i))
+                return text[..(i + 1)];
+        }
+        for (var i = maxChars; i > 0; i--)
+        {
+            if (char.IsWhiteSpace(text[i]) && !(char.IsDigit(text[i - 1]) && i + 1 < text.Length && char.IsDigit(text[i + 1])))
+                return text[..i].TrimEnd();
+        }
+        return string.Empty;
     }
+
+    private static bool EndsSentenceAt(this string text, int index) =>
+        text[index] is '.' or '!' or '?'
+        && index + 1 < text.Length
+        && char.IsWhiteSpace(text[index + 1])
+        && !(text[index] == '.' && index > 0 && char.IsDigit(text[index - 1]));
 }

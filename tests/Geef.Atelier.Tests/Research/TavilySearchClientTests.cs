@@ -199,17 +199,41 @@ public sealed class TavilySearchClientTests
     }
 
     [Fact]
-    public async Task Raw_text_is_cut_to_the_configured_length_without_splitting_a_character()
+    public async Task Raw_text_is_cut_back_to_the_last_sentence_end_and_a_text_without_one_is_left_out()
     {
-        var raw = new string('a', 9) + "😀" + new string('b', 20);
-        var (client, _, provider) = Create((_, _, _) => Ok(Results(Result("https://example.org/a", raw), Result("https://example.org/b", "short"))),
-            research: new ResearchOptions { RawCharsPerPage = 10 });
+        const string raw = "Der Beitrag ist neu. 😀 Er beträgt 1.500 Euro im Jahr.";
+        var (client, _, provider) = Create((_, _, _) => Ok(Results(
+                Result("https://example.org/a", raw), Result("https://example.org/b", "short"), Result("https://example.org/c", new string('x', 40)))),
+            research: new ResearchOptions { RawCharsPerPage = raw.IndexOf("500", StringComparison.Ordinal) });
         await using var _ = provider;
 
         var outcome = await client.SearchAsync(Topic, 3, CancellationToken.None);
 
-        Assert.Equal(new string('a', 9), outcome.Hits[0].RawContent);
-        Assert.Equal("short", outcome.Hits[1].RawContent);
+        Assert.Equal(["Der Beitrag ist neu.", "short"], outcome.Hits.Select(h => h.RawContent));
+        Assert.Equal(1, outcome.Skipped);
+    }
+
+    [Theory]
+    [InlineData("Zeile eins ohne Punkt\nZeile zwei mit 1.500 Euro", 36, "Zeile eins ohne Punkt")]
+    [InlineData("Erster Satz. Frist bis zum 1. Mai und danach 1.250,00 Euro", 50, "Erster Satz.")]
+    [InlineData("Frage? Antwort folgt hier mit 12,5 Prozent", 33, "Frage?")]
+    [InlineData("ohne Satzende aber mit Wörtern 1 250 000 Euro", 35, "ohne Satzende aber mit Wörtern")]
+    [InlineData("Kurz.", 10, "Kurz.")]
+    public void The_cut_ends_at_a_sentence_or_line_end_never_inside_a_word_or_number(string text, int max, string expected) =>
+        Assert.Equal(expected, text.Cut(max));
+
+    [Theory]
+    [InlineData("https://trusted.example@evil.example/x")]
+    [InlineData("ftp://example.org/a")]
+    public async Task A_result_whose_address_is_not_kept_is_left_out(string url)
+    {
+        var (client, _, provider) = Create((_, _, _) => Ok(Results(Result(url, "Text."), Result("https://example.org/" + new string('a', 490), "Text."), Result("https://example.org/ok", "Text."))));
+        await using var _ = provider;
+
+        var outcome = await client.SearchAsync(Topic, 3, CancellationToken.None);
+
+        Assert.Equal(["https://example.org/ok"], outcome.Hits.Select(h => h.Url));
+        Assert.Equal(2, outcome.Skipped);
     }
 
     [Fact]
