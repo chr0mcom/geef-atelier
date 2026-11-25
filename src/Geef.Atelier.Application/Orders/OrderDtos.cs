@@ -4,6 +4,7 @@ using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
+using Geef.Atelier.Core.Domain.Research;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Warnings;
 
@@ -76,7 +77,8 @@ public sealed record OrderView(
 /// check saw the content of the files. <see cref="NotesNotShown"/> is the fixed sentence about notes of the writer that could not be
 /// shown (they hold a link, an address, or account or access details); <see cref="NotGivenFacts"/> are the assumptions of the
 /// clarifier about facts that went to the writer only as "not given by the person" (never stated as facts), shown apart from the
-/// assumptions that were used.
+/// assumptions that were used. <see cref="LookedUp"/> is the research of the order as the person sees it (built only by
+/// <see cref="OrderResearchLines"/>), <c>null</c> when there is nothing to show.
 /// </summary>
 public sealed record OrderResult(
     Guid OrderId,
@@ -100,7 +102,17 @@ public sealed record OrderResult(
     OrderChecksView? Checks = null,
     FactCheckScope? FactCheckScope = null,
     string? NotesNotShown = null,
-    IReadOnlyList<string>? NotGivenFacts = null);
+    IReadOnlyList<string>? NotGivenFacts = null,
+    OrderLookedUpView? LookedUp = null);
+
+/// <summary>A passage looked up on the web, word for word from its page; <see cref="Url"/> is <c>null</c> unless it is an absolute http or https address.</summary>
+public sealed record OrderLookedUpEntry(string Quote, string? Url, string Title, DateTimeOffset RetrievedAt);
+
+/// <summary>
+/// The research of an order for the person: its status, the fixed sentence for it (<see cref="Note"/>, <c>null</c> when the entries speak
+/// for themselves), how many topics were withheld and the entries. The entries are content of other web pages, not instructions.
+/// </summary>
+public sealed record OrderLookedUpView(ResearchStatus Status, string? Note, int Withheld, IReadOnlyList<OrderLookedUpEntry> Entries);
 
 /// <summary>A passage the writer quoted from a file, verified against that file.</summary>
 public sealed record OrderSourceQuoteView(string FileName, string Quote);
