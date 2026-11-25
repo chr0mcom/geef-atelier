@@ -38,7 +38,9 @@ public sealed record RunReportCorrection(string Code, string? QuoteBefore);
 /// of the files and the corrections after the checks. <see cref="LookedUp"/> says that the passages looked up on the web (<c>W1</c>) were
 /// part of the material of the run. <see cref="EarlierOpenPoints"/> are the open points and assumptions of the writer for the version this
 /// run changed that it does not repeat (never dropped). <see cref="Revision"/> says that the run changed an earlier version, so that the
-/// rules read from the first request were only notes.
+/// rules read from the first request were only notes. <see cref="EarlierNeedsCheck"/> says that the version this run changed was shown as
+/// "Ready – please check" and its checks could not be taken over (it had no readable report), or that its report says so of the version
+/// before it: nothing of it was checked again, so this version is shown the same way (<see cref="Orders.OrderStateResolver"/>).
 /// </summary>
 public sealed record RunReport(
     int SchemaVersion,
@@ -60,7 +62,8 @@ public sealed record RunReport(
     IReadOnlyList<RunReportCorrection>? Corrections = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool LookedUp = false,
     IReadOnlyList<RunReportEarlierPoint>? EarlierOpenPoints = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Revision = false)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Revision = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool EarlierNeedsCheck = false)
 {
     public const int CurrentSchemaVersion = 2;
     public const string DirectKind = "direct";

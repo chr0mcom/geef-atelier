@@ -7,7 +7,8 @@ namespace Geef.Atelier.Core.Domain.Orders;
 /// The parts of a run that decide how its order is shown. <see cref="Finishing"/> is true for a few seconds after the run
 /// reached its final status while its outcome, text or report are still being stored (or, for a composition, while the
 /// writing run is being created). <see cref="CarriesBlockingPoint"/> is true for a change of an earlier version whose report keeps
-/// a blocking passage of that version open while the fact check blocks (<see cref="FactCheckMode.On"/>).
+/// a blocking passage of that version open while the fact check blocks (<see cref="FactCheckMode.On"/>), or whose report says that the
+/// version it changed needed a check that was not taken over (<see cref="RunReport.EarlierNeedsCheck"/>, in every mode of the fact check).
 /// </summary>
 public sealed record OrderRunState(RunStatus Status, RunOutcome? Outcome, RunKind Kind, bool HasText, bool Finishing = false, bool CarriesBlockingPoint = false);
 
@@ -121,8 +122,10 @@ public static class OrderStateResolver
     /// is not blank. A run that ended less than <see cref="FinishingWindow"/> before <paramref name="now"/> is still finishing
     /// while it has no outcome, and so is a completed composition (its writing run follows). A run with a text that changes an earlier
     /// version (<see cref="RunEntity.RevisionHint"/> not blank) carries a blocking point when its stored report keeps a blocking passage of
-    /// that version (<see cref="FactFinding.FromVersion"/>) open while the fact check ran in <see cref="FactCheckMode.On"/>; a report
-    /// without these fields or one that cannot be read carries none.
+    /// that version (<see cref="FactFinding.FromVersion"/>) open while the fact check ran in <see cref="FactCheckMode.On"/>, or says that the
+    /// version it changed was shown as "Ready – please check" and its checks were not taken over (<see cref="RunReport.EarlierNeedsCheck"/>,
+    /// whatever the mode of the fact check, because nothing of it was checked again); a report without these fields or one that cannot be
+    /// read carries none.
     /// </summary>
     public static OrderRunState ToRunState(this RunEntity run, DateTimeOffset now)
     {
@@ -137,8 +140,9 @@ public static class OrderStateResolver
     }
 
     private static bool CarriesBlockingPoint(string? reportJson) =>
-        RunReportJson.TryParse(reportJson)?.FactCheck is { Mode: FactCheckMode.On } check
-        && (check.Open ?? []).Any(f => f is { Blocking: true, FromVersion: not null });
+        RunReportJson.TryParse(reportJson) is { } report
+        && (report.EarlierNeedsCheck
+            || report.FactCheck is { Mode: FactCheckMode.On } check && (check.Open ?? []).Any(f => f is { Blocking: true, FromVersion: not null }));
 
     /// <summary>Returns the snake_case name used on the wire (MCP, JSON), e.g. <c>delivered_with_open_points</c>.</summary>
     public static string ToWireName(this OrderDisplayState state) => state switch

@@ -462,6 +462,66 @@ public sealed class OrderChangeTests : TestContext
     }
 
     [Fact]
+    public void Fixed_sentences_about_an_earlier_version_stand_under_their_own_neutral_lead()
+    {
+        var view = Delivered(RunView(2, RunStatus.Completed, RunOutcome.Converged, 13, Asked, 5));
+        _orders.SetResult(Result(view, 2, 2, SecondText) with
+        {
+            EarlierOpenPoints =
+            [
+                new OrderEarlierPoint(1, "Es fehlt, bis wann man sich anmelden soll."),
+                new OrderEarlierPoint(1, "The checks of version 1 were not taken over, so anything they left open was not checked again.", EarlierPointKind.Note),
+            ],
+        });
+
+        var cut = Render(view);
+
+        Assert.Equal(["Es fehlt, bis wann man sich anmelden soll."],
+            cut.FindAll("[data-testid='order-earlier-points'] [data-testid='order-earlier-point']").Select(p => p.TextContent));
+        Assert.Equal("About version 1:", cut.Find("[data-testid='order-earlier-notes-lead']").TextContent);
+        var note = cut.Find("[data-testid='order-earlier-notes'] [data-testid='order-earlier-point']");
+        Assert.Equal(("note", "The checks of version 1 were not taken over, so anything they left open was not checked again."), (note.GetAttribute("data-kind"), note.TextContent));
+    }
+
+    [Fact]
+    public void Only_fixed_sentences_about_an_earlier_version_never_say_that_the_change_may_have_settled_them()
+    {
+        var view = Delivered(RunView(2, RunStatus.Completed, RunOutcome.Converged, 13, Asked, 5));
+        _orders.SetResult(Result(view, 2, 2, SecondText) with
+        {
+            EarlierOpenPoints = [new OrderEarlierPoint(1, "1 flagged passage could not be checked or listed.", EarlierPointKind.Note)],
+        });
+
+        var cut = Render(view);
+
+        Assert.Empty(cut.FindAll("[data-testid='order-earlier-lead']"));
+        Assert.DoesNotContain("may have settled", cut.Find("[data-testid='order-open-points']").TextContent, StringComparison.Ordinal);
+        Assert.Equal("About version 1:", cut.Find("[data-testid='order-earlier-notes-lead']").TextContent);
+    }
+
+    [Theory]
+    [InlineData(InstructionOrigin.Stated, "Do not mention the price.", "Asked for: “Do not mention the price.”")]
+    [InlineData(InstructionOrigin.Memory, "Never use exclamation marks.", "Your About me details say: “Never use exclamation marks.”")]
+    [InlineData(InstructionOrigin.Memory, null, "This may go against the About me details of the person who ordered the text; they are hidden here.")]
+    public void A_passage_against_an_instruction_from_before_the_latest_change_is_a_hint_that_says_so(InstructionOrigin origin, string? instruction, string asked)
+    {
+        var view = Delivered(RunView(2, RunStatus.Completed, RunOutcome.Converged, 13, Asked, 5));
+        _orders.SetResult(Result(view, 2, 2, SecondText) with
+        {
+            UnbackedPassages = [new OrderUnbackedPassage("Wir freuen uns auf Sie.", FactFindingKind.Instruction, instruction, false, origin, BeforeLastChange: true)],
+        });
+
+        var cut = Render(view);
+
+        Assert.Empty(cut.FindAll("[data-testid='order-against-instruction']"));
+        Assert.DoesNotContain("may not follow", cut.Markup, StringComparison.Ordinal);
+        var hint = cut.Find("[data-testid='order-hint'][data-kind='against-instruction']");
+        Assert.Contains(asked, hint.TextContent, StringComparison.Ordinal);
+        Assert.Equal(RevisionLines.BeforeLastChangeNote, hint.QuerySelector("[data-testid='order-passage-before-change']")!.TextContent);
+        Assert.Equal("This instruction applied before your latest change; your change may have replaced it.", RevisionLines.BeforeLastChangeNote);
+    }
+
+    [Fact]
     public void The_diff_component_renders_unchanged_text_and_says_when_nothing_changed()
     {
         var cut = RenderComponent<OrderVersionDiff>(p => p.Add(c => c.Before, FirstText).Add(c => c.After, FirstText).Add(c => c.BeforeVersion, 1));

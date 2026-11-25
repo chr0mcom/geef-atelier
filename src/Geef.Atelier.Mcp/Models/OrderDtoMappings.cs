@@ -94,8 +94,12 @@ internal static class OrderDtoMappings
         var points = result.ShownEarlierPoints();
         return points.Count == 0
             ? null
-            : points.Select(p => new OrderEarlierPointDto(p.Version, p.Text,
-                p.Kind == EarlierPointKind.Assumption ? OrderEarlierPointDto.AssumptionKind : OrderEarlierPointDto.OpenPointKind)).ToList();
+            : points.Select(p => new OrderEarlierPointDto(p.Version, p.Text, p.Kind switch
+            {
+                EarlierPointKind.Assumption => OrderEarlierPointDto.AssumptionKind,
+                EarlierPointKind.Note => OrderEarlierPointDto.NoteKind,
+                _ => OrderEarlierPointDto.OpenPointKind,
+            })).ToList();
     }
 
     /// <summary>Quotes per file at most, as on the web page (<see cref="OrderResultRules.MaxQuotesPerFile"/>).</summary>
@@ -109,7 +113,8 @@ internal static class OrderDtoMappings
 
     public const string EarlierPointsNote =
         "earlierOpenPoints were noted for an earlier version (see their version; kind assumption marks what the writer assumed then); " +
-        "the change may have settled them, or not. Show them with their version, do not drop them and do not say they are settled.";
+        "the change may have settled them, or not. Entries of kind note are fixed sentences by Atelier about that version (what of it could not be shown " +
+        "or taken over), which a change does not settle. Show them with their version, do not drop them and do not say they are settled.";
 
     /// <summary>Note for a changed version with assumptions of the clarifier: <c>{0}</c> is the version they were noted for.</summary>
     public const string AssumptionsVersionNoteFormat =
@@ -131,7 +136,11 @@ internal static class OrderDtoMappings
     public static OrderChecksDto ToDto(this OrderChecksView checks) =>
         new(checks.Checked, checks.Changed, checks.ToReview, checks.Limits);
 
-    /// <summary>The flagged passages in the order of the web page (<see cref="OrderResultRules.ShownPassages(OrderResult)"/>); the instruction only for passages against one.</summary>
+    /// <summary>
+    /// The flagged passages in the order of the web page (<see cref="OrderResultRules.ShownPassages(OrderResult)"/>); the instruction only for
+    /// passages against one, and the sentence of the web page in <c>note</c> for a passage the pages looked up say otherwise and for one against
+    /// an instruction from before the latest change (<see cref="RevisionLines.BeforeLastChangeNote"/>).
+    /// </summary>
     public static IReadOnlyList<OrderUnbackedPassageDto> ToPassageDtos(this OrderResult result) => result.UnbackedPassages.ToPassageDtos();
 
     /// <summary>The shown passages of <paramref name="passages"/> as DTOs, in the order of the web page.</summary>
@@ -143,7 +152,7 @@ internal static class OrderDtoMappings
                 p.Kind == FactFindingKind.Instruction && !string.IsNullOrWhiteSpace(p.Instruction) ? p.Instruction : null,
                 p.Blocking,
                 p.Kind == FactFindingKind.Instruction ? p.Origin?.ToWire() : null,
-                p.LookedUp ? OrderResearchLines.DiffersFromLookedUp : null,
+                p.LookedUp ? OrderResearchLines.DiffersFromLookedUp : p.BeforeLastChange ? RevisionLines.BeforeLastChangeNote : null,
                 p.FromVersion))
             .ToList();
 

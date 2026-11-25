@@ -1,5 +1,6 @@
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Checks;
+using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Reports;
 using Geef.Atelier.Infrastructure.Pipeline;
 using Geef.Atelier.Infrastructure.Pipeline.Direct;
@@ -175,5 +176,28 @@ public sealed class DirectPipelineRevisionTests
         var point = Assert.Single(outcome.Report!.EarlierOpenPoints!);
         Assert.Equal(new RunReportEarlierPoint(1, "The checks of version 1 were not taken over, so anything they left open was not checked again.", EarlierPointKind.Note), point);
         Assert.DoesNotContain(DirectReportBuilder.EarlierReportMissingNote, outcome.Report.Notes!);
+        Assert.False(outcome.Report.EarlierNeedsCheck);
+    }
+
+    [Theory]
+    [InlineData(RunStatus.Completed, RunOutcome.DeliveredWithOpenPoints, true)]
+    [InlineData(RunStatus.Failed, RunOutcome.Failed, true)]
+    [InlineData(RunStatus.Completed, RunOutcome.Converged, false)]
+    public async Task An_earlier_version_without_a_report_that_was_shown_as_please_check_makes_the_new_one_please_check(RunStatus status, RunOutcome outcome, bool expected)
+    {
+        var (harness, first) = await FirstVersionAsync();
+        harness.Runs.Put(new RunEntity
+        {
+            Id = first.Id, CreatedAt = first.CreatedAt, Status = status, Outcome = outcome, CompletedAt = DateTimeOffset.UtcNow.AddHours(-1),
+            BriefingText = first.BriefingText, ConfigJson = "{}", OrderId = first.OrderId, OrderVersion = 1, FinalText = first.FinalText,
+        });
+        harness.Script.EnqueueExecutorText(Marker + " " + Words(60));
+        var second = SecondVersion(first);
+
+        var result = await harness.RunAsync(second);
+
+        Assert.Equal(expected, result.Report!.EarlierNeedsCheck);
+        var stored = harness.StoreFinished(second, result);
+        Assert.Equal(expected, stored.ToRunState(DateTimeOffset.UtcNow.AddHours(1)).CarriesBlockingPoint);
     }
 }

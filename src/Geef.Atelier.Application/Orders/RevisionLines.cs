@@ -36,6 +36,18 @@ public static class RevisionLines
     /// <summary>Lead of the open points of an earlier version that the shown version does not repeat: <c>{0}</c> is that version.</summary>
     public const string EarlierPointsLeadFormat = "Noted for version {0} – your change may have settled it:";
 
+    /// <summary>
+    /// Lead of the fixed sentences of Atelier about an earlier version (what of it could not be shown or taken over): <c>{0}</c> is that
+    /// version. Neutral, because a change does not settle them.
+    /// </summary>
+    public const string EarlierNotesLeadFormat = "About version {0}:";
+
+    /// <summary>
+    /// Sentence with a passage against an instruction from before the latest change (the request, the answers, the About me details or an
+    /// earlier change): it never blocks, because the latest change may have replaced the instruction.
+    /// </summary>
+    public const string BeforeLastChangeNote = "This instruction applied before your latest change; your change may have replaced it.";
+
     /// <summary>Words before an assumption the writer made for an earlier version, listed with the points noted for that version.</summary>
     public const string EarlierAssumptionLead = "Assumed: ";
 

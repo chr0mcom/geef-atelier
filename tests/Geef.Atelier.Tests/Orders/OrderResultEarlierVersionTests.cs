@@ -47,6 +47,22 @@ public sealed class OrderResultEarlierVersionTests
             null, [], EarlierOpenPoints: earlier);
 
     [Fact]
+    public void A_passage_against_an_instruction_from_before_the_latest_change_is_shown_as_a_hint_with_its_mark_and_the_about_me_rule()
+    {
+        var hint = AgainstProfile(fromVersion: null) with { Blocking = false, BeforeLastChange = true };
+        var stillMarkedBlocking = AgainstProfile(fromVersion: 1) with { BeforeLastChange = true, TextQuote = "in der Aula" };
+
+        var owner = Base().WithReport(Report(open: [hint, stillMarkedBlocking]));
+        var other = Base().WithReport(Report(open: [hint]), showProfile: false);
+
+        Assert.All(owner.UnbackedPassages!, p => Assert.Equal((false, true), (p.Blocking, p.BeforeLastChange)));
+        Assert.Equal("Termine immer mit Wochentag nennen.", owner.UnbackedPassages![0].Instruction);
+        Assert.Null(Assert.Single(other.UnbackedPassages!).Instruction);
+        Assert.Empty(owner.BlockingPassages(FactFindingKind.Instruction));
+        Assert.Equal(2, owner.HintPassages().Count);
+    }
+
+    [Fact]
     public void A_carried_over_passage_keeps_its_version_and_the_earlier_open_points_are_shown_without_blank_ones()
     {
         var report = Report(

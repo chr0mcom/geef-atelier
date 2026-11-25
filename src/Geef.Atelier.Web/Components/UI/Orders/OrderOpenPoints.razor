@@ -104,7 +104,7 @@
                 }
             </ul>
         }
-        @foreach (var earlier in Result.ShownEarlierPoints().GroupBy(p => p.Version))
+        @foreach (var earlier in Result.ShownEarlierPoints().Where(p => p.Kind != EarlierPointKind.Note).GroupBy(p => p.Version))
         {
             <p data-testid="order-earlier-lead">@string.Format(System.Globalization.CultureInfo.InvariantCulture, RevisionLines.EarlierPointsLeadFormat, earlier.Key)</p>
             <ul class="order-writer-open" data-testid="order-earlier-points" data-version="@earlier.Key">
@@ -114,6 +114,16 @@
                         {
                             <span class="order-earlier-kind">@RevisionLines.EarlierAssumptionLead</span>
                         }<span lang="@Language">@point.Text</span></li>
+                }
+            </ul>
+        }
+        @foreach (var earlier in Result.ShownEarlierPoints().Where(p => p.Kind == EarlierPointKind.Note).GroupBy(p => p.Version))
+        {
+            <p data-testid="order-earlier-notes-lead">@string.Format(System.Globalization.CultureInfo.InvariantCulture, RevisionLines.EarlierNotesLeadFormat, earlier.Key)</p>
+            <ul class="order-writer-open" data-testid="order-earlier-notes" data-version="@earlier.Key">
+                @foreach (var point in earlier)
+                {
+                    <li data-testid="order-earlier-point" data-kind="note">@point.Text</li>
                 }
             </ul>
         }
@@ -133,9 +143,24 @@
                         {
                             <span class="order-passage-asked" data-testid="order-hint-looked-up">@OrderResearchLines.DiffersFromLookedUp</span>
                         }
+                        else if (passage.Kind == FactFindingKind.Instruction && passage.Origin == InstructionOrigin.Memory)
+                        {
+                            @if (!string.IsNullOrWhiteSpace(passage.Instruction))
+                            {
+                                <span class="order-passage-asked" data-origin="about-me">Your About me details say: “<span lang="@Language">@passage.Instruction</span>”</span>
+                            }
+                            else
+                            {
+                                <span class="order-passage-asked" data-origin="about-me">This may go against the About me details of the person who ordered the text; they are hidden here.</span>
+                            }
+                        }
                         else if (!string.IsNullOrWhiteSpace(passage.Instruction))
                         {
                             <span class="order-passage-asked">Asked for: “<span lang="@Language">@passage.Instruction</span>”</span>
+                        }
+                        @if (passage.BeforeLastChange)
+                        {
+                            <span class="order-passage-asked" data-testid="order-passage-before-change">@RevisionLines.BeforeLastChangeNote</span>
                         }
                         @FoundIn(passage)
                     </li>
@@ -149,9 +174,11 @@
     /// <summary>
     /// The delivered result with placeholders, open checks, passages of the text that may not be backed or may not follow an
     /// instruction, problems in the files, open points of the writer, open points and assumptions (<see cref="RevisionLines.EarlierAssumptionLead"/>)
-    /// of the writer for an earlier version that the shown version does not repeat (<see cref="RevisionLines.EarlierPointsLeadFormat"/>) and hints (everything that never blocks, among them
-    /// passages the pages looked up say otherwise, with <see cref="OrderResearchLines.DiffersFromLookedUp"/>). A passage carried over from
-    /// an earlier version names that version (<see cref="FoundInFormat"/>).
+    /// of the writer for an earlier version that the shown version does not repeat (<see cref="RevisionLines.EarlierPointsLeadFormat"/>), the fixed
+    /// sentences of Atelier about an earlier version under their own neutral lead (<see cref="RevisionLines.EarlierNotesLeadFormat"/>) and hints
+    /// (everything that never blocks, among them passages the pages looked up say otherwise, with <see cref="OrderResearchLines.DiffersFromLookedUp"/>,
+    /// and passages against an instruction from before the latest change, with <see cref="RevisionLines.BeforeLastChangeNote"/>). A passage carried
+    /// over from an earlier version names that version (<see cref="FoundInFormat"/>).
     /// </summary>
     [Parameter, EditorRequired] public OrderResult Result { get; set; } = null!;
 

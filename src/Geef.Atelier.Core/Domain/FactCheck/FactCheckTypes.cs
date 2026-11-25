@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Writing;
 
@@ -24,17 +27,69 @@ public enum MaterialPart { Request = 0, PersonAnswers = 1, AssistantAnswers = 2,
 /// </summary>
 public sealed record FactSource(string Id, string FileName, string Text, bool LookedUp = false);
 
-/// <summary>Everything the text may rely on. Assumptions and the writer's notes are deliberately not part of it.</summary>
+/// <summary>
+/// Everything the text may rely on. Assumptions and the writer's notes are deliberately not part of it. <see cref="Changes"/> are the changes
+/// the person asked for when the run changes an earlier version (in their order, the newest last; empty for the first run of an order): words
+/// of the person, kept apart from <see cref="PersonAnswers"/> so that the mark that says which change is the newest (<see cref="FactChange.Marked"/>)
+/// is only ever added where the material is written out for the check, never to what a quote is looked up in.
+/// </summary>
 public sealed record FactMaterial(string Request, IReadOnlyList<string> PersonAnswers, IReadOnlyList<string> AssistantAnswers, string? Profile,
-    IReadOnlyList<FactSource> Files, FactCheckScope Scope, string? FileMap)
+    IReadOnlyList<FactSource> Files, FactCheckScope Scope, string? FileMap, IReadOnlyList<FactChange>? Changes = null)
 {
-    /// <summary>Characters of all parts together, the files included.</summary>
+    /// <summary>Characters of all parts together as the check reads them, the files and the marks of the changes included.</summary>
     public int TotalChars { get; } = Request.Length
         + PersonAnswers.Sum(a => a.Length)
+        + (Changes ?? []).Sum(c => c.Marked.Length)
         + AssistantAnswers.Sum(a => a.Length)
         + (Profile?.Length ?? 0)
         + Files.Sum(f => f.Text.Length)
         + (FileMap?.Length ?? 0);
+
+    /// <summary>True when the run changes an earlier version: the person asked for at least one change.</summary>
+    public bool IsRevision => Changes is { Count: > 0 };
+}
+
+/// <summary>
+/// A change the person asked for: its <see cref="Version"/> (<c>null</c> when the briefing names none), the <see cref="Words"/> of the person
+/// and whether it is the <see cref="Newest"/>, the change made now. The mark before the words (<see cref="NewestMarkFormat"/>,
+/// <see cref="EarlierMarkFormat"/>) is Atelier's, never a word of the person: it is written out only for the check (<see cref="Marked"/>)
+/// and taken out of every quote of the check (<see cref="WithoutMarks"/>).
+/// </summary>
+public sealed partial record FactChange(int? Version, string Words, bool Newest)
+{
+    /// <summary>Mark before the newest change: <c>{0}</c> is its version.</summary>
+    public const string NewestMarkFormat = "(newest change, version {0}) ";
+
+    /// <summary>Mark before an earlier change: <c>{0}</c> is its version.</summary>
+    public const string EarlierMarkFormat = "(earlier change, version {0}; a newer change wins where they differ) ";
+
+    /// <summary>The mark of this change, with its trailing space.</summary>
+    public string Mark => string.Format(CultureInfo.InvariantCulture, Newest ? NewestMarkFormat : EarlierMarkFormat,
+        Version?.ToString(CultureInfo.InvariantCulture) ?? "?");
+
+    /// <summary>The line as the check reads it under the answers of the person: <see cref="Mark"/> and then the words.</summary>
+    public string Marked => Mark + Words;
+
+    /// <summary>
+    /// <paramref name="quote"/> without any mark of a change: a whole mark anywhere, and the end of a mark the quote starts with (for example
+    /// <c>version 2) …</c>), are taken out; <c>null</c> stays <c>null</c>. A quote that was only a mark comes back blank.
+    /// </summary>
+    public static string? WithoutMarks(string? quote)
+    {
+        if (string.IsNullOrEmpty(quote))
+            return quote;
+        var rest = WholeMark().Replace(quote, " ");
+        rest = MarkEnd().Replace(rest, string.Empty);
+        return rest == quote ? quote : string.Join(' ', rest.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    [GeneratedRegex(@"\(\s*(?:newest|earlier)\s+change\s*,\s*version\s+(?:\d+|\?)\s*(?:;\s*a\s+newer\s+change\s+wins\s+where\s+they\s+differ\s*)?\)",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex WholeMark();
+
+    [GeneratedRegex(@"^[^()]{0,80}?(?:\bversion\s+(?:\d+|\?)|\bwhere\s+they\s+differ)\s*\)",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex MarkEnd();
 }
 
 /// <summary>A finding as the model proposed it, before the code checked it.</summary>
@@ -55,12 +110,16 @@ public enum FactFilterDecision
 /// A finding after the code checked it. Ids are <c>f1…</c>, given by the filter. <see cref="TextQuote"/> is null only for a source
 /// conflict the text does not use. <see cref="MaterialFrom"/> and <see cref="Material2From"/> say in which part of the material the
 /// code found <see cref="MaterialQuote"/> and <see cref="MaterialQuote2"/>, <see cref="Material2File"/> the file of the second quote
-/// (<c>null</c> in reports written before they were kept). <see cref="FromVersion"/> is reserved for a finding carried over from the
-/// report of an earlier version; nothing sets it yet, so it is always <c>null</c> and never written.
+/// (<c>null</c> in reports written before they were kept). <see cref="FromVersion"/> is the version that found a finding carried over from
+/// the report of an earlier version (<c>null</c> for one of this version). <see cref="BeforeLastChange"/> marks a finding against an
+/// instruction in a run that changes an earlier version whose instruction does not stand in the newest change (it stands in the request,
+/// the answers of the person or the assistant, the About me details or an earlier change): the newest change may have replaced it, so it
+/// never blocks; written only when true. No quote of a finding ever holds the mark of a change (<see cref="FactChange.WithoutMarks"/>).
 /// </summary>
 public sealed record FactFinding(string Id, FactFindingKind Kind, string? TextQuote, string WhatIsWrong, string? InstructionQuote,
     string? MaterialQuote, string? MaterialQuote2, string? MaterialFile, InstructionOrigin? Origin, bool Blocking, QuoteMatchKind Match,
-    MaterialPart? MaterialFrom = null, MaterialPart? Material2From = null, string? Material2File = null, int? FromVersion = null);
+    MaterialPart? MaterialFrom = null, MaterialPart? Material2From = null, string? Material2File = null, int? FromVersion = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool BeforeLastChange = false);
 
 /// <summary>Decision of the filter for the proposed finding at <see cref="Index"/>.</summary>
 public sealed record FactFilterTrace(int Index, FactFilterDecision Decision);
@@ -73,7 +132,10 @@ public sealed record FactFilterResult(IReadOnlyList<FactFinding> Findings, IRead
 /// finding stays, where an instruction comes from and whether a finding blocks follow from where its quotes are found,
 /// never from what the model says about them. A finding about replaced information whose replacing passage stands in the pages
 /// looked up on the web (<see cref="MaterialPart.LookedUp"/>) never blocks and never takes the place of another finding at the same
-/// passage of the text (D-074).
+/// passage of the text (D-074). In a run that changes an earlier version (<see cref="FactMaterial.IsRevision"/>) a finding against an
+/// instruction blocks only when its instruction stands in the newest change (also when it stands elsewhere as well); any other is kept
+/// as a hint with <see cref="FactFinding.BeforeLastChange"/>. Every quote is taken without the marks of the changes
+/// (<see cref="FactChange.WithoutMarks"/>) before it is looked up or kept, so a mark never counts as a word of the person.
 /// </summary>
 public static class FactFindingFilter
 {
@@ -113,7 +175,14 @@ public static class FactFindingFilter
 
         for (var index = 0; index < proposed.Count; index++)
         {
-            var finding = proposed[index];
+            var finding = proposed[index] is { } raw
+                ? raw with
+                {
+                    InstructionQuote = FactChange.WithoutMarks(raw.InstructionQuote),
+                    MaterialQuote = FactChange.WithoutMarks(raw.MaterialQuote),
+                    MaterialQuote2 = FactChange.WithoutMarks(raw.MaterialQuote2),
+                }
+                : null;
             var (decision, result) = finding is null
                 ? (FactFilterDecision.DroppedTooShort, (FactFinding?)null)
                 : finding.Kind == FactFindingKind.SourceConflict
@@ -155,12 +224,14 @@ public static class FactFindingFilter
         }
 
         InstructionOrigin? origin = null;
+        var beforeLastChange = false;
         if (finding.Kind == FactFindingKind.Instruction)
         {
-            var (found, decision) = OriginOf(finding.InstructionQuote, parts);
+            var (found, before, decision) = OriginOf(finding.InstructionQuote, parts, material.IsRevision);
             if (decision is not null)
                 return (decision.Value, null);
             origin = found;
+            beforeLastChange = before;
         }
 
         var reason = Reason(finding.WhatIsWrong, material);
@@ -183,7 +254,7 @@ public static class FactFindingFilter
 
         var isBlocking = finding.Kind switch
         {
-            FactFindingKind.Instruction => origin is InstructionOrigin.Stated or InstructionOrigin.Answered or InstructionOrigin.Memory,
+            FactFindingKind.Instruction => !beforeLastChange && origin is InstructionOrigin.Stated or InstructionOrigin.Answered or InstructionOrigin.Memory,
             FactFindingKind.Superseded => materialFrom != MaterialPart.LookedUp,
             _ => true,
         };
@@ -194,7 +265,23 @@ public static class FactFindingFilter
         var excerpt = QuoteVerifier.ExcerptWholeWords(draft, match);
         return (FactFilterDecision.Kept, new FactFinding(string.Empty, finding.Kind, excerpt.Length > 0 ? excerpt : quote,
             reason, Trimmed(finding.InstructionQuote), SafeQuote(finding.MaterialQuote, material), SafeQuote(finding.MaterialQuote2, material),
-            materialFile, origin, isBlocking, match.Kind, materialFrom));
+            materialFile, origin, isBlocking, match.Kind, materialFrom, BeforeLastChange: beforeLastChange));
+    }
+
+    /// <summary>
+    /// <paramref name="finding"/> as it counts in a run that changes an earlier version, whose material is <paramref name="material"/>: a
+    /// finding against an instruction (also one carried over from an earlier version) blocks only when its instruction stands in the newest
+    /// change of <paramref name="material"/>; any other, and every one when the material is unknown, is a hint with
+    /// <see cref="FactFinding.BeforeLastChange"/>. Every other kind of finding stays as it is. Only for runs that change an earlier version.
+    /// </summary>
+    public static FactFinding ForRevision(FactFinding finding, FactMaterial? material)
+    {
+        if (finding is not { Kind: FactFindingKind.Instruction } || finding.BeforeLastChange)
+            return finding;
+        var quote = FactChange.WithoutMarks(finding.InstructionQuote)?.Trim() ?? string.Empty;
+        var newest = quote.Length > 0 && material is not null && material.Parts().Any(p => p.Change is { Newest: true }
+            && QuoteVerifier.FindVerbatim(p.Text, quote, MinInstructionChars).IsVerbatim);
+        return newest ? finding : finding with { Blocking = false, BeforeLastChange = true };
     }
 
     private static (FactFilterDecision, FactFinding?) DecideConflict(ProposedFactFinding finding, string draft, FactMaterial material,
@@ -230,26 +317,35 @@ public static class FactFindingFilter
             first.Part, second.Part, second.FileName));
     }
 
-    private static (InstructionOrigin? Origin, FactFilterDecision? Decision) OriginOf(string? instructionQuote, List<MaterialSlice> parts)
+    /// <summary>
+    /// Where the instruction quote stands, in the order request, answers of the person (the changes among them), About me details,
+    /// answers of the assistant. In a run that changes an earlier version (<paramref name="revision"/>) the newest change is looked at
+    /// first: a quote that stands there is an answer of the person from the newest change, wherever else it stands too; any other quote
+    /// that is found comes from before the newest change (<c>BeforeLastChange</c>).
+    /// </summary>
+    private static (InstructionOrigin? Origin, bool BeforeLastChange, FactFilterDecision? Decision) OriginOf(string? instructionQuote,
+        List<MaterialSlice> parts, bool revision)
     {
         var quote = instructionQuote?.Trim() ?? string.Empty;
         if (quote.Length == 0)
-            return (null, FactFilterDecision.DroppedInstructionNotFound);
+            return (null, false, FactFilterDecision.DroppedInstructionNotFound);
 
-        bool In(MaterialPart part) => parts.Any(p => p.Part == part
-            && QuoteVerifier.FindVerbatim(p.Text, quote, MinInstructionChars).IsVerbatim);
+        bool Found(MaterialSlice slice) => QuoteVerifier.FindVerbatim(slice.Text, quote, MinInstructionChars).IsVerbatim;
+        bool In(MaterialPart part) => parts.Any(p => p.Part == part && Found(p));
 
+        if (revision && parts.Any(p => p.Change is { Newest: true } && Found(p)))
+            return (InstructionOrigin.Answered, false, null);
         if (In(MaterialPart.Request))
-            return (InstructionOrigin.Stated, null);
+            return (InstructionOrigin.Stated, revision, null);
         if (In(MaterialPart.PersonAnswers))
-            return (InstructionOrigin.Answered, null);
+            return (InstructionOrigin.Answered, revision, null);
         if (In(MaterialPart.Profile))
-            return (InstructionOrigin.Memory, null);
+            return (InstructionOrigin.Memory, revision, null);
         if (In(MaterialPart.AssistantAnswers))
-            return (InstructionOrigin.Client, null);
+            return (InstructionOrigin.Client, revision, null);
         if (In(MaterialPart.Files) || In(MaterialPart.LookedUp))
-            return (null, FactFilterDecision.DroppedInstructionFromFile);
-        return (null, FactFilterDecision.DroppedInstructionNotFound);
+            return (null, false, FactFilterDecision.DroppedInstructionFromFile);
+        return (null, false, FactFilterDecision.DroppedInstructionNotFound);
     }
 
     private static MaterialSlice? FindMaterial(string? quote, List<MaterialSlice> parts)
@@ -323,21 +419,27 @@ public static class FactFindingFilter
     }
 }
 
-/// <summary>A part of the material with its kind; <see cref="FileName"/> is set for files.</summary>
-internal sealed record MaterialSlice(MaterialPart Part, string Text, string? FileName);
+/// <summary>A part of the material with its kind; <see cref="FileName"/> is set for files, <see cref="Change"/> for a change of the person.</summary>
+internal sealed record MaterialSlice(MaterialPart Part, string Text, string? FileName, FactChange? Change = null);
 
 /// <summary>Helpers on <see cref="FactMaterial"/>.</summary>
 internal static class FactMaterialExtensions
 {
     /// <summary>
-    /// Every part of the material in the order request, answers of the person, answers of the assistant, profile, files, file map. A
-    /// source marked <see cref="FactSource.LookedUp"/> is <see cref="MaterialPart.LookedUp"/>, never one of the person's files.
+    /// Every part of the material in the order request, answers of the person, the changes of the person (their words only, as answers of
+    /// the person, without their marks), answers of the assistant, profile, files, file map. A source marked <see cref="FactSource.LookedUp"/>
+    /// is <see cref="MaterialPart.LookedUp"/>, never one of the person's files.
     /// </summary>
     public static IEnumerable<MaterialSlice> Parts(this FactMaterial material)
     {
         yield return new MaterialSlice(MaterialPart.Request, material.Request ?? string.Empty, null);
         foreach (var answer in material.PersonAnswers ?? [])
             yield return new MaterialSlice(MaterialPart.PersonAnswers, answer ?? string.Empty, null);
+        foreach (var change in material.Changes ?? [])
+        {
+            if (change is not null)
+                yield return new MaterialSlice(MaterialPart.PersonAnswers, change.Words ?? string.Empty, null, change);
+        }
         foreach (var answer in material.AssistantAnswers ?? [])
             yield return new MaterialSlice(MaterialPart.AssistantAnswers, answer ?? string.Empty, null);
         if (!string.IsNullOrEmpty(material.Profile))
@@ -453,7 +555,8 @@ public static class FactCarryOver
     /// always stays, because a correction of the text does not change the material (without a passage when its passage is gone).
     /// Only a repetition is dropped: a passage finding whose passage lies wholly inside the passage of one already kept of the same
     /// kind (for an instruction, also against the same instruction; for replaced information, also from the same side of the material,
-    /// the pages looked up or not), which then blocks when either blocks, or a source conflict
+    /// the pages looked up or not), which then blocks when either blocks (never when the kept one is against an instruction from before
+    /// the latest change, <see cref="FactFinding.BeforeLastChange"/>), or a source conflict
     /// whose two passages contain each other as whole words and that names the same files. A passage that only overlaps a kept one
     /// is shown as well. No limit applies; ids are given anew (<c>f1…</c>).
     /// </summary>
@@ -494,7 +597,7 @@ public static class FactCarryOver
                     && (carried.Kind != FactFindingKind.Superseded || (k.Finding.MaterialFrom == MaterialPart.LookedUp) == (carried.MaterialFrom == MaterialPart.LookedUp)));
                 if (twin >= 0)
                 {
-                    if (carried.Blocking && !kept[twin].Finding.Blocking)
+                    if (carried.Blocking && !kept[twin].Finding.Blocking && !kept[twin].Finding.BeforeLastChange)
                         kept[twin] = (kept[twin].Finding with { Blocking = true }, kept[twin].Range);
                     continue;
                 }

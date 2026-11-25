@@ -1,8 +1,13 @@
+using Geef.Atelier.Core.Domain.FactCheck;
+
 namespace Geef.Atelier.Application.Orders;
 
-/// <summary>The briefing split back into what the composer put in; lines keep their order, the answer marks are removed.</summary>
+/// <summary>
+/// The briefing split back into what the composer put in; lines keep their order, the answer marks are removed. <see cref="Changes"/> are
+/// the changes the person asked for (newest last, empty when there are none), apart from <see cref="PersonAnswers"/>.
+/// </summary>
 public sealed record BriefParts(string Request, IReadOnlyList<string> PersonAnswers, IReadOnlyList<string> AssistantAnswers,
-    IReadOnlyList<string> FormAssumptions, IReadOnlyList<string> OpenFacts, string? Profile);
+    IReadOnlyList<string> FormAssumptions, IReadOnlyList<string> OpenFacts, string? Profile, IReadOnlyList<FactChange> Changes);
 
 /// <summary>
 /// Reads the parts of a briefing built by <see cref="IOrderBriefComposer"/>: the request comes first and unchanged, the blocks
@@ -74,16 +79,16 @@ public static class BriefingSections
     /// Splits <paramref name="briefing"/> into the request and the blocks of the composer; a briefing not built by the composer is all
     /// request. Answers keep their question (<c>question → answer</c>); of a correction only the person's words remain, because the
     /// corrected assumption is not something the person said. The lines of the block with the changes the person asked for
-    /// (<see cref="RevisionBrief.Heading"/>) are words of the person too: each keeps the words of the person unchanged after a short mark
-    /// that says which change is the newest and which are earlier (<see cref="NewestChangeFormat"/>, <see cref="EarlierChangeFormat"/>), so
-    /// that whoever reads them knows the order without the heading. The summary of a prepared brief belongs to no part.
+    /// (<see cref="RevisionBrief.Heading"/>) are words of the person too: they come back as <see cref="BriefParts.Changes"/>, each with its
+    /// version and the words of the person unchanged, the last one as the newest. Their mark (<see cref="FactChange.Marked"/>) is added only
+    /// where they are written out for the fact check, never to the words. The summary of a prepared brief belongs to no part.
     /// </summary>
     public static BriefParts Parse(string briefing)
     {
         briefing ??= string.Empty;
         var request = RequestPart(briefing);
         if (request.Length == briefing.Length)
-            return new BriefParts(briefing, [], [], [], [], null);
+            return new BriefParts(briefing, [], [], [], [], null, []);
 
         var person = new List<string>();
         var assistant = new List<string>();
@@ -92,7 +97,6 @@ public static class BriefingSections
         string? profile = null;
         var block = BriefBlock.None;
         var changes = new List<RevisionChange>();
-        var changesAt = -1;
         var lines = briefing[(request.Length + Separator.Length)..].Split('\n');
         for (var i = 0; i < lines.Length; i++)
         {
@@ -130,33 +134,17 @@ public static class BriefingSections
                     break;
                 case BriefBlock.Changes:
                     if (RevisionBrief.ReadLine(line) is { } change)
-                    {
-                        if (changesAt < 0)
-                            changesAt = person.Count;
                         changes.Add(change);
-                    }
                     break;
             }
         }
 
-        if (changes.Count > 0)
-            person.InsertRange(changesAt, changes.Select((c, i) => Marked(c, newest: i == changes.Count - 1)));
-
-        return new BriefParts(request, person, assistant, form, open, string.IsNullOrEmpty(profile) ? null : profile);
+        return new BriefParts(request, person, assistant, form, open, string.IsNullOrEmpty(profile) ? null : profile,
+            changes.Select((c, i) => new FactChange(c.Version, c.Words, Newest: i == changes.Count - 1)).ToList());
     }
 
     private const string ItemStart = "- ";
     private const string AnswerArrow = " → ";
-
-    /// <summary>Mark before the newest change of the person in <see cref="BriefParts.PersonAnswers"/>: <c>{0}</c> is its version.</summary>
-    public const string NewestChangeFormat = "(newest change, version {0}) ";
-
-    /// <summary>Mark before an earlier change of the person in <see cref="BriefParts.PersonAnswers"/>: <c>{0}</c> is its version.</summary>
-    public const string EarlierChangeFormat = "(earlier change, version {0}; a newer change wins where they differ) ";
-
-    private static string Marked(RevisionChange change, bool newest) =>
-        string.Format(System.Globalization.CultureInfo.InvariantCulture, newest ? NewestChangeFormat : EarlierChangeFormat,
-            change.Version?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "?") + change.Words;
 
     private enum BriefBlock { None, Understanding, Answers, Corrections, FormAssumptions, OpenFacts, Changes }
 

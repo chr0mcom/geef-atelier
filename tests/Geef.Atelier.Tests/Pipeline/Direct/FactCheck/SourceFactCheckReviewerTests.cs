@@ -132,6 +132,37 @@ public sealed class SourceFactCheckReviewerTests
     }
 
     [Fact]
+    public async Task In_a_change_an_instruction_of_the_first_request_never_rejects_and_never_reaches_the_correction()
+    {
+        var (reviewer, checker, _) = Create();
+        var changed = Material() with { Changes = [new FactChange(2, "Please add the price of 5 euros per family.", Newest: true)] };
+        checker.Checks.Enqueue(Answer(AgainstInstruction("ohne Emojis")));
+
+        var result = await reviewer.ReviewAsync(Context(FactCheckMode.On, material: changed), default);
+
+        Assert.Equal(ReviewDecision.Approved, result.Decision);
+        var finding = Assert.Single(result.Findings);
+        Assert.Equal(FindingSeverity.Info, finding.Severity);
+        Assert.Equal(false, finding.Metadata![FactFindingMetadata.Blocking]);
+        Assert.Equal("ohne Emojis", finding.Metadata[FactFindingMetadata.Instruction]);
+    }
+
+    [Fact]
+    public async Task In_a_change_an_instruction_of_the_newest_change_still_rejects()
+    {
+        var (reviewer, checker, _) = Create();
+        var changed = Material() with { Changes = [new FactChange(2, "Bitte ohne Emojis und mit dem Preis.", Newest: true)] };
+        checker.Checks.Enqueue(Answer(AgainstInstruction("(newest change, version 2) Bitte ohne Emojis")));
+
+        var result = await reviewer.ReviewAsync(Context(FactCheckMode.On, material: changed), default);
+
+        Assert.Equal(ReviewDecision.Rejected, result.Decision);
+        var finding = Assert.Single(result.Findings);
+        Assert.Equal(FindingSeverity.Error, finding.Severity);
+        Assert.Equal("Bitte ohne Emojis", finding.Metadata![FactFindingMetadata.Instruction]);
+    }
+
+    [Fact]
     public async Task An_instruction_of_the_assistant_only_is_a_hint_and_never_blocks()
     {
         var (reviewer, checker, _) = Create();

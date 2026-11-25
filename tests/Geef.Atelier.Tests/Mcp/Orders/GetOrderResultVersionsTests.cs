@@ -78,13 +78,40 @@ public sealed class GetOrderResultVersionsTests
 
         Assert.Equal(
             [new OrderEarlierPointDto(1, "Die Anmeldefrist ist Freitag.", "assumption"),
-             new OrderEarlierPointDto(1, "The checks of version 1 were not taken over, so anything they left open was not checked again.", "openPoint")],
+             new OrderEarlierPointDto(1, "The checks of version 1 were not taken over, so anything they left open was not checked again.", "note")],
             dto.EarlierOpenPoints!);
         Assert.Equal(1, dto.AssumptionsVersion);
         Assert.Contains(string.Format(CultureInfo.InvariantCulture, OrderDtoMappings.AssumptionsVersionNoteFormat, 1), dto.Note);
         var json = JsonSerializer.Serialize(dto, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         Assert.Contains("\"kind\":\"assumption\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"kind\":\"note\"", json, StringComparison.Ordinal);
+        Assert.Contains("Entries of kind note are fixed sentences by Atelier about that version", dto.Note, StringComparison.Ordinal);
         Assert.Contains("\"assumptionsVersion\":1", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_passage_against_an_instruction_from_before_the_latest_change_comes_with_the_sentence_of_the_web_page()
+    {
+        var id = Guid.NewGuid();
+        _orders.AddResult("alice", OrderToolTestData.Result(id, OrderDisplayState.Delivered, V1Text) with
+        {
+            Version = 2,
+            LatestVersion = 2,
+            UnbackedPassages =
+            [
+                new OrderUnbackedPassage("Wir freuen uns auf Sie.", FactFindingKind.Instruction, "Do not mention the price.", false, InstructionOrigin.Stated, BeforeLastChange: true),
+                new OrderUnbackedPassage("Bitte bis Freitag melden.", FactFindingKind.Instruction, "Please add the deadline.", true, InstructionOrigin.Answered),
+            ],
+            FactCheck = FactCheckState.OpenPoints,
+            Checks = ReviewChecks,
+        });
+
+        var dto = await GetOrderResultTool.GetOrderResult(_orders, _alice, id.ToString());
+
+        Assert.Equal(
+            [new OrderUnbackedPassageDto("Bitte bis Freitag melden.", "against_instruction", "Please add the deadline.", true, "answers"),
+             new OrderUnbackedPassageDto("Wir freuen uns auf Sie.", "against_instruction", "Do not mention the price.", false, "request", RevisionLines.BeforeLastChangeNote)],
+            dto.UnbackedPassages!);
     }
 
     [Fact]

@@ -31,9 +31,10 @@ internal sealed record DirectRunFacts(
 
 /// <summary>
 /// The earlier version a run changes: its <see cref="Version"/> in the order (<c>null</c> when the run of that version has none or is gone)
-/// and its stored report (<c>null</c> when it has none). <see cref="ReportUnreadable"/> says that a stored report could not be read.
+/// and its stored report (<c>null</c> when it has none). <see cref="ReportUnreadable"/> says that a stored report could not be read,
+/// <see cref="NeedsCheck"/> that the earlier version itself was shown as "Ready – please check".
 /// </summary>
-internal sealed record DirectRevision(int? Version, RunReport? Report, bool ReportUnreadable = false);
+internal sealed record DirectRevision(int? Version, RunReport? Report, bool ReportUnreadable = false, bool NeedsCheck = false);
 
 /// <summary>Builds the report of a direct-path run from the delivered text, which is checked once more here.</summary>
 internal static class DirectReportBuilder
@@ -125,8 +126,18 @@ internal static class DirectReportBuilder
             corrections,
             lookedUp,
             EarlierPoints(facts.Revision, writerNotes.OpenPoints, writerNotes.Assumptions),
-            facts.Revision is not null);
+            facts.Revision is not null,
+            EarlierNeedsCheck(facts.Revision));
     }
+
+    /// <summary>
+    /// True when the earlier version (<paramref name="revision"/>) was shown as "Ready – please check" and its checks were not taken over
+    /// because it has no readable report (for example a text written with "Extra careful" that was not finished cleanly), or when its own
+    /// report says so of the version before it; then nothing of it was checked again and this version is shown the same way, in every
+    /// mode of the fact check (<see cref="RunReport.EarlierNeedsCheck"/>).
+    /// </summary>
+    internal static bool EarlierNeedsCheck(DirectRevision? revision) =>
+        revision is { Report: null, NeedsCheck: true } || revision?.Report is { EarlierNeedsCheck: true };
 
     /// <summary>
     /// What the writer noted for the earlier version (<paramref name="revision"/>) that this run does not repeat in the same kind: first
@@ -189,17 +200,18 @@ internal static class DirectReportBuilder
     /// The open findings of the earlier version (<paramref name="revision"/>), passages and source conflicts, each marked with the version
     /// that found it (<see cref="FactFinding.FromVersion"/>; a finding the earlier version carried over keeps its own). A finding the earlier
     /// version carried over is taken also when its own fact check was off or not shown, so that it is never lost over versions; the earlier
-    /// version's own findings only when its fact check was shown (findings of the shadow mode stay unseen). Empty when the run changes no
-    /// earlier version.
+    /// version's own findings only when its fact check was shown (findings of the shadow mode stay unseen). A finding against an instruction
+    /// blocks only when its instruction stands in the newest change of <paramref name="material"/> (<see cref="FactFindingFilter.ForRevision"/>),
+    /// so one from before the latest change never blocks again in a later version. Empty when the run changes no earlier version.
     /// </summary>
-    internal static IReadOnlyList<FactFinding> EarlierFindings(DirectRevision? revision)
+    internal static IReadOnlyList<FactFinding> EarlierFindings(DirectRevision? revision, FactMaterial? material = null)
     {
         if (revision is not { Version: { } version, Report.FactCheck: { } earlier })
             return [];
         var shown = earlier.State is not (FactCheckState.Off or FactCheckState.NotShown);
         return (earlier.Open ?? []).Concat(earlier.SourceConflicts ?? [])
             .Where(f => f is not null && (shown || f.FromVersion is not null))
-            .Select(f => f with { FromVersion = f.FromVersion ?? version })
+            .Select(f => FactFindingFilter.ForRevision(f with { FromVersion = f.FromVersion ?? version }, material))
             .ToList();
     }
 
@@ -240,7 +252,7 @@ internal static class DirectReportBuilder
         var open = !checkedThis
             ? FactCarryOver.Merge([], answered.OrderByDescending(r => r.Iteration).Select(r => r.Open), text)
             : later.Count == 0 ? delivered!.Open : FactCarryOver.Merge(delivered!.Open, later.Select(r => r.Open), text);
-        if (EarlierFindings(facts.Revision) is { Count: > 0 } earlier)
+        if (EarlierFindings(facts.Revision, facts.Material) is { Count: > 0 } earlier)
             open = mode is FactCheckMode.Off or FactCheckMode.Shadow
                 ? FactCarryOver.Merge(FactCarryOver.Merge([], [earlier], text), [open], text)
                 : FactCarryOver.Merge(open, [earlier], text);

@@ -1,5 +1,6 @@
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Configuration;
+using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Profiles;
@@ -68,9 +69,12 @@ public sealed class RevisionBriefTests
                 Assert.True(brief.IndexOf(RevisionBrief.Heading, StringComparison.Ordinal) < brief.IndexOf(BriefingSections.ProfileHeading, StringComparison.Ordinal));
         }
 
-        Assert.Equal([.. before.PersonAnswers, "(newest change, version 2) " + Change2], BriefingSections.Parse(v2).PersonAnswers);
-        Assert.Equal([.. before.PersonAnswers, "(earlier change, version 2; a newer change wins where they differ) " + Change2, "(newest change, version 3) " + Change3],
-            BriefingSections.Parse(v3).PersonAnswers);
+        Assert.Equal(before.PersonAnswers, BriefingSections.Parse(v2).PersonAnswers);
+        Assert.Equal(before.PersonAnswers, BriefingSections.Parse(v3).PersonAnswers);
+        Assert.Equal([new FactChange(2, Change2, Newest: true)], BriefingSections.Parse(v2).Changes);
+        Assert.Equal([new FactChange(2, Change2, Newest: false), new FactChange(3, Change3, Newest: true)], BriefingSections.Parse(v3).Changes);
+        Assert.Equal(["(earlier change, version 2; a newer change wins where they differ) " + Change2, "(newest change, version 3) " + Change3],
+            BriefingSections.Parse(v3).Changes.Select(c => c.Marked));
         Assert.Single(AllIndexes(v3, RevisionBrief.Heading));
         Assert.Contains(RevisionBrief.Heading + "\n" + Earlier(2, Change2) + "\n" + Now(3, Change3), v3, StringComparison.Ordinal);
         Assert.StartsWith(original.Contains(BriefingSections.ProfileHeading, StringComparison.Ordinal)
@@ -87,7 +91,8 @@ public sealed class RevisionBriefTests
 
         Assert.Equal(request + BriefingSections.Separator + RevisionBrief.Heading + "\n" + Now(2, Change2), brief);
         Assert.Equal(request, BriefingSections.RequestPart(brief));
-        Assert.Equal(["(newest change, version 2) " + Change2], BriefingSections.Parse(brief).PersonAnswers);
+        Assert.Empty(BriefingSections.Parse(brief).PersonAnswers);
+        Assert.Equal([new FactChange(2, Change2, Newest: true)], BriefingSections.Parse(brief).Changes);
         Assert.Equal(brief, BriefingSections.WithoutProfile(brief));
     }
 
@@ -187,10 +192,10 @@ public sealed class RevisionBriefTests
         const string words = "(version 9) keep this bracket. The meeting is on 5 May.";
         var v3 = RevisionBrief.Compose(RevisionBrief.Compose("Write a note.", words, 2), Change3, 3);
 
-        var answers = BriefingSections.Parse(v3).PersonAnswers;
+        var changes = BriefingSections.Parse(v3).Changes;
 
-        Assert.Equal("(earlier change, version 2; a newer change wins where they differ) " + words, answers[0]);
-        Assert.Equal("(newest change, version 3) " + Change3, answers[1]);
+        Assert.Equal([new FactChange(2, words, Newest: false), new FactChange(3, Change3, Newest: true)], changes);
+        Assert.Equal("(earlier change, version 2; a newer change wins where they differ) " + words, changes[0].Marked);
     }
 
     private static string Now(int version, string change) => $"- (version {version}, the change to make now) {change}";

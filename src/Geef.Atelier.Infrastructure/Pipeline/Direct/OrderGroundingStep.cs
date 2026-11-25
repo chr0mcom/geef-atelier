@@ -200,8 +200,8 @@ internal sealed class OrderGroundingStep(
     }
 
     /// <summary>
-    /// Everything the text may rely on: request, answers of the person and of the assistant and the profile, read back from the
-    /// frozen briefing (<see cref="BriefingSections.Parse"/>), and the files. Assumptions and the writer's notes are never part of it.
+    /// Everything the text may rely on: request, answers of the person and of the assistant, the changes the person asked for and the
+    /// profile, read back from the frozen briefing (<see cref="BriefingSections.Parse"/>), and the files. Assumptions and the writer's notes are never part of it.
     /// Above <see cref="DirectOptions.FactCheckMaxMaterialChars"/> the scope is <see cref="FactCheckScope.WithoutFiles"/>; the file map
     /// is always there, so that the check can also narrow the scope once it knows the length of the text.
     /// </summary>
@@ -209,7 +209,7 @@ internal sealed class OrderGroundingStep(
     {
         var parts = BriefingSections.Parse(briefing);
         var map = files.Count == 0 ? null : string.Join('\n', files.Select(f => $"{f.Id} \"{f.FileName.Replace('"', '\'')}\" — {f.Text.Length} characters"));
-        var full = new FactMaterial(parts.Request, parts.PersonAnswers, parts.AssistantAnswers, parts.Profile, files, FactCheckScope.Full, map);
+        var full = new FactMaterial(parts.Request, parts.PersonAnswers, parts.AssistantAnswers, parts.Profile, files, FactCheckScope.Full, map, parts.Changes);
         return full.TotalChars > options.FactCheckMaxMaterialChars ? full with { Scope = FactCheckScope.WithoutFiles } : full;
     }
 

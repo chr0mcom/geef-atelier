@@ -148,9 +148,11 @@ public sealed record OrderSourceQuoteView(string FileName, string Quote);
 /// anyone but the owner of the order. <see cref="LookedUp"/> marks a passage that the pages looked up on the web say otherwise
 /// (<see cref="FactFindingKind.Superseded"/> with the replacing passage in the research): it never blocks and is never called a
 /// matter of the person's files. <see cref="FromVersion"/> is the version that found a passage carried over from an earlier version.
+/// <see cref="BeforeLastChange"/> marks a passage against an instruction from before the latest change the person asked for: it never blocks
+/// and is shown with <see cref="RevisionLines.BeforeLastChangeNote"/>.
 /// </summary>
 public sealed record OrderUnbackedPassage(string Quote, FactFindingKind Kind, string? Instruction, bool Blocking, InstructionOrigin? Origin = null, bool LookedUp = false,
-    int? FromVersion = null);
+    int? FromVersion = null, bool BeforeLastChange = false);
 
 /// <summary>
 /// What the person reads under "What was checked" (web) and in <c>checks</c> (MCP); plain English, built only by

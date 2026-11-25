@@ -22,7 +22,8 @@ public static class GetOrderResultTool
     public const string VersionRule =
         "version is the version of the text. If latestVersion is higher, a newer version is still being written or could not be finished, " +
         "so text is the earlier version: tell the person what note says. earlierOpenPoints are open points (kind openPoint) and assumptions (kind assumption) " +
-        "the writer noted for an earlier version that the change may have settled: show them with their version. " +
+        "the writer noted for an earlier version that the change may have settled, and fixed sentences by Atelier about that version (kind note): show them with their version. " +
+        "An unbackedPassages entry with a note: show the note with it. " +
         "When assumptionsVersion is set, the text is a changed version and assumptions were noted for that earlier version, before the changes: " +
         "say so and do not present them as facts the person did not give now.";
 

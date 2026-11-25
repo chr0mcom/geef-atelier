@@ -1,5 +1,6 @@
 using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.FactCheck;
+using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Reports;
 using Geef.Atelier.Core.Domain.Writing;
 using Geef.Atelier.Infrastructure.Pipeline;
@@ -7,6 +8,10 @@ using Geef.Atelier.Infrastructure.Pipeline.Direct;
 using Geef.Atelier.Infrastructure.Pipeline.Direct.FactCheck;
 using Geef.Sdk.Context;
 using Geef.Sdk.Results;
+using RunEntity = Geef.Atelier.Core.Domain.RunEntity;
+using RunKind = Geef.Atelier.Core.Domain.RunKind;
+using RunOutcome = Geef.Atelier.Core.Domain.RunOutcome;
+using RunStatus = Geef.Atelier.Core.Domain.RunStatus;
 
 namespace Geef.Atelier.Tests.Pipeline.Direct;
 
@@ -401,4 +406,76 @@ public sealed class DirectRevisionTests
         Assert.Equal(1, Assert.Single(parsed.FactCheck!.Open).FromVersion);
         Assert.Equal([new RunReportEarlierPoint(1, "Die Uhrzeit fehlte.")], parsed.EarlierOpenPoints);
     }
+    private static readonly FactFinding AgainstRequest = new("f4", FactFindingKind.Instruction, "Wir freuen uns auf Sie.", "Breaks the instruction.",
+        "max. 60 Wörter", null, null, null, InstructionOrigin.Stated, true, QuoteMatchKind.Exact);
+
+    private static FactMaterial ChangedMaterial(string newest) =>
+        new(Brief, [], [], null, [], FactCheckScope.Full, null, [new FactChange(2, newest, Newest: true)]);
+
+    [Fact]
+    public void A_blocking_finding_of_the_earlier_version_against_an_instruction_of_the_request_is_carried_as_a_hint()
+    {
+        var earlier = Earlier(Checked(FactCheckState.OpenPoints, AgainstRequest));
+        var facts = new DirectRunFacts(Material: ChangedMaterial("Bitte die Uhrzeit ergänzen."), Mode: FactCheckMode.On, FactRounds: [Round()],
+            Revision: new DirectRevision(1, earlier));
+
+        var report = Build(Text, facts);
+
+        var passage = Assert.Single(report.FactCheck!.Open);
+        Assert.Equal((1, false, true), (passage.FromVersion, passage.Blocking, passage.BeforeLastChange));
+        Assert.Equal("max. 60 Wörter", passage.InstructionQuote);
+        var parsed = RunReportJson.TryParse(RunReportJson.Serialize(report))!;
+        Assert.True(Assert.Single(parsed.FactCheck!.Open).BeforeLastChange);
+        Assert.False(RunEntityWith(RunReportJson.Serialize(report)).ToRunState(DateTimeOffset.UtcNow).CarriesBlockingPoint);
+    }
+
+    [Fact]
+    public void A_carried_finding_whose_instruction_the_newest_change_repeats_still_blocks()
+    {
+        var earlier = Earlier(Checked(FactCheckState.OpenPoints, AgainstRequest));
+        var facts = new DirectRunFacts(Material: ChangedMaterial("Bitte wirklich max. 60 Wörter."), Mode: FactCheckMode.On, FactRounds: [Round()],
+            Revision: new DirectRevision(1, earlier));
+
+        var passage = Assert.Single(Build(Text, facts).FactCheck!.Open);
+
+        Assert.Equal((true, false), (passage.Blocking, passage.BeforeLastChange));
+    }
+
+    [Fact]
+    public void A_finding_that_is_not_marked_before_the_last_change_writes_no_new_field()
+    {
+        var report = Build(Text, new DirectRunFacts(Mode: FactCheckMode.On, FactRounds: [Round(Office)]));
+
+        Assert.DoesNotContain("beforeLastChange", RunReportJson.Serialize(report), StringComparison.Ordinal);
+        Assert.DoesNotContain("earlierNeedsCheck", RunReportJson.Serialize(report), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, true)]
+    [InlineData(false, false, false)]
+    public void An_earlier_version_without_a_readable_report_that_was_shown_as_please_check_passes_that_on(bool needsCheck, bool unreadable, bool expected)
+    {
+        var report = Build(Text, new DirectRunFacts(Mode: FactCheckMode.Off, Revision: new DirectRevision(1, null, ReportUnreadable: unreadable, NeedsCheck: needsCheck)));
+
+        Assert.Equal(expected, report.EarlierNeedsCheck);
+        Assert.Equal(expected, RunEntityWith(RunReportJson.Serialize(report)).ToRunState(DateTimeOffset.UtcNow).CarriesBlockingPoint);
+    }
+
+    [Fact]
+    public void An_earlier_version_with_a_report_passes_on_only_what_its_report_says()
+    {
+        var plain = Build(Text, new DirectRunFacts(Revision: new DirectRevision(1, Earlier(), NeedsCheck: true)));
+        var inherited = Build(Text, new DirectRunFacts(Revision: new DirectRevision(2, Earlier() with { EarlierNeedsCheck = true })));
+
+        Assert.False(plain.EarlierNeedsCheck);
+        Assert.True(inherited.EarlierNeedsCheck);
+    }
+
+    private static RunEntity RunEntityWith(string reportJson) => new()
+    {
+        Id = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow.AddHours(-1), Status = RunStatus.Completed, BriefingText = "b", ConfigJson = "{}",
+        Kind = RunKind.Standard, Outcome = RunOutcome.Converged, CompletedAt = DateTimeOffset.UtcNow.AddHours(-1), FinalText = Text, OrderVersion = 2,
+        RevisionHint = "Bitte die Uhrzeit ergänzen.", ReportJson = reportJson,
+    };
 }

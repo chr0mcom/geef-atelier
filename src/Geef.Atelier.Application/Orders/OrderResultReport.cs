@@ -52,8 +52,8 @@ public static class OrderResultReport
                 ? factCheck.Open
                     .Where(f => f.Kind != FactFindingKind.SourceConflict && !string.IsNullOrWhiteSpace(f.TextQuote) && (shown || f.FromVersion is not null))
                     .Select(f => new OrderUnbackedPassage(f.TextQuote!.Trim(), f.Kind,
-                        f.Origin == InstructionOrigin.Memory && !showProfile ? null : f.InstructionQuote, f.Blocking && !f.FromLookedUp(), f.Origin, f.FromLookedUp(),
-                        f.FromVersion))
+                        f.Origin == InstructionOrigin.Memory && !showProfile ? null : f.InstructionQuote, f.Blocking && !f.FromLookedUp() && !f.BeforeLastChange, f.Origin,
+                        f.FromLookedUp(), f.FromVersion, f.Kind == FactFindingKind.Instruction && f.BeforeLastChange))
                     .ToList()
                 : [],
             SourceIssues = OrderCheckLines.SourceIssueSentences(report, showProfile),

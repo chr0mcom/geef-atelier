@@ -121,7 +121,7 @@ public sealed class FactCheckPromptsTests
 
         Assert.DoesNotContain(typeof(WriterNotes), parameters);
         Assert.DoesNotContain(typeof(WriterNotesSplit), parameters);
-        Assert.Equal(["Request", "PersonAnswers", "AssistantAnswers", "Profile", "Files", "Scope", "FileMap"],
+        Assert.Equal(["Request", "PersonAnswers", "AssistantAnswers", "Profile", "Files", "Scope", "FileMap", "Changes"],
             typeof(FactMaterial).GetConstructors().Single().GetParameters().Select(p => p.Name));
     }
 

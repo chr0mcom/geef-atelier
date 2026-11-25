@@ -94,6 +94,21 @@ public sealed class OrderStateCarriedPointTests
     }
 
     [Theory]
+    [InlineData(FactCheckMode.Off)]
+    [InlineData(FactCheckMode.Shadow)]
+    [InlineData(FactCheckMode.Report)]
+    [InlineData(FactCheckMode.On)]
+    public void A_change_of_a_version_without_report_that_needed_a_check_is_ready_to_check_in_every_mode(FactCheckMode mode)
+    {
+        var json = Report(mode).Replace("\"schemaVersion\":2,", "\"schemaVersion\":2,\"earlierNeedsCheck\":true,", StringComparison.Ordinal);
+
+        Assert.True(Run(json).ToRunState(Now).CarriesBlockingPoint);
+        Assert.Equal(OrderDisplayState.DeliveredWithOpenPoints, Shown(Run(json)));
+        Assert.Equal(OrderDisplayState.Delivered, Shown(Run(json, revisionHint: null)));
+        Assert.Equal(OrderDisplayState.Delivered, Shown(Run(Report(mode))));
+    }
+
+    [Theory]
     [InlineData(RunStatus.Running, null, OrderDisplayState.Working)]
     [InlineData(RunStatus.Pending, null, OrderDisplayState.Queued)]
     [InlineData(RunStatus.Aborted, RunOutcome.Aborted, OrderDisplayState.Stopped)]

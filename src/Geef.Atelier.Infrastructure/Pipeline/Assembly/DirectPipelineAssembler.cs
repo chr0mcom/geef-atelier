@@ -5,6 +5,7 @@ using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Models;
 using Geef.Atelier.Core.Domain.Crew.Profiles;
+using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Reports;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Persistence;
@@ -119,7 +120,8 @@ internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOpti
     /// <summary>
     /// The earlier version a run changes, read from the run of <see cref="RunEntity.ParentRunId"/>; <c>null</c> for a run that is no
     /// change (<see cref="RunEntity.RevisionHint"/> blank). A run that is gone gives no version; a stored report that cannot be read, or
-    /// a failed read, is marked <see cref="DirectRevision.ReportUnreadable"/> and never ends the run.
+    /// a failed read, is marked <see cref="DirectRevision.ReportUnreadable"/> and never ends the run. <see cref="DirectRevision.NeedsCheck"/>
+    /// says whether that run was shown as "Ready – please check" (<see cref="OrderStateResolver"/>).
     /// </summary>
     internal static async Task<DirectRevision?> EarlierVersionAsync(PipelineAssemblyContext context, CancellationToken ct)
     {
@@ -133,11 +135,12 @@ internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOpti
             await using var scope = context.ScopeFactory.CreateAsyncScope();
             if (await scope.ServiceProvider.GetRequiredService<IRunRepository>().GetByIdAsync(parentId, ct) is not { } parent)
                 return new DirectRevision(null, null);
+            var needsCheck = OrderStateResolver.Resolve(OrderState.Ready, parent.ToRunState(DateTimeOffset.UtcNow)).State == OrderDisplayState.DeliveredWithOpenPoints;
             if (string.IsNullOrWhiteSpace(parent.ReportJson))
-                return new DirectRevision(parent.OrderVersion, null);
+                return new DirectRevision(parent.OrderVersion, null, NeedsCheck: needsCheck);
             return RunReportJson.TryParse(parent.ReportJson) is { } report
-                ? new DirectRevision(parent.OrderVersion, report)
-                : new DirectRevision(parent.OrderVersion, null, ReportUnreadable: true);
+                ? new DirectRevision(parent.OrderVersion, report, NeedsCheck: needsCheck)
+                : new DirectRevision(parent.OrderVersion, null, ReportUnreadable: true, NeedsCheck: needsCheck);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {

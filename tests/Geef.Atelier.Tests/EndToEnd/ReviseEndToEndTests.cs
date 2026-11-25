@@ -101,7 +101,8 @@ public sealed class ReviseEndToEndTests(PostgresFixture postgres)
         Assert.Null(first.RevisionHint);
         var brief = BriefingSections.Parse(second.BriefingText);
         Assert.Equal(Request, brief.Request);
-        Assert.Contains("(newest change, version 2) " + Change, brief.PersonAnswers);
+        Assert.Equal("(newest change, version 2) " + Change, Assert.Single(brief.Changes).Marked);
+        Assert.DoesNotContain(brief.PersonAnswers, a => a.Contains(Change, StringComparison.Ordinal));
         Assert.Equal(RunStatus.Completed, second.Status);
         Assert.Equal(SecondText, second.FinalText);
         var result = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetResultAsync(orderId, User));
