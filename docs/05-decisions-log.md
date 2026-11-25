@@ -1909,3 +1909,42 @@ not converge, so the rule is now structural and favours precision over recall, a
 synthetic requests labelled by a separate generator before the extractor saw them (development set, held-out set and
 a second set in a hasty typing style). The 25 % threshold limits the damage of any remaining misreading to texts that
 are far off.
+
+
+## D-071 — Stage 2: clarify before the run (2026-11-25)
+
+**Status:** implemented (package Q2 of stage 2: clarifier, gate, worker, measuring tool), shipped with
+`Orders:IntakeMode = Shadow`. `On` follows in a separate commit once the acceptance gates of the corpus measurement and
+the shadow operation are met.
+
+**Decision.** Before the first run a **clarifier** analyses the order in exactly one structured call. A **gate in code**
+brings its proposals back to the question rule. The person gets at most three short questions with clickable answers,
+or none; every failure starts the order with the request as written.
+
+- **Clarifier** (`LlmClarifier`): slot `ModelSlot.Intake` (Sonnet, fallback Sol), `response_format` json_schema
+  `clarify_order`, `reasoning_effort: low`, hard limit `Intake:Timeout` (40 s), failover allowed. It sees the request,
+  the start and end of every file (2,000 + 1,000 characters, at most 12,000 together and five files) and the profile.
+  Tags in the material are defused; the material is something to analyse, never an instruction. No second attempt in
+  the application: the proxy already repeats an invalid answer once.
+- **Gate** (`QuestionGate`, pure function, every rule tested): profile before question (language, sender, signature,
+  form of address); anything researchable is never asked; questions the person cannot answer or that change little
+  become assumptions; a revision never asks about length, tone or form of address and asks at most one question; the
+  length only from the fixed template (German, English; otherwise an assumption) and only when the request names none;
+  question ≤ 120 characters, 2–4 options ≤ 60 characters, no filler answers ("other", "egal"), no blocked words
+  (`JargonBlocklist`, including plurals), no other language; one topic, one question; length first; at most three.
+  Every dropped question becomes an assumption. The gate assigns all ids.
+- **Flow** (`OrderIntakeService`, `OrderIntakeWorker`): atomic claim, at most two clarifications at a time, a wake-up
+  signal after submitting. Zero questions start the run in the same step (`Clarified`); otherwise the order waits with
+  its questions stored. Stuck clarifications start without questions after 60 s in the queue or two attempts,
+  unanswered questions after 24 h with the assumptions. Claims from before the process start count as abandoned at once.
+- **Shadow:** in `Shadow` mode the order runs as in stage 1; the worker also clarifies while the live queue is empty and
+  stores the result only in `OrderIntakeShadows` (at most 50 per UTC day).
+- **Answered length:** the answer to the template question becomes a length check "about n words" (±20 %) without the
+  text parser (`IntakeConstraints.WithAnswers` in `OrderGroundingStep`). Free text is never parsed.
+- **Measurement:** `tools/Eval/geef_eval/intake_corpus.py` generates and labels a synthetic corpus, `tools/IntakeEval`
+  measures clarifier and gate on it, `IntakeCorpusTests` replays the stored raw answers through the gate without a model.
+
+**Rationale.** In the measurement of 2026-11-24 an agent with free tool access asked questions in every case and took
+too long doing so. One structured call on a small model plus a gate in code make the question rule verifiable instead of
+leaving it to the model. Assuming is cheaper than a needless question, so the gate is strict and every rejection only
+costs one more assumption.

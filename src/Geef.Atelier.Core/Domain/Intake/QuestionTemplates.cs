@@ -82,11 +82,39 @@ public static class QuestionTemplates
         };
 
     /// <summary>True when a length template exists for <paramref name="language"/>.</summary>
-    public static bool Supports(string? language) => throw new NotImplementedException();
+    public static bool Supports(string? language) => Normalize(language) is { } code && LengthQuestions.ContainsKey(code);
 
     /// <summary>The length question for <paramref name="language"/> and <paramref name="scale"/>.</summary>
-    public static ClarifyQuestion Length(string language, LengthScale scale) => throw new NotImplementedException();
+    public static ClarifyQuestion Length(string language, LengthScale scale)
+    {
+        var code = Normalize(language) is { } c && LengthQuestions.ContainsKey(c)
+            ? c
+            : throw new ArgumentException($"No length template for language '{language}'.", nameof(language));
+        var options = OptionsFor(code, scale).Select(o => new QuestionOption(o.Id, o.Label)).ToList();
+        return new ClarifyQuestion(LengthQuestionId, GapTopic.Length, LengthQuestions[code], options, null, true, true);
+    }
 
     /// <summary>The length constraint of an answered length question: the chosen option as an approximate word count; null for free text, "decide for me" or an unknown option.</summary>
-    public static LengthConstraint? ToLengthConstraint(OrderAnswer answer, string language, LengthScale scale) => throw new NotImplementedException();
+    public static LengthConstraint? ToLengthConstraint(OrderAnswer answer, string language, LengthScale scale)
+    {
+        if (answer.QuestionId != LengthQuestionId || answer.DecideForMe || !string.IsNullOrWhiteSpace(answer.FreeText))
+            return null;
+        if (answer.OptionId is not { } optionId || Normalize(language) is not { } code || !LengthQuestions.TryGetValue(code, out var question))
+            return null;
+        var option = OptionsFor(code, scale).FirstOrDefault(o => o.Id == optionId);
+        return option is null
+            ? null
+            : new LengthConstraint(LengthUnit.Words, option.Words, option.Words, $"{question} → {option.Label}", LengthKind.About);
+    }
+
+    private static IReadOnlyList<LengthTemplateOption> OptionsFor(string code, LengthScale scale) =>
+        LengthOptions[code].TryGetValue(scale, out var options) ? options : LengthOptions[code][LengthScale.Standard];
+
+    private static string? Normalize(string? language)
+    {
+        if (string.IsNullOrWhiteSpace(language))
+            return null;
+        var code = language.Trim().Split('-', '_')[0].ToLowerInvariant();
+        return code.Length == 0 ? null : code;
+    }
 }

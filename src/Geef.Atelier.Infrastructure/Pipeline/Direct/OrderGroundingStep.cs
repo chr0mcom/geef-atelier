@@ -1,5 +1,6 @@
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Checks;
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Core.Persistence.Orders;
@@ -61,7 +62,7 @@ internal sealed class OrderGroundingStep(
 
         var bundle = SourceBlockRenderer.Render(prompt.Sources, options);
         var seed = seedDraft ?? template?.Source.ExtractedText!.WithoutPageMarkers();
-        var constraints = RequestConstraintExtractor.Extract(order.RequestText);
+        var constraints = Constraints(order);
 
         IRunContext context = new RunContext()
             .Set(AtelierContextKeys.GroundedBrief, input)
@@ -80,6 +81,18 @@ internal sealed class OrderGroundingStep(
             Context = context,
             Notes = [$"order-sources files={bundle.Sources.Count} chars={bundle.TotalChars} mode={bundle.Mode} template={(template is not null)}"],
         };
+    }
+
+    /// <summary>
+    /// The constraints read from the request in the person's own words; for a clarified order with answers, the answered length
+    /// is added when the request names none (<see cref="IntakeConstraints.WithAnswers"/>). The text parser never sees the answers.
+    /// </summary>
+    internal static OrderConstraints Constraints(Core.Domain.Orders.OrderEntity order)
+    {
+        var fromRequest = RequestConstraintExtractor.Extract(order.RequestText);
+        if (order.ClarifyJson is null || order.AnswersJson is null)
+            return fromRequest;
+        return IntakeConstraints.WithAnswers(fromRequest, IntakeRecordJson.TryParse(order.ClarifyJson), IntakeRecordJson.ParseAnswers(order.AnswersJson));
     }
 
     private async Task RecordUsagesAsync(
