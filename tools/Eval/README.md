@@ -162,7 +162,9 @@ python3 -m geef_eval.intake_corpus stats --corpus intake-corpus.jsonl
 | `stats` | zählt je Korpus, Kategorie, Sprache, Teilung (`dev`/`holdout`) und Beschriftungsstand |
 
 `--max-calls` kappt die Zahl der Modellaufrufe je Lauf. Ungültige Antworten werden nicht geschrieben und beim nächsten
-Lauf erneut versucht; ein Nutzungslimit beendet den Lauf mit Meldung und Rückgabewert 3.
+Lauf erneut versucht; ein Nutzungslimit beendet den Lauf mit Meldung und Rückgabewert 3. Fehlen nach `generate` noch
+Einträge oder sind nach `label` noch Einträge unbeschriftet (Abbruch, `--max-calls`, verworfene Antworten), endet der
+Befehl mit Rückgabewert 4: Der Korpus ist dann unvollständig und für `tools/IntakeEval evaluate` nicht auswertbar.
 
 Eintragsformat (JSONL, eine Zeile je Eintrag, UTF-8 ohne ASCII-Escapes):
 

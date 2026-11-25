@@ -1,6 +1,8 @@
 """Synthetic corpus for the intake clarifier: ``generate`` invents requests, ``label`` annotates which questions are legitimate.
 
 Usage (from ``tools/Eval``): ``python3 -m geef_eval.intake_corpus {generate|label|stats} ...``
+
+Exit codes: 0 complete, 3 stopped by the usage limit, 4 entries still missing (``generate``) or unlabelled (``label``).
 """
 from __future__ import annotations
 
@@ -363,6 +365,7 @@ def generate(out: Path, main_count: int, second_count: int, *, model: str = "son
         present.add(eid)
         summary["written"] += 1
     summary["calls"] = budget.used
+    summary["missing"] = sum(1 for corpus, index, _ in plan if entry_id(corpus, index) not in present)
     return summary
 
 
@@ -397,6 +400,7 @@ def label(path: Path, *, model: str = "opus", max_calls: int | None = None, runn
         write_entries(path, entries)
         summary["labeled"] += 1
     summary["calls"] = budget.used
+    summary["missing"] = sum(1 for entry in entries if "labels" not in entry)
     return summary
 
 
@@ -450,7 +454,13 @@ def main(argv: list[str] | None = None, runner: Runner = run_cli) -> int:
     else:
         summary = label(Path(args.corpus), model=args.model, max_calls=args.max_calls, runner=runner)
     print(f"{args.command}: {summary}")
-    return 3 if summary["stopped_by_limit"] else 0
+    if summary["stopped_by_limit"]:
+        return 3
+    if summary["missing"]:
+        what = "Einträge fehlen" if args.command == "generate" else "Einträge sind nicht beschriftet"
+        _log(f"{summary['missing']} {what}; der Korpus ist unvollständig und nicht auswertbar. Mit demselben Befehl fortsetzen.")
+        return 4
+    return 0
 
 
 if __name__ == "__main__":

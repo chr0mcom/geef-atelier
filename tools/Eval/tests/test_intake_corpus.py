@@ -273,12 +273,37 @@ def test_main_generate_label_and_stats(tmp_path, capsys):
     code = ic.main(["generate", "--out", str(out), "--main", "3", "--second", "0"], runner=FakeRunner([_reply_for_prompt()] * 3))
     assert code == 0
     code = ic.main(["label", "--corpus", str(out), "--max-calls", "1"], runner=FakeRunner([json.dumps(LABELS)]))
-    assert code == 0
+    assert code == 4
     assert ic.main(["stats", "--corpus", str(out)]) == 0
 
     text = capsys.readouterr().out
     assert "corpus: main=3" in text and "beschriftet=1" in text and "offen=2" in text
     assert "split:" in text
+
+    code = ic.main(["label", "--corpus", str(out)], runner=FakeRunner([json.dumps(LABELS)] * 2))
+    assert code == 0
+    assert ic.main(["stats", "--corpus", str(out)]) == 0
+    assert "beschriftet=3" in capsys.readouterr().out
+
+
+def test_main_generate_ends_with_4_while_entries_are_missing(tmp_path, capsys):
+    out = tmp_path / "corpus.jsonl"
+    bad = claude_json(json.dumps({"request": "", "intent": "x", "files": [], "profile": None}))
+
+    assert ic.main(["generate", "--out", str(out), "--main", "3", "--second", "0", "--max-calls", "2"],
+                   runner=FakeRunner([_reply_for_prompt()] * 2)) == 4
+    assert ic.main(["generate", "--out", str(out), "--main", "3", "--second", "0"], runner=FakeRunner([bad, bad])) == 4
+    assert "1 Einträge fehlen" in capsys.readouterr().err
+    assert ic.main(["generate", "--out", str(out), "--main", "3", "--second", "0"], runner=FakeRunner([_reply_for_prompt()])) == 0
+
+
+def test_main_label_ends_with_4_when_a_reply_is_rejected(tmp_path):
+    path = tmp_path / "corpus.jsonl"
+    _seed_corpus(path, count=2)
+    bad = json.dumps({"labels": {"length": "maybe"}, "note": "x"})
+
+    assert ic.main(["label", "--corpus", str(path)], runner=FakeRunner([json.dumps(LABELS), bad, bad])) == 4
+    assert ic.main(["label", "--corpus", str(path)], runner=FakeRunner([json.dumps(LABELS)])) == 0
 
 
 def test_main_returns_3_on_limit(tmp_path):
