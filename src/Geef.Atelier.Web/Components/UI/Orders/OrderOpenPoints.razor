@@ -78,7 +78,13 @@
             <ul class="order-source-issues" data-testid="order-source-issues">
                 @foreach (var issue in SourceIssues)
                 {
-                    <li data-testid="order-source-issue">@issue</li>
+                    <li data-testid="order-source-issue">
+                        @issue
+                        @foreach (var note in Result.NotesOn(issue))
+                        {
+                            <span class="order-issue-note" data-testid="order-source-issue-note">@WriterNoteLead <span lang="@Language">@note</span></span>
+                        }
+                    </li>
                 }
             </ul>
         }
@@ -133,7 +139,10 @@
 
     IReadOnlyList<string> SourceIssues => Result.SourceIssues.Shown() ?? [];
 
-    IReadOnlyList<string> WriterOpenPoints => Result.WriterOpenPoints.Shown() ?? [];
+    IReadOnlyList<string> WriterOpenPoints => Result.WriterOpenPointsOnTheirOwn();
+
+    /// <summary>Words before an open point of the writer shown with the sentence about the same wrong total.</summary>
+    public const string WriterNoteLead = "The writer noted:";
 
     bool HasContent => Result.HasOpenPoints();
 

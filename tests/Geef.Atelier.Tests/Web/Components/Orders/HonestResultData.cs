@@ -3,6 +3,7 @@ using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Intake;
+using Geef.Atelier.Core.Domain.Research;
 using Geef.Atelier.Core.Domain.Sources;
 
 namespace Geef.Atelier.Tests.Web.Components.Orders;
@@ -25,6 +26,14 @@ internal static class HonestResultData
     public const string WriterAssumption = "Ich habe die Eltern mit „Liebe Eltern“ angesprochen.";
     public const string ClarifierAssumption = "Freundlicher, sachlicher Ton";
     public const string FileQuote = "Material: Pinsel 22, Papier 31, Farben 19, Summe 62";
+    public const string LookedUpQuote = "Ab dem 1. Januar 2027 beträgt der gesetzliche Mindestlohn 13,90 Euro brutto je Zeitstunde.";
+    public const string LookedUpTitle = "Mindestlohn-Erhöhung-zum-1.-Januar-2027-alle-Beträge-im-Überblick-für-Arbeitgeberinnen-und-Arbeitgeber";
+    public const string LookedUpUrl = "https://www.wages.example/aktuelles/mindestlohn/2027/erhoehung-zum-ersten-januar-alle-betraege-im-ueberblick-fuer-arbeitgeberinnen-und-arbeitgeber?quelle=newsletter&abschnitt=uebersicht";
+    public static readonly DateTimeOffset LookedUpAt = new(2026, 11, 28, 8, 15, 0, TimeSpan.Zero);
+
+    /// <summary>Found research with one long entry (long title and address without spaces) and one topic that was not looked up.</summary>
+    public static OrderLookedUpView LookedUp() =>
+        new(ResearchStatus.Found, OrderResearchLines.SomeWithheld, 1, [new OrderLookedUpEntry(LookedUpQuote, LookedUpUrl, LookedUpTitle, LookedUpAt)]);
 
     public static OrderChecksView Checks(bool openPoints = true, bool changed = false) => new(
         [
@@ -63,6 +72,7 @@ internal static class HonestResultData
             SourceQuotes = [new OrderSourceQuoteView("notizen.txt", FileQuote)],
             FactCheck = FactCheckState.OpenPoints,
             Checks = Checks(),
+            LookedUp = LookedUp(),
         };
 
     /// <summary>Fails when the visible wording outside the person's own content (elements with <c>lang</c>) uses a blocked word.</summary>
