@@ -132,6 +132,30 @@ public sealed class OrderIntakeWorkerTests
     }
 
     [Fact]
+    public async Task A_claim_that_throws_gives_its_slot_back()
+    {
+        var broken = Enumerable.Range(0, 3).Select(_ => Guid.NewGuid()).ToList();
+        var worker = Worker(new IntakeOptions { MaxConcurrent = 2 });
+        foreach (var id in broken)
+        {
+            _orders.Candidates.Add(id);
+            _orders.ClaimThrows.Add(id);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => worker.RunOnceAsync(CancellationToken.None));
+            _orders.Candidates.Remove(id);
+        }
+
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        _orders.Candidates.AddRange([a, b]);
+        await worker.RunOnceAsync(CancellationToken.None);
+        await WaitUntil(() => _service.Running == 2);
+
+        Assert.Equal(new[] { a, b }.Order(), _service.Processed.Order());
+        _service.Gate.SetResult();
+        await Drain(worker);
+    }
+
+    [Fact]
     public async Task At_most_max_concurrent_orders_run_at_the_same_time()
     {
         _orders.Candidates.AddRange(Enumerable.Range(0, 5).Select(_ => Guid.NewGuid()));

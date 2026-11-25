@@ -109,12 +109,9 @@ internal sealed class OrderIntakeWorker(
         {
             if (_inFlight.ContainsKey(orderId) || !await _slots.WaitAsync(0, ct))
                 continue;
-            if (!await orders.TryClaimForIntakeAsync(orderId, now, staleBefore, settings.MaxAttempts, ct))
-            {
-                _slots.Release();
-                continue;
-            }
-            Launch(orderId, (service, token) => service.ProcessAsync(orderId, token), ct);
+            await ClaimAndLaunchAsync(
+                () => orders.TryClaimForIntakeAsync(orderId, now, staleBefore, settings.MaxAttempts, ct),
+                orderId, (service, token) => service.ProcessAsync(orderId, token), ct);
         }
         return candidates.Count > 0;
     }
@@ -129,12 +126,9 @@ internal sealed class OrderIntakeWorker(
         {
             if (_inFlight.ContainsKey(orderId) || !await _slots.WaitAsync(0, ct))
                 continue;
-            if (!await shadows.TryClaimAsync(orderId, now, staleBefore, settings.MaxAttempts, ct))
-            {
-                _slots.Release();
-                continue;
-            }
-            Launch(orderId, (service, token) => service.ProcessShadowAsync(orderId, token), ct);
+            await ClaimAndLaunchAsync(
+                () => shadows.TryClaimAsync(orderId, now, staleBefore, settings.MaxAttempts, ct),
+                orderId, (service, token) => service.ProcessShadowAsync(orderId, token), ct);
         }
     }
 
@@ -162,6 +156,25 @@ internal sealed class OrderIntakeWorker(
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             logger.LogError("Intake sweep for unanswered orders failed: {Error}", ex.ToRedactedLogText());
+        }
+    }
+
+    /// <summary>Claims with the slot already taken; the slot goes back unless the work was launched, also when the claim throws.</summary>
+    private async Task ClaimAndLaunchAsync(
+        Func<Task<bool>> claim, Guid orderId, Func<IOrderIntakeService, CancellationToken, Task<IntakeProcessResult>> work, CancellationToken ct)
+    {
+        var launched = false;
+        try
+        {
+            if (!await claim())
+                return;
+            Launch(orderId, work, ct);
+            launched = true;
+        }
+        finally
+        {
+            if (!launched)
+                _slots.Release();
         }
     }
 
