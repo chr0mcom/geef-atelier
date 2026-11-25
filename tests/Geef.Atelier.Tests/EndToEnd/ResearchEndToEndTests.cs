@@ -112,7 +112,7 @@ public sealed partial class ResearchEndToEndTests(PostgresFixture postgres)
 
         var call = Assert.Single(research.Calls);
         Assert.Equal((1, false), (call.OrderVersion, call.Revises));
-        Assert.Equal(["Aushang ans schwarze Brett im Lager."], call.FileTexts.Select(t => t.Trim()));
+        Assert.Equal(["Aushang ans schwarze Brett im Lager.", "notizen.txt"], call.FileTexts.Select(t => t.Trim()));
 
         var writer = Assert.Single(host.Llm.CallsFor(LlmRole.Executor));
         var input = WriterInput(writer);

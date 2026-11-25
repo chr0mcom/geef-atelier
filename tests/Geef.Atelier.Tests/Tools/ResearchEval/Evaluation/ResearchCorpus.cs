@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Geef.Atelier.Tools.FactCheckEval;
 using Geef.Atelier.Tools.IntakeEval;
+using CorpusFile = Geef.Atelier.Tools.IntakeEval.CorpusFile;
 using CorpusProfile = Geef.Atelier.Tools.IntakeEval.CorpusProfile;
 
 namespace Geef.Atelier.Tools.ResearchEval;
@@ -72,7 +73,7 @@ public static class ResearchCorpus
                 continue;
             }
             orders.Add(new ResearchOrder(line.Id, line.Split, entry.Request, line.ResearchTopics!.ToList(),
-                (entry.Files ?? []).Select(f => f.Text).ToList(), ProfileText(entry.Profile)));
+                FileWords(entry.Files ?? []), ProfileText(entry.Profile)));
         }
 
         Expect(problems, "orders with research topics", orders.Count, OrdersWithTopics);
@@ -99,6 +100,10 @@ public static class ResearchCorpus
     /// <summary>The set an order belongs to, or null for a reserved order.</summary>
     public static string? SetOf(IReadOnlyList<ResearchOrder> orders, string id) =>
         Set(orders, DevSet).Any(o => o.Id == id) ? DevSet : Set(orders, HoldoutSet).Any(o => o.Id == id) ? HoldoutSet : null;
+
+    /// <summary>The texts and then the names of the files, as the research of Atelier hands them to the query gate.</summary>
+    public static IReadOnlyList<string> FileWords(IReadOnlyList<CorpusFile> files) =>
+        files.Select(f => f.Text).Concat(files.Select(f => f.Name)).Where(t => !string.IsNullOrEmpty(t)).ToList();
 
     /// <summary>
     /// All fields of the About me details joined by line breaks; a superset of what production hands the query gate, so the

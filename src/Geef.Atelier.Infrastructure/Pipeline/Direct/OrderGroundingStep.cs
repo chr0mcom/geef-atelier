@@ -133,8 +133,9 @@ internal sealed class OrderGroundingStep(
     }
 
     /// <summary>
-    /// Asks <see cref="IOrderResearchService"/> (when one is registered) for the research of the order, with the full text of every file of
-    /// the order and the About me details of the briefing, so that the service can keep their words out of the searches. An exception or a
+    /// Asks <see cref="IOrderResearchService"/> (when one is registered) for the research of the order, with the full text and the name of
+    /// every file of the order (the clarifier that wrote the topics saw both) and the About me details of the briefing, so that the service
+    /// can keep their words out of the searches. An exception or a
     /// wait longer than <see cref="ResearchWaitLimit"/> counts as <see cref="ResearchStatus.Failed"/>; only the cancellation of the run itself
     /// ends the step.
     /// </summary>
@@ -149,7 +150,10 @@ internal sealed class OrderGroundingStep(
             if (scope.ServiceProvider.GetService<IOrderResearchService>() is not { } service)
                 return RunResearch.None;
 
-            var fileTexts = items.Select(i => i.Source.ExtractedText ?? string.Empty).Where(t => t.Length > 0).ToList();
+            var fileTexts = items.Select(i => i.Source.ExtractedText ?? string.Empty)
+                .Concat(items.Select(i => i.Source.FileName ?? string.Empty))
+                .Where(t => t.Length > 0)
+                .ToList();
             var research = await service.EnsureAsync(order, orderVersion, revises, fileTexts, profile, limit.Token);
             return research is null ? RunResearch.None : new RunResearch(research, research.Status, research.Status == ResearchStatus.Failed);
         }

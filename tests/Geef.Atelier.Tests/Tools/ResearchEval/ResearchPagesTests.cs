@@ -3,6 +3,7 @@ using Geef.Atelier.Tests.Intake;
 using Geef.Atelier.Tools.FactCheckEval;
 using Geef.Atelier.Tools.IntakeEval;
 using Geef.Atelier.Tools.ResearchEval;
+using CorpusFile = Geef.Atelier.Tools.IntakeEval.CorpusFile;
 
 namespace Geef.Atelier.Tests.ResearchEvalTool;
 
@@ -45,5 +46,13 @@ public sealed class ResearchPagesTests
             ["main-061", "main-063", "main-066", "main-073", "main-094", "main-100", "main-108", "main-117",
              "second-002", "second-003", "second-006", "second-009", "second-018", "second-019", "second-035"],
             ResearchCorpus.Reserved(orders).Select(o => o.Id));
+    }
+
+    [Fact]
+    public void The_measurement_hands_texts_and_names_of_the_files_to_the_query_gate_like_Atelier()
+    {
+        IReadOnlyList<CorpusFile> files = [new("mietvertrag-hartmann.txt", "text", "Vertragstext.", null), new("leer.md", "markdown", "", null)];
+
+        Assert.Equal(["Vertragstext.", "mietvertrag-hartmann.txt", "leer.md"], ResearchCorpus.FileWords(files));
     }
 }

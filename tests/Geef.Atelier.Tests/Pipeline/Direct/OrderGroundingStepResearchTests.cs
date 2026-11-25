@@ -136,7 +136,7 @@ public sealed class OrderGroundingStepResearchTests
     }
 
     [Fact]
-    public async Task The_service_gets_version_full_file_texts_and_the_about_me_details()
+    public async Task The_service_gets_version_full_file_texts_file_names_and_the_about_me_details()
     {
         var setup = new Setup();
         var order = setup.Orders.Add(Request);
@@ -149,7 +149,7 @@ public sealed class OrderGroundingStepResearchTests
 
         var call = Assert.Single(setup.Research.Calls);
         Assert.Equal((order.Id, 3, false), (call.OrderId, call.OrderVersion, call.Revises));
-        Assert.Equal([longText, Notes], call.FileTexts);
+        Assert.Equal([longText, Notes, "lagerordnung.pdf", "notizen.txt"], call.FileTexts);
         Assert.Equal(BriefingSections.Parse(briefing).Profile, call.ProfileText);
         Assert.Contains("Lager Nord GmbH", call.ProfileText, StringComparison.Ordinal);
     }
