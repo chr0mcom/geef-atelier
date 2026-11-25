@@ -2450,3 +2450,16 @@ Suchthemen); Tagesgrenze ≤ 200 Suchen, je Konto ≤ 80.
 **Rückweg:** `Research__Mode=Off` ohne neues Image; gespeicherte Recherchen bleiben und erscheinen nur bei Läufen, die sie
 nutzten. Code: vorheriges Web-Image; Step51 ist nullable, der Code von Etappe 3 ignoriert die Spalten; kein `Down()` in
 Produktion. Die Vorlage `direct` ändert sich nicht; laufende Läufe dürfen bleiben.
+
+**Messläufe R2 und R3 (2026-11-25, nach der Auslieferung):** **R2 bestanden:** fünf neue Aufträge, alle mit Fundstellen und
+ohne Rückfrage; (a) und (e) im Code bestanden, (c) höchstens eine als ungedeckt gemeldete, aber nachgeschlagene Stelle (die
+Handfälle entschied eine unabhängige Prüfung, alle „nicht gedeckt“), (d) Median der Recherche rund 5 s. **R3 nicht
+auswertbar:** Von acht Paaren hatten nur vier eine Recherche mit Fundstellen (bei dreien erkannte der Klärer diesmal kein
+Suchthema, bei einem fand die Suche nichts; verlangt sind sechs). Hinweis ohne Beweiskraft aus den vier Paaren: Siege mit
+Recherche 3:1, fehlende Angaben 1 gegen 5, erfundene Angaben streng gezählt 30 gegen 12,5, ohne wörtlich Belegtes 12,5 gegen
+11,5 (die 37 Fälle dafür sind nicht von Hand entschieden). **Folge:** `Research:Mode` bleibt `Off`. Ein neuer R3-Lauf braucht
+eine neue, größere Auftragsmenge, bei der der Klärer verlässlich Suchthemen liefert.
+
+**Beobachtungen aus der Abnahme:** Der Faktenprüfer meldet auch Sätze mit Platzhaltern und höfliche Schlusssätze als
+ungedeckt; der Klärer bot einmal geratene Daten als Antworten an, obwohl sein Prompt das verbietet; Zitate zeigen
+Formatzeichen der Quellseite.

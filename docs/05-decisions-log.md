@@ -2354,3 +2354,16 @@ topics); daily limit ≤ 200 searches, ≤ 80 per account.
 **Way back:** `Research__Mode=Off` without a new image; stored research stays and is shown only for runs that used it. Code:
 previous web image; Step51 is nullable, the code of stage 3 ignores the columns; no `Down()` in production. The template
 `direct` does not change; running runs may stay.
+
+**Measurements R2 and R3 (2026-11-25, after the deploy):** **R2 passed:** five new orders, all with passages and without a
+question; (a) and (e) passed in code, (c) at most one passage reported as not backed although looked up (an independent
+reviewer decided the hand cases, all "not covered"), (d) median research time about 5 s. **R3 not evaluable:** only four of the
+eight pairs had research with passages (for three the clarifier named no research topic this time, for one the search found
+nothing; six are required). Indication without proof from the four pairs: wins with research 3:1, missing facts 1 against 5,
+invented facts counted strictly 30 against 12.5, without word-for-word backed ones 12.5 against 11.5 (the 37 cases for this are
+not decided by hand). **Consequence:** `Research:Mode` stays `Off`. A new R3 run needs a new, larger set of orders for which
+the clarifier reliably names research topics.
+
+**Observed during acceptance:** the fact checker also reports sentences with placeholders and polite closing sentences as not
+backed; the clarifier once offered guessed dates as options although its prompt forbids it; quotes show formatting characters of
+the source page.
