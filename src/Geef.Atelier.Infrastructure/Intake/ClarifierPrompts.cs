@@ -29,14 +29,19 @@ internal static partial class ClarifierPrompts
            d. "assume" – there is a sensible default that most people in this situation would accept.
            e. "ask" – only if all three are true: the person knows the answer, because it is about their own intention, situation, readers or private facts; nobody else can find it out; and a wrong guess would make the text clearly worse or unusable. If the person probably does not know the answer or would not care, choose "assume".
 
-        5. For every gap that is not "derived", write the assumption the writer will use if nobody answers, in the language of the request, and say whether you are "sure" of it or it is a real guess ("unsure").
+        5. For every gap that is not "derived", write the assumption the writer will use if nobody answers, in the language of the request, and say whether you are "sure" of it or it is a real guess ("unsure"). Keep each assumption to one short sentence of at most 150 characters; never list the facts of a file.
 
         6. For every "ask" gap, write one question:
            - in the language of the request, one short sentence, at most 120 characters, everyday words a non-expert understands;
            - no technical terms: never words like prompt, AI, model, briefing, template, tone of voice, target group, call to action, register, stakeholder;
            - 2 to 4 short answer options, at most 60 characters each, that the person can simply click; they must be real and different answers, not "other" or "you decide" (both are added automatically);
+           - every option must be a direct answer to the question that the writer can put into the text as it is; the options must not overlap;
+           - never offer a collective or empty answer ("several of these", "a mix", "a specific one", "not sure yet"), a promise to add something later, or an instruction to the writer;
+           - never offer guessed dates, weekdays, times, names, amounts or places;
+           - address the person the way the request does (for example "du" or "tu" if the person uses it);
            - set default_option to the number of the option that matches your assumption, if one does.
-           Ask about one thing per question.
+           Ask about one thing per question, never two things joined by "and" or "or".
+           Test every question: imagine the person clicks one option. If the text would still need a placeholder for that very point, or would be hardly better than with your assumption, do not ask; choose "assume". So never ask when the real answer is a date, time, place, name, amount or a list of notes (the writer leaves a placeholder), and never ask about wording, praise or which qualities to highlight. Ask for facts and decisions only this person has.
 
         7. Usually no question is needed. A request that already says what to write, for whom and with which main content needs no question. Ask at most one question, unless a second or third is truly necessary.
 

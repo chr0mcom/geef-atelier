@@ -11,7 +11,7 @@ internal static class ClarifierOutputParser
     public const int MaxUnderstandingChars = 400;
 
     /// <summary>Longest assumption kept.</summary>
-    public const int MaxAssumptionChars = 200;
+    public const int MaxAssumptionChars = 300;
 
     /// <summary>Longest question kept before the gate; the gate drops everything over 120.</summary>
     public const int MaxQuestionChars = 300;
@@ -34,7 +34,7 @@ internal static class ClarifierOutputParser
     /// <summary>Most options read per question; more still reach the gate as "too many".</summary>
     public const int MaxOptionsRead = 8;
 
-    /// <summary>Tolerant parse: unknown enum values become Other/Assume, strings are trimmed and capped (understanding 400, assumption 200, question 300 before the gate), at most 8 gaps and 5 topics. Null when understanding, language or gaps are missing.</summary>
+    /// <summary>Tolerant parse: unknown enum values become Other/Assume, strings are trimmed and capped (understanding 400 and assumption 300 at a word end with an ellipsis, question 300 before the gate), at most 8 gaps and 5 topics. Null when understanding, language or gaps are missing.</summary>
     public static ClarifierOutput? Parse(string json)
     {
         if (ExtractObject(json) is not { } text)
@@ -56,7 +56,7 @@ internal static class ClarifierOutputParser
         if (root.ValueKind != JsonValueKind.Object)
             return null;
 
-        var understanding = Cap(String(root, "understanding"), MaxUnderstandingChars);
+        var understanding = Shorten(String(root, "understanding"), MaxUnderstandingChars);
         var language = Language(String(root, "language"));
         if (understanding is null || language is null || !root.TryGetProperty("gaps", out var gapsElement) || gapsElement.ValueKind != JsonValueKind.Array)
             return null;
@@ -92,7 +92,7 @@ internal static class ClarifierOutputParser
         Bool(gap, "user_can_know") ?? false,
         Bool(gap, "web_researchable") ?? false,
         Enum(String(gap, "impact"), GapImpact.Low),
-        Cap(String(gap, "assumption"), MaxAssumptionChars),
+        Shorten(String(gap, "assumption"), MaxAssumptionChars),
         Enum(String(gap, "confidence"), AssumptionConfidence.Unsure),
         gap.TryGetProperty("question", out var question) && question.ValueKind == JsonValueKind.Object ? ReadQuestion(question) : null);
 
@@ -164,6 +164,16 @@ internal static class ClarifierOutputParser
         && !int.TryParse(value, out _)
             ? parsed
             : fallback;
+
+    private static string? Shorten(string? value, int max)
+    {
+        var text = value?.Trim();
+        if (string.IsNullOrEmpty(text) || text.Length <= max)
+            return string.IsNullOrEmpty(text) ? null : text;
+        var head = Cap(text, max - 1)!;
+        var space = head.LastIndexOf(' ');
+        return $"{(space > max / 2 ? head[..space] : head).TrimEnd(',', ';', ':', ' ')}…";
+    }
 
     private static string? Cap(string? value, int max)
     {

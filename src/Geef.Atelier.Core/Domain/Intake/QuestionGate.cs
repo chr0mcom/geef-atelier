@@ -179,15 +179,28 @@ public static class QuestionGate
             return (GateDecision.Asked, QuestionTemplates.Length(language, input.Output.LengthScale));
         }
 
-        if (CheckForm(gap.Question, language) is { } rejected)
-            return (rejected, null);
-        if (Unsafe(gap.Question!, input.RequestText))
+        if (gap.Question is { } original && Unsafe(original, input.RequestText))
             return (GateDecision.DroppedUnsafeContent, null);
 
-        var proposed = gap.Question!;
-        var options = proposed.Options.Select((o, i) => new QuestionOption($"o{i + 1}", o.Trim())).ToList();
+        var proposed = gap.Question is { } raw ? WithoutDeferrals(raw) : null;
+        if (CheckForm(proposed, language) is { } rejected)
+            return (rejected, null);
+
+        var options = proposed!.Options.Select((o, i) => new QuestionOption($"o{i + 1}", o.Trim())).ToList();
         var defaultId = proposed.DefaultIndex is { } index && index >= 0 && index < options.Count ? options[index].Id : null;
         return (GateDecision.Asked, new ClarifyQuestion(string.Empty, gap.Topic, proposed.Text.Trim(), options, defaultId, proposed.AllowFreeText, false));
+    }
+
+    private static ProposedQuestion WithoutDeferrals(ProposedQuestion question)
+    {
+        var kept = question.Options
+            .Select((text, index) => (Text: text, Index: index))
+            .Where(o => !JargonBlocklist.IsDeferralOption(o.Text ?? string.Empty))
+            .ToList();
+        if (kept.Count == question.Options.Count)
+            return question;
+        var defaultIndex = kept.FindIndex(o => o.Index == question.DefaultIndex);
+        return question with { Options = kept.Select(o => o.Text).ToList(), DefaultIndex = defaultIndex < 0 ? null : defaultIndex };
     }
 
     private static GateDecision? CheckForm(ProposedQuestion? question, string language)

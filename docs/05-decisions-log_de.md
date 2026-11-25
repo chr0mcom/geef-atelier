@@ -2094,3 +2094,32 @@ Gate streng und jede Verwerfung nur eine Annahme mehr.
   Namen eines gelöschten oder umbenannten Kontos sieht diese alten Läufe und Aufträge mit Wortlaut, Antworten und
   Ergebnis; nur der Profilblock wird aus ihren Briefen entfernt. Profilwerte im gespeicherten Klärprotokoll
   (`FromMemory`) bleiben; sie werden nirgends angezeigt.
+
+## D-072 — Klärer eingeschaltet (`IntakeMode=On`) nach Messung (2026-11-25)
+
+**Entscheidung:** Ausgeliefert wird `Orders:IntakeMode = On`. Der Code-Standard bleibt `Shadow`.
+
+**Messung** (synthetischer Korpus: 120 Haupt- und 40 Zweiteinträge, von einem Modell erzeugt, von einem anderen blind
+beschriftet; Eingabe-Hash je Ergebniszeile): Auf der zurückgehaltenen Menge und dem Zweitkorpus bestehen die Tore a–f.
+160 von 160 Aufrufen erfolgreich, Median rund 6 Sekunden, keine Frage bei vollständigen Aufträgen, keine Frage zu einem
+verbotenen Thema, im Mittel höchstens 0,25 Fragen je Auftrag. Die Warnschwelle e′ ist unterschritten (6–27 % der als nötig
+beschrifteten Lücken werden gefragt); das ist gewollt, im Zweifel nimmt der Schreiber an oder setzt einen Platzhalter.
+
+**Drei Korrekturen aus der Messung:**
+1. Das Schema begrenzt keine Textlängen mehr. Das Gateway verwarf die ganze Antwort, sobald eine Annahme zu lang war
+   (5 von 160 Aufrufen, vor allem Überarbeitungen). Der Parser kürzt selbst.
+2. Das Gate streicht Antworten, die nur ankündigen, die Angabe später zu liefern („Ich füge sie ein“, „Platzhalter“);
+   bleiben weniger als zwei, entfällt die Frage. Abgeleitet aus der Entwicklungsmenge.
+3. Der Prompt verlangt, dass jede Antwort so in den Text übernommen werden kann, und verbietet Fragen, nach deren
+   Beantwortung für denselben Punkt trotzdem ein Platzhalter bliebe, sowie Fragen nach Formulierungen oder Lob.
+
+**Sichtprüfung statt Tor g:** Tor g (eine Woche oder 30 echte Aufträge im Schattenbetrieb) ist bei der geringen Zahl echter
+Aufträge nicht zeitnah erreichbar. An seine Stelle tritt eine unabhängige Prüfung aller 27 im Korpus gestellten Fragen im
+Zusammenhang ihres Auftrags (Maßstab: höchstens 10 % schlecht). Erste Runde: 3 von 29 schlecht, 7 grenzwertig → nicht
+einschalten, Korrektur 3. Zweite Runde mit frischem Prüfer: 20 gut, 6 grenzwertig, 1 schlecht (3,7 %) → einschalten.
+Der Abstand ist knapp. Die zweite Messung nach den Korrekturen nutzt denselben Korpus; die zurückgehaltene Menge ist für
+künftige Promptänderungen damit nicht mehr unberührt.
+
+**Nachkontrolle:** Die Fragen echter Aufträge werden mit `tools/IntakeEval` und dem Auftragsbestand nach den ersten 30
+geklärten Aufträgen erneut gesichtet. Rückweg ohne neues Image: `Orders__IntakeMode=Off` in der Umgebung des Webdienstes setzen; offene Aufträge im
+Zustand `Analyzing` oder `NeedsInput` arbeitet der Worker weiter ab.

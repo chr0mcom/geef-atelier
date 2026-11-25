@@ -102,6 +102,25 @@ public sealed class ClarifierOutputParserTests
     }
 
     [Fact]
+    public void A_long_assumption_is_cut_at_a_word_end_and_marked()
+    {
+        var long400 = string.Join(' ', Enumerable.Repeat("Fakten", 60));
+
+        var output = ClarifierOutputParser.Parse(
+            $$"""{"language":"de","understanding":"x","gaps":[{"topic":"facts","resolution":"assume","assumption":"{{long400}}"}]}""")!;
+
+        var assumption = output.Gaps[0].Assumption!;
+        Assert.True(assumption.Length <= ClarifierOutputParser.MaxAssumptionChars, assumption.Length.ToString());
+        Assert.EndsWith("Fakten…", assumption);
+    }
+
+    [Fact]
+    public void The_schema_never_limits_the_length_of_a_text_because_the_gateway_would_reject_the_whole_answer()
+    {
+        Assert.DoesNotContain("maxLength", ClarifierSchema.Json);
+    }
+
+    [Fact]
     public void More_than_eight_gaps_and_five_topics_are_cut()
     {
         var gaps = string.Join(',', Enumerable.Range(0, 12).Select(i => $$"""{"topic":"other","resolution":"assume","assumption":"a{{i}}"}"""));
