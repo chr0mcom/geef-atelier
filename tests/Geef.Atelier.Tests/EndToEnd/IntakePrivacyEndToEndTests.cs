@@ -20,8 +20,9 @@ namespace Geef.Atelier.Tests.EndToEnd;
 /// <summary>
 /// Over the real wiring: the "About me" profile reaches the clarifier and every writer briefing (answered, skipped,
 /// started after the deadline), but never an outside search service: Tavily, news and academic search, the embeddings of
-/// the learning search, the query shaping and the refinement get only the request as written. Also for
-/// <c>submit_request</c> with an own crew, for a clarified careful order and for a resumed run.
+/// the learning search (learning switched on), the query shaping and the refinement get only the request as written, and each of
+/// these services is really called. Also for <c>submit_request</c> with an own crew, for a clarified careful order and for a
+/// resumed run.
 /// </summary>
 [Collection(EndToEndCollection.Name)]
 [Trait("Category", "EndToEnd")]
@@ -49,7 +50,7 @@ public sealed class IntakePrivacyEndToEndTests(PostgresFixture postgres)
     [Fact]
     public async Task Submit_request_with_an_own_crew_and_its_resumed_run_send_no_profile_to_any_search_service()
     {
-        await using var host = await StartAsync(IntakeMode.Off);
+        await using var host = await StartAsync(IntakeMode.Off, learning: true);
         await SaveProfileAsync(host, AtelierEndToEndHost.McpTokenUser);
         host.Tavily.ResultText = "Leipzig hat einen neuen Standort.";
 
@@ -65,6 +66,7 @@ public sealed class IntakePrivacyEndToEndTests(PostgresFixture postgres)
         await host.WaitForTerminalAsync(runId);
 
         Assert.True(host.Llm.AnyExecutorPromptContains(ProfileMarker), host.Llm.Describe());
+        AssertEveryServiceWasCalled(host.External.All);
         AssertResearchSawOnlyTheRequest(host, ProfileMarker);
         var researched = host.External.All.Count;
 
@@ -74,7 +76,18 @@ public sealed class IntakePrivacyEndToEndTests(PostgresFixture postgres)
         await host.WaitForTerminalAsync(resumedId);
 
         Assert.True(host.External.All.Count > researched, "The resumed run did not search again.");
+        AssertEveryServiceWasCalled(host.External.All.Skip(researched).ToList());
         AssertResearchSawOnlyTheRequest(host, ProfileMarker);
+    }
+
+    private static void AssertEveryServiceWasCalled(IReadOnlyList<ExternalCall> calls)
+    {
+        var tavily = calls.Where(c => c.Client == FakeTavilyEndpoint.ClientName).ToList();
+        var described = string.Join("; ", calls.Select(c => $"{c.Client} {c.Url}"));
+        Assert.True(tavily.Any(c => !c.Body.Contains("\"news\"", StringComparison.Ordinal)), $"No web search call. {described}");
+        Assert.True(tavily.Any(c => c.Body.Contains("\"news\"", StringComparison.Ordinal)), $"No news search call. {described}");
+        Assert.True(calls.Any(c => c.Client.Contains("academic-", StringComparison.Ordinal)), $"No academic search call. {described}");
+        Assert.True(calls.Any(c => c.Client == FakeEmbeddingsEndpoint.ClientName), $"No embeddings call for the learning search. {described}");
     }
 
     [Fact]
@@ -196,10 +209,12 @@ public sealed class IntakePrivacyEndToEndTests(PostgresFixture postgres)
             return true;
         });
 
-    private Task<AtelierEndToEndHost> StartAsync(IntakeMode mode, bool withWorker = true) =>
+    private Task<AtelierEndToEndHost> StartAsync(IntakeMode mode, bool withWorker = true, bool learning = false) =>
         AtelierEndToEndHost.StartAsync(postgres, services =>
         {
             services.PostConfigure<OrderOptions>(o => o.IntakeMode = mode);
+            if (learning)
+                services.PostConfigure<LearningOptions>(o => o.Enabled = true);
             services.PostConfigure<IntakeOptions>(o => o.PollInterval = TimeSpan.FromMilliseconds(200));
             if (!withWorker)
             {
