@@ -26,10 +26,11 @@ Decisions of the client that come on top of the contract (each one stricter):
 - N4 also covers the whole chain: every entry of ``earlierOpenPoints`` of the base appears in the new version under ``openPoints``
   or under ``earlierOpenPoints`` with its original version (and its kind). Every assumption of the writer of the base
   (``writerAssumptions``) that the new version does not repeat under ``writerAssumptions`` stands under its ``earlierOpenPoints``
-  with ``kind`` ``assumption`` and the version of the base. ``kind`` of an entry is ``openPoint`` (also when absent) or
-  ``assumption``. An assumption (an entry of kind ``assumption`` or one of the writer of the base) is also kept when the new
-  version shows it as an assumption: under ``writerAssumptions`` or among the assumptions of the clarifier (``assumptions[].text``).
-  An entry of kind ``openPoint`` is not kept by an assumption.
+  with ``kind`` ``assumption`` and the version of the base. ``kind`` of an entry is ``openPoint`` (also when absent),
+  ``assumption`` or ``note`` (a fixed sentence by Atelier about that version). An assumption (an entry of kind ``assumption`` or one
+  of the writer of the base) is also kept when the new version shows it as an assumption: under ``writerAssumptions`` or among the
+  assumptions of the clarifier (``assumptions[].text``). An entry of kind ``openPoint`` is not kept by an assumption. An entry of kind
+  ``note`` is kept only under ``earlierOpenPoints`` with its version and kind ``note``, never by an open point or an assumption.
 - N5 needs ``state`` ``stopped``; a change that failed on its own does not show that stopping works.
 - A local case whose base text has fewer than 4 paragraphs is not evaluable for N1 (with ``paragraphs − 2`` such a text could
   be rewritten almost or completely).
@@ -107,7 +108,8 @@ MIN_LOCAL_PARAGRAPHS = 4
 STOPPED_STATE = "stopped"
 KIND_OPEN_POINT = "openPoint"
 KIND_ASSUMPTION = "assumption"
-EARLIER_KINDS = frozenset({KIND_OPEN_POINT, KIND_ASSUMPTION})
+KIND_NOTE = "note"
+EARLIER_KINDS = frozenset({KIND_OPEN_POINT, KIND_ASSUMPTION, KIND_NOTE})
 WORD_TOLERANCE = 0.15
 SHORTER_RANGE = (0.40, 0.85)
 LONGER_RANGE = (1.15, 1.60)
@@ -115,6 +117,7 @@ MAX_NEW_NOT_BACKED = 1
 NOT_BACKED = "not_backed"
 CHECK_RAN = frozenset({"checked", "open_points"})
 NOT_FINISHED_FORMAT = "Version {0} could not be finished. This is version {1}."
+EARLIER_KIND_NAMES = {KIND_OPEN_POINT: "offener Punkt", KIND_ASSUMPTION: "Annahme", KIND_NOTE: "fester Satz von Atelier"}
 LEADING_ARTICLES = frozenset({"der", "die", "das", "the"})
 CLOSING_PUNCTUATION = ".!?;:…"
 QUOTES = str.maketrans({"„": '"', "“": '"', "”": '"', "«": '"', "»": '"', "‟": '"', "″": '"',
@@ -393,7 +396,7 @@ def keep_check(base: dict, new: dict) -> dict:
                 problems.append(f"{name}: {field} fehlt")
         if _earlier_entries(result) is None:
             problems.append(f"{name}: earlierOpenPoints nicht lesbar (Liste aus version, text und wahlweise kind "
-                            f"{KIND_OPEN_POINT} oder {KIND_ASSUMPTION})")
+                            f"{KIND_OPEN_POINT}, {KIND_ASSUMPTION} oder {KIND_NOTE})")
     if _clarifier_assumptions(new) is None:
         problems.append("neue Fassung: assumptions nicht lesbar (Liste von Objekten mit text)")
     if not isinstance(new.get("placeholders"), list):
@@ -415,7 +418,8 @@ def keep_check(base: dict, new: dict) -> dict:
                            if point_key(p) not in open_keys and (base_version, KIND_OPEN_POINT, point_key(p)) not in carried]
     lost["lost_earlier_points"] = [{"version": version, "kind": kind, "text": text}
                                    for version, kind, text in _earlier_entries(base)
-                                   if point_key(text) not in open_keys and (version, kind, point_key(text)) not in carried
+                                   if (version, kind, point_key(text)) not in carried
+                                   and (kind == KIND_NOTE or point_key(text) not in open_keys)
                                    and not (kind == KIND_ASSUMPTION and point_key(text) in assumption_keys)]
     lost["lost_assumptions"] = [str(a) for a in base["writerAssumptions"]
                                 if point_key(a) and point_key(a) not in assumption_keys
@@ -604,7 +608,7 @@ def evaluate(cases: list[dict], root: Path) -> dict:
         n4["problems"] += [f"{row['case']}: {p}" for p in keep["problems"]]
         n4["failures"] += [f"{row['case']}: offene Stelle der Vorversion fehlt: „{q}“" for q in keep["lost_passages"]]
         n4["failures"] += [f"{row['case']}: Punkt des Schreibers der Vorversion fehlt: „{p}“" for p in keep["lost_points"]]
-        n4["failures"] += [f"{row['case']}: {'Annahme' if e['kind'] == KIND_ASSUMPTION else 'offener Punkt'} aus Version "
+        n4["failures"] += [f"{row['case']}: {EARLIER_KIND_NAMES[e['kind']]} aus Version "
                            f"{e['version']} (earlierOpenPoints der Vorversion) fehlt: „{e['text']}“"
                            for e in keep["lost_earlier_points"]]
         n4["failures"] += [f"{row['case']}: Annahme des Schreibers der Vorversion fehlt: „{a}“" for a in keep["lost_assumptions"]]

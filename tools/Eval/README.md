@@ -438,9 +438,11 @@ mindestens 4 Absätzen wählen.
   unter `openPoints` oder unter `earlierOpenPoints` mit seiner ursprünglichen Version (und seiner Art). Jede Annahme des
   Schreibers der Ausgangsfassung (`writerAssumptions`), die die neue Fassung nicht unter `writerAssumptions` wiederholt, steht
   unter ihren `earlierOpenPoints` mit `kind` `assumption` und der Version der Ausgangsfassung. `kind` ist `openPoint` (auch wenn
-  das Feld fehlt) oder `assumption`. Eine Annahme (Eintrag der Art `assumption` oder Schreiber-Annahme der Ausgangsfassung) gilt
-  auch als erhalten, wenn die neue Fassung sie als Annahme zeigt: unter `writerAssumptions` oder unter den Annahmen des Klärers
-  (`assumptions[].text`). Ein Eintrag der Art `openPoint` ist durch eine Annahme nicht erhalten.
+  das Feld fehlt), `assumption` oder `note` (ein fester Satz von Atelier über diese Version). Eine Annahme (Eintrag der Art
+  `assumption` oder Schreiber-Annahme der Ausgangsfassung) gilt auch als erhalten, wenn die neue Fassung sie als Annahme zeigt:
+  unter `writerAssumptions` oder unter den Annahmen des Klärers (`assumptions[].text`). Ein Eintrag der Art `openPoint` ist durch
+  eine Annahme nicht erhalten. Ein Eintrag der Art `note` gilt nur als erhalten, wenn er unter `earlierOpenPoints` mit seiner
+  Version und der Art `note` steht, nie durch einen offenen Punkt oder eine Annahme.
 - N5 verlangt `state` `stopped`; eine von selbst gescheiterte Fassung (`failed`) verfehlt N5.
 - Ein lokaler Fall, dessen Ausgangstext weniger als 4 Absätze hat, ist für N1 nicht auswertbar.
 

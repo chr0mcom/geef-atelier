@@ -650,3 +650,39 @@ def test_snapshot_rejects_bad_order_id_and_reports_sign_in_failure(tmp_path):
     assert rc.main(["snapshot", "--order", O1, "--label", "v1", "--out-dir", str(tmp_path)], connector=refuse,
                    echo=lambda _: None) == 3
     assert not os.listdir(tmp_path)
+
+
+NOTE = "The checks of version 1 were not taken over, so anything they left open was not checked again."
+
+
+@pytest.mark.parametrize("v3_fields,verdict", [
+    ({"earlierOpenPoints": [{"version": 1, "text": NOTE, "kind": "note"}]}, "passed"),
+    ({}, "failed"),
+    ({"earlierOpenPoints": [{"version": 1, "text": NOTE}]}, "failed"),
+    ({"earlierOpenPoints": [{"version": 1, "text": NOTE, "kind": "assumption"}]}, "failed"),
+    ({"earlierOpenPoints": [{"version": 2, "text": NOTE, "kind": "note"}]}, "failed"),
+    ({"openPoints": [NOTE]}, "failed"),
+    ({"writerAssumptions": [NOTE]}, "failed"),
+])
+def test_n4_keeps_a_fixed_sentence_of_atelier_only_in_its_own_kind(tmp_path, v3_fields, verdict):
+    """A fixed sentence of Atelier (kind note) about an earlier version is kept only as a note with that version."""
+    data = scenario(tmp_path)
+    v2, v3 = data[(O2, "v2")], data[(O2, "v3")]
+    v2["earlierOpenPoints"] = [{"version": 1, "text": NOTE, "kind": "note"}]
+    v3.update(v3_fields)
+    write(tmp_path, O2, "v2", v2)
+    write(tmp_path, O2, "v3", v3)
+    report = rc.evaluate(plan_cases(), tmp_path)
+    assert report["parts"]["N4"]["verdict"] == verdict, report["parts"]["N4"]
+    if verdict == "failed":
+        assert any(f.startswith("tone-friendly: fester Satz von Atelier aus Version 1") for f in report["parts"]["N4"]["failures"])
+
+
+def test_n4_reads_the_kind_note_and_still_refuses_unknown_kinds(tmp_path):
+    data = scenario(tmp_path)
+    v2 = data[(O2, "v2")]
+    v2["earlierOpenPoints"] = [{"version": 1, "text": NOTE, "kind": "remark"}]
+    write(tmp_path, O2, "v2", v2)
+    report = rc.evaluate(plan_cases(), tmp_path)
+    assert report["parts"]["N4"]["verdict"] == "not_evaluable", report["parts"]["N4"]
+    assert any("note" in p for p in report["parts"]["N4"]["problems"])
