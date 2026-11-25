@@ -29,13 +29,6 @@ public sealed record Replay(CorpusEntry Entry, EvalResult Answer, ClarifierOutpu
 /// </summary>
 public sealed record CallFigures(int Calls, int Entries, int Retries, int Failures, double FailureRate, int Timed, double MedianMs, double P90Ms, int OverProductionLimit, int Unreplayable);
 
-/// <summary>
-/// What the gate rule <see cref="IntakeOptions.DropGuessedDateOptions"/> takes away, counted by replaying every answer with and without
-/// it: <see cref="Questions"/> asked without the rule and dropped with it, <see cref="Options"/> answer options it removed from questions
-/// that stay. The rule writes no decision of its own into the trace, so only this comparison tells its drops apart.
-/// </summary>
-public sealed record DateRuleFigures(int Questions, int Options);
-
 /// <summary>Figures over the last successful, replayable answer of each entry: gates b to e′.</summary>
 public sealed record QuestionFigures(
     int Answered,
@@ -100,36 +93,16 @@ public static class CorpusEvaluation
     private static readonly HashSet<GateDecision> FormDrops =
         [GateDecision.DroppedTooLong, GateDecision.DroppedBadOptions, GateDecision.DroppedJargon, GateDecision.DroppedLanguageMismatch];
 
-    /// <summary>
-    /// Replays one stored answer with the same mapping as the measuring run; <paramref name="dropGuessedDates"/> switches on the gate rule
-    /// <see cref="IntakeOptions.DropGuessedDateOptions"/>, which does not change the clarifier input.
-    /// </summary>
-    public static Replay ReplayOne(CorpusEntry entry, EvalResult answer, bool dropGuessedDates = false)
+    /// <summary>Replays one stored answer with the same mapping as the measuring run.</summary>
+    public static Replay ReplayOne(CorpusEntry entry, EvalResult answer)
     {
         if (answer.Status != nameof(IntakeRecordStatus.Ok) || answer.Raw is null)
             return new Replay(entry, answer, null, null);
         var output = ClarifierOutputParser.Parse(answer.Raw);
         if (output is null)
             return new Replay(entry, answer, null, null);
-        var options = new IntakeOptions { DropGuessedDateOptions = dropGuessedDates };
+        var options = new IntakeOptions();
         return new Replay(entry, answer, output, entry.Gate(entry.Request(options), output, options).Gate);
-    }
-
-    /// <summary>The questions and answer options the date rule drops in <paramref name="lines"/> (<see cref="DateRuleFigures"/>).</summary>
-    public static DateRuleFigures DateRuleEffect(IReadOnlyList<CorpusEntry> corpus, IReadOnlyList<EvalResult> lines)
-    {
-        var byId = corpus.GroupBy(e => e.Id, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Last(), StringComparer.Ordinal);
-        int questions = 0, options = 0;
-        foreach (var line in lines.Where(l => byId.ContainsKey(l.Id)))
-        {
-            var plain = ReplayOne(byId[line.Id], line).Gate;
-            var ruled = ReplayOne(byId[line.Id], line, dropGuessedDates: true).Gate;
-            if (plain is null || ruled is null)
-                continue;
-            questions += plain.Trace.Zip(ruled.Trace).Count(t => !FormDrops.Contains(t.First.Decision) && FormDrops.Contains(t.Second.Decision));
-            options += plain.Questions.Join(ruled.Questions, q => q.Text, q => q.Text, (p, r) => p.Options.Count - r.Options.Count, StringComparer.Ordinal).Sum();
-        }
-        return new DateRuleFigures(questions, options);
     }
 
     /// <summary>True when the line counts as a failure: not <c>Ok</c>, longer than <paramref name="productionLimit"/> or not replayable.</summary>
@@ -275,12 +248,10 @@ public static class CorpusEvaluation
     }
 
     /// <summary>
-    /// The verdict of gates a to f (and the warning e′) for the held-out set and the second corpus, replayed with or without the gate
-    /// rule <see cref="IntakeOptions.DropGuessedDateOptions"/>. With any of <see cref="Problems"/>, every gate is
-    /// <see cref="GateVerdict.NotEvaluable"/>.
+    /// The verdict of gates a to f (and the warning e′) for the held-out set and the second corpus. With any of
+    /// <see cref="Problems"/>, every gate is <see cref="GateVerdict.NotEvaluable"/>.
     /// </summary>
-    public static IReadOnlyList<GateResult> Verdicts(
-        IReadOnlyList<CorpusEntry> corpus, IReadOnlyList<EvalResult> lines, TimeSpan productionLimit, bool dropGuessedDates = false)
+    public static IReadOnlyList<GateResult> Verdicts(IReadOnlyList<CorpusEntry> corpus, IReadOnlyList<EvalResult> lines, TimeSpan productionLimit)
     {
         var problems = Problems(corpus, lines);
         var gates = new[] { "a", "b", "c", "d", "e", "e'", "f" };
@@ -291,7 +262,7 @@ public static class CorpusEvaluation
         }
 
         var byId = corpus.ToDictionary(e => e.Id, StringComparer.Ordinal);
-        var replays = lines.Select(l => ReplayOne(byId[l.Id], l, dropGuessedDates)).ToList();
+        var replays = lines.Select(l => ReplayOne(byId[l.Id], l)).ToList();
         var results = new List<GateResult>();
         foreach (var (scope, inScope) in new (string, Func<CorpusEntry, bool>)[]
         {

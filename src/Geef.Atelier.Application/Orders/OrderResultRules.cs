@@ -74,77 +74,19 @@ public static class OrderResultRules
 
     /// <summary>
     /// The assumptions the text was written with: those of the clarifier nobody corrected, then those of the writer, without blank
-    /// lines and without repeats (<see cref="WithoutRepeatedAssumptions"/>). Assumptions about facts that went to the writer only as
-    /// "not given by the person" (<see cref="NotGivenFacts"/>) are not among them.
+    /// lines and without repeats (<see cref="SameAssumptionKey"/>; the first wording is kept). Assumptions about facts that went to
+    /// the writer only as "not given by the person" (<see cref="NotGivenFacts"/>) are not among them.
     /// </summary>
     public static IReadOnlyList<string> AllAssumptions(this OrderResult result)
     {
         var notGiven = (result.NotGivenFacts ?? []).Select(AssumptionKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return WithoutRepeatedAssumptions((result.Assumptions ?? []).Select(a => a.Text)
-                .Where(t => !notGiven.Contains(AssumptionKey(t)))
-                .Select(t => (t, true))
-                .Concat((result.WriterAssumptions ?? []).Select(t => (t, false)))
-                .ToList())
-            .Select(a => a.Text)
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        return (result.Assumptions ?? []).Select(a => a.Text)
+            .Where(t => !notGiven.Contains(AssumptionKey(t)))
+            .Concat(result.WriterAssumptions ?? [])
+            .Where(t => !string.IsNullOrWhiteSpace(t) && seen.Add(SameAssumptionKey(t)))
             .ToList();
     }
-
-    /// <summary>
-    /// <paramref name="assumptions"/> in their order without blank lines and without repeats: of two with the same
-    /// <see cref="SameAssumptionKey"/> the first wording is kept, unless only the later one is marked <c>Fixed</c>, which then takes the
-    /// place of the first; one that another continues word for word
-    /// (<see cref="ContinuedBy"/>) is left out and the longer one is shown where the first of them stood. One marked
-    /// <c>Fixed</c> (an assumption of the clarifier, which has an id) is never left out for a longer one, so a longer assumption of
-    /// the writer then stays beside it. Any other difference in wording keeps both, because only a person can tell whether they say
-    /// the same.
-    /// </summary>
-    public static IReadOnlyList<(string Text, bool Fixed)> WithoutRepeatedAssumptions(IReadOnlyList<(string Text, bool Fixed)> assumptions)
-    {
-        var unique = new List<(string Text, bool Fixed)>();
-        var at = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var assumption in assumptions.Where(a => !string.IsNullOrWhiteSpace(a.Text)))
-        {
-            var key = SameAssumptionKey(assumption.Text);
-            if (!at.TryGetValue(key, out var index))
-            {
-                at[key] = unique.Count;
-                unique.Add(assumption);
-            }
-            else if (assumption.Fixed && !unique[index].Fixed)
-                unique[index] = assumption;
-        }
-        var keys = unique.Select(a => SameAssumptionKey(a.Text)).ToList();
-        var place = Enumerable.Range(0, unique.Count).ToArray();
-        var left = new bool[unique.Count];
-        for (var i = 0; i < unique.Count; i++)
-        {
-            if (unique[i].Fixed)
-                continue;
-            var longer = Enumerable.Range(0, unique.Count).Where(j => j != i && Continues(keys[i], keys[j])).ToList();
-            if (longer.Count == 0)
-                continue;
-            left[i] = true;
-            var writer = longer.Where(j => !unique[j].Fixed).OrderByDescending(j => keys[j].Length).ThenBy(j => j).ToList();
-            if (writer.Count > 0)
-                place[writer[0]] = Math.Min(place[writer[0]], place[i]);
-        }
-        return Enumerable.Range(0, unique.Count).Where(i => !left[i]).OrderBy(i => place[i]).ThenBy(i => i).Select(i => unique[i]).ToList();
-    }
-
-    /// <summary>
-    /// True when <paramref name="longer"/> continues <paramref name="shorter"/> word for word: the <see cref="SameAssumptionKey"/>
-    /// of <paramref name="shorter"/> is the beginning of that of <paramref name="longer"/>, and there it is followed by a comma,
-    /// semicolon or colon with a blank after it, an opening bracket or a dash between blanks (<see cref="ContinuationMarks"/>). So
-    /// "Eltern werden mit Sie angesprochen, auch im Betreff." continues "Eltern werden mit Sie angesprochen.", but "Eltern werden mit
-    /// Sie angesprochen und geduzt", "Eltern werden nicht mit Sie angesprochen" and "Beginn um 19:30 Uhr" after "Beginn um 19" do not.
-    /// </summary>
-    public static bool ContinuedBy(string? shorter, string? longer) => Continues(SameAssumptionKey(shorter), SameAssumptionKey(longer));
-
-    /// <summary>
-    /// The marks after which a longer assumption continues a shorter one (<see cref="ContinuedBy"/>); a comma, semicolon or colon counts
-    /// only with a blank after it (not in <c>5,5</c> or <c>18:30</c>), a dash only between blanks.
-    /// </summary>
-    public static IReadOnlySet<char> ContinuationMarks { get; } = new HashSet<char>([',', ';', ':', '(', '-']);
 
     /// <summary>
     /// The key by which two assumptions count as the same and only the first is shown: the text normalized as quotes are (blanks,
@@ -206,23 +148,6 @@ public static class OrderResultRules
     /// <summary>The key two assumption texts are compared by: one line, without surrounding blanks and closing punctuation.</summary>
     public static string AssumptionKey(string? text) =>
         string.Join(' ', (text ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)).TrimEnd('.', '!', '?', ';', ':').Trim();
-
-    private static bool Continues(string shorterKey, string longerKey)
-    {
-        if (shorterKey.Length == 0 || longerKey.Length <= shorterKey.Length || !longerKey.StartsWith(shorterKey, StringComparison.OrdinalIgnoreCase))
-            return false;
-        var rest = longerKey.AsSpan(shorterKey.Length);
-        var mark = rest.TrimStart();
-        if (mark.IsEmpty || !ContinuationMarks.Contains(mark[0]))
-            return false;
-        var blankAfter = mark.Length > 1 && char.IsWhiteSpace(mark[1]);
-        return mark[0] switch
-        {
-            '(' => true,
-            '-' => mark.Length < rest.Length && blankAfter,
-            _ => blankAfter,
-        };
-    }
 
     private static IReadOnlyList<OrderUnbackedPassage> Candidates(IReadOnlyList<OrderUnbackedPassage>? passages) =>
         (passages ?? []).Where(p => !string.IsNullOrWhiteSpace(p.Quote) && p.Kind != FactFindingKind.SourceConflict).ToList();

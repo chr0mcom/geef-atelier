@@ -2,19 +2,13 @@ using Geef.Atelier.Core.Domain.Checks;
 
 namespace Geef.Atelier.Core.Domain.Intake;
 
-/// <summary>
-/// Input of <see cref="QuestionGate.Apply"/>. <see cref="MaterialTexts"/> are the whole texts of the files of the order and the About me
-/// details; with <see cref="DropGuessedDates"/> answer options naming a calendar day are dropped when nothing in the material of the
-/// person looks like a date.
-/// </summary>
+/// <summary>Input of <see cref="QuestionGate.Apply"/>.</summary>
 public sealed record QuestionGateInput(
     ClarifierOutput Output,
     string RequestText,
     bool RevisionDetected,
     IReadOnlyDictionary<GapTopic, MemoryAnswer> Known,
-    int MaxQuestions,
-    IReadOnlyList<string>? MaterialTexts = null,
-    bool DropGuessedDates = false);
+    int MaxQuestions);
 
 /// <summary>
 /// What is left after the gate: the questions to show, the assumptions, the profile answers, the research topics, the trace
@@ -67,13 +61,6 @@ public static class QuestionGate
     /// topic (<see cref="GapTopic.Facts"/>, <see cref="GapTopic.Other"/>) covers different matters, so a dropped duplicate keeps the
     /// assumption the model gave (never a generated "not specified" line). Questions, options, assumptions and the summary with links, addresses or secrets are dropped (see
     /// <see cref="IntakeContentGuard.IsUnsafe"/>; the request of the person decides which bare names and secret topics are fine).
-    /// With <see cref="QuestionGateInput.DropGuessedDates"/> and nothing date-like in the material of the person (request, file texts,
-    /// About me details and known answers, read generously by <see cref="CalendarMentions.AnyDateLike"/>), an option of a question that
-    /// passed the form rules is dropped when it names a calendar day (<see cref="CalendarMentions.NamesCalendarDay"/>); the shortened
-    /// question goes through the form rules again, so with fewer than <see cref="MinOptions"/> options left it becomes its assumption
-    /// (<see cref="GateDecision.DroppedBadOptions"/>, a value older versions can read). As soon as anything in the material looks like a
-    /// date, every option stays, also an invented date. The rule only removes options and questions, it never lets a question through
-    /// that the other rules drop.
     /// </summary>
     public static QuestionGateResult Apply(QuestionGateInput input)
     {
@@ -82,15 +69,13 @@ public static class QuestionGate
         var language = (output.Language ?? string.Empty).Trim().ToLowerInvariant();
         var revision = input.RevisionDetected || output.IsRevision;
         var lengthKnown = new Lazy<bool>(() => LengthInRequest(input.RequestText));
-        var materialHasDate = new Lazy<bool>(() => CalendarMentions.AnyDateLike(
-            (input.MaterialTexts ?? []).Prepend(input.RequestText).Concat(input.Known.Values.Select(k => k.Value)), language));
         var decisions = new GateDecision[gaps.Count];
         var candidates = new List<(int Index, ClarifyQuestion Question)>();
         var fromMemory = new List<MemoryAnswer>();
 
         for (var i = 0; i < gaps.Count; i++)
         {
-            var (decision, question) = Decide(gaps[i], input, language, revision, lengthKnown, materialHasDate);
+            var (decision, question) = Decide(gaps[i], input, language, revision, lengthKnown);
             decisions[i] = decision;
             if (question is not null)
                 candidates.Add((i, question));
@@ -157,7 +142,7 @@ public static class QuestionGate
     public static string NotSpecified(GapTopic topic) => $"{topic.Label()}: not specified – the writer decides";
 
     private static (GateDecision Decision, ClarifyQuestion? Question) Decide(
-        IntakeGap gap, QuestionGateInput input, string language, bool revision, Lazy<bool> lengthKnown, Lazy<bool> materialHasDate)
+        IntakeGap gap, QuestionGateInput input, string language, bool revision, Lazy<bool> lengthKnown)
     {
         if (ProfileTopics.Contains(gap.Topic) && input.Known.ContainsKey(gap.Topic))
             return (GateDecision.FromMemory, null);
@@ -201,26 +186,16 @@ public static class QuestionGate
         if (CheckForm(proposed, language) is { } rejected)
             return (rejected, null);
 
-        if (input.DropGuessedDates && !materialHasDate.Value)
-        {
-            proposed = Without(proposed!, o => CalendarMentions.NamesCalendarDay(o, language));
-            if (CheckForm(proposed, language) is { } rejectedAfterDates)
-                return (rejectedAfterDates, null);
-        }
-
         var options = proposed!.Options.Select((o, i) => new QuestionOption($"o{i + 1}", o.Trim())).ToList();
         var defaultId = proposed.DefaultIndex is { } index && index >= 0 && index < options.Count ? options[index].Id : null;
         return (GateDecision.Asked, new ClarifyQuestion(string.Empty, gap.Topic, proposed.Text.Trim(), options, defaultId, proposed.AllowFreeText, false));
     }
 
-    private static ProposedQuestion WithoutDeferrals(ProposedQuestion question) =>
-        Without(question, o => JargonBlocklist.IsDeferralOption(o ?? string.Empty));
-
-    private static ProposedQuestion Without(ProposedQuestion question, Func<string?, bool> drop)
+    private static ProposedQuestion WithoutDeferrals(ProposedQuestion question)
     {
         var kept = question.Options
             .Select((text, index) => (Text: text, Index: index))
-            .Where(o => !drop(o.Text))
+            .Where(o => !JargonBlocklist.IsDeferralOption(o.Text ?? string.Empty))
             .ToList();
         if (kept.Count == question.Options.Count)
             return question;

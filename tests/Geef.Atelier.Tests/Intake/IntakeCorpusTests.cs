@@ -71,68 +71,6 @@ public sealed class IntakeCorpusTests(ITestOutputHelper output)
         }
     }
 
-    [Fact]
-    public void The_guessed_date_rule_leaves_every_gate_and_every_shown_question_of_the_stored_results_unchanged()
-    {
-        var directory = CorpusDirectory();
-        var corpus = new[] { MainCorpus, SecondCorpus }
-            .Select(name => Path.Combine(directory, name))
-            .Where(File.Exists)
-            .SelectMany(Corpus.Load)
-            .ToList();
-        var resultFiles = Directory.Exists(directory) ? Directory.GetFiles(directory, "results-*.jsonl").Order().ToList() : [];
-        Assert.NotEmpty(resultFiles);
-
-        foreach (var file in resultFiles)
-        {
-            var lines = Results.Load(file);
-            var before = CorpusEvaluation.Verdicts(corpus, lines, Limit);
-            var after = CorpusEvaluation.Verdicts(corpus, lines, Limit, dropGuessedDates: true);
-            foreach (var verdict in after)
-                output.WriteLine($"{Path.GetFileName(file)} with guessed-date rule {verdict}");
-            Assert.Equal(before, after);
-            Assert.All(after.Where(v => v.Gate != "e'"), v => Assert.Equal(GateVerdict.Passed, v.Verdict));
-
-            var byId = corpus.ToDictionary(e => e.Id, StringComparer.Ordinal);
-            var datedOptions = 0;
-            foreach (var line in lines)
-            {
-                var plain = CorpusEvaluation.ReplayOne(byId[line.Id], line);
-                var ruled = CorpusEvaluation.ReplayOne(byId[line.Id], line, dropGuessedDates: true);
-                Assert.Equal(Shown(plain.Gate), Shown(ruled.Gate));
-                datedOptions += plain.Gate?.Questions.Sum(q => q.Options.Count(o => CalendarMentions.NamesCalendarDay(o.Label, plain.Output?.Language))) ?? 0;
-            }
-            var effect = CorpusEvaluation.DateRuleEffect(corpus, lines);
-            output.WriteLine($"{Path.GetFileName(file)}: the date rule drops {effect.Questions} questions and {effect.Options} options; {datedOptions} shown options name a calendar day.");
-            Assert.Equal(new DateRuleFigures(0, 0), effect);
-            Assert.Equal(0, datedOptions);
-        }
-
-        static string Shown(QuestionGateResult? gate) => gate is null
-            ? "-"
-            : string.Join(" || ", gate.Questions.Select(q => $"{q.Id}:{q.Text}:{q.DefaultOptionId}:{string.Join(" | ", q.Options.Select(o => $"{o.Id}={o.Label}"))}"));
-    }
-
-    private const string GuessedReopening =
-        """{"text_type":"E-Mail","language":"en","understanding":"An email about the closed office.","is_revision":false,"length_scale":"short_form","gaps":[{"topic":"date","resolution":"ask","user_can_know":true,"web_researchable":false,"impact":"high","assumption":"Open again on Monday 4 January 2027.","confidence":"unsure","question":{"text":"On which day does the office open again?","options":["Monday, 4 January 2027","Tuesday, 5 January 2027","Saturday, 2 January 2027"],"default_option":0,"allow_free_text":true}}],"research_topics":[]}""";
-
-    [Fact]
-    public void A_synthetic_answer_with_guessed_days_is_dropped_only_with_the_date_rule_and_counted()
-    {
-        var entry = new CorpusEntry("main-001", "main", "sparse", "en", "Write a short email to our tenants: the office is closed over the holidays.", null, null, null);
-        var line = new EvalResult(entry.Id, "main", "sparse", "en", "dev", "Ok", "m", 5_000, null, GuessedReopening, 1, [], [], [], DateTimeOffset.UnixEpoch, 40_000);
-
-        var plain = CorpusEvaluation.ReplayOne(entry, line);
-        var ruled = CorpusEvaluation.ReplayOne(entry, line, dropGuessedDates: true);
-
-        Assert.Equal(3, Assert.Single(plain.Gate!.Questions).Options.Count);
-        Assert.Empty(ruled.Gate!.Questions);
-        Assert.Equal(GateDecision.DroppedBadOptions, Assert.Single(ruled.Gate.Trace).Decision);
-        Assert.Equal("Open again on Monday 4 January 2027.", Assert.Single(ruled.Gate.Assumptions).Text);
-        Assert.Equal(new DateRuleFigures(1, 0), CorpusEvaluation.DateRuleEffect([entry], [line]));
-        Assert.Equal(new DateRuleFigures(0, 0), CorpusEvaluation.DateRuleEffect([entry with { Request = $"{entry.Request} Back on 04.01." }], [line]));
-    }
-
     private static readonly (string Corpus, string Category, int Count)[] Plan =
     [
         ("main", "sparse", 50), ("main", "complete", 40), ("main", "revision", 10), ("main", "researchable", 10), ("main", "profile_covered", 10),

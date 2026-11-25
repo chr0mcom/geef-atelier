@@ -6,7 +6,7 @@ const string Usage = """
     Usage: IntakeEval run --corpus <file.jsonl> --proxy <url> --out <results.jsonl> [--max-calls N] [--parallel 2]
                           [--model <name>] [--split all|dev|holdout] [--timeout-seconds 40]
            IntakeEval evaluate --corpus <main.jsonl> --second <second.jsonl> --results <results.jsonl>
-                          [--production-timeout-seconds 40] [--drop-guessed-dates false|true]
+                          [--production-timeout-seconds 40]
            IntakeEval shadow --csv <shadows.csv> [--sample 10]
 
     run       Runs the real clarifier and question gate over a synthetic corpus and appends one JSON line per call
@@ -15,10 +15,7 @@ const string Usage = """
               in the evaluation. Results for another input are called again and leave the file not evaluable.
               Example: --proxy http://cli-proxy:8090/v1/claude
     evaluate  Replays the stored answers and prints passed / FAILED / NOT EVALUABLE for gates a to f (and the warning e')
-              on the held-out set and the second corpus. Exit code 0 only when every gate passed. With
-              --drop-guessed-dates true the gate drops answer options naming a calendar day when nothing in the request,
-              the files or the profile looks like a date (Intake:DropGuessedDateOptions); the stored answers stay valid.
-              The first line names the mode and how many questions and options the rule drops in these results.
+              on the held-out set and the second corpus. Exit code 0 only when every gate passed.
     shadow    Reads a CSV export of OrderIntakeShadows (see README.md) and prints gates a, f and g of the shadow mode
               and a sample of questions for the visual check. Exit code 0 only when every measurable gate passed.
     """;
@@ -29,18 +26,11 @@ if (args.Length == 0 || args[0] is not ("run" or "evaluate" or "shadow"))
     return 2;
 }
 
-string[] known = args[0] switch
-{
-    "run" => ["corpus", "proxy", "out", "max-calls", "parallel", "model", "split", "timeout-seconds"],
-    "evaluate" => ["corpus", "second", "results", "production-timeout-seconds", "drop-guessed-dates"],
-    _ => ["csv", "sample"],
-};
 var values = new Dictionary<string, string>(StringComparer.Ordinal);
 for (var i = 1; i < args.Length; i += 2)
 {
-    if (!args[i].StartsWith("--", StringComparison.Ordinal) || i + 1 >= args.Length || !known.Contains(args[i][2..], StringComparer.Ordinal))
+    if (!args[i].StartsWith("--", StringComparison.Ordinal) || i + 1 >= args.Length)
     {
-        Console.Error.WriteLine($"Unknown or incomplete argument: {args[i]}");
         Console.Error.WriteLine(Usage);
         return 2;
     }
@@ -59,19 +49,9 @@ if (args[0] == "evaluate")
         Console.Error.WriteLine(Usage);
         return 2;
     }
-    if (values.GetValueOrDefault("drop-guessed-dates", "false") is not ("true" or "false") and var flag)
-    {
-        Console.Error.WriteLine($"--drop-guessed-dates takes true or false, not {flag}");
-        Console.Error.WriteLine(Usage);
-        return 2;
-    }
-    var dropGuessedDates = values.GetValueOrDefault("drop-guessed-dates") == "true";
     var corpusEntries = Corpus.Load(mainPath).Concat(Corpus.Load(secondPath)).ToList();
     var lines = Results.Load(resultsPath);
-    var effect = CorpusEvaluation.DateRuleEffect(corpusEntries, lines);
-    Console.WriteLine($"Date rule (Intake:DropGuessedDateOptions): {(dropGuessedDates ? "on" : "off")}; with the rule on it would drop " +
-        $"{effect.Questions} questions and {effect.Options} answer options of these results.");
-    var verdicts = CorpusEvaluation.Verdicts(corpusEntries, lines, productionLimit, dropGuessedDates);
+    var verdicts = CorpusEvaluation.Verdicts(corpusEntries, lines, productionLimit);
     foreach (var verdict in verdicts)
         Console.WriteLine(verdict);
     return verdicts.Where(v => v.Gate != "e'").All(v => v.Verdict == GateVerdict.Passed) ? 0 : 1;

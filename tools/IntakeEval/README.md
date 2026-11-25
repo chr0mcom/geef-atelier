@@ -5,14 +5,14 @@ Misst den Klärer (die Rückfragen vor dem Schreiben) gegen die Abnahmetore der 
 
 ```bash
 dotnet run --project tools/IntakeEval -- run --corpus intake-corpus.jsonl --proxy <gateway-url> --out results.jsonl [--max-calls N] [--parallel 2] [--timeout-seconds 40]
-dotnet run --project tools/IntakeEval -- evaluate --corpus intake-corpus.jsonl --second intake-corpus-second.jsonl --results results.jsonl [--drop-guessed-dates true]
+dotnet run --project tools/IntakeEval -- evaluate --corpus intake-corpus.jsonl --second intake-corpus-second.jsonl --results results.jsonl
 dotnet run --project tools/IntakeEval -- shadow --csv shadows.csv [--sample 10]
 ```
 
 | Befehl | Wirkung |
 |---|---|
 | `run` | ruft den echten Klärer und das Gate je Eintrag und hängt je Aufruf eine Zeile an (Dauer, Modell, Rohantwort, Gate-Spur, Fragen, Zeitgrenze `timeout_ms`, Eingabe-Hash `input_hash`). Fortsetzbar: Einträge, deren letztes Ergebnis zur aktuellen Eingabe `Ok` oder `Invalid` ist, werden übersprungen; gescheiterte Aufrufe bleiben in der Datei. Ergebnisse zu einer anderen Eingabe werden nie übersprungen (Warnung im Protokoll); die Datei bleibt dann aber nicht auswertbar, also eine neue `--out`-Datei nehmen. |
-| `evaluate` | spielt die Rohantworten durch Parser und Gate und gibt je Tor a–f (und die Warnschwelle e′) für die zurückgehaltene Menge und den Zweitkorpus `passed`, `FAILED` oder `NOT EVALUABLE` aus. Rückgabewert 0 nur, wenn alle Tore bestanden sind. Mit `--drop-guessed-dates true` (nur `true` oder `false`) streicht das Gate wie mit `Intake:DropGuessedDateOptions` Antworten, die einen Kalendertag nennen, wenn in Auftrag, Dateien und Profil nichts Datumsartiges steht; die Eingabe des Klärers ändert sich dadurch nicht, die gespeicherten Antworten bleiben gültig. Die erste Zeile nennt den Modus und wie viele Fragen und Antworten die Regel in diesen Ergebnissen streicht (Vergleich mit und ohne Regel, weil die Regel keine eigene Entscheidung in den Verlauf schreibt). Unbekannte Argumente lehnt das Werkzeug mit Rückgabewert 2 ab. |
+| `evaluate` | spielt die Rohantworten durch Parser und Gate und gibt je Tor a–f (und die Warnschwelle e′) für die zurückgehaltene Menge und den Zweitkorpus `passed`, `FAILED` oder `NOT EVALUABLE` aus. Rückgabewert 0 nur, wenn alle Tore bestanden sind. |
 | `shadow` | wertet einen CSV-Export der Tabelle `OrderIntakeShadows` aus: Tore a und f im Schatten und Tor g, dazu eine Stichprobe von Fragen für die Sichtprüfung. Rückgabewert 0 nur, wenn alle messbaren Tore bestanden sind. |
 
 Verlangt das Gateway einen Schlüssel, liest `run` ihn aus der Umgebungsvariablen `INTAKE_EVAL_API_KEY` (nie als Argument übergeben, nie ausgeben).
