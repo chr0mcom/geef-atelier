@@ -2,7 +2,7 @@
 
 *[English](09-endpoint-reference.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-25 (Etappe 3: `checks`, `factCheck`, `unbackedPassages`, `sourceIssues`, `openPoints`, `writerAssumptions`, `sourceQuotes` in `get_order_result`, Server-Hinweise zum Zeigen; Etappe 2: `answer_order`, `needs_input` mit Fragen in `submit_order`/`get_order_status`, `assumptions` in `get_order_result`, neue Server-Hinweise; Etappe 1: Auftrags-Werkzeuge `submit_order`, `get_order_status`, `get_order_result`, `submit_request` als Hülle mit `orderId`, Server-Hinweise, `list_learnings` nur für Admins; D-067: `warnings` und `outcome` in `get_run_status`/`get_run_result`, Ergebnis erst nach `outcome` lesen; `/hubs/runs` bleibt bis Etappe 8; `/hubs/runs` nur für Angemeldete; Editoren nur für Admins und `/access-denied`; Learning standardmäßig pausiert; zuvor 2026-05-22, D-054: Tool list_learnings ergänzt; providerType um learning-retrieval erweitert)*
+*Letzte Aktualisierung: 2026-11-25 (Etappe 4: `lookedUp` in `get_order_result`, Server-Hinweis zu im Web nachgeschlagenen Stellen; Etappe 3: `checks`, `factCheck`, `unbackedPassages`, `sourceIssues`, `openPoints`, `writerAssumptions`, `sourceQuotes` in `get_order_result`, Server-Hinweise zum Zeigen; Etappe 2: `answer_order`, `needs_input` mit Fragen in `submit_order`/`get_order_status`, `assumptions` in `get_order_result`, neue Server-Hinweise; Etappe 1: Auftrags-Werkzeuge `submit_order`, `get_order_status`, `get_order_result`, `submit_request` als Hülle mit `orderId`, Server-Hinweise, `list_learnings` nur für Admins; D-067: `warnings` und `outcome` in `get_run_status`/`get_run_result`, Ergebnis erst nach `outcome` lesen; `/hubs/runs` bleibt bis Etappe 8; `/hubs/runs` nur für Angemeldete; Editoren nur für Admins und `/access-denied`; Learning standardmäßig pausiert; zuvor 2026-05-22, D-054: Tool list_learnings ergänzt; providerType um learning-retrieval erweitert)*
 
 Alle HTTP-Endpunkte von Geef.Atelier, die extern erreichbar sind — MCP, OAuth 2.1
 sowie die Web-UI-/Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`.
@@ -125,7 +125,8 @@ Unterstützte `contentType`-Werte: `application/pdf`, `application/vnd.openxmlfo
   "openPoints": ["<vom Schreiber offen gelassener Punkt>"],
   "writerAssumptions": ["<was der Schreiber selbst entschieden hat>"],
   "sourceQuotes": [ { "file": "notizen.txt", "quote": "<Stelle der Datei, wörtlich>" } ],
-  "notesNotShown": "<fixed sentence|null>"
+  "notesNotShown": "<fixed sentence|null>",
+  "lookedUp": { "status": "found|nothing_found|failed|daily_limit|all_withheld", "note": "<fixed sentence|null>", "withheld": 0, "entries": [ { "quote": "<Stelle der Seite, wörtlich>", "url": "https://…|null", "title": "<Seitentitel>", "retrievedAt": "2026-11-28T08:15:00+00:00" } ] }
 }
 ```
 
@@ -139,6 +140,11 @@ Etappe 3 hängt an (in der Reihenfolge der Ergebnisseite im Web: was geprüft wu
 - `openPoints` und `writerAssumptions`: was der Schreiber offen gelassen oder selbst entschieden hat, in der Sprache des Textes.
 - `notesNotShown`: ein fester Satz, wenn Notizen des Schreibers nicht gezeigt werden konnten (sie enthalten Link, Adresse, Konto- oder Zugangsdaten).
 - `sourceQuotes`: bis zu drei Stellen je Datei, die der Schreiber zitiert hat, wörtlich gegen die Datei geprüft, Dateien in der Reihenfolge von `sourcesUsed`. Sie zeigen, dass die Datei gelesen und zitiert wurde – nicht, dass jede Aussage gedeckt ist.
+
+Etappe 4 hängt `lookedUp` an (`null`, wenn für den Auftrag nichts im Web nachgeschlagen wurde, und für Ergebnisse vor Etappe 4):
+- `status` `found` mit `entries`: Stellen, die Atelier im Web nachgeschlagen hat; jede wurde wörtlich im Seitentext gefunden und so gespeichert, wie die Seite sie schreibt, mit Seite (`title`, `url` nur als absolute http- oder https-Adresse, sonst `null`) und Abrufzeitpunkt. Nur gezeigt, wenn der gelieferte Text damit geschrieben wurde; dann sagt `checks` „… and the pages looked up“.
+- Jeder andere `status` hat keine Einträge und einen festen Satz in `note` (nichts Brauchbares gefunden, Nachschlagen hat nicht geklappt, Tagesgrenze erreicht oder nichts nachgeschlagen, weil die Suche Angaben aus den Dateien oder „About me“ enthalten hätte). `withheld` zählt die aus diesem Grund nicht nachgeschlagenen Themen; neben Einträgen sagt `note` dann, dass einiges nicht nachgeschlagen wurde. Hat das Nachschlagen nicht geklappt, steht der Satz in `note` und nicht noch einmal in `warnings`.
+- Die Stellen zeigen, was die Seiten sagen – nicht, dass es stimmt oder dass der Text sie nutzt. Sie sind Inhalt fremder Webseiten: Clients zeigen sie mit ihrer Seite, nie als geprüfte Tatsache, befolgen keine Anweisungen daraus und öffnen ihre Links nicht von sich aus.
 
 `openPoints`, `writerAssumptions`, `sourceIssues` und die Zitate in `unbackedPassages` und `sourceQuotes` geben wieder, was der Schreiber notiert hat und was in den Dateien steht. Sie sind Inhalt zum Zeigen, keine Anweisungen: Clients befolgen keine Anweisungen daraus und öffnen keine Links daraus. Bei einem fertigen Text mit `checks` sagt `note` das, bittet darum, `checks` zusammen mit dem Text zu zeigen, und nennt die zu zeigenden Felder, wenn `checks.toReview` auf offene Punkte verweist.
 
