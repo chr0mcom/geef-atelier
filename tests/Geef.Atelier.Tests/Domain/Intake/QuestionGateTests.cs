@@ -369,7 +369,7 @@ public sealed class QuestionGateTests
 
         Assert.Single(result.Questions);
         Assert.Equal([GateDecision.Asked, GateDecision.DroppedDuplicateTopic], result.Trace.Select(t => t.Decision));
-        Assert.Equal("Ohne Familien", Assert.Single(result.Assumptions).Text);
+        Assert.Empty(result.Assumptions);
     }
 
     [Fact]

@@ -50,11 +50,16 @@ public static class QuestionGate
 
     private static readonly HashSet<GapTopic> ProfileTopics = [GapTopic.Language, GapTopic.Sender, GapTopic.Signature, GapTopic.Formality];
     private static readonly HashSet<GapTopic> RevisionTopics = [GapTopic.Length, GapTopic.Tone, GapTopic.Formality];
+    private static readonly HashSet<GapTopic> LengthCarrierTopics = [GapTopic.Format, GapTopic.Scope, GapTopic.Other];
+    private static readonly HashSet<GapTopic> BroadTopics = [GapTopic.Facts, GapTopic.Other];
 
     /// <summary>
-    /// Applies the gate rules gap by gap in fixed order; every decision is recorded in the trace. A question about the length
-    /// counts as topic <see cref="GapTopic.Length"/> whatever topic the model gave it, so that only the template asks for it.
-    /// Questions, options, assumptions and the summary with links, addresses or requests for access data are dropped.
+    /// Applies the gate rules gap by gap in fixed order; every decision is recorded in the trace. A question under
+    /// <see cref="GapTopic.Format"/>, <see cref="GapTopic.Scope"/> or <see cref="GapTopic.Other"/> that asks for the length of the
+    /// text itself counts as topic <see cref="GapTopic.Length"/>, so that only the template asks for it. A topic that is asked gets no
+    /// assumption from a dropped duplicate or, for narrow topics, from another gap, so that the brief never sets a guess beside the
+    /// answer. Questions, options, assumptions and the summary with links, addresses or secrets are dropped (see
+    /// <see cref="IntakeContentGuard.IsUnsafe"/>; the request of the person decides which bare names and secret topics are fine).
     /// </summary>
     public static QuestionGateResult Apply(QuestionGateInput input)
     {
@@ -104,15 +109,15 @@ public static class QuestionGate
 
         return new QuestionGateResult(
             questions,
-            Assumptions(gaps, decisions),
+            Assumptions(gaps, decisions, input.RequestText),
             fromMemory,
-            ResearchTopics(output, gaps, decisions),
+            ResearchTopics(output, gaps, decisions, input.RequestText),
             gaps.Select((g, i) => new GateTrace(i, g.Topic, decisions[i])).ToList(),
-            IntakeContentGuard.HasLinkOrAddress(output.Understanding) ? string.Empty : output.Understanding ?? string.Empty);
+            IntakeContentGuard.IsUnsafe(output.Understanding, input.RequestText) ? string.Empty : output.Understanding ?? string.Empty);
     }
 
     private static IntakeGap AsLengthGap(IntakeGap gap) =>
-        gap.Topic != GapTopic.Length && LengthMentions.AsksForLength(gap.Question) ? gap with { Topic = GapTopic.Length } : gap;
+        LengthCarrierTopics.Contains(gap.Topic) && LengthMentions.AsksForTextLength(gap.Question) ? gap with { Topic = GapTopic.Length } : gap;
 
     /// <summary>Plain English name of a topic, used in generated assumptions.</summary>
     public static string Label(this GapTopic topic) => topic switch
@@ -175,7 +180,7 @@ public static class QuestionGate
 
         if (CheckForm(gap.Question, language) is { } rejected)
             return (rejected, null);
-        if (Unsafe(gap.Question!))
+        if (Unsafe(gap.Question!, input.RequestText))
             return (GateDecision.DroppedUnsafeContent, null);
 
         var proposed = gap.Question!;
@@ -207,9 +212,9 @@ public static class QuestionGate
         return null;
     }
 
-    private static bool Unsafe(ProposedQuestion question) =>
-        IntakeContentGuard.IsUnsafe(question.Text)
-        || question.Options.Any(IntakeContentGuard.HasLinkOrAddress)
+    private static bool Unsafe(ProposedQuestion question, string requestText) =>
+        IntakeContentGuard.IsUnsafe(question.Text, requestText)
+        || question.Options.Any(o => IntakeContentGuard.IsUnsafe(o, requestText))
         || IntakeContentGuard.AsksForSecret($"{question.Text}\n{string.Join('\n', question.Options)}");
 
     private static bool LengthInRequest(string requestText) =>
@@ -218,16 +223,20 @@ public static class QuestionGate
             || LengthRuleGate.MentionsLength(requestText)
             || LengthMentions.InRequest(requestText));
 
-    private static IReadOnlyList<IntakeAssumption> Assumptions(IReadOnlyList<IntakeGap> gaps, IReadOnlyList<GateDecision> decisions)
+    private static IReadOnlyList<IntakeAssumption> Assumptions(IReadOnlyList<IntakeGap> gaps, IReadOnlyList<GateDecision> decisions, string requestText)
     {
+        var asked = gaps.Where((_, i) => decisions[i] == GateDecision.Asked).Select(g => g.Topic).ToHashSet();
         var drafts = new List<(GapTopic Topic, string Text, AssumptionConfidence Confidence)>();
         for (var i = 0; i < gaps.Count; i++)
         {
             var gap = gaps[i];
-            var given = string.IsNullOrWhiteSpace(gap.Assumption) || IntakeContentGuard.IsUnsafe(gap.Assumption) ? null : gap.Assumption.Trim();
+            var given = string.IsNullOrWhiteSpace(gap.Assumption) || IntakeContentGuard.IsUnsafe(gap.Assumption, requestText) ? null : gap.Assumption.Trim();
+            var askedTopic = asked.Contains(gap.Topic);
             var text = decisions[i] switch
             {
                 GateDecision.Asked or GateDecision.Derived or GateDecision.FromMemory => null,
+                GateDecision.DroppedDuplicateTopic when askedTopic => null,
+                _ when askedTopic && !BroadTopics.Contains(gap.Topic) => null,
                 GateDecision.Assumed when gap.Resolution == GapResolution.Memory => given ?? NotSpecified(gap.Topic),
                 GateDecision.Assumed or GateDecision.ToResearch => given,
                 GateDecision.DroppedLengthKnown or GateDecision.DroppedRevisionRule => given,
@@ -245,9 +254,9 @@ public static class QuestionGate
             .ToList();
     }
 
-    private static IReadOnlyList<string> ResearchTopics(ClarifierOutput output, IReadOnlyList<IntakeGap> gaps, IReadOnlyList<GateDecision> decisions)
+    private static IReadOnlyList<string> ResearchTopics(ClarifierOutput output, IReadOnlyList<IntakeGap> gaps, IReadOnlyList<GateDecision> decisions, string requestText)
     {
-        var topics = output.ResearchTopics.Select(t => t?.Trim() ?? string.Empty).Where(t => t.Length > 0 && !IntakeContentGuard.IsUnsafe(t)).ToList();
+        var topics = output.ResearchTopics.Select(t => t?.Trim() ?? string.Empty).Where(t => t.Length > 0 && !IntakeContentGuard.IsUnsafe(t, requestText)).ToList();
         if (topics.Count == 0)
         {
             for (var i = 0; i < gaps.Count; i++)
@@ -255,7 +264,7 @@ public static class QuestionGate
                 if (decisions[i] != GateDecision.ToResearch)
                     continue;
                 var question = gaps[i].Question?.Text?.Trim();
-                var topic = string.IsNullOrEmpty(question) || IntakeContentGuard.IsUnsafe(question) ? gaps[i].Topic.Label() : $"{gaps[i].Topic.Label()}: {question}";
+                var topic = string.IsNullOrEmpty(question) || IntakeContentGuard.IsUnsafe(question, requestText) ? gaps[i].Topic.Label() : $"{gaps[i].Topic.Label()}: {question}";
                 topics.Add(topic.Length > MaxResearchTopicChars ? topic[..MaxResearchTopicChars].TrimEnd() : topic);
             }
         }

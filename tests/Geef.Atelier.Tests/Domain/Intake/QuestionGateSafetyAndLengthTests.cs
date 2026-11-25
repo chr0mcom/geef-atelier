@@ -71,8 +71,8 @@ public sealed class QuestionGateSafetyAndLengthTests
     [Fact]
     public void Options_with_word_counts_make_a_length_question()
     {
-        Assert.True(LengthMentions.AsksForLength(new ProposedQuestion("Was passt?", ["150 Wörter", "400 Wörter"], null, false)));
-        Assert.False(LengthMentions.AsksForLength(new ProposedQuestion("Wer kommt?", ["Das Team", "Alle"], null, false)));
+        Assert.True(LengthMentions.AsksForTextLength(new ProposedQuestion("Was passt?", ["150 Wörter", "400 Wörter"], null, false)));
+        Assert.False(LengthMentions.AsksForTextLength(new ProposedQuestion("Wer kommt?", ["Das Team", "Alle"], null, false)));
     }
 
     public static TheoryData<string, string[]> UnsafeQuestions() => new()
