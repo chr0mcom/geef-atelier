@@ -2,7 +2,7 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-11-25 (D-074: research in the grounding step of the direct path; before that 2026-11-24, D-067: strict snapshot reading, at least one reviewer, outcome after finalizers, run warnings, system grounding back on the provider-type path, learning paused by default; second review round: reviewer check on save, vector scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserved, finalizers and cancellation; before that 2026-11-23, D-066/12: explicit model_domain, one assignment rule; D-066/10–11: codex aliases, host sync, availability only as reported by the live catalog; before that 2026-11-22, D-066: model matrix — system profiles and model matrix section rewritten; before that 2026-06-04, D-059)
+Last updated: 2026-11-25 (D-075 part B: change run on the direct path; D-074: research in the grounding step of the direct path; before that 2026-11-24, D-067: strict snapshot reading, at least one reviewer, outcome after finalizers, run warnings, system grounding back on the provider-type path, learning paused by default; second review round: reviewer check on save, vector scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserved, finalizers and cancellation; before that 2026-11-23, D-066/12: explicit model_domain, one assignment rule; D-066/10–11: codex aliases, host sync, availability only as reported by the live catalog; before that 2026-11-22, D-066: model matrix — system profiles and model matrix section rewritten; before that 2026-06-04, D-059)
 
 ## Overview
 
@@ -881,3 +881,26 @@ never searches again.
   `grounding.research_failed` ("Looking things up on the web did not work this time. The text was written without it.") and
   the run goes on without `W1`. `NothingFound`, `AllWithheld`, `DailyLimit` and `FilesAttached` add no source and no warning; the result shows
   them as fixed sentences. Only the cancellation of the run itself ends the step.
+
+## Change run on the direct path (D-075, part B)
+
+A run that changes an earlier version of the order ("Change something", `revise_order`) always uses the direct path. It carries
+`RunEntity.RevisionHint` (the person's change including the sentences of the quick buttons), `ParentRunId` (the run of the shown
+version) and `SeedDraftText` (its delivered text). The order service creates the run; the direct path does the following:
+
+- **Grounding:** the assembler passes `RevisionHint` to `OrderGroundingStep`, which sets the context key
+  `AtelierContextKeys.RevisionHint`. The earlier text is only the seed, never material of the fact check. As for any revision, the
+  research only returns what is stored.
+- **Writer:** only in the user prompt of the first pass, `DirectWriterPrompts.RevisionInstruction` replaces `SeedInstruction` (for
+  providers without document mode through the same replacement "the text in draft.md" → "this text"). The system prompt stays
+  bit-identical (hash test); the correction pass is unchanged.
+- **Checks:** in a change run the length of the first request is only a note, never blocking (`DeterministicChecksReviewer.Evaluate`,
+  sentence "Because you asked for a change, the length was not corrected."); placeholder, language, term and fact checks run as always.
+- **Never lose across versions (`DirectReportBuilder`):** after the run the assembler reads the report of `ParentRunId`. Its open
+  findings (passages and source conflicts) go into the new report through `FactCarryOver.Merge`: passages only when their quote still
+  stands as whole words, conflicts always, each with `FactFinding.FromVersion` (a finding carried over before keeps the version that
+  found it); when the new check reports the same passage, it appears once as its own finding. Findings of an earlier check in `Off` or
+  shadow mode are not carried over. The writer's open points of the earlier version that the new one does not repeat word for word
+  (`SameAssumptionKey`) go to `RunReport.EarlierOpenPoints` with their version (including those the earlier version had carried over).
+  When the earlier report cannot be read, the report says so in one sentence and the run goes on. Reports of all other runs stay
+  bit-identical (`null` is not written).

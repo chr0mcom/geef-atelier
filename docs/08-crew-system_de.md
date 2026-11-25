@@ -2,7 +2,7 @@
 
 *[English](08-crew-system.md) · **Deutsch***
 
-Letzte Aktualisierung: 2026-11-25 (D-074: Recherche im Grounding-Schritt des Direktwegs; zuvor 2026-11-24, D-067: strenges Lesen des Snapshots, mindestens ein Reviewer, Outcome nach den Finalizern, Warnungen am Lauf, System-Grounding wieder über den Provider-Typ-Weg, Learning standardmäßig pausiert; zweite Prüfrunde: Reviewer-Prüfung beim Speichern, Vektor-Scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserviert, Finalizer und Abbruch; zuvor 2026-11-23, D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
+Letzte Aktualisierung: 2026-11-25 (D-075 Teil B: Nachbesserungslauf im Direktweg; D-074: Recherche im Grounding-Schritt des Direktwegs; zuvor 2026-11-24, D-067: strenges Lesen des Snapshots, mindestens ein Reviewer, Outcome nach den Finalizern, Warnungen am Lauf, System-Grounding wieder über den Provider-Typ-Weg, Learning standardmäßig pausiert; zweite Prüfrunde: Reviewer-Prüfung beim Speichern, Vektor-Scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserviert, Finalizer und Abbruch; zuvor 2026-11-23, D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
 
 ## Überblick
 
@@ -903,3 +903,27 @@ gespeicherten Ausschnitte unverändert und sucht nie neu.
   `grounding.research_failed` („Looking things up on the web did not work this time. The text was written without it.“), und
   der Lauf geht ohne `W1` weiter. `NothingFound`, `AllWithheld`, `DailyLimit` und `FilesAttached` hängen keine Quelle an und warnen nicht; das
   Ergebnis zeigt sie als feste Sätze. Nur der Abbruch des Laufs selbst beendet den Schritt.
+
+## Nachbesserungslauf im Direktweg (D-075, Teil B)
+
+Ein Lauf, der eine frühere Version des Auftrags ändert („Change something“, `revise_order`), läuft immer über den Direktweg. Er
+trägt `RunEntity.RevisionHint` (die Änderung der Person samt Sätzen der Schnellknöpfe), `ParentRunId` (Lauf der gezeigten Version)
+und `SeedDraftText` (deren ausgelieferter Text). Den Lauf legt der Auftragsdienst an; der Direktweg macht daraus Folgendes:
+
+- **Grounding:** Der Assembler reicht `RevisionHint` an `OrderGroundingStep`; der Schritt setzt den Kontextschlüssel
+  `AtelierContextKeys.RevisionHint`. Der frühere Text ist nur Ausgangstext, nie Material des Faktenprüfers. Die Recherche liefert wie
+  bei jeder Überarbeitung nur Gespeichertes.
+- **Schreiber:** Nur im Nutzerprompt des ersten Durchgangs ersetzt `DirectWriterPrompts.RevisionInstruction` die `SeedInstruction`
+  (für Anbieter ohne Dokumentmodus über dieselbe Ersetzung „the text in draft.md“ → „this text“). Der System-Prompt bleibt bitgleich
+  (Hash-Test); Korrekturdurchgang unverändert.
+- **Prüfungen:** Die Längenregel des ersten Auftrags ist im Nachbesserungslauf nur eine Notiz, nie blockierend
+  (`DeterministicChecksReviewer.Evaluate`, Satz „Because you asked for a change, the length was not corrected.“); Platzhalter-, Sprach-,
+  Wort- und Faktenprüfung laufen wie immer.
+- **Nie verlieren über Versionen (`DirectReportBuilder`):** Nach dem Lauf liest der Assembler den Bericht des `ParentRunId`. Dessen
+  offene Befunde (Stellen und Quellenwidersprüche) gehen über `FactCarryOver.Merge` in den neuen Bericht: Stellen nur, wenn ihr Zitat
+  als ganze Wörter noch dasteht, Widersprüche immer, jeweils mit `FactFinding.FromVersion` (ein schon übernommener Befund behält die
+  Version, die ihn fand); meldet der neue Prüfer dieselbe Stelle, steht sie einmal als eigener Befund. Befunde eines früheren Prüfers in
+  `Off` oder Schattenmodus werden nicht übernommen. Offene Punkte des Schreibers der Vorversion, die die neue nicht wortgleich
+  (`SameAssumptionKey`) wiederholt, stehen in `RunReport.EarlierOpenPoints` mit ihrer Version (auch die von der Vorversion schon
+  übernommenen). Kann der frühere Bericht nicht gelesen werden, steht im Bericht ein Satz dazu; der Lauf geht weiter. Berichte anderer
+  Läufe bleiben bitgleich (`null` wird nicht geschrieben).
