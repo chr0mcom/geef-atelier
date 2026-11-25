@@ -35,8 +35,9 @@ public sealed record ShadowFigures(
 
 /// <summary>
 /// Gate g and the shadow parts of gates a and f from a CSV export of <c>OrderIntakeShadows</c>. Rows that never ran
-/// (<c>SkippedCap</c>, <c>Pending</c>) are left out and counted. A failed preparation (<c>prepare_failed</c>, stored with
-/// duration 0) is a failure but never a latency; a missing question count (failures) never counts as zero questions.
+/// (<c>SkippedCap</c>, <c>Pending</c>) are left out and counted. Only answers (<c>Done</c>) and time-outs carry a latency; other
+/// failures (also a failed preparation, <c>prepare_failed</c>) count as failures but never as latency, so that fast failures never
+/// make the median look better. A missing question count (failures) never counts as zero questions.
 /// </summary>
 public static class ShadowEvaluation
 {
@@ -83,6 +84,7 @@ public static class ShadowEvaluation
     {
         var finished = rows.Where(r => r.Status is IntakeShadowStatuses.Done or IntakeShadowStatuses.Failed or IntakeShadowStatuses.TimedOut).ToList();
         var timed = finished
+            .Where(r => r.Status is IntakeShadowStatuses.Done or IntakeShadowStatuses.TimedOut)
             .Where(r => r.DurationMs is > 0 && !string.Equals(r.ErrorCode, PrepareFailedCode, StringComparison.Ordinal))
             .Select(r => (double)r.DurationMs!.Value)
             .Order()
@@ -122,7 +124,7 @@ public static class ShadowEvaluation
         return
         [
             Result("a", f.Timed > 0, f.MedianMs <= CorpusEvaluation.MaxMedianMs && f.P90Ms <= CorpusEvaluation.MaxP90Ms,
-                $"median {f.MedianMs / 1000:0.0} s, p90 {f.P90Ms / 1000:0.0} s over {f.Timed} timed calls ({f.PrepareFailed} failed preparations without latency); {excluded}"),
+                $"median {f.MedianMs / 1000:0.0} s, p90 {f.P90Ms / 1000:0.0} s over {f.Timed} answers and time-outs (other failures without latency); {excluded}"),
             Result("f", f.Finished > 0, f.FailureRate <= CorpusEvaluation.MaxFailureRate,
                 $"{f.FailureRate:P1} failures ({f.Failed} failed, {f.TimedOut} timed out) over {f.Finished} finished; {excluded}"),
             Result("g", enough && f.WithQuestionCount > 0 && f.Timed > 0,

@@ -101,4 +101,32 @@ public sealed class ShadowEvaluationTests
         Assert.Equal("Frage 0?", sample[0]);
         Assert.Equal("Frage 27?", sample[9]);
     }
+
+    [Fact]
+    public void Fast_failures_never_improve_the_latency_of_gates_a_and_g()
+    {
+        var rows = Enumerable.Range(0, 20).Select(i => Row(i, "Failed", 200, null, "http_502"))
+            .Concat(Enumerable.Range(20, 20).Select(i => Row(i, "Done", 30_000, 0)))
+            .ToArray();
+
+        var figures = ShadowEvaluation.Measure(Read(rows));
+        var verdicts = ShadowEvaluation.Verdicts(figures);
+
+        Assert.Equal((20, 30_000d), (figures.Timed, figures.MedianMs));
+        Assert.Equal(GateVerdict.Failed, Gate(verdicts, "a").Verdict);
+        Assert.Equal(GateVerdict.Failed, Gate(verdicts, "g").Verdict);
+        Assert.Equal(GateVerdict.Failed, Gate(verdicts, "f").Verdict);
+    }
+
+    [Fact]
+    public void Time_outs_count_in_the_latency()
+    {
+        var rows = Enumerable.Range(0, 10).Select(i => Row(i, "Done", 10_000, 0))
+            .Concat(Enumerable.Range(10, 20).Select(i => Row(i, "TimedOut", 40_000, null)))
+            .ToArray();
+
+        var figures = ShadowEvaluation.Measure(Read(rows));
+
+        Assert.Equal((30, 40_000d), (figures.Timed, figures.MedianMs));
+    }
 }
