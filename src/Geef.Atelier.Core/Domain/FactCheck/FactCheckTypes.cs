@@ -71,7 +71,8 @@ public sealed record FactFilterResult(IReadOnlyList<FactFinding> Findings, IRead
 /// Checks proposed findings against the text and the material without an AI model (contract stage 3, 4.3). Whether a
 /// finding stays, where an instruction comes from and whether a finding blocks follow from where its quotes are found,
 /// never from what the model says about them. A finding about replaced information whose replacing passage stands in the pages
-/// looked up on the web (<see cref="MaterialPart.LookedUp"/>) never blocks (D-074).
+/// looked up on the web (<see cref="MaterialPart.LookedUp"/>) never blocks and never takes the place of another finding at the same
+/// passage of the text (D-074).
 /// </summary>
 public static class FactFindingFilter
 {
@@ -105,6 +106,7 @@ public static class FactFindingFilter
         var kept = new List<FactFinding>();
         var trace = new List<FactFilterTrace>();
         var ranges = new List<(int Start, int End)>();
+        var hintRanges = new List<(int Start, int End)>();
         var conflicts = new List<(string A, string B)>();
         var blocking = 0;
 
@@ -115,7 +117,7 @@ public static class FactFindingFilter
                 ? (FactFilterDecision.DroppedTooShort, (FactFinding?)null)
                 : finding.Kind == FactFindingKind.SourceConflict
                     ? DecideConflict(finding, draft, material, parts, conflicts)
-                    : DecideTextFinding(finding, draft, normalizedDraft, material, parts, ranges, blocking);
+                    : DecideTextFinding(finding, draft, normalizedDraft, material, parts, ranges, hintRanges, blocking);
 
             if (decision == FactFilterDecision.Kept && result is not null)
             {
@@ -130,7 +132,7 @@ public static class FactFindingFilter
     }
 
     private static (FactFilterDecision, FactFinding?) DecideTextFinding(ProposedFactFinding finding, string draft, string normalizedDraft,
-        FactMaterial material, List<MaterialSlice> parts, List<(int Start, int End)> ranges, int blocking)
+        FactMaterial material, List<MaterialSlice> parts, List<(int Start, int End)> ranges, List<(int Start, int End)> hintRanges, int blocking)
     {
         var quote = finding.TextQuote?.Trim() ?? string.Empty;
         if (IsTooShort(quote))
@@ -162,15 +164,16 @@ public static class FactFindingFilter
 
         var reason = Reason(finding.WhatIsWrong, material);
 
+        var slice = finding.Kind == FactFindingKind.Superseded ? FindMaterial(finding.MaterialQuote, parts) : null;
+        var isHint = slice?.Part == MaterialPart.LookedUp;
         var range = (Start: match.Start, End: match.Start + Math.Max(1, match.Length));
-        if (ranges.Any(r => r.Start < range.End && range.Start < r.End))
+        if (ranges.Any(r => r.Start < range.End && range.Start < r.End) || isHint && hintRanges.Any(r => r.Start < range.End && range.Start < r.End))
             return (FactFilterDecision.DroppedDuplicate, null);
 
         string? materialFile = null;
         MaterialPart? materialFrom = null;
         if (finding.Kind == FactFindingKind.Superseded)
         {
-            var slice = FindMaterial(finding.MaterialQuote, parts);
             if (slice is null)
                 return (FactFilterDecision.DroppedMaterialQuoteNotFound, null);
             materialFile = slice.FileName;
@@ -186,7 +189,7 @@ public static class FactFindingFilter
         if (isBlocking && blocking >= MaxBlocking)
             return (FactFilterDecision.DroppedOverLimit, null);
 
-        ranges.Add(range);
+        (isHint ? hintRanges : ranges).Add(range);
         var excerpt = QuoteVerifier.ExcerptWholeWords(draft, match);
         return (FactFilterDecision.Kept, new FactFinding(string.Empty, finding.Kind, excerpt.Length > 0 ? excerpt : quote,
             reason, Trimmed(finding.InstructionQuote), SafeQuote(finding.MaterialQuote, material), SafeQuote(finding.MaterialQuote2, material),

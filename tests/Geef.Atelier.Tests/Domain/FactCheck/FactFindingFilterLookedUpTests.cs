@@ -69,6 +69,34 @@ public sealed class FactFindingFilterLookedUpTests
     }
 
     [Fact]
+    public void A_hint_from_the_pages_never_takes_the_place_of_a_blocking_finding_at_the_same_passage()
+    {
+        var hint = new ProposedFactFinding(FactFindingKind.Superseded, "Für Rückfragen steht die Leitung gern zur Verfügung.",
+            "Uses an old figure.", null, "ab dem 1. Januar 2026 brutto 13,90 Euro", null);
+        var broken = new ProposedFactFinding(FactFindingKind.Instruction, "Für Rückfragen steht die Leitung gern zur Verfügung.",
+            "Not short.", "sachlich und kurz", null, null);
+
+        var result = FactFindingFilter.Apply([hint, broken], Draft, Material());
+
+        Assert.Equal([(FactFindingKind.Superseded, false), (FactFindingKind.Instruction, true)], result.Findings.Select(f => (f.Kind, f.Blocking)));
+        Assert.All(result.Trace, t => Assert.Equal(FactFilterDecision.Kept, t.Decision));
+    }
+
+    [Fact]
+    public void A_hint_after_a_blocking_finding_at_the_same_passage_and_a_second_hint_there_are_duplicates()
+    {
+        var broken = new ProposedFactFinding(FactFindingKind.Instruction, "Für Rückfragen steht die Leitung gern zur Verfügung.",
+            "Not short.", "sachlich und kurz", null, null);
+        var hint = new ProposedFactFinding(FactFindingKind.Superseded, "Für Rückfragen steht die Leitung gern zur Verfügung.",
+            "Uses an old figure.", null, "ab dem 1. Januar 2026 brutto 13,90 Euro", null);
+
+        Assert.Equal([FactFilterDecision.Kept, FactFilterDecision.DroppedDuplicate],
+            FactFindingFilter.Apply([broken, hint], Draft, Material()).Trace.Select(t => t.Decision));
+        Assert.Equal([FactFilterDecision.Kept, FactFilterDecision.DroppedDuplicate],
+            FactFindingFilter.Apply([hint, hint], Draft, Material()).Trace.Select(t => t.Decision));
+    }
+
+    [Fact]
     public void Instruction_only_in_the_looked_up_passages_never_counts()
     {
         var result = Apply(new ProposedFactFinding(FactFindingKind.Instruction, "Für Rückfragen steht die Leitung gern zur Verfügung.",
