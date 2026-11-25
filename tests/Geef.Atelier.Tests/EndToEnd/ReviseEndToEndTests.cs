@@ -97,6 +97,11 @@ public sealed class ReviseEndToEndTests(PostgresFixture postgres)
         var second = await RunAsync(host, orderId, 2);
         var first = await RunAsync(host, orderId, 1);
         Assert.Equal((first.Id, FirstText), (second.ParentRunId, second.SeedDraftText));
+        Assert.Equal(RevisionBrief.Change(Change, []), second.RevisionHint);
+        Assert.Null(first.RevisionHint);
+        var brief = BriefingSections.Parse(second.BriefingText);
+        Assert.Equal(Request, brief.Request);
+        Assert.Contains(Change, brief.PersonAnswers);
         Assert.Equal(RunStatus.Completed, second.Status);
         Assert.Equal(SecondText, second.FinalText);
         var result = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetResultAsync(orderId, User));
@@ -145,10 +150,16 @@ public sealed class ReviseEndToEndTests(PostgresFixture postgres)
         await using var host = await StartAsync(postgres, FactCheckMode.Report);
         host.Script.EnqueueFactCheckJson(Findings(Finding("unsupported", "Wir freuen uns auf Sie.", "Nobody said that.")));
         var orderId = await FirstVersionAsync(host);
+        var callsBefore = host.Llm.Calls.Count;
         host.Script.EnqueueExecutorText(SecondText);
         host.Script.EnqueueFactCheckJson(Findings());
 
         await ReviseAsync(host, orderId);
+
+        var check = Assert.Single(host.Llm.Calls.Skip(callsBefore), ScriptedLlmEndpoint.IsFactCheckCall);
+        Assert.Contains(Change, check.PromptText, StringComparison.Ordinal);
+        Assert.Contains("ist am 5. Mai", check.PromptText, StringComparison.Ordinal);
+        Assert.DoesNotContain("ist am 12. Mai", check.PromptText, StringComparison.Ordinal);
 
         var report = RunReportJson.TryParse((await RunAsync(host, orderId, 2)).ReportJson)!;
         var kept = Assert.Single(report.FactCheck!.Open);
