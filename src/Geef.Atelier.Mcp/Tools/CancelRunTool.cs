@@ -8,7 +8,7 @@ namespace Geef.Atelier.Mcp.Tools;
 [McpServerToolType]
 public static class CancelRunTool
 {
-    [McpServerTool, Description("Cancels a running or pending run.")]
+    [McpServerTool, Description(McpToolCatalog.LegacyLeadStart + "cancel_order" + McpToolCatalog.LegacyLeadEnd + "Cancels a running or pending run.")]
     public static async Task<bool> CancelRun(
         IRunService runService,
         ICurrentUserService currentUser,
