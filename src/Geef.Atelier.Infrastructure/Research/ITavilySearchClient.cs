@@ -4,7 +4,11 @@ namespace Geef.Atelier.Infrastructure.Research;
 internal sealed record TavilyHit(string Url, string Title, string? RawContent);
 
 /// <summary>Results of one search; <see cref="ErrorCode"/> is set when the search failed and then <see cref="Hits"/> is empty.</summary>
-internal sealed record TavilySearchOutcome(IReadOnlyList<TavilyHit> Hits, string? ErrorCode, int DurationMs);
+internal sealed record TavilySearchOutcome(IReadOnlyList<TavilyHit> Hits, string? ErrorCode, int DurationMs)
+{
+    /// <summary>Results left out because they had no raw text or no http or https address.</summary>
+    public int Skipped { get; init; }
+}
 
 /// <summary>One web search with the raw text of the pages found; never repeated, never fetches a page itself.</summary>
 internal interface ITavilySearchClient

@@ -28,8 +28,8 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<OrderEntity>
         builder.Property(o => o.IntakeFinishedAt).IsRequired(false);
         builder.Property(o => o.QuestionsAskedAt).IsRequired(false);
         builder.Property(o => o.AnsweredAt).IsRequired(false);
-        builder.Ignore(o => o.ResearchJson);
-        builder.Ignore(o => o.ResearchAt);
+        builder.Property(o => o.ResearchJson).HasColumnType("text").IsRequired(false);
+        builder.Property(o => o.ResearchAt).IsRequired(false);
         builder.Property(o => o.CreatedAt).IsRequired();
         builder.Property(o => o.UpdatedAt).IsRequired();
 
