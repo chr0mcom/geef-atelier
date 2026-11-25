@@ -18,14 +18,12 @@ namespace Geef.Atelier.Tests.EndToEnd;
 /// Changing a delivered text over the real wiring (contract stage 5, 4.2 and N2 acceptance): order → version 1 →
 /// <see cref="IOrderService.ReviseAsync"/> → the writer gets the delivered text as seed and the change, no clarifier and no web search are
 /// asked; a failed version 2 leaves version 1 shown; with the fact check on, a passage against the change blocks; open findings of
-/// version 1 that still apply stay in version 2. Needs the order service and the persistence of the change (package N1, Step52).
+/// version 1 that still apply stay in version 2, and open points of the writer for version 1 are shown with version 2.
 /// </summary>
 [Collection(EndToEndCollection.Name)]
 [Trait("Category", "EndToEnd")]
 public sealed class ReviseEndToEndTests(PostgresFixture postgres)
 {
-    private const string AfterN1 = "Needs ReviseAsync, RevisionBrief and Step52 of package N1; remove the skip after the N1 merge.";
-
     private const string User = "e2e-revise";
 
     private const string Request = "Schreibe eine kurze Einladung zum Elternabend der Klasse 3b am 12. Mai um 19 Uhr in der Aula, max. 80 Wörter.";
@@ -38,10 +36,14 @@ public sealed class ReviseEndToEndTests(PostgresFixture postgres)
 
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
-    private static Task<AtelierEndToEndHost> StartAsync(PostgresFixture postgres, FactCheckMode mode = FactCheckMode.Off) =>
+    private static Task<AtelierEndToEndHost> StartAsync(PostgresFixture postgres, FactCheckMode mode = FactCheckMode.Off, bool notes = false) =>
         AtelierEndToEndHost.StartAsync(postgres, services =>
         {
-            services.PostConfigure<DirectOptions>(o => o.FactCheckMode = mode);
+            services.PostConfigure<DirectOptions>(o =>
+            {
+                o.FactCheckMode = mode;
+                o.WriterNotes = notes;
+            });
             services.PostConfigure<OrderOptions>(o => o.Revise = ReviseMode.On);
         });
 
@@ -72,7 +74,7 @@ public sealed class ReviseEndToEndTests(PostgresFixture postgres)
     private static Task<RunEntity> RunAsync(AtelierEndToEndHost host, Guid orderId, int version) =>
         host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == orderId && r.OrderVersion == version));
 
-    [Fact(Skip = AfterN1)]
+    [Fact]
     public async Task The_writer_gets_the_delivered_text_and_the_change_and_nobody_else_is_asked()
     {
         await using var host = await StartAsync(postgres);
@@ -101,7 +103,7 @@ public sealed class ReviseEndToEndTests(PostgresFixture postgres)
         Assert.Equal((2, SecondText), (result!.Version, result.Text));
     }
 
-    [Fact(Skip = AfterN1)]
+    [Fact]
     public async Task A_failed_second_version_leaves_the_first_one_shown_with_a_sentence()
     {
         await using var host = await StartAsync(postgres);
@@ -116,7 +118,7 @@ public sealed class ReviseEndToEndTests(PostgresFixture postgres)
         Assert.Equal(string.Format(RevisionLines.NotFinishedFormat, 2, 1), result.Note);
     }
 
-    [Fact(Skip = AfterN1)]
+    [Fact]
     public async Task With_the_fact_check_on_a_passage_against_the_change_blocks_and_is_corrected()
     {
         await using var host = await StartAsync(postgres, FactCheckMode.On);
@@ -137,7 +139,7 @@ public sealed class ReviseEndToEndTests(PostgresFixture postgres)
         Assert.Contains(Change, UserPrompt(writers[^1]), StringComparison.Ordinal);
     }
 
-    [Fact(Skip = AfterN1)]
+    [Fact]
     public async Task An_open_finding_of_version_one_that_still_stands_is_kept_in_version_two()
     {
         await using var host = await StartAsync(postgres, FactCheckMode.Report);
@@ -152,5 +154,37 @@ public sealed class ReviseEndToEndTests(PostgresFixture postgres)
         var kept = Assert.Single(report.FactCheck!.Open);
         Assert.Equal(("Wir freuen uns auf Sie.", 1), (kept.TextQuote, kept.FromVersion));
         Assert.Equal(FactFindingKind.Unsupported, kept.Kind);
+
+        var result = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetResultAsync(orderId, User));
+        Assert.Equal(2, result!.Version);
+        var shown = Assert.Single(result.ShownPassages());
+        Assert.Equal(("Wir freuen uns auf Sie.", 1), (shown.Quote, shown.FromVersion));
+        Assert.Equal(OrderCheckLines.ToReviewOpenPoints, result.Checks!.ToReview);
+    }
+
+    [Fact]
+    public async Task An_open_point_of_the_writer_for_version_one_is_shown_with_version_two_and_never_reads_as_nothing_to_review()
+    {
+        const string point = "Es fehlt, bis wann man sich anmelden soll.";
+        await using var host = await StartAsync(postgres, FactCheckMode.Report, notes: true);
+        host.Script.EnqueueFactCheckJson(Findings());
+        host.Script.EnqueueExecutorText(FirstText + "\n<!-- atelier-notes\n" + JsonSerializer.Serialize(new { assumptions = Array.Empty<string>(), open_points = new[] { point }, quotes = Array.Empty<object>() }) + "\n-->");
+        var submission = await host.SubmitOrderAsync(new SubmitOrderRequest(Request, User, OrderEntry.Web, null));
+        await host.WaitForOrderFinishedAsync(submission.OrderId);
+        var orderId = submission.OrderId;
+        var first = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetResultAsync(orderId, User));
+        Assert.Equal([point], first!.WriterOpenPoints);
+        host.Script.EnqueueExecutorText(SecondText + "\n<!-- atelier-notes\n{\"assumptions\":[],\"open_points\":[],\"quotes\":[]}\n-->");
+        host.Script.EnqueueFactCheckJson(Findings());
+
+        await ReviseAsync(host, orderId);
+
+        var result = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetResultAsync(orderId, User));
+        Assert.Equal((2, SecondText), (result!.Version, result.Text));
+        Assert.Empty(result.WriterOpenPoints!);
+        Assert.Empty(result.ShownPassages());
+        Assert.Equal([new OrderEarlierPoint(1, point)], result.EarlierOpenPoints);
+        Assert.True(result.HasOpenPoints());
+        Assert.Equal(OrderCheckLines.ToReviewOpenPoints, result.Checks!.ToReview);
     }
 }
