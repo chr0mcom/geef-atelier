@@ -4,7 +4,7 @@
 
 **Atelier macht aus einem kurzen Auftrag einen fertigen Text** – einen Brief, eine E-Mail, einen Artikel, eine Zusammenfassung,
 einen Bericht. Du sagst, was du brauchst, hängst Dateien an, wenn du welche hast, und bekommst den Text zusammen mit dem, was
-geprüft wurde, was noch offen ist und was angenommen wurde. Es läuft im Browser und aus KI-Assistenten wie Claude (über MCP).
+geprüft wurde, was noch offen ist und was angenommen wurde. Es läuft im Browser und aus KI-Assistenten wie Claude Code (über MCP).
 Grundlage ist das offene [Geef SDK](https://github.com/chr0mcom/geef).
 
 ## So funktioniert es, in einem Bild
@@ -26,31 +26,33 @@ aktuellen Schalter (und die Ausnahmen einer angemeldeten Person) und zeigt desha
 | Du … | Hier anfangen |
 |---|---|
 | willst einen Text und nutzt den Browser | [Leitfaden: Schreiben mit Atelier](docs/12-user-guide_de.md) |
-| nutzt einen KI-Assistenten (claude.ai, Claude Desktop, Claude Code) | [Leitfaden: aus einem KI-Assistenten](docs/13-ai-assistant-guide_de.md) |
+| nutzt einen KI-Assistenten (geprüft mit Claude Code) | [Leitfaden: aus einem KI-Assistenten](docs/13-ai-assistant-guide_de.md) |
 | betreibst Atelier für ein Team: Konten, Schalter, die ältere Werkstatt | [Leitfaden für die Administration](docs/14-admin-guide_de.md) |
 | entwickelst oder betreibst es selbst | [Leitfaden für Entwicklung und Betrieb](docs/15-developer-guide_de.md) |
 
-## Was es gegenüber einem Chatbot bringt – und was nicht
+## Was es um das Schreiben herum tut – und was nicht
 
 Jeder Punkt nennt die Entscheidung, die ihn beschreibt.
 
-- **Liest ganze Dateien.** Bis 150.000 Zeichen bekommt der Schreiber die Dateien vollständig, bis 600.000 mit
-  Inhaltsverzeichnis (D-069, D-070).
+- **Gibt dem Schreiber ganze Dateien.** Bis 150.000 Zeichen bekommt der Schreiber die Dateien vollständig, vorher wird nichts
+  gekürzt; bis 600.000 bekommt er ein Inhaltsverzeichnis und durchsucht die Teile, auf die es ankommt. Scheint er nur Teile
+  gelesen zu haben, sagt das Ergebnis es (D-069, D-070).
 - **Fragt vorher statt hinterher.** Höchstens drei kurze Fragen mit Antworten zum Anklicken, nur vor dem Start, immer
-  überspringbar; was es nicht fragt, wird als Annahme aufgelistet (D-068, D-071, D-072). In einer Messung an elf echten Aufträgen
-  schlug Fragen das bloße Annehmen 9 : 1 (D-068).
+  überspringbar; was es nicht fragt, wird als Annahme aufgelistet (D-068, D-071, D-072). In einer kleinen Messung (elf Aufträge einer
+  Person, blind von KI-Juroren bewertet) schlug Fragen das bloße Annehmen 9 : 1 (D-068).
 - **Lässt Lücken sichtbar.** Vermutungen über Fakten, die die Person nicht genannt hat, erreichen den Schreiber als „nicht
   gegeben“ markiert, und der Schreiber wird gebeten, Platzhalter zu lassen; das Ergebnis listet sie unter „Fill these in before you send the text“ (D-069,
   D-073).
-- **Sagt, was geprüft wurde – und was nicht.** „What was checked“ nennt nur Prüfungen, die gelaufen sind, und endet mit dem Satz,
+- **Sagt, was geprüft wurde – und was nicht.** Auf dem Standardweg nennt „What was checked“ nur Prüfungen, die gelaufen sind, und endet mit dem Satz,
   dass sie nicht beweisen, dass der Text stimmt. Der Faktenprüfer meldet Stellen, die vielleicht nicht gestützt sind; in der
   ausgelieferten Einstellung ändert er den Text nicht (D-073).
 - **Ein Ort für jede Version.** Aufträge, Versionen und Exporte (Word, PDF, Markdown) in der Web-App und über MCP (D-070, D-075).
 
 Grenzen: Der Text kann trotzdem falsch sein; der Faktenprüfer kann etwas übersehen und meldet auch harmlose Sätze (D-075); Atelier
 ist kein Chat; es lernt nicht aus früheren Texten (Lernen pausiert, D-067; Gedächtnis nicht gebaut, D-077); Scans ohne Text kann es
-nicht lesen (D-076). Ändern eines fertigen Textes und Web-Recherche sind gebaut, aber für alle ausgeschaltet, bis ihre Messungen
-bestanden sind (D-074, D-075, D-077).
+nicht lesen (D-076); „Extra careful“ nutzt die ältere Schleife, sucht nicht im Web und hat kein „What was checked“. Ändern eines
+fertigen Textes und Web-Recherche auf dem Standardweg sind gebaut, aber für alle ausgeschaltet, bis ihre Messungen bestanden sind
+(D-074, D-075, D-077). Ausdrücklich gewählte Werkstatt-Teams können eine eigene Websuche nutzen.
 
 ## Weiterlesen
 

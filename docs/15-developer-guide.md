@@ -2,7 +2,7 @@
 
 *[Deutsch](15-developer-guide_de.md) · **English***
 
-*Last updated: 2026-11-26*
+*Last updated: 2026-11-26 (after review: web search, `/docs` rendering, admin-only settings table)*
 
 This guide is for developers and for people who host Atelier. It gives the map of the current system and points to the detailed
 documents. Setup commands are in the [README](../README.md); the reasons behind every rule are in the
@@ -60,15 +60,18 @@ All paths are below `src/Geef.Atelier.*`.
 
 `/how-it-works` is open without signing in. `HowItWorksFeatureExtensions.FeaturesFor` derives what the page may call available from
 the same options and the same exception rules as the application (`OrderOptions.ReviseModeFor`, `ResearchOptions.ModeFor`,
-`DirectOptions.FactCheckModeFor`, `UiOptions.ShowsWorkshopEntriesTo`). The pipeline uses the same two helpers for research and
-fact check. Rules that are tested (`tests/…/Web/HowItWorks`):
+`DirectOptions.FactCheckModeFor`). The pipeline uses the same two helpers for research and fact check. Rules that are tested (`tests/…/Web/HowItWorks`):
 
 - a feature that is off for the viewer is never shown as available, also when another person has an exception;
-- signed out, the page shows the values for everyone; the settings table never shows an exception;
-- research counts as available only together with `Orders:IntakeMode = On`;
+- signed out, the page shows the values for everyone; the table with setting names and raw values is rendered for administrators
+  only and never shows an exception;
+- research counts as available only together with `Orders:IntakeMode = On`, and only for the standard way: the direct template has
+  no grounding source, so its only web access is `OrderResearchService`. "Extra careful" does not search the web; teams chosen
+  explicitly in the workshop or through the older tools use their own sources, which can include a web search;
 - a fact-check mode the page does not know is described as "points things out" and never as "may fix";
 - switching a feature on for everyone needs no change of the page;
-- the example uses the fixed sentences of `OrderCheckLines`, so it cannot drift from the result page.
+- the box "What was checked" in the example uses the fixed sentences of `OrderCheckLines`; the leads of the open points and the
+  assumptions are compared with `OrderOpenPoints.razor` and `OrderAssumptions.razor` by a test.
 
 When you add a switch that changes what a person can do, add it to `HowItWorksFeatures` and to the page in the same change.
 
@@ -84,7 +87,10 @@ When you add a switch that changes what a person can do, add it to `HowItWorksFe
   `tools/ResearchEval` (research). Changing the prompt or schema of the clarifier, the fact check or the passage picker makes the
   stored measurement invalid; for the clarifier and the fact check, tests with input hashes turn red until it is measured again.
 - **Drift guards for the documentation:** the tool table in [13-ai-assistant-guide.md](13-ai-assistant-guide.md) and its German
-  version is compared with the tool catalogue; every guide must exist in both languages and be listed for `/docs`.
+  version is compared with the tool catalogue; every guide must exist in both languages and be listed for `/docs`. Every document
+  served under `/docs` is rendered in a test: Mermaid blocks and HTML comments are left out (GitHub draws the diagrams), links to
+  allow-listed documents go to `/docs/…`, links to other files of the repository go to GitHub, and links into the unpublished
+  working folders become plain text.
 
 ## Rules that keep it honest
 
@@ -97,7 +103,7 @@ When you add a switch that changes what a person can do, add it to `HowItWorksFe
 
 ## Hosting
 
-- Docker Compose with the web service, Postgres (pgvector) and the subscription gateway `cli-proxy`; see the README for the first
+- Docker Compose with the web service, Postgres (pgvector) and the CLI gateway `cli-proxy`; see the README for the first
   setup, backups and restore.
 - Deploy order when both change: first `cli-proxy`, then `web` (D-064, D-066).
 - Deploy only when no run is `Pending` or `Running` (D-077).

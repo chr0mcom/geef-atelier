@@ -4,7 +4,7 @@
 
 **Atelier turns a short request into a finished text** – a letter, an email, an article, a summary, a report. You say what you
 need, add files if you have them, and get the text together with what was checked, what is still open and what was assumed.
-It runs in the browser and from AI assistants such as Claude (over MCP). It is built on the open [Geef SDK](https://github.com/chr0mcom/geef).
+It runs in the browser and from AI assistants such as Claude Code (over MCP). It is built on the open [Geef SDK](https://github.com/chr0mcom/geef).
 
 ## How it works, in one picture
 
@@ -25,30 +25,32 @@ switches (and a signed-in person's exceptions), so it never shows a feature as a
 | You … | Start here |
 |---|---|
 | want a text and use the browser | [Guide: writing with Atelier](docs/12-user-guide.md) |
-| use an AI assistant (claude.ai, Claude Desktop, Claude Code) | [Guide: from an AI assistant](docs/13-ai-assistant-guide.md) |
+| use an AI assistant (tested with Claude Code) | [Guide: from an AI assistant](docs/13-ai-assistant-guide.md) |
 | run Atelier for a team: accounts, switches, the older workshop | [Guide for administrators](docs/14-admin-guide.md) |
 | develop or host it | [Guide for developers and hosts](docs/15-developer-guide.md) |
 
-## What it adds to asking a chatbot – and what not
+## What it does around the writing – and what not
 
 Each point names the decision that describes it.
 
-- **Reads whole files.** Up to 150,000 characters the writer gets the files completely, up to 600,000 with a table of contents
+- **Gives the writer whole files.** Up to 150,000 characters the writer gets the files completely, nothing shortened first; up to
+  600,000 it gets a table of contents and searches the parts that matter. If it seems to have read only parts, the result says so
   (D-069, D-070).
 - **Asks before, not after.** At most three short questions with answers to click, only before the start, always skippable; what
-  it does not ask is listed as an assumption (D-068, D-071, D-072). In a measurement on eleven real jobs, asking beat merely
-  assuming 9 : 1 (D-068).
+  it does not ask is listed as an assumption (D-068, D-071, D-072). In a small measurement (eleven jobs by one person, judged
+  blind by AI jurors) asking beat merely assuming 9 : 1 (D-068).
 - **Leaves gaps visible.** Guesses about facts the person did not give reach the writer marked as "not given", and the writer is
   asked to leave placeholders; the result lists them under "Fill these in before you send the text" (D-069, D-073).
-- **Says what was checked – and what not.** "What was checked" lists only checks that ran and ends with the sentence that they do
+- **Says what was checked – and what not.** On the standard way, "What was checked" lists only checks that ran and ends with the sentence that they do
   not prove the text is right. The fact check points out passages that may not be backed; in the shipped setting it does not
   change the text (D-073).
 - **One place for every version.** Orders, versions and exports (Word, PDF, Markdown) in the web app and over MCP (D-070, D-075).
 
 Limits: the text can still be wrong; the fact check can miss things and also flags harmless sentences (D-075); Atelier is not a
 chat; it does not learn from earlier texts (learning paused, D-067; memory not built, D-077); scans without text cannot be read
-(D-076). Changing a finished text and web research are built but switched off for everyone until their measurements pass
-(D-074, D-075, D-077).
+(D-076); "Extra careful" uses the older loop, does not search the web and has no "What was checked". Changing a finished text and
+web research on the standard way are built but switched off for everyone until their measurements pass (D-074, D-075, D-077).
+Teams chosen explicitly in the workshop can use their own web search.
 
 ## Read on
 

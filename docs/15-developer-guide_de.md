@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](15-developer-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-26*
+*Letzte Aktualisierung: 2026-11-26 (nach Prüfung: Websuche, Darstellung unter `/docs`, Einstellungstabelle nur für Admins)*
 
 Dieser Leitfaden ist für Entwicklerinnen und Entwickler und für alle, die Atelier selbst betreiben. Er gibt die Karte des heutigen
 Systems und verweist auf die ausführlichen Dokumente. Die Einrichtungsbefehle stehen im [README](../README_de.md); die Gründe
@@ -60,16 +60,20 @@ Alle Pfade liegen unter `src/Geef.Atelier.*`.
 
 `/how-it-works` ist ohne Anmeldung erreichbar. `HowItWorksFeatureExtensions.FeaturesFor` leitet ab, was die Seite als verfügbar
 bezeichnen darf – aus denselben Optionen und denselben Ausnahmeregeln wie die Anwendung (`OrderOptions.ReviseModeFor`,
-`ResearchOptions.ModeFor`, `DirectOptions.FactCheckModeFor`, `UiOptions.ShowsWorkshopEntriesTo`). Die Pipeline nutzt dieselben
-beiden Hilfen für Recherche und Faktenprüfung. Getestete Regeln (`tests/…/Web/HowItWorks`):
+`ResearchOptions.ModeFor`, `DirectOptions.FactCheckModeFor`). Die Pipeline nutzt dieselben beiden Hilfen für Recherche und
+Faktenprüfung. Getestete Regeln (`tests/…/Web/HowItWorks`):
 
 - eine Funktion, die für die betrachtende Person aus ist, erscheint nie als verfügbar, auch wenn eine andere Person eine Ausnahme
   hat;
-- abgemeldet zeigt die Seite die Werte für alle; die Einstellungstabelle zeigt nie eine Ausnahme;
-- Recherche gilt nur zusammen mit `Orders:IntakeMode = On` als verfügbar;
+- abgemeldet zeigt die Seite die Werte für alle; die Tabelle mit Einstellungsnamen und Rohwerten erscheint nur für Administratoren
+  und zeigt nie eine Ausnahme;
+- Recherche gilt nur zusammen mit `Orders:IntakeMode = On` als verfügbar, und nur für den Standardweg: Die Vorlage `direct` hat keine
+  Grounding-Quelle, ihr einziger Webzugang ist `OrderResearchService`. „Extra careful“ sucht nicht im Web; ausdrücklich gewählte
+  Werkstatt-Teams (auch über die älteren Werkzeuge) nutzen ihre eigenen Quellen, und dazu kann eine Websuche gehören;
 - einen unbekannten Modus der Faktenprüfung beschreibt die Seite als „meldet“, nie als „korrigiert“;
 - Einschalten für alle braucht keine Änderung an der Seite;
-- das Beispiel nutzt die festen Sätze aus `OrderCheckLines` und kann deshalb nicht von der Ergebnisseite abweichen.
+- der Kasten „What was checked“ im Beispiel nutzt die festen Sätze aus `OrderCheckLines`; die Einleitungen der offenen Punkte und
+  der Annahmen vergleicht ein Test mit `OrderOpenPoints.razor` und `OrderAssumptions.razor`.
 
 Wer einen Schalter ergänzt, der ändert, was eine Person tun kann, nimmt ihn in derselben Änderung in `HowItWorksFeatures` und in
 die Seite auf.
@@ -87,7 +91,9 @@ die Seite auf.
   gespeicherte Messung ungültig; für Klärer und Faktenprüfer werden Tests mit Eingabe-Hashes rot, bis neu gemessen ist.
 - **Drift-Schutz für die Doku:** Die Werkzeugtabelle in [13-ai-assistant-guide_de.md](13-ai-assistant-guide_de.md) und ihrer
   englischen Fassung wird mit dem Werkzeugkatalog verglichen; jeder Leitfaden muss in beiden Sprachen existieren und für `/docs`
-  eingetragen sein.
+  eingetragen sein. Jedes unter `/docs` ausgelieferte Dokument wird in einem Test gerendert: Mermaid-Blöcke und HTML-Kommentare
+  fallen weg (GitHub zeichnet die Diagramme), Links auf freigegebene Dokumente führen nach `/docs/…`, Links auf andere Dateien des
+  Repositorys zu GitHub, und Links in die nicht veröffentlichten Arbeitsordner werden zu reinem Text.
 
 ## Regeln, die es ehrlich halten
 
@@ -103,7 +109,7 @@ die Seite auf.
 
 ## Betrieb
 
-- Docker Compose mit Webdienst, Postgres (pgvector) und dem Abo-Gateway `cli-proxy`; Ersteinrichtung, Sicherung und Wiederherstellung
+- Docker Compose mit Webdienst, Postgres (pgvector) und dem CLI-Gateway `cli-proxy`; Ersteinrichtung, Sicherung und Wiederherstellung
   im README.
 - Ändern sich beide, gilt die Reihenfolge: erst `cli-proxy`, dann `web` (D-064, D-066).
 - Nur ausliefern, wenn kein Lauf `Pending` oder `Running` ist (D-077).

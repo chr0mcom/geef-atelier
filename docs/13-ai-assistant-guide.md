@@ -2,9 +2,9 @@
 
 *[Deutsch](13-ai-assistant-guide_de.md) · **English***
 
-*Last updated: 2026-11-26*
+*Last updated: 2026-11-26 (after review: what is tested, OAuth clients, web search)*
 
-This guide is for people who want to use Atelier from an AI assistant such as Claude (claude.ai, Claude Desktop or Claude Code).
+This guide is for people who want to use Atelier from an AI assistant such as Claude Code.
 Assistants connect through **MCP** (Model Context Protocol), a common way for assistants to use outside tools. The technical
 contract of every tool is in [04-mcp-integration.md](04-mcp-integration.md) and [09-endpoint-reference.md](09-endpoint-reference.md).
 
@@ -54,14 +54,16 @@ sequenceDiagram
 The address is the Atelier address followed by `/mcp`, for example `https://atelier.example/mcp`. The page How it works in the app
 shows the exact address of your Atelier.
 
-- **claude.ai or Claude Desktop:** add a custom connector with this address. The assistant opens the Atelier sign-in page; sign
-  in and allow access (OAuth). From then on it acts as you. Your administrator may have to allow the assistant first.
+**What is tested:** Claude Code, also through a connection set up in claude.ai, with a complete order including a file and a
+question. Using Atelier from the claude.ai chat window itself and from Claude Desktop has not been tested.
+
 - **Claude Code:** `claude mcp add --transport http atelier https://atelier.example/mcp` and sign in when asked. Administrators can
   also use a fixed key (bearer token); orders placed with it belong to the account set for that key.
-- **See and remove** connected assistants under **Connected clients** in your menu.
-
-Claude Code was used in the acceptance tests of the order tools and of the upload ticket (decisions D-075, D-076). The decisions
-log states what has been checked with other clients.
+- **Adding a connector in claude.ai:** add a custom connector with this address. The assistant opens the Atelier sign-in page;
+  sign in and allow access (OAuth). From then on it acts as you. If the sign-in page does not open, ask your administrator.
+- **OAuth clients:** every signed-in person can register an assistant under **OAuth clients** in the menu; only administrators can
+  delete one.
+- **See and remove** your connected assistants under **Connected clients** in your menu.
 
 ## The tools
 
@@ -98,9 +100,20 @@ files go as Base64 in `attachments`, which only works for small files.
 - Files cannot be added to an order later.
 - Atelier never sends your files to a web search.
 
+## Web search
+
+- `submit_order` looks things up on the web only when research is switched on for the person, only for the first version and only
+  when the order has no files. The search gets short topics taken from the request; topics with words from the About me details
+  are held back (a word comparison, so it can miss a word in another language).
+- `submit_order` with `extraCareful` never searches the web.
+- The older tools are different: `submit_request` with a workshop template or an own team (`crewTemplate`, `customCrew`) and
+  `submit_auto_crew_request` use the sources of that team, and these can include a web search, whatever the switch for the
+  standard way says.
+
 ## Limits
 
-- Atelier is not a chat: after the questions, it works in the background. An order typically takes several minutes.
+- Atelier is not a chat: after the questions, it works in the background. An order can take from less than a minute to several
+  minutes.
 - The assistant may shorten what it shows you. The order page in the web app shows everything.
 - Changing a text depends on a switch (see How it works). Atelier asks the writer to make only the requested change but does not
   check that nothing else changed.

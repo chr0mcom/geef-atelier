@@ -2,10 +2,9 @@
 
 ***Deutsch** · [English](13-ai-assistant-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-26*
+*Letzte Aktualisierung: 2026-11-26 (nach Prüfung: was geprüft ist, OAuth-Clients, Websuche)*
 
-Dieser Leitfaden ist für alle, die Atelier aus einem KI-Assistenten wie Claude (claude.ai, Claude Desktop oder Claude Code)
-nutzen wollen. Assistenten verbinden sich über **MCP** (Model Context Protocol), einen verbreiteten Weg, auf dem Assistenten
+Dieser Leitfaden ist für alle, die Atelier aus einem KI-Assistenten wie Claude Code nutzen wollen. Assistenten verbinden sich über **MCP** (Model Context Protocol), einen verbreiteten Weg, auf dem Assistenten
 fremde Werkzeuge benutzen. Den technischen Vertrag jedes Werkzeugs beschreiben [04-mcp-integration_de.md](04-mcp-integration_de.md)
 und [09-endpoint-reference_de.md](09-endpoint-reference_de.md).
 
@@ -58,16 +57,18 @@ sequenceDiagram
 Die Adresse ist die Atelier-Adresse mit `/mcp` dahinter, zum Beispiel `https://atelier.example/mcp`. Die Seite How it works in der
 App zeigt die genaue Adresse deines Ateliers.
 
-- **claude.ai oder Claude Desktop:** einen eigenen Connector mit dieser Adresse hinzufügen. Der Assistent öffnet die
-  Anmeldeseite von Atelier; anmelden und Zugriff erlauben (OAuth). Ab dann handelt er als du. Eventuell muss die Administration
-  den Assistenten zuerst zulassen.
+**Was geprüft ist:** Claude Code, auch über eine in claude.ai eingerichtete Verbindung, mit einem kompletten Auftrag samt Datei
+und Rückfrage. Die Nutzung aus dem Chatfenster von claude.ai selbst und aus Claude Desktop ist nicht geprüft.
+
 - **Claude Code:** `claude mcp add --transport http atelier https://atelier.example/mcp` und bei Nachfrage anmelden. Die
   Administration kann auch einen festen Schlüssel (Bearer-Token) nutzen; Aufträge damit gehören dem für diesen Schlüssel
   eingestellten Konto.
-- **Ansehen und entfernen** kannst du verbundene Assistenten unter **Connected clients** in deinem Menü.
-
-Claude Code wurde bei den Abnahmen der Auftragswerkzeuge und des Upload-Tickets genutzt (Entscheidungen D-075, D-076). Was mit
-anderen Clients geprüft ist, steht im Entscheidungslog.
+- **Connector in claude.ai hinzufügen:** einen eigenen Connector mit dieser Adresse anlegen. Der Assistent öffnet die
+  Anmeldeseite von Atelier; anmelden und Zugriff erlauben (OAuth). Ab dann handelt er als du. Öffnet sich die Anmeldeseite nicht,
+  frag die Administration.
+- **OAuth-Clients:** Jede angemeldete Person kann unter **OAuth clients** im Menü einen Assistenten eintragen; löschen kann ihn nur
+  die Administration.
+- **Ansehen und entfernen** kannst du deine verbundenen Assistenten unter **Connected clients** in deinem Menü.
 
 ## Die Werkzeuge
 
@@ -105,9 +106,20 @@ Upload-Ticket gehen Dateien als Base64 in `attachments`, was nur für kleine Dat
 - Dateien lassen sich später nicht nachreichen.
 - Atelier schickt deine Dateien nie an eine Websuche.
 
+## Websuche
+
+- `submit_order` schlägt nur im Web nach, wenn die Recherche für die Person eingeschaltet ist, nur für die erste Version und nur,
+  wenn der Auftrag keine Dateien hat. Die Suche bekommt kurze Themen aus dem Auftrag; Themen mit Wörtern aus den About-me-Angaben
+  werden zurückgehalten (ein Wortvergleich, der ein Wort in einer anderen Sprache übersehen kann).
+- `submit_order` mit `extraCareful` sucht nie im Web.
+- Die älteren Werkzeuge sind anders: `submit_request` mit einer Werkstatt-Vorlage oder einem eigenen Team (`crewTemplate`,
+  `customCrew`) und `submit_auto_crew_request` nutzen die Quellen dieses Teams, und dazu kann eine Websuche gehören – unabhängig vom
+  Schalter für den Standardweg.
+
 ## Grenzen
 
-- Atelier ist kein Chat: Nach den Fragen arbeitet es im Hintergrund. Ein Auftrag dauert typischerweise einige Minuten.
+- Atelier ist kein Chat: Nach den Fragen arbeitet es im Hintergrund. Ein Auftrag kann zwischen weniger als einer Minute und einigen
+  Minuten dauern.
 - Der Assistent kann verkürzen, was er dir zeigt. Die Auftragsseite in der Web-App zeigt alles.
 - Ändern hängt an einem Schalter (siehe How it works). Atelier bittet den Schreiber, nur die gewünschte Änderung zu machen, prüft
   aber nicht, dass sonst nichts geändert wurde.

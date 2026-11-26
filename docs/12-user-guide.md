@@ -2,7 +2,7 @@
 
 *[Deutsch](12-user-guide_de.md) · **English***
 
-*Last updated: 2026-11-26*
+*Last updated: 2026-11-26 (after review: web search only on the standard way, storage, wording)*
 
 This guide is for everyone who uses Atelier in the web browser. You need no technical knowledge. The page **How it works**
 (`/how-it-works`, also open without signing in) shows the same in short, with the features that are switched on for you right
@@ -35,16 +35,16 @@ Open **New**. Write in your own words what you need, for example: "Write a short
 delivery delay." You do not need special phrasing.
 
 **Files** (optional): add PDF, Word (.docx), text or Markdown files by dropping, pasting or choosing them. After each file you see
-what Atelier read: pages, characters and how well it could be read.
+a short receipt: what Atelier read, with pages, characters and how well it could be read.
 
 - Up to 10 files per request, each up to 25 MB (default settings).
 - Up to 150,000 characters in all, the writer gets the files completely. Up to 600,000 characters it gets a table of contents and
-  reads the parts that matter. Above that you choose the pages of a PDF to use; Start stays locked until it fits.
-- Scanned pages without a text layer cannot be read.
+  searches the parts that matter. Above that you choose the pages of a PDF to use; Start stays locked until it fits.
+- Scanned pages (photos of paper) cannot be read.
 - You cannot add files to a request later. Add everything before you press Start.
 
-**Extra careful** is a box below the files. It uses an older way of working with several review rounds. It takes longer, and
-its result does not show "What was checked".
+**Extra careful** is a box below the files. It uses an older way of working with several review rounds. It takes longer, it does
+not look things up on the web, and its result does not show "What was checked". For most texts, leave it off.
 
 ### 2. Answer a few questions (or skip them)
 
@@ -56,11 +56,11 @@ Atelier asks only before it starts, never while it writes. If nothing important 
 
 ### 3. Wait
 
-Writing can take several minutes. You can leave the page; your text waits under **My work**. You can stop a request with **Stop**.
+This can take from less than a minute to several minutes. You can leave the page; your text waits under **My work**. You can stop a request with **Stop**.
 
 ### 4. Read the result
 
-The order page shows, from top to bottom:
+The page of your request shows, from top to bottom:
 
 | Part | What it means |
 |---|---|
@@ -85,8 +85,8 @@ nothing checks that nothing else changed, so read the new version. While this fe
 
 | Line in "What was checked" | What happened |
 |---|---|
-| Checked automatically: the text … | Rules from your request, checked without AI: length, language, no gaps, no lists or headings, words to use or avoid. Only what your request asked for. |
-| Facts in the text were compared with … | Another AI compared the facts in the text with your request, your answers and your files and lists passages it could not find there. In the current default setting it **does not change the text**. It can miss things, and it can also point at harmless sentences such as a greeting. |
+| Checked automatically: the text … | Checked without AI. A few basics always: the text is not empty and starts directly. Length, language, gaps, lists or headings and words to use or avoid only when your request asked for them. |
+| Facts in the text were compared with … | Another AI compared the facts in the text with your request, your answers and your files and lists passages it could not find there. In the current default setting it **does not change the text**. It can miss things, and it often points at harmless sentences too, such as a closing line or a signature. With very long files it compares the text only with your request and answers, and the line says so. |
 | Totals in your files … | Sums in your files were added up again without AI. If one does not match, you see both figures. |
 | Changed after the check | What was changed because of a check. |
 
@@ -98,24 +98,29 @@ Only you can change it.
 
 ## Where your words go
 
-- Your request, your answers, your About me details and your files go to the AI models that write and check the text.
-- Web search, when it is switched on, gets only short search topics from your request, never your files, answers or About me
-  details, and it never runs when you add files.
+- Your request, your answers, your About me details and your files go to the AI services this Atelier uses to write and check the
+  text.
+- Looking things up on the web, when it is switched on, happens only on the standard way and only when you add no files. The
+  search gets only short topics taken from your request; topics with words from your About me details are held back (this compares
+  words, so it can miss a word in another language). "Extra careful" never searches the web. Teams that administrators set up
+  in the workshop can have their own web search.
 - Only you and the administrators of this Atelier can see your requests.
+- Atelier keeps your request, your text and what it read from your files until you delete the request under My work. Deleting it
+  also deletes the files that no other request uses. The original file is removed about 30 days after the last request that used it
+  finished; the text read from it stays with the request.
 
-## Why not just ask a chatbot?
+## What Atelier does around the writing
 
-A chatbot can write a good text too. Atelier adds:
-
-- It reads your whole file instead of an excerpt (up to the limit above).
-- It asks before it starts, and only what changes the result.
-- It says what it did not know: gaps stay visible, guesses are listed.
+- The writer gets your whole file (up to the limit above); nothing is shortened first. If it seems to have read only parts, the
+  result says so.
+- It asks before it starts, and it is built to ask only what changes the result.
+- It is built to show what it did not know: the writer is asked to leave gaps, and guesses are listed.
 - It says what was checked and what was not, and never claims the text is right.
 - It knows your About me details.
 - Every request, version and download stays under My work.
 
 What it does **not** do: it can still be wrong; it is not a chat; it does not learn from your earlier texts (only About me carries
-over); it cannot read scans.
+over); it cannot read scans (photos of paper).
 
 ## When something goes wrong
 

@@ -2,7 +2,7 @@
 
 *[Deutsch](14-admin-guide_de.md) · **English***
 
-*Last updated: 2026-11-26*
+*Last updated: 2026-11-26 (after review: web search outside the standard way, OAuth clients)*
 
 This guide is for administrators: people who add accounts, decide which features are on and look after the older workshop. How
 to install and host Atelier is in the [developer and host guide](15-developer-guide.md) and the [README](../README.md).
@@ -12,7 +12,7 @@ to install and host Atelier is in the [developer and host guide](15-developer-gu
 | Task | Where |
 |---|---|
 | Add, change, deactivate or delete accounts | Menu → **User management** (`/admin/users`) |
-| Allow AI assistants to connect (OAuth clients) | Menu → **OAuth clients** (`/admin/oauth-clients`) |
+| Delete registered AI assistants (OAuth clients); registering one is open to every signed-in person | Menu → **OAuth clients** (`/admin/oauth-clients`) |
 | Operator details for imprint and privacy pages | Menu → **Site settings** (`/admin/site-settings`) |
 | See and stop every request | **My work** with "Show all users"; an order page of another account opens for administrators |
 | The older workshop: teams, profiles, providers, models | Menu → **Workshop** (by default only for administrators) |
@@ -32,7 +32,7 @@ feature on.
 |---|---|---|---|---|
 | Questions before the start | `Orders:IntakeMode` (`Off`, `Shadow`, `On`) | `Shadow` | `On` (D-072) | – |
 | Changing a finished text | `Orders:Revise` (`Off`, `On`) | `Off` | `Off` (D-075) | `Orders:ReviseOverrides:<user>` |
-| Looking things up on the web | `Research:Mode` (`Off`, `On`) | `Off` | `Off` (D-074) | `Research:ModeOverrides:<user>` |
+| Looking things up on the web (standard way) | `Research:Mode` (`Off`, `On`) | `Off` | `Off` (D-074) | `Research:ModeOverrides:<user>` |
 | Fact check | `Direct:FactCheckMode` (`Off`, `Shadow`, `Report`, `On`) | `Report` | `Report` (D-073) | `Direct:FactCheckModeOverrides:<user>` |
 | Files from an AI assistant (upload ticket) | `Uploads:Tickets` (`Off`, `On`) | `Off` | `On` (D-076) | – |
 | Workshop menu only for administrators | `Ui:WorkshopForAdminsOnly` | `true` | `true` (D-077) | – |
@@ -45,7 +45,10 @@ What the values mean:
   text; `On` may also correct once (D-073). The page How it works describes any mode it does not know as "points things out".
 - **Research** needs questions (`Orders:IntakeMode = On`), because its search topics come from reading the request. It never runs
   when the order has files, and only for the first version (D-074). Daily limits: `Research:DailyOrderCap`,
-  `Research:DailyOrderCapPerUser`.
+  `Research:DailyOrderCapPerUser`. This switch covers the standard way only. "Extra careful" never searches the web. A workshop
+  template or an own team that someone chooses explicitly – on the older form `/new` or through the older tools (`submit_request`
+  with `crewTemplate` or `customCrew`, `submit_auto_crew_request`) – uses the sources of that team, and these can include a web
+  search whenever a search key is set, whatever `Research:Mode` says.
 - **Workshop:** with `true`, only administrators see the menu "Workshop", the link to the older form on the start page and
   "Technical details" on the order page. The pages themselves still open for anyone signed in who types their address (D-077).
 
@@ -79,7 +82,7 @@ on the start page and the older tools for AI assistants still use it. Its parts 
 
 What to know:
 
-- **Models** are chosen by role from the model matrix, not freely (D-066). Claude runs through the subscription gateway as
+- **Models** are chosen by role from the model matrix, not freely (D-066). Claude runs through the CLI gateway as
   `claude-cli`, OpenAI as `codex-cli`. Profiles set to "Manual" keep their model.
 - The agentic tool path was never wired into the pipeline and is frozen; the learning loop is paused (D-067).
 - Removing the older way waits for the trigger in D-077; nothing of it is deleted before.

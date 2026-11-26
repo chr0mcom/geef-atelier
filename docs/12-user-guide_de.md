@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](12-user-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-26*
+*Letzte Aktualisierung: 2026-11-26 (nach Prüfung: Websuche nur auf dem Standardweg, Aufbewahrung, Wortwahl)*
 
 Dieser Leitfaden ist für alle, die Atelier im Browser nutzen. Technisches Wissen ist nicht nötig. Die Seite **How it works**
 (`/how-it-works`, auch ohne Anmeldung erreichbar) zeigt dasselbe in kurz, zusammen mit den Funktionen, die gerade für dich
@@ -35,18 +35,18 @@ was für dich eingeschaltet ist.
 Öffne **New**. Schreib in deinen eigenen Worten, was du brauchst, zum Beispiel: „Schreib eine kurze, freundliche E-Mail an einen
 Kunden wegen zwei Wochen Lieferverzug.“ Besondere Formulierungen sind nicht nötig.
 
-**Dateien** (freiwillig): PDF, Word (.docx), Text oder Markdown hineinziehen, einfügen oder auswählen. Nach jeder Datei siehst du,
-was Atelier gelesen hat: Seiten, Zeichen und wie gut sie lesbar war.
+**Dateien** (freiwillig): PDF, Word (.docx), Text oder Markdown hineinziehen, einfügen oder auswählen. Nach jeder Datei siehst du
+eine kurze Quittung: was Atelier gelesen hat, mit Seiten, Zeichen und wie gut sie lesbar war.
 
 - Bis zu 10 Dateien je Auftrag, je bis 25 MB (Standardeinstellung).
 - Bis 150.000 Zeichen zusammen bekommt der Schreiber die Dateien vollständig. Bis 600.000 Zeichen bekommt er ein
-  Inhaltsverzeichnis und liest die Teile, auf die es ankommt. Darüber wählst du die Seiten eines PDFs; „Start“ bleibt gesperrt,
+  Inhaltsverzeichnis und durchsucht die Teile, auf die es ankommt. Darüber wählst du die Seiten eines PDFs; „Start“ bleibt gesperrt,
   bis es passt.
-- Eingescannte Seiten ohne Textebene kann Atelier nicht lesen.
+- Eingescannte Seiten (Fotos von Papier) kann Atelier nicht lesen.
 - Dateien lassen sich später nicht nachreichen. Füg alles hinzu, bevor du auf „Start“ drückst.
 
 **Extra careful** ist ein Kästchen unter den Dateien. Es nutzt eine ältere Arbeitsweise mit mehreren Prüfrunden. Es dauert länger,
-und sein Ergebnis zeigt kein „What was checked“.
+schlägt nichts im Web nach, und sein Ergebnis zeigt kein „What was checked“. Für die meisten Texte lässt du es aus.
 
 ### 2. Ein paar Fragen beantworten (oder überspringen)
 
@@ -58,12 +58,12 @@ Atelier fragt nur vor dem Start, nie während des Schreibens. Fehlt nichts Wicht
 
 ### 3. Warten
 
-Das Schreiben kann einige Minuten dauern. Du kannst die Seite verlassen; dein Text wartet unter **My work**. Mit **Stop** hältst
+Das kann zwischen weniger als einer Minute und einigen Minuten dauern. Du kannst die Seite verlassen; dein Text wartet unter **My work**. Mit **Stop** hältst
 du einen Auftrag an.
 
 ### 4. Das Ergebnis lesen
 
-Die Auftragsseite zeigt von oben nach unten:
+Die Seite deines Auftrags zeigt von oben nach unten:
 
 | Teil | Bedeutung |
 |---|---|
@@ -89,8 +89,8 @@ die Funktion aus ist, erscheint der Knopf nicht.
 
 | Zeile in „What was checked“ | Was passiert ist |
 |---|---|
-| Checked automatically: the text … | Regeln aus deinem Auftrag, ohne KI geprüft: Länge, Sprache, keine Lücken, keine Listen oder Überschriften, Wörter, die vorkommen oder fehlen sollen. Nur, was dein Auftrag verlangt. |
-| Facts in the text were compared with … | Eine weitere KI hat die Fakten im Text mit deinem Auftrag, deinen Antworten und deinen Dateien verglichen und listet Stellen, die sie dort nicht fand. In der aktuellen Standardeinstellung **ändert sie den Text nicht**. Sie kann etwas übersehen und auch harmlose Sätze wie einen Gruß melden. |
+| Checked automatically: the text … | Ohne KI geprüft. Ein paar Grundlagen immer: Der Text ist nicht leer und beginnt direkt. Länge, Sprache, Lücken, Listen oder Überschriften und Wörter, die vorkommen oder fehlen sollen, nur, wenn dein Auftrag es verlangt. |
+| Facts in the text were compared with … | Eine weitere KI hat die Fakten im Text mit deinem Auftrag, deinen Antworten und deinen Dateien verglichen und listet Stellen, die sie dort nicht fand. In der aktuellen Standardeinstellung **ändert sie den Text nicht**. Sie kann etwas übersehen und meldet oft auch harmlose Sätze, etwa eine Schlussformel oder eine Unterschrift. Bei sehr langen Dateien vergleicht sie den Text nur mit deinem Auftrag und deinen Antworten, und die Zeile sagt das. |
 | Totals in your files … | Summen in deinen Dateien wurden ohne KI nachgerechnet. Passt eine nicht, siehst du beide Zahlen. |
 | Changed after the check | Was wegen einer Prüfung geändert wurde. |
 
@@ -102,25 +102,30 @@ nicht wiederholen. Nur du kannst es ändern.
 
 ## Wohin deine Worte gehen
 
-- Dein Auftrag, deine Antworten, deine About-me-Angaben und deine Dateien gehen an die KI-Modelle, die den Text schreiben und
-  prüfen.
-- Eine Websuche bekommt, wenn sie eingeschaltet ist, nur kurze Suchthemen aus deinem Auftrag, nie deine Dateien, Antworten oder
-  About-me-Angaben, und sie läuft nie, wenn du Dateien anhängst.
+- Dein Auftrag, deine Antworten, deine About-me-Angaben und deine Dateien gehen an die KI-Dienste, die dieses Atelier zum
+  Schreiben und Prüfen nutzt.
+- Im Web nachgeschlagen wird, wenn es eingeschaltet ist, nur auf dem Standardweg und nur, wenn du keine Dateien anhängst. Die
+  Suche bekommt nur kurze Themen aus deinem Auftrag; Themen mit Wörtern aus deinen About-me-Angaben werden zurückgehalten (das
+  vergleicht Wörter und kann deshalb ein Wort in einer anderen Sprache übersehen). „Extra careful“ sucht nie im Web. Teams, die
+  die Administration in der Werkstatt einrichtet, können eine eigene Websuche haben.
 - Nur du und die Administration dieses Ateliers sehen deine Aufträge.
+- Atelier behält deinen Auftrag, deinen Text und das aus deinen Dateien Gelesene, bis du den Auftrag unter My work löschst. Dabei
+  werden auch die Dateien gelöscht, die kein anderer Auftrag nutzt. Die Originaldatei wird etwa 30 Tage nach dem Ende des letzten
+  Auftrags entfernt, der sie nutzte; der daraus gelesene Text bleibt beim Auftrag.
 
-## Warum nicht einfach einen Chatbot fragen?
+## Was Atelier um das Schreiben herum tut
 
-Ein Chatbot kann auch einen guten Text schreiben. Atelier kommt hinzu:
-
-- Es liest deine ganze Datei statt eines Ausschnitts (bis zur Grenze oben).
-- Es fragt vor dem Start, und nur, was das Ergebnis ändert.
-- Es sagt, was es nicht wusste: Lücken bleiben sichtbar, Vermutungen werden aufgelistet.
+- Der Schreiber bekommt deine ganze Datei (bis zur Grenze oben); vorher wird nichts gekürzt. Scheint er nur Teile gelesen zu
+  haben, sagt das Ergebnis es.
+- Es fragt vor dem Start und ist darauf gebaut, nur zu fragen, was das Ergebnis ändert.
+- Es ist darauf gebaut zu zeigen, was es nicht wusste: Der Schreiber wird gebeten, Lücken zu lassen, und Vermutungen werden
+  aufgelistet.
 - Es sagt, was geprüft wurde und was nicht, und behauptet nie, dass der Text stimmt.
 - Es kennt deine About-me-Angaben.
 - Jeder Auftrag, jede Version und jeder Download bleibt unter My work.
 
 Was es **nicht** tut: Es kann sich trotzdem irren; es ist kein Chat; es lernt nicht aus deinen früheren Texten (nur About me
-bleibt); es kann keine Scans lesen.
+bleibt); es kann keine Scans (Fotos von Papier) lesen.
 
 ## Wenn etwas schiefgeht
 

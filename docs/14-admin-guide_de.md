@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](14-admin-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-26*
+*Letzte Aktualisierung: 2026-11-26 (nach Prüfung: Websuche außerhalb des Standardwegs, OAuth-Clients)*
 
 Dieser Leitfaden ist für die Administration: Menschen, die Konten anlegen, entscheiden, welche Funktionen an sind, und sich um die
 ältere Werkstatt kümmern. Installation und Betrieb beschreiben der [Leitfaden für Entwicklung und Betrieb](15-developer-guide_de.md)
@@ -13,7 +13,7 @@ und das [README](../README_de.md).
 | Aufgabe | Wo |
 |---|---|
 | Konten anlegen, ändern, deaktivieren oder löschen | Menü → **User management** (`/admin/users`) |
-| KI-Assistenten das Verbinden erlauben (OAuth-Clients) | Menü → **OAuth clients** (`/admin/oauth-clients`) |
+| Eingetragene KI-Assistenten löschen (OAuth-Clients); eintragen kann jede angemeldete Person | Menü → **OAuth clients** (`/admin/oauth-clients`) |
 | Betreiberangaben für Impressum und Datenschutz | Menü → **Site settings** (`/admin/site-settings`) |
 | Alle Aufträge sehen und anhalten | **My work** mit „Show all users“; die Auftragsseite eines anderen Kontos öffnet sich für die Administration |
 | Die ältere Werkstatt: Teams, Profile, Anbieter, Modelle | Menü → **Workshop** (standardmäßig nur für die Administration) |
@@ -33,7 +33,7 @@ muss beim Einschalten nicht geändert werden.
 |---|---|---|---|---|
 | Fragen vor dem Start | `Orders:IntakeMode` (`Off`, `Shadow`, `On`) | `Shadow` | `On` (D-072) | – |
 | Fertigen Text ändern | `Orders:Revise` (`Off`, `On`) | `Off` | `Off` (D-075) | `Orders:ReviseOverrides:<user>` |
-| Im Web nachschlagen | `Research:Mode` (`Off`, `On`) | `Off` | `Off` (D-074) | `Research:ModeOverrides:<user>` |
+| Im Web nachschlagen (Standardweg) | `Research:Mode` (`Off`, `On`) | `Off` | `Off` (D-074) | `Research:ModeOverrides:<user>` |
 | Faktenprüfung | `Direct:FactCheckMode` (`Off`, `Shadow`, `Report`, `On`) | `Report` | `Report` (D-073) | `Direct:FactCheckModeOverrides:<user>` |
 | Dateien aus einem KI-Assistenten (Upload-Ticket) | `Uploads:Tickets` (`Off`, `On`) | `Off` | `On` (D-076) | – |
 | Werkstatt-Menü nur für die Administration | `Ui:WorkshopForAdminsOnly` | `true` | `true` (D-077) | – |
@@ -47,7 +47,10 @@ Was die Werte bedeuten:
   „meldet“ („points things out“).
 - **Recherche** braucht die Fragen (`Orders:IntakeMode = On`), weil ihre Suchthemen aus dem Lesen des Auftrags stammen. Sie läuft
   nie, wenn der Auftrag Dateien hat, und nur für die erste Version (D-074). Tagesgrenzen: `Research:DailyOrderCap`,
-  `Research:DailyOrderCapPerUser`.
+  `Research:DailyOrderCapPerUser`. Dieser Schalter gilt nur für den Standardweg. „Extra careful“ sucht nie im Web. Eine
+  Werkstatt-Vorlage oder ein eigenes Team, das jemand ausdrücklich wählt – im älteren Formular `/new` oder über die älteren
+  Werkzeuge (`submit_request` mit `crewTemplate` oder `customCrew`, `submit_auto_crew_request`) –, nutzt die Quellen dieses Teams,
+  und dazu kann eine Websuche gehören, sobald ein Suchschlüssel gesetzt ist, unabhängig von `Research:Mode`.
 - **Werkstatt:** Mit `true` sehen nur Administratoren das Menü „Workshop“, den Link zum älteren Formular auf der Startseite und
   „Technical details“ auf der Auftragsseite. Die Seiten selbst öffnen sich weiter für alle Angemeldeten, die ihre Adresse eingeben
   (D-077).
@@ -83,7 +86,7 @@ careful“ auf der Startseite und die älteren Werkzeuge für KI-Assistenten nut
 
 Gut zu wissen:
 
-- **Modelle** werden nach Rolle aus der Modellmatrix gewählt, nicht frei (D-066). Claude läuft über das Abo-Gateway als
+- **Modelle** werden nach Rolle aus der Modellmatrix gewählt, nicht frei (D-066). Claude läuft über das CLI-Gateway als
   `claude-cli`, OpenAI als `codex-cli`. Profile auf „Manual“ behalten ihr Modell.
 - Der agentische Werkzeugpfad wurde nie mit der Pipeline verdrahtet und ist eingefroren; die Lernschleife ist pausiert (D-067).
 - Der Rückbau des älteren Wegs wartet auf den Auslöser in D-077; vorher wird davon nichts gelöscht.
