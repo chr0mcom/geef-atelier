@@ -102,7 +102,8 @@ public sealed class TavilyGroundingProviderTests
             new FakeHttpClientFactory(httpClient),
             Options.Create(opts),
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
-            NullLogger<TavilyGroundingProvider>.Instance);
+            NullLogger<TavilyGroundingProvider>.Instance,
+            FakeQueryExtractor.Echo());
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => provider.EnrichAsync("briefing", SystemCrew.TavilyBasicProfile, Guid.NewGuid(), CancellationToken.None));
@@ -202,6 +203,33 @@ public sealed class TavilyGroundingProviderTests
         Assert.Equal("verbose briefing with tone instructions", extractor.LastBriefing);
     }
 
+    [Fact]
+    public async Task EnrichAsync_SearchesNothingAndFails_WhenNoQueryCouldBeFormed()
+    {
+        var handler = FakeHttpHandler.Ok(ValidTavilyResponse);
+        var (provider, repo) = BuildProvider(handler, queryExtractor: new FakeQueryExtractor(GroundingQuery.NotFormed));
+        var runId = Guid.NewGuid();
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => provider.EnrichAsync("request text that must never be the query", SystemCrew.TavilyRefinedProfile, runId, CancellationToken.None));
+
+        Assert.Equal(TavilyGroundingProvider.QueryNotFormedMessage, ex.Message);
+        Assert.Equal(0, handler.CallCount);
+        Assert.Empty(await repo.GetByRunIdAsync(runId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task EnrichAsync_SearchesNothingAndFails_WhenTheExtractorAsksToSearchWithoutAQuery()
+    {
+        var handler = FakeHttpHandler.Ok(ValidTavilyResponse);
+        var (provider, _) = BuildProvider(handler, queryExtractor: new FakeQueryExtractor(new GroundingQuery(ShouldSearch: true, Query: "  ")));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => provider.EnrichAsync("request text that must never be the query", SystemCrew.TavilyBasicProfile, Guid.NewGuid(), CancellationToken.None));
+
+        Assert.Equal(0, handler.CallCount);
+    }
+
     // --- helpers ---
 
     private static (TavilyGroundingProvider, InMemoryGroundingConsultationRepository) BuildProvider(
@@ -227,18 +255,20 @@ public sealed class TavilyGroundingProviderTests
             Options.Create(opts),
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
             NullLogger<TavilyGroundingProvider>.Instance,
-            queryExtractor);
+            queryExtractor ?? FakeQueryExtractor.Echo());
         return (provider, repo);
     }
 
-    private sealed class FakeQueryExtractor(GroundingQuery result) : IGroundingQueryExtractor
+    private sealed class FakeQueryExtractor(GroundingQuery? result) : IGroundingQueryExtractor
     {
+        public static FakeQueryExtractor Echo() => new(null);
+
         public string? LastBriefing { get; private set; }
 
         public Task<GroundingQuery> ExtractAsync(string briefingText, CancellationToken ct)
         {
             LastBriefing = briefingText;
-            return Task.FromResult(result);
+            return Task.FromResult(result ?? new GroundingQuery(ShouldSearch: true, Query: briefingText));
         }
     }
 

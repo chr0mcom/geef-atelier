@@ -3122,3 +3122,50 @@ unverändert; `Orders:Revise`, Recherche und Faktenprüfer werden nicht für all
 Ändern eines Ergebnisses ohne den Schnellknopf „Longer“ (der im Tor N′ eine Tatsache hinzufügte, D-075) als eigene kleine
 Etappe mit eigenem Vertrag und einer Nachtmessung – ohne sie kann ein Laie an einem Ergebnis nichts ändern. Danach R3 der
 Recherche mit größerer Menge (D-074). Beides nur nachts und mit Obergrenze.
+
+## D-079 — Keine Websuche bei Aufträgen mit der Standard-Crew; Suchanfrage scheitert geschlossen (2026-11-26)
+
+**Status:** umgesetzt.
+
+**Kontext.** Zugesagt ist: Die Websuche ist für alle aus (`Research:Mode = Off`), ein Auftrag mit Dateien sucht nie, und
+Antworten und die Angaben unter „About me“ gehen nie in eine Suche. „Extra careful“ hielt das nicht ein. Es nutzt die
+Standard-Crew (`klassik`), und diese trägt die Grounding-Quelle `tavily-refined`, die kein Schalter steuerte: Jeder solche
+Auftrag schickte eine Suchanfrage an Tavily, auch mit angehängten Dateien. Die Anfrage bildete `LlmGroundingQueryExtractor` aus
+dem Auftragsteil des Briefings (seit E2 Fix 1 ohne Antworten und Profil); schlug dieser Modellaufruf fehl oder kam nichts zurück,
+ging der Anfang des Auftragstexts selbst (bis 400 Zeichen) an den Suchdienst.
+
+**Entscheidung.**
+- **Standardaufträge suchen nichts außerhalb.** Ein Lauf eines Auftrags mit der Standard-Crew – „Extra careful“ im Web oder über
+  MCP, `submit_request` ohne `crewTemplate`/`customCrew` (bei `Orders:LegacySubmitDefaultMode = Careful`) – behält nur die
+  Grounding-Quellen, die in Atelier bleiben: die Typen `vector-store`, `order-sources`, `learning-retrieval`, `static-context`,
+  `crew-catalog`, `tool-catalog`, `pack-catalog`, und keine davon über den Tool-Pfad (eine Erlaubnisliste, ein neuer Typ bleibt
+  also draußen, bis er aufgenommen wird). Web-, Nachrichten-, Wissenschafts-, REST-, URL- und Tool-Quellen fallen weg. Die Regel
+  wendet der Orchestrator auf jeden Lauf an, bevor die Pipeline gebaut wird (`StandardOrderWebSearch.ForRunAsync`); sie gilt damit
+  auch für fortgesetzte und wiederholte Läufe, deren gespeicherter Snapshot die Websuche noch nennt, und für einen fortgesetzten
+  Lauf, der noch nicht mit seinem Auftrag verknüpft ist (dann zählt der Auftrag des Laufs, den er fortsetzt). Gespeicherte
+  Snapshots werden nicht umgeschrieben.
+- **Was als Standard gilt:** Der Snapshot ist `klassik`, der Auftrag nennt kein Template, und für den Auftrag wurde keine Crew
+  zusammengestellt. Unverändert bleiben: ein bewusst genanntes Template (Werkstatt-Formular, `submit_request` mit `crewTemplate`,
+  auch `klassik`), eine eigene Crew (`customCrew`), eine zusammengestellte Crew (`submit_auto_crew_request`, Werkstatt „auto“)
+  und Läufe ohne Auftrag. Aufträge, die aus der Zeit vor den Aufträgen übernommen wurden, nennen kein Template; ihre Läufe gelten
+  als Standardaufträge, weil nicht mehr bekannt ist, ob das Template gewählt wurde.
+- **Suchanfrage scheitert geschlossen.** `IGroundingQueryExtractor` liefert `GroundingQuery.NotFormed`, wenn der Aufruf
+  fehlschlägt oder keine Anfrage zurückkommt; der `tavily`-Provider schickt dann nichts und scheitert, die Quelle wird zur
+  Laufwarnung `grounding.provider_skipped`. Der Extractor ist Pflicht; einen Weg ohne ihn gibt es nicht. Der Auftragstext ist nie
+  die Ersatzanfrage. Unverändert und nur über eine bewusst gewählte Crew erreichbar: Ein Profil mit `ExtractQuery=false` sowie die
+  Typen `news-search`, `academic-search`, `rest-api` und Tool-Quellen schicken den Auftragsteil des Briefings (nie Antworten oder
+  Profil) unverändert.
+- **Recherche des Direktwegs (`OrderResearchService`)** scheiterte schon geschlossen und bleibt unverändert: standardmäßig aus,
+  nie mit Dateien, nie bei „Extra careful“, nur Themen des Klärers passieren das Tor, kein Rohtext.
+
+**Ohne bewusste Wahl erreichbar?** Nicht über die Menüs. Das ältere Formular `/new` öffnet sich für alle Angemeldeten, die seine
+Adresse eingeben (D-077, 8a), und hat `klassik` vorausgewählt; ein dort gestarteter Lauf nennt sein Template und behält die
+Websuche. Dafür braucht es die Adresse, und es ist die Werkstatt; das gilt als Wahl.
+
+**Tests.** Ende-zu-Ende über die echte Verdrahtung mit aufgezeichneten HTTP-Anfragen (`CarefulOrderWebSearchEndToEndTests`):
+„Extra careful“ über MCP mit Angaben unter „About me“, ein sorgfältiger Web-Auftrag und `submit_request` ohne Template sowie ein
+fortgesetzter Lauf mit gespeichertem Snapshot schicken nichts an den Suchdienst und rufen keine Anfrageformung auf, während die
+Angaben unter „About me“ weiter beim Schreiber ankommen; `submit_request` mit `crewTemplate = klassik` sucht weiter, nur mit der
+gebildeten Anfrage; ohne gebildete Anfrage sucht es nichts und speichert die Warnung. Ohne diese Änderung scheitern alle diese
+Tests außer dem mit `crewTemplate`, der weiter sucht. Die Prüfung eines geklärten sorgfältigen Auftrags in `IntakePrivacyEndToEndTests` erwartet jetzt keine Suche.
+Datenbanktests für die Regel (`StandardOrderWebSearchTests`), Unit-Tests für Extractor und Provider.
