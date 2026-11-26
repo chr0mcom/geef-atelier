@@ -1,0 +1,128 @@
+@using Geef.Atelier.Application.Orders
+@using HowItWorksPage = Geef.Atelier.Web.Components.Pages.HowItWorks
+
+<section class="lp-section lp-example" id="example" aria-labelledby="lp-example-title" data-testid="landing-example">
+    <div class="lp-container">
+        <div class="lp-split-head">
+            <div>
+                <p class="lp-eyebrow">A made-up example</p>
+                <h2 class="lp-h2" id="lp-example-title">From one sentence to a text you can check.</h2>
+            </div>
+            <p class="lp-lede" data-testid="landing-example-made-up">This example is made up to show how it goes. A real result depends on your request.</p>
+        </div>
+
+        <ol class="ex-flow@(Features.Questions ? "" : " ex-flow--no-question")">
+            <li class="ex-stage ex-request">
+                <p class="ex-label"><span class="ex-step" aria-hidden="true">1</span> You write</p>
+                <blockquote class="ex-slip">Write an email to my landlord. The heating in my flat has not worked since Monday. I want it repaired this week.</blockquote>
+            </li>
+
+            @if (Features.Questions)
+            {
+                <li class="ex-stage ex-question" data-testid="landing-example-question">
+                    <p class="ex-label"><span class="ex-step" aria-hidden="true">2</span> Atelier asks first</p>
+                    <div class="ex-card">
+                        <p class="ex-q">Is this the first time the heating has failed?</p>
+                        <ul class="ex-options" aria-label="Answers to click (example)">
+                            <li>Yes, the first time</li>
+                            <li class="is-chosen"><span class="visually-hidden">Chosen: </span>No, it happened before</li>
+                            <li class="is-skip">Skip</li>
+                        </ul>
+                        <p class="ex-small">You can skip every question.</p>
+                    </div>
+                </li>
+            }
+
+            <li class="ex-stage ex-result">
+                <p class="ex-label"><span class="ex-step" aria-hidden="true">@(Features.Questions ? 3 : 2)</span> You get the text, and what to look at</p>
+                <div class="proof" data-testid="landing-example-text">
+                    <div class="proof-row">
+                        <p class="proof-text proof-subject">Heating not working since Monday: please repair it this week</p>
+                    </div>
+                    <div class="proof-row">
+                        <p class="proof-text">Dear <mark>[landlord's name]</mark>,</p>
+                        <p class="proof-note"><span class="visually-hidden">Note: </span>Fill in</p>
+                    </div>
+                    <div class="proof-row">
+                        <p class="proof-text">the heating in my flat at <mark>[address]</mark> has not worked since Monday.</p>
+                        <p class="proof-note"><span class="visually-hidden">Note: </span>Fill in</p>
+                    </div>
+                    @if (Features.Questions)
+                    {
+                        <div class="proof-row" data-testid="landing-example-from-answer">
+                            <p class="proof-text">This is not the first time it has failed.</p>
+                            <p class="proof-note proof-note--answer"><span class="visually-hidden">Note: </span>From your answer</p>
+                        </div>
+                    }
+                    <div class="proof-row">
+                        <p class="proof-text"><span class="@(ShowsFactCheck ? "proof-flag" : "")">I already reported it by phone on Tuesday.</span></p>
+                        @if (ShowsFactCheck)
+                        {
+                            <p class="proof-note proof-note--flag" data-testid="landing-example-flag-note"><span class="visually-hidden">Note: </span>May not be backed: you did not say this</p>
+                        }
+                    </div>
+                    <div class="proof-row">
+                        <p class="proof-text">Please arrange a repair this week. I am at home <mark>[times you are at home]</mark>.</p>
+                        <p class="proof-note"><span class="visually-hidden">Note: </span>Fill in</p>
+                    </div>
+                    <div class="proof-row">
+                        <p class="proof-text">Kind regards,<br /><mark>[Your name]</mark></p>
+                        <p class="proof-note"><span class="visually-hidden">Note: </span>Fill in</p>
+                    </div>
+                </div>
+
+                <div class="proof-report" data-testid="landing-example-report">
+                    <div class="proof-report-part" data-testid="landing-example-checks">
+                        <p class="ex-label">@OrderCheckLines.Heading</p>
+                        <ul>
+                            <li>@AutomaticLine</li>
+                            <li>@FactLine</li>
+                        </ul>
+                        <p>@(ShowsFactCheck ? OrderCheckLines.ToReviewOpenPoints : OrderCheckLines.ToReviewFactsNotFullyChecked)</p>
+                        <p class="proof-limits">@OrderCheckLines.Limits</p>
+                    </div>
+                    <div class="proof-report-part">
+                        <p class="ex-label">Open points</p>
+                        <p>@HowItWorksPage.FillInLead <mark>[landlord's name]</mark>, <mark>[address]</mark>, <mark>[times you are at home]</mark>, <mark>[Your name]</mark></p>
+                        @if (ShowsFactCheck)
+                        {
+                            <p data-testid="landing-example-unbacked">@HowItWorksPage.UnbackedLead <span class="proof-flag">“I already reported it by phone on Tuesday.”</span></p>
+                        }
+                    </div>
+                    <div class="proof-report-part">
+                        <p class="ex-label">Assumptions</p>
+                        <p>@HowItWorksPage.AssumedLead the email should be polite but firm.</p>
+                    </div>
+                </div>
+            </li>
+        </ol>
+
+        <p class="ex-explain" data-testid="landing-example-explained">@Explanation</p>
+        <p class="ex-more"><a href="/how-it-works#example" data-enhance-nav="false">Another example, and what each part means</a></p>
+    </div>
+</section>
+
+@code {
+    /// <summary>What the start page may call available for the viewer.</summary>
+    [Parameter, EditorRequired] public HowItWorksFeatures Features { get; set; } = null!;
+
+    bool ShowsFactCheck => Features.FactCheck != FactCheckOffer.NotShown;
+
+    string AutomaticLine => OrderCheckLines.AutomaticLead + OrderCheckLines.PassedNotEmpty + OrderCheckLines.AutomaticSeparator
+        + OrderCheckLines.PassedStartsDirectly + OrderCheckLines.AutomaticEnd;
+
+    string FactLine => ShowsFactCheck ? OrderCheckLines.FactsComparedLeadNoFiles + OrderCheckLines.FactsOpenOne : OrderCheckLines.FactsNotChecked;
+
+    string Explanation
+    {
+        get
+        {
+            var answer = Features.Questions ? "The answer to the question went into the email. " : "";
+            var gaps = "What only you know stays as a gap in [square brackets]. ";
+            var added = ShowsFactCheck
+                ? "The writer also added a sentence nobody gave it (“I already reported it by phone on Tuesday.”), and the fact check pointed it out. Read the open points before you send anything."
+                : "The writer also added a sentence nobody gave it (“I already reported it by phone on Tuesday.”). Read every text before you send it.";
+            return answer + gaps + added;
+        }
+    }
+}

@@ -2,6 +2,7 @@ using Bunit;
 using Bunit.TestDoubles;
 using Geef.Atelier.Web.Components.Pages;
 using Geef.Atelier.Web.Components.UI.Landing;
+using Geef.Atelier.Web.Display;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Geef.Atelier.Tests.Web.Components;
@@ -29,6 +30,16 @@ public sealed class LandingPageTests : TestContext
     }
 
     [Fact]
+    public void LandingNav_SignedIn_OffersMyWorkAndANewText()
+    {
+        this.AddTestAuthorization().SetAuthorized("someone");
+        var cut = RenderComponent<LandingNav>();
+        Assert.Equal("/work", cut.Find("[data-testid='landing-nav-my-work']").GetAttribute("href"));
+        Assert.Equal("/start", cut.Find("[data-testid='landing-nav-start']").GetAttribute("href"));
+        Assert.Empty(cut.FindAll("a[href='/login']"));
+    }
+
+    [Fact]
     public void LandingNav_RendersCTALinkToLogin()
     {
         var cut = RenderComponent<LandingNav>();
@@ -44,124 +55,109 @@ public sealed class LandingPageTests : TestContext
         // Absolute (/#…) so the links also resolve from the public stub pages,
         // where the nav is shared but the anchor targets live on the landing page.
         Assert.Contains(midLinks, a => a.GetAttribute("href") == "/how-it-works");
-        Assert.Contains(midLinks, a => a.GetAttribute("href") == "/#geef");
+        Assert.Contains(midLinks, a => a.GetAttribute("href") == "/#for-whom");
+        Assert.Contains(midLinks, a => a.GetAttribute("href") == "/#teams");
         Assert.Contains(midLinks, a => a.GetAttribute("href") == "/self-host");
         Assert.DoesNotContain(midLinks, a => a.TextContent.Contains("crew", StringComparison.OrdinalIgnoreCase) || a.TextContent.Contains("Manuscript", StringComparison.Ordinal));
     }
 
     // ── Hero ─────────────────────────────────────────────────────────────
 
+    private static HowItWorksFeatures Everyone(bool signedIn = false) => new(
+        ForSignedInPerson: signedIn, Questions: true, MaxQuestions: 3, ChangeText: true, MaxVersions: 10, WebResearch: false,
+        FactCheck: FactCheckOffer.ReportsOnly, SumsInFiles: true, UploadThroughAssistant: true, OlderAssistantTools: true,
+        LearnsFromEarlierTexts: false, MaxFiles: 10, MaxFileBytes: 26_214_400, FullTextChars: 150_000, MapChars: 600_000);
+
     [Fact]
-    public void LandingHero_ContainsManufactoryHeadline()
+    public void LandingHero_SaysWhatItIsInTheHeadline()
     {
-        var cut = RenderComponent<LandingHero>();
-        Assert.Contains("manufactory", cut.Find("h1").TextContent, StringComparison.OrdinalIgnoreCase);
+        var cut = RenderComponent<LandingHero>(p => p.Add(c => c.Features, Everyone()));
+        Assert.Equal("A finished text, and what you still need to check.", cut.Find("h1").TextContent.Trim());
+        Assert.Contains("manufactory", cut.Find(".colophon-row").TextContent, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void LandingHero_CTAsLinkToLogin()
+    public void LandingHero_SignedOut_StartsAtTheSignInPageAndSaysWhoSetsUpAccounts()
     {
-        var cut = RenderComponent<LandingHero>();
-        var ctas = cut.FindAll("a.lp-cta");
-        Assert.All(ctas, a =>
-        {
-            var href = a.GetAttribute("href") ?? "";
-            Assert.True(href == "/login" || href == "/how-it-works", $"Unexpected href: {href}");
-        });
+        var cut = RenderComponent<LandingHero>(p => p.Add(c => c.Features, Everyone()));
+        Assert.Equal("/login", cut.Find("[data-testid='landing-hero-start']").GetAttribute("href"));
+        Assert.Equal("/how-it-works", cut.Find("[data-testid='landing-hero-how']").GetAttribute("href"));
+        Assert.Contains("administrators", cut.Find("[data-testid='landing-hero-account']").TextContent, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void LandingHero_RendersHeroPressIllustration()
+    public void LandingHero_SignedIn_StartsANewText()
     {
-        var cut = RenderComponent<LandingHero>();
+        var cut = RenderComponent<LandingHero>(p => p.Add(c => c.Features, Everyone(signedIn: true)));
+        Assert.Equal("/start", cut.Find("[data-testid='landing-hero-start']").GetAttribute("href"));
+        Assert.Empty(cut.FindAll("[data-testid='landing-hero-account']"));
+    }
+
+    [Fact]
+    public void LandingHero_RendersHeroPressIllustrationHiddenFromScreenReaders()
+    {
+        var cut = RenderComponent<LandingHero>(p => p.Add(c => c.Features, Everyone()));
+        Assert.Equal("true", cut.Find(".hero-visual").GetAttribute("aria-hidden"));
         cut.Find(".press-anim");
     }
 
-    // ── GeefFlow ─────────────────────────────────────────────────────────
+    // ── Steps ────────────────────────────────────────────────────────────
 
     [Fact]
-    public void LandingGeefFlow_RendersFourPhases()
+    public void LandingSteps_ShowsFiveStepsWithQuestionsAndFourWithout()
     {
-        var cut = RenderComponent<LandingGeefFlow>();
-        var phases = cut.FindAll(".geef-phase");
-        Assert.Equal(4, phases.Count);
+        var with = RenderComponent<LandingSteps>(p => p.Add(c => c.Features, Everyone()));
+        Assert.Equal(5, with.FindAll(".lp-flow-step").Count);
+        Assert.Equal("Five steps from your words to your text.", with.Find("h2").TextContent);
+
+        var without = RenderComponent<LandingSteps>(p => p.Add(c => c.Features, Everyone() with { Questions = false }));
+        Assert.Equal(4, without.FindAll(".lp-flow-step").Count);
+        Assert.Empty(without.FindAll("[data-step='questions']"));
     }
 
     [Fact]
-    public void LandingGeefFlow_HasGeefAnchorId()
+    public void LandingSteps_TheOneMoreTryArcSpansFromTheCheckBackToTheWriter()
     {
-        var cut = RenderComponent<LandingGeefFlow>();
-        var section = cut.Find("section");
-        Assert.Equal("geef", section.GetAttribute("id"));
-    }
+        var with = RenderComponent<LandingSteps>(p => p.Add(c => c.Features, Everyone()));
+        var style = with.Find("[data-testid='landing-flow']").GetAttribute("style");
+        Assert.Contains("--steps: 5", style, StringComparison.Ordinal);
+        Assert.Contains("--retry-from: 40%", style, StringComparison.Ordinal);
+        Assert.Contains("--retry-to: 40%", style, StringComparison.Ordinal);
 
-    [Fact]
-    public void LandingGeefFlow_EvaluationPhaseHasIterBadge()
-    {
-        var cut = RenderComponent<LandingGeefFlow>();
-        var badge = cut.Find(".iter-badge");
-        Assert.Contains("×3", badge.TextContent);
-    }
-
-    [Fact]
-    public void LandingGeefFlow_ContainsIterationLoop()
-    {
-        var cut = RenderComponent<LandingGeefFlow>();
-        cut.Find(".loop");
-        cut.Find(".loop-label");
-    }
-
-    [Fact]
-    public void LandingGeefFlow_StartsWithRunClassPresent_ForVisibility()
-    {
-        var cut = RenderComponent<LandingGeefFlow>();
-        // Section starts with "in" for immediate visibility (animation driven by JS)
-        var section = cut.Find("section");
-        Assert.Contains("in", section.ClassList);
-    }
-
-    // ── Crew ─────────────────────────────────────────────────────────────
-
-    [Fact]
-    public void LandingCrew_HasCrewAnchorId()
-    {
-        var cut = RenderComponent<LandingCrew>();
-        var section = cut.Find("section");
-        Assert.Equal("crew", section.GetAttribute("id"));
-    }
-
-    [Fact]
-    public void LandingCrew_RendersCrewSheet()
-    {
-        var cut = RenderComponent<LandingCrew>();
-        cut.Find(".crew-sheet");
-    }
-
-    // ── Proof ─────────────────────────────────────────────────────────────
-
-    [Fact]
-    public void LandingProof_HasProofAnchorId()
-    {
-        var cut = RenderComponent<LandingProof>();
-        var section = cut.Find("section");
-        Assert.Equal("proof", section.GetAttribute("id"));
-    }
-
-    [Fact]
-    public void LandingProof_RendersRunMock()
-    {
-        var cut = RenderComponent<LandingProof>();
-        cut.Find(".run-mock");
+        var without = RenderComponent<LandingSteps>(p => p.Add(c => c.Features, Everyone() with { Questions = false }));
+        var style4 = without.Find("[data-testid='landing-flow']").GetAttribute("style");
+        Assert.Contains("--retry-from: 25%", style4, StringComparison.Ordinal);
+        Assert.Contains("--retry-to: 50%", style4, StringComparison.Ordinal);
     }
 
     // ── Capabilities ─────────────────────────────────────────────────────
 
     [Fact]
-    public void LandingCapabilities_RendersSixCapCards()
+    public void LandingCapabilities_RendersSixCardsAndTheLimits()
     {
-        var cut = RenderComponent<LandingCapabilities>();
-        var cards = cut.FindAll(".cap");
-        Assert.Equal(6, cards.Count);
+        var cut = RenderComponent<LandingCapabilities>(p => p.Add(c => c.Features, Everyone()));
+        Assert.Equal(6, cut.FindAll(".cap").Count);
+        Assert.Contains("150,000 characters (roughly 60 pages)", cut.Find("[data-testid='landing-cap-files']").TextContent, StringComparison.Ordinal);
+        cut.Find("[data-testid='landing-limits']");
+    }
+
+    // ── Workshop ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void LandingWorkshop_HasTeamsAnchorAndNamesNoModel()
+    {
+        var cut = RenderComponent<LandingWorkshop>();
+        Assert.Equal("teams", cut.Find("section").GetAttribute("id"));
+        Assert.Contains("administrators", cut.Find("h2").TextContent, StringComparison.Ordinal);
+        Assert.Equal(5, cut.FindAll(".team-row").Count);
+    }
+
+    [Fact]
+    public void LandingWorkshop_FollowsTheSwitchForWhoSeesTheMenu()
+    {
+        var cut = RenderComponent<LandingWorkshop>(p => p.Add(c => c.WorkshopForAdminsOnly, false));
+        Assert.Equal("The workshop, for teams.", cut.Find("h2").TextContent);
+        Assert.Contains("shown to everyone who is signed in", cut.Find("[data-testid='landing-teams-visibility']").TextContent, StringComparison.Ordinal);
     }
 
     // ── Film ─────────────────────────────────────────────────────────────
@@ -222,9 +218,15 @@ public sealed class LandingPageTests : TestContext
     [Fact]
     public void LandingClosing_CTALinksToLogin()
     {
-        var cut = RenderComponent<LandingClosing>();
-        var cta = cut.Find("a.lp-cta");
-        Assert.Equal("/login", cta.GetAttribute("href"));
+        var cut = RenderComponent<LandingClosing>(p => p.Add(c => c.Features, Everyone()));
+        Assert.Equal("/login", cut.Find("[data-testid='landing-closing-start']").GetAttribute("href"));
+    }
+
+    [Fact]
+    public void LandingClosing_SignedIn_LinksToStart()
+    {
+        var cut = RenderComponent<LandingClosing>(p => p.Add(c => c.Features, Everyone(signedIn: true)));
+        Assert.Equal("/start", cut.Find("[data-testid='landing-closing-start']").GetAttribute("href"));
     }
 
     // ── Landing page (auth routing) ───────────────────────────────────────

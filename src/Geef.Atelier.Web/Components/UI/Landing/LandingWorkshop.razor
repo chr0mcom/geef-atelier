@@ -1,0 +1,42 @@
+<section class="lp-section lp-workshop" id="teams" aria-labelledby="lp-workshop-title" data-testid="landing-teams">
+    <div class="lp-container lp-workshop-grid">
+        <div class="workshop-copy">
+            <p class="lp-eyebrow">For teams</p>
+            <h2 class="lp-h2" id="lp-workshop-title">@(WorkshopForAdminsOnly ? "The workshop, for administrators." : "The workshop, for teams.")</h2>
+            <p class="lp-lede">
+                Atelier also keeps an older way of working, the workshop. There, administrators set up a team of AI roles for one kind
+                of text: one model writes, other models read the draft and say what is wrong, and the draft is rewritten until they find
+                no serious problem or a set number of rounds is reached.
+            </p>
+            <ul class="lp-plain-list">
+                <li data-testid="landing-teams-visibility">@(WorkshopForAdminsOnly ? "Its menu is shown only to administrators." : "Its menu is shown to everyone who is signed in.") It is slower than the standard way, and its results do not show “What was checked”.</li>
+                <li>Teams chosen in the workshop can search the web with their own sources, whatever the setting for the standard way says.</li>
+                <li data-testid="landing-teams-careful">Anyone can tick “Extra careful” when they start a text. It uses this older way with the built-in team: slower, several rounds of reading and rewriting, no web search and no “What was checked”. For most texts, leave it off.</li>
+            </ul>
+            <p class="workshop-links">
+                <a href="/how-it-works#admins" data-enhance-nav="false">For administrators</a>
+                <a href="/docs/14-admin-guide">Guide for administrators</a>
+            </p>
+        </div>
+
+        <div class="team-sheet" aria-labelledby="lp-team-sheet-title" role="group">
+            <div class="top">
+                <p class="label">The workshop</p>
+                <p class="title" id="lp-team-sheet-title">A team sheet</p>
+                <p class="ord">What an administrator fills in</p>
+            </div>
+            <dl>
+                <div class="team-row"><dt>Request</dt><dd>in the person's own words</dd></div>
+                <div class="team-row"><dt>Writer</dt><dd>a model the administrator chooses</dd></div>
+                <div class="team-row"><dt>Readers</dt><dd>one or more other models, each with its own task</dd></div>
+                <div class="team-row"><dt>Sources</dt><dd>a knowledge base, the web or other sources, if allowed</dd></div>
+                <div class="team-row"><dt>Finishing</dt><dd>steps such as a summary, another tone or passing the text on</dd></div>
+            </dl>
+        </div>
+    </div>
+</section>
+
+@code {
+    /// <summary>Whether the workshop menu is shown only to administrators (<c>Ui:WorkshopForAdminsOnly</c>).</summary>
+    [Parameter] public bool WorkshopForAdminsOnly { get; set; } = true;
+}

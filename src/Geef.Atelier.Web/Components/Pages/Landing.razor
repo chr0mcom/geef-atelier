@@ -2,21 +2,60 @@
 @layout Layout.LandingLayout
 @attribute [AllowAnonymous]
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.Extensions.Options
+@using Geef.Atelier.Core.Configuration
+@inject IOptions<OrderOptions> OrderSettings
+@inject IOptions<IntakeOptions> IntakeSettings
+@inject IOptions<ResearchOptions> ResearchSettings
+@inject IOptions<DirectOptions> DirectSettings
+@inject IOptions<UploadOptions> UploadSettings
+@inject IOptions<UiOptions> UiSettings
+@inject IOptions<McpOptions> McpSettings
+@inject IOptions<LearningOptions> LearningSettings
+@inject IOptions<SourceOptions> SourceSettings
 
-<PageTitle>Geef.Atelier — A manufactory for the written word</PageTitle>
+<PageTitle>@Title</PageTitle>
 <HeadContent>
-    <meta name="description" content="Atelier turns a short request into a finished text: it may ask a few questions first, gives the writer your files in full up to a size limit, checks what it can and tells you what is still open." />
+    <meta name="description" content="@Description" />
 </HeadContent>
 
-<div class="landing">
+<div class="landing" data-testid="landing">
     <LandingNav />
-    <LandingHero />
-    <LandingTurn />
-    <LandingGeefFlow />
-    <LandingFilm />
-    <LandingCrew />
-    <LandingProof />
-    <LandingCapabilities />
-    <LandingClosing />
+    <main id="main">
+        <LandingHero Features="_f" />
+        <LandingExample Features="_f" />
+        <LandingSteps Features="_f" />
+        <LandingFilm />
+        <LandingCapabilities Features="_f" />
+        <LandingAudiences />
+        <LandingPrivacy Features="_f" OriginalRetentionDays="RetentionDays" />
+        <LandingWorkshop WorkshopForAdminsOnly="UiSettings.Value.WorkshopForAdminsOnly" />
+        <LandingClosing Features="_f" />
+    </main>
     <LandingFooter />
 </div>
+
+@code {
+    /// <summary>The title of the start page.</summary>
+    public const string Title = "Geef.Atelier — finished texts that show what is still open";
+
+    /// <summary>The description search engines and link previews show; true for every setting of the switches.</summary>
+    public const string Description =
+        "Say in your own words what you need and add files if you have them. Atelier writes the text and shows what was checked, "
+        + "what is still open and what was assumed. You decide what to send.";
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    HowItWorksFeatures _f = null!;
+
+    int RetentionDays => (int)SourceSettings.Value.OriginalRetention.TotalDays;
+
+    HowItWorksSettings Settings => new(OrderSettings.Value, IntakeSettings.Value, ResearchSettings.Value, DirectSettings.Value, UploadSettings.Value,
+        UiSettings.Value, McpSettings.Value, LearningSettings.Value, SourceSettings.Value);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var viewer = AuthState is null ? null : (await AuthState).User;
+        _f = Settings.FeaturesFor(viewer);
+    }
+}

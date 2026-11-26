@@ -14,7 +14,7 @@
     });
   }, { threshold: 0.18 });
 
-  document.querySelectorAll('.lp-reveal:not(.geef-flow)').forEach(function (el) {
+  document.querySelectorAll('.lp-reveal').forEach(function (el) {
     if (reduced) { el.classList.add('in'); } else { revealObs.observe(el); }
   });
 
@@ -71,52 +71,51 @@
     }
   }
 
-  // GEEF flow choreography — phases G → E → E-loop → F
-  var flow = document.querySelector('.geef-flow');
+  // Steps choreography: one pass over the steps of the standard way, the
+  // "one more try" arc shows while the check step is active.
+  var flow = document.querySelector('.lp-flow');
   if (!flow) return;
 
-  var phases = flow.querySelectorAll('.geef-phase');
+  var steps = Array.prototype.slice.call(flow.querySelectorAll('.lp-flow-step'));
 
-  function setPhase(p) {
-    phases.forEach(function (ph, i) {
-      ph.classList.remove('is-active', 'has-passed');
-      if (p > i) ph.classList.add('has-passed');
-      if (p === i || (i === 2 && p >= 2 && p < 3)) ph.classList.add('is-active');
+  function setStep(p) {
+    steps.forEach(function (st, i) {
+      st.classList.toggle('has-passed', p > i);
+      st.classList.toggle('is-active', p === i);
     });
   }
 
   function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
   async function runSequence() {
-    await wait(280);
+    await wait(240);
     flow.classList.add('run');
-    setPhase(0);
-    await wait(900);
-    setPhase(1);
-    await wait(900);
-    setPhase(2);
-    await wait(2400);
-    setPhase(3);
-    await wait(800);
-    phases.forEach(function (ph) { ph.classList.remove('is-active'); ph.classList.add('has-passed'); });
+    for (var i = 0; i < steps.length; i++) {
+      setStep(i);
+      var isCheck = steps[i].getAttribute('data-step') === 'check';
+      if (isCheck) flow.classList.add('retrying');
+      await wait(isCheck ? 1800 : 800);
+      if (isCheck) flow.classList.remove('retrying');
+    }
+    setStep(steps.length);
   }
 
   if (reduced) {
     flow.classList.add('run');
-    phases.forEach(function (ph) { ph.classList.add('has-passed'); });
+    setStep(steps.length);
     return;
   }
 
-  var geefStarted = false;
-  var geefObs = new IntersectionObserver(function (entries) {
+  var flowStarted = false;
+  var flowObs = new IntersectionObserver(function (entries) {
     entries.forEach(function (e) {
-      if (e.isIntersecting && !geefStarted) {
-        geefStarted = true;
-        geefObs.unobserve(e.target);
+      if (e.isIntersecting && !flowStarted) {
+        flowStarted = true;
+        flowObs.unobserve(e.target);
         runSequence();
       }
     });
-  }, { threshold: 0.32 });
+  }, { threshold: 0.15 });
 
-  geefObs.observe(flow);
+  flowObs.observe(flow);
 })();

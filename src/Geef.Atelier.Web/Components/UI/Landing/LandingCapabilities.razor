@@ -1,53 +1,97 @@
-<section class="lp-section lp-caps lp-reveal">
+@using Geef.Atelier.Web.Components.UI.Orders
+
+<section class="lp-section lp-caps" id="rely" aria-labelledby="lp-caps-title" data-testid="landing-rely">
     <div class="lp-container">
-        <div class="lp-caps-head">
+        <div class="lp-split-head">
             <div>
-                <p class="lp-eyebrow">The Workshop</p>
-                <h2 class="lp-h2">What it <em>can draw on</em>.</h2>
+                <p class="lp-eyebrow">What you can count on</p>
+                <h2 class="lp-h2" id="lp-caps-title">What it does for you, and what it does not.</h2>
             </div>
-            <p class="lp-lede" style="padding-bottom: 10px">
-                What the standard way does for everyone, and what the workshop adds for teams
-                that administrators set up.
+            <p class="lp-lede">
+                A text that reads well can still be wrong. Atelier is built to show you where it may be: what it was given, what it had
+                to guess and what it checked.
             </p>
         </div>
 
         <div class="caps-grid">
-            <div class="cap">
-                <div class="ico"><LandingIllustrations Name="CapSources" /></div>
-                <div class="meta">— Your files</div>
-                <h3>Your files, <em>in full</em></h3>
-                <p>The writer gets your PDF, Word and text files completely, up to a size limit. Workshop teams can also use a knowledge base, papers and the web.</p>
+            <div class="cap" data-testid="landing-cap-files">
+                <div class="ico" aria-hidden="true"><LandingIllustrations Name="CapFiles" /></div>
+                <h3>Your files, in full</h3>
+                <p>Up to @Features.FullTextChars.Grouped() characters (roughly @Features.FullTextChars.ApproxPages() pages), the writer gets your files completely; nothing is cut off or shortened first. If it seems to have read only parts, the result says so.</p>
             </div>
-            <div class="cap">
-                <div class="ico"><LandingIllustrations Name="CapFilter" /></div>
-                <div class="meta">— Questions</div>
-                <h3>It <em>asks first</em></h3>
-                <p>If something important is missing, you get a few short questions with answers to click before it starts. You can skip them.</p>
+            <div class="cap" data-testid="landing-cap-questions">
+                <div class="ico" aria-hidden="true"><LandingIllustrations Name="CapQuestions" /></div>
+                @if (Features.Questions)
+                {
+                    <h3>It asks first, not afterwards</h3>
+                    <p>It is built to ask only what changes the result, before it starts and never while it writes. What it does not ask is written down as an assumption.</p>
+                }
+                else
+                {
+                    <h3>Guesses are written down</h3>
+                    <p>What you did not say and it had to assume is listed with the text, so you can see it and correct it.</p>
+                }
             </div>
-            <div class="cap">
-                <div class="ico"><LandingIllustrations Name="CapModels" /></div>
-                <div class="meta">— Models</div>
-                <h3>A model <em>for each role</em></h3>
-                <p>Each part of the work uses a model chosen for its role. Administrators can add providers in the workshop.</p>
+            <div class="cap" data-testid="landing-cap-gaps">
+                <div class="ico" aria-hidden="true"><LandingIllustrations Name="CapGaps" /></div>
+                <h3>Gaps stay visible</h3>
+                <p>The writer is asked to leave a gap in [square brackets] where a fact is missing, such as a date or a name. The result lists every gap to fill in before you send the text.</p>
             </div>
-            <div class="cap">
-                <div class="ico"><LandingIllustrations Name="CapExport" /></div>
-                <div class="meta">— Finishing</div>
-                <h3>Ready <em>to download</em></h3>
-                <p>Download every text as Word, PDF or Markdown. Workshop teams can add finishing steps such as a summary.</p>
+            <div class="cap" data-testid="landing-cap-checked">
+                <div class="ico" aria-hidden="true"><LandingIllustrations Name="CapChecked" /></div>
+                <h3>It says what was checked</h3>
+                <p>Every text written the standard way comes with what was checked, what is still open and what was assumed. It never claims that the text is right.</p>
             </div>
-            <div class="cap">
-                <div class="ico"><LandingIllustrations Name="CapLearn" /></div>
-                <div class="meta">— Honesty</div>
-                <h3>It says <em>what it checked</em></h3>
-                <p>Every text written the standard way comes with what was checked, what is still open and what was assumed. It never claims to be flawless.</p>
+            <div class="cap" data-testid="landing-cap-versions">
+                <div class="ico" aria-hidden="true"><LandingIllustrations Name="CapVersions" /></div>
+                @if (Features.ChangeText)
+                {
+                    <h3>Change it in your words</h3>
+                    <p>Say what to change and you get a new version; the earlier ones are kept, up to @Features.MaxVersions in all. Every request stays under My work.</p>
+                }
+                else
+                {
+                    <h3>Everything in one place</h3>
+                    <p>Every request, its text and the downloads stay under My work until you delete them.</p>
+                }
             </div>
-            <div class="cap">
-                <div class="ico"><LandingIllustrations Name="CapTrust" /></div>
-                <div class="meta">— Trust</div>
-                <h3>Built for <em>trust</em></h3>
-                <p>Accounts per person, self-hosted and open source. Keys for outside services come from the server's settings, not from forms.</p>
+            <div class="cap" data-testid="landing-cap-export">
+                <div class="ico" aria-hidden="true"><LandingIllustrations Name="CapExport" /></div>
+                <h3>Ready to download</h3>
+                <p>Download every text as Word, PDF or Markdown. The file holds only the text; the open points stay on the page.</p>
             </div>
+        </div>
+
+        <div class="lp-limits" data-testid="landing-limits">
+            <h3 class="lp-limits-title">What Atelier does not do</h3>
+            <ul>
+                <li>It can still be wrong. The checks look for certain problems; they do not prove that everything in the text is right.</li>
+                @if (Features.FactCheck != FactCheckOffer.NotShown)
+                {
+                    <li data-testid="landing-limit-factcheck">The fact check can miss things, and it often points at harmless sentences too, such as a closing line.</li>
+                }
+                <li>It does not send your text on to other people. You read it, fill in the gaps and decide what to send.</li>
+                <li>It is not a chat. Once it starts, you wait for the result, and you cannot add files to a request later.</li>
+                @if (Features.WebResearch)
+                {
+                    <li data-testid="landing-limit-web">It looks things up on the web only for gaps in your request, never when you add files, and it never puts your files into a search.</li>
+                }
+                else
+                {
+                    <li data-testid="landing-limit-web">Right now it does not look things up on the web for your texts. It works from what you give it.</li>
+                }
+                @if (!Features.LearnsFromEarlierTexts)
+                {
+                    <li data-testid="landing-limit-learning">It does not learn from your earlier texts. Only your About me details carry over.</li>
+                }
+                <li>It cannot read scanned pages (photos of paper).</li>
+            </ul>
+            <p class="lp-limits-more"><a href="/how-it-works#why" data-enhance-nav="false">More on what it does and does not do</a></p>
         </div>
     </div>
 </section>
+
+@code {
+    /// <summary>What the start page may call available for the viewer.</summary>
+    [Parameter, EditorRequired] public HowItWorksFeatures Features { get; set; } = null!;
+}

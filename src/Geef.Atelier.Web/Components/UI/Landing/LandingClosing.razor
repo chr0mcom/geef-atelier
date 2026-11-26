@@ -1,16 +1,27 @@
-<section class="lp-section lp-close lp-reveal">
+<section class="lp-section lp-close" aria-labelledby="lp-close-title" data-testid="landing-closing">
     <div class="lp-container">
         <div class="stamp" aria-hidden="true"></div>
-        <h2>Your words deserve a <em>workshop</em>.</h2>
+        <h2 id="lp-close-title">Start with one sentence.</h2>
+        <p class="lp-close-sub">Say what you need. Read what comes back, fill in the gaps, and send it when you are happy with it.</p>
         <div class="actions">
-            <a class="lp-cta lg" href="/login">
-                Enter the Atelier
-                <span class="arrow">→</span>
-            </a>
-            <a class="lp-cta lg ghost" href="https://github.com/chr0mcom/geef" target="_blank" rel="noopener">
-                Read the SDK
-                <span class="arrow">↗</span>
-            </a>
+            @if (Features.ForSignedInPerson)
+            {
+                <a class="lp-cta lg" href="/start" data-testid="landing-closing-start">Write something</a>
+            }
+            else
+            {
+                <a class="lp-cta lg" href="/login" data-testid="landing-closing-start">Enter the Atelier</a>
+            }
+            <a class="lp-cta lg ghost" href="/how-it-works" data-enhance-nav="false">See how it works</a>
         </div>
+        @if (!Features.ForSignedInPerson)
+        {
+            <p class="lp-close-note">Accounts are set up by the administrators of this Atelier.</p>
+        }
     </div>
 </section>
+
+@code {
+    /// <summary>What the start page may call available for the viewer.</summary>
+    [Parameter, EditorRequired] public HowItWorksFeatures Features { get; set; } = null!;
+}
