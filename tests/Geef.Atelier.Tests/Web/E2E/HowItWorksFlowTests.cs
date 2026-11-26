@@ -1,5 +1,6 @@
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Intake;
+using Microsoft.Extensions.Configuration;
 using Geef.Atelier.Tests.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Playwright;
@@ -42,9 +43,9 @@ public sealed class HowItWorksFlowTests(PlaywrightFixture pw, PostgresFixture pg
             Assert.Equal(0, await page.Locator("[data-testid='hiw-step-change']").CountAsync());
             Assert.True(await page.Locator("[data-testid='hiw-sign-in']").IsVisibleAsync());
 
-            await page.GotoAsync($"{host.BaseUrl}/how-it-works");
-            await page.Locator("[data-testid='how-it-works']").WaitForAsync(new LocatorWaitForOptions { Timeout = 15_000 });
             await AssertNoLayoutShiftAsync(page);
+            Assert.True(await page.Locator("[data-testid='menu-sign-in']").IsVisibleAsync());
+            Assert.Equal(0, await page.Locator("[data-testid='hiw-admins-table']").CountAsync());
             await AssertFitsAsync(page, $"signed-out-{palette}-{width}");
         }
         finally
@@ -72,8 +73,7 @@ public sealed class HowItWorksFlowTests(PlaywrightFixture pw, PostgresFixture pg
 
             Assert.Equal("true", await page.Locator("[data-testid='hiw-status-change']").GetAttributeAsync("data-on"));
             Assert.True(await page.Locator("[data-testid='hiw-step-change']").IsVisibleAsync());
-            Assert.Equal("Off", (await page.Locator("[data-testid='hiw-admins'] tbody tr", new PageLocatorOptions { HasText = "Orders:Revise" })
-                .Locator("td").Nth(2).TextContentAsync())?.Trim());
+            Assert.Equal(0, await page.Locator("[data-testid='hiw-admins-table']").CountAsync());
             Assert.True(await page.Locator("[data-testid='hiw-start']").IsVisibleAsync());
 
             await AssertFitsAsync(page, $"signed-in-{palette}-{width}");
@@ -116,9 +116,19 @@ public sealed class HowItWorksFlowTests(PlaywrightFixture pw, PostgresFixture pg
 
     private static void Shipped(IServiceCollection services)
     {
-        services.Configure<OrderOptions>(o => o.IntakeMode = IntakeMode.On);
-        services.Configure<UploadOptions>(o => o.Tickets = UploadTicketsMode.On);
-        services.Configure<DirectOptions>(o => o.FactCheckMode = Geef.Atelier.Core.Domain.FactCheck.FactCheckMode.Report);
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Geef.Atelier.slnx")))
+            dir = dir.Parent;
+        var shipped = new ConfigurationBuilder()
+            .AddJsonFile(Path.Combine(dir!.FullName, "src", "Geef.Atelier.Web", "appsettings.json"), optional: false, reloadOnChange: false)
+            .Build();
+        services.Configure<OrderOptions>(shipped.GetSection(OrderOptions.SectionName));
+        services.Configure<IntakeOptions>(shipped.GetSection(IntakeOptions.SectionName));
+        services.Configure<ResearchOptions>(shipped.GetSection(ResearchOptions.SectionName));
+        services.Configure<DirectOptions>(shipped.GetSection(DirectOptions.SectionName));
+        services.Configure<UploadOptions>(shipped.GetSection(UploadOptions.SectionName));
+        services.Configure<UiOptions>(shipped.GetSection(UiOptions.SectionName));
+        services.Configure<LearningOptions>(shipped.GetSection(LearningOptions.SectionName));
     }
 
     private async Task<IBrowserContext> ContextAsync(WebTestHost host, string palette, int width, int height)
@@ -149,7 +159,7 @@ public sealed class HowItWorksFlowTests(PlaywrightFixture pw, PostgresFixture pg
         if (Environment.GetEnvironmentVariable("ATELIER_SCREENSHOT_DIR") is { Length: > 0 } dir)
         {
             await page.ScreenshotAsync(new PageScreenshotOptions { Path = Path.Combine(dir, $"how-it-works-{name}.png"), FullPage = true });
-            foreach (var part in new[] { "steps", "example", "status" })
+            foreach (var part in new[] { "steps", "example", "status", "about-me" })
             {
                 await page.Locator($"#{part}").ScrollIntoViewIfNeededAsync();
                 await page.ScreenshotAsync(new PageScreenshotOptions { Path = Path.Combine(dir, $"how-it-works-{name}-{part}.png") });

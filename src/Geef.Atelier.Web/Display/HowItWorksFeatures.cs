@@ -39,11 +39,13 @@ public sealed record HowItWorksSettings(
 /// <param name="MaxQuestions">Most questions per order.</param>
 /// <param name="ChangeText">Whether a finished text can be changed ("Change something", <c>revise_order</c>).</param>
 /// <param name="MaxVersions">Most versions of one order.</param>
-/// <param name="WebResearch">Whether the first version may look things up on the web (research on and questions on, because the topics come from reading the request).</param>
+/// <param name="WebResearch">
+/// Whether the first version of an order on the standard way may look things up on the web (research on and questions on, because the
+/// topics come from reading the request). "Extra careful" and teams chosen in the workshop are not covered by this switch.
+/// </param>
 /// <param name="FactCheck">How the fact check may be described.</param>
 /// <param name="SumsInFiles">Whether totals in the files are recalculated without an AI model.</param>
 /// <param name="UploadThroughAssistant">Whether an AI assistant can upload files with an upload ticket.</param>
-/// <param name="WorkshopVisible">Whether the viewer sees the entries to the workshop.</param>
 /// <param name="OlderAssistantTools">Whether AI assistants are also offered the older tools.</param>
 /// <param name="LearnsFromEarlierTexts">Whether the learning loop runs.</param>
 /// <param name="MaxFiles">Most files per order.</param>
@@ -60,7 +62,6 @@ public sealed record HowItWorksFeatures(
     FactCheckOffer FactCheck,
     bool SumsInFiles,
     bool UploadThroughAssistant,
-    bool WorkshopVisible,
     bool OlderAssistantTools,
     bool LearnsFromEarlierTexts,
     int MaxFiles,
@@ -73,7 +74,7 @@ public static class HowItWorksFeatureExtensions
 {
     /// <summary>
     /// The features for <paramref name="viewer"/>: for a signed-in person with their exceptions per user name (changing a text,
-    /// research, fact check) and their right to see the workshop; for nobody signed in the values for everyone.
+    /// research, fact check); for nobody signed in the values for everyone.
     /// </summary>
     public static HowItWorksFeatures FeaturesFor(this HowItWorksSettings settings, ClaimsPrincipal? viewer)
     {
@@ -90,7 +91,6 @@ public static class HowItWorksFeatureExtensions
             FactCheck: settings.Direct.FactCheckModeFor(user).ToOffer(),
             SumsInFiles: settings.Direct.SourceArithmetic,
             UploadThroughAssistant: settings.Uploads.Tickets == UploadTicketsMode.On,
-            WorkshopVisible: user is not null && settings.Ui.ShowsWorkshopEntriesTo(viewer),
             OlderAssistantTools: settings.Mcp.LegacyTools,
             LearnsFromEarlierTexts: settings.Learning.Enabled,
             MaxFiles: settings.Sources.MaxFilesPerOrder,

@@ -56,9 +56,71 @@ public sealed class GuideDriftTests
     public void The_german_guides_use_real_umlauts()
     {
         var docs = Path.Combine(RepoRoot(), "docs");
-        var substitutes = new Regex(@"\b(fuer|ueber|koennen|moeglich|Aenderung|pruefen|geprueft|Pruefung|muessen|waehlen|Schluessel)\b");
+        var substitutes = new Regex(
+            @"\b(fuer|ueber|koennen|moeglich\w*|[Aa]enderung\w*|aendern|pruef\w*|gepruef\w*|[Pp]ruefung\w*|muess\w*|waehl\w*|[Ss]chluessel\w*|"
+            + @"zurueck\w*|spaeter|naechst\w*|hoechst\w*|groess\w*|Groesse|laenger|laeuft|fuehr\w*|gehoer\w*|loesch\w*|oeffn\w*|oeffentlich\w*|"
+            + @"Auftraeg\w*|Ueberblick|uebersieh\w*|zusaetzlich|unterstuetz\w*|weiss|heisst|gross|draussen|Strasse|ausser|Massnahme\w*)\b");
         foreach (var guide in Guides)
             Assert.DoesNotMatch(substitutes, File.ReadAllText(Path.Combine(docs, guide + "_de.md")));
+    }
+
+    public static TheoryData<string, bool> ServedDocuments()
+    {
+        var data = new TheoryData<string, bool>();
+        foreach (var entry in DocsService.Entries)
+        {
+            data.Add(entry.Slug, false);
+            data.Add(entry.Slug, true);
+        }
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(ServedDocuments))]
+    public void Every_served_document_renders_without_diagram_source_comments_or_dead_links(string slug, bool german)
+    {
+        var html = new DocsService().GetHtml(slug, german).Value;
+
+        Assert.False(string.IsNullOrWhiteSpace(html));
+        Assert.DoesNotContain("language-mermaid", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("flowchart", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("sequenceDiagram", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("&lt;!--", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<!--", html, StringComparison.Ordinal);
+        foreach (Match link in Regex.Matches(html, @"<a href=""(?<href>[^""]*)"""))
+        {
+            var href = System.Net.WebUtility.HtmlDecode(link.Groups["href"].Value);
+            if (href.StartsWith("/docs/", StringComparison.Ordinal))
+            {
+                var target = href[6..].Split('?', '#')[0];
+                Assert.True(DocsService.IsAllowed(target), $"{slug}: {href}");
+            }
+            else if (href.StartsWith(DocsService.RepositoryFileBase, StringComparison.Ordinal))
+            {
+                var file = href[DocsService.RepositoryFileBase.Length..].Split('#')[0];
+                Assert.True(File.Exists(Path.Combine(RepoRoot(), file)) || Directory.Exists(Path.Combine(RepoRoot(), file)), $"{slug}: {href}");
+            }
+            else
+            {
+                Assert.True(href.StartsWith("https://", StringComparison.Ordinal) || href.StartsWith("http://", StringComparison.Ordinal)
+                    || href.StartsWith("mailto:", StringComparison.Ordinal) || href.StartsWith('#'), $"{slug}: {href}");
+            }
+        }
+    }
+
+    [Fact]
+    public void Links_are_pointed_to_docs_github_or_plain_text()
+    {
+        var html = DocsService.RewriteLinks(
+            "<a href=\"14-admin-guide_de.md#funktionen-schalten\">a</a> <a href=\"10-tool-system.md\">b</a> <a href=\"../README.md\">c</a> " +
+            "<a href=\"reports/step-01-report.md\">d</a> <a href=\"https://example.org/x\">e</a>");
+
+        Assert.Contains("href=\"/docs/14-admin-guide?lang=de#funktionen-schalten\"", html, StringComparison.Ordinal);
+        Assert.Contains($"href=\"{DocsService.RepositoryFileBase}docs/10-tool-system.md\"", html, StringComparison.Ordinal);
+        Assert.Contains($"href=\"{DocsService.RepositoryFileBase}README.md\"", html, StringComparison.Ordinal);
+        Assert.Contains(" d ", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("reports/", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"https://example.org/x\"", html, StringComparison.Ordinal);
     }
 
     private static List<string> ToolTable(string markdown)

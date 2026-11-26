@@ -5212,10 +5212,11 @@ textarea.form-control {
   background: var(--surface);
   display: grid; place-items: center;
 }
-.hiw-step-mark svg {
-  width: 28px; height: 28px;
-  fill: none; stroke: var(--hero); stroke-width: 1.6;
-  stroke-linecap: round; stroke-linejoin: round;
+.hiw-step-mark {
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1;
+  color: var(--hero);
 }
 .hiw-step-body { padding-top: 12px; }
 .hiw-step-body p { margin: 0 0 8px; color: var(--ink-2); }
@@ -5274,6 +5275,7 @@ textarea.form-control {
   text-decoration-thickness: 1.5px;
   text-underline-offset: 4px;
 }
+.hiw-flag--harmless { text-decoration-style: dotted; text-decoration-color: var(--paper-ink-2); }
 .hiw-sheet-part--checks ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
 .hiw-limits { font-size: 14px; color: var(--paper-ink-2) !important; }
 
@@ -5339,7 +5341,7 @@ textarea.form-control {
   .hiw-step { grid-template-columns: 40px minmax(0, 1fr); gap: 14px; }
   .hiw-step::before { left: 19px; top: 40px; }
   .hiw-step-mark { width: 40px; height: 40px; }
-  .hiw-step-mark svg { width: 22px; height: 22px; }
+  .hiw-step-mark { font-size: 20px; }
   .hiw-step-body { padding-top: 7px; }
   .hiw-sheet { padding: 20px 16px; }
   .hiw-status-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
@@ -5347,10 +5349,28 @@ textarea.form-control {
   .hiw-table th:nth-child(2), .hiw-table td:nth-child(2) { min-width: 9rem; }
 }
 
-/* Mermaid diagrams in /docs are shown as their source; GitHub draws them. */
-.docs-article pre:has(> code.language-mermaid) { position: relative; padding-top: 34px; }
-.docs-article pre:has(> code.language-mermaid)::before {
-  content: "Diagram source – GitHub shows it as a picture";
-  position: absolute; top: 10px; left: 14px;
-  font-family: var(--font-ui); font-size: 12px; color: var(--ink-2);
+.hiw-flow { margin: 0 0 18px; }
+.hiw-flow-row { display: grid; grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr) 28px minmax(0, 1.2fr); align-items: center; gap: 6px; }
+.hiw-flow-ends { display: grid; gap: 10px; }
+.hiw-flow-box {
+  display: grid; gap: 2px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--hairline-strong);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.hiw-flow-box strong { font-weight: 600; }
+.hiw-flow-box span { font-size: 13px; color: var(--ink-2); }
+.hiw-flow-box--main { border-color: var(--hero); border-width: 2px; }
+.hiw-flow-box--off { border-style: dashed; background: transparent; }
+.hiw-flow-arrow { height: 2px; background: var(--hero); position: relative; }
+.hiw-flow-arrow::after {
+  content: ""; position: absolute; right: -1px; top: -5px;
+  border: 6px solid transparent; border-left-color: var(--hero); border-right: 0;
+}
+.hiw-flow figcaption { margin-top: 10px; }
+@media (max-width: 640px) {
+  .hiw-flow-row { grid-template-columns: minmax(0, 1fr); }
+  .hiw-flow-arrow { width: 2px; height: 22px; justify-self: center; }
+  .hiw-flow-arrow::after { right: -5px; top: auto; bottom: -1px; border: 6px solid transparent; border-top-color: var(--hero); border-bottom: 0; }
 }

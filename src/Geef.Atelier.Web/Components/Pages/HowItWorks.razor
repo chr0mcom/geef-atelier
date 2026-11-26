@@ -3,6 +3,7 @@
 @using Geef.Atelier.Application.Orders
 @using Geef.Atelier.Core.Configuration
 @using Geef.Atelier.Web.Components.UI.Orders
+@using Geef.Atelier.Web.Notifications
 @using Microsoft.Extensions.Options
 @inject IOptions<OrderOptions> OrderSettings
 @inject IOptions<IntakeOptions> IntakeSettings
@@ -40,8 +41,8 @@
         <h2 id="hiw-ways-title" class="hiw-h2">Start where you are</h2>
         <ul class="hiw-ways-list">
             <li><a href="#steps" data-testid="hiw-way-everyone"><strong>I just want a text</strong><span>The steps, an example and what the checks mean.</span></a></li>
-            <li><a href="#assistant" data-testid="hiw-way-assistant"><strong>I use an AI assistant</strong><span>Use Atelier from Claude or another assistant.</span></a></li>
-            <li><a href="#admins" data-testid="hiw-way-admins"><strong>I manage Atelier for a team</strong><span>People, settings and the older workshop.</span></a></li>
+            <li><a href="#assistant" data-testid="hiw-way-assistant"><strong>I use an AI assistant</strong><span>Use Atelier from Claude Code or another assistant.</span></a></li>
+            <li><a href="#admins" data-testid="hiw-way-admins"><strong>I manage Atelier for a team</strong><span>People and settings.</span></a></li>
             <li><a href="#developers" data-testid="hiw-way-developers"><strong>I build or host it</strong><span>Code, documentation and decisions.</span></a></li>
         </ul>
     </nav>
@@ -50,18 +51,14 @@
         <h2 id="hiw-steps-title" class="hiw-h2">The steps</h2>
         <ol class="hiw-thread">
             <li class="hiw-step" data-testid="hiw-step" data-step="ask">
-                <span class="hiw-step-mark" aria-hidden="true">
-                    <svg viewBox="0 0 32 32" focusable="false"><path d="M7 25 L9 19 L21 7 L25 11 L13 23 Z" /><path d="M19 9 L23 13" /></svg>
-                </span>
+                <span class="hiw-step-mark" aria-hidden="true">1</span>
                 <div class="hiw-step-body">
                     <h3>You ask</h3>
                     <p>Write in one or two sentences what you need, in your own words. You can add up to @_f.MaxFiles files: PDF, Word or text.</p>
                 </div>
             </li>
             <li class="hiw-step" data-testid="hiw-step" data-step="@(_f.Questions ? "questions" : "no-questions")">
-                <span class="hiw-step-mark" aria-hidden="true">
-                    <svg viewBox="0 0 32 32" focusable="false"><path d="M6 8 H26 V21 H15 L9 26 V21 H6 Z" /><path d="M13.5 12.5 C13.5 10 18.5 10 18.5 12.5 C18.5 14.5 16 14.5 16 16.5" /><circle cx="16" cy="18.6" r="0.6" /></svg>
-                </span>
+                <span class="hiw-step-mark" aria-hidden="true">2</span>
                 <div class="hiw-step-body">
                     @if (_f.Questions)
                     {
@@ -76,22 +73,18 @@
                 </div>
             </li>
             <li class="hiw-step" data-testid="hiw-step" data-step="write">
-                <span class="hiw-step-mark" aria-hidden="true">
-                    <svg viewBox="0 0 32 32" focusable="false"><path d="M8 5 H20 L25 10 V27 H8 Z" /><path d="M12 14 H21 M12 18 H21 M12 22 H17" /></svg>
-                </span>
+                <span class="hiw-step-mark" aria-hidden="true">3</span>
                 <div class="hiw-step-body">
                     <h3>It writes</h3>
                     <p>An AI writer drafts the text from your request, your answers, your <a href="#about-me">About me</a> details and your files. Where a fact is missing, it is asked to leave a gap in [square brackets] instead of making something up.</p>
                     @if (_f.WebResearch)
                     {
-                        <p data-testid="hiw-step-research">If your request has gaps that can be looked up on the web, it may look them up first. It never does this when you add files.</p>
+                        <p data-testid="hiw-step-research">If your request has gaps that can be looked up on the web, it may look them up first. It never does this when you add files, and never for “Extra careful”.</p>
                     }
                 </div>
             </li>
             <li class="hiw-step" data-testid="hiw-step" data-step="check">
-                <span class="hiw-step-mark" aria-hidden="true">
-                    <svg viewBox="0 0 32 32" focusable="false"><circle cx="14" cy="14" r="8" /><path d="M20 20 L26 26" /><path d="M10.5 14 L13 16.5 L17.5 11.5" /></svg>
-                </span>
+                <span class="hiw-step-mark" aria-hidden="true">4</span>
                 <div class="hiw-step-body">
                     <h3>It checks</h3>
                     <p>Automatic checks look for certain problems, such as the wrong length or language, or gaps left in the text. If one finds a clear problem, the writer gets one more try.</p>
@@ -99,17 +92,15 @@
                 </div>
             </li>
             <li class="hiw-step" data-testid="hiw-step" data-step="result">
-                <span class="hiw-step-mark" aria-hidden="true">
-                    <svg viewBox="0 0 32 32" focusable="false"><path d="M8 5 H24 V27 H8 Z" /><path d="M12 11 H20 M12 15 H20" /><path d="M12 21 L14.5 23.5 L20 18" /></svg>
-                </span>
+                <span class="hiw-step-mark" aria-hidden="true">5</span>
                 <div class="hiw-step-body">
                     <h3>You get the text</h3>
-                    <p>The text comes first. Below it: what was checked, what you still need to fill in or look at, and what was assumed. Download it as Word, PDF or Markdown.</p>
+                    <p>The text comes first. Right below it: what was checked, then what you still need to fill in or look at, and what was assumed. Download it as Word, PDF or Markdown.</p>
                     @if (_f.ChangeText)
                     {
-                        <p data-testid="hiw-step-change">Not quite right? Use “@RevisionLines.ChangeButton” and say in your own words what to change. Atelier writes a new version and keeps the earlier ones.</p>
+                        <p data-testid="hiw-step-change">Not quite right? Use “@RevisionLines.ChangeButton” and say in your own words what to change. Atelier writes a new version and keeps the earlier ones (up to @_f.MaxVersions versions).</p>
                     }
-                    <p>Writing can take several minutes. You can leave the page; the text waits for you under My work.</p>
+                    <p data-testid="hiw-step-time">This can take from less than a minute to several minutes. You can leave the page; the text waits for you under My work.</p>
                 </div>
             </li>
         </ol>
@@ -129,11 +120,11 @@
             {
                 <div class="hiw-sheet-part" data-testid="hiw-example-question">
                     <p class="hiw-sheet-label">One question before it starts</p>
-                    <p class="hiw-question">Should the note say when the party ends?</p>
+                    <p class="hiw-question">What time does the party start?</p>
                     <ul class="hiw-options" aria-label="Answers to click (example)">
-                        <li>Until 8 pm</li>
-                        <li class="is-chosen"><span class="visually-hidden">Chosen: </span>Leave the end open</li>
-                        <li class="is-skip">Skip</li>
+                        <li>3 pm</li>
+                        <li>4 pm</li>
+                        <li class="is-chosen is-skip"><span class="visually-hidden">Chosen: </span>Skip</li>
                     </ul>
                 </div>
             }
@@ -144,19 +135,8 @@
                     <p>Dear neighbours,</p>
                     <p>this Saturday from <mark>[start time]</mark> we are having a party in the courtyard, and you are all warmly invited. <span class="hiw-flag">We will take care of the grill.</span></p>
                     <p>If you have questions, ring at <mark>[your flat number]</mark>.</p>
-                    <p>See you on Saturday!<br /><mark>[Your name]</mark></p>
+                    <p><span class="@(_f.FactCheck == FactCheckOffer.NotShown ? "" : "hiw-flag hiw-flag--harmless")">See you on Saturday!</span><br /><mark>[Your name]</mark></p>
                 </div>
-            </div>
-
-            <div class="hiw-sheet-part hiw-sheet-part--notes">
-                <p class="hiw-sheet-label">Open points</p>
-                <p>Fill these in before you send the text: <mark>[start time]</mark>, <mark>[your flat number]</mark>, <mark>[Your name]</mark></p>
-                @if (_f.FactCheck != FactCheckOffer.NotShown)
-                {
-                    <p data-testid="hiw-example-unbacked">These passages may not be backed by your request or your files. Please check them: <span class="hiw-flag">“We will take care of the grill.”</span></p>
-                }
-                <p class="hiw-sheet-label">Assumptions</p>
-                <p>You did not say this, so it was assumed: the note is friendly and informal.</p>
             </div>
 
             <div class="hiw-sheet-part hiw-sheet-part--checks" data-testid="hiw-example-checks">
@@ -168,30 +148,40 @@
                 <p>@(_f.FactCheck == FactCheckOffer.NotShown ? OrderCheckLines.ToReviewFactsNotFullyChecked : OrderCheckLines.ToReviewOpenPoints)</p>
                 <p class="hiw-limits">@OrderCheckLines.Limits</p>
             </div>
+
+            <div class="hiw-sheet-part hiw-sheet-part--notes">
+                <p class="hiw-sheet-label">Open points</p>
+                <p>@FillInLead <mark>[start time]</mark>, <mark>[your flat number]</mark>, <mark>[Your name]</mark></p>
+                @if (_f.FactCheck != FactCheckOffer.NotShown)
+                {
+                    <p data-testid="hiw-example-unbacked">@UnbackedLead <span class="hiw-flag">“We will take care of the grill.”</span> <span class="hiw-flag hiw-flag--harmless">“See you on Saturday!”</span></p>
+                }
+                <p class="hiw-sheet-label">Assumptions</p>
+                <p>@AssumedLead the note is friendly and informal.</p>
+            </div>
         </div>
         @if (_f.FactCheck != FactCheckOffer.NotShown)
         {
-            <p class="hiw-note">In this example the writer added a sentence that nobody asked for. The fact check pointed it out. That is why the open points are worth reading.</p>
+            <p class="hiw-note" data-testid="hiw-example-explained">The person skipped the question, so the start time stays a gap to fill in. The writer added a sentence nobody asked for (“We will take care of the grill.”), and the fact check pointed it out. It also pointed at “See you on Saturday!”, which is harmless. That is typical: read the open points, they are not all problems.</p>
         }
         else
         {
-            <p class="hiw-note">In this example the writer added a sentence that nobody asked for (“We will take care of the grill.”). Read every text before you send it.</p>
+            <p class="hiw-note" data-testid="hiw-example-explained">The person skipped the question, so the start time stays a gap to fill in. The writer added a sentence nobody asked for (“We will take care of the grill.”). Read every text before you send it.</p>
         }
     </section>
 
     <section class="hiw-section" id="why" aria-labelledby="hiw-why-title" data-testid="hiw-why">
-        <h2 id="hiw-why-title" class="hiw-h2">Why not just ask a chatbot?</h2>
-        <p>A chatbot can write a good text too. The difference is what Atelier does around the writing.</p>
+        <h2 id="hiw-why-title" class="hiw-h2">What Atelier does around the writing</h2>
         <div class="hiw-columns">
             <div>
-                <h3>What Atelier adds</h3>
+                <h3>What it adds</h3>
                 <ul class="hiw-list hiw-list--plus">
-                    <li><strong>It reads your whole file.</strong> Up to @_f.FullTextChars.Grouped() characters the writer gets all of it, with no copying and pasting.</li>
+                    <li data-testid="hiw-why-files"><strong>The writer gets your whole file.</strong> Up to @_f.FullTextChars.Grouped() characters (roughly @ApproxPages(_f.FullTextChars) pages) nothing is cut off or shortened first. If the writer seems to have read only parts, the result says so.</li>
                     @if (_f.Questions)
                     {
                         <li><strong>It asks before it starts, not afterwards.</strong> It is built to ask only what changes the result, with answers to click.</li>
                     }
-                    <li><strong>It says what it did not know.</strong> Gaps stay visible as [square brackets], and guesses are listed as assumptions.</li>
+                    <li><strong>It is built to show what it did not know.</strong> The writer is asked to leave gaps as [square brackets], and guesses are listed as assumptions.</li>
                     <li><strong>It says what was checked, and what was not.</strong> It never claims that the text is right.</li>
                     <li><strong>It knows who you are.</strong> What you write once under About me goes along with every request.</li>
                     <li><strong>Your texts stay in one place.</strong> Every request, every version and the downloads are under My work.</li>
@@ -203,15 +193,15 @@
                     <li>It can still be wrong. The checks look for certain problems; they do not prove that everything is right.</li>
                     @if (_f.FactCheck != FactCheckOffer.NotShown)
                     {
-                        <li>The fact check can miss things. It can also point at harmless sentences, such as a greeting.</li>
+                        <li>The fact check can miss things. It often points at harmless sentences too, such as a closing line or a signature.</li>
                     }
                     <li>It is not a chat. Once it starts, you wait for the result. You cannot add files to a request later.</li>
                     @if (!_f.LearnsFromEarlierTexts)
                     {
                         <li data-testid="hiw-limit-learning">It does not learn from your earlier texts. Only your About me details carry over.</li>
                     }
-                    <li>Scanned pages without a text layer cannot be read.</li>
-                    <li>“Extra careful” takes longer and uses an older way of working with several review rounds. Its result does not show “What was checked”.</li>
+                    <li>Scanned pages (photos of paper) cannot be read.</li>
+                    <li data-testid="hiw-limit-careful">“Extra careful” takes longer and uses an older way of working with several review rounds. It does not look things up on the web. Its result does not show “What was checked”. For most texts, leave it off.</li>
                 </ul>
             </div>
         </div>
@@ -228,7 +218,7 @@
             <HowItWorksStatusRow Key="questions" Label="Questions before it starts" On="_f.Questions" OnText="On" OffText="Off" />
             <HowItWorksStatusRow Key="change" Label="Changing a finished text" On="_f.ChangeText" OnText="On" OffText="Not switched on yet" />
             <HowItWorksStatusRow Key="research" Label="Looking things up on the web" On="_f.WebResearch" OnText="On" OffText="Not switched on yet" />
-            <HowItWorksStatusRow Key="factcheck" Label="Fact check" On="_f.FactCheck != FactCheckOffer.NotShown" OnText="@(_f.FactCheck == FactCheckOffer.MayFixOnce ? "Points things out, may fix some" : "Points things out, changes nothing")" OffText="Off" />
+            <HowItWorksStatusRow Key="factcheck" Label="Fact check" On="_f.FactCheck != FactCheckOffer.NotShown" OnText="@(_f.FactCheck == FactCheckOffer.MayFixOnce ? "Points things out, may fix some" : "Points things out, changes nothing")" OffText="Not shown" />
             <HowItWorksStatusRow Key="upload" Label="Files from an AI assistant" On="_f.UploadThroughAssistant" OnText="On" OffText="Only very small text files" />
         </dl>
         @if (!_f.ChangeText || !_f.WebResearch)
@@ -240,19 +230,20 @@
     <section class="hiw-section" id="files" aria-labelledby="hiw-files-title" data-testid="hiw-files">
         <h2 id="hiw-files-title" class="hiw-h2">Your files</h2>
         <ul class="hiw-list">
-            <li>PDF, Word (.docx), text and Markdown files. Up to @_f.MaxFiles files per request, each up to @_f.MaxFileBytes.ToFileSize().</li>
-            <li>After you add a file you see what Atelier read: pages, characters and how well it could be read.</li>
-            <li>Up to @_f.FullTextChars.Grouped() characters in all, the writer gets your files completely. Up to @_f.MapChars.Grouped() characters it gets a table of contents and reads the parts that matter. Above that you choose the pages of a PDF to use.</li>
-            <li>Your files go to the AI models that write and check your text. Atelier never sends them to a web search.</li>
+            <li>PDF, Word (.docx), text and Markdown files. Up to @_f.MaxFiles files per request, each up to @Megabytes(_f.MaxFileBytes) MB.</li>
+            <li>After you add a file you see a short receipt: what Atelier read, with pages, characters and how well it could be read.</li>
+            <li>Up to @_f.FullTextChars.Grouped() characters in all, the writer gets your files completely. Up to @_f.MapChars.Grouped() characters it gets a table of contents and searches the parts that matter. Above that you choose the pages of a PDF to use.</li>
+            <li>Your files go to the AI services this Atelier uses to write and check your text. Atelier never puts them into a web search.</li>
+            <li data-testid="hiw-files-kept">Atelier keeps your request, your text and what it read from your files until you delete the request under My work. Deleting it also deletes the files that no other request uses. The original file is removed about @((int)SourceSettings.Value.OriginalRetention.TotalDays) days after the last request that used it finished; the text read from it stays with the request.</li>
         </ul>
     </section>
 
     <section class="hiw-section" id="checks" aria-labelledby="hiw-checks-title" data-testid="hiw-checks">
         <h2 id="hiw-checks-title" class="hiw-h2">What the checks mean</h2>
-        <p>Below every text there is a box “@OrderCheckLines.Heading”. It lists only the checks that really ran.</p>
+        <p>Below every text written the standard way there is a box “@OrderCheckLines.Heading”. It lists only the checks that really ran. (“Extra careful” has no such box.)</p>
         <dl class="hiw-defs">
             <dt>Checked automatically</dt>
-            <dd>Rules from your request, checked without AI: length, language, no gaps, no lists or headings, words to use or to avoid. Only what your request asked for is checked.</dd>
+            <dd>Checked without AI. A few basics are always checked: the text is not empty and starts directly. Length, language, gaps, lists or headings, and words to use or to avoid are checked only when your request asked for them.</dd>
             <dt>Facts</dt>
             <dd data-testid="hiw-checks-facts">@FactCheckDefinition</dd>
             @if (_f.SumsInFiles)
@@ -261,30 +252,44 @@
                 <dd data-testid="hiw-checks-sums">Totals in your files are added up again without AI. If one does not match, you see both figures and which one the text uses.</dd>
             }
             <dt>Changed after the check</dt>
-            <dd>What was changed because of a check is listed, so nothing changes silently.</dd>
+            <dd>What a check asked the writer to change is listed here.</dd>
         </dl>
         <p>Every box ends with the same sentence: “@OrderCheckLines.Limits”</p>
     </section>
 
-    <section class="hiw-section" id="about-me" aria-labelledby="hiw-about-title">
+    <section class="hiw-section" id="about-me" aria-labelledby="hiw-about-title" data-testid="hiw-about">
         <h2 id="hiw-about-title" class="hiw-h2">About me and your privacy</h2>
+        <figure class="hiw-flow" data-testid="hiw-flow" aria-labelledby="hiw-flow-caption">
+            <div class="hiw-flow-row">
+                <div class="hiw-flow-box"><strong>You</strong><span>request, answers, About me, files</span></div>
+                <span class="hiw-flow-arrow" aria-hidden="true"></span>
+                <div class="hiw-flow-box hiw-flow-box--main"><strong>Atelier</strong><span>keeps your requests</span></div>
+                <span class="hiw-flow-arrow" aria-hidden="true"></span>
+                <div class="hiw-flow-ends">
+                    <div class="hiw-flow-box"><strong>AI services</strong><span>write and check the text</span></div>
+                    <div class="hiw-flow-box@(_f.WebResearch ? "" : " hiw-flow-box--off")" data-testid="hiw-flow-search"><strong>Web search</strong><span>@(_f.WebResearch ? "short topics only, never files" : "not switched on")</span></div>
+                </div>
+            </div>
+            <figcaption id="hiw-flow-caption" class="hiw-note">@FlowDescription</figcaption>
+        </figure>
         <ul class="hiw-list">
             <li>Under About me you can save your name, how you sign off, how readers are addressed, your language and what never to do. Atelier uses it in every text. Only you can change it.</li>
-            <li>Your request, your answers, your About me details and your files go to the AI models that write and check the text.</li>
+            <li>Your request, your answers, your About me details and your files go to the AI services that write and check the text.</li>
             @if (_f.WebResearch)
             {
-                <li>A web search gets only short search topics from your request, never your files, your answers or your About me details.</li>
+                <li data-testid="hiw-privacy-research">A web search gets only short search topics taken from your request, and only when you add no files. Topics with words from your About me details are held back; this compares words, so it can miss a word in another language. “Extra careful” never searches the web.</li>
             }
-            <li>Only you and the administrators of this Atelier can see your requests.</li>
+            <li>Only you and the administrators of this Atelier can see your requests. More in the <a href="/privacy">privacy notice</a>.</li>
         </ul>
     </section>
 
     <section class="hiw-section" id="assistant" aria-labelledby="hiw-assistant-title" data-testid="hiw-assistant">
         <h2 id="hiw-assistant-title" class="hiw-h2">From an AI assistant</h2>
-        <p>You can connect Atelier to an AI assistant such as Claude (on claude.ai, in Claude Desktop or in Claude Code). They connect through MCP, a common way for assistants to use outside tools.</p>
+        <p>You can connect Atelier to an AI assistant through MCP, a common way for assistants to use outside tools.</p>
+        <p data-testid="hiw-assistant-tested">It is tested with Claude Code, also through a connection set up in claude.ai, with a complete request including a file and a question. Using it from the claude.ai chat window itself and from Claude Desktop has not been tested.</p>
         <ol class="hiw-list hiw-list--numbered">
             <li>In your assistant, add a connector with this address: <code class="hiw-code" data-testid="hiw-mcp-address">@McpAddress</code></li>
-            <li>Your assistant opens a sign-in page. Sign in and allow access. From then on the assistant acts as you.</li>
+            <li>Your assistant opens a sign-in page. Sign in and allow access. From then on the assistant acts as you. If the sign-in page does not open, ask your administrator.</li>
             <li>Ask it, for example: “Have Atelier write a short note for the notice board.”</li>
         </ol>
         <p>Atelier tells the assistant to pass your words on unchanged, to ask you Atelier's questions, to wait and to show you the text together with what was checked and what is open, without filling in gaps itself. Whether it does so depends on the assistant; the full result is always in the web app.</p>
@@ -309,23 +314,26 @@
 
     <section class="hiw-section" id="admins" aria-labelledby="hiw-admins-title" data-testid="hiw-admins">
         <h2 id="hiw-admins-title" class="hiw-h2">For administrators</h2>
-        <p>Administrators add people under User management, can see and stop every request and decide which features are on. Features are switched in the server settings, for everyone or first for single people. This page follows those settings.</p>
-        <div class="hiw-table-wrap" role="region" aria-labelledby="hiw-admins-table-caption" tabindex="0">
-            <table class="hiw-table">
-                <caption id="hiw-admins-table-caption">Settings for everyone</caption>
-                <thead><tr><th scope="col">Feature</th><th scope="col">Setting</th><th scope="col">For everyone now</th></tr></thead>
-                <tbody>
-                    <tr><td>Questions before it starts</td><td><code>Orders:IntakeMode</code></td><td>@_everyone.Questions.OnOff()</td></tr>
-                    <tr><td>Changing a finished text</td><td><code>Orders:Revise</code>, per person <code>Orders:ReviseOverrides</code></td><td>@_everyone.ChangeText.OnOff()</td></tr>
-                    <tr><td>Looking things up on the web</td><td><code>Research:Mode</code>, per person <code>Research:ModeOverrides</code></td><td>@_everyone.WebResearch.OnOff()</td></tr>
-                    <tr><td>Fact check</td><td><code>Direct:FactCheckMode</code>, per person <code>Direct:FactCheckModeOverrides</code></td><td>@DirectSettings.Value.FactCheckMode</td></tr>
-                    <tr><td>Files from an AI assistant</td><td><code>Uploads:Tickets</code></td><td>@_everyone.UploadThroughAssistant.OnOff()</td></tr>
-                    <tr><td>Workshop only for administrators</td><td><code>Ui:WorkshopForAdminsOnly</code></td><td>@UiSettings.Value.WorkshopForAdminsOnly.OnOff()</td></tr>
-                    <tr><td>Older tools for AI assistants</td><td><code>Mcp:LegacyTools</code></td><td>@_everyone.OlderAssistantTools.OnOff()</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <p>The workshop is the older way of working: teams of AI roles that you set up yourself, with their own models, sources and rules. @(UiSettings.Value.WorkshopForAdminsOnly ? "Its menu is shown only to administrators." : "Its menu is shown to everyone.")</p>
+        <p>Administrators add people under User management, can see and stop every request and decide which features are on, for everyone or first for single people. This page follows those settings.</p>
+        @if (_isAdmin)
+        {
+            <div class="hiw-table-wrap" role="region" aria-labelledby="hiw-admins-table-caption" tabindex="0" data-testid="hiw-admins-table">
+                <table class="hiw-table">
+                    <caption id="hiw-admins-table-caption">Settings for everyone (shown to administrators only)</caption>
+                    <thead><tr><th scope="col">Feature</th><th scope="col">Setting</th><th scope="col">For everyone now</th></tr></thead>
+                    <tbody>
+                        <tr><td>Questions before it starts</td><td><code>Orders:IntakeMode</code></td><td>@OrderSettings.Value.IntakeMode</td></tr>
+                        <tr><td>Changing a finished text</td><td><code>Orders:Revise</code>, per person <code>Orders:ReviseOverrides</code></td><td>@_everyone.ChangeText.OnOff()</td></tr>
+                        <tr><td>Looking things up on the web (standard way)</td><td><code>Research:Mode</code>, per person <code>Research:ModeOverrides</code></td><td>@_everyone.WebResearch.OnOff()</td></tr>
+                        <tr><td>Fact check</td><td><code>Direct:FactCheckMode</code>, per person <code>Direct:FactCheckModeOverrides</code></td><td>@DirectSettings.Value.FactCheckMode</td></tr>
+                        <tr><td>Files from an AI assistant</td><td><code>Uploads:Tickets</code></td><td>@_everyone.UploadThroughAssistant.OnOff()</td></tr>
+                        <tr><td>Workshop only for administrators</td><td><code>Ui:WorkshopForAdminsOnly</code></td><td>@UiSettings.Value.WorkshopForAdminsOnly.OnOff()</td></tr>
+                        <tr><td>Older tools for AI assistants</td><td><code>Mcp:LegacyTools</code></td><td>@_everyone.OlderAssistantTools.OnOff()</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p data-testid="hiw-admins-workshop">The workshop is the older way of working: teams of AI roles that you set up yourself, with their own models, sources and rules. @(UiSettings.Value.WorkshopForAdminsOnly ? "Its menu is shown only to administrators." : "Its menu is shown to everyone.") A team chosen there (also through the older tools for AI assistants) can search the web with its own sources, whatever the setting for the standard way says.</p>
+        }
         <p><a href="/docs/14-admin-guide">Guide for administrators</a></p>
     </section>
 
@@ -341,39 +349,60 @@
 </div>
 
 @code {
+    /// <summary>Lead of the placeholder list, as the result page shows it (<c>OrderOpenPoints.razor</c>).</summary>
+    public const string FillInLead = "Fill these in before you send the text:";
+
+    /// <summary>Lead of the passages that may not be backed, as the result page shows it (<c>OrderOpenPoints.razor</c>).</summary>
+    public const string UnbackedLead = "These passages may not be backed by your request or your files. Please check them:";
+
+    /// <summary>Lead of the assumptions, as the result page shows it (<c>OrderAssumptions.razor</c>).</summary>
+    public const string AssumedLead = "You did not say this, so it was assumed:";
+
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
     HowItWorksFeatures _f = null!;
     HowItWorksFeatures _everyone = null!;
+    bool _isAdmin;
 
     HowItWorksSettings Settings => new(OrderSettings.Value, IntakeSettings.Value, ResearchSettings.Value, DirectSettings.Value, UploadSettings.Value,
         UiSettings.Value, McpSettings.Value, LearningSettings.Value, SourceSettings.Value);
 
     string McpAddress => Nav.BaseUri.TrimEnd('/') + "/mcp";
 
+    string FlowDescription => _f.WebResearch
+        ? "Your request, answers, About me details and files go to Atelier, which passes them to the AI services that write and check the text. A web search gets only short topics from your request, never your files."
+        : "Your request, answers, About me details and files go to Atelier, which passes them to the AI services that write and check the text. Nothing goes to a web search.";
+
     string FactCheckSentence => _f.FactCheck switch
     {
         FactCheckOffer.MayFixOnce => "Another AI compares the facts in the text with what you gave and points out passages that may not be backed. Some of them may be fixed once; the rest is shown for you to check.",
         FactCheckOffer.ReportsOnly => "Another AI compares the facts in the text with what you gave and points out passages that may not be backed. It does not change the text.",
-        _ => "The facts in the text are not compared with what you gave right now.",
+        _ => "No fact check is shown for your texts right now.",
     };
 
     string FactCheckDefinition => _f.FactCheck switch
     {
-        FactCheckOffer.MayFixOnce => "Another AI compares the facts in the text with your request, your answers and your files. Passages it cannot find there are listed for you to check. Some may be fixed once; what was changed is listed.",
-        FactCheckOffer.ReportsOnly => "Another AI compares the facts in the text with your request, your answers and your files. Passages it cannot find there are listed for you to check. It does not change the text.",
-        _ => "Switched off right now: the box then says “" + OrderCheckLines.FactsNotChecked + "”",
+        FactCheckOffer.MayFixOnce => "Another AI compares the facts in the text with your request, your answers and your files. Passages it cannot find there are listed for you to check. Some may be fixed once; what was changed is listed. With very long files the facts are not compared with the files; the box then says so.",
+        FactCheckOffer.ReportsOnly => "Another AI compares the facts in the text with your request, your answers and your files. Passages it cannot find there are listed for you to check. It does not change the text. With very long files the facts are not compared with the files; the box then says so.",
+        _ => "No fact check is shown right now: the box then says “" + OrderCheckLines.FactsNotChecked + "”",
     };
 
     string ExampleAutomaticLine => OrderCheckLines.AutomaticLead + OrderCheckLines.PassedNotEmpty + OrderCheckLines.AutomaticSeparator
         + OrderCheckLines.PassedStartsDirectly + OrderCheckLines.AutomaticEnd;
 
-    string ExampleFactLine => _f.FactCheck == FactCheckOffer.NotShown ? OrderCheckLines.FactsNotChecked : OrderCheckLines.FactsOpenPointOneNoFiles;
+    string ExampleFactLine => _f.FactCheck == FactCheckOffer.NotShown
+        ? OrderCheckLines.FactsNotChecked
+        : OrderCheckLines.FactsComparedLeadNoFiles + string.Format(System.Globalization.CultureInfo.InvariantCulture, OrderCheckLines.FactsOpenFormat, 2);
+
+    static int ApproxPages(int chars) => Math.Max(1, (int)Math.Round(chars / 2_500d / 10d) * 10);
+
+    static string Megabytes(long bytes) => (bytes / (1024d * 1024d)).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
 
     protected override async Task OnParametersSetAsync()
     {
         var viewer = AuthState is null ? null : (await AuthState).User;
         _f = Settings.FeaturesFor(viewer);
         _everyone = Settings.FeaturesFor(null);
+        _isAdmin = viewer?.Identity?.IsAuthenticated == true && viewer.IsAtelierAdmin();
     }
 }

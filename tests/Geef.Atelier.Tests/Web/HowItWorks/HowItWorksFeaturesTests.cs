@@ -26,7 +26,6 @@ public sealed class HowItWorksFeaturesTests
         Assert.False(features.WebResearch);
         Assert.Equal(FactCheckOffer.ReportsOnly, features.FactCheck);
         Assert.False(features.UploadThroughAssistant);
-        Assert.False(features.WorkshopVisible);
         Assert.False(features.LearnsFromEarlierTexts);
         Assert.True(features.OlderAssistantTools);
     }
@@ -126,30 +125,19 @@ public sealed class HowItWorksFeaturesTests
     }
 
     [Theory]
-    [InlineData(true, false, false)]
-    [InlineData(true, true, true)]
-    [InlineData(false, false, true)]
-    public void The_workshop_is_called_visible_exactly_when_its_menu_is_shown(bool adminsOnly, bool admin, bool expected)
-    {
-        var settings = Settings(ui: new UiOptions { WorkshopForAdminsOnly = adminsOnly });
-
-        Assert.Equal(expected, settings.FeaturesFor(User("alice", admin)).WorkshopVisible);
-        Assert.False(settings.FeaturesFor(null).WorkshopVisible);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("tester")]
-    [InlineData("alice")]
-    public void The_overrides_resolve_exactly_as_in_the_pipeline(string? user)
+    [InlineData(null, FactCheckMode.Report, ResearchMode.Off)]
+    [InlineData("tester", FactCheckMode.On, ResearchMode.On)]
+    [InlineData("Tester", FactCheckMode.On, ResearchMode.On)]
+    [InlineData("alice", FactCheckMode.Report, ResearchMode.Off)]
+    public void The_pipeline_and_the_page_resolve_an_exception_by_user_name_and_otherwise_take_the_value_for_everyone(
+        string? user, FactCheckMode fact, ResearchMode research)
     {
         var direct = new DirectOptions { FactCheckMode = FactCheckMode.Report, FactCheckModeOverrides = { ["tester"] = FactCheckMode.On } };
-        var research = new ResearchOptions { ModeOverrides = { ["tester"] = ResearchMode.On } };
-        var orders = new OrderOptions { ReviseOverrides = { ["tester"] = ReviseMode.On } };
+        var options = new ResearchOptions { ModeOverrides = { ["tester"] = ResearchMode.On } };
 
-        Assert.Equal(OrderGroundingStep.Mode(direct, user), direct.FactCheckModeFor(user));
-        Assert.Equal(user == "tester" ? ResearchMode.On : ResearchMode.Off, research.ModeFor(user));
-        Assert.Equal(user == "tester" ? ReviseMode.On : ReviseMode.Off, orders.ReviseModeFor(user));
+        Assert.Equal(fact, OrderGroundingStep.Mode(direct, user));
+        Assert.Equal(fact, direct.FactCheckModeFor(user));
+        Assert.Equal(research, options.ModeFor(user));
     }
 
     [Fact]

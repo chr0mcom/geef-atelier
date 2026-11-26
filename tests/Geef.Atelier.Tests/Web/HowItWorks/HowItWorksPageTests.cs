@@ -82,16 +82,34 @@ public sealed class HowItWorksPageTests : TestContext
     }
 
     [Fact]
-    public void The_settings_table_shows_the_values_for_everyone_and_never_an_exception()
+    public void The_table_with_setting_names_is_shown_to_administrators_only_and_never_shows_an_exception()
     {
         Services.Configure<OrderOptions>(o => o.ReviseOverrides["tester"] = ReviseMode.On);
-        this.AddTestAuthorization().SetAuthorized("tester");
+        Services.Configure<DirectOptions>(o => o.FactCheckMode = FactCheckMode.Shadow);
+        var auth = this.AddTestAuthorization();
+        string[] settingNames = ["Orders:", "Research:", "Direct:", "Uploads:", "Ui:", "Mcp:", "Shadow"];
 
-        var cut = Render();
+        foreach (var viewer in new[] { (string?)null, "tester" })
+        {
+            if (viewer is null)
+                auth.SetNotAuthorized();
+            else
+                auth.SetAuthorized(viewer);
+            var cut = Render();
+            Assert.Empty(cut.FindAll("[data-testid='hiw-admins-table']"));
+            Assert.Empty(cut.FindAll("[data-testid='hiw-admins-workshop']"));
+            foreach (var name in settingNames)
+                Assert.DoesNotContain(name, cut.Markup, StringComparison.Ordinal);
+        }
 
-        var row = cut.FindAll("[data-testid='hiw-admins'] tbody tr").Single(r => r.TextContent.Contains("Orders:Revise", StringComparison.Ordinal));
+        auth.SetAuthorized("boss");
+        auth.SetRoles(OwnerScope.AdminRole);
+        var admin = Render();
+        var row = admin.FindAll("[data-testid='hiw-admins'] tbody tr").Single(r => r.TextContent.Contains("Orders:Revise", StringComparison.Ordinal));
         Assert.Equal("Off", row.Children[2].TextContent);
-        Assert.DoesNotContain("tester", cut.Markup, StringComparison.Ordinal);
+        Assert.Contains("Shadow", admin.Find("[data-testid='hiw-admins-table']").TextContent, StringComparison.Ordinal);
+        Assert.DoesNotContain("tester", admin.Markup, StringComparison.Ordinal);
+        Assert.Contains("search the web", admin.Find("[data-testid='hiw-admins-workshop']").TextContent, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -124,6 +142,8 @@ public sealed class HowItWorksPageTests : TestContext
         Assert.Empty(cut.FindAll("[data-testid='hiw-example-unbacked']"));
         Assert.Contains(OrderCheckLines.FactsNotChecked, cut.Find("[data-testid='hiw-example-checks']").TextContent, StringComparison.Ordinal);
         Assert.Equal("false", cut.Find("[data-testid='hiw-status-factcheck']").GetAttribute("data-on"));
+        Assert.Contains("Not shown", cut.Find("[data-testid='hiw-status-factcheck']").TextContent, StringComparison.Ordinal);
+        Assert.Equal("No fact check is shown for your texts right now.", cut.Find("[data-testid='hiw-step-factcheck']").TextContent);
         Assert.DoesNotContain("Another AI compares", cut.Find("[data-testid='hiw-steps']").TextContent, StringComparison.Ordinal);
     }
 
@@ -149,7 +169,7 @@ public sealed class HowItWorksPageTests : TestContext
         var checks = Render().Find("[data-testid='hiw-example-checks']").TextContent;
 
         Assert.Contains(OrderCheckLines.Heading, checks, StringComparison.Ordinal);
-        Assert.Contains(OrderCheckLines.FactsOpenPointOneNoFiles, checks, StringComparison.Ordinal);
+        Assert.Contains(OrderCheckLines.FactsComparedLeadNoFiles + string.Format(System.Globalization.CultureInfo.InvariantCulture, OrderCheckLines.FactsOpenFormat, 2), checks, StringComparison.Ordinal);
         Assert.Contains(OrderCheckLines.ToReviewOpenPoints, checks, StringComparison.Ordinal);
         Assert.Contains(OrderCheckLines.Limits, checks, StringComparison.Ordinal);
     }
@@ -169,15 +189,20 @@ public sealed class HowItWorksPageTests : TestContext
     }
 
     [Fact]
-    public void The_drawings_are_hidden_from_screen_readers_and_the_steps_are_an_ordered_list()
+    public void The_steps_are_a_numbered_list_and_the_picture_of_where_words_go_has_a_text()
     {
         this.AddTestAuthorization();
 
         var cut = Render();
 
-        Assert.All(cut.FindAll("svg"), svg => Assert.Equal("true", svg.ParentElement!.GetAttribute("aria-hidden")));
-        Assert.Equal(5, cut.FindAll("ol.hiw-thread > li").Count);
-        Assert.All(cut.FindAll("section.hiw-section"), s => Assert.NotNull(s.QuerySelector("h2")));
+        Assert.Equal(["1", "2", "3", "4", "5"], cut.FindAll("ol.hiw-thread > li .hiw-step-mark").Select(m => m.TextContent));
+        Assert.All(cut.FindAll(".hiw-step-mark"), m => Assert.Equal("true", m.GetAttribute("aria-hidden")));
+        var figure = cut.Find("[data-testid='hiw-flow']");
+        Assert.Equal("hiw-flow-caption", figure.GetAttribute("aria-labelledby"));
+        Assert.Contains("Nothing goes to a web search", figure.QuerySelector("figcaption")!.TextContent, StringComparison.Ordinal);
+        Assert.Contains("not switched on", cut.Find("[data-testid='hiw-flow-search']").TextContent, StringComparison.Ordinal);
+        Assert.All(cut.FindAll("section.hiw-section"), sec => Assert.NotNull(sec.QuerySelector("h2")));
+        Assert.Empty(cut.FindAll("svg"));
     }
 
     [Fact]
@@ -186,11 +211,15 @@ public sealed class HowItWorksPageTests : TestContext
         this.AddTestAuthorization();
 
         var cut = Render();
-        var lay = string.Join(' ', new[] { "hiw-ways", "hiw-steps", "hiw-example", "hiw-why", "hiw-status", "hiw-files", "hiw-checks" }
+        var lay = string.Join(' ', new[] { "hiw-ways", "hiw-steps", "hiw-example", "hiw-why", "hiw-status", "hiw-files", "hiw-checks", "hiw-about" }
             .Select(id => cut.Find($"[data-testid='{id}']").TextContent));
+        var assistant = cut.Find("[data-testid='hiw-assistant']").TextContent;
+        string[] words = ["crew", "run", "grounding", "iteration", "convergence", "converged", "finalizer", "manuscript", "briefing", "LLM", "prompt", "executor"];
 
-        foreach (var word in new[] { "crew", "run", "grounding", "iteration", "convergence", "finalizer", "manuscript", "MCP", "LLM", "prompt" })
+        foreach (var word in words.Append("MCP"))
             Assert.DoesNotMatch(new Regex($@"\b{word}s?\b", RegexOptions.IgnoreCase), lay);
+        foreach (var word in words)
+            Assert.DoesNotMatch(new Regex($@"\b{word}s?\b", RegexOptions.IgnoreCase), assistant);
     }
 
     [Fact]
@@ -201,7 +230,7 @@ public sealed class HowItWorksPageTests : TestContext
         var cut = Render();
 
         Assert.Equal("http://localhost/mcp", cut.Find("[data-testid='hiw-mcp-address']").TextContent);
-        Assert.Contains("MCP, a common way for assistants to use outside tools", cut.Find("[data-testid='hiw-assistant']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("through MCP, a common way for assistants to use outside tools", cut.Find("[data-testid='hiw-assistant']").TextContent, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -217,6 +246,79 @@ public sealed class HowItWorksPageTests : TestContext
         Services.Configure<LearningOptions>(o => o.Enabled = true);
         this.AddTestAuthorization();
         Assert.Empty(Render().FindAll("[data-testid='hiw-limit-learning']"));
+    }
+
+    [Fact]
+    public void Without_research_no_web_search_is_promised_and_extra_careful_says_it_does_not_search()
+    {
+        Services.Configure<OrderOptions>(o => o.IntakeMode = IntakeMode.On);
+        this.AddTestAuthorization();
+
+        var off = Render();
+
+        Assert.Empty(off.FindAll("[data-testid='hiw-step-research']"));
+        Assert.Empty(off.FindAll("[data-testid='hiw-privacy-research']"));
+        Assert.Contains("does not look things up on the web", off.Find("[data-testid='hiw-limit-careful']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("Nothing goes to a web search", off.Find("[data-testid='hiw-flow']").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void With_research_the_web_search_is_promised_only_for_the_standard_way_without_files()
+    {
+        Services.Configure<OrderOptions>(o => o.IntakeMode = IntakeMode.On);
+        Services.Configure<ResearchOptions>(o => o.Mode = ResearchMode.On);
+        this.AddTestAuthorization();
+
+        var on = Render();
+
+        Assert.Contains("never for “Extra careful”", on.Find("[data-testid='hiw-step-research']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("when you add no files", on.Find("[data-testid='hiw-privacy-research']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("“Extra careful” never searches the web", on.Find("[data-testid='hiw-privacy-research']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("never your files", on.Find("[data-testid='hiw-flow']").TextContent, StringComparison.Ordinal);
+        Assert.Contains("does not look things up on the web", on.Find("[data-testid='hiw-limit-careful']").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_standard_way_reaches_the_web_only_through_the_research_service()
+    {
+        Assert.Empty(Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplate.GroundingProviderNames);
+        Assert.Equal(Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplateName, Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplate.Name);
+    }
+
+    [Fact]
+    public void The_copied_leads_of_the_example_match_the_result_page()
+    {
+        var orders = Path.Combine(RepoRoot(), "src", "Geef.Atelier.Web", "Components", "UI", "Orders");
+        var openPoints = File.ReadAllText(Path.Combine(orders, "OrderOpenPoints.razor"));
+        var assumptions = File.ReadAllText(Path.Combine(orders, "OrderAssumptions.razor"));
+
+        Assert.Contains(HowItWorksPage.FillInLead, openPoints, StringComparison.Ordinal);
+        Assert.Contains(HowItWorksPage.UnbackedLead, openPoints, StringComparison.Ordinal);
+        Assert.Contains(HowItWorksPage.AssumedLead, assumptions, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Sizes_are_shown_in_plain_numbers()
+    {
+        this.AddTestAuthorization();
+        UseShippedSettings();
+
+        var files = Render().Find("[data-testid='hiw-files']").TextContent;
+
+        Assert.Contains("each up to 25 MB", files, StringComparison.Ordinal);
+        Assert.Contains("about 30 days", files, StringComparison.Ordinal);
+        Assert.Contains("roughly 60 pages", Render().Find("[data-testid='hiw-why-files']").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_assistant_part_says_exactly_what_was_tested()
+    {
+        this.AddTestAuthorization();
+
+        var tested = Render().Find("[data-testid='hiw-assistant-tested']").TextContent;
+
+        Assert.Contains("tested with Claude Code", tested, StringComparison.Ordinal);
+        Assert.Contains("claude.ai chat window itself and from Claude Desktop has not been tested", tested, StringComparison.Ordinal);
     }
 
     private IRenderedComponent<HowItWorksPage> Render() => RenderComponent<HowItWorksPage>();

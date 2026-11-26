@@ -36,10 +36,16 @@ public sealed class DocsService
     private static readonly IReadOnlyDictionary<string, string> BaseNameToSlug =
         Entries.ToDictionary(e => e.BaseName, e => e.Slug, StringComparer.OrdinalIgnoreCase);
 
-    // Rewrites relative Markdown links (e.g. href="08-crew-system_de.md") to Blazor routes.
-    private static readonly Regex DocLinkRegex = new(
-        @"href=""([^""/\\]+?)(_de)?\.md""",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    /// <summary>Where a link to a file of the repository that <c>/docs</c> does not serve points to.</summary>
+    public const string RepositoryFileBase = "https://github.com/chr0mcom/geef-atelier/blob/main/";
+
+    private static readonly Regex DiagramRegex = new(@"^```mermaid[^\n]*\n.*?^```[ \t]*$\n?", RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.Multiline);
+
+    private static readonly Regex CommentRegex = new(@"<!--.*?-->", RegexOptions.Compiled | RegexOptions.Singleline);
+
+    private static readonly Regex AnchorRegex = new(@"<a href=""(?<href>[^""]*)""(?<rest>[^>]*)>(?<text>.*?)</a>", RegexOptions.Compiled | RegexOptions.Singleline);
+
+    private static readonly string[] UnpublishedFolders = ["docs/reports/", "docs/prompts/"];
 
     private static readonly Assembly Asm = typeof(DocsService).Assembly;
     private const string ResourcePrefix = "Geef.Atelier.Web.EmbeddedDocs.";
@@ -81,19 +87,70 @@ public sealed class DocsService
     {
         var md = GetMarkdown(slug, german);
         if (md is null) return new MarkupString("");
-        var html = MarkdownRenderer.ToHtml(md);
-        return new MarkupString(RewriteDocLinks(html));
+        var html = MarkdownRenderer.ToHtml(WithoutDiagramsAndComments(md));
+        return new MarkupString(RewriteLinks(html));
     }
 
-    private static string RewriteDocLinks(string html) =>
-        DocLinkRegex.Replace(html, m =>
+    /// <summary>
+    /// The Markdown without Mermaid blocks and HTML comments: GitHub draws the diagrams, the page would only show their source, and
+    /// the guides tell the same in words; comments are markers for tests.
+    /// </summary>
+    internal static string WithoutDiagramsAndComments(string markdown) =>
+        CommentRegex.Replace(DiagramRegex.Replace(markdown.Replace("\r\n", "\n"), string.Empty), string.Empty);
+
+    /// <summary>
+    /// Points every relative link to a place that exists: allow-listed documents to <c>/docs/{slug}</c> (with language and anchor),
+    /// other files of the repository to <see cref="RepositoryFileBase"/>, and links into the unpublished working folders become plain text.
+    /// </summary>
+    internal static string RewriteLinks(string html) =>
+        AnchorRegex.Replace(html, m =>
         {
-            var baseName = m.Groups[1].Value;
-            var isDe = m.Groups[2].Success;
-            if (!BaseNameToSlug.TryGetValue(baseName, out var targetSlug))
+            var href = System.Net.WebUtility.HtmlDecode(m.Groups["href"].Value);
+            if (href.Length == 0 || href.StartsWith('#') || href.StartsWith('/') || href.Contains(':', StringComparison.Ordinal))
                 return m.Value;
-            return isDe ? $"href=\"/docs/{targetSlug}?lang=de\"" : $"href=\"/docs/{targetSlug}\"";
+
+            var hash = href.IndexOf('#', StringComparison.Ordinal);
+            var path = hash < 0 ? href : href[..hash];
+            var anchor = hash < 0 ? string.Empty : href[hash..];
+            var repoPath = RepositoryPath(path);
+            if (repoPath is null || UnpublishedFolders.Any(f => repoPath.StartsWith(f, StringComparison.Ordinal)))
+                return m.Groups["text"].Value;
+
+            return $"<a href=\"{System.Net.WebUtility.HtmlEncode(Target(repoPath, anchor))}\"{m.Groups["rest"].Value}>{m.Groups["text"].Value}</a>";
         });
+
+    private static string Target(string repoPath, string anchor)
+    {
+        if (repoPath.StartsWith("docs/", StringComparison.Ordinal) && repoPath.IndexOf('/', 5) < 0
+            && repoPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+        {
+            var fileName = repoPath[5..^3];
+            var german = fileName.EndsWith("_de", StringComparison.OrdinalIgnoreCase);
+            var baseName = german ? fileName[..^3] : fileName;
+            if (BaseNameToSlug.TryGetValue(baseName, out var slug))
+                return $"/docs/{slug}{(german ? "?lang=de" : string.Empty)}{anchor}";
+        }
+        return RepositoryFileBase + repoPath + anchor;
+    }
+
+    private static string? RepositoryPath(string relativeToDocs)
+    {
+        var parts = new List<string> { "docs" };
+        foreach (var part in relativeToDocs.Split('/'))
+        {
+            if (part is "" or ".")
+                continue;
+            if (part == "..")
+            {
+                if (parts.Count == 0)
+                    return null;
+                parts.RemoveAt(parts.Count - 1);
+                continue;
+            }
+            parts.Add(part);
+        }
+        return parts.Count == 0 ? null : string.Join('/', parts);
+    }
 }
 
 /// <param name="Slug">URL slug used in <c>/docs/{slug}</c>.</param>
