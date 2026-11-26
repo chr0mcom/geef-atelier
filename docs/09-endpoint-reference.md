@@ -250,7 +250,7 @@ The older entry point keeps its answer but now creates an order without question
 { "runId": "<uuid>", "status": "Pending", "errorMessage": null, "orderId": "<uuid>" }
 ```
 
-Without `crewTemplate` and `customCrew` the order uses `Orders:LegacySubmitDefaultMode` (default: direct path; `Careful` switches back to the classic template). With either of them the order is `Careful` and uses that template or crew. Invalid `customCrew` JSON is an error (before stage 1 it was silently ignored). `get_run_status`/`get_run_result` keep working with `runId`; `orderId` works with the order tools. `submit_auto_crew_request` keeps its behaviour; its runs are attached to orders as well.
+Without `crewTemplate` and `customCrew` the order uses `Orders:LegacySubmitDefaultMode` (default: direct path; `Careful` switches back to the classic template, without any web search, D-079). With either of them the order is `Careful` and uses that template or crew. Invalid `customCrew` JSON is an error (before stage 1 it was silently ignored). `get_run_status`/`get_run_result` keep working with `runId`; `orderId` works with the order tools. `submit_auto_crew_request` keeps its behaviour; its runs are attached to orders as well.
 
 #### Server instructions and tool errors
 
