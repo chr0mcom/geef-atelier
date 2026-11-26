@@ -3078,6 +3078,11 @@ wrong behaviour. Consequences: lost data or a missing fixed sentence → halt an
 only the newest change), then switching on with a fixed note from the third version; "Simpler words" failed → that button goes as
 well and the rest is switched on. The result follows as an addendum.
 
+**Addendum (2026-11-26): gate N″ passed.** Measured on two fresh test orders (German, English) with six changes including both
+chains, "Simpler words", "make it longer" as free text and the `quick: longer` probe (no model call). Every part passed; nothing
+was struck from the blind judge's answer. The request to make the text longer added one sentence with content of its own; the
+fixed notice above the text is there for exactly that. `Orders:Revise` is now `On` (way back: `Orders__Revise=Off`).
+
 ## D-079 — No web search for orders with the default crew; search query fails closed (2026-11-26)
 
 **Status:** implemented.

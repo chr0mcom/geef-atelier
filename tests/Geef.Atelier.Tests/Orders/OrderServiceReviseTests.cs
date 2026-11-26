@@ -109,11 +109,26 @@ public sealed class OrderServiceReviseTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task As_shipped_changing_is_on_for_everyone()
+    {
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
+        var user = NewUser();
+        var submission = await SubmitAsync(host, new SubmitOrderRequest("Write a slogan.", user, OrderEntry.Web));
+        await DeliverAsync(host, submission.RunId!.Value, "Fresh ideas, fast.");
+
+        Assert.Equal(2, (await ReviseAsync(host, new(submission.OrderId, user, null, [RevisionQuick.Friendlier], OrderEntry.Web))).Version);
+    }
+
+    [Fact]
     public async Task Changing_is_off_unless_switched_on_globally_or_for_the_owner()
     {
         var tester = NewUser();
         await using var host = await AtelierEndToEndHost.StartAsync(postgres, services =>
-            services.PostConfigure<OrderOptions>(o => o.ReviseOverrides[tester] = ReviseMode.On));
+            services.PostConfigure<OrderOptions>(o =>
+            {
+                o.Revise = ReviseMode.Off;
+                o.ReviseOverrides[tester] = ReviseMode.On;
+            }));
         var other = NewUser();
 
         var theirs = await SubmitAsync(host, new SubmitOrderRequest("Write a slogan.", other, OrderEntry.Web));

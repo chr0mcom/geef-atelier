@@ -42,7 +42,8 @@ public sealed class OrderServiceLongerTests(PostgresFixture postgres)
     [Fact]
     public async Task While_changing_is_switched_off_longer_gets_the_same_answer_as_everything_else()
     {
-        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres, services =>
+            services.PostConfigure<OrderOptions>(o => o.Revise = ReviseMode.Off));
         var user = NewUser();
         var submission = await SubmitAsync(host, user);
         await DeliverAsync(host, submission.RunId!.Value, V1Text);
