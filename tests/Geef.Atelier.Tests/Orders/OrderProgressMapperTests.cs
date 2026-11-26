@@ -166,5 +166,21 @@ public sealed class OrderProgressMapperTests
         Assert.Equal(OrderStepStatus.Skipped, OrderProgressMapper.Map(stoppedDisplay, OrderMode.Direct, false, [], T0, T0, T0, stoppedWhileReading.ToIntakeProgress()).Steps[0].Status);
     }
 
+    [Fact]
+    public void A_change_counts_the_time_from_the_start_of_its_version_not_from_the_order()
+    {
+        var versionStart = T0.AddDays(1);
+        var events = new List<RunEventRow> { new("ExecutionStartedEvent", 1, versionStart.AddSeconds(2)) };
+
+        var working = OrderProgressMapper.Map(Working, OrderMode.Direct, false, events, T0, null, versionStart.AddSeconds(8), versionStartedAt: versionStart);
+        var delivered = OrderProgressMapper.Map(new OrderDisplay(OrderDisplayState.Delivered, true, true), OrderMode.Direct, false, events, T0,
+            versionStart.AddSeconds(95), versionStart.AddHours(3), versionStartedAt: versionStart);
+        var first = OrderProgressMapper.Map(Working, OrderMode.Direct, false, events, T0, null, versionStart.AddSeconds(8));
+
+        Assert.Equal(TimeSpan.FromSeconds(8), working.Elapsed);
+        Assert.Equal(TimeSpan.FromSeconds(95), delivered.Elapsed);
+        Assert.Equal(TimeSpan.FromDays(1) + TimeSpan.FromSeconds(8), first.Elapsed);
+    }
+
     private static OrderDisplay Working => new(OrderDisplayState.Working, false, false);
 }

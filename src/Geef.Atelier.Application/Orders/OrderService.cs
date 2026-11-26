@@ -464,7 +464,9 @@ internal sealed class OrderService(
         var events = current is null ? [] : await orders.ListRunEventsAsync(current.Id, ct);
         var warnings = current is null ? [] : await warningRepository.ListByRunAsync(current.Id, ct);
         var finishedAt = display.IsFinished ? current?.CompletedAt ?? order.UpdatedAt : (DateTimeOffset?)null;
-        var progress = OrderProgressMapper.Map(display, order.Mode, linked.Count > 0, events, order.CreatedAt, finishedAt, time.GetUtcNow(), order.ToIntakeProgress());
+        var versionStartedAt = current is { RevisionHint: { Length: > 0 } } ? current.CreatedAt : (DateTimeOffset?)null;
+        var progress = OrderProgressMapper.Map(display, order.Mode, linked.Count > 0, events, order.CreatedAt, finishedAt, time.GetUtcNow(), order.ToIntakeProgress(),
+            versionStartedAt);
 
         return new OrderView(
             order.Id,

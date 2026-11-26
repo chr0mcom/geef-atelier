@@ -40,9 +40,10 @@ public static class OrderProgressMapper
     /// Builds the steps of the progress display: direct path <c>files</c> (only with sources), <c>write</c>, <c>check</c>,
     /// <c>fix</c> (only when a second iteration began), <c>done</c>; careful path <c>files</c> (only with sources), <c>write</c>,
     /// <c>review</c>, <c>done</c>. Clarified orders (<paramref name="intake"/> given) start with <c>understand</c> and, when
-    /// questions were asked, <c>answers</c>.
+    /// questions were asked, <c>answers</c>. The elapsed time counts from <paramref name="versionStartedAt"/> when it is given (a run that
+    /// changes an earlier version counts from its own start, not from the order), otherwise from <paramref name="orderCreatedAt"/>.
     /// </summary>
-    public static OrderProgress Map(OrderDisplay display, OrderMode mode, bool hasSources, IReadOnlyList<RunEventRow> events, DateTimeOffset orderCreatedAt, DateTimeOffset? finishedAt, DateTimeOffset now, OrderIntakeProgress? intake = null)
+    public static OrderProgress Map(OrderDisplay display, OrderMode mode, bool hasSources, IReadOnlyList<RunEventRow> events, DateTimeOffset orderCreatedAt, DateTimeOffset? finishedAt, DateTimeOffset now, OrderIntakeProgress? intake = null, DateTimeOffset? versionStartedAt = null)
     {
         ArgumentNullException.ThrowIfNull(display);
         ArgumentNullException.ThrowIfNull(events);
@@ -55,7 +56,7 @@ public static class OrderProgressMapper
         steps.Add(new StepDraft(DoneKey, "Done"));
         Finish(steps, display, finishedAt);
 
-        var elapsed = (finishedAt ?? now) - orderCreatedAt;
+        var elapsed = (finishedAt ?? now) - (versionStartedAt ?? orderCreatedAt);
         if (elapsed < TimeSpan.Zero)
             elapsed = TimeSpan.Zero;
 

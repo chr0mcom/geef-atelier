@@ -201,6 +201,24 @@ public sealed class OrderServiceReviseTests(PostgresFixture postgres)
         });
     }
 
+    [Fact]
+    public async Task The_time_shown_for_a_change_counts_from_its_start_even_a_day_after_the_order()
+    {
+        await using var host = await StartAsync();
+        var user = NewUser();
+        var submission = await SubmitAsync(host, new SubmitOrderRequest("Write a note to the team.", user, OrderEntry.Web));
+        await DeliverAsync(host, submission.RunId!.Value, V1Text, words: 9);
+        var dayBefore = DateTimeOffset.UtcNow.AddDays(-1);
+        await host.QueryAsync(db => db.Orders.Where(o => o.Id == submission.OrderId).ExecuteUpdateAsync(s => s.SetProperty(o => o.CreatedAt, dayBefore)));
+
+        var v2 = await ReviseAsync(host, new(submission.OrderId, user, Change, [], OrderEntry.Web));
+        await host.QueryAsync(db => db.Runs.Where(r => r.Id == v2.RunId).ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RunStatus.Running)));
+
+        var view = (await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetAsync(submission.OrderId, user)))!;
+        Assert.Equal(OrderDisplayState.Working, view.Display.State);
+        Assert.InRange(view.Progress.Elapsed, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+    }
+
     private static async Task AssertShowsV1Async(AtelierEndToEndHost host, OrderSubmission submission, string user, OrderDisplayState state, string note)
     {
         await host.WithScopeAsync(async sp =>
