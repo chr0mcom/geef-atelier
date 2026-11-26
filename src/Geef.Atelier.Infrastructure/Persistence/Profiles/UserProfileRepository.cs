@@ -6,6 +6,9 @@ namespace Geef.Atelier.Infrastructure.Persistence.Profiles;
 
 internal sealed class UserProfileRepository(AtelierDbContext db) : IUserProfileRepository
 {
+    /// <summary>How often <see cref="FillEmptyAsync"/> creates the row again when the profile was deleted between its two statements.</summary>
+    internal const int FillAttempts = 3;
+
     public Task<UserProfileEntity?> GetAsync(string username, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(username);
@@ -45,29 +48,35 @@ internal sealed class UserProfileRepository(AtelierDbContext db) : IUserProfileR
         var language = fill.Language;
         var signature = fill.Signature;
         var unset = nameof(Formality.Unset);
-        await db.Database.ExecuteSqlAsync($"""
-            INSERT INTO "UserProfiles" ("Username", "Formality", "CreatedAt", "UpdatedAt")
-            VALUES ({username}, {unset}, {now}, {now})
-            ON CONFLICT ("Username") DO NOTHING
-            """, ct);
-        var before = await db.Database.SqlQuery<FilledRow>($"""
-            UPDATE "UserProfiles" AS p SET
-                "DisplayName" = COALESCE(o."DisplayName", {name}::text),
-                "Formality" = CASE WHEN o."Formality" = {unset} AND {formality}::text IS NOT NULL THEN {formality}::text ELSE o."Formality" END,
-                "Language" = COALESCE(o."Language", {language}::text),
-                "Signature" = COALESCE(o."Signature", {signature}::text),
-                "UpdatedAt" = CASE
-                    WHEN (o."DisplayName" IS NULL AND {name}::text IS NOT NULL)
-                      OR (o."Formality" = {unset} AND {formality}::text IS NOT NULL)
-                      OR (o."Language" IS NULL AND {language}::text IS NOT NULL)
-                      OR (o."Signature" IS NULL AND {signature}::text IS NOT NULL)
-                    THEN {now} ELSE o."UpdatedAt" END
-            FROM (SELECT "Username", "DisplayName", "Formality", "Language", "Signature", "UpdatedAt"
-                  FROM "UserProfiles" WHERE "Username" = {username} FOR UPDATE) AS o
-            WHERE p."Username" = o."Username"
-            RETURNING o."DisplayName" AS "DisplayName", o."Formality" AS "Formality", o."Language" AS "Language", o."Signature" AS "Signature"
-            """).ToListAsync(ct);
-        var old = before.Single();
+        FilledRow? old = null;
+        for (var attempt = 0; attempt < FillAttempts && old is null; attempt++)
+        {
+            await db.Database.ExecuteSqlAsync($"""
+                INSERT INTO "UserProfiles" ("Username", "Formality", "CreatedAt", "UpdatedAt")
+                VALUES ({username}, {unset}, {now}, {now})
+                ON CONFLICT ("Username") DO NOTHING
+                """, ct);
+            var before = await db.Database.SqlQuery<FilledRow>($"""
+                UPDATE "UserProfiles" AS p SET
+                    "DisplayName" = COALESCE(o."DisplayName", {name}::text),
+                    "Formality" = CASE WHEN o."Formality" = {unset} AND {formality}::text IS NOT NULL THEN {formality}::text ELSE o."Formality" END,
+                    "Language" = COALESCE(o."Language", {language}::text),
+                    "Signature" = COALESCE(o."Signature", {signature}::text),
+                    "UpdatedAt" = CASE
+                        WHEN (o."DisplayName" IS NULL AND {name}::text IS NOT NULL)
+                          OR (o."Formality" = {unset} AND {formality}::text IS NOT NULL)
+                          OR (o."Language" IS NULL AND {language}::text IS NOT NULL)
+                          OR (o."Signature" IS NULL AND {signature}::text IS NOT NULL)
+                        THEN {now} ELSE o."UpdatedAt" END
+                FROM (SELECT "Username", "DisplayName", "Formality", "Language", "Signature", "UpdatedAt"
+                      FROM "UserProfiles" WHERE "Username" = {username} FOR UPDATE) AS o
+                WHERE p."Username" = o."Username"
+                RETURNING o."DisplayName" AS "DisplayName", o."Formality" AS "Formality", o."Language" AS "Language", o."Signature" AS "Signature"
+                """).ToListAsync(ct);
+            old = before.SingleOrDefault();
+        }
+        if (old is null)
+            return new UserProfileFillResult([], []);
 
         var filled = new List<ProfileFillField>();
         var alreadySet = new List<ProfileFillField>();

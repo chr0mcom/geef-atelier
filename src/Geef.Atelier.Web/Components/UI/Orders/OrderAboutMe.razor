@@ -162,7 +162,12 @@
             var user = Username;
             var part = Part(topic);
             var saved = await DataGate.RunAsync(() => Profiles.SavePartAsync(user, part));
-            (saved.AlreadySet.Count > 0 ? _already : _saved).Add(topic);
+            if (saved.Saved.Count > 0)
+                _saved.Add(topic);
+            else if (saved.AlreadySet.Count > 0)
+                _already.Add(topic);
+            else
+                _errors[topic] = AboutMeLines.SaveFailed;
         }
         catch (ProfileValidationException ex)
         {

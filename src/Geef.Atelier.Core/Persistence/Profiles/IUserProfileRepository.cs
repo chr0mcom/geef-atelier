@@ -15,7 +15,8 @@ public interface IUserProfileRepository
     /// Puts the values of <paramref name="fill"/> into the fields of the profile of <paramref name="username"/> that are empty, in one
     /// locked step, and creates the profile when there is none; a field that holds a value keeps it, and every other field stays as it is,
     /// also when other saves run at the same time. <see cref="UserProfileEntity.UpdatedAt"/> becomes <paramref name="now"/> only when a
-    /// field was filled.
+    /// field was filled. When the profile is deleted between creating and filling it, the row is created again (a few times at most);
+    /// if that never holds, nothing is filled and nothing reported as already set.
     /// </summary>
     Task<UserProfileFillResult> FillEmptyAsync(string username, UserProfileFill fill, DateTimeOffset now, CancellationToken ct = default);
 

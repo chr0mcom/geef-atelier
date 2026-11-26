@@ -348,6 +348,9 @@ public sealed class HowItWorksPageTests : TestContext
         var cut = Render();
 
         Assert.Equal(shown, cut.FindAll("[data-testid='hiw-about-tell-once']").Count == 1);
+        if (shown)
+            Assert.Equal(mode == TellOnceMode.On,
+                cut.Find("[data-testid='hiw-about-tell-once']").TextContent.Contains("Atelier takes it from About me instead of guessing or asking", StringComparison.Ordinal));
         Assert.Equal(shown, cut.FindAll("[data-testid='hiw-assistant-about-me']").Count == 1);
         var row = cut.FindAll("[data-testid='hiw-admins'] tbody tr").Single(r => r.TextContent.Contains("Orders:TellOnce", StringComparison.Ordinal));
         Assert.Equal(mode.ToString(), row.Children[2].TextContent);
@@ -363,8 +366,8 @@ public sealed class HowItWorksPageTests : TestContext
         var line = Render().Find("[data-testid='hiw-about-tell-once']").TextContent;
         Assert.Equal(TellOnceMode.WithoutPromise, new OrderOptions().TellOnce);
 
-        Assert.Contains("instead of guessing or asking", line, StringComparison.Ordinal);
-        Assert.Contains("the writer gets it with every new request", line, StringComparison.Ordinal);
+        Assert.DoesNotContain("instead of guessing or asking", line, StringComparison.Ordinal);
+        Assert.Contains("Atelier uses it for your next requests: the writer gets it with every new request.", line, StringComparison.Ordinal);
         Assert.Contains("A change of a text you already have keeps the details it was written with", line, StringComparison.Ordinal);
         Assert.Contains("as long as that field is still empty", line, StringComparison.Ordinal);
     }

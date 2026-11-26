@@ -236,6 +236,16 @@ public sealed class CancelListProfileToolTests
     }
 
     [Fact]
+    public async Task When_nothing_could_be_saved_the_note_never_says_saved()
+    {
+        var profiles = new FakeProfileService { NothingChanged = true };
+
+        var dto = await ProfileTool.Profile(profiles, _alice, Shipped, signature: "Viele Grüße");
+
+        Assert.Equal(ProfileTool.NothingChangedNote, dto.Note);
+    }
+
+    [Fact]
     public async Task An_unknown_form_of_address_saves_nothing()
     {
         var profiles = new FakeProfileService();

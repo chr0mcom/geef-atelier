@@ -16,6 +16,7 @@ internal sealed class FakeProfileService : IProfileService
     public ConcurrentQueue<string> Cleared { get; } = new();
     public Exception? GetError { get; set; }
     public Exception? SaveError { get; set; }
+    public bool NothingChanged { get; set; }
 
     public void Set(string username, UserProfileInput input) => _profiles[username] = input;
 
@@ -47,6 +48,8 @@ internal sealed class FakeProfileService : IProfileService
         SavedParts.Enqueue((username, part));
         if (SaveError is not null)
             throw SaveError;
+        if (NothingChanged)
+            return Task.FromResult(new UserProfilePartResult(View(Stored(username)), [], []));
         var old = Stored(username) ?? Empty;
         var saved = new List<ProfileFillField>();
         var already = new List<ProfileFillField>();

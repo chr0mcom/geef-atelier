@@ -103,8 +103,7 @@ Only you can change it.
 **Tell Atelier once.** When a text had to guess or leave open your name, how you sign off, how readers are addressed or your
 language, and About me has nothing on it yet, the result shows a field for it with **Save**. What you save there goes into About me;
 if that field was filled under About me in the meantime, nothing is overwritten and the result says “Already saved under About me”.
-From your next request on, Atelier takes it from About me instead of guessing or asking, and the writer gets it with every new
-request. The text you are looking at keeps the details it was written with, and so does every change you ask for to it with
+Atelier uses it for your next requests: the writer gets it with every new request. The text you are looking at keeps the details it was written with, and so does every change you ask for to it with
 “Change something” – also a detail you have deleted under About me since then. To have the new value in this text, write it into
 your change. The result also says what the writer got from About me with that request (“With this request the writer got from
 About me: …”). You change or delete it under About me; that counts for your next requests. Whether the writer really uses it, for

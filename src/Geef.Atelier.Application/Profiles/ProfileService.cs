@@ -115,7 +115,12 @@ internal sealed partial class ProfileService(IUserProfileRepository profiles, Ti
     }
 
     private static bool IsSpecial(char c) =>
-        char.IsControl(c) || char.GetUnicodeCategory(c) is UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator or UnicodeCategory.Format;
+        char.IsControl(c)
+        || char.GetUnicodeCategory(c) is UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator
+        || (char.GetUnicodeCategory(c) == UnicodeCategory.Format && c is not (ZeroWidthNonJoiner or ZeroWidthJoiner));
+
+    private const char ZeroWidthNonJoiner = '\u200C';
+    private const char ZeroWidthJoiner = '\u200D';
 
     private static readonly Regex FieldNamePattern = new(
         "^\\s*(?<label>" + string.Join("|", ProfilePrompt.Labels.Select(l => Regex.Escape(l).Replace("\\ ", "\\s+", StringComparison.Ordinal))) + ")\\s*:",

@@ -276,7 +276,7 @@
             <li>Under About me you can save your name, how you sign off, how readers are addressed, your language and what never to do. Atelier uses it in every text. Only you can change it.</li>
             @if (_f.TellOnce != TellOnceMode.Off)
             {
-                <li data-testid="hiw-about-tell-once">When a text had to guess or leave open your name, how you sign off, how readers are addressed or your language, and About me has nothing on it yet, the result offers a field to save it there, as long as that field is still empty. From your next request on, Atelier takes it from About me instead of guessing or asking, and the writer gets it with every new request. A change of a text you already have keeps the details it was written with. The result also says what the writer got from About me.</li>
+                <li data-testid="hiw-about-tell-once">When a text had to guess or leave open your name, how you sign off, how readers are addressed or your language, and About me has nothing on it yet, the result offers a field to save it there, as long as that field is still empty. @TellOnceNext A change of a text you already have keeps the details it was written with. The result also says what the writer got from About me.</li>
             }
             <li>Your request, your answers, your About me details and your files go to the AI services that write and check the text.</li>
             @if (_f.WebResearch)
@@ -377,6 +377,10 @@
         UiSettings.Value, McpSettings.Value, LearningSettings.Value, SourceSettings.Value);
 
     string McpAddress => Nav.BaseUri.TrimEnd('/') + "/mcp";
+
+    string TellOnceNext => _f.TellOnce == TellOnceMode.On
+        ? "From your next request on, Atelier takes it from About me instead of guessing or asking, and the writer gets it with every new request."
+        : "Atelier uses it for your next requests: the writer gets it with every new request.";
 
     string FlowDescription => _f.WebResearch
         ? "Your request, answers, About me details and files go to Atelier, which passes them to the AI services that write and check the text. A web search gets only short topics from your request, never your files."

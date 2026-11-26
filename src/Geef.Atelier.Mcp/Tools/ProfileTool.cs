@@ -43,6 +43,9 @@ public static class ProfileTool
     public const string SavedNote =
         "Saved under About me. The person's next requests get it; texts already written, and changes asked for to them, keep the details they were written with. " + ChangeNote;
 
+    /// <summary>Note when nothing could be saved, because the profile was deleted at the same moment again and again.</summary>
+    public const string NothingChangedNote = "Nothing was saved, because About me changed at the same moment. Try again.";
+
     /// <summary>Added to the note for fields that were already set and stayed as they were: <c>{0}</c> lists them.</summary>
     public const string AlreadySetFormat = "Already set, so not changed: {0} – the person changes it under About me.";
 
@@ -106,6 +109,8 @@ public static class ProfileTool
 
     private static string Note(UserProfilePartResult saved)
     {
+        if (saved.Saved.Count == 0 && saved.AlreadySet.Count == 0)
+            return NothingChangedNote;
         if (saved.AlreadySet.Count == 0)
             return SavedNote;
         var already = string.Format(CultureInfo.InvariantCulture, AlreadySetFormat, string.Join(", ", saved.AlreadySet.Select(Wire)));

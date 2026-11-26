@@ -115,6 +115,20 @@ public sealed class OrderAboutMeTests : TestContext
     }
 
     [Fact]
+    public void When_nothing_could_be_saved_the_page_says_so_and_keeps_the_field()
+    {
+        _profiles.NothingChanged = true;
+        var cut = RenderPage([GapTopic.Signature]);
+
+        cut.Find("[data-topic='signature'] textarea").Input("Viele Grüße");
+        cut.Find("[data-topic='signature'] [data-testid='order-tell-once-save']").Click();
+
+        Assert.Equal(AboutMeLines.SaveFailed, cut.Find("[data-testid='order-tell-once-error']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='order-tell-once-saved']"));
+        Assert.Empty(cut.FindAll("[data-testid='order-tell-once-already']"));
+    }
+
+    [Fact]
     public void The_saved_line_says_that_only_the_next_requests_get_it()
     {
         Assert.Contains("Your next requests get it", AboutMeLines.Saved, StringComparison.Ordinal);
