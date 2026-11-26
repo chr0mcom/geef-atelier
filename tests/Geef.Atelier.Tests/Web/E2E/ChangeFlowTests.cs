@@ -106,6 +106,33 @@ public sealed class ChangeFlowTests(PlaywrightFixture pw, PostgresFixture pg) : 
     [Theory]
     [InlineData("noir")]
     [InlineData("vellum")]
+    public async Task The_sentence_about_a_clearly_longer_version_stands_above_the_text_and_fits_a_phone(string theme)
+    {
+        var orderId = AddOrder(writing: false);
+        var shown = await _orders.GetResultAsync(orderId, User);
+        _orders.SetResult(shown! with { LengthNotice = RevisionLines.LongerThanBefore });
+        var page = await OpenAsync(orderId, theme, 360);
+        try
+        {
+            var notice = page.Locator("[data-testid='order-longer-notice']");
+            await notice.WaitForAsync(new LocatorWaitForOptions { Timeout = 15_000 });
+            Assert.Equal(RevisionLines.LongerThanBefore, (await notice.InnerTextAsync()).Trim());
+            Assert.True(await page.EvaluateAsync<bool>(
+                "() => !!(document.querySelector(\"[data-testid='order-longer-notice']\").compareDocumentPosition(document.querySelector('.order-result-sheet')) & Node.DOCUMENT_POSITION_FOLLOWING)"),
+                "the sentence stands above the text");
+
+            await AssertFitsAsync(page);
+            await ScreenshotAsync(page, $"longer-notice-phone-{theme}.png");
+        }
+        finally
+        {
+            await page.Context.CloseAsync();
+        }
+    }
+
+    [Theory]
+    [InlineData("noir")]
+    [InlineData("vellum")]
     public async Task The_page_with_card_versions_and_changes_fits_a_phone(string theme)
     {
         var orderId = AddOrder(writing: false);
