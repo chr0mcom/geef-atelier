@@ -14,7 +14,9 @@ public sealed record BriefParts(string Request, IReadOnlyList<string> PersonAnsw
 /// <summary>
 /// Reads the parts of a briefing built by <see cref="IOrderBriefComposer"/>: the request comes first and unchanged, the blocks
 /// of the intake (answers, corrections, assumptions) and the profile follow after <see cref="Separator"/>. Briefings that were
-/// not built this way come back unchanged.
+/// not built this way come back unchanged. Only full headings start a block; stored briefings keep the headings of the first version
+/// of the open questions (<see cref="IntakeBriefComposer.OpenQuestionsHeadingFirstVersion"/>, <see cref="IntakeBriefComposer.NotCheckedHeadingFirstVersion"/>),
+/// which are therefore still read.
 /// </summary>
 public static class BriefingSections
 {
@@ -33,6 +35,8 @@ public static class BriefingSections
         IntakeBriefComposer.CorrectionsHeading,
         IntakeBriefComposer.OpenQuestionsHeading,
         IntakeBriefComposer.NotCheckedHeading,
+        IntakeBriefComposer.OpenQuestionsHeadingFirstVersion,
+        IntakeBriefComposer.NotCheckedHeadingFirstVersion,
         IntakeBriefComposer.AssumptionsHeadingStart,
         IntakeBriefComposer.AssumptionsNotShownHeadingStart,
         IntakeBriefComposer.OpenFactsHeadingStart,
@@ -161,8 +165,8 @@ public static class BriefingSections
     {
         _ when line == IntakeBriefComposer.AnswersHeading => BriefBlock.Answers,
         _ when line == IntakeBriefComposer.CorrectionsHeading => BriefBlock.Corrections,
-        _ when line == IntakeBriefComposer.OpenQuestionsHeading => BriefBlock.OpenQuestions,
-        _ when line == IntakeBriefComposer.NotCheckedHeading => BriefBlock.NotChecked,
+        _ when line == IntakeBriefComposer.OpenQuestionsHeading || line == IntakeBriefComposer.OpenQuestionsHeadingFirstVersion => BriefBlock.OpenQuestions,
+        _ when line == IntakeBriefComposer.NotCheckedHeading || line == IntakeBriefComposer.NotCheckedHeadingFirstVersion => BriefBlock.NotChecked,
         _ when line.StartsWith(IntakeBriefComposer.AssumptionsHeadingStart, StringComparison.Ordinal)
                || line.StartsWith(IntakeBriefComposer.AssumptionsNotShownHeadingStart, StringComparison.Ordinal) => BriefBlock.FormAssumptions,
         _ when line.StartsWith(IntakeBriefComposer.OpenFactsHeadingStart, StringComparison.Ordinal) => BriefBlock.OpenFacts,

@@ -68,6 +68,23 @@ public sealed class OpenQuestionsParseTests
     }
 
     [Fact]
+    public void Briefings_stored_with_the_first_version_of_the_headings_are_still_read()
+    {
+        var stored = Request + BriefingSections.Separator + IntakeBriefComposer.OpenQuestionsHeadingFirstVersion + "\n- " + Question + "\n" +
+                     IntakeBriefComposer.AssumptionsHeading + "\n- Förmliches Sie.";
+        var unchecked_ = Request + BriefingSections.Separator + IntakeBriefComposer.NotCheckedHeadingFirstVersion + "\n\n" + IntakeBriefComposer.ProfileHeading + "\nName: Anna Beispiel";
+
+        Assert.Equal(Request, BriefingSections.RequestPart(stored));
+        Assert.Equal([Question], BriefingSections.Parse(stored).OpenQuestions!);
+        Assert.Equal(["Förmliches Sie."], BriefingSections.Parse(stored).FormAssumptions);
+        Assert.Equal(Request, BriefingSections.RequestPart(unchecked_));
+        Assert.Equal("Name: Anna Beispiel", BriefingSections.Parse(unchecked_).Profile);
+        var changed = RevisionBrief.Compose(stored, "Bitte schreib, dass es mitfährt.", 2);
+        Assert.Equal([Question], BriefingSections.Parse(changed).OpenQuestions!);
+        Assert.Equal(Request, BriefingSections.RequestPart(changed));
+    }
+
+    [Fact]
     public void A_change_keeps_the_open_questions_and_the_person_can_settle_them()
     {
         var changed = RevisionBrief.Compose(Briefing, "Bitte schreib, dass es mitfährt.", 2);

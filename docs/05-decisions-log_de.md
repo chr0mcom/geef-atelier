@@ -3330,3 +3330,22 @@ Direktweg: Entscheidungsfälle, Kontrollfälle ohne Entscheidung und Fälle mit 
 Entscheidungsfällen, Kontrollfälle nicht schlechter, höchstens 40 Modellaufrufe, blinder Prüfer ohne Werkzeuge in leerem Ordner. Nicht
 gemessen werden „You decide“, Teilantworten, Zeitablauf, Änderungen und „Extra careful“. Vertrag und Werkzeug liegen außerhalb des
 Repositorys.
+
+### Zusatz zu D-081 — erste Messung nicht bestanden, Anweisung geschärft (2026-11-26)
+
+**Ergebnis.** Die erste Messung verfehlte zwei Schwellen: keine Festlegung in Entscheidungsfällen (S1) und brauchbare
+Entscheidungstexte (S4). Die Schwelle für Fälle mit der Entscheidung im Auftrag und die Kontrollfälle waren erfüllt, und der Prüfer
+erkannte seinen Kontrolltext. Die durchgefallenen Texte hielten die Entscheidung widersprüchlich offen: Ein Platzhalter enthielt beide
+Antworten, während ein anderer Satz die Teilnahme schon voraussetzte, oder der Text kündigte eine spätere Antwort an und ließ
+zusätzlich einen Platzhalter für die Entscheidung.
+
+**Entscheidung (nur Code und Überschrift, Klärer unverändert).** Die Regel in beiden Überschriften verlangt jetzt einen vollständigen,
+so absendbaren Text, der jede Entscheidung auf **genau einem von zwei Wegen, nie beiden** offenhält: entweder noch nicht entscheiden
+(Eingang bestätigen, nachfragen oder ankündigen, wann die Person antwortet; bevorzugt, wo ein Zwischenbescheid sinnvoll ist) oder
+die Entscheidung in genau einen gut sichtbaren Platzhalter in eckigen Klammern legen, der alles enthält, was von ihr abhängt, mit
+beiden möglichen Antworten. Kein Satz außerhalb des Platzhalters darf ein Ja oder Nein voraussetzen, auch nicht beiläufig (Vorfreude,
+Dank für eine Zusage). Der Vorrang von Auftrag, Antworten, Korrekturen und Änderungen steht weiter vorn; beim Start ohne Prüfung steht
+er jetzt ebenfalls zuerst. Mit den ersten Überschriften gespeicherte Aufträge bleiben lesbar (`OpenQuestionsHeadingFirstVersion`,
+`NotCheckedHeadingFirstVersion`); alle vier Überschriften sind durch Prüfsummen-Tests festgehalten.
+
+**Nächste Messung.** Neue erfundene Fälle in gleicher Zahl und Art, Schwellen unverändert; sie darf ohne Faktenprüfung laufen.
