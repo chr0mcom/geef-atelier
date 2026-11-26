@@ -23,4 +23,29 @@ public static class OpenQuestions
         var knownOption = answer.OptionId is { } optionId && question.Options.Any(o => o.Id == optionId);
         return !knownOption && string.IsNullOrWhiteSpace(answer.FreeText);
     }
+
+    /// <summary>
+    /// The key two question texts are compared by: lower case, letters and digits only, runs of anything else as one space. A question
+    /// the gate held back with the same key as a question the person answered is the same question and is not open.
+    /// </summary>
+    public static string SameQuestionKey(this string? text)
+    {
+        var builder = new System.Text.StringBuilder();
+        var gap = false;
+        foreach (var c in (text ?? string.Empty).ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                if (gap && builder.Length > 0)
+                    builder.Append(' ');
+                builder.Append(c);
+                gap = false;
+            }
+            else
+            {
+                gap = true;
+            }
+        }
+        return builder.ToString();
+    }
 }

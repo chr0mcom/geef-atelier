@@ -40,6 +40,21 @@ public sealed class ClarificationSummaryTests : TestContext
     }
 
     [Fact]
+    public void You_decide_on_the_length_question_keeps_left_to_me_and_on_other_questions_reads_left_open()
+    {
+        var clarification = OrderTestData.Clarification(
+            questions: [OrderTestData.LengthQuestion(), OrderTestData.Question(1)],
+            answers: [new OrderAnswer("length", null, null, true, AnswerOrigin.User), new OrderAnswer("q1", null, null, true, AnswerOrigin.User)],
+            outcome: IntakeOutcome.Answered);
+
+        var answers = RenderComponent<ClarificationSummary>(p => p.Add(c => c.Clarification, clarification))
+            .FindAll("[data-testid='clarify-summary-answer']").Select(a => a.TextContent).ToList();
+
+        Assert.Equal("Wie lang soll der Text ungefähr werden? → left to me", answers[0]);
+        Assert.Equal("Frage 1: Wann findet das Fest statt? → left open", answers[1]);
+    }
+
+    [Fact]
     public void AnswersOfTheAssistantAndTheTurnedDownRevisionAreNamed()
     {
         var clarification = OrderTestData.Clarification(

@@ -3285,10 +3285,13 @@ MCP weitergegeben.
   Option noch eigene Worte; `OpenQuestions.IsLeftOpen`). Dazu wird eine Frage, die der Klärer unter den Themen `Purpose` oder `Other`
   stellen wollte und die das Tor als zweite Frage zum Thema, über der Obergrenze oder wegen ihrer Form verwirft, zurückgehalten
   (`QuestionGateResult.HeldBack`, gespeichert als `IntakeRecord.HeldBack`) und nie zur Annahme oder zur Zeile „the writer decides“.
-  Beide Arten stehen wörtlich unter der Überschrift „Questions the person did not answer …“. Sie sagt dem Schreiber: nie für die
-  Person entscheiden, was sie bindet; offenhalten (Eingang bestätigen, nachfragen, um Zeit bitten) oder einen gut sichtbaren
-  Platzhalter setzen; die offene Entscheidung unter den offenen Punkten nennen; keine Fakten erfinden; alles andere frei wählen; der
-  Person folgen, wo der Auftrag oder eine spätere Änderung die Frage klärt. Die feste Längenfrage öffnet den Block nie.
+  Beide Arten stehen wörtlich unter der Überschrift „Questions the person did not answer …“. Sie sagt zuerst, dass Auftrag,
+  Antworten und Korrekturen der Person und spätere Änderungen vorgehen und befolgt werden, wo sie eine Frage klären; sonst
+  entscheidet der Schreiber nie für die Person, was sie bindet, hält es offen (Eingang bestätigen, nachfragen, um Zeit bitten) oder
+  setzt einen gut sichtbaren Platzhalter, nennt die offene Entscheidung unter den offenen Punkten, erfindet keine Fakten und wählt
+  alles andere frei. Eine zurückgehaltene Frage, die wortgleich mit einer beantworteten ist (ohne Rücksicht auf Groß- und
+  Kleinschreibung, Leerraum und Satzzeichen), entfällt aus Block und Ergebnis. Die feste Längenfrage öffnet den Block nie; „You
+  decide“ erscheint dort weiter als „left to me“.
 - **Start ohne Prüfung.** Ein Auftrag mit Rückfrage-Stufe, der startet, bevor sein Auftrag geprüft ist (Start während des Lesens,
   Klärer gescheitert oder zu langsam), bekommt dieselbe Regel als eine allgemeine Zeile („The request was not checked …“). Aufträge
   ohne Rückfrage-Stufe (`Orders:IntakeMode = Off` oder `Shadow`) bekommen sie nie.

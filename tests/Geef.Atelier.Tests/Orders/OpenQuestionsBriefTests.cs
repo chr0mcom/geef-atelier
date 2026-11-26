@@ -115,6 +115,38 @@ public sealed class OpenQuestionsBriefTests
         Assert.DoesNotContain(SecondGuess, text, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("o1")]
+    [InlineData("o2")]
+    public void A_held_back_copy_of_an_answered_question_is_not_open(string option)
+    {
+        var copy = "darf dein Kind an der Klassenfahrt teilnehmen ?!";
+        var record = Record(DecisionGap(Question, TripOptions, Guess), DecisionGap(copy, ["Ja", "Nein"], SecondGuess), FormGap());
+        Assert.Equal([copy.Trim()], record.HeldBack!);
+
+        var text = Compose(record, [new OrderAnswer("q1", option, null, false, AnswerOrigin.User)]);
+
+        Assert.DoesNotContain(IntakeBriefComposer.OpenQuestionsHeading, text, StringComparison.Ordinal);
+        Assert.Contains(IntakeBriefComposer.AnswersHeading + "\n- " + Question + " → ", text, StringComparison.Ordinal);
+        Assert.Empty(BriefingSections.Parse(text).OpenQuestions!);
+        Assert.Equal(Question.SameQuestionKey(), copy.SameQuestionKey());
+    }
+
+    [Fact]
+    public void A_held_back_question_in_other_words_stays_open_under_the_rule_that_the_answer_of_the_person_wins()
+    {
+        var other = "Soll dein Kind bei der Klassenfahrt mitfahren?";
+        var record = Record(DecisionGap(Question, TripOptions, Guess), DecisionGap(other, ["Ja", "Nein"], SecondGuess), FormGap());
+
+        var text = Compose(record, [new OrderAnswer("q1", "o2", null, false, AnswerOrigin.User)]);
+
+        Assert.Contains(IntakeBriefComposer.AnswersHeading + "\n- " + Question + " → Nein, es fährt nicht mit\n", text, StringComparison.Ordinal);
+        Assert.Contains(IntakeBriefComposer.OpenQuestionsHeading + "\n- " + other + "\n", text, StringComparison.Ordinal);
+        Assert.True(text.IndexOf(IntakeBriefComposer.AnswersHeading, StringComparison.Ordinal) < text.IndexOf(IntakeBriefComposer.OpenQuestionsHeading, StringComparison.Ordinal));
+        Assert.Contains("the answers and corrections of the person", IntakeBriefComposer.OpenQuestionsHeading, StringComparison.Ordinal);
+        Assert.DoesNotContain(SecondGuess, text, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void A_decision_over_the_limit_of_a_revision_is_held_back_and_its_guess_is_no_assumption()
     {
@@ -207,10 +239,14 @@ public sealed class OpenQuestionsBriefTests
                      {
                          "never decide it for the person", "accept or decline", "order, cancel, pay or confirm attendance",
                          "confirming receipt, asking back or asking for time", "placeholder in square brackets",
-                         "name the open decision among your open points", "a change the person asks for settles",
+                         "name the open decision among your open points",
                      })
                 Assert.Contains(part, heading, StringComparison.Ordinal);
         }
+        Assert.Contains("Where the request or a change the person asks for settles it, follow the person.", IntakeBriefComposer.NotCheckedHeading, StringComparison.Ordinal);
+        Assert.Contains(
+            "The request, the answers and corrections of the person and any change the person asks for take precedence: where one of them settles one of these questions, follow the person. Otherwise, where the answer would commit the person",
+            IntakeBriefComposer.OpenQuestionsHeading, StringComparison.Ordinal);
         Assert.EndsWith(":", IntakeBriefComposer.OpenQuestionsHeading, StringComparison.Ordinal);
         Assert.Contains("Never invent facts", IntakeBriefComposer.OpenQuestionsHeading, StringComparison.Ordinal);
         Assert.Contains("choose what fits the request best", IntakeBriefComposer.OpenQuestionsHeading, StringComparison.Ordinal);

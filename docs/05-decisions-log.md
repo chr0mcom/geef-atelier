@@ -3167,10 +3167,12 @@ was only passed on over MCP.
   `OpenQuestions.IsLeftOpen`). In addition, a question the clarifier wanted to ask under the topics `Purpose` or `Other` and the gate
   dropped as a second question on its topic, over the limit or for its form is held back (`QuestionGateResult.HeldBack`, stored as
   `IntakeRecord.HeldBack`) and never becomes an assumption or a "the writer decides" line. Both kinds are listed word for word under
-  the heading "Questions the person did not answer …", which tells the writer never to decide for the person what would commit
-  them, to keep it open (confirm receipt, ask back, ask for time) or write a clearly visible placeholder, to name the open decision
-  among its open points, to invent no facts, to choose freely for anything else, and to follow the person where the request or a
-  later change settles the question. The fixed length question never opens the block.
+  the heading "Questions the person did not answer …". It says first that the request, the answers and corrections of the person
+  and any later change take precedence and are followed where they settle a question; otherwise the writer never decides for the
+  person what would commit them, keeps it open (confirm receipt, ask back, ask for time) or writes a clearly visible placeholder,
+  names the open decision among its open points, invents no facts and chooses freely for anything else. A held-back question with
+  the same wording as a question the person answered (ignoring case, spaces and punctuation) is dropped from the block and the
+  result. The fixed length question never opens the block; "You decide" on it still reads "left to me".
 - **Unchecked start.** An order of the intake that starts before its request was checked (started while it is still being read,
   clarifier failed or timed out) gets the same rule as one general line ("The request was not checked …"). Orders without the
   intake step (`Orders:IntakeMode = Off` or `Shadow`) never get it.

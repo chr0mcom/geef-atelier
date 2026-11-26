@@ -58,9 +58,9 @@ internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOr
     public const string KeepDecisionsOpen =
         "never decide it for the person: keep it open, for example by confirming receipt, asking back or asking for time, or write a clearly visible placeholder in square brackets, and name the open decision among your open points.";
     public const string OpenQuestionsHeading = "Questions the person did not answer (the person skipped them, left them to you, or was not asked). "
-        + "Where the answer would commit the person – for example to accept or decline, order, cancel, pay or confirm attendance – " + KeepDecisionsOpen + " "
-        + "Never invent facts for these questions either. For anything else, choose what fits the request best. "
-        + "Where the request or a change the person asks for settles one of these questions, follow the person:";
+        + "The request, the answers and corrections of the person and any change the person asks for take precedence: where one of them settles one of these questions, follow the person. "
+        + "Otherwise, where the answer would commit the person – for example to accept or decline, order, cancel, pay or confirm attendance – " + KeepDecisionsOpen + " "
+        + "Never invent facts for these questions either. For anything else, choose what fits the request best:";
     public const string NotCheckedHeading = "The request was not checked for missing details before writing. "
         + "Where the text would need a decision only the person can make – for example to accept or decline, order, cancel, pay or confirm attendance – " + KeepDecisionsOpen + " "
         + "Where the request or a change the person asks for settles it, follow the person.";
@@ -93,10 +93,11 @@ internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOr
 
         var questions = record?.Questions ?? [];
         var openQuestions = questions.Where(q => q.IsLeftOpen(answers)).ToList();
+        var answered = questions.Where(q => !openQuestions.Contains(q)).Select(q => q.Text.SameQuestionKey()).ToHashSet(StringComparer.Ordinal);
         var openLines = openQuestions.Select(q => OneLine(q.Text))
-            .Concat((record?.HeldBack ?? []).Select(OneLine))
+            .Concat((record?.HeldBack ?? []).Select(OneLine).Where(l => !answered.Contains(l.SameQuestionKey())))
             .Where(l => l.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .DistinctBy(l => l.SameQuestionKey(), StringComparer.Ordinal)
             .ToList();
         var answerLines = questions
             .Where(q => answers.ContainsKey(q.Id) && !openQuestions.Contains(q))
