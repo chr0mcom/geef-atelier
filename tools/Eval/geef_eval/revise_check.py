@@ -51,7 +51,7 @@ it stands there as whole words after normalising white space, invisible characte
 Atelier's ``QuoteVerifier`` does). A passage of v1 appears in v2 when a passage of v2 (of any kind) contains its quote. A point of
 the writer appears in v2 under ``openPoints`` or under ``earlierOpenPoints`` (kind ``openPoint``) with the version of v1; points
 and assumptions are compared without case, closing punctuation and one leading article. Placeholders are text in square brackets
-(2 to 80 characters, one line), except links, images, check boxes and footnotes.
+(2 to 300 characters, one line, as in the Atelier since gate N), except links, images, check boxes and footnotes.
 
 Never passed without data: a case counts only with readable snapshots of the planned order, a base with a text and, after a change,
 a text of a newer version. A criterion with no such case (Shorter, Longer, the first local case, every tone case) is not
@@ -134,7 +134,7 @@ QUOTES = str.maketrans({"„": '"', "“": '"', "”": '"', "«": '"', "»": '"'
                         "‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "―": "-", "−": "-"})
 ORDER_ID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$")
-PLACEHOLDER_RE = re.compile(r"\[[^\[\]\n]{2,80}\]")
+PLACEHOLDER_RE = re.compile(r"\[[^\[\]\n]{2,300}\]")
 FOOTNOTE_RE = re.compile(r"^[\d\s,;–-]+$|^\^")
 EXPORT_FILE_VERSION_RE = re.compile(r"-v(\d+)\.md$")
 FOLLOW_UP = {

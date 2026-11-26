@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Writing;
 
@@ -159,7 +160,7 @@ public static class FactFindingFilter
     /// <summary>Shortest material quote of a source conflict or a replacing passage; a stated total such as "Summe 62 €" is short.</summary>
     public const int MinMaterialChars = 5;
 
-    private const int MaxPlaceholderChars = 200;
+    private const int MaxPlaceholderChars = DraftCheckEvaluator.MaxPlaceholderChars;
 
     /// <summary>Applies the rules in their fixed order; every decision lands in the trace.</summary>
     public static FactFilterResult Apply(IReadOnlyList<ProposedFactFinding> proposed, string draft, FactMaterial material)

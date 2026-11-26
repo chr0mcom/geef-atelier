@@ -169,6 +169,16 @@ def test_placeholders_skip_links_images_check_boxes_and_footnotes():
     assert rc.find_placeholders(text) == ["[Name]", "[Datum Ostermontag 2027]"]
 
 
+def test_placeholders_up_to_300_characters_like_the_atelier():
+    long_one = "[Art der Rückmeldung, z. B. über den Abschnitt unten, per E-Mail oder über das Hausaufgabenheft]"
+    longest, too_long = "[" + "a" * 300 + "]", "[" + "b" * 301 + "]"
+    words = " ".join(["Beschluss der Mitgliederversammlung"] * 5)
+    text = (f"Bitte {long_one} angeben. {longest} {too_long} [Name\nKlasse] Siehe [{words}](https://info.example), "
+            f"![{words}](a.png), [^{words}], [{words}]: https://info.example")
+    assert len(long_one) - 2 == 94
+    assert rc.find_placeholders(text) == [long_one, longest]
+
+
 def test_passing_scenario(tmp_path):
     report = run(tmp_path)
     assert report["verdict"] == "passed", (report["problems"], {k: (v["failures"], v["problems"]) for k, v in report["parts"].items()})

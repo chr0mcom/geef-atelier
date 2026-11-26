@@ -87,6 +87,18 @@ public sealed class FactFindingFilterTests
         Assert.Equal(FactFilterDecision.DroppedPlaceholder, Decision(Unsupported(quote)));
 
     [Fact]
+    public void Rule3_quote_at_the_end_of_a_placeholder_of_up_to_300_characters_is_dropped()
+    {
+        var inner = string.Join(' ', Enumerable.Repeat("Angaben zur rechtlichen Grundlage des Zauns,", 6)) + " mit Datum bzw. Fundstelle";
+        var draft = $"Sehr geehrte Damen und Herren,\n\nder Zaun steht dort seit Jahren [{inner}]. Wir bitten um Antwort.";
+
+        Assert.InRange(inner.Length, 250, Geef.Atelier.Core.Domain.Checks.DraftCheckEvaluator.MaxPlaceholderChars);
+        var result = FactFindingFilter.Apply([Unsupported("des Zauns, mit Datum bzw. Fundstelle")], draft, Material());
+
+        Assert.Equal(FactFilterDecision.DroppedPlaceholder, Assert.Single(result.Trace).Decision);
+    }
+
+    [Fact]
     public void Rule3_quote_around_a_placeholder_is_kept() =>
         Assert.Equal(FactFilterDecision.Kept, Decision(Unsupported("Die Kosten liegen bei [Betrag aus den Notizen] pro Kind.")));
 
