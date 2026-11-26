@@ -105,6 +105,7 @@ async def model_warmup_loop(interval: int = MODEL_WARMUP_INTERVAL_SECONDS) -> No
 async def lifespan(app: FastAPI):  # noqa: ANN001
     # Re-initialise semaphores after the event loop is running.
     claude_adapter._semaphore = asyncio.Semaphore(claude_adapter.MAX_CONCURRENT)
+    claude_adapter._probe_semaphore = asyncio.Semaphore(claude_adapter._PROBE_CONCURRENCY)
     codex_adapter._semaphore = asyncio.Semaphore(codex_adapter.MAX_CONCURRENT)
     codex_adapter._image_semaphore = asyncio.Semaphore(codex_adapter.IMAGE_MAX_CONCURRENT)
     # Sync provider configs from backend (best-effort; failure is non-fatal).
@@ -931,10 +932,10 @@ async def _complete_with_failover(
             raise error from exc
         except (RuntimeError, OSError) as exc:
             finished = True
-            if failover.cli_of(target) == "claude" and failover.is_not_in_plan(exc):
+            if isinstance(exc, claude_adapter.NotInPlanError):
                 queue, switched = _requeue_after_not_in_plan(
                     target, target_req.model, queue, tried, allow_failover)
-                if switched is not None:
+                if switched is not None and backend == "claude":
                     routed.add(switched)
                     origin = switched
                     model_routing.log_route(target_req.model, target, switched, "not in plan (answer)")
@@ -1093,13 +1094,13 @@ def _stream_completion(
                 _caller_timeout(target, exc)
                 raise
             except (RuntimeError, OSError) as exc:
-                if not emitted and failover.cli_of(target) == "claude" and failover.is_not_in_plan(exc):
+                if not emitted and isinstance(exc, claude_adapter.NotInPlanError):
                     try:
                         queue, switched = _requeue_after_not_in_plan(
                             target, target_req.model, queue, tried, allow_failover)
                     except OpenAIError as unavailable:
                         raise RuntimeError(unavailable.message) from exc
-                    if switched is not None:
+                    if switched is not None and primary == "claude":
                         routed.add(switched)
                         origin = switched
                         model_routing.log_route(target_req.model, target, switched, "not in plan (answer)")
@@ -1210,7 +1211,7 @@ async def _generic_claude(adapter, config: dict, req: ChatCompletionRequest, pro
         except cli_process.CallerTimeoutError as exc:
             raise _caller_timeout(provider_name, exc) from exc
         except Exception as exc:
-            if isinstance(exc, (RuntimeError, OSError)) and failover.is_not_in_plan(exc):
+            if isinstance(exc, claude_adapter.NotInPlanError):
                 failover.mark_not_in_plan(account, model_routing.model_key(req.model))
                 log.info("%s: model %s is not in the plan of this account (generic endpoint)",
                          account, req.model or "(default)")

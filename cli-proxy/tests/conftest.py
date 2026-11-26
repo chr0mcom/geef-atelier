@@ -39,3 +39,5 @@ def _no_real_alt_account(monkeypatch, tmp_path_factory):
     monkeypatch.setattr(claude_adapter, "_alt_model_cache", None)
     monkeypatch.setattr(claude_adapter, "_alt_last_attempt_at", None)
     monkeypatch.setattr(claude_adapter, "_not_in_plan_families", {})
+    monkeypatch.setattr(claude_adapter, "_family_probe", {})
+    monkeypatch.setattr(claude_adapter, "_alt_refresh_task", None)

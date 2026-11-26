@@ -49,9 +49,19 @@ def lacks(account: str, model: str | None) -> str | None:
     return None
 
 
+#: Rule (c) compares the two accounts' resolutions of a family only when they were obtained at most
+#: this far apart; the alternative account is refreshed in the background, so a small lag is normal.
+RESOLUTION_MAX_SKEW_SECONDS = failover._env_int("CLAUDE_ROUTE_RESOLUTION_MAX_SKEW_SECONDS", 900)
+
+
 def _only_on_alt(model: str | None) -> str | None:
     """(c) A concrete id only the alternative account resolves to, while the primary resolves the
-    same family to a different model -- the CLI would otherwise silently swap the model."""
+    same family to a different model -- the CLI would otherwise silently swap the model.
+
+    Only on current evidence: the most recent probe of the family resolved on BOTH accounts, and
+    the two resolutions are at most RESOLUTION_MAX_SKEW_SECONDS apart (so neither is stale against
+    the other). In doubt the request goes to the primary first (a "not in plan"
+    answer there is learned anyway)."""
     if not _is_concrete(model):
         return None
     key = model_key(model)
@@ -62,6 +72,12 @@ def _only_on_alt(model: str | None) -> str | None:
         return None
     resolved = primary_map.get(claude_adapter._alias_for(family))
     if resolved is None or resolved == key:
+        return None
+    primary_current, primary_at = claude_adapter.resolution_state(PRIMARY, family)
+    alt_current, alt_at = claude_adapter.resolution_state(ALT, family)
+    if not (primary_current and alt_current) or primary_at is None or alt_at is None:
+        return None
+    if abs(alt_at - primary_at) > RESOLUTION_MAX_SKEW_SECONDS:
         return None
     return f"{key} only on {ALT} (primary resolves {family} to {resolved})"
 

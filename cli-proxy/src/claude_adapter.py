@@ -181,10 +181,24 @@ _model_cache_lock = asyncio.Lock()
 # `_last_attempt_at` above stay the primary account's.
 _alt_model_cache: tuple[dict[str, str], float] | None = None
 _alt_last_attempt_at: float | None = None
+_alt_model_cache_lock = asyncio.Lock()
+
+# The background refresh of the alternative account's catalog (see list_models_with_source_async);
+# the handle is kept because asyncio holds only weak references to running tasks.
+_alt_refresh_task: asyncio.Task | None = None
+
+# At most this many model probes run at once, on top of the shared CLI semaphore: probing two
+# accounts must never take every CLI slot away from real requests.
+_PROBE_CONCURRENCY = max(1, int(os.getenv("CLAUDE_MODEL_PROBE_CONCURRENCY", "2")))
+_probe_semaphore = asyncio.Semaphore(_PROBE_CONCURRENCY)
 
 # Families a probe of the account answered with the CLI's "not in plan" wording, per account.
 # Replaced family by family by later probes; an unknown answer (limit, auth, timeout) leaves it.
 _not_in_plan_families: dict[str, set[str]] = {}
+
+# Per account and family: (did the most recent probe of the family resolve, when it last resolved).
+# Routing rule (c) trusts a mapping only when it is current on both accounts (model_routing.py).
+_family_probe: dict[str, dict[str, tuple[bool, float | None]]] = {}
 
 
 class _NotInPlan:
@@ -195,6 +209,41 @@ class _NotInPlan:
 
 
 NOT_IN_PLAN = _NotInPlan()
+
+
+class NotInPlanError(RuntimeError):
+    """The claude CLI reported, in its structured result (`is_error: true`), that the bound account's
+    subscription does not include the requested model. Raised only from that field -- never from
+    free text such as model output or stderr -- so callers can rely on the type."""
+
+
+def _not_in_plan_result(data: dict | None, model_arg: str | None) -> bool:
+    """True when a CLI result object carries the "not in plan" answer.
+
+    Requires `is_error: true` and the wording in its `result` field. The requested model name (the
+    argv value, which the CLI may repeat in its message) is cut out before matching, so a caller
+    cannot trigger the detection through the model name."""
+    if not isinstance(data, dict) or data.get("is_error") is not True:
+        return False
+    text = str(data.get("result", "")).lower()
+    if model_arg:
+        text = text.replace(model_arg.lower(), " ")
+    return failover.is_not_in_plan(text)
+
+
+def _model_arg(args: list[str]) -> str | None:
+    """The value of `--model` in a claude argv, if any."""
+    try:
+        return args[args.index("--model") + 1]
+    except (ValueError, IndexError):
+        return None
+
+
+def _raise_not_in_plan(data: dict) -> None:
+    raise NotInPlanError(
+        f"claude CLI API error (status={data.get('api_error_status')}): "
+        f"{clip_redacted(str(data.get('result', '')), RESULT_CHARS)}"
+    )
 
 
 def _cache_of(account: str) -> tuple[dict[str, str], float] | None:
@@ -255,13 +304,14 @@ async def _probe_alias(alias: str) -> str | _NotInPlan | None:
     id, NOT_IN_PLAN when the CLI answers with its unambiguous "not in plan" wording, and None for
     every other outcome (limit, auth, timeout, unreadable output) -- None means "unknown".
 
-    Runs under the shared CLI semaphore so a model probe cannot outrank real completions,
-    and always reaps its subprocess: without the kill a timed-out probe would leave a
-    `claude` process running against the same subscription.
+    Runs under the shared CLI semaphore so a model probe cannot outrank real completions, and under
+    the probe semaphore (CLAUDE_MODEL_PROBE_CONCURRENCY, default 2) so probes of both accounts never
+    hold more than that many CLI slots. Always reaps its subprocess: without the kill a timed-out
+    probe would leave a `claude` process running against the same subscription.
     """
     args = ["claude", "-p", "--model", alias, "--output-format", "json", "--no-session-persistence"]
     env = policy.agent_env(current_home())
-    async with _semaphore:
+    async with _probe_semaphore, _semaphore:
         proc = None
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -279,7 +329,7 @@ async def _probe_alias(alias: str) -> str | _NotInPlan | None:
             keys = list((data.get("modelUsage") or {}).keys())
             if keys:
                 return keys[0]
-            if data.get("is_error") and failover.is_not_in_plan(str(data.get("result", ""))):
+            if _not_in_plan_result(data, alias):
                 log.info("claude model alias probe for %s on %s: not in plan", alias, current_account())
                 return NOT_IN_PLAN
             log.warning("claude model alias probe for %s returned no modelUsage entry", alias)
@@ -320,6 +370,7 @@ async def _resolve_alias_map(account: str = PRIMARY) -> tuple[dict[str, str], bo
         for family, resolved in zip(families, results)
         if isinstance(resolved, str) and resolved
     }
+    _record_family_probes(account, families, results)
     if alias_map:
         lacking = _not_in_plan_families.setdefault(account, set())
         for family, resolved in zip(families, results):
@@ -331,6 +382,22 @@ async def _resolve_alias_map(account: str = PRIMARY) -> tuple[dict[str, str], bo
                 lacking.discard(family)
                 failover.clear_not_in_plan(account, _marked_models_of(account, family))
     return alias_map, bool(alias_map)
+
+
+def _record_family_probes(account: str, families, results) -> None:
+    """Note per family whether this probe resolved it, and when it last did."""
+    now = time.time()
+    state = _family_probe.setdefault(account, {})
+    for family, resolved in zip(families, results):
+        if isinstance(resolved, str) and resolved:
+            state[family] = (True, now)
+        else:
+            state[family] = (False, state.get(family, (False, None))[1])
+
+
+def resolution_state(account: str, family: str) -> tuple[bool, float | None]:
+    """(did the most recent probe of `family` on `account` resolve, when it last resolved)."""
+    return _family_probe.get(account, {}).get(family, (False, None))
 
 
 def _marked_models_of(account: str, family: str) -> list[str]:
@@ -469,19 +536,65 @@ async def list_models_with_source_async(
     With an alternative account logged in (failover.alt_configured) both accounts are probed and
     the result is their union: accounts can carry different models. The alias map takes each
     family from the primary account and falls back to the alternative one; the source is "live"
-    when at least one account answered live.
+    when at least one account answered live. A forced call (refresh, periodic sweep) waits for both
+    accounts. An ordinary call never waits for the alternative account: without a fresh cache of
+    its own it is refreshed in the background, and the call serves what is known so far.
     """
-    async with _model_cache_lock:
-        accounts = _accounts()
-        views = await asyncio.gather(*(_account_view(a, bypass_cache, force) for a in accounts))
-    primary_map, primary_source = views[0]
-    alt_map, alt_source = views[1] if len(views) > 1 else ({}, SOURCE_DEGRADED)
+    alt_map, alt_source = {}, SOURCE_DEGRADED
+    if failover.alt_configured() and bypass_cache:
+        (primary_map, primary_source), (alt_map, alt_source) = await asyncio.gather(
+            _locked_view(PRIMARY, bypass_cache, force), _locked_view(failover.ALT, bypass_cache, force))
+    else:
+        primary_map, primary_source = await _locked_view(PRIMARY, bypass_cache, force)
+        if failover.alt_configured():
+            alt_map, alt_source = _alt_view_nowait()
     alias_map, concrete = _merge_accounts(primary_map, alt_map)
     source = SOURCE_LIVE if SOURCE_LIVE in (primary_source, alt_source) else SOURCE_DEGRADED
     if not alias_map:
         log.warning("claude model probe failed entirely; serving static list as degraded")
         return _compose_model_list(list(STATIC_MODELS)), SOURCE_DEGRADED, {}
     return _compose_model_list(concrete), source, alias_map
+
+
+async def _locked_view(account: str, bypass_cache: bool, force: bool) -> tuple[dict[str, str], str]:
+    """`_account_view` under the account's own lock, so a slow probe of one account never holds up
+    a catalog call that only needs the other one."""
+    lock = _alt_model_cache_lock if account == failover.ALT else _model_cache_lock
+    async with lock:
+        return await _account_view(account, bypass_cache, force)
+
+
+def _alt_view_nowait() -> tuple[dict[str, str], str]:
+    """The alternative account's view without waiting: its fresh cache, or what is known so far
+    (stale mapping or nothing, reported as degraded) while a background refresh runs."""
+    cache = _alt_model_cache
+    if cache is not None and time.time() - cache[1] < _MODEL_CACHE_TTL:
+        return dict(cache[0]), SOURCE_LIVE
+    _schedule_alt_refresh()
+    return (dict(cache[0]) if cache else {}), SOURCE_DEGRADED
+
+
+def _schedule_alt_refresh() -> None:
+    """Start one background refresh of the alternative account unless one is running. The ordinary
+    throttle of that account (see `_account_view`) still limits how often it actually probes."""
+    global _alt_refresh_task
+    if _alt_refresh_task is not None and not _alt_refresh_task.done():
+        return
+    _alt_refresh_task = asyncio.get_running_loop().create_task(_refresh_alt())
+
+
+async def _refresh_alt() -> None:
+    try:
+        await _locked_view(failover.ALT, False, False)
+    except Exception as exc:  # noqa: BLE001 — a background refresh is best-effort
+        log.warning("background model refresh of %s failed: %s", failover.ALT, exc)
+
+
+async def wait_for_alt_refresh() -> None:
+    """Wait for a running background refresh of the alternative account (test and shutdown seam)."""
+    task = _alt_refresh_task
+    if task is not None and not task.done():
+        await asyncio.shield(task)
 
 
 def _throttled(last_attempt_at: float | None) -> bool:
@@ -627,10 +740,13 @@ async def _run_claude_decision(
         # 2.1.219 the (long) usage object precedes it, so a naive prefix truncation cut the
         # cause off and failover.classify() saw only "exited with code" — a session-limit
         # outage was raised as "transport" instead of "limit" (incident 2026-07-24).
-        raise RuntimeError(
+        message = (
             f"claude CLI (agentic file mode) exited with code {proc.returncode}: "
             f"{claude_failure_detail(stdout.decode(errors='replace'), stderr.decode(errors='replace'))}"
         )
+        if _not_in_plan_result(_json_dict(stdout), _model_arg(args)):
+            raise NotInPlanError(message)
+        raise RuntimeError(message)
 
     # Usage (and a fallback answer) come from the stdout JSON; the decision itself is the file.
     usage = UsageParts()
@@ -638,7 +754,7 @@ async def _run_claude_decision(
     try:
         data = json.loads(stdout.decode(errors="replace").strip())
         if isinstance(data, dict):
-            _raise_if_not_in_plan(data)
+            _raise_if_not_in_plan(data, _model_arg(args))
             fallback_text, usage = _extract_result_and_usage(data, "")
     except (json.JSONDecodeError, ValueError):
         pass
@@ -725,6 +841,7 @@ async def _stream_claude(
                             yield ("delta", str(delta["text"]))
                 elif etype == "result":
                     if ev.get("is_error"):
+                        _raise_if_not_in_plan(ev, _model_arg(args))
                         status = ev.get("api_error_status")
                         raise RuntimeError(
                             f"claude CLI API error (status={status}): "
@@ -821,17 +938,17 @@ async def _run_claude_document(
     if proc.returncode != 0:
         # The cause fields (subtype, is_error, result, api_error_status) follow the long usage
         # block, so the former stdout[:200] kept only token counts (pre-study V1, 2026-11-24).
-        raise RuntimeError(
+        message = (
             f"claude CLI (document mode) exited with code {proc.returncode}: "
             f"{claude_failure_detail(stdout.decode(errors='replace'), stderr.decode(errors='replace'))}"
         )
+        if _not_in_plan_result(_json_dict(stdout), _model_arg(args)):
+            raise NotInPlanError(message)
+        raise RuntimeError(message)
 
-    try:
-        parsed = json.loads(stdout.decode(errors="replace").strip())
-    except (json.JSONDecodeError, ValueError):
-        parsed = None
-    if isinstance(parsed, dict):
-        _raise_if_not_in_plan(parsed)
+    parsed = _json_dict(stdout)
+    if parsed is not None:
+        _raise_if_not_in_plan(parsed, _model_arg(args))
 
     draft_path = workspace_path / "draft.md"
     try:
@@ -978,7 +1095,10 @@ async def _exec_print(
         # Errors may appear in stdout JSON (is_error: true) rather than stderr.
         stderr_txt = stderr.decode(errors="replace")
         if data and data.get("is_error"):
-            raise RuntimeError(f"claude CLI error: {claude_failure_detail(raw, stderr_txt)}")
+            message = f"claude CLI error: {claude_failure_detail(raw, stderr_txt)}"
+            if _not_in_plan_result(data, _model_arg(args)):
+                raise NotInPlanError(message)
+            raise RuntimeError(message)
         raise RuntimeError(
             f"claude CLI exited with code {proc.returncode}: {claude_failure_detail(raw, stderr_txt)}")
 
@@ -986,6 +1106,7 @@ async def _exec_print(
     # the failure surfaces as is_error:true in the JSON. Treat it as an error so it maps
     # to an OpenAI error envelope instead of being returned as a "successful" result.
     if data and data.get("is_error"):
+        _raise_if_not_in_plan(data, _model_arg(args))
         status = data.get("api_error_status")
         raise RuntimeError(
             f"claude CLI API error (status={status}): "
@@ -995,17 +1116,23 @@ async def _exec_print(
     return _extract_result_and_usage(data, raw)
 
 
-def _raise_if_not_in_plan(data: dict) -> None:
-    """Raise when a run that exited 0 carries the CLI's "not in plan" answer.
+def _raise_if_not_in_plan(data: dict, model_arg: str | None) -> None:
+    """Raise NotInPlanError when a result object carries the CLI's structured "not in plan" answer.
 
-    The file-writing modes (document, decision file) read their result from a file and would
-    otherwise take the refusal for an unchanged draft or a final answer. Only this one wording is
-    turned into an error here; every other exit-0 result keeps its earlier handling."""
-    if data.get("is_error") and failover.is_not_in_plan(str(data.get("result", ""))):
-        raise RuntimeError(
-            f"claude CLI API error (status={data.get('api_error_status')}): "
-            f"{clip_redacted(str(data.get('result', '')), RESULT_CHARS)}"
-        )
+    In the file-writing modes (document, decision file) this also covers a run that exited 0: they
+    read their result from a file and would otherwise take the refusal for an unchanged draft or a
+    final answer. Every other exit-0 result keeps its earlier handling."""
+    if _not_in_plan_result(data, model_arg):
+        _raise_not_in_plan(data)
+
+
+def _json_dict(stdout: bytes) -> dict | None:
+    """The CLI's stdout parsed as one JSON object, or None."""
+    try:
+        parsed = json.loads(stdout.decode(errors="replace").strip())
+    except (json.JSONDecodeError, ValueError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
 
 
 def _extract_result_and_usage(data: dict | None, raw: str) -> tuple[str, UsageParts]:

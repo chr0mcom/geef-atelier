@@ -110,8 +110,9 @@ _FAILOVER_REASONS = frozenset({"auth", "limit", "transport"})
 
 #: Wording with which the claude CLI says that the subscription of the bound account does not
 #: include the requested model at all (as opposed to an exhausted window). The only place that
-#: knows these phrases: the probe, the request paths and the generic endpoint all ask
-#: `is_not_in_plan`. Observed: "You're out of usage credits. Switch to another model, or manage
+#: knows these phrases. The claude adapter applies them to the `result` field of a CLI result with
+#: `is_error: true` only (claude_adapter._not_in_plan_result, which raises NotInPlanError); the
+#: request paths check that type, never free text. Observed: "You're out of usage credits. Switch to another model, or manage
 #: usage credits at ..." (api_error_status 429, empty modelUsage) for a model the plan lacks.
 _NOT_IN_PLAN_PATTERNS: tuple[str, ...] = (
     "out of usage credits",

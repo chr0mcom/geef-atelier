@@ -29,7 +29,7 @@ from usage import UsageParts  # noqa: E402
 
 NOT_IN_PLAN_TEXT = ("You're out of usage credits. Switch to another model, or manage usage credits at "
                     "https://claude.ai/settings/usage?from=cli to continue.")
-NOT_IN_PLAN = RuntimeError(f"claude CLI API error (status=429): {NOT_IN_PLAN_TEXT}")
+NOT_IN_PLAN = claude_adapter.NotInPlanError(f"claude CLI API error (status=429): {NOT_IN_PLAN_TEXT}")
 LIMIT = RuntimeError("claude CLI error: You've hit your session limit · resets 4:20pm (UTC)")
 OFF = {"x-cli-proxy-failover": "off"}
 
@@ -87,6 +87,20 @@ def _seed(monkeypatch, primary_map: dict, alt_map: dict | None = None, primary_l
         monkeypatch.setattr(claude_adapter, "_alt_model_cache", (dict(alt_map), now))
     monkeypatch.setattr(claude_adapter, "_not_in_plan_families",
                         {"claude": set(primary_lacks), "claude-alt": set(alt_lacks)})
+    monkeypatch.setattr(claude_adapter, "_family_probe", {
+        "claude": {claude_adapter._family_of(a): (True, now) for a in primary_map},
+        "claude-alt": {claude_adapter._family_of(a): (True, now) for a in (alt_map or {})},
+    })
+
+
+async def _catalog(bypass_cache: bool = False, force: bool = False):
+    """One catalog call, then -- once the background refresh of the alternative account finished --
+    the ordinary call a consumer would make next."""
+    first = await claude_adapter.list_models_with_source_async(bypass_cache, force)
+    if bypass_cache:
+        return first
+    await claude_adapter.wait_for_alt_refresh()
+    return await claude_adapter.list_models_with_source_async()
 
 
 def _seed_primary_lacks_fable(monkeypatch):
@@ -197,7 +211,7 @@ class TestCatalogUnion:
         calls: list = []
         monkeypatch.setattr(claude_adapter, "_probe_alias", _probe_by_account(PRIMARY_PROBES, ALT_PROBES, calls))
 
-        models, source, aliases = await claude_adapter.list_models_with_source_async()
+        models, source, aliases = await _catalog()
 
         assert source == "live"
         assert "claude-fable-5-2" in models
@@ -214,7 +228,7 @@ class TestCatalogUnion:
         primary = {**PRIMARY_PROBES, "fable": "claude-fable-5"}
         monkeypatch.setattr(claude_adapter, "_probe_alias", _probe_by_account(primary, ALT_PROBES))
 
-        models, _source, aliases = await claude_adapter.list_models_with_source_async()
+        models, _source, aliases = await _catalog()
 
         assert aliases["claude-fable-latest"] == "claude-fable-5"
         assert "claude-fable-5" in models and "claude-fable-5-2" in models
@@ -223,7 +237,7 @@ class TestCatalogUnion:
     async def test_failed_alt_probe_leaves_the_primary_list_live(self, alt_home, monkeypatch) -> None:
         monkeypatch.setattr(claude_adapter, "_probe_alias", _probe_by_account(PRIMARY_PROBES, {}))
 
-        models, source, aliases = await claude_adapter.list_models_with_source_async()
+        models, source, aliases = await _catalog()
 
         assert source == "live"
         assert "claude-fable-latest" not in aliases
@@ -234,7 +248,7 @@ class TestCatalogUnion:
     async def test_failed_primary_probe_with_live_alt_is_live(self, alt_home, monkeypatch) -> None:
         monkeypatch.setattr(claude_adapter, "_probe_alias", _probe_by_account({}, ALT_PROBES))
 
-        models, source, aliases = await claude_adapter.list_models_with_source_async()
+        models, source, aliases = await _catalog()
 
         assert source == "live"
         assert aliases["claude-fable-latest"] == "claude-fable-5-2"
@@ -244,7 +258,7 @@ class TestCatalogUnion:
     async def test_both_failing_is_degraded_static(self, alt_home, monkeypatch) -> None:
         monkeypatch.setattr(claude_adapter, "_probe_alias", _probe_by_account({}, {}))
 
-        models, source, aliases = await claude_adapter.list_models_with_source_async()
+        models, source, aliases = await _catalog()
 
         assert source == "degraded"
         assert aliases == {}
@@ -254,12 +268,12 @@ class TestCatalogUnion:
     async def test_unknown_never_erases_knowledge(self, alt_home, monkeypatch) -> None:
         monkeypatch.setattr(claude_adapter, "_MODEL_REFRESH_MIN_INTERVAL", 0)
         monkeypatch.setattr(claude_adapter, "_probe_alias", _probe_by_account(PRIMARY_PROBES, ALT_PROBES))
-        await claude_adapter.list_models_with_source_async()
+        await _catalog()
 
         partial_primary = {"opus": "claude-opus-5-5"}
         partial_alt = {"opus": "claude-opus-5-5"}
         monkeypatch.setattr(claude_adapter, "_probe_alias", _probe_by_account(partial_primary, partial_alt))
-        _models, _source, aliases = await claude_adapter.list_models_with_source_async(bypass_cache=True)
+        _models, _source, aliases = await _catalog(bypass_cache=True)
 
         assert claude_adapter._not_in_plan_families["claude"] == {"fable"}
         assert aliases["claude-fable-latest"] == "claude-fable-5-2"
@@ -269,7 +283,7 @@ class TestCatalogUnion:
         refuses = {f: claude_adapter.NOT_IN_PLAN for f in ("opus", "sonnet", "haiku", "fable")}
         monkeypatch.setattr(claude_adapter, "_probe_alias", _probe_by_account(refuses, ALT_PROBES))
 
-        await claude_adapter.list_models_with_source_async()
+        await _catalog()
 
         assert not claude_adapter._not_in_plan_families.get("claude")
         assert model_routing.route_to_alt("claude-opus-latest") is None
@@ -278,12 +292,12 @@ class TestCatalogUnion:
     async def test_a_later_successful_probe_clears_status_and_marks(self, alt_home, monkeypatch) -> None:
         monkeypatch.setattr(claude_adapter, "_MODEL_REFRESH_MIN_INTERVAL", 0)
         monkeypatch.setattr(claude_adapter, "_probe_alias", _probe_by_account(PRIMARY_PROBES, ALT_PROBES))
-        await claude_adapter.list_models_with_source_async()
+        await _catalog()
         failover.mark_not_in_plan("claude", "claude-fable-5-2")
 
         granted = {**PRIMARY_PROBES, "fable": "claude-fable-5-2"}
         monkeypatch.setattr(claude_adapter, "_probe_alias", _probe_by_account(granted, ALT_PROBES))
-        await claude_adapter.list_models_with_source_async(bypass_cache=True)
+        await _catalog(bypass_cache=True)
 
         assert "fable" not in claude_adapter._not_in_plan_families["claude"]
         assert failover.marked_not_in_plan("claude", "claude-fable-5-2") is False
@@ -294,10 +308,10 @@ class TestCatalogUnion:
         monkeypatch.setattr(claude_adapter, "_MODEL_REFRESH_MIN_INTERVAL", 0)
         granted = {**PRIMARY_PROBES, "fable": "claude-fable-5"}
         monkeypatch.setattr(claude_adapter, "_probe_alias", _probe_by_account(granted, ALT_PROBES))
-        await claude_adapter.list_models_with_source_async()
+        await _catalog()
 
         monkeypatch.setattr(claude_adapter, "_probe_alias", _probe_by_account(PRIMARY_PROBES, ALT_PROBES))
-        _models, _source, aliases = await claude_adapter.list_models_with_source_async(bypass_cache=True)
+        _models, _source, aliases = await _catalog(bypass_cache=True)
 
         assert aliases["claude-fable-latest"] == "claude-fable-5-2"
         assert "claude-fable-latest" not in claude_adapter._model_cache[0]
@@ -307,7 +321,7 @@ class TestCatalogUnion:
         calls: list = []
         monkeypatch.setattr(claude_adapter, "_probe_alias", _probe_by_account(PRIMARY_PROBES, ALT_PROBES, calls))
 
-        models, _source, aliases = await claude_adapter.list_models_with_source_async()
+        models, _source, aliases = await _catalog()
 
         assert {a for a, _ in calls} == {"claude"}
         assert len(calls) == 4
@@ -320,9 +334,9 @@ class TestCatalogUnion:
         monkeypatch.setattr(claude_adapter, "_MODEL_REFRESH_MIN_INTERVAL", 3600)
         monkeypatch.setattr(claude_adapter, "_probe_alias", _probe_by_account(PRIMARY_PROBES, {}, calls))
 
-        await claude_adapter.list_models_with_source_async()
-        await claude_adapter.list_models_with_source_async()
-        await claude_adapter.list_models_with_source_async()
+        await _catalog()
+        await _catalog()
+        await _catalog()
 
         assert sum(1 for a, _ in calls if a == "claude-alt") == 4
 
@@ -332,8 +346,8 @@ class TestCatalogUnion:
         monkeypatch.setattr(claude_adapter, "_MODEL_REFRESH_MIN_INTERVAL", 3600)
         monkeypatch.setattr(claude_adapter, "_probe_alias", _probe_by_account(PRIMARY_PROBES, ALT_PROBES, calls))
 
-        await claude_adapter.list_models_with_source_async()
-        await claude_adapter.list_models_with_source_async(bypass_cache=True, force=True)
+        await _catalog()
+        await _catalog(bypass_cache=True, force=True)
 
         assert sum(1 for a, _ in calls if a == "claude-alt") == 8
 
@@ -608,10 +622,10 @@ class TestRuntimeLearning:
         assert failover.marked_not_in_plan("claude", "fable") is False
 
     def test_document_mode_exit_zero_refusal_is_not_an_unchanged_draft(self) -> None:
-        with pytest.raises(RuntimeError, match="out of usage credits"):
+        with pytest.raises(claude_adapter.NotInPlanError, match="out of usage credits"):
             claude_adapter._raise_if_not_in_plan(
-                {"is_error": True, "api_error_status": 429, "result": NOT_IN_PLAN_TEXT})
-        claude_adapter._raise_if_not_in_plan({"is_error": True, "result": "something else"})
+                {"is_error": True, "api_error_status": 429, "result": NOT_IN_PLAN_TEXT}, "fable")
+        claude_adapter._raise_if_not_in_plan({"is_error": True, "result": "something else"}, "fable")
 
 
 class TestOrdinaryLimitsUnchanged:
@@ -767,3 +781,214 @@ class TestHealth:
         monkeypatch.setattr(failover, "FAILS", 1)
         failover.record_failure("claude-alt", "auth", "expired")
         assert client.get("/health").json()["degraded"] is False
+
+
+class _FakeProc:
+    """A finished claude process for the adapter's spawn/communicate seams."""
+
+    def __init__(self, returncode: int, stdout: bytes) -> None:
+        self.returncode = returncode
+        self.stdout_bytes = stdout
+
+
+def _fake_cli(monkeypatch, returncode: int, payload: dict) -> list[list[str]]:
+    argvs: list[list[str]] = []
+
+    async def _spawn(*args, **kwargs):
+        argvs.append(list(args))
+        return _FakeProc(returncode, json.dumps(payload).encode())
+
+    async def _communicate(proc, data, timeout, on_timeout, label):
+        return proc.stdout_bytes, b""
+
+    monkeypatch.setattr(claude_adapter.cli_process, "spawn", _spawn)
+    monkeypatch.setattr(claude_adapter.cli_process, "communicate", _communicate)
+    return argvs
+
+
+class TestGateStructuredDetection:
+    """Gate finding 1: only the CLI's structured error field may say "not in plan"."""
+
+    def test_exit_nonzero_without_is_error_is_never_not_in_plan(self, client, alt_home, monkeypatch) -> None:
+        _fake_cli(monkeypatch, 1, {"is_error": False, "result": "Sure! " + NOT_IN_PLAN_TEXT})
+        with patch.object(main.codex_adapter, "complete_with_usage", _ok("from codex")):
+            resp = client.post("/v1/claude/chat/completions", json=_body("claude-opus-latest"))
+
+        assert resp.headers["x-cli-proxy-provider"] == "codex"
+        assert resp.headers["x-cli-proxy-failover"] == "claude->codex"
+        assert failover.not_in_plan_marks() == {}
+        assert failover._state("claude").consecutive_failures == 1
+
+    def test_structured_answer_raises_the_dedicated_type(self, monkeypatch) -> None:
+        _fake_cli(monkeypatch, 0, {"is_error": True, "api_error_status": 429, "result": NOT_IN_PLAN_TEXT})
+
+        async def _run():
+            return await claude_adapter._exec_print(
+                ["claude", "-p", "--model", "fable", "--output-format", "json"], "hi")
+
+        with pytest.raises(claude_adapter.NotInPlanError):
+            asyncio.run(_run())
+
+    def test_a_model_name_repeated_by_the_cli_cannot_trigger_it(self, client, alt_home, monkeypatch) -> None:
+        model = "claude-x out of usage credits"
+        _fake_cli(monkeypatch, 0, {
+            "is_error": True, "api_error_status": 404,
+            "result": f"There's an issue with the selected model ({model}). It may not exist."})
+        with patch.object(main.codex_adapter, "complete_with_usage", _ok()) as codex:
+            resp = client.post("/v1/claude/chat/completions", json=_body(model))
+
+        assert resp.status_code == 502
+        assert failover.not_in_plan_marks() == {}
+        assert codex.await_count == 0
+
+    def test_stream_result_without_is_error_flag_is_not_not_in_plan(self) -> None:
+        assert claude_adapter._not_in_plan_result({"is_error": False, "result": NOT_IN_PLAN_TEXT}, None) is False
+        assert claude_adapter._not_in_plan_result({"result": NOT_IN_PLAN_TEXT}, None) is False
+        assert claude_adapter._not_in_plan_result({"is_error": True, "result": NOT_IN_PLAN_TEXT}, "fable") is True
+
+
+class TestGateCodexRequests:
+    """Gate finding 2: a codex request served by a Claude account keeps its failover traces."""
+
+    _CODEX = {"model": "gpt-6.2-sol", "messages": [{"role": "user", "content": "hi"}]}
+
+    def test_non_streaming(self, client, alt_home) -> None:
+        fake, seen = _recording_claude({"": NOT_IN_PLAN})
+        with patch.object(main.codex_adapter, "complete_with_usage",
+                          AsyncMock(side_effect=RuntimeError("codex CLI error: rate limit exceeded"))), \
+             patch.object(main.claude_adapter, "complete_with_usage", fake):
+            resp = client.post("/v1/codex/chat/completions", json=self._CODEX)
+
+        assert resp.status_code == 200
+        assert resp.headers["x-cli-proxy-provider"] == "claude-alt"
+        assert resp.headers["x-cli-proxy-failover"] == "codex->claude-alt"
+        assert resp.json()["model"] == "gpt-6.2-sol"
+        assert failover._state("codex").failover_count == 1
+        assert [a for a, _ in seen] == ["claude", "claude-alt"]
+
+    def test_streaming(self, client, alt_home) -> None:
+        async def _codex_stream(prompt, model, max_tokens, **_):
+            raise RuntimeError("codex CLI error: rate limit exceeded")
+            yield  # pragma: no cover
+
+        async def _claude_stream(prompt, model, max_tokens, **_):
+            if not _on_alt():
+                raise NOT_IN_PLAN
+            yield ("delta", "served by alt")
+
+        with patch.object(main.codex_adapter, "stream", _codex_stream), \
+             patch.object(main.claude_adapter, "stream", _claude_stream):
+            resp = client.post("/v1/codex/chat/completions", json={**self._CODEX, "stream": True})
+
+        assert "served by alt" in resp.text
+        assert failover._state("codex").failover_count == 1
+
+
+class _HangingProbe:
+    returncode = None
+
+    async def communicate(self, input=None):
+        await asyncio.sleep(3600)
+        return b"", b""
+
+    def kill(self) -> None:
+        self.returncode = -9
+
+    async def wait(self) -> int:
+        return -9
+
+
+class TestGateProbeLoad:
+    """Gate finding 3: probes never take more than two CLI slots and an ordinary catalog call with a
+    fresh primary cache never waits for the alternative account."""
+
+    @pytest.fixture(autouse=True)
+    def _hanging(self, monkeypatch):
+        async def _spawn(*args, **kwargs):
+            return _HangingProbe()
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", _spawn)
+        monkeypatch.setattr(claude_adapter, "_PROBE_TIMEOUT_SECONDS", 3600)
+        monkeypatch.setattr(claude_adapter, "_semaphore", asyncio.Semaphore(6))
+        monkeypatch.setattr(claude_adapter, "_probe_semaphore", asyncio.Semaphore(2))
+        monkeypatch.setattr(claude_adapter, "_model_cache_lock", asyncio.Lock())
+        monkeypatch.setattr(claude_adapter, "_alt_model_cache_lock", asyncio.Lock())
+
+    @pytest.mark.asyncio
+    async def test_hanging_probes_leave_request_slots_free(self, alt_home) -> None:
+        sweep = asyncio.create_task(claude_adapter.list_models_with_source_async(True, True))
+        await asyncio.sleep(0.05)
+        try:
+            assert claude_adapter._semaphore._value >= 6 - 2
+        finally:
+            sweep.cancel()
+            await asyncio.gather(sweep, return_exceptions=True)
+
+    @pytest.mark.asyncio
+    async def test_ordinary_call_does_not_wait_for_reserve_probes(self, alt_home, monkeypatch) -> None:
+        monkeypatch.setattr(claude_adapter, "_model_cache",
+                            ({"claude-opus-latest": "claude-opus-5-5"}, time.time()))
+        try:
+            models, source, aliases = await asyncio.wait_for(
+                claude_adapter.list_models_with_source_async(), timeout=1.0)
+            assert source == "live"
+            assert aliases == {"claude-opus-latest": "claude-opus-5-5"}
+            assert claude_adapter._semaphore._value >= 6 - 2
+        finally:
+            task = claude_adapter._alt_refresh_task
+            if task is not None:
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+
+
+class TestGateRuleC:
+    """Gate finding 4: rule (c) only on current resolutions of both accounts; in doubt the primary."""
+
+    def _maps(self, monkeypatch) -> None:
+        _seed(monkeypatch,
+              {"claude-opus-latest": "claude-opus-5-5"},
+              {"claude-opus-latest": "claude-opus-5-6"})
+
+    def test_current_resolutions_route(self, alt_home, monkeypatch) -> None:
+        self._maps(monkeypatch)
+        assert model_routing.route_to_alt("claude-opus-5-6") is not None
+
+    def test_failed_latest_primary_probe_keeps_the_primary(self, alt_home, monkeypatch) -> None:
+        self._maps(monkeypatch)
+        claude_adapter._family_probe["claude"]["opus"] = (False, time.time() - 60)
+        assert model_routing.route_to_alt("claude-opus-5-6") is None
+
+    def test_failed_latest_alt_probe_keeps_the_primary(self, alt_home, monkeypatch) -> None:
+        self._maps(monkeypatch)
+        claude_adapter._family_probe["claude-alt"]["opus"] = (False, time.time() - 60)
+        assert model_routing.route_to_alt("claude-opus-5-6") is None
+
+    def test_stale_primary_resolution_keeps_the_primary(self, alt_home, monkeypatch) -> None:
+        self._maps(monkeypatch)
+        claude_adapter._family_probe["claude"]["opus"] = (True, time.time() - 7200)
+        assert model_routing.route_to_alt("claude-opus-5-6") is None
+
+    def test_no_probe_state_keeps_the_primary(self, alt_home, monkeypatch) -> None:
+        self._maps(monkeypatch)
+        monkeypatch.setattr(claude_adapter, "_family_probe", {})
+        assert model_routing.route_to_alt("claude-opus-5-6") is None
+
+    def test_in_doubt_the_request_reaches_the_primary_with_failover_off(self, client, alt_home, monkeypatch) -> None:
+        self._maps(monkeypatch)
+        claude_adapter._family_probe["claude"]["opus"] = (False, time.time() - 60)
+        fake, seen = _recording_claude()
+        with patch.object(main.claude_adapter, "complete_with_usage", fake):
+            resp = client.post("/v1/claude/chat/completions", json=_body("claude-opus-5-6"), headers=OFF)
+
+        assert resp.headers["x-cli-proxy-provider"] == "claude"
+        assert seen == [("claude", "claude-opus-5-6")]
+
+    @pytest.mark.asyncio
+    async def test_probe_records_resolution_state(self, alt_home, monkeypatch) -> None:
+        monkeypatch.setattr(claude_adapter, "_probe_alias",
+                            _probe_by_account(PRIMARY_PROBES, ALT_PROBES))
+        await claude_adapter.list_models_with_source_async(True, True)
+
+        assert claude_adapter.resolution_state("claude", "opus")[0] is True
+        assert claude_adapter.resolution_state("claude", "fable")[0] is False
+        assert claude_adapter.resolution_state("claude-alt", "fable")[0] is True
