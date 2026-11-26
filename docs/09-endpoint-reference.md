@@ -1,6 +1,6 @@
 # Endpoint reference
 
-*[Deutsch](09-endpoint-reference_de.md) · **English***
+*Last updated: 2026-11-26 (public pages `/`, `/how-it-works`, `/docs` corrected and added; 09-endpoint-reference_de.md) · **English***
 
 *Last updated: 2026-11-26 (stage 6: HTTP endpoints of the upload ticket and the page `/u/{id}`, `prepare_attachment`, `uploadIds` in `submit_order`, counting of refused attachments, server instruction step 2 behind `Uploads:Tickets`; stage 5: `revise_order`, `export_order`, `cancel_order`, `list_orders`, `profile`, `latestVersion`, `earlierOpenPoints`, `fromVersion`, older tools behind `Mcp:LegacyTools`; stage 4: `lookedUp` in `get_order_result`, server instruction on passages looked up on the web; stage 3: `checks`, `factCheck`, `unbackedPassages`, `sourceIssues`, `openPoints`, `writerAssumptions`, `sourceQuotes` in `get_order_result`, server instructions on showing them; stage 2: `answer_order`, `needs_input` with questions in `submit_order`/`get_order_status`, `assumptions` in `get_order_result`, new server instructions; stage 1: order tools `submit_order`, `get_order_status`, `get_order_result`, `submit_request` as a shell with `orderId`, server instructions, `list_learnings` admin only; D-067: `warnings` and `outcome` in `get_run_status`/`get_run_result`, reading the result after `outcome`; `/hubs/runs` stays until stage 8; `/hubs/runs` only for signed-in users; admin-only editors and `/access-denied`; learning paused by default; before that 2026-05-22, D-054: `list_learnings` tool added; `providerType` updated to include `learning-retrieval`)*
 
@@ -207,7 +207,7 @@ Every tool of stage 5 answers `Order not found.` for an unknown or foreign order
 
 #### Stage 6: `prepare_attachment` and `uploadIds`
 
-Only while `Uploads:Tickets` is `On` (shipped `Off`). With `Off` the tool is not offered, `submit_order` does not list `uploadIds`, and an `uploadIds` argument sent anyway is refused with "Uploading files this way is not available. Attach small files in attachments or ask the person to use the Atelier web app. Nothing was started."
+Only while `Uploads:Tickets` is `On` (code default `Off`; `appsettings.json` ships `On` since the acceptance in D-076). With `Off` the tool is not offered, `submit_order` does not list `uploadIds`, and an `uploadIds` argument sent anyway is refused with "Uploading files this way is not available. Attach small files in attachments or ask the person to use the Atelier web app. Nothing was started."
 
 **`prepare_attachment` input:** `{ "fileName": "<string, required, 1–255 characters, only shown, never a path>", "sizeBytes": <long, optional: an upload of another size is refused> }`
 
@@ -656,7 +656,9 @@ externally reachable routes:
 
 | Endpoint | Method | Auth | Purpose |
 |----------|---------|------|-------|
-| `/` | GET | Cookie | Home page / Atelier overview |
+| `/` | GET | None | Public landing page |
+| `/how-it-works` | GET | None | Public explanation page; what it calls available follows the current switches and, for a signed-in person, their own exceptions |
+| `/docs`, `/docs/{slug}` | GET | None | Allow-listed documentation (README, 01–04, 06–09, guides 12–15) |
 | `/health` | GET | None | Health check (`Healthy`) — for the reverse proxy/container lifecycle; includes the database and the `pending-migrations` check (D-067) |
 | `/login` | GET/POST | None | Login page (static SSR) |
 | `/auth/logout` | POST | Cookie | Logout (anti-forgery, Minimal API) |
@@ -711,7 +713,7 @@ separate HTTP endpoint for submitting an order.
 
 ## Upload ticket endpoints (D-076)
 
-Only while `Uploads:Tickets` is `On` (shipped `Off`). With `Off` the endpoints are not mapped and the page `/u/{id}` is taken
+Only while `Uploads:Tickets` is `On` (code default `Off`; `appsettings.json` ships `On` since the acceptance in D-076). With `Off` the endpoints are not mapped and the page `/u/{id}` is taken
 out of the request before authentication: the addresses answer like addresses that do not exist. Answers are JSON in the
 format of the receipt above; without a receipt `{ "reason": "…" }`.
 

@@ -2,9 +2,15 @@
 
 *[English](01-vision-and-scope.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-26 (D-077: Gedächtnis je Nutzer nicht gebaut, Learning-Schleife bleibt pausiert; D-068: höchstens drei kurze Rückfragen mit Klickantworten vor dem Lauf, nie währenddessen; D-067: Learning-Schleife standardmäßig pausiert; zuvor 22. Mai 2026, D-054: Continuous-Learning-Loop in den Scope aufgenommen; learning-retrieval-Providertyp)*
+*Letzte Aktualisierung: 2026-11-26 (Leitfäden je Zielgruppe und die Seite „How it works“; Export-Knopf auf der Auftragsseite richtiggestellt; D-077: Gedächtnis je Nutzer nicht gebaut, Learning-Schleife bleibt pausiert; D-068: höchstens drei kurze Rückfragen mit Klickantworten vor dem Lauf, nie währenddessen; D-067: Learning-Schleife standardmäßig pausiert; zuvor 22. Mai 2026, D-054: Continuous-Learning-Loop in den Scope aufgenommen; learning-retrieval-Providertyp)*
 
 ## Vision
+
+> **Aktueller Stand (seit dem Umbau im November 2026, D-068 bis D-077).** Die Vision unten wurde für die Crew-basierte
+> Arbeitsweise geschrieben. Was eine Person heute standardmäßig nutzt, ist einfacher: Ein Anliegen wird ein **Auftrag**; höchstens
+> drei Fragen vor dem Start; ein Schreibaufruf mit den Dateien im Volltext; Prüfungen mit einem festen Bericht, was geprüft wurde;
+> höchstens eine Korrektur. Das Crew-System bleibt als „Workshop“ und „Extra careful“ verfügbar. Die Leitfäden
+> [12](12-user-guide_de.md) bis [15](15-developer-guide_de.md) beschreiben den aktuellen Stand je Zielgruppe.
 
 **Geef.Atelier** ist eine Text-Manufaktur: ein Atelier aus spezialisierten KI-Rollen (Executor, Reviewer, optional Advisor), das je nach Werkstück unterschiedlich besetzt wird. Der Unterschied zu einem klassischen "GPT-Wrapper" ist nicht Bedienung oder Preis, sondern dass die Maschine *vor der Arbeit entscheidet, wie sie arbeitet* (adaptive Crew-Komposition) und *während der Arbeit transparent macht, was sie tut* (Prozess-Sichtbarkeit über Iterations- und Findings-Trail).
 
@@ -27,7 +33,7 @@ Das Projekt ist die produktive Anwendung des [Geef SDK](https://github.com/chr0m
 - Fire-and-Forget-Workflow: Auftrag starten, später Status prüfen, am Ende Ergebnis abholen — keine Mensch-im-Loop-Eingriffe während des Runs. **Vor** dem Lauf sind höchstens drei kurze Rückfragen mit fertigen Antworten zum Anklicken erlaubt, immer überspringbar (D-068)
 - Persistente Run-Historie mit vollständigem Iterations-Trail
 - Run-Fortsetzung: einen fehlgeschlagenen oder abgebrochenen Run ab dem letzten Draft-Text (Seed-Modus) oder mit frischer Pipeline (Clean-Modus) fortsetzen — D-046
-- Datei-Export in den Formaten md / html / pdf / docx / txt / json über die Finalizer-Pipeline (D-044); die fünf Finalizer-Profil-Typen (FileExport, MetadataEnrich, ExternalSink, Transform) sind als Teil des Crew-Systems implementiert
+- Download des Textes jedes Auftrags als Word, PDF oder Markdown auf der Auftragsseite und über MCP (`export_order`, D-070, D-075); im älteren Crew-System zusätzlich Datei-Export in md / html / pdf / docx / txt / json über die Finalizer-Pipeline (D-044; Finalizer-Typen FileExport, MetadataEnrich, ExternalSink, Transform)
 - Grounding-Anreicherung in mehreren Formen: Tavily-Websuche (`tavily`), semantische Vector-Store-RAG (`vector-store`), kuratierter Fixtext für Style-Guides und Glossare (`static-context`), gezieltes URL-Fetching mit SSRF-Schutz (`url-fetch`), Tavily-Newssuche mit Datumsfilter (`news-search`), akademische Literaturrecherche bei arXiv / Semantic Scholar / OpenAlex (`academic-search`) und generisches REST-Endpoint-Grounding mit SSRF-Schutz und JSONPath-Extraktion (`rest-api`); jeder Provider unterstützt optional einen KI-Refinement-Pass (D-050–D-052); domänen-bewusste Abfrage aus dem Learning-Store (`learning-retrieval`, D-054)
 - **Continuous-Learning-Loop (D-054):** Ein opt-in-`learning-extractor`-Finalizer extrahiert strukturierte Fakten aus abgeschlossenen Runs und stößt fire-and-forget einen dedizierten Qualitäts-Gate-Run an (`learning-evaluation`-Crew). Nur Learnings, die das Gate konvergent durchlaufen (drei strenge Reviewer, `AbortOnCritical=true`, Multi-Modell-Pluralismus), werden als `Approved` im Learning-Store gespeichert (`LearningEntries`-Tabelle, getrennter Namespace von der kuratierten Wissensbasis). Der `learning-retrieval`-Grounding-Provider spielt sie gewichtet nach Domänen-Ähnlichkeit in spätere Runs ein. Verwaltungs-UI unter `/crew/learnings`; MCP-Tool `list_learnings`. Drei Schutzmechanismen gegen Model Collapse: (1) getrennter Namespace, (2) auditierbares Gate, (3) ausschließlich strukturierte Fakten. **Seit D-067 pausiert** (`Learning:Enabled`, Standard `false`); ein Gedächtnis je Nutzer (D-068) sollte sie ersetzen; Etappe 7 ist bis zu ihrem Auslöser gestrichen (D-077), die Schleife bleibt pausiert
 
@@ -40,7 +46,6 @@ Das Projekt ist die produktive Anwendung des [Geef SDK](https://github.com/chr0m
 - Kommerzielles Hosting, Billing, Abrechnung
 - Ungefiltertes Cross-Run-Self-RAG (bewusst verworfen; der Continuous-Learning-Loop oben bietet gegatetes Cross-Run-Lernen mit drei Schutzmechanismen gegen Model Collapse)
 - Domänen-spezifische Datenbank-Connectors (z.B. juristische Datenbanken wie dejure.org oder Beck-Online) — später optional
-- Direkter „Export”-Button in der Briefing-UI: ein mit einem Klick erreichbarer Export-Button in der Run-/Briefing-Oberfläche ist nicht implementiert. (Datei-Export in md/html/pdf/docx/txt/json *ist* implementiert, aber ausschließlich über die Finalizer-Pipeline, die im Crew-Template konfiguriert wird — siehe „In Scope” oben.)
 
 ## Zielnutzer
 

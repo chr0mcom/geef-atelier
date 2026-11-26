@@ -2,55 +2,62 @@
 
 *[Deutsch](README_de.md) · **English***
 
-Text-generation pipeline platform built on the [Geef SDK](https://github.com/chr0mcom/geef). Multiple models collaborate in configurable crews — the executor writes, the reviewers assess, and the pipeline iterates until convergence.
+**Atelier turns a short request into a finished text** – a letter, an email, an article, a summary, a report. You say what you
+need, add files if you have them, and get the text together with what was checked, what is still open and what was assumed.
+It runs in the browser and from AI assistants such as Claude (over MCP). It is built on the open [Geef SDK](https://github.com/chr0mcom/geef).
 
-## Implementation status
+## How it works, in one picture
 
-**Step 1 ✅** Solution structure, Postgres persistence, health check, Docker Compose.
+```mermaid
+flowchart LR
+    A["Request<br/>(+ files)"] --> B["At most 3 short<br/>questions, skippable"]
+    B --> C["Writer: files in full text,<br/>gaps stay in [brackets]"]
+    C --> D["Checks: rules from the request<br/>without AI, fact check, sums in files"]
+    D -- "clear problem: once" --> C
+    D --> E["Text + what was checked<br/>+ open points + assumptions"]
+```
 
-**Step 2 ✅** In-memory Geef pipeline with stub providers — no LLM, no DB access. Convergence loop, event sink, all four provider contracts implemented and covered by xUnit tests.
+The running application explains itself on the public page **How it works** (`/how-it-works`). That page reads the current
+switches (and a signed-in person's exceptions), so it never shows a feature as available that is switched off.
 
-**Step 3 ✅** Real Anthropic API calls — `IAnthropicClient`, `LlmExecutionStep`, two `LlmReviewer` (tool use). Polly resilience.
+## Who it is for
 
-**Step 4 ✅** Postgres persistence — `PostgresEventSink` writes every pipeline run with its iterations, findings, token usage and event log to the DB.
+| You … | Start here |
+|---|---|
+| want a text and use the browser | [Guide: writing with Atelier](docs/12-user-guide.md) |
+| use an AI assistant (claude.ai, Claude Desktop, Claude Code) | [Guide: from an AI assistant](docs/13-ai-assistant-guide.md) |
+| run Atelier for a team: accounts, switches, the older workshop | [Guide for administrators](docs/14-admin-guide.md) |
+| develop or host it | [Guide for developers and hosts](docs/15-developer-guide.md) |
 
-**Step 5 ✅** BackgroundService orchestration — `RunOrchestratorService` polls for pending runs, sets an atomic claim, runs the Geef pipeline concurrently, and recovers crashed runs on startup.
+## What it adds to asking a chatbot – and what not
 
-**Step 6 ✅** Application service layer — `IRunService` (Submit/Get/List/Cancel), `IRunRepository`, cancellation watcher.
+Each point names the decision that describes it.
 
-**Step 7 ✅** Blazor UI — three pages (`/new`, `/runs`, `/runs/{id}`), SignalR hub with live status, 9 UI components, bUnit and Playwright tests.
+- **Reads whole files.** Up to 150,000 characters the writer gets the files completely, up to 600,000 with a table of contents
+  (D-069, D-070).
+- **Asks before, not after.** At most three short questions with answers to click, only before the start, always skippable; what
+  it does not ask is listed as an assumption (D-068, D-071, D-072). In a measurement on eleven real jobs, asking beat merely
+  assuming 9 : 1 (D-068).
+- **Leaves gaps visible.** Guesses about facts the person did not give reach the writer marked as "not given", and the writer is
+  asked to leave placeholders; the result lists them under "Fill these in before you send the text" (D-069, D-073).
+- **Says what was checked – and what not.** "What was checked" lists only checks that ran and ends with the sentence that they do
+  not prove the text is right. The fact check points out passages that may not be backed; in the shipped setting it does not
+  change the text (D-073).
+- **One place for every version.** Orders, versions and exports (Word, PDF, Markdown) in the web app and over MCP (D-070, D-075).
 
-**Step 8 ✅** Cookie auth — single-user login, `[Authorize]` on pages, login/logout, `TestAuthenticationHandler` for E2E tests.
+Limits: the text can still be wrong; the fact check can miss things and also flags harmless sentences (D-075); Atelier is not a
+chat; it does not learn from earlier texts (learning paused, D-067; memory not built, D-077); scans without text cannot be read
+(D-076). Changing a finished text and web research are built but switched off for everyone until their measurements pass
+(D-074, D-075, D-077).
 
-**Step 9+ ✅** Crew system, advisor passes, Template Studio (with full-field edit, D-043), domain templates, grounding-provider CRUD, vector-store RAG, PDF support, cost tracking.
+## Read on
 
-**MCP OAuth ✅** Self-hosted OAuth 2.1 authorization server (RFC 8414/7591/7636/7009/8252) — authorization-code flow with mandatory PKCE/S256, opaque tokens, refresh rotation, reuse detection.
-
-**Multi-user ✅** DB-based user management with BCrypt, admin UI at `/admin/users`, startup seeding of the admin account from env vars.
-
-**Run-user isolation ✅** Each user sees only their own runs; admin override via explicit toggles. MCP runs are attributed to the authorizing OAuth user, Claude Code CLI runs (static token) to the admin (D-042).
-
-**Finalizer pipeline ✅** 5th profile type — FinalizerProfile with four types (FileExport, MetadataEnrich, ExternalSink, Transform). 17 system profiles. RunArtifact entity (File with download, Url, Status). Download endpoint with owner check. FinalizerPicker + RunFinalizersOnMaxAttempts in CrewTemplateEditor. RunDetail artifact table. Studio integration. 2 new MCP tools (D-044, 2026-05-19).
-
-**Run-Resume ✅** Resume a failed or aborted run from where it left off — Seed mode (continue from last draft) or Clean mode (fresh start with same briefing). "Fortsetzen" button in RunDetail, ResumeRunDialog with MaxIterations override. ParentRunId link shown in RunDetail (PR #18, 2026-05-19).
-
-**Grounding Refinement ✅** Optional AI filter pass after every grounding provider fetch — Filter mode (keep/drop per source with reasoning) and Synthesize mode (merge all sources into a coherent text with `[n]` citations). Configurable per provider via `LlmBinding` (D-049/D-050, PR #22, 2026-05-20).
-
-**Grounding Types ✅** Three new grounding-provider types alongside the existing `tavily` and `vector-store` providers: `static-context` (curated fixed text — style guides, glossaries, brand voice), `url-fetch` (fetch specific URLs with SSRF guard blocking all private/cloud-metadata IPs), and `news-search` (Tavily news topic with date filter). New system profile `tavily-news`. Dashboard cost aggregation now includes Grounding Refiner costs (D-051, PR #23, 2026-05-20).
-
-**Tool System ✅** Central `ToolDefinition` catalogue + agentic tool-use (Pull, `IToolUseRunner`) for executor/reviewer/advisor, grounding rebuilt on the same tools (Push), provider capability detection, `/tools` CRUD + `ToolPicker`, `ToolInvocationsBlock` audit, Auto-Crew tool binding, and an MCP client (`/mcp-servers` discovery/import). See [docs/10-tool-system.md](docs/10-tool-system.md) (D-060).
-
-**Specialization Packs ✅** Generic actors (role prompt + `{specialization}` slot) + reusable scoped `SpecializationPack`s bound per crew. Effective prompt composed at snapshot-build time (CrewSnapshot v3 + provenance), audit UI shows it. The six domain-specialized system reviewers became two generic roles + six DomainScoped packs. `/packs` CRUD, scope enforcement, composer integration (`pack_names`/`packs` + pack-catalog grounding), lifecycle (cascade-delete, promote/demote/clone with LLM generality review, auto-GC). See [docs/11-specialization-packs.md](docs/11-specialization-packs.md) (D-061).
-
-**Model matrix ✅** Model chosen by role (`ModelSlot`) and crew domain from a researched `ModelMatrix`; Claude/OpenAI only via the subscription cli-proxy; assignment at snapshot build with live availability, executor exclusion, cross-family reviewers, reviewer ring and paid cap; composer picks `model_slot`; migration Step46 reclassified all existing custom profiles; cli-proxy codex catalog from `models_cache.json` (D-066, 2026-11-22).
-
-**Stage 1: orders and direct path ✅** The order is the unit the person sees (`/start`, `/work`, `/orders/{id}`); files are uploaded one by one with a receipt and kept as sources; the direct path writes with the files in full text (with a map above 150,000 characters, page choice above 600,000), checks the result without a model and corrects once; MCP tools `submit_order`, `get_order_status`, `get_order_result`; migration Step48 links existing runs to orders (D-069, D-070, 2026-11-24).
-
-**Stages 2–6 ✅, rebuild completed (D-077)** Questions before the run (D-071/D-072), honest writing with checks (D-073), research (D-074, switched off), changing a result (D-075, switched off) and the full MCP order contract, files over an upload ticket (D-076). Stage 8a: the workshop entries are shown to administrators only (`Ui:WorkshopForAdminsOnly`). Not built, each waiting for a trigger: stage 1b (defused loop and first removal cut), stage 7 (memory), the removal of stage 8 and stage 9 (D-077).
-
-Currently: **over 1800 tests** (green; pre-existing Testcontainers/E2E env flakes excluded).
-
-Full scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope.md)
+| Document | Content |
+|---|---|
+| [docs/README.md](docs/README.md) | Index of all documents |
+| [docs/05-decisions-log.md](docs/05-decisions-log.md) | Every design decision and measurement, most recently D-067 to D-077 |
+| [docs/02-architecture.md](docs/02-architecture.md) | Layers, data model, safeguards, switches |
+| [docs/04-mcp-integration.md](docs/04-mcp-integration.md), [docs/09-endpoint-reference.md](docs/09-endpoint-reference.md) | MCP tools and HTTP endpoints in detail |
 
 ---
 
@@ -80,7 +87,7 @@ dotnet run --project tools/HashPassword -- "YourPassword"
 ```
 
 ```env
-ATELIER_USER=stefan
+ATELIER_USER=<admin-username>
 ATELIER_PASSWORD_HASH=$2a$11$...
 ```
 
@@ -149,36 +156,17 @@ Prerequisite: the OAuth client must be registered in the admin panel at `/admin/
 
 ### MCP tools
 
-**Run management:**
-- `submit_request` — submit a new run (optional: `crew_template`, `custom_crew`)
-- `get_run_status` — query the status of a run
-- `get_run_result` — retrieve the result of a completed run
-- `list_runs` — list recent runs
-- `get_run_details` — retrieve detailed information including iterations
-- `cancel_run` — cancel a running run
-
-**Crew system:**
-- `list_crew_templates` — available crew templates (system + custom)
-- `list_reviewer_profiles` — available reviewer profiles (system + custom)
-- `list_advisor_profiles` — available advisor profiles (system + custom)
-- `list_grounding_provider_profiles` — available grounding-provider profiles (system + custom)
-
-**Knowledge base & Template Studio:**
-- `list_knowledge_documents` — list global knowledge-base documents
-- `analyze_template_proposal` — analyze a task description, produce a template proposal (persisted)
-- `materialize_template_proposal` — materialize a reviewed proposal as a custom template + profiles
-
-**Artifacts:**
-- `list_run_artifacts` — list RunArtifacts from a completed run
-- `download_run_artifact` — download artifact content (Base64 for files, URL for external sinks)
-
-15 MCP tools in total. Full endpoint documentation: [docs/09-endpoint-reference.md](docs/09-endpoint-reference.md)
+The order tools (`submit_order`, `answer_order`, `get_order_status`, `get_order_result`, `revise_order`, `export_order`,
+`cancel_order`, `list_orders`, `profile`) and, while `Uploads:Tickets` is `On`, `prepare_attachment`. While `Mcp:LegacyTools` is
+`true` (shipped), the older workshop tools are offered as well. Overview: [docs/13-ai-assistant-guide.md](docs/13-ai-assistant-guide.md)
+(the tool table there is checked against the server by a test); contracts: [docs/04-mcp-integration.md](docs/04-mcp-integration.md),
+[docs/09-endpoint-reference.md](docs/09-endpoint-reference.md).
 
 ---
 
-## Crew system
+## The older workshop: crew system
 
-Every run uses a configurable crew of an executor (writes the draft) and reviewers (assess the draft). The default template `"klassik"` reproduces the original behaviour with two reviewers running in parallel.
+This is the way of working from before the rebuild of November 2026; "Extra careful" and the older tools still use it. Every run of it uses a configurable crew of an executor (writes the draft) and reviewers (assess the draft). The default template `"klassik"` reproduces the original behaviour with two reviewers running in parallel.
 
 **Available evaluation strategies:** `Parallel` (default), `Sequential`, `FailFast`, `Priority`.
 
@@ -270,6 +258,7 @@ docker compose logs -f web
 | URL | Description |
 |-----|--------------|
 | `https://<your-domain>/` | Web UI (cookie auth) |
+| `https://<your-domain>/how-it-works` | Public explanation page; follows the current switches |
 | `https://<your-domain>/health` | Health check |
 | `https://<your-domain>/mcp` | MCP endpoint (bearer / OAuth 2.1) |
 | `https://<your-domain>/admin/users` | User management (admin only) |
@@ -333,3 +322,55 @@ docs/
 - PostgreSQL 16 + pgvector via `Npgsql.EntityFrameworkCore.PostgreSQL`
 - [Geef.Sdk 1.0.0-ci.1](https://www.nuget.org/packages/Geef.Sdk/) (prerelease)
 - Docker / Traefik
+
+---
+
+## History of the build (historical)
+
+The list below records how the project grew. It is kept for provenance; the current state is described above and in the guides.
+
+**Step 1 ✅** Solution structure, Postgres persistence, health check, Docker Compose.
+
+**Step 2 ✅** In-memory Geef pipeline with stub providers — no LLM, no DB access. Convergence loop, event sink, all four provider contracts implemented and covered by xUnit tests.
+
+**Step 3 ✅** Real Anthropic API calls — `IAnthropicClient`, `LlmExecutionStep`, two `LlmReviewer` (tool use). Polly resilience.
+
+**Step 4 ✅** Postgres persistence — `PostgresEventSink` writes every pipeline run with its iterations, findings, token usage and event log to the DB.
+
+**Step 5 ✅** BackgroundService orchestration — `RunOrchestratorService` polls for pending runs, sets an atomic claim, runs the Geef pipeline concurrently, and recovers crashed runs on startup.
+
+**Step 6 ✅** Application service layer — `IRunService` (Submit/Get/List/Cancel), `IRunRepository`, cancellation watcher.
+
+**Step 7 ✅** Blazor UI — three pages (`/new`, `/runs`, `/runs/{id}`), SignalR hub with live status, 9 UI components, bUnit and Playwright tests.
+
+**Step 8 ✅** Cookie auth — single-user login, `[Authorize]` on pages, login/logout, `TestAuthenticationHandler` for E2E tests.
+
+**Step 9+ ✅** Crew system, advisor passes, Template Studio (with full-field edit, D-043), domain templates, grounding-provider CRUD, vector-store RAG, PDF support, cost tracking.
+
+**MCP OAuth ✅** Self-hosted OAuth 2.1 authorization server (RFC 8414/7591/7636/7009/8252) — authorization-code flow with mandatory PKCE/S256, opaque tokens, refresh rotation, reuse detection.
+
+**Multi-user ✅** DB-based user management with BCrypt, admin UI at `/admin/users`, startup seeding of the admin account from env vars.
+
+**Run-user isolation ✅** Each user sees only their own runs; admin override via explicit toggles. MCP runs are attributed to the authorizing OAuth user, Claude Code CLI runs (static token) to the admin (D-042).
+
+**Finalizer pipeline ✅** 5th profile type — FinalizerProfile with four types (FileExport, MetadataEnrich, ExternalSink, Transform). 17 system profiles. RunArtifact entity (File with download, Url, Status). Download endpoint with owner check. FinalizerPicker + RunFinalizersOnMaxAttempts in CrewTemplateEditor. RunDetail artifact table. Studio integration. 2 new MCP tools (D-044, 2026-05-19).
+
+**Run-Resume ✅** Resume a failed or aborted run from where it left off — Seed mode (continue from last draft) or Clean mode (fresh start with same briefing). "Fortsetzen" button in RunDetail, ResumeRunDialog with MaxIterations override. ParentRunId link shown in RunDetail (PR #18, 2026-05-19).
+
+**Grounding Refinement ✅** Optional AI filter pass after every grounding provider fetch — Filter mode (keep/drop per source with reasoning) and Synthesize mode (merge all sources into a coherent text with `[n]` citations). Configurable per provider via `LlmBinding` (D-049/D-050, PR #22, 2026-05-20).
+
+**Grounding Types ✅** Three new grounding-provider types alongside the existing `tavily` and `vector-store` providers: `static-context` (curated fixed text — style guides, glossaries, brand voice), `url-fetch` (fetch specific URLs with SSRF guard blocking all private/cloud-metadata IPs), and `news-search` (Tavily news topic with date filter). New system profile `tavily-news`. Dashboard cost aggregation now includes Grounding Refiner costs (D-051, PR #23, 2026-05-20).
+
+**Tool System ✅** Central `ToolDefinition` catalogue + agentic tool-use (Pull, `IToolUseRunner`) for executor/reviewer/advisor, grounding rebuilt on the same tools (Push), provider capability detection, `/tools` CRUD + `ToolPicker`, `ToolInvocationsBlock` audit, Auto-Crew tool binding, and an MCP client (`/mcp-servers` discovery/import). See [docs/10-tool-system.md](docs/10-tool-system.md) (D-060).
+
+**Specialization Packs ✅** Generic actors (role prompt + `{specialization}` slot) + reusable scoped `SpecializationPack`s bound per crew. Effective prompt composed at snapshot-build time (CrewSnapshot v3 + provenance), audit UI shows it. The six domain-specialized system reviewers became two generic roles + six DomainScoped packs. `/packs` CRUD, scope enforcement, composer integration (`pack_names`/`packs` + pack-catalog grounding), lifecycle (cascade-delete, promote/demote/clone with LLM generality review, auto-GC). See [docs/11-specialization-packs.md](docs/11-specialization-packs.md) (D-061).
+
+**Model matrix ✅** Model chosen by role (`ModelSlot`) and crew domain from a researched `ModelMatrix`; Claude/OpenAI only via the subscription cli-proxy; assignment at snapshot build with live availability, executor exclusion, cross-family reviewers, reviewer ring and paid cap; composer picks `model_slot`; migration Step46 reclassified all existing custom profiles; cli-proxy codex catalog from `models_cache.json` (D-066, 2026-11-22).
+
+**Stage 1: orders and direct path ✅** The order is the unit the person sees (`/start`, `/work`, `/orders/{id}`); files are uploaded one by one with a receipt and kept as sources; the direct path writes with the files in full text (with a map above 150,000 characters, page choice above 600,000), checks the result without a model and corrects once; MCP tools `submit_order`, `get_order_status`, `get_order_result`; migration Step48 links existing runs to orders (D-069, D-070, 2026-11-24).
+
+**Stages 2–6 ✅, rebuild completed (D-077)** Questions before the run (D-071/D-072), honest writing with checks (D-073), research (D-074, switched off), changing a result (D-075, switched off) and the full MCP order contract, files over an upload ticket (D-076). Stage 8a: the workshop entries are shown to administrators only (`Ui:WorkshopForAdminsOnly`). Not built, each waiting for a trigger: stage 1b (defused loop and first removal cut), stage 7 (memory), the removal of stage 8 and stage 9 (D-077).
+
+Currently: **over 1800 tests** (green; pre-existing Testcontainers/E2E env flakes excluded).
+
+Full scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope.md)

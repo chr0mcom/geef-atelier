@@ -2,9 +2,15 @@
 
 *[Deutsch](01-vision-and-scope_de.md) · **English***
 
-*Last updated: 2026-11-26 (D-077: per-user memory not built, learning loop stays paused; D-068: at most three short questions with click answers before the run, never during it; D-067: learning loop paused by default; before that 22 May 2026, D-054: continuous learning loop added to scope; learning-retrieval provider type)*
+*Last updated: 2026-11-26 (guides per audience and the page "How it works"; export button on the order page corrected; D-077: per-user memory not built, learning loop stays paused; D-068: at most three short questions with click answers before the run, never during it; D-067: learning loop paused by default; before that 22 May 2026, D-054: continuous learning loop added to scope; learning-retrieval provider type)*
 
 ## Vision
+
+> **Current state (since the rebuild of November 2026, D-068 to D-077).** The vision below was written for the crew-based way of
+> working. What a person uses by default today is simpler: one request becomes an **order**; at most three questions before the
+> start; one writing call with the files in full text; checks with a fixed account of what was checked; at most one correction.
+> The crew system stays available as "Workshop" and "Extra careful". The guides [12](12-user-guide.md) to
+> [15](15-developer-guide.md) describe the current state for each audience.
 
 **Geef.Atelier** is a text manufactory: an atelier of specialized AI roles (executor, reviewer, optionally advisor) staffed differently depending on the piece of work. The difference from a classic "GPT wrapper" is not the UX or the price, but that the machine *decides how it works before it works* (adaptive crew composition) and *makes transparent what it does while it works* (process visibility via an iteration and findings trail).
 
@@ -27,7 +33,7 @@ The project is the productive application of the [Geef SDK](https://github.com/c
 - Fire-and-forget workflow: start a job, check status later, fetch the result at the end — no human-in-the-loop interventions during the run. **Before** the run, at most three short questions with ready-made answers to click are allowed, always skippable (D-068)
 - Persistent run history with a complete iteration trail
 - Run resumption: continue a failed or aborted run from its last draft text (seed mode) or with a fresh pipeline (clean mode) — D-046
-- File export in formats md / html / pdf / docx / txt / json via the Finalizer pipeline (D-044); the five Finalizer profile types (FileExport, MetadataEnrich, ExternalSink, Transform) are implemented as part of the crew system
+- Download of every order's text as Word, PDF or Markdown on the order page and over MCP (`export_order`, D-070, D-075); in the older crew system also file export in md / html / pdf / docx / txt / json via the Finalizer pipeline (D-044; finalizer types FileExport, MetadataEnrich, ExternalSink, Transform)
 - Grounding enrichment in multiple forms: Tavily web search (`tavily`), semantic vector-store RAG (`vector-store`), curated fixed text for style guides and glossaries (`static-context`), specific URL fetching with SSRF protection (`url-fetch`), Tavily news search with date filter (`news-search`), academic paper retrieval from arXiv / Semantic Scholar / OpenAlex (`academic-search`), and generic REST endpoint grounding with SSRF protection and JSONPath extraction (`rest-api`); each provider supports an optional AI refinement pass (D-050–D-052); domain-aware retrieval from the learning store (`learning-retrieval`, D-054)
 - **Continuous learning loop (D-054):** an opt-in `learning-extractor` finalizer extracts structured facts from completed runs and fires a dedicated quality-gate run (`learning-evaluation` crew) fire-and-forget. Only learnings that converge through the gate (three strict reviewers, `AbortOnCritical=true`, multi-model pluralism) are stored as `Approved` in the learning store (`LearningEntries` table, separate namespace from the curated knowledge base). The `learning-retrieval` grounding provider re-injects them into later runs weighted by domain similarity. Management UI at `/crew/learnings`; MCP tool `list_learnings`. Three protective mechanisms against model collapse: (1) separate namespace, (2) auditable gate, (3) structured facts only. **Paused since D-067** (`Learning:Enabled`, default `false`); a per-user memory (D-068) was meant to replace it; stage 7 is dropped until its trigger (D-077), so the loop stays paused
 
@@ -40,7 +46,6 @@ The project is the productive application of the [Geef SDK](https://github.com/c
 - Commercial hosting, billing, invoicing
 - Unfiltered cross-run self-RAG (deliberately rejected; the continuous learning loop above provides gated cross-run learning with three protective mechanisms against model collapse)
 - Domain-specific database connectors (e.g. legal databases such as dejure.org or Beck-Online) — optional later
-- Direct "Export" button in the briefing UI: a one-click export button accessible from the run/briefing UI is not implemented. (File export in md/html/pdf/docx/txt/json *is* implemented, but only via the Finalizer pipeline configured in a crew template — see "In scope" above.)
 
 ## Target users
 

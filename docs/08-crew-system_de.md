@@ -2,9 +2,14 @@
 
 *[English](08-crew-system.md) · **Deutsch***
 
-Letzte Aktualisierung: 2026-11-26 (D-076: Dateien über das Upload-Ticket, Aufräumen und Auswertung der Ablehnungen; zuvor 2026-11-25, D-075 Teil B: Nachbesserungslauf im Direktweg; D-074: Recherche im Grounding-Schritt des Direktwegs; zuvor 2026-11-24, D-067: strenges Lesen des Snapshots, mindestens ein Reviewer, Outcome nach den Finalizern, Warnungen am Lauf, System-Grounding wieder über den Provider-Typ-Weg, Learning standardmäßig pausiert; zweite Prüfrunde: Reviewer-Prüfung beim Speichern, Vektor-Scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserviert, Finalizer und Abbruch; zuvor 2026-11-23, D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
+Letzte Aktualisierung: 2026-11-26 (Hinweis, wo das Crew-System heute steht; D-076: Dateien über das Upload-Ticket, Aufräumen und Auswertung der Ablehnungen; zuvor 2026-11-25, D-075 Teil B: Nachbesserungslauf im Direktweg; D-074: Recherche im Grounding-Schritt des Direktwegs; zuvor 2026-11-24, D-067: strenges Lesen des Snapshots, mindestens ein Reviewer, Outcome nach den Finalizern, Warnungen am Lauf, System-Grounding wieder über den Provider-Typ-Weg, Learning standardmäßig pausiert; zweite Prüfrunde: Reviewer-Prüfung beim Speichern, Vektor-Scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserviert, Finalizer und Abbruch; zuvor 2026-11-23, D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
 
 ## Überblick
+
+> **Wo das heute steht.** Das Crew-System ist die ältere Arbeitsweise. Seit dem Umbau im November 2026 ist der Auftrag mit dem
+> Direktweg der Standard (D-068 bis D-077, [15-developer-guide_de.md](15-developer-guide_de.md)). Crews nutzen weiterhin „Extra
+> careful“, die älteren MCP-Werkzeuge und die Werkstatt-Seiten, deren Menü standardmäßig nur die Administration sieht
+> (`Ui:WorkshopForAdminsOnly`, [14-admin-guide_de.md](14-admin-guide_de.md)).
 
 Das Crew-System ersetzt die in PS-2 hartkodierte Dreier-Crew (Executor + BriefingTreueReviewer + KlarheitReviewer) durch ein konfigurierbares Profil- und Template-System. Jeder Run erhält beim Einreichen einen vollständig eingebetteten **CrewSnapshot**, der die Reproduzierbarkeit des Runs auch dann garantiert, wenn Profile später geändert oder gelöscht werden.
 
