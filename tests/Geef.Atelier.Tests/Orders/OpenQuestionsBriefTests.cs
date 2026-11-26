@@ -238,19 +238,37 @@ public sealed class OpenQuestionsBriefTests
             foreach (var part in new[]
                      {
                          "never decide it for the person", "accept or decline", "order, cancel, pay or confirm attendance",
-                         "confirming receipt, asking back or asking for time", "placeholder in square brackets",
-                         "name the open decision among your open points",
+                         "Still write a complete text that can be sent as it is",
+                         "in exactly one of two ways, never both",
+                         "either do not decide yet – confirm receipt, ask back or say when the person will reply (prefer this where an interim reply makes sense)",
+                         "or put the decision into exactly one clearly visible placeholder in square brackets that holds everything that depends on it",
+                         "No sentence outside that placeholder may assume a yes or a no, not even in passing",
+                         "Name each open decision among your open points.",
                      })
                 Assert.Contains(part, heading, StringComparison.Ordinal);
+            Assert.True(heading.IndexOf("take precedence", StringComparison.Ordinal) < heading.IndexOf("never decide it for the person", StringComparison.Ordinal));
         }
-        Assert.Contains("Where the request or a change the person asks for settles it, follow the person.", IntakeBriefComposer.NotCheckedHeading, StringComparison.Ordinal);
         Assert.Contains(
             "The request, the answers and corrections of the person and any change the person asks for take precedence: where one of them settles one of these questions, follow the person. Otherwise, where the answer would commit the person",
             IntakeBriefComposer.OpenQuestionsHeading, StringComparison.Ordinal);
+        Assert.Contains("The request and any change the person asks for take precedence: where one of them settles a decision, follow the person.", IntakeBriefComposer.NotCheckedHeading, StringComparison.Ordinal);
         Assert.EndsWith(":", IntakeBriefComposer.OpenQuestionsHeading, StringComparison.Ordinal);
         Assert.Contains("Never invent facts", IntakeBriefComposer.OpenQuestionsHeading, StringComparison.Ordinal);
         Assert.Contains("choose what fits the request best", IntakeBriefComposer.OpenQuestionsHeading, StringComparison.Ordinal);
         Assert.Contains("or was not asked", IntakeBriefComposer.OpenQuestionsHeading, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_headings_are_pinned_and_the_first_version_stays_as_stored()
+    {
+        static string Hash(string text) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text)));
+
+        Assert.Equal("9A2F023CF096FA0BBA245954757C4074B775C81431F13E1126ECAC029FF7CEE7", Hash(IntakeBriefComposer.OpenQuestionsHeading));
+        Assert.Equal("74C124160F35403FD48AFA7E879AA282BA1C4FFDE9F111BBCF571B26C4E63C7C", Hash(IntakeBriefComposer.NotCheckedHeading));
+        Assert.Equal("221696CF8017B7BCF810B397FAF474D7F5FCD1BA4E84256A250B176ECF7A57DC", Hash(IntakeBriefComposer.OpenQuestionsHeadingFirstVersion));
+        Assert.Equal("65C9282C554F937980D39C5AC5FFE5D8527BEB3212306FC535F3CC5CEB5F01CA", Hash(IntakeBriefComposer.NotCheckedHeadingFirstVersion));
+        Assert.NotEqual(IntakeBriefComposer.OpenQuestionsHeading, IntakeBriefComposer.OpenQuestionsHeadingFirstVersion);
+        Assert.NotEqual(IntakeBriefComposer.NotCheckedHeading, IntakeBriefComposer.NotCheckedHeadingFirstVersion);
     }
 
     [Fact]

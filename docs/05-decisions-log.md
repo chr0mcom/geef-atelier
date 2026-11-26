@@ -3207,3 +3207,21 @@ All examples are made up.
 cases, control cases without a decision, and cases with the decision in the request; threshold 0 commitments in decision cases,
 control cases not worse, at most 40 model calls, blind judge without tools in an empty folder. It does not measure "You decide",
 partial answers, the time limit, changes or "Extra careful". Contract and tool are kept outside the repository.
+
+### Addendum to D-081 — first measurement not passed, instruction sharpened (2026-11-26)
+
+**Result.** The first measurement missed two thresholds: no commitment in decision cases (S1) and usable decision texts (S4).
+The threshold for cases with the decision in the request and the control cases were met, and the judge recognised its control
+text. The texts that failed kept the decision open in a contradictory way: a placeholder held both answers while another sentence
+already assumed attendance, or the text announced a later reply and also left a placeholder for the decision.
+
+**Decision (code and heading only, clarifier unchanged).** The rule in both headings now asks for a complete text that can be sent
+as it is and keeps each decision open in **exactly one of two ways, never both**: either not decide yet (confirm receipt, ask back
+or say when the person will reply; preferred where an interim reply makes sense), or put the decision into exactly one clearly
+visible placeholder in square brackets that holds everything depending on it, with both possible answers. No sentence outside the
+placeholder may assume a yes or a no, not even in passing (looking forward to it, thanking for an acceptance). The precedence of
+request, answers, corrections and changes still comes first; the unchecked start now states that precedence first as well.
+Briefings stored with the first headings stay readable (`OpenQuestionsHeadingFirstVersion`, `NotCheckedHeadingFirstVersion`), and
+all four headings are pinned by hash tests.
+
+**Next measurement.** New made-up cases of the same number and kinds, thresholds unchanged; it may run without the fact check.

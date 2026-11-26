@@ -55,14 +55,25 @@ internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOr
     public const string AssumptionsNotShownHeading = AssumptionsNotShownHeadingStart + " (use them only where neither the request nor the files say otherwise; never state them as facts):";
     public const string OpenFactsHeadingStart = "Not given by the person";
     public const string OpenFactsHeading = OpenFactsHeadingStart + " (never state these as facts in the text; where the text needs one of them, write a placeholder in square brackets or leave it out):";
-    public const string KeepDecisionsOpen =
-        "never decide it for the person: keep it open, for example by confirming receipt, asking back or asking for time, or write a clearly visible placeholder in square brackets, and name the open decision among your open points.";
+    public const string KeepDecisionsOpenInOneWay =
+        "never decide it for the person. Still write a complete text that can be sent as it is, and keep each such decision open in exactly one of two ways, never both: "
+        + "either do not decide yet – confirm receipt, ask back or say when the person will reply (prefer this where an interim reply makes sense) – "
+        + "or put the decision into exactly one clearly visible placeholder in square brackets that holds everything that depends on it, with both possible answers in the language of the text. "
+        + "No sentence outside that placeholder may assume a yes or a no, not even in passing, for example by looking forward to it or by thanking for an acceptance. "
+        + "Name each open decision among your open points.";
     public const string OpenQuestionsHeading = "Questions the person did not answer (the person skipped them, left them to you, or was not asked). "
         + "The request, the answers and corrections of the person and any change the person asks for take precedence: where one of them settles one of these questions, follow the person. "
-        + "Otherwise, where the answer would commit the person – for example to accept or decline, order, cancel, pay or confirm attendance – " + KeepDecisionsOpen + " "
+        + "Otherwise, where the answer would commit the person – for example to accept or decline, order, cancel, pay or confirm attendance – " + KeepDecisionsOpenInOneWay + " "
         + "Never invent facts for these questions either. For anything else, choose what fits the request best:";
     public const string NotCheckedHeading = "The request was not checked for missing details before writing. "
-        + "Where the text would need a decision only the person can make – for example to accept or decline, order, cancel, pay or confirm attendance – " + KeepDecisionsOpen + " "
+        + "The request and any change the person asks for take precedence: where one of them settles a decision, follow the person. "
+        + "Otherwise, where the text would need a decision only the person can make – for example to accept or decline, order, cancel, pay or confirm attendance – " + KeepDecisionsOpenInOneWay;
+    public const string OpenQuestionsHeadingFirstVersion = "Questions the person did not answer (the person skipped them, left them to you, or was not asked). "
+        + "The request, the answers and corrections of the person and any change the person asks for take precedence: where one of them settles one of these questions, follow the person. "
+        + "Otherwise, where the answer would commit the person – for example to accept or decline, order, cancel, pay or confirm attendance – never decide it for the person: keep it open, for example by confirming receipt, asking back or asking for time, or write a clearly visible placeholder in square brackets, and name the open decision among your open points. "
+        + "Never invent facts for these questions either. For anything else, choose what fits the request best:";
+    public const string NotCheckedHeadingFirstVersion = "The request was not checked for missing details before writing. "
+        + "Where the text would need a decision only the person can make – for example to accept or decline, order, cancel, pay or confirm attendance – never decide it for the person: keep it open, for example by confirming receipt, asking back or asking for time, or write a clearly visible placeholder in square brackets, and name the open decision among your open points. "
         + "Where the request or a change the person asks for settles it, follow the person.";
     public const string RevisionQuestion = "Improve the attached file chosen as the text to revise?";
     public const string RevisionYes = "Yes, improve that file";
