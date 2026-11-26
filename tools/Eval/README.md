@@ -416,6 +416,10 @@ python3 -m geef_eval.revise_check evaluate --plan $EVAL_N_DIR/plan.json --out-di
 `get_order_result`, solange sie die gezeigte ist: den Schnappschuss der Ausgangsfassung **vor** der Nachbesserung ziehen. Für
 N5 nach dem Stopp von v3 einen Schnappschuss (etwa `after-stop`) ziehen; er enthält den Export ohne Versionsangabe.
 
+**Jeder Schnappschuss steht in höchstens einem Fall** (als Ausgangsfassung oder neue Fassung, der Stopp eingeschlossen). In einer
+Kette schließt etwa `v2` die erste Nachbesserung ab; direkt vor der nächsten Nachbesserung (oder vor dem Start von v3 für den
+Stopp) wird dieselbe Fassung erneut als eigener Schnappschuss gezogen, etwa `v2-basis`, und dient dort als Ausgangsfassung.
+
 Der Plan (JSON, außerhalb von Git) nennt die 9 Fälle in fester Reihenfolge, Format im Kopf des Moduls: **8 echte
 Nachbesserungen** (mindestens 3 × `local`, der erste mit `expect`, der neuen Angabe wörtlich, 2 × `tone`, je 1 × `shorter` und
 `longer`; die achte ist eine weitere dieser vier Arten und muss deren Schwellen bestehen) **und zusätzlich** 1 × `stop` (mit
@@ -445,6 +449,15 @@ mindestens 4 Absätzen wählen.
   Version und der Art `note` steht, nie durch einen offenen Punkt oder eine Annahme.
 - N5 verlangt `state` `stopped`; eine von selbst gescheiterte Fassung (`failed`) verfehlt N5.
 - Ein lokaler Fall, dessen Ausgangstext weniger als 4 Absätze hat, ist für N1 nicht auswertbar.
+- Jede Nachbesserung zählt einmal (G1): Ein Schnappschuss in mehreren Fällen, dasselbe `(Auftrag, Ausgangsfassung, neue
+  Fassung)` in mehreren Fällen, Ausgangs- und neue Fassung als derselbe Schnappschuss oder zwei echte Nachbesserungen mit
+  derselben neuen Version desselben Auftrags (etwa über Kopien unter anderen Bezeichnungen) machen das Tor nicht auswertbar.
+- In N1 und N2 muss sich der Text geändert haben (G2): Gleicht der neue Text nach Zusammenfassen des Leerraums dem
+  Ausgangstext, verfehlt der Fall sein Kriterium. Das ist ein **Fehler**, nicht „nicht auswertbar“: Die Daten sind vollständig
+  und zeigen, dass die Änderung nicht gemacht wurde. „Nicht auswertbar“ verlangte nur einen anderen Fall und ließe einen Lauf,
+  der die Bitte übergeht, aus dem Befund verschwinden; der Fehler bleibt im Bericht und löst die Folge aus Vertrag 8 aus (eine
+  Runde am Satz `RevisionInstruction`). Kürzer und Länger können mit unverändertem Text ohnehin nicht bestehen (100 % liegt
+  außerhalb ihrer Spannen).
 
 Eigene Lesart, unabhängig vom C#-`ParagraphDiff`: Absatz = Block zwischen Leerzeilen, verglichen nach Zusammenfassen des
 Leerraums; unverändert = längste gemeinsame Teilfolge. Wort = Folge zwischen Leerraum mit mindestens einem Buchstaben oder einer
@@ -489,7 +502,9 @@ ist nicht auswertbar.
   → `revise_order` (`version` 2, `notices`) → `get_order_result` (`version` 2) → `export_order` md **ohne `version`** (Inhalt =
   `text` der Datei; jeder md-Export ohne `version` nach diesem `get_order_result` ist textgleich mit dessen Version 2, verglichen
   nach Entfernen der BOM, Vereinheitlichen der Zeilenenden und Trimmen, sonst `failed`) und docx
-  (ZIP), dazu `list_orders` (mit A, alle Felder), `profile` und `cancel_order` an einem zweiten Auftrag (`changed`). Jeder
+  (ZIP) **ohne `version` oder mit `version` 2** (ein Export der Version 1 zählt nie als Schritt, G4; jeder Export von A nach
+  diesem `get_order_result` ohne `version` oder mit `version` 2 muss im Dateinamen Version 2 nennen, `…-v2.docx`, sonst
+  `failed`; nennt der Dateiname des Schritts keine Version, ist das Tor nicht auswertbar), dazu `list_orders` (mit A, alle Felder), `profile` und `cancel_order` an einem zweiten Auftrag (`changed`). Jeder
   Fehler eines Auftragswerkzeugs lässt das Tor scheitern; fehlende Schritte, keine Rückfrage, `changed = false`, eine
   unlesbare (etwa gekürzte) Antwort oder ein Aufruf ohne Ergebnis machen es nicht auswertbar.
 - **V-MCP:** alle `get_order_status` mit `waitSeconds=50` ≤ 55 s ohne Fehler → 50 s bleibt (Rückgabe 0); Fehler oder > 55 s bei

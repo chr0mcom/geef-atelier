@@ -44,11 +44,18 @@ def export_md(text, version):
                    "contentBase64": base64.b64encode(text.encode("utf-8")).decode("ascii"), "text": text}}
 
 
-def write(root, order, label, res, export=None, export_error=None):
-    path = rc.snapshot_path(root, order, label)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"orderId": order, "label": label, "fetchedAt": "2026-11-29T00:00:00+00:00", "result": res,
-                                "export": export, "exportError": export_error}, ensure_ascii=False), encoding="utf-8")
+BASIS_SUFFIX = "-basis"
+
+
+def write(root, order, label, res, export=None, export_error=None, basis=True):
+    """Writes the snapshot and, unless ``basis`` is false, the same state again as ``<label>-basis``: in a chain the base of the
+    next change is a snapshot of its own (G1), taken right before that change."""
+    labels = [label] + ([label + BASIS_SUFFIX] if basis and not label.endswith(BASIS_SUFFIX) else [])
+    for name in labels:
+        path = rc.snapshot_path(root, order, name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"orderId": order, "label": name, "fetchedAt": "2026-11-29T00:00:00+00:00", "result": res,
+                                    "export": export, "exportError": export_error}, ensure_ascii=False), encoding="utf-8")
 
 
 def plan_cases():
@@ -56,12 +63,12 @@ def plan_cases():
         {"case": "local-date", "kind": "local", "order": O1, "channel": "web", "base": "v1", "new": "v2", "expect": "5. Mai"},
         {"case": "local-add", "kind": "local", "order": O2, "channel": "web", "base": "v1", "new": "v2"},
         {"case": "local-delete", "kind": "local", "order": O3, "channel": "mcp", "base": "v1", "new": "v2"},
-        {"case": "tone-formal", "kind": "tone", "order": O1, "channel": "web", "base": "v2", "new": "v3"},
-        {"case": "tone-friendly", "kind": "tone", "order": O2, "channel": "mcp", "base": "v2", "new": "v3"},
-        {"case": "shorter", "kind": "shorter", "order": O3, "channel": "web", "base": "v2", "new": "v3"},
+        {"case": "tone-formal", "kind": "tone", "order": O1, "channel": "web", "base": "v2-basis", "new": "v3"},
+        {"case": "tone-friendly", "kind": "tone", "order": O2, "channel": "mcp", "base": "v2-basis", "new": "v3"},
+        {"case": "shorter", "kind": "shorter", "order": O3, "channel": "web", "base": "v2-basis", "new": "v3"},
         {"case": "longer", "kind": "longer", "order": O4, "channel": "mcp", "base": "v1", "new": "v2"},
-        {"case": "local-chain", "kind": "local", "order": O1, "channel": "web", "base": "v3", "new": "v4"},
-        {"case": "stop", "kind": "stop", "order": O4, "channel": "web", "base": "v2", "new": "after-stop",
+        {"case": "local-chain", "kind": "local", "order": O1, "channel": "web", "base": "v3-basis", "new": "v4"},
+        {"case": "stop", "kind": "stop", "order": O4, "channel": "web", "base": "v2-basis", "new": "after-stop",
          "stopped_version": 3},
     ]
 
@@ -686,3 +693,77 @@ def test_n4_reads_the_kind_note_and_still_refuses_unknown_kinds(tmp_path):
     report = rc.evaluate(plan_cases(), tmp_path)
     assert report["parts"]["N4"]["verdict"] == "not_evaluable", report["parts"]["N4"]
     assert any("note" in p for p in report["parts"]["N4"]["problems"])
+
+
+def test_plan_counting_the_same_change_twice_is_not_evaluable(tmp_path):
+    cases = plan_cases()
+    tone = next(c for c in cases if c["case"] == "tone-friendly")
+    tone.update(order=O1, base="v2-basis", new="v3")
+    report = run(tmp_path, cases)
+    assert report["verdict"] == "not_evaluable"
+    assert any("dieselbe Nachbesserung" in p and "tone-formal" in p and "tone-friendly" in p for p in report["problems"])
+    with pytest.raises(ValueError):
+        rc.load_plan(_plan_file(tmp_path, [dict(cases[0]), dict(cases[0])]))
+
+
+def _plan_file(tmp_path, cases):
+    path = tmp_path / "plan.json"
+    path.write_text(json.dumps({"cases": cases}), encoding="utf-8")
+    return path
+
+
+def test_snapshot_in_two_cases_is_not_evaluable_also_in_a_chain(tmp_path):
+    cases = plan_cases()
+    next(c for c in cases if c["case"] == "tone-formal")["base"] = "v2"
+    report = run(tmp_path, cases)
+    assert report["verdict"] == "not_evaluable"
+    assert any(p.startswith(f"Schnappschuss v2 von {O1} in mehreren Fällen: local-date, tone-formal") for p in report["problems"])
+
+
+def test_stop_may_not_reuse_the_snapshot_of_a_change(tmp_path):
+    cases = plan_cases()
+    next(c for c in cases if c["case"] == "stop")["base"] = "v2"
+    report = run(tmp_path, cases)
+    assert report["verdict"] == "not_evaluable"
+    assert any("longer, stop" in p for p in report["problems"]), report["problems"]
+
+
+def test_case_with_the_same_snapshot_as_base_and_new_is_not_evaluable(tmp_path):
+    cases = plan_cases()
+    next(c for c in cases if c["case"] == "longer").update(base="v2", new="v2")
+    report = run(tmp_path, cases)
+    assert report["verdict"] == "not_evaluable"
+    assert any("derselbe Schnappschuss v2" in p for p in report["problems"]), report["problems"]
+
+
+def test_other_labels_for_the_same_new_version_are_not_evaluable(tmp_path):
+    """The finding of the release gate: cases point at copies of the snapshots of other cases."""
+    cases = plan_cases()
+    next(c for c in cases if c["case"] == "tone-friendly").update(order=O1, base="v1-basis", new="v2-basis")
+    report = run(tmp_path, cases)
+    assert report["verdict"] == "not_evaluable"
+    assert any(p.startswith(f"dieselbe neue Fassung (Auftrag {O1}, Version 2) in mehreren Fällen: local-date, tone-friendly")
+               for p in report["problems"]), report["problems"]
+
+
+@pytest.mark.parametrize("case,part", [("tone-formal", "N2"), ("local-add", "N1"), ("local-delete", "N1")])
+def test_unchanged_text_fails_n1_and_n2(tmp_path, case, part):
+    row = next(c for c in plan_cases() if c["case"] == case)
+    data = scenario(tmp_path)
+    base = data[(row["order"], row["base"].removesuffix("-basis"))]
+    unchanged = dict(base, version=data[(row["order"], row["new"])]["version"])
+    report = run(tmp_path, override={(row["order"], row["new"]): unchanged})
+    assert report["parts"][part]["verdict"] == "failed", report["parts"][part]
+    assert f"{case}: Text unverändert, die Änderung wurde nicht gemacht" in report["parts"][part]["failures"]
+    assert report["verdict"] == "failed"
+    assert rc.FOLLOW_UP["instruction"] in report["follow_up"]
+
+
+def test_only_white_space_changed_counts_as_unchanged(tmp_path):
+    data = scenario(tmp_path)
+    base = data[(O2, "v2")]
+    spaced = dict(data[(O2, "v3")], text=base["text"].replace("\n\n", "\n\n\n").replace(" ", "  "))
+    report = run(tmp_path, override={(O2, "v3"): spaced})
+    assert "tone-friendly: Text unverändert, die Änderung wurde nicht gemacht" in report["parts"]["N2"]["failures"]
+    row = next(r for r in report["cases"] if r["case"] == "tone-friendly")
+    assert row["change"]["text_changed"] is False
