@@ -3364,3 +3364,24 @@ Kontrollfälle brauchbar, Entscheidungstexte versendbar. Gemessen ist nur das Ü
 - `Direct:FactCheckMode` bleibt `Report`. Der Stand liegt unversendet in einem Archivzweig. Wiederaufnahme nur, wenn ein neues
   Nachspiel wiederholt fallbezogene, nicht allgemein bekannte erfundene Zahlen findet. Eine ruhigere Anzeige wird erst nach einer
   inhaltlichen Einordnung der Meldungen neu entschieden.
+
+## D-084 — Startseite sagt, was Atelier für alle tut (2026-11-26)
+
+- **Inhalt:** Die Startseite (`/`) beschreibt jetzt den Standardweg statt der Werkstatt-Schleife: Auftrag in eigenen Worten
+  (Dateien optional), höchstens die eingestellte Zahl an Rückfragen (überspringbar), ein Schreibdurchgang, Prüfungen ohne KI und ein
+  Faktenprüfer, der meldet, höchstens ein weiterer Versuch, dann der Text mit „What was checked“, offenen Punkten und Annahmen;
+  „Change something“ und Downloads. Neu: ein erfundenes Beispiel (Auftrag → Rückfrage → Text mit Lücken, Randnotizen und den
+  Ergebniskästen), „Who it is for“ mit Einstiegen für Privat, Verein und Schule, kleines Büro, Nutzer von KI-Assistenten,
+  Administratoren und Entwickler, „What Atelier does not do“, kurz „Where your words go“ und ein klarer Weg zum Start (angemeldet:
+  „Write something“).
+- **Werkstatt verkleinert** auf einen Abschnitt „For teams“: keine Modellnamen, Zahlen, Kosten oder Lauf-Kennungen mehr. „Extra
+  careful“ ist als älterer Weg mit dem eingebauten Team beschrieben, offen für alle.
+- **Dieselben Schalter wie „How it works“:** Die Seite liest `HowItWorksFeatures` für die betrachtende Person; nichts ist kopiert.
+  Titel und Beschreibung stimmen für jeden Schalterstand.
+- **Ehrlichkeit vor Werbung:** keine Aussagen über andere Produkte, keine Garantien, keine Zahlen, die nicht aus den Einstellungen
+  kommen. Das Beispiel ist als erfunden gekennzeichnet. Tests prüfen verbotene Wörter und Namen, jeden Schalterzustand, dass jeder
+  Link auflöst, und im Browser (hell/dunkel × Desktop/Telefon) seitliches Scrollen, Layoutsprung, Kontrast jedes Textes und die
+  Tastatur.
+- **Nebenbei behoben:** Die „Ghost“-Schaltflächen der öffentlichen Seiten wurden durch eine allgemeine Regel des
+  Dashboard-Stylesheets mit 40 % Deckkraft gezeichnet (Kontrast unter dem Minimum); dem Kopfbereich nahm eine spezifischere Regel den
+  seitlichen Abstand. Der Filmabschnitt ist unverändert.

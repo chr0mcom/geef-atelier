@@ -17,8 +17,11 @@ flowchart LR
     D --> E["Text + what was checked<br/>+ open points + assumptions"]
 ```
 
-The running application explains itself on the public page **How it works** (`/how-it-works`). That page reads the current
-switches (and a signed-in person's exceptions), so it never shows a feature as available that is switched off.
+The running application explains itself on two public pages. The **start page** (`/`) says in short what Atelier does, shows a
+made-up example from request to text with gaps and open points, names what it does not do and leads each audience (people at home,
+clubs and schools, small offices, AI-assistant users, administrators and developers) to the right part of **How it works**
+(`/how-it-works`). Both pages read the current switches (and a signed-in person's exceptions), so neither shows a feature as
+available that is switched off (D-080, D-084).
 
 ## Who it is for
 
