@@ -7,6 +7,7 @@ using Geef.Atelier.Core.Domain.FactCheck;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Reports;
 using Geef.Atelier.Infrastructure.Llm;
+using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Pipeline.Direct;
 using Geef.Atelier.Tests.EndToEnd.Fakes;
 using Geef.Atelier.Tests.Persistence;
@@ -20,7 +21,8 @@ namespace Geef.Atelier.Tests.EndToEnd;
 /// <see cref="IOrderService.ReviseAsync"/> → the writer gets the delivered text as seed and the change, no clarifier and no web search are
 /// asked; a failed version 2 leaves version 1 shown; with the fact check on, a passage against the change blocks; open findings of
 /// version 1 that still apply stay in version 2, and open points of the writer for version 1 are shown with version 2. "Resume" on a failed
-/// change makes the same change again to the shown version (review E5B, B3), and on any other run resumes it as before.
+/// change without a text makes the same change again to the shown version (review E5B, B3), and on any other run resumes it as before; it is
+/// refused for a change that already has its own text and for one followed by a later version with a text, and no run is created then.
 /// </summary>
 [Collection(EndToEndCollection.Name)]
 [Trait("Category", "EndToEnd")]
@@ -286,6 +288,65 @@ public sealed class ReviseEndToEndTests(PostgresFixture postgres)
         Assert.Equal(FactFindingKind.Instruction, hint.Kind);
         Assert.False(hint.Blocking);
         Assert.True(hint.BeforeLastChange);
+    }
+
+    private static Task<int> RunCountAsync(AtelierEndToEndHost host, Guid orderId) =>
+        host.QueryAsync(db => db.Runs.CountAsync(r => r.OrderId == orderId));
+
+    [Fact]
+    public async Task Resume_on_a_change_that_already_has_its_text_is_refused_and_never_makes_the_change_twice()
+    {
+        await using var host = await StartAsync(postgres);
+        var orderId = await FirstVersionAsync(host);
+        host.Script.EnqueueExecutorText(SecondText);
+        await ReviseAsync(host, orderId);
+        var changed = await RunAsync(host, orderId, 2);
+        Assert.Equal(SecondText, changed.FinalText);
+        await host.QueryAsync(db => db.Runs.Where(r => r.Id == changed.Id).ExecuteUpdateAsync(s => s
+            .SetProperty(r => r.Status, RunStatus.Failed)
+            .SetProperty(r => r.ErrorMessage, RunStopMessageExtensions.StoppedWithOpenPointsMessage)));
+        var callsBefore = host.Llm.Calls.Count;
+
+        foreach (var user in new[] { User, null })
+        {
+            var refused = await Assert.ThrowsAsync<RunNotResumableException>(() => host.WithScopeAsync(sp => sp.GetRequiredService<IRunService>()
+                .ResumeRunAsync(new ResumeOptions(changed.Id, UseSeedDraft: true, MaxIterationsOverride: null), user)));
+            Assert.Equal(RevisionLines.ResumeChangedText, refused.Message);
+        }
+
+        Assert.Contains("Change something", RevisionLines.ResumeChangedText, StringComparison.Ordinal);
+        Assert.Equal(2, await RunCountAsync(host, orderId));
+        Assert.Equal(callsBefore, host.Llm.Calls.Count);
+        var result = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetResultAsync(orderId, User));
+        Assert.Equal((2, 2, SecondText), (result!.Version, result.LatestVersion, result.Text));
+    }
+
+    [Fact]
+    public async Task Resume_on_a_failed_change_is_refused_once_a_later_version_has_a_text()
+    {
+        const string laterChange = "Please add that the meeting ends at 21:00.";
+        const string laterText = FirstText + "\n\nDer Abend endet um 21 Uhr.";
+        await using var host = await StartAsync(postgres);
+        var orderId = await FirstVersionAsync(host);
+        host.Script.EnqueueExecutorError(503, LlmApiError.BackendUnavailableCode);
+        await ReviseAsync(host, orderId);
+        var failed = await RunAsync(host, orderId, 2);
+        Assert.Equal(RunStatus.Failed, failed.Status);
+        Assert.True(string.IsNullOrWhiteSpace(failed.FinalText));
+        host.Script.EnqueueExecutorText(laterText);
+        await ReviseAsync(host, orderId, laterChange);
+        Assert.Equal(laterText, (await RunAsync(host, orderId, 3)).FinalText);
+        var callsBefore = host.Llm.Calls.Count;
+
+        var refused = await Assert.ThrowsAsync<RunNotResumableException>(() => host.WithScopeAsync(sp => sp.GetRequiredService<IRunService>()
+            .ResumeRunAsync(new ResumeOptions(failed.Id, UseSeedDraft: true, MaxIterationsOverride: null), User)));
+
+        Assert.Equal(RevisionLines.ResumeLaterVersion, refused.Message);
+        Assert.Contains("Change something", RevisionLines.ResumeLaterVersion, StringComparison.Ordinal);
+        Assert.Equal(3, await RunCountAsync(host, orderId));
+        Assert.Equal(callsBefore, host.Llm.Calls.Count);
+        var result = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetResultAsync(orderId, User));
+        Assert.Equal((3, 3, laterText), (result!.Version, result.LatestVersion, result.Text));
     }
 
     [Fact]

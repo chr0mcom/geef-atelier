@@ -225,6 +225,9 @@ internal sealed class RunService(
             throw new InvalidOperationException(
                 $"Run {options.ParentRunId} is in status {details.Run.Status} and cannot be resumed. Only Aborted and Failed runs are resumable.");
 
+        if (details.Run.ResumeRefusal() is { } refusal)
+            throw new RunNotResumableException(refusal);
+
         if (!CrewSnapshot.IsUsableForRun(details.Run.CrewSnapshot))
             throw new RunNotResumableException(RunNotResumableException.NotPreparedMessage);
 
@@ -256,8 +259,7 @@ internal sealed class RunService(
             }
         }
 
-        if (details.Run is { Kind: RunKind.Standard, OrderId: { } changedOrderId } && !string.IsNullOrWhiteSpace(details.Run.RevisionHint)
-            && orderRepository is not null)
+        if (details.Run.ChangesAnEarlierVersion() && details.Run.OrderId is { } changedOrderId && orderRepository is not null)
             return await ResumeChangeAsync(details.Run, changedOrderId, snapshotJson, cancellationToken);
 
         var resumedId = await persistence.CreateResumedRunAsync(
@@ -282,6 +284,8 @@ internal sealed class RunService(
         var orderRuns = await orderRepository!.ListRunsAsync(orderId, cancellationToken);
         var shown = OrderStateResolver.SelectShownRun(orderRuns)
                     ?? throw new RunNotResumableException(RevisionLines.NothingToChange);
+        if ((shown.OrderVersion ?? 0) > (failed.OrderVersion ?? 0))
+            throw new RunNotResumableException(RevisionLines.ResumeLaterVersion);
         var version = orderRuns.Where(r => r.Kind == RunKind.Standard).Max(r => r.OrderVersion ?? 0) + 1;
         var change = failed.RevisionHint!;
         var run = new RunEntity

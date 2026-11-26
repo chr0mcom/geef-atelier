@@ -27,6 +27,18 @@ public static class RevisionLines
     /// <summary>Refusal for an order that does not exist or belongs to someone else.</summary>
     public const string NotFound = "This order was not found.";
 
+    /// <summary>
+    /// Refusal of "Resume" on a version that changed an earlier one and already has its own text: resuming it would make the same change a
+    /// second time to the text that already has it.
+    /// </summary>
+    public const string ResumeChangedText = "This version already has a text with this change, so it is not made again. To change the text further, use “Change something” on the order page.";
+
+    /// <summary>
+    /// Refusal of "Resume" on a version that changed an earlier one, ended without a text and was followed by a later version with a text:
+    /// resuming it would put an older change on top of the newer text.
+    /// </summary>
+    public const string ResumeLaterVersion = "A later version of this order already has a text, so this older change is not made again. To change the text, use “Change something” on the order page.";
+
     /// <summary>Shown with the earlier version while the new one is written: <c>{0}</c> is the shown version.</summary>
     public const string StillWritingFormat = "A new version is being written. Version {0} stays here until it is ready.";
 

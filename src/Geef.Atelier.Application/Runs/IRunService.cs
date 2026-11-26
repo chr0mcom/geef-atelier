@@ -99,6 +99,10 @@ public interface IRunService
     /// same conditions as a change (no other run active, the shown version unchanged, the order not stopped, at most
     /// <see cref="Core.Configuration.OrderOptions.MaxVersionsPerOrder"/> versions), otherwise <see cref="RunNotResumableException"/> with the reason;
     /// the switch <see cref="Core.Configuration.OrderOptions.Revise"/> is not asked, since the change was already accepted.
+    /// Such a run is never resumed when it already has its own text (<see cref="Orders.RevisionLines.ResumeChangedText"/>, see
+    /// <see cref="ResumeRules.ResumeRefusal"/>: the same change would be made twice) or when a later version of its order has a text
+    /// (<see cref="Orders.RevisionLines.ResumeLaterVersion"/>: the older change would be put on the newer text); both throw
+    /// <see cref="RunNotResumableException"/> and create no run. The sentences point to "Change something" on the order page.
     /// </summary>
     Task<Guid> ResumeRunAsync(
         ResumeOptions options,
