@@ -160,7 +160,12 @@ public static class FactFindingFilter
     /// <summary>Shortest material quote of a source conflict or a replacing passage; a stated total such as "Summe 62 €" is short.</summary>
     public const int MinMaterialChars = 5;
 
-    private const int MaxPlaceholderChars = DraftCheckEvaluator.MaxPlaceholderChars;
+    /// <summary>
+    /// Longest placeholder, in characters, inside which a passage is dropped as a placeholder (<see cref="FactFilterDecision.DroppedPlaceholder"/>).
+    /// It stays below the limit by which placeholders are listed (<see cref="DraftCheckEvaluator.MaxPlaceholderChars"/>) on purpose: a passage
+    /// in a longer bracket is kept, because a needless point the person can dismiss is better than a claim that silently disappears.
+    /// </summary>
+    public const int MaxPlaceholderChars = 200;
 
     /// <summary>Applies the rules in their fixed order; every decision lands in the trace.</summary>
     public static FactFilterResult Apply(IReadOnlyList<ProposedFactFinding> proposed, string draft, FactMaterial material)

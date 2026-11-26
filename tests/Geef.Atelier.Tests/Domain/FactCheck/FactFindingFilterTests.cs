@@ -86,16 +86,30 @@ public sealed class FactFindingFilterTests
     public void Rule3_quote_inside_a_placeholder_is_dropped(string quote) =>
         Assert.Equal(FactFilterDecision.DroppedPlaceholder, Decision(Unsupported(quote)));
 
+    private static FactFilterDecision DecisionAtTheEndOfABracket(int repeats)
+    {
+        var inner = string.Join(' ', Enumerable.Repeat("Angaben zur rechtlichen Grundlage des Zauns,", repeats)) + " mit Datum bzw. Fundstelle";
+        var draft = $"Sehr geehrte Damen und Herren,\n\nder Zaun steht dort seit Jahren [{inner}]. Wir bitten um Antwort.";
+        return Assert.Single(FactFindingFilter.Apply([Unsupported("des Zauns, mit Datum bzw. Fundstelle")], draft, Material()).Trace).Decision;
+    }
+
     [Fact]
-    public void Rule3_quote_at_the_end_of_a_placeholder_of_up_to_300_characters_is_dropped()
+    public void Rule3_quote_at_the_end_of_a_placeholder_of_up_to_200_characters_is_dropped()
+    {
+        Assert.InRange(string.Join(' ', Enumerable.Repeat("Angaben zur rechtlichen Grundlage des Zauns,", 3)).Length + 26, 150, FactFindingFilter.MaxPlaceholderChars);
+
+        Assert.Equal(FactFilterDecision.DroppedPlaceholder, DecisionAtTheEndOfABracket(3));
+    }
+
+    [Fact]
+    public void Rule3_quote_in_a_bracket_longer_than_200_characters_is_kept_even_though_the_bracket_is_listed_as_a_placeholder()
     {
         var inner = string.Join(' ', Enumerable.Repeat("Angaben zur rechtlichen Grundlage des Zauns,", 6)) + " mit Datum bzw. Fundstelle";
-        var draft = $"Sehr geehrte Damen und Herren,\n\nder Zaun steht dort seit Jahren [{inner}]. Wir bitten um Antwort.";
 
+        Assert.Equal(200, FactFindingFilter.MaxPlaceholderChars);
         Assert.InRange(inner.Length, 250, Geef.Atelier.Core.Domain.Checks.DraftCheckEvaluator.MaxPlaceholderChars);
-        var result = FactFindingFilter.Apply([Unsupported("des Zauns, mit Datum bzw. Fundstelle")], draft, Material());
-
-        Assert.Equal(FactFilterDecision.DroppedPlaceholder, Assert.Single(result.Trace).Decision);
+        Assert.Equal([$"[{inner}]"], Geef.Atelier.Core.Domain.Checks.DraftCheckEvaluator.FindPlaceholders($"Text [{inner}]."));
+        Assert.Equal(FactFilterDecision.Kept, DecisionAtTheEndOfABracket(6));
     }
 
     [Fact]

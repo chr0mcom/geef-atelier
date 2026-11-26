@@ -27,8 +27,9 @@ public static partial class DraftCheckEvaluator
     public const string KeepEverythingElse = "Keep everything else unchanged.";
 
     /// <summary>
-    /// Longest placeholder in characters between the brackets; a placeholder stays on one line. The same limit holds wherever a
-    /// placeholder is recognised (<see cref="FindPlaceholders"/> and the fact check filter).
+    /// Longest placeholder in characters between the brackets that <see cref="FindPlaceholders"/> lists; a placeholder stays on one line.
+    /// The fact check drops a passage inside a placeholder only up to a lower limit
+    /// (<see cref="FactCheck.FactFindingFilter.MaxPlaceholderChars"/>), so a claim in a longer bracket is never lost.
     /// </summary>
     public const int MaxPlaceholderChars = 300;
 
