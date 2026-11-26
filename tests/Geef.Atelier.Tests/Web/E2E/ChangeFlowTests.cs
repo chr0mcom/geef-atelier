@@ -76,6 +76,22 @@ public sealed class ChangeFlowTests(PlaywrightFixture pw, PostgresFixture pg) : 
         return page;
     }
 
+    /// <summary>The page is prerendered, so a first click can arrive before the circuit is connected and is then lost.</summary>
+    private static async Task OpenChangeCardAsync(IPage page)
+    {
+        var card = page.Locator("[data-testid='order-change-card']");
+        var open = page.Locator("[data-testid='order-change-open']");
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
+        while (!await card.IsVisibleAsync() && DateTimeOffset.UtcNow < deadline)
+        {
+            if (await open.IsVisibleAsync())
+                await open.ClickAsync();
+            await Task.Delay(250);
+        }
+
+        await card.WaitForAsync(new LocatorWaitForOptions { Timeout = 5_000 });
+    }
+
     [Fact]
     public async Task The_card_sends_what_was_clicked_and_typed()
     {
@@ -83,7 +99,7 @@ public sealed class ChangeFlowTests(PlaywrightFixture pw, PostgresFixture pg) : 
         var page = await OpenAsync(orderId, "vellum", 1200);
         try
         {
-            await page.Locator("[data-testid='order-change-open']").ClickAsync();
+            await OpenChangeCardAsync(page);
             await page.Locator("[data-quick='Shorter']").ClickAsync();
             await page.Locator("[data-quick='Friendlier']").ClickAsync();
             Assert.Equal("true", await page.Locator("[data-quick='Friendlier']").GetAttributeAsync("aria-pressed"));
@@ -139,8 +155,7 @@ public sealed class ChangeFlowTests(PlaywrightFixture pw, PostgresFixture pg) : 
         var page = await OpenAsync(orderId, theme, 360);
         try
         {
-            await page.Locator("[data-testid='order-change-open']").ClickAsync();
-            await page.Locator("[data-testid='order-change-card']").WaitForAsync();
+            await OpenChangeCardAsync(page);
             await page.Locator("[data-version='2'] [data-testid='order-version-toggle']").ClickAsync();
             await page.Locator("[data-testid='order-diff-added']").WaitForAsync(new LocatorWaitForOptions { Timeout = 15_000 });
             foreach (var same in await page.Locator("[data-testid='order-diff-same'] summary").AllAsync())
