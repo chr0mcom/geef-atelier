@@ -175,11 +175,12 @@ Stage 5 appends to `get_order_result` (fields with the value `null` are left out
 - `earlierOpenPoints`: `[ { "version": 1, "text": "<point the writer left open for version 1>", "kind": "openPoint|assumption|note" } ]` – open points and assumptions of the writer for an earlier version that the shown version does not repeat, which the change may have settled or not, and fixed sentences by Atelier (`note`) about notes or passages of that version that could not be shown, or about checks of a version without a report that were not taken over, which a change does not settle. `null` when there are none.
 - `unbackedPassages[].note` is also set for a passage of kind `against_instruction` whose instruction applied before the latest change (request, answers, About me details, assistant or an earlier change): "This instruction applied before your latest change; your change may have replaced it."; such a passage never blocks.
 - `assumptionsVersion`: for a changed version with `assumptions`, the version they were noted for (before the changes; a change may have settled or overtaken them). `null` otherwise.
+- `lengthNotice`: "This version is longer than the one before. Anything new in it did not come from you – please check it." for a changed version with more than 115 % of the words of the text it changed (from the stored texts, also for older versions). `null` otherwise.
 - `unbackedPassages[].fromVersion`: the earlier version a passage was flagged for; it still stands in the text word for word. `null` for passages of this version.
 
 `note` names `earlierOpenPoints` among the fields to show, says for a changed version that the assumptions were noted for `assumptionsVersion` and, while a new version is written, asks to wait with `get_order_status`. In a changed version `checks.checked` names the rules of the first request on their own lines ("Checked automatically against the rules of your first request (your change may have replaced them): …" / "Rules of your first request the new version does not keep – …"), and a rule that is not kept is a note in `openChecks`, never blocking.
 
-**`revise_order` input:** `{ "orderId": "<uuid, required>", "change": "<the person's words, word for word|null>", "quick": ["shorter|longer|more_formal|friendlier|simpler"] }` – at least `change` or one `quick`.
+**`revise_order` input:** `{ "orderId": "<uuid, required>", "change": "<the person's words, word for word|null>", "quick": ["shorter|more_formal|friendlier|simpler"] }` – at least `change` or one `quick`. `longer` is refused with "A text only gets longer with new details from you. Tell me what to add." (nothing is started).
 
 **`revise_order` output:**
 ```json

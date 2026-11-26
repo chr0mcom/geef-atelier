@@ -175,11 +175,12 @@ Etappe 5 hängt an `get_order_result` an (Felder mit dem Wert `null` fehlen auf 
 - `earlierOpenPoints`: `[ { "version": 1, "text": "<offener Punkt des Schreibers für Fassung 1>", "kind": "openPoint|assumption|note" } ]` – offene Punkte und Annahmen des Schreibers einer früheren Fassung, die die gezeigte Fassung nicht wiederholt und die die Änderung erledigt haben kann oder nicht, sowie feste Sätze von Atelier (`note`) zu Notizen oder Stellen dieser Fassung, die nicht gezeigt werden konnten, oder zu nicht übernommenen Prüfungen einer Fassung ohne Bericht, die eine Änderung nicht erledigt. `null`, wenn es keine gibt.
 - `unbackedPassages[].note` steht auch bei einer Stelle der Art `against_instruction`, deren Vorgabe vor der letzten Änderung galt (Auftrag, Antworten, „About me“-Angaben, Assistent oder frühere Änderung): „This instruction applied before your latest change; your change may have replaced it.“; eine solche Stelle blockiert nie.
 - `assumptionsVersion`: bei einer geänderten Fassung mit `assumptions` die Fassung, für die sie notiert wurden (vor den Änderungen; eine Änderung kann sie erledigt oder überholt haben). Sonst `null`.
+- `lengthNotice`: „This version is longer than the one before. Anything new in it did not come from you – please check it.“ bei einer geänderten Fassung mit mehr als 115 % der Wörter des geänderten Textes (aus den gespeicherten Texten, auch für ältere Fassungen). Sonst `null`.
 - `unbackedPassages[].fromVersion`: die frühere Fassung, für die eine Stelle gemeldet wurde; sie steht noch wörtlich im Text. `null` für Stellen dieser Fassung.
 
 `note` nennt `earlierOpenPoints` unter den zu zeigenden Feldern, sagt bei einer geänderten Fassung, dass die Annahmen für `assumptionsVersion` notiert wurden, und bittet, während eine neue Fassung geschrieben wird, mit `get_order_status` zu warten. In einer geänderten Fassung nennt `checks.checked` die Regeln des ersten Auftrags in eigenen Zeilen („Checked automatically against the rules of your first request (your change may have replaced them): …“ / „Rules of your first request the new version does not keep – …“); eine nicht eingehaltene Regel ist eine Notiz in `openChecks`, nie blockierend.
 
-**Eingabe `revise_order`:** `{ "orderId": "<uuid, Pflicht>", "change": "<Worte der Person, wörtlich|null>", "quick": ["shorter|longer|more_formal|friendlier|simpler"] }` – mindestens `change` oder ein `quick`.
+**Eingabe `revise_order`:** `{ "orderId": "<uuid, Pflicht>", "change": "<Worte der Person, wörtlich|null>", "quick": ["shorter|more_formal|friendlier|simpler"] }` – mindestens `change` oder ein `quick`. `longer` wird mit „A text only gets longer with new details from you. Tell me what to add.“ abgelehnt (nichts startet).
 
 **Ausgabe `revise_order`:**
 ```json
