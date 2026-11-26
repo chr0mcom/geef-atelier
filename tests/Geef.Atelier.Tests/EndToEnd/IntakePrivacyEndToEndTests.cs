@@ -21,8 +21,8 @@ namespace Geef.Atelier.Tests.EndToEnd;
 /// Over the real wiring: the "About me" profile reaches the clarifier and every writer briefing (answered, skipped,
 /// started after the deadline), but never an outside search service: Tavily, news and academic search, the embeddings of
 /// the learning search (learning switched on), the query shaping and the refinement get only the request as written, and each of
-/// these services is really called. Also for <c>submit_request</c> with an own crew, for a clarified careful order and for a
-/// resumed run.
+/// these services is really called. Also for <c>submit_request</c> with an own crew and for a resumed run. A clarified careful
+/// order with the default crew searches nothing at all (D-079).
 /// </summary>
 [Collection(EndToEndCollection.Name)]
 [Trait("Category", "EndToEnd")]
@@ -91,7 +91,7 @@ public sealed class IntakePrivacyEndToEndTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task A_clarified_careful_order_gives_profile_answers_and_assumptions_to_the_writer_and_only_the_request_to_search()
+    public async Task A_clarified_careful_order_gives_profile_answers_and_assumptions_to_the_writer_and_nothing_to_search()
     {
         await using var host = await StartAsync(IntakeMode.On);
         await SaveProfileAsync(host, AtelierEndToEndHost.McpTokenUser);
@@ -115,7 +115,7 @@ public sealed class IntakePrivacyEndToEndTests(PostgresFixture postgres)
 
         foreach (var marker in new[] { ProfileMarker, AnswerMarker, AssumptionMarker })
             Assert.True(host.Llm.AnyExecutorPromptContains(marker), $"{marker} missing for the writer.\n{host.Llm.Describe()}");
-        Assert.NotEmpty(host.External.For(FakeTavilyEndpoint.ClientName));
+        Assert.Empty(host.External.For(FakeTavilyEndpoint.ClientName));
         foreach (var marker in new[] { ProfileMarker, AnswerMarker, AssumptionMarker })
             AssertResearchSawOnlyTheRequest(host, marker);
     }

@@ -1,3 +1,4 @@
+using Geef.Atelier.Application.Crew.Grounding;
 using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Llm;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -39,7 +40,7 @@ public sealed class LlmGroundingQueryExtractorTests
     }
 
     [Fact]
-    public async Task ExtractAsync_FallsBackToBriefing_WhenResolverThrows()
+    public async Task ExtractAsync_SearchesNothing_WhenResolverThrows()
     {
         var extractor = new LlmGroundingQueryExtractor(
             new ThrowingResolver(),
@@ -47,19 +48,34 @@ public sealed class LlmGroundingQueryExtractorTests
 
         var result = await extractor.ExtractAsync("the raw briefing text", CancellationToken.None);
 
-        Assert.True(result.ShouldSearch);
-        Assert.Equal("the raw briefing text", result.Query);
+        Assert.Equal(GroundingQuery.NotFormed, result);
+        Assert.False(result.ShouldSearch);
+        Assert.True(result.Failed);
+        Assert.Equal(string.Empty, result.Query);
+    }
+
+    [Theory]
+    [InlineData("   ")]
+    [InlineData("\"\"")]
+    [InlineData("\"  \"\nexplanation")]
+    public async Task ExtractAsync_SearchesNothing_WhenModelReturnsNoQuery(string answer)
+    {
+        var extractor = Build(answer);
+
+        var result = await extractor.ExtractAsync("briefing that must never be the query", CancellationToken.None);
+
+        Assert.Equal(GroundingQuery.NotFormed, result);
     }
 
     [Fact]
-    public async Task ExtractAsync_FallsBackToBriefing_WhenModelReturnsBlank()
+    public async Task ExtractAsync_SearchesNothing_WhenTheModelCallFails()
     {
-        var extractor = Build("   ");
+        var extractor = new LlmGroundingQueryExtractor(new StubResolver(new HttpRequestException("gateway down")),
+            NullLogger<LlmGroundingQueryExtractor>.Instance);
 
-        var result = await extractor.ExtractAsync("briefing fallback", CancellationToken.None);
+        var result = await extractor.ExtractAsync("briefing that must never be the query", CancellationToken.None);
 
-        Assert.True(result.ShouldSearch);
-        Assert.Equal("briefing fallback", result.Query);
+        Assert.Equal(GroundingQuery.NotFormed, result);
     }
 
     // --- helpers ---
@@ -97,10 +113,10 @@ public sealed class LlmGroundingQueryExtractorTests
         public bool SupportsStructuredOutputs(string providerName) => true;
     }
 
-    private sealed class StubClient(string text) : ILlmClient
+    private sealed class StubClient(string text, Exception? failure = null) : ILlmClient
     {
         public Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken) =>
-            Task.FromResult(new LlmResponse
+            failure is not null ? Task.FromException<LlmResponse>(failure) : Task.FromResult(new LlmResponse
             {
                 Text         = text,
                 TokenUsage   = new LlmTokenUsage { InputTokens = 1, OutputTokens = 1 },
@@ -108,10 +124,14 @@ public sealed class LlmGroundingQueryExtractorTests
             });
     }
 
-    private sealed class StubResolver(string text) : ILlmClientResolver
+    private sealed class StubResolver(string text, Exception? failure = null) : ILlmClientResolver
     {
+        public StubResolver(Exception failure) : this(string.Empty, failure)
+        {
+        }
+
         public (ILlmClient Client, string Model, int MaxTokens) ForActor(string actorName) =>
-            (new StubClient(text), "test-model", 256);
+            (new StubClient(text, failure), "test-model", 256);
 
         public (ILlmClient Client, string Model, int MaxTokens) ForProfile(string provider, string model, int? maxTokens) =>
             throw new NotSupportedException();
