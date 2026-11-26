@@ -108,6 +108,34 @@ _PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
 #: Reasons that justify handing the request to the partner backend.
 _FAILOVER_REASONS = frozenset({"auth", "limit", "transport"})
 
+#: Wording with which the claude CLI says that the subscription of the bound account does not
+#: include the requested model at all (as opposed to an exhausted window). The only place that
+#: knows these phrases. The claude adapter applies them to the `result` field of a CLI result with
+#: `is_error: true` only (claude_adapter._not_in_plan_result, which raises NotInPlanError); the
+#: request paths check that type, never free text. Observed: "You're out of usage credits. Switch to another model, or manage
+#: usage credits at ..." (api_error_status 429, empty modelUsage) for a model the plan lacks.
+_NOT_IN_PLAN_PATTERNS: tuple[str, ...] = (
+    "out of usage credits",
+    "not available on your plan",
+    "not available on your current plan",
+    "not available with your plan",
+    "not included in your plan",
+    "does not have access to model",
+    "doesn't have access to model",
+    "do not have access to model",
+    "don't have access to model",
+)
+
+#: An ordinary session/weekly/rate window that merely ran out. Such a message is NEVER a
+#: "not in plan" answer, whatever else it says: it belongs to the breaker and the failover.
+_ORDINARY_LIMIT_PATTERNS: tuple[str, ...] = (
+    "session limit", "weekly limit", "rate limit", "rate_limit", "usage limit",
+    "limit resets", "limit will reset", "hit your", "too many requests", "overloaded",
+)
+
+#: How long a model the CLI refused as "not in plan" stays parked on that account.
+NOT_IN_PLAN_TTL_SECONDS = _env_int("CLAUDE_NOT_IN_PLAN_TTL_SECONDS", 3600)
+
 #: A document-mode run that exited normally but produced no text. It is an error of that one
 #: request (502 `empty_result`, never handed over, see main.py) and NOT a breaker failure: whether
 #: the CLI writes the document depends on the request's content (a refusal, a chat answer instead
@@ -155,6 +183,10 @@ class _BackendState:
 
 _STATE: dict[str, _BackendState] = {}
 
+#: (Claude account, normalised model name) -> epoch seconds until which the account is taken
+#: not to have the model, learned from a "not in plan" answer of a real request.
+_NOT_IN_PLAN_MARKS: dict[tuple[str, str], float] = {}
+
 
 def _state(backend: str) -> _BackendState:
     if backend not in _STATE:
@@ -163,8 +195,55 @@ def _state(backend: str) -> _BackendState:
 
 
 def reset() -> None:
-    """Drop all breaker state. Test seam; also used on process start."""
+    """Drop all breaker state and runtime marks. Test seam; also used on process start."""
     _STATE.clear()
+    _NOT_IN_PLAN_MARKS.clear()
+
+
+def is_not_in_plan(exc_or_text: BaseException | str) -> bool:
+    """True when the CLI said the bound account's subscription does not include the model.
+
+    Unambiguous wording only (see `_NOT_IN_PLAN_PATTERNS`), and never when the text also names an
+    ordinary session/weekly/rate window: those stay `limit` faults for the breaker."""
+    text = str(exc_or_text).lower()
+    if any(needle in text for needle in _ORDINARY_LIMIT_PATTERNS):
+        return False
+    return any(needle in text for needle in _NOT_IN_PLAN_PATTERNS)
+
+
+def mark_not_in_plan(account: str, model: str) -> None:
+    """Park `model` on `account` for NOT_IN_PLAN_TTL_SECONDS. Moves no breaker."""
+    _NOT_IN_PLAN_MARKS[(account, model)] = time.time() + NOT_IN_PLAN_TTL_SECONDS
+
+
+def marked_not_in_plan(account: str, model: str) -> bool:
+    """True while a runtime mark for (account, model) is running; expired marks are dropped."""
+    until = _NOT_IN_PLAN_MARKS.get((account, model))
+    if until is None:
+        return False
+    if time.time() >= until:
+        _NOT_IN_PLAN_MARKS.pop((account, model), None)
+        return False
+    return True
+
+
+def clear_not_in_plan(account: str, models) -> None:
+    """Drop the runtime marks of `account` for each of `models` (a later success proved them wrong)."""
+    for model in models:
+        if _NOT_IN_PLAN_MARKS.pop((account, model), None) is not None:
+            log.info("Model %s is served by %s again -- not-in-plan mark dropped", model or "(default)", account)
+
+
+def not_in_plan_marks() -> dict[str, dict[str, float]]:
+    """Running marks per account: {account: {model: until}} (expired ones are pruned)."""
+    now = time.time()
+    out: dict[str, dict[str, float]] = {}
+    for (account, model), until in list(_NOT_IN_PLAN_MARKS.items()):
+        if now >= until:
+            _NOT_IN_PLAN_MARKS.pop((account, model), None)
+            continue
+        out.setdefault(account, {})[model] = until
+    return out
 
 
 def classify(exc: BaseException) -> str:
@@ -309,7 +388,7 @@ def record_failover(primary: str, used: str) -> None:
                 primary, used, _state(primary).last_reason, _state(primary).last_error)
 
 
-def attempt_order(backend: str) -> list[str]:
+def attempt_order(backend: str, to_alt: bool = False) -> list[str]:
     """Backends to try, in order.
 
     The chain is claude -> (alt Claude account, when configured) -> codex; a codex request
@@ -317,7 +396,17 @@ def attempt_order(backend: str) -> list[str]:
     (stable, so the chain order still decides among equals) -- but with nothing healthy
     left we honour the caller's choice rather than shuffling requests between broken
     backends.
+
+    `to_alt` is the model routing (a model only the alt account has, see model_routing.py), not
+    a failover: the chain is then claude-alt -> codex, and with the failover switched off
+    (FAILOVER_ENABLED=0) it is claude-alt alone instead of the primary alone.
     """
+    if to_alt and backend == "claude":
+        if not ENABLED:
+            return [ALT]
+        chain = [ALT, PARTNER[backend]]
+        ready = [b for b in chain if available(b)]
+        return chain if not ready else ready + [b for b in chain if b not in ready]
     partner = PARTNER.get(backend)
     if not ENABLED or partner is None:
         return [backend]
