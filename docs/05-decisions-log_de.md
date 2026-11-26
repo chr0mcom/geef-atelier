@@ -3349,3 +3349,7 @@ er jetzt ebenfalls zuerst. Mit den ersten Überschriften gespeicherte Aufträge 
 `NotCheckedHeadingFirstVersion`); alle vier Überschriften sind durch Prüfsummen-Tests festgehalten.
 
 **Nächste Messung.** Neue erfundene Fälle in gleicher Zahl und Art, Schwellen unverändert; sie darf ohne Faktenprüfung laufen.
+
+**Zusatz (2026-11-26): Messtor bestanden.** Zweiter Lauf mit neuen, frei erfundenen Testfällen (Deutsch und Englisch), alle mit
+übersprungenen Rückfragen: keine Festlegung in den offenen Entscheidungsfällen, im Auftrag verlangte Entscheidungen umgesetzt,
+Kontrollfälle brauchbar, Entscheidungstexte versendbar. Gemessen ist nur das Überspringen auf dem Standardweg.

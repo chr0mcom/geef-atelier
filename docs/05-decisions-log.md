@@ -3225,3 +3225,7 @@ Briefings stored with the first headings stay readable (`OpenQuestionsHeadingFir
 all four headings are pinned by hash tests.
 
 **Next measurement.** New made-up cases of the same number and kinds, thresholds unchanged; it may run without the fact check.
+
+**Addendum (2026-11-26): gate passed.** Second run with new, invented test cases (German and English), all with the questions
+skipped: no commitment in the open decision cases, decisions stated in the request carried out, control cases usable, decision
+texts ready to send. Only skipping on the standard way has been measured.
