@@ -824,7 +824,7 @@ einmal und korrigiert höchstens einmal (`MaxIterations: 2`). Seit Etappe 3 hat 
 
 | Prüfer | Profil | Modell | Was er tut |
 |---|---|---|---|
-| Automatische Prüfungen | `deterministic-checks` | keins | `DraftCheckEvaluator`: nicht leer, keine Vorrede, Länge, Sprache, Platzhalter, verbotene Formen und Wörter, verlangte Wörter, ausgeschriebene Rechnungen. Blockierendes → `Error`, Rest `Info`. |
+| Automatische Prüfungen | `deterministic-checks` | keins | `DraftCheckEvaluator`: nicht leer, keine Vorrede, Länge, Sprache, Platzhalter (in eckigen Klammern, bis 300 Zeichen auf einer Zeile; der Faktenprüfer verwirft eine gemeldete Stelle innerhalb eines Platzhalters nur bis 200 Zeichen, damit eine Aussage in einer längeren Klammer stehen bleibt), verbotene Formen und Wörter, verlangte Wörter, ausgeschriebene Rechnungen. Blockierendes → `Error`, Rest `Info`. |
 | Faktenprüfung | `source-fact-check` | Slot `FactReviewer` (heute Codex Astra, nie die Familie des Schreibers) | `SourceFactCheckReviewer`: vergleicht die Tatsachen im Text mit Wortlaut, Antworten, Profil und Dateien (`FactCheckPrompts`, Version `fact-check-1`). |
 
 Die Faktenprüfung läuft bei jedem Auftrag des Direktwegs. Nur `Direct:FactCheckMode = Off`, `Shadow` oder ein Ausfall des
@@ -908,7 +908,12 @@ gespeicherten Ausschnitte unverändert und sucht nie neu.
 
 Ein Lauf, der eine frühere Version des Auftrags ändert („Change something“, `revise_order`), läuft immer über den Direktweg. Er
 trägt `RunEntity.RevisionHint` (die Änderung der Person samt Sätzen der Schnellknöpfe), `ParentRunId` (Lauf der gezeigten Version)
-und `SeedDraftText` (deren ausgelieferter Text). Den Lauf legt der Auftragsdienst an; der Direktweg macht daraus Folgendes:
+und `SeedDraftText` (deren ausgelieferter Text). Den Lauf legt der Auftragsdienst an; „Resume“ auf einem gescheiterten oder
+gestoppten Nachbesserungslauf legt ihn genauso an (`RunService.ResumeRunAsync`: dieselbe `RevisionHint`, die jetzt gezeigte Version
+als `ParentRunId` und Ausgangstext, ihr Brief neu zusammengesetzt, gespeichert über `TryAddRevisionRunAsync`). Er lehnt mit
+`RunNotResumableException` ab und legt keinen Lauf an, wenn der Nachbesserungslauf schon einen eigenen Text hat
+(`RevisionLines.ResumeChangedText`; die Laufseite zeigt den Satz statt des Knopfs) oder eine spätere Version des Auftrags einen Text hat
+(`RevisionLines.ResumeLaterVersion`). Der Direktweg macht daraus Folgendes:
 
 - **Grounding:** Der Assembler reicht `RevisionHint` an `OrderGroundingStep`; der Schritt setzt den Kontextschlüssel
   `AtelierContextKeys.RevisionHint`. Der frühere Text ist nur Ausgangstext, nie Material des Faktenprüfers. Die Recherche liefert wie
@@ -919,11 +924,14 @@ und `SeedDraftText` (deren ausgelieferter Text). Den Lauf legt der Auftragsdiens
   Änderungen getrennt von den Antworten zurück (`BriefParts.Changes`, die letzte als neueste), und das Material des Faktenprüfers
   hält sie so (`FactMaterial.Changes`). Nur der Prompt des Prüfers schreibt sie unter die Antworten der Person, mit kurzer Marke
   („newest change, version n“ / „earlier change, version n; a newer change wins where they differ“, `FactChange.Marked`) vor dem
-  unveränderten Wortlaut. Nachgeschlagen werden Zitate nur in den Worten; der Filter nimmt die Marke vorher aus jedem Zitat des
-  Prüfers (`FactChange.WithoutMarks`), sodass ein reines Marken-Zitat keine Vorgabe ist und kein gespeichertes Zitat die Marke trägt.
+  unveränderten Wortlaut. Nachgeschlagen werden Zitate nur in den Worten; in einem Nachbesserungslauf (`FactMaterial.IsRevision`)
+  nimmt der Filter die Marke vorher aus jedem Zitat des Prüfers (`FactChange.WithoutMarks`), sodass ein reines Marken-Zitat keine
+  Vorgabe ist und kein gespeichertes Zitat die Marke trägt. Im ersten Lauf eines Auftrags lässt der Filter die Zitate, wie sie sind.
 - **Schreiber:** Nur im Nutzerprompt des ersten Durchgangs ersetzt `DirectWriterPrompts.RevisionInstruction` die `SeedInstruction`
-  (für Anbieter ohne Dokumentmodus über dieselbe Ersetzung „the text in draft.md“ → „this text“). Der System-Prompt bleibt bitgleich
-  (Hash-Test); Korrekturdurchgang unverändert.
+  (für Anbieter ohne Dokumentmodus über dieselbe Ersetzung „the text in draft.md“ → „this text“). Wortlaut seit Tor N′ (D-075):
+  Anschlusskorrekturen so klein wie möglich, Ton-, Stil- und Längenänderungen ohne neue Aussage und ohne anderes Verhältnis zwischen
+  Absender und Angesprochenen, ein längerer Text führt aus, was er schon sagt. Der System-Prompt bleibt bitgleich (Hash-Test);
+  Korrekturdurchgang unverändert.
 - **Prüfungen:** Jede Regel des ersten Auftrags (`DraftCheckResult.IsFirstRequestRule`: Länge, Sprache, keine Platzhalter, verbotene
   Formen, verbotene und verlangte Wörter) ist im Nachbesserungslauf nur eine Notiz, nie blockierend (`DeterministicChecksReviewer.Evaluate`,
   Satz `FirstRequestNoteFormat`); leerer Text, Vorrede, Anzeige der Platzhalter, Rechenprüfung und Faktenprüfung laufen wie immer. Der

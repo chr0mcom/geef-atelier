@@ -4857,6 +4857,17 @@ textarea.form-control {
   quotes: "“" "”" "‘" "’";
 }
 .order-passage-asked { display: block; font-size: 13px; color: var(--ink-3); }
+.order-earlier { margin-top: 10px; overflow-wrap: anywhere; }
+.order-earlier > summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: list-item;
+  padding: 10px 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.order-earlier > summary:focus-visible { outline: 2px solid var(--hero); outline-offset: 2px; border-radius: 3px; }
+.order-earlier[open] > summary { padding-bottom: 4px; }
 
 .order-sources-used > ul > li { display: grid; gap: 4px; }
 .order-block .order-sources-caveat { margin: 0 0 10px; font-size: 13px; color: var(--ink-3); }

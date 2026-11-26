@@ -2434,7 +2434,9 @@ so far nor an open point that still applies.
   newer change wins where they differ") before the unchanged words; its prompt and schema stay the same. The mark is never a word
   of the person: the material keeps the changes apart from their mark (`FactMaterial.Changes`), the mark is written out only in
   the checker's prompt, and in one place (the filter of the fact check) it is taken out of every quote of the checker before the
-  quote is looked up or stored. A quote from such a line still counts as an answer of the person and is stored without the mark;
+  quote is looked up or stored – only in a change run, where marks are written out. In the first run of an order no mark exists
+  and the filter leaves every quote as the checker gave it, exactly as before stage 5 (a quote such as "Tariff version 2) costs
+  …" or an instruction quote "draft version 2)" keeps its words; tests). A quote from such a line still counts as an answer of the person and is stored without the mark;
   a quote that is only the mark or parts of it is not taken as an instruction of the person. Stored and shown quotes (web, MCP,
   correction) therefore never hold the mark. Whether the model follows the order this way is **not measured** (gate N).
 - **Writer:** only in the first pass of a change run, `RevisionInstruction` replaces the usual instruction for a seed text (user
@@ -2470,7 +2472,7 @@ so far nor an open point that still applies.
   "Extra careful"), the fixed sentence "The checks of version n were not taken over, so anything they left open was not checked
   again." stands there; it counts as an open point. On the web these fixed sentences of Atelier do not stand under "your change
   may have settled it" but under a neutral lead of their own, "About version n:"; MCP gives them in `earlierOpenPoints` with
-  `kind = note`. Carrying over happens only in change runs. Findings of the version before
+  `kind = note`. Carrying over happens only in change runs (also in one started by "Resume" on a change). Findings of the version before
   whose own check was off or hidden are not carried over; findings already carried over (with their origin) stay and stay visible
   across all versions, also when the fact-check mode was off or hidden in between (findings of the hidden check itself stay
   unseen).
@@ -2503,6 +2505,18 @@ so far nor an open point that still applies.
   the order page can offer the change; otherwise "Resume" stays.
 - **Resume (older path):** "Resume" seeds with the delivered text when the run has one, otherwise with the last iteration as
   before (a fix, no switch).
+- **Resume on a change run:** when the run that failed or was stopped was itself a change, "Resume" (still offered to
+  administrators, and to the owner while the switch is `Off`) starts a change again: the same change, made to the version shown
+  now, seeded with its text, with the brief of that version plus the change as the next version, and that version as the base
+  of the report. Open passages, open points, assumptions and fixed sentences of the earlier versions are therefore carried over,
+  and the rules of the first request do not block, as in any change. It is stored under the same conditions as a change (no run
+  active, the shown version unchanged, the order not stopped, at most 10 versions), otherwise "Resume" names the reason; the
+  switch `Orders:Revise` is not asked, because the change was already accepted. The option to seed with the last iteration does
+  not apply to such a run. "Resume" is refused, and no run is created, when the change run already has its own text (for example
+  one that ended as "not finished" with a text: the same change would be made a second time to a text that already has it; the run
+  page shows the sentence instead of the button) and when a later version of the order already has a text (the older change would
+  be put on the newer text). Both sentences point to "Change something" on the order page. Resume on any other run is unchanged.
+  Proven by end-to-end tests over the real wiring.
 - **MCP:** nine order tools, registered one by one: `submit_order`, `answer_order`, `get_order_status`, `get_order_result` (new
   `latestVersion`, `earlierOpenPoints` with `kind` `openPoint`, `assumption` or `note`, `unbackedPassages[].fromVersion`,
   `unbackedPassages[].note` also for instructions from before the latest change, `assumptionsVersion`), `revise_order`
@@ -2519,6 +2533,17 @@ findings of the version before's own check that was off or hidden are not carrie
 text (web and MCP); administrators (also the static token) can export and stop orders of others over MCP as before on the web.
 In the contract the length was the only note; now every rule of the first request is a note, and "Keep the language of the text"
 applies only while the change asks for no other language (decided after the review).
+
+**Limits of carrying over and of the defused rules (named, not measured):**
+- Whether a finding against an instruction blocks depends on the part of the instruction the checker quotes. When it quotes only
+  words that also stand in the newest change (for example "mention the price" for a request "Do not mention the price." and a
+  change "Please mention the price: 5 euros per family."), the quote counts as standing in the newest change and the finding
+  blocks; in mode `On` the correction may then undo the change. Only with the full quote is the finding defused. Whether the
+  model quotes this way is not measured; a contradiction case belongs to the measurement before switching on for everyone.
+- An open passage of the version before is carried over only while its quoted words still stand in the new text as they were.
+  When the change rewords it ("The fee is 30 euros." becomes "The fee is 30 euros per person.", bold or "amounts to 30 euros"),
+  the earlier finding falls away, and only the new check of the new version can report it again; no gate measures whether it
+  does. Before switching on for everyone, the passages of version 1 are followed by hand in one tone case.
 
 **Deliberate limit:** the brief of a change is the brief of the shown version plus the change. It therefore holds the About me
 details that applied to the first request, also when the person has changed them since; the writer gets them again when the text
@@ -2564,3 +2589,110 @@ text, as before part B, and the export without a version finds none (the earlier
 its version); it does not show the points of the version before (`earlierOpenPoints`) or the origin of carried passages, a
 version with a carried blocking point or with `earlierNeedsCheck` appears as "Ready", and a passage against an instruction from
 before the latest change stands among the hints without its sentence. None of this is deleted; it shows again after the next deploy.
+
+### Addendum to D-075 — Stage 5: first measurement (gates M, V-MCP, N) and the definition of gate N′ (2026-11-26)
+
+**Status:** gate M passed, V-MCP passed (see above), **gate N not passed**. `Orders:Revise` stays `Off` (override `On` only for the
+measuring user). The preconditions of the second and last measurement (gate N′) are built and backed by tests; deploy and
+measurement are still open. The prompts and schemas of the fact checker, the clarifier and the condenser and the writer's system
+prompt stay bit for bit the same (hash tests green).
+
+**First result of gate N: not passed – unchanged.** Failed according to the measuring tool: N1 in the case "delete a paragraph"
+(paragraph and word thresholds) and N2 (eleven "new unbacked passages" in the two tone cases together, at most one allowed); N3, N4
+and N5 passed. The old data are not judged again, and no threshold is loosened on them.
+
+**Reading of the independent adviser** (on the stored texts, without a model call):
+- **Both failures are faults of the measurement.** The paragraph to delete was a section of four blocks in Markdown; the requested
+  deletion alone already rules out "at most two blocks changed" and ±15 % words. The writer deleted exactly that section and
+  adjusted one half-sentence that would otherwise have pointed at what was gone. The N2 figure counts every flagged passage whose
+  quote does not stand word for word in the version before; a change of tone rewords every sentence, so it counts rewordings of
+  sentences the fact checker had already flagged before. None of the eleven passages is a new statement in substance. Above eight
+  listed passages the figure is blind as well. A light product finding on the way: in one case a warmer tone shifted the address
+  ("tenants" became "neighbours" although the management writes).
+- **N4, placeholder part: passed only on paper, missed in substance.** A placeholder of 94 characters stood in the text of three
+  versions and in no list "Fill these in before you send the text". Product and measuring tool recognised placeholders only up to 80
+  characters, so it went unnoticed. The fault is older than changing a text.
+- **N3 "Longer": not secured.** "One new passage" is only a lower bound, because two more flagged passages were not listed; the text
+  holds two new soft statements, one of them a new promise for the next occasion.
+- **Base snapshots as copies:** the base versions of follow-up changes were added afterwards as copies to satisfy the rule "each
+  snapshot in at most one case". Harmless in substance, formally a way around the tool's own rule; in gate N′ each base version is
+  taken right before its change.
+- "Simpler words" was not measured; the opened comparison view is not shown in the data.
+
+**Why the measurement changes:** the figure "new `not_backed`" counts rewordings and stops at eight listed passages; the paragraph
+and word thresholds cannot be met by a flawless writer when a paragraph is deleted. Another try only at the sentence with the old
+figure would have failed again whatever the sentence; withholding the only way to change a text from lay users because of two faults
+of the measurement would not be more honest. So the one round at the sentence is used, and the measurement is repeated exactly once
+with a corrected set-up fixed in advance.
+
+**Gate N′ – second and last measurement.** The definition holds before any new data and is not changed once the measurement has
+begun:
+- **Data:** three fresh orders of the measuring user (an invitation to a club meeting and a report for a school paper in German, an
+  email about an office move in English), seven changes, five on the web with real clicks and two over MCP: replace a detail, add a
+  sentence, delete a paragraph, tone twice, Longer, Shorter. Every kind that failed in the first measurement is in it again. Before
+  each change the base version is taken fresh.
+- **Mechanical, every case (N4′):** a new version with a text and the next version number; nothing known of the version before is
+  lost; every placeholder of the new text (an own rule independent of the product, up to 300 characters) is listed; the export
+  without a version holds the new version.
+- **Mechanical, per kind:** thresholds on blocks, word ratio (±15 %, Shorter 40–85 %, Longer 115–160 %), placeholders and digit
+  runs; when deleting, the removed blocks form one connected target region (at most one connecting fix elsewhere), and the word
+  ratio is computed without that region. Page: the opened comparison view shows the old date as removed and the new one as added (at
+  most two changed paragraphs); the time shown while writing is below 1:00.
+- **Content: a blind reviewer** (a fresh subagent that can only read one input file and knows nothing of the product, the gate, the
+  thresholds or the fact checker) judges all seven pairs of request, text before and text after, plus two hand-built control pairs
+  (a planted statement, a clean single change). The verdict counts only when both control pairs show what is expected; quotes are
+  checked against the texts. Thresholds: the request is met in every case; no essential new statement in the local changes and in
+  Shorter, at most one in the two tone cases together and at most one in Longer; no lost key statement, no changed detail; outside
+  a local spot at most one change, and only a necessary one.
+- The fact checker's figures are reported per version but are **no criterion** any more.
+- Limits of model calls (clarifier 4, writer 12, fact checker and blind reviewer together 12); after a technical failure the same
+  change may be restarted once.
+- **Consequences:** passed → together with gate M and after V4/V5 a separate commit `Orders:Revise = On`. N4′ failed → halt: fix
+  it, never switch on for everyone before it is shown again on the case concerned. Failed otherwise → `Orders:Revise` stays with the
+  measuring user, no further round at the sentence and no further measurement in stage 5; a new attempt is a stage of its own. Not
+  evaluable → only the missing cases may be repeated once under the same definition. No case is swapped, no verdict overruled, no
+  threshold adjusted.
+- **Not measured:** the button "Simpler words" (no budget). Stopping (N5) is carried over from the first measurement, because no
+  precondition changes how the state, the shown version or the stop path are decided.
+
+**New sentence `RevisionInstruction`** (the one round of the contract), word for word:
+
+> Change the text in draft.md only as the person asks in the line marked "the change to make now" under "Change requested by the
+> person". The earlier changes listed there are already made in the text: keep them and do not make them again. Keep everything
+> else as it is: the same facts, structure and wording. If the change leaves another sentence wrong or pointing at something that
+> is no longer in the text, adjust that sentence as little as possible. A change of tone, style or length changes the wording, not
+> the content: add no statement about what happened, what will happen, what is offered or what is expected that the text does not
+> already make, and keep who writes and who is addressed. When the text has to get longer, expand on what it already says and do
+> not invent detail to fill it. Keep the language of the text unless the change asks for another language. Keep the length within
+> ±15 % unless the change asks for another length or cannot be made without changing it.
+
+For providers without document mode, as before, with "this text" instead of "the text in draft.md". The fixed sentences of the
+quick buttons and the instruction of a seeded first pass stay unchanged (tests).
+
+**Preconditions (code with tests, no model call):**
+- **V1 placeholders:** recognised up to 300 characters on one line in the product (check and list "Fill these in …") and in the
+  measuring tool. The fact check filter, which drops a flagged passage inside a placeholder, stays at 200 characters on purpose: a
+  passage in a longer bracket is kept, because a needless point is better than a claim that silently disappears. Links, references, images, footnotes, check boxes and double brackets
+  stay excluded whatever their length. Stored results do not change, because the list is written into the report during the run;
+  new runs also list long placeholders, and with "no placeholders" in the request they block like short ones. Long square brackets
+  with other content (such as an editorial insertion in a quote) count as placeholders, as short ones always did; in the stored texts
+  of earlier runs every newly recognised long bracket was a real placeholder.
+- **V2 time shown:** while a text is changed, the time shown (web and `elapsedSeconds`) counts from the start of the running version,
+  not from when the order was created.
+- **V3:** the new sentence above.
+- **V4 (before "On for everyone"):** notes of earlier versions ("Noted for version n …", also the assumptions and facts not given
+  that were noted for version 1) are folded behind one line with their number; nothing is deleted. The fixed sentences under "About
+  version n" (what was not shown or not taken over, among them that the checks of an earlier version were not taken over, which can
+  be the reason for "Ready – please check") always stand open and are not counted in that line. Works with the keyboard and fits a
+  phone.
+- **V5 (before "On for everyone"):** the assumptions of the writer of a changed version stand under "The writer noted while making
+  your change:" instead of "You did not say this, so it was assumed:"; MCP says in `note` that `writerAssumptions` are then notes
+  about the change.
+- Recommended and done: the link above the text reads "See what changed and all versions" when the list offers "Show changes" for
+  the shown version (an earlier version has a text to compare with), otherwise "See all versions", for example after a first version
+  that ended without a text. Not done: merging a passage shown twice, showing the request next to the progress.
+
+**Finding of its own, outside gate N: background noise of the fact checker.** In the fresh first versions of the first measurement
+it flagged 3 to 9 passages per harmless text, among them the closing and the signature ("may not be backed"), and with an unchanged
+text it flagged other sentences from run to run. It is therefore unfit as a measuring instrument for new statements; for the person
+it remains an older finding of its own (backlog). The fact checker's prompt and schema stay unchanged in stage 5.

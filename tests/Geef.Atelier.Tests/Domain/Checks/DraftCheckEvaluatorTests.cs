@@ -256,6 +256,60 @@ public sealed class DraftCheckEvaluatorTests
         Assert.Equal(["[Datum]"], DraftCheckEvaluator.FindPlaceholders(draft));
     }
 
+    private const string LongPlaceholder = "[Art der Rückmeldung, z. B. über den Abschnitt unten, per E-Mail oder über das Hausaufgabenheft]";
+
+    [Fact]
+    public void A_placeholder_of_94_characters_is_found_and_listed_to_fill_in()
+    {
+        var draft = $"Bitte geben Sie uns bis zum [Datum] Bescheid ({LongPlaceholder}), ob Sie kommen.";
+
+        Assert.Equal(94, LongPlaceholder.Length - 2);
+        Assert.Equal(["[Datum]", LongPlaceholder], DraftCheckEvaluator.FindPlaceholders(draft));
+        var check = Single(DraftCheckEvaluator.Evaluate(draft, OrderConstraints.None), DraftCheckCodes.Placeholders);
+        Assert.Contains(LongPlaceholder, check.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Placeholders_are_found_up_to_300_characters_on_one_line()
+    {
+        var longest = "[" + new string('a', DraftCheckEvaluator.MaxPlaceholderChars) + "]";
+        var tooLong = "[" + new string('b', DraftCheckEvaluator.MaxPlaceholderChars + 1) + "]";
+        var twoLines = "[Name der Lehrkraft\nund Klasse]";
+
+        Assert.Equal(300, DraftCheckEvaluator.MaxPlaceholderChars);
+        Assert.Equal([longest], DraftCheckEvaluator.FindPlaceholders($"Text {longest} Text {tooLong} Text {twoLines}"));
+    }
+
+    [Fact]
+    public void Long_brackets_that_are_links_references_images_footnotes_or_check_boxes_are_still_no_placeholders()
+    {
+        var words = string.Join(' ', Enumerable.Repeat("Beschluss der Mitgliederversammlung", 5));
+        var draft = string.Join('\n',
+            $"Siehe [{words}](https://example.org/protokoll).",
+            $"Wie im [{words}][1] beschrieben.",
+            $"[{words}]: https://example.org/verweis",
+            $"Bild ![{words}](bild.png)",
+            $"Fußnote [^{words}]",
+            $"Doppelt [[{words}]]",
+            "Bitte [Datum] eintragen.");
+
+        Assert.True(words.Length > 80);
+        Assert.Equal(["[Datum]"], DraftCheckEvaluator.FindPlaceholders(draft));
+    }
+
+    [Fact]
+    public void A_long_placeholder_blocks_when_the_request_forbids_placeholders()
+    {
+        var draft = $"Wir bitten um Rückmeldung {LongPlaceholder}.";
+
+        var check = Single(
+            DraftCheckEvaluator.Evaluate(draft, OrderConstraints.None with { ForbidPlaceholders = true, ForbidPlaceholdersQuote = "ohne Platzhalter" }),
+            DraftCheckCodes.Placeholders);
+
+        Assert.False(check.Passed);
+        Assert.True(check.Blocking);
+    }
+
     [Fact]
     public void Forbidden_forms_are_found_line_by_line()
     {

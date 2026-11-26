@@ -131,7 +131,7 @@
                         {
                             <a class="btn secondary" href="@($"/orders/{changeOrderId}?change=1")" data-testid="resume-change-link">@RevisionLines.ChangeButton</a>
                         }
-                        else if (_canResume)
+                        else if (_canResume && ResumeRefusal is null)
                         {
                             <button class="btn secondary" data-testid="resume-run-button"
                                     @onclick="OpenResumeDialog">
@@ -143,6 +143,10 @@
                             Delete
                         </button>
                     </div>
+                    @if (ChangeOrderId is null && ResumeRefusal is { } refusal)
+                    {
+                        <p class="text-muted" data-testid="resume-refusal">@refusal</p>
+                    }
                 }
                 @if (_details.Run.Status is RunStatus.Completed)
                 {
@@ -336,6 +340,12 @@
         && ServiceProvider.GetService<Microsoft.Extensions.Options.IOptions<OrderOptions>>()?.Value.ReviseModeFor(run.CreatedByUser) == ReviseMode.On
             ? orderId
             : null;
+
+    /// <summary>
+    /// Why "Resume" is not offered for a run that changed an earlier version and already has its own text (<see cref="ResumeRules.ResumeRefusal"/>):
+    /// the sentence stands in place of the button, unless "Change something" is linked. <c>null</c> for every other run.
+    /// </summary>
+    string? ResumeRefusal => _details?.Run.ResumeRefusal();
 
     string ShownBriefing => _details is null ? string.Empty : BriefingSections.ForViewer(_details.Run.BriefingText, _details.Run.CreatedByUser, _viewerName);
 

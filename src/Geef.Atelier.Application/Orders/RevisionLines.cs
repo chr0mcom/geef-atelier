@@ -27,6 +27,18 @@ public static class RevisionLines
     /// <summary>Refusal for an order that does not exist or belongs to someone else.</summary>
     public const string NotFound = "This order was not found.";
 
+    /// <summary>
+    /// Refusal of "Resume" on a version that changed an earlier one and already has its own text: resuming it would make the same change a
+    /// second time to the text that already has it.
+    /// </summary>
+    public const string ResumeChangedText = "This version already has a text with this change, so it is not made again. To change the text further, use “Change something” on the order page.";
+
+    /// <summary>
+    /// Refusal of "Resume" on a version that changed an earlier one, ended without a text and was followed by a later version with a text:
+    /// resuming it would put an older change on top of the newer text.
+    /// </summary>
+    public const string ResumeLaterVersion = "A later version of this order already has a text, so this older change is not made again. To change the text, use “Change something” on the order page.";
+
     /// <summary>Shown with the earlier version while the new one is written: <c>{0}</c> is the shown version.</summary>
     public const string StillWritingFormat = "A new version is being written. Version {0} stays here until it is ready.";
 
@@ -63,6 +75,33 @@ public static class RevisionLines
     /// <summary>Like <see cref="NotGivenNotedLeadFormat"/> when the text was written with passages looked up on the web.</summary>
     public const string NotGivenNotedLeadLookedUpFormat =
         "Noted for version {0} – you had not given these facts then, so they were not assumed. Where the pages looked up cover one, the text may use it. Your change may have given them:";
+
+    /// <summary>
+    /// Lead of the assumptions the writer of a changed version noted: they were written while making the change, so they never stand under
+    /// the sentence that the person did not say them.
+    /// </summary>
+    public const string ChangeNotesLead = "The writer noted while making your change:";
+
+    /// <summary>
+    /// The line that folds the notes about earlier versions (<see cref="EarlierPointsLeadFormat"/>, <see cref="AssumptionsNotedLeadFormat"/>,
+    /// <see cref="NotGivenNotedLeadFormat"/>): <paramref name="count"/> notes, named with their version when all of them belong to one. The fixed
+    /// sentences under <see cref="EarlierNotesLeadFormat"/> (what was not shown or not taken over) are never folded and never counted here.
+    /// </summary>
+    public static string EarlierNotesSummary(int count, IEnumerable<int> versions)
+    {
+        var distinct = versions.Distinct().ToList();
+        var about = distinct is [var only] ? $"version {only}" : count == 1 ? "an earlier version" : "earlier versions";
+        return count == 1 ? $"1 note about {about}" : $"{count} notes about {about}";
+    }
+
+    /// <summary>Link above the text to the list of versions.</summary>
+    public const string SeeVersions = "See all versions";
+
+    /// <summary>
+    /// Like <see cref="SeeVersions"/> when the list offers “Show changes” for the shown version, that is when an earlier version has a text
+    /// to compare with; otherwise (for example after a first version that ended without a text) the link stays <see cref="SeeVersions"/>.
+    /// </summary>
+    public const string SeeChangesAndVersions = "See what changed and all versions";
 
     /// <summary>Second line of the banner after a change could not be finished, when the shown version still has open points.</summary>
     public const string EarlierStillToCheck = "This version still needs your attention before you use it – see “Open points”.";

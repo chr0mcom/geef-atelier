@@ -5,35 +5,67 @@
 {
     <section class="order-block order-assumptions" aria-labelledby="order-assumptions-title" data-testid="order-assumptions">
         <h2 id="order-assumptions-title">Assumptions</h2>
-        @if (Noted.Count > 0)
+        @if (Result.AssumptionsVersion is int noted)
         {
-            <p data-testid="order-assumptions-noted-lead">@string.Format(CultureInfo.InvariantCulture, RevisionLines.AssumptionsNotedLeadFormat, Result.AssumptionsVersion)</p>
-            <ul>
-                @foreach (var line in Noted)
-                {
-                    <li data-testid="order-assumption" data-noted-for="@Result.AssumptionsVersion" lang="@Language">@line</li>
-                }
-            </ul>
+            @if (Current.Count > 0)
+            {
+                <p data-testid="order-assumptions-change-lead">@RevisionLines.ChangeNotesLead</p>
+                <ul>
+                    @foreach (var line in Current)
+                    {
+                        <li data-testid="order-assumption" lang="@Language">@line</li>
+                    }
+                </ul>
+            }
+            @if (Noted.Count + NotGiven.Count > 0)
+            {
+                <details class="order-earlier" data-testid="order-earlier-details">
+                    <summary>@RevisionLines.EarlierNotesSummary(Noted.Count + NotGiven.Count, [noted])</summary>
+                    @if (Noted.Count > 0)
+                    {
+                        <p data-testid="order-assumptions-noted-lead">@string.Format(CultureInfo.InvariantCulture, RevisionLines.AssumptionsNotedLeadFormat, noted)</p>
+                        <ul>
+                            @foreach (var line in Noted)
+                            {
+                                <li data-testid="order-assumption" data-noted-for="@noted" lang="@Language">@line</li>
+                            }
+                        </ul>
+                    }
+                    @if (NotGiven.Count > 0)
+                    {
+                        <p data-testid="order-not-given-lead">@NotGivenLead</p>
+                        <ul>
+                            @foreach (var line in NotGiven)
+                            {
+                                <li data-testid="order-not-given" lang="@Language">@line</li>
+                            }
+                        </ul>
+                    }
+                </details>
+            }
         }
-        @if (Current.Count > 0)
+        else
         {
-            <p>You did not say this, so it was assumed:</p>
-            <ul>
-                @foreach (var line in Current)
-                {
-                    <li data-testid="order-assumption" lang="@Language">@line</li>
-                }
-            </ul>
-        }
-        @if (NotGiven.Count > 0)
-        {
-            <p data-testid="order-not-given-lead">@NotGivenLead</p>
-            <ul>
-                @foreach (var line in NotGiven)
-                {
-                    <li data-testid="order-not-given" lang="@Language">@line</li>
-                }
-            </ul>
+            @if (Current.Count > 0)
+            {
+                <p>You did not say this, so it was assumed:</p>
+                <ul>
+                    @foreach (var line in Current)
+                    {
+                        <li data-testid="order-assumption" lang="@Language">@line</li>
+                    }
+                </ul>
+            }
+            @if (NotGiven.Count > 0)
+            {
+                <p data-testid="order-not-given-lead">@NotGivenLead</p>
+                <ul>
+                    @foreach (var line in NotGiven)
+                    {
+                        <li data-testid="order-not-given" lang="@Language">@line</li>
+                    }
+                </ul>
+            }
         }
     </section>
 }
@@ -43,7 +75,9 @@
     /// The delivered result with the assumptions of the clarifier that nobody corrected and those of the writer; assumptions about
     /// facts that the writer got only as "not given by the person" are listed apart, because the text was not written with them. When the
     /// shown version changed an earlier one (<see cref="OrderResult.AssumptionsVersion"/>), the assumptions of the clarifier and the facts not
-    /// given are said to be noted for that version, because the change may have settled them; nothing is left out.
+    /// given are said to be noted for that version, because the change may have settled them, and they are folded behind one line with their
+    /// number (<see cref="RevisionLines.EarlierNotesSummary"/>); the assumptions the writer of that version noted stand under
+    /// <see cref="RevisionLines.ChangeNotesLead"/>, never under the sentence that the person did not say them. Nothing is left out.
     /// </summary>
     [Parameter, EditorRequired] public OrderResult Result { get; set; } = null!;
 

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Writing;
 
@@ -114,7 +115,8 @@ public enum FactFilterDecision
 /// the report of an earlier version (<c>null</c> for one of this version). <see cref="BeforeLastChange"/> marks a finding against an
 /// instruction in a run that changes an earlier version whose instruction does not stand in the newest change (it stands in the request,
 /// the answers of the person or the assistant, the About me details or an earlier change): the newest change may have replaced it, so it
-/// never blocks; written only when true. No quote of a finding ever holds the mark of a change (<see cref="FactChange.WithoutMarks"/>).
+/// never blocks; written only when true. In a run that changes an earlier version no quote of a finding holds the mark of a change
+/// (<see cref="FactChange.WithoutMarks"/>); in the first run of an order the quotes stay as the check gave them.
 /// </summary>
 public sealed record FactFinding(string Id, FactFindingKind Kind, string? TextQuote, string WhatIsWrong, string? InstructionQuote,
     string? MaterialQuote, string? MaterialQuote2, string? MaterialFile, InstructionOrigin? Origin, bool Blocking, QuoteMatchKind Match,
@@ -134,8 +136,9 @@ public sealed record FactFilterResult(IReadOnlyList<FactFinding> Findings, IRead
 /// looked up on the web (<see cref="MaterialPart.LookedUp"/>) never blocks and never takes the place of another finding at the same
 /// passage of the text (D-074). In a run that changes an earlier version (<see cref="FactMaterial.IsRevision"/>) a finding against an
 /// instruction blocks only when its instruction stands in the newest change (also when it stands elsewhere as well); any other is kept
-/// as a hint with <see cref="FactFinding.BeforeLastChange"/>. Every quote is taken without the marks of the changes
-/// (<see cref="FactChange.WithoutMarks"/>) before it is looked up or kept, so a mark never counts as a word of the person.
+/// as a hint with <see cref="FactFinding.BeforeLastChange"/>. In such a run every quote is taken without the marks of the changes
+/// (<see cref="FactChange.WithoutMarks"/>) before it is looked up or kept, so a mark never counts as a word of the person; in the first run
+/// of an order no mark is written, and the quotes stay as the check gave them (a quote such as "Tarif Version 2) …" keeps its words).
 /// </summary>
 public static class FactFindingFilter
 {
@@ -157,7 +160,12 @@ public static class FactFindingFilter
     /// <summary>Shortest material quote of a source conflict or a replacing passage; a stated total such as "Summe 62 €" is short.</summary>
     public const int MinMaterialChars = 5;
 
-    private const int MaxPlaceholderChars = 200;
+    /// <summary>
+    /// Longest placeholder, in characters, inside which a passage is dropped as a placeholder (<see cref="FactFilterDecision.DroppedPlaceholder"/>).
+    /// It stays below the limit by which placeholders are listed (<see cref="DraftCheckEvaluator.MaxPlaceholderChars"/>) on purpose: a passage
+    /// in a longer bracket is kept, because a needless point the person can dismiss is better than a claim that silently disappears.
+    /// </summary>
+    public const int MaxPlaceholderChars = 200;
 
     /// <summary>Applies the rules in their fixed order; every decision lands in the trace.</summary>
     public static FactFilterResult Apply(IReadOnlyList<ProposedFactFinding> proposed, string draft, FactMaterial material)
@@ -175,14 +183,14 @@ public static class FactFindingFilter
 
         for (var index = 0; index < proposed.Count; index++)
         {
-            var finding = proposed[index] is { } raw
+            var finding = material.IsRevision && proposed[index] is { } raw
                 ? raw with
                 {
                     InstructionQuote = FactChange.WithoutMarks(raw.InstructionQuote),
                     MaterialQuote = FactChange.WithoutMarks(raw.MaterialQuote),
                     MaterialQuote2 = FactChange.WithoutMarks(raw.MaterialQuote2),
                 }
-                : null;
+                : proposed[index];
             var (decision, result) = finding is null
                 ? (FactFilterDecision.DroppedTooShort, (FactFinding?)null)
                 : finding.Kind == FactFindingKind.SourceConflict

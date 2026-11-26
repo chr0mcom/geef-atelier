@@ -99,16 +99,11 @@
     readonly HashSet<int> _loading = [];
     readonly Dictionary<int, string?> _texts = [];
 
-    IReadOnlyList<OrderRunView> Listed => Runs
-        .Where(r => r.Kind == RunKind.Standard && r.Version is not null)
-        .GroupBy(r => r.Version!.Value)
-        .Select(g => g.OrderByDescending(r => r.CreatedAt).First())
-        .OrderByDescending(r => r.Version)
-        .ToList();
+    IReadOnlyList<OrderRunView> Listed => Runs.Listed();
 
-    bool HasText(OrderRunView run) => run.WordCount is > 0 || run.Version == ShownVersion;
+    bool HasText(OrderRunView run) => run.HasText(ShownVersion);
 
-    int? BaseOf(int version) => Listed.Where(r => r.Version < version && HasText(r)).Select(r => r.Version).FirstOrDefault();
+    int? BaseOf(int version) => Runs.ComparedWith(version, ShownVersion);
 
     static string Line(OrderRunView run)
     {

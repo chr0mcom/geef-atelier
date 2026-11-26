@@ -8,7 +8,7 @@ namespace Geef.Atelier.Mcp.Models;
 /// </param>
 /// <param name="Done">True when the order is finished; then call <c>get_order_result</c>.</param>
 /// <param name="Step">The current step in plain English, for example <c>Writing</c>.</param>
-/// <param name="ElapsedSeconds">Seconds since the order was created or until it finished.</param>
+/// <param name="ElapsedSeconds">Seconds since the order was created, or since the current version was started when it changes an earlier version; until it finished.</param>
 /// <param name="Version">Version of the current run of the order, if any.</param>
 /// <param name="RunId">Id of the current run, if any.</param>
 /// <param name="Warnings">Problems the order worked around; empty when none.</param>

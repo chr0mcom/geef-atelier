@@ -176,6 +176,36 @@ public sealed class RunServiceResumeTests
         Assert.Null(capturing.LastParentRunId);
     }
 
+    [Theory]
+    [InlineData(RunStatus.Failed, null)]
+    [InlineData(RunStatus.Aborted, "alice")]
+    public async Task ResumeRunAsync_ChangeThatAlreadyHasItsText_IsRejectedWithoutCreatingARun(RunStatus status, string? requestingUser)
+    {
+        var parentId  = Guid.NewGuid();
+        var parent    = MakeOrderRun(parentId, status, "changed text with open points", 2, "Make it shorter.");
+        var capturing = new CapturingPersistenceService();
+        var svc       = MakeService(capturing, new SingleDetailsRepository(parent, []));
+
+        var ex = await Assert.ThrowsAsync<RunNotResumableException>(() =>
+            svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: true, MaxIterationsOverride: null), requestingUser));
+
+        Assert.Equal(Geef.Atelier.Application.Orders.RevisionLines.ResumeChangedText, ex.Message);
+        Assert.Null(capturing.LastParentRunId);
+    }
+
+    [Fact]
+    public async Task ResumeRunAsync_RunWithTextWithoutChange_IsResumedAsBefore()
+    {
+        var parentId  = Guid.NewGuid();
+        var parent    = MakeOrderRun(parentId, RunStatus.Failed, "first text with open points", 1, null);
+        var capturing = new CapturingPersistenceService();
+        var svc       = MakeService(capturing, new SingleDetailsRepository(parent, []));
+
+        await svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: true, MaxIterationsOverride: null), "alice");
+
+        Assert.Equal((parentId, "first text with open points"), (capturing.LastParentRunId, capturing.LastSeedDraftText));
+    }
+
     // ── MaxIterationsOverride ─────────────────────────────────────────────
 
     [Fact]
@@ -282,6 +312,15 @@ public sealed class RunServiceResumeTests
             Id = id, CreatedAt = DateTimeOffset.UtcNow, Status = status,
             BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = createdByUser,
             CrewSnapshot = TestCrewSnapshots.KlassikJson, FinalText = finalText,
+        };
+
+    private static RunEntity MakeOrderRun(Guid id, RunStatus status, string finalText, int version, string? revisionHint) =>
+        new RunEntity
+        {
+            Id = id, CreatedAt = DateTimeOffset.UtcNow, Status = status,
+            BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = "alice",
+            CrewSnapshot = TestCrewSnapshots.KlassikJson, FinalText = finalText,
+            OrderId = Guid.NewGuid(), OrderVersion = version, RevisionHint = revisionHint,
         };
 
     private static RunEntity MakeRunWithSnapshot(Guid id, RunStatus status, string? createdByUser, string? snapshotJson) =>

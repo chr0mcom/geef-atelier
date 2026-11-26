@@ -34,6 +34,15 @@ Decisions of the client that come on top of the contract (each one stricter):
 - N5 needs ``state`` ``stopped``; a change that failed on its own does not show that stopping works.
 - A local case whose base text has fewer than 4 paragraphs is not evaluable for N1 (with ``paragraphs − 2`` such a text could
   be rewritten almost or completely).
+- Each change counts once (G1): every snapshot stands in at most one case (as base or as new version, the stop included), every
+  ``(order, base, new)`` in at most one case, base and new of a case are two snapshots, and no two real changes show the same new
+  version of the same order. Otherwise the plan is not evaluable. In a chain the base of the next change is therefore a snapshot of
+  its own, taken right before that change (for example ``v2`` closes the first change, ``v2-basis`` opens the second).
+- In N1 and N2 the text has to have changed (G2): a new version whose text equals the base after collapsing white space fails its
+  criterion. That is a failure and not "not evaluable": the case has all its data, and the data show that the change was not made.
+  "Not evaluable" would only ask for another case and let a run that ignores the request disappear from the record; a failure stays
+  in the report and brings the follow-up of contract 8 (one round at ``RevisionInstruction``). Shorter and Longer cannot pass with
+  an unchanged text anyway (their word ranges exclude 100 %).
 
 How this tool reads them (its own code, independent of the C# ``ParagraphDiff``): a paragraph is a block between blank lines,
 compared after collapsing white space, case and quote marks unchanged; unchanged paragraphs are the longest common subsequence of
@@ -42,7 +51,7 @@ it stands there as whole words after normalising white space, invisible characte
 Atelier's ``QuoteVerifier`` does). A passage of v1 appears in v2 when a passage of v2 (of any kind) contains its quote. A point of
 the writer appears in v2 under ``openPoints`` or under ``earlierOpenPoints`` (kind ``openPoint``) with the version of v1; points
 and assumptions are compared without case, closing punctuation and one leading article. Placeholders are text in square brackets
-(2 to 80 characters, one line), except links, images, check boxes and footnotes.
+(2 to 300 characters, one line, as in the Atelier since gate N), except links, images, check boxes and footnotes.
 
 Never passed without data: a case counts only with readable snapshots of the planned order, a base with a text and, after a change,
 a text of a newer version. A criterion with no such case (Shorter, Longer, the first local case, every tone case) is not
@@ -66,11 +75,11 @@ Plan (JSON, outside Git; the order of the cases decides which local case is the 
       {"case": "local-date", "kind": "local", "order": "<orderId>", "channel": "web", "base": "v1", "new": "v2",
        "expect": "<new detail, word for word>"},
       {"case": "tone-formal", "kind": "tone", "order": "<orderId>", "channel": "mcp", "base": "v1", "new": "v2"},
-      {"case": "stop", "kind": "stop", "order": "<orderId>", "channel": "web", "base": "v2", "new": "after-stop",
+      {"case": "stop", "kind": "stop", "order": "<orderId>", "channel": "web", "base": "v2-basis", "new": "after-stop",
        "stopped_version": 3}
     ]}
 
-(shortened: a complete plan has 8 changes and the stop)
+(shortened: a complete plan has 8 changes and the stop; each label of an order stands in one case only)
 
 ``kind`` is ``local``, ``tone``, ``shorter``, ``longer`` or ``stop``; ``channel`` ``web`` or ``mcp``.
 
@@ -125,7 +134,7 @@ QUOTES = str.maketrans({"„": '"', "“": '"', "”": '"', "«": '"', "»": '"'
                         "‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "―": "-", "−": "-"})
 ORDER_ID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$")
-PLACEHOLDER_RE = re.compile(r"\[[^\[\]\n]{2,80}\]")
+PLACEHOLDER_RE = re.compile(r"\[[^\[\]\n]{2,300}\]")
 FOOTNOTE_RE = re.compile(r"^[\d\s,;–-]+$|^\^")
 EXPORT_FILE_VERSION_RE = re.compile(r"-v(\d+)\.md$")
 FOLLOW_UP = {
@@ -290,9 +299,41 @@ def load_plan(path: Path) -> list[dict]:
     return cases
 
 
-def plan_problems(cases: list[dict]) -> list[str]:
-    """Where the plan differs from the data of gate N (contract 8)."""
+def reuse_problems(cases: list[dict]) -> list[str]:
+    """G1 in the plan: a snapshot or an ``(order, base, new)`` that stands in more than one case, or base and new alike."""
     problems = []
+    uses: dict[tuple[str, str], list[str]] = {}
+    triples: dict[tuple[str, str, str], list[str]] = {}
+    for case in cases:
+        order = case["order"].lower()
+        if case["base"] == case["new"]:
+            problems.append(f"Fall {case['case']}: Ausgangsfassung und neue Fassung sind derselbe Schnappschuss {case['base']}")
+        for label in dict.fromkeys((case["base"], case["new"])):
+            uses.setdefault((order, label), []).append(case["case"])
+        triples.setdefault((order, case["base"], case["new"]), []).append(case["case"])
+    for (order, base, new), names in triples.items():
+        if len(names) > 1:
+            problems.append(f"dieselbe Nachbesserung ({order}, {base} → {new}) in mehreren Fällen: {', '.join(names)}")
+    for (order, label), names in uses.items():
+        if len(names) > 1:
+            problems.append(f"Schnappschuss {label} von {order} in mehreren Fällen: {', '.join(names)} (je Fall eigene "
+                            "Schnappschüsse; die Ausgangsfassung einer Folgeänderung direkt vor ihr neu aufnehmen)")
+    return problems
+
+
+def same_version_problems(rows: list[dict]) -> list[str]:
+    """G1 in the data: two real changes whose new versions are the same version of the same order."""
+    seen: dict[tuple[str, int], list[str]] = {}
+    for row in rows:
+        if row["kind"] != STOP_KIND and "change" in row:
+            seen.setdefault((row["order"].lower(), row["change"]["new_version"]), []).append(row["case"])
+    return [f"dieselbe neue Fassung (Auftrag {order}, Version {version}) in mehreren Fällen: {', '.join(names)}"
+            for (order, version), names in seen.items() if len(names) > 1]
+
+
+def plan_problems(cases: list[dict]) -> list[str]:
+    """Where the plan differs from the data of gate N (contract 8), including G1 (each change counts once)."""
+    problems = reuse_problems(cases)
     kinds = Counter(c["kind"] for c in cases)
     if unknown := sorted(set(kinds) - set(MIN_KINDS) - {STOP_KIND}):
         problems.append(f"unbekannte Art: {', '.join(unknown)}")
@@ -455,6 +496,7 @@ def analyse_change(case: dict, base: dict, new: dict) -> dict:
               "words": {"base": base_words, "new": new_words, "ratio": _ratio(base_words, new_words),
                         "api_base": base_result.get("wordCount"), "api_new": new_result.get("wordCount")},
               "paragraphs": paragraph_diff(base_text, new_text),
+              "text_changed": collapse(base_text) != collapse(new_text),
               "fact_check": {"base": (base_result.get("factCheck") or {}).get("state")
                              if isinstance(base_result.get("factCheck"), dict) else None,
                              "new": (new_result.get("factCheck") or {}).get("state")
@@ -536,6 +578,7 @@ def evaluate(cases: list[dict], root: Path) -> dict:
                     row["change"] = analyse_change(case, base, new)
         rows.append(row)
 
+    problems += same_version_problems(rows)
     changes = [r for r in rows if r["kind"] != STOP_KIND]
     with_text = sum(1 for r in changes if r["has_text"])
     if with_text < MIN_WITH_TEXT:
@@ -552,6 +595,8 @@ def evaluate(cases: list[dict], root: Path) -> dict:
     for row in (r for r in locals_ if r["has_text"]):
         change = row["change"]
         para, ratio = change["paragraphs"], change["words"]["ratio"]
+        if not change["text_changed"]:
+            n1["failures"].append(f"{row['case']}: Text unverändert, die Änderung wurde nicht gemacht")
         if para["old"] < MIN_LOCAL_PARAGRAPHS:
             n1["problems"].append(f"{row['case']}: Ausgangstext hat nur {para['old']} Absätze (mindestens {MIN_LOCAL_PARAGRAPHS}), "
                                   "die Absatzschwelle belegt nichts")
@@ -573,6 +618,8 @@ def evaluate(cases: list[dict], root: Path) -> dict:
     new_total = 0
     for row in tones:
         change = row["change"]
+        if not change["text_changed"]:
+            n2["failures"].append(f"{row['case']}: Text unverändert, die Änderung wurde nicht gemacht")
         if not _within(change["words"]["ratio"], 1 - WORD_TOLERANCE, 1 + WORD_TOLERANCE):
             n2["failures"].append(f"{row['case']}: Wörter {change['words']['base']} → {change['words']['new']} (±15 %)")
         if change["new_not_backed"] is None:

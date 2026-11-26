@@ -26,7 +26,14 @@ public static partial class DraftCheckEvaluator
     /// <summary>Added to the length finding when it is the only blocking problem.</summary>
     public const string KeepEverythingElse = "Keep everything else unchanged.";
 
-    [GeneratedRegex(@"\[[^\[\]\n]{2,80}\]", RegexOptions.CultureInvariant)]
+    /// <summary>
+    /// Longest placeholder in characters between the brackets that <see cref="FindPlaceholders"/> lists; a placeholder stays on one line.
+    /// The fact check drops a passage inside a placeholder only up to a lower limit
+    /// (<see cref="FactCheck.FactFindingFilter.MaxPlaceholderChars"/>), so a claim in a longer bracket is never lost.
+    /// </summary>
+    public const int MaxPlaceholderChars = 300;
+
+    [GeneratedRegex(@"\[[^\[\]\n]{2,300}\]", RegexOptions.CultureInvariant)]
     private static partial Regex PlaceholderPattern();
 
     [GeneratedRegex(@"^\s*[-*•]\s+", RegexOptions.CultureInvariant)]
@@ -163,7 +170,10 @@ public static partial class DraftCheckEvaluator
         return results;
     }
 
-    /// <summary>Finds placeholders in square brackets, ignoring Markdown links, footnotes and check boxes.</summary>
+    /// <summary>
+    /// Finds placeholders in square brackets (2 to <see cref="MaxPlaceholderChars"/> characters on one line), ignoring Markdown links and
+    /// references, images, footnotes, check boxes and double brackets, whatever their length.
+    /// </summary>
     public static IReadOnlyList<string> FindPlaceholders(string draft)
     {
         if (string.IsNullOrEmpty(draft))

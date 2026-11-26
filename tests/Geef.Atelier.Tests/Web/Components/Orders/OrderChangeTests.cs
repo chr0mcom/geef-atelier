@@ -233,9 +233,17 @@ public sealed class OrderChangeTests : TestContext
             cut.Find("[data-testid='order-assumptions-noted-lead']").TextContent);
         Assert.Equal("Noted for version 1 – you had not given these facts then, so they were left open instead of assumed. Your change may have given them:",
             cut.Find("[data-testid='order-not-given-lead']").TextContent);
-        Assert.Equal(["Die Eltern werden mit Sie angesprochen.", "Die Länge ist etwa eine halbe Seite."], cut.FindAll("[data-testid='order-assumption']").Select(a => a.TextContent));
-        Assert.Equal("1", cut.FindAll("[data-testid='order-assumption']")[0].GetAttribute("data-noted-for"));
-        Assert.Null(cut.FindAll("[data-testid='order-assumption']")[1].GetAttribute("data-noted-for"));
+        Assert.Equal(["Die Länge ist etwa eine halbe Seite.", "Die Eltern werden mit Sie angesprochen."], cut.FindAll("[data-testid='order-assumption']").Select(a => a.TextContent));
+        Assert.Equal("The writer noted while making your change:", cut.Find("[data-testid='order-assumptions-change-lead']").TextContent);
+        Assert.DoesNotContain("You did not say this, so it was assumed:", cut.Find("[data-testid='order-assumptions']").TextContent, StringComparison.Ordinal);
+        var collapsed = cut.Find("[data-testid='order-assumptions'] [data-testid='order-earlier-details']");
+        Assert.False(collapsed.HasAttribute("open"));
+        Assert.Equal("2 notes about version 1", collapsed.QuerySelector("summary")!.TextContent);
+        Assert.NotNull(collapsed.QuerySelector("[data-testid='order-assumptions-noted-lead']"));
+        Assert.NotNull(collapsed.QuerySelector("[data-testid='order-not-given']"));
+        Assert.Null(collapsed.QuerySelector("[data-testid='order-assumptions-change-lead']"));
+        Assert.Null(cut.FindAll("[data-testid='order-assumption']")[0].GetAttribute("data-noted-for"));
+        Assert.Equal("1", cut.FindAll("[data-testid='order-assumption']")[1].GetAttribute("data-noted-for"));
         Assert.Equal(["Das Treffen ist in Raum A."], cut.FindAll("[data-testid='order-not-given']").Select(a => a.TextContent));
         Assert.DoesNotContain("You did not give these facts", cut.Markup);
         var earlier = cut.Find("[data-testid='order-earlier-point']");
@@ -257,6 +265,96 @@ public sealed class OrderChangeTests : TestContext
 
         Assert.Equal("You did not give these facts, so they were left open instead of assumed:", cut.Find("[data-testid='order-not-given-lead']").TextContent);
         Assert.Empty(cut.FindAll("[data-testid='order-assumptions-noted-lead']"));
+        Assert.Empty(cut.FindAll("[data-testid='order-earlier-details']"));
+        Assert.Empty(cut.FindAll("[data-testid='order-assumptions-change-lead']"));
+    }
+
+    [Fact]
+    public void Notes_of_earlier_versions_are_folded_behind_one_line_with_their_number_and_none_is_left_out()
+    {
+        var view = Delivered(RunView(2, RunStatus.Completed, RunOutcome.Converged, 13, Asked, 5), RunView(3, RunStatus.Completed, RunOutcome.Converged, 12, "Shorter", 9));
+        _orders.SetResult(Result(view, 3, 3, SecondText) with
+        {
+            WriterOpenPoints = ["Der Raum fehlt noch."],
+            EarlierOpenPoints =
+            [
+                new OrderEarlierPoint(1, "Es fehlt, bis wann man sich anmelden soll."),
+                new OrderEarlierPoint(1, "Die Anrede ist Sie.", EarlierPointKind.Assumption),
+                new OrderEarlierPoint(2, "Der Name der Lehrkraft fehlt."),
+                new OrderEarlierPoint(1, "1 flagged passage could not be checked or listed.", EarlierPointKind.Note),
+            ],
+        });
+
+        var cut = Render(view);
+
+        var open = cut.Find("[data-testid='order-open-points']");
+        var details = open.QuerySelector("[data-testid='order-earlier-details']")!;
+        Assert.False(details.HasAttribute("open"));
+        var summary = details.QuerySelector("summary")!;
+        Assert.Same(details.FirstElementChild, summary);
+        Assert.Equal("3 notes about earlier versions", summary.TextContent);
+        Assert.Equal(
+            ["Es fehlt, bis wann man sich anmelden soll.", "Assumed: Die Anrede ist Sie.", "Der Name der Lehrkraft fehlt."],
+            details.QuerySelectorAll("[data-testid='order-earlier-point']").Select(p => p.TextContent));
+        Assert.Equal(2, details.QuerySelectorAll("[data-testid='order-earlier-lead']").Length);
+        Assert.Null(details.QuerySelector("[data-testid='order-earlier-notes-lead']"));
+        var note = open.QuerySelector("[data-testid='order-earlier-notes'] [data-testid='order-earlier-point']")!;
+        Assert.Equal("1 flagged passage could not be checked or listed.", note.TextContent);
+        Assert.Null(note.Closest("details"));
+        Assert.Equal("About version 1:", open.QuerySelector("[data-testid='order-earlier-notes-lead']")!.TextContent);
+        Assert.Equal(4, open.QuerySelectorAll("[data-testid='order-earlier-point']").Length);
+        Assert.Equal("Der Raum fehlt noch.", open.QuerySelector("[data-testid='order-writer-open-point']")!.TextContent);
+        Assert.Null(open.QuerySelector("[data-testid='order-writer-open']")!.Closest("details"));
+        HonestResultData.AssertPlain(open.ChildNodes);
+    }
+
+    [Fact]
+    public void The_sentence_that_the_checks_of_the_earlier_version_were_not_taken_over_always_stands_open()
+    {
+        var view = Delivered(RunView(2, RunStatus.Completed, RunOutcome.Converged, 13, Asked, 5));
+        var notTakenOver = "The checks of version 1 were not taken over, so anything they left open was not checked again.";
+        _orders.SetResult(Result(view, 2, 2, SecondText) with { EarlierOpenPoints = [new OrderEarlierPoint(1, notTakenOver, EarlierPointKind.Note)] });
+
+        var cut = Render(view);
+
+        var note = cut.Find("[data-testid='order-open-points'] [data-testid='order-earlier-notes'] [data-testid='order-earlier-point']");
+        Assert.Equal(notTakenOver, note.TextContent);
+        Assert.Null(note.Closest("details"));
+        Assert.Empty(cut.FindAll("[data-testid='order-earlier-details']"));
+    }
+
+    [Fact]
+    public void One_earlier_note_is_named_in_the_singular()
+    {
+        var view = Delivered(RunView(2, RunStatus.Completed, RunOutcome.Converged, 13, Asked, 5));
+        _orders.SetResult(Result(view, 2, 2, SecondText) with { EarlierOpenPoints = [new OrderEarlierPoint(1, "Es fehlt, bis wann man sich anmelden soll.")] });
+
+        var cut = Render(view);
+
+        Assert.Equal("1 note about version 1", cut.Find("[data-testid='order-earlier-details'] summary").TextContent);
+    }
+
+    [Fact]
+    public void A_version_that_is_not_newer_than_the_first_keeps_the_plain_link_to_the_versions()
+    {
+        var view = AddOrder(OrderDisplayState.Working, [RunView(1, RunStatus.Completed, RunOutcome.Converged, 14), RunView(2, RunStatus.Running, null, null, Asked, 5)]);
+        _orders.SetResult(Result(view, 1, 2, FirstText, string.Format(RevisionLines.StillWritingFormat, 1)));
+
+        var cut = Render(view);
+
+        Assert.Equal("See all versions", cut.Find("[data-testid='order-versions-link']").TextContent);
+    }
+
+    [Fact]
+    public void A_second_version_after_a_first_one_without_text_keeps_the_plain_link_because_there_is_nothing_to_compare()
+    {
+        var view = AddOrder(OrderDisplayState.Delivered, [RunView(1, RunStatus.Failed, RunOutcome.Failed, null), RunView(2, RunStatus.Completed, RunOutcome.Converged, 14, minutes: 5)]);
+        _orders.SetResult(Result(view, 2, 2, FirstText));
+
+        var cut = Render(view);
+
+        Assert.Equal("See all versions", cut.Find("[data-testid='order-versions-link']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='order-version-toggle']"));
     }
 
     [Fact]
@@ -359,6 +457,7 @@ public sealed class OrderChangeTests : TestContext
 
         Assert.Equal("This is version 2, the newest.", cut.Find("[data-testid='order-version-now'] span").TextContent);
         Assert.Equal($"/orders/{view.OrderId}#order-versions", cut.Find("[data-testid='order-versions-link']").GetAttribute("href"));
+        Assert.Equal("See what changed and all versions", cut.Find("[data-testid='order-versions-link']").TextContent);
         Assert.Equal("Versions", cut.Find("[data-testid='order-versions'] h2").TextContent);
         var versions = cut.FindAll("[data-testid='order-version']");
         Assert.Equal(["2", "1"], versions.Select(v => v.GetAttribute("data-version")));

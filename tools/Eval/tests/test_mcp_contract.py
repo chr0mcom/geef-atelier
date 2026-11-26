@@ -450,3 +450,54 @@ def test_md_export_with_byte_order_mark_matches_its_text():
     export = dict(md_export("Text zwei"), contentBase64=base64.b64encode("﻿Text zwei".encode()).decode())
     report = mc.evaluate_gate_m(contract_tools(), gate_m_calls(c9=call(9, "export_order", {"orderId": A, "format": "md"}, export)))
     assert report["verdict"] == "passed", report["failures"]
+
+
+def docx_call(seq, file_name="rundbrief-v2.docx", **arguments):
+    return call(seq, "export_order", {"orderId": A, "format": "docx", **arguments}, dict(docx_export(), fileName=file_name))
+
+
+def test_gate_m_docx_step_never_counts_an_export_of_version_1():
+    report = mc.evaluate_gate_m(contract_tools(), gate_m_calls(c10=docx_call(10, "rundbrief-v1.docx", version=1)))
+    assert report["verdict"] == "not_evaluable", (report["failures"], report["problems"])
+    assert report["steps"]["export_order_docx"] == {"found": False}
+    rows = gate_m_calls(c10=docx_call(10, "rundbrief-v1.docx", version=1)) + [docx_call(15)]
+    assert mc.evaluate_gate_m(contract_tools(), rows)["verdict"] == "passed"
+
+
+def test_gate_m_docx_step_accepts_version_2_named_explicitly():
+    report = mc.evaluate_gate_m(contract_tools(), gate_m_calls(c10=docx_call(10, version=2)))
+    assert report["verdict"] == "passed", (report["failures"], report["problems"])
+    assert report["steps"]["export_order_docx"] == {"found": True, "file_version": 2}
+
+
+@pytest.mark.parametrize("row", [
+    docx_call(10, "rundbrief-v1.docx"),
+    docx_call(10, "rundbrief-v1.docx", version=2),
+    call(9, "export_order", {"orderId": A, "format": "md"}, dict(md_export("Text zwei"), fileName="rundbrief-v1.md")),
+])
+def test_gate_m_fails_when_an_export_of_version_2_names_another_version(row):
+    report = mc.evaluate_gate_m(contract_tools(), gate_m_calls(**{f"c{row['seq']}": row}))
+    assert report["verdict"] == "failed"
+    assert any(f"(#{row['seq']}): Datei gehört zu Version 1, nicht 2" in f for f in report["failures"]), report["failures"]
+
+
+def test_gate_m_later_docx_export_without_version_must_be_version_2():
+    rows = gate_m_calls() + [docx_call(15, "rundbrief-v1.docx")]
+    report = mc.evaluate_gate_m(contract_tools(), rows)
+    assert report["verdict"] == "failed"
+    assert any("#15" in f for f in report["failures"])
+    rows = gate_m_calls() + [docx_call(15, "rundbrief-v1.docx", version=1)]
+    assert mc.evaluate_gate_m(contract_tools(), rows)["verdict"] == "passed"
+
+
+def test_gate_m_docx_step_without_a_version_in_its_file_name_is_not_evaluable():
+    report = mc.evaluate_gate_m(contract_tools(), gate_m_calls(c10=docx_call(10, "rundbrief.docx")))
+    assert report["verdict"] == "not_evaluable", (report["failures"], report["problems"])
+    assert any("Dateiname nennt keine Version" in p for p in report["problems"]), report["problems"]
+
+
+def test_export_file_version_reads_the_version_of_the_file_name():
+    assert mc.export_file_version(docx_call(1, "a-b-v12.docx")) == 12
+    assert mc.export_file_version(docx_call(1, "rundbrief-v2.docx.txt")) is None
+    assert mc.export_file_version(docx_call(1, "rundbrief.docx")) is None
+    assert mc.export_file_version(call(1, "export_order", {}, None)) is None

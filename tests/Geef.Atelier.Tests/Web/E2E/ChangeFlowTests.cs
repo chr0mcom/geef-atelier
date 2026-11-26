@@ -153,6 +153,51 @@ public sealed class ChangeFlowTests(PlaywrightFixture pw, PostgresFixture pg) : 
         }
     }
 
+    [Theory]
+    [InlineData("noir")]
+    [InlineData("vellum")]
+    public async Task Notes_of_earlier_versions_open_with_the_keyboard_and_fit_a_phone(string theme)
+    {
+        var runs = new[]
+        {
+            RunView(1, RunStatus.Completed, RunOutcome.Converged, 40),
+            RunView(2, RunStatus.Completed, RunOutcome.Converged, 40, "The meeting is on 5 May, not 12 May."),
+        };
+        var view = _orders.Add(User, OrderTestData.View(OrderDisplayState.Delivered, hasText: true) with { Runs = runs, CurrentRun = runs[^1] });
+        _orders.SetResult(OrderTestData.Result(view, text: SecondText) with
+        {
+            Version = 2,
+            LatestVersion = 2,
+            AssumptionsVersion = 1,
+            WriterAssumptions = [$"Der Text wurde nur beim Datum geändert. {LongWord}."],
+            EarlierOpenPoints = Enumerable.Range(1, 12).Select(i => new OrderEarlierPoint(1, $"Punkt {i}: Der Name der Klassenlehrkraft fehlt noch. {LongWord}.")).ToList(),
+        });
+        _exports.Texts[(view.OrderId, 1)] = FirstText;
+        _exports.Texts[(view.OrderId, 2)] = SecondText;
+        var page = await OpenAsync(view.OrderId, theme, 360);
+        try
+        {
+            var details = page.Locator("[data-testid='order-open-points'] [data-testid='order-earlier-details']");
+            var summary = details.Locator("summary");
+            Assert.Equal("12 notes about version 1", (await summary.TextContentAsync())?.Trim());
+            Assert.False(await details.Locator("[data-testid='order-earlier-point']").First.IsVisibleAsync());
+            Assert.Equal(RevisionLines.ChangeNotesLead, (await page.Locator("[data-testid='order-assumptions-change-lead']").TextContentAsync())?.Trim());
+            await AssertFitsAsync(page);
+
+            await summary.FocusAsync();
+            await page.Keyboard.PressAsync("Enter");
+
+            await details.Locator("[data-testid='order-earlier-point']").Last.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+            Assert.Equal(12, await details.Locator("[data-testid='order-earlier-point']").CountAsync());
+            await AssertFitsAsync(page);
+            await ScreenshotAsync(page, $"change-earlier-notes-phone-{theme}.png");
+        }
+        finally
+        {
+            await page.Context.CloseAsync();
+        }
+    }
+
     private static async Task AssertFitsAsync(IPage page)
     {
         var overflow = await page.EvaluateAsync<int>("document.documentElement.scrollWidth - document.documentElement.clientWidth");

@@ -804,7 +804,7 @@ most once (`MaxIterations: 2`). Since stage 3 it has two reviewers, both injecte
 
 | Reviewer | Profile | Model | What it does |
 |---|---|---|---|
-| Automatic checks | `deterministic-checks` | none | `DraftCheckEvaluator`: not empty, no remark before the text, length, language, placeholders, forbidden patterns and words, required words, written calculations. Blocking failures → `Error`, the rest `Info`. |
+| Automatic checks | `deterministic-checks` | none | `DraftCheckEvaluator`: not empty, no remark before the text, length, language, placeholders (in square brackets, up to 300 characters on one line; the fact check drops a flagged passage inside a placeholder only up to 200 characters, so a claim in a longer bracket is kept), forbidden patterns and words, required words, written calculations. Blocking failures → `Error`, the rest `Info`. |
 | Fact check | `source-fact-check` | slot `FactReviewer` (today Codex Astra, never the writer's family) | `SourceFactCheckReviewer`: compares the facts of the text with the request, the answers, the profile and the files (`FactCheckPrompts`, version `fact-check-1`). |
 
 The fact check runs for every order of the direct path; only `Direct:FactCheckMode = Off`, `Shadow` or a failure of the
@@ -886,7 +886,11 @@ never searches again.
 
 A run that changes an earlier version of the order ("Change something", `revise_order`) always uses the direct path. It carries
 `RunEntity.RevisionHint` (the person's change including the sentences of the quick buttons), `ParentRunId` (the run of the shown
-version) and `SeedDraftText` (its delivered text). The order service creates the run; the direct path does the following:
+version) and `SeedDraftText` (its delivered text). The order service creates the run; "Resume" on a failed or stopped change run
+creates one the same way (`RunService.ResumeRunAsync`: the same `RevisionHint`, the version shown now as `ParentRunId` and seed, its
+brief composed again, stored through `TryAddRevisionRunAsync`). It refuses with `RunNotResumableException` and creates no run when
+the change run already has its own text (`RevisionLines.ResumeChangedText`; the run page shows the sentence instead of the button) or
+when a later version of the order has a text (`RevisionLines.ResumeLaterVersion`). The direct path does the following:
 
 - **Grounding:** the assembler passes `RevisionHint` to `OrderGroundingStep`, which sets the context key
   `AtelierContextKeys.RevisionHint`. The earlier text is only the seed, never material of the fact check. As for any revision, the
@@ -897,11 +901,14 @@ version) and `SeedDraftText` (its delivered text). The order service creates the
   gives the changes back apart from the answers (`BriefParts.Changes`, the last one as the newest), and the material of the fact check
   keeps them that way (`FactMaterial.Changes`). Only the checker's prompt writes them under the answers of the person, with a short
   mark ("newest change, version n" / "earlier change, version n; a newer change wins where they differ", `FactChange.Marked`) before
-  the unchanged words. Quotes are looked up in the words only; the filter first takes the mark out of every quote of the checker
-  (`FactChange.WithoutMarks`), so a quote that is only a mark is no instruction and no stored quote holds the mark.
+  the unchanged words. Quotes are looked up in the words only; in a change run (`FactMaterial.IsRevision`) the filter first takes the
+  mark out of every quote of the checker (`FactChange.WithoutMarks`), so a quote that is only a mark is no instruction and no stored
+  quote holds the mark. In the first run of an order the filter leaves the quotes as they are.
 - **Writer:** only in the user prompt of the first pass, `DirectWriterPrompts.RevisionInstruction` replaces `SeedInstruction` (for
-  providers without document mode through the same replacement "the text in draft.md" → "this text"). The system prompt stays
-  bit-identical (hash test); the correction pass is unchanged.
+  providers without document mode through the same replacement "the text in draft.md" → "this text"). Wording since gate N′
+  (D-075): connecting fixes as small as possible, changes of tone, style or length without a new statement and without changing who
+  writes to whom, a longer text expands on what it already says. The system prompt stays bit-identical (hash test); the correction
+  pass is unchanged.
 - **Checks:** in a change run every rule of the first request (`DraftCheckResult.IsFirstRequestRule`: length, language, no
   placeholders, forbidden forms, ruled-out and required words) is only a note, never blocking (`DeterministicChecksReviewer.Evaluate`,
   sentence `FirstRequestNoteFormat`); empty text, remark before the text, the placeholders to fill in, the calculations and the fact

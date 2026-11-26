@@ -13,7 +13,10 @@ The tool never submits, answers, changes or cancels an order and never calls a m
 ``get_order_result`` → ``revise_order`` → ``get_order_result`` (``version`` 2) → ``export_order`` md and docx → ``list_orders`` →
 ``profile`` → ``cancel_order`` (second order): every call without an error, tool list as in 4.4. Decision of the client on top:
 the md step is an export **without** ``version``, and every md export of that order without ``version`` after that
-``get_order_result`` holds the same text as its version 2 (after :func:`same_text`), otherwise the gate fails. Not evaluable when
+``get_order_result`` holds the same text as its version 2 (after :func:`same_text`), otherwise the gate fails. The docx step is an
+export without ``version`` or with ``version`` 2 (an export of version 1 never counts as the step, G4); every export of that order
+after that ``get_order_result`` without ``version`` or with ``version`` 2 has to name version 2 in its file name (``…-v2.docx``),
+otherwise the gate fails; a step whose file name names no version is not evaluable. Not evaluable when
 the token or connection is missing; here also when the transcript or tool list is missing or unreadable, when an answer cannot be
 read (for example cut short in the session file), when the first order never asked a question, when ``cancel_order`` changed
 nothing, or when the client is not Claude Code.
@@ -81,6 +84,7 @@ LIST_ORDER_REQUIRED = ("orderId", "title", "state", "updatedAt")
 EXPORT_FORMATS = frozenset({"md", "docx", "pdf"})
 DOCX_MAGIC = b"PK\x03\x04"
 REVISED_VERSION = 2
+EXPORT_FILE_VERSION_RE = re.compile(r"-v(\d+)\.(?:md|docx|pdf)$", re.IGNORECASE)
 NEEDS_INPUT = "needs_input"
 
 LONG_WAIT_SECONDS = 50
@@ -439,6 +443,22 @@ def _is_current_md_export(call: dict) -> bool:
         and str(arguments.get("format") or "md").lower() == "md"
 
 
+def _is_version_2_export(call: dict) -> bool:
+    """An ``export_order`` without a version or with version 2: what it gives has to be version 2."""
+    version = (call.get("arguments") or {}).get("version")
+    return call.get("tool") == "export_order" and (version is None
+                                                   or (isinstance(version, int) and not isinstance(version, bool)
+                                                       and version == REVISED_VERSION))
+
+
+def export_file_version(call: dict) -> int | None:
+    """The version the file name of an ``export_order`` answer names (``…-v2.docx``), ``None`` when it names none."""
+    response = call.get("response")
+    name = response.get("fileName") if isinstance(response, dict) else None
+    match = EXPORT_FILE_VERSION_RE.search(name) if isinstance(name, str) else None
+    return int(match.group(1)) if match else None
+
+
 def _export_problem(call: dict) -> str | None:
     response = call.get("response")
     if not isinstance(response, dict):
@@ -543,11 +563,21 @@ def evaluate_gate_m(tools: list[dict] | None, calls: list[dict], legacy: bool = 
     for fmt in ("md", "docx"):
         export = first("export_order", cursor,
                        lambda c, f=fmt: for_a(c) and str(arg(c, "format") or "").lower() == f
-                       and (f != "md" or arg(c, "version") is None)) if cursor else None
+                       and (arg(c, "version") is None if f == "md" else _is_version_2_export(c))) if cursor else None
         steps[f"export_order_{fmt}"] = {"found": export is not None}
-        if export is not None and (problem := _export_problem(export)):
-            failures.append(f"export_order {fmt}: {problem}")
+        if export is not None:
+            steps[f"export_order_{fmt}"]["file_version"] = export_file_version(export)
+            if problem := _export_problem(export):
+                failures.append(f"export_order {fmt}: {problem}")
+            elif export_file_version(export) is None:
+                problems.append(f"export_order {fmt} (#{export.get('seq')}): Dateiname nennt keine Version; dass es Version "
+                                f"{REVISED_VERSION} ist, ist nicht belegt")
     if result_2 is not None:
+        for export in (c for c in ok if int(c.get("seq") or 0) > cursor and for_a(c) and _is_version_2_export(c)):
+            shown = export_file_version(export)
+            if shown is not None and shown != REVISED_VERSION:
+                failures.append(f"export_order {str(arg(export, 'format') or 'md').lower()} (#{export.get('seq')}): Datei gehört "
+                                f"zu Version {shown}, nicht {REVISED_VERSION}")
         for export in (c for c in ok if int(c.get("seq") or 0) > cursor and for_a(c) and _is_current_md_export(c)):
             response = export.get("response")
             text = response.get("text") if isinstance(response, dict) else None
