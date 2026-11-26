@@ -111,7 +111,7 @@ public sealed class RunServiceAttachmentTests
 
         await svc.SubmitRunAsync(new SubmitRunRequest("briefing", "{}"));
 
-        Assert.Null(persistence.LastUpdatedSnapshotJson);
+        AssertReleasedWithoutRunAttachments(persistence);
     }
 
     [Fact]
@@ -135,7 +135,7 @@ public sealed class RunServiceAttachmentTests
         await svc.SubmitRunAsync(new SubmitRunRequest("briefing", "{}", Attachments: []));
 
         Assert.Empty(knowledge.UploadCalls);
-        Assert.Null(persistence.LastUpdatedSnapshotJson);
+        AssertReleasedWithoutRunAttachments(persistence);
     }
 
     [Fact]
@@ -170,14 +170,21 @@ public sealed class RunServiceAttachmentTests
     }
 
     [Fact]
-    public async Task SubmitRunAsync_WithoutAttachments_StoresTheSnapshotAtCreation()
+    public async Task SubmitRunAsync_WithoutAttachments_ReleasesTheRunRightAfterCreation()
     {
         var persistence = new CapturingPersistenceService();
         var svc         = BuildService(persistence: persistence);
 
         await svc.SubmitRunAsync(new SubmitRunRequest("briefing", "{}"));
 
-        Assert.True(persistence.CreatedWithSnapshot);
+        Assert.False(persistence.CreatedWithSnapshot);
+        Assert.NotNull(persistence.LastUpdatedSnapshotJson);
+    }
+
+    private static void AssertReleasedWithoutRunAttachments(CapturingPersistenceService persistence)
+    {
+        Assert.NotNull(persistence.LastUpdatedSnapshotJson);
+        Assert.DoesNotContain(SystemCrew.RunAttachmentsProfile.Name, persistence.LastUpdatedSnapshotJson, StringComparison.Ordinal);
     }
 
     [Fact]

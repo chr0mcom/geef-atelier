@@ -110,7 +110,7 @@ internal sealed class RunService(
 
         var runId = await persistence.CreateRunAsync(
             effectiveBriefing, normalizedConfig, request.CreatedByUser,
-            resolvedTemplateName, hasAttachments ? null : snapshotJson, effectiveKind,
+            resolvedTemplateName, null, effectiveKind,
             request.ParentCompositionRunId, cancellationToken);
 
         if (effectiveKind != RunKind.Learning)
@@ -148,6 +148,10 @@ internal sealed class RunService(
                 await persistence.MarkRunFailedAsync(runId, AttachmentUploadFailedMessage, cancellationToken);
                 throw;
             }
+        }
+        else
+        {
+            await persistence.UpdateSnapshotAsync(runId, snapshotJson, cancellationToken);
         }
 
         return runId;
@@ -267,7 +271,7 @@ internal sealed class RunService(
             details.Run.ConfigJson,
             details.Run.CreatedByUser,
             details.Run.CrewTemplateName,
-            snapshotJson,
+            null,
             options.ParentRunId,
             seedDraftText,
             details.Run.Kind,
@@ -276,6 +280,7 @@ internal sealed class RunService(
         if (details.Run.Kind != RunKind.Learning)
             await LinkToOrderAsync(resumedId, OrderEntry.Legacy, cancellationToken);
 
+        await persistence.UpdateSnapshotAsync(resumedId, snapshotJson!, cancellationToken);
         return resumedId;
     }
 
