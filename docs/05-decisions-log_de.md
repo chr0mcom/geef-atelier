@@ -2803,3 +2803,25 @@ die Anweisung für einen gesäten ersten Durchgang bleiben unverändert (Tests).
 beanstandete er je harmlosem Text 3 bis 9 Stellen, darunter Grußformel und Unterschrift („may not be backed“), und bei
 unverändertem Text von Lauf zu Lauf andere Sätze. Als Messinstrument für neue Aussagen ist er deshalb ungeeignet; für die Person
 bleibt es ein älterer, eigener Befund (Backlog). Prüfer-Prompt und -Schema bleiben in Etappe 5 unverändert.
+
+### Zusatz zu D-075 — Ergebnis von Tor N′ (2026-11-26)
+
+**Ausgeliefert** wurden vorher die Vorbedingungen V1–V5 und die Auflagen der Freigabe; Nachbessern blieb dabei ausgeschaltet,
+eingeschaltet nur für das Messkonto. Gemessen genau nach der vorab festgelegten Anlage: 3 frische Aufträge, 7 Änderungen
+(5 in der Weboberfläche mit echten Klicks, 2 über MCP), Aufnahmen unmittelbar vor und nach jeder Änderung, ein blinder Prüfer
+mit zwei Kontrollpaaren. Aufrufe innerhalb der Obergrenzen, keine technischen Fehlschläge.
+
+**Urteil: Tor N′ verfehlt.** Alle mechanischen Kriterien bestanden bei allen sieben Änderungen (neue Fassung, nichts Offenes
+verloren, Platzhalter gelistet, Export, Schwellen je Art, Änderungsansicht, Laufzeitanzeige). Die Antwort des Prüfers war gültig
+(beide Kontrollpaare wie erwartet); bei sechs von sieben Änderungen bestanden alle seine Schwellen. Verfehlt ist „Länger“
+(Knopf): Wunsch nur **teilweise** erfüllt, weil die Verlängerung trotz „without adding new facts“ eine Tatsache über den
+Anlass hinzufügte. Die Ergebnisseite führte den betreffenden Satz unter „may not be backed“, zusammen mit seinen Nachbarsätzen;
+weitere ausschmückende Sätze (vom Prüfer als unwesentlich gewertet) meldete sie nicht in jedem Fall.
+
+**Folge wie vorab festgelegt:** `Orders:Revise` bleibt `Off` und nur für das Messkonto eingeschaltet. Keine weitere Runde am Satz
+und keine weitere Messung in Etappe 5. Ein neuer Anlauf ist eine eigene Etappe mit eigenem Vertrag; sein Ansatzpunkt ist das
+Verlängern (etwa: den Knopf „Longer“ nicht anbieten, oder Verlängern nur mit neuen Angaben der Person), nicht das Nachbessern
+insgesamt. Nicht gemessen blieben „Simpler words“; der Stopp gilt aus der ersten Messung fort.
+
+**Stand der Etappe 5:** ausgeliefert sind die Zitat-Anzeige (Teil A), der vollständige MCP-Vertrag (Tor M und 50-Sekunden-Aufruf
+bestanden) und Nachbessern hinter ausgeschaltetem Schalter. Nicht geprüft: claude.ai als MCP-Client.

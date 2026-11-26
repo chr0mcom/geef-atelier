@@ -2696,3 +2696,25 @@ quick buttons and the instruction of a seeded first pass stay unchanged (tests).
 it flagged 3 to 9 passages per harmless text, among them the closing and the signature ("may not be backed"), and with an unchanged
 text it flagged other sentences from run to run. It is therefore unfit as a measuring instrument for new statements; for the person
 it remains an older finding of its own (backlog). The fact checker's prompt and schema stay unchanged in stage 5.
+
+### Addendum to D-075 — result of gate N′ (2026-11-26)
+
+**Deployed** beforehand were the preconditions V1–V5 and the conditions of the release review; revising stayed switched off, on
+only for the measurement account. Measured exactly as fixed in advance: 3 fresh orders, 7 changes (5 in the web app with real
+clicks, 2 over MCP), snapshots right before and after every change, a blind judge with two control pairs. Calls within the
+caps, no technical failures.
+
+**Verdict: gate N′ failed.** All mechanical criteria passed for all seven changes (new version, nothing open lost, placeholders
+listed, export, thresholds per kind, the changes view, the elapsed time). The judge's answer was valid (both control pairs as
+expected); for six of the seven changes all of its thresholds held. “Longer” (the button) failed: the wish was only **partly**
+met, because the longer text added a fact about the occasion despite “without adding new facts”. The result page listed that
+sentence under “may not be backed”, together with its neighbours; further embellishing sentences (judged minor) were not
+reported in every case.
+
+**Consequence as fixed in advance:** `Orders:Revise` stays `Off`, on only for the measurement account. No further round on the
+sentence and no further measurement in stage 5. A new attempt is a stage of its own with its own contract; its starting point is
+lengthening (for example: not offering the “Longer” button, or lengthening only with new details from the person), not revising
+as a whole. “Simpler words” was not measured; the stop result carries over from the first measurement.
+
+**State of stage 5:** deployed are the quote display (part A), the full MCP contract (gate M and the 50-second call passed) and
+revising behind a switched-off switch. Not checked: claude.ai as an MCP client.
