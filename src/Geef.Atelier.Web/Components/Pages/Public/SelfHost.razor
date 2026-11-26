@@ -3,87 +3,99 @@
 @attribute [AllowAnonymous]
 @using Microsoft.AspNetCore.Authorization
 
-<PageTitle>Self-host — Geef.Atelier</PageTitle>
+<PageTitle>@Title</PageTitle>
 <HeadContent>
-    <meta name="description" content="Geef.Atelier is open source under the MIT license. Self-host the full pipeline on your own infrastructure — bring your own models, keep your own data." />
+    <meta name="description" content="@Description" />
 </HeadContent>
 
-<div class="landing">
+<div class="landing" data-testid="self-host">
     <LandingNav />
 
-    <section class="lp-section sh">
+    <main id="main">
+    <section class="lp-section sh" aria-labelledby="sh-title">
         <div class="lp-container">
-            <p class="lp-eyebrow">Open source · MIT licensed</p>
-            <h1 class="lp-h2">Run the atelier on <em>your own iron</em>.</h1>
+            <p class="lp-eyebrow">Open source, MIT license</p>
+            <h1 class="lp-h2" id="sh-title">Host Atelier on your own server.</h1>
             <p class="lp-lede">
-                Geef.Atelier is free and open source under the MIT license — like the
+                Atelier is free and open source under the MIT license, like the
                 <a class="sh-link" href="https://github.com/chr0mcom/geef" target="_blank" rel="noopener">open Geef SDK</a>
-                it is built on. Clone the repository, bring your own model keys, and run the
-                whole workshop on your own infrastructure. Your briefings, your drafts,
-                your data — they never leave your servers.
+                it is built on. You can host the whole application yourself: the web app, the database with every request and text, and the
+                files people add.
             </p>
 
             <div class="sh-actions">
-                <a class="lp-cta lg" href="https://github.com/chr0mcom/geef-atelier" target="_blank" rel="noopener">
-                    View on GitHub
-                    <span class="arrow">↗</span>
-                </a>
-                <a class="lp-cta lg ghost" href="https://github.com/chr0mcom/geef" target="_blank" rel="noopener">
-                    Read the SDK
-                    <span class="arrow">↗</span>
-                </a>
+                <a class="lp-cta lg" href="https://github.com/chr0mcom/geef-atelier" target="_blank" rel="noopener">View the code on GitHub</a>
+                <a class="lp-cta lg ghost" href="https://github.com/chr0mcom/geef" target="_blank" rel="noopener">Read about the SDK</a>
+            </div>
+
+            <div class="sh-data" data-testid="self-host-data">
+                <h2 class="sh-h2">What stays on your server, and what does not</h2>
+                <ul class="lp-plain-list">
+                    <li data-testid="self-host-stays">On your server: accounts, requests, texts and their versions, the files people add and what was read from them.</li>
+                    <li data-testid="self-host-leaves">To write and check a text, Atelier sends the request, the answers, the About me details and the files to the AI services you connect. You choose which ones, and their terms apply.</li>
+                    <li>Web searches happen only where an administrator has set them up or switched them on.</li>
+                </ul>
             </div>
 
             <div class="sh-grid">
                 <div class="sh-item">
-                    <h3>The full pipeline</h3>
-                    <p>Grounding · Execution · Evaluation · Finalize — the same GEEF loop that powers every run here, running on your machine.</p>
+                    <h3>One stack</h3>
+                    <p>The web app, a Postgres database, a nightly database backup and a gateway for AI command-line tools, started with one <code>docker compose</code> command. Database changes are applied when the app starts.</p>
                 </div>
                 <div class="sh-item">
-                    <h3>Bring your own models</h3>
-                    <p>Plug in your own keys via OpenRouter — OpenAI, Anthropic, or local models. No vendor lock-in, no per-seat tax.</p>
+                    <h3>Your AI services</h3>
+                    <p>You connect them yourself: with an OpenRouter key, or through the included gateway, which uses AI command-line tools signed in with your own accounts. Administrators can add more.</p>
                 </div>
                 <div class="sh-item">
-                    <h3>Multi-user &amp; admin</h3>
-                    <p>DB-backed accounts with BCrypt, an admin panel, and per-user run isolation. Seed the first admin from env vars.</p>
+                    <h3>People and settings</h3>
+                    <p>Accounts with hashed passwords; the first administrator comes from your settings file. Administrators add people and decide which features are on.</p>
                 </div>
                 <div class="sh-item">
-                    <h3>MCP server built in</h3>
-                    <p>Connect Claude Desktop or the CLI over a self-hosted OAuth 2.1 server, or a static bearer token. Fifteen tools out of the box.</p>
+                    <h3>From AI assistants</h3>
+                    <p>A built-in MCP server, a common way for AI assistants to use outside tools. People sign in through the browser, or you use a fixed token.</p>
                 </div>
                 <div class="sh-item">
-                    <h3>Knowledge base &amp; RAG</h3>
-                    <p>Postgres + pgvector for vector search over your own documents, with global and run-local knowledge scopes.</p>
+                    <h3>Explained on every level</h3>
+                    <p>Guides for everyone, for administrators and for developers, and the log of every design decision, are in the repository and under <a class="sh-link" href="/docs">Documentation</a>.</p>
                 </div>
                 <div class="sh-item">
-                    <h3>Docker &amp; Traefik</h3>
-                    <p>One <code>docker compose</code> stack. Migrations run on startup, daily Postgres backups, health checks for your reverse proxy.</p>
+                    <h3>Behind your reverse proxy</h3>
+                    <p>A health check at <code>/health</code> tells your reverse proxy or monitor whether the app is up.</p>
                 </div>
             </div>
 
             <div class="sh-quickstart">
-                <span class="lp-mono-caption">Quick start</span>
+                <h2 class="sh-h2">Quick start</h2>
                 <pre><code>git clone https://github.com/chr0mcom/geef-atelier
 cd geef-atelier
-cp .env.example .env        # add your model + Postgres keys
+cp .env.example .env        # fill in passwords and keys
 docker compose up -d --build</code></pre>
                 <p class="sh-note">
-                    Migrations run automatically on startup. Health check at
-                    <code>https://&lt;your-domain&gt;/health</code>.
-                    Full deployment guide in the repository README.
+                    The README in the repository explains every step: passwords, the first administrator, the AI services, backups and restore.
+                    Health check at <code>https://&lt;your-domain&gt;/health</code>.
                 </p>
             </div>
 
             <p class="sh-foot">
-                MIT licensed · Built on .NET 10, Blazor Server &amp; the open Geef SDK
-                <span class="sh-sep">·</span>
-                <a href="/">← Back to the atelier</a>
+                MIT license. Built on .NET 10, Blazor and the open Geef SDK.
+                <a href="/">Back to the start page</a>
             </p>
         </div>
     </section>
+    </main>
 
     <LandingFooter />
 </div>
+
+@code {
+    /// <summary>The title of the page.</summary>
+    public const string Title = "Host it yourself — Geef.Atelier";
+
+    /// <summary>The description search engines and link previews show.</summary>
+    public const string Description =
+        "Atelier is open source under the MIT license. Host it on your own server: requests, texts and files are kept there and go only "
+        + "to the AI services you connect.";
+}
 
 <style>
     .sh { padding-top: 72px; }
@@ -135,6 +147,14 @@ docker compose up -d --build</code></pre>
     }
 
     .sh-quickstart { margin-top: 48px; }
+    .sh-h2 {
+        font-family: var(--font-display);
+        font-weight: 400;
+        font-size: 24px;
+        color: var(--ink);
+        margin: 0 0 14px;
+    }
+    .sh-data { margin-top: 44px; }
     .sh-quickstart pre {
         margin: 14px 0 0;
         background: var(--surface-2);
@@ -153,7 +173,7 @@ docker compose up -d --build</code></pre>
     .sh-note {
         font-family: var(--font-ui);
         font-size: 14px;
-        color: var(--ink-3);
+        color: var(--ink-2);
         margin: 16px 0 0;
         line-height: 1.55;
     }
@@ -167,13 +187,9 @@ docker compose up -d --build</code></pre>
         margin-top: 48px;
         padding-top: 24px;
         border-top: 1px solid var(--hairline-soft);
-        font-family: var(--font-mono);
-        font-size: 11px;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        color: var(--ink-3);
+        font-size: 13px;
+        color: var(--ink-2);
     }
-    .sh-foot .sh-sep { margin: 0 10px; color: var(--ink-4); }
-    .sh-foot a { color: var(--ink-2); text-decoration: none; }
+    .sh-foot a { color: var(--hero); margin-left: 12px; }
     .sh-foot a:hover { color: var(--hero); }
 </style>

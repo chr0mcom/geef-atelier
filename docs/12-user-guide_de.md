@@ -94,7 +94,7 @@ die Funktion aus ist, erscheint der Knopf nicht.
 
 | Zeile in „What was checked“ | Was passiert ist |
 |---|---|
-| Checked automatically: the text … | Ohne KI geprüft. Ein paar Grundlagen immer: Der Text ist nicht leer und beginnt direkt. Länge, Sprache, Lücken, Listen oder Überschriften und Wörter, die vorkommen oder fehlen sollen, nur, wenn dein Auftrag es verlangt. |
+| Checked automatically: the text … | Ohne KI geprüft. Ein paar Grundlagen immer: Der Text ist nicht leer und beginnt mit dem Text selbst, nicht mit einer Bemerkung an den Leser. Länge, Sprache, Lücken, Listen oder Überschriften und Wörter, die vorkommen oder fehlen sollen, nur, wenn dein Auftrag es verlangt. |
 | Facts in the text were compared with … | Eine weitere KI hat die Fakten im Text mit deinem Auftrag, deinen Antworten und deinen Dateien verglichen und listet Stellen, die sie dort nicht fand. In der aktuellen Standardeinstellung **ändert sie den Text nicht**. Sie kann etwas übersehen und meldet oft auch harmlose Sätze, etwa eine Schlussformel oder eine Unterschrift. Bei sehr langen Dateien vergleicht sie den Text nur mit deinem Auftrag und deinen Antworten, und die Zeile sagt das. |
 | Totals in your files … | Summen in deinen Dateien wurden ohne KI nachgerechnet. Passt eine nicht, siehst du beide Zahlen. |
 | Changed after the check | Was wegen einer Prüfung geändert wurde. |

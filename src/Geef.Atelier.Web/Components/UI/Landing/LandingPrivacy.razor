@@ -1,0 +1,35 @@
+<section class="lp-section lp-privacy" id="privacy" aria-labelledby="lp-privacy-title" data-testid="landing-privacy">
+    <div class="lp-container lp-privacy-grid">
+        <div>
+            <p class="lp-eyebrow">Your words and your files</p>
+            <h2 class="lp-h2" id="lp-privacy-title">Where your words go.</h2>
+        </div>
+        <div>
+            <ul class="lp-plain-list">
+                <li>Your request, your answers, your About me details and your files go to the AI services this Atelier uses to write and check the text.</li>
+                @if (Features.WebResearch)
+                {
+                    <li data-testid="landing-privacy-research">A web search gets only short topics taken from your request, and only when you add no files; topics with words from your About me details are held back (this compares words, so it can miss one). Your files never go into a web search.</li>
+                }
+                else
+                {
+                    <li data-testid="landing-privacy-research">Right now nothing goes to a web search when you write a text here. Only teams set up in the workshop can search the web.</li>
+                }
+                <li>Only you and the administrators of this Atelier can see your requests.</li>
+                <li data-testid="landing-privacy-kept">Atelier keeps your request, your text and what it read from your files until you delete the request under My work. The original file is removed about @OriginalRetentionDays days after the last request that used it finished.</li>
+            </ul>
+            <p class="lp-privacy-links">
+                <a href="/how-it-works#about-me" data-enhance-nav="false">More on your data</a>
+                <a href="/privacy">Privacy notice</a>
+            </p>
+        </div>
+    </div>
+</section>
+
+@code {
+    /// <summary>What the start page may call available for the viewer.</summary>
+    [Parameter, EditorRequired] public HowItWorksFeatures Features { get; set; } = null!;
+
+    /// <summary>About how many days an original file is kept after the last request that used it finished.</summary>
+    [Parameter, EditorRequired] public int OriginalRetentionDays { get; set; }
+}

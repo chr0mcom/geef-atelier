@@ -18,8 +18,11 @@ flowchart LR
     D --> E["Text + was geprüft wurde<br/>+ offene Punkte + Annahmen"]
 ```
 
-Die laufende Anwendung erklärt sich selbst auf der öffentlichen Seite **How it works** (`/how-it-works`). Diese Seite liest die
-aktuellen Schalter (und die Ausnahmen einer angemeldeten Person) und zeigt deshalb nie etwas als verfügbar, was ausgeschaltet ist.
+Die laufende Anwendung erklärt sich selbst auf zwei öffentlichen Seiten. Die **Startseite** (`/`) sagt kurz, was Atelier tut,
+zeigt ein erfundenes Beispiel vom Auftrag bis zum Text mit Lücken und offenen Punkten, nennt, was Atelier nicht tut, und führt jede
+Zielgruppe (Privat, Verein und Schule, kleines Büro, Nutzer von KI-Assistenten, Administratoren und Entwickler) zum passenden Teil
+von **How it works** (`/how-it-works`). Beide Seiten lesen die aktuellen Schalter (und die Ausnahmen einer angemeldeten Person) und
+zeigen deshalb nie etwas als verfügbar, was ausgeschaltet ist (D-080, D-084).
 
 ## Für wen
 

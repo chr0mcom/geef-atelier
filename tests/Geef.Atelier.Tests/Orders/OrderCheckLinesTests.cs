@@ -46,7 +46,7 @@ public sealed class OrderCheckLinesTests
     {
         var view = OrderCheckLines.Build(Report(factCheck: Facts(FactCheckState.Checked)), hasOpenPoints: false);
 
-        Assert.Equal(["Checked automatically: the text is not empty, starts directly.", OrderCheckLines.FactsChecked, OrderCheckLines.Contradictions], view.Checked);
+        Assert.Equal(["Checked automatically: the text is not empty, starts with the text itself, not with a remark to the reader.", OrderCheckLines.FactsChecked, OrderCheckLines.Contradictions], view.Checked);
         Assert.Empty(view.Changed);
         Assert.Equal(OrderCheckLines.ToReviewNothing, view.ToReview);
         Assert.Equal(OrderCheckLines.Limits, view.Limits);
@@ -64,7 +64,7 @@ public sealed class OrderCheckLinesTests
 
         var lines = OrderCheckLines.Build(Report(checks), false).Checked;
 
-        Assert.Equal("Checked automatically: the text is not empty, starts directly, has the requested length, is in the requested language, " +
+        Assert.Equal("Checked automatically: the text is not empty, starts with the text itself, not with a remark to the reader, has the requested length, is in the requested language, " +
                      "has no placeholders, avoids lists, emojis and the words you ruled out, uses the words you asked for.", lines[0]);
         Assert.Equal(OrderCheckLines.ArithmeticSearched, lines[1]);
     }
@@ -96,7 +96,7 @@ public sealed class OrderCheckLinesTests
     {
         var view = OrderCheckLines.Build(Report([Check(DraftCheckCodes.Empty), Check(DraftCheckCodes.Preamble), Check(DraftCheckCodes.Length, blocking: false, passed: false)], schema: 1), true);
 
-        Assert.Equal(["Checked automatically: the text is not empty, starts directly.",
+        Assert.Equal(["Checked automatically: the text is not empty, starts with the text itself, not with a remark to the reader.",
             "Checked automatically and not met – see the open points below: the text does not have the requested length.", OrderCheckLines.FactsNotChecked], view.Checked);
     }
 
@@ -193,7 +193,7 @@ public sealed class OrderCheckLinesTests
     {
         var view = OrderCheckLines.Build(Report(schema: 1), false);
 
-        Assert.Equal(["Checked automatically: the text is not empty, starts directly.", OrderCheckLines.FactsNotChecked], view.Checked);
+        Assert.Equal(["Checked automatically: the text is not empty, starts with the text itself, not with a remark to the reader.", OrderCheckLines.FactsNotChecked], view.Checked);
     }
 
     [Fact]
