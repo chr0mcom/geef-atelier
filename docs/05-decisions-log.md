@@ -3129,3 +3129,14 @@ nothing and stores the warning. Without this change every one of these tests fai
 still searches. The check of a clarified careful order in
 `IntakePrivacyEndToEndTests` now expects no search. Database tests for the rule (`StandardOrderWebSearchTests`), unit tests for
 extractor and provider.
+
+## D-080 — "How it works" page and guides per audience (2026-11-26)
+
+- **Page `/how-it-works`**, reachable without signing in: explains in plain English (D-062) what Atelier does, what is checked and
+  what is not. It reads the same switches as the application, including per-person exceptions, so it never describes a feature
+  that is off for the person. Only administrators see the table with setting names and values.
+- **Guides** `docs/12` to `docs/15` (users, AI assistants, administration, development) in German and English. One test compares
+  the tool list in the AI-assistant guide with the server, another renders every document the app serves and checks every link
+  target.
+- **Truth before promotion:** claims only as far as the code ensures them; no claims about other products. Checked in two
+  independent rounds.

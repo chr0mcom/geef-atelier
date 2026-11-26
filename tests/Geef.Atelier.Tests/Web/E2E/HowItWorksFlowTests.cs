@@ -38,9 +38,9 @@ public sealed class HowItWorksFlowTests(PlaywrightFixture pw, PostgresFixture pg
             await page.Locator("[data-testid='how-it-works']").WaitForAsync(new LocatorWaitForOptions { Timeout = 15_000 });
             Assert.EndsWith("/how-it-works", page.Url, StringComparison.Ordinal);
 
-            Assert.Equal("false", await page.Locator("[data-testid='hiw-status-change']").GetAttributeAsync("data-on"));
+            Assert.Equal("true", await page.Locator("[data-testid='hiw-status-change']").GetAttributeAsync("data-on"));
             Assert.Equal("false", await page.Locator("[data-testid='hiw-status-research']").GetAttributeAsync("data-on"));
-            Assert.Equal(0, await page.Locator("[data-testid='hiw-step-change']").CountAsync());
+            Assert.Equal(1, await page.Locator("[data-testid='hiw-step-change']").CountAsync());
             Assert.True(await page.Locator("[data-testid='hiw-sign-in']").IsVisibleAsync());
 
             await AssertNoLayoutShiftAsync(page);

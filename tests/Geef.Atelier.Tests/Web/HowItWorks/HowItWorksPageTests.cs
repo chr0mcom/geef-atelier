@@ -35,24 +35,37 @@ public sealed class HowItWorksPageTests : TestContext
     }
 
     [Fact]
-    public void With_the_shipped_settings_changing_and_research_are_shown_as_not_switched_on()
+    public void As_shipped_changing_is_on_and_research_is_shown_as_not_switched_on()
     {
         this.AddTestAuthorization();
         UseShippedSettings();
 
         var cut = Render();
 
-        Assert.Equal("false", cut.Find("[data-testid='hiw-status-change']").GetAttribute("data-on"));
+        Assert.Equal("true", cut.Find("[data-testid='hiw-status-change']").GetAttribute("data-on"));
         Assert.Equal("false", cut.Find("[data-testid='hiw-status-research']").GetAttribute("data-on"));
         Assert.Equal("true", cut.Find("[data-testid='hiw-status-questions']").GetAttribute("data-on"));
         Assert.Equal("true", cut.Find("[data-testid='hiw-status-upload']").GetAttribute("data-on"));
         Assert.Contains("changes nothing", cut.Find("[data-testid='hiw-status-factcheck']").TextContent, StringComparison.Ordinal);
-        Assert.Empty(cut.FindAll("[data-testid='hiw-step-change']"));
-        Assert.Empty(cut.FindAll("[data-testid='hiw-assistant-change']"));
+        Assert.Contains(RevisionLines.ChangeButton, cut.Find("[data-testid='hiw-step-change']").TextContent, StringComparison.Ordinal);
+        Assert.NotEmpty(cut.FindAll("[data-testid='hiw-assistant-change']"));
         Assert.Empty(cut.FindAll("[data-testid='hiw-step-research']"));
-        Assert.DoesNotContain(RevisionLines.ChangeButton, cut.Find("[data-testid='hiw-steps']").TextContent, StringComparison.Ordinal);
         Assert.Contains("does not change the text", cut.Find("[data-testid='hiw-step-factcheck']").TextContent, StringComparison.Ordinal);
         Assert.Contains("for everyone", cut.Find("[data-testid='hiw-status-scope']").TextContent, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void With_changing_switched_off_the_page_says_so_and_offers_no_change_step()
+    {
+        Services.Configure<OrderOptions>(o => { o.IntakeMode = IntakeMode.On; o.Revise = ReviseMode.Off; });
+        this.AddTestAuthorization();
+
+        var cut = Render();
+
+        Assert.Equal("false", cut.Find("[data-testid='hiw-status-change']").GetAttribute("data-on"));
+        Assert.Empty(cut.FindAll("[data-testid='hiw-step-change']"));
+        Assert.Empty(cut.FindAll("[data-testid='hiw-assistant-change']"));
+        Assert.DoesNotContain(RevisionLines.ChangeButton, cut.Find("[data-testid='hiw-steps']").TextContent, StringComparison.Ordinal);
     }
 
     [Fact]
