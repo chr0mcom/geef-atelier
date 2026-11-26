@@ -661,7 +661,7 @@ externally reachable routes:
 | `/login` | GET/POST | None | Login page (static SSR) |
 | `/auth/logout` | POST | Cookie | Logout (anti-forgery, Minimal API) |
 | `/settings/theme` | POST | None | Theme-switch fallback (no-JS), redirect to the referer |
-| `/hubs/runs` | WS | Cookie | SignalR hub for live run updates, signed-in users only; group names are derived on the server and the connection closes when the sign-in expires (D-067). The application's own pages use the in-process `IRunUpdateFeed` instead; no external client is known, and the hub is removed in stage 8 (D-068). |
+| `/hubs/runs` | WS | Cookie | SignalR hub for live run updates, signed-in users only; group names are derived on the server and the connection closes when the sign-in expires (D-067). The application's own pages use the in-process `IRunUpdateFeed` instead; no external client is known, and the hub goes with the second removal cut once its trigger in D-077 is met (D-068). |
 | `/access-denied` | GET | Cookie | Shown to signed-in users who open a page they have no access to (D-067) |
 | `/admin/users` | GET | Cookie (admin) | User management |
 | `/admin/oauth-clients` | GET | Cookie (admin) | OAuth client management |

@@ -1,0 +1,30 @@
+@using Geef.Atelier.Core.Configuration
+@using Microsoft.Extensions.Options
+@inject IOptions<UiOptions> UiSettings
+
+@if (_visible)
+{
+    @ChildContent
+}
+else
+{
+    @Fallback
+}
+
+@code {
+    /// <summary>The entry to a workshop page; shown when <see cref="WorkshopEntryExtensions.ShowsWorkshopEntriesTo"/> allows it.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Shown instead of <see cref="ChildContent"/> when the entry is hidden; nothing when not set.</summary>
+    [Parameter] public RenderFragment? Fallback { get; set; }
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    bool _visible;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var user = AuthState is null ? null : (await AuthState).User;
+        _visible = UiSettings.Value.ShowsWorkshopEntriesTo(user);
+    }
+}

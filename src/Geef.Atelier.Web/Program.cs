@@ -114,6 +114,7 @@ builder.Services.PostConfigure<SourceOptions>(o =>
 builder.Services.Configure<OrderOptions>(builder.Configuration.GetSection(OrderOptions.SectionName));
 builder.Services.Configure<IntakeOptions>(builder.Configuration.GetSection(IntakeOptions.SectionName));
 builder.Services.Configure<DirectOptions>(builder.Configuration.GetSection(DirectOptions.SectionName));
+builder.Services.Configure<UiOptions>(builder.Configuration.GetSection(UiOptions.SectionName));
 builder.Services.AddSingleton<IRunFactCheckModeStore, RunFactCheckModeStore>();
 builder.Services.AddSources(builder.Configuration);
 builder.Services.AddProfiles();

@@ -46,6 +46,8 @@ Text-generation pipeline platform built on the [Geef SDK](https://github.com/chr
 
 **Stage 1: orders and direct path ✅** The order is the unit the person sees (`/start`, `/work`, `/orders/{id}`); files are uploaded one by one with a receipt and kept as sources; the direct path writes with the files in full text (with a map above 150,000 characters, page choice above 600,000), checks the result without a model and corrects once; MCP tools `submit_order`, `get_order_status`, `get_order_result`; migration Step48 links existing runs to orders (D-069, D-070, 2026-11-24).
 
+**Stages 2–6 ✅, rebuild completed (D-077)** Questions before the run (D-071/D-072), honest writing with checks (D-073), research (D-074, switched off), changing a result (D-075, switched off) and the full MCP order contract, files over an upload ticket (D-076). Stage 8a: the workshop entries are shown to administrators only (`Ui:WorkshopForAdminsOnly`). Not built, each waiting for a trigger: stage 1b (defused loop and first removal cut), stage 7 (memory), the removal of stage 8 and stage 9 (D-077).
+
 Currently: **over 1800 tests** (green; pre-existing Testcontainers/E2E env flakes excluded).
 
 Full scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope.md)
@@ -204,6 +206,8 @@ See [docs/08-crew-system.md](docs/08-crew-system.md).
 | Grounding providers | `/crew/profiles/grounding-providers` |
 | Finalizer profiles | `/crew/profiles/finalizers` |
 | Template Studio (AI-assisted template creation) | `/crew/studio` |
+
+These pages are reached through the menu "Workshop", which only administrators see while `Ui:WorkshopForAdminsOnly` is on (shipped); the addresses themselves stay open to every signed-in user as before (D-077).
 
 Details: [docs/08-crew-system.md](docs/08-crew-system.md)
 

@@ -1,11 +1,13 @@
 using System.Reflection;
 using Bunit;
 using Bunit.TestDoubles;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Web.Components.Layout;
 using Geef.Atelier.Web.Components.Pages;
 using Geef.Atelier.Web.Components.UI;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Geef.Atelier.Tests.Web.Auth;
 
@@ -79,8 +81,9 @@ public sealed class AdminOnlyPagesTests : TestContext
     }
 
     [Fact]
-    public void NavMenu_HidesAdminLinks_ForNormalUsers()
+    public void NavMenu_HidesAdminLinks_ForNormalUsers_WhenTheWorkshopIsShownToEveryone()
     {
+        Services.Configure<UiOptions>(o => o.WorkshopForAdminsOnly = false);
         this.AddTestAuthorization().SetAuthorized("alice");
         var cut = RenderComponent<NavMenu>();
         cut.Find("button.nav-group-trigger").Click();

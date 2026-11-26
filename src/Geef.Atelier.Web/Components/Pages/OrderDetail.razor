@@ -232,7 +232,9 @@
 
                 @if (_view.CurrentRun is { } current)
                 {
-                    <p class="order-how-tech"><a href="/runs/@current.RunId" data-testid="order-technical-details">Technical details</a></p>
+                    <WorkshopEntry>
+                        <p class="order-how-tech"><a href="/runs/@current.RunId" data-testid="order-technical-details">Technical details</a></p>
+                    </WorkshopEntry>
                 }
             </div>
         </details>

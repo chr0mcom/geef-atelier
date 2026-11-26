@@ -37,8 +37,8 @@ Im übergeordneten Infrastruktur-Repository unter `/srv/docker/docs/` liegen die
 ## Status
 
 - **Phase:** Walking Skeleton abgeschlossen; produktiv unter `https://geef.stefan-bechtel.de`. Zahlreiche Post-Skeleton-Erweiterungen ausgeliefert (Crew-System, Advisor-Pässe, Grounding/Vector-Store-RAG, Run-Attachments, Cost-Tracking, Template Studio, Domain-Templates, MCP-OAuth 2.1, Multi-User, Run-User-Isolation, Finalizer-Pipeline, Grounding-Refinement, Academic-Search, REST-API-Grounding, Landing-Page, Continuous-Learning-Loop).
-- **Letzte Aktualisierung:** 2026-11-24
-- **Aktueller Stand & nächste Schritte:** siehe [Projekt-README](../README_de.md) (Implementierungsstand) und [Decisions-Log](05-decisions-log_de.md) (chronologische Entscheidungshistorie, zuletzt D-068 „Richtung Umbau“, D-069 „Etappe 1: Direktweg-Engine“ und D-070 „Etappe 1: Aufträge, Quellen und was die Person sieht“). Der Umbau nach D-068 ersetzt große Teile von Crew-, Tool- und Learning-System in Etappen; die Dokumente kennzeichnen eingefrorene oder zum Rückbau vorgesehene Teile.
+- **Letzte Aktualisierung:** 2026-11-26
+- **Aktueller Stand & nächste Schritte:** siehe [Projekt-README](../README_de.md) (Implementierungsstand) und [Decisions-Log](05-decisions-log_de.md) (chronologische Entscheidungshistorie, zuletzt D-077 „Abschluss des Umbaus“). Der Umbau nach D-068 endet mit Etappe 6 und der Abschlussrunde 8a (D-077): Die Etappen 1b, 7, 8 (außer 8a) und 9 sind nicht gebaut, und das alte Crew-, Tool- und Learning-System bleibt bestehen, bis der Auslöser für den Rückbau in D-077 erfüllt ist; die Dokumente kennzeichnen eingefrorene oder zum Rückbau vorgesehene Teile.
 
 ## Konventionen
 

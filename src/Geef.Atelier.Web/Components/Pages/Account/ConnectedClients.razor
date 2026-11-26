@@ -11,7 +11,10 @@
 <div class="connected-clients" data-testid="connected-clients-page">
     <div class="page-header">
         <h1>Connected clients</h1>
-        <a href="/workshop" class="btn ghost" data-testid="btn-back">← Back</a>
+        <WorkshopEntry>
+            <ChildContent><a href="/workshop" class="btn ghost" data-testid="btn-back">← Back</a></ChildContent>
+            <Fallback><a href="@WorkshopEntryExtensions.LayBackLink" class="btn ghost" data-testid="btn-back">← Back</a></Fallback>
+        </WorkshopEntry>
     </div>
 
     @if (!string.IsNullOrEmpty(_error))

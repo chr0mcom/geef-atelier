@@ -2,7 +2,7 @@
 
 *[Deutsch](01-vision-and-scope_de.md) · **English***
 
-*Last updated: 2026-11-24 (D-068: at most three short questions with click answers before the run, never during it; D-067: learning loop paused by default; before that 22 May 2026, D-054: continuous learning loop added to scope; learning-retrieval provider type)*
+*Last updated: 2026-11-26 (D-077: per-user memory not built, learning loop stays paused; D-068: at most three short questions with click answers before the run, never during it; D-067: learning loop paused by default; before that 22 May 2026, D-054: continuous learning loop added to scope; learning-retrieval provider type)*
 
 ## Vision
 
@@ -29,7 +29,7 @@ The project is the productive application of the [Geef SDK](https://github.com/c
 - Run resumption: continue a failed or aborted run from its last draft text (seed mode) or with a fresh pipeline (clean mode) — D-046
 - File export in formats md / html / pdf / docx / txt / json via the Finalizer pipeline (D-044); the five Finalizer profile types (FileExport, MetadataEnrich, ExternalSink, Transform) are implemented as part of the crew system
 - Grounding enrichment in multiple forms: Tavily web search (`tavily`), semantic vector-store RAG (`vector-store`), curated fixed text for style guides and glossaries (`static-context`), specific URL fetching with SSRF protection (`url-fetch`), Tavily news search with date filter (`news-search`), academic paper retrieval from arXiv / Semantic Scholar / OpenAlex (`academic-search`), and generic REST endpoint grounding with SSRF protection and JSONPath extraction (`rest-api`); each provider supports an optional AI refinement pass (D-050–D-052); domain-aware retrieval from the learning store (`learning-retrieval`, D-054)
-- **Continuous learning loop (D-054):** an opt-in `learning-extractor` finalizer extracts structured facts from completed runs and fires a dedicated quality-gate run (`learning-evaluation` crew) fire-and-forget. Only learnings that converge through the gate (three strict reviewers, `AbortOnCritical=true`, multi-model pluralism) are stored as `Approved` in the learning store (`LearningEntries` table, separate namespace from the curated knowledge base). The `learning-retrieval` grounding provider re-injects them into later runs weighted by domain similarity. Management UI at `/crew/learnings`; MCP tool `list_learnings`. Three protective mechanisms against model collapse: (1) separate namespace, (2) auditable gate, (3) structured facts only. **Paused since D-067** (`Learning:Enabled`, default `false`); to be replaced by a per-user memory (D-068)
+- **Continuous learning loop (D-054):** an opt-in `learning-extractor` finalizer extracts structured facts from completed runs and fires a dedicated quality-gate run (`learning-evaluation` crew) fire-and-forget. Only learnings that converge through the gate (three strict reviewers, `AbortOnCritical=true`, multi-model pluralism) are stored as `Approved` in the learning store (`LearningEntries` table, separate namespace from the curated knowledge base). The `learning-retrieval` grounding provider re-injects them into later runs weighted by domain similarity. Management UI at `/crew/learnings`; MCP tool `list_learnings`. Three protective mechanisms against model collapse: (1) separate namespace, (2) auditable gate, (3) structured facts only. **Paused since D-067** (`Learning:Enabled`, default `false`); a per-user memory (D-068) was meant to replace it; stage 7 is dropped until its trigger (D-077), so the loop stays paused
 
 ## Out of scope (for now)
 

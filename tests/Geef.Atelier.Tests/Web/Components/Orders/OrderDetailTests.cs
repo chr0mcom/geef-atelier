@@ -2,6 +2,7 @@ using Bunit;
 using Bunit.TestDoubles;
 using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Orders;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Sources;
@@ -291,6 +292,30 @@ public sealed class OrderDetailTests : TestContext
         Assert.Equal("bill.pdf · 160,485 characters · 80 pages · pages used: 1-40", cut.Find("[data-testid='order-how-file']").TextContent);
         Assert.Contains("Version 1", cut.Find("[data-testid='order-how-version']").TextContent);
         Assert.Equal(view.RequestText, cut.Find("[data-testid='order-how-request']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='order-technical-details']"));
+    }
+
+    [Fact]
+    public void TheTechnicalDetailsAreLinkedForAdministrators()
+    {
+        _auth.SetRoles(OwnerScope.AdminRole);
+        var view = _orders.Add("alice", OrderTestData.View(OrderDisplayState.Delivered));
+        _orders.SetResult(OrderTestData.Result(view));
+
+        var cut = Render(view.OrderId);
+
+        Assert.Equal($"/runs/{view.CurrentRun!.RunId}", cut.Find("[data-testid='order-technical-details']").GetAttribute("href"));
+    }
+
+    [Fact]
+    public void TheTechnicalDetailsAreLinkedForEveryoneWhenTheWorkshopSwitchIsOff()
+    {
+        Services.Configure<UiOptions>(o => o.WorkshopForAdminsOnly = false);
+        var view = _orders.Add("alice", OrderTestData.View(OrderDisplayState.Delivered));
+        _orders.SetResult(OrderTestData.Result(view));
+
+        var cut = Render(view.OrderId);
+
         Assert.Equal($"/runs/{view.CurrentRun!.RunId}", cut.Find("[data-testid='order-technical-details']").GetAttribute("href"));
     }
 

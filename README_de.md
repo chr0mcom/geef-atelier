@@ -46,6 +46,8 @@ Text-Generations-Pipeline-Plattform auf Basis des [Geef SDK](https://github.com/
 
 **Etappe 1: Aufträge und Direktweg ✅** Der Auftrag ist die Einheit, die die Person sieht (`/start`, `/work`, `/orders/{id}`); Dateien werden einzeln mit Quittung hochgeladen und als Quellen gehalten; der Direktweg schreibt mit den Dateien im Volltext (ab 150.000 Zeichen mit Karte, ab 600.000 mit Seitenauswahl), prüft das Ergebnis ohne Modell und korrigiert einmal; MCP-Werkzeuge `submit_order`, `get_order_status`, `get_order_result`; Migration Step48 verknüpft bestehende Läufe mit Aufträgen (D-069, D-070, 2026-11-24).
 
+**Etappen 2–6 ✅, Umbau abgeschlossen (D-077)** Rückfragen vor dem Lauf (D-071/D-072), ehrliches Schreiben mit Prüfungen (D-073), Recherche (D-074, ausgeschaltet), Ändern eines Ergebnisses (D-075, ausgeschaltet) und der vollständige MCP-Auftragsvertrag, Dateien über ein Upload-Ticket (D-076). Etappe 8a: Die Werkstatt-Einstiege sehen nur Admins (`Ui:WorkshopForAdminsOnly`). Nicht gebaut, jeweils mit Auslöser: Etappe 1b (entschärfte Schleife und erster Rückbau), Etappe 7 (Gedächtnis), der Rückbau aus Etappe 8 und Etappe 9 (D-077).
+
 Aktuell: **über 1800 Tests** (grün; vorbestehende Testcontainers-/E2E-Umgebungs-Flakes ausgenommen).
 
 Vollständiger Scope: [docs/01-vision-and-scope.md](docs/01-vision-and-scope_de.md)
@@ -204,6 +206,8 @@ Siehe [docs/08-crew-system_de.md](docs/08-crew-system_de.md).
 | Grounding-Provider | `/crew/profiles/grounding-providers` |
 | Finalizer-Profile | `/crew/profiles/finalizers` |
 | Template Studio (KI-gestützte Template-Erstellung) | `/crew/studio` |
+
+Diese Seiten erreicht man über das Menü „Workshop“, das nur Admins sehen, solange `Ui:WorkshopForAdminsOnly` an ist (ausgeliefert); die Adressen selbst bleiben wie bisher für alle Angemeldeten offen (D-077).
 
 Details: [docs/08-crew-system.md](docs/08-crew-system_de.md)
 

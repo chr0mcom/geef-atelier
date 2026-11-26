@@ -10,78 +10,80 @@
         My work
     </NavLink>
 
-    <div class="nav-group @(_workshopOpen ? "open" : "")">
-        <button class="nav-link nav-group-trigger @(IsWorkshopActive() ? "active" : "")"
-                @onclick="ToggleWorkshop"
-                aria-expanded="@_workshopOpen"
-                aria-haspopup="true"
-                data-testid="nav-workshop">
-            Workshop
-            <span class="nav-group-chevron" aria-hidden="true">▾</span>
-        </button>
-        @if (_workshopOpen)
-        {
-            <div class="nav-dropdown" role="menu">
-                <NavLink class="nav-link" href="/workshop" Match="NavLinkMatch.All" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                    Dashboard
-                </NavLink>
-                <NavLink class="nav-link" href="/runs" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                    Runs
-                </NavLink>
-                <NavLink class="nav-link" href="/new" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                    Advanced form (choose a team)
-                </NavLink>
-                <div class="nav-dropdown-sep">Crew</div>
-                <NavLink class="nav-link" href="/crew/templates" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                    Templates
-                </NavLink>
-                <NavLink class="nav-link" href="/crew/studio" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                    Studio
-                </NavLink>
-                <NavLink class="nav-link" href="/crew/knowledge" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                    Knowledge
-                </NavLink>
-                <AuthorizeView Roles="admin">
-                    <NavLink class="nav-link" href="/crew/learnings" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                        Learnings
+    <WorkshopEntry>
+        <div class="nav-group @(_workshopOpen ? "open" : "")">
+            <button class="nav-link nav-group-trigger @(IsWorkshopActive() ? "active" : "")"
+                    @onclick="ToggleWorkshop"
+                    aria-expanded="@_workshopOpen"
+                    aria-haspopup="true"
+                    data-testid="nav-workshop">
+                Workshop
+                <span class="nav-group-chevron" aria-hidden="true">▾</span>
+            </button>
+            @if (_workshopOpen)
+            {
+                <div class="nav-dropdown" role="menu">
+                    <NavLink class="nav-link" href="/workshop" Match="NavLinkMatch.All" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                        Dashboard
                     </NavLink>
-                </AuthorizeView>
-                <div class="nav-dropdown-sep">Profiles</div>
-                <NavLink class="nav-link" href="/crew/profiles/reviewers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                    Reviewers
-                </NavLink>
-                <NavLink class="nav-link" href="/crew/profiles/executors" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                    Executors
-                </NavLink>
-                <NavLink class="nav-link" href="/crew/profiles/advisors" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                    Advisors
-                </NavLink>
-                <NavLink class="nav-link" href="/crew/profiles/grounding-providers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                    Groundings
-                </NavLink>
-                <NavLink class="nav-link" href="/crew/profiles/finalizers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                    Finalizers
-                </NavLink>
-                <AuthorizeView Roles="admin">
-                    <NavLink class="nav-link" href="/tools" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                        Tools
+                    <NavLink class="nav-link" href="/runs" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                        Runs
                     </NavLink>
-                </AuthorizeView>
-                <NavLink class="nav-link" href="/packs" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                    Packs
-                </NavLink>
-                <AuthorizeView Roles="admin">
-                    <NavLink class="nav-link" href="/mcp-servers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                        MCP Servers
+                    <NavLink class="nav-link" href="/new" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                        Advanced form (choose a team)
                     </NavLink>
-                    <div class="nav-dropdown-sep">Infrastructure</div>
-                    <NavLink class="nav-link" href="/crew/providers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                        Providers
+                    <div class="nav-dropdown-sep">Crew</div>
+                    <NavLink class="nav-link" href="/crew/templates" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                        Templates
                     </NavLink>
-                </AuthorizeView>
-            </div>
-        }
-    </div>
+                    <NavLink class="nav-link" href="/crew/studio" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                        Studio
+                    </NavLink>
+                    <NavLink class="nav-link" href="/crew/knowledge" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                        Knowledge
+                    </NavLink>
+                    <AuthorizeView Roles="admin">
+                        <NavLink class="nav-link" href="/crew/learnings" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                            Learnings
+                        </NavLink>
+                    </AuthorizeView>
+                    <div class="nav-dropdown-sep">Profiles</div>
+                    <NavLink class="nav-link" href="/crew/profiles/reviewers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                        Reviewers
+                    </NavLink>
+                    <NavLink class="nav-link" href="/crew/profiles/executors" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                        Executors
+                    </NavLink>
+                    <NavLink class="nav-link" href="/crew/profiles/advisors" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                        Advisors
+                    </NavLink>
+                    <NavLink class="nav-link" href="/crew/profiles/grounding-providers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                        Groundings
+                    </NavLink>
+                    <NavLink class="nav-link" href="/crew/profiles/finalizers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                        Finalizers
+                    </NavLink>
+                    <AuthorizeView Roles="admin">
+                        <NavLink class="nav-link" href="/tools" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                            Tools
+                        </NavLink>
+                    </AuthorizeView>
+                    <NavLink class="nav-link" href="/packs" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                        Packs
+                    </NavLink>
+                    <AuthorizeView Roles="admin">
+                        <NavLink class="nav-link" href="/mcp-servers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                            MCP Servers
+                        </NavLink>
+                        <div class="nav-dropdown-sep">Infrastructure</div>
+                        <NavLink class="nav-link" href="/crew/providers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
+                            Providers
+                        </NavLink>
+                    </AuthorizeView>
+                </div>
+            }
+        </div>
+    </WorkshopEntry>
 </div>
 
 @code {

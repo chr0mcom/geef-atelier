@@ -580,6 +580,7 @@ D-070 im [Decisions-Log](05-decisions-log_de.md).
 | `Learning:Enabled` | `false` | Schaltet die Learning-Schleife (D-054) ein oder aus. Ist sie aus, kehren die Finalizer `learning-extractor` und `learning-publisher` sofort zurück (kein LLM-Aufruf, kein Eintrag, kein `learning-evaluation`-Lauf, kein Embedding), das Grounding `learning-retrieval` liefert leeren Kontext ohne Embedding, und `/crew/learnings` zeigt, dass Learning pausiert ist. Crews mit diesen Teilen bleiben gültig. |
 | `EnvReference:Allowed` | leere Liste | Zusätzliche Umgebungsvariablen-Namen oder Präfixe (mit `*` am Ende), die Konfiguration nennen darf, zusätzlich zur eingebauten Standardliste und zum Präfix `ATELIER_SECRET_*`. Einzelheiten: [10-tool-system](10-tool-system_de.md#secrets-und-die-allowlist-für-umgebungsvariablen). |
 | `Orchestrator:PreparationTimeout` | `00:15:00` | Wie lange ein `Pending`-Lauf ohne Crew-Snapshot (Anhänge noch in Vorbereitung) bleiben darf, bevor er auf `Failed` gesetzt wird. |
+| `Ui:WorkshopForAdminsOnly` | `true` | Solange an, sehen nur Admins die Einstiege zu den Werkstatt-Seiten: das Menü „Workshop“, den Link zum alten Formular auf der Startseite und „Technical details“ auf der Auftragsseite; die Kontoseiten führen alle anderen zurück zu „My work“. Seiten, Routen und Rechte bleiben unverändert (D-077, Etappe 8a). Rückweg: `Ui__WorkshopForAdminsOnly=false` in der Umgebung. |
 
 `Learning:Enabled` wird genau einmal registriert (`AddLearningSwitch`, Infrastructure); alle Leser
 (Finalizer, Retrieval-Provider, Learnings-Seite) lesen den Schalter über `IOptionsMonitor`, eine Änderung
@@ -695,8 +696,8 @@ verschachtelt** werden: Eine Aktion im Tor ruft nie eine andere Aktion im Tor au
 laufen nach dem Block im Tor.
 
 `RunHub` (`Web/Hubs/RunHub.cs`, über `MapRunHub()` auf `/hubs/runs` gemappt) hat in der Anwendung keinen
-Client mehr, und ein externer Client ist nicht bekannt. Er bleibt **bis zum Rückbau in Etappe 8**
-([D-068](05-decisions-log_de.md#d-068--richtung-umbau-auftrag-direktweg-rückfragen-quellen-gedächtnis-2026-11-24))
+Client mehr, und ein externer Client ist nicht bekannt. Er bleibt **bis zum Rückbau Schnitt 2**, der auf seinen Auslöser in
+[D-077](05-decisions-log_de.md#d-077--abschluss-des-umbaus-2026-11-26) wartet ([D-068](05-decisions-log_de.md#d-068--richtung-umbau-auftrag-direktweg-rückfragen-quellen-gedächtnis-2026-11-24))
 und ist bis dahin abgesichert:
 
 - **Nur für Angemeldete:** `[Authorize]` am Hub; `MapRunHub()` (`LiveUpdateServiceExtensions`) mappt ihn mit
@@ -709,7 +710,7 @@ und ist bis dahin abgesichert:
 
 ### `IRunNotifier` / `LiveRunNotifier`
 
-`IRunNotifier` lebt in Core (`Core/Notifications/`). `PostgresEventSink` (Infrastructure) konsumiert den Vertrag — ohne Web-Dependency. `LiveRunNotifier` (`Web/Notifications/`) lebt in Web, Singleton-Lifetime, und veröffentlicht jede Meldung zweimal: in den `IRunUpdateFeed` für die Blazor-Seiten und in die `RunHub`-Gruppen (bis zum Rückbau des Hubs in Etappe 8). Den Besitzer des Laufs ermittelt er selbst (`IRunRepository`, zwischengespeichert) und schickt Listen-Updates nur an Besitzer und Administratoren, nie an alle. Notifier-Aufrufe sind best-effort (`try/catch`).
+`IRunNotifier` lebt in Core (`Core/Notifications/`). `PostgresEventSink` (Infrastructure) konsumiert den Vertrag — ohne Web-Dependency. `LiveRunNotifier` (`Web/Notifications/`) lebt in Web, Singleton-Lifetime, und veröffentlicht jede Meldung zweimal: in den `IRunUpdateFeed` für die Blazor-Seiten und in die `RunHub`-Gruppen (bis zum Rückbau des Hubs mit Schnitt 2, D-077). Den Besitzer des Laufs ermittelt er selbst (`IRunRepository`, zwischengespeichert) und schickt Listen-Updates nur an Besitzer und Administratoren, nie an alle. Notifier-Aufrufe sind best-effort (`try/catch`).
 
 **Sequenz User-Submit → Live-View:**
 
@@ -727,7 +728,7 @@ Browser /new  →  IRunService.SubmitRunAsync  →  RunEntity (Pending) in DB
                                                 ↓
                                       LiveRunNotifier
                                         → IRunUpdateFeed: Lauf-Thema, Listen-Thema des Besitzers, Admin-Listen-Thema
-                                        → RunHub-Gruppen (bis zum Rückbau in Etappe 8)
+                                        → RunHub-Gruppen (bis zum Rückbau, D-077)
                                                 ↓
                                       Seiten-Callback (WatchRunAsync / WatchRunList)
                                         → IRunService.GetRunAsync → StateHasChanged

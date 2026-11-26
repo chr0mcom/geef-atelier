@@ -67,9 +67,29 @@ public sealed class StartPageTests : TestContext
         Assert.Contains("several review rounds", cut.Find("label.start-careful").TextContent);
         Assert.True(cut.Find("[data-testid='start-submit']").HasAttribute("disabled"));
         Assert.Equal("Describe what you need first.", cut.Find("[data-testid='start-blocked-reason']").TextContent);
-        Assert.Equal("/new", cut.Find("[data-testid='start-more-options']").GetAttribute("href"));
+        Assert.Empty(cut.FindAll("[data-testid='start-more-options']"));
         Assert.Empty(cut.FindAll("select"));
         Assert.DoesNotContain("crew", cut.Markup, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TheLinkToTheOlderFormIsShownToAdministrators()
+    {
+        _auth.SetRoles(OwnerScope.AdminRole);
+
+        var cut = RenderComponent<Start>();
+
+        Assert.Equal("/new", cut.Find("[data-testid='start-more-options']").GetAttribute("href"));
+    }
+
+    [Fact]
+    public void TheLinkToTheOlderFormIsShownToEveryoneWhenTheWorkshopSwitchIsOff()
+    {
+        Services.Configure<UiOptions>(o => o.WorkshopForAdminsOnly = false);
+
+        var cut = RenderComponent<Start>();
+
+        Assert.Equal("/new", cut.Find("[data-testid='start-more-options']").GetAttribute("href"));
     }
 
     [Fact]

@@ -663,7 +663,7 @@ extern erreichbaren Routen:
 | `/login` | GET/POST | Keine | Login-Seite (Static SSR) |
 | `/auth/logout` | POST | Cookie | Logout (Anti-Forgery, Minimal-API) |
 | `/settings/theme` | POST | Keine | Theme-Wechsel-Fallback (No-JS), Redirect zum Referer |
-| `/hubs/runs` | WS | Cookie | SignalR-Hub für Live-Run-Updates, nur für Angemeldete; Gruppennamen leitet der Server ab, und die Verbindung schließt bei Ablauf der Anmeldung (D-067). Die eigenen Seiten der Anwendung nutzen stattdessen den prozessinternen `IRunUpdateFeed`; ein externer Client ist nicht bekannt, der Hub entfällt in Etappe 8 (D-068). |
+| `/hubs/runs` | WS | Cookie | SignalR-Hub für Live-Run-Updates, nur für Angemeldete; Gruppennamen leitet der Server ab, und die Verbindung schließt bei Ablauf der Anmeldung (D-067). Die eigenen Seiten der Anwendung nutzen stattdessen den prozessinternen `IRunUpdateFeed`; ein externer Client ist nicht bekannt, der Hub entfällt mit Rückbau Schnitt 2, sobald sein Auslöser in D-077 erfüllt ist (D-068). |
 | `/access-denied` | GET | Cookie | Erscheint für Angemeldete, die eine Seite ohne Berechtigung öffnen (D-067) |
 | `/admin/users` | GET | Cookie (Admin) | Benutzerverwaltung |
 | `/admin/oauth-clients` | GET | Cookie (Admin) | OAuth-Client-Verwaltung |

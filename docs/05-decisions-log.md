@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-11-26 (D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
+*Last updated: 2026-11-26 (D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -1720,7 +1720,7 @@ blind pairwise comparison; real tasks stay outside Git ([`tools/Eval/README.md`]
 
 ## D-068 — Direction of the rebuild: order, direct path, questions, sources, memory (2026-11-24)
 
-**Status:** decided, being implemented. A direction decision; the individual stages get their own entries.
+**Status:** decided; implemented up to stage 6, then completed by D-077 (stages 1b, 7, 8 and 9 not built, each with a trigger). A direction decision; the individual stages get their own entries.
 
 **Goal.** A user, including a layperson, types one sentence, optionally adds files, and within minutes gets
 a result they prefer to a direct model call. The result invents nothing, keeps hard requirements and states
@@ -2921,3 +2921,89 @@ together with `upload_check`, **passed**:
 
 Then `Uploads:Tickets=On` became the default. Way back: the switch `Off` or the previous image; Step53 is purely additive.
 Not checked: claude.ai as a client.
+
+## D-077 — Completion of the rebuild (2026-11-26)
+
+**Status:** decided. The rebuild that D-068 started ends with stage 6 (D-076) and a small closing round, stage 8a. Stages 1b, 7,
+8 (apart from 8a) and 9 are not built; each of them waits for the trigger named below. An independent review of the plan
+against the code and the use so far led to this split.
+
+**Why stop here.** The new way is hardly used so far. Every further stage could therefore essentially only be checked on
+measurement accounts – the lesson of stage 5 (three rules built and removed again) and stage 6 (library dropped). The next
+gain comes from using the product, not from building more. The older way (crew composer, `submit_auto_crew_request`, the
+older tools, the older form, "Extra careful") is not taken away before the new way has been used. "Finished as far as
+possible" therefore means a clean end state, not every line of the plan. The list of measurement accounts for the triggers lives only in the operations configuration, never in
+this repository.
+
+**What runs.** Stages 0–6 as described in D-067 to D-076: one sentence as an order, at most three questions with click answers
+before the run, files read in full, the direct path as default, upload ticket over MCP. Built but switched off or reduced:
+change of a result (`Orders:Revise = Off`), web research (`Research:Mode = Off`), fact check only reporting
+(`Direct:FactCheckMode = Report`). Placing an order from claude.ai is not checked.
+
+**Stage 1b is not built.** Checked against the code on 2026-11-26; missing are:
+- **Loop:** no `BestDraftSelector` – the careful loop still delivers the last draft; `ProfileBasedExecutor` keeps only a
+  "best draft" yardstick, and that is the longest text (`LongestOf`). The writer still gets all findings of the previous round
+  (`ExtractPreviousFindings` returns `AllFindings`), including non-blocking findings and findings that only report a failed
+  reviewer. No `DraftCollapseDetector`: the length guard stays (`IsRegression` – below 70 % of the longest draft so far, from
+  2,000 characters on; one forceful retry, then the longest text wins), so shortening a text in the loop is still impossible.
+  No `PlateauConvergencePolicy`: there is no stop after two rounds without improvement (the crew composer's template sets
+  `StagnationThreshold` equal to `MaxIterations`; elsewhere the default of 3 for unchanged findings applies). Built, but already in stage 0 (D-067): a failover reported by
+  `OpenAiCompatibleClient` becomes a run warning.
+- **First removal cut:** nothing removed. Agentic tool path, `/tools` and tool bindings; MCP client and `/mcp-servers`;
+  Template Studio; grounding types `rest-api`, `academic-search`, `news-search` and `url-fetch` with
+  `Infrastructure/Security/*`; finalizers `ExternalSink` and `MetadataEnrich`; `HttpProviderEditor`; the dead concepts
+  `MaxQueriesPerRun` and `AdvisorRetryAttempted`; the tables `ToolDefinitions`, `ToolInvocations`, `McpServerConfigs`,
+  `TemplateStudioAnalyses` and `StudioSettings` – all still in place. DNS pinning (D-066) stays an open hardening task.
+- **Consequence:** "stages 0–6 shipped" is true only without 1b. The question of stage 9 ("does the *defused* loop beat the
+  direct path?") cannot be asked in this form; a measurement would compare today's loop.
+
+**Stage 7 (memory): dropped.** No need shown; the proof of the stage ("the second order asks one question less") would only
+be possible on a measurement account. Remembered rules would go into the clarifier prompt and make the
+measurement D-072 invalid. The learnings are not carried over (they fit no kind of text of the direct path); the table stays.
+**Trigger** for a new start in the smallest form ("Remember this?" after an answer): an account outside the measurements gets a
+question on the same topic twice, or at least 10 answered questions from at least 2 such accounts within 60 days (query over
+`Orders.QuestionsAskedAt`/`AnsweredAt` and the topics in `ClarifyJson`).
+
+**Stage 8: only 8a now** (see below). The rest:
+- **Locked**, because it belongs to the older way, which goes only once the new one is used: crew composer, `submit_auto_crew_request`, the older MCP
+  tools, the older form; tool path, older grounding profiles, vector knowledge base, embeddings (attachments and web search of
+  "Extra careful" and the composer run through them).
+- **Later, in one go with the rest:** learning loop, MCP client, Template Studio code (dead, but invisible to non-admins with
+  the switch of 8a; a separate pass with review, full suite and deploy is not worth it).
+- **Dropped until the removal:** archiving one-off crews and the columns `OwnerUsername`/`Origin`; hand-built crews are never
+  deleted.
+- **Migration baseline:** locked, at the earliest after the last `DROP`, otherwise never.
+- **Later:** orchestrator out of the web layer, orders that survive a deploy, "Insights", documentation in one language. Until
+  then: deploy only when no run is `Pending` or `Running`.
+- **Trigger for the removal** (cuts 1 and 2 together): an account outside the measurements has placed at least 3 orders through
+  the new tools or the new page, **and** in the 30 days after that no account outside the measurements has a run through
+  `submit_auto_crew_request`, `submit_request` or "Extra careful". Then in this order: navigation → registration (the older
+  tools answer with a hint for one version) → code → tests → seeds; crews are only archived; a `DROP` at the earliest one
+  deploy **and** 30 days later, with a dump and an image tag; the baseline last.
+
+**Stage 9 ("Extra careful" anew): deferred.** The measurement costs at least ten long runs plus a blind comparison on a shared
+quota, and its result would only decide about the older way – which stays for now anyway. **Trigger:** the older way is still
+used *although* the new tools have arrived in the AI clients in use (at least 3 runs of an account outside the measurements in
+30 days). Then a single night measurement on the existing system decides: five
+long tasks, at most ten runs, stop when the circuit breaker is open. If the loop loses, the removal of stage 8 applies; if the
+older way is no longer used, it goes without a measurement.
+
+**Stage 8a: workshop entries for administrators only.** New switch `Ui:WorkshopForAdminsOnly` (shipped `true`). While it is on,
+only administrators see the menu "Workshop", the link "More options (choose a team yourself)" on the start page and
+"Technical details" on the order page; on "Connected clients" and "OAuth clients" the way back leads others to "My work"
+instead of into the hidden workshop. Pages, routes, access rights and data are unchanged: a workshop page still opens when its
+address is typed or comes from an older tool, and earlier runs are listed under "My work" as orders (Step48). On a phone the
+opened workshop menu now takes the width of the link row (before, it stuck out 8 px). Tests: bUnit for menu, start page,
+order page, account pages, the shipped value and the unchanged access rights of the workshop pages; Playwright on a phone in
+a dark and a light theme. **Way back:** set `Ui__WorkshopForAdminsOnly=false` under `environment` of the web service in the compose file or override
+(an `.env` file alone is not enough) and recreate the container.
+
+**Hard limits, also later, without exception when working autonomously:** no `DROP`, no deleting of rows (crews, learnings,
+documents, accounts, OAuth clients of real users); `Mcp:LegacyTools` stays `true`; `submit_auto_crew_request` and
+`submit_request` are neither removed nor silently redirected to the new way; no baseline; clarifier and reviewer prompts
+unchanged; `Orders:Revise`, research and the fact checker are not switched on for everyone while their gate is missing.
+
+**If something is built later.** Closer to the benefit than stages 7–9 is what is built but switched off. First choice:
+changing a result without the quick button "Longer" (which invented a fact at gate N′, D-075) as a small stage of its own with
+its own contract and a night measurement – without it a layperson cannot change anything about a result. After that R3 of the
+research with a larger sample (D-074). Both only at night and with an upper limit.

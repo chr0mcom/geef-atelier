@@ -4789,7 +4789,9 @@ textarea.form-control {
     padding: 10px 16px;
   }
   .nav-right { justify-self: end; display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .nav-links { grid-column: 1 / -1; grid-row: 2; flex-wrap: wrap; margin: 0 -12px; }
+  .nav-links { grid-column: 1 / -1; grid-row: 2; flex-wrap: wrap; margin: 0 -12px; position: relative; }
+  .nav-group { position: static; }
+  .nav-dropdown { left: 12px; right: 12px; }
   .user-menu-dd { right: 16px; }
 }
 

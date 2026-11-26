@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-26 (D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
+*Letzte Aktualisierung: 2026-11-26 (D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -1782,7 +1782,7 @@ auf einem festen Aufgabenset; echte Aufträge bleiben außerhalb von Git
 
 ## D-068 — Richtung Umbau: Auftrag, Direktweg, Rückfragen, Quellen, Gedächtnis (2026-11-24)
 
-**Status:** beschlossen, in Umsetzung. Richtungsentscheidung; die einzelnen Etappen bekommen eigene Einträge.
+**Status:** beschlossen; bis Etappe 6 umgesetzt, dann mit D-077 abgeschlossen (Etappen 1b, 7, 8 und 9 nicht gebaut, je mit Auslöser). Richtungsentscheidung; die einzelnen Etappen bekommen eigene Einträge.
 
 **Ziel.** Ein Anwender, auch ein Laie, tippt einen Satz, gibt optional Dateien mit und bekommt in Minuten ein
 Ergebnis, das er dem direkten Modellaufruf vorzieht. Das Ergebnis erfindet nichts, hält harte Vorgaben ein
@@ -3035,3 +3035,90 @@ ausgewertet mit `upload_check`, **bestanden**:
 
 Danach `Uploads:Tickets=On` als Standard. Rückweg: Schalter `Off` oder das vorherige Image; Step53 ist rein additiv.
 Nicht geprüft: claude.ai als Client.
+
+## D-077 — Abschluss des Umbaus (2026-11-26)
+
+**Status:** beschlossen. Der mit D-068 begonnene Umbau endet mit Etappe 6 (D-076) und einer kleinen Abschlussrunde, Etappe 8a.
+Die Etappen 1b, 7, 8 (außer 8a) und 9 sind nicht gebaut; jede wartet auf den unten genannten Auslöser. Grundlage der
+Einteilung ist eine unabhängige Prüfung des Plans gegen den Code und die bisherige Nutzung.
+
+**Warum hier anhalten.** Der neue Weg wird bisher kaum genutzt. Jede weitere Etappe ließe sich deshalb im Wesentlichen nur an
+Messkonten prüfen – die Lehre aus Etappe 5 (drei Regeln gebaut und wieder entfernt) und Etappe 6 (Bibliothek gestrichen). Der
+nächste Gewinn kommt aus dem Benutzen, nicht aus mehr Bau. Der alte Weg (Crew-Composer, `submit_auto_crew_request`, die älteren
+Werkzeuge, das alte Formular, „Extra careful“) wird nicht weggenommen, bevor der neue benutzt wurde. „Soweit möglich fertig“
+heißt deshalb: sauberer Endstand, nicht jede Planzeile. Die Liste der Messkonten für die Auslöser steht nur in der Betriebskonfiguration, nie in diesem
+Repository.
+
+**Was läuft.** Die Etappen 0–6 wie in D-067 bis D-076 beschrieben: ein Satz als Auftrag, höchstens drei Rückfragen zum Anklicken
+vor dem Lauf, Dateien ganz gelesen, Direktweg als Standard, Upload-Ticket über MCP. Gebaut, aber ausgeschaltet oder
+eingeschränkt: Ändern eines Ergebnisses (`Orders:Revise = Off`), Internet-Recherche (`Research:Mode = Off`), Faktenprüfer nur
+meldend (`Direct:FactCheckMode = Report`). Ein Auftrag aus claude.ai heraus ist nicht geprüft.
+
+**Etappe 1b ist nicht gebaut.** Am Code geprüft am 2026-11-26; es fehlen:
+- **Schleife:** kein `BestDraftSelector` – die sorgfältige Schleife liefert weiter die letzte Fassung; `ProfileBasedExecutor`
+  führt nur einen „besten Entwurf“ als Maßstab, und das ist der längste Text (`LongestOf`). Der Schreiber bekommt weiter alle
+  Befunde der Vorrunde (`ExtractPreviousFindings` liefert `AllFindings`), auch nicht blockierende und solche, die nur einen
+  ausgefallenen Prüfer melden. Kein `DraftCollapseDetector`: Der Längenschutz bleibt (`IsRegression` – unter 70 % des bisher
+  längsten Entwurfs, ab 2.000 Zeichen; ein nachdrücklicher zweiter Versuch, danach gewinnt der längste Text), Kürzen in der
+  Schleife ist also weiter unmöglich. Keine `PlateauConvergencePolicy`: Es gibt keinen Stopp nach zwei Runden ohne Verbesserung
+  (die Vorlage des Crew-Composers setzt `StagnationThreshold` gleich `MaxIterations`; sonst gilt der Standardwert 3 für
+  gleichbleibende Befunde). Gebaut, aber schon in Etappe 0 (D-067): Ein Failover,
+  den `OpenAiCompatibleClient` erkennt, wird zur Warnung am Lauf.
+- **Rückbau Schnitt 1:** nichts entfernt. Agentischer Tool-Pfad, `/tools` und Tool-Bindungen; MCP-Client und `/mcp-servers`;
+  Template Studio; die Grounding-Typen `rest-api`, `academic-search`, `news-search` und `url-fetch` samt
+  `Infrastructure/Security/*`; die Finalizer `ExternalSink` und `MetadataEnrich`; `HttpProviderEditor`; die toten Konzepte
+  `MaxQueriesPerRun` und `AdvisorRetryAttempted`; die Tabellen `ToolDefinitions`, `ToolInvocations`, `McpServerConfigs`,
+  `TemplateStudioAnalyses` und `StudioSettings` – alles noch vorhanden. DNS-Pinning (D-066) bleibt eine offene Härtung.
+- **Folge:** „Etappen 0–6 ausgeliefert“ stimmt nur ohne 1b. Die Frage von Etappe 9 („schlägt die *entschärfte* Schleife den
+  Direktweg?“) ist so nicht stellbar; eine Messung würde die heutige Schleife vergleichen.
+
+**Etappe 7 (Gedächtnis): gestrichen.** Kein Bedarf belegt; der Nachweis der Etappe („der zweite Auftrag fragt eine Frage
+weniger“) wäre nur an einem Messkonto möglich. Gemerkte Regeln gingen in den Klärer-Prompt und machten die Messung
+D-072 ungültig. Die Learnings werden nicht übernommen (sie passen zu keiner Textsorte des Direktwegs); die Tabelle bleibt.
+**Auslöser** für einen Neuanlauf in kleinster Form („Remember this?“ nach einer Antwort): Ein Konto außerhalb der Messungen
+bekommt zweimal eine Frage zum selben Thema, oder mindestens 10 beantwortete Fragen aus mindestens 2 solchen Konten in 60 Tagen
+(Abfrage über `Orders.QuestionsAskedAt`/`AnsweredAt` und die Themen in `ClarifyJson`).
+
+**Etappe 8: jetzt nur 8a** (siehe unten). Der Rest:
+- **Gesperrt**, weil Teil des alten Wegs, der erst entfällt, wenn der neue benutzt wird: Crew-Composer, `submit_auto_crew_request`, die älteren
+  MCP-Werkzeuge, das alte Formular; Werkzeug-Pfad, alte Grounding-Profile, Vektor-Wissensbasis, Embeddings (Anhänge und
+  Websuche von „Extra careful“ und dem Composer laufen darüber).
+- **Später, in einem Zug mit dem Rest:** Learning-Schleife, MCP-Client, Template Studio (Code) – tot, aber mit dem Schalter aus
+  8a für Nicht-Admins unsichtbar; ein eigener Durchgang mit Review, Gesamtsuite und Deploy lohnt nicht.
+- **Gestrichen bis zum Rückbau:** Einmal-Crews archivieren und die Spalten `OwnerUsername`/`Origin`; handgebaute Crews werden
+  nie gelöscht.
+- **Migrations-Baseline:** gesperrt, frühestens nach dem letzten `DROP`, sonst nie.
+- **Später:** Orchestrator aus der Web-Schicht, Aufträge, die einen Deploy überleben, „Insights“, Doku in einer Sprache. Bis
+  dahin gilt: Deploy nur, wenn kein Lauf `Pending` oder `Running` ist.
+- **Auslöser für den Rückbau** (Schnitt 1 und 2 zusammen): Ein Konto außerhalb der Messungen hat mindestens 3 Aufträge über die
+  neuen Werkzeuge oder die neue Seite gestellt, **und** in den 30 Tagen danach hat kein Konto außerhalb der Messungen einen Lauf
+  über `submit_auto_crew_request`, `submit_request` oder „Extra careful“. Dann in dieser Reihenfolge: Navigation → Registrierung
+  (die älteren Werkzeuge antworten eine Version lang mit Hinweis) → Code → Tests → Seeds; Crews nur archivieren; `DROP`
+  frühestens einen Deploy **und** 30 Tage später, mit Dump und Image-Tag; die Baseline zuletzt.
+
+**Etappe 9 („Extra careful“ neu): zurückgestellt.** Die Messung kostet mindestens zehn lange Läufe plus Blindvergleich auf
+einem geteilten Kontingent, und ihr Ergebnis entschiede nur über den alten Weg – der vorerst ohnehin bleibt. **Auslöser:** Der
+alte Weg wird weiter genutzt, *obwohl* die neuen Werkzeuge in den verwendeten KI-Clients angekommen sind (mindestens 3 Läufe eines Kontos außerhalb der Messungen in 30 Tagen). Dann entscheidet
+eine einzige Nachtmessung am Bestand: fünf lange Aufgaben, höchstens zehn Läufe, Abbruch bei offenem Breaker. Verliert die
+Schleife, greift der Rückbau aus Etappe 8; wird der alte Weg nicht mehr genutzt, entfällt er ohne Messung.
+
+**Etappe 8a: Werkstatt-Einstiege nur für Admins.** Neuer Schalter `Ui:WorkshopForAdminsOnly` (ausgeliefert `true`). Solange er
+an ist, sehen nur Admins das Menü „Workshop“, den Link „More options (choose a team yourself)“ auf der Startseite und „Technical
+details“ auf der Auftragsseite; auf „Connected clients“ und „OAuth clients“ führt der Rückweg alle anderen zu „My work“ statt in
+die ausgeblendete Werkstatt. Seiten, Routen, Rechte und Daten sind unverändert: Eine Werkstatt-Seite öffnet weiter, wenn ihre
+Adresse eingegeben wird oder aus einem älteren Werkzeug kommt, und frühere Läufe stehen als Aufträge unter „My work“ (Step48).
+Am Telefon nimmt das aufgeklappte Werkstatt-Menü jetzt die Breite der Linkzeile ein (vorher ragte es 8 px über den Rand).
+Tests: bUnit für Menü, Startseite, Auftragsseite, Kontoseiten, den ausgelieferten Wert und die unveränderten Rechte der
+Werkstatt-Seiten; Playwright am Telefon in einem dunklen und einem hellen Thema. **Rückweg:** `Ui__WorkshopForAdminsOnly=false`
+unter `environment` des Webdienstes in der Compose-Datei bzw. Override setzen (eine `.env`-Datei allein genügt nicht) und den
+Container neu erstellen.
+
+**Harte Grenzen, auch später ohne Ausnahme bei autonomer Arbeit:** kein `DROP`, kein Löschen von Zeilen (Crews, Learnings,
+Dokumente, Konten, OAuth-Clients echter Nutzer); `Mcp:LegacyTools` bleibt `true`; `submit_auto_crew_request` und
+`submit_request` werden weder entfernt noch still auf den neuen Weg umgeleitet; keine Baseline; Klärer- und Prüfer-Prompt
+unverändert; `Orders:Revise`, Recherche und Faktenprüfer werden nicht für alle eingeschaltet, solange ihr Tor fehlt.
+
+**Falls später doch gebaut wird.** Näher am Nutzen als die Etappen 7–9 liegt, was gebaut, aber ausgeschaltet ist. Erste Wahl:
+Ändern eines Ergebnisses ohne den Schnellknopf „Longer“ (der im Tor N′ eine Tatsache hinzufügte, D-075) als eigene kleine
+Etappe mit eigenem Vertrag und einer Nachtmessung – ohne sie kann ein Laie an einem Ergebnis nichts ändern. Danach R3 der
+Recherche mit größerer Menge (D-074). Beides nur nachts und mit Obergrenze.

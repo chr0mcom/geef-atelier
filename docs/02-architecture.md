@@ -620,6 +620,7 @@ two passes, report in `Runs.ReportJson`. Details: D-069 and D-070 in the
 | `Learning:Enabled` | `false` | Switches the continuous learning loop (D-054) on or off. When off, the `learning-extractor` and `learning-publisher` finalizers return immediately (no LLM call, no entry, no `learning-evaluation` run, no embedding), `learning-retrieval` grounding returns empty context without an embedding, and `/crew/learnings` shows that learning is paused. Crews that contain these parts stay valid. |
 | `EnvReference:Allowed` | empty list | Additional environment-variable names or prefixes (ending in `*`) that configuration may reference, on top of the built-in default list and the prefix `ATELIER_SECRET_*`. Details: [10-tool-system](10-tool-system.md#secrets-and-the-environment-variable-allow-list). |
 | `Orchestrator:PreparationTimeout` | `00:15:00` | How long a `Pending` run may stay without a crew snapshot (attachments still being prepared) before it is failed. |
+| `Ui:WorkshopForAdminsOnly` | `true` | While on, only administrators see the entries to the workshop pages: the menu "Workshop", the link to the older form on the start page and "Technical details" on the order page; the account pages lead others back to "My work". Pages, routes and access rights stay unchanged (D-077, stage 8a). Way back: `Ui__WorkshopForAdminsOnly=false` in the environment. |
 
 `Learning:Enabled` is registered exactly once (`AddLearningSwitch`, Infrastructure); every reader
 (finalizers, the retrieval provider, the learnings page) reads it through `IOptionsMonitor`, so a change
@@ -731,8 +732,8 @@ gated action (the gate is a `SemaphoreSlim(1,1)` and would wait for itself); cal
 `OnCancelled` or a reload run after the gated block.
 
 `RunHub` (`Web/Hubs/RunHub.cs`, mapped to `/hubs/runs` by `MapRunHub()`) has no client inside the
-application any more, and no external client is known. It stays **until its removal in stage 8**
-([D-068](05-decisions-log.md#d-068--direction-of-the-rebuild-order-direct-path-questions-sources-memory-2026-11-24))
+application any more, and no external client is known. It stays **until the second removal cut**, which waits for its trigger in
+[D-077](05-decisions-log.md#d-077--completion-of-the-rebuild-2026-11-26) ([D-068](05-decisions-log.md#d-068--direction-of-the-rebuild-order-direct-path-questions-sources-memory-2026-11-24))
 and is protected until then:
 
 - **Signed-in users only:** `[Authorize]` on the hub; `MapRunHub()` (`LiveUpdateServiceExtensions`) maps it
@@ -745,7 +746,7 @@ and is protected until then:
 
 ### `IRunNotifier` / `LiveRunNotifier`
 
-`IRunNotifier` lives in Core (`Core/Notifications/`). `PostgresEventSink` (Infrastructure) consumes the contract — without a Web dependency. `LiveRunNotifier` (`Web/Notifications/`) lives in Web, singleton lifetime, and publishes every update twice: into `IRunUpdateFeed` for the Blazor pages and into the `RunHub` groups (until the hub is removed in stage 8). It looks up the run's owner itself (`IRunRepository`, cached) and sends list updates only to the owner and to administrators, never to everyone. Notifier calls are best-effort (`try/catch`).
+`IRunNotifier` lives in Core (`Core/Notifications/`). `PostgresEventSink` (Infrastructure) consumes the contract — without a Web dependency. `LiveRunNotifier` (`Web/Notifications/`) lives in Web, singleton lifetime, and publishes every update twice: into `IRunUpdateFeed` for the Blazor pages and into the `RunHub` groups (until the hub is removed with the second removal cut, D-077). It looks up the run's owner itself (`IRunRepository`, cached) and sends list updates only to the owner and to administrators, never to everyone. Notifier calls are best-effort (`try/catch`).
 
 **Sequence user-submit → live view:**
 
@@ -763,7 +764,7 @@ Browser /new  →  IRunService.SubmitRunAsync  →  RunEntity (Pending) in DB
                                                 ↓
                                       LiveRunNotifier
                                         → IRunUpdateFeed: run topic, owner list topic, admin list topic
-                                        → RunHub groups (until removal in stage 8)
+                                        → RunHub groups (until the removal, D-077)
                                                 ↓
                                       Page callback (WatchRunAsync / WatchRunList)
                                         → IRunService.GetRunAsync → StateHasChanged

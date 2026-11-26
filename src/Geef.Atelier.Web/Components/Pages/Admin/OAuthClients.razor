@@ -11,7 +11,10 @@
 <div class="user-management" data-testid="oauth-clients-page">
     <div class="page-header">
         <h1>OAuth Clients</h1>
-        <a href="/runs" class="btn ghost" data-testid="btn-back">← Back</a>
+        <WorkshopEntry>
+            <ChildContent><a href="/runs" class="btn ghost" data-testid="btn-back">← Back</a></ChildContent>
+            <Fallback><a href="@WorkshopEntryExtensions.LayBackLink" class="btn ghost" data-testid="btn-back">← Back</a></Fallback>
+        </WorkshopEntry>
     </div>
 
     @if (!string.IsNullOrEmpty(_error))
