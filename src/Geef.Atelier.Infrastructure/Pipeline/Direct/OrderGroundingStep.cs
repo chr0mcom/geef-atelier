@@ -214,8 +214,7 @@ internal sealed class OrderGroundingStep(
     }
 
     /// <summary>The fact-check mode of the run: the override of the person who ordered the text, otherwise the global switch. Every run gets one.</summary>
-    internal static FactCheckMode Mode(DirectOptions options, string? user) =>
-        user is not null && options.FactCheckModeOverrides is { } overrides && overrides.TryGetValue(user, out var mode) ? mode : options.FactCheckMode;
+    internal static FactCheckMode Mode(DirectOptions options, string? user) => options.FactCheckModeFor(user);
 
     private DirectOptions Direct()
     {

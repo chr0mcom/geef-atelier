@@ -2,7 +2,7 @@
 
 *[Deutsch](02-architecture_de.md) · **English***
 
-*Last updated: 2026-11-24 (D-067: stage 0 safety net — run warnings, `Runs.Outcome`, fail-loud start and snapshot handling, preparation timeout, live updates in process and the hub for signed-in users only, configuration switches, end-to-end harness; second review round: described as built, `LiveRunNotifier`, `CircuitDataGate`, secret redaction, outcome table and snapshot test variables; before that 2026-11-22, D-066: model matrix — columns `ModelSlot`/`ModelDomain`/`Domain` (Step46), assignment at snapshot build; before that 2026-08-04, D-064: dynamic model catalog for CLI providers via the cli-proxy, three-state provenance, alias resolution at snapshot build time)*
+*Last updated: 2026-11-26 (pointer to the switches of the order features and the page `/how-it-works`; before that 2026-11-24, D-067: stage 0 safety net — run warnings, `Runs.Outcome`, fail-loud start and snapshot handling, preparation timeout, live updates in process and the hub for signed-in users only, configuration switches, end-to-end harness; second review round: described as built, `LiveRunNotifier`, `CircuitDataGate`, secret redaction, outcome table and snapshot test variables; before that 2026-11-22, D-066: model matrix — columns `ModelSlot`/`ModelDomain`/`Domain` (Step46), assignment at snapshot build; before that 2026-08-04, D-064: dynamic model catalog for CLI providers via the cli-proxy, three-state provenance, alias resolution at snapshot build time)*
 
 ## Layer diagram
 
@@ -621,6 +621,10 @@ two passes, report in `Runs.ReportJson`. Details: D-069 and D-070 in the
 | `EnvReference:Allowed` | empty list | Additional environment-variable names or prefixes (ending in `*`) that configuration may reference, on top of the built-in default list and the prefix `ATELIER_SECRET_*`. Details: [10-tool-system](10-tool-system.md#secrets-and-the-environment-variable-allow-list). |
 | `Orchestrator:PreparationTimeout` | `00:15:00` | How long a `Pending` run may stay without a crew snapshot (attachments still being prepared) before it is failed. |
 | `Ui:WorkshopForAdminsOnly` | `true` | While on, only administrators see the entries to the workshop pages: the menu "Workshop", the link to the older form on the start page and "Technical details" on the order page; the account pages lead others back to "My work". Pages, routes and access rights stay unchanged (D-077, stage 8a). Way back: `Ui__WorkshopForAdminsOnly=false` in the environment. |
+
+The switches of the order features (questions, changing a text, research, fact check, upload ticket, older MCP tools), their
+shipped values and their exceptions per person are listed in the [admin guide](14-admin-guide.md#switching-features). The public
+page `/how-it-works` reads the same switches and exceptions (`Web/Display/HowItWorksFeatures.cs`).
 
 `Learning:Enabled` is registered exactly once (`AddLearningSwitch`, Infrastructure); every reader
 (finalizers, the retrieval provider, the learnings page) reads it through `IOptionsMonitor`, so a change

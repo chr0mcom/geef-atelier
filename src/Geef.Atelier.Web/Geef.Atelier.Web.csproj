@@ -17,7 +17,7 @@
     <InternalsVisibleTo Include="Geef.Atelier.Tests" />
   </ItemGroup>
 
-  <!-- Embed allowlisted docs (README + 01-04 + 06-09). 05-decisions-log is intentionally excluded. -->
+  <!-- Embed allowlisted docs (README, 01-04, 06-09 and the guides 12-15). 05-decisions-log is intentionally excluded. -->
   <ItemGroup>
     <EmbeddedResource Include="..\..\docs\*.md"
                       Exclude="..\..\docs\05-decisions-log.md;..\..\docs\05-decisions-log_de.md">

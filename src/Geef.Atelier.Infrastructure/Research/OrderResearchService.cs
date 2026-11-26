@@ -270,8 +270,7 @@ internal sealed class OrderResearchService(
             stored switch { true => "yes", false => "no, read the stored one", null => "failed" });
     }
 
-    private static ResearchMode ModeFor(ResearchOptions settings, string? user) =>
-        user is not null && settings.ModeOverrides.TryGetValue(user, out var mode) ? mode : settings.Mode;
+    private static ResearchMode ModeFor(ResearchOptions settings, string? user) => settings.ModeFor(user);
 
     private static bool HasAudit(ResearchOptions settings, string? user) =>
         !string.IsNullOrWhiteSpace(settings.AuditDirectory) && user is not null && settings.ModeOverrides.ContainsKey(user);

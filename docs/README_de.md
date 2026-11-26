@@ -2,7 +2,18 @@
 
 *[English](README.md) · **Deutsch***
 
-Dies ist die laufend gepflegte Doku zum Projekt **Geef.Atelier** — einer Text-Manufaktur, die auf dem [Geef SDK](https://github.com/chr0mcom/geef) aufbaut und dessen GEEF-Pipeline (Grounding / Execution / Evaluation / Finalize) produktiv nutzt, um hochwertige Texte beliebiger Sorte zu erzeugen.
+Dies ist die laufend gepflegte Doku zum Projekt **Geef.Atelier**: Es macht aus einem kurzen Auftrag einen fertigen Text und sagt, was geprüft wurde, was noch offen ist und was angenommen wurde. Grundlage ist das [Geef SDK](https://github.com/chr0mcom/geef).
+
+**Neu hier?** Fang mit dem Leitfaden für deine Rolle an:
+
+| Leitfaden | Für |
+|---|---|
+| [12-user-guide_de.md](12-user-guide_de.md) | Alle, die im Browser mit Atelier schreiben |
+| [13-ai-assistant-guide_de.md](13-ai-assistant-guide_de.md) | Menschen, die Atelier aus einem KI-Assistenten nutzen (MCP) |
+| [14-admin-guide_de.md](14-admin-guide_de.md) | Administration: Konten, Schalter, die ältere Werkstatt |
+| [15-developer-guide_de.md](15-developer-guide_de.md) | Entwicklung und Betrieb: Karte des Systems, Tests, Regeln |
+
+Die laufende Anwendung erklärt sich außerdem auf der öffentlichen Seite `/how-it-works`, die den aktuellen Schaltern folgt.
 
 Die Doku entsteht parallel zum Brainstorming und wird nach jeder Entscheidungsrunde aktualisiert. Wenn ein Thema noch nicht ausgearbeitet ist, steht das explizit im jeweiligen Dokument.
 
@@ -10,6 +21,7 @@ Die Doku entsteht parallel zum Brainstorming und wird nach jeder Entscheidungsru
 
 | Datei | Inhalt | Typ |
 |---|---|---|
+| [12-user-guide.md](12-user-guide_de.md) … [15-developer-guide.md](15-developer-guide_de.md) | Leitfäden je Zielgruppe (siehe oben) | Living |
 | [01-vision-and-scope.md](01-vision-and-scope_de.md) | Was ist das Projekt, was nicht, für wen, in welchem Umfeld | Living |
 | [02-architecture.md](02-architecture_de.md) | Schichten, Komponenten, Datenfluss, DB-Schema; Schutzmechanismen am Lauf, Konfigurationsschalter, Ende-zu-Ende-Gerüst (D-067) | Living |
 | [03-walking-skeleton-plan.md](03-walking-skeleton-plan_de.md) | Der ursprüngliche 10-Schritte-Bauplan (historisch; Skeleton abgeschlossen) | Historisch |
@@ -17,7 +29,7 @@ Die Doku entsteht parallel zum Brainstorming und wird nach jeder Entscheidungsru
 | [05-decisions-log.md](05-decisions-log_de.md) | Chronologisches, append-only Protokoll aller Architektur-Entscheidungen (D-001 ff.) | Historisch |
 | [06-reviewer-calibration.md](06-reviewer-calibration_de.md) | Severity-Taxonomie und Convergence-Policy-Standard für Reviewer | Living |
 | [07-design-system.md](07-design-system_de.md) | Theme-System, Typografie, Komponenten-Inventar (Stand Design-Translation PS-3) | Living |
-| [08-crew-system.md](08-crew-system_de.md) | Crew-/Profil-/Template-System, System-Profile, Advisor-Pässe | Living |
+| [08-crew-system.md](08-crew-system_de.md) | Crew-/Profil-/Template-System, System-Profile, Advisor-Pässe – der ältere Weg („Workshop“, „Extra careful“) | Living |
 | [09-endpoint-reference.md](09-endpoint-reference_de.md) | Referenz aller extern erreichbaren HTTP-Endpunkte (MCP, OAuth, Web/Account) | Living |
 | [10-tool-system.md](10-tool-system_de.md) | Zentraler Tool-Katalog + agentischer Tool-Use (Pull) + Grounding (Push) + MCP-Client (D-060); Ist-Zustand: Pull nie verdrahtet und eingefroren, Allowlist für Umgebungsvariablen (D-067) | Living |
 | [11-specialization-packs.md](11-specialization-packs_de.md) | Generische Akteure + wiederverwendbare gescopte Spezialisierungs-Packs (D-061) | Living |
@@ -36,7 +48,7 @@ Im übergeordneten Infrastruktur-Repository unter `/srv/docker/docs/` liegen die
 
 ## Status
 
-- **Phase:** Walking Skeleton abgeschlossen; produktiv unter `https://geef.stefan-bechtel.de`. Zahlreiche Post-Skeleton-Erweiterungen ausgeliefert (Crew-System, Advisor-Pässe, Grounding/Vector-Store-RAG, Run-Attachments, Cost-Tracking, Template Studio, Domain-Templates, MCP-OAuth 2.1, Multi-User, Run-User-Isolation, Finalizer-Pipeline, Grounding-Refinement, Academic-Search, REST-API-Grounding, Landing-Page, Continuous-Learning-Loop).
+- **Phase:** produktiv. Seit dem Umbau im November 2026 (D-068 bis D-077) ist der Auftrag mit dem Direktweg der Standard; das ältere Crew-System (mit seinen Erweiterungen wie Advisor-Pässen, Grounding, Finalizern, Template Studio und der pausierten Lernschleife) bleibt als „Workshop“ und „Extra careful“ verfügbar.
 - **Letzte Aktualisierung:** 2026-11-26
 - **Aktueller Stand & nächste Schritte:** siehe [Projekt-README](../README_de.md) (Implementierungsstand) und [Decisions-Log](05-decisions-log_de.md) (chronologische Entscheidungshistorie, zuletzt D-077 „Abschluss des Umbaus“). Der Umbau nach D-068 endet mit Etappe 6 und der Abschlussrunde 8a (D-077): Die Etappen 1b, 7, 8 (außer 8a) und 9 sind nicht gebaut, und das alte Crew-, Tool- und Learning-System bleibt bestehen, bis der Auslöser für den Rückbau in D-077 erfüllt ist; die Dokumente kennzeichnen eingefrorene oder zum Rückbau vorgesehene Teile.
 

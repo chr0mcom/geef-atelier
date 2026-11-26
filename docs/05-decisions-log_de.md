@@ -3246,3 +3246,18 @@ Angaben unter „About me“ weiter beim Schreiber ankommen; `submit_request` mi
 gebildeten Anfrage; ohne gebildete Anfrage sucht es nichts und speichert die Warnung. Ohne diese Änderung scheitern alle diese
 Tests außer dem mit `crewTemplate`, der weiter sucht. Die Prüfung eines geklärten sorgfältigen Auftrags in `IntakePrivacyEndToEndTests` erwartet jetzt keine Suche.
 Datenbanktests für die Regel (`StandardOrderWebSearchTests`), Unit-Tests für Extractor und Provider.
+
+## D-080 — Erklärseite „How it works“ und Leitfäden je Zielgruppe (2026-11-26)
+
+- **Seite `/how-it-works`**, ohne Anmeldung erreichbar: erklärt in einfachen englischen Wörtern (D-062), was Atelier tut, was
+  geprüft wird und was nicht. Sie liest dieselben Schalter wie die Anwendung, einschließlich der Ausnahmen je Person, und
+  beschreibt deshalb nie eine Funktion, die für die Person ausgeschaltet ist. Die Tabelle mit Schlüsselnamen und Werten sehen nur
+  Administratoren.
+- **Leitfäden** `docs/12` bis `docs/15` (Anwender, KI-Assistenten, Administration, Entwicklung), deutsch und englisch. Ein Test
+  gleicht die Werkzeugliste im KI-Assistenten-Leitfaden mit dem Server ab, ein weiterer rendert alle in der App freigegebenen
+  Dokumente und prüft jedes Linkziel.
+- **Ehrlichkeit vor Werbung:** Aussagen nur, soweit der Code sie sicherstellt; keine Behauptungen über andere Produkte.
+  Geprüft in zwei unabhängigen Runden.
+- **Zur Aussage über claude.ai:** Seit dem 26.11. ist ein kompletter Weg über eine in claude.ai eingerichtete Verbindung erprobt,
+  aufgerufen aus Claude Code: Auftrag mit Datei und Rückfrage, danach eine Änderung. Das Chatfenster von claude.ai selbst und
+  Claude Desktop sind weiterhin nicht geprüft. Das ersetzt insoweit die früheren Vermerke „claude.ai nicht geprüft“.

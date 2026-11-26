@@ -2,7 +2,7 @@
 
 *[English](02-architecture.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-24 (D-067: Etappe 0 Sicherheitsnetz — Warnungen am Lauf, `Runs.Outcome`, lautes Verhalten bei Start und Snapshot, Vorbereitungs-Zeitlimit, Live-Updates im Prozess und Hub nur für Angemeldete, Konfigurationsschalter, Ende-zu-Ende-Gerüst; zweite Prüfrunde: als umgesetzt beschrieben, `LiveRunNotifier`, `CircuitDataGate`, Schwärzen von Geheimnissen, Outcome-Tabelle und Variablen für den Snapshot-Test; zuvor 2026-11-22, D-066: Modellmatrix — Spalten `ModelSlot`/`ModelDomain`/`Domain` (Step46), Zuweisung beim Snapshot-Bau; zuvor 2026-08-04, D-064: dynamischer Modell-Katalog für CLI-Provider über den cli-proxy, dreiwertige Herkunft, Alias-Auflösung zum Snapshot-Bauzeitpunkt)*
+*Letzte Aktualisierung: 2026-11-26 (Verweis auf die Schalter der Auftragsfunktionen und die Seite `/how-it-works`; zuvor 2026-11-24, D-067: Etappe 0 Sicherheitsnetz — Warnungen am Lauf, `Runs.Outcome`, lautes Verhalten bei Start und Snapshot, Vorbereitungs-Zeitlimit, Live-Updates im Prozess und Hub nur für Angemeldete, Konfigurationsschalter, Ende-zu-Ende-Gerüst; zweite Prüfrunde: als umgesetzt beschrieben, `LiveRunNotifier`, `CircuitDataGate`, Schwärzen von Geheimnissen, Outcome-Tabelle und Variablen für den Snapshot-Test; zuvor 2026-11-22, D-066: Modellmatrix — Spalten `ModelSlot`/`ModelDomain`/`Domain` (Step46), Zuweisung beim Snapshot-Bau; zuvor 2026-08-04, D-064: dynamischer Modell-Katalog für CLI-Provider über den cli-proxy, dreiwertige Herkunft, Alias-Auflösung zum Snapshot-Bauzeitpunkt)*
 
 ## Schichtenbild
 
@@ -581,6 +581,11 @@ D-070 im [Decisions-Log](05-decisions-log_de.md).
 | `EnvReference:Allowed` | leere Liste | Zusätzliche Umgebungsvariablen-Namen oder Präfixe (mit `*` am Ende), die Konfiguration nennen darf, zusätzlich zur eingebauten Standardliste und zum Präfix `ATELIER_SECRET_*`. Einzelheiten: [10-tool-system](10-tool-system_de.md#secrets-und-die-allowlist-für-umgebungsvariablen). |
 | `Orchestrator:PreparationTimeout` | `00:15:00` | Wie lange ein `Pending`-Lauf ohne Crew-Snapshot (Anhänge noch in Vorbereitung) bleiben darf, bevor er auf `Failed` gesetzt wird. |
 | `Ui:WorkshopForAdminsOnly` | `true` | Solange an, sehen nur Admins die Einstiege zu den Werkstatt-Seiten: das Menü „Workshop“, den Link zum alten Formular auf der Startseite und „Technical details“ auf der Auftragsseite; die Kontoseiten führen alle anderen zurück zu „My work“. Seiten, Routen und Rechte bleiben unverändert (D-077, Etappe 8a). Rückweg: `Ui__WorkshopForAdminsOnly=false` in der Umgebung. |
+
+Die Schalter der Auftragsfunktionen (Fragen, Ändern eines Textes, Recherche, Faktenprüfung, Upload-Ticket, ältere
+MCP-Werkzeuge), ihre ausgelieferten Werte und ihre Ausnahmen je Person stehen im [Leitfaden für die
+Administration](14-admin-guide_de.md#funktionen-schalten). Die öffentliche Seite `/how-it-works` liest dieselben Schalter und
+Ausnahmen (`Web/Display/HowItWorksFeatures.cs`).
 
 `Learning:Enabled` wird genau einmal registriert (`AddLearningSwitch`, Infrastructure); alle Leser
 (Finalizer, Retrieval-Provider, Learnings-Seite) lesen den Schalter über `IOptionsMonitor`, eine Änderung

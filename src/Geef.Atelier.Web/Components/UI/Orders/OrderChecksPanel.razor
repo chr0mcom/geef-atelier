@@ -26,6 +26,7 @@
         <p class="order-checks-review" data-testid="order-checks-review" data-open="@(NeedsReview(checks) ? "true" : "false")">@checks.ToReview</p>
         <p class="order-checks-limits" data-testid="order-checks-limits">@checks.Limits</p>
     </section>
+    <p class="order-checks-more" data-testid="order-checks-more"><a href="/how-it-works#checks">What these checks mean</a></p>
 }
 
 @code {

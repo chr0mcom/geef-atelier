@@ -42,7 +42,7 @@ public sealed class WorkshopEntryFlowTests(PlaywrightFixture pw, PostgresFixture
             await page.GotoAsync($"{_host!.BaseUrl}/start");
             await page.Locator("[data-testid='start-page']").WaitForAsync(new LocatorWaitForOptions { Timeout = 15_000 });
             await WaitInteractiveAsync(page);
-            Assert.Equal(new[] { "/start", "/work" }, await NavHrefsAsync(page));
+            Assert.Equal(new[] { "/start", "/work", "/how-it-works" }, await NavHrefsAsync(page));
             Assert.Equal(0, await page.Locator("[data-testid='nav-workshop']").CountAsync());
             Assert.Equal(0, await page.Locator("[data-testid='start-more-options']").CountAsync());
             Assert.True(await page.Locator("[data-testid='nav-my-work']").IsVisibleAsync());
@@ -64,7 +64,7 @@ public sealed class WorkshopEntryFlowTests(PlaywrightFixture pw, PostgresFixture
             var response = await page.GotoAsync($"{_host.BaseUrl}/runs");
             Assert.Equal(200, response!.Status);
             await page.WaitForSelectorAsync("main h1", new PageWaitForSelectorOptions { Timeout = 15_000 });
-            Assert.Equal(new[] { "/start", "/work" }, await NavHrefsAsync(page));
+            Assert.Equal(new[] { "/start", "/work", "/how-it-works" }, await NavHrefsAsync(page));
         }
         finally
         {

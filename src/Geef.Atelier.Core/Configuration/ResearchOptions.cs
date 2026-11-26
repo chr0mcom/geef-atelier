@@ -45,3 +45,17 @@ public sealed class ResearchOptions
     /// <summary>Local directory for raw texts and entries during the acceptance; empty writes nothing.</summary>
     public string? AuditDirectory { get; set; }
 }
+
+/// <summary>Helpers on <see cref="ResearchOptions"/>.</summary>
+public static class ResearchOptionsExtensions
+{
+    /// <summary>
+    /// The research mode for orders of <paramref name="user"/>: the entry of <see cref="ResearchOptions.ModeOverrides"/> for that user
+    /// name, otherwise <see cref="ResearchOptions.Mode"/>.
+    /// </summary>
+    public static ResearchMode ModeFor(this ResearchOptions options, string? user)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return user is not null && options.ModeOverrides is { } overrides && overrides.TryGetValue(user, out var mode) ? mode : options.Mode;
+    }
+}

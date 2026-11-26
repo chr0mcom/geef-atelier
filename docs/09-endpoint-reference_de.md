@@ -2,7 +2,7 @@
 
 *[English](09-endpoint-reference.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-26 (Etappe 6: HTTP-Endpunkte des Upload-Tickets und Seite `/u/{id}`, `prepare_attachment`, `uploadIds` in `submit_order`, Zählung abgelehnter Anhänge, Server-Hinweis Schritt 2 hinter `Uploads:Tickets`; Etappe 5: `revise_order`, `export_order`, `cancel_order`, `list_orders`, `profile`, `latestVersion`, `earlierOpenPoints`, `fromVersion`, ältere Werkzeuge hinter `Mcp:LegacyTools`; Etappe 4: `lookedUp` in `get_order_result`, Server-Hinweis zu im Web nachgeschlagenen Stellen; Etappe 3: `checks`, `factCheck`, `unbackedPassages`, `sourceIssues`, `openPoints`, `writerAssumptions`, `sourceQuotes` in `get_order_result`, Server-Hinweise zum Zeigen; Etappe 2: `answer_order`, `needs_input` mit Fragen in `submit_order`/`get_order_status`, `assumptions` in `get_order_result`, neue Server-Hinweise; Etappe 1: Auftrags-Werkzeuge `submit_order`, `get_order_status`, `get_order_result`, `submit_request` als Hülle mit `orderId`, Server-Hinweise, `list_learnings` nur für Admins; D-067: `warnings` und `outcome` in `get_run_status`/`get_run_result`, Ergebnis erst nach `outcome` lesen; `/hubs/runs` bleibt bis Etappe 8; `/hubs/runs` nur für Angemeldete; Editoren nur für Admins und `/access-denied`; Learning standardmäßig pausiert; zuvor 2026-05-22, D-054: Tool list_learnings ergänzt; providerType um learning-retrieval erweitert)*
+*Letzte Aktualisierung: 2026-11-26 (öffentliche Seiten `/`, `/how-it-works`, `/docs` richtiggestellt und ergänzt; Etappe 6: HTTP-Endpunkte des Upload-Tickets und Seite `/u/{id}`, `prepare_attachment`, `uploadIds` in `submit_order`, Zählung abgelehnter Anhänge, Server-Hinweis Schritt 2 hinter `Uploads:Tickets`; Etappe 5: `revise_order`, `export_order`, `cancel_order`, `list_orders`, `profile`, `latestVersion`, `earlierOpenPoints`, `fromVersion`, ältere Werkzeuge hinter `Mcp:LegacyTools`; Etappe 4: `lookedUp` in `get_order_result`, Server-Hinweis zu im Web nachgeschlagenen Stellen; Etappe 3: `checks`, `factCheck`, `unbackedPassages`, `sourceIssues`, `openPoints`, `writerAssumptions`, `sourceQuotes` in `get_order_result`, Server-Hinweise zum Zeigen; Etappe 2: `answer_order`, `needs_input` mit Fragen in `submit_order`/`get_order_status`, `assumptions` in `get_order_result`, neue Server-Hinweise; Etappe 1: Auftrags-Werkzeuge `submit_order`, `get_order_status`, `get_order_result`, `submit_request` als Hülle mit `orderId`, Server-Hinweise, `list_learnings` nur für Admins; D-067: `warnings` und `outcome` in `get_run_status`/`get_run_result`, Ergebnis erst nach `outcome` lesen; `/hubs/runs` bleibt bis Etappe 8; `/hubs/runs` nur für Angemeldete; Editoren nur für Admins und `/access-denied`; Learning standardmäßig pausiert; zuvor 2026-05-22, D-054: Tool list_learnings ergänzt; providerType um learning-retrieval erweitert)*
 
 Alle HTTP-Endpunkte von Geef.Atelier, die extern erreichbar sind — MCP, OAuth 2.1
 sowie die Web-UI-/Account-Endpunkte. Basis-URL: `https://geef.stefan-bechtel.de`.
@@ -208,7 +208,7 @@ Jedes Werkzeug der Etappe 5 antwortet bei unbekanntem oder fremdem Auftrag `Orde
 
 #### Etappe 6: `prepare_attachment` und `uploadIds`
 
-Nur solange `Uploads:Tickets` `On` ist (ausgeliefert `Off`). Bei `Off` wird das Werkzeug nicht angeboten, `submit_order` nennt `uploadIds` nicht, und ein trotzdem gesendetes `uploadIds` wird mit „Uploading files this way is not available. Attach small files in attachments or ask the person to use the Atelier web app. Nothing was started.“ abgelehnt.
+Nur solange `Uploads:Tickets` `On` ist (Standard im Code `Off`; `appsettings.json` liefert seit der Abnahme in D-076 `On`). Bei `Off` wird das Werkzeug nicht angeboten, `submit_order` nennt `uploadIds` nicht, und ein trotzdem gesendetes `uploadIds` wird mit „Uploading files this way is not available. Attach small files in attachments or ask the person to use the Atelier web app. Nothing was started.“ abgelehnt.
 
 **Eingabe `prepare_attachment`:** `{ "fileName": "<string, Pflicht, 1–255 Zeichen, nur Anzeige, nie ein Pfad>", "sizeBytes": <long, optional: ein Upload anderer Größe wird abgelehnt> }`
 
@@ -659,7 +659,9 @@ extern erreichbaren Routen:
 
 | Endpunkt | Methode | Auth | Zweck |
 |----------|---------|------|-------|
-| `/` | GET | Cookie | Startseite / Atelier-Übersicht |
+| `/` | GET | Keine | Öffentliche Landingpage |
+| `/how-it-works` | GET | Keine | Öffentliche Erklärseite; was sie als verfügbar nennt, folgt den aktuellen Schaltern und bei einer angemeldeten Person deren Ausnahmen |
+| `/docs`, `/docs/{slug}` | GET | Keine | Freigegebene Doku (README, 01–04, 06–09, Leitfäden 12–15) |
 | `/health` | GET | Keine | Health-Check (`Healthy`) — für Reverse-Proxy/Container-Lifecycle; umfasst die Datenbank und den Check `pending-migrations` (D-067) |
 | `/login` | GET/POST | Keine | Login-Seite (Static SSR) |
 | `/auth/logout` | POST | Cookie | Logout (Anti-Forgery, Minimal-API) |
@@ -714,7 +716,7 @@ Anlegen eines Auftrags gibt es nicht.
 
 ## Endpunkte des Upload-Tickets (D-076)
 
-Nur solange `Uploads:Tickets` `On` ist (ausgeliefert `Off`). Bei `Off` sind die Endpunkte nicht gemappt und die Seite
+Nur solange `Uploads:Tickets` `On` ist (Standard im Code `Off`; `appsettings.json` liefert seit der Abnahme in D-076 `On`). Bei `Off` sind die Endpunkte nicht gemappt und die Seite
 `/u/{id}` wird vor der Anmeldung aus der Anfrage genommen: Die Adressen antworten wie Adressen, die es nicht gibt.
 Antworten sind JSON im Format der Quittung oben; ohne Quittung `{ "reason": "…" }`.
 

@@ -2,9 +2,14 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-11-26 (D-076: files through the upload ticket, cleanup and evaluation of refusals; before that 2026-11-25, D-075 part B: change run on the direct path; D-074: research in the grounding step of the direct path; before that 2026-11-24, D-067: strict snapshot reading, at least one reviewer, outcome after finalizers, run warnings, system grounding back on the provider-type path, learning paused by default; second review round: reviewer check on save, vector scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserved, finalizers and cancellation; before that 2026-11-23, D-066/12: explicit model_domain, one assignment rule; D-066/10–11: codex aliases, host sync, availability only as reported by the live catalog; before that 2026-11-22, D-066: model matrix — system profiles and model matrix section rewritten; before that 2026-06-04, D-059)
+Last updated: 2026-11-26 (note on where the crew system fits today; D-076: files through the upload ticket, cleanup and evaluation of refusals; before that 2026-11-25, D-075 part B: change run on the direct path; D-074: research in the grounding step of the direct path; before that 2026-11-24, D-067: strict snapshot reading, at least one reviewer, outcome after finalizers, run warnings, system grounding back on the provider-type path, learning paused by default; second review round: reviewer check on save, vector scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserved, finalizers and cancellation; before that 2026-11-23, D-066/12: explicit model_domain, one assignment rule; D-066/10–11: codex aliases, host sync, availability only as reported by the live catalog; before that 2026-11-22, D-066: model matrix — system profiles and model matrix section rewritten; before that 2026-06-04, D-059)
 
 ## Overview
+
+> **Where this fits today.** The crew system is the older way of working. Since the rebuild of November 2026 the default is the
+> order with the direct path (D-068 to D-077, [15-developer-guide.md](15-developer-guide.md)). Crews are still used by "Extra
+> careful", the older MCP tools and the workshop pages, whose menu only administrators see by default (`Ui:WorkshopForAdminsOnly`,
+> [14-admin-guide.md](14-admin-guide.md)).
 
 The crew system replaces the three-member crew hard-coded in PS-2 (executor + BriefingTreueReviewer + KlarheitReviewer) with a configurable profile and template system. On submission every run receives a fully embedded **CrewSnapshot** that guarantees the run's reproducibility even if profiles are changed or deleted later.
 
