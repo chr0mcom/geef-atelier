@@ -292,15 +292,35 @@ public sealed class OrderChangeTests : TestContext
         Assert.False(details.HasAttribute("open"));
         var summary = details.QuerySelector("summary")!;
         Assert.Same(details.FirstElementChild, summary);
-        Assert.Equal("4 notes about earlier versions", summary.TextContent);
+        Assert.Equal("3 notes about earlier versions", summary.TextContent);
         Assert.Equal(
-            ["Es fehlt, bis wann man sich anmelden soll.", "Assumed: Die Anrede ist Sie.", "Der Name der Lehrkraft fehlt.", "1 flagged passage could not be checked or listed."],
+            ["Es fehlt, bis wann man sich anmelden soll.", "Assumed: Die Anrede ist Sie.", "Der Name der Lehrkraft fehlt."],
             details.QuerySelectorAll("[data-testid='order-earlier-point']").Select(p => p.TextContent));
         Assert.Equal(2, details.QuerySelectorAll("[data-testid='order-earlier-lead']").Length);
-        Assert.NotNull(details.QuerySelector("[data-testid='order-earlier-notes-lead']"));
+        Assert.Null(details.QuerySelector("[data-testid='order-earlier-notes-lead']"));
+        var note = open.QuerySelector("[data-testid='order-earlier-notes'] [data-testid='order-earlier-point']")!;
+        Assert.Equal("1 flagged passage could not be checked or listed.", note.TextContent);
+        Assert.Null(note.Closest("details"));
+        Assert.Equal("About version 1:", open.QuerySelector("[data-testid='order-earlier-notes-lead']")!.TextContent);
+        Assert.Equal(4, open.QuerySelectorAll("[data-testid='order-earlier-point']").Length);
         Assert.Equal("Der Raum fehlt noch.", open.QuerySelector("[data-testid='order-writer-open-point']")!.TextContent);
         Assert.Null(open.QuerySelector("[data-testid='order-writer-open']")!.Closest("details"));
         HonestResultData.AssertPlain(open.ChildNodes);
+    }
+
+    [Fact]
+    public void The_sentence_that_the_checks_of_the_earlier_version_were_not_taken_over_always_stands_open()
+    {
+        var view = Delivered(RunView(2, RunStatus.Completed, RunOutcome.Converged, 13, Asked, 5));
+        var notTakenOver = "The checks of version 1 were not taken over, so anything they left open was not checked again.";
+        _orders.SetResult(Result(view, 2, 2, SecondText) with { EarlierOpenPoints = [new OrderEarlierPoint(1, notTakenOver, EarlierPointKind.Note)] });
+
+        var cut = Render(view);
+
+        var note = cut.Find("[data-testid='order-open-points'] [data-testid='order-earlier-notes'] [data-testid='order-earlier-point']");
+        Assert.Equal(notTakenOver, note.TextContent);
+        Assert.Null(note.Closest("details"));
+        Assert.Empty(cut.FindAll("[data-testid='order-earlier-details']"));
     }
 
     [Fact]

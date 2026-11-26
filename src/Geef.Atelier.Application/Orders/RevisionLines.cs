@@ -71,9 +71,9 @@ public static class RevisionLines
     public const string ChangeNotesLead = "The writer noted while making your change:";
 
     /// <summary>
-    /// The line that folds the notes about earlier versions (<see cref="EarlierPointsLeadFormat"/>, <see cref="EarlierNotesLeadFormat"/>,
-    /// <see cref="AssumptionsNotedLeadFormat"/>, <see cref="NotGivenNotedLeadFormat"/>): <paramref name="count"/> notes, named with their
-    /// version when all of them belong to one.
+    /// The line that folds the notes about earlier versions (<see cref="EarlierPointsLeadFormat"/>, <see cref="AssumptionsNotedLeadFormat"/>,
+    /// <see cref="NotGivenNotedLeadFormat"/>): <paramref name="count"/> notes, named with their version when all of them belong to one. The fixed
+    /// sentences under <see cref="EarlierNotesLeadFormat"/> (what was not shown or not taken over) are never folded and never counted here.
     /// </summary>
     public static string EarlierNotesSummary(int count, IEnumerable<int> versions)
     {
