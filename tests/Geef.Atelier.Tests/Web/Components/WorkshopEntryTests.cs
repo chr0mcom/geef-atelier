@@ -80,13 +80,13 @@ public sealed class WorkshopEntryTests : TestContext
     }
 
     [Fact]
-    public void A_normal_user_sees_only_new_and_my_work_in_the_menu()
+    public void A_normal_user_sees_only_new_my_work_and_how_it_works_in_the_menu()
     {
         this.AddTestAuthorization().SetAuthorized("alice");
 
         var cut = RenderComponent<NavMenu>();
 
-        Assert.Equal(new[] { "/start", "/work" }, cut.FindAll(".nav-links a.nav-link").Select(a => a.GetAttribute("href")).ToArray());
+        Assert.Equal(new[] { "/start", "/work", "/how-it-works" }, cut.FindAll(".nav-links a.nav-link").Select(a => a.GetAttribute("href")).ToArray());
         Assert.Empty(cut.FindAll("[data-testid='nav-workshop']"));
         Assert.DoesNotContain("Workshop", cut.Markup, StringComparison.Ordinal);
     }

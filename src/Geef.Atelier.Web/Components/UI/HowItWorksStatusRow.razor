@@ -1,0 +1,24 @@
+<div class="hiw-status-row@(On ? " is-on" : " is-off")" data-testid="hiw-status-@Key" data-on="@(On ? "true" : "false")">
+    <dt>@Label</dt>
+    <dd>
+        <span class="hiw-status-mark" aria-hidden="true">@(On ? "✓" : "–")</span>
+        <span class="hiw-status-text">@(On ? OnText : OffText)</span>
+    </dd>
+</div>
+
+@code {
+    /// <summary>Short key for tests (<c>data-testid="hiw-status-{Key}"</c>).</summary>
+    [Parameter, EditorRequired] public string Key { get; set; } = "";
+
+    /// <summary>What the feature is, in plain words.</summary>
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+
+    /// <summary>Whether the feature is available.</summary>
+    [Parameter] public bool On { get; set; }
+
+    /// <summary>The state shown when <see cref="On"/> is true.</summary>
+    [Parameter] public string OnText { get; set; } = "On";
+
+    /// <summary>The state shown when <see cref="On"/> is false.</summary>
+    [Parameter] public string OffText { get; set; } = "Off";
+}

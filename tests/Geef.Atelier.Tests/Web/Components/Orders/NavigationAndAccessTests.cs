@@ -27,7 +27,7 @@ public sealed class NavigationAndAccessTests : TestContext
         Assert.Equal("/start", cut.Find("[data-testid='nav-new']").GetAttribute("href"));
         Assert.Equal("/work", cut.Find("[data-testid='nav-my-work']").GetAttribute("href"));
         var visible = cut.FindAll(".nav-links > a.nav-link").Select(a => a.GetAttribute("href")).ToList();
-        Assert.Equal(new[] { "/start", "/work" }, visible);
+        Assert.Equal(new[] { "/start", "/work", "/how-it-works" }, visible);
         Assert.Empty(cut.FindAll("[data-testid='nav-workshop']"));
     }
 
