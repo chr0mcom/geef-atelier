@@ -3229,3 +3229,14 @@ all four headings are pinned by hash tests.
 **Addendum (2026-11-26): gate passed.** Second run with new, invented test cases (German and English), all with the questions
 skipped: no commitment in the open decision cases, decisions stated in the request carried out, control cases usable, decision
 texts ready to send. Only skipping on the standard way has been measured.
+
+## D-082 — Number correction by the fact check: built, replayed, not switched on (2026-11-26)
+
+- **Built and replayed** (no model calls): a narrow correction that only turns a number found nowhere in the material into a gap,
+  together with a view that folds all other findings away behind their count.
+- **Not switched on and not shipped.** The replay showed no case in which the correction would have helped; it would have removed
+  a correct, commonly known number. The folded view would have hidden findings about content. An exception for common knowledge
+  cannot be drawn cleanly without a model.
+- `Direct:FactCheckMode` stays `Report`. The work stays unshipped in an archive branch. It comes back only if a new replay finds
+  invented numbers of the case at hand, not common knowledge, more than once. A calmer view will only be decided after the
+  findings have been sorted by content.

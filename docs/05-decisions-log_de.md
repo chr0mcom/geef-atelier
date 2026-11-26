@@ -3353,3 +3353,14 @@ er jetzt ebenfalls zuerst. Mit den ersten Überschriften gespeicherte Aufträge 
 **Zusatz (2026-11-26): Messtor bestanden.** Zweiter Lauf mit neuen, frei erfundenen Testfällen (Deutsch und Englisch), alle mit
 übersprungenen Rückfragen: keine Festlegung in den offenen Entscheidungsfällen, im Auftrag verlangte Entscheidungen umgesetzt,
 Kontrollfälle brauchbar, Entscheidungstexte versendbar. Gemessen ist nur das Überspringen auf dem Standardweg.
+
+## D-082 — Zahlen-Korrektur des Faktenprüfers: gebaut, nachgespielt, nicht eingeschaltet (2026-11-26)
+
+- **Gebaut und nachgespielt** (ohne Modellaufrufe): eine enge Korrektur, die nur eine Zahl durch eine Lücke ersetzt, die nirgends
+  im Material steht, samt einer Anzeige, die alle übrigen Meldungen eingeklappt hinter ihrer Anzahl zeigt.
+- **Nicht eingeschaltet und nicht ausgeliefert.** Im Nachspiel zeigte sich kein Fall, in dem die Korrektur geholfen hätte; sie
+  hätte eine richtige, allgemein bekannte Zahl entfernt. Die eingeklappte Anzeige hätte inhaltliche Meldungen verdeckt. Eine
+  Ausnahme für Allgemeinwissen ließe sich ohne Modell nicht sauber fassen.
+- `Direct:FactCheckMode` bleibt `Report`. Der Stand liegt unversendet in einem Archivzweig. Wiederaufnahme nur, wenn ein neues
+  Nachspiel wiederholt fallbezogene, nicht allgemein bekannte erfundene Zahlen findet. Eine ruhigere Anzeige wird erst nach einer
+  inhaltlichen Einordnung der Meldungen neu entschieden.
