@@ -121,6 +121,11 @@ internal static class OrderDtoMappings
         "The assumptions were noted for version {0}, before the person asked for changes; a change may have settled or overtaken them. " +
         "Say so, and do not present them as facts the person did not give now.";
 
+    /// <summary>Note for a changed version with assumptions of its writer: they were noted while making the change.</summary>
+    public const string ChangeNotesNote =
+        "writerAssumptions of this changed version are what the writer noted while making the change. " +
+        "Do not present them as things the person did not say.";
+
     public const string NewVersionNote =
         "text is the earlier version. Call get_order_status with waitSeconds, then get_order_result again when done is true.";
 
@@ -201,6 +206,8 @@ internal static class OrderDtoMappings
             parts.Add(EarlierPointsNote);
         if (result.AssumptionsVersion is { } noted && result.Assumptions is { Count: > 0 })
             parts.Add(string.Format(System.Globalization.CultureInfo.InvariantCulture, AssumptionsVersionNoteFormat, noted));
+        if (result.AssumptionsVersion is not null && (result.WriterAssumptions.Shown()?.Count ?? 0) > 0)
+            parts.Add(ChangeNotesNote);
         if (HasUncheckedContent(result))
             parts.Add(UncheckedContentNote);
         if (result.LookedUp is { Entries.Count: > 0 })

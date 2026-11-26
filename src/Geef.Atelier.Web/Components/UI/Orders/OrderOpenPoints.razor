@@ -104,28 +104,34 @@
                 }
             </ul>
         }
-        @foreach (var earlier in Result.ShownEarlierPoints().Where(p => p.Kind != EarlierPointKind.Note).GroupBy(p => p.Version))
+        @if (EarlierPoints.Count > 0)
         {
-            <p data-testid="order-earlier-lead">@string.Format(System.Globalization.CultureInfo.InvariantCulture, RevisionLines.EarlierPointsLeadFormat, earlier.Key)</p>
-            <ul class="order-writer-open" data-testid="order-earlier-points" data-version="@earlier.Key">
-                @foreach (var point in earlier)
+            <details class="order-earlier" data-testid="order-earlier-details">
+                <summary>@RevisionLines.EarlierNotesSummary(EarlierPoints.Count, EarlierPoints.Select(p => p.Version))</summary>
+                @foreach (var earlier in EarlierPoints.Where(p => p.Kind != EarlierPointKind.Note).GroupBy(p => p.Version))
                 {
-                    <li data-testid="order-earlier-point" data-kind="@(point.Kind == EarlierPointKind.Assumption ? "assumption" : "open-point")">@if (point.Kind == EarlierPointKind.Assumption)
+                    <p data-testid="order-earlier-lead">@string.Format(System.Globalization.CultureInfo.InvariantCulture, RevisionLines.EarlierPointsLeadFormat, earlier.Key)</p>
+                    <ul class="order-writer-open" data-testid="order-earlier-points" data-version="@earlier.Key">
+                        @foreach (var point in earlier)
                         {
-                            <span class="order-earlier-kind">@RevisionLines.EarlierAssumptionLead</span>
-                        }<span lang="@Language">@point.Text</span></li>
+                            <li data-testid="order-earlier-point" data-kind="@(point.Kind == EarlierPointKind.Assumption ? "assumption" : "open-point")">@if (point.Kind == EarlierPointKind.Assumption)
+                                {
+                                    <span class="order-earlier-kind">@RevisionLines.EarlierAssumptionLead</span>
+                                }<span lang="@Language">@point.Text</span></li>
+                        }
+                    </ul>
                 }
-            </ul>
-        }
-        @foreach (var earlier in Result.ShownEarlierPoints().Where(p => p.Kind == EarlierPointKind.Note).GroupBy(p => p.Version))
-        {
-            <p data-testid="order-earlier-notes-lead">@string.Format(System.Globalization.CultureInfo.InvariantCulture, RevisionLines.EarlierNotesLeadFormat, earlier.Key)</p>
-            <ul class="order-writer-open" data-testid="order-earlier-notes" data-version="@earlier.Key">
-                @foreach (var point in earlier)
+                @foreach (var earlier in EarlierPoints.Where(p => p.Kind == EarlierPointKind.Note).GroupBy(p => p.Version))
                 {
-                    <li data-testid="order-earlier-point" data-kind="note">@point.Text</li>
+                    <p data-testid="order-earlier-notes-lead">@string.Format(System.Globalization.CultureInfo.InvariantCulture, RevisionLines.EarlierNotesLeadFormat, earlier.Key)</p>
+                    <ul class="order-writer-open" data-testid="order-earlier-notes" data-version="@earlier.Key">
+                        @foreach (var point in earlier)
+                        {
+                            <li data-testid="order-earlier-point" data-kind="note">@point.Text</li>
+                        }
+                    </ul>
                 }
-            </ul>
+            </details>
         }
         @if (Result.OpenChecks.Any(c => !c.Blocking) || Hints.Count > 0)
         {
@@ -178,7 +184,8 @@
     /// sentences of Atelier about an earlier version under their own neutral lead (<see cref="RevisionLines.EarlierNotesLeadFormat"/>) and hints
     /// (everything that never blocks, among them passages the pages looked up say otherwise, with <see cref="OrderResearchLines.DiffersFromLookedUp"/>,
     /// and passages against an instruction from before the latest change, with <see cref="RevisionLines.BeforeLastChangeNote"/>). A passage carried
-    /// over from an earlier version names that version (<see cref="FoundInFormat"/>).
+    /// over from an earlier version names that version (<see cref="FoundInFormat"/>). The notes about earlier versions are folded behind one line
+    /// with their number (<see cref="RevisionLines.EarlierNotesSummary"/>); nothing of them is left out.
     /// </summary>
     [Parameter, EditorRequired] public OrderResult Result { get; set; } = null!;
 
@@ -186,6 +193,8 @@
     [Parameter] public string? Language { get; set; }
 
     IReadOnlyList<OrderUnbackedPassage> Hints => Result.HintPassages();
+
+    IReadOnlyList<OrderEarlierPoint> EarlierPoints => Result.ShownEarlierPoints();
 
     IReadOnlyList<string> SourceIssues => Result.SourceIssues.Shown() ?? [];
 

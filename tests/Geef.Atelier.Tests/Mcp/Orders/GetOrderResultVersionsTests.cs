@@ -90,6 +90,35 @@ public sealed class GetOrderResultVersionsTests
     }
 
     [Fact]
+    public async Task The_notes_of_the_writer_of_a_changed_version_are_said_to_be_about_the_change_and_not_unsaid_by_the_person()
+    {
+        var changed = Guid.NewGuid();
+        var first = Guid.NewGuid();
+        _orders.AddResult("alice", OrderToolTestData.Result(changed, OrderDisplayState.Delivered, V1Text) with
+        {
+            Version = 2,
+            LatestVersion = 2,
+            WriterAssumptions = ["Der Text wurde um etwa ein Drittel gekürzt."],
+            AssumptionsVersion = 1,
+            FactCheck = FactCheckState.Checked,
+            Checks = ReviewChecks,
+        });
+        _orders.AddResult("alice", OrderToolTestData.Result(first, OrderDisplayState.Delivered, V1Text) with
+        {
+            WriterAssumptions = ["Die Anrede ist Sie."],
+            FactCheck = FactCheckState.Checked,
+            Checks = ReviewChecks,
+        });
+
+        var dto = await GetOrderResultTool.GetOrderResult(_orders, _alice, changed.ToString());
+        var plain = await GetOrderResultTool.GetOrderResult(_orders, _alice, first.ToString());
+
+        Assert.Contains(OrderDtoMappings.ChangeNotesNote, dto.Note);
+        Assert.Contains("writerAssumptions", OrderDtoMappings.ChangeNotesNote, StringComparison.Ordinal);
+        Assert.DoesNotContain(OrderDtoMappings.ChangeNotesNote, plain.Note ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_passage_against_an_instruction_from_before_the_latest_change_comes_with_the_sentence_of_the_web_page()
     {
         var id = Guid.NewGuid();

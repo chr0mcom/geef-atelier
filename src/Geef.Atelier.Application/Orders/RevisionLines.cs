@@ -64,6 +64,30 @@ public static class RevisionLines
     public const string NotGivenNotedLeadLookedUpFormat =
         "Noted for version {0} – you had not given these facts then, so they were not assumed. Where the pages looked up cover one, the text may use it. Your change may have given them:";
 
+    /// <summary>
+    /// Lead of the assumptions the writer of a changed version noted: they were written while making the change, so they never stand under
+    /// the sentence that the person did not say them.
+    /// </summary>
+    public const string ChangeNotesLead = "The writer noted while making your change:";
+
+    /// <summary>
+    /// The line that folds the notes about earlier versions (<see cref="EarlierPointsLeadFormat"/>, <see cref="EarlierNotesLeadFormat"/>,
+    /// <see cref="AssumptionsNotedLeadFormat"/>, <see cref="NotGivenNotedLeadFormat"/>): <paramref name="count"/> notes, named with their
+    /// version when all of them belong to one.
+    /// </summary>
+    public static string EarlierNotesSummary(int count, IEnumerable<int> versions)
+    {
+        var distinct = versions.Distinct().ToList();
+        var about = distinct is [var only] ? $"version {only}" : count == 1 ? "an earlier version" : "earlier versions";
+        return count == 1 ? $"1 note about {about}" : $"{count} notes about {about}";
+    }
+
+    /// <summary>Link above the text to the list of versions.</summary>
+    public const string SeeVersions = "See all versions";
+
+    /// <summary>Like <see cref="SeeVersions"/> when the shown version changed an earlier one: the list holds “Show changes”.</summary>
+    public const string SeeChangesAndVersions = "See what changed and all versions";
+
     /// <summary>Second line of the banner after a change could not be finished, when the shown version still has open points.</summary>
     public const string EarlierStillToCheck = "This version still needs your attention before you use it – see “Open points”.";
 
