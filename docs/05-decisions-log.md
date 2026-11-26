@@ -3077,3 +3077,50 @@ N′. All thresholds are fixed in advance and shown on the stored recordings of 
 wrong behaviour. Consequences: lost data or a missing fixed sentence → halt and fix; a failed chain → one repair (the writer gets
 only the newest change), then switching on with a fixed note from the third version; "Simpler words" failed → that button goes as
 well and the rest is switched on. The result follows as an addendum.
+
+## D-079 — No web search for orders with the default crew; search query fails closed (2026-11-26)
+
+**Status:** implemented.
+
+**Context.** What is promised: web research is off for everybody (`Research:Mode = Off`), an order with files never searches,
+and answers and the About me details never go into a search. "Extra careful" did not keep this. It runs the default crew
+(`klassik`), and that crew carries the grounding source `tavily-refined`, which no switch governed: every such order sent a
+search query to Tavily, with files attached as well. The query was formed by `LlmGroundingQueryExtractor` from the request part
+of the briefing (since E2 fix 1 without answers and profile); when that model call failed or returned nothing, the start of the
+request text itself (up to 400 characters) went to the search service.
+
+**Decision.**
+- **Default orders search nothing outside.** A run of an order with the default crew – "Extra careful" on the web or over MCP,
+  `submit_request` without `crewTemplate`/`customCrew` (with `Orders:LegacySubmitDefaultMode = Careful`) – keeps only the
+  grounding sources that stay inside Atelier: types `vector-store`, `order-sources`, `learning-retrieval`, `static-context`,
+  `crew-catalog`, `tool-catalog`, `pack-catalog`, and none of them through the tool path (an allow list, so a new type is
+  outside until it is added). Web, news, academic, REST, URL and tool sources are dropped. The rule is applied by the
+  orchestrator to every run before the pipeline is built (`StandardOrderWebSearch.ForRunAsync`), so it also covers resumed and
+  repeated runs whose stored snapshot still names the web search, and a resumed run that is not yet linked to its order (then
+  the order of the run it continues counts). Stored snapshots are not rewritten.
+- **What counts as default:** the snapshot is `klassik`, the order names no template, and no crew was composed for the order.
+  Kept unchanged: a template named on purpose (workshop form, `submit_request` with `crewTemplate`, also `klassik`), an own crew
+  (`customCrew`), a composed crew (`submit_auto_crew_request`, workshop "auto"), and runs without an order. Orders taken over
+  from before orders existed name no template; their runs are treated as default orders, because it is no longer known whether
+  the template was chosen.
+- **Search query fails closed.** `IGroundingQueryExtractor` returns `GroundingQuery.NotFormed` when the call fails or no query
+  comes back; the `tavily` provider then sends nothing and fails, so the source becomes the run warning
+  `grounding.provider_skipped`. The extractor is required; there is no path without it. The request text is never the fallback
+  query. Unchanged and only reachable through a crew chosen on purpose: a profile with `ExtractQuery=false` and the types
+  `news-search`, `academic-search`, `rest-api` and tool sources send the request part of the briefing (never answers or profile)
+  as it is.
+- **Research of the direct path (`OrderResearchService`)** already failed closed and is unchanged: off by default, never with
+  files, never for "Extra careful", only topics of the clarifier pass the gate, no raw text.
+
+**Reachable without a deliberate choice?** Not through the menus. The older form `/new` opens for anyone signed in who types its
+address (D-077, 8a) and has `klassik` preselected; a run started there names its template and keeps the web search. That needs
+the address and is the workshop, so it counts as a choice.
+
+**Tests.** End-to-end over the real wiring with recorded HTTP requests (`CarefulOrderWebSearchEndToEndTests`): "Extra careful"
+over MCP with About me details, a careful web order and `submit_request` without template, and a resumed run with the stored
+snapshot send nothing to the search service and make no query-shaping call, while the About me details still reach the writer;
+`submit_request` with `crewTemplate = klassik` still searches, with the formed query only; with no query formed it searches
+nothing and stores the warning. Without this change every one of these tests fails except the one with `crewTemplate` that
+still searches. The check of a clarified careful order in
+`IntakePrivacyEndToEndTests` now expects no search. Database tests for the rule (`StandardOrderWebSearchTests`), unit tests for
+extractor and provider.

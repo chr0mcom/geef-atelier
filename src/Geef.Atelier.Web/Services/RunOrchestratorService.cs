@@ -266,12 +266,12 @@ internal sealed class RunOrchestratorService(
         {
             var sinkLogger = loggerFactory.CreateLogger($"PostgresEventSink[{run.Id}]");
             var sink       = new PostgresEventSink(run.Id, scopeFactory, runNotifier, sinkLogger);
-            var snapshot   = CrewSnapshot.DeserializeForRun(run.CrewSnapshot);
-
             var costTrackingEnabled = costTrackingOptions?.Value.Enabled ?? false;
             var accumulator = costTrackingEnabled ? new RunCostAccumulator() : null;
 
             await using var scope = scopeFactory.CreateAsyncScope();
+            var snapshot = await scope.ServiceProvider.GetRequiredService<AtelierDbContext>()
+                .ForRunAsync(run, CrewSnapshot.DeserializeForRun(run.CrewSnapshot), cts.Token);
             var assemblyContext = new PipelineAssemblyContext(
                 run, snapshot, scope.ServiceProvider, scopeFactory, llmClientResolver, convergenceOptions, loggerFactory,
                 sink, accumulator, warningSink, groundingProviderFactory, pricingCatalog);

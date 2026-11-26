@@ -11,14 +11,22 @@ using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Infrastructure.Grounding;
 
+/// <summary>
+/// Web search through Tavily. With <c>ExtractQuery</c> (default on, set on every system profile) the query comes from
+/// <see cref="IGroundingQueryExtractor"/>; when that cannot form one, nothing is searched and the source is reported as skipped
+/// (D-079). Only a profile with <c>ExtractQuery=false</c> sends the request text it was given as the query.
+/// </summary>
 internal sealed class TavilyGroundingProvider(
     IHttpClientFactory httpClientFactory,
     IOptions<TavilyOptions> options,
     IServiceScopeFactory scopeFactory,
     ILogger<TavilyGroundingProvider> logger,
-    IGroundingQueryExtractor? queryExtractor = null) : IGroundingProvider
+    IGroundingQueryExtractor queryExtractor) : IGroundingProvider
 {
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
+
+    /// <summary>Message of the failure raised when no search query could be formed; nothing was sent to Tavily.</summary>
+    internal const string QueryNotFormedMessage = "No search query could be formed, so nothing was searched.";
 
     public string ProviderType => "tavily";
 
@@ -52,12 +60,12 @@ internal sealed class TavilyGroundingProvider(
             : opts.BasicSearchCostUsd;
         var costEur = (decimal)(costUsd * opts.UsdToEurRate);
 
-        // Refine the briefing into a focused query — or skip web search entirely
-        // when the briefing does not benefit from current web information.
         var query = briefingText;
-        if (extractQuery && queryExtractor is not null)
+        if (extractQuery)
         {
             var extracted = await queryExtractor.ExtractAsync(briefingText, ct);
+            if (extracted.Failed || (extracted.ShouldSearch && string.IsNullOrWhiteSpace(extracted.Query)))
+                throw new InvalidOperationException(QueryNotFormedMessage);
             if (!extracted.ShouldSearch)
             {
                 logger.LogInformation(

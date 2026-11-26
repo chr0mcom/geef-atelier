@@ -79,7 +79,7 @@ Der ältere Einstieg, seit Etappe 1 eine Hülle über Aufträge: Er legt einen A
 { "runId": "uuid", "status": "Pending", "errorMessage": null, "orderId": "uuid" }
 ```
 
-Ohne `crewTemplate`/`customCrew` folgt der Modus `Orders:LegacySubmitDefaultMode` (Standard: Direktweg); mit einem von beiden ist der Auftrag `Careful` und nutzt dieses Template bzw. diese Crew. `submit_auto_crew_request` verhält sich wie bisher; auch seine Läufe hängen an Aufträgen.
+Ohne `crewTemplate`/`customCrew` folgt der Modus `Orders:LegacySubmitDefaultMode` (Standard: Direktweg); mit einem von beiden ist der Auftrag `Careful` und nutzt dieses Template bzw. diese Crew. Ein `Careful`-Auftrag ohne beides läuft wie `submit_order` mit `extraCareful` mit dem klassischen Template ohne jede Websuche (D-079). `submit_auto_crew_request` verhält sich wie bisher; auch seine Läufe hängen an Aufträgen.
 
 ### `get_run_status`
 

@@ -38,6 +38,9 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
     /// <summary>Reviewer behaviour for all reviewer calls.</summary>
     public ReviewerVerdict ReviewerVerdict { get; set; } = ReviewerVerdict.ApproveWithNote;
 
+    /// <summary>Text the search query extractor returns.</summary>
+    public string QueryExtractorText { get; set; } = "e2e lighthouse history search";
+
     private readonly System.Collections.Concurrent.ConcurrentQueue<(string? Text, int Status, string? Code)> _executorAnswers = new();
 
     /// <summary>Queues the text of the next executor answer; once the queue is empty <see cref="ExecutorText"/> is used.</summary>
@@ -278,7 +281,7 @@ internal sealed class ScriptedLlmEndpoint(LlmTrafficRecorder recorder)
     {
         LlmRole.Reviewer => ToolCallResponse(call, "submit_review", ReviewArguments()),
         LlmRole.Refiner => ToolCallResponse(call, "submit_refinement", RefinementArguments(call)),
-        LlmRole.QueryExtractor => TextResponse(call, "e2e lighthouse history search"),
+        LlmRole.QueryExtractor => TextResponse(call, QueryExtractorText),
         LlmRole.Executor => Envelope(call, new JsonObject { ["role"] = "assistant", ["content"] = ExecutorText }, "stop", ExecutorPromptTokens),
         _ when call.ToolChoice is { } choice && choice.StartsWith("function:", StringComparison.Ordinal)
             => ToolCallResponse(call, choice["function:".Length..], new JsonObject()),

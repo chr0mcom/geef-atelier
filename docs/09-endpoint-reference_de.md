@@ -251,7 +251,7 @@ Der ältere Einstieg behält seine Antwort, legt aber jetzt einen Auftrag ohne R
 { "runId": "<uuid>", "status": "Pending", "errorMessage": null, "orderId": "<uuid>" }
 ```
 
-Ohne `crewTemplate` und `customCrew` gilt `Orders:LegacySubmitDefaultMode` (Standard: Direktweg; `Careful` schaltet auf das klassische Template zurück). Mit einem von beiden ist der Auftrag `Careful` und nutzt dieses Template bzw. diese Crew. Ungültiges `customCrew`-JSON ist ein Fehler (vor Etappe 1 wurde es still ignoriert). `get_run_status`/`get_run_result` funktionieren weiter mit `runId`; `orderId` gilt für die Auftrags-Werkzeuge. `submit_auto_crew_request` verhält sich wie bisher; auch seine Läufe hängen an Aufträgen.
+Ohne `crewTemplate` und `customCrew` gilt `Orders:LegacySubmitDefaultMode` (Standard: Direktweg; `Careful` schaltet auf das klassische Template zurück, ohne jede Websuche, D-079). Mit einem von beiden ist der Auftrag `Careful` und nutzt dieses Template bzw. diese Crew. Ungültiges `customCrew`-JSON ist ein Fehler (vor Etappe 1 wurde es still ignoriert). `get_run_status`/`get_run_result` funktionieren weiter mit `runId`; `orderId` gilt für die Auftrags-Werkzeuge. `submit_auto_crew_request` verhält sich wie bisher; auch seine Läufe hängen an Aufträgen.
 
 #### Server-Hinweise und Werkzeugfehler
 

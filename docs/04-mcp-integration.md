@@ -79,7 +79,7 @@ The older entry point, since stage 1 a shell over orders: it creates an order **
 { "runId": "uuid", "status": "Pending", "errorMessage": null, "orderId": "uuid" }
 ```
 
-Without `crewTemplate`/`customCrew` the mode follows `Orders:LegacySubmitDefaultMode` (default: direct path); with one of them the order is `Careful` and uses that template or crew. `submit_auto_crew_request` keeps its behaviour; its runs are attached to orders as well.
+Without `crewTemplate`/`customCrew` the mode follows `Orders:LegacySubmitDefaultMode` (default: direct path); with one of them the order is `Careful` and uses that template or crew. A `Careful` order without either of them, like `submit_order` with `extraCareful`, runs the classic template without any web search (D-079). `submit_auto_crew_request` keeps its behaviour; its runs are attached to orders as well.
 
 ### `get_run_status`
 
