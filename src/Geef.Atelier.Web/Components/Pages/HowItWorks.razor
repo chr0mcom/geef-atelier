@@ -189,11 +189,11 @@
                     <li><strong>It reads your whole file.</strong> Up to @_f.FullTextChars.Grouped() characters the writer gets all of it, with no copying and pasting.</li>
                     @if (_f.Questions)
                     {
-                        <li><strong>It asks before it starts, not afterwards.</strong> Only what changes the result, with answers to click.</li>
+                        <li><strong>It asks before it starts, not afterwards.</strong> It is built to ask only what changes the result, with answers to click.</li>
                     }
                     <li><strong>It says what it did not know.</strong> Gaps stay visible as [square brackets], and guesses are listed as assumptions.</li>
                     <li><strong>It says what was checked, and what was not.</strong> It never claims that the text is right.</li>
-                    <li><strong>It knows who you are.</strong> What you write once under About me is used in every text.</li>
+                    <li><strong>It knows who you are.</strong> What you write once under About me goes along with every request.</li>
                     <li><strong>Your texts stay in one place.</strong> Every request, every version and the downloads are under My work.</li>
                 </ul>
             </div>
@@ -243,7 +243,7 @@
             <li>PDF, Word (.docx), text and Markdown files. Up to @_f.MaxFiles files per request, each up to @_f.MaxFileBytes.ToFileSize().</li>
             <li>After you add a file you see what Atelier read: pages, characters and how well it could be read.</li>
             <li>Up to @_f.FullTextChars.Grouped() characters in all, the writer gets your files completely. Up to @_f.MapChars.Grouped() characters it gets a table of contents and reads the parts that matter. Above that you choose the pages of a PDF to use.</li>
-            <li>Your files are read by the AI models that write and check your text. Atelier never sends them to a web search.</li>
+            <li>Your files go to the AI models that write and check your text. Atelier never sends them to a web search.</li>
         </ul>
     </section>
 
@@ -287,7 +287,7 @@
             <li>Your assistant opens a sign-in page. Sign in and allow access. From then on the assistant acts as you.</li>
             <li>Ask it, for example: “Have Atelier write a short note for the notice board.”</li>
         </ol>
-        <p>The assistant passes your words on unchanged, asks you Atelier's questions, waits and shows you the text together with what was checked and what is open. It is told not to fill in gaps itself.</p>
+        <p>Atelier tells the assistant to pass your words on unchanged, to ask you Atelier's questions, to wait and to show you the text together with what was checked and what is open, without filling in gaps itself. Whether it does so depends on the assistant; the full result is always in the web app.</p>
         <ul class="hiw-list">
             @if (_f.UploadThroughAssistant)
             {
