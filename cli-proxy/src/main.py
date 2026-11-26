@@ -15,6 +15,7 @@ import claude_adapter
 import cli_process
 import codex_adapter
 import failover
+import model_routing
 import policy
 from adapters import get_adapter
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -799,31 +800,83 @@ def _failover_allowed(request: Request) -> bool:
     return value is None or value.strip().lower() not in _FAILOVER_OFF_VALUES
 
 
-def _attempt_order(backend: str, allow_failover: bool) -> list[str]:
+def _backend_unavailable(backend: str) -> OpenAIError:
+    """503 `backend_unavailable` for a request that may not leave `backend` while its breaker is open."""
+    retry_after = max(1, int(failover.open_until(backend) - time.time()))
+    return OpenAIError(
+        f"Backend {backend} is temporarily unavailable after repeated failures, and failover "
+        f"is switched off for this request. Retry in about {retry_after} s.",
+        status_code=503, type="api_error", code="backend_unavailable",
+        headers={"Retry-After": str(retry_after)},
+    )
+
+
+def _route_reason(backend: str, model: str) -> str | None:
+    """Why the request belongs on the alternative Claude account (model routing), or None."""
+    return model_routing.route_to_alt(model) if backend == "claude" else None
+
+
+def _attempt_order(backend: str, allow_failover: bool, route_to_alt: bool = False) -> list[str]:
     """The failover chain, or only `backend` when the caller switched the failover off.
 
     An open breaker is honoured for such a request too: it is answered at once with 503
     `backend_unavailable` instead of being sent to a backend the breaker currently keeps out
     (or to its partner). Once the open window elapses one probe passes, as for every request.
+
+    `route_to_alt` (a model only the alternative Claude account has) replaces the primary account
+    by the alternative one in both cases; it is routing, so the failover switch does not stop it.
     """
     if allow_failover:
-        return failover.attempt_order(backend)
-    if not failover.available(backend):
-        retry_after = max(1, int(failover.open_until(backend) - time.time()))
-        raise OpenAIError(
-            f"Backend {backend} is temporarily unavailable after repeated failures, and failover "
-            f"is switched off for this request. Retry in about {retry_after} s.",
-            status_code=503, type="api_error", code="backend_unavailable",
-            headers={"Retry-After": str(retry_after)},
-        )
-    return [backend]
+        return failover.attempt_order(backend, to_alt=route_to_alt)
+    target = failover.ALT if route_to_alt and backend == "claude" else backend
+    if not failover.available(target):
+        raise _backend_unavailable(target)
+    return [target]
 
 
-def _empty_result_error(backend: str, target: str) -> OpenAIError:
+def _not_in_plan_error(target: str, exc: BaseException) -> OpenAIError:
+    """404 `model_not_found` when no Claude account may serve the model and no handover is left.
+
+    404 rather than 429/502/503: the OpenAI SDKs and most callers retry those at once, but the
+    subscription will not gain the model within seconds. The message is the CLI's own."""
+    return OpenAIError(
+        f"The requested model is not available on the Claude subscription(s) of this gateway: {exc}",
+        status_code=404, type="invalid_request_error", code="model_not_found", param="model",
+        headers={"x-cli-proxy-provider": target},
+    )
+
+
+def _requeue_after_not_in_plan(
+    target: str, model: str, rest: list[str], tried: set[str], allow_failover: bool,
+) -> tuple[list[str], str | None]:
+    """Remember that `target` lacks `model` and return (remaining attempts, account switched to).
+
+    The other Claude account comes next when it may have the model -- also with the failover off,
+    since it is the same CLI and the same model. Claude accounts known to lack the model drop out.
+    A sibling whose breaker is open is answered with 503 when the failover is off (as for every
+    request) and otherwise goes behind the remaining members, like the breaker sorting does."""
+    failover.mark_not_in_plan(target, model_routing.model_key(model))
+    log.info("%s: model %s is not in the plan of this account (marked for %ss, no breaker change)",
+             target, model or "(default)", failover.NOT_IN_PLAN_TTL_SECONDS)
+    rest = [t for t in rest
+            if not (failover.cli_of(t) == "claude" and model_routing.lacks(t, model))]
+    other = model_routing.sibling_candidate(target, model, tried)
+    if other is None:
+        return rest, None
+    rest = [t for t in rest if t != other]
+    if failover.available(other):
+        return [other, *rest], other
+    if not allow_failover:
+        raise _backend_unavailable(other)
+    return [*rest, other], other
+
+
+def _empty_result_error(backend: str, target: str, handed_over_flag: bool | None = None) -> OpenAIError:
     """502 `empty_result` for a document-mode run of `target` that produced no text."""
-    handed_over = f" after failover from {backend}" if target != backend else ""
+    is_handover = target != backend if handed_over_flag is None else handed_over_flag
+    handed_over = f" after failover from {backend}" if is_handover else ""
     headers = {"x-cli-proxy-provider": target}
-    if target != backend:
+    if is_handover:
         headers["x-cli-proxy-failover"] = f"{backend}->{target}"
     return OpenAIError(
         f"Document mode returned no text: {target}{handed_over} finished without writing "
@@ -847,32 +900,53 @@ async def _complete_with_failover(
     /health but moves no breaker -- neither the producing backend's nor, after a handover, the
     origin's (which already holds the origin's own fault).
     """
-    order = _attempt_order(backend, allow_failover)
+    route = _route_reason(backend, req.model)
+    queue = _attempt_order(backend, allow_failover, route_to_alt=route is not None)
+    routed: set[str] = set()
+    origin = backend
+    if route is not None:
+        routed.add(failover.ALT)
+        origin = failover.ALT
+        model_routing.log_route(req.model, backend, failover.ALT, route)
+    tried: set[str] = set()
     dead_cli: str | None = None
-    for index, target in enumerate(order):
+    while queue:
+        target = queue.pop(0)
         if failover.cli_of(target) == dead_cli:
             continue
+        tried.add(target)
         finished = False
+        target_req = _retarget(req, backend, target)
         try:
-            resp = await _call_backend(_retarget(req, backend, target), target)
+            resp = await _call_backend(target_req, target)
             finished = True
         except cli_process.CallerTimeoutError as exc:
             finished = True
             raise _caller_timeout(target, exc) from exc
         except EmptyResultError as exc:
             finished = True
-            error = _empty_result_error(backend, target)
+            error = _empty_result_error(backend, target, target != backend and target not in routed)
             failover.record_empty_result(target, error.message)
             log.error("%s document mode produced no text (%s)", target, exc)
             raise error from exc
         except (RuntimeError, OSError) as exc:
             finished = True
+            if failover.cli_of(target) == "claude" and failover.is_not_in_plan(exc):
+                queue, switched = _requeue_after_not_in_plan(
+                    target, target_req.model, queue, tried, allow_failover)
+                if switched is not None:
+                    routed.add(switched)
+                    origin = switched
+                    model_routing.log_route(target_req.model, target, switched, "not in plan (answer)")
+                if not queue:
+                    raise _not_in_plan_error(target, exc) from exc
+                continue
             reason = failover.classify(exc)
             failover.record_failure(target, reason, str(exc))
             log.error("%s CLI call failed (%s): %s", target, reason, exc)
             if reason == "transport":
                 dead_cli = failover.cli_of(target)
-            if not failover.should_failover(reason) or not _more_targets(order, index, dead_cli):
+            if not failover.should_failover(reason) or not _more_targets([target, *queue], 0, dead_cli):
                 raise HTTPException(status_code=502, detail=str(exc)) from exc
             continue
         finally:
@@ -880,12 +954,14 @@ async def _complete_with_failover(
             if req.document_mode and finished:
                 failover.record_document_attempt(target)
         failover.record_success(target)
+        if failover.cli_of(target) == "claude":
+            failover.clear_not_in_plan(target, [model_routing.model_key(target_req.model)])
         response.headers["x-cli-proxy-provider"] = target
         if req.reasoning_effort:
             response.headers[REASONING_EFFORT_HEADER] = req.reasoning_effort
             log.info("reasoning_effort=%s applied via %s", req.reasoning_effort, target)
-        if target != backend:
-            failover.record_failover(backend, target)
+        if target != backend and target not in routed:
+            failover.record_failover(origin, target)
             response.headers["x-cli-proxy-failover"] = f"{backend}->{target}"
             # Echo the model the caller asked for -- OpenAI clients key off this field.
             resp.model = req.model
@@ -909,7 +985,11 @@ def _stream_completion(
     at least feeds the breaker so the NEXT request routes pre-emptively.
     """
     primary = backend
-    order = _attempt_order(primary, allow_failover)
+    route = _route_reason(primary, req.model)
+    order = _attempt_order(primary, allow_failover, route_to_alt=route is not None)
+    routed: set[str] = {failover.ALT} if route is not None else set()
+    if route is not None:
+        model_routing.log_route(req.model, primary, failover.ALT, route)
 
     prompt = _build_prompt(req)
     rf = req.response_format
@@ -991,9 +1071,14 @@ def _stream_completion(
 
     async def _events():
         dead_cli: str | None = None
-        for index, target in enumerate(order):
+        queue = list(order)
+        tried: set[str] = set()
+        origin = failover.ALT if route is not None else primary
+        while queue:
+            target = queue.pop(0)
             if failover.cli_of(target) == dead_cli:
                 continue
+            tried.add(target)
             # The model name may not cross the backend boundary (see _retarget); the SSE
             # frames still echo the model the caller asked for.
             target_req = _retarget(req, primary, target)
@@ -1008,22 +1093,38 @@ def _stream_completion(
                 _caller_timeout(target, exc)
                 raise
             except (RuntimeError, OSError) as exc:
+                if not emitted and failover.cli_of(target) == "claude" and failover.is_not_in_plan(exc):
+                    try:
+                        queue, switched = _requeue_after_not_in_plan(
+                            target, target_req.model, queue, tried, allow_failover)
+                    except OpenAIError as unavailable:
+                        raise RuntimeError(unavailable.message) from exc
+                    if switched is not None:
+                        routed.add(switched)
+                        origin = switched
+                        model_routing.log_route(target_req.model, target, switched, "not in plan (answer)")
+                    if not queue:
+                        raise
+                    continue
                 reason = failover.classify(exc)
                 failover.record_failure(target, reason, str(exc))
                 log.error("%s CLI stream failed (%s): %s", target, reason, exc)
                 if reason == "transport":
                     dead_cli = failover.cli_of(target)
-                if emitted or not _more_targets(order, index, dead_cli) \
+                if emitted or not _more_targets([target, *queue], 0, dead_cli) \
                         or not failover.should_failover(reason):
                     raise
                 continue
             failover.record_success(target)
+            if failover.cli_of(target) == "claude":
+                failover.clear_not_in_plan(target, [model_routing.model_key(target_req.model)])
             if req.reasoning_effort:
                 log.info("reasoning_effort=%s applied via %s (stream)", req.reasoning_effort, target)
-            if target != primary:
-                failover.record_failover(primary, target)
+            if target != primary and target not in routed:
+                failover.record_failover(origin, target)
             return
 
+    handed_over = order[0] != primary and order[0] not in routed
     return ClosingStreamingResponse(
         sse_response(req.model, _events(), include_usage=include_usage),
         media_type="text/event-stream",
@@ -1031,7 +1132,7 @@ def _stream_completion(
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
             "x-cli-proxy-provider": order[0],
-            **({"x-cli-proxy-failover": f"{primary}->{order[0]}"} if order[0] != primary else {}),
+            **({"x-cli-proxy-failover": f"{primary}->{order[0]}"} if handed_over else {}),
             **({REASONING_EFFORT_HEADER: req.reasoning_effort} if req.reasoning_effort else {}),
         },
     )
@@ -1078,6 +1179,9 @@ async def cli_chat_completions(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    if cli_kind == "claude":
+        return await _generic_claude(adapter, config, req, provider_name)
+
     try:
         result = await adapter.execute(config, req.model_dump())
         return JSONResponse(result)
@@ -1086,6 +1190,40 @@ async def cli_chat_completions(
     except Exception as exc:
         log.error("CLI adapter error for %s: %s", provider_name, exc)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+async def _generic_claude(adapter, config: dict, req: ChatCompletionRequest, provider_name: str) -> JSONResponse:
+    """The generic endpoint for a provider of cli_kind claude: same model routing between the
+    Claude accounts as the explicit endpoints, but -- as before -- no failover to codex and no
+    breaker bookkeeping. Every attempt binds its account explicitly, so no binding of an earlier
+    request or stage can carry over; the serving account is reported in x-cli-proxy-provider."""
+    route = model_routing.route_to_alt(req.model)
+    account = failover.ALT if route is not None else model_routing.PRIMARY
+    if route is not None:
+        model_routing.log_route(req.model, model_routing.PRIMARY, account, route)
+    tried: set[str] = set()
+    while True:
+        tried.add(account)
+        _bind_account(account)
+        try:
+            result = await adapter.execute(config, req.model_dump())
+        except cli_process.CallerTimeoutError as exc:
+            raise _caller_timeout(provider_name, exc) from exc
+        except Exception as exc:
+            if isinstance(exc, (RuntimeError, OSError)) and failover.is_not_in_plan(exc):
+                failover.mark_not_in_plan(account, model_routing.model_key(req.model))
+                log.info("%s: model %s is not in the plan of this account (generic endpoint)",
+                         account, req.model or "(default)")
+                other = model_routing.sibling_candidate(account, req.model, tried)
+                if other is not None:
+                    model_routing.log_route(req.model, account, other, "not in plan (answer)")
+                    account = other
+                    continue
+                raise _not_in_plan_error(account, exc) from exc
+            log.error("CLI adapter error for %s: %s", provider_name, exc)
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        failover.clear_not_in_plan(account, [model_routing.model_key(req.model)])
+        return JSONResponse(result, headers={"x-cli-proxy-provider": account})
 
 
 @app.get("/v1/cli/{provider_name}/models")
@@ -1359,4 +1497,7 @@ async def health() -> JSONResponse:
         "synced_providers": provider_sync.all_provider_names(),
         "degraded": snapshot["degraded"],
         "failover": snapshot,
+        # Per Claude account: families it resolves, families its probe answered with "not in
+        # plan", and the running runtime marks (model -> epoch until). No account data.
+        "claude_accounts": model_routing.snapshot(),
     })

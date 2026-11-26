@@ -50,6 +50,15 @@ def bind_account(account: str) -> None:
     _account_home.set(failover.ALT_HOME if account == failover.ALT else None)
 
 
+#: Name of the primary Claude account in the failover chain and in the per-account catalog.
+PRIMARY = "claude"
+
+
+def current_account() -> str:
+    """The Claude account the claude CLI calls of this context run under."""
+    return failover.ALT if _account_home.get() else PRIMARY
+
+
 def current_home() -> str:
     """HOME for the claude CLI: the alt account's directory when bound, else the primary."""
     return _account_home.get() or CLAUDE_HOME
@@ -167,6 +176,55 @@ _MODEL_CACHE_TTL = 86400  # 24 hours
 _model_cache: tuple[dict[str, str], float] | None = None
 _model_cache_lock = asyncio.Lock()
 
+# The same two pieces of state for the alternative account (failover.ALT). Accounts can carry
+# different models, so each one is probed and cached on its own; `_model_cache` and
+# `_last_attempt_at` above stay the primary account's.
+_alt_model_cache: tuple[dict[str, str], float] | None = None
+_alt_last_attempt_at: float | None = None
+
+# Families a probe of the account answered with the CLI's "not in plan" wording, per account.
+# Replaced family by family by later probes; an unknown answer (limit, auth, timeout) leaves it.
+_not_in_plan_families: dict[str, set[str]] = {}
+
+
+class _NotInPlan:
+    """Probe answer: the bound account's subscription does not include the probed family."""
+
+    def __repr__(self) -> str:
+        return "NOT_IN_PLAN"
+
+
+NOT_IN_PLAN = _NotInPlan()
+
+
+def _cache_of(account: str) -> tuple[dict[str, str], float] | None:
+    return _alt_model_cache if account == failover.ALT else _model_cache
+
+
+def _set_cache(account: str, value: tuple[dict[str, str], float]) -> None:
+    global _model_cache, _alt_model_cache
+    if account == failover.ALT:
+        _alt_model_cache = value
+    else:
+        _model_cache = value
+
+
+def _last_attempt_of(account: str) -> float | None:
+    return _alt_last_attempt_at if account == failover.ALT else _last_attempt_at
+
+
+def _set_last_attempt(account: str, value: float) -> None:
+    global _last_attempt_at, _alt_last_attempt_at
+    if account == failover.ALT:
+        _alt_last_attempt_at = value
+    else:
+        _last_attempt_at = value
+
+
+def _accounts() -> list[str]:
+    """Claude accounts whose catalog counts: the primary, and the alternative once logged in."""
+    return [PRIMARY, failover.ALT] if failover.alt_configured() else [PRIMARY]
+
 # Source markers reported alongside every model list.
 SOURCE_LIVE = "live"
 SOURCE_DEGRADED = "degraded"
@@ -190,8 +248,12 @@ def _normalize_model(model: str | None) -> str | None:
     return family if family else bare
 
 
-async def _probe_alias(alias: str) -> str | None:
+async def _probe_alias(alias: str) -> str | _NotInPlan | None:
     """Ask the claude CLI which concrete model the family alias currently resolves to.
+
+    Runs under the account bound in this context (see `_resolve_alias_map`). Returns the concrete
+    id, NOT_IN_PLAN when the CLI answers with its unambiguous "not in plan" wording, and None for
+    every other outcome (limit, auth, timeout, unreadable output) -- None means "unknown".
 
     Runs under the shared CLI semaphore so a model probe cannot outrank real completions,
     and always reaps its subprocess: without the kill a timed-out probe would leave a
@@ -217,6 +279,9 @@ async def _probe_alias(alias: str) -> str | None:
             keys = list((data.get("modelUsage") or {}).keys())
             if keys:
                 return keys[0]
+            if data.get("is_error") and failover.is_not_in_plan(str(data.get("result", ""))):
+                log.info("claude model alias probe for %s on %s: not in plan", alias, current_account())
+                return NOT_IN_PLAN
             log.warning("claude model alias probe for %s returned no modelUsage entry", alias)
         except Exception as exc:  # noqa: BLE001 — best-effort discovery, never fatal
             log.warning("claude model alias probe failed for %s: %s", alias, exc)
@@ -230,21 +295,74 @@ async def _probe_alias(alias: str) -> str | None:
     return None
 
 
-async def _resolve_alias_map() -> tuple[dict[str, str], bool]:
+async def _resolve_alias_map(account: str = PRIMARY) -> tuple[dict[str, str], bool]:
     """Resolve each family alias to its current concrete model id via the CLI itself.
 
     Probes run concurrently so a cache refresh costs one round-trip, not three. The second
     tuple element is False when not a single probe succeeded — the caller must not cache
     that result and must report it as degraded rather than live.
+
+    The probes run under `account`: the binding is set for the probe tasks only and reset
+    afterwards, so it can never reach a request. A family the account answered with "not in
+    plan" is recorded in `_not_in_plan_families` -- but only when another family of the same run
+    resolved: an account whose every probe says so is out of credit as a whole (no subscription
+    lacks every model), and that is unknown, not knowledge. A resolved family clears both the
+    family entry and the runtime marks of its models (failover.clear_not_in_plan).
     """
     families = await _discover_families()
-    results = await asyncio.gather(*(_probe_alias(a) for a in families))
+    token = _account_home.set(failover.ALT_HOME if account == failover.ALT else None)
+    try:
+        results = await asyncio.gather(*(_probe_alias(a) for a in families))
+    finally:
+        _account_home.reset(token)
     alias_map = {
         _alias_for(family): resolved
         for family, resolved in zip(families, results)
-        if resolved
+        if isinstance(resolved, str) and resolved
     }
+    if alias_map:
+        lacking = _not_in_plan_families.setdefault(account, set())
+        for family, resolved in zip(families, results):
+            if resolved is NOT_IN_PLAN:
+                if family not in lacking:
+                    log.info("claude family %s is not in the plan of account %s", family, account)
+                lacking.add(family)
+            elif isinstance(resolved, str) and resolved:
+                lacking.discard(family)
+                failover.clear_not_in_plan(account, _marked_models_of(account, family))
     return alias_map, bool(alias_map)
+
+
+def _marked_models_of(account: str, family: str) -> list[str]:
+    """Models of `family` that currently carry a runtime not-in-plan mark on `account`."""
+    return [m for m in failover.not_in_plan_marks().get(account, {}) if family_of_model(m) == family]
+
+
+def family_of_model(model: str | None) -> str | None:
+    """The CLI family a requested model belongs to, or None.
+
+    `claude-<family>-latest`, the bare family alias and concrete ids `claude-<family>-<version>`
+    of a known family (discovered, or seen in a per-account status) all map to the family."""
+    bare = _normalize_model(model)
+    if not bare:
+        return None
+    known = set(_families)
+    for lacking in _not_in_plan_families.values():
+        known |= lacking
+    if bare in known:
+        return bare
+    if bare.startswith(_ALIAS_PREFIX):
+        segment = bare[len(_ALIAS_PREFIX):].split("-", 1)[0]
+        if segment in known:
+            return segment
+    return None
+
+
+def account_catalog(account: str) -> tuple[dict[str, str], frozenset[str]]:
+    """What is known about `account` right now, without probing: (alias map of its last successful
+    probe, whatever its age; families it answered with "not in plan")."""
+    cache = _cache_of(account)
+    return (dict(cache[0]) if cache else {}), frozenset(_not_in_plan_families.get(account, ()))
 
 
 def latest_alias_models() -> list[str]:
@@ -271,6 +389,64 @@ def _concrete_from(alias_map: dict[str, str]) -> list[str]:
     return concrete
 
 
+def _merge_accounts(primary: dict[str, str], alt: dict[str, str]) -> tuple[dict[str, str], list[str]]:
+    """(alias map, concrete ids) of the union of both accounts.
+
+    A family resolves to the primary account's model when the primary has one, else to the
+    alternative account's. The concrete ids are the primary's first, then those only the
+    alternative account resolves to -- so a model only one subscription carries is listed too."""
+    merged = dict(primary)
+    for alias, resolved in alt.items():
+        merged.setdefault(alias, resolved)
+    concrete = _concrete_from(primary) if primary else []
+    for m in _concrete_from(alt) if alt else []:
+        if m not in concrete:
+            concrete.append(m)
+    return merged, concrete
+
+
+async def _account_view(account: str, bypass_cache: bool, force: bool) -> tuple[dict[str, str], str]:
+    """(alias map, source) of one account, probing it when its cache does not answer.
+
+    The primary account keeps the contract described in `list_models_with_source_async`. The
+    alternative account follows it with one difference: an ordinary call without a fresh cache is
+    throttled like a forced one, so a broken reserve login cannot turn every model-list request
+    into a round of failing probes."""
+    cache = _cache_of(account)
+    age = time.time() - cache[1] if cache is not None else None
+    cached_fresh = age is not None and age < _MODEL_CACHE_TTL
+
+    if cached_fresh and not bypass_cache:
+        return dict(cache[0]), SOURCE_LIVE  # type: ignore[index]
+
+    throttle_applies = bypass_cache or account == failover.ALT
+    if throttle_applies and not force and _throttled(_last_attempt_of(account)):
+        if cached_fresh:
+            return dict(cache[0]), SOURCE_LIVE  # type: ignore[index]
+        log.warning("claude model probe of %s throttled; serving no live mapping for it", account)
+        return {}, SOURCE_DEGRADED
+
+    _set_last_attempt(account, time.time())
+    alias_map, probed = await _resolve_alias_map(account)
+    if probed:
+        # Merge rather than replace: `probed` is true as soon as ONE family answered, so a
+        # partial run must not drop the families that answered on an earlier run. A family
+        # the account now answers with "not in plan" leaves the mapping.
+        cache = _cache_of(account)
+        if cache is not None:
+            alias_map = {**cache[0], **alias_map}
+        lacking = _not_in_plan_families.get(account, set())
+        alias_map = {a: m for a, m in alias_map.items() if _family_of(a) not in lacking}
+        _set_cache(account, (alias_map, time.time()))
+        return dict(alias_map), SOURCE_LIVE
+
+    if cached_fresh:
+        # A forced re-resolution that failed must not throw away a mapping that still holds.
+        log.warning("claude model re-resolution of %s failed; keeping the cached mapping", account)
+        return dict(cache[0]), SOURCE_DEGRADED  # type: ignore[index]
+    return {}, SOURCE_DEGRADED
+
+
 async def list_models_with_source_async(
     bypass_cache: bool = False,
     force: bool = False,
@@ -289,41 +465,23 @@ async def list_models_with_source_async(
     re-resolutions — an ordinary call after a failure still probes, as the no-caching promise above
     states. `force` skips the throttle entirely and is reserved for the internal periodic sweep,
     which is the only remaining path that discovers a new model during an outage.
+
+    With an alternative account logged in (failover.alt_configured) both accounts are probed and
+    the result is their union: accounts can carry different models. The alias map takes each
+    family from the primary account and falls back to the alternative one; the source is "live"
+    when at least one account answered live.
     """
-    global _model_cache, _last_attempt_at
     async with _model_cache_lock:
-        age = time.time() - _model_cache[1] if _model_cache is not None else None
-        cached_fresh = age is not None and age < _MODEL_CACHE_TTL
-
-        if cached_fresh and not bypass_cache:
-            alias_map = _model_cache[0]  # type: ignore[index]
-            return _compose_model_list(_concrete_from(alias_map)), SOURCE_LIVE, dict(alias_map)
-
-        if bypass_cache and not force and _throttled(_last_attempt_at):
-            if cached_fresh:
-                alias_map = _model_cache[0]  # type: ignore[index]
-                return _compose_model_list(_concrete_from(alias_map)), SOURCE_LIVE, dict(alias_map)
-            log.warning("claude model probe throttled; serving static list as degraded")
-            return _compose_model_list(list(STATIC_MODELS)), SOURCE_DEGRADED, {}
-
-        _last_attempt_at = time.time()
-        alias_map, probed = await _resolve_alias_map()
-        if probed:
-            # Merge rather than replace: `probed` is true as soon as ONE family answered, so a
-            # partial run must not drop the families that answered on an earlier run.
-            if _model_cache is not None:
-                alias_map = {**_model_cache[0], **alias_map}
-            _model_cache = (alias_map, time.time())
-            return _compose_model_list(_concrete_from(alias_map)), SOURCE_LIVE, dict(alias_map)
-
-        if cached_fresh:
-            # A forced re-resolution that failed must not throw away a mapping that still holds.
-            alias_map = _model_cache[0]  # type: ignore[index]
-            log.warning("claude model re-resolution failed; keeping the cached mapping")
-            return _compose_model_list(_concrete_from(alias_map)), SOURCE_DEGRADED, dict(alias_map)
-
-    log.warning("claude model probe failed entirely; serving static list as degraded")
-    return _compose_model_list(list(STATIC_MODELS)), SOURCE_DEGRADED, {}
+        accounts = _accounts()
+        views = await asyncio.gather(*(_account_view(a, bypass_cache, force) for a in accounts))
+    primary_map, primary_source = views[0]
+    alt_map, alt_source = views[1] if len(views) > 1 else ({}, SOURCE_DEGRADED)
+    alias_map, concrete = _merge_accounts(primary_map, alt_map)
+    source = SOURCE_LIVE if SOURCE_LIVE in (primary_source, alt_source) else SOURCE_DEGRADED
+    if not alias_map:
+        log.warning("claude model probe failed entirely; serving static list as degraded")
+        return _compose_model_list(list(STATIC_MODELS)), SOURCE_DEGRADED, {}
+    return _compose_model_list(concrete), source, alias_map
 
 
 def _throttled(last_attempt_at: float | None) -> bool:
@@ -346,9 +504,13 @@ async def resolve_alias_map_async() -> dict[str, str]:
 
 
 def list_models() -> list[str]:
-    """Synchronous shim (startup / fallback): always-latest aliases + cached-or-static concrete ids."""
-    concrete = _concrete_from(_model_cache[0]) if _model_cache else list(STATIC_MODELS)
-    return _compose_model_list(concrete)
+    """Synchronous shim (startup / fallback): always-latest aliases + cached-or-static concrete ids
+    of every account."""
+    alt = _alt_model_cache[0] if _alt_model_cache and failover.alt_configured() else {}
+    primary = _model_cache[0] if _model_cache else {}
+    if not primary and not alt:
+        return _compose_model_list(list(STATIC_MODELS))
+    return _compose_model_list(_merge_accounts(primary, alt)[1])
 
 
 async def complete_document(
@@ -476,6 +638,7 @@ async def _run_claude_decision(
     try:
         data = json.loads(stdout.decode(errors="replace").strip())
         if isinstance(data, dict):
+            _raise_if_not_in_plan(data)
             fallback_text, usage = _extract_result_and_usage(data, "")
     except (json.JSONDecodeError, ValueError):
         pass
@@ -663,6 +826,13 @@ async def _run_claude_document(
             f"{claude_failure_detail(stdout.decode(errors='replace'), stderr.decode(errors='replace'))}"
         )
 
+    try:
+        parsed = json.loads(stdout.decode(errors="replace").strip())
+    except (json.JSONDecodeError, ValueError):
+        parsed = None
+    if isinstance(parsed, dict):
+        _raise_if_not_in_plan(parsed)
+
     draft_path = workspace_path / "draft.md"
     try:
         result = draft_path.read_text(encoding="utf-8")
@@ -823,6 +993,19 @@ async def _exec_print(
         )
 
     return _extract_result_and_usage(data, raw)
+
+
+def _raise_if_not_in_plan(data: dict) -> None:
+    """Raise when a run that exited 0 carries the CLI's "not in plan" answer.
+
+    The file-writing modes (document, decision file) read their result from a file and would
+    otherwise take the refusal for an unchanged draft or a final answer. Only this one wording is
+    turned into an error here; every other exit-0 result keeps its earlier handling."""
+    if data.get("is_error") and failover.is_not_in_plan(str(data.get("result", ""))):
+        raise RuntimeError(
+            f"claude CLI API error (status={data.get('api_error_status')}): "
+            f"{clip_redacted(str(data.get('result', '')), RESULT_CHARS)}"
+        )
 
 
 def _extract_result_and_usage(data: dict | None, raw: str) -> tuple[str, UsageParts]:

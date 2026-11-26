@@ -212,7 +212,8 @@ class TestHealthFields:
 
     def test_existing_fields_are_unchanged(self, client: TestClient) -> None:
         body = client.get("/health").json()
-        assert set(body) == {"status", "cli_status", "synced_providers", "degraded", "failover"}
+        assert set(body) == {"status", "cli_status", "synced_providers", "degraded", "failover",
+                             "claude_accounts"}
         assert set(body["failover"]) == {
             "enabled", "degraded", "backends",
             "empty_result_alert", "empty_result_window_seconds",
