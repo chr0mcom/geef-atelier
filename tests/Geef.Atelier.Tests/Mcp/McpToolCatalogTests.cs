@@ -110,20 +110,27 @@ public sealed class McpToolCatalogTests
         Assert.Equal(["orderId"], Properties(tools["cancel_order"]));
         Assert.Equal(["limit"], Properties(tools["list_orders"]));
         Assert.Empty(Required(tools["list_orders"]));
-        Assert.Empty(Properties(tools["profile"]));
+        Assert.Equal(["name", "signature", "formality", "language"], Properties(tools["profile"]));
+        Assert.Empty(Required(tools["profile"]));
     }
 
     [Fact]
-    public void The_reading_tools_are_marked_read_only_and_profile_has_no_way_to_write()
+    public void The_reading_tools_are_marked_read_only_and_profile_writes_only_the_four_about_me_fields()
     {
         var tools = Tools(legacy: "false");
 
-        Assert.All(new[] { "export_order", "list_orders", "profile" }, name => Assert.True(tools[name].ProtocolTool.Annotations?.ReadOnlyHint));
+        Assert.All(new[] { "export_order", "list_orders" }, name => Assert.True(tools[name].ProtocolTool.Annotations?.ReadOnlyHint));
         Assert.Null(tools["revise_order"].ProtocolTool.Annotations?.ReadOnlyHint);
+        var annotations = tools["profile"].ProtocolTool.Annotations;
+        Assert.Equal((false, false, true), (annotations?.ReadOnlyHint, annotations?.DestructiveHint, annotations?.IdempotentHint));
         var profile = typeof(ProfileTool).GetMethod(nameof(ProfileTool.Profile))!;
-        Assert.DoesNotContain(profile.GetParameters(), p => p.ParameterType.IsClientValue());
-        Assert.Contains("About me", tools["profile"].ProtocolTool.Description, StringComparison.Ordinal);
-        Assert.Contains("cannot change", tools["profile"].ProtocolTool.Description, StringComparison.Ordinal);
+        Assert.Equal(["name", "signature", "formality", "language"], profile.GetParameters().Where(p => p.ParameterType.IsClientValue()).Select(p => p.Name));
+        Assert.All(profile.GetParameters().Where(p => p.ParameterType.IsClientValue()), p => Assert.Equal(typeof(string), p.ParameterType));
+        var description = tools["profile"].ProtocolTool.Description!;
+        Assert.Contains("About me", description, StringComparison.Ordinal);
+        Assert.Contains("Save only what the person asked you to save", description, StringComparison.Ordinal);
+        Assert.Contains("never guess", description, StringComparison.Ordinal);
+        Assert.Contains("Called without values it only reads", description, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -190,6 +197,20 @@ public sealed class McpToolCatalogTests
         Assert.EndsWith("do not add it.", without, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(TellOnceMode.On, true)]
+    [InlineData(TellOnceMode.WithoutPromise, true)]
+    [InlineData(TellOnceMode.Off, false)]
+    public void The_instructions_offer_saving_about_me_details_only_while_the_switch_allows_it(TellOnceMode mode, bool saving)
+    {
+        var instructions = Instructions(Provider(legacy: "false", tellOnce: mode));
+
+        Assert.Equal(saving, instructions.Contains(McpServerInstructions.ProfileSavingLine, StringComparison.Ordinal));
+        Assert.Equal(!saving, instructions.Contains(McpServerInstructions.ProfileReadOnlyLine, StringComparison.Ordinal));
+        Assert.Equal(saving, instructions.Contains("aboutMeMissing", StringComparison.Ordinal));
+        Assert.DoesNotContain("not leave this open again", instructions, StringComparison.Ordinal);
+    }
+
     private static Dictionary<string, McpServerTool> Tools(string legacy) => ToolsOf(Provider(legacy));
 
     private static Dictionary<string, McpServerTool> ToolsOf(ServiceProvider provider) =>
@@ -198,7 +219,7 @@ public sealed class McpToolCatalogTests
     private static string Instructions(ServiceProvider provider) =>
         provider.GetRequiredService<IOptions<McpServerOptions>>().Value.ServerInstructions!;
 
-    private static ServiceProvider Provider(string legacy, string? maxWait = null)
+    private static ServiceProvider Provider(string legacy, string? maxWait = null, TellOnceMode? tellOnce = null)
     {
         var settings = new Dictionary<string, string?> { ["Mcp:LegacyTools"] = legacy };
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
@@ -207,6 +228,8 @@ public sealed class McpToolCatalogTests
         services.AddSingleton<IConfiguration>(configuration);
         if (maxWait is not null)
             services.Configure<OrderOptions>(o => o.MaxWaitSeconds = int.Parse(maxWait, System.Globalization.CultureInfo.InvariantCulture));
+        if (tellOnce is { } mode)
+            services.Configure<OrderOptions>(o => o.TellOnce = mode);
         foreach (var type in typeof(McpAssemblyMarker).Assembly.ToolMethods().SelectMany(m => m.GetParameters()).Select(p => p.ParameterType)
                      .Where(t => t.IsInterface && !t.IsClientValue() && !t.IsSdkValue() && !t.IsGenericType).Distinct())
             services.AddScoped(type, _ => throw new NotSupportedException());

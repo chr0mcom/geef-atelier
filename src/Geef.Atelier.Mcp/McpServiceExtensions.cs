@@ -34,7 +34,7 @@ public static class McpServiceExtensions
                 (o, orders, mcp, uploads, ticketTools, legacy) =>
             {
                 var tickets = uploads.Value.Tickets == UploadTicketsMode.On;
-                o.ServerInstructions = McpServerInstructions.For(orders.Value.MaxWaitSeconds, mcp.Value.LegacyTools, tickets);
+                o.ServerInstructions = McpServerInstructions.For(orders.Value.MaxWaitSeconds, mcp.Value.LegacyTools, tickets, orders.Value.TellOnce != TellOnceMode.Off);
                 if (tickets)
                 {
                     o.ToolCollection ??= new McpServerPrimitiveCollection<McpServerTool>();

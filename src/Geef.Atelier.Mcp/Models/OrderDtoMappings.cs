@@ -88,7 +88,9 @@ internal static class OrderDtoMappings
             result.ToEarlierPointDtos(),
             result.Assumptions is { Count: > 0 } || result.UnansweredQuestions().Count > 0 ? result.AssumptionsVersion : null,
             string.IsNullOrWhiteSpace(result.LengthNotice) ? null : result.LengthNotice,
-            result.UnansweredQuestions() is { Count: > 0 } unanswered ? unanswered : null);
+            result.UnansweredQuestions() is { Count: > 0 } unanswered ? unanswered : null,
+            result.FromAboutMe is { Count: > 0 } fromAboutMe ? fromAboutMe.Select(t => t.ToWire()).ToList() : null,
+            result.TellOnce is { Count: > 0 } tellOnce ? tellOnce.Select(t => t.ToWire()).ToList() : null);
 
     /// <summary>The open points of the writer for an earlier version that the shown version does not repeat (<see cref="OrderResultRules.ShownEarlierPoints"/>); <c>null</c> when there are none.</summary>
     public static IReadOnlyList<OrderEarlierPointDto>? ToEarlierPointDtos(this OrderResult result)
@@ -122,6 +124,15 @@ internal static class OrderDtoMappings
     public const string AssumptionsVersionNoteFormat =
         "The assumptions were noted for version {0}, before the person asked for changes; a change may have settled or overtaken them. " +
         "Say so, and do not present them as facts the person did not give now.";
+
+    /// <summary>Note for a result with <c>aboutMeMissing</c>: the assistant offers to save the details once, in the person's words.</summary>
+    public const string AboutMeMissingNote =
+        "aboutMeMissing names details Atelier had to assume or leave open because the person has not saved them under About me. " +
+        "Ask the person whether they want to tell them once; then call profile with their own words. Do not fill them in yourself.";
+
+    /// <summary>Note for a result with <c>fromAboutMe</c>.</summary>
+    public const string FromAboutMeNote =
+        "fromAboutMe names what came from the person's About me details; tell the person that they can change or delete it under About me.";
 
     /// <summary>Note for a result with questions the person left open before writing.</summary>
     public const string UnansweredQuestionsNote =
@@ -229,6 +240,10 @@ internal static class OrderDtoMappings
             parts.Add(UncheckedContentNote);
         if (result.LookedUp is { Entries.Count: > 0 })
             parts.Add(LookedUpNote);
+        if (result.TellOnce is { Count: > 0 })
+            parts.Add(AboutMeMissingNote);
+        if (result.FromAboutMe is { Count: > 0 })
+            parts.Add(FromAboutMeNote);
         return parts.Count == 0 ? null : string.Join(" ", parts);
     }
 

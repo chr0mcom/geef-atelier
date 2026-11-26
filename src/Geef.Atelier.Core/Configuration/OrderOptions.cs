@@ -6,6 +6,13 @@ namespace Geef.Atelier.Core.Configuration;
 /// <summary>Whether a delivered text can be changed by a new version of the same order (<c>Orders:Revise</c>).</summary>
 public enum ReviseMode { Off = 0, On = 1 }
 
+/// <summary>
+/// Whether a result offers to save a missing sender, signature, form of address or language under About me (<c>Orders:TellOnce</c>).
+/// <see cref="On"/> shows the offer with the sentence that Atelier will not leave it open again; <see cref="WithoutPromise"/> shows it
+/// without that sentence; <see cref="Off"/> shows nothing of it, and AI assistants cannot save About me details.
+/// </summary>
+public enum TellOnceMode { Off = 0, On = 1, WithoutPromise = 2 }
+
 /// <summary>Behaviour of orders (section <c>Orders</c>).</summary>
 public sealed class OrderOptions
 {
@@ -41,6 +48,9 @@ public sealed class OrderOptions
 
     /// <summary>Most versions of one order; no change is started beyond it.</summary>
     public int MaxVersionsPerOrder { get; set; } = 10;
+
+    /// <summary>Whether a result offers to save what About me lacks and shows what came from About me.</summary>
+    public TellOnceMode TellOnce { get; set; } = TellOnceMode.On;
 }
 
 /// <summary>Helpers on <see cref="OrderOptions"/>.</summary>

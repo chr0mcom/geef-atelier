@@ -40,6 +40,25 @@ internal sealed class FakeProfileService : IProfileService
         return Task.FromResult(View(trimmed));
     }
 
+    public ConcurrentQueue<(string Username, UserProfilePart Part)> SavedParts { get; } = new();
+
+    public Task<UserProfileView> SavePartAsync(string username, UserProfilePart part, CancellationToken ct = default)
+    {
+        SavedParts.Enqueue((username, part));
+        if (SaveError is not null)
+            throw SaveError;
+        var old = Stored(username) ?? Empty;
+        var merged = old with
+        {
+            DisplayName = Trim(part.DisplayName) ?? old.DisplayName,
+            Formality = part.Formality ?? old.Formality,
+            Language = Trim(part.Language) ?? old.Language,
+            Signature = Trim(part.Signature) ?? old.Signature,
+        };
+        _profiles[username] = merged;
+        return Task.FromResult(View(merged));
+    }
+
     public Task ClearAsync(string username, CancellationToken ct = default)
     {
         Cleared.Enqueue(username);

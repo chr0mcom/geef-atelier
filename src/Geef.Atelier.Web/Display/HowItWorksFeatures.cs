@@ -52,6 +52,7 @@ public sealed record HowItWorksSettings(
 /// <param name="MaxFileBytes">Largest file.</param>
 /// <param name="FullTextChars">Up to this many characters the writer gets the files completely.</param>
 /// <param name="MapChars">Up to this many characters the writer gets the files with a table of contents.</param>
+/// <param name="TellOnce">Whether a result offers to save a missing name, sign-off, form of address or language under About me (<c>Orders:TellOnce</c>).</param>
 public sealed record HowItWorksFeatures(
     bool ForSignedInPerson,
     bool Questions,
@@ -67,7 +68,8 @@ public sealed record HowItWorksFeatures(
     int MaxFiles,
     long MaxFileBytes,
     int FullTextChars,
-    int MapChars);
+    int MapChars,
+    TellOnceMode TellOnce = TellOnceMode.Off);
 
 /// <summary>Derives <see cref="HowItWorksFeatures"/> from the settings and the viewer.</summary>
 public static class HowItWorksFeatureExtensions
@@ -96,7 +98,8 @@ public static class HowItWorksFeatureExtensions
             MaxFiles: settings.Sources.MaxFilesPerOrder,
             MaxFileBytes: settings.Sources.MaxFileBytes,
             FullTextChars: settings.Sources.FullTextMaxChars,
-            MapChars: settings.Sources.MapMaxChars);
+            MapChars: settings.Sources.MapMaxChars,
+            TellOnce: settings.Orders.TellOnce);
     }
 
     /// <summary>

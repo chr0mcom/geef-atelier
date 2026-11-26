@@ -15,10 +15,13 @@ internal sealed class ProfileMemoryResolution(IUserProfileRepository profiles) :
             ? new MemoryFacts(null)
             : new MemoryFacts(await profiles.GetAsync(username, ct));
 
-    public IReadOnlyDictionary<GapTopic, MemoryAnswer> Resolve(MemoryFacts facts, string? textType)
+    public IReadOnlyDictionary<GapTopic, MemoryAnswer> Resolve(MemoryFacts facts, string? textType) => Answers(facts.Profile);
+
+    /// <summary>The answers <paramref name="profile"/> gives, by topic; none without a profile. The same for every text type.</summary>
+    internal static IReadOnlyDictionary<GapTopic, MemoryAnswer> Answers(UserProfileEntity? profile)
     {
         var answers = new Dictionary<GapTopic, MemoryAnswer>();
-        if (facts.Profile is not { } profile)
+        if (profile is null)
             return answers;
 
         if (Value(profile.Language) is { } language)

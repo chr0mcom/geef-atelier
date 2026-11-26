@@ -1,3 +1,4 @@
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Checks;
 using Geef.Atelier.Core.Domain.Crew;
@@ -95,6 +96,10 @@ public sealed record OrderView(
 /// <see cref="UnansweredQuestions"/> are the questions the person left open before writing (skipped, not answered in time, "You decide"),
 /// read back from the briefing of the shown version, which told the writer never to decide them where that would commit the person;
 /// <c>null</c> when there are none. For a changed version they were noted for <see cref="AssumptionsVersion"/>.
+/// <see cref="FromAboutMe"/> are the topics of <see cref="AboutMeTopics.Topics"/> that came from About me for the shown version, and
+/// <see cref="TellOnce"/> those the reading of the request assumed or left open while About me has nothing on them now
+/// (<see cref="AboutMeTopics.Missing"/>); both are set only for the owner of the order, only with a text, never empty, and never while
+/// <c>Orders:TellOnce</c> is <see cref="TellOnceMode.Off"/>.
 /// </summary>
 public sealed record OrderResult(
     Guid OrderId,
@@ -125,7 +130,9 @@ public sealed record OrderResult(
     IReadOnlyList<OrderEarlierPoint>? EarlierOpenPoints = null,
     int? AssumptionsVersion = null,
     string? LengthNotice = null,
-    IReadOnlyList<string>? UnansweredQuestions = null);
+    IReadOnlyList<string>? UnansweredQuestions = null,
+    IReadOnlyList<GapTopic>? FromAboutMe = null,
+    IReadOnlyList<GapTopic>? TellOnce = null);
 
 /// <summary>
 /// Something the writer noted for an earlier <see cref="Version"/> that the shown version does not repeat: an open point (also a fixed

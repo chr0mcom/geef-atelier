@@ -185,7 +185,26 @@ internal sealed class OrderService(
             UnansweredQuestions: UnansweredQuestions(run));
         var viewer = viewerUsername ?? requestingUsername;
         var showProfile = viewer is not null && string.Equals(viewer, order.CreatedByUser, StringComparison.Ordinal);
+        if (showProfile && hasText)
+            result = await WithAboutMeAsync(result, order, run, ct);
         return report is null || !hasText ? result : result.WithReport(report, showProfile);
+    }
+
+    private async Task<OrderResult> WithAboutMeAsync(OrderResult result, OrderEntity order, RunEntity run, CancellationToken ct)
+    {
+        if (orderOptions.Value.TellOnce == TellOnceMode.Off || string.IsNullOrWhiteSpace(order.CreatedByUser))
+            return result;
+        var record = IntakeRecordJson.TryParse(order.ClarifyJson);
+        var fromAboutMe = AboutMeTopics.FromAboutMe(run.BriefingText, record);
+        var answers = IntakeRecordJson.ParseAnswers(order.AnswersJson);
+        var tellOnce = AboutMeTopics.Missing(record, answers, null);
+        if (tellOnce.Count > 0)
+            tellOnce = AboutMeTopics.Missing(record, answers, await profiles.GetAsync(order.CreatedByUser, ct));
+        return result with
+        {
+            FromAboutMe = fromAboutMe.Count > 0 ? fromAboutMe : null,
+            TellOnce = tellOnce.Count > 0 ? tellOnce : null,
+        };
     }
 
     public async Task<IReadOnlyList<OrderListItem>> ListAsync(string? ownerUsername, int limit = 50, CancellationToken ct = default)

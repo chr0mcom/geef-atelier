@@ -334,6 +334,38 @@ public sealed class HowItWorksPageTests : TestContext
         Assert.Contains("claude.ai chat window itself and from Claude Desktop has not been tested", tested, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(TellOnceMode.On, true)]
+    [InlineData(TellOnceMode.WithoutPromise, true)]
+    [InlineData(TellOnceMode.Off, false)]
+    public void The_offer_to_save_missing_details_under_about_me_follows_its_switch(TellOnceMode mode, bool shown)
+    {
+        Services.Configure<OrderOptions>(o => o.TellOnce = mode);
+        var auth = this.AddTestAuthorization();
+        auth.SetAuthorized("boss");
+        auth.SetRoles(OwnerScope.AdminRole);
+
+        var cut = Render();
+
+        Assert.Equal(shown, cut.FindAll("[data-testid='hiw-about-tell-once']").Count == 1);
+        Assert.Equal(shown, cut.FindAll("[data-testid='hiw-assistant-about-me']").Count == 1);
+        var row = cut.FindAll("[data-testid='hiw-admins'] tbody tr").Single(r => r.TextContent.Contains("Orders:TellOnce", StringComparison.Ordinal));
+        Assert.Equal(mode.ToString(), row.Children[2].TextContent);
+        Assert.DoesNotContain("not leave this open again", cut.Markup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void As_shipped_the_offer_to_save_missing_details_is_described()
+    {
+        this.AddTestAuthorization();
+        UseShippedSettings();
+
+        var line = Render().Find("[data-testid='hiw-about-tell-once']").TextContent;
+
+        Assert.Contains("instead of guessing or asking", line, StringComparison.Ordinal);
+        Assert.Contains("the writer gets it with every request", line, StringComparison.Ordinal);
+    }
+
     private IRenderedComponent<HowItWorksPage> Render() => RenderComponent<HowItWorksPage>();
 
     private void UseShippedSettings()

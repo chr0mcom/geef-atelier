@@ -62,9 +62,18 @@ public static class McpServerInstructions
         "If revise_order refuses the change, give the person its answer and do not change the text yourself.\n" +
         "7. If the person wants the text as a file, call export_order (md, docx or pdf). The file holds only the text, " +
         "so still tell the person about the open points from get_order_result.\n" +
-        "cancel_order stops an order. list_orders lists the person's recent orders. profile shows what the person saved under About me " +
-        "in the Atelier web app; it cannot be changed here, only by the person under About me.\n" +
+        "cancel_order stops an order. list_orders lists the person's recent orders. " + ProfileReadOnlyLine + "\n" +
         "8. Do not invent anything: if the person did not ask for something or did not give a file or a fact, do not add it.";
+
+    /// <summary>The sentence about <c>profile</c> while AI assistants cannot save About me details (<c>Orders:TellOnce</c> is <c>Off</c>).</summary>
+    public const string ProfileReadOnlyLine =
+        "profile shows what the person saved under About me in the Atelier web app; it cannot be changed here, only by the person under About me.";
+
+    /// <summary>The sentence about <c>profile</c> while AI assistants can save the four About me details a result can ask for; it replaces <see cref="ProfileReadOnlyLine"/>.</summary>
+    public const string ProfileSavingLine =
+        "profile shows what the person saved under About me in the Atelier web app. If get_order_result has aboutMeMissing, Atelier had to assume or leave open " +
+        "the person's name, sign-off, form of address or language because About me has nothing on it: ask the person whether they want to tell it once, " +
+        "and save only their own words with profile. Never fill it in yourself. Everything else the person changes under About me.";
 
     /// <summary>The instructions; <c>{0}</c> is the longest wait of <c>get_order_status</c> (<c>Orders:MaxWaitSeconds</c>).</summary>
     public const string TextFormat = StartLines + AttachmentFilesStep + LaterSteps;
@@ -89,13 +98,19 @@ public static class McpServerInstructions
         "\nThe other tools (such as submit_request, get_run_status and get_run_result) are the older interface and remain available for now; " +
         "use the tools above instead. submit_request never asks questions.";
 
-    /// <summary>The instructions with the defaults of <see cref="OrderOptions.MaxWaitSeconds"/> and <see cref="McpOptions.LegacyTools"/>; the server uses <see cref="For"/> with the configured values.</summary>
-    public static string Text { get; } = For(new OrderOptions().MaxWaitSeconds, new McpOptions().LegacyTools);
+    /// <summary>The instructions with the defaults of <see cref="OrderOptions.MaxWaitSeconds"/>, <see cref="McpOptions.LegacyTools"/> and <see cref="OrderOptions.TellOnce"/>; the server uses <see cref="For"/> with the configured values.</summary>
+    public static string Text { get; } = For(new OrderOptions().MaxWaitSeconds, new McpOptions().LegacyTools, aboutMeSaving: new OrderOptions().TellOnce != TellOnceMode.Off);
 
     /// <summary>
     /// The instructions for the longest wait <paramref name="maxWaitSeconds"/>, with the line about the older tools when
-    /// <paramref name="legacyTools"/> is true and with <see cref="TicketFilesStep"/> as step 2 when <paramref name="tickets"/> is true.
+    /// <paramref name="legacyTools"/> is true, with <see cref="TicketFilesStep"/> as step 2 when <paramref name="tickets"/> is true and with
+    /// <see cref="ProfileSavingLine"/> instead of <see cref="ProfileReadOnlyLine"/> when <paramref name="aboutMeSaving"/> is true.
     /// </summary>
-    public static string For(int maxWaitSeconds, bool legacyTools, bool tickets = false) =>
-        string.Format(CultureInfo.InvariantCulture, tickets ? TicketTextFormat : TextFormat, Math.Max(0, maxWaitSeconds)) + (legacyTools ? LegacyLine : string.Empty);
+    public static string For(int maxWaitSeconds, bool legacyTools, bool tickets = false, bool aboutMeSaving = false)
+    {
+        var text = string.Format(CultureInfo.InvariantCulture, tickets ? TicketTextFormat : TextFormat, Math.Max(0, maxWaitSeconds));
+        if (aboutMeSaving)
+            text = text.Replace(ProfileReadOnlyLine, ProfileSavingLine, StringComparison.Ordinal);
+        return text + (legacyTools ? LegacyLine : string.Empty);
+    }
 }

@@ -274,6 +274,10 @@
         </figure>
         <ul class="hiw-list">
             <li>Under About me you can save your name, how you sign off, how readers are addressed, your language and what never to do. Atelier uses it in every text. Only you can change it.</li>
+            @if (_f.TellOnce != TellOnceMode.Off)
+            {
+                <li data-testid="hiw-about-tell-once">When a text had to guess or leave open your name, how you sign off, how readers are addressed or your language, and About me has nothing on it yet, the result offers a field to save it there. From then on Atelier takes it from About me instead of guessing or asking, and the writer gets it with every request. The result also says what came from About me.</li>
+            }
             <li>Your request, your answers, your About me details and your files go to the AI services that write and check the text.</li>
             @if (_f.WebResearch)
             {
@@ -306,6 +310,10 @@
             {
                 <li data-testid="hiw-assistant-change">Changes: the assistant can ask for a change in your words. Atelier asks the writer to make only that change; it does not check that nothing else changed.</li>
             }
+            @if (_f.TellOnce != TellOnceMode.Off)
+            {
+                <li data-testid="hiw-assistant-about-me">About me: the assistant can save your name, how you sign off, how readers are addressed and your language when you ask it to. Everything else you change under About me.</li>
+            }
             <li>Everything you order through the assistant is also under My work in the web app, with the full result.</li>
             <li>You can see and remove connected assistants under Connected clients in your menu.</li>
         </ul>
@@ -327,6 +335,7 @@
                         <tr><td>Looking things up on the web (standard way)</td><td><code>Research:Mode</code>, per person <code>Research:ModeOverrides</code></td><td>@_everyone.WebResearch.OnOff()</td></tr>
                         <tr><td>Fact check</td><td><code>Direct:FactCheckMode</code>, per person <code>Direct:FactCheckModeOverrides</code></td><td>@DirectSettings.Value.FactCheckMode</td></tr>
                         <tr><td>Files from an AI assistant</td><td><code>Uploads:Tickets</code></td><td>@_everyone.UploadThroughAssistant.OnOff()</td></tr>
+                        <tr><td>Offer to save missing details under About me</td><td><code>Orders:TellOnce</code></td><td>@_everyone.TellOnce</td></tr>
                         <tr><td>Workshop only for administrators</td><td><code>Ui:WorkshopForAdminsOnly</code></td><td>@UiSettings.Value.WorkshopForAdminsOnly.OnOff()</td></tr>
                         <tr><td>Older tools for AI assistants</td><td><code>Mcp:LegacyTools</code></td><td>@_everyone.OlderAssistantTools.OnOff()</td></tr>
                     </tbody>

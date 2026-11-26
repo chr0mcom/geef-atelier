@@ -4454,6 +4454,12 @@ textarea.form-control {
 .order-source-name { font-weight: 500; margin-right: 8px; }
 .order-source-meta { color: var(--ink-3); font-size: 12px; }
 .order-note { margin: 0; font-size: 13px; color: var(--ink-2); }
+.order-about-me { display: grid; gap: 12px; }
+.order-about-me h2 { margin-bottom: 0; }
+.order-about-me > p { margin: 0; }
+.order-about-me-row { display: grid; gap: 8px; border-top: 1px solid var(--hairline-soft); padding-top: 12px; }
+.order-about-me-row .about-saved { margin: 0; }
+.order-tell-once-error { margin: 0; font-size: 13px; color: var(--sv-major); }
 
 .order-how { border-top: 1px solid var(--hairline-soft); padding-top: 14px; }
 .order-how > summary { cursor: pointer; font-size: 14px; color: var(--ink-2); }

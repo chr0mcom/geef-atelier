@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using System.Globalization;
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Application.Profiles;
@@ -163,7 +164,7 @@ public sealed class McpOrderContractEndToEndTests(PostgresFixture postgres)
                 Assert.Equal("Order not found.", (await Assert.ThrowsAsync<McpException>(call)).Message);
 
             Assert.DoesNotContain(await ListOrdersTool.ListOrders(orders, mallory), r => r.OrderId == id);
-            var profile = await ProfileTool.Profile(sp.GetRequiredService<IProfileService>(), mallory);
+            var profile = await ProfileTool.Profile(sp.GetRequiredService<IProfileService>(), mallory, sp.GetRequiredService<IOptions<OrderOptions>>());
             Assert.True(profile.IsEmpty);
             Assert.Null(profile.Name);
 

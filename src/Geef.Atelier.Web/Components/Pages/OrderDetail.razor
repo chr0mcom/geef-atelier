@@ -152,6 +152,10 @@
             <OrderChecksPanel Result="result" />
             <OrderOpenPoints Result="result" Language="@OrderLanguage" />
             <OrderAssumptions Result="result" Language="@OrderLanguage" />
+            @if (_isOwner && (result.TellOnce is { Count: > 0 } || result.FromAboutMe is { Count: > 0 }))
+            {
+                <OrderAboutMe @key="_view.OrderId" Result="result" Username="@_viewer" Language="@OrderLanguage" />
+            }
             <OrderLookedUp LookedUp="result.LookedUp" />
             <OrderSourcesUsed Sources="result.SourcesUsed" Quotes="result.SourceQuotes" Language="@OrderLanguage" />
             @if (VersionCount > 1)

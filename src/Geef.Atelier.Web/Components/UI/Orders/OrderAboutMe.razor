@@ -1,0 +1,176 @@
+@using Geef.Atelier.Application.Orders
+@using Geef.Atelier.Application.Profiles
+@using Geef.Atelier.Core.Configuration
+@using Geef.Atelier.Core.Domain.Intake
+@using Geef.Atelier.Core.Domain.Profiles
+@using Geef.Atelier.Web.Components.Pages
+@using Microsoft.Extensions.Options
+@inject IProfileService Profiles
+@inject IOptions<OrderOptions> OrderSettings
+@inject CircuitDataGate DataGate
+@inject ILogger<OrderAboutMe> Logger
+
+@if (Rows.Count > 0 && Heading is { } heading)
+{
+    <section class="order-block order-about-me" aria-labelledby="order-about-me-title" data-testid="order-tell-once">
+        <h2 id="order-about-me-title" data-testid="order-tell-once-heading">@heading</h2>
+        <p>@AboutMeLines.TellOnceLead</p>
+        @foreach (var topic in Rows)
+        {
+            var key = Key(topic);
+            <div class="order-about-me-row" data-testid="order-tell-once-row" data-topic="@key">
+                @if (_saved.Contains(topic))
+                {
+                    <p class="about-saved" role="status" data-testid="order-tell-once-saved">@AboutMeLines.Saved <a href="/about-me">About me</a></p>
+                }
+                else
+                {
+                    @switch (topic)
+                    {
+                        case GapTopic.Formality:
+                            <fieldset class="about-choice" data-testid="order-tell-once-field">
+                                <legend>@topic.FieldLabel()</legend>
+                                @foreach (var (value, label) in FormalityChoices)
+                                {
+                                    <label class="about-radio">
+                                        <input type="radio" name="order-tell-once-formality" value="@value" checked="@(_formality == value)" disabled="@_busy"
+                                               data-testid="order-tell-once-formality-@value.ToString().ToLowerInvariant()" @onchange="() => _formality = value" />
+                                        <span>@label</span>
+                                    </label>
+                                }
+                            </fieldset>
+                            break;
+                        case GapTopic.Language:
+                            <label class="about-field">
+                                <span>@topic.FieldLabel()</span>
+                                <select data-testid="order-tell-once-field" disabled="@_busy" @bind="_language">
+                                    <option value="">Choose a language</option>
+                                    @foreach (var (languageCode, languageName) in AboutMe.KnownLanguages)
+                                    {
+                                        <option value="@languageCode">@languageName</option>
+                                    }
+                                </select>
+                            </label>
+                            break;
+                        case GapTopic.Signature:
+                            <label class="about-field">
+                                <span>@topic.FieldLabel()</span>
+                                <textarea rows="3" maxlength="@UserProfileLimits.Signature" placeholder="For example: Kind regards, Sam" disabled="@_busy"
+                                          data-testid="order-tell-once-field" value="@Text(topic)" @oninput="e => _texts[topic] = e.Value?.ToString() ?? string.Empty"></textarea>
+                            </label>
+                            break;
+                        default:
+                            <label class="about-field">
+                                <span>@topic.FieldLabel()</span>
+                                <input type="text" maxlength="@UserProfileLimits.DisplayName" autocomplete="name" disabled="@_busy"
+                                       data-testid="order-tell-once-field" value="@Text(topic)" @oninput="e => _texts[topic] = e.Value?.ToString() ?? string.Empty" />
+                            </label>
+                            break;
+                    }
+                    @if (_errors.TryGetValue(topic, out var error))
+                    {
+                        <p class="order-tell-once-error" role="alert" data-testid="order-tell-once-error">@error</p>
+                    }
+                    <div class="about-actions">
+                        <button type="button" class="btn small" data-testid="order-tell-once-save" disabled="@(_busy || !Filled(topic))" @onclick="() => SaveAsync(topic)">@AboutMeLines.SaveButton</button>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+}
+
+@if (FromAboutMe.Count > 0)
+{
+    <p class="order-note" data-testid="order-from-about-me">@AboutMeLines.FromAboutMeLead@string.Join(", ", FromAboutMe.Select(t => t.FromAboutMeName())). <a href="/about-me">@AboutMeLines.ChangeThere</a></p>
+}
+
+@code {
+    /// <summary>
+    /// The result of the order. Its <see cref="OrderResult.TellOnce"/> and <see cref="OrderResult.FromAboutMe"/> are set only for the owner,
+    /// so the page shows this component only to the owner as well and saves only into the profile of <see cref="Username"/>.
+    /// </summary>
+    [Parameter, EditorRequired] public OrderResult Result { get; set; } = null!;
+
+    /// <summary>The signed-in owner of the order; the only profile this component writes to.</summary>
+    [Parameter, EditorRequired] public string? Username { get; set; }
+
+    /// <summary>Language of the order as a two-letter code; preselects the language field when it is one of the offered languages.</summary>
+    [Parameter] public string? Language { get; set; }
+
+    /// <summary>The two choices for the address of readers (without "It depends", which would save nothing).</summary>
+    public static readonly IReadOnlyList<(Formality Value, string Label)> FormalityChoices =
+        AboutMe.FormalityChoices.Where(c => c.Value != Formality.Unset).ToList();
+
+    readonly Dictionary<GapTopic, string> _texts = [];
+    readonly Dictionary<GapTopic, string> _errors = [];
+    readonly HashSet<GapTopic> _saved = [];
+    Formality _formality;
+    string _language = string.Empty;
+    bool _languageSet;
+    bool _busy;
+
+    string? Heading => OrderSettings.Value.TellOnce.Heading();
+
+    IReadOnlyList<GapTopic> Rows => AboutMeTopics.Topics.Where(t => (Result.TellOnce ?? []).Contains(t) || _saved.Contains(t)).ToList();
+
+    IReadOnlyList<GapTopic> FromAboutMe => Result.FromAboutMe ?? [];
+
+    static string Key(GapTopic topic) => topic.ToString().ToLowerInvariant();
+
+    string Text(GapTopic topic) => _texts.TryGetValue(topic, out var text) ? text : string.Empty;
+
+    bool Filled(GapTopic topic) => topic switch
+    {
+        GapTopic.Formality => _formality != Formality.Unset,
+        GapTopic.Language => _language.Length > 0,
+        _ => !string.IsNullOrWhiteSpace(Text(topic)),
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (_languageSet)
+            return;
+        _languageSet = true;
+        var language = Language?.Trim().ToLowerInvariant();
+        if (language is not null && AboutMe.KnownLanguages.Any(l => l.Code == language))
+            _language = language;
+    }
+
+    UserProfilePart Part(GapTopic topic) => topic switch
+    {
+        GapTopic.Sender => new UserProfilePart(DisplayName: Text(topic)),
+        GapTopic.Signature => new UserProfilePart(Signature: Text(topic)),
+        GapTopic.Formality => new UserProfilePart(Formality: _formality),
+        GapTopic.Language => new UserProfilePart(Language: _language),
+        _ => throw new ArgumentOutOfRangeException(nameof(topic), topic, null),
+    };
+
+    async Task SaveAsync(GapTopic topic)
+    {
+        if (_busy || string.IsNullOrWhiteSpace(Username) || !(Result.TellOnce ?? []).Contains(topic) || !Filled(topic))
+            return;
+        _busy = true;
+        _errors.Remove(topic);
+        try
+        {
+            var user = Username;
+            var part = Part(topic);
+            await DataGate.RunAsync(() => Profiles.SavePartAsync(user, part));
+            _saved.Add(topic);
+        }
+        catch (ProfileValidationException ex)
+        {
+            _errors[topic] = ex.Message;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Saving an About me detail from a result failed");
+            _errors[topic] = AboutMeLines.SaveFailed;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

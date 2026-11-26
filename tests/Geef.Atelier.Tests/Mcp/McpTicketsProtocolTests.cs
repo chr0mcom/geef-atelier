@@ -69,7 +69,7 @@ public sealed class McpTicketsProtocolTests
         Assert.Equal(SubmitOrderTool.UploadIdsDescription, uploadIds.GetProperty("description").GetString());
         Assert.Contains("string", Types(uploadIds.GetProperty("items")));
         Assert.Contains("array", Types(uploadIds));
-        Assert.Equal(McpServerInstructions.For(new OrderOptions().MaxWaitSeconds, false, tickets: true), session.Client.ServerInstructions);
+        Assert.Equal(McpServerInstructions.For(new OrderOptions().MaxWaitSeconds, false, tickets: true, aboutMeSaving: true), session.Client.ServerInstructions);
         Assert.Contains(McpServerInstructions.TicketFilesStep, session.Client.ServerInstructions, StringComparison.Ordinal);
         Assert.DoesNotContain(McpServerInstructions.AttachmentFilesStep, session.Client.ServerInstructions, StringComparison.Ordinal);
     }

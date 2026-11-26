@@ -1,18 +1,24 @@
 using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Application.Profiles;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Orders;
 using Geef.Atelier.Core.Domain.Profiles;
 using Geef.Atelier.Mcp.Tools;
 using Geef.Atelier.Tests.Web.Components.Profile;
+using Microsoft.Extensions.Options;
 using ModelContextProtocol;
 
 namespace Geef.Atelier.Tests.Mcp.Orders;
 
-/// <summary><c>cancel_order</c>, <c>list_orders</c> and <c>profile</c>: only the caller's own orders and details, nothing written to the profile.</summary>
+/// <summary>
+/// <c>cancel_order</c>, <c>list_orders</c> and <c>profile</c>: only the caller's own orders and details; <c>profile</c> writes only the four
+/// fields a result can ask for, only into the caller's own profile and never while <c>Orders:TellOnce</c> is <c>Off</c>.
+/// </summary>
 public sealed class CancelListProfileToolTests
 {
     private readonly FakeOrderService _orders = new();
     private readonly FakeUser _alice = new("alice");
+    private static readonly IOptions<OrderOptions> Shipped = Options.Create(new OrderOptions());
 
     [Fact]
     public async Task Cancel_stops_an_own_order_and_reports_the_state_afterwards()
@@ -97,14 +103,14 @@ public sealed class CancelListProfileToolTests
     }
 
     [Fact]
-    public async Task Profile_returns_the_own_about_me_details_and_never_writes()
+    public async Task Profile_without_values_returns_the_own_about_me_details_and_never_writes()
     {
         var profiles = new FakeProfileService();
         profiles.Set("alice", new UserProfileInput("Anna Beispiel", "Elternbeirat", "Grundschule Beispielstadt", Formality.Informal, "de",
             "Viele Grüße, Anna", "Keine Emojis", "Ich schreibe meist an Eltern."));
         profiles.Set("bob", new UserProfileInput("Bob", null, null, Formality.Formal, "en", null, null, null));
 
-        var dto = await ProfileTool.Profile(profiles, _alice);
+        var dto = await ProfileTool.Profile(profiles, _alice, Shipped);
 
         Assert.Equal(("Anna Beispiel", "Elternbeirat", "Grundschule Beispielstadt", "informal", "de"), (dto.Name, dto.Role, dto.Organization, dto.Formality, dto.Language));
         Assert.Equal(("Viele Grüße, Anna", "Keine Emojis", "Ich schreibe meist an Eltern."), (dto.Signature, dto.NeverDo, dto.Notes));
@@ -113,6 +119,7 @@ public sealed class CancelListProfileToolTests
         Assert.Contains("About me", dto.Note, StringComparison.Ordinal);
         Assert.Equal(["alice"], profiles.Loaded);
         Assert.Empty(profiles.Saved);
+        Assert.Empty(profiles.SavedParts);
         Assert.Empty(profiles.Cleared);
     }
 
@@ -122,7 +129,7 @@ public sealed class CancelListProfileToolTests
         var profiles = new FakeProfileService();
         profiles.Set("alice", new UserProfileInput("Anna", null, null, Formality.Formal, null, null, null, null));
 
-        var dto = await ProfileTool.Profile(profiles, new FakeUser("root", isAdmin: true));
+        var dto = await ProfileTool.Profile(profiles, new FakeUser("root", isAdmin: true), Shipped);
 
         Assert.True(dto.IsEmpty);
         Assert.Null(dto.Name);
@@ -135,10 +142,88 @@ public sealed class CancelListProfileToolTests
     {
         var profiles = new FakeProfileService();
 
-        var ex = await Assert.ThrowsAsync<McpException>(() => ProfileTool.Profile(profiles, new FakeUser(null, isAdmin: true)));
+        var ex = await Assert.ThrowsAsync<McpException>(() => ProfileTool.Profile(profiles, new FakeUser(null, isAdmin: true), Shipped));
 
         Assert.Equal(Geef.Atelier.Application.Auth.OwnerScope.UnknownUserMessage, ex.Message);
         Assert.Empty(profiles.Loaded);
+    }
+
+    [Fact]
+    public async Task Profile_saves_only_the_given_fields_into_the_own_profile_and_keeps_the_rest()
+    {
+        var profiles = new FakeProfileService();
+        profiles.Set("alice", new UserProfileInput(null, "Elternbeirat", null, Formality.Unset, null, null, "Keine Emojis", null));
+        profiles.Set("bob", new UserProfileInput("Bob", null, null, Formality.Formal, "en", "Best, Bob", null, null));
+
+        var dto = await ProfileTool.Profile(profiles, _alice, Shipped, name: " Anna Beispiel ", signature: "Viele Grüße\nAnna", formality: "Informal", language: "de");
+
+        Assert.Equal(("Anna Beispiel", "Viele Grüße\nAnna", "informal", "de"), (dto.Name, dto.Signature, dto.Formality, dto.Language));
+        Assert.Equal(("Elternbeirat", "Keine Emojis"), (dto.Role, dto.NeverDo));
+        Assert.Equal(ProfileTool.SavedNote, dto.Note);
+        var (user, part) = Assert.Single(profiles.SavedParts);
+        Assert.Equal("alice", user);
+        Assert.Equal(new UserProfilePart(" Anna Beispiel ", Formality.Informal, "de", "Viele Grüße\nAnna"), part);
+        Assert.Empty(profiles.Saved);
+        Assert.Equal(new UserProfileInput("Bob", null, null, Formality.Formal, "en", "Best, Bob", null, null), profiles.Stored("bob"));
+    }
+
+    [Fact]
+    public async Task An_administrator_saves_only_into_the_own_profile()
+    {
+        var profiles = new FakeProfileService();
+        profiles.Set("alice", new UserProfileInput("Anna", null, null, Formality.Formal, null, null, null, null));
+
+        await ProfileTool.Profile(profiles, new FakeUser("root", isAdmin: true), Shipped, signature: "Grüße, Root");
+
+        Assert.Equal("root", Assert.Single(profiles.SavedParts).Username);
+        Assert.Equal(new UserProfileInput("Anna", null, null, Formality.Formal, null, null, null, null), profiles.Stored("alice"));
+    }
+
+    [Theory]
+    [InlineData(TellOnceMode.Off, false)]
+    [InlineData(TellOnceMode.On, true)]
+    [InlineData(TellOnceMode.WithoutPromise, true)]
+    public async Task Saving_follows_the_switch_and_reading_works_always(TellOnceMode mode, bool saves)
+    {
+        var profiles = new FakeProfileService();
+        var options = Options.Create(new OrderOptions { TellOnce = mode });
+
+        var read = await ProfileTool.Profile(profiles, _alice, options);
+        Assert.True(read.IsEmpty);
+        if (saves)
+        {
+            var dto = await ProfileTool.Profile(profiles, _alice, options, name: "Anna");
+            Assert.Equal("Anna", dto.Name);
+        }
+        else
+        {
+            var ex = await Assert.ThrowsAsync<McpException>(() => ProfileTool.Profile(profiles, _alice, options, name: "Anna"));
+            Assert.Equal(ProfileTool.SavingOffMessage, ex.Message);
+            Assert.Empty(profiles.SavedParts);
+        }
+    }
+
+    [Fact]
+    public async Task An_unknown_form_of_address_saves_nothing()
+    {
+        var profiles = new FakeProfileService();
+
+        var ex = await Assert.ThrowsAsync<McpException>(() => ProfileTool.Profile(profiles, _alice, Shipped, name: "Anna", formality: "sie"));
+
+        Assert.Contains("formal or informal", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("Nothing was saved", ex.Message, StringComparison.Ordinal);
+        Assert.Empty(profiles.SavedParts);
+    }
+
+    [Fact]
+    public async Task A_value_the_profile_refuses_comes_back_in_plain_words_and_saves_nothing()
+    {
+        var profiles = new FakeProfileService { SaveError = new ProfileValidationException("Please enter the language as a two-letter code, for example de or en.") };
+
+        var ex = await Assert.ThrowsAsync<McpException>(() => ProfileTool.Profile(profiles, _alice, Shipped, language: "deutsch"));
+
+        Assert.Equal("Please enter the language as a two-letter code, for example de or en. Nothing was saved.", ex.Message);
+        Assert.Null(profiles.Stored("alice"));
     }
 
     private static OrderListItem Item(string title, OrderDisplayState state, int version, int? words, DateTimeOffset updated) =>

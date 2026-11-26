@@ -62,16 +62,26 @@ public static class ProfilePrompt
     {
         var values = new List<string>();
         var hasFreeText = false;
+        foreach (var (label, text) in Scan(rendered))
+        {
+            hasFreeText |= label is NoGosLabel or FreeTextLabel;
+            if (label != FormalityLabel && text.Trim() is { Length: > 0 } value)
+                values.Add(value);
+        }
+        return new ProfileValues(values, hasFreeText);
+    }
+
+    /// <summary>
+    /// The field names of <see cref="Labels"/> that a block written by <see cref="Render"/> holds with a value, in the order of the block,
+    /// read the same way as <see cref="Values"/>. <c>null</c>, blank or a block without field names gives none.
+    /// </summary>
+    public static IReadOnlyList<string> Fields(string? rendered) =>
+        Scan(rendered).Where(f => f.Label is not null && f.Text.Trim().Length > 0).Select(f => f.Label!).Distinct(StringComparer.Ordinal).ToList();
+
+    private static IEnumerable<(string? Label, string Text)> Scan(string? rendered)
+    {
         var current = -1;
         var value = new List<string>();
-
-        void Close()
-        {
-            if (!(current >= 0 && Labels[current] == FormalityLabel) && value.Count > 0 && string.Join('\n', value).Trim() is { Length: > 0 } text)
-                values.Add(text);
-            value.Clear();
-        }
-
         foreach (var line in (rendered ?? string.Empty).Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
         {
             var next = -1;
@@ -88,13 +98,14 @@ public static class ProfilePrompt
                 value.Add(line);
                 continue;
             }
-            Close();
+            if (value.Count > 0)
+                yield return (current >= 0 ? Labels[current] : null, string.Join('\n', value));
+            value.Clear();
             current = next;
-            hasFreeText |= Labels[next] is NoGosLabel or FreeTextLabel;
             value.Add(line[(Labels[next].Length + 1)..]);
         }
-        Close();
-        return new ProfileValues(values, hasFreeText);
+        if (value.Count > 0)
+            yield return (current >= 0 ? Labels[current] : null, string.Join('\n', value));
     }
 
     private static void Add(List<string> lines, string label, string? value)

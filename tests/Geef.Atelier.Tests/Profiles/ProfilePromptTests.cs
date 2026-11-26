@@ -91,5 +91,24 @@ public sealed class ProfilePromptTests
         Assert.Empty(ProfilePrompt.Values(null).Values);
     }
 
+    [Fact]
+    public void The_fields_of_a_rendered_block_come_back_in_order_and_a_label_inside_a_later_value_is_no_field()
+    {
+        var profile = Profile() with
+        {
+            Organization = "Beispiel GmbH",
+            Formality = Formality.Formal,
+            Signature = "Name: Anna\nRole: none",
+            FreeText = "Signature: steht auch hier",
+        };
+
+        Assert.Equal([ProfilePrompt.OrganizationLabel, ProfilePrompt.FormalityLabel, ProfilePrompt.SignatureLabel, ProfilePrompt.FreeTextLabel],
+            ProfilePrompt.Fields(ProfilePrompt.Render(profile)));
+        Assert.Equal([ProfilePrompt.LanguageLabel], ProfilePrompt.Fields(ProfilePrompt.Render(Profile() with { Language = "de" })));
+        Assert.Empty(ProfilePrompt.Fields("Ich heiße Oberhuber.\nAus Kassel."));
+        Assert.Empty(ProfilePrompt.Fields("Name:   \nSignature:"));
+        Assert.Empty(ProfilePrompt.Fields(null));
+    }
+
     private static UserProfileEntity Profile() => new() { Username = "user-a", CreatedAt = T0, UpdatedAt = T0 };
 }
