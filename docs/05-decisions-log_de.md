@@ -3194,6 +3194,12 @@ eine verfehlte Kette → eine Reparatur (der Schreiber bekommt nur noch die neue
 Hinweis ab der dritten Fassung; „Simpler words“ verfehlt → auch dieser Knopf entfällt, der Rest wird eingeschaltet. Das Ergebnis
 folgt als Zusatz.
 
+**Zusatz (2026-11-26): Tor N″ bestanden.** Gemessen an zwei frischen Testaufträgen (Deutsch, Englisch) mit sechs Änderungen
+samt beiden Ketten, „Simpler words“, „länger“ als Freitext und der Probe `quick: longer` (kein Modellaufruf). Alle Teile
+bestanden; im Urteil des blinden Prüfers wurde nichts gestrichen. Beim Wunsch „länger“ kam ein zusätzlicher Satz mit eigenem
+Inhalt dazu; genau dafür steht der feste Hinweis über dem Text. `Orders:Revise` steht ab jetzt auf `On`
+(Rückweg: `Orders__Revise=Off`).
+
 ## D-079 — Keine Websuche bei Aufträgen mit der Standard-Crew; Suchanfrage scheitert geschlossen (2026-11-26)
 
 **Status:** umgesetzt.

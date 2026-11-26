@@ -92,7 +92,8 @@ public sealed class ReviseLongerEndToEndTests(PostgresFixture postgres)
     [Fact]
     public async Task While_changing_is_switched_off_longer_is_answered_that_changing_is_not_available()
     {
-        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres, services =>
+            services.PostConfigure<OrderOptions>(o => o.Revise = ReviseMode.Off));
         host.Script.EnqueueExecutorText(FirstText);
         var submission = await host.SubmitOrderAsync(new SubmitOrderRequest(Request, User, OrderEntry.Web, null));
         await host.WaitForOrderFinishedAsync(submission.OrderId);

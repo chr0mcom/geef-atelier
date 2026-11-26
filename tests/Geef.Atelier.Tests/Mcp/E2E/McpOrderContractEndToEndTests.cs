@@ -126,7 +126,8 @@ public sealed class McpOrderContractEndToEndTests(PostgresFixture postgres)
     [Fact]
     public async Task Revise_order_says_plainly_when_changing_is_switched_off()
     {
-        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres, services =>
+            services.PostConfigure<OrderOptions>(o => o.Revise = ReviseMode.Off));
         var (orderId, _) = await SubmitAndDeliverAsync(host);
 
         var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => host.CallMcpToolAsync("revise_order", new { orderId, change = Change }));
