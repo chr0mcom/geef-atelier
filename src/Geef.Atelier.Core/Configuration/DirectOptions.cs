@@ -41,3 +41,17 @@ public sealed class DirectOptions
     /// <summary>Whether a failed fact-check call is tried once more with the next model of the slot.</summary>
     public bool FactCheckFallbackModel { get; set; } = true;
 }
+
+/// <summary>Helpers on <see cref="DirectOptions"/>.</summary>
+public static class DirectOptionsExtensions
+{
+    /// <summary>
+    /// The fact-check mode for orders of <paramref name="user"/>: the entry of <see cref="DirectOptions.FactCheckModeOverrides"/> for
+    /// that user name, otherwise <see cref="DirectOptions.FactCheckMode"/>.
+    /// </summary>
+    public static FactCheckMode FactCheckModeFor(this DirectOptions options, string? user)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return user is not null && options.FactCheckModeOverrides is { } overrides && overrides.TryGetValue(user, out var mode) ? mode : options.FactCheckMode;
+    }
+}
