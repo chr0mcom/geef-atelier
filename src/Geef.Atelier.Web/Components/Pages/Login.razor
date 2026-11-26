@@ -47,6 +47,13 @@
         HttpContext.Response.Redirect(target);
     }
 
-    internal static string ResolvePostLogin(string? returnUrl) =>
-        string.IsNullOrEmpty(returnUrl) ? "/start" : returnUrl;
+    /// <summary>
+    /// The page to open after signing in: <paramref name="returnUrl"/> only when it is a path on this site, otherwise the start page.
+    /// A path on this site begins with one slash that is not followed by a second slash or a backslash, and holds no control
+    /// characters (browsers drop some of them, which would turn such a path into another address).
+    /// </summary>
+    internal static string ResolvePostLogin(string? returnUrl) => IsPathOnThisSite(returnUrl) ? returnUrl! : "/start";
+
+    private static bool IsPathOnThisSite(string? url) =>
+        url is ['/', ..] && url is not ([_, '/', ..] or [_, '\\', ..]) && !url.Any(char.IsControl);
 }
