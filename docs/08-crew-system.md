@@ -804,7 +804,7 @@ most once (`MaxIterations: 2`). Since stage 3 it has two reviewers, both injecte
 
 | Reviewer | Profile | Model | What it does |
 |---|---|---|---|
-| Automatic checks | `deterministic-checks` | none | `DraftCheckEvaluator`: not empty, no remark before the text, length, language, placeholders, forbidden patterns and words, required words, written calculations. Blocking failures → `Error`, the rest `Info`. |
+| Automatic checks | `deterministic-checks` | none | `DraftCheckEvaluator`: not empty, no remark before the text, length, language, placeholders (in square brackets, up to 300 characters on one line), forbidden patterns and words, required words, written calculations. Blocking failures → `Error`, the rest `Info`. |
 | Fact check | `source-fact-check` | slot `FactReviewer` (today Codex Astra, never the writer's family) | `SourceFactCheckReviewer`: compares the facts of the text with the request, the answers, the profile and the files (`FactCheckPrompts`, version `fact-check-1`). |
 
 The fact check runs for every order of the direct path; only `Direct:FactCheckMode = Off`, `Shadow` or a failure of the
@@ -903,8 +903,10 @@ brief composed again, stored through `TryAddRevisionRunAsync`). The direct path 
   mark out of every quote of the checker (`FactChange.WithoutMarks`), so a quote that is only a mark is no instruction and no stored
   quote holds the mark. In the first run of an order the filter leaves the quotes as they are.
 - **Writer:** only in the user prompt of the first pass, `DirectWriterPrompts.RevisionInstruction` replaces `SeedInstruction` (for
-  providers without document mode through the same replacement "the text in draft.md" → "this text"). The system prompt stays
-  bit-identical (hash test); the correction pass is unchanged.
+  providers without document mode through the same replacement "the text in draft.md" → "this text"). Wording since gate N′
+  (D-075): connecting fixes as small as possible, changes of tone, style or length without a new statement and without changing who
+  writes to whom, a longer text expands on what it already says. The system prompt stays bit-identical (hash test); the correction
+  pass is unchanged.
 - **Checks:** in a change run every rule of the first request (`DraftCheckResult.IsFirstRequestRule`: length, language, no
   placeholders, forbidden forms, ruled-out and required words) is only a note, never blocking (`DeterministicChecksReviewer.Evaluate`,
   sentence `FirstRequestNoteFormat`); empty text, remark before the text, the placeholders to fill in, the calculations and the fact

@@ -2692,3 +2692,106 @@ und die Herkunft übernommener Stellen zeigt es nicht, eine Version mit übernom
 `earlierNeedsCheck` erscheint als „Ready“, und eine Stelle gegen eine Vorgabe von vor der letzten Änderung steht unter den
 Hinweisen ohne den Satz dazu.
 Nichts davon wird gelöscht; nach erneutem Deploy erscheint es wieder.
+
+### Zusatz zu D-075 — Etappe 5: erste Messung (Tore M, V-MCP, N) und Festlegung von Tor N′ (2026-11-26)
+
+**Status:** Tor M bestanden, V-MCP bestanden (siehe oben), **Tor N nicht bestanden**. `Orders:Revise` bleibt `Off` (Override
+`On` nur für den Messnutzer). Die Vorbedingungen für die zweite und letzte Messung (Tor N′) sind gebaut und mit Tests belegt;
+Deploy und Messung stehen aus. Prüfer-, Klärer- und Verdichter-Prompt samt Schema und der System-Prompt des Schreibers bleiben
+bitgleich (Hash-Tests grün).
+
+**Erstes Ergebnis Tor N: nicht bestanden – unverändert.** Laut Messwerkzeug verfehlt: N1 am Fall „Absatz streichen“ (Absatz-
+und Wortschwelle) und N2 (zusammen elf „neue nicht belegte Stellen“ in den beiden Ton-Fällen, höchstens eine erlaubt); N3, N4
+und N5 bestanden. Die alten Daten werden nicht neu bewertet, keine Schwelle wird an ihnen gelockert.
+
+**Lesung des unabhängigen Beraters** (an den gespeicherten Texten, ohne Modellaufruf):
+- **Beide Fehlschläge sind Fehler der Messanlage.** Der zu streichende Absatz war im Markdown ein Abschnitt aus vier Blöcken;
+  schon die verlangte Streichung allein lässt höchstens zwei geänderte Blöcke und ±15 % Wörter nicht zu. Der Schreiber strich
+  genau diesen Abschnitt und passte einen Halbsatz an, der sonst auf Gestrichenes gezeigt hätte. Die Kennzahl von N2 zählt jede
+  beanstandete Stelle, deren Zitat nicht wörtlich in der Vorfassung steht; bei einer Tonänderung wird jeder Satz umformuliert,
+  gezählt werden also Umformulierungen von Sätzen, die der Faktenprüfer schon vorher beanstandet hatte. Keine der elf Stellen ist
+  in der Sache eine neue Aussage. Oberhalb von acht gelisteten Stellen ist die Kennzahl zudem blind. Leichter Produktbefund dabei:
+  Ein wärmerer Ton verschob in einem Fall die Anrede (aus „Mieter“ wurden „Nachbarn“, obwohl die Verwaltung schreibt).
+- **N4, Teilkriterium Platzhalter: Schein-Bestehen, in der Sache verfehlt.** Ein Platzhalter mit 94 Zeichen stand in drei
+  Fassungen im Text und in keiner Liste „Fill these in before you send the text“. Produkt und Messwerkzeug erkannten Platzhalter
+  nur bis 80 Zeichen, deshalb fiel es nicht auf. Der Fehler ist älter als das Nachbessern.
+- **N3 „Länger“: ungesichert.** „Eine neue Stelle“ ist nur eine Untergrenze, weil zwei weitere beanstandete Stellen nicht in der
+  Liste standen; im Text stehen zwei neue weiche Aussagen, darunter eine neue Zusage für den nächsten Anlass.
+- **Basisaufnahmen als Kopien:** Die Ausgangsfassungen der Folgeänderungen wurden nachträglich als Kopien angelegt, um die Regel
+  „jeder Schnappschuss in höchstens einem Fall“ zu erfüllen. In der Sache unschädlich, formal eine Umgehung der eigenen Regel; bei
+  Tor N′ wird jede Ausgangsfassung unmittelbar vor ihrer Änderung aufgenommen.
+- „Simpler words“ wurde nicht gemessen; die geöffnete Änderungsansicht ist in den Daten nicht belegt.
+
+**Begründung des Messwechsels:** Die Kennzahl „neue `not_backed`“ zählt Umformulierungen und endet bei acht gelisteten Stellen;
+Absatz- und Wortschwelle sind bei „Absatz streichen“ für einen fehlerfreien Schreiber unerreichbar. Ein neuer Anlauf nur am Satz
+mit der alten Kennzahl wäre unabhängig vom Satz wieder verfehlt worden; den Laien das Ändern eines Textes wegen zweier Messfehler
+vorzuenthalten, wäre nicht ehrlicher. Deshalb wird die eine Runde am Satz genutzt und genau einmal mit einer vorab festgelegten,
+berichtigten Messanlage neu gemessen.
+
+**Tor N′ – zweite und letzte Messung.** Die Festlegung gilt vor jedem neuen Datum und wird nach Beginn der Messung nicht mehr
+geändert:
+- **Daten:** drei frische Aufträge des Messnutzers (eine Einladung zu einer Vereinsversammlung und ein Bericht für eine
+  Schulzeitung auf Deutsch, eine Rundmail zu einem Umzug auf Englisch), sieben Änderungen, fünf im Web mit echten Klicks und zwei
+  über MCP: eine Angabe ersetzen, einen Satz ergänzen, einen Absatz streichen, zweimal Ton, Länger, Kürzer. Jede Art, die in der
+  ersten Messung verfehlt wurde, ist wieder dabei. Vor jeder Änderung wird die Ausgangsfassung frisch aufgenommen.
+- **Mechanisch für jeden Fall (N4′):** neue Fassung mit Text und der nächsten Versionsnummer; nichts Bekanntes der Vorfassung geht
+  verloren; jeder Platzhalter des neuen Texts (eigene, vom Produkt unabhängige Regel bis 300 Zeichen) steht in der Liste; der
+  Export ohne Versionsangabe enthält die neue Fassung.
+- **Mechanisch je Art:** Schwellen auf Blöcke, Wortverhältnis (±15 %, Kürzer 40–85 %, Länger 115–160 %), Platzhalter und
+  Ziffernfolgen; beim Streichen bilden die entfernten Blöcke einen zusammenhängenden Zielbereich (höchstens eine Anschlusskorrektur
+  woanders), und das Wortverhältnis wird ohne diesen Bereich gerechnet. Oberfläche: Die geöffnete Änderungsansicht zeigt das alte
+  Datum als entfernt und das neue als hinzugefügt (höchstens zwei geänderte Absätze); die Laufzeit beim Schreiben steht unter 1:00.
+- **Inhaltlich: ein blinder Prüfer** (frischer Unteragent, nur das Lesen einer Eingabedatei, ohne Wissen über Produkt, Tor,
+  Schwellen und Faktenprüfer) beurteilt alle sieben Paare aus Wunsch, Text vorher und Text nachher, dazu zwei von Hand gebaute
+  Kontrollpaare (eine gepflanzte Aussage, eine saubere Einzeländerung). Gültig ist sein Urteil nur, wenn beide Kontrollpaare das
+  Erwartete zeigen; Zitate werden gegen die Texte geprüft. Schwellen: Wunsch in allen Fällen erfüllt; keine wesentliche neue Aussage
+  bei den lokalen Änderungen und bei Kürzer, bei den beiden Ton-Fällen zusammen und bei Länger je höchstens eine; keine weggefallene
+  tragende Aussage, keine veränderte Angabe; außerhalb einer lokalen Stelle höchstens eine Änderung, und nur eine nötige.
+- Die Zahlen des Faktenprüfers werden je Fassung berichtet, sind aber **kein Kriterium** mehr.
+- Obergrenzen der Modellaufrufe (Klärer 4, Schreiber 12, Faktenprüfer und blinder Prüfer zusammen 12); nach einem technischen
+  Fehlschlag darf dieselbe Änderung einmal neu gestartet werden.
+- **Folgen:** bestanden → zusammen mit Tor M und nach V4/V5 eigener Commit `Orders:Revise = On`. Mechanisch N4′ verfehlt → Halt:
+  Fehler beheben, nie für alle einschalten, bevor er am betroffenen Fall erneut nachgewiesen ist. Sonst verfehlt → `Orders:Revise`
+  bleibt beim Messnutzer, keine weitere Runde am Satz und keine weitere Messung in Etappe 5; ein neuer Anlauf ist eine eigene Etappe.
+  Nicht auswertbar → nur die fehlenden Fälle dürfen einmal unter derselben Festlegung nachgeholt werden. Kein Fall wird ausgetauscht,
+  kein Urteil überstimmt, keine Schwelle angepasst.
+- **Nicht gemessen:** der Knopf „Simpler words“ (kein Budget). Der Stopp (N5) wird aus der ersten Messung fortgeschrieben, weil
+  keine Vorbedingung die Bestimmung des Zustands, der gezeigten Version oder den Stopp-Pfad ändert.
+
+**Neuer Satz `RevisionInstruction`** (die eine Runde des Vertrags), Wortlaut:
+
+> Change the text in draft.md only as the person asks in the line marked "the change to make now" under "Change requested by the
+> person". The earlier changes listed there are already made in the text: keep them and do not make them again. Keep everything
+> else as it is: the same facts, structure and wording. If the change leaves another sentence wrong or pointing at something that
+> is no longer in the text, adjust that sentence as little as possible. A change of tone, style or length changes the wording, not
+> the content: add no statement about what happened, what will happen, what is offered or what is expected that the text does not
+> already make, and keep who writes and who is addressed. When the text has to get longer, expand on what it already says and do
+> not invent detail to fill it. Keep the language of the text unless the change asks for another language. Keep the length within
+> ±15 % unless the change asks for another length or cannot be made without changing it.
+
+Für Anbieter ohne Dokumentmodus wie bisher mit „this text“ statt „the text in draft.md“. Die festen Sätze der Schnellknöpfe und
+die Anweisung für einen gesäten ersten Durchgang bleiben unverändert (Tests).
+
+**Vorbedingungen (Code mit Tests, ohne Modellaufruf):**
+- **V1 Platzhalter:** erkannt bis 300 Zeichen auf einer Zeile, gleich im Produkt (Prüfung und Liste „Fill these in …“, Filter des
+  Faktenprüfers, vorher 200) und im Messwerkzeug. Links, Verweise, Bilder, Fußnoten, Ankreuzfelder und Doppelklammern bleiben
+  unabhängig von der Länge ausgenommen. Gespeicherte Ergebnisse ändern sich nicht, weil die Liste beim Lauf in den Bericht
+  geschrieben wird; neue Läufe listen auch lange Platzhalter, und bei „keine Platzhalter“ im Auftrag blockieren sie wie kurze.
+  Lange eckige Klammern mit anderem Inhalt (etwa eine redaktionelle Einfügung in einem Zitat) gelten wie bisher kurze als
+  Platzhalter; in den gesicherten Texten früherer Läufe waren alle neu erkannten langen Klammern echte Platzhalter.
+- **V2 Laufzeit:** Beim Nachbessern zählt die Anzeige (Web und `elapsedSeconds`) ab Beginn der laufenden Version, nicht ab Anlage
+  des Auftrags.
+- **V3:** der neue Satz oben.
+- **V4 (vor „On für alle“):** Notizen früherer Versionen („Noted for version n …“, „About version n“, auch die für Version 1
+  notierten Annahmen und nicht gegebenen Fakten) stehen eingeklappt hinter einer Zeile mit ihrer Anzahl; nichts wird gelöscht.
+  Mit der Tastatur bedienbar, passt auf ein Telefon.
+- **V5 (vor „On für alle“):** Annahmen des Schreibers einer geänderten Version stehen unter „The writer noted while making your
+  change:“ statt unter „You did not say this, so it was assumed:“; MCP sagt in `note`, dass `writerAssumptions` dann Notizen zur
+  Änderung sind.
+- Empfohlen und umgesetzt: Der Link über dem Text heißt bei einer geänderten Version „See what changed and all versions“ und führt
+  zu „Show changes“. Nicht umgesetzt: doppelte Stelle zusammenführen, Wunsch neben dem Fortschritt zeigen.
+
+**Eigener Befund außerhalb von Tor N: Grundrauschen des Faktenprüfers.** In den frischen ersten Fassungen der ersten Messung
+beanstandete er je harmlosem Text 3 bis 9 Stellen, darunter Grußformel und Unterschrift („may not be backed“), und bei
+unverändertem Text von Lauf zu Lauf andere Sätze. Als Messinstrument für neue Aussagen ist er deshalb ungeeignet; für die Person
+bleibt es ein älterer, eigener Befund (Backlog). Prüfer-Prompt und -Schema bleiben in Etappe 5 unverändert.
