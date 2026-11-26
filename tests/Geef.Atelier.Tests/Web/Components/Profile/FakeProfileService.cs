@@ -42,21 +42,32 @@ internal sealed class FakeProfileService : IProfileService
 
     public ConcurrentQueue<(string Username, UserProfilePart Part)> SavedParts { get; } = new();
 
-    public Task<UserProfileView> SavePartAsync(string username, UserProfilePart part, CancellationToken ct = default)
+    public Task<UserProfilePartResult> SavePartAsync(string username, UserProfilePart part, CancellationToken ct = default)
     {
         SavedParts.Enqueue((username, part));
         if (SaveError is not null)
             throw SaveError;
         var old = Stored(username) ?? Empty;
+        var saved = new List<ProfileFillField>();
+        var already = new List<ProfileFillField>();
+        void Sort(ProfileFillField field, bool asked, bool empty)
+        {
+            if (asked)
+                (empty ? saved : already).Add(field);
+        }
+        Sort(ProfileFillField.DisplayName, part.DisplayName is not null, old.DisplayName is null);
+        Sort(ProfileFillField.Formality, part.Formality is not null, old.Formality == Formality.Unset);
+        Sort(ProfileFillField.Language, part.Language is not null, old.Language is null);
+        Sort(ProfileFillField.Signature, part.Signature is not null, old.Signature is null);
         var merged = old with
         {
-            DisplayName = Trim(part.DisplayName) ?? old.DisplayName,
-            Formality = part.Formality ?? old.Formality,
-            Language = Trim(part.Language) ?? old.Language,
-            Signature = Trim(part.Signature) ?? old.Signature,
+            DisplayName = old.DisplayName ?? Trim(part.DisplayName),
+            Formality = old.Formality == Formality.Unset ? part.Formality ?? old.Formality : old.Formality,
+            Language = old.Language ?? Trim(part.Language),
+            Signature = old.Signature ?? Trim(part.Signature),
         };
         _profiles[username] = merged;
-        return Task.FromResult(View(merged));
+        return Task.FromResult(new UserProfilePartResult(View(merged), saved, already));
     }
 
     public Task ClearAsync(string username, CancellationToken ct = default)

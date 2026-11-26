@@ -3367,7 +3367,8 @@ Kontrollfälle brauchbar, Entscheidungstexte versendbar. Gemessen ist nur das Ü
 
 ## D-083 — Gedächtnis, kleinste Form: „Tell Atelier once“ (2026-11-26)
 
-**Status:** gebaut; Abnahme am echten Lauf mit zwei Testkonten vorbereitet und noch nicht ausgeführt.
+**Status:** gebaut und nach einer unabhängigen Prüfung nachgeschärft; Abnahme am echten Lauf mit zwei Testkonten vorbereitet und noch
+nicht ausgeführt.
 
 **Anlass.** Rückfragen betrafen bisher nur Dinge des einen Auftrags; Absender, Anrede und Unterschrift wurden nie gefragt, aber in
 vielen Aufträgen angenommen oder als Lücke gelassen, und kaum jemand hatte „About me“ ausgefüllt. Ein Gedächtnis hilft also genau
@@ -3376,30 +3377,37 @@ dort: einmal sagen, wer man ist.
 **Entscheidung.**
 - **Angebot am Ergebnis.** Hat ein Ergebnis eine nicht korrigierte Annahme oder eine offen gelassene Frage zu Absender, Unterschrift,
   Anrede oder Sprache und hat „About me“ dazu nichts, zeigt die Ergebnisseite der Person, der der Auftrag gehört, je Thema ein Feld
-  mit „Save“ unter der Überschrift „Tell Atelier once – it will not leave this open again“. Gespeichert wird nur dieses Feld im
-  vorhandenen Profil; alles andere bleibt. Der Text bleibt, wie er ist.
+  mit „Save“. Gespeichert wird nur in Felder, die noch leer sind, in einem gesperrten Schritt; ein inzwischen belegtes Feld bleibt, und
+  die Seite sagt „Already saved under About me“. Alle anderen Felder bleiben, auch wenn gleichzeitig gespeichert wird.
 - **Ab dem nächsten Auftrag ohne Modell.** Der vorhandene Code beantwortet diese Themen aus dem Profil (`ProfileMemoryResolution`,
-  `QuestionGate`): keine Annahme, keine Frage dazu; der Schreiber bekommt das Profil wie bisher im Profilblock. Das Versprechen der
-  Überschrift deckt der Code für das Lesen des Auftrags; ob der Schreiber die Unterschrift wörtlich setzt, zeigt erst der echte Lauf.
-- **Was aus About me kam.** Das Ergebnis nennt die Themen, die für die gezeigte Fassung aus „About me“ kamen („From About me: …“),
-  mit Verweis zum Ändern und Löschen unter „About me“.
+  `QuestionGate`): keine Annahme, keine Frage dazu; der Schreiber bekommt das Profil wie bisher im Profilblock. Der gezeigte Text und
+  jede Änderung daran behalten die Angaben, mit denen er entstand (eine Änderung nutzt das Briefing der Fassung, die sie ändert) – auch
+  gelöschte; das sagen Ergebnisseite und Handbuch.
+- **Was der Schreiber bekam.** Das Ergebnis nennt die Themen, die der Schreiber mit dieser Fassung aus „About me“ bekam („With this
+  request the writer got from About me: …“) – gesendet, nicht unbedingt verwendet –, mit Verweis zum Ändern und Löschen für die
+  nächsten Aufträge.
 - **Themen nur strukturell.** Sie kommen aus dem gespeicherten Lesen des Auftrags und dem Profilblock des gespeicherten Briefings,
   nie aus Wörtern im Text oder in Platzhaltern. Ein Platzhalter wie „[Ihr Name]“, den nur der Schreiber setzt, ohne dass das
   Lesen des Auftrags das Thema nannte, löst kein Angebot aus.
-- **MCP.** `profile` speichert dieselben vier Felder (`name`, `signature`, `formality`, `language`) ins eigene Profil; ohne Werte liest
-  es nur. `get_order_result` liefert `aboutMeMissing` und `fromAboutMe`; die Server-Hinweise sagen, nur die eigenen Worte der Person zu
-  speichern und nie selbst zu füllen.
+- **MCP.** `profile` füllt dieselben vier Felder (`name`, `signature`, `formality`, `language`) im eigenen Profil, nur wenn sie leer
+  sind; ein belegtes Feld nennt die Antwort. Ohne Werte liest es nur. `get_order_result` liefert `aboutMeMissing` und `fromAboutMe`;
+  die Server-Hinweise sagen, nur die eigenen Worte der Person zu speichern und nie selbst zu füllen.
+- **Zeichenprüfung.** Name, Tätigkeit und Organisation sind eine Zeile ohne Steuerzeichen; eine Unterschrift darf Zeilenumbrüche
+  haben, aber keine anderen Steuerzeichen und keine Zeile, die mit einem Feldnamen des Profilblocks und Doppelpunkt beginnt. Damit lässt
+  sich über einen Wert kein weiteres Feld in den Profilblock einschleusen. Das gilt für Formular, Ergebnisseite und MCP.
 - **Streng je Konto.** Beides steht nur für die Person, der der Auftrag gehört; die Administration sieht es an fremden Aufträgen nicht,
   und gespeichert wird nur ins eigene Profil, auch über MCP.
-- **Schalter `Orders:TellOnce`** (`On` ausgeliefert, `WithoutPromise`, `Off`) als Rückweg ohne Deploy: `WithoutPromise` zeigt die
-  Überschrift „Save it under About me for your next texts“, `Off` zeigt nichts davon und lässt `profile` nur lesen. Die Seite „How it
-  works“ folgt dem Schalter.
+- **Schalter `Orders:TellOnce`** (`WithoutPromise` ausgeliefert, `On`, `Off`): `WithoutPromise` zeigt die Überschrift „Save it under
+  About me for your next texts“; `On` zeigt „Tell Atelier once – it will not leave this open again“ und wird erst nach bestandener
+  Abnahme gesetzt, weil das Versprechen auch den Text betrifft, den nur der echte Lauf belegt. `Off` zeigt nichts davon; Werkzeugliste
+  und Server-Hinweise sind dann bitgleich zum Stand vor D-083 (`profile` nur lesend). Die Seite „How it works“ folgt dem Schalter.
 - **Unverändert:** Klärer-Prompt und -Schema (Prüfsummen-Tests), das Briefing an den Schreiber und die Antworten von Aufträgen ohne ein
   solches Thema.
 
 **Nicht gebaut:** eine Regel aus einer Korrektur (Auslöser: ein Konto außerhalb der Messungen stellt denselben Änderungswunsch zweimal),
-Stilvorlagen (kein Fall), „Remember this?“ und die Übernahme der früheren Lernnotizen.
+Stilvorlagen (kein Fall), „Remember this?“, die Übernahme der früheren Lernnotizen und ein neues Laden des Profils bei einer Änderung.
 
 **Abnahme (vorbereitet).** Testkonto A, zwei Aufträge derselben Textsorte ohne Faktenprüfung: Nach dem Speichern hat der zweite keine
-Annahme und keine Lücke zum Thema, und die gespeicherte Unterschrift steht wörtlich im Text. Testkonto B sieht nichts von A. Verfehlt der
-Schreiber das trotz Profil: eine Reparatur am Profilblock, ein Auftrag neu, höchstens zwei Runden; danach `Orders:TellOnce = WithoutPromise`.
+Annahme und keine Lücke zum Thema, und die gespeicherte Unterschrift steht wörtlich im Text. Testkonto B sieht nichts von A. Bestanden →
+`Orders:TellOnce = On`. Verfehlt der Schreiber das trotz Profil: eine Reparatur am Profilblock, ein Auftrag neu, höchstens zwei Runden;
+danach bleibt `WithoutPromise`.

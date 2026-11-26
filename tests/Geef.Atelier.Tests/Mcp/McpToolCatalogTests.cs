@@ -197,6 +197,18 @@ public sealed class McpToolCatalogTests
         Assert.EndsWith("do not add it.", without, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void While_saving_is_off_profile_is_offered_read_only_with_its_earlier_description()
+    {
+        var profile = ToolsOf(Provider(legacy: "false", tellOnce: TellOnceMode.Off))["profile"].ProtocolTool;
+
+        Assert.Empty(profile.InputSchema.TryGetProperty("properties", out var properties) ? properties.EnumerateObject().Select(p => p.Name).ToList() : []);
+        Assert.True(profile.Annotations?.ReadOnlyHint);
+        Assert.Null(profile.Annotations?.DestructiveHint);
+        Assert.Equal(ProfileTool.ReadOnlyToolDescription, profile.Description);
+        Assert.Contains("Read only", profile.Description, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(TellOnceMode.On, true)]
     [InlineData(TellOnceMode.WithoutPromise, true)]

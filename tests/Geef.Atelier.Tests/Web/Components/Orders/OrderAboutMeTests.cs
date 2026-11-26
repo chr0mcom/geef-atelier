@@ -100,6 +100,29 @@ public sealed class OrderAboutMeTests : TestContext
     }
 
     [Fact]
+    public void A_field_set_under_about_me_in_the_meantime_is_not_overwritten()
+    {
+        var cut = RenderPage([GapTopic.Signature]);
+        _profiles.Set("alice", FakeProfileService.Empty with { Signature = "Liebe Grüße, Erika" });
+
+        cut.Find("[data-topic='signature'] textarea").Input("Viele Grüße\nErika");
+        cut.Find("[data-topic='signature'] [data-testid='order-tell-once-save']").Click();
+
+        Assert.Equal(AboutMeLines.AlreadySaved + " About me", cut.Find("[data-testid='order-tell-once-already']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='order-tell-once-saved']"));
+        Assert.Equal("Liebe Grüße, Erika", _profiles.Stored("alice")!.Signature);
+        Assert.Empty(cut.FindAll("[data-testid='order-tell-once-save']"));
+    }
+
+    [Fact]
+    public void The_saved_line_says_that_only_the_next_requests_get_it()
+    {
+        Assert.Contains("Your next requests get it", AboutMeLines.Saved, StringComparison.Ordinal);
+        Assert.Contains("any change you ask for to it, keeps the details it was written with", AboutMeLines.Saved, StringComparison.Ordinal);
+        Assert.DoesNotContain("Change something", AboutMeLines.Saved, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_refused_value_keeps_the_field_and_shows_the_reason()
     {
         _profiles.SaveError = new ProfileValidationException("\"Your name\" is too long (201 characters, at most 200).");
@@ -140,7 +163,7 @@ public sealed class OrderAboutMeTests : TestContext
         var cut = RenderPage(null, [GapTopic.Sender, GapTopic.Signature]);
 
         var line = cut.Find("[data-testid='order-from-about-me']");
-        Assert.Equal("From About me: who you are, how you sign off. You can change or delete it under About me.", line.TextContent);
+        Assert.Equal("With this request the writer got from About me: who you are, how you sign off. You can change or delete it under About me; that counts for your next requests.", line.TextContent);
         Assert.Equal("/about-me", line.QuerySelector("a")!.GetAttribute("href"));
         Assert.Empty(cut.FindAll("[data-testid='order-tell-once']"));
         HonestResultData.AssertPlain(line.ChildNodes);

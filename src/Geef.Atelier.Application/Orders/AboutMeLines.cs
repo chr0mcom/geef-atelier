@@ -18,14 +18,20 @@ public static class AboutMeLines
     /// <summary>Line under the heading of the offer.</summary>
     public const string TellOnceLead = "This text had to guess or leave this open because About me has nothing on it yet.";
 
-    /// <summary>Shown after saving one field.</summary>
-    public const string Saved = "Saved under About me. Your next texts get it. This text stays as it is.";
+    /// <summary>
+    /// Shown after saving one field. Only the next requests get it: this text, and any change asked for to it, keeps the details it was
+    /// written with (a change reuses the briefing of the version it changes).
+    /// </summary>
+    public const string Saved = "Saved under About me. Your next requests get it. This text, and any change you ask for to it, keeps the details it was written with.";
 
-    /// <summary>Lead of the topics that came from About me.</summary>
-    public const string FromAboutMeLead = "From About me: ";
+    /// <summary>Shown instead of <see cref="Saved"/> when the field was set under About me in the meantime; nothing is changed then.</summary>
+    public const string AlreadySaved = "Already saved under About me, so nothing was changed. You can change it under About me.";
 
-    /// <summary>End of the line with the topics that came from About me.</summary>
-    public const string ChangeThere = "You can change or delete it under About me.";
+    /// <summary>Lead of the topics of About me that the writer got with this request (sent, not necessarily used).</summary>
+    public const string FromAboutMeLead = "With this request the writer got from About me: ";
+
+    /// <summary>End of the line with the topics the writer got from About me.</summary>
+    public const string ChangeThere = "You can change or delete it under About me; that counts for your next requests.";
 
     /// <summary>Label of the save button.</summary>
     public const string SaveButton = "Save";
@@ -61,7 +67,7 @@ public static class AboutMeLines
         _ => topic.Label().ToLowerInvariant(),
     };
 
-    /// <summary>The line about the topics that came from About me, for example "From About me: who you are, how you sign off. You can change …".</summary>
+    /// <summary>The line about the topics the writer got from About me, for example "With this request the writer got from About me: who you are, how you sign off. You can change …".</summary>
     public static string FromAboutMeLine(IReadOnlyList<GapTopic> topics)
     {
         ArgumentNullException.ThrowIfNull(topics);

@@ -22,6 +22,15 @@ public sealed record UserProfileEntity
     public required DateTimeOffset UpdatedAt { get; init; }
 }
 
+/// <summary>A field a result can ask for (name, form of address, language, signature); it is only ever filled while it is empty.</summary>
+public enum ProfileFillField { DisplayName = 0, Formality = 1, Language = 2, Signature = 3 }
+
+/// <summary>Values to put into the empty fields of a profile; <c>null</c> (and <see cref="Formality.Unset"/>) asks for nothing.</summary>
+public sealed record UserProfileFill(string? DisplayName, Formality? Formality, string? Language, string? Signature);
+
+/// <summary>Which of the asked fields were filled and which already held a value and stayed as they were.</summary>
+public sealed record UserProfileFillResult(IReadOnlyList<ProfileFillField> Filled, IReadOnlyList<ProfileFillField> AlreadySet);
+
 /// <summary>Longest accepted value per profile field, in characters.</summary>
 public static class UserProfileLimits
 {

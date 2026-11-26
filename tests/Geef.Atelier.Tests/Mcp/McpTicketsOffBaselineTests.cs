@@ -17,14 +17,16 @@ namespace Geef.Atelier.Tests.Mcp;
 /// see it (<see cref="McpJsonUtilities.DefaultOptions"/>), and taken again once when changing a text lost the quick change <c>longer</c>
 /// (<c>revise_order</c>, <c>get_order_result</c> with <c>lengthNotice</c>, step 6 of the instructions), and once more for the questions the
 /// person did not answer in step 5 of the instructions (D-081), and once more for <c>profile</c>, which since D-083 can save four About me
-/// fields, with the sentence about it in the instructions. With saving switched off the instructions still give the hashes before D-083.
+/// fields, with the sentence about it in the instructions. With saving switched off the tool list and the instructions still give the hashes before D-083.
 /// </summary>
 public sealed class McpTicketsOffBaselineTests
 {
-    private const string ToolsWithLegacyHash = "d6a120a9c822c43b6b6b8cce5185287449f2de2c64b27a962ac1fbf393a4c1d6";
-    private const string ToolsWithoutLegacyHash = "1f2669b65c1d648f66284d2ef6150a0986ee0da37c3437e34cb0ccd830b3bbb2";
+    private const string ToolsWithLegacyHash = "7f6b42c13ffc2e9b136a8a96e81fe77e90e68176214b775bf70be99e170b3ab1";
+    private const string ToolsWithoutLegacyHash = "3ab86f77d9601fc3eff624da80683902eef18f6c75d7195e2059d09987170a42";
     private const string InstructionsWithLegacyHash = "55ae0dda5dc96ad7b099eaa5cd01b6804e00e4b1cbea7985fe9155eb96ea36c2";
     private const string InstructionsWithoutLegacyHash = "03fe8a67778d2a20323d1db96d64d4920cf096407c6e1a43a4e55ad50346b8fb";
+    private const string ToolsWithLegacyBeforeAboutMeHash = "db658fcddf55eeab54412dcb5d988294421dc793359281a45492e3dec9f1c840";
+    private const string ToolsWithoutLegacyBeforeAboutMeHash = "165e018513d9f4c28ab23e7b103c71cda389761a326e13804832554f754ed42a";
     private const string InstructionsWithLegacyBeforeAboutMeHash = "39052d88f5f976882751a4fcde33a70c4bc889cd9f4ea3b0b92ebdf60f256672";
     private const string InstructionsWithoutLegacyBeforeAboutMeHash = "e56324836621e79badcad70ab3888faaf4477a2d0343d3400008a514b552e2a3";
 
@@ -51,6 +53,17 @@ public sealed class McpTicketsOffBaselineTests
     }
 
     [Theory]
+    [InlineData("true", ToolsWithLegacyBeforeAboutMeHash)]
+    [InlineData("false", ToolsWithoutLegacyBeforeAboutMeHash)]
+    public void Without_saving_about_me_details_the_tool_list_is_the_one_before_it(string legacy, string expected)
+    {
+        using var provider = McpTestServer.Provider(legacy, tickets: null, tellOnce: TellOnceMode.Off);
+
+        var actual = Sha256(McpTestServer.ToolListJson(provider));
+        Assert.True(expected == actual, $"tool list hash {actual}");
+    }
+
+    [Theory]
     [InlineData(true, InstructionsWithLegacyBeforeAboutMeHash)]
     [InlineData(false, InstructionsWithoutLegacyBeforeAboutMeHash)]
     public void Without_saving_about_me_details_the_instructions_are_those_before_it(bool legacy, string expected)
@@ -65,7 +78,7 @@ public sealed class McpTicketsOffBaselineTests
 /// <summary>The MCP server options as the host builds them, with every service of the tools registered as a stub.</summary>
 internal static class McpTestServer
 {
-    public static ServiceProvider Provider(string legacy, string? tickets)
+    public static ServiceProvider Provider(string legacy, string? tickets, TellOnceMode? tellOnce = null)
     {
         var settings = new Dictionary<string, string?> { ["Mcp:LegacyTools"] = legacy };
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
@@ -74,6 +87,8 @@ internal static class McpTestServer
         services.AddSingleton<IConfiguration>(configuration);
         if (tickets is not null)
             services.Configure<UploadOptions>(o => o.Tickets = Enum.Parse<UploadTicketsMode>(tickets));
+        if (tellOnce is { } mode)
+            services.Configure<OrderOptions>(o => o.TellOnce = mode);
         foreach (var type in typeof(McpAssemblyMarker).Assembly.ToolMethods().SelectMany(m => m.GetParameters()).Select(p => p.ParameterType)
                      .Where(t => t.IsInterface && !t.IsClientValue() && !t.IsSdkValue() && !t.IsGenericType).Distinct())
             services.AddScoped(type, _ => throw new NotSupportedException());

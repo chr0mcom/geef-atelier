@@ -3243,7 +3243,8 @@ texts ready to send. Only skipping on the standard way has been measured.
 
 ## D-083 — Memory in its smallest form: "Tell Atelier once" (2026-11-26)
 
-**Status:** built; the acceptance on the real system with two test accounts is prepared and not yet run.
+**Status:** built and tightened after an independent review; the acceptance on the real system with two test accounts is prepared and
+not yet run.
 
 **Why.** Questions so far were only about matters of the one order; sender, form of address and signature were never asked, but in
 many orders they were assumed or left as a gap, and hardly anyone had filled in "About me". So a memory helps exactly there: say once
@@ -3252,30 +3253,35 @@ who you are.
 **Decision.**
 - **Offer on the result.** When a result has an uncorrected assumption or a question left open about the sender, signature, form of
   address or language, and "About me" has nothing on it, the result page shows the person who ordered the text one field per topic
-  with "Save" under the heading "Tell Atelier once – it will not leave this open again". Only that field is saved in the existing
-  profile; everything else stays. The text stays as it is.
+  with "Save". Saving fills only fields that are still empty, in one locked step; a field filled in the meantime stays, and the page
+  says "Already saved under About me". Every other field stays, also when other saves run at the same time.
 - **From the next order on, without a model.** The existing code answers these topics from the profile (`ProfileMemoryResolution`,
-  `QuestionGate`): no assumption, no question about them; the writer gets the profile in the profile block as before. The code covers
-  the promise of the heading for the reading of the request; whether the writer puts the signature in word for word only the real run
-  shows.
-- **What came from About me.** The result names the topics that came from "About me" for the shown version ("From About me: …"), with a
-  pointer to change or delete them under "About me".
+  `QuestionGate`): no assumption, no question about them; the writer gets the profile in the profile block as before. The shown text
+  and every change to it keep the details it was written with (a change uses the briefing of the version it changes) – also deleted
+  ones; the result page and the guide say so.
+- **What the writer got.** The result names the topics the writer got from "About me" with this version ("With this request the writer
+  got from About me: …") – sent, not necessarily used – with a pointer to change or delete them for the next requests.
 - **Topics only by structure.** They come from the stored reading of the request and the profile block of the stored briefing, never
   from words in the text or in placeholders. A placeholder such as "[Your name]" that only the writer puts in, without the reading of
   the request naming the topic, does not trigger the offer.
-- **MCP.** `profile` saves the same four fields (`name`, `signature`, `formality`, `language`) into the own profile; without values it
-  only reads. `get_order_result` returns `aboutMeMissing` and `fromAboutMe`; the server instructions say to save only the person's own
-  words and never to fill anything in.
+- **MCP.** `profile` fills the same four fields (`name`, `signature`, `formality`, `language`) in the own profile, only where they are
+  empty; the answer names a field that was already set. Without values it only reads. `get_order_result` returns `aboutMeMissing` and
+  `fromAboutMe`; the server instructions say to save only the person's own words and never to fill anything in.
+- **Character checks.** Name, role and organization are one line without special characters; a signature may have line breaks but no
+  other special characters and no line that starts with a field name of the profile block and a colon. So no value can slip another
+  field into the profile block. This holds for the form, the result page and MCP.
 - **Strictly per account.** Both are there only for the person who ordered the text; administrators do not see them on someone else's
   order, and saving goes only into the own profile, also over MCP.
-- **Switch `Orders:TellOnce`** (`On` shipped, `WithoutPromise`, `Off`) as a way back without a deploy: `WithoutPromise` shows the heading
-  "Save it under About me for your next texts", `Off` shows none of it and lets `profile` only read. The page "How it works" follows the
-  switch.
+- **Switch `Orders:TellOnce`** (`WithoutPromise` shipped, `On`, `Off`): `WithoutPromise` shows the heading "Save it under About me for
+  your next texts"; `On` shows "Tell Atelier once – it will not leave this open again" and is set only after a passed acceptance, because
+  the promise also covers the text, which only the real run shows. `Off` shows none of it; the tool list and the server instructions
+  are then bit-identical to before D-083 (`profile` read only). The page "How it works" follows the switch.
 - **Unchanged:** clarifier prompt and schema (checksum tests), the briefing for the writer and the answers of orders without such a topic.
 
 **Not built:** a rule from a correction (trigger: an account outside the measurements asks for the same change twice), style templates
-(no case), "Remember this?" and taking over the earlier learning notes.
+(no case), "Remember this?", taking over the earlier learning notes, and reloading the profile for a change.
 
 **Acceptance (prepared).** Test account A, two orders of the same kind without fact check: after saving, the second has no assumption and
-no gap about the topic, and the saved signature stands word for word in the text. Test account B sees nothing of A. If the writer misses
-this despite the profile: one repair of the profile block, one new order, at most two rounds; after that `Orders:TellOnce = WithoutPromise`.
+no gap about the topic, and the saved signature stands word for word in the text. Test account B sees nothing of A. Passed →
+`Orders:TellOnce = On`. If the writer misses this despite the profile: one repair of the profile block, one new order, at most two rounds;
+after that it stays `WithoutPromise`.

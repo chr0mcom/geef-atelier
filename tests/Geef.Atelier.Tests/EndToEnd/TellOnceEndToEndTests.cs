@@ -19,7 +19,7 @@ namespace Geef.Atelier.Tests.EndToEnd;
 /// accounts: account A gets a letter whose sender and signature were assumed, is offered to save them (MCP <c>aboutMeMissing</c>),
 /// saves them with <c>profile</c>, and its next letter of the same kind has no assumption about them, the writer gets the signature word
 /// for word and the result says what came from About me. Account B and an administrator looking at A's order see none of it, and B's
-/// writer never gets A's details. With <c>Orders:TellOnce = Off</c> nothing of it shows and the assistant cannot save.
+/// writer never gets A's details. A change of the first letter after saving keeps the details that letter was written with, as the guide says. With <c>Orders:TellOnce = Off</c> nothing of it shows and the assistant cannot save.
 /// </summary>
 [Collection(EndToEndCollection.Name)]
 [Trait("Category", "EndToEnd")]
@@ -93,6 +93,29 @@ public sealed class TellOnceEndToEndTests(PostgresFixture postgres)
         Assert.NotEmpty(writerB);
         Assert.DoesNotContain(writerB, body => body.Contains(Name, StringComparison.Ordinal) || body.Contains("Wohnung 2b", StringComparison.Ordinal));
         Assert.Equal(Name, (await host.WithScopeAsync(sp => sp.GetRequiredService<IProfileService>().GetAsync(accountA))).Values.DisplayName);
+
+        var revised = await host.CallMcpToolAsync("revise_order", new { orderId = first.ToString(), change = "Bitte etwas kürzer." });
+        Assert.NotEqual(JsonValueKind.Undefined, revised.ValueKind);
+        await WaitForVersionAsync(host, first, 2);
+        var changeBriefing = await host.QueryAsync(db => db.Runs.AsNoTracking().Where(r => r.OrderId == first && r.OrderVersion == 2).Select(r => r.BriefingText).SingleAsync());
+        Assert.DoesNotContain("Wohnung 2b", changeBriefing ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain(Name, changeBriefing ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    private static async Task WaitForVersionAsync(AtelierEndToEndHost host, Guid orderId, int version)
+    {
+        var deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(90);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            var run = await host.QueryAsync(db => db.Runs.AsNoTracking().Where(r => r.OrderId == orderId && r.OrderVersion == version).FirstOrDefaultAsync());
+            if (run is not null)
+            {
+                await host.WaitForTerminalAsync(run.Id);
+                return;
+            }
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+        }
+        throw new TimeoutException($"Version {version} of order {orderId} was not started.");
     }
 
     [Fact]
@@ -155,6 +178,7 @@ public sealed class TellOnceEndToEndTests(PostgresFixture postgres)
             services.PostConfigure<OrderOptions>(o =>
             {
                 o.IntakeMode = IntakeMode.On;
+                o.Revise = ReviseMode.On;
                 o.TellOnce = mode;
             });
             services.PostConfigure<IntakeOptions>(o => o.PollInterval = TimeSpan.FromMilliseconds(200));

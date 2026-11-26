@@ -276,7 +276,7 @@
             <li>Under About me you can save your name, how you sign off, how readers are addressed, your language and what never to do. Atelier uses it in every text. Only you can change it.</li>
             @if (_f.TellOnce != TellOnceMode.Off)
             {
-                <li data-testid="hiw-about-tell-once">When a text had to guess or leave open your name, how you sign off, how readers are addressed or your language, and About me has nothing on it yet, the result offers a field to save it there. From then on Atelier takes it from About me instead of guessing or asking, and the writer gets it with every request. The result also says what came from About me.</li>
+                <li data-testid="hiw-about-tell-once">When a text had to guess or leave open your name, how you sign off, how readers are addressed or your language, and About me has nothing on it yet, the result offers a field to save it there, as long as that field is still empty. From your next request on, Atelier takes it from About me instead of guessing or asking, and the writer gets it with every new request. A change of a text you already have keeps the details it was written with. The result also says what the writer got from About me.</li>
             }
             <li>Your request, your answers, your About me details and your files go to the AI services that write and check the text.</li>
             @if (_f.WebResearch)
@@ -312,7 +312,7 @@
             }
             @if (_f.TellOnce != TellOnceMode.Off)
             {
-                <li data-testid="hiw-assistant-about-me">About me: the assistant can save your name, how you sign off, how readers are addressed and your language when you ask it to. Everything else you change under About me.</li>
+                <li data-testid="hiw-assistant-about-me">About me: the assistant can save your name, how you sign off, how readers are addressed and your language when you ask it to, but only where About me has nothing yet. Everything else you change under About me.</li>
             }
             <li>Everything you order through the assistant is also under My work in the web app, with the full result.</li>
             <li>You can see and remove connected assistants under Connected clients in your menu.</li>

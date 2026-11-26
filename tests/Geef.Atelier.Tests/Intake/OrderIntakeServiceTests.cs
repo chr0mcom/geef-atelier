@@ -430,6 +430,7 @@ public sealed class OrderIntakeServiceTests
         public Task<Geef.Atelier.Core.Domain.Profiles.UserProfileEntity?> GetAsync(string username, CancellationToken ct = default) =>
             Task.FromResult<Geef.Atelier.Core.Domain.Profiles.UserProfileEntity?>(username == profile.Username ? profile : null);
         public Task UpsertAsync(Geef.Atelier.Core.Domain.Profiles.UserProfileEntity p, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Geef.Atelier.Core.Domain.Profiles.UserProfileFillResult> FillEmptyAsync(string username, Geef.Atelier.Core.Domain.Profiles.UserProfileFill fill, DateTimeOffset now, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> DeleteAsync(string username, CancellationToken ct = default) => throw new NotSupportedException();
     }
 

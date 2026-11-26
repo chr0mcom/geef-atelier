@@ -10,6 +10,9 @@ internal sealed partial class ProfileService(IUserProfileRepository profiles, Ti
     internal const string LanguageMessage = "Please enter the language as a two-letter code, for example de or en.";
     internal const string NothingToSaveMessage = "There is nothing to save. Please fill in the field first.";
     internal const string FormalityMessage = "Please choose how readers are addressed.";
+    internal const string SingleLineFormat = "\"{0}\" must be a single line without special characters.";
+    internal const string SignatureCharactersMessage = "\"Signature\" can only contain line breaks, no other special characters.";
+    internal const string SignatureLabelFormat = "A line of \"Signature\" cannot start with \"{0}:\", because that is the name of a field of About me.";
 
     public async Task<UserProfileView> GetAsync(string username, CancellationToken ct = default)
     {
@@ -31,12 +34,12 @@ internal sealed partial class ProfileService(IUserProfileRepository profiles, Ti
         var profile = new UserProfileEntity
         {
             Username = username,
-            DisplayName = Clean(input.DisplayName, "Your name", UserProfileLimits.DisplayName),
-            Role = Clean(input.Role, "What you do", UserProfileLimits.Role),
-            Organization = Clean(input.Organization, "Organization", UserProfileLimits.Organization),
+            DisplayName = CleanLine(input.DisplayName, "Your name", UserProfileLimits.DisplayName),
+            Role = CleanLine(input.Role, "What you do", UserProfileLimits.Role),
+            Organization = CleanLine(input.Organization, "Organization", UserProfileLimits.Organization),
             Formality = input.Formality,
             Language = language,
-            Signature = Clean(input.Signature, "Signature", UserProfileLimits.Signature),
+            Signature = CleanSignature(input.Signature),
             NoGos = Clean(input.NoGos, "Never do this", UserProfileLimits.NoGos),
             FreeText = Clean(input.FreeText, "Anything else we should know", UserProfileLimits.FreeText),
             CreatedAt = existing?.CreatedAt ?? now,
@@ -46,31 +49,21 @@ internal sealed partial class ProfileService(IUserProfileRepository profiles, Ti
         return ToView(profile);
     }
 
-    public async Task<UserProfileView> SavePartAsync(string username, UserProfilePart part, CancellationToken ct = default)
+    public async Task<UserProfilePartResult> SavePartAsync(string username, UserProfilePart part, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(username);
         ArgumentNullException.ThrowIfNull(part);
 
         if (part.DisplayName is null && part.Formality is null && part.Language is null && part.Signature is null)
             throw new ProfileValidationException(NothingToSaveMessage);
-        var name = Given(part.DisplayName, "Your name", UserProfileLimits.DisplayName);
-        var signature = Given(part.Signature, "Signature", UserProfileLimits.Signature);
+        var name = part.DisplayName is null ? null : CleanLine(part.DisplayName, "Your name", UserProfileLimits.DisplayName) ?? throw new ProfileValidationException(NothingToSaveMessage);
+        var signature = part.Signature is null ? null : CleanSignature(part.Signature) ?? throw new ProfileValidationException(NothingToSaveMessage);
         var language = part.Language is null ? null : CleanLanguage(part.Language) ?? throw new ProfileValidationException(NothingToSaveMessage);
         if (part.Formality is { } chosen && (chosen == Formality.Unset || !Enum.IsDefined(chosen)))
             throw new ProfileValidationException(FormalityMessage);
 
-        var now = time.GetUtcNow();
-        var existing = await profiles.GetAsync(username, ct);
-        var profile = (existing ?? new UserProfileEntity { Username = username, CreatedAt = now, UpdatedAt = now }) with
-        {
-            DisplayName = name ?? existing?.DisplayName,
-            Formality = part.Formality ?? existing?.Formality ?? Formality.Unset,
-            Language = language ?? existing?.Language,
-            Signature = signature ?? existing?.Signature,
-            UpdatedAt = now,
-        };
-        await profiles.UpsertAsync(profile, ct);
-        return ToView(profile);
+        var result = await profiles.FillEmptyAsync(username, new UserProfileFill(name, part.Formality, language, signature), time.GetUtcNow(), ct);
+        return new UserProfilePartResult(ToView(await profiles.GetAsync(username, ct)), result.Filled, result.AlreadySet);
     }
 
     public async Task ClearAsync(string username, CancellationToken ct = default)
@@ -94,8 +87,39 @@ internal sealed partial class ProfileService(IUserProfileRepository profiles, Ti
         return language;
     }
 
-    private static string? Given(string? value, string label, int limit) =>
-        value is null ? null : Clean(value, label, limit) ?? throw new ProfileValidationException(NothingToSaveMessage);
+    private static string? CleanLine(string? value, string label, int limit)
+    {
+        var line = Clean(value, label, limit);
+        if (line is not null && line.Any(IsSpecial))
+            throw new ProfileValidationException(string.Format(CultureInfo.InvariantCulture, SingleLineFormat, label));
+        return line;
+    }
+
+    private static string? CleanSignature(string? value)
+    {
+        var signature = Clean(value?.Replace("\r\n", "\n", StringComparison.Ordinal), "Signature", UserProfileLimits.Signature);
+        if (signature is null)
+            return null;
+        if (signature.Any(c => c != '\n' && IsSpecial(c)))
+            throw new ProfileValidationException(SignatureCharactersMessage);
+        foreach (var line in signature.Split('\n'))
+        {
+            if (FieldNamePattern.Match(line) is { Success: true } field)
+            {
+                var found = Regex.Replace(field.Groups["label"].Value, "\\s+", " ");
+                throw new ProfileValidationException(string.Format(CultureInfo.InvariantCulture, SignatureLabelFormat,
+                    ProfilePrompt.Labels.FirstOrDefault(l => string.Equals(l, found, StringComparison.OrdinalIgnoreCase)) ?? found));
+            }
+        }
+        return signature;
+    }
+
+    private static bool IsSpecial(char c) =>
+        char.IsControl(c) || char.GetUnicodeCategory(c) is UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator or UnicodeCategory.Format;
+
+    private static readonly Regex FieldNamePattern = new(
+        "^\\s*(?<label>" + string.Join("|", ProfilePrompt.Labels.Select(l => Regex.Escape(l).Replace("\\ ", "\\s+", StringComparison.Ordinal))) + ")\\s*:",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static string? Clean(string? value, string label, int limit)
     {

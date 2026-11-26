@@ -38,7 +38,7 @@ feature on.
 | Workshop menu only for administrators | `Ui:WorkshopForAdminsOnly` | `true` | `true` (D-077) | – |
 | Older tools for AI assistants | `Mcp:LegacyTools` | `true` | `true` (D-075) | – |
 | Learning loop of the older way | `Learning:Enabled` | `false` | `false` (D-067) | – |
-| Offer to save missing details under About me (“Tell Atelier once”) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `On` | `On` (D-083) | – |
+| Offer to save missing details under About me (“Tell Atelier once”) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `WithoutPromise` | `WithoutPromise` (D-083; `On` after the acceptance) | – |
 
 What the values mean:
 
@@ -52,13 +52,14 @@ What the values mean:
   search whenever a search key is set, whatever `Research:Mode` says.
 - **Workshop:** with `true`, only administrators see the menu "Workshop", the link to the older form on the start page and
   "Technical details" on the order page. The pages themselves still open for anyone signed in who types their address (D-077).
-- **Tell Atelier once:** `On` shows the owner of a result one field per topic (sender, signature, form of address, language) that the
-  reading of the request had to assume or leave open while About me has nothing on it, under the heading “Tell Atelier once – it will
-  not leave this open again”, and the line “From About me: …”; AI assistants get the same as `aboutMeMissing`/`fromAboutMe` and can
-  save these four fields with `profile`. `WithoutPromise` is the same with the heading “Save it under About me for your next texts”
-  (the way back if the writer still leaves the signature open although it is saved). `Off` shows none of it, and `profile` only
-  reads. Administrators never see it on someone else's order, and saving goes only into the own About me (D-083). Way back:
-  `Orders__TellOnce=WithoutPromise` or `Orders__TellOnce=Off`.
+- **Tell Atelier once:** shows the owner of a result one field per topic (sender, signature, form of address, language) that the
+  reading of the request had to assume or leave open while About me has nothing on it, and the line “With this request the writer got
+  from About me: …”; AI assistants get the same as `aboutMeMissing`/`fromAboutMe` and can save these four fields with `profile`. Saving
+  fills only fields that are still empty, in one locked step, and never overwrites. `WithoutPromise` (shipped) uses the heading “Save it
+  under About me for your next texts”; `On` uses “Tell Atelier once – it will not leave this open again” and is meant only after the
+  acceptance on the real system has shown that the writer uses what was saved. `Off` shows none of it, and `profile` is offered read
+  only with its earlier description. Administrators never see it on someone else's order, and saving goes only into the own About me
+  (D-083). After a passed acceptance: `Orders__TellOnce=On`; way back: `Orders__TellOnce=WithoutPromise` or `Orders__TellOnce=Off`.
 
 **How to set a switch.** The settings are read at start. Set them as environment variables of the web service, with `__` in place
 of `:` (for example `Orders__Revise=On`, `Orders__ReviseOverrides__alice=On`). `docker-compose.yml` passes variables one by one,

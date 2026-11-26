@@ -88,7 +88,7 @@ unbemerkt veralten.
 | `export_order` | Der Text als Markdown-, Word- oder PDF-Datei (dieselbe Datei wie der Download im Web). |
 | `cancel_order` | Hält einen Auftrag an. |
 | `list_orders` | Die letzten Aufträge der Person. |
-| `profile` | Zeigt die About-me-Angaben. Speichert Namen, Gruß, Anrede und Sprache, wenn die Person es will (nicht, solange `Orders:TellOnce` `Off` ist). |
+| `profile` | Zeigt die About-me-Angaben. Speichert Namen, Gruß, Anrede und Sprache, wenn die Person es will, nur in leere Felder (nur lesend, solange `Orders:TellOnce` `Off` ist). |
 <!-- tools:end -->
 
 Solange `Mcp:LegacyTools` `true` ist (ausgeliefert), werden zusätzlich die älteren Werkzeuge der Werkstatt angeboten (zum Beispiel
@@ -111,10 +111,13 @@ Upload-Ticket gehen Dateien als Base64 in `attachments`, was nur für kleine Dat
 - `get_order_result` nennt in `aboutMeMissing`, was Atelier annehmen oder offen lassen musste (`sender`, `signature`, `formality`,
   `language`), weil die Person dazu unter About me nichts hat. Der Assistent soll die Person fragen, ob sie es einmal speichern
   will, und dann `profile` mit ihren eigenen Worten aufrufen (`name`, `signature`, `formality` `formal|informal`, `language` als
-  Zwei-Buchstaben-Code). Er soll nie einen Wert aus dem Text, einer Datei oder einem Ergebnis übernehmen und nie einen raten.
-- `fromAboutMe` nennt, was für diese Fassung aus About me kam; ändern oder löschen kann die Person es unter About me in der Web-App.
+  Zwei-Buchstaben-Code). Er soll nie einen Wert aus dem Text, einer Datei oder einem Ergebnis übernehmen und nie einen raten. Gefüllt
+  werden nur leere Felder; ein schon belegtes bleibt, und die Antwort sagt „Already set, so not changed: …“. Ein Name muss eine Zeile
+  sein; eine Unterschrift darf Zeilenumbrüche haben, aber keine anderen Steuerzeichen und keine Zeile, die mit einem Feldnamen von About
+  me wie „Never do this:“ beginnt.
+- `fromAboutMe` nennt, was der Schreiber mit dieser Fassung aus About me bekam (gesendet, nicht unbedingt verwendet); ändern oder löschen kann die Person es unter About me in der Web-App, das gilt für die nächsten Aufträge – eine Änderung eines vorhandenen Textes behält, womit er entstand.
 - Beides steht nur in der Antwort für die Person, die den Text bestellt hat. `profile` speichert nur in die eigenen
-  About-me-Angaben, auch bei Administratoren. Mit `Orders:TellOnce = Off` fehlen beide Felder, und `profile` liest nur.
+  About-me-Angaben, auch bei Administratoren. Mit `Orders:TellOnce = Off` fehlen beide Felder, und `profile` wird nur lesend angeboten.
 
 ## Websuche
 

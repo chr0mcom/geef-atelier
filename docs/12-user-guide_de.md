@@ -107,10 +107,13 @@ nicht wiederholen. Nur du kannst es ändern.
 
 **Einmal sagen („Tell Atelier once“).** Musste ein Text deinen Namen, deinen Gruß, die Anrede der Leser oder deine Sprache raten
 oder offen lassen, und steht dazu noch nichts unter About me, zeigt das Ergebnis dafür ein Feld mit **Save**. Was du dort
-speicherst, kommt in About me. Ab dem nächsten Auftrag nimmt Atelier es aus About me, statt zu raten oder zu fragen, und der
-Schreiber bekommt es bei jedem Auftrag. Der Text, den du gerade siehst, bleibt, wie er ist; um es dort einzufügen, nutze „Change
-something“. Das Ergebnis sagt außerdem, was aus About me kam („From About me: …“). Ändern oder löschen kannst du es unter About me.
-Ob der Schreiber es wirklich verwendet, etwa deinen Gruß wörtlich, hängt vom Text ab: Prüf das Ergebnis wie immer.
+speicherst, kommt in About me; wurde das Feld inzwischen unter About me ausgefüllt, wird nichts überschrieben, und das Ergebnis sagt
+„Already saved under About me“. Ab deinem nächsten Auftrag nimmt Atelier es aus About me, statt zu raten oder zu fragen, und der
+Schreiber bekommt es bei jedem neuen Auftrag. Der Text, den du gerade siehst, behält die Angaben, mit denen er entstand, und ebenso
+jede Änderung, um die du mit „Change something“ bittest – auch eine Angabe, die du inzwischen unter About me gelöscht hast. Soll der
+neue Wert in diesen Text, schreib ihn in deine Änderung. Das Ergebnis sagt außerdem, was der Schreiber mit diesem Auftrag aus About
+me bekam („With this request the writer got from About me: …“). Ändern oder löschen kannst du es unter About me; das gilt für deine
+nächsten Aufträge. Ob der Schreiber es wirklich verwendet, etwa deinen Gruß wörtlich, hängt vom Text ab: Prüf das Ergebnis wie immer.
 
 ## Wohin deine Worte gehen
 

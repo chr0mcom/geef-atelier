@@ -16,6 +16,7 @@ public sealed class ProfileMemoryResolutionTests
             return Task.FromResult(profile);
         }
         public Task UpsertAsync(UserProfileEntity profile, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<UserProfileFillResult> FillEmptyAsync(string username, UserProfileFill fill, DateTimeOffset now, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> DeleteAsync(string username, CancellationToken ct = default) => throw new NotSupportedException();
     }
 

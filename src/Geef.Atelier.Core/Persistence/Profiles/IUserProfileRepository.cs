@@ -11,6 +11,14 @@ public interface IUserProfileRepository
     /// <summary>Inserts or replaces the profile of <see cref="UserProfileEntity.Username"/>.</summary>
     Task UpsertAsync(UserProfileEntity profile, CancellationToken ct = default);
 
+    /// <summary>
+    /// Puts the values of <paramref name="fill"/> into the fields of the profile of <paramref name="username"/> that are empty, in one
+    /// locked step, and creates the profile when there is none; a field that holds a value keeps it, and every other field stays as it is,
+    /// also when other saves run at the same time. <see cref="UserProfileEntity.UpdatedAt"/> becomes <paramref name="now"/> only when a
+    /// field was filled.
+    /// </summary>
+    Task<UserProfileFillResult> FillEmptyAsync(string username, UserProfileFill fill, DateTimeOffset now, CancellationToken ct = default);
+
     /// <summary>Deletes the profile; false when there was none.</summary>
     Task<bool> DeleteAsync(string username, CancellationToken ct = default);
 }

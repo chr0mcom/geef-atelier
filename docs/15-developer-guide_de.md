@@ -109,7 +109,9 @@ die Seite auf.
 - UI-Texte nur Englisch (D-062); Doku zweisprachig (Englisch führend, Deutsch als `_de.md`).
 - About me ist streng je Konto: Die Ergebnisfelder `TellOnce` und `FromAboutMe` werden nur für die Person gefüllt, der der Auftrag
   gehört, die Web-Komponente erscheint nur ihr, und `IProfileService.SavePartAsync` sowie `profile` schreiben nur in das Profil der
-  angemeldeten Person. Die Themen kommen aus dem gespeicherten Lesen des Auftrags (`IntakeRecord`) und dem Profilblock des
+  angemeldeten Person, und nur in leere Felder, in einer gesperrten Anweisung (`IUserProfileRepository.FillEmptyAsync`); Name, Tätigkeit
+  und Organisation sind eine Zeile ohne Steuerzeichen, und keine Zeile der Unterschrift darf mit einem Feldnamen aus
+  `ProfilePrompt.Labels` beginnen. Die Themen kommen aus dem gespeicherten Lesen des Auftrags (`IntakeRecord`) und dem Profilblock des
   gespeicherten Briefings, nie aus Wörtern im Text; Klärer-Prompt und Briefing von Aufträgen ohne ein solches Thema bleiben
   unverändert (D-083).
 

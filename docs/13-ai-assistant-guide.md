@@ -82,7 +82,7 @@ switched off. A test compares this table with the tool catalogue of the server, 
 | `export_order` | The text as a Markdown, Word or PDF file (the same file as the web download). |
 | `cancel_order` | Stops an order. |
 | `list_orders` | The person's recent orders. |
-| `profile` | Shows the About me details. Saves the name, sign-off, form of address and language when the person asks (not while `Orders:TellOnce` is `Off`). |
+| `profile` | Shows the About me details. Saves the name, sign-off, form of address and language when the person asks, only into empty fields (read only while `Orders:TellOnce` is `Off`). |
 <!-- tools:end -->
 
 While `Mcp:LegacyTools` is `true` (shipped), the older tools of the workshop are offered as well (for example `submit_request`,
@@ -105,10 +105,12 @@ files go as Base64 in `attachments`, which only works for small files.
 - `get_order_result` names in `aboutMeMissing` what Atelier had to assume or leave open (`sender`, `signature`, `formality`,
   `language`) while the person has nothing on it under About me. The assistant should ask the person whether to save it once and
   then call `profile` with the person's own words (`name`, `signature`, `formality` `formal|informal`, `language` as a two-letter
-  code). It should never take a value from the text, a file or a result, and never guess one.
-- `fromAboutMe` names what came from About me for that version; the person changes or deletes it under About me in the web app.
+  code). It should never take a value from the text, a file or a result, and never guess one. Only empty fields are filled; a field
+  that is already set stays and the answer says “Already set, so not changed: …”. A name must be one line; a signature may have line
+  breaks but no other special characters and no line that starts with a field name of About me such as “Never do this:”.
+- `fromAboutMe` names what the writer got from About me with that version (sent, not necessarily used); the person changes or deletes it under About me in the web app, which counts for the next requests – a change of an existing text keeps what it was written with.
 - Both are only in the answer for the person who ordered the text. `profile` saves only into the own About me, also for
-  administrators. With `Orders:TellOnce = Off` both fields are missing and `profile` only reads.
+  administrators. With `Orders:TellOnce = Off` both fields are missing and `profile` is offered read only.
 
 ## Web search
 

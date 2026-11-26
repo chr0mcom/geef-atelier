@@ -18,6 +18,7 @@ internal static class EntryMapping
     {
         public Task<UserProfileEntity?> GetAsync(string username, CancellationToken ct = default) => Task.FromResult<UserProfileEntity?>(null);
         public Task UpsertAsync(UserProfileEntity profile, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<UserProfileFillResult> FillEmptyAsync(string username, UserProfileFill fill, DateTimeOffset now, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> DeleteAsync(string username, CancellationToken ct = default) => throw new NotSupportedException();
     }
 

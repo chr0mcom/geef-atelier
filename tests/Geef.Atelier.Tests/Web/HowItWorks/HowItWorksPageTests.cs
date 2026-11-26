@@ -355,15 +355,18 @@ public sealed class HowItWorksPageTests : TestContext
     }
 
     [Fact]
-    public void As_shipped_the_offer_to_save_missing_details_is_described()
+    public void As_shipped_the_offer_to_save_missing_details_is_described_without_the_promise_until_the_acceptance()
     {
         this.AddTestAuthorization();
         UseShippedSettings();
 
         var line = Render().Find("[data-testid='hiw-about-tell-once']").TextContent;
+        Assert.Equal(TellOnceMode.WithoutPromise, new OrderOptions().TellOnce);
 
         Assert.Contains("instead of guessing or asking", line, StringComparison.Ordinal);
-        Assert.Contains("the writer gets it with every request", line, StringComparison.Ordinal);
+        Assert.Contains("the writer gets it with every new request", line, StringComparison.Ordinal);
+        Assert.Contains("A change of a text you already have keeps the details it was written with", line, StringComparison.Ordinal);
+        Assert.Contains("as long as that field is still empty", line, StringComparison.Ordinal);
     }
 
     private IRenderedComponent<HowItWorksPage> Render() => RenderComponent<HowItWorksPage>();

@@ -23,6 +23,10 @@
                 {
                     <p class="about-saved" role="status" data-testid="order-tell-once-saved">@AboutMeLines.Saved <a href="/about-me">About me</a></p>
                 }
+                else if (_already.Contains(topic))
+                {
+                    <p class="about-saved" role="status" data-testid="order-tell-once-already">@AboutMeLines.AlreadySaved <a href="/about-me">About me</a></p>
+                }
                 else
                 {
                     @switch (topic)
@@ -105,6 +109,7 @@
     readonly Dictionary<GapTopic, string> _texts = [];
     readonly Dictionary<GapTopic, string> _errors = [];
     readonly HashSet<GapTopic> _saved = [];
+    readonly HashSet<GapTopic> _already = [];
     Formality _formality;
     string _language = string.Empty;
     bool _languageSet;
@@ -112,7 +117,7 @@
 
     string? Heading => OrderSettings.Value.TellOnce.Heading();
 
-    IReadOnlyList<GapTopic> Rows => AboutMeTopics.Topics.Where(t => (Result.TellOnce ?? []).Contains(t) || _saved.Contains(t)).ToList();
+    IReadOnlyList<GapTopic> Rows => AboutMeTopics.Topics.Where(t => (Result.TellOnce ?? []).Contains(t) || _saved.Contains(t) || _already.Contains(t)).ToList();
 
     IReadOnlyList<GapTopic> FromAboutMe => Result.FromAboutMe ?? [];
 
@@ -148,7 +153,7 @@
 
     async Task SaveAsync(GapTopic topic)
     {
-        if (_busy || string.IsNullOrWhiteSpace(Username) || !(Result.TellOnce ?? []).Contains(topic) || !Filled(topic))
+        if (_busy || string.IsNullOrWhiteSpace(Username) || !(Result.TellOnce ?? []).Contains(topic) || _saved.Contains(topic) || _already.Contains(topic) || !Filled(topic))
             return;
         _busy = true;
         _errors.Remove(topic);
@@ -156,8 +161,8 @@
         {
             var user = Username;
             var part = Part(topic);
-            await DataGate.RunAsync(() => Profiles.SavePartAsync(user, part));
-            _saved.Add(topic);
+            var saved = await DataGate.RunAsync(() => Profiles.SavePartAsync(user, part));
+            (saved.AlreadySet.Count > 0 ? _already : _saved).Add(topic);
         }
         catch (ProfileValidationException ex)
         {

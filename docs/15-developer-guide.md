@@ -103,7 +103,8 @@ When you add a switch that changes what a person can do, add it to `HowItWorksFe
 - UI texts are English only (D-062); documentation is bilingual (English primary, German `_de.md`).
 - About me is strictly per account: the result fields `TellOnce` and `FromAboutMe` are filled only for the owner of the order, the
   web component is rendered only for the owner, and `IProfileService.SavePartAsync` and `profile` write only into the profile of
-  the signed-in user. The topics come from the stored reading of the request (`IntakeRecord`) and the profile block of the stored
+  the signed-in user, and only into empty fields, in one locked statement (`IUserProfileRepository.FillEmptyAsync`); name, role and
+  organization are one line without special characters, and no signature line may start with a field name of `ProfilePrompt.Labels`. The topics come from the stored reading of the request (`IntakeRecord`) and the profile block of the stored
   briefing, never from words in the text; the clarifier prompt and the briefing of orders without such a topic stay unchanged (D-083).
 
 ## Hosting

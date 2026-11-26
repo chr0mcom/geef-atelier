@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Mcp.Tools;
 using ModelContextProtocol;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
 namespace Geef.Atelier.Mcp;
@@ -64,6 +65,14 @@ public static class McpToolCatalog
         if (schema["properties"] is JsonObject properties && properties[property] is JsonObject entry)
             entry["description"] = description;
         tool.ProtocolTool.InputSchema = JsonSerializer.SerializeToElement(schema, McpJsonUtilities.DefaultOptions);
+        return tool;
+    }
+
+    /// <summary>Replaces the annotations of <paramref name="tool"/>.</summary>
+    public static McpServerTool WithAnnotations(this McpServerTool tool, ToolAnnotations annotations)
+    {
+        ArgumentNullException.ThrowIfNull(tool);
+        tool.ProtocolTool.Annotations = annotations;
         return tool;
     }
 

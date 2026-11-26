@@ -132,7 +132,8 @@ internal static class OrderDtoMappings
 
     /// <summary>Note for a result with <c>fromAboutMe</c>.</summary>
     public const string FromAboutMeNote =
-        "fromAboutMe names what came from the person's About me details; tell the person that they can change or delete it under About me.";
+        "fromAboutMe names what the writer got from the person's About me details with this version (sent with the request, not necessarily used); " +
+        "tell the person that they can change or delete it under About me, which counts for their next requests.";
 
     /// <summary>Note for a result with questions the person left open before writing.</summary>
     public const string UnansweredQuestionsNote =

@@ -49,8 +49,11 @@ public sealed class OrderOptions
     /// <summary>Most versions of one order; no change is started beyond it.</summary>
     public int MaxVersionsPerOrder { get; set; } = 10;
 
-    /// <summary>Whether a result offers to save what About me lacks and shows what came from About me.</summary>
-    public TellOnceMode TellOnce { get; set; } = TellOnceMode.On;
+    /// <summary>
+    /// Whether a result offers to save what About me lacks and shows what the writer got from About me. <see cref="TellOnceMode.WithoutPromise"/>
+    /// until the acceptance on the real system shows that the writer uses what was saved; then <see cref="TellOnceMode.On"/>.
+    /// </summary>
+    public TellOnceMode TellOnce { get; set; } = TellOnceMode.WithoutPromise;
 }
 
 /// <summary>Helpers on <see cref="OrderOptions"/>.</summary>

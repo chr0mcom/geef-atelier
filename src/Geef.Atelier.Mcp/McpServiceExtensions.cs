@@ -6,6 +6,7 @@ using Geef.Atelier.Mcp.Tools;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
 namespace Geef.Atelier.Mcp;
@@ -68,6 +69,9 @@ public static class McpServiceExtensions
         var description = method.DeclaringType == typeof(GetOrderStatusTool)
             ? GetOrderStatusTool.Describe(services.GetRequiredService<IOptions<OrderOptions>>().Value.MaxWaitSeconds)
             : submit && tickets ? SubmitOrderTool.TicketToolDescription : null;
+        if (method.DeclaringType == typeof(ProfileTool) && services.GetRequiredService<IOptions<OrderOptions>>().Value.TellOnce == TellOnceMode.Off)
+            return ProfileTool.SavingParameters.Aggregate(method.CreateTool(services, ProfileTool.ReadOnlyToolDescription), (t, p) => t.WithoutInputProperty(p))
+                .WithAnnotations(new ToolAnnotations { ReadOnlyHint = true });
         var tool = method.CreateTool(services, description);
         if (!submit)
             return tool;
