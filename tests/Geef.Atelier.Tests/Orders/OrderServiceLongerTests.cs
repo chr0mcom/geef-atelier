@@ -66,7 +66,7 @@ public sealed class OrderServiceLongerTests(PostgresFixture postgres)
         await DeliverAsync(host, v2.RunId!.Value, v2Text);
         var second = await ResultAsync(host, submission.OrderId, user);
         Assert.Equal(2, second.Version);
-        Assert.Equal("This version is longer than the one before. Anything new in it did not come from you – please check it.", second.LengthNotice);
+        Assert.Equal("This version is noticeably longer than the one before. Please check the new parts: the writer may have added things you did not ask for.", second.LengthNotice);
 
         var v3 = await ReviseAsync(host, new(submission.OrderId, user, "The meeting is on 5 May, not 12 May.", [], OrderEntry.Mcp));
         await DeliverAsync(host, v3.RunId!.Value, v2Text.Replace("12 May", "5 May", StringComparison.Ordinal));
@@ -124,7 +124,7 @@ public sealed class OrderServiceLongerTests(PostgresFixture postgres)
     {
         var before = await host.QueryAsync(db => db.Runs.CountAsync());
         var ex = await Assert.ThrowsAsync<OrderRevisionException>(() => ReviseAsync(host, request));
-        Assert.Equal("A text only gets longer with new details from you. Tell me what to add.", ex.Message);
+        Assert.Equal("To make the text longer, tell the writer what to add.", ex.Message);
         Assert.Equal(before, await host.QueryAsync(db => db.Runs.CountAsync()));
     }
 }

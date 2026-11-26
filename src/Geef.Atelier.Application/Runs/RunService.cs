@@ -287,7 +287,9 @@ internal sealed class RunService(
         if ((shown.OrderVersion ?? 0) > (failed.OrderVersion ?? 0))
             throw new RunNotResumableException(RevisionLines.ResumeLaterVersion);
         var version = orderRuns.Where(r => r.Kind == RunKind.Standard).Max(r => r.OrderVersion ?? 0) + 1;
-        var change = failed.RevisionHint!;
+        var change = RevisionBrief.WithoutRetired(failed.RevisionHint);
+        if (change.Length == 0)
+            throw new RunNotResumableException(RevisionLines.ResumeRetired);
         var run = new RunEntity
         {
             Id = Guid.NewGuid(),

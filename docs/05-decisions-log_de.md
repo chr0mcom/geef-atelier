@@ -3167,16 +3167,19 @@ Messung nicht geändert. Gestrichen: Migrations-Baseline, „Remember this?“, 
 **Paket 1 – Ändern für alle.** Tor N′ (D-075) scheiterte nur am Knopf „Longer“: Die Verlängerung fügte trotz „without adding new
 facts“ eine Tatsache hinzu. Gebaut in kleinster Form:
 - **Knopf „Longer“ entfällt** in Web und MCP. Angeboten werden Shorter, More formal, Friendlier, Simpler words. Eine Änderung mit
-  „Longer“ lehnt der Dienst ab, ohne einen Lauf anzulegen: „A text only gets longer with new details from you. Tell me what to
-  add.“ `revise_order` mit `quick: ["longer"]` antwortet mit diesem Satz und dem Hinweis an den Client, die Person zu fragen und
-  ihre Worte in `change` zu übergeben. Der Enum-Wert bleibt, weil gespeicherte Änderungen ihn nennen.
+  „Longer“ lehnt der Dienst ab, ohne einen Lauf anzulegen: „To make the text longer, tell the writer what to add.“ `revise_order`
+  mit `quick: ["longer"]` antwortet mit diesem Satz und dem Hinweis an den Client, die Person zu fragen und ihre Worte in `change`
+  zu übergeben; ist Ändern für das Konto aus, kommt sofort „Changing a text is not available yet.“. Der Enum-Wert bleibt, weil
+  gespeicherte Änderungen ihn nennen; sein fester Satz geht aber nie wieder an den Schreiber – er fehlt unter den früheren
+  Änderungen einer neuen Fassung, und „Resume“ einer Änderung, die nur ihn verlangte, wird abgelehnt.
 - **Hinweisfeld mit Beispiel:** „For example: The meeting is on 5 May, not 12 May. Or: Add that parking is free.“
 - **Wer Verlängern als Freitext verlangt, bekommt es.** Statt einer Wortliste gilt eine strukturelle Regel: Hat eine geänderte
   Fassung mehr als 115 % der Wörter des Textes, den sie geändert hat (`Runs.SeedDraftText`, gezählt wie `Runs.WordCount`), steht
-  im Web über dem Text und in MCP im neuen Feld `lengthNotice` von `get_order_result`: „This version is longer than the one
-  before. Anything new in it did not come from you – please check it.“ Die Regel wird bei jeder Anzeige aus den gespeicherten
+  im Web über dem Text und in MCP im neuen Feld `lengthNotice` von `get_order_result`: „This version is noticeably longer than the
+  one before. Please check the new parts: the writer may have added things you did not ask for.“ Der Satz behauptet keine Herkunft,
+  weil der Code nur die Länge misst (auch eine verlangte Ergänzung kann ihn auslösen). Die Regel wird bei jeder Anzeige aus den gespeicherten
   Texten berechnet, nicht gespeichert und nicht im Bericht; ältere gespeicherte Fassungen bekommen den Satz ebenso, alte
-  Berichte bleiben unberührt. Erste Fassungen und fortgesetzte Läufe ohne Änderungswunsch bekommen ihn nie.
+  Berichte bleiben unberührt. Erste Fassungen und ohne Änderungswunsch fortgesetzte Läufe bekommen ihn nie; eine fortgesetzte Änderung zählt wie eine Änderung.
 - **Bitgleich** (Hash-Tests, festgehalten vor dem Bau): Satz `RevisionInstruction`, System-Prompt des Schreibers, Klärer-Prompt
   und -Schema, Prüfer-Prompt und -Schema, die festen Sätze aller Schnellknöpfe. Die sechs in N′ bestandenen Fälle gelten weiter.
 - **Schalter:** `Orders:Revise` bleibt ausgeliefert `Off`. **Rückweg:** `Orders__Revise=Off`.

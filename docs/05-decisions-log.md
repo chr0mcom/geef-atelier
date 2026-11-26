@@ -3051,16 +3051,19 @@ Dropped: migration baseline, "Remember this?", style templates, library, `DraftC
 **Package 1 – Changing for everyone.** Gate N′ (D-075) failed only at the button "Longer": the longer version added a fact
 despite "without adding new facts". Built in the smallest form:
 - **The button "Longer" is gone** on the web and in MCP. Offered are Shorter, More formal, Friendlier, Simpler words. The service
-  refuses a change with "Longer" without creating a run: "A text only gets longer with new details from you. Tell me what to add."
-  `revise_order` with `quick: ["longer"]` answers with this sentence and tells the client to ask the person and pass their words
-  in `change`. The enum value stays because stored changes name it.
+  refuses a change with "Longer" without creating a run: "To make the text longer, tell the writer what to add." `revise_order`
+  with `quick: ["longer"]` answers with this sentence and tells the client to ask the person and pass their words in `change`;
+  when changing is switched off for the account, it answers "Changing a text is not available yet." at once. The enum value stays
+  because stored changes name it, but its fixed sentence never reaches the writer again – it is left out of the earlier changes of
+  a new version, and "Resume" of a change that asked only for it is refused.
 - **Hint field with an example:** "For example: The meeting is on 5 May, not 12 May. Or: Add that parking is free."
 - **Asking for a longer text in one's own words is made.** Instead of a word list a structural rule applies: when a changed
   version has more than 115 % of the words of the text it changed (`Runs.SeedDraftText`, counted like `Runs.WordCount`), the web
-  page shows above the text, and MCP in the new field `lengthNotice` of `get_order_result`: "This version is longer than the one
-  before. Anything new in it did not come from you – please check it." The rule is worked out from the stored texts each time it
+  page shows above the text, and MCP in the new field `lengthNotice` of `get_order_result`: "This version is noticeably longer than
+  the one before. Please check the new parts: the writer may have added things you did not ask for." The sentence claims no origin,
+  because the code only measures the length (an addition the person asked for can trigger it too). The rule is worked out from the stored texts each time it
   is shown, never stored and not in the report; older stored versions get the sentence as well, old reports stay untouched. First
-  versions and resumed runs without a change request never get it.
+  versions and runs resumed without a change request never get it; a resumed change counts like a change.
 - **Bit-identical** (hash tests, taken before building): the sentence `RevisionInstruction`, the writer's system prompt, the
   clarifier prompt and schema, the fact check prompt and schema, the fixed sentences of all quick buttons. The six cases that
   passed at N′ stay valid.

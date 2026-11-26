@@ -120,16 +120,27 @@ public sealed class ReviseOrderToolTests
     [InlineData(null, new[] { "longer" })]
     [InlineData(null, new[] { " Longer ", "shorter" })]
     [InlineData("Add the room number.", new[] { "longer" })]
-    public async Task The_quick_change_longer_asks_for_the_details_to_add_and_starts_nothing(string? change, string[] quick)
+    public async Task The_quick_change_longer_goes_to_the_service_which_decides_and_its_refusal_asks_what_to_add(string? change, string[] quick)
     {
         var id = Owned("alice");
+        _orders.ReviseException = new OrderRevisionException(RevisionLines.LongerNeedsDetails);
 
         var ex = await Assert.ThrowsAsync<McpException>(() => ReviseOrderTool.ReviseOrder(_orders, _alice, id.ToString(), change, quick));
 
         Assert.Equal(ReviseOrderTool.LongerMessage, ex.Message);
-        Assert.StartsWith("A text only gets longer with new details from you. Tell me what to add. ", ex.Message, StringComparison.Ordinal);
-        Assert.Contains(RevisionLines.LongerNeedsDetails, ex.Message, StringComparison.Ordinal);
-        Assert.Empty(_orders.Revisions);
+        Assert.StartsWith("To make the text longer, tell the writer what to add. ", ex.Message, StringComparison.Ordinal);
+        Assert.Contains(RevisionQuick.Longer, Assert.Single(_orders.Revisions).Quick);
+    }
+
+    [Fact]
+    public async Task While_changing_is_off_longer_gets_the_answer_that_changing_is_not_available()
+    {
+        var id = Owned("alice");
+        _orders.ReviseException = new OrderRevisionException(RevisionLines.NotAvailable);
+
+        var ex = await Assert.ThrowsAsync<McpException>(() => ReviseOrderTool.ReviseOrder(_orders, _alice, id.ToString(), quick: ["longer"]));
+
+        Assert.Equal(RevisionLines.NotAvailable, ex.Message);
     }
 
     [Fact]
@@ -164,7 +175,8 @@ public sealed class ReviseOrderToolTests
         Assert.DoesNotContain("longer,", quickParameter, StringComparison.Ordinal);
         Assert.Contains("There is none for a longer text: pass what to add in change.", quickParameter, StringComparison.Ordinal);
         Assert.DoesNotContain("longer", ReviseOrderTool.UnknownQuickFormat, StringComparison.Ordinal);
-        Assert.Contains("There is no quick change for a longer text", ReviseOrderTool.ToolDescription, StringComparison.Ordinal);
+        Assert.Contains("There is no quick change for a longer text: ask the person what to add", ReviseOrderTool.ToolDescription, StringComparison.Ordinal);
+        Assert.DoesNotContain("only gets longer", ReviseOrderTool.ToolDescription, StringComparison.Ordinal);
     }
 
     [Theory]

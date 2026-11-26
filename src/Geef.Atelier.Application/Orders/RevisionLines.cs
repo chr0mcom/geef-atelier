@@ -10,16 +10,22 @@ public static class RevisionLines
     public const string NotAvailable = "Changing a text is not available yet.";
 
     /// <summary>
-    /// Refusal of a change that asks for the quick change "Longer": a text only gets longer with new details from the person, so they are
-    /// asked for them. Nothing is started.
+    /// Refusal of a change that asks for the quick change "Longer", which is no longer offered: the person is asked to say what to add.
+    /// Nothing is started.
     /// </summary>
-    public const string LongerNeedsDetails = "A text only gets longer with new details from you. Tell me what to add.";
+    public const string LongerNeedsDetails = "To make the text longer, tell the writer what to add.";
 
     /// <summary>
-    /// Shown with a version that changed an earlier one and is clearly longer than the text it changed (<c>RevisionLength</c>): whatever is new
-    /// in it beyond the change did not come from the person.
+    /// Shown with a version that changed an earlier one and is clearly longer than the text it changed (<c>RevisionLength</c>). Only the
+    /// length is measured, so the sentence says no more than that: the new parts may hold things the person did not ask for.
     /// </summary>
-    public const string LongerThanBefore = "This version is longer than the one before. Anything new in it did not come from you – please check it.";
+    public const string LongerThanBefore = "This version is noticeably longer than the one before. Please check the new parts: the writer may have added things you did not ask for.";
+
+    /// <summary>
+    /// Refusal of "Resume" on a version whose change asked only for the quick change "Longer", which is no longer offered: it is not made
+    /// again.
+    /// </summary>
+    public const string ResumeRetired = "This change asked for a longer text without saying what to add, which is no longer made. To change the text, use “Change something” on the order page.";
 
     /// <summary>Refusal of a change without the person's words and without a quick button.</summary>
     public const string NoChangeGiven = "Please write what should change or choose one of the buttons.";

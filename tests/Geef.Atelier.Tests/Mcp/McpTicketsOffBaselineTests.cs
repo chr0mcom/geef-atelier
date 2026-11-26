@@ -19,10 +19,10 @@ namespace Geef.Atelier.Tests.Mcp;
 /// </summary>
 public sealed class McpTicketsOffBaselineTests
 {
-    private const string ToolsWithLegacyHash = "ecc7c6f7d9382fdfe792b67abed7d6131146b54f0e96664d701199379df87fcc";
-    private const string ToolsWithoutLegacyHash = "0fa78552ab744f286aa9bb10319398b5a613daf1b1f20fabc3cd114312a4e340";
-    private const string InstructionsWithLegacyHash = "2a2bea1ecee187c978329c70268dcc752809088e6e16a11e3d90bc1cd7164d85";
-    private const string InstructionsWithoutLegacyHash = "da4d6dcb34a7d7ad213774155080b212f2d4ef2eed30ca188c784a23cea8c928";
+    private const string ToolsWithLegacyHash = "db658fcddf55eeab54412dcb5d988294421dc793359281a45492e3dec9f1c840";
+    private const string ToolsWithoutLegacyHash = "165e018513d9f4c28ab23e7b103c71cda389761a326e13804832554f754ed42a";
+    private const string InstructionsWithLegacyHash = "c5ef1b77a1558dad0baef3e36a98eb829ea6c7e675c0ef87579216ac91eedb6b";
+    private const string InstructionsWithoutLegacyHash = "44542b8183b3938d76674e840d8538df97e7f7d9c06fbf9d62a3f257cb7afa6a";
 
     [Theory]
     [InlineData("true", ToolsWithLegacyHash)]

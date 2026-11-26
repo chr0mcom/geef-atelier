@@ -19,7 +19,7 @@ public static class ReviseOrderTool
         "Only the person who ordered the text can change it. " +
         "Pass the person's words about the change in change, word for word as they said them: do not rephrase, shorten, translate or add to them, " +
         "and add no changes of your own. For a simple wish you can pass quick instead of change or together with it. " +
-        "There is no quick change for a longer text: a text only gets longer with new details from the person, so ask them what to add and pass their words in change. " +
+        "There is no quick change for a longer text: ask the person what to add and pass their words in change. " +
         "Atelier asks no questions and does not look anything up again. The new version gets the same automatic checks as every version, " +
         "except that the rules of the first request (such as its length, lists, words or language) only lead to notes, because the change may replace them. " +
         "Then call get_order_status with waitSeconds, and get_order_result when done is true. Until the new version is ready, get_order_result shows the earlier one. " +
@@ -58,8 +58,6 @@ public static class ReviseOrderTool
         var quickChanges = ParseQuick(quick);
         if (string.IsNullOrWhiteSpace(change) && quickChanges.Count == 0)
             throw new McpException(NoChangeMessage);
-        if (quickChanges.Any(q => !q.IsOffered()))
-            throw new McpException(LongerMessage);
 
         OrderRevision revision;
         try

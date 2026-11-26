@@ -153,7 +153,7 @@ public sealed class OrderChangeTests : TestContext
         var cut = Render(view);
 
         var notice = cut.Find("[data-testid='order-longer-notice']");
-        Assert.Equal("This version is longer than the one before. Anything new in it did not come from you – please check it.", notice.TextContent);
+        Assert.Equal("This version is noticeably longer than the one before. Please check the new parts: the writer may have added things you did not ask for.", notice.TextContent);
         Assert.Equal("note", notice.GetAttribute("role"));
         var markup = cut.Markup;
         Assert.True(markup.IndexOf("data-testid=\"order-longer-notice\"", StringComparison.Ordinal) < markup.IndexOf("order-result-sheet", StringComparison.Ordinal));
