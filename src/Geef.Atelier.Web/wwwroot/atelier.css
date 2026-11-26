@@ -4932,6 +4932,17 @@ textarea.form-control {
 .order-version-now span { flex: 1 1 240px; min-width: 0; }
 .order-version-now.is-earlier span { color: var(--ink); font-weight: 500; }
 .order-version-now a { color: var(--ink-3); text-decoration: underline; text-underline-offset: 2px; }
+.order-longer-notice {
+  margin: 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--sv-major);
+  border-radius: 4px;
+  background: color-mix(in oklch, var(--sv-major) 8%, var(--surface));
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
 
 .order-version-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
 .order-block .order-version-list { padding-left: 0; }

@@ -16,7 +16,7 @@ else
         <h2 id="order-change-title" class="order-change-title" tabindex="-1" @ref="_heading">@RevisionLines.ChangeButton</h2>
 
         <div class="question-options" role="group" aria-label="Quick changes" data-testid="order-change-quick-list">
-            @foreach (var quick in Enum.GetValues<RevisionQuick>())
+            @foreach (var quick in RevisionQuickText.Offered)
             {
                 var chosen = _quick.Contains(quick);
                 <button type="button"
@@ -104,7 +104,7 @@ else
         if (Draft is null)
             return;
         _text = Cap(Draft.Text);
-        _quick.UnionWith(Draft.Quick);
+        _quick.UnionWith(Draft.Quick.Where(q => q.IsOffered()));
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

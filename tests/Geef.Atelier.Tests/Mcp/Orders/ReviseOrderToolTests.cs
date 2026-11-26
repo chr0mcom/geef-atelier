@@ -112,8 +112,71 @@ public sealed class ReviseOrderToolTests
 
         var ex = await Assert.ThrowsAsync<McpException>(() => ReviseOrderTool.ReviseOrder(_orders, _alice, id.ToString(), quick: ["shortest"]));
 
-        Assert.Equal("Unknown quick change \"shortest\". Use shorter, longer, more_formal, friendlier or simpler.", ex.Message);
+        Assert.Equal("Unknown quick change \"shortest\". Use shorter, more_formal, friendlier or simpler.", ex.Message);
         Assert.Empty(_orders.Revisions);
+    }
+
+    [Theory]
+    [InlineData(null, new[] { "longer" })]
+    [InlineData(null, new[] { " Longer ", "shorter" })]
+    [InlineData("Add the room number.", new[] { "longer" })]
+    public async Task The_quick_change_longer_goes_to_the_service_which_decides_and_its_refusal_asks_what_to_add(string? change, string[] quick)
+    {
+        var id = Owned("alice");
+        _orders.ReviseException = new OrderRevisionException(RevisionLines.LongerNeedsDetails);
+
+        var ex = await Assert.ThrowsAsync<McpException>(() => ReviseOrderTool.ReviseOrder(_orders, _alice, id.ToString(), change, quick));
+
+        Assert.Equal(ReviseOrderTool.LongerMessage, ex.Message);
+        Assert.StartsWith("To make the text longer, tell the writer what to add. ", ex.Message, StringComparison.Ordinal);
+        Assert.Contains(RevisionQuick.Longer, Assert.Single(_orders.Revisions).Quick);
+    }
+
+    [Fact]
+    public async Task While_changing_is_off_longer_gets_the_answer_that_changing_is_not_available()
+    {
+        var id = Owned("alice");
+        _orders.ReviseException = new OrderRevisionException(RevisionLines.NotAvailable);
+
+        var ex = await Assert.ThrowsAsync<McpException>(() => ReviseOrderTool.ReviseOrder(_orders, _alice, id.ToString(), quick: ["longer"]));
+
+        Assert.Equal(RevisionLines.NotAvailable, ex.Message);
+    }
+
+    [Fact]
+    public async Task The_refusal_of_longer_by_the_service_comes_back_as_the_same_sentence()
+    {
+        var id = Owned("alice");
+        _orders.ReviseException = new OrderRevisionException(RevisionLines.LongerNeedsDetails);
+
+        var ex = await Assert.ThrowsAsync<McpException>(() => ReviseOrderTool.ReviseOrder(_orders, _alice, id.ToString(), "Make it longer."));
+
+        Assert.Equal(ReviseOrderTool.LongerMessage, ex.Message);
+    }
+
+    [Fact]
+    public async Task Making_it_longer_in_the_persons_own_words_is_passed_on_unchanged()
+    {
+        var id = Owned("alice");
+
+        await ReviseOrderTool.ReviseOrder(_orders, _alice, id.ToString(), "Bitte mach den Text länger.");
+
+        var revision = Assert.Single(_orders.Revisions);
+        Assert.Equal("Bitte mach den Text länger.", revision.Change);
+        Assert.Empty(revision.Quick);
+    }
+
+    [Fact]
+    public void No_tool_text_offers_the_quick_change_longer()
+    {
+        var quickParameter = typeof(ReviseOrderTool).GetMethod(nameof(ReviseOrderTool.ReviseOrder))!.GetParameters().Single(p => p.Name == "quick")
+            .GetCustomAttributes(typeof(System.ComponentModel.DescriptionAttribute), false).Cast<System.ComponentModel.DescriptionAttribute>().Single().Description;
+
+        Assert.DoesNotContain("longer,", quickParameter, StringComparison.Ordinal);
+        Assert.Contains("There is none for a longer text: pass what to add in change.", quickParameter, StringComparison.Ordinal);
+        Assert.DoesNotContain("longer", ReviseOrderTool.UnknownQuickFormat, StringComparison.Ordinal);
+        Assert.Contains("There is no quick change for a longer text: ask the person what to add", ReviseOrderTool.ToolDescription, StringComparison.Ordinal);
+        Assert.DoesNotContain("only gets longer", ReviseOrderTool.ToolDescription, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -184,7 +247,9 @@ public sealed class ReviseOrderToolTests
     [Fact]
     public void Every_quick_button_has_a_wire_name()
     {
-        Assert.Equal(Enum.GetValues<RevisionQuick>().Select(q => q.ToWire()), OrderWireNames.QuickNames);
+        Assert.Equal(["shorter", "more_formal", "friendlier", "simpler"], OrderWireNames.QuickNames);
+        Assert.Equal(RevisionQuickText.Offered.Select(q => q.ToWire()), OrderWireNames.QuickNames);
+        Assert.Equal("longer", RevisionQuick.Longer.ToWire());
         Assert.All(OrderWireNames.QuickNames, name => Assert.Contains(name, ReviseOrderTool.UnknownQuickFormat, StringComparison.Ordinal));
     }
 

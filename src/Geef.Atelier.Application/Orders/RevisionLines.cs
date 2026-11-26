@@ -9,6 +9,24 @@ public static class RevisionLines
     /// <summary>Answer while changing a text is switched off for the person.</summary>
     public const string NotAvailable = "Changing a text is not available yet.";
 
+    /// <summary>
+    /// Refusal of a change that asks for the quick change "Longer", which is no longer offered: the person is asked to say what to add.
+    /// Nothing is started.
+    /// </summary>
+    public const string LongerNeedsDetails = "To make the text longer, tell the writer what to add.";
+
+    /// <summary>
+    /// Shown with a version that changed an earlier one and is clearly longer than the text it changed (<c>RevisionLength</c>). Only the
+    /// length is measured, so the sentence says no more than that: the new parts may hold things the person did not ask for.
+    /// </summary>
+    public const string LongerThanBefore = "This version is noticeably longer than the one before. Please check the new parts: the writer may have added things you did not ask for.";
+
+    /// <summary>
+    /// Refusal of "Resume" on a version whose change asked only for the quick change "Longer", which is no longer offered: it is not made
+    /// again.
+    /// </summary>
+    public const string ResumeRetired = "This change asked for a longer text without saying what to add, which is no longer made. To change the text, use “Change something” on the order page.";
+
     /// <summary>Refusal of a change without the person's words and without a quick button.</summary>
     public const string NoChangeGiven = "Please write what should change or choose one of the buttons.";
 
@@ -112,8 +130,8 @@ public static class RevisionLines
     /// <summary>Label of the field for the person's own words.</summary>
     public const string ChangeFieldLabel = "What should change?";
 
-    /// <summary>Placeholder of the field.</summary>
-    public const string ChangeFieldPlaceholder = "For example: The meeting is on 5 May, not 12 May.";
+    /// <summary>Placeholder of the field: one change of a detail and one addition, the way to get a longer text.</summary>
+    public const string ChangeFieldPlaceholder = "For example: The meeting is on 5 May, not 12 May. Or: Add that parking is free.";
 
     /// <summary>Line on the card: it promises only what is done (the writer is asked for this change alone), not that nothing else changes.</summary>
     public const string OnlyWhatYouAsk = "The writer is asked to make only this change. “Show changes” then shows what was changed.";

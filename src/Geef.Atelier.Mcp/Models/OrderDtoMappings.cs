@@ -86,7 +86,8 @@ internal static class OrderDtoMappings
             result.LookedUp.ToDto(),
             result.LatestVersion,
             result.ToEarlierPointDtos(),
-            result.Assumptions is { Count: > 0 } ? result.AssumptionsVersion : null);
+            result.Assumptions is { Count: > 0 } ? result.AssumptionsVersion : null,
+            string.IsNullOrWhiteSpace(result.LengthNotice) ? null : result.LengthNotice);
 
     /// <summary>The open points of the writer for an earlier version that the shown version does not repeat (<see cref="OrderResultRules.ShownEarlierPoints"/>); <c>null</c> when there are none.</summary>
     public static IReadOnlyList<OrderEarlierPointDto>? ToEarlierPointDtos(this OrderResult result)

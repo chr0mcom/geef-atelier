@@ -3008,6 +3008,76 @@ changing a result without the quick button "Longer" (which invented a fact at ga
 its own contract and a night measurement – without it a layperson cannot change anything about a result. After that R3 of the
 research with a larger sample (D-074). Both only at night and with an upper limit.
 
+## D-078 — Remaining plan: build and switch on everything; package 1 "Changing for everyone" (2026-11-26)
+
+**Status:** decided on the operator's request. Package 1 is built and ships switched off; it is switched on after gate N″ with
+a commit of its own (addendum to this entry).
+
+**Request.** The operator asked to switch on for everyone the three functions that are built but switched off – changing a
+result, research on the web, correction by the fact checker – and to build the parts not built: memory, a new "Extra careful"
+and the removal of the old way together with the loop part of stage 1b. A remaining plan lays down how.
+
+**Relation to D-077.** For these points the remaining plan replaces the triggers of D-077; to that extent its limits are lifted.
+This concerns: switching on changing, research and the fact checker (each only after its own gate), memory and "Extra careful"
+(in the smallest forms named below) and the removal (`Mcp:LegacyTools`, the older tools and finally deleting old tables, only in
+the stages of packages 8 and 9). All other rules of D-077 stay: no deleted rows of real users, no `DROP` except in package 9, no
+migration baseline, clarifier and reviewer prompts bit-identical except where a package explicitly plans a new measurement
+(package 5), no silent redirect of the older submit tools.
+
+**Remaining plan in short (order):**
+0. Preparation: backup, acceptance of the way over claude.ai, one shared measurement guard for all measurement runs.
+1. **Changing for everyone** without the button "Longer" (below).
+2. **Research on the web for everyone** after a larger measurement (R3′) with a tolerance for the juror's noise fixed in
+   advance; if it fails, research becomes only a check box "Look things up on the web" (off by default).
+3. **The fact checker corrects the clear case:** a number that stands nowhere in the material becomes a gap in square brackets;
+   the other findings stand folded behind one line with their number; the fallback model never corrects.
+4. **Memory, smallest form:** state sender, signature, form of address and language once under "About me", with one click from
+   the result; MCP `profile` can write the same fields; strictly per account.
+5. **Conditional: a quieter fact checker** with a new check prompt, measured on a held-back half; if it fails, the old checker
+   stays with the folded display of package 3.
+6. **Stage 1b, loop part, smallest form:** best instead of last version, only blocking findings to the writer, stop after two
+   rounds without improvement – one switch each, shown by replaying stored runs.
+7. **New "Extra careful":** direct path with an outline against the direct path and against the softened loop, blind juror;
+   without a winner the check box goes.
+8. **Removal of the old way in four reversible stages:** off for non-admins, transition with team choice for admins in the new
+   way, dead code, then the rest.
+9. **Delete old tables**, at the earliest 30 days after stage 8d and after a tested restore of the backup – the only
+   irreversible step.
+
+Every package has its own contract before it is built (criteria, dry run, upper limits of model calls; outside this repository),
+its own branch, a review, one deploy and an acceptance on a real run; thresholds are not changed once a measurement has begun.
+Dropped: migration baseline, "Remember this?", style templates, library, `DraftCollapseDetector` (unless package 7 needs it).
+
+**Package 1 – Changing for everyone.** Gate N′ (D-075) failed only at the button "Longer": the longer version added a fact
+despite "without adding new facts". Built in the smallest form:
+- **The button "Longer" is gone** on the web and in MCP. Offered are Shorter, More formal, Friendlier, Simpler words. The service
+  refuses a change with "Longer" without creating a run: "To make the text longer, tell the writer what to add." `revise_order`
+  with `quick: ["longer"]` answers with this sentence and tells the client to ask the person and pass their words in `change`;
+  when changing is switched off for the account, it answers "Changing a text is not available yet." at once. The enum value stays
+  because stored changes name it, but its fixed sentence never reaches the writer again – it is left out of the earlier changes of
+  a new version, and "Resume" of a change that asked only for it is refused.
+- **Hint field with an example:** "For example: The meeting is on 5 May, not 12 May. Or: Add that parking is free."
+- **Asking for a longer text in one's own words is made.** Instead of a word list a structural rule applies: when a changed
+  version has more than 115 % of the words of the text it changed (`Runs.SeedDraftText`, counted like `Runs.WordCount`), the web
+  page shows above the text, and MCP in the new field `lengthNotice` of `get_order_result`: "This version is noticeably longer than
+  the one before. Please check the new parts: the writer may have added things you did not ask for." The sentence claims no origin,
+  because the code only measures the length (an addition the person asked for can trigger it too). The rule is worked out from the stored texts each time it
+  is shown, never stored and not in the report; older stored versions get the sentence as well, old reports stay untouched. First
+  versions and runs resumed without a change request never get it; a resumed change counts like a change.
+- **Bit-identical** (hash tests, taken before building): the sentence `RevisionInstruction`, the writer's system prompt, the
+  clarifier prompt and schema, the fact check prompt and schema, the fixed sentences of all quick buttons. The six cases that
+  passed at N′ stay valid.
+- **Switch:** `Orders:Revise` stays shipped `Off`. **Way back:** `Orders__Revise=Off`.
+
+**Condition for switching on, gate N″** (closes the gaps D-075 names as "to observe before switching on"): two fresh orders
+(German, English), six changes – a chain "shorten, then replace a date" (the shortening must not be made again), a chain "add a
+sentence against an instruction of the first request, then replace its value again", "Simpler words" (never measured) and "make
+it longer" in one's own words – plus a probe `quick: longer` without a model call; a blind reviewer with two control pairs as in
+N′. All thresholds are fixed in advance and shown on the stored recordings of N′ to be reachable with correct and to fail with
+wrong behaviour. Consequences: lost data or a missing fixed sentence → halt and fix; a failed chain → one repair (the writer gets
+only the newest change), then switching on with a fixed note from the third version; "Simpler words" failed → that button goes as
+well and the rest is switched on. The result follows as an addendum.
+
 ## D-079 — No web search for orders with the default crew; search query fails closed (2026-11-26)
 
 **Status:** implemented.

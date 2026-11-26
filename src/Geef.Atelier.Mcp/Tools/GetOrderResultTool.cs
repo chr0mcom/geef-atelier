@@ -25,7 +25,8 @@ public static class GetOrderResultTool
         "the writer noted for an earlier version that the change may have settled, and fixed sentences by Atelier about that version (kind note): show them with their version. " +
         "An unbackedPassages entry with a note: show the note with it. " +
         "When assumptionsVersion is set, the text is a changed version and assumptions were noted for that earlier version, before the changes: " +
-        "say so and do not present them as facts the person did not give now.";
+        "say so and do not present them as facts the person did not give now. " +
+        "When lengthNotice is set, the changed version became clearly longer than the one before: show the person that sentence with the text.";
 
     /// <summary>The sentence of the stage-3 contract (7.5), word for word.</summary>
     public const string ShowEverythingRule =

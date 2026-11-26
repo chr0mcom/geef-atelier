@@ -110,11 +110,11 @@ internal sealed class RunService(
 
         var runId = await persistence.CreateRunAsync(
             effectiveBriefing, normalizedConfig, request.CreatedByUser,
-            resolvedTemplateName, hasAttachments ? null : snapshotJson, effectiveKind,
+            resolvedTemplateName, null, effectiveKind,
             request.ParentCompositionRunId, cancellationToken);
 
         if (effectiveKind != RunKind.Learning)
-            await LinkToOrderAsync(runId, request.Entry, cancellationToken);
+            await LinkToOrderAsync(runId, request.Entry, CancellationToken.None);
 
         await ReportAssignmentWarningsAsync(runId, resolved.Warnings);
 
@@ -148,6 +148,10 @@ internal sealed class RunService(
                 await persistence.MarkRunFailedAsync(runId, AttachmentUploadFailedMessage, cancellationToken);
                 throw;
             }
+        }
+        else
+        {
+            await persistence.UpdateSnapshotAsync(runId, snapshotJson, CancellationToken.None);
         }
 
         return runId;
@@ -267,15 +271,16 @@ internal sealed class RunService(
             details.Run.ConfigJson,
             details.Run.CreatedByUser,
             details.Run.CrewTemplateName,
-            snapshotJson,
+            null,
             options.ParentRunId,
             seedDraftText,
             details.Run.Kind,
             cancellationToken);
 
         if (details.Run.Kind != RunKind.Learning)
-            await LinkToOrderAsync(resumedId, OrderEntry.Legacy, cancellationToken);
+            await LinkToOrderAsync(resumedId, OrderEntry.Legacy, CancellationToken.None);
 
+        await persistence.UpdateSnapshotAsync(resumedId, snapshotJson!, CancellationToken.None);
         return resumedId;
     }
 
@@ -287,7 +292,9 @@ internal sealed class RunService(
         if ((shown.OrderVersion ?? 0) > (failed.OrderVersion ?? 0))
             throw new RunNotResumableException(RevisionLines.ResumeLaterVersion);
         var version = orderRuns.Where(r => r.Kind == RunKind.Standard).Max(r => r.OrderVersion ?? 0) + 1;
-        var change = failed.RevisionHint!;
+        var change = RevisionBrief.WithoutRetired(failed.RevisionHint);
+        if (change.Length == 0)
+            throw new RunNotResumableException(RevisionLines.ResumeRetired);
         var run = new RunEntity
         {
             Id = Guid.NewGuid(),
