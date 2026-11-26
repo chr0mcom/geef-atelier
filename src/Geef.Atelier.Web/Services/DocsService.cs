@@ -16,6 +16,10 @@ public sealed class DocsService
     public static readonly IReadOnlyList<DocEntry> Entries =
     [
         new("readme",                   "README",                   "Overview / README"),
+        new("12-user-guide",            "12-user-guide",            "Guide: writing with Atelier"),
+        new("13-ai-assistant-guide",    "13-ai-assistant-guide",    "Guide: from an AI assistant"),
+        new("14-admin-guide",           "14-admin-guide",           "Guide: for administrators"),
+        new("15-developer-guide",       "15-developer-guide",       "Guide: for developers and hosts"),
         new("01-vision-and-scope",      "01-vision-and-scope",      "1 · Vision & Scope"),
         new("02-architecture",          "02-architecture",          "2 · Architecture"),
         new("03-walking-skeleton-plan", "03-walking-skeleton-plan", "3 · Walking Skeleton Plan"),

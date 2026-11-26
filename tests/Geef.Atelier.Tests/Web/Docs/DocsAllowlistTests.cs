@@ -7,9 +7,9 @@ public sealed class DocsAllowlistTests
     // ── Allowlist size ────────────────────────────────────────────────────
 
     [Fact]
-    public void Entries_HasNineAllowlistedDocs()
+    public void Entries_HasThirteenAllowlistedDocs()
     {
-        Assert.Equal(9, DocsService.Entries.Count);
+        Assert.Equal(13, DocsService.Entries.Count);
     }
 
     // ── Allowed slugs ─────────────────────────────────────────────────────
@@ -24,6 +24,10 @@ public sealed class DocsAllowlistTests
     [InlineData("07-design-system")]
     [InlineData("08-crew-system")]
     [InlineData("09-endpoint-reference")]
+    [InlineData("12-user-guide")]
+    [InlineData("13-ai-assistant-guide")]
+    [InlineData("14-admin-guide")]
+    [InlineData("15-developer-guide")]
     public void IsAllowed_KnownSlug_ReturnsTrue(string slug)
     {
         Assert.True(DocsService.IsAllowed(slug));
