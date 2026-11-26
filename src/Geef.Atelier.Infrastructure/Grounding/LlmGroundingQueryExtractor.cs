@@ -8,7 +8,8 @@ namespace Geef.Atelier.Infrastructure.Grounding;
 /// <summary>
 /// Uses a small LLM call (the <c>GroundingQueryExtractor</c> actor) to turn a briefing
 /// into one focused web-search query, or to decide that web search is not useful.
-/// Always degrades gracefully — any failure falls back to searching with the raw briefing.
+/// Fails closed (D-079): when the call fails or the answer holds no query, nothing is searched and the raw briefing is never
+/// used as the query.
 /// The model comes from the <see cref="ModelSlot.Helper"/> slot of the model matrix (D-066) unless
 /// <c>Llm:Actors:GroundingQueryExtractor</c> overrides it explicitly.
 /// </summary>
@@ -60,22 +61,19 @@ internal sealed class LlmGroundingQueryExtractor(
                 query = query[..MaxQueryLength];
 
             if (string.IsNullOrWhiteSpace(query))
-                return new GroundingQuery(ShouldSearch: true, Query: Fallback(briefingText));
+            {
+                logger.LogWarning("Grounding query extraction returned no query; nothing is searched.");
+                return GroundingQuery.NotFormed;
+            }
 
             logger.LogInformation("Grounding query extraction: refined query='{Query}'", query);
             return new GroundingQuery(ShouldSearch: true, Query: query);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning(ex, "Grounding query extraction failed; falling back to the raw briefing as query.");
-            return new GroundingQuery(ShouldSearch: true, Query: Fallback(briefingText));
+            logger.LogWarning(ex, "Grounding query extraction failed; nothing is searched.");
+            return GroundingQuery.NotFormed;
         }
-    }
-
-    private static string Fallback(string briefingText)
-    {
-        var trimmed = briefingText.Trim();
-        return trimmed.Length <= MaxQueryLength ? trimmed : trimmed[..MaxQueryLength];
     }
 
     private (ILlmClient Client, string Model, int MaxTokens) ResolveActor()

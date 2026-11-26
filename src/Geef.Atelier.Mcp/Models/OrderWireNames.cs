@@ -116,8 +116,11 @@ internal static class OrderWireNames
     public const string QuickFriendlier = "friendlier";
     public const string QuickSimpler = "simpler";
 
-    /// <summary>The wire names of the quick changes of <c>revise_order</c>, in the order of the buttons on the web page.</summary>
-    public static IReadOnlyList<string> QuickNames { get; } = [QuickShorter, QuickLonger, QuickMoreFormal, QuickFriendlier, QuickSimpler];
+    /// <summary>
+    /// The wire names of the quick changes <c>revise_order</c> offers, in the order of the buttons on the web page. <see cref="QuickLonger"/>
+    /// is not offered; it is still recognised so that it gets the sentence that a longer text needs new details.
+    /// </summary>
+    public static IReadOnlyList<string> QuickNames { get; } = RevisionQuickText.Offered.Select(q => q.ToWire()).ToList();
 
     /// <summary>Wire name of a quick change of <c>revise_order</c>.</summary>
     public static string ToWire(this RevisionQuick quick) => quick switch

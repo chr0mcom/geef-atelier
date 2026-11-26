@@ -60,7 +60,7 @@ Defined in `Geef.Atelier.Core.Domain.Crew.SystemCrew` (read-only, versioned with
 - `marketing`: Marketing, `Parallel`.
 - `crew-composer`: General.
 
-All four standard templates ship with three default grounding providers (`tavily-basic`, `run-attachments`, `learning-retriever-default`) and one default finalizer (`learning-extractor`). The `learning-evaluation` template is the only exception — it carries no grounding providers and no `learning-extractor` (recursion stop). Since D-067 the learning parts run empty unless `Learning:Enabled` is set (see [Continuous Learning Loop](#continuous-learning-loop-d-054)).
+All four standard templates ship with three default grounding providers (`tavily-refined`, `run-attachments`, `learning-retriever-default`) and one default finalizer (`learning-extractor`). The `learning-evaluation` template is the only exception — it carries no grounding providers and no `learning-extractor` (recursion stop). Since D-067 the learning parts run empty unless `Learning:Enabled` is set (see [Continuous Learning Loop](#continuous-learning-loop-d-054)).
 
 ## Model matrix (D-066)
 
@@ -389,6 +389,8 @@ Grounding providers enrich the briefing with external context before the GEEF ex
 
 - The five system profiles `tavily-basic`, `tavily-refined`, `run-attachments`, `knowledge-base-default` and `academic-default` run through their type-specific provider listed below, not through the tool path, also for older snapshots that still carry a `ToolName`. Only custom profiles with a `ToolName` use the tool-backed provider ([10-tool-system](10-tool-system.md#a-t9--grounding-rebuild-on-central-tools)).
 - A provider that is skipped or fails (missing key, unknown type, error) becomes a run warning (`grounding.provider_skipped`) instead of silently empty context. The code `grounding.tool_failed` is reserved and currently never written; failures of tool-backed sources also use `grounding.provider_skipped`.
+- **No outside search for default orders (D-079):** a run of an order with the default crew ("Extra careful" on the web or over MCP, `submit_request` without `crewTemplate`/`customCrew`) keeps only the sources that stay inside Atelier (`vector-store`, `order-sources`, `learning-retrieval`, `static-context` and the catalogs, never through the tool path); web, news, academic, REST, URL and tool sources are dropped before the pipeline is built, also when the run resumes with a stored snapshot that still names them. A template named on purpose (workshop, `submit_request` with `crewTemplate`), an own crew and a composed crew keep their sources.
+- **Search query fails closed (D-079):** with `ExtractQuery` (on for every system profile) the `tavily` provider searches only with the query the `GroundingQueryExtractor` formed; when the call fails or returns no query, nothing is searched and the source becomes `grounding.provider_skipped`. The request text is never the fallback query. Only a profile with `ExtractQuery=false`, and the `news-search`, `academic-search` and `rest-api` types, send the request part of the briefing as it is.
 - Key and header references (`authHeaderEnv`, `apiKeyEnv`) are only accepted and read for names on the allow list ([10-tool-system](10-tool-system.md#secrets-and-the-environment-variable-allow-list)); the grounding editor is admin-only.
 
 ### Provider Types

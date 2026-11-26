@@ -16,7 +16,8 @@ public interface IRunPersistenceService
 
     /// <summary>
     /// Replaces the <c>CrewSnapshot</c> JSON for the run with the given <paramref name="runId"/>.
-    /// Used to attach run-local grounding providers after the run record has been created.
+    /// A run without a snapshot is not picked up for processing: it is saved once everything the run needs exists
+    /// (link to its order, run-local grounding providers), and saving it releases the run.
     /// Throws <see cref="InvalidOperationException"/> if no run with that ID exists.
     /// </summary>
     Task UpdateSnapshotAsync(Guid runId, string snapshotJson, CancellationToken cancellationToken = default);

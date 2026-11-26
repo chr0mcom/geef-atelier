@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using Geef.Atelier.Application.Crew;
 using Geef.Atelier.Application.Runs;
@@ -6,6 +7,7 @@ using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
 using Geef.Atelier.Core.Persistence;
 using Geef.Atelier.Core.Persistence.Crew;
+using Geef.Atelier.Core.Persistence.Orders;
 using Geef.Atelier.Tests.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -287,7 +289,7 @@ public sealed class RunServiceResumeTests
 
     // ── Helpers ───────────────────────────────────────────────────────────
 
-    private static RunService MakeService(IRunPersistenceService persistence, IRunRepository repo) =>
+    private static RunService MakeService(IRunPersistenceService persistence, IRunRepository repo, IOrderRepository? orders = null) =>
         new RunService(
             persistence,
             repo,
@@ -296,7 +298,8 @@ public sealed class RunServiceResumeTests
             new NoOpKnowledgeService(),
             NullLogger<RunService>.Instance,
             new InMemoryRunWarnings(),
-            new InMemoryRunWarnings());
+            new InMemoryRunWarnings(),
+            orderRepository: orders);
 
     private static RunEntity MakeRun(Guid id, RunStatus status, string? createdByUser) =>
         new RunEntity
@@ -340,7 +343,35 @@ public sealed class RunServiceResumeTests
             },
             []);
 
+    [Fact]
+    public async Task ResumeRunAsync_ReleasesTheRunOnlyAfterItIsLinkedToItsOrder()
+    {
+        var parentId  = Guid.NewGuid();
+        var capturing = new CapturingPersistenceService();
+        var orders    = DispatchProxy.Create<IOrderRepository, LinkRecorder>();
+        ((LinkRecorder)(object)orders).Steps = capturing.Steps;
+        var svc = MakeService(capturing, new SingleDetailsRepository(MakeRun(parentId, RunStatus.Failed, "alice"), []), orders);
+
+        await svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: false, MaxIterationsOverride: null), "alice");
+
+        Assert.Equal(["created held", "linked", "released"], capturing.Steps);
+        Assert.NotNull(CrewSnapshot.Deserialize(capturing.LastSnapshotJson));
+    }
+
     // ── Fakes ─────────────────────────────────────────────────────────────
+
+    public class LinkRecorder : DispatchProxy
+    {
+        public List<string> Steps { get; set; } = [];
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name != nameof(IOrderRepository.LinkLegacyRunAsync))
+                throw new NotSupportedException(targetMethod?.Name);
+            Steps.Add("linked");
+            return Task.FromResult(Guid.NewGuid());
+        }
+    }
 
     private sealed class CapturingPersistenceService : IRunPersistenceService
     {
@@ -348,6 +379,7 @@ public sealed class RunServiceResumeTests
         public string?  LastSeedDraftText { get; private set; }
         public string?  LastSnapshotJson  { get; private set; }
         public RunKind? LastKind          { get; private set; }
+        public List<string> Steps         { get; } = [];
 
         public Task<Guid> CreateRunAsync(string briefingText, string configJson,
             string? createdByUser = null, string? crewTemplateName = null,
@@ -365,11 +397,16 @@ public sealed class RunServiceResumeTests
             LastSeedDraftText = seedDraftText;
             LastSnapshotJson  = crewSnapshotJson;
             LastKind          = kind;
+            Steps.Add(crewSnapshotJson is null ? "created held" : "created claimable");
             return Task.FromResult(Guid.NewGuid());
         }
 
         public Task UpdateSnapshotAsync(Guid runId, string snapshotJson, CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
+        {
+            LastSnapshotJson = snapshotJson;
+            Steps.Add("released");
+            return Task.CompletedTask;
+        }
 
         public Task MarkRunFailedAsync(Guid runId, string errorMessage, CancellationToken cancellationToken = default)
             => Task.CompletedTask;

@@ -3122,3 +3122,121 @@ unverändert; `Orders:Revise`, Recherche und Faktenprüfer werden nicht für all
 Ändern eines Ergebnisses ohne den Schnellknopf „Longer“ (der im Tor N′ eine Tatsache hinzufügte, D-075) als eigene kleine
 Etappe mit eigenem Vertrag und einer Nachtmessung – ohne sie kann ein Laie an einem Ergebnis nichts ändern. Danach R3 der
 Recherche mit größerer Menge (D-074). Beides nur nachts und mit Obergrenze.
+
+## D-078 — Restplan: alles bauen und freischalten; Paket 1 „Ändern für alle“ (2026-11-26)
+
+**Status:** beschlossen auf Auftrag des Betreibers. Paket 1 ist gebaut und wird ausgeschaltet ausgeliefert; eingeschaltet wird
+nach Tor N″ mit eigenem Commit (Zusatz zu diesem Eintrag).
+
+**Auftrag.** Der Betreiber hat beauftragt, die drei gebauten, aber ausgeschalteten Funktionen für alle einzuschalten – Ändern
+eines Ergebnisses, Internet-Recherche, Korrektur durch den Faktenprüfer – und die ungebauten Teile zu bauen: Gedächtnis, ein
+neues „Extra careful“ und den Rückbau des alten Wegs samt dem Teil Schleife von Etappe 1b. Ein Restplan legt fest, wie.
+
+**Verhältnis zu D-077.** Für diese Punkte ersetzt der Restplan die Auslöser von D-077; insoweit sind dessen Grenzen aufgehoben.
+Das betrifft: die Freischaltung von Ändern, Recherche und Faktenprüfer (jede erst nach ihrem eigenen Tor), Gedächtnis und
+„Extra careful“ (in den unten genannten kleinsten Formen) sowie den Rückbau (`Mcp:LegacyTools`, die älteren Werkzeuge und
+zuletzt das Löschen alter Tabellen, nur in den Stufen von Paket 8 und 9). Alle anderen Regeln von D-077 gelten weiter: keine
+gelöschten Zeilen echter Nutzer, kein `DROP` außer in Paket 9, keine Migrations-Baseline, Klärer- und Prüfer-Prompt bitgleich,
+außer wo ein Paket ausdrücklich eine neue Messung vorsieht (Paket 5), kein stilles Umleiten der älteren Einreich-Werkzeuge.
+
+**Restplan in Kurzform (Reihenfolge):**
+0. Vorbereitung: Sicherung, Abnahme des Wegs über claude.ai, ein gemeinsamer Messwächter für alle Messläufe.
+1. **Ändern für alle** ohne Knopf „Longer“ (unten).
+2. **Internet-Recherche für alle** nach einer größeren Messung (R3′) mit vorab bestimmter Toleranz für das Rauschen des Jurors;
+   verfehlt sie, wird Recherche nur ein Häkchen „Look things up on the web“ (Standard aus).
+3. **Faktenprüfer korrigiert den eindeutigen Fall:** Eine Zahl, die nirgends im Material steht, wird zur Lücke in eckigen
+   Klammern; die übrigen Meldungen stehen eingeklappt hinter einer Zeile mit ihrer Anzahl; das Ersatzmodell korrigiert nie.
+4. **Gedächtnis, kleinste Form:** Absender, Unterschrift, Anrede und Sprache einmal unter „About me“ angeben, mit einem Klick aus
+   dem Ergebnis; MCP `profile` bekommt Schreiben für dieselben Felder; streng je Konto.
+5. **Bedingt: leiserer Faktenprüfer** mit neuem Prüfauftrag, gemessen an einer zurückgehaltenen Hälfte; verfehlt er, bleibt der
+   alte Prüfer mit der eingeklappten Anzeige aus Paket 3.
+6. **Etappe 1b, Teil Schleife, kleinste Form:** beste statt letzter Fassung, an den Schreiber nur blockierende Befunde, Stopp nach
+   zwei Runden ohne Verbesserung – je ein Schalter, belegt durch Nachspiel gespeicherter Läufe.
+7. **Neues „Extra careful“:** Direktweg mit Gliederung gegen den Direktweg und gegen die entschärfte Schleife, blinder Juror;
+   ohne Sieger entfällt das Häkchen.
+8. **Rückbau des alten Wegs in vier umkehrbaren Stufen:** für Nicht-Admins abschalten, Übergang mit Team-Wahl für Admins im neuen
+   Weg, toter Code, dann der Rest.
+9. **Alte Tabellen löschen**, frühestens 30 Tage nach Stufe 8d und nach einem geprüften Rückspielen der Sicherung – der einzige
+   nicht umkehrbare Schritt.
+
+Jedes Paket hat einen eigenen Vertrag vor dem Bau (Kriterien, Trockenfall, Obergrenzen der Modellaufrufe; außerhalb dieses
+Repositorys), einen eigenen Zweig, ein Review, einen Deploy und eine Abnahme am echten Lauf; Schwellen werden nach Beginn einer
+Messung nicht geändert. Gestrichen: Migrations-Baseline, „Remember this?“, Stilvorlagen, Bibliothek, `DraftCollapseDetector`
+(außer Paket 7 verlangt ihn).
+
+**Paket 1 – Ändern für alle.** Tor N′ (D-075) scheiterte nur am Knopf „Longer“: Die Verlängerung fügte trotz „without adding new
+facts“ eine Tatsache hinzu. Gebaut in kleinster Form:
+- **Knopf „Longer“ entfällt** in Web und MCP. Angeboten werden Shorter, More formal, Friendlier, Simpler words. Eine Änderung mit
+  „Longer“ lehnt der Dienst ab, ohne einen Lauf anzulegen: „To make the text longer, tell the writer what to add.“ `revise_order`
+  mit `quick: ["longer"]` antwortet mit diesem Satz und dem Hinweis an den Client, die Person zu fragen und ihre Worte in `change`
+  zu übergeben; ist Ändern für das Konto aus, kommt sofort „Changing a text is not available yet.“. Der Enum-Wert bleibt, weil
+  gespeicherte Änderungen ihn nennen; sein fester Satz geht aber nie wieder an den Schreiber – er fehlt unter den früheren
+  Änderungen einer neuen Fassung, und „Resume“ einer Änderung, die nur ihn verlangte, wird abgelehnt.
+- **Hinweisfeld mit Beispiel:** „For example: The meeting is on 5 May, not 12 May. Or: Add that parking is free.“
+- **Wer Verlängern als Freitext verlangt, bekommt es.** Statt einer Wortliste gilt eine strukturelle Regel: Hat eine geänderte
+  Fassung mehr als 115 % der Wörter des Textes, den sie geändert hat (`Runs.SeedDraftText`, gezählt wie `Runs.WordCount`), steht
+  im Web über dem Text und in MCP im neuen Feld `lengthNotice` von `get_order_result`: „This version is noticeably longer than the
+  one before. Please check the new parts: the writer may have added things you did not ask for.“ Der Satz behauptet keine Herkunft,
+  weil der Code nur die Länge misst (auch eine verlangte Ergänzung kann ihn auslösen). Die Regel wird bei jeder Anzeige aus den gespeicherten
+  Texten berechnet, nicht gespeichert und nicht im Bericht; ältere gespeicherte Fassungen bekommen den Satz ebenso, alte
+  Berichte bleiben unberührt. Erste Fassungen und ohne Änderungswunsch fortgesetzte Läufe bekommen ihn nie; eine fortgesetzte Änderung zählt wie eine Änderung.
+- **Bitgleich** (Hash-Tests, festgehalten vor dem Bau): Satz `RevisionInstruction`, System-Prompt des Schreibers, Klärer-Prompt
+  und -Schema, Prüfer-Prompt und -Schema, die festen Sätze aller Schnellknöpfe. Die sechs in N′ bestandenen Fälle gelten weiter.
+- **Schalter:** `Orders:Revise` bleibt ausgeliefert `Off`. **Rückweg:** `Orders__Revise=Off`.
+
+**Freischaltbedingung Tor N″** (schließt die in D-075 als „vor dem Einschalten zu beobachten“ genannten Lücken): zwei frische
+Aufträge (deutsch, englisch), sechs Änderungen – eine Kette „Kürzen, danach ein Datum ersetzen“ (die Kürzung darf nicht erneut
+ausgeführt werden), eine Kette „Satz gegen eine Vorgabe des ersten Auftrags ergänzen, danach seinen Wert wieder ersetzen“, „Simpler
+words“ (nie gemessen) und „mach es länger“ als Freitext – sowie eine Probe `quick: longer` ohne Modellaufruf; ein blinder Prüfer
+mit zwei Kontrollpaaren wie in N′. Alle Schwellen sind vorab fest und an den gespeicherten Aufnahmen von N′ als erreichbar bei
+richtigem und reißend bei falschem Verhalten gezeigt. Folgen: Datenverlust oder ein fehlender fester Satz → Halt und Behebung;
+eine verfehlte Kette → eine Reparatur (der Schreiber bekommt nur noch die neueste Änderung), danach Einschalten mit einem festen
+Hinweis ab der dritten Fassung; „Simpler words“ verfehlt → auch dieser Knopf entfällt, der Rest wird eingeschaltet. Das Ergebnis
+folgt als Zusatz.
+
+## D-079 — Keine Websuche bei Aufträgen mit der Standard-Crew; Suchanfrage scheitert geschlossen (2026-11-26)
+
+**Status:** umgesetzt.
+
+**Kontext.** Zugesagt ist: Die Websuche ist für alle aus (`Research:Mode = Off`), ein Auftrag mit Dateien sucht nie, und
+Antworten und die Angaben unter „About me“ gehen nie in eine Suche. „Extra careful“ hielt das nicht ein. Es nutzt die
+Standard-Crew (`klassik`), und diese trägt die Grounding-Quelle `tavily-refined`, die kein Schalter steuerte: Jeder solche
+Auftrag schickte eine Suchanfrage an Tavily, auch mit angehängten Dateien. Die Anfrage bildete `LlmGroundingQueryExtractor` aus
+dem Auftragsteil des Briefings (seit E2 Fix 1 ohne Antworten und Profil); schlug dieser Modellaufruf fehl oder kam nichts zurück,
+ging der Anfang des Auftragstexts selbst (bis 400 Zeichen) an den Suchdienst.
+
+**Entscheidung.**
+- **Standardaufträge suchen nichts außerhalb.** Ein Lauf eines Auftrags mit der Standard-Crew – „Extra careful“ im Web oder über
+  MCP, `submit_request` ohne `crewTemplate`/`customCrew` (bei `Orders:LegacySubmitDefaultMode = Careful`) – behält nur die
+  Grounding-Quellen, die in Atelier bleiben: die Typen `vector-store`, `order-sources`, `learning-retrieval`, `static-context`,
+  `crew-catalog`, `tool-catalog`, `pack-catalog`, und keine davon über den Tool-Pfad (eine Erlaubnisliste, ein neuer Typ bleibt
+  also draußen, bis er aufgenommen wird). Web-, Nachrichten-, Wissenschafts-, REST-, URL- und Tool-Quellen fallen weg. Die Regel
+  wendet der Orchestrator auf jeden Lauf an, bevor die Pipeline gebaut wird (`StandardOrderWebSearch.ForRunAsync`); sie gilt damit
+  auch für fortgesetzte und wiederholte Läufe, deren gespeicherter Snapshot die Websuche noch nennt, und für einen fortgesetzten
+  Lauf, der noch nicht mit seinem Auftrag verknüpft ist (dann zählt der Auftrag des Laufs, den er fortsetzt). Gespeicherte
+  Snapshots werden nicht umgeschrieben.
+- **Was als Standard gilt:** Der Snapshot ist `klassik`, der Auftrag nennt kein Template, und für den Auftrag wurde keine Crew
+  zusammengestellt. Unverändert bleiben: ein bewusst genanntes Template (Werkstatt-Formular, `submit_request` mit `crewTemplate`,
+  auch `klassik`), eine eigene Crew (`customCrew`), eine zusammengestellte Crew (`submit_auto_crew_request`, Werkstatt „auto“)
+  und Läufe ohne Auftrag. Aufträge, die aus der Zeit vor den Aufträgen übernommen wurden, nennen kein Template; ihre Läufe gelten
+  als Standardaufträge, weil nicht mehr bekannt ist, ob das Template gewählt wurde.
+- **Suchanfrage scheitert geschlossen.** `IGroundingQueryExtractor` liefert `GroundingQuery.NotFormed`, wenn der Aufruf
+  fehlschlägt oder keine Anfrage zurückkommt; der `tavily`-Provider schickt dann nichts und scheitert, die Quelle wird zur
+  Laufwarnung `grounding.provider_skipped`. Der Extractor ist Pflicht; einen Weg ohne ihn gibt es nicht. Der Auftragstext ist nie
+  die Ersatzanfrage. Unverändert und nur über eine bewusst gewählte Crew erreichbar: Ein Profil mit `ExtractQuery=false` sowie die
+  Typen `news-search`, `academic-search`, `rest-api` und Tool-Quellen schicken den Auftragsteil des Briefings (nie Antworten oder
+  Profil) unverändert.
+- **Recherche des Direktwegs (`OrderResearchService`)** scheiterte schon geschlossen und bleibt unverändert: standardmäßig aus,
+  nie mit Dateien, nie bei „Extra careful“, nur Themen des Klärers passieren das Tor, kein Rohtext.
+
+**Ohne bewusste Wahl erreichbar?** Nicht über die Menüs. Das ältere Formular `/new` öffnet sich für alle Angemeldeten, die seine
+Adresse eingeben (D-077, 8a), und hat `klassik` vorausgewählt; ein dort gestarteter Lauf nennt sein Template und behält die
+Websuche. Dafür braucht es die Adresse, und es ist die Werkstatt; das gilt als Wahl.
+
+**Tests.** Ende-zu-Ende über die echte Verdrahtung mit aufgezeichneten HTTP-Anfragen (`CarefulOrderWebSearchEndToEndTests`):
+„Extra careful“ über MCP mit Angaben unter „About me“, ein sorgfältiger Web-Auftrag und `submit_request` ohne Template sowie ein
+fortgesetzter Lauf mit gespeichertem Snapshot schicken nichts an den Suchdienst und rufen keine Anfrageformung auf, während die
+Angaben unter „About me“ weiter beim Schreiber ankommen; `submit_request` mit `crewTemplate = klassik` sucht weiter, nur mit der
+gebildeten Anfrage; ohne gebildete Anfrage sucht es nichts und speichert die Warnung. Ohne diese Änderung scheitern alle diese
+Tests außer dem mit `crewTemplate`, der weiter sucht. Die Prüfung eines geklärten sorgfältigen Auftrags in `IntakePrivacyEndToEndTests` erwartet jetzt keine Suche.
+Datenbanktests für die Regel (`StandardOrderWebSearchTests`), Unit-Tests für Extractor und Provider.

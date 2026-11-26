@@ -10,9 +10,8 @@ public interface IGroundingQueryExtractor
 {
     /// <summary>
     /// Produces a focused search query for <paramref name="briefingText"/>.
-    /// Implementations must degrade gracefully: on any failure they return
-    /// <see cref="GroundingQuery.ShouldSearch"/> <c>= true</c> with the raw briefing
-    /// as the query, never throwing.
+    /// Implementations fail closed and never throw: on any failure, and when no query comes back, they return
+    /// <see cref="GroundingQuery.NotFormed"/>, so nothing is searched. The briefing itself is never the query.
     /// </summary>
     Task<GroundingQuery> ExtractAsync(string briefingText, CancellationToken ct);
 }
@@ -23,4 +22,12 @@ public interface IGroundingQueryExtractor
 /// in which case the provider should skip the external call entirely.
 /// </param>
 /// <param name="Query">The focused search query. Empty when <see cref="ShouldSearch"/> is <c>false</c>.</param>
-public sealed record GroundingQuery(bool ShouldSearch, string Query);
+/// <param name="Failed">
+/// <c>true</c> when no query could be formed (the call failed or returned nothing); then <see cref="ShouldSearch"/> is <c>false</c>
+/// as well, and the provider reports the source as skipped instead of searching.
+/// </param>
+public sealed record GroundingQuery(bool ShouldSearch, string Query, bool Failed = false)
+{
+    /// <summary>The outcome when no query could be formed: nothing is searched.</summary>
+    public static GroundingQuery NotFormed { get; } = new(ShouldSearch: false, Query: string.Empty, Failed: true);
+}

@@ -24,3 +24,20 @@ def _reset_failover_breaker():
     failover.reset()
     yield
     failover.reset()
+
+
+@pytest.fixture(autouse=True)
+def _no_real_alt_account(monkeypatch, tmp_path_factory):
+    """Keep the suite hermetic: inside the container a real second login lives under the default
+    ALT_HOME, which would add a chain member and extra model probes to every test. Tests that want
+    an alternative account point ALT_HOME at their own credentials file (fixture `alt_home`).
+    Also drops the per-account catalog state so no test sees another one's probe results."""
+    import claude_adapter
+    import failover
+
+    monkeypatch.setattr(failover, "ALT_HOME", str(tmp_path_factory.mktemp("no-alt") / "claude-alt"))
+    monkeypatch.setattr(claude_adapter, "_alt_model_cache", None)
+    monkeypatch.setattr(claude_adapter, "_alt_last_attempt_at", None)
+    monkeypatch.setattr(claude_adapter, "_not_in_plan_families", {})
+    monkeypatch.setattr(claude_adapter, "_family_probe", {})
+    monkeypatch.setattr(claude_adapter, "_alt_refresh_task", None)

@@ -89,7 +89,9 @@ public sealed record OrderView(
 /// <see cref="Version"/> while a change is being written or after it could not be finished); <see cref="EarlierOpenPoints"/> is what the
 /// writer noted for an earlier version that the shown version does not repeat. <see cref="AssumptionsVersion"/> is set when the shown
 /// version changed an earlier one: <see cref="Assumptions"/> and <see cref="NotGivenFacts"/> were noted for that version, before the person
-/// asked for changes, and a change may have settled or overtaken them.
+/// asked for changes, and a change may have settled or overtaken them. <see cref="LengthNotice"/> is
+/// <see cref="RevisionLines.LongerThanBefore"/> when the shown version changed an earlier one and became clearly longer than the text it
+/// changed (worked out from the stored texts, also for versions written before the rule existed), otherwise <c>null</c>.
 /// </summary>
 public sealed record OrderResult(
     Guid OrderId,
@@ -118,7 +120,8 @@ public sealed record OrderResult(
     IReadOnlyList<OrderSourceIssueNote>? SourceIssueNotes = null,
     int? LatestVersion = null,
     IReadOnlyList<OrderEarlierPoint>? EarlierOpenPoints = null,
-    int? AssumptionsVersion = null);
+    int? AssumptionsVersion = null,
+    string? LengthNotice = null);
 
 /// <summary>
 /// Something the writer noted for an earlier <see cref="Version"/> that the shown version does not repeat: an open point (also a fixed
