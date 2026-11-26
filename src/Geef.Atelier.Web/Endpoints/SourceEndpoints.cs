@@ -38,9 +38,9 @@ public static class SourceEndpoints
     /// <summary>Seconds in the <c>Retry-After</c> header when all upload slots are busy (HTTP 503).</summary>
     public const string BusyRetryAfterSeconds = "30";
 
-    private const string UnreadableReason = "The upload could not be read.";
-    private const string OutOfDateReason = "The page is out of date. Reload it and try again.";
-    private const string OneFileReason = "Send exactly one file per upload.";
+    internal const string UnreadableReason = "The upload could not be read.";
+    internal const string OutOfDateReason = "The page is out of date. Reload it and try again.";
+    internal const string OneFileReason = "Send exactly one file per upload.";
     private static readonly TimeSpan MinRateGracePeriod = TimeSpan.FromSeconds(10);
 
     /// <summary>JSON format of receipts and error answers.</summary>
@@ -102,9 +102,12 @@ public static class SourceEndpoints
         CancellationToken ct)
     {
         var opts = options.Value;
-        var tooLarge = string.Create(CultureInfo.InvariantCulture, $"The file is larger than {opts.MaxFileBytes / 1_048_576.0:0.#} MB.");
+        var tooLarge = TooLargeReason(opts);
         if (http.Request.ContentLength > RequestLimitBytes)
+        {
+            await CountTooLargeAsync(http, antiforgery, antiforgeryOptions.Value, currentUser, RefusalPath.Web, ct);
             return Reason(StatusCodes.Status413PayloadTooLarge, tooLarge);
+        }
 
         if (antiforgeryOptions.Value.HeaderName is not { } tokenHeader || !http.Request.Headers.ContainsKey(tokenHeader))
             return Reason(StatusCodes.Status400BadRequest, OutOfDateReason);
@@ -141,7 +144,7 @@ public static class SourceEndpoints
             return Reason(StatusCodes.Status400BadRequest, OneFileReason);
 
         var fileName = HeaderUtilities.RemoveQuotes(disposition.FileNameStar.HasValue ? disposition.FileNameStar : disposition.FileName).Value ?? string.Empty;
-        var receipt = await intake.IntakeAsync(new SourceUpload(fileName, section.ContentType, 0, section.Body), username, SourceOrigin.WebUpload, ct);
+        var receipt = await intake.IntakeAsync(new SourceUpload(fileName, section.ContentType, 0, section.Body), username, SourceOrigin.WebUpload, ct, RefusalPath.Web);
 
         switch (receipt.Refusal)
         {
@@ -174,7 +177,36 @@ public static class SourceEndpoints
         return Results.Json(receipt, JsonOptions, statusCode: StatusCodes.Status201Created);
     }
 
-    private static string? MultipartBoundary(HttpRequest request)
+    internal static string TooLargeReason(SourceOptions options) =>
+        string.Create(CultureInfo.InvariantCulture, $"The file is larger than {options.MaxFileBytes / 1_048_576.0:0.#} MB.");
+
+    internal static async Task CountTooLargeAsync(
+        HttpContext http,
+        IAntiforgery antiforgery,
+        AntiforgeryOptions antiforgeryOptions,
+        ICurrentUserService currentUser,
+        RefusalPath path,
+        CancellationToken ct)
+    {
+        if (http.RequestServices.GetService<ISourceRefusalLog>() is not { } refusals
+            || antiforgeryOptions.HeaderName is not { } tokenHeader
+            || !http.Request.Headers.ContainsKey(tokenHeader)
+            || await CheckWriteAsync(http, antiforgery) is not null
+            || !currentUser.TryGetOwnUsername(out var username))
+            return;
+
+        try
+        {
+            await refusals.RecordAsync(new SourceRefusalRecord(username, path, SourceRefusalCodes.TooLarge, null, null, null, http.Request.ContentLength), ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            http.RequestServices.GetService<ILoggerFactory>()?.CreateLogger(typeof(SourceEndpoints))
+                .LogWarning("A refused upload could not be counted ({Error}).", ex.GetType().Name);
+        }
+    }
+
+    internal static string? MultipartBoundary(HttpRequest request)
     {
         if (!MediaTypeHeaderValue.TryParse(request.ContentType, out var mediaType)
             || !mediaType.MediaType.Equals("multipart/form-data", StringComparison.OrdinalIgnoreCase))
@@ -183,7 +215,7 @@ public static class SourceEndpoints
         return string.IsNullOrWhiteSpace(boundary) || boundary.Length > 200 ? null : boundary;
     }
 
-    private static async Task<(MultipartSection? Section, ContentDispositionHeaderValue? Disposition)> NextFileAsync(MultipartReader reader, CancellationToken ct)
+    internal static async Task<(MultipartSection? Section, ContentDispositionHeaderValue? Disposition)> NextFileAsync(MultipartReader reader, CancellationToken ct)
     {
         while (await reader.ReadNextSectionAsync(ct) is { } section)
         {
@@ -206,7 +238,7 @@ public static class SourceEndpoints
         }
     }
 
-    private static void RequireMinimumRate(HttpContext http, int bytesPerSecond)
+    internal static void RequireMinimumRate(HttpContext http, int bytesPerSecond)
     {
         if (bytesPerSecond <= 0 || http.Features.Get<IHttpMinRequestBodyDataRateFeature>() is not { } rate)
             return;
@@ -221,7 +253,7 @@ public static class SourceEndpoints
         }
     }
 
-    private static async Task<IResult?> CheckWriteAsync(HttpContext http, IAntiforgery antiforgery)
+    internal static async Task<IResult?> CheckWriteAsync(HttpContext http, IAntiforgery antiforgery)
     {
         if (!OriginMatchesHost(http.Request))
             return Reason(StatusCodes.Status400BadRequest, "The request came from another site.");

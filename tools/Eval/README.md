@@ -139,7 +139,9 @@ und beliebig vielen `# Anhang: name.md`.
 cd tools/Eval && python3 -m pytest -q
 ```
 
-Die Tests laufen vollständig offline mit Attrappen; kein Test ruft ein Modell auf.
+Die Tests laufen vollständig offline mit Attrappen; kein Test ruft ein Modell auf. Ausnahme auf Wunsch:
+`tests/test_upload_check_postgres.py` prüft die Abfragen von `upload_check` gegen ein echtes, **wegwerfbares** Postgres
+(Containername in `EVAL_PG_TEST_CONTAINER`, Anleitung im Kopf der Datei); ohne die Variable wird er übersprungen.
 
 ## Klärer-Korpus (`geef_eval/intake_corpus.py`)
 
@@ -510,3 +512,80 @@ ist nicht auswertbar.
 - **V-MCP:** alle `get_order_status` mit `waitSeconds=50` ≤ 55 s ohne Fehler → 50 s bleibt (Rückgabe 0); Fehler oder > 55 s bei
   einem langen Aufruf → `Orders:MaxWaitSeconds` 25 s (Rückgabe 1). Nicht auswertbar (4) ohne langen Aufruf, wenn keiner
   mindestens 45 s wartete (der lange Aufruf wurde nicht geprüft), bei Fehlern oder fehlenden Ergebnissen anderer Aufrufe.
+
+## Etappe 6: Upload-Ticket, Tore T-A2 bis T-A5 (`geef_eval/upload_check.py`)
+
+Das Werkzeug lädt nie selbst hoch, startet keinen Auftrag und ruft kein Modell auf. Es erzeugt synthetische Testdateien,
+merkt sich Zeitfenster, liest Mitschnitte und mitgeschnittene Antworten und fragt die Datenbank **nur lesend** ab
+(`PGOPTIONS=-c default_transaction_read_only=on` und zusätzlich `BEGIN TRANSACTION READ ONLY … ROLLBACK`, über
+`docker exec <container> psql`; Container aus `--container` oder `EVAL_PG_CONTAINER`, Benutzer und Datenbank aus der Umgebung des
+Containers). Prüfsummen werden in der Abfrage verglichen; keine Abfrage liefert Dateinamen, Nutzernamen, Hashes oder Inhalte.
+Bildschirm und `upload-gates.json` enthalten nur Zählungen und ja/nein. Alle Verzeichnisse (Testdateien, Mitschnitte, Antworten,
+Bericht) liegen außerhalb jedes Git-Baums, sonst Abbruch mit Rückgabe 2. Mitschnitte enthalten den Einmal-Token und Dateiinhalt:
+nicht weitergeben.
+
+### Ablauf
+
+```bash
+cd tools/Eval
+D=~/.local/state/geef-eval/e6-tore                       # außerhalb von Git
+python3 -m geef_eval.upload_check generate --out-dir $D   # Testdateien, files.json, plan-vorlage.json
+```
+
+`generate` schreibt je Lauf neue Dateien (eigene Kennung im Inhalt, also nie eine Dublette eines früheren Uploads):
+
+| Schlüssel in `files.json` | Datei | wofür |
+|---|---|---|
+| `s1` | Text-PDF, 24 Seiten, > 200 KB, Markersätze auf erster und letzter Seite (`markers`) | T-A2 S1 |
+| `s2` | DOCX mit denselben Markersätzen | T-A2 S2 |
+| `page` | kleines Text-PDF | T-A3 (Upload-Seite) |
+| `scan` | PDF nur mit Bildern, ohne Textebene | T-A4 |
+| `png` | PNG | T-A5 (Web) |
+| `placeholder` | Platzhaltertext; `attachments` nennt die fertige JSON-Datei für das Argument `attachments` | T-A5 (MCP-Anhang) |
+| `size` | Markdown; `declared_bytes` = echte Größe + 100 für `prepare_attachment(sizeBytes)` | T-A5 (falsche Größe) |
+
+1. **T-A2:** je Sitzung `claude -p "Fasse die angehängte Datei zusammen: <Pfad>" --output-format stream-json --verbose
+   --mcp-config <Konfiguration mit Token aus der Umgebung> > $D/s1-stream.jsonl` (S2 ebenso mit der DOCX, danach `cancel_order`).
+   S1 erst auswerten, wenn ein Lauf des Auftrags fertig ist (vorher ist die Schreiber-Prüfung `fehlt`).
+2. **T-A3:** `prepare_attachment` (Messkonto), die Datei `page` über `/u/<id>` im Chromium ablegen, `submit_order(uploadIds)`,
+   dann `cancel_order`. Mitschneiden: `document.documentElement.outerHTML` der fertigen Seite (`t-a3-done.html`), dieselbe Seite
+   als zweites Konto (`t-a3-foreign.html`, **erste Zeile** `<!-- url: <location.href> -->`, also
+   `'<!-- url: ' + location.href + ' -->\n' + document.documentElement.outerHTML`) und die Antwort von `submit_order` des zweiten
+   Kontos mit der Id (`t-a3-foreign-submit.txt`, Text der Antwort oder Fehlermeldung).
+3. **T-A4:** `python3 -m geef_eval.upload_check mark --gate T-A4 --at start --out-dir $D`, dann zwei Tickets anlegen; die Datei
+   `scan` per Token (`curl … -w '\n%{http_code}\n' > $D/t-a4-token.txt`) und über die Seite hochladen (Antwort des
+   `POST …/page` über CDP im selben Format: Rumpf, letzte Zeile Statuscode, `t-a4-page.txt`), danach `mark --gate T-A4 --at end`.
+4. **T-A5:** `mark --gate T-A5 --at start`; PNG über die Startseite (Antwort von `POST /api/sources` als `t-a5-png.txt`),
+   Platzhalter über `attachments` (Fehlertext als `t-a5-placeholder.txt`), `prepare_attachment(sizeBytes=declared_bytes)` und
+   die Datei `size` per Token (`t-a5-size.txt`); dann `mark --gate T-A5 --at end`. Die Fenster von T-A4 und T-A5 dürfen sich nicht
+   überlappen; in ihnen darf sonst nichts hochgeladen werden.
+5. `plan-vorlage.json` nach `plan.json` kopieren, Upload-Ids eintragen (relative Pfade gelten ab dem Planordner), dann
+
+```bash
+python3 -m geef_eval.upload_check evaluate --plan $D/plan.json --out-dir $D [--gate T-A4 …]
+```
+
+Hilfsbefehle: `compare --file <datei> --upload-id <id>` (SHA-256 gleich: ja/nein) und `largest-base64 --transcript <datei>`.
+
+### Schwellen (Vertrag 10, wörtlich) und was das Werkzeug zusätzlich verlangt
+
+| Tor | Vertrag | zusätzlich (jeweils strenger) |
+|---|---|---|
+| T-A2 | je Sitzung (a) `prepare_attachment` aufgerufen, (b) `curl` mit 201, (c) `submit_order` mit `uploadIds`, (d) `Sources.Sha256` = lokale SHA-256, (e) größtes `contentBase64` ≤ 1 KB; S1: `RunSourceUsages` Ziel `writer`, `FullText`, `CharsIncluded` = `CharCount`; 2/2 | (b) zählt nur eine Antwort mit Upload-Id, `sha256` und brauchbarer Quittung; (d) auch Ticket `Used`, Quelle desselben Besitzers, Herkunft `McpAttachment`, `sha256` der curl-Antwort = lokal; (f) Auftrag mit der Quelle verknüpft (K1); `contentBase64` wird in allen Werkzeugaufrufen gesucht, auch in JSON-Zeichenketten und Shell-Befehlen |
+| T-A3 | (a) Seite zeigt Quittung und „Done …“, (b) `Sources.Sha256` gleich, (c) zweites Konto: Seite „Not found“, `submit_order` → „not found“ | (b) Herkunft `WebUpload` (über die Seite, nicht per curl); (c) das Seitenabbild nennt in der ersten Zeile seine Adresse, und die ist `/u/<Upload-Id des Plans>` (ohne Adresse `fehlt`, mit anderer `nein`); die Seite des zweiten Kontos zeigt weder Dateinamen noch einen Satz der Upload-Seite, kein Auftrag einer anderen Person verknüpft die Quelle |
+| T-A4 | beide 422 mit dem Satz aus `PdfSourceExtractor.NoTextReason`; 0 neue `Sources`; genau 2 Zählzeilen `pdf_no_text` (`mcp_ticket`, `upload_page`) | beide Antworten nennen die Upload-Id ihres Tickets aus dem Plan (`uploadId`); Tickets ohne Quelle und nicht `Used`, mit mindestens einem geprüften Versuch und `LastRefusalCode` = `pdf_no_text` (ein unberührtes Ticket besteht nicht); Zeilen mit Endung `pdf`; jede Spalte von `SourceRefusals` stammt aus Vertrag 7.1, jeder Wert aus seinem Wortschatz, keiner enthält einen Dateinamen |
+| T-A5 | `SourceRefusals` seit Torbeginn = genau die erwarteten Zeilen (Code, Weg); keine Spalte enthält einen Dateinamen | die drei Antworten sind die erwarteten Ablehnungen (422 und Satz bzw. Satz des Parsers), die Antwort zur falschen Größe nennt die Upload-Id des Plans; Ticket der falschen Größe ohne Quelle, mit geprüftem Versuch und `LastRefusalCode` = `size_mismatch`; 0 neue `Sources`; Endungen `png`, `txt`, `md`; Spalten und Wortschatz wie T-A4 |
+
+Zeilen jeder Person zählen (eine fremde Ablehnung im Fenster lässt das Tor scheitern). **Nie bestanden ohne Daten:** fehlt ein
+Planeintrag, eine Datei der verlangten Art, ein vollständiger Mitschnitt (mit Ergebniszeile), eine Antwort mit Statuszeile, eine
+Marke oder eine Datenbankzeile, ist das Kriterium `fehlt` und das Tor nicht auswertbar; ein Ticket in zwei Toren ebenso. Ein
+verfehltes Kriterium (`nein`) macht das Tor `failed`, auch wenn anderswo Daten fehlen; davon abhängige Kriterien stehen auf `folgt`.
+
+**Folgen:** T-A2 nur bei (a)/(b)/(c)/(e) verfehlt → eine Runde an den Sätzen 5.5, dann zwei neue Sitzungen (Kappe 4); (d), (f)
+oder Schreiber-Prüfung verfehlt → Halt, Schalter `Off`; T-A3/T-A4/T-A5 verfehlt → Halt, Schalter `Off`; alle vier bestanden →
+eigener Commit `Uploads:Tickets=On`. Rückgabe 0 bestanden, 1 verfehlt, 2 falscher Aufruf oder Plan, 3 Datenbankabfrage
+gescheitert, 4 nicht auswertbar.
+
+**Trockenfall:** `tests/upload_world.py` baut einen vollständigen, korrekten Durchlauf aller vier Tore aus synthetischen Daten;
+`tests/test_upload_check.py` belegt, dass er besteht, dass jedes einzelne Fehlverhalten sein Tor verfehlen lässt und dass ohne
+Daten kein Tor besteht. Die Sätze, Codes und Wege sind gegen die C#-Konstanten geprüft (Drift-Test).

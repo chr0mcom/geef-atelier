@@ -4980,3 +4980,141 @@ textarea.form-control {
   .order-change .question-option { flex: 0 1 auto; }
   .order-version-actions .order-download-menu { min-width: 0; width: max-content; max-width: calc(100vw - 48px); }
 }
+
+/* ============================================================
+   Upload page (/u/{id}) — one file for the person's AI assistant
+   ============================================================ */
+.upload-page {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 48px 32px 80px;
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.upload-title {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 36px;
+  letter-spacing: -0.014em;
+  line-height: 1.15;
+  margin: 0;
+}
+.upload-intro {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  max-width: 60ch;
+}
+.upload-file-name {
+  color: var(--ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.upload-drop {
+  position: relative;
+  border: 2px dashed var(--hairline-strong);
+  border-radius: 16px;
+  background: var(--surface);
+  transition: border-color .18s, background .18s;
+}
+.upload-drop[hidden] { display: none; }
+.upload-drop:hover,
+.upload-drop.is-dragging {
+  border-color: var(--hero);
+  background: var(--hero-soft);
+}
+.upload-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.upload-drop-label {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 44px 24px;
+  text-align: center;
+  cursor: pointer;
+  min-height: 200px;
+  align-content: center;
+}
+.upload-file-input:focus-visible + .upload-drop-label { outline: 2px solid var(--hero); outline-offset: 4px; border-radius: 14px; }
+.upload-drop-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: var(--hero);
+  color: var(--on-hero);
+}
+.upload-drop-text { display: grid; gap: 4px; min-width: 0; }
+.upload-drop-action {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--hero);
+  text-underline-offset: 4px;
+}
+.upload-drop-or { font-size: 15px; color: var(--ink-2); }
+.upload-drop-hint { font-size: 13px; color: var(--ink-3); margin-top: 6px; }
+.upload-drop-off { margin: 0; padding: 0 24px 20px; font-size: 13px; color: var(--ink-3); text-align: center; }
+
+.upload-state {
+  --upload-tone: var(--hairline-strong);
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 14px;
+  align-items: start;
+  padding: 18px 20px;
+  border: 1px solid color-mix(in oklch, var(--upload-tone) 55%, var(--hairline));
+  border-left-width: 4px;
+  border-left-color: var(--upload-tone);
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--upload-tone) 9%, var(--surface));
+  min-width: 0;
+}
+.upload-state-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 2px solid var(--upload-tone);
+  color: var(--upload-tone);
+  font-weight: 700;
+  font-size: 17px;
+  line-height: 1;
+}
+.upload-state-body { display: grid; gap: 10px; min-width: 0; justify-items: start; }
+.upload-state-line { margin: 0; font-size: 16px; line-height: 1.5; color: var(--ink); overflow-wrap: anywhere; }
+.upload-progress { width: 100%; height: 8px; accent-color: var(--hero); }
+
+.upload-state--done { --upload-tone: var(--st-completed); }
+.upload-state--done .upload-state-mark { background: var(--st-completed); color: var(--bg); }
+.upload-state--done .upload-state-line { font-weight: 600; }
+.upload-state--used { --upload-tone: var(--sv-info); }
+.upload-state--expired, .upload-state--failed { --upload-tone: var(--sv-major); }
+.upload-state--expired .upload-state-mark, .upload-state--failed .upload-state-mark { border-style: dashed; }
+.upload-state--problem { --upload-tone: var(--sv-critical); }
+.upload-state--busy { --upload-tone: var(--st-running); }
+.upload-state--busy .upload-state-mark { animation: order-pulse 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .upload-state--busy .upload-state-mark { animation: none; } }
+
+.upload-notice { margin: 0; font-size: 14px; color: var(--sv-major); }
+.upload-receipt .source-card-remove { display: none; }
+.upload-receipt .source-card-name { overflow-wrap: anywhere; min-width: 0; }
+
+@media (max-width: 640px) {
+  .upload-page { padding: 28px 16px 64px; gap: 16px; }
+  .upload-title { font-size: 28px; }
+  .upload-drop-label { padding: 32px 16px; min-height: 180px; }
+  .upload-state { grid-template-columns: 32px 1fr; padding: 16px; gap: 12px; }
+}

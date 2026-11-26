@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Geef.Atelier.Application.Auth;
 using Geef.Atelier.Application.Runs;
+using Geef.Atelier.Application.Sources;
 using Geef.Atelier.Core.Domain.Orders;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
@@ -18,6 +19,7 @@ public static class SubmitAutoCrewRequestTool
         "The tool returns immediately after the composition run is queued; both runs are visible in /runs.")]
     public static async Task<AutoCrewRunStatusDto> SubmitAutoCrewRequest(
         IRunService runService,
+        ISourceRefusalLog refusals,
         ICurrentUserService currentUser,
         [Description("The briefing text describing the task for the AI crew.")] string briefingText,
         [Description("Optional JSON configuration object. Defaults to '{}'.")] string? configJson = null,
@@ -25,7 +27,7 @@ public static class SubmitAutoCrewRequestTool
         [Description("Optional attachments as a JSON array: [{\"filename\":\"report.md\",\"contentType\":\"text/plain\",\"contentBase64\":\"...\"}]. Supported content types: text/markdown, text/plain, application/pdf.")] string? attachments = null,
         CancellationToken cancellationToken = default)
     {
-        var attachmentInputs = ToLegacyAttachments(McpAttachmentParser.Parse(attachments));
+        var attachmentInputs = ToLegacyAttachments(await refusals.ParseAttachmentsAsync(attachments, currentUser.Username));
 
         var runId = await runService.SubmitRunAsync(
             new SubmitRunRequest(

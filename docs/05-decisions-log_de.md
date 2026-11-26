@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-24 (Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
+*Letzte Aktualisierung: 2026-11-26 (D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -2825,3 +2825,196 @@ insgesamt. Nicht gemessen blieben „Simpler words“; der Stopp gilt aus der er
 
 **Stand der Etappe 5:** ausgeliefert sind die Zitat-Anzeige (Teil A), der vollständige MCP-Vertrag (Tor M und 50-Sekunden-Aufruf
 bestanden) und Nachbessern hinter ausgeschaltetem Schalter. Nicht geprüft: claude.ai als MCP-Client.
+
+## D-076 — Etappe 6: Dateien über MCP (Upload-Ticket) und Ablehnungszählung (2026-11-26)
+
+**Status:** integriert, nicht ausgeliefert. Ausgeliefert wird mit `Uploads:Tickets = Off`; eingeschaltet wird erst nach dem
+Deploy per Umgebung für die Tore T-A2 bis T-A5, und erst wenn alle bestanden sind, folgt ein eigener Commit
+`Uploads:Tickets = On`. Das Sicherheits-Review (Tor T-A1) ist bestanden: 0 kritisch, 0 hoch, 1 mittel (ob ein Modell die
+Quoting-Regel befolgt, ist ungemessen; das wird in T-A2 mit einem Dateinamen mit Apostroph und Leerzeichen gemessen), 8 niedrig
+(Umgang unter „Korrekturrunde nach T-A1“ und „Entscheidungen“). Kein Prompt geändert
+(Klärer, Prüfer, Verdichter samt Schema und System-Prompt des Schreibers bitgleich, Hash-Tests grün). Keine neuen Pakete.
+
+**Leitsatz.** Eine Datei, die die Person ihrem KI-Assistenten gibt, kommt Byte für Byte an – oder der Assistent bekommt eine
+Meldung, die den richtigen Weg nennt. Nichts wird abgetippt, nichts still verloren, und Ablehnungen werden gezählt, wo eine Person
+zuzuordnen ist; welche Fälle nicht gezählt werden, steht unter „Zählung“.
+
+**Bedarf.** Base64 in einem Werkzeugargument muss ein Modell Zeichen für Zeichen ausgeben; das bricht schon bei einigen Dutzend
+Kilobyte ab, und claude.ai reicht Dateien aus dem Chat nicht an Connectoren weiter. Die bisherige Nutzung passt dazu. Abgelehnte
+Dateien hinterließen
+keine Zeile, MCP-Ablehnungen (JSON-RPC-Antwort mit Status 200) waren damit unsichtbar. Entwurfsregel: Der Token steht nie in
+einer Adresse oder Query, weil Adressen in Logs landen können.
+
+**Einteilung.** Gebaut: Upload-Ticket (`prepare_attachment`, Token-Upload, Upload-Seite, `uploadIds`), Ablehnungszählung,
+Aufräumen. Später, jeweils mit Auslöser aus der Zählung (≥ 3 Ablehnungen von ≥ 2 Konten außerhalb der Messkonten in 60 Tagen):
+E-Mail-Dateien (`eml`/`msg`; `.eml` dann über MimeKit aus MailKit), Tabellen (`xlsx`, dann über `DocumentFormat.OpenXml`;
+`ExcelDataReader` gestrichen), Scans und Bilder (OCR, `pdf_no_text` oder Bild-Endungen; braucht eine asynchrone Quittung),
+`add_text_document` (Ablehnungen `mcp_placeholder`/`mcp_base64_invalid`), Größendeckel für Base64-Anhänge
+(`mcp_type_mismatch`/`unreadable`). Gestrichen: Bibliothek und „immer mitgeben“ (keine Wiederverwendung im Bestand; Stilvorlagen
+kommen mit dem Gedächtnis), Rollen je Datei änderbar, Volume ins Backup (Originale werden nach der Extraktion nie gelesen, der Text
+liegt in der gesicherten Datenbank), Pflicht-Prüfsumme im Ticket (die Antwort nennt `sha256`). Die Namensliste der Messkonten
+für die Auslöser-Abfrage steht nur in der Betriebskonfiguration, nie im Repository.
+
+**Regeln**
+- **`prepare_attachment(fileName, sizeBytes?)`** (nur bei `On`): Name getrimmt, 1–255 Zeichen, nur Anzeige und Endung, über
+  `SourceFileNames` bereinigt (je Unicode-Zeichen, also auch unsichtbare Tag-Zeichen ab U+E0000 und Richtungssteuerzeichen
+  entfernt; Umlaute und Emojis bleiben), nie Teil eines Pfads. `sizeBytes` über `Sources:MaxFileBytes` wird sofort abgelehnt und
+  als `too_large` auf dem Weg `mcp_ticket` gezählt, sonst ist er Obergrenze und Sollwert. Kontingent je Person: höchstens 10 offene Tickets und 50 in 24 Stunden (Zählen und Anlegen unter einer
+  Sperre je Person). Antwort `{uploadId, curlCommand, uploadPage, tokenExpiresAt, pageExpiresAt, maxBytes, next}`. Der Token
+  (32 Zufallsbytes, base64url) wird einmal ausgegeben und nur als SHA-256 gespeichert, gilt 15 Minuten und steht nur im Kopf
+  `X-Upload-Token`. Der Befehl ist
+  `curl --fail-with-body -sS --globoff -T '<path to the file>' -H 'X-Upload-Token: <token>' <OAuth:Issuer>/api/uploads/<uploadId>`;
+  er enthält außer Token und Adresse nichts Veränderliches, insbesondere nie den Dateinamen. `--globoff` ist nötig, weil `curl`
+  bei `-T` sonst `{}` und `[]` im Pfad als Muster auswertet. Beschreibung, `next` und Server-Hinweis verlangen, den Pfad in
+  einfache Anführungszeichen zu setzen; enthält er ein Anführungszeichen, einen Zeilenumbruch oder ein anderes ungewöhnliches
+  Zeichen, soll der Assistent den Namen nicht in einen Befehl schreiben, sondern in **einem** Shell-Befehl die Datei mit einem
+  Muster nur aus Buchstaben, Ziffern und `/ . - _ *` (ein `*` statt jedes anderen Zeichens) unter einem schlichten Namen in ein
+  frisches Verzeichnis kopieren, die Kopie hochladen und das Verzeichnis entfernen:
+  `d=$(mktemp -d) && cp -- <pattern> "$d/upload" && <curlCommand>; rm -rf "$d"`. In `<curlCommand>` tritt `"$d/upload"` mit den
+  doppelten Anführungszeichen an die Stelle von `'<path to the file>'`; in einfachen Anführungszeichen würde `$d` nicht ersetzt,
+  und in einem zweiten Befehl wäre `$d` leer. Sonst den Link verwenden. Die Upload-Seite `/u/<uploadId>` enthält kein Geheimnis, gilt
+  24 Stunden und nur nach Anmeldung als dieselbe Person.
+- **Token-Upload `PUT /api/uploads/{id}`:** einziger Ausweis ist der Kopf; Cookies werden nicht gelesen, kein CORS, also kein
+  CSRF. Anspruch in einer Anweisung (`Open → Receiving`); unbekannt, falscher Token, abgelaufen, benutzt und fremd antworten
+  einheitlich `404`; ein laufender Upload desselben Tickets `409`. Aufnahme über dieselbe Erkennung, Extraktion im Kindprozess
+  und dieselben Kontingente wie die Weboberfläche, Herkunft `McpAttachment`. Größe ≠ angekündigt → `size_mismatch`, nichts
+  gespeichert. Brauchbar → `201` mit Quittung, `uploadId`, `sha256` und `next`. Die Antwort liest ein KI-Assistent; sie enthält
+  deshalb weder den Anfang des Textes noch den Dateinamen.
+- **Versuche:** Ein Versuch zählt nur, wenn die Datei wirklich geprüft und abgelehnt wurde; dann bleibt das Ticket offen bis
+  3 Versuche, danach `Failed`, und der Code der letzten Ablehnung steht in `UploadTickets.LastRefusalCode`. Zu viele gleichzeitige
+  Uploads (`user_busy`), Überlast (`busy`), Abbruch (`interrupted`), Speicherfehler (`save_failed`), nicht verfügbare Extraktion
+  (`unavailable`), volles Kontingent (`quota`), Zeitgrenze, abgebrochene Anfrage und Serverfehler geben den Versuch zurück.
+  `next` sagt nach einer geprüften Ablehnung, dass der Assistent der Person den Grund wörtlich sagen und dieselbe Datei nicht
+  erneut hochladen soll, nach einer ungeprüften, dass es kein Problem der Datei war. Bei `quota` und `unavailable` sagt `next`
+  zusätzlich, dass sofortiges Wiederholen nicht hilft, und was hilft (Kontingent: erst den Auftrag mit den schon angekommenen
+  Dateien senden oder später, wenn nie benutzte Dateien automatisch gelöscht sind; nicht verfügbar: später, bei Dauer ein
+  Administrator), jeweils mit neuem `prepare_attachment`, falls der Link bis dahin abgelaufen ist.
+- **Zu lang für diesen Weg:** Eine Datei, die zu lang ist, um ganz verwendet zu werden (die Weboberfläche würde nach Seiten
+  fragen), ist auf dem Ticketweg nicht brauchbar: `422` mit eigenem Satz (kürzere Datei, oder den Auftrag in der Web-App starten
+  und dort Seiten wählen), Code `too_long_for_ticket`, nichts gespeichert (eine schon vorhandene gleiche Datei bleibt). Scheitert
+  das Löschen der Kopie, endet der Satz nicht mit „Nothing was stored.“, sondern sagt, dass die Datei vorerst gespeichert bleiben
+  kann und so keinem Auftrag hinzugefügt wird. Die Seite fragt nie nach Seiten.
+- **Upload-Seite:** angemeldete Seite mit genau einem Ablagefeld; fremde und unbekannte Tickets sehen gleich aus („Not found“).
+  `POST /api/uploads/{id}/page` prüft Cookie, Antiforgery-Kopf und `Origin` wie `/api/sources`, Herkunft `WebUpload`, ohne
+  Größenvergleich (die Person wählt die Datei selbst). Ein Ticket, dessen Versuche alle durch abgelehnte Dateien verbraucht sind,
+  heißt dort nicht „abgelaufen“, sondern hat einen eigenen Satz.
+- **`submit_order(…, uploadIds?)`:** nur angekommene Dateien der angemeldeten Person, alles oder nichts; zusammen mit
+  `attachments` höchstens 10 Dateien. „no longer stored“ nur für eine Datei, die angekommen war und gelöscht wurde. Für ein Ticket
+  ohne brauchbare Datei: „No usable file arrived for upload {id}.“ mit dem Grund der letzten geprüften Ablehnung, wenn es einen
+  gibt (aus dem gespeicherten Code, nie aus der Datei), sonst mit dem Rat, ein neues Ticket anzulegen; ist das Ticket noch offen,
+  zusätzlich der Link. Sind mehrere Dateien zusammen zu lang, nennt die Ablehnung bei `On` keinen Seitenweg, sondern die Web-App.
+  Bei `Off` fehlt `uploadIds` im Schema; ein trotzdem gesendeter Wert wird abgelehnt. Bei `On` widerspricht kein Text dem
+  Dateiweg: Schritt 1 der Server-Hinweise und die Beschreibung von `submit_order` sagen, dass Dateien zuerst mit
+  `prepare_attachment` hochgeladen werden; `attachments` nur für sehr kleine Textdateien. Bei `Off` bitgleich (Hash-Tests).
+- **Zählung (`SourceRefusals`, ohne Schalter):** jede unbrauchbare Quittung der Aufnahme auf allen Wegen, die 413-Vorabprüfung
+  von `/api/sources` und der Seite (nur mit gültigem Antiforgery-Kopf), jede Ablehnung der Anhangsprüfung von MCP und
+  `size_mismatch`. Gespeichert werden Zeit, Person, Weg (`web`, `mcp_inline`, `mcp_ticket`, `upload_page`), fester Code, erkannte
+  Art, Endung (`[a-z0-9]`, ≤ 8), angegebener Typ (nur `typ/untertyp`, ≤ 100) und Größe – nie Dateiname, Vorschau, Inhalt oder
+  Hash. Zusätzlich zu den Codes des Vertrags `pdf_encrypted`, `unavailable` (Serverfehler, nicht die Schuld der Datei) und
+  `too_long_for_ticket`; dazu die Ablehnung über `sizeBytes` bei `prepare_attachment`. **Nicht gezählt** werden: ein Token-Upload
+  über der Anfragegrenze (`413` vor dem Anspruch, keine Person zuzuordnen), ein ungültiger Token (`404`), eine Datei, die die
+  Upload-Seite schon im Browser abweist (über 25 MB, nie gesendet), ein Upload, der an der Zeitgrenze endet oder abgebrochen wird
+  (keine Quittung), und technische `400` (veraltete Seite, kein Multipart). `too_large` ist damit untererfasst. Ein Zählfehler
+  ändert nie die Antwort. Aufbewahrung 180 Tage. Auswertungsabfrage in `08-crew-system_de.md`.
+- **Aufräumen:** hängende `Receiving` nach `Sources:UploadTimeout` + 1 Minute zurück auf `Open` bzw. `Failed` – im stündlichen
+  Lauf und, wenn das Ticket vorher wieder benutzt wird (Seite, Token- oder Seiten-Upload), sofort bei diesem Zugriff mit derselben
+  Frist; der Versuch bleibt dabei gezählt (eine Datei, die den Prozess abstürzen lässt, kann nicht endlos wiederholt werden).
+  Tickets 7 Tage nach Ablauf der Seite gelöscht; Zählzeilen nach 180 Tagen.
+
+**Bei der Integration geschlossen.** Die ersten vier Punkte sind je mit einem Test über die echte Verdrahtung belegt und per
+Gegenprobe geprüft (alle vier Behebungen zurückgenommen: die Tests wurden rot); der fünfte nicht.
+- **Dateinamen in der Shell.** Der erzeugte Befehl läuft unverändert mit dem echten `curl` gegen den echten Kestrel-Server, auch
+  für Pfade mit Leerzeichen, Anführungszeichen, Umlauten, führendem Bindestrich, `$`, Backticks, Zeilenumbruch, `{}` und `[]`;
+  kein Teil eines Namens wird ausgeführt. Ohne `--globoff` kamen Dateien mit `{}` oder `[]` nicht an.
+- **Token in Logs.** Das MCP-SDK schreibt jede gesendete und empfangene Nachricht vollständig auf Trace – mit Token, Auftragstext
+  und Base64-Dateien. `McpMessageLogGuard` verwirft Trace-Zeilen der SDK-Kategorien unabhängig von der Logging-Konfiguration.
+  Belegt bei allen Kategorien auf Trace: Der Token steht in keiner Logzeile, keiner Antwort (auch nicht in Fehlerantworten),
+  keiner Adresse und keiner Tabellenzeile.
+- **Aufräumen gegen laufenden Upload.** Jeder Anspruch läuft in einer Anfrage mit Zeitgrenze `UploadTimeout` (Empfang,
+  Warteschlange und Extraktion zusammen); ein hängender Upload endet damit lange vor der Frist des Aufräumens (Test mit
+  gestocktem Rumpf). Zusätzlich schließen Abschluss und Freigabe nur den eigenen Anspruch (gleiches `ReceivingSince`): Ein Upload,
+  den das Aufräumen doch zurückgesetzt hat, kann einen neueren Anspruch desselben Tickets weder mit seiner Datei abschließen noch
+  wieder öffnen. Seine eigene Datei bleibt dann als ungebundene Quelle und wird nach 24 Stunden aufgeräumt.
+- **Schalter aus.** Die Upload-Endpunkte werden nicht gemappt, und die Seite `/u/{id}` wird vor der Anmeldung aus der Anfrage
+  genommen. Die Adressen antworten damit genau wie Adressen, die es nie gab (`GET` 404; auf `PUT` und `POST` an unbekannte
+  Adressen antwortet die Anwendung wie bisher 405), angemeldet wie anonym. Vorher leitete `/u/{id}` zur Anmeldung um bzw. zeigte „Not found“
+  mit Status 200. Werkzeugliste, Server-Hinweise und alle Anhang-Meldungen sind bei `Off` bitgleich zu Etappe 5 (Hash- und
+  Wortlaut-Tests).
+- **Messwerkzeug.** Eine einmalige, nicht versionierte Probe ließ `upload_check.py` gegen die echte Ausgabe des Testhosts laufen
+  (echtes `curl`, echte Upload-Seite im Browser, echte Tabellen über die SQL-Abfragen des Werkzeugs): alle vier Tore bestanden.
+  Das ist kein dauerhafter Test und war nicht Teil der Gegenprobe; die Mitschnitte von Claude Code waren aus den echten Antworten
+  zusammengesetzt, das Modellverhalten misst erst T-A2. Dauerhaft belegt sind die SQL-Abfragen gegen ein Wegwerf-Postgres
+  (`tests/test_upload_check_postgres.py`) und der Trockenfall aus synthetischen Daten.
+
+**Korrekturrunde nach den Prüfberichten** (Sicherheit und Funktion, je mit Test, der ohne die Korrektur rot ist)
+- Versuche zählen nur für geprüfte Dateien (siehe „Versuche“); belegt mit parallelen Uploads über Postgres und über die echte
+  Verdrahtung.
+- Pfad und Shell: die Quoting-Regel oben; ein Test führt den empfohlenen Kopierweg mit dem echten `sh` für feindliche Namen aus
+  (`'`, `"`, `$( )`, Backticks, `;`, Zeilenumbruch, Emoji, Richtungssteuerzeichen): kein Namensteil wird ausgeführt, die Bytes
+  kommen an; passt das Muster auf zwei Dateien, scheitert `cp`, und nichts wird hochgeladen.
+- Antwort des Token-Uploads ohne Vorschau und Dateiname; `next` auch nach Ablehnung.
+- Ehrliche Sätze in `submit_order` für nie angekommene Dateien; eigener Zustand der Seite für verbrauchte Tickets.
+- Dateinamen über Unicode-Zeichen statt über UTF-16-Einheiten bereinigt.
+- Zu lange Dateien auf dem Ticketweg abgelehnt; kein Text fordert ein Seitenfeld, das es dort nicht gibt.
+- Texte unterscheiden Transportfehler (Link an die Person) von abgelehnter Datei (Grund wörtlich weitergeben, nicht erneut
+  hochladen), auch bei `422` mit `curl --fail-with-body`.
+- Hängendes `Receiving` wird beim nächsten Zugriff freigegeben.
+- Zählweg `web` über die echte Verdrahtung belegt.
+- `upload_check.py`: T-A3 (c) verlangt, dass das Seitenabbild des zweiten Kontos seine Adresse nennt und diese `/u/<Upload-Id>`
+  ist; T-A4/T-A5 verlangen, dass die 422-Antworten die Upload-Id des Plans nennen und das Ticket einen geprüften, abgelehnten
+  Versuch mit dem erwarteten Code zeigt. Kein Tor wurde lockerer.
+
+**Korrekturrunde nach T-A1** (je mit Test, der ohne die Korrektur rot ist; per Gegenprobe geprüft)
+- Kopierweg (B4): Kopie und Upload ausdrücklich in **einem** Shell-Befehl, mit vollständiger Vorlage und dem Platzhalter
+  `"$d/upload"` in doppelten Anführungszeichen (siehe Regeln). Ein Test baut genau diesen Befehl aus der Beschreibung und führt ihn
+  mit dem echten `curl` gegen den echten Kestrel-Server abwechselnd in `sh` und `bash` für feindliche Namen aus: die Bytes kommen
+  an, kein Namensteil wird ausgeführt, das Verzeichnis ist danach weg. Ein zweiter Test zeigt, dass Kopie und Upload in zwei
+  Befehlen oder `'$d/upload'` in einfachen Anführungszeichen nichts hochladen und das Ticket offen bleibt.
+- Volles Kontingent und nicht verfügbare Extraktion (B3): eigener `next` ohne „run curlCommand again“ (siehe Versuche).
+- „Nothing was stored.“ (B6) nur, wenn das Löschen der zu langen Datei gelang (siehe „Zu lang für diesen Weg“); belegt für ein
+  Löschen, das mit einer Ausnahme scheitert, und für eines, das die Datei als benutzt meldet.
+- Dieser Eintrag (B8): Ergebnis von T-A1 statt „steht aus“, keine Angaben zur Nutzung der Produktion.
+
+**Schalter:** `Uploads:Tickets` (`Off|On`, ein globaler Schalter ohne Übersteuerung je Person, weil Werkzeugliste und
+Server-Hinweise einmal beim Start gebaut werden). Ein Wechsel braucht das Neuerstellen des Containers.
+
+**Step53** (`20261130120000_Step53Uploads`): zwei neue Tabellen `UploadTickets` (mit `LastRefusalCode`, nur ein Code) und
+`SourceRefusals` samt Indizes, FK `SourceId → Sources` mit `ON DELETE SET NULL`; rein additiv und idempotent, `Sources`
+unverändert, kein neuer `SourceOrigin`.
+
+**Entscheidungen.** Ein Deploy für Ticket, Seite und Zählung; Token im Kopf; Token 15 Minuten, Seite 24 Stunden mit Anmeldung;
+„einmalig“ heißt einmal erfolgreich, bis zu 3 geprüfte Versuche; `submit_order` alles oder nichts; ältere Werkzeuge
+(`submit_request`, `submit_auto_crew_request`) behalten den bisherigen Ausweg, weil sie keine `uploadIds` annehmen.
+
+Nach T-A1 bewusst nicht geändert:
+- **Ungeprüfte Versuche und Zählzeilen ohne Deckel (B2).** Ein abgebrochener Upload gibt den Versuch zurück und schreibt eine
+  Zählzeile; ebenso ein volles Kontingent, das erst nach der Extraktion auffällt. Begrenzt ist das durch zwei Plätze je Person,
+  die Zeitgrenze je Anfrage und die Fristen (Token 15 Minuten, Seite 24 Stunden); der Web-Upload erlaubt angemeldeten Personen
+  dasselbe, neu ist nur die Menge der Zählzeilen (auch bei `Off`). Zählzeilen je Konto und Tag werden beobachtet und bei Bedarf
+  gedeckelt.
+- **Was `submit_order` über eine angekommene Datei meldet (B5, Berichtigung des Vertrags).** Der Vertrag sagte, `submit_order`
+  zeige Name, Größe und Vorschau. Tatsächlich nennt die Quittung je Datei den bereinigten Dateinamen, die Seitenzahl (nur PDF),
+  die Zeichenzahl, die Lesequalität und die Warnungen – keine Größe, keine Vorschau, keine Prüfsumme. Auf dem Token-Weg ist der
+  Name der, den der Assistent bei `prepare_attachment` selbst angegeben hat. Ein fremder Upload mit gestohlenem Token fällt also
+  nur an Seiten, Zeichen oder Qualität auf und auf der Seite der Person („This file has already arrived“). Er braucht einen Token
+  aus einem geteilten Verlauf binnen 15 Minuten; mit `sizeBytes` wird zusätzlich nur eine Datei genau dieser Größe angenommen.
+- **`upload_check` bindet Zählzeilen nicht an das Messkonto (B7).** Kein Tor kann ohne echte Daten bestehen: Leere oder fehlende
+  Belege ergeben „fehlt“, „nein“ oder „not_evaluable“. Die Lücke wirkt eher als falsches Scheitern: Eine Ablehnung eines anderen
+  Kontos im Messfenster kann T-A4/T-A5 scheitern lassen; dann wird der Lauf wiederholt. Vor dem Lauf werden alte Ausgaben
+  gelöscht, und alle Tore werden zusammen ausgewertet.
+
+**Restrisiken**
+- Den Pfad setzt der KI-Client in den Befehl ein. Der Befehl selbst enthält nichts Fremdes, und die Texte sagen, wie zu quoten
+  ist und was bei ungewöhnlichen Namen zu tun ist; dass der empfohlene Weg sicher ist, belegt ein Test. Ob ein Modell den Texten
+  folgt, ist noch ungemessen (T-A1, mittel); vor `On` wird es in T-A2 mit einem Dateinamen mit Apostroph und Leerzeichen
+  gemessen. Ein Fehlgriff endet dort in einem Shell-Fehler. Unter Windows-PowerShell ist `curl` ein anderer Befehl; dann bleibt
+  der Link.
+- Der Token steht im Verlauf des Assistenten (gewollt: 15 Minuten, einmal erfolgreich, nur ins Konto der Person; ein zweiter
+  Upload bekommt 404; was die Quittung in `submit_order` über die Datei nennt, steht unter „Entscheidungen“, B5).
+- Ungeprüfte Versuche sind nicht begrenzt; ein Upload, der immer wieder an der Überlast scheitert, kann innerhalb der
+  Token-Frist (15 Minuten) bzw. der Seitenfrist (24 Stunden) wiederholt werden. Die Kosten begrenzen die vorhandenen Plätze je
+  Person und die Zeitgrenze je Anfrage.
+- claude.ai ist nicht geprüft (Einladung an den Betreiber).
+
+**Rückweg:** Schalter `Off` per Umgebung (sofort). Code: vorheriges Image; Step53 ist additiv, der alte Code liest `Sources`
+unverändert. Über Tickets hochgeladene Quellen bleiben normale Quellen.

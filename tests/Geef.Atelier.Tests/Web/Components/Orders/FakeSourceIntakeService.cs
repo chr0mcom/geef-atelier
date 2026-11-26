@@ -16,7 +16,7 @@ internal sealed class FakeSourceIntakeService : ISourceIntakeService
         return receipt;
     }
 
-    public Task<SourceReceipt> IntakeAsync(SourceUpload upload, string ownerUsername, SourceOrigin origin, CancellationToken ct = default) =>
+    public Task<SourceReceipt> IntakeAsync(SourceUpload upload, string ownerUsername, SourceOrigin origin, CancellationToken ct = default, RefusalPath path = RefusalPath.Web) =>
         Task.FromResult(Add(ownerUsername, OrderReceipts.Usable(upload.FileName)));
 
     public Task<SourceReceipt> IntakeTextAsync(string title, string text, string ownerUsername, SourceOrigin origin, CancellationToken ct = default) =>

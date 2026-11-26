@@ -26,7 +26,7 @@
             <ul class="source-card-warnings" data-testid="source-card-warnings">
                 @foreach (var warning in receipt.Warnings)
                 {
-                    <li data-testid="source-card-warning" data-code="@warning.Code">@warning.ToPlainText(receipt.PageCount is not null)</li>
+                    <li data-testid="source-card-warning" data-code="@warning.Code">@warning.ToPlainText(AskForPages && receipt.PageCount is not null)</li>
                 }
             </ul>
         }

@@ -1,6 +1,7 @@
 using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Orders;
+using Geef.Atelier.Core.Domain.Sources;
 using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Mcp.Tools;
 using ModelContextProtocol;
@@ -11,11 +12,12 @@ public sealed class SubmitAutoCrewRequestToolTests
 {
     private readonly CapturingRunService _runs = new();
     private readonly FakeUser _alice = new("alice");
+    private readonly FakeRefusalLog _refusals = new();
 
     [Fact]
     public async Task The_old_path_marks_its_run_as_coming_from_mcp()
     {
-        var dto = await SubmitAutoCrewRequestTool.SubmitAutoCrewRequest(_runs, _alice, "Write a short note.");
+        var dto = await SubmitAutoCrewRequestTool.SubmitAutoCrewRequest(_runs, _refusals, _alice, "Write a short note.");
 
         var request = Assert.Single(_runs.Requests);
         Assert.Equal(OrderEntry.Mcp, request.Entry);
@@ -30,7 +32,7 @@ public sealed class SubmitAutoCrewRequestToolTests
     {
         var json = Attachments.Json(("offer.pdf", "application/pdf", Attachments.MinimalPdf));
 
-        await SubmitAutoCrewRequestTool.SubmitAutoCrewRequest(_runs, _alice, "Summarise the offer.", attachments: json);
+        await SubmitAutoCrewRequestTool.SubmitAutoCrewRequest(_runs, _refusals, _alice, "Summarise the offer.", attachments: json);
 
         var attachment = Assert.Single(Assert.Single(_runs.Requests).Attachments!);
         Assert.Equal("offer.pdf", attachment.Filename);
@@ -43,8 +45,8 @@ public sealed class SubmitAutoCrewRequestToolTests
     {
         var json = Attachments.Text("full.md", "See attached full version.", "text/markdown");
 
-        await Assert.ThrowsAsync<McpException>(() =>
-            SubmitAutoCrewRequestTool.SubmitAutoCrewRequest(_runs, _alice, "Summarise it.", attachments: json));
+        await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitAutoCrewRequestTool.SubmitAutoCrewRequest(_runs, _refusals, _alice, "Summarise it.", attachments: json));
 
         Assert.Empty(_runs.Requests);
     }
@@ -54,11 +56,25 @@ public sealed class SubmitAutoCrewRequestToolTests
     {
         var json = Attachments.Json(("letter.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", Attachments.MinimalDocx));
 
-        var ex = await Assert.ThrowsAsync<McpException>(() =>
-            SubmitAutoCrewRequestTool.SubmitAutoCrewRequest(_runs, _alice, "Summarise it.", attachments: json));
+        var ex = await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitAutoCrewRequestTool.SubmitAutoCrewRequest(_runs, _refusals, _alice, "Summarise it.", attachments: json));
 
         Assert.Contains("submit_order", ex.Message);
         Assert.Empty(_runs.Requests);
+    }
+
+    [Fact]
+    public async Task A_rejected_attachment_is_counted_once_with_the_unchanged_message()
+    {
+        var c = RefusalCase.Named("type");
+
+        var ex = await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitAutoCrewRequestTool.SubmitAutoCrewRequest(_runs, _refusals, _alice, "Summarise it.", attachments: c.Json));
+
+        Assert.Equal(c.MessageStart + McpAttachmentRefusalTests.OffWay, ex.Message);
+        var record = Assert.Single(_refusals.Records);
+        Assert.Equal(("alice", RefusalPath.McpInline, SourceRefusalCodes.McpUnsupportedType, "image/png"),
+            (record.OwnerUsername, record.Path, record.Code, record.DeclaredType));
     }
 
     private sealed class CapturingRunService : IRunService

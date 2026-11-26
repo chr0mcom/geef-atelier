@@ -6,16 +6,31 @@ namespace Geef.Atelier.Mcp;
 /// <summary>Instructions the server sends to MCP clients during initialization (<c>McpServerOptions.ServerInstructions</c>).</summary>
 public static class McpServerInstructions
 {
-    /// <summary>The instructions; <c>{0}</c> is the longest wait of <c>get_order_status</c> (<c>Orders:MaxWaitSeconds</c>).</summary>
-    public const string TextFormat =
-        "Atelier writes finished texts for people (letters, emails, articles, summaries, reports) from their request and their files.\n" +
-        "1. Start with submit_order. Pass the person's request word for word, as they wrote or said it. Do not write your own version of the order, " +
-        "and do not summarise, translate, shorten or expand it.\n" +
+    private const string Intro =
+        "Atelier writes finished texts for people (letters, emails, articles, summaries, reports) from their request and their files.\n";
+
+    private const string RequestWordForWord =
+        "Pass the person's request word for word, as they wrote or said it. Do not write your own version of the order, " +
+        "and do not summarise, translate, shorten or expand it.\n";
+
+    private const string StartLines = Intro + "1. Start with submit_order. " + RequestWordForWord;
+
+    /// <summary>Step 1 while <c>Uploads:Tickets</c> is <c>On</c>: files are uploaded before <c>submit_order</c>, because an order cannot get files later.</summary>
+    public const string TicketStartStep =
+        "1. Send the order with submit_order. If the person gave you files, first upload each one with prepare_attachment as step 2 says and then pass their uploadIds " +
+        "to submit_order; files cannot be added to an order later. ";
+
+    private const string TicketStartLines = Intro + TicketStartStep + RequestWordForWord;
+
+    /// <summary>Step 2 of <see cref="TextFormat"/> while <c>Uploads:Tickets</c> is <c>Off</c>: files only as Base64 in <c>attachments</c>.</summary>
+    public const string AttachmentFilesStep =
         "2. Files go only into the attachments parameter, with the complete original file as Base64 and the matching contentType " +
         "(PDF, Word, Markdown or plain text). Never send a placeholder, a file name, a summary or shortened content instead of a file, " +
         "and never paste file content into the request. The server rejects attachments that look like placeholders, contain Base64 encoded twice, " +
         "or whose content does not match the contentType. If a file is too large to pass as an argument, ask the person to start the order " +
-        "in the Atelier web app and add the file there.\n" +
+        "in the Atelier web app and add the file there.\n";
+
+    private const string LaterSteps =
         "3. Atelier may answer with state needs_input and at most three short questions, each with answer options. Ask the person these questions, " +
         "keep the answer options, and tell them that skipping is fine. Answer a question yourself only if the answer is certain from this conversation; " +
         "then set origin to \"client\". Answers from the person get origin \"user\". Never guess an answer. " +
@@ -49,6 +64,24 @@ public static class McpServerInstructions
         "in the Atelier web app; it cannot be changed here, only by the person under About me.\n" +
         "8. Do not invent anything: if the person did not ask for something or did not give a file or a fact, do not add it.";
 
+    /// <summary>The instructions; <c>{0}</c> is the longest wait of <c>get_order_status</c> (<c>Orders:MaxWaitSeconds</c>).</summary>
+    public const string TextFormat = StartLines + AttachmentFilesStep + LaterSteps;
+
+    /// <summary>The instructions while <c>Uploads:Tickets</c> is <c>On</c>: <see cref="TextFormat"/> with <see cref="TicketStartStep"/> as step 1 and <see cref="TicketFilesStep"/> as step 2.</summary>
+    public const string TicketTextFormat = TicketStartLines + TicketFilesStep + LaterSteps;
+
+    /// <summary>Step 2 of <see cref="TextFormat"/> while <c>Uploads:Tickets</c> is <c>On</c>; it replaces the step about attachments.</summary>
+    public const string TicketFilesStep =
+        "2. For each file the person gives you, call prepare_attachment. If you can run shell commands and read the file, upload it with its curlCommand, " +
+        "with the path quoted for the shell as prepare_attachment describes. If the answer has usable false, the file was refused: tell the person its reason " +
+        "word for word and do not ask them to upload the same file again. If you cannot run the command, or it fails without an answer from Atelier, " +
+        "give the person its uploadPage link word for word and wait until they say it is done. " +
+        "Then call submit_order with the uploadIds. Say that a file has arrived only when an answer from Atelier shows it. " +
+        "Only very small text files (a few kilobytes) may go into " +
+        "attachments as Base64 instead. Never send a placeholder, a file name, a summary or shortened content instead of a file, " +
+        "and never paste file content into the request. The server rejects attachments that look like placeholders, contain Base64 encoded twice, " +
+        "or whose content does not match the contentType.\n";
+
     /// <summary>The line about the older tools, added while <see cref="McpOptions.LegacyTools"/> is true.</summary>
     public const string LegacyLine =
         "\nThe other tools (such as submit_request, get_run_status and get_run_result) are the older interface and remain available for now; " +
@@ -57,7 +90,10 @@ public static class McpServerInstructions
     /// <summary>The instructions with the defaults of <see cref="OrderOptions.MaxWaitSeconds"/> and <see cref="McpOptions.LegacyTools"/>; the server uses <see cref="For"/> with the configured values.</summary>
     public static string Text { get; } = For(new OrderOptions().MaxWaitSeconds, new McpOptions().LegacyTools);
 
-    /// <summary>The instructions for the longest wait <paramref name="maxWaitSeconds"/>, with the line about the older tools when <paramref name="legacyTools"/> is true.</summary>
-    public static string For(int maxWaitSeconds, bool legacyTools) =>
-        string.Format(CultureInfo.InvariantCulture, TextFormat, Math.Max(0, maxWaitSeconds)) + (legacyTools ? LegacyLine : string.Empty);
+    /// <summary>
+    /// The instructions for the longest wait <paramref name="maxWaitSeconds"/>, with the line about the older tools when
+    /// <paramref name="legacyTools"/> is true and with <see cref="TicketFilesStep"/> as step 2 when <paramref name="tickets"/> is true.
+    /// </summary>
+    public static string For(int maxWaitSeconds, bool legacyTools, bool tickets = false) =>
+        string.Format(CultureInfo.InvariantCulture, tickets ? TicketTextFormat : TextFormat, Math.Max(0, maxWaitSeconds)) + (legacyTools ? LegacyLine : string.Empty);
 }

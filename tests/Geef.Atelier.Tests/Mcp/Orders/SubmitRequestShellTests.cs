@@ -14,6 +14,7 @@ public sealed class SubmitRequestShellTests
     private readonly FakeOrderService _orders = new();
     private readonly FakeSourceIntake _intake = new();
     private readonly FakeUser _admin = new("admin", isAdmin: true);
+    private readonly FakeRefusalLog _refusals = new();
 
     [Fact]
     public async Task Without_template_it_creates_a_direct_order_without_questions_and_returns_run_and_order()
@@ -22,7 +23,7 @@ public sealed class SubmitRequestShellTests
         var runId = Guid.NewGuid();
         _orders.OnSubmit = _ => new OrderSubmission(orderId, OrderDisplayState.Queued, runId, []);
 
-        var dto = await SubmitRequestTool.SubmitRequest(_orders, _intake, _admin, OrderToolTestData.Options(), Briefing);
+        var dto = await SubmitRequestTool.SubmitRequest(_orders, _intake, _refusals, _admin, OrderToolTestData.Options(), Briefing);
 
         var submitted = Assert.Single(_orders.Submitted);
         Assert.Equal(Briefing, submitted.RequestText);
@@ -42,7 +43,7 @@ public sealed class SubmitRequestShellTests
     [Fact]
     public async Task The_default_mode_follows_the_switch()
     {
-        await SubmitRequestTool.SubmitRequest(_orders, _intake, _admin, OrderToolTestData.Options(legacyMode: OrderMode.Careful), Briefing);
+        await SubmitRequestTool.SubmitRequest(_orders, _intake, _refusals, _admin, OrderToolTestData.Options(legacyMode: OrderMode.Careful), Briefing);
 
         var submitted = Assert.Single(_orders.Submitted);
         Assert.Equal(OrderMode.Careful, submitted.Mode);
@@ -52,7 +53,7 @@ public sealed class SubmitRequestShellTests
     [Fact]
     public async Task With_template_it_creates_a_careful_order_with_that_template()
     {
-        await SubmitRequestTool.SubmitRequest(_orders, _intake, _admin, OrderToolTestData.Options(), Briefing, crewTemplate: "klassik");
+        await SubmitRequestTool.SubmitRequest(_orders, _intake, _refusals, _admin, OrderToolTestData.Options(), Briefing, crewTemplate: "klassik");
 
         var submitted = Assert.Single(_orders.Submitted);
         Assert.Equal(OrderMode.Careful, submitted.Mode);
@@ -72,7 +73,7 @@ public sealed class SubmitRequestShellTests
             }
             """;
 
-        await SubmitRequestTool.SubmitRequest(_orders, _intake, _admin, OrderToolTestData.Options(), Briefing, crewTemplate: "klassik", customCrew: json);
+        await SubmitRequestTool.SubmitRequest(_orders, _intake, _refusals, _admin, OrderToolTestData.Options(), Briefing, crewTemplate: "klassik", customCrew: json);
 
         var submitted = Assert.Single(_orders.Submitted);
         Assert.Equal(OrderMode.Careful, submitted.Mode);
@@ -84,7 +85,7 @@ public sealed class SubmitRequestShellTests
     [Fact]
     public async Task A_custom_crew_without_reviewer_list_gets_an_empty_list()
     {
-        await SubmitRequestTool.SubmitRequest(_orders, _intake, _admin, OrderToolTestData.Options(), Briefing,
+        await SubmitRequestTool.SubmitRequest(_orders, _intake, _refusals, _admin, OrderToolTestData.Options(), Briefing,
             customCrew: """{"executorProfileName":"default-executor"}""");
 
         Assert.Empty(Assert.Single(_orders.Submitted).CustomCrew!.ReviewerProfileNames);
@@ -95,8 +96,8 @@ public sealed class SubmitRequestShellTests
     [InlineData("""{"executorProfileName": "default-executor",""")]
     public async Task Broken_custom_crew_json_is_reported_instead_of_ignored(string customCrew)
     {
-        var ex = await Assert.ThrowsAsync<McpException>(() =>
-            SubmitRequestTool.SubmitRequest(_orders, _intake, _admin, OrderToolTestData.Options(), Briefing, crewTemplate: "klassik", customCrew: customCrew));
+        var ex = await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitRequestTool.SubmitRequest(_orders, _intake, _refusals, _admin, OrderToolTestData.Options(), Briefing, crewTemplate: "klassik", customCrew: customCrew));
 
         Assert.Contains("customCrew is not valid JSON", ex.Message);
         Assert.Empty(_orders.Submitted);
@@ -108,8 +109,8 @@ public sealed class SubmitRequestShellTests
     [InlineData("""{"reviewerProfileNames":["briefing-fidelity"]}""")]
     public async Task A_custom_crew_without_executor_is_rejected(string customCrew)
     {
-        var ex = await Assert.ThrowsAsync<McpException>(() =>
-            SubmitRequestTool.SubmitRequest(_orders, _intake, _admin, OrderToolTestData.Options(), Briefing, customCrew: customCrew));
+        var ex = await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitRequestTool.SubmitRequest(_orders, _intake, _refusals, _admin, OrderToolTestData.Options(), Briefing, customCrew: customCrew));
 
         Assert.Contains("executorProfileName", ex.Message);
         Assert.Empty(_orders.Submitted);
@@ -118,10 +119,10 @@ public sealed class SubmitRequestShellTests
     [Fact]
     public async Task Invalid_config_json_is_rejected_and_valid_config_json_is_accepted()
     {
-        await Assert.ThrowsAsync<McpException>(() =>
-            SubmitRequestTool.SubmitRequest(_orders, _intake, _admin, OrderToolTestData.Options(), Briefing, configJson: "{broken"));
+        await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitRequestTool.SubmitRequest(_orders, _intake, _refusals, _admin, OrderToolTestData.Options(), Briefing, configJson: "{broken"));
 
-        await SubmitRequestTool.SubmitRequest(_orders, _intake, _admin, OrderToolTestData.Options(), Briefing, configJson: """{"tone":"formal"}""");
+        await SubmitRequestTool.SubmitRequest(_orders, _intake, _refusals, _admin, OrderToolTestData.Options(), Briefing, configJson: """{"tone":"formal"}""");
         Assert.Single(_orders.Submitted);
     }
 
@@ -132,7 +133,7 @@ public sealed class SubmitRequestShellTests
             ("a.txt", "text/plain", "The first file has enough text."u8.ToArray()),
             ("b.pdf", "application/pdf", Attachments.MinimalPdf));
 
-        await SubmitRequestTool.SubmitRequest(_orders, _intake, _admin, OrderToolTestData.Options(), Briefing, attachments: json);
+        await SubmitRequestTool.SubmitRequest(_orders, _intake, _refusals, _admin, OrderToolTestData.Options(), Briefing, attachments: json);
 
         Assert.Equal(["a.txt", "b.pdf"], _intake.Intakes.Select(i => i.FileName));
         Assert.All(_intake.Intakes, i => Assert.Equal(SourceOrigin.McpAttachment, i.Origin));
@@ -146,7 +147,7 @@ public sealed class SubmitRequestShellTests
     [InlineData("[]")]
     public async Task Without_attachments_nothing_is_read(string? attachments)
     {
-        await SubmitRequestTool.SubmitRequest(_orders, _intake, _admin, OrderToolTestData.Options(), Briefing, attachments: attachments);
+        await SubmitRequestTool.SubmitRequest(_orders, _intake, _refusals, _admin, OrderToolTestData.Options(), Briefing, attachments: attachments);
 
         Assert.Empty(_intake.Intakes);
         Assert.Empty(Assert.Single(_orders.Submitted).Sources!);
@@ -158,8 +159,8 @@ public sealed class SubmitRequestShellTests
         _intake.UnusableReasons["scan.pdf"] = "The PDF is encrypted";
         var json = Attachments.Json(("scan.pdf", "application/pdf", Attachments.MinimalPdf));
 
-        var ex = await Assert.ThrowsAsync<McpException>(() =>
-            SubmitRequestTool.SubmitRequest(_orders, _intake, _admin, OrderToolTestData.Options(), Briefing, attachments: json));
+        var ex = await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitRequestTool.SubmitRequest(_orders, _intake, _refusals, _admin, OrderToolTestData.Options(), Briefing, attachments: json));
 
         Assert.Contains("'scan.pdf' cannot be used: The PDF is encrypted.", ex.Message);
         Assert.Empty(_orders.Submitted);
@@ -172,8 +173,8 @@ public sealed class SubmitRequestShellTests
     [InlineData("""[{"filename":"data.bin","contentType":"application/octet-stream","contentBase64":"YmluYXJ5IGRhdGE="}]""", "application/octet-stream")]
     public async Task Malformed_attachments_are_reported_with_a_readable_message(string attachments, string expected)
     {
-        var ex = await Assert.ThrowsAsync<McpException>(() =>
-            SubmitRequestTool.SubmitRequest(_orders, _intake, _admin, OrderToolTestData.Options(), Briefing, attachments: attachments));
+        var ex = await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitRequestTool.SubmitRequest(_orders, _intake, _refusals, _admin, OrderToolTestData.Options(), Briefing, attachments: attachments));
 
         Assert.Contains(expected, ex.Message);
         Assert.Empty(_intake.Intakes);
@@ -184,8 +185,8 @@ public sealed class SubmitRequestShellTests
     {
         _orders.SubmitException = new OrderSubmissionException("You can attach at most 10 files.");
 
-        var ex = await Assert.ThrowsAsync<McpException>(() =>
-            SubmitRequestTool.SubmitRequest(_orders, _intake, _admin, OrderToolTestData.Options(), Briefing));
+        var ex = await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitRequestTool.SubmitRequest(_orders, _intake, _refusals, _admin, OrderToolTestData.Options(), Briefing));
 
         Assert.Equal("You can attach at most 10 files.", ex.Message);
     }
@@ -196,8 +197,8 @@ public sealed class SubmitRequestShellTests
         var orderId = Guid.NewGuid();
         _orders.OnSubmit = _ => new OrderSubmission(orderId, OrderDisplayState.NeedsInput, null, []);
 
-        var ex = await Assert.ThrowsAsync<McpException>(() =>
-            SubmitRequestTool.SubmitRequest(_orders, _intake, _admin, OrderToolTestData.Options(), Briefing));
+        var ex = await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitRequestTool.SubmitRequest(_orders, _intake, _refusals, _admin, OrderToolTestData.Options(), Briefing));
 
         Assert.Contains(orderId.ToString(), ex.Message);
         Assert.Contains("get_order_status", ex.Message);
@@ -208,8 +209,8 @@ public sealed class SubmitRequestShellTests
     [InlineData("  ")]
     public async Task An_empty_briefing_is_rejected(string briefing)
     {
-        await Assert.ThrowsAsync<McpException>(() =>
-            SubmitRequestTool.SubmitRequest(_orders, _intake, _admin, OrderToolTestData.Options(), briefing));
+        await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitRequestTool.SubmitRequest(_orders, _intake, _refusals, _admin, OrderToolTestData.Options(), briefing));
 
         Assert.Empty(_orders.Submitted);
     }

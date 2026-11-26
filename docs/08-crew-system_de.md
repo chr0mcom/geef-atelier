@@ -2,7 +2,7 @@
 
 *[English](08-crew-system.md) · **Deutsch***
 
-Letzte Aktualisierung: 2026-11-25 (D-075 Teil B: Nachbesserungslauf im Direktweg; D-074: Recherche im Grounding-Schritt des Direktwegs; zuvor 2026-11-24, D-067: strenges Lesen des Snapshots, mindestens ein Reviewer, Outcome nach den Finalizern, Warnungen am Lauf, System-Grounding wieder über den Provider-Typ-Weg, Learning standardmäßig pausiert; zweite Prüfrunde: Reviewer-Prüfung beim Speichern, Vektor-Scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserviert, Finalizer und Abbruch; zuvor 2026-11-23, D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
+Letzte Aktualisierung: 2026-11-26 (D-076: Dateien über das Upload-Ticket, Aufräumen und Auswertung der Ablehnungen; zuvor 2026-11-25, D-075 Teil B: Nachbesserungslauf im Direktweg; D-074: Recherche im Grounding-Schritt des Direktwegs; zuvor 2026-11-24, D-067: strenges Lesen des Snapshots, mindestens ein Reviewer, Outcome nach den Finalizern, Warnungen am Lauf, System-Grounding wieder über den Provider-Typ-Weg, Learning standardmäßig pausiert; zweite Prüfrunde: Reviewer-Prüfung beim Speichern, Vektor-Scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserviert, Finalizer und Abbruch; zuvor 2026-11-23, D-066/12: `model_domain` explizit, ein Zuweisungsprädikat; D-066/10–11: Codex-Aliase, Host-Abgleich, verfügbare Modelle nur laut Live-Katalog; zuvor 2026-11-22, D-066: Modellmatrix — System-Profile und Abschnitt Modellmatrix neu; zuvor 2026-06-04, D-059: Auto-Crew)
 
 ## Überblick
 
@@ -903,6 +903,52 @@ gespeicherten Ausschnitte unverändert und sucht nie neu.
   `grounding.research_failed` („Looking things up on the web did not work this time. The text was written without it.“), und
   der Lauf geht ohne `W1` weiter. `NothingFound`, `AllWithheld`, `DailyLimit` und `FilesAttached` hängen keine Quelle an und warnen nicht; das
   Ergebnis zeigt sie als feste Sätze. Nur der Abbruch des Laufs selbst beendet den Schritt.
+
+## Dateien über das Upload-Ticket (D-076)
+
+Ein KI-Assistent kann eine Datei nicht verlässlich als Base64 in ein Werkzeugargument schreiben. Solange `Uploads:Tickets` `On`
+ist, kommt sie deshalb außerhalb des MCP-Aufrufs an:
+
+1. `prepare_attachment(fileName, sizeBytes?)` legt eine Zeile in `UploadTickets` an (Zustand `Open`, Token nur als SHA-256,
+   Token 15 Minuten, Seite 24 Stunden) und gibt `curlCommand` und `uploadPage` zurück.
+2. Entweder führt der Assistent `curlCommand` aus (`PUT /api/uploads/{id}`, Token im Kopf `X-Upload-Token`), oder die Person legt
+   die Datei auf der Seite `/u/{id}` ab (`POST /api/uploads/{id}/page`, angemeldet). Beide Wege beanspruchen das Ticket in einer
+   Anweisung (`Open → Receiving`, `Attempts + 1`, `ReceivingSince = jetzt`) und geben die Datei an dieselbe Aufnahme wie die
+   Weboberfläche (`ISourceIntakeService.IntakeAsync`: Erkennung am Inhalt, Extraktion im Kindprozess, Kontingente). Herkunft der
+   Quelle: Token-Weg `McpAttachment`, Seite `WebUpload`.
+3. Brauchbar → `Used` mit `SourceId`. Geprüft und abgelehnt → zurück auf `Open`, der Versuch bleibt gezählt, der Code steht in
+   `LastRefusalCode`; nach 3 solchen Versuchen `Failed`. Nicht geprüft (zu viele gleichzeitige Uploads, Überlast, Abbruch,
+   Speicherfehler, Extraktion nicht verfügbar, volles Kontingent, Zeitgrenze, Serverfehler) → zurück auf `Open`, der Versuch wird
+   zurückgegeben (`Attempts - 1`). Eine Datei, die zu lang ist, um ganz verwendet zu werden, wird auf diesem Weg abgelehnt
+   (`too_long_for_ticket`; Seiten wählen geht nur in der Web-App) und nicht gespeichert. Abschluss und Freigabe gelten nur für den
+   eigenen Anspruch (gleiches `ReceivingSince`).
+4. `submit_order(…, uploadIds)` verknüpft die Quellen der angekommenen Tickets der angemeldeten Person mit dem Auftrag (alles oder
+   nichts); ab hier ist die Datei eine normale Quelle des Auftrags.
+
+**Aufräumen** (stündlicher Aufräumdienst der Quellen): `Receiving` länger als `Sources:UploadTimeout` + 1 Minute → `Open` bzw.
+`Failed` (nach einem Absturz; ein laufender Upload endet vorher an der Zeitgrenze seiner Anfrage). Dieselbe Frist prüft der
+Ticketdienst bei jedem Zugriff auf das Ticket (Seite, Token- oder Seiten-Upload) und gibt ein hängendes Ticket sofort frei, statt
+auf den nächsten Lauf zu warten; der Versuch bleibt dabei gezählt. Tickets 7 Tage
+(`Uploads:TicketRetention`) nach Ablauf der Seite gelöscht; Zeilen in `SourceRefusals` nach 180 Tagen
+(`Uploads:RefusalRetention`). Wird eine Quelle gelöscht, wird `UploadTickets.SourceId` `NULL`.
+
+**Ablehnungen zählen.** `SourceRefusals` hält je abgelehnter Datei Zeit, Person, Weg (`web`, `mcp_inline`, `mcp_ticket`,
+`upload_page`), Code, erkannte Art, Endung, angegebenen Typ und Größe, nie Name oder Inhalt. Nicht gezählt werden ein
+Token-Upload über der Anfragegrenze (`413` vor dem Anspruch), ein ungültiger Token, eine Datei, die die Upload-Seite schon im
+Browser abweist, ein Upload, der an der Zeitgrenze endet oder abgebrochen wird, und technische `400`; `too_large` ist damit
+untererfasst. Grundlage der Entscheidung über
+weitere Dateiarten (Auslöser in D-076: mindestens 3 Ablehnungen von mindestens 2 Konten außerhalb der Messkonten in 60 Tagen).
+Auswertung, nur lesend; die Liste der Messkonten kommt aus der Betriebskonfiguration (`-v messkonten='{konto1,konto2}'`):
+
+```sql
+SELECT "Code", coalesce("Extension", '-') AS "Endung", "Path" AS "Weg",
+       count(*) AS "Ablehnungen", count(DISTINCT "OwnerUsername") AS "Konten"
+FROM "SourceRefusals"
+WHERE "CreatedAt" > now() - interval '60 days'
+  AND NOT ("OwnerUsername" = ANY (:'messkonten'::text[]))
+GROUP BY 1, 2, 3
+ORDER BY 4 DESC, 1, 2;
+```
 
 ## Nachbesserungslauf im Direktweg (D-075, Teil B)
 

@@ -6,13 +6,16 @@ namespace Geef.Atelier.Application.Sources;
 /// <summary>
 /// One uploaded file as received. <see cref="DeclaredContentType"/> is only a hint and never trusted. <see cref="Length"/>
 /// is the size known in advance, or 0 when the content is streamed and its size is only known after reading it.
+/// <see cref="AnnouncedBytes"/> is the size the sender promised before sending (upload ticket); when it is set, the content
+/// is read only up to it and a file of any other size is refused as <see cref="SourceRefusalCodes.SizeMismatch"/>.
 /// </summary>
-public sealed record SourceUpload(string FileName, string? DeclaredContentType, long Length, Stream Content);
+public sealed record SourceUpload(string FileName, string? DeclaredContentType, long Length, Stream Content, long? AnnouncedBytes = null);
 
 /// <summary>
 /// Receipt for one file: what was read, whether it can be used and why not. <see cref="EstimatedTokens"/> is the
 /// estimated size for the writing model. <see cref="Refusal"/> tells callers such as the upload endpoint which refusals
-/// need their own answer; it is not part of the JSON.
+/// need their own answer; <see cref="RefusalCode"/> is the counted code of a refused file (<see cref="SourceRefusalCodes"/>).
+/// Neither is part of the JSON.
 /// </summary>
 public sealed record SourceReceipt(
     Guid? SourceId,
@@ -30,7 +33,8 @@ public sealed record SourceReceipt(
     IReadOnlyList<SourceWarning> Warnings,
     string? Reason,
     int EstimatedTokens = 0,
-    [property: JsonIgnore] SourceRefusal Refusal = SourceRefusal.None);
+    [property: JsonIgnore] SourceRefusal Refusal = SourceRefusal.None,
+    [property: JsonIgnore] string? RefusalCode = null);
 
 /// <summary>Refusals of the intake that callers may answer differently from an unusable file.</summary>
 public enum SourceRefusal
@@ -56,9 +60,10 @@ public interface ISourceIntakeService
 {
     /// <summary>
     /// Reads and stores an uploaded file; an identical file of the same owner is reused and marked as duplicate. Takes one of
-    /// the owner's upload places and an upload slot before the content is read.
+    /// the owner's upload places and an upload slot before the content is read. A refused file is counted with
+    /// <paramref name="path"/> through <see cref="ISourceRefusalLog"/>; counting never changes the receipt.
     /// </summary>
-    Task<SourceReceipt> IntakeAsync(SourceUpload upload, string ownerUsername, SourceOrigin origin, CancellationToken ct = default);
+    Task<SourceReceipt> IntakeAsync(SourceUpload upload, string ownerUsername, SourceOrigin origin, CancellationToken ct = default, RefusalPath path = RefusalPath.Web);
 
     /// <summary>Stores pasted text as a source; it needs no upload place or slot because the text is already in memory.</summary>
     Task<SourceReceipt> IntakeTextAsync(string title, string text, string ownerUsername, SourceOrigin origin, CancellationToken ct = default);

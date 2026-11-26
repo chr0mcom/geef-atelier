@@ -53,7 +53,7 @@ public sealed class McpAttachmentParserTests
     [InlineData("""[{"filename":"a.txt","contentType":"text/plain"}]""")]
     public void Malformed_json_is_rejected_with_the_expected_format(string json)
     {
-        var ex = Assert.Throws<McpException>(() => McpAttachmentParser.Parse(json));
+        var ex = Assert.ThrowsAny<McpException>(() => McpAttachmentParser.Parse(json));
         Assert.Contains("filename, contentType and contentBase64", ex.Message);
     }
 
@@ -65,7 +65,7 @@ public sealed class McpAttachmentParserTests
     {
         var json = Attachments.Json(("doc.bin", contentType, "binary data"u8.ToArray()));
 
-        var ex = Assert.Throws<McpException>(() => McpAttachmentParser.Parse(json));
+        var ex = Assert.ThrowsAny<McpException>(() => McpAttachmentParser.Parse(json));
         Assert.Contains(contentType, ex.Message);
         Assert.Contains("doc.bin", ex.Message);
     }
@@ -78,7 +78,7 @@ public sealed class McpAttachmentParserTests
     {
         var json = $$"""[{"filename":"doc.pdf","contentType":"application/pdf","contentBase64":"{{content}}"}]""";
 
-        var ex = Assert.Throws<McpException>(() => McpAttachmentParser.Parse(json));
+        var ex = Assert.ThrowsAny<McpException>(() => McpAttachmentParser.Parse(json));
         Assert.Contains("doc.pdf", ex.Message);
         Assert.Contains("not valid Base64", ex.Message);
         Assert.Contains(WebAppHint, ex.Message);
@@ -89,7 +89,7 @@ public sealed class McpAttachmentParserTests
     {
         var json = """[{"filename":"doc.txt","contentType":"text/plain","contentBase64":""}]""";
 
-        var ex = Assert.Throws<McpException>(() => McpAttachmentParser.Parse(json));
+        var ex = Assert.ThrowsAny<McpException>(() => McpAttachmentParser.Parse(json));
         Assert.Contains("has no content", ex.Message);
     }
 
@@ -103,7 +103,7 @@ public sealed class McpAttachmentParserTests
     [InlineData("Inhalt gekürzt – vollständige Fassung liegt vor.")]
     public void Placeholder_text_is_rejected_with_the_right_way(string text)
     {
-        var ex = Assert.Throws<McpException>(() => McpAttachmentParser.Parse(Attachments.Text("full.md", text, "text/markdown")));
+        var ex = Assert.ThrowsAny<McpException>(() => McpAttachmentParser.Parse(Attachments.Text("full.md", text, "text/markdown")));
 
         Assert.Contains("placeholder", ex.Message);
         Assert.Contains("contentBase64", ex.Message);
@@ -116,7 +116,7 @@ public sealed class McpAttachmentParserTests
     [InlineData("  \n\t ")]
     public void Too_short_text_is_rejected(string text)
     {
-        var ex = Assert.Throws<McpException>(() => McpAttachmentParser.Parse(Attachments.Text("short.txt", text)));
+        var ex = Assert.ThrowsAny<McpException>(() => McpAttachmentParser.Parse(Attachments.Text("short.txt", text)));
         Assert.Contains("short.txt", ex.Message);
     }
 
@@ -143,7 +143,7 @@ public sealed class McpAttachmentParserTests
     {
         var once = Convert.ToBase64String(Attachments.MinimalPdf);
 
-        var ex = Assert.Throws<McpException>(() => McpAttachmentParser.Parse(Attachments.Text("file.txt", once)));
+        var ex = Assert.ThrowsAny<McpException>(() => McpAttachmentParser.Parse(Attachments.Text("file.txt", once)));
         Assert.Contains("encoded twice", ex.Message);
     }
 
@@ -152,7 +152,7 @@ public sealed class McpAttachmentParserTests
     {
         var json = Attachments.Json(("offer.pdf", "application/pdf", "Siehe angehängte Vollversion im Briefing-Kontext"u8.ToArray()));
 
-        var ex = Assert.Throws<McpException>(() => McpAttachmentParser.Parse(json));
+        var ex = Assert.ThrowsAny<McpException>(() => McpAttachmentParser.Parse(json));
         Assert.Contains("not a PDF", ex.Message);
         Assert.Contains("placeholder", ex.Message);
     }
@@ -163,7 +163,7 @@ public sealed class McpAttachmentParserTests
         var twice = Encoding.ASCII.GetBytes(Convert.ToBase64String(Attachments.MinimalPdf));
         var json = Attachments.Json(("offer.pdf", "application/pdf", twice));
 
-        var ex = Assert.Throws<McpException>(() => McpAttachmentParser.Parse(json));
+        var ex = Assert.ThrowsAny<McpException>(() => McpAttachmentParser.Parse(json));
         Assert.Contains("encoded twice", ex.Message);
     }
 
@@ -172,7 +172,7 @@ public sealed class McpAttachmentParserTests
     {
         var json = Attachments.Json(("letter.docx", McpAttachmentParser.DocxContentType, Attachments.MinimalPdf));
 
-        var ex = Assert.Throws<McpException>(() => McpAttachmentParser.Parse(json));
+        var ex = Assert.ThrowsAny<McpException>(() => McpAttachmentParser.Parse(json));
         Assert.Contains("not a .docx file", ex.Message);
     }
 
@@ -181,7 +181,7 @@ public sealed class McpAttachmentParserTests
     {
         var json = Attachments.Json(("offer.txt", "text/plain", Attachments.MinimalPdf));
 
-        var ex = Assert.Throws<McpException>(() => McpAttachmentParser.Parse(json));
+        var ex = Assert.ThrowsAny<McpException>(() => McpAttachmentParser.Parse(json));
         Assert.Contains("application/pdf", ex.Message);
     }
 
@@ -190,7 +190,7 @@ public sealed class McpAttachmentParserTests
     {
         var json = Attachments.Json(("letter.txt", "text/plain", Attachments.MinimalDocx));
 
-        var ex = Assert.Throws<McpException>(() => McpAttachmentParser.Parse(json));
+        var ex = Assert.ThrowsAny<McpException>(() => McpAttachmentParser.Parse(json));
         Assert.Contains("binary file", ex.Message);
     }
 
@@ -199,7 +199,7 @@ public sealed class McpAttachmentParserTests
     {
         var json = """[{"filename":" ","contentType":"text/plain","contentBase64":"SGVsbG8gd29ybGQgaGVsbG8="}]""";
 
-        var ex = Assert.Throws<McpException>(() => McpAttachmentParser.Parse(json));
+        var ex = Assert.ThrowsAny<McpException>(() => McpAttachmentParser.Parse(json));
         Assert.Contains("filename", ex.Message);
     }
 }

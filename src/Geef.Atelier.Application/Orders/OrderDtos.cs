@@ -169,7 +169,11 @@ public sealed record OrderListItem(Guid OrderId, string Title, OrderDisplay Disp
     int? Version = null);
 
 /// <summary>Raised for problems the person can fix (empty request, too many files, budget exceeded, foreign source). The message is plain English for the UI and MCP.</summary>
-public sealed class OrderSubmissionException(string message) : InvalidOperationException(message);
+public sealed class OrderSubmissionException(string message, string? withoutPageChoice = null) : InvalidOperationException(message)
+{
+    /// <summary>The message for a caller that cannot choose pages (MCP with upload tickets), when it differs; otherwise <c>null</c>.</summary>
+    public string? WithoutPageChoice { get; } = withoutPageChoice;
+}
 
 /// <summary>Thrown when an order is deleted while one of its runs is still working; the message is meant for the person.</summary>
 public sealed class OrderStillWorkingException() : InvalidOperationException("This order is still being worked on. Stop it first.");

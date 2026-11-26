@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-11-24 (D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
+*Last updated: 2026-11-26 (D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -2718,3 +2718,190 @@ as a whole. “Simpler words” was not measured; the stop result carries over f
 
 **State of stage 5:** deployed are the quote display (part A), the full MCP contract (gate M and the 50-second call passed) and
 revising behind a switched-off switch. Not checked: claude.ai as an MCP client.
+
+## D-076 — Stage 6: files over MCP (upload ticket) and counting refusals (2026-11-26)
+
+**Status:** integrated, not shipped. It ships with `Uploads:Tickets = Off`; it is switched on only after the deploy, through the
+environment, for gates T-A2 to T-A5, and only when all of them pass does a separate commit set `Uploads:Tickets = On`. The
+security review (gate T-A1) passed: 0 critical, 0 high, 1 medium (whether a model follows the quoting rule is not measured; T-A2
+measures it with a file name holding an apostrophe and a space), 8 low (handled under "Correction round after T-A1" and
+"Decisions"). No prompt changed (clarifier, reviewer, condenser
+with their schemas and the writer's system prompt are bit-identical, hash tests green). No new packages.
+
+**Guiding sentence.** A file the person gives their AI assistant arrives byte for byte – or the assistant gets a message that
+names the right way. Nothing is typed out, nothing is silently lost, and refusals are counted where a person can be told; the
+cases that are not counted are listed under "Counting".
+
+**Need.** Base64 in a tool argument has to be written out by a model character by character; that breaks off at a few dozen
+kilobytes, and claude.ai does not pass files from the chat to connectors. The use so far fits this. Refused files left no row,
+so MCP refusals (a JSON-RPC
+answer with status 200) were invisible. Design rule: the token is never in an address or a query, because addresses can end up in
+logs.
+
+**Scope.** Built: upload ticket (`prepare_attachment`, token upload, upload page, `uploadIds`), counting refusals, cleanup.
+Later, each with a trigger from the counts (≥ 3 refusals from ≥ 2 accounts outside the measurement accounts in 60 days): e-mail
+files (`eml`/`msg`; `.eml` then through MimeKit from MailKit), spreadsheets (`xlsx`, then through `DocumentFormat.OpenXml`;
+`ExcelDataReader` dropped), scans and images (OCR, `pdf_no_text` or image extensions; needs an asynchronous receipt),
+`add_text_document` (refusals `mcp_placeholder`/`mcp_base64_invalid`), a size cap for Base64 attachments
+(`mcp_type_mismatch`/`unreadable`). Dropped: library and "always include" (no reuse in the data; style references come with the
+memory), roles per file, the volume in the backup (originals are never read after extraction, the text is in the backed-up
+database), a mandatory checksum in the ticket (the answer names `sha256`). The list of measurement accounts for the trigger query
+lives only in the operations configuration, never in the repository.
+
+**Rules**
+- **`prepare_attachment(fileName, sizeBytes?)`** (only with `On`): name trimmed, 1–255 characters, only for display and the
+  extension, cleaned by `SourceFileNames` (per Unicode character, so invisible tag characters from U+E0000 and direction controls
+  go too; umlauts and emoji stay), never part of a path. A `sizeBytes` above `Sources:MaxFileBytes` is refused at once and counted
+  as `too_large` on the way `mcp_ticket`, otherwise it is the limit and the expected size. Limits per person: at most 10 open tickets and 50 in 24 hours (counting and
+  inserting under a lock per person). Answer `{uploadId, curlCommand, uploadPage, tokenExpiresAt, pageExpiresAt, maxBytes, next}`.
+  The token (32 random bytes, base64url) is handed out once and stored only as SHA-256, lasts 15 minutes and is only in the
+  `X-Upload-Token` header. The command is
+  `curl --fail-with-body -sS --globoff -T '<path to the file>' -H 'X-Upload-Token: <token>' <OAuth:Issuer>/api/uploads/<uploadId>`;
+  apart from token and address it holds nothing variable, in particular never the file name. `--globoff` is needed because
+  `curl` otherwise expands `{}` and `[]` in the path of `-T`. Description, `next` and server instructions ask for the path in
+  single quotes; when it holds a quote, a line break or another unusual character, the assistant is not to type the name in a
+  command but, in **one** shell command, to copy the file under a plain name into a fresh folder with a pattern made only of
+  letters, digits and `/ . - _ *` (a `*` in place of every other character), upload the copy and remove the folder:
+  `d=$(mktemp -d) && cp -- <pattern> "$d/upload" && <curlCommand>; rm -rf "$d"`. In `<curlCommand>`, `"$d/upload"` with its
+  double quotes takes the place of `'<path to the file>'`; in single quotes `$d` would not be replaced, and in a second command
+  `$d` would be empty. Otherwise the link. The upload page `/u/<uploadId>` holds no secret, lasts 24 hours and
+  works only after signing in as the same person.
+- **Token upload `PUT /api/uploads/{id}`:** the header is the only credential; cookies are not read, no CORS, so no CSRF. The
+  claim is one statement (`Open → Receiving`); unknown, wrong token, expired, used and foreign all answer `404`; a running upload of
+  the same ticket `409`. Intake through the same detection, extraction in the child process and the same limits as the web
+  interface, origin `McpAttachment`. Size ≠ announced → `size_mismatch`, nothing stored. Usable → `201` with the receipt,
+  `uploadId`, `sha256` and `next`. An AI assistant reads this answer, so it holds neither the beginning of the text nor the file
+  name.
+- **Attempts:** an attempt counts only when the file was really checked and refused; then the ticket stays open up to 3 attempts,
+  then `Failed`, and the code of the last refusal is kept in `UploadTickets.LastRefusalCode`. Too many uploads at once
+  (`user_busy`), overload (`busy`), a broken-off upload (`interrupted`), a failed save (`save_failed`), extraction not available
+  (`unavailable`), a full quota (`quota`), the time limit, a cancelled request and server errors give the attempt back. After a
+  checked refusal `next` tells the assistant to give the person the reason word for word and not to upload the same file again;
+  after an unchecked one, that it was not a problem with the file. For `quota` and `unavailable`, `next` also says that
+  repeating at once will not help, and what does (quota: send the order first with the files that have already arrived, or try
+  later, when files that were never used have been deleted automatically; not available: later, and an administrator if it
+  keeps happening), each with a new `prepare_attachment` if the link has expired by then.
+- **Too long for this way:** a file too long to be used completely (the web interface would ask for pages) is not usable over
+  the ticket: `422` with its own sentence (a shorter file, or start the order in the web app and choose the pages there), code
+  `too_long_for_ticket`, nothing stored (an identical file stored before stays). If removing the copy fails, the sentence does
+  not end with "Nothing was stored." but says that the file may still be stored for a while and is not added to any order this
+  way. The page never asks for pages.
+- **Upload page:** signed-in page with exactly one drop zone; foreign and unknown tickets look the same ("Not found").
+  `POST /api/uploads/{id}/page` checks cookie, antiforgery header and `Origin` like `/api/sources`, origin `WebUpload`, without a
+  size comparison (the person picks the file). A ticket whose attempts were all used by refused files is not called "expired"
+  there; it has its own sentence.
+- **`submit_order(…, uploadIds?)`:** only arrived files of the signed-in person, all or nothing; together with `attachments` at most
+  10 files. "no longer stored" only for a file that arrived and was deleted. For a ticket without a usable file: "No usable file
+  arrived for upload {id}." with the reason of the last checked refusal when there is one (from the stored code, never from the
+  file), otherwise with the advice to prepare a new ticket; while the ticket is still open, also the link. When several files are
+  too long together, the refusal with `On` names the web app, not a way to choose pages. With `Off` the schema has no `uploadIds`;
+  a value sent anyway is refused. With `On` no text contradicts the file way: step 1 of the server instructions and the
+  description of `submit_order` say that files are uploaded first with `prepare_attachment`; `attachments` only for very small
+  text files. With `Off` bit-identical (hash tests).
+- **Counting (`SourceRefusals`, no switch):** every unusable receipt of the intake on all ways, the 413 pre-check of
+  `/api/sources` and of the page (only with a valid antiforgery header), every refusal of the MCP attachment check and
+  `size_mismatch`. Stored are time, person, way (`web`, `mcp_inline`, `mcp_ticket`, `upload_page`), a fixed code, the detected
+  kind, the extension (`[a-z0-9]`, ≤ 8), the declared type (only `type/subtype`, ≤ 100) and the size – never file name, preview,
+  content or hash. In addition to the codes of the contract: `pdf_encrypted`, `unavailable` (server error, not the file's fault)
+  and `too_long_for_ticket`; also the refusal for `sizeBytes` in `prepare_attachment`. **Not counted** are: a token upload above
+  the request limit (`413` before the claim, no person known), an invalid token (`404`), a file the upload page refuses in the
+  browser (above 25 MB, never sent), an upload that ends at the time limit or is cancelled (no receipt), and technical `400`
+  (outdated page, no multipart). `too_large` is therefore under-counted. A counting error never changes the answer. Kept for
+  180 days. Evaluation query in `08-crew-system.md`.
+- **Cleanup:** hanging `Receiving` back to `Open` or `Failed` after `Sources:UploadTimeout` + 1 minute – in the hourly pass and,
+  when the ticket is used again before (page, token or page upload), right at that access with the same deadline; the attempt
+  stays counted (a file that brings the process down cannot be retried forever). Tickets deleted 7 days after the page expired;
+  counted rows after 180 days.
+
+**Closed at the integration.** The first four points each have a test over the real wiring and were checked by a mutation (all
+four fixes taken back: the tests turned red); the fifth was not.
+- **File names in the shell.** The generated command runs as it is with the real `curl` against the real Kestrel server, also
+  for paths with spaces, quotes, umlauts, a leading dash, `$`, backticks, a line break, `{}` and `[]`; no part of a name is
+  executed. Without `--globoff`, files with `{}` or `[]` did not arrive.
+- **Token in logs.** The MCP SDK writes every message it sends and receives in full at trace level – with token, order text and
+  Base64 files. `McpMessageLogGuard` drops trace lines of the SDK categories whatever the logging configuration says. Shown with
+  every category at trace: the token is in no log line, no answer (error answers included), no address and no table row.
+- **Cleanup versus a running upload.** Every claim runs inside a request with the `UploadTimeout` limit (receiving, queue and
+  extraction together); a hanging upload therefore ends long before the cleanup's deadline (test with a stalled body). In
+  addition, completing and releasing only touch their own claim (same `ReceivingSince`): an upload that the cleanup did reset
+  can neither complete a newer claim of the same ticket with its file nor open it again. Its own file then stays as an unattached
+  source and is cleaned up after 24 hours.
+- **Switch off.** The upload endpoints are not mapped, and the page `/u/{id}` is taken out of the request before
+  authentication. The addresses therefore answer exactly like addresses that never existed (`GET` 404; as before, the application
+  answers `PUT` and `POST` to unknown addresses with 405), signed in and anonymous alike. Before, `/u/{id}` redirected to the
+  sign-in or showed "Not found" with status 200. Tool list, server instructions and all attachment messages are bit-identical to
+  stage 5 with `Off` (hash and wording tests).
+- **Measurement tool.** A one-off probe that is not versioned ran `upload_check.py` against the real output of the test host (real
+  `curl`, the real upload page in a browser, real tables through the tool's SQL queries): all four gates passed. It is not a
+  lasting test and was not part of the mutation check; the Claude Code transcripts were assembled from the real answers, model
+  behaviour is only measured by T-A2. Lasting evidence are the SQL queries against a disposable Postgres
+  (`tests/test_upload_check_postgres.py`) and the dry run from synthetic data.
+
+**Correction round after the reviews** (security and function, each with a test that is red without the correction)
+- Attempts count only for checked files (see "Attempts"); shown with parallel uploads over Postgres and over the real wiring.
+- Path and shell: the quoting rule above; a test runs the recommended copy with the real `sh` for hostile names (`'`, `"`, `$( )`,
+  backticks, `;`, a line break, emoji, direction controls): no part of a name is executed and the bytes arrive; when the pattern
+  matches two files, `cp` fails and nothing is uploaded.
+- Answer of the token upload without preview and file name; `next` also after a refusal.
+- Honest sentences in `submit_order` for files that never arrived; a state of its own on the page for used-up tickets.
+- File names cleaned per Unicode character instead of per UTF-16 unit.
+- Files too long for the ticket way are refused; no text asks for a pages field that is not there.
+- The texts tell a transport error (link to the person) from a refused file (give the reason word for word, do not upload again),
+  also for `422` with `curl --fail-with-body`.
+- A hanging `Receiving` is released at the next access.
+- The counting way `web` shown over the real wiring.
+- `upload_check.py`: T-A3 (c) needs the capture of the second account's page to name its address, and it must be `/u/<upload id>`;
+  T-A4/T-A5 need the 422 answers to name the upload id of the plan and the ticket to show a checked, refused attempt with the
+  expected code. No gate became looser.
+
+**Correction round after T-A1** (each with a test that is red without the correction; checked by a mutation)
+- Copy path (B4): copy and upload explicitly in **one** shell command, with the complete template and the placeholder
+  `"$d/upload"` in double quotes (see Rules). A test builds exactly this command from the description and runs it with the real
+  `curl` against the real Kestrel server, alternately in `sh` and `bash`, for hostile names: the bytes arrive, no part of a name
+  is executed, the folder is gone afterwards. A second test shows that copy and upload in two commands, or `'$d/upload'` in
+  single quotes, upload nothing and leave the ticket open.
+- Full quota and extraction not available (B3): a `next` of their own without "run curlCommand again" (see Attempts).
+- "Nothing was stored." (B6) only when removing the file that is too long succeeded (see "Too long for this way"); shown for a
+  removal that fails with an exception and for one that reports the file as in use.
+- This entry (B8): the result of T-A1 instead of "still open", no details about the use of production.
+
+**Switch:** `Uploads:Tickets` (`Off|On`, one global switch without per-person override, because tool list and server instructions
+are built once at start). A change needs the container to be recreated.
+
+**Step53** (`20261130120000_Step53Uploads`): two new tables `UploadTickets` (with `LastRefusalCode`, a code only) and
+`SourceRefusals` with indexes, FK `SourceId → Sources` with `ON DELETE SET NULL`; purely additive and idempotent, `Sources`
+unchanged, no new `SourceOrigin`.
+
+**Decisions.** One deploy for ticket, page and counting; token in a header; token 15 minutes, page 24 hours with sign-in; "one
+time" means one success, up to 3 checked attempts; `submit_order` all or nothing; the older tools (`submit_request`,
+`submit_auto_crew_request`) keep the previous way out, because they take no `uploadIds`.
+
+Deliberately not changed after T-A1:
+- **Unchecked attempts and counted rows without a cap (B2).** A broken-off upload gives the attempt back and writes a counted
+  row; so does a full quota that is only noticed after extraction. This is bounded by two places per person, the time limit per
+  request and the deadlines (token 15 minutes, page 24 hours); the web upload allows signed-in people the same, only the number of
+  counted rows is new (also with `Off`). Rows per account and day are watched and capped if needed.
+- **What `submit_order` reports about an arrived file (B5, correction of the contract).** The contract said `submit_order` shows
+  name, size and preview. In fact the receipt per file names the cleaned file name, the page count (PDF only), the characters,
+  the reading quality and the warnings – no size, no preview, no checksum. On the token way the name is the one the assistant
+  itself gave to `prepare_attachment`. A foreign upload with a stolen token therefore shows only in pages, characters or quality,
+  and on the person's page ("This file has already arrived"). It needs a token from a shared history within 15 minutes; with
+  `sizeBytes` only a file of exactly that size is accepted as well.
+- **`upload_check` does not bind counted rows to the measurement account (B7).** No gate can pass without real data: empty or
+  missing evidence gives `fehlt`, `nein` or `not_evaluable`. The gap rather causes a false failure: a refusal of another account
+  in the measurement window can make T-A4/T-A5 fail; the run is then repeated. Before the run, old output is deleted, and all
+  gates are evaluated together.
+
+**Remaining risks**
+- The AI client puts the path into the command. The command itself holds nothing foreign, and the texts say how to quote and what
+  to do with unusual names; a test shows that the recommended way is safe. Whether a model follows the texts is not measured
+  yet (T-A1, medium); before `On`, T-A2 measures it with a file name holding an apostrophe and a space. A wrong step ends there
+  in a shell error. In Windows PowerShell `curl` is a different command; the link remains.
+- The token is in the assistant's history (intended: 15 minutes, one success, only into the person's account; a second upload
+  gets 404; what the receipt in `submit_order` names about the file is under "Decisions", B5).
+- Unchecked attempts are not limited; an upload that keeps failing at overload can be repeated within the token time
+  (15 minutes) or the page time (24 hours). The places per person and the time limit per request bound the cost.
+- claude.ai is not checked (invitation to the operator).
+
+**Way back:** switch `Off` through the environment (immediate). Code: the previous image; Step53 is additive, the old code reads
+`Sources` unchanged. Sources uploaded through tickets stay ordinary sources.

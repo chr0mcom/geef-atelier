@@ -95,8 +95,10 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
     /// are off as well (<c>Direct:FactCheckMode=Off</c>, <c>Direct:WriterNotes=false</c>, <c>Intake:ContentAssumptions=Defaults</c>),
     /// so the direct path runs as in stage 2 unless a test configures <c>DirectOptions</c> or
     /// <c>IntakeOptions</c> there. The research of stage 4 is off too (<c>Research:Mode=Off</c>); research tests switch it on there.
+    /// With <paramref name="kestrelPort"/> the application listens on that loopback port with the real Kestrel server instead of the
+    /// in-memory test server, so that outside programs such as <c>curl</c> can reach it.
     /// </summary>
-    public static async Task<AtelierEndToEndHost> StartAsync(PostgresFixture postgres, Action<IServiceCollection>? configureServices = null)
+    public static async Task<AtelierEndToEndHost> StartAsync(PostgresFixture postgres, Action<IServiceCollection>? configureServices = null, int? kestrelPort = null)
     {
         var connectionString = await CreateIsolatedDatabaseAsync(postgres.ConnectionString);
         var keyDirectory = Path.Combine(Path.GetTempPath(), $"geef-e2e-keys-{Guid.NewGuid():N}");
@@ -174,6 +176,9 @@ internal sealed partial class AtelierEndToEndHost : IAsyncDisposable
                 configureServices?.Invoke(services);
             });
         });
+
+        if (kestrelPort is { } port)
+            factory.UseKestrel(options => options.Listen(System.Net.IPAddress.Loopback, port));
 
         var host = new AtelierEndToEndHost(factory, gate, keyDirectory, connectionString, postgres.ConnectionString, llm, script, tavily, external);
         await host.EnsureMigratedAsync();

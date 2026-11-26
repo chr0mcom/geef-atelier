@@ -27,6 +27,14 @@ internal static class OrderToolTestData
     public static IOptions<IntakeOptions> Intake(int submitWaitSeconds = 30) =>
         Microsoft.Extensions.Options.Options.Create(new IntakeOptions { SubmitWaitSeconds = submitWaitSeconds });
 
+    public const string Issuer = "https://atelier.example";
+
+    public static IOptions<SourceOptions> Sources(int maxFilesPerOrder = 10) =>
+        Microsoft.Extensions.Options.Options.Create(new SourceOptions { MaxFilesPerOrder = maxFilesPerOrder });
+
+    public static IOptions<OAuthOptions> OAuth(string issuer = Issuer) =>
+        Microsoft.Extensions.Options.Options.Create(new OAuthOptions { Issuer = issuer });
+
     public static readonly ClarifyQuestion LengthQuestion = new(
         "length", GapTopic.Length, "Wie lang soll der Text ungefähr werden?",
         [new QuestionOption("short", "Kurz (etwa 150 Wörter)"), new QuestionOption("medium", "Mittel (etwa 400 Wörter)"), new QuestionOption("long", "Lang (etwa 800 Wörter)")],
@@ -234,19 +242,19 @@ internal sealed class FakeOrderService : IOrderService
 
 internal sealed class FakeSourceIntake : ISourceIntakeService
 {
-    public sealed record Intake(string FileName, string? ContentType, long Length, byte[] Content, string Owner, SourceOrigin Origin);
+    public sealed record Intake(string FileName, string? ContentType, long Length, byte[] Content, string Owner, SourceOrigin Origin, RefusalPath Path);
 
     public List<Intake> Intakes { get; } = [];
     public List<(Guid SourceId, string? RequestingUsername)> Deletes { get; } = [];
     public Dictionary<string, string> UnusableReasons { get; } = new(StringComparer.Ordinal);
     public HashSet<string> Duplicates { get; } = new(StringComparer.Ordinal);
 
-    public async Task<SourceReceipt> IntakeAsync(SourceUpload upload, string ownerUsername, SourceOrigin origin, CancellationToken ct = default)
+    public async Task<SourceReceipt> IntakeAsync(SourceUpload upload, string ownerUsername, SourceOrigin origin, CancellationToken ct = default, RefusalPath path = RefusalPath.Web)
     {
         using var buffer = new MemoryStream();
         await upload.Content.CopyToAsync(buffer, ct);
         var content = buffer.ToArray();
-        Intakes.Add(new Intake(upload.FileName, upload.DeclaredContentType, upload.Length, content, ownerUsername, origin));
+        Intakes.Add(new Intake(upload.FileName, upload.DeclaredContentType, upload.Length, content, ownerUsername, origin, path));
 
         if (UnusableReasons.TryGetValue(upload.FileName, out var reason))
             return new SourceReceipt(null, upload.FileName, null, content.Length, null, 0, 0, SourceQuality.Unreadable,
@@ -273,6 +281,92 @@ internal sealed class FakeSourceIntake : ISourceIntakeService
     {
         Deletes.Add((sourceId, requestingUsername));
         return Task.FromResult(SourceDeleteResult.Deleted);
+    }
+}
+
+internal sealed class FakeRefusalLog : ISourceRefusalLog
+{
+    public List<SourceRefusalRecord> Records { get; } = [];
+    public Exception? Failure { get; set; }
+
+    public Task RecordAsync(SourceRefusalRecord record, CancellationToken ct = default)
+    {
+        if (Failure is not null)
+            throw Failure;
+        Records.Add(record);
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>Upload tickets of several people; <see cref="ResolveAsync"/> follows the contract of the real service with the sentences of <see cref="UploadTicketLines"/>.</summary>
+internal sealed class FakeUploadTickets(bool enabled = true) : IUploadTicketService
+{
+    public enum TicketState { Open, Used, Deleted }
+
+    public sealed record Ticket(Guid Id, string Owner, TicketState State, SourceReceipt? Receipt);
+
+    public bool Enabled { get; set; } = enabled;
+    public Dictionary<Guid, Ticket> Tickets { get; } = [];
+    public List<(string Owner, string FileName, long? SizeBytes)> Prepared { get; } = [];
+    public List<(IReadOnlyList<Guid> Ids, string Owner)> Resolved { get; } = [];
+    public PreparedUpload? NextPrepared { get; set; }
+    public UploadTicketException? PrepareFailure { get; set; }
+
+    public Guid AddUsed(string owner, string fileName, string preview = "preview")
+    {
+        var id = Guid.NewGuid();
+        var receipt = new SourceReceipt(Guid.NewGuid(), fileName, SourceKind.Pdf, 210_000, 24, 52_000, 1, SourceQuality.Good,
+            Usable: true, Duplicate: false, SourceBudgetClass.FullText, preview, [], null);
+        Tickets[id] = new Ticket(id, owner, TicketState.Used, receipt);
+        return id;
+    }
+
+    public Guid Add(string owner, TicketState state)
+    {
+        var id = Guid.NewGuid();
+        Tickets[id] = new Ticket(id, owner, state, null);
+        return id;
+    }
+
+    public Task<PreparedUpload> PrepareAsync(string owner, string fileName, long? sizeBytes, CancellationToken ct = default)
+    {
+        Prepared.Add((owner, fileName, sizeBytes));
+        if (PrepareFailure is not null)
+            throw PrepareFailure;
+        var now = DateTimeOffset.UtcNow;
+        return Task.FromResult(NextPrepared ?? new PreparedUpload(
+            Guid.NewGuid(), "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_abcde", now.AddMinutes(15), now.AddHours(24), 25L * 1024 * 1024));
+    }
+
+    public Task<UploadOutcome> ReceiveByTokenAsync(Guid uploadId, string token, Stream body, CancellationToken ct = default) =>
+        throw new NotSupportedException();
+
+    public Task<UploadOutcome> ReceiveFromPageAsync(Guid uploadId, string owner, string fileName, Stream body, CancellationToken ct = default) =>
+        throw new NotSupportedException();
+
+    public Task<UploadClaimProbe> ProbeAsync(Guid uploadId, string owner, CancellationToken ct = default) =>
+        throw new NotSupportedException();
+
+    public Task<IReadOnlyList<SourceReceipt>> ResolveAsync(IReadOnlyList<Guid> uploadIds, string owner, Func<Guid, string> pageLink, CancellationToken ct = default)
+    {
+        Resolved.Add((uploadIds, owner));
+        var receipts = new List<SourceReceipt>();
+        foreach (var id in uploadIds)
+        {
+            if (!Tickets.TryGetValue(id, out var ticket) || ticket.Owner != owner)
+                throw new UploadTicketException(string.Format(System.Globalization.CultureInfo.InvariantCulture, UploadTicketLines.NotFoundFormat, id));
+            switch (ticket.State)
+            {
+                case TicketState.Open:
+                    throw new UploadTicketException(string.Format(System.Globalization.CultureInfo.InvariantCulture, UploadTicketLines.NotArrivedFormat, id, pageLink(id)));
+                case TicketState.Deleted:
+                    throw new UploadTicketException(string.Format(System.Globalization.CultureInfo.InvariantCulture, UploadTicketLines.NoLongerStoredFormat, id));
+            }
+
+            receipts.Add(ticket.Receipt!);
+        }
+
+        return Task.FromResult<IReadOnlyList<SourceReceipt>>(receipts);
     }
 }
 

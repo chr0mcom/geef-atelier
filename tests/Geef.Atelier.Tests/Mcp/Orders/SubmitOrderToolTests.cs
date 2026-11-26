@@ -15,6 +15,8 @@ public sealed class SubmitOrderToolTests
     private readonly FakeOrderService _orders = new();
     private readonly FakeSourceIntake _intake = new();
     private readonly FakeUser _alice = new("alice");
+    private readonly FakeUploadTickets _uploads = new(enabled: false);
+    private readonly FakeRefusalLog _refusals = new();
 
     [Fact]
     public async Task Request_is_passed_verbatim_as_a_direct_mcp_order_that_may_ask_questions()
@@ -23,7 +25,7 @@ public sealed class SubmitOrderToolTests
         var runId = Guid.NewGuid();
         _orders.OnSubmit = _ => new OrderSubmission(orderId, OrderDisplayState.Queued, runId, []);
 
-        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), Request);
+        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request);
 
         var submitted = Assert.Single(_orders.Submitted);
         Assert.Equal(Request, submitted.RequestText);
@@ -49,7 +51,7 @@ public sealed class SubmitOrderToolTests
     [Fact]
     public async Task Extra_careful_submits_a_careful_order()
     {
-        await SubmitOrderTool.SubmitOrder(_orders, _intake, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), Request, extraCareful: true);
+        await SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request, extraCareful: true);
 
         Assert.Equal(OrderMode.Careful, Assert.Single(_orders.Submitted).Mode);
     }
@@ -59,7 +61,7 @@ public sealed class SubmitOrderToolTests
     {
         _orders.OnSubmit = _ => new OrderSubmission(Guid.NewGuid(), OrderDisplayState.Queued, Guid.NewGuid(), ["One file is very long and is read with a map."]);
 
-        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), Request);
+        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request);
 
         Assert.EndsWith("One file is very long and is read with a map.", dto.Message);
     }
@@ -71,7 +73,7 @@ public sealed class SubmitOrderToolTests
             ("offer.pdf", "application/pdf", Attachments.MinimalPdf),
             ("notes.md", "text/markdown", "# Notes\n\nDelivery in calendar week 12."u8.ToArray()));
 
-        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), Request, attachments: json);
+        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request, attachments: json);
 
         Assert.Equal(2, _intake.Intakes.Count);
         Assert.All(_intake.Intakes, i => Assert.Equal("alice", i.Owner));
@@ -104,8 +106,8 @@ public sealed class SubmitOrderToolTests
             ("known.md", "text/markdown", "# Older notes\n\nThe customer is in Sampletown."u8.ToArray()),
             ("scan.pdf", "application/pdf", Attachments.MinimalPdf));
 
-        var ex = await Assert.ThrowsAsync<McpException>(() =>
-            SubmitOrderTool.SubmitOrder(_orders, _intake, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), Request, attachments: json));
+        var ex = await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request, attachments: json));
 
         Assert.Contains("'scan.pdf' cannot be used: The PDF contains no readable text (probably a scan).", ex.Message);
         Assert.Contains("Nothing was started", ex.Message);
@@ -121,8 +123,8 @@ public sealed class SubmitOrderToolTests
     {
         var json = Attachments.Text("vertrag.md", "Siehe angehängte Vollversion im Briefing-Kontext", "text/markdown");
 
-        var ex = await Assert.ThrowsAsync<McpException>(() =>
-            SubmitOrderTool.SubmitOrder(_orders, _intake, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), Request, attachments: json));
+        var ex = await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request, attachments: json));
 
         Assert.Contains("vertrag.md", ex.Message);
         Assert.Contains("placeholder", ex.Message);
@@ -137,8 +139,8 @@ public sealed class SubmitOrderToolTests
             "Your files are too long to use completely (950,000 characters, the limit is 900,000). Choose pages for: big.pdf");
         var json = Attachments.Json(("big.pdf", "application/pdf", Attachments.MinimalPdf));
 
-        var ex = await Assert.ThrowsAsync<McpException>(() =>
-            SubmitOrderTool.SubmitOrder(_orders, _intake, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), Request, attachments: json));
+        var ex = await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request, attachments: json));
 
         Assert.StartsWith("Your files are too long to use completely", ex.Message);
         Assert.Single(_intake.Deletes);
@@ -150,7 +152,7 @@ public sealed class SubmitOrderToolTests
         var orderId = Guid.NewGuid();
         _orders.OnSubmit = _ => new OrderSubmission(orderId, OrderDisplayState.NeedsInput, null, []);
 
-        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), Request);
+        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request);
 
         Assert.Equal("needs_input", dto.State);
         Assert.Null(dto.RunId);
@@ -165,8 +167,8 @@ public sealed class SubmitOrderToolTests
     {
         var json = Attachments.Json(("offer.pdf", "application/pdf", Attachments.MinimalPdf));
 
-        var ex = await Assert.ThrowsAsync<McpException>(() =>
-            SubmitOrderTool.SubmitOrder(_orders, _intake, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), request, attachments: json));
+        var ex = await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), request, attachments: json));
 
         Assert.Contains("request is empty", ex.Message);
         Assert.Empty(_intake.Intakes);
@@ -175,8 +177,8 @@ public sealed class SubmitOrderToolTests
     [Fact]
     public async Task Without_user_no_order_is_created()
     {
-        await Assert.ThrowsAsync<McpException>(() =>
-            SubmitOrderTool.SubmitOrder(_orders, _intake, new FakeUser(null), OrderToolTestData.Options(), OrderToolTestData.Intake(), Request));
+        await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, new FakeUser(null), OrderToolTestData.Options(), OrderToolTestData.Intake(), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request));
 
         Assert.Empty(_orders.Submitted);
     }
@@ -199,7 +201,7 @@ public sealed class SubmitOrderToolTests
         _orders.ViewAfterWait = OrderToolTestData.View(orderId, OrderDisplayState.NeedsInput, runId: null, clarification: OrderToolTestData.Clarification());
         var json = Attachments.Json(("notes.md", "text/markdown", "# Notes\n\nDelivery in calendar week 12."u8.ToArray()));
 
-        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), Request, attachments: json);
+        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request, attachments: json);
 
         var wait = Assert.Single(_orders.Waits);
         Assert.Equal(orderId, wait.OrderId);
@@ -246,7 +248,7 @@ public sealed class SubmitOrderToolTests
         _orders.ViewAfterWait = OrderToolTestData.View(orderId, OrderDisplayState.NeedsInput, runId: null,
             clarification: OrderToolTestData.Clarification([OrderToolTestData.LengthQuestion]));
 
-        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), Request);
+        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request);
 
         Assert.StartsWith("Before writing, Atelier has 1 short question. Ask the person", dto.Message);
     }
@@ -260,7 +262,7 @@ public sealed class SubmitOrderToolTests
         _orders.ViewAfterWait = OrderToolTestData.View(orderId, OrderDisplayState.Queued, runId: runId,
             clarification: OrderToolTestData.Clarification([], IntakeOutcome.Clarified));
 
-        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), Request);
+        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request);
 
         Assert.Equal("queued", dto.State);
         Assert.Equal(runId.ToString(), dto.RunId);
@@ -277,7 +279,7 @@ public sealed class SubmitOrderToolTests
         _orders.OnSubmit = _ => new OrderSubmission(orderId, OrderDisplayState.Preparing, null, []);
         _orders.ViewAfterWait = OrderToolTestData.View(orderId, OrderDisplayState.Preparing, step: "Reading your request", runId: null);
 
-        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), Request);
+        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request);
 
         Assert.Equal("preparing", dto.State);
         Assert.Null(dto.RunId);
@@ -295,7 +297,7 @@ public sealed class SubmitOrderToolTests
         _orders.OnSubmit = _ => new OrderSubmission(orderId, OrderDisplayState.Preparing, null, []);
         _orders.ViewAfterWait = OrderToolTestData.View(orderId, OrderDisplayState.Preparing, runId: null);
 
-        await SubmitOrderTool.SubmitOrder(_orders, _intake, _alice, OrderToolTestData.Options(maxWait), OrderToolTestData.Intake(submitWait), Request);
+        await SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(maxWait), OrderToolTestData.Intake(submitWait), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request);
 
         Assert.Equal(TimeSpan.FromSeconds(expected), Assert.Single(_orders.Waits).MaxWait);
     }
@@ -305,7 +307,7 @@ public sealed class SubmitOrderToolTests
     {
         _orders.OnSubmit = _ => new OrderSubmission(Guid.NewGuid(), OrderDisplayState.Preparing, null, []);
 
-        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(0), Request);
+        var dto = await SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(0), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request);
 
         Assert.Empty(_orders.Waits);
         Assert.Equal("preparing", dto.State);
@@ -318,8 +320,8 @@ public sealed class SubmitOrderToolTests
         _orders.OnSubmit = _ => new OrderSubmission(Guid.NewGuid(), OrderDisplayState.Preparing, null, []);
         _orders.DeleteDuringWait = true;
 
-        var ex = await Assert.ThrowsAsync<McpException>(() =>
-            SubmitOrderTool.SubmitOrder(_orders, _intake, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), Request));
+        var ex = await Assert.ThrowsAnyAsync<McpException>(() =>
+            SubmitOrderTool.SubmitOrder(_orders, _intake, _uploads, _refusals, _alice, OrderToolTestData.Options(), OrderToolTestData.Intake(), OrderToolTestData.Sources(), OrderToolTestData.OAuth(), Request));
 
         Assert.Equal("Order not found.", ex.Message);
     }

@@ -2,7 +2,7 @@
 
 *[Deutsch](08-crew-system_de.md) · **English***
 
-Last updated: 2026-11-25 (D-075 part B: change run on the direct path; D-074: research in the grounding step of the direct path; before that 2026-11-24, D-067: strict snapshot reading, at least one reviewer, outcome after finalizers, run warnings, system grounding back on the provider-type path, learning paused by default; second review round: reviewer check on save, vector scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserved, finalizers and cancellation; before that 2026-11-23, D-066/12: explicit model_domain, one assignment rule; D-066/10–11: codex aliases, host sync, availability only as reported by the live catalog; before that 2026-11-22, D-066: model matrix — system profiles and model matrix section rewritten; before that 2026-06-04, D-059)
+Last updated: 2026-11-26 (D-076: files through the upload ticket, cleanup and evaluation of refusals; before that 2026-11-25, D-075 part B: change run on the direct path; D-074: research in the grounding step of the direct path; before that 2026-11-24, D-067: strict snapshot reading, at least one reviewer, outcome after finalizers, run warnings, system grounding back on the provider-type path, learning paused by default; second review round: reviewer check on save, vector scope `both`, `grounding.scope_unknown`, `grounding.tool_failed` reserved, finalizers and cancellation; before that 2026-11-23, D-066/12: explicit model_domain, one assignment rule; D-066/10–11: codex aliases, host sync, availability only as reported by the live catalog; before that 2026-11-22, D-066: model matrix — system profiles and model matrix section rewritten; before that 2026-06-04, D-059)
 
 ## Overview
 
@@ -881,6 +881,51 @@ never searches again.
   `grounding.research_failed` ("Looking things up on the web did not work this time. The text was written without it.") and
   the run goes on without `W1`. `NothingFound`, `AllWithheld`, `DailyLimit` and `FilesAttached` add no source and no warning; the result shows
   them as fixed sentences. Only the cancellation of the run itself ends the step.
+
+## Files through the upload ticket (D-076)
+
+An AI assistant cannot reliably write a file as Base64 into a tool argument. While `Uploads:Tickets` is `On`, the file therefore
+arrives outside the MCP call:
+
+1. `prepare_attachment(fileName, sizeBytes?)` adds a row to `UploadTickets` (state `Open`, token only as SHA-256, token
+   15 minutes, page 24 hours) and returns `curlCommand` and `uploadPage`.
+2. Either the assistant runs `curlCommand` (`PUT /api/uploads/{id}`, token in the `X-Upload-Token` header), or the person drops
+   the file on the page `/u/{id}` (`POST /api/uploads/{id}/page`, signed in). Both ways claim the ticket in one statement
+   (`Open → Receiving`, `Attempts + 1`, `ReceivingSince = now`) and hand the file to the same intake as the web interface
+   (`ISourceIntakeService.IntakeAsync`: detection by content, extraction in the child process, limits). Origin of the source:
+   token way `McpAttachment`, page `WebUpload`.
+3. Usable → `Used` with `SourceId`. Checked and refused → back to `Open`, the attempt stays counted, the code is kept in
+   `LastRefusalCode`; after 3 such attempts `Failed`. Not checked (too many uploads at once, overload, broken off, failed save,
+   extraction not available, full quota, time limit, server error) → back to `Open`, the attempt is given back (`Attempts - 1`). A
+   file too long to be used completely is refused on this way (`too_long_for_ticket`; pages can be chosen only in the web app) and
+   not stored. Completing and releasing only apply to the own claim (same `ReceivingSince`).
+4. `submit_order(…, uploadIds)` links the sources of the arrived tickets of the signed-in person to the order (all or nothing);
+   from here on the file is an ordinary source of the order.
+
+**Cleanup** (hourly cleanup service of the sources): `Receiving` for longer than `Sources:UploadTimeout` + 1 minute → `Open` or
+`Failed` (after a crash; a running upload ends earlier at the time limit of its request). The ticket service checks the same
+deadline at every access to the ticket (page, token or page upload) and releases a hanging ticket right away instead of waiting
+for the next pass; the attempt stays counted. tickets deleted 7 days
+(`Uploads:TicketRetention`) after the page expired; rows of `SourceRefusals` after 180 days (`Uploads:RefusalRetention`). When a
+source is deleted, `UploadTickets.SourceId` becomes `NULL`.
+
+**Counting refusals.** `SourceRefusals` holds per refused file the time, person, way (`web`, `mcp_inline`, `mcp_ticket`,
+`upload_page`), code, detected kind, extension, declared type and size, never name or content. Not counted are a token upload
+above the request limit (`413` before the claim), an invalid token, a file the upload page refuses in the browser, an upload that
+ends at the time limit or is cancelled, and technical `400`; `too_large` is therefore under-counted. It is the basis for deciding about
+further file kinds (trigger in D-076: at least 3 refusals from at least 2 accounts outside the measurement accounts in 60 days).
+Evaluation, read-only; the list of measurement accounts comes from the operations configuration
+(`-v messkonten='{account1,account2}'`):
+
+```sql
+SELECT "Code", coalesce("Extension", '-') AS "Endung", "Path" AS "Weg",
+       count(*) AS "Ablehnungen", count(DISTINCT "OwnerUsername") AS "Konten"
+FROM "SourceRefusals"
+WHERE "CreatedAt" > now() - interval '60 days'
+  AND NOT ("OwnerUsername" = ANY (:'messkonten'::text[]))
+GROUP BY 1, 2, 3
+ORDER BY 4 DESC, 1, 2;
+```
 
 ## Change run on the direct path (D-075, part B)
 

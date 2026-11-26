@@ -1,8 +1,10 @@
 using System.Reflection;
 using System.Text.Json;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Mcp;
 using Geef.Atelier.Tests.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Server;
 
 namespace Geef.Atelier.Tests.EndToEnd;
@@ -19,7 +21,7 @@ public sealed class McpToolBindingEndToEndTests(PostgresFixture postgres)
     [Fact]
     public async Task Tools_list_shows_exactly_the_client_values_of_every_tool_and_no_service()
     {
-        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres, s => s.Configure<UploadOptions>(o => o.Tickets = UploadTicketsMode.On));
 
         var response = await host.PostMcpAsync("tools/list");
         var listed = response.GetProperty("result").GetProperty("tools").EnumerateArray()

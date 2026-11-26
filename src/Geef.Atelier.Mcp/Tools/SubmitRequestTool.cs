@@ -34,6 +34,7 @@ public static class SubmitRequestTool
     public static async Task<RunStatusDto> SubmitRequest(
         IOrderService orders,
         ISourceIntakeService intake,
+        ISourceRefusalLog refusals,
         ICurrentUserService currentUser,
         IOptions<OrderOptions> options,
         [Description("The task in the person's own words.")] string briefingText,
@@ -51,7 +52,7 @@ public static class SubmitRequestTool
         var template = crewSpec is null && !string.IsNullOrWhiteSpace(crewTemplate) ? crewTemplate.Trim() : null;
         var mode = crewSpec is not null || template is not null ? OrderMode.Careful : options.Value.LegacySubmitDefaultMode;
 
-        var parsed = McpAttachmentParser.Parse(attachments);
+        var parsed = await refusals.ParseAttachmentsAsync(attachments, username);
         var receipts = await intake.IntakeAttachmentsAsync(parsed, username, cancellationToken);
 
         OrderSubmission submission;

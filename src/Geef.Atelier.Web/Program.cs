@@ -209,6 +209,7 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
+app.UseUploadPageSwitch();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
@@ -235,6 +236,7 @@ app.MapSettingsEndpoints();
 app.MapArtifactEndpoints();
 app.MapProviderEndpoints();
 app.MapSourceEndpoints();
+app.MapUploadEndpoints();
 app.MapOrderEndpoints();
 
 app.MapStaticAssets();

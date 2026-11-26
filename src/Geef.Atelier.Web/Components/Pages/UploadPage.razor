@@ -1,0 +1,449 @@
+@page "/u/{UploadId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@implements IAsyncDisposable
+@using System.Globalization
+@using Geef.Atelier.Application.Sources
+@using Geef.Atelier.Core.Configuration
+@using Geef.Atelier.Core.Domain.Sources
+@using Geef.Atelier.Core.Persistence.Sources
+@using Geef.Atelier.Web.Components.UI.Orders
+@using Microsoft.Extensions.Options
+@inject IUploadTicketService Tickets
+@inject IUploadTicketRepository TicketStore
+@inject IOptions<SourceOptions> SourceSettings
+@inject AntiforgeryStateProvider AntiforgeryState
+@inject AuthenticationStateProvider AuthProvider
+@inject CircuitDataGate DataGate
+@inject IJSRuntime JS
+@inject ILogger<UploadPage> Logger
+
+<PageTitle>Add a file — Atelier</PageTitle>
+
+@switch (_state)
+{
+    case UploadPageState.Loading:
+        <div class="upload-page" data-testid="upload-page" data-state="loading">
+            <EmptyState Message="Loading…" />
+        </div>
+        break;
+    case UploadPageState.NotFound:
+        <div data-testid="upload-not-found">
+            <NotFound />
+        </div>
+        break;
+    case UploadPageState.UnknownUser:
+        <div class="upload-page" data-testid="upload-page" data-state="unknown-user">
+            <EmptyState Message="@OwnerScope.UnknownUserMessage" />
+        </div>
+        break;
+    default:
+        <div class="upload-page" @ref="_root" data-testid="upload-page" data-state="@StateKey">
+            <h1 class="upload-title">@UploadTicketLines.PageHeading</h1>
+
+            @if (_state is UploadPageState.Open or UploadPageState.Uploading)
+            {
+                <p class="upload-intro" data-testid="upload-intro">@IntroBefore<strong class="upload-file-name">@_fileName</strong>@IntroAfter</p>
+            }
+
+            @if (_problem is not null && _state is not UploadPageState.Done)
+            {
+                <div class="upload-state upload-state--problem" role="alert" data-testid="upload-problem">
+                    <span class="upload-state-mark" aria-hidden="true">!</span>
+                    <div class="upload-state-body">
+                        <p class="upload-state-line">@_problem</p>
+                        @if (_state == UploadPageState.Open && _retryable)
+                        {
+                            <button type="button" class="btn small" data-testid="upload-retry" @onclick="RetryAsync">Try again</button>
+                        }
+                        else if (_state == UploadPageState.Open && _reload)
+                        {
+                            <a class="btn small" data-testid="upload-reload" href="@PagePath" data-enhance-nav="false">Reload the page</a>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (_state is UploadPageState.Open or UploadPageState.Uploading or UploadPageState.Running)
+            {
+                <div class="upload-drop" data-upload-zone data-testid="upload-drop" data-ready="@(_uploadAvailable == true ? "true" : "false")" hidden="@(_state != UploadPageState.Open)">
+                    <input type="file" id="upload-file-input" class="upload-file-input"
+                           accept=".pdf,.docx,.txt,.md,.markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
+                           data-upload-input data-testid="upload-file-input" />
+                    <label for="upload-file-input" class="upload-drop-label">
+                        <span class="upload-drop-mark" aria-hidden="true"><IconAdd Size="22" /></span>
+                        <span class="upload-drop-text">
+                            <span class="upload-drop-action">@(_problem is null ? "Choose the file" : "Choose a different file")</span>
+                            <span class="upload-drop-or">or drop it here</span>
+                            <span class="upload-drop-hint">PDF, Word, text or Markdown, up to @MaxMegabytes MB</span>
+                        </span>
+                    </label>
+                    @if (_uploadAvailable == false)
+                    {
+                        <p class="upload-drop-off" role="status" data-testid="upload-unavailable">Adding a file does not work in this browser right now. Reload the page to try again.</p>
+                    }
+                </div>
+            }
+
+            @if (_state == UploadPageState.Uploading && _item is not null)
+            {
+                <div class="upload-state upload-state--busy" role="status" data-testid="upload-state">
+                    <span class="upload-state-mark" aria-hidden="true"></span>
+                    <div class="upload-state-body">
+                        <p class="upload-state-line">@(_item.Percent >= 100 ? "Reading the file…" : $"Uploading… {_item.Percent}%")</p>
+                        <progress class="upload-progress" max="100" value="@_item.Percent" aria-label="Upload progress" data-testid="upload-progress"></progress>
+                    </div>
+                </div>
+            }
+
+            @if (_notice is not null && _state is UploadPageState.Open or UploadPageState.Uploading)
+            {
+                <p class="upload-notice" role="status" data-testid="upload-notice">@_notice</p>
+            }
+
+            @switch (_state)
+            {
+                case UploadPageState.Done:
+                    <div class="upload-state upload-state--done" role="status" data-testid="upload-state">
+                        <span class="upload-state-mark" aria-hidden="true"><IconCheck Size="20" /></span>
+                        <div class="upload-state-body">
+                            <p class="upload-state-line" data-testid="upload-done">@UploadTicketLines.PageDone</p>
+                        </div>
+                    </div>
+                    @if (_item is not null)
+                    {
+                        <ul class="source-cards upload-receipt" data-testid="upload-receipt">
+                            <SourceReceiptCard Item="_item" />
+                        </ul>
+                    }
+                    break;
+                case UploadPageState.AlreadyUsed:
+                    <div class="upload-state upload-state--used" role="status" data-testid="upload-state">
+                        <span class="upload-state-mark" aria-hidden="true"><IconCheck Size="20" /></span>
+                        <div class="upload-state-body">
+                            <p class="upload-state-line" data-testid="upload-used">@UploadTicketLines.PageAlreadyUsed</p>
+                        </div>
+                    </div>
+                    break;
+                case UploadPageState.Expired:
+                    <div class="upload-state upload-state--expired" role="status" data-testid="upload-state">
+                        <span class="upload-state-mark" aria-hidden="true"></span>
+                        <div class="upload-state-body">
+                            <p class="upload-state-line" data-testid="upload-expired">@UploadTicketLines.PageExpired</p>
+                        </div>
+                    </div>
+                    break;
+                case UploadPageState.Failed:
+                    <div class="upload-state upload-state--failed" role="status" data-testid="upload-state">
+                        <span class="upload-state-mark" aria-hidden="true"></span>
+                        <div class="upload-state-body">
+                            <p class="upload-state-line" data-testid="upload-failed">@UploadTicketLines.PageFailed</p>
+                        </div>
+                    </div>
+                    break;
+                case UploadPageState.Running:
+                    <div class="upload-state upload-state--busy" role="status" data-testid="upload-state">
+                        <span class="upload-state-mark" aria-hidden="true"></span>
+                        <div class="upload-state-body">
+                            <p class="upload-state-line" data-testid="upload-running">@UploadTicketLines.AlreadyRunning</p>
+                            <button type="button" class="btn small" data-testid="upload-check-again" @onclick="CheckAgainAsync">Check again</button>
+                        </div>
+                    </div>
+                    break;
+            }
+        </div>
+        break;
+}
+
+@code {
+    private const string ModulePath = "./js/source-upload.js";
+
+    /// <summary>Shown when several files were dropped or chosen at once; only the first one is sent.</summary>
+    public const string OneFileNotice = "Only one file can be added here. The first one was used.";
+
+    /// <summary>Shown when the state of the link could not be checked.</summary>
+    public const string CheckFailed = "Something went wrong on our side. Reload the page in a moment.";
+
+    [Parameter] public Guid UploadId { get; set; }
+
+    UploadPageState _state = UploadPageState.Loading;
+    ElementReference _root;
+    string? _owner;
+    string _fileName = string.Empty;
+    SourceUploadItem? _item;
+    string? _problem;
+    string? _notice;
+    bool _retryable;
+    bool _reload;
+    bool? _uploadAvailable;
+    IJSObjectReference? _module;
+    IJSObjectReference? _handle;
+    DotNetObjectReference<UploadPage>? _self;
+    bool _disposed;
+
+    string StateKey => _state switch
+    {
+        UploadPageState.AlreadyUsed => "used",
+        _ when _problem is not null && _state == UploadPageState.Open => "problem",
+        _ => _state.ToString().ToLowerInvariant(),
+    };
+
+    string PagePath => string.Format(CultureInfo.InvariantCulture, UploadTicketRoutes.PagePathFormat, UploadId);
+
+    string IntroBefore => UploadTicketLines.PageIntroFormat.Split("{0}")[0];
+
+    string IntroAfter => UploadTicketLines.PageIntroFormat.Split("{0}")[1];
+
+    string MaxMegabytes => (SourceSettings.Value.MaxFileBytes / 1_048_576.0).ToString("0.#", CultureInfo.InvariantCulture);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthProvider.GetAuthenticationStateAsync();
+        var name = auth.User.Identity?.Name;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            _state = UploadPageState.UnknownUser;
+            return;
+        }
+
+        _owner = name;
+        if (!Tickets.Enabled)
+        {
+            _state = UploadPageState.NotFound;
+            return;
+        }
+
+        try
+        {
+            var probe = await DataGate.RunAsync(() => Tickets.ProbeAsync(UploadId, name));
+            if (probe == UploadClaimProbe.Open)
+            {
+                var ticket = (await DataGate.RunAsync(() => TicketStore.FindForOwnerAsync([UploadId], name))).FirstOrDefault(t => t.Id == UploadId);
+                if (ticket is null)
+                {
+                    _state = UploadPageState.NotFound;
+                    return;
+                }
+                _fileName = ticket.FileName;
+            }
+            _state = StateOf(probe);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Loading upload ticket {UploadId} for its page failed", UploadId);
+            _state = UploadPageState.Error;
+            _problem = CheckFailed;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_state is not (UploadPageState.Open or UploadPageState.Running) || _handle is not null || _uploadAvailable is not null)
+            return;
+        try
+        {
+            _self = DotNetObjectReference.Create(this);
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", ModulePath);
+            var token = AntiforgeryState.GetAntiforgeryToken()?.Value ?? string.Empty;
+            var url = string.Format(CultureInfo.InvariantCulture, UploadTicketRoutes.PageUploadPathFormat, UploadId);
+            _handle = await _module.InvokeAsync<IJSObjectReference>("init", _root, _self, new { url, token, single = true });
+            _uploadAvailable = _handle is not null;
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            Logger.LogInformation(ex, "File upload script could not be loaded on the upload page");
+            _uploadAvailable = false;
+        }
+        if (_disposed)
+            await ReleaseScriptAsync();
+        StateHasChanged();
+    }
+
+    /// <summary>Called by the upload script before the file is sent; returns false when it is not sent.</summary>
+    [JSInvokable]
+    public async Task<bool> OnUploadStarted(string localId, string fileName, long sizeBytes, string? hint)
+    {
+        if (_state != UploadPageState.Open)
+            return false;
+        _problem = null;
+        _retryable = false;
+        _reload = false;
+        var maxBytes = SourceSettings.Value.MaxFileBytes;
+        if (sizeBytes > maxBytes)
+        {
+            _problem = $"This file is larger than {MaxMegabytes} MB. Choose a smaller file.";
+            await InvokeAsync(StateHasChanged);
+            return false;
+        }
+        _item = new SourceUploadItem(localId, fileName, sizeBytes) { Hint = hint };
+        _state = UploadPageState.Uploading;
+        await InvokeAsync(StateHasChanged);
+        return true;
+    }
+
+    /// <summary>Called by the upload script while the file is being sent.</summary>
+    [JSInvokable]
+    public async Task OnUploadProgress(string localId, int percent)
+    {
+        if (_item is null || _item.LocalId != localId || _state != UploadPageState.Uploading)
+            return;
+        _item.Percent = Math.Clamp(percent, 0, 100);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>Called by the upload script when more than one file was dropped or chosen.</summary>
+    [JSInvokable]
+    public async Task OnExtraFilesIgnored(int count)
+    {
+        _notice = OneFileNotice;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>Called by the upload script with the answer of the server (status 0 = no answer).</summary>
+    [JSInvokable]
+    public async Task OnUploadCompleted(string localId, int status, string? body)
+    {
+        if (_item is null || _item.LocalId != localId)
+            return;
+        _item.ApplyResponse(status, body, SourceSettings.Value.MaxFileBytes);
+        if (_item.Status == SourceUploadStatus.Ready)
+        {
+            _state = UploadPageState.Done;
+            _problem = null;
+            _notice = null;
+            await ForgetAsync(_item);
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        _problem = ProblemOf(status, body, _item);
+        _retryable = _item.Recovery == SourceUploadRecovery.Retry;
+        _reload = _item.Recovery is SourceUploadRecovery.Reload or SourceUploadRecovery.SignIn;
+        if (!_retryable)
+            await ForgetAsync(_item);
+        await RefreshStateAsync();
+        if (_state is UploadPageState.Expired or UploadPageState.Failed)
+            _problem = _item.Receipt?.Reason ?? (status == 413 ? SourceReceiptJson.TryParseReason(body) : null);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    static string ProblemOf(int status, string? body, SourceUploadItem item) => status switch
+    {
+        404 or 409 or 410 => SourceReceiptJson.TryParseReason(body) ?? CheckFailed,
+        200 or 201 or 413 or 422 => item.Problem?.Replace(" Remove it, or try a different file.", " Choose a different file.", StringComparison.Ordinal)
+                                               .Replace(" Remove it, or try a smaller file.", " Choose a smaller file.", StringComparison.Ordinal)
+                                    ?? CheckFailed,
+        _ => item.Problem ?? CheckFailed,
+    };
+
+    async Task RefreshStateAsync()
+    {
+        if (_owner is not { } owner)
+            return;
+        try
+        {
+            var probe = await DataGate.RunAsync(() => Tickets.ProbeAsync(UploadId, owner));
+            _state = StateOf(probe);
+            if (_state is UploadPageState.AlreadyUsed or UploadPageState.Running or UploadPageState.NotFound)
+                _problem = null;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogWarning(ex, "Checking upload ticket {UploadId} again failed", UploadId);
+            _state = UploadPageState.Open;
+        }
+    }
+
+    async Task CheckAgainAsync()
+    {
+        await RefreshStateAsync();
+        if (_state == UploadPageState.Open && string.IsNullOrEmpty(_fileName) && _owner is { } owner)
+        {
+            var ticket = (await DataGate.RunAsync(() => TicketStore.FindForOwnerAsync([UploadId], owner))).FirstOrDefault(t => t.Id == UploadId);
+            if (ticket is null)
+                _state = UploadPageState.NotFound;
+            else
+                _fileName = ticket.FileName;
+        }
+    }
+
+    async Task RetryAsync()
+    {
+        if (_module is null || _handle is null || _item is null)
+            return;
+        try
+        {
+            if (await _module.InvokeAsync<bool>("retry", _handle, _item.LocalId))
+            {
+                _item.Status = SourceUploadStatus.Uploading;
+                _item.Percent = 0;
+                _item.Problem = null;
+                _problem = null;
+                _retryable = false;
+                _state = UploadPageState.Uploading;
+            }
+            else
+            {
+                _problem = "This file can no longer be sent. Choose it again.";
+                _retryable = false;
+            }
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException)
+        {
+            Logger.LogDebug(ex, "Retrying the upload on the upload page failed");
+        }
+    }
+
+    static UploadPageState StateOf(UploadClaimProbe probe) => probe switch
+    {
+        UploadClaimProbe.Open => UploadPageState.Open,
+        UploadClaimProbe.Receiving => UploadPageState.Running,
+        UploadClaimProbe.Used => UploadPageState.AlreadyUsed,
+        UploadClaimProbe.Expired => UploadPageState.Expired,
+        UploadClaimProbe.Failed => UploadPageState.Failed,
+        _ => UploadPageState.NotFound,
+    };
+
+    async Task ForgetAsync(SourceUploadItem item)
+    {
+        if (_module is null || _handle is null)
+            return;
+        try
+        {
+            await _module.InvokeVoidAsync("forget", _handle, item.LocalId);
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException)
+        {
+            Logger.LogDebug(ex, "Releasing the upload in the browser failed");
+        }
+    }
+
+    async Task ReleaseScriptAsync()
+    {
+        try
+        {
+            if (_module is not null && _handle is not null)
+                await _module.InvokeVoidAsync("dispose", _handle);
+            if (_handle is not null)
+                await _handle.DisposeAsync();
+            if (_module is not null)
+                await _module.DisposeAsync();
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or TaskCanceledException or ObjectDisposedException)
+        {
+            Logger.LogDebug(ex, "Releasing the upload script failed");
+        }
+        _handle = null;
+        _module = null;
+        _self?.Dispose();
+        _self = null;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        await ReleaseScriptAsync();
+    }
+
+    enum UploadPageState { Loading, NotFound, UnknownUser, Open, Uploading, Done, AlreadyUsed, Expired, Running, Error, Failed }
+}

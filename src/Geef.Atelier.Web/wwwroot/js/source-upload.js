@@ -22,6 +22,7 @@ export function init(root, dotnet, options) {
         dotnet,
         url: options.url,
         token: options.token,
+        single: !!options.single,
         files: new Map(),
         requests: new Map(),
         queue: [],
@@ -79,7 +80,11 @@ export function init(root, dotnet, options) {
 }
 
 async function addFiles(handle, fileList) {
-    const files = Array.prototype.slice.call(fileList || []);
+    let files = Array.prototype.slice.call(fileList || []);
+    if (handle.single && files.length > 1) {
+        handle.dotnet.invokeMethodAsync('OnExtraFilesIgnored', files.length - 1).catch(() => { });
+        files = files.slice(0, 1);
+    }
     for (const file of files) {
         const localId = 'u' + (++nextId) + '-' + Date.now().toString(36);
         let accepted = false;

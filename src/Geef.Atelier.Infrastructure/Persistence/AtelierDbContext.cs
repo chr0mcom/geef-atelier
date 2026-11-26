@@ -36,6 +36,8 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     public DbSet<SourceEntity> Sources => Set<SourceEntity>();
     public DbSet<OrderSourceEntity> OrderSources => Set<OrderSourceEntity>();
     public DbSet<RunSourceUsageEntity> RunSourceUsages => Set<RunSourceUsageEntity>();
+    public DbSet<UploadTicketEntity> UploadTickets => Set<UploadTicketEntity>();
+    public DbSet<SourceRefusalEntity> SourceRefusals => Set<SourceRefusalEntity>();
 
     public DbSet<UserProfileEntity> UserProfiles => Set<UserProfileEntity>();
     public DbSet<OrderIntakeShadowEntity> OrderIntakeShadows => Set<OrderIntakeShadowEntity>();

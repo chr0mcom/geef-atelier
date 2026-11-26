@@ -74,7 +74,7 @@ internal sealed class OrderService(
 
         var plan = await PlanSourcesAsync(selections, request.CreatedByUser, srcOptions, ct);
         if (plan.Budget.Class == SourceBudgetClass.TooLarge)
-            throw new OrderSubmissionException(TooLargeMessage(plan.Budget));
+            throw new OrderSubmissionException(TooLargeMessage(plan.Budget), TooLargeWithoutPagesMessage(plan.Budget));
         var notices = new List<string>();
         if (plan.Budget.Class == SourceBudgetClass.WithMap)
             notices.Add(MapNotice);
@@ -598,6 +598,10 @@ internal sealed class OrderService(
             : " Please use fewer or shorter files.";
         return Invariant($"Your files are too long to use completely ({budget.TotalChars:N0} characters, the limit is {budget.MapMaxChars:N0}).") + choose;
     }
+
+    private static string TooLargeWithoutPagesMessage(SourceBudgetPlan budget) =>
+        Invariant($"Your files are too long to use completely ({budget.TotalChars:N0} characters, the limit is {budget.MapMaxChars:N0}). ") +
+        "Pages cannot be chosen here: use fewer or shorter files, or ask the person to start the order in the Atelier web app and choose the pages there. Nothing was started.";
 
     private async Task NotifyAsync(Guid orderId)
     {

@@ -13,6 +13,7 @@ namespace Geef.Atelier.Tests.Mcp;
 /// <summary>
 /// The tool list of the stage-5 contract (4.4): exactly the nine order tools, the older tools beside them only with
 /// <c>Mcp:LegacyTools=true</c>, the five with a successor pointing to it, and the longest wait named from <c>Orders:MaxWaitSeconds</c>.
+/// Without configuration upload tickets are off, so the ticket tool of stage 6 is not offered here.
 /// </summary>
 public sealed class McpToolCatalogTests
 {
@@ -34,10 +35,13 @@ public sealed class McpToolCatalogTests
         var all = typeof(McpAssemblyMarker).Assembly.GetTypes().Where(t => t.GetCustomAttribute<McpServerToolTypeAttribute>() is not null).ToList();
 
         Assert.Equal(9, McpToolCatalog.OrderTools.Count);
+        Assert.Equal([typeof(PrepareAttachmentTool)], McpToolCatalog.TicketTools);
         Assert.Equal(19, McpToolCatalog.LegacyTools.Count);
-        Assert.Empty(McpToolCatalog.OrderTools.Intersect(McpToolCatalog.LegacyTools));
-        Assert.Equal(all.OrderBy(t => t.Name), McpToolCatalog.OrderTools.Concat(McpToolCatalog.LegacyTools).OrderBy(t => t.Name));
-        Assert.Equal(all.Count, McpToolCatalog.OrderTools.Concat(McpToolCatalog.LegacyTools).ToolMethods().Count);
+        var lists = McpToolCatalog.OrderTools.Concat(McpToolCatalog.TicketTools).Concat(McpToolCatalog.LegacyTools).ToList();
+        Assert.Equal(lists.Count, lists.Distinct().Count());
+        Assert.Equal(all.OrderBy(t => t.Name), lists.OrderBy(t => t.Name));
+        Assert.Equal(all.Count, lists.ToolMethods().Count);
+        Assert.Equal(29, typeof(McpAssemblyMarker).Assembly.ToolMethods().Count);
     }
 
     [Fact]
@@ -47,7 +51,8 @@ public sealed class McpToolCatalogTests
 
         Assert.Equal(28, tools.Count);
         Assert.Equal(OrderToolNames.Order(StringComparer.Ordinal), tools.Keys.Intersect(OrderToolNames).Order(StringComparer.Ordinal));
-        Assert.Equal(typeof(McpAssemblyMarker).Assembly.ToolMethods().Count, tools.Count);
+        Assert.Equal(typeof(McpAssemblyMarker).Assembly.ToolMethods().Count - McpToolCatalog.TicketTools.ToolMethods().Count, tools.Count);
+        Assert.DoesNotContain("prepare_attachment", tools.Keys);
     }
 
     [Fact]

@@ -118,6 +118,10 @@ public sealed class OrderServiceTests(PostgresFixture postgres)
         Assert.Equal(
             string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Your files are too long to use completely ({big.CharCount:N0} characters, the limit is 600,000). Choose pages for: tender.pdf."),
             refused.Message);
+        Assert.Equal(
+            string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Your files are too long to use completely ({big.CharCount:N0} characters, the limit is 600,000). ")
+            + "Pages cannot be chosen here: use fewer or shorter files, or ask the person to start the order in the Atelier web app and choose the pages there. Nothing was started.",
+            refused.WithoutPageChoice);
 
         var badPages = await Assert.ThrowsAsync<OrderSubmissionException>(() =>
             SubmitAsync(host, new SubmitOrderRequest("Summarise.", user, OrderEntry.Web, [new OrderSourceSelection(big.Id, "1-300")])));

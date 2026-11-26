@@ -16,7 +16,8 @@ namespace Geef.Atelier.Infrastructure.Sources;
 /// through <see cref="ISourceExtractionRunner"/>, refuses text beyond <see cref="SourceOptions.MaxExtractedChars"/> before
 /// copying it, prepares it in one pass (line ends, page-marker look-alikes, long lines, counts) and stores it with the
 /// original under the per-user quota of unattached sources (files, bytes and characters, checked again under a lock).
-/// Pasted text needs no upload place or slot.
+/// Pasted text needs no upload place or slot. Every refused upload carries its code (<see cref="SourceRefusalCodes"/>) and is
+/// counted through <see cref="ISourceRefusalLog"/>; counting never changes the receipt.
 /// </summary>
 internal sealed class SourceIntakeService(
     ISourceRepository repository,
@@ -24,6 +25,7 @@ internal sealed class SourceIntakeService(
     ISourceFileStore files,
     ISourceExtractionRunner extraction,
     SourceIntakeLimiter limiter,
+    ISourceRefusalLog refusals,
     IOptions<SourceOptions> options,
     ILogger<SourceIntakeService> logger,
     TimeProvider? timeProvider = null) : ISourceIntakeService
@@ -32,11 +34,26 @@ internal sealed class SourceIntakeService(
     internal const string MapMessage = "Large file: parts will be searched, not read in full.";
     internal const string SaveFailedReason = "The file could not be saved. Please try again.";
     internal const string InterruptedReason = "The upload was interrupted. Please try again.";
+    internal const string EmptyReason = "This file is empty.";
+    internal const string NoReadableTextReason = "This file has no readable text.";
 
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
-    public Task<SourceReceipt> IntakeAsync(SourceUpload upload, string ownerUsername, SourceOrigin origin, CancellationToken ct = default) =>
-        IntakeCoreAsync(upload, ownerUsername, origin, limited: true, ct);
+    public async Task<SourceReceipt> IntakeAsync(SourceUpload upload, string ownerUsername, SourceOrigin origin, CancellationToken ct = default, RefusalPath path = RefusalPath.Web)
+    {
+        var receipt = await IntakeCoreAsync(upload, ownerUsername, origin, limited: true, ct);
+        if (!receipt.Usable)
+            await refusals.RecordAsync(ToRefusalRecord(receipt, upload, ownerUsername, path), CancellationToken.None);
+        return receipt;
+    }
+
+    private static SourceRefusalRecord ToRefusalRecord(SourceReceipt receipt, SourceUpload upload, string ownerUsername, RefusalPath path)
+    {
+        var code = receipt.RefusalCode ?? SourceRefusalCodes.Other;
+        long? size = receipt.SizeBytes > 0 || code == SourceRefusalCodes.Empty ? receipt.SizeBytes : null;
+        return new SourceRefusalRecord(ownerUsername, path, code, receipt.Kind,
+            SourceRefusalCodes.ExtensionOf(upload.FileName), SourceRefusalCodes.DeclaredTypeOf(upload.DeclaredContentType), size);
+    }
 
     private async Task<SourceReceipt> IntakeCoreAsync(SourceUpload upload, string ownerUsername, SourceOrigin origin, bool limited, CancellationToken ct)
     {
@@ -46,47 +63,55 @@ internal sealed class SourceIntakeService(
         var opts = options.Value;
         var fileName = SourceFileNames.Sanitize(upload.FileName);
         var declared = Math.Max(0, upload.Length);
-        if (declared > opts.MaxFileBytes)
-            return Refused(fileName, declared, TooLargeReason(opts), refusal: SourceRefusal.TooLarge);
+        var announced = upload.AnnouncedBytes is { } promised ? Math.Max(0, promised) : (long?)null;
+        if (declared > opts.MaxFileBytes || announced > opts.MaxFileBytes)
+            return Refused(fileName, Math.Max(declared, announced ?? 0), TooLargeReason(opts), SourceRefusalCodes.TooLarge, refusal: SourceRefusal.TooLarge);
 
         using var place = limited ? limiter.TryEnterUser(ownerUsername) : null;
         if (limited && place is null)
-            return Refused(fileName, declared, limiter.UserBusyReason, refusal: SourceRefusal.TooManyUploads);
+            return Refused(fileName, declared, limiter.UserBusyReason, SourceRefusalCodes.UserBusy, refusal: SourceRefusal.TooManyUploads);
 
         using var slot = limited ? await limiter.EnterIntakeAsync(ct) : null;
         if (limited && slot is null)
         {
             logger.LogWarning("An upload was refused because all upload slots stayed busy.");
-            return Refused(fileName, declared, SourceIntakeLimiter.BusyReason, refusal: SourceRefusal.Busy);
+            return Refused(fileName, declared, SourceIntakeLimiter.BusyReason, SourceRefusalCodes.Busy, refusal: SourceRefusal.Busy);
         }
 
         IncomingUpload? received;
         try
         {
-            received = await IncomingUpload.ReceiveAsync(upload.Content, opts.StorageRoot, opts.MaxFileBytes, ct);
+            received = await IncomingUpload.ReceiveAsync(upload.Content, opts.StorageRoot, announced ?? opts.MaxFileBytes, ct);
         }
         catch (UploadInterruptedException ex)
         {
             logger.LogInformation("An upload ended before its last byte: {Error}", ex.InnerException?.GetType().Name);
-            return Refused(fileName, declared, InterruptedReason, refusal: SourceRefusal.Interrupted);
+            return Refused(fileName, declared, InterruptedReason, SourceRefusalCodes.Interrupted, refusal: SourceRefusal.Interrupted);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             logger.LogError("An upload could not be written to the sources volume: {Error}", ex.GetType().Name);
-            return Refused(fileName, declared, SaveFailedReason);
+            return Refused(fileName, declared, SaveFailedReason, SourceRefusalCodes.SaveFailed);
         }
 
         if (received is null)
-            return Refused(fileName, declared, TooLargeReason(opts), refusal: SourceRefusal.TooLarge);
+            return announced is { } limit
+                ? Refused(fileName, 0, string.Format(CultureInfo.InvariantCulture, UploadTicketLines.LargerThanAnnouncedFormat, limit), SourceRefusalCodes.SizeMismatch)
+                : Refused(fileName, declared, TooLargeReason(opts), SourceRefusalCodes.TooLarge, refusal: SourceRefusal.TooLarge);
 
         await using (received)
+        {
+            if (announced is { } expected && received.Length != expected)
+                return Refused(fileName, received.Length,
+                    string.Format(CultureInfo.InvariantCulture, UploadTicketLines.SizeMismatchFormat, received.Length, expected), SourceRefusalCodes.SizeMismatch);
             return await IntakeReceivedAsync(received, fileName, ownerUsername, origin, opts, ct);
+        }
     }
 
     private async Task<SourceReceipt> IntakeReceivedAsync(IncomingUpload received, string fileName, string ownerUsername, SourceOrigin origin, SourceOptions opts, CancellationToken ct)
     {
         if (received.Length == 0)
-            return Refused(fileName, 0, "This file is empty.");
+            return Refused(fileName, 0, EmptyReason, SourceRefusalCodes.Empty);
 
         if (await ReuseAsync(ownerUsername, received.Sha256, opts, ct) is { } reused)
             return reused;
@@ -94,20 +119,26 @@ internal sealed class SourceIntakeService(
         var quota = Quota(opts);
         var usage = await retention.GetUnattachedUsageAsync(ownerUsername, ct);
         if (!quota.Allows(usage, received.Length, 0))
-            return Refused(fileName, received.Length, QuotaReason(usage, received.Length, 0, opts));
+            return Refused(fileName, received.Length, QuotaReason(usage, received.Length, 0, opts), SourceRefusalCodes.Quota);
 
         var detected = SourceKindDetector.DetectFile(received.FilePath, received.Head, fileName, opts.MaxArchiveEntries);
         if (detected.Kind is not { } kind)
-            return Refused(fileName, received.Length, detected.Reason ?? SourceKindDetector.UnsupportedReason);
+        {
+            var reason = detected.Reason ?? SourceKindDetector.UnsupportedReason;
+            return Refused(fileName, received.Length, reason, SourceRefusalCodeMap.FromExtractionReason(reason));
+        }
 
         SourceExtraction? result = await extraction.ExtractAsync(kind, received.FilePath, received.Directory, ct);
         if (result.Quality == SourceQuality.Unreadable || string.IsNullOrWhiteSpace(result.Text))
-            return Refused(fileName, received.Length, result.FailureReason ?? "This file has no readable text.", kind, result.PageCount, result.Warnings,
+        {
+            var reason = result.FailureReason ?? NoReadableTextReason;
+            return Refused(fileName, received.Length, reason, SourceRefusalCodeMap.FromExtractionReason(reason, result.Warnings), kind, result.PageCount, result.Warnings,
                 result.FailureReason == SourceIntakeLimiter.BusyReason ? SourceRefusal.Busy : SourceRefusal.None);
+        }
         if (result.Text.Length > opts.MaxExtractedChars)
         {
             logger.LogInformation("A {Kind} file was refused because its text is longer than {Limit} characters.", kind, opts.MaxExtractedChars);
-            return Refused(fileName, received.Length, SourceExtraction.TooMuchTextReason, kind, result.PageCount);
+            return Refused(fileName, received.Length, SourceExtraction.TooMuchTextReason, SourceRefusalCodes.TooMuchText, kind, result.PageCount);
         }
 
         var warnings = result.Warnings.ToList();
@@ -131,7 +162,7 @@ internal sealed class SourceIntakeService(
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             logger.LogError("Source file could not be stored: {Error}", ex.GetType().Name);
-            return Refused(fileName, received.Length, SaveFailedReason, kind, pageCount, warnings);
+            return Refused(fileName, received.Length, SaveFailedReason, SourceRefusalCodes.SaveFailed, kind, pageCount, warnings);
         }
 
         var now = _time.GetUtcNow();
@@ -165,7 +196,7 @@ internal sealed class SourceIntakeService(
         {
             files.TryDelete(storagePath);
             return await ReuseAsync(ownerUsername, received.Sha256, opts, ct)
-                   ?? Refused(fileName, received.Length, SaveFailedReason, kind, pageCount, warnings);
+                   ?? Refused(fileName, received.Length, SaveFailedReason, SourceRefusalCodes.SaveFailed, kind, pageCount, warnings);
         }
         catch
         {
@@ -176,7 +207,7 @@ internal sealed class SourceIntakeService(
         if (refusedBy is { } over)
         {
             files.TryDelete(storagePath);
-            return Refused(fileName, received.Length, QuotaReason(over, received.Length, charCount, opts), kind, pageCount);
+            return Refused(fileName, received.Length, QuotaReason(over, received.Length, charCount, opts), SourceRefusalCodes.Quota, kind, pageCount);
         }
 
         return ToReceipt(source, duplicate: false);
@@ -279,10 +310,10 @@ internal sealed class SourceIntakeService(
                     $"This file is too long ({chars:N0} characters, the limit is {opts.MapMaxChars:N0}). Please use a shorter version.")));
     }
 
-    private static SourceReceipt Refused(string fileName, long size, string reason, SourceKind? kind = null, int? pageCount = null,
+    private static SourceReceipt Refused(string fileName, long size, string reason, string code, SourceKind? kind = null, int? pageCount = null,
         IReadOnlyList<SourceWarning>? warnings = null, SourceRefusal refusal = SourceRefusal.None) =>
         new(null, fileName, kind, size, pageCount, 0, 0, SourceQuality.Unreadable, Usable: false, Duplicate: false,
-            SourceBudgetClass.FullText, string.Empty, warnings ?? [], reason, Refusal: refusal);
+            SourceBudgetClass.FullText, string.Empty, warnings ?? [], reason, Refusal: refusal, RefusalCode: code);
 
     private static string TooLargeReason(SourceOptions opts) =>
         opts.MaxFileBytes >= 1_048_576
