@@ -67,7 +67,7 @@ public sealed class DirectRevisionTests
         Assert.DoesNotContain(DirectWriterPrompts.SeedInstruction, change, StringComparison.Ordinal);
         Assert.Equal(plain.Replace(DirectWriterPrompts.SeedInstruction, DirectWriterPrompts.RevisionInstruction, StringComparison.Ordinal), change);
         Assert.Equal(
-            "Change the text in draft.md only as the person asks in the line marked \"the change to make now\" under \"Change requested by the person\". The earlier changes listed there are already made in the text: keep them and do not make them again. Keep everything else as it is: the same facts, structure and wording. Keep the language of the text unless the change asks for another language. Keep the length within ±15 % unless the change asks for another length.",
+            "Change the text in draft.md only as the person asks in the line marked \"the change to make now\" under \"Change requested by the person\". The earlier changes listed there are already made in the text: keep them and do not make them again. Keep everything else as it is: the same facts, structure and wording. If the change leaves another sentence wrong or pointing at something that is no longer in the text, adjust that sentence as little as possible. A change of tone, style or length changes the wording, not the content: add no statement about what happened, what will happen, what is offered or what is expected that the text does not already make, and keep who writes and who is addressed. When the text has to get longer, expand on what it already says and do not invent detail to fill it. Keep the language of the text unless the change asks for another language. Keep the length within ±15 % unless the change asks for another length or cannot be made without changing it.",
             DirectWriterPrompts.RevisionInstruction);
     }
 
@@ -78,7 +78,25 @@ public sealed class DirectRevisionTests
 
         Assert.Contains("<<<TEXT\n" + Text + "\nTEXT>>>", prompt, StringComparison.Ordinal);
         Assert.Contains("Change this text only as the person asks in the line marked \"the change to make now\" under \"Change requested by the person\".", prompt, StringComparison.Ordinal);
+        Assert.Contains(DirectWriterPrompts.RevisionInstruction.Replace("the text in draft.md", "this text", StringComparison.Ordinal), prompt, StringComparison.Ordinal);
+        Assert.Contains("keep who writes and who is addressed. When the text has to get longer, expand on what it already says", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("draft.md", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_seed_instruction_and_the_sentences_of_the_quick_buttons_stay_word_for_word()
+    {
+        Assert.Equal("Revise the text in draft.md as the request asks. Change as little as possible; keep length within ±15 % unless the request says otherwise.",
+            DirectWriterPrompts.SeedInstruction);
+        Assert.Equal(
+            [
+                "Make the text about a third shorter.",
+                "Make the text about a third longer without adding new facts.",
+                "Make the tone more formal.",
+                "Make the tone warmer and friendlier.",
+                "Use simpler words and shorter sentences.",
+            ],
+            Enum.GetValues<RevisionQuick>().Select(q => q.Instruction()));
     }
 
     [Fact]

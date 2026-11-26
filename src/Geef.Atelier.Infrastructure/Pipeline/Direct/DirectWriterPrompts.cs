@@ -24,10 +24,12 @@ internal static class DirectWriterPrompts
 
     /// <summary>
     /// Instruction of the first pass of a run that changes an earlier version; replaces <see cref="SeedInstruction"/> there. Only the line
-    /// marked as the change to make now is carried out; the earlier changes of the block are already in the text.
+    /// marked as the change to make now is carried out; the earlier changes of the block are already in the text. A sentence that the
+    /// change leaves wrong is adjusted as little as possible; a change of tone, style or length adds no statement and keeps who writes and
+    /// who is addressed; a longer text expands on what it says.
     /// </summary>
     public const string RevisionInstruction =
-        "Change the text in draft.md only as the person asks in the line marked \"the change to make now\" under \"Change requested by the person\". The earlier changes listed there are already made in the text: keep them and do not make them again. Keep everything else as it is: the same facts, structure and wording. Keep the language of the text unless the change asks for another language. Keep the length within ±15 % unless the change asks for another length.";
+        "Change the text in draft.md only as the person asks in the line marked \"the change to make now\" under \"Change requested by the person\". The earlier changes listed there are already made in the text: keep them and do not make them again. Keep everything else as it is: the same facts, structure and wording. If the change leaves another sentence wrong or pointing at something that is no longer in the text, adjust that sentence as little as possible. A change of tone, style or length changes the wording, not the content: add no statement about what happened, what will happen, what is offered or what is expected that the text does not already make, and keep who writes and who is addressed. When the text has to get longer, expand on what it already says and do not invent detail to fill it. Keep the language of the text unless the change asks for another language. Keep the length within ±15 % unless the change asks for another length or cannot be made without changing it.";
 
     /// <summary>Sentences that make the writer read the whole background document instead of searching it.</summary>
     public const string ReadCompletelyInstruction =
