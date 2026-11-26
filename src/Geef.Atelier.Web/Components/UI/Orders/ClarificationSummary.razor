@@ -99,7 +99,7 @@
                     (_, null, { } f) => $"“{f}”",
                     _ => null,
                 };
-                lines.Add(new AnswerLine(question.Text, text ?? "left to me", true, text is null, Who(answer, string.Empty)));
+                lines.Add(new AnswerLine(question.Text, text ?? (question.FromTemplate ? "left to me" : "left open"), true, text is null, Who(answer, string.Empty)));
             }
             if (Clarification.RevisionFileName is { } file
                 && Clarification.Answers.FirstOrDefault(a => a.QuestionId == RevisionAnswer.QuestionId) is { OptionId: RevisionAnswer.No or RevisionAnswer.Yes } revision)

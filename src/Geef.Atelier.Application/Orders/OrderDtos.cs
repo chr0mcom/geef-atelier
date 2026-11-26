@@ -92,6 +92,9 @@ public sealed record OrderView(
 /// asked for changes, and a change may have settled or overtaken them. <see cref="LengthNotice"/> is
 /// <see cref="RevisionLines.LongerThanBefore"/> when the shown version changed an earlier one and became clearly longer than the text it
 /// changed (worked out from the stored texts, also for versions written before the rule existed), otherwise <c>null</c>.
+/// <see cref="UnansweredQuestions"/> are the questions the person left open before writing (skipped, not answered in time, "You decide"),
+/// read back from the briefing of the shown version, which told the writer never to decide them where that would commit the person;
+/// <c>null</c> when there are none. For a changed version they were noted for <see cref="AssumptionsVersion"/>.
 /// </summary>
 public sealed record OrderResult(
     Guid OrderId,
@@ -121,7 +124,8 @@ public sealed record OrderResult(
     int? LatestVersion = null,
     IReadOnlyList<OrderEarlierPoint>? EarlierOpenPoints = null,
     int? AssumptionsVersion = null,
-    string? LengthNotice = null);
+    string? LengthNotice = null,
+    IReadOnlyList<string>? UnansweredQuestions = null);
 
 /// <summary>
 /// Something the writer noted for an earlier <see cref="Version"/> that the shown version does not repeat: an open point (also a fixed

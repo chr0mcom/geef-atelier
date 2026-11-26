@@ -15,14 +15,15 @@ namespace Geef.Atelier.Tests.Mcp;
 /// With <c>Uploads:Tickets=Off</c> the tool list and the server instructions are the same, byte for byte, as before stage 6
 /// (<c>main</c> at <c>aadcac5</c>), apart from the texts changed on purpose later: the hashes below were taken from that state, as clients
 /// see it (<see cref="McpJsonUtilities.DefaultOptions"/>), and taken again once when changing a text lost the quick change <c>longer</c>
-/// (<c>revise_order</c>, <c>get_order_result</c> with <c>lengthNotice</c>, step 6 of the instructions).
+/// (<c>revise_order</c>, <c>get_order_result</c> with <c>lengthNotice</c>, step 6 of the instructions), and once more for the questions the
+/// person did not answer in step 5 of the instructions (D-081).
 /// </summary>
 public sealed class McpTicketsOffBaselineTests
 {
     private const string ToolsWithLegacyHash = "db658fcddf55eeab54412dcb5d988294421dc793359281a45492e3dec9f1c840";
     private const string ToolsWithoutLegacyHash = "165e018513d9f4c28ab23e7b103c71cda389761a326e13804832554f754ed42a";
-    private const string InstructionsWithLegacyHash = "c5ef1b77a1558dad0baef3e36a98eb829ea6c7e675c0ef87579216ac91eedb6b";
-    private const string InstructionsWithoutLegacyHash = "44542b8183b3938d76674e840d8538df97e7f7d9c06fbf9d62a3f257cb7afa6a";
+    private const string InstructionsWithLegacyHash = "39052d88f5f976882751a4fcde33a70c4bc889cd9f4ea3b0b92ebdf60f256672";
+    private const string InstructionsWithoutLegacyHash = "e56324836621e79badcad70ab3888faaf4477a2d0343d3400008a514b552e2a3";
 
     [Theory]
     [InlineData("true", ToolsWithLegacyHash)]

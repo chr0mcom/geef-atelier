@@ -61,7 +61,7 @@ public sealed class McpIntakeEndToEndTests(PostgresFixture postgres)
         Assert.Equal(["short", "medium", "long"], questions[0].GetProperty("options").EnumerateArray().Select(o => o.GetProperty("id").GetString()));
         Assert.Equal("Kurz (etwa 150 Wörter)", questions[0].GetProperty("options")[0].GetProperty("label").GetString());
         Assert.True(questions[0].GetProperty("allowFreeText").GetBoolean());
-        Assert.Equal("o1", questions[1].GetProperty("defaultOptionId").GetString());
+        Assert.True(!questions[1].TryGetProperty("defaultOptionId", out var preselected) || preselected.ValueKind == JsonValueKind.Null, questions[1].ToString());
         Assert.StartsWith("Before writing, Atelier has 2 short questions.", submitted.GetProperty("message").GetString());
 
         var watch = Stopwatch.StartNew();

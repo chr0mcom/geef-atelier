@@ -104,6 +104,16 @@
                 }
             </ul>
         }
+        @if (Unanswered.Count > 0)
+        {
+            <p data-testid="order-unanswered-lead">@UnansweredLead</p>
+            <ul class="order-writer-open" data-testid="order-unanswered">
+                @foreach (var question in Unanswered)
+                {
+                    <li data-testid="order-unanswered-question" lang="@Language">@question</li>
+                }
+            </ul>
+        }
         @foreach (var earlier in EarlierPoints.Where(p => p.Kind == EarlierPointKind.Note).GroupBy(p => p.Version))
         {
             <p data-testid="order-earlier-notes-lead">@string.Format(System.Globalization.CultureInfo.InvariantCulture, RevisionLines.EarlierNotesLeadFormat, earlier.Key)</p>
@@ -179,7 +189,8 @@
 @code {
     /// <summary>
     /// The delivered result with placeholders, open checks, passages of the text that may not be backed or may not follow an
-    /// instruction, problems in the files, open points of the writer, open points and assumptions (<see cref="RevisionLines.EarlierAssumptionLead"/>)
+    /// instruction, problems in the files, open points of the writer, the questions the person left open before writing
+    /// (<see cref="UnansweredLeadNow"/>, for a changed version <see cref="UnansweredLeadNotedFormat"/>), open points and assumptions (<see cref="RevisionLines.EarlierAssumptionLead"/>)
     /// of the writer for an earlier version that the shown version does not repeat (<see cref="RevisionLines.EarlierPointsLeadFormat"/>), the fixed
     /// sentences of Atelier about an earlier version under their own neutral lead (<see cref="RevisionLines.EarlierNotesLeadFormat"/>) and hints
     /// (everything that never blocks, among them passages the pages looked up say otherwise, with <see cref="OrderResearchLines.DiffersFromLookedUp"/>,
@@ -208,6 +219,20 @@
 
     /// <summary>Lead of the problems in the material when the pages looked up were part of it; each sentence names where it stands.</summary>
     public const string SourceIssuesLeadWithLookedUp = "Please check these figures and statements:";
+
+    IReadOnlyList<string> Unanswered => Result.UnansweredQuestions();
+
+    /// <summary>Lead of the questions the person left open before writing.</summary>
+    public const string UnansweredLeadNow =
+        "These questions stayed open: you skipped them, left them to me, or I did not ask them. The writer was told not to say yes or no for you on them. Please check how the text handles them:";
+
+    /// <summary>Lead of the questions the person left open, for a changed version: <c>{0}</c> is the version they were noted for.</summary>
+    public const string UnansweredLeadNotedFormat =
+        "Before version {0}, these questions stayed open: you skipped them, left them to me, or I did not ask them. A later change may have settled them. Please check how the text handles them:";
+
+    string UnansweredLead => Result.AssumptionsVersion is int noted
+        ? string.Format(System.Globalization.CultureInfo.InvariantCulture, UnansweredLeadNotedFormat, noted)
+        : UnansweredLeadNow;
 
     /// <summary>Words before an open point of the writer shown with the sentence about the same wrong total.</summary>
     public const string WriterNoteLead = "The writer noted:";

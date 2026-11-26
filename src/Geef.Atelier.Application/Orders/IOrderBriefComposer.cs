@@ -8,9 +8,12 @@ namespace Geef.Atelier.Application.Orders;
 
 /// <summary>
 /// What the briefing of the next run is built from. <see cref="AssumptionsShown"/> is true only when the person saw the card with
-/// the assumptions before the start (the run starts from <see cref="OrderState.NeedsInput"/>).
+/// the assumptions before the start (the run starts from <see cref="OrderState.NeedsInput"/>). <see cref="NotChecked"/> is true when an
+/// order of the intake starts before its request was checked (skipped while reading, the clarifier failed or timed out); orders without
+/// the intake step never set it.
 /// </summary>
-public sealed record OrderBriefInput(OrderEntity Order, IntakeRecord? Record, IReadOnlyList<OrderAnswer> Answers, UserProfileEntity? Profile, bool AssumptionsShown = false);
+public sealed record OrderBriefInput(OrderEntity Order, IntakeRecord? Record, IReadOnlyList<OrderAnswer> Answers, UserProfileEntity? Profile, bool AssumptionsShown = false,
+    bool NotChecked = false);
 
 /// <summary>The briefing text and the names of the sections it contains, in order.</summary>
 public sealed record IntakeBrief(string Text, IReadOnlyList<string> Sections);
@@ -21,7 +24,10 @@ public sealed record IntakeBrief(string Text, IReadOnlyList<string> Sections);
 /// (<c>Intake:ContentAssumptions</c>): assumptions about facts of the case are listed as not given by the person instead of as
 /// defaults. The assumptions are called shown to the person only when the card was really shown
 /// (<see cref="OrderBriefInput.AssumptionsShown"/>). The request always comes first and unchanged; everything else follows after
-/// <see cref="BriefingSections.Separator"/>.
+/// <see cref="BriefingSections.Separator"/>. Questions the person left open (<see cref="OpenQuestions.IsLeftOpen"/>: skipped, not
+/// answered in time, "You decide") and the questions the gate held back (<see cref="IntakeRecord.HeldBack"/>) are listed under their own
+/// heading, which forbids deciding for the person what would commit them; an order of the intake that starts unchecked
+/// (<see cref="OrderBriefInput.NotChecked"/>) gets the same rule as one general line. A briefing without either stays exactly as before.
 /// </summary>
 public interface IOrderBriefComposer
 {
@@ -38,6 +44,8 @@ internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOr
     public const string AssumptionsSection = "assumptions";
     public const string ProfileSection = "profile";
     public const string OpenFactsSection = "open-facts";
+    public const string OpenQuestionsSection = "open-questions";
+    public const string NotCheckedSection = "not-checked";
 
     public const string AnswersHeading = "Answers the person gave before writing:";
     public const string CorrectionsHeading = "Corrections to assumptions:";
@@ -47,6 +55,15 @@ internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOr
     public const string AssumptionsNotShownHeading = AssumptionsNotShownHeadingStart + " (use them only where neither the request nor the files say otherwise; never state them as facts):";
     public const string OpenFactsHeadingStart = "Not given by the person";
     public const string OpenFactsHeading = OpenFactsHeadingStart + " (never state these as facts in the text; where the text needs one of them, write a placeholder in square brackets or leave it out):";
+    public const string KeepDecisionsOpen =
+        "never decide it for the person: keep it open, for example by confirming receipt, asking back or asking for time, or write a clearly visible placeholder in square brackets, and name the open decision among your open points.";
+    public const string OpenQuestionsHeading = "Questions the person did not answer (the person skipped them, left them to you, or was not asked). "
+        + "The request, the answers and corrections of the person and any change the person asks for take precedence: where one of them settles one of these questions, follow the person. "
+        + "Otherwise, where the answer would commit the person – for example to accept or decline, order, cancel, pay or confirm attendance – " + KeepDecisionsOpen + " "
+        + "Never invent facts for these questions either. For anything else, choose what fits the request best:";
+    public const string NotCheckedHeading = "The request was not checked for missing details before writing. "
+        + "Where the text would need a decision only the person can make – for example to accept or decline, order, cancel, pay or confirm attendance – " + KeepDecisionsOpen + " "
+        + "Where the request or a change the person asks for settles it, follow the person.";
     public const string RevisionQuestion = "Improve the attached file chosen as the text to revise?";
     public const string RevisionYes = "Yes, improve that file";
     public const string RevisionNo = "No, write something new and use the file only as material";
@@ -74,8 +91,16 @@ internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOr
             sections.Add(UnderstandingSection);
         }
 
-        var answerLines = (record?.Questions ?? [])
-            .Where(q => answers.ContainsKey(q.Id))
+        var questions = record?.Questions ?? [];
+        var openQuestions = questions.Where(q => q.IsLeftOpen(answers)).ToList();
+        var answered = questions.Where(q => !openQuestions.Contains(q)).Select(q => q.Text.SameQuestionKey()).ToHashSet(StringComparer.Ordinal);
+        var openLines = openQuestions.Select(q => OneLine(q.Text))
+            .Concat((record?.HeldBack ?? []).Select(OneLine).Where(l => !answered.Contains(l.SameQuestionKey())))
+            .Where(l => l.Length > 0)
+            .DistinctBy(l => l.SameQuestionKey(), StringComparer.Ordinal)
+            .ToList();
+        var answerLines = questions
+            .Where(q => answers.ContainsKey(q.Id) && !openQuestions.Contains(q))
             .Select(q => $"- {OneLine(q.Text)} → {Describe(q, answers[q.Id])}")
             .ToList();
         if (record?.RevisionSourceId is not null && answers.TryGetValue(RevisionAnswer.QuestionId, out var revision)
@@ -103,6 +128,19 @@ internal sealed class IntakeBriefComposer(IOptions<IntakeOptions> options) : IOr
             intake.Add(CorrectionsHeading);
             intake.AddRange(correctionLines);
             sections.Add(CorrectionsSection);
+        }
+
+        if (openLines.Count > 0)
+        {
+            intake.Add(OpenQuestionsHeading);
+            intake.AddRange(openLines.Select(l => "- " + l));
+            sections.Add(OpenQuestionsSection);
+        }
+
+        if (input.NotChecked && record?.Output is null)
+        {
+            intake.Add(NotCheckedHeading);
+            sections.Add(NotCheckedSection);
         }
 
         if (record?.Output is not null)

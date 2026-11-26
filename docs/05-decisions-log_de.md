@@ -3261,3 +3261,72 @@ Datenbanktests für die Regel (`StandardOrderWebSearchTests`), Unit-Tests für E
 - **Zur Aussage über claude.ai:** Seit dem 26.11. ist ein kompletter Weg über eine in claude.ai eingerichtete Verbindung erprobt,
   aufgerufen aus Claude Code: Auftrag mit Datei und Rückfrage, danach eine Änderung. Das Chatfenster von claude.ai selbst und
   Claude Desktop sind weiterhin nicht geprüft. Das ersetzt insoweit die früheren Vermerke „claude.ai nicht geprüft“.
+
+## D-081 — Überspringen legt den Anwender nie fest (2026-11-26)
+
+**Status:** umgesetzt; die Messung am echten System ist vorbereitet und steht noch aus.
+
+**Regel.** Überspringt die Person eine Frage, startet sie ohne Antwort, läuft die Antwortzeit ab oder drückt sie „You decide“, darf
+Atelier keine verbindliche Entscheidung für sie treffen, die sie nicht selbst gesagt hat: keine Zu- oder Absage, Bestellung,
+Kündigung, Zahlung, Teilnahmebestätigung oder Zustimmung. Ein solcher Punkt bleibt im Text offen oder wird als Lücke markiert und am
+Ergebnis genannt. Antworten der Person und Entscheidungen, die schon im Auftrag stehen, gelten wie bisher.
+
+**Mechanismus vor dieser Änderung.** `QuestionGate` behält für eine gestellte Lücke keine Annahme. Eine übersprungene Frage stand
+deshalb gar nicht im Auftrag an den Schreiber, und er wählte frei; „You decide“ kam als `Frage → left to you` an. Eine Frage, die
+das Tor verwarf (zweite Frage zum Thema, über der Obergrenze, unbrauchbare Antworten), machte ihre Annahme oder „not specified – the
+writer decides“ zur Annahme im Auftrag. Die Vorauswahl des Klärers (`defaultOptionId`) erreichte den Schreiber nie; sie wurde nur über
+MCP weitergegeben.
+
+**Entscheidung.**
+- **Keine Vorauswahl.** `QuestionGate` setzt `DefaultOptionId` nie, und die MCP-Abbildung sendet immer `null`, auch für Datensätze von
+  vor dieser Änderung.
+- **Offene Fragen bekommen einen eigenen Block im Auftrag an den Schreiber.** Eine Frage des Klärers gilt als offen, wenn keine
+  verwertbare Antwort der Person vorliegt (übersprungen, ohne Antworten gestartet, Zeit abgelaufen, „You decide“ oder weder bekannte
+  Option noch eigene Worte; `OpenQuestions.IsLeftOpen`). Dazu wird eine Frage, die der Klärer unter den Themen `Purpose` oder `Other`
+  stellen wollte und die das Tor als zweite Frage zum Thema, über der Obergrenze oder wegen ihrer Form verwirft, zurückgehalten
+  (`QuestionGateResult.HeldBack`, gespeichert als `IntakeRecord.HeldBack`) und nie zur Annahme oder zur Zeile „the writer decides“.
+  Beide Arten stehen wörtlich unter der Überschrift „Questions the person did not answer …“. Sie sagt zuerst, dass Auftrag,
+  Antworten und Korrekturen der Person und spätere Änderungen vorgehen und befolgt werden, wo sie eine Frage klären; sonst
+  entscheidet der Schreiber nie für die Person, was sie bindet, hält es offen (Eingang bestätigen, nachfragen, um Zeit bitten) oder
+  setzt einen gut sichtbaren Platzhalter, nennt die offene Entscheidung unter den offenen Punkten, erfindet keine Fakten und wählt
+  alles andere frei. Eine zurückgehaltene Frage, die wortgleich mit einer beantworteten ist (ohne Rücksicht auf Groß- und
+  Kleinschreibung, Leerraum und Satzzeichen), entfällt aus Block und Ergebnis. Die feste Längenfrage öffnet den Block nie; „You
+  decide“ erscheint dort weiter als „left to me“.
+- **Start ohne Prüfung.** Ein Auftrag mit Rückfrage-Stufe, der startet, bevor sein Auftrag geprüft ist (Start während des Lesens,
+  Klärer gescheitert oder zu langsam), bekommt dieselbe Regel als eine allgemeine Zeile („The request was not checked …“). Aufträge
+  ohne Rückfrage-Stufe (`Orders:IntakeMode = Off` oder `Shadow`) bekommen sie nie.
+- **Unverändert:** Aufträge an den Schreiber ohne offene oder zurückgehaltene Frage und ohne Start ohne Prüfung bleiben bitgleich;
+  Datensätze ohne zurückgehaltene Frage werden gespeichert wie bisher. Prompts und Schemata von Klärer, Schreiber und Faktenprüfung
+  sind unverändert (Prüfsummen-Tests).
+- **Ergebnis.** Die Fragen werden aus dem Auftrag der gezeigten Fassung gelesen: im Web unter „Open points“ (bei einer geänderten
+  Fassung mit der Version, vor der sie gestellt wurden), über MCP als `unansweredQuestions` (angehängt) mit dem Hinweis, sie zu zeigen
+  und nicht selbst zu beantworten; Schritt 5 der MCP-Hinweise nennt sie. Die Karte sagt, dass der Schreiber bei übersprungenen Fragen
+  angewiesen wird, nicht für die Person zu- oder abzusagen, und bittet, Annahmen und Text zu prüfen; „You decide“ erscheint als
+  „left open“.
+- **Recherche und Prüfungen** bekommen den Auftrag ohne diese Blöcke; nur die vollständigen Überschriften gelten als Blockanfang.
+  Eine Änderung behält den Block.
+
+**Grenzen.**
+- Durchgesetzt ist nur, was dem Schreiber gesagt wird; ob er sich daran hält, misst das Messtor unten, garantiert ist es nicht.
+- Eine Entscheidung, die der Klärer ohne Rückfrage in eine Annahme schreibt, ist nicht abgedeckt (braucht eine Klärer-Änderung und
+  eine neue große Messung).
+- Vor dieser Änderung gespeicherte Aufträge behalten ihren Auftrag an den Schreiber: Ändern oder Fortsetzen fügt keinen Block hinzu,
+  und ihr Ergebnis zeigt keine `unansweredQuestions`. Beim Deploy wartende Aufträge behalten die Annahmen ihres gespeicherten
+  Datensatzes.
+- „Extra careful“ und `Direct:WriterNotes = false` haben keinen Kanal für offene Punkte; dort kann die Anweisung nur im Text sichtbar
+  werden. Nicht gemessen.
+- **Rückweg:** Ein älteres Image kennt die neuen Überschriften nicht. Steht ein solcher Block als erster Block im Auftrag an den
+  Schreiber, hält das ältere Image beim Ändern oder Fortsetzen dieses Auftrags den ganzen Auftrag samt About-me-Angaben für die
+  Anfrage. Nach einem Rückweg mit dieser Version geschriebene Aufträge nicht ändern oder fortsetzen.
+
+**Tests.** Reine Tests von Tor und Auftragsaufbau (keine Vorauswahl, keine Annahme im Auftrag, „You decide“ und Teilantworten offen,
+zurückgehaltene Fragen bei zweiter Frage, Obergrenze und unbrauchbaren Antworten, andere Themen unverändert, Start ohne Prüfung,
+Antworten unverändert, Längenfrage, nur volle Überschrift), Parser und Änderung, Datenbank- und Ende-zu-Ende-Tests für Überspringen,
+Antworten, automatischen Start und Klärer-Fehler, bUnit für „Open points“, MCP-Feld, Hinweis und `defaultOptionId`, Grundlinien der
+MCP-Hinweise neu genommen. Alle Beispiele sind erfunden.
+
+**Messung (vorbereitet, nicht ausgeführt).** Frische, erfundene Fälle auf Deutsch und Englisch, alle mit `skip=true` auf dem
+Direktweg: Entscheidungsfälle, Kontrollfälle ohne Entscheidung und Fälle mit der Entscheidung im Auftrag; Schwelle 0 Festlegungen in
+Entscheidungsfällen, Kontrollfälle nicht schlechter, höchstens 40 Modellaufrufe, blinder Prüfer ohne Werkzeuge in leerem Ordner. Nicht
+gemessen werden „You decide“, Teilantworten, Zeitablauf, Änderungen und „Extra careful“. Vertrag und Werkzeug liegen außerhalb des
+Repositorys.

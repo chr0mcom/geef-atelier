@@ -30,14 +30,14 @@ public sealed class IntakeBriefComposerTests
     }
 
     [Fact]
-    public void Without_answers_the_assumptions_shown_are_appended_as_defaults_and_an_empty_profile_adds_nothing()
+    public void Without_answers_the_questions_stay_open_the_assumptions_shown_are_appended_as_defaults_and_an_empty_profile_adds_nothing()
     {
         var emptyProfile = new UserProfileEntity { Username = "user-a", Signature = " ", CreatedAt = T0, UpdatedAt = T0 };
 
         var brief = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), [], emptyProfile, AssumptionsShown: true));
 
-        Assert.Equal(Request + "\n\n---\n" + Assumptions, brief.Text);
-        Assert.Equal([IntakeBriefComposer.RequestSection, IntakeBriefComposer.AssumptionsSection], brief.Sections);
+        Assert.Equal(Request + "\n\n---\n" + OpenBlock("Wer kommt?", "Gibt es ein Motto?") + "\n" + Assumptions, brief.Text);
+        Assert.Equal([IntakeBriefComposer.RequestSection, IntakeBriefComposer.OpenQuestionsSection, IntakeBriefComposer.AssumptionsSection], brief.Sections);
         Assert.Contains("the answers and corrections of the person above always take precedence", IntakeBriefComposer.AssumptionsHeading, StringComparison.Ordinal);
         Assert.Contains("never state them as facts", IntakeBriefComposer.AssumptionsHeading, StringComparison.Ordinal);
         Assert.DoesNotContain(IntakeBriefComposer.AnswersHeading, brief.Text, StringComparison.Ordinal);
@@ -76,18 +76,20 @@ public sealed class IntakeBriefComposerTests
             Answers the person gave before writing:
             - Wie lang soll der Text ungefähr werden? → Kurz (etwa 150 Wörter)
             - Wer kommt? → Ganzes Team – "Bitte mit Grill" (answered by the assistant)
-            - Gibt es ein Motto? → left to you
             Corrections to assumptions:
             - Lockerer, herzlicher Ton → Eher förmlich, bitte
             - Datum als Platzhalter → Am 12. Juli (answered by the assistant)
+            {{OpenQuestions}}
+            - Gibt es ein Motto?
 
             About the person (use only where it fits the text; never invent anything beyond it):
             Name: Anna Beispiel
             Address the readers: informally
-            """.ReplaceLineEndings("\n"),
+            """.ReplaceLineEndings("\n").Replace("{{OpenQuestions}}", IntakeBriefComposer.OpenQuestionsHeading, StringComparison.Ordinal),
             brief.Text);
         Assert.Equal(
-            [IntakeBriefComposer.RequestSection, IntakeBriefComposer.AnswersSection, IntakeBriefComposer.CorrectionsSection, IntakeBriefComposer.ProfileSection],
+            [IntakeBriefComposer.RequestSection, IntakeBriefComposer.AnswersSection, IntakeBriefComposer.CorrectionsSection,
+             IntakeBriefComposer.OpenQuestionsSection, IntakeBriefComposer.ProfileSection],
             brief.Sections);
         Assert.DoesNotContain(IntakeBriefComposer.AssumptionsHeading, brief.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("What will be written", brief.Text, StringComparison.Ordinal);
@@ -102,7 +104,7 @@ public sealed class IntakeBriefComposerTests
     }
 
     [Fact]
-    public void Free_text_only_and_empty_answers_are_shown_honestly()
+    public void Free_text_only_and_empty_answers_are_shown_honestly_and_empty_or_left_answers_stay_open()
     {
         IReadOnlyList<OrderAnswer> answers =
         [
@@ -114,8 +116,8 @@ public sealed class IntakeBriefComposerTests
         var text = Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), answers, null, AssumptionsShown: true)).Text;
 
         Assert.Contains("- Wie lang soll der Text ungefähr werden? → \"3 Minuten Rede\"\n", text, StringComparison.Ordinal);
-        Assert.Contains("- Wer kommt? → left to you\n", text, StringComparison.Ordinal);
-        Assert.Contains("- Gibt es ein Motto? → left to you (answered by the assistant)\n", text, StringComparison.Ordinal);
+        Assert.Contains(OpenBlock("Wer kommt?", "Gibt es ein Motto?") + "\n", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(IntakeBriefComposer.LeftToYou, text, StringComparison.Ordinal);
         Assert.DoesNotContain("\"Sommer\"", text, StringComparison.Ordinal);
         Assert.EndsWith(Assumptions, text, StringComparison.Ordinal);
     }
@@ -137,15 +139,17 @@ public sealed class IntakeBriefComposerTests
 
         Assert.Equal(
             [IntakeBriefComposer.RequestSection, IntakeBriefComposer.UnderstandingSection, IntakeBriefComposer.AnswersSection,
-             IntakeBriefComposer.CorrectionsSection, IntakeBriefComposer.AssumptionsSection, IntakeBriefComposer.ProfileSection],
+             IntakeBriefComposer.CorrectionsSection, IntakeBriefComposer.OpenQuestionsSection, IntakeBriefComposer.AssumptionsSection,
+             IntakeBriefComposer.ProfileSection],
             prepared.Sections);
         Assert.Equal(appended.Sections, prepared.Sections.Where(s => s is not IntakeBriefComposer.UnderstandingSection));
 
         var understanding = "What will be written: Eine Einladung zum Sommerfest des Teams.\nText type: Einladung\n";
         var assumptions = IntakeBriefComposer.AssumptionsHeading + "\n- Datum als Platzhalter\n";
         Assert.Contains("---\n" + understanding + IntakeBriefComposer.AnswersHeading, prepared.Text, StringComparison.Ordinal);
-        Assert.Contains("- Lockerer, herzlicher Ton → Förmlich\n" + assumptions + "\n", prepared.Text, StringComparison.Ordinal);
-        Assert.Contains("- Lockerer, herzlicher Ton → Förmlich\n" + assumptions + "\n", appended.Text, StringComparison.Ordinal);
+        var open = OpenBlock("Wer kommt?", "Gibt es ein Motto?") + "\n";
+        Assert.Contains("- Lockerer, herzlicher Ton → Förmlich\n" + open + assumptions + "\n", prepared.Text, StringComparison.Ordinal);
+        Assert.Contains("- Lockerer, herzlicher Ton → Förmlich\n" + open + assumptions + "\n", appended.Text, StringComparison.Ordinal);
         Assert.Equal(appended.Text, prepared.Text.Replace(understanding, string.Empty, StringComparison.Ordinal));
     }
 
@@ -154,7 +158,8 @@ public sealed class IntakeBriefComposerTests
     {
         IReadOnlyList<OrderAnswer> answers = [new("q9", "o1", null, false, AnswerOrigin.User), new("revision", "no", null, false, AnswerOrigin.User)];
 
-        Assert.Equal(Request + "\n\n---\n" + Assumptions, Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), answers, null, AssumptionsShown: true)).Text);
+        Assert.Equal(Request + "\n\n---\n" + OpenBlock("Wer kommt?", "Gibt es ein Motto?") + "\n" + Assumptions,
+            Composer(BriefMode.AppendAnswers).Compose(new OrderBriefInput(TheOrder, Record(), answers, null, AssumptionsShown: true)).Text);
     }
 
     [Theory]
@@ -175,6 +180,7 @@ public sealed class IntakeBriefComposerTests
     {
         var record = Record() with
         {
+            Questions = [],
             Assumptions =
             [
                 new IntakeAssumption("a1", GapTopic.Tone, "Sachlicher, bestimmter Ton", AssumptionConfidence.Sure),
@@ -210,7 +216,7 @@ public sealed class IntakeBriefComposerTests
     [MemberData(nameof(AllTopics))]
     public void Every_topic_goes_either_to_the_defaults_or_to_the_open_facts(GapTopic topic)
     {
-        var record = Record() with { Assumptions = [new IntakeAssumption("a1", topic, "Annahme zum Thema", AssumptionConfidence.Sure)] };
+        var record = Record() with { Questions = [], Assumptions = [new IntakeAssumption("a1", topic, "Annahme zum Thema", AssumptionConfidence.Sure)] };
 
         var text = Composer(BriefMode.AppendAnswers, ContentAssumptionMode.OpenPoints)
             .Compose(new OrderBriefInput(TheOrder, record, [], null, AssumptionsShown: true)).Text;
@@ -225,7 +231,7 @@ public sealed class IntakeBriefComposerTests
         IReadOnlyList<OrderAnswer> answers = [new("a2", null, "Am 12. Juli", false, AnswerOrigin.User)];
 
         var text = Composer(BriefMode.AppendAnswers, ContentAssumptionMode.OpenPoints)
-            .Compose(new OrderBriefInput(TheOrder, Record(), answers, null, AssumptionsShown: true)).Text;
+            .Compose(new OrderBriefInput(TheOrder, Record() with { Questions = [] }, answers, null, AssumptionsShown: true)).Text;
 
         Assert.Equal(
             Request + "\n\n---\n" +
@@ -259,6 +265,9 @@ public sealed class IntakeBriefComposerTests
 
         Assert.Equal(shown.Replace(IntakeBriefComposer.AssumptionsHeading, IntakeBriefComposer.AssumptionsNotShownHeading, StringComparison.Ordinal), hidden);
     }
+
+    private static string OpenBlock(params string[] questions) =>
+        IntakeBriefComposer.OpenQuestionsHeading + "\n" + string.Join('\n', questions.Select(q => "- " + q));
 
     private static readonly string Assumptions =
         IntakeBriefComposer.AssumptionsHeading + "\n- Lockerer, herzlicher Ton\n- Datum als Platzhalter";

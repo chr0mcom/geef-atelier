@@ -61,7 +61,10 @@ public sealed record ClarifierOutput(
 /// <summary>A clickable answer option. Ids are <c>o1…o4</c>, or fixed ids for template questions.</summary>
 public sealed record QuestionOption(string Id, string Label);
 
-/// <summary>A question shown to the person (wire: <c>{id, slot, text, options:[{id,label}], default_option_id, allow_free_text}</c>).</summary>
+/// <summary>
+/// A question shown to the person (wire: <c>{id, slot, text, options:[{id,label}], default_option_id, allow_free_text}</c>).
+/// <see cref="DefaultOptionId"/> is never set by the gate and never passed on; older stored records may still carry one.
+/// </summary>
 public sealed record ClarifyQuestion(
     string Id,
     GapTopic Slot,
@@ -116,7 +119,11 @@ public enum GateDecision
 /// <summary>One entry of the gate trace: the gap by its position in the clarifier output and the decision.</summary>
 public sealed record GateTrace(int GapIndex, GapTopic Topic, GateDecision Decision);
 
-/// <summary>Everything the intake step decided; stored as <c>Orders.ClarifyJson</c> and <c>OrderIntakeShadows.RecordJson</c>.</summary>
+/// <summary>
+/// Everything the intake step decided; stored as <c>Orders.ClarifyJson</c> and <c>OrderIntakeShadows.RecordJson</c>.
+/// <see cref="HeldBack"/> are the questions about a possible decision of the person that the gate did not ask
+/// (<see cref="QuestionGateResult.HeldBack"/>); <c>null</c> when there are none and for records written before they existed.
+/// </summary>
 public sealed record IntakeRecord(
     int SchemaVersion,
     IntakeRecordStatus Status,
@@ -130,7 +137,8 @@ public sealed record IntakeRecord(
     IReadOnlyList<MemoryAnswer> FromMemory,
     IReadOnlyList<string> ResearchTopics,
     Guid? RevisionSourceId,
-    BriefMode BriefMode)
+    BriefMode BriefMode,
+    IReadOnlyList<string>? HeldBack = null)
 {
     /// <summary>Schema version written by this code.</summary>
     public const int CurrentSchemaVersion = 1;

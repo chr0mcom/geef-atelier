@@ -138,7 +138,8 @@ public static class OrderResultRules
 
     /// <summary>
     /// True when "Open points" has something to show: placeholders, open checks, flagged passages, problems in the files, open points of
-    /// the writer, open points of the writer for the version before (<see cref="ShownEarlierPoints"/>) or notes that could not be shown.
+    /// the writer, open points of the writer for the version before (<see cref="ShownEarlierPoints"/>), questions the person left open
+    /// (<see cref="UnansweredQuestions(OrderResult)"/>) or notes that could not be shown.
     /// </summary>
     public static bool HasOpenPoints(this OrderResult result) =>
         result.Placeholders.Count > 0
@@ -147,7 +148,12 @@ public static class OrderResultRules
         || (result.SourceIssues.Shown()?.Count ?? 0) > 0
         || (result.WriterOpenPoints.Shown()?.Count ?? 0) > 0
         || result.ShownEarlierPoints().Count > 0
+        || result.UnansweredQuestions().Count > 0
         || !string.IsNullOrWhiteSpace(result.NotesNotShown);
+
+    /// <summary>The questions the person left open before writing (<see cref="OrderResult.UnansweredQuestions"/>), without blank ones, in their order.</summary>
+    public static IReadOnlyList<string> UnansweredQuestions(this OrderResult result) =>
+        (result.UnansweredQuestions ?? []).Where(q => !string.IsNullOrWhiteSpace(q)).ToList();
 
     /// <summary>The open points of the writer for the version before that the shown version does not repeat, without blank ones, in their order.</summary>
     public static IReadOnlyList<OrderEarlierPoint> ShownEarlierPoints(this OrderResult result) =>

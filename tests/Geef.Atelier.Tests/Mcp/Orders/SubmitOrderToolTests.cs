@@ -229,7 +229,7 @@ public sealed class SubmitOrderToolTests
         var audience = dto.Questions[1];
         Assert.Equal("q1", audience.Id);
         Assert.Equal("audience", audience.Topic);
-        Assert.Equal("o1", audience.DefaultOptionId);
+        Assert.Null(audience.DefaultOptionId);
         Assert.False(audience.AllowFreeText);
 
         Assert.StartsWith(

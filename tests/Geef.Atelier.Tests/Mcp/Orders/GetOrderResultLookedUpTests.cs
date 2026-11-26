@@ -120,7 +120,7 @@ public sealed class GetOrderResultLookedUpTests
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(dto, Web));
         var root = doc.RootElement;
 
-        Assert.Equal(["lookedUp", "latestVersion", "earlierOpenPoints", "assumptionsVersion", "lengthNotice"], root.EnumerateObject().Select(p => p.Name).SkipWhile(n => n != "lookedUp"));
+        Assert.Equal(["lookedUp", "latestVersion", "earlierOpenPoints", "assumptionsVersion", "lengthNotice", "unansweredQuestions"], root.EnumerateObject().Select(p => p.Name).SkipWhile(n => n != "lookedUp"));
         var lookedUp = root.GetProperty("lookedUp");
         Assert.Equal(["status", "note", "withheld", "entries"], lookedUp.EnumerateObject().Select(p => p.Name));
         Assert.Equal(["quote", "url", "title", "retrievedAt"], lookedUp.GetProperty("entries")[0].EnumerateObject().Select(p => p.Name));

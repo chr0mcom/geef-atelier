@@ -60,7 +60,7 @@ public sealed class QuestionGateDeferralOptionTests
     }
 
     [Fact]
-    public void The_real_options_stay_and_the_default_follows_its_option()
+    public void The_real_options_stay_and_no_answer_is_preselected()
     {
         var gap = QuestionGateTests.Ask(GapTopic.Facts, "Was soll mit dem Sofa passieren?",
             ["Ich schreibe es gleich dazu", "Ersatz liefern", "Geld zurück"]);
@@ -69,7 +69,7 @@ public sealed class QuestionGateDeferralOptionTests
         var question = Assert.Single(Run(gap).Questions);
 
         Assert.Equal(["Ersatz liefern", "Geld zurück"], question.Options.Select(o => o.Label));
-        Assert.Equal(question.Options[1].Id, question.DefaultOptionId);
+        Assert.Null(question.DefaultOptionId);
     }
 
     private static QuestionGateResult Run(IntakeGap gap) => QuestionGate.Apply(new QuestionGateInput(

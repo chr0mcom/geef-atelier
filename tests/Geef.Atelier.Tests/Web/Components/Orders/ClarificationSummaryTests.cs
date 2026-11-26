@@ -29,7 +29,7 @@ public sealed class ClarificationSummaryTests : TestContext
         var answers = cut.FindAll("[data-testid='clarify-summary-answer']").Select(a => a.TextContent).ToList();
         Assert.Equal("Wie lang soll der Text ungefähr werden? → Kurz (etwa 150 Wörter)", answers[0]);
         Assert.Equal("Frage 1: Wann findet das Fest statt? → Am Samstag – “ab 16 Uhr”", answers[1]);
-        Assert.Equal("Frage 2: Wann findet das Fest statt? → left to me", answers[2]);
+        Assert.Equal("Frage 2: Wann findet das Fest statt? → left open", answers[2]);
         var assumptions = cut.FindAll("[data-testid='clarify-summary-assumption']");
         Assert.Equal("Lockerer, herzlicher Ton", assumptions[0].TextContent.Trim());
         Assert.Contains("Samstag im Innenhof", assumptions[1].TextContent);
@@ -37,6 +37,21 @@ public sealed class ClarificationSummaryTests : TestContext
         Assert.Equal("Datum und Ort als Platzhalter", assumptions[1].QuerySelector("s")!.TextContent);
         Assert.Empty(cut.FindAll("button"));
         Assert.Empty(cut.FindAll("textarea"));
+    }
+
+    [Fact]
+    public void You_decide_on_the_length_question_keeps_left_to_me_and_on_other_questions_reads_left_open()
+    {
+        var clarification = OrderTestData.Clarification(
+            questions: [OrderTestData.LengthQuestion(), OrderTestData.Question(1)],
+            answers: [new OrderAnswer("length", null, null, true, AnswerOrigin.User), new OrderAnswer("q1", null, null, true, AnswerOrigin.User)],
+            outcome: IntakeOutcome.Answered);
+
+        var answers = RenderComponent<ClarificationSummary>(p => p.Add(c => c.Clarification, clarification))
+            .FindAll("[data-testid='clarify-summary-answer']").Select(a => a.TextContent).ToList();
+
+        Assert.Equal("Wie lang soll der Text ungefähr werden? → left to me", answers[0]);
+        Assert.Equal("Frage 1: Wann findet das Fest statt? → left open", answers[1]);
     }
 
     [Fact]

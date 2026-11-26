@@ -78,7 +78,7 @@
                                Answer="@(_answers.GetValueOrDefault(id))"
                                AnswerChanged="a => SetAnswer(id, a)" />
             }
-            <p class="clarify-hint">Skipping is fine – I'll decide what you leave open and go with my assumptions.</p>
+            <p class="clarify-hint">@SkipHint</p>
         </div>
     }
 
@@ -108,6 +108,9 @@
 </section>
 
 @code {
+    /// <summary>Line under the questions: skipping is fine, what the writer is told for skipped questions, and to check before sending.</summary>
+    public const string SkipHint = "Skipping is fine – I'll go with my assumptions. For questions you skip, the writer is told not to say yes or no for you. Please check the assumptions and the text before you send it.";
+
     /// <summary>The order that waits for answers.</summary>
     [Parameter, EditorRequired] public Guid OrderId { get; set; }
 

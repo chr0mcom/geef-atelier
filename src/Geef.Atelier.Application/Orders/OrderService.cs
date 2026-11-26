@@ -181,7 +181,8 @@ internal sealed class OrderService(
             LookedUp: lookedUp,
             LatestVersion: current.OrderVersion,
             AssumptionsVersion: string.IsNullOrWhiteSpace(run.RevisionHint) ? null : FirstVersion(orderRuns),
-            LengthNotice: hasText && run.GrewBeyondItsBase() ? RevisionLines.LongerThanBefore : null);
+            LengthNotice: hasText && run.GrewBeyondItsBase() ? RevisionLines.LongerThanBefore : null,
+            UnansweredQuestions: UnansweredQuestions(run));
         var viewer = viewerUsername ?? requestingUsername;
         var showProfile = viewer is not null && string.Equals(viewer, order.CreatedByUser, StringComparison.Ordinal);
         return report is null || !hasText ? result : result.WithReport(report, showProfile);
@@ -526,6 +527,10 @@ internal sealed class OrderService(
             .Where(t => open.Contains(OrderResultRules.AssumptionKey(t)))
             .ToList();
     }
+
+    /// <summary>The questions the briefing of <paramref name="run"/> lists as left open by the person; <c>null</c> without such a block.</summary>
+    private static IReadOnlyList<string>? UnansweredQuestions(RunEntity run) =>
+        BriefingSections.Parse(run.BriefingText ?? string.Empty).OpenQuestions is { Count: > 0 } open ? open : null;
 
     /// <summary>The first version of the order: the lowest version of its standard runs, 1 when none has one.</summary>
     private static int FirstVersion(IReadOnlyList<RunEntity> orderRuns) =>

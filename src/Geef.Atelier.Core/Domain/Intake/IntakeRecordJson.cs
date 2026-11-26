@@ -71,6 +71,7 @@ public static class IntakeRecordJson
         Assumptions = (record.Assumptions ?? []).Where(a => a is not null).ToList(),
         FromMemory = record.FromMemory ?? [],
         ResearchTopics = record.ResearchTopics ?? [],
+        HeldBack = record.HeldBack?.Where(q => !string.IsNullOrWhiteSpace(q)).ToList() is { Count: > 0 } held ? held : null,
     };
 
     private static ClarifierOutput Normalize(ClarifierOutput output) => output with

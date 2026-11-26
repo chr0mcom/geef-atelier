@@ -5,9 +5,11 @@ namespace Geef.Atelier.Application.Orders;
 /// <summary>
 /// The briefing split back into what the composer put in; lines keep their order, the answer marks are removed. <see cref="Changes"/> are
 /// the changes the person asked for (newest last, empty when there are none), apart from <see cref="PersonAnswers"/>.
+/// <see cref="OpenQuestions"/> are the questions the person left open (skipped, not answered in time, "You decide"), word for word.
 /// </summary>
 public sealed record BriefParts(string Request, IReadOnlyList<string> PersonAnswers, IReadOnlyList<string> AssistantAnswers,
-    IReadOnlyList<string> FormAssumptions, IReadOnlyList<string> OpenFacts, string? Profile, IReadOnlyList<FactChange> Changes);
+    IReadOnlyList<string> FormAssumptions, IReadOnlyList<string> OpenFacts, string? Profile, IReadOnlyList<FactChange> Changes,
+    IReadOnlyList<string>? OpenQuestions = null);
 
 /// <summary>
 /// Reads the parts of a briefing built by <see cref="IOrderBriefComposer"/>: the request comes first and unchanged, the blocks
@@ -29,6 +31,8 @@ public static class BriefingSections
     [
         IntakeBriefComposer.AnswersHeading,
         IntakeBriefComposer.CorrectionsHeading,
+        IntakeBriefComposer.OpenQuestionsHeading,
+        IntakeBriefComposer.NotCheckedHeading,
         IntakeBriefComposer.AssumptionsHeadingStart,
         IntakeBriefComposer.AssumptionsNotShownHeadingStart,
         IntakeBriefComposer.OpenFactsHeadingStart,
@@ -88,12 +92,13 @@ public static class BriefingSections
         briefing ??= string.Empty;
         var request = RequestPart(briefing);
         if (request.Length == briefing.Length)
-            return new BriefParts(briefing, [], [], [], [], null, []);
+            return new BriefParts(briefing, [], [], [], [], null, [], []);
 
         var person = new List<string>();
         var assistant = new List<string>();
         var form = new List<string>();
         var open = new List<string>();
+        var openQuestions = new List<string>();
         string? profile = null;
         var block = BriefBlock.None;
         var changes = new List<RevisionChange>();
@@ -132,6 +137,10 @@ public static class BriefingSections
                 case BriefBlock.OpenFacts:
                     open.Add(item.Trim());
                     break;
+                case BriefBlock.OpenQuestions:
+                    if (!string.IsNullOrWhiteSpace(item))
+                        openQuestions.Add(item.Trim());
+                    break;
                 case BriefBlock.Changes:
                     if (RevisionBrief.ReadLine(line) is { } change)
                         changes.Add(change);
@@ -140,18 +149,20 @@ public static class BriefingSections
         }
 
         return new BriefParts(request, person, assistant, form, open, string.IsNullOrEmpty(profile) ? null : profile,
-            changes.Select((c, i) => new FactChange(c.Version, c.Words, Newest: i == changes.Count - 1)).ToList());
+            changes.Select((c, i) => new FactChange(c.Version, c.Words, Newest: i == changes.Count - 1)).ToList(), openQuestions);
     }
 
     private const string ItemStart = "- ";
     private const string AnswerArrow = " → ";
 
-    private enum BriefBlock { None, Understanding, Answers, Corrections, FormAssumptions, OpenFacts, Changes }
+    private enum BriefBlock { None, Understanding, Answers, Corrections, FormAssumptions, OpenFacts, Changes, OpenQuestions, NotChecked }
 
     private static BriefBlock? BlockOf(string line) => line switch
     {
         _ when line == IntakeBriefComposer.AnswersHeading => BriefBlock.Answers,
         _ when line == IntakeBriefComposer.CorrectionsHeading => BriefBlock.Corrections,
+        _ when line == IntakeBriefComposer.OpenQuestionsHeading => BriefBlock.OpenQuestions,
+        _ when line == IntakeBriefComposer.NotCheckedHeading => BriefBlock.NotChecked,
         _ when line.StartsWith(IntakeBriefComposer.AssumptionsHeadingStart, StringComparison.Ordinal)
                || line.StartsWith(IntakeBriefComposer.AssumptionsNotShownHeadingStart, StringComparison.Ordinal) => BriefBlock.FormAssumptions,
         _ when line.StartsWith(IntakeBriefComposer.OpenFactsHeadingStart, StringComparison.Ordinal) => BriefBlock.OpenFacts,

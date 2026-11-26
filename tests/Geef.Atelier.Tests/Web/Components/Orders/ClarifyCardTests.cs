@@ -47,7 +47,8 @@ public sealed class ClarifyCardTests : TestContext
         else
         {
             Assert.Equal(heading, cut.Find(".clarify-questions-title").TextContent);
-            Assert.Contains("Skipping is fine – I'll decide what you leave open and go with my assumptions.", cut.Markup);
+            Assert.Contains("Skipping is fine – I'll go with my assumptions. For questions you skip, the writer is told not to say yes or no for you. Please check the assumptions and the text before you send it.", cut.Markup);
+            Assert.DoesNotContain("decide what you leave open", cut.Markup);
         }
         Assert.Equal("Start writing", cut.Find("[data-testid='clarify-start']").TextContent.Trim());
         Assert.Equal("Just start", cut.Find("[data-testid='clarify-just-start']").TextContent.Trim());

@@ -43,7 +43,7 @@ public static class McpServerInstructions
         "Call get_order_status with waitSeconds (up to {0}) to wait for a change instead of sleeping or polling in a loop of your own. " +
         "When done is true, call get_order_result.\n" +
         "5. Give the person the text from get_order_result as it is, together with what was checked (checks), the open points " +
-        "(the placeholders to fill in, open checks, passages that may not be backed, problems in their files and points the writer left open) " +
+        "(the placeholders to fill in, open checks, passages that may not be backed, problems in their files, points the writer left open and the questions the person did not answer) " +
         "and the assumptions. Do not say more was checked than checks says, and do not fill in placeholders or open points yourself. " +
         "For a changed version, assumptions were noted for the version named in assumptionsVersion, before the changes: say so, because a change may have settled them. " +
         "If no text was written, say so and do not write one yourself.\n" +

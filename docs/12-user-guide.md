@@ -50,7 +50,10 @@ not look things up on the web, and its result does not show "What was checked". 
 
 If something important is missing, Atelier asks up to three short questions before it starts, each with answers to click. You can
 also write your own answer where it is offered, press **You decide**, or press **Just start**. What Atelier still has to guess is
-written down as an assumption, and you can correct the assumptions it shows you.
+written down as an assumption, and you can correct the assumptions it shows you. If you skip one of these questions (or press **You
+decide**), the writer is told not to say yes or no for you on it, and the result lists the question under "Open points". This does
+not cover things Atelier did not ask about or its assumptions; if you start while Atelier is still reading your request, the writer
+only gets a general reminder of the same rule. Check the text before you send it.
 
 Atelier asks only before it starts, never while it writes. If nothing important is missing, it starts at once.
 
