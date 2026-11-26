@@ -45,8 +45,7 @@ html.palette-vellum body.landing-body {
   align-items: center;
   gap: 24px;
   padding: 18px 48px;
-  background: color-mix(in oklch, var(--bg) 88%, transparent);
-  backdrop-filter: blur(10px);
+  background: var(--bg);
   border-bottom: 1px solid color-mix(in oklch, var(--hairline-soft) 60%, transparent);
 }
 .lp-nav .brand {

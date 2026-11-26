@@ -73,7 +73,7 @@ public sealed class LandingPageTests : TestContext
     {
         var cut = RenderComponent<LandingHero>(p => p.Add(c => c.Features, Everyone()));
         Assert.Equal("A finished text, and what you still need to check.", cut.Find("h1").TextContent.Trim());
-        Assert.Contains("manufactory", cut.Find(".colophon-row").TextContent, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Writes your letters, emails and notices", cut.Find(".colophon-row").TextContent.Trim());
     }
 
     [Fact]

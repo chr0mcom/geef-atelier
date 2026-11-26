@@ -25,7 +25,7 @@ public sealed class OrderChecksPanelTests : TestContext
         var cut = RenderComponent<OrderChecksPanel>(p => p.Add(c => c.Result, Result(checks)));
 
         Assert.Equal("What was checked", cut.Find("[data-testid='order-checks'] h2").TextContent);
-        Assert.Equal(new[] { "Checked automatically: the text is not empty, starts directly.", OrderCheckLines.FactsChecked },
+        Assert.Equal(new[] { "Checked automatically: the text is not empty, starts with the text itself, not with a remark to the reader.", OrderCheckLines.FactsChecked },
             cut.FindAll("[data-testid='order-checks-line']").Select(e => e.TextContent));
         Assert.Equal("There is nothing from these checks that you need to look at.", cut.Find("[data-testid='order-checks-review']").TextContent);
         Assert.Equal("false", cut.Find("[data-testid='order-checks-review']").GetAttribute("data-open"));

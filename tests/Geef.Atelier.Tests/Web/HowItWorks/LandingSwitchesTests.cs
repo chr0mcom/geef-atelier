@@ -20,7 +20,7 @@ public sealed class LandingSwitchesTests : TestContext
     public void As_shipped_it_offers_questions_and_changing_and_says_research_is_off_and_the_fact_check_changes_nothing()
     {
         this.AddTestAuthorization().SetNotAuthorized();
-        UseShippedSettings();
+        UseShippedSettings(Services);
 
         var cut = RenderComponent<Landing>();
         var text = cut.Find(".landing").TextContent;
@@ -170,7 +170,7 @@ public sealed class LandingSwitchesTests : TestContext
     public void The_page_has_one_main_heading_and_never_skips_a_heading_level()
     {
         this.AddTestAuthorization().SetNotAuthorized();
-        UseShippedSettings();
+        UseShippedSettings(Services);
 
         var headings = RenderComponent<Landing>().FindAll("h1, h2, h3, h4, h5, h6");
 
@@ -197,18 +197,19 @@ public sealed class LandingSwitchesTests : TestContext
         Assert.Equal(cut.FindAll("main section:not(#film)").Count, cut.FindAll("main section[aria-labelledby]").Count);
     }
 
-    private void UseShippedSettings()
+    /// <summary>Configures <paramref name="services"/> with the settings shipped in <c>appsettings.json</c>.</summary>
+    internal static void UseShippedSettings(IServiceCollection services)
     {
         var shipped = new ConfigurationBuilder()
             .AddJsonFile(Path.Combine(LandingLinksTests.RepoRoot(), "src", "Geef.Atelier.Web", "appsettings.json"), optional: false, reloadOnChange: false)
             .Build();
-        Services.Configure<OrderOptions>(shipped.GetSection(OrderOptions.SectionName));
-        Services.Configure<IntakeOptions>(shipped.GetSection(IntakeOptions.SectionName));
-        Services.Configure<ResearchOptions>(shipped.GetSection(ResearchOptions.SectionName));
-        Services.Configure<DirectOptions>(shipped.GetSection(DirectOptions.SectionName));
-        Services.Configure<UploadOptions>(shipped.GetSection(UploadOptions.SectionName));
-        Services.Configure<UiOptions>(shipped.GetSection(UiOptions.SectionName));
-        Services.Configure<LearningOptions>(shipped.GetSection(LearningOptions.SectionName));
-        Services.Configure<SourceOptions>(shipped.GetSection(SourceOptions.SectionName));
+        services.Configure<OrderOptions>(shipped.GetSection(OrderOptions.SectionName));
+        services.Configure<IntakeOptions>(shipped.GetSection(IntakeOptions.SectionName));
+        services.Configure<ResearchOptions>(shipped.GetSection(ResearchOptions.SectionName));
+        services.Configure<DirectOptions>(shipped.GetSection(DirectOptions.SectionName));
+        services.Configure<UploadOptions>(shipped.GetSection(UploadOptions.SectionName));
+        services.Configure<UiOptions>(shipped.GetSection(UiOptions.SectionName));
+        services.Configure<LearningOptions>(shipped.GetSection(LearningOptions.SectionName));
+        services.Configure<SourceOptions>(shipped.GetSection(SourceOptions.SectionName));
     }
 }

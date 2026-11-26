@@ -37,7 +37,7 @@ public sealed class OrderCheckLinesRevisionTests
     {
         var view = OrderCheckLines.Build(Report(Kept, revision: true), hasOpenPoints: false);
 
-        Assert.Equal("Checked automatically: the text is not empty, starts directly.", view.Checked[0]);
+        Assert.Equal("Checked automatically: the text is not empty, starts with the text itself, not with a remark to the reader.", view.Checked[0]);
         Assert.Equal(
             "Checked automatically against the rules of your first request (your change may have replaced them): the text has the length it asked for, "
             + "is in the language it asked for, has no placeholders, avoids lists and the words it ruled out, uses the words it asked for.",
@@ -52,7 +52,7 @@ public sealed class OrderCheckLinesRevisionTests
     {
         var view = OrderCheckLines.Build(Report(Kept, revision: false), hasOpenPoints: false);
 
-        Assert.StartsWith("Checked automatically: the text is not empty, starts directly, has the requested length, is in the requested language, has no placeholders",
+        Assert.StartsWith("Checked automatically: the text is not empty, starts with the text itself, not with a remark to the reader, has the requested length, is in the requested language, has no placeholders",
             view.Checked[0], StringComparison.Ordinal);
         Assert.DoesNotContain(view.Checked, l => l.StartsWith(OrderCheckLines.FirstRequestLead, StringComparison.Ordinal));
     }

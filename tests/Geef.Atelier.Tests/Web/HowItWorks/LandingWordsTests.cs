@@ -1,6 +1,9 @@
 using System.Text.RegularExpressions;
 using Bunit;
 using Bunit.TestDoubles;
+using Geef.Atelier.Core.Configuration;
+using Geef.Atelier.Core.Domain.FactCheck;
+using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Web.Components.Pages;
 using Geef.Atelier.Web.Components.UI;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,6 +30,8 @@ public sealed class LandingWordsTests : TestContext
         "fact-checked", "verified", "nothing is made up", "never makes", "always right", "100%", "our customers", "trusted by", "award",
     ];
 
+    private static readonly string[] PlainWordsOnly = ["MCP", "models?", "AI roles", "rounds?", "manufactory", "starts directly"];
+
     [Fact]
     public void The_start_page_uses_none_of_the_technical_words_of_the_older_way()
     {
@@ -52,6 +57,48 @@ public sealed class LandingWordsTests : TestContext
             Assert.DoesNotContain(phrase, text, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("It never claims that the text is right.", text, StringComparison.Ordinal);
         Assert.Contains("It can still be wrong.", text, StringComparison.Ordinal);
+    }
+
+    public static TheoryData<string> SwitchStates => new() { "shipped", "all-off", "research-on", "fact-check-on", "signed-in-exception", "workshop-open" };
+
+    [Theory]
+    [MemberData(nameof(SwitchStates))]
+    public void In_every_switch_state_the_start_page_stays_free_of_technical_words_names_and_promises(string state)
+    {
+        var auth = this.AddTestAuthorization();
+        auth.SetNotAuthorized();
+        LandingSwitchesTests.UseShippedSettings(Services);
+        switch (state)
+        {
+            case "all-off":
+                Services.Configure<OrderOptions>(o => { o.IntakeMode = IntakeMode.Off; o.Revise = ReviseMode.Off; });
+                Services.Configure<DirectOptions>(o => o.FactCheckMode = FactCheckMode.Off);
+                Services.Configure<LearningOptions>(o => o.Enabled = true);
+                break;
+            case "research-on":
+                Services.Configure<ResearchOptions>(o => o.Mode = ResearchMode.On);
+                break;
+            case "fact-check-on":
+                Services.Configure<DirectOptions>(o => o.FactCheckMode = FactCheckMode.On);
+                break;
+            case "signed-in-exception":
+                Services.Configure<OrderOptions>(o => { o.Revise = ReviseMode.Off; o.ReviseOverrides["tester"] = ReviseMode.On; });
+                Services.Configure<ResearchOptions>(o => o.ModeOverrides["tester"] = ResearchMode.On);
+                auth.SetAuthorized("tester");
+                break;
+            case "workshop-open":
+                Services.Configure<UiOptions>(o => o.WorkshopForAdminsOnly = false);
+                break;
+        }
+
+        var text = RenderComponent<Landing>().Find(".landing").TextContent;
+
+        foreach (var word in TechnicalWords)
+            Assert.DoesNotMatch(new Regex($@"\b{word}s?\b", RegexOptions.IgnoreCase), text);
+        foreach (var phrase in NeverOnTheStartPage)
+            Assert.DoesNotContain(phrase, text, StringComparison.OrdinalIgnoreCase);
+        foreach (var plain in PlainWordsOnly)
+            Assert.DoesNotMatch(new Regex($@"\b{plain}\b", RegexOptions.IgnoreCase), text);
     }
 
     [Fact]

@@ -46,7 +46,32 @@ public sealed class LandingFlowTests(PlaywrightFixture pw, PostgresFixture pg)
 
             await AssertNoLayoutShiftAsync(page);
             await AssertContrastAsync(page, $"{palette}-{width}");
+            await AssertNavigationIsOpaqueAsync(page);
             await AssertFitsAsync(page, $"signed-out-{palette}-{width}");
+        }
+        finally
+        {
+            await context.CloseAsync();
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Views))]
+    public async Task The_page_host_it_yourself_fits_and_keeps_its_contrast(string palette, int width, int height)
+    {
+        await using var host = await WebTestHost.StartAsync(pg, authenticated: false, configureServices: Shipped);
+        var context = await ContextAsync(host, palette, width, height, ReducedMotion.Reduce);
+        var page = await context.NewPageAsync();
+        try
+        {
+            await page.GotoAsync($"{host.BaseUrl}/self-host");
+            await page.Locator("[data-testid='self-host']").WaitForAsync(new LocatorWaitForOptions { Timeout = 15_000 });
+
+            await AssertContrastAsync(page, $"self-host-{palette}-{width}", "self-host");
+            var overflow = await page.EvaluateAsync<int>("document.documentElement.scrollWidth - document.documentElement.clientWidth");
+            if (Environment.GetEnvironmentVariable("ATELIER_SCREENSHOT_DIR") is { Length: > 0 } dir)
+                await page.ScreenshotAsync(new PageScreenshotOptions { Path = Path.Combine(dir, $"self-host-{palette}-{width}.png"), FullPage = true });
+            Assert.True(overflow <= 0, $"The page scrolls sideways by {overflow} px.");
         }
         finally
         {
@@ -182,11 +207,25 @@ public sealed class LandingFlowTests(PlaywrightFixture pw, PostgresFixture pg)
         Assert.True(double.Parse(shift.Split(' ')[0], System.Globalization.CultureInfo.InvariantCulture) < 0.05, $"The page shifted its layout by {shift}.");
     }
 
-    private static async Task AssertContrastAsync(IPage page, string name)
+    private static async Task AssertNavigationIsOpaqueAsync(IPage page)
+    {
+        var alpha = await page.EvaluateAsync<double>(
+            """
+            () => {
+                const nav = document.querySelector('.lp-nav');
+                const ctx = document.createElement('canvas').getContext('2d');
+                ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillStyle = getComputedStyle(nav).backgroundColor; ctx.fillRect(0, 0, 1, 1);
+                return ctx.getImageData(0, 0, 1, 1).data[3] / 255 * parseFloat(getComputedStyle(nav).opacity);
+            }
+            """);
+        Assert.True(alpha >= 0.999, $"The sticky navigation lets the page show through (opacity {alpha:0.00}).");
+    }
+
+    private static async Task AssertContrastAsync(IPage page, string name, string scope = "landing")
     {
         var failures = await page.EvaluateAsync<string[]>(
             """
-            () => {
+            scopeId => {
                 const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1;
                 const ctx = canvas.getContext('2d', { willReadFrequently: true });
                 const rgba = c => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = 'rgba(0,0,0,0)'; ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1);
@@ -205,7 +244,7 @@ public sealed class LandingFlowTests(PlaywrightFixture pw, PostgresFixture pg)
                 const lum = c => { const v = c.slice(0, 3).map(x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); });
                     return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
                 const failures = [];
-                const scope = document.querySelector('[data-testid="landing"]');
+                const scope = document.querySelector(`[data-testid="${scopeId}"]`);
                 const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
                 const seen = new Set();
                 for (let t = walker.nextNode(); t; t = walker.nextNode()) {
@@ -229,7 +268,7 @@ public sealed class LandingFlowTests(PlaywrightFixture pw, PostgresFixture pg)
                 }
                 return failures;
             }
-            """);
+            """, scope);
         Assert.True(failures.Length == 0, $"Text below the contrast minimum ({name}):\n" + string.Join("\n", failures));
     }
 
