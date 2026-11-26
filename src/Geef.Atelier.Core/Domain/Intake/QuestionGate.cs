@@ -13,6 +13,8 @@ public sealed record QuestionGateInput(
 /// <summary>
 /// What is left after the gate: the questions to show, the assumptions, the profile answers, the research topics, the trace
 /// and the summary of the request (<see cref="Understanding"/>, empty when the model's summary must not be shown).
+/// <see cref="HeldBack"/> are the questions about a possible decision of the person that the gate did not ask (see
+/// <see cref="QuestionGate.Apply"/>); they stay open for the writer and never become an assumption.
 /// </summary>
 public sealed record QuestionGateResult(
     IReadOnlyList<ClarifyQuestion> Questions,
@@ -20,7 +22,8 @@ public sealed record QuestionGateResult(
     IReadOnlyList<MemoryAnswer> FromMemory,
     IReadOnlyList<string> ResearchTopics,
     IReadOnlyList<GateTrace> Trace,
-    string Understanding);
+    string Understanding,
+    IReadOnlyList<string>? HeldBack = null);
 
 /// <summary>Enforces the question rule in code: few, short, plain questions with clickable answers. Pure function.</summary>
 public static class QuestionGate
@@ -52,6 +55,12 @@ public static class QuestionGate
     private static readonly HashSet<GapTopic> RevisionTopics = [GapTopic.Length, GapTopic.Tone, GapTopic.Formality];
     private static readonly HashSet<GapTopic> LengthCarrierTopics = [GapTopic.Format, GapTopic.Scope, GapTopic.Other];
     private static readonly HashSet<GapTopic> BroadTopics = [GapTopic.Facts, GapTopic.Other];
+    private static readonly HashSet<GapTopic> DecisionTopics = [GapTopic.Purpose, GapTopic.Other];
+    private static readonly HashSet<GateDecision> HoldBackDecisions =
+    [
+        GateDecision.DroppedDuplicateTopic, GateDecision.DroppedOverLimit, GateDecision.DroppedBadOptions,
+        GateDecision.DroppedJargon, GateDecision.DroppedLanguageMismatch, GateDecision.DroppedTooLong,
+    ];
 
     /// <summary>
     /// Applies the gate rules gap by gap in fixed order; every decision is recorded in the trace. A question under
@@ -61,6 +70,11 @@ public static class QuestionGate
     /// topic (<see cref="GapTopic.Facts"/>, <see cref="GapTopic.Other"/>) covers different matters, so a dropped duplicate keeps the
     /// assumption the model gave (never a generated "not specified" line). Questions, options, assumptions and the summary with links, addresses or secrets are dropped (see
     /// <see cref="IntakeContentGuard.IsUnsafe"/>; the request of the person decides which bare names and secret topics are fine).
+    /// No question carries a preselected answer (<see cref="ClarifyQuestion.DefaultOptionId"/> is always <c>null</c>): the guess of the
+    /// model may be a decision only the person can make, and a question that is not answered stays open. For the same reason a question
+    /// the model wanted to ask under <see cref="GapTopic.Purpose"/> or <see cref="GapTopic.Other"/> that the gate drops for its form, as a
+    /// second question on its topic or over the limit is held back (<see cref="QuestionGateResult.HeldBack"/>, its text, or the name of its
+    /// topic when it has none) instead of turning its guess or a "not specified" line into an assumption.
     /// </summary>
     public static QuestionGateResult Apply(QuestionGateInput input)
     {
@@ -108,13 +122,26 @@ public static class QuestionGate
             .Select(c => c.Question.FromTemplate ? c.Question : c.Question with { Id = $"q{++number}" })
             .ToList();
 
+        var heldBack = gaps.Select((g, i) => IsHeldBack(g, decisions[i])).ToArray();
+        var heldBackTexts = gaps.Where((_, i) => heldBack[i]).Select(HeldBackText).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
         return new QuestionGateResult(
             questions,
-            Assumptions(gaps, decisions, input.RequestText, lengthKnown),
+            Assumptions(gaps, decisions, heldBack, input.RequestText, lengthKnown),
             fromMemory,
             ResearchTopics(output, gaps, decisions, input.RequestText),
             gaps.Select((g, i) => new GateTrace(i, g.Topic, decisions[i])).ToList(),
-            IntakeContentGuard.IsUnsafe(output.Understanding, input.RequestText) ? string.Empty : output.Understanding ?? string.Empty);
+            IntakeContentGuard.IsUnsafe(output.Understanding, input.RequestText) ? string.Empty : output.Understanding ?? string.Empty,
+            heldBackTexts.Count > 0 ? heldBackTexts : null);
+    }
+
+    private static bool IsHeldBack(IntakeGap gap, GateDecision decision) =>
+        gap.Resolution == GapResolution.Ask && DecisionTopics.Contains(gap.Topic) && HoldBackDecisions.Contains(decision);
+
+    private static string HeldBackText(IntakeGap gap)
+    {
+        var text = string.Join(' ', (gap.Question?.Text ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return text.Length > 0 ? text : $"{gap.Topic.Label()}: not asked";
     }
 
     private static IntakeGap AsLengthGap(IntakeGap gap) =>
@@ -187,20 +214,13 @@ public static class QuestionGate
             return (rejected, null);
 
         var options = proposed!.Options.Select((o, i) => new QuestionOption($"o{i + 1}", o.Trim())).ToList();
-        var defaultId = proposed.DefaultIndex is { } index && index >= 0 && index < options.Count ? options[index].Id : null;
-        return (GateDecision.Asked, new ClarifyQuestion(string.Empty, gap.Topic, proposed.Text.Trim(), options, defaultId, proposed.AllowFreeText, false));
+        return (GateDecision.Asked, new ClarifyQuestion(string.Empty, gap.Topic, proposed.Text.Trim(), options, null, proposed.AllowFreeText, false));
     }
 
     private static ProposedQuestion WithoutDeferrals(ProposedQuestion question)
     {
-        var kept = question.Options
-            .Select((text, index) => (Text: text, Index: index))
-            .Where(o => !JargonBlocklist.IsDeferralOption(o.Text ?? string.Empty))
-            .ToList();
-        if (kept.Count == question.Options.Count)
-            return question;
-        var defaultIndex = kept.FindIndex(o => o.Index == question.DefaultIndex);
-        return question with { Options = kept.Select(o => o.Text).ToList(), DefaultIndex = defaultIndex < 0 ? null : defaultIndex };
+        var kept = question.Options.Where(o => !JargonBlocklist.IsDeferralOption(o ?? string.Empty)).ToList();
+        return kept.Count == question.Options.Count ? question : question with { Options = kept };
     }
 
     private static GateDecision? CheckForm(ProposedQuestion? question, string language)
@@ -237,7 +257,7 @@ public static class QuestionGate
             || LengthRuleGate.MentionsLength(requestText)
             || LengthMentions.InRequest(requestText));
 
-    private static IReadOnlyList<IntakeAssumption> Assumptions(IReadOnlyList<IntakeGap> gaps, IReadOnlyList<GateDecision> decisions, string requestText, Lazy<bool> lengthKnown)
+    private static IReadOnlyList<IntakeAssumption> Assumptions(IReadOnlyList<IntakeGap> gaps, IReadOnlyList<GateDecision> decisions, IReadOnlyList<bool> heldBack, string requestText, Lazy<bool> lengthKnown)
     {
         var asked = gaps.Where((_, i) => decisions[i] == GateDecision.Asked).Select(g => g.Topic).ToHashSet();
         var drafts = new List<(GapTopic Topic, string Text, AssumptionConfidence Confidence)>();
@@ -248,6 +268,7 @@ public static class QuestionGate
             var askedTopic = asked.Contains(gap.Topic);
             var text = decisions[i] switch
             {
+                _ when heldBack[i] => null,
                 GateDecision.Asked or GateDecision.Derived or GateDecision.FromMemory => null,
                 _ when gap.Topic == GapTopic.Length && lengthKnown.Value => null,
                 GateDecision.DroppedDuplicateTopic when askedTopic => BroadTopics.Contains(gap.Topic) ? given : null,

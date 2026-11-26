@@ -27,7 +27,7 @@ internal static class OrderDtoMappings
             question.Slot.ToWire(),
             question.Text,
             question.Options.Select(o => new QuestionOptionDto(o.Id, o.Label)).ToList(),
-            question.DefaultOptionId,
+            null,
             question.AllowFreeText);
 
     public static AssumptionDto ToDto(this IntakeAssumption assumption) =>
@@ -86,8 +86,9 @@ internal static class OrderDtoMappings
             result.LookedUp.ToDto(),
             result.LatestVersion,
             result.ToEarlierPointDtos(),
-            result.Assumptions is { Count: > 0 } ? result.AssumptionsVersion : null,
-            string.IsNullOrWhiteSpace(result.LengthNotice) ? null : result.LengthNotice);
+            result.Assumptions is { Count: > 0 } || result.UnansweredQuestions().Count > 0 ? result.AssumptionsVersion : null,
+            string.IsNullOrWhiteSpace(result.LengthNotice) ? null : result.LengthNotice,
+            result.UnansweredQuestions() is { Count: > 0 } unanswered ? unanswered : null);
 
     /// <summary>The open points of the writer for an earlier version that the shown version does not repeat (<see cref="OrderResultRules.ShownEarlierPoints"/>); <c>null</c> when there are none.</summary>
     public static IReadOnlyList<OrderEarlierPointDto>? ToEarlierPointDtos(this OrderResult result)
@@ -121,6 +122,15 @@ internal static class OrderDtoMappings
     public const string AssumptionsVersionNoteFormat =
         "The assumptions were noted for version {0}, before the person asked for changes; a change may have settled or overtaken them. " +
         "Say so, and do not present them as facts the person did not give now.";
+
+    /// <summary>Note for a result with questions the person left open before writing.</summary>
+    public const string UnansweredQuestionsNote =
+        "unansweredQuestions stayed open before writing: the person skipped them or left them to Atelier, or Atelier did not ask them. " +
+        "The writer was told not to say yes or no for the person on them. Show them with the open points and do not answer them yourself.";
+
+    /// <summary>Note for a changed version with questions the person left open: <c>{0}</c> is the version they were asked before.</summary>
+    public const string UnansweredQuestionsVersionNoteFormat =
+        "They were asked before version {0}; a change may have settled them.";
 
     /// <summary>Note for a changed version with assumptions of its writer: they were noted while making the change.</summary>
     public const string ChangeNotesNote =
@@ -209,6 +219,12 @@ internal static class OrderDtoMappings
             parts.Add(string.Format(System.Globalization.CultureInfo.InvariantCulture, AssumptionsVersionNoteFormat, noted));
         if (result.AssumptionsVersion is not null && (result.WriterAssumptions.Shown()?.Count ?? 0) > 0)
             parts.Add(ChangeNotesNote);
+        if (result.UnansweredQuestions().Count > 0)
+        {
+            parts.Add(UnansweredQuestionsNote);
+            if (result.AssumptionsVersion is { } asked)
+                parts.Add(string.Format(System.Globalization.CultureInfo.InvariantCulture, UnansweredQuestionsVersionNoteFormat, asked));
+        }
         if (HasUncheckedContent(result))
             parts.Add(UncheckedContentNote);
         if (result.LookedUp is { Entries.Count: > 0 })

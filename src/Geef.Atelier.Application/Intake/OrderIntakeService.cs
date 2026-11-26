@@ -203,7 +203,8 @@ internal sealed class OrderIntakeService(
             gate.FromMemory,
             gate.ResearchTopics,
             order.Mode == OrderMode.Direct ? revision?.SourceId : null,
-            settings.BriefMode);
+            settings.BriefMode,
+            gate.HeldBack);
         return new Analysis(record, gate.Questions.Count, true);
     }
 

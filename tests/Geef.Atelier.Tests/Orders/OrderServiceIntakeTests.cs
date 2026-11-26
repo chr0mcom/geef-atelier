@@ -152,10 +152,11 @@ public sealed class OrderServiceIntakeTests(PostgresFixture postgres)
             Request + "\n\n---\n" +
             "Answers the person gave before writing:\n" +
             "- Wie lang soll der Text ungefähr werden? → Kurz (etwa 150 Wörter)\n" +
-            "- Wer kommt? → left to you\n" +
-            "- Gibt es ein Motto? → left to you\n" +
             "Corrections to assumptions:\n" +
             "- Lockerer, herzlicher Ton → Eher förmlich\n" +
+            IntakeBriefComposer.OpenQuestionsHeading + "\n" +
+            "- Wer kommt?\n" +
+            "- Gibt es ein Motto?\n" +
             IntakeBriefComposer.AssumptionsHeading + "\n" +
             "- Datum als Platzhalter",
             run.BriefingText);
@@ -165,6 +166,7 @@ public sealed class OrderServiceIntakeTests(PostgresFixture postgres)
 
         var result = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetResultAsync(orderId, user));
         Assert.Equal(["a2"], result!.Assumptions!.Select(a => a.Id));
+        Assert.Equal(["Wer kommt?", "Gibt es ein Motto?"], result.UnansweredQuestions!);
 
         var repeat = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().AnswerAsync(new AnswerOrderRequest(orderId, user,
             [new OrderAnswer("length", "long", null, false, AnswerOrigin.User)])));
@@ -221,7 +223,7 @@ public sealed class OrderServiceIntakeTests(PostgresFixture postgres)
         var skipped = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().SkipClarificationAsync(reading.OrderId, user));
         Assert.Equal(OrderDisplayState.Queued, skipped.State);
         var run = await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == reading.OrderId));
-        Assert.Equal(Request, run.BriefingText);
+        Assert.Equal(Request + BriefingSections.Separator + IntakeBriefComposer.NotCheckedHeading, run.BriefingText);
         var order = await LoadAsync(host, reading.OrderId);
         Assert.Equal((OrderState.Ready, IntakeOutcome.Skipped), (order.State, order.IntakeOutcome!.Value));
         Assert.NotNull(order.IntakeFinishedAt);
@@ -238,7 +240,8 @@ public sealed class OrderServiceIntakeTests(PostgresFixture postgres)
         Assert.NotNull(waitingOrder.AnsweredAt);
         Assert.NotNull(waitingOrder.ClarifyJson);
         Assert.Equal(
-            Request + "\n\n---\n" + IntakeBriefComposer.AssumptionsHeading + "\n- Lockerer, herzlicher Ton\n- Datum als Platzhalter",
+            Request + "\n\n---\n" + IntakeBriefComposer.OpenQuestionsHeading + "\n- Wer kommt?\n- Gibt es ein Motto?\n" +
+            IntakeBriefComposer.AssumptionsHeading + "\n- Lockerer, herzlicher Ton\n- Datum als Platzhalter",
             (await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == waitingId))).BriefingText);
 
         var stopped = await SubmitAsync(host, new SubmitOrderRequest(Request, user, OrderEntry.Web));
@@ -274,6 +277,8 @@ public sealed class OrderServiceIntakeTests(PostgresFixture postgres)
 
         var lateId = await WaitingForAnswersAsync(host, user, IntakeBriefComposerTests.Record());
         var lateRun = await StartAsync(host, lateId, OrderState.NeedsInput, IntakeRecordJson.TryParse((await LoadAsync(host, lateId)).ClarifyJson), IntakeOutcome.AutoStarted, recordIsNew: false);
+        Assert.StartsWith(Request + "\n\n---\n" + IntakeBriefComposer.OpenQuestionsHeading + "\n- Wer kommt?\n- Gibt es ein Motto?\n",
+            (await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.Id == lateRun))).BriefingText, StringComparison.Ordinal);
         var lateWarning = await host.QueryAsync(db => db.RunWarnings.AsNoTracking().SingleAsync(w => w.RunId == lateRun));
         Assert.Equal((RunWarningCodes.IntakeUnanswered, IntakeWarningMessages.Unanswered), (lateWarning.Code, lateWarning.Message));
         var lateView = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetAsync(lateId, user));

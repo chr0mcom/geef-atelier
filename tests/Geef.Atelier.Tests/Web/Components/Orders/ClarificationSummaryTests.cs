@@ -29,7 +29,7 @@ public sealed class ClarificationSummaryTests : TestContext
         var answers = cut.FindAll("[data-testid='clarify-summary-answer']").Select(a => a.TextContent).ToList();
         Assert.Equal("Wie lang soll der Text ungefähr werden? → Kurz (etwa 150 Wörter)", answers[0]);
         Assert.Equal("Frage 1: Wann findet das Fest statt? → Am Samstag – “ab 16 Uhr”", answers[1]);
-        Assert.Equal("Frage 2: Wann findet das Fest statt? → left to me", answers[2]);
+        Assert.Equal("Frage 2: Wann findet das Fest statt? → left open", answers[2]);
         var assumptions = cut.FindAll("[data-testid='clarify-summary-assumption']");
         Assert.Equal("Lockerer, herzlicher Ton", assumptions[0].TextContent.Trim());
         Assert.Contains("Samstag im Innenhof", assumptions[1].TextContent);

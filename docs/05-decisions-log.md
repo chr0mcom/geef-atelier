@@ -3143,3 +3143,65 @@ extractor and provider.
 - **On the statement about claude.ai:** since 2026-11-26 one complete path through a connection set up in claude.ai has been
   tried, called from Claude Code: an order with a file and a question, then a change. The claude.ai chat window itself and Claude
   Desktop are still not checked. To that extent this replaces the earlier notes "claude.ai is not checked".
+
+## D-081 — Skipping never commits the person (2026-11-26)
+
+**Status:** implemented; the measurement on the real system is prepared and still to be run.
+
+**Rule.** When the person skips a question, starts without answering, lets the answer time run out or presses "You decide", Atelier
+must not make a binding decision for them that they did not state: no acceptance or refusal, order, cancellation, payment,
+confirmation of attendance or consent. Such a point is kept open in the text or marked as a gap, and it is named on the result.
+Answers the person gives and decisions already stated in the request are used as before.
+
+**Mechanism before this change.** `QuestionGate` keeps no guess for a gap it asks about. A skipped question therefore did not
+appear in the briefing at all, and the writer chose freely; "You decide" reached the writer as `question → left to you`. A
+question the gate dropped (second question on a topic, over the limit, unusable options) turned its guess, or "not specified –
+the writer decides", into an assumption. The preselected answer of the clarifier (`defaultOptionId`) never reached the writer; it
+was only passed on over MCP.
+
+**Decision.**
+- **No preselected answer.** `QuestionGate` never sets `DefaultOptionId`, and the MCP mapping always sends `null`, also for records
+  stored before this change.
+- **Open questions get their own block in the briefing.** A question of the clarifier counts as open when the person gave no
+  usable answer (skipped, started without answers, time ran out, "You decide", or neither a known option nor own words;
+  `OpenQuestions.IsLeftOpen`). In addition, a question the clarifier wanted to ask under the topics `Purpose` or `Other` and the gate
+  dropped as a second question on its topic, over the limit or for its form is held back (`QuestionGateResult.HeldBack`, stored as
+  `IntakeRecord.HeldBack`) and never becomes an assumption or a "the writer decides" line. Both kinds are listed word for word under
+  the heading "Questions the person did not answer …", which tells the writer never to decide for the person what would commit
+  them, to keep it open (confirm receipt, ask back, ask for time) or write a clearly visible placeholder, to name the open decision
+  among its open points, to invent no facts, to choose freely for anything else, and to follow the person where the request or a
+  later change settles the question. The fixed length question never opens the block.
+- **Unchecked start.** An order of the intake that starts before its request was checked (started while it is still being read,
+  clarifier failed or timed out) gets the same rule as one general line ("The request was not checked …"). Orders without the
+  intake step (`Orders:IntakeMode = Off` or `Shadow`) never get it.
+- **Unchanged:** briefings without an open or held-back question and without an unchecked start stay bit-identical; records without
+  held-back questions are stored as before. Clarifier, writer and fact check prompts and schemas are unchanged (hash tests).
+- **Result.** The questions are read back from the briefing of the shown version: on the web under "Open points" (for a changed
+  version naming the version they were asked before), over MCP as `unansweredQuestions` (appended) with a note to show them and not
+  to answer them; step 5 of the MCP instructions names them. The card says that the writer is told not to say yes or no for skipped
+  questions and asks to check assumptions and text; "You decide" is shown as "left open".
+- **Research and checks** get the request without these blocks; only the full headings count as block starts. A change keeps the
+  block.
+
+**Limits.**
+- Only what the writer is told is enforced; whether it follows is measured by the gate below, not guaranteed.
+- A decision the clarifier writes into an assumption without asking is not covered (needs a clarifier change and a new large
+  measurement).
+- Orders stored before this change keep their briefing: changing or resuming such an order adds no block, and their result shows no
+  `unansweredQuestions`. Orders waiting for answers at deploy time keep the assumptions of their stored record.
+- "Extra careful" and `Direct:WriterNotes = false` have no channel for open points; there the instruction can only show in the
+  text. Not measured.
+- **Way back:** an older image does not know the new headings. If such a block is the first block of a briefing, the older image
+  takes the whole briefing, including the About me details, for the request when a change or a resume of that order is started
+  there. After rolling back, do not change or resume orders written with this version.
+
+**Tests.** Pure tests of gate and briefing (no preselection, no guess in the briefing, "You decide" and partial answers open, held
+back questions for a second question, over the limit and unusable options, other topics unchanged, unchecked start, answers
+unchanged, length question, full heading only), parser and change, database and end-to-end tests of skip, answer, automatic start
+and clarifier failure, bUnit of "Open points", MCP field, note and `defaultOptionId`, baselines of the MCP instructions taken again.
+All examples are made up.
+
+**Measurement (prepared, not run).** Fresh made-up cases in German and English, all with `skip=true` on the direct path: decision
+cases, control cases without a decision, and cases with the decision in the request; threshold 0 commitments in decision cases,
+control cases not worse, at most 40 model calls, blind judge without tools in an empty folder. It does not measure "You decide",
+partial answers, the time limit, changes or "Extra careful". Contract and tool are kept outside the repository.

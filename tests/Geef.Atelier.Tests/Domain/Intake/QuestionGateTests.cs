@@ -44,7 +44,7 @@ public sealed class QuestionGateTests
     private static GateDecision Only(QuestionGateResult result) => Assert.Single(result.Trace).Decision;
 
     [Fact]
-    public void A_good_question_is_asked_with_stable_ids()
+    public void A_good_question_is_asked_with_stable_ids_and_without_a_preselected_answer()
     {
         var result = Apply([Ask(GapTopic.Audience, defaultIndex: 1)]);
 
@@ -52,7 +52,7 @@ public sealed class QuestionGateTests
         Assert.Equal("q1", question.Id);
         Assert.Equal(GapTopic.Audience, question.Slot);
         Assert.Equal(["o1", "o2", "o3"], question.Options.Select(o => o.Id));
-        Assert.Equal("o2", question.DefaultOptionId);
+        Assert.Null(question.DefaultOptionId);
         Assert.False(question.FromTemplate);
         Assert.True(question.AllowFreeText);
         Assert.Equal(GateDecision.Asked, Only(result));

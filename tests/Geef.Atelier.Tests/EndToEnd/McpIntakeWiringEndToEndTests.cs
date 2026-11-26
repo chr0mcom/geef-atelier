@@ -218,7 +218,7 @@ public sealed class McpIntakeWiringEndToEndTests(PostgresFixture postgres)
         Assert.Equal(status, IntakeRecordJson.TryParse(order.ClarifyJson)!.Status);
         var id = Guid.Parse(orderId);
         var run = await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == id));
-        Assert.Equal(Request, run.BriefingText);
+        Assert.Equal(Request + Geef.Atelier.Application.Orders.BriefingSections.Separator + Geef.Atelier.Application.Orders.IntakeBriefComposer.NotCheckedHeading, run.BriefingText);
         Assert.DoesNotContain(AnswerBlock, Assert.Single(host.Llm.CallsFor(LlmRole.Executor)).Messages.Last(m => m.Role == "user").Content);
     }
 

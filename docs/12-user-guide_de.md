@@ -52,7 +52,11 @@ schlägt nichts im Web nach, und sein Ergebnis zeigt kein „What was checked“
 
 Fehlt etwas Wichtiges, stellt Atelier vor dem Start bis zu drei kurze Fragen, jede mit Antworten zum Anklicken. Du kannst, wo es
 angeboten wird, auch selbst antworten, **You decide** drücken oder **Just start**. Was Atelier dann noch raten muss, wird als
-Annahme notiert; die gezeigten Annahmen kannst du korrigieren.
+Annahme notiert; die gezeigten Annahmen kannst du korrigieren. Überspringst du eine dieser Fragen (oder drückst du **You
+decide**), wird der Schreiber angewiesen, dazu nicht für dich zu- oder abzusagen, und das Ergebnis nennt die Frage unter „Open
+points“. Das gilt nicht für Dinge, nach denen Atelier nicht gefragt hat, und nicht für seine Annahmen; startest du, während Atelier
+den Auftrag noch liest, bekommt der Schreiber nur einen allgemeinen Hinweis auf dieselbe Regel. Prüfe den Text, bevor du ihn
+verschickst.
 
 Atelier fragt nur vor dem Start, nie während des Schreibens. Fehlt nichts Wichtiges, beginnt es sofort.
 
