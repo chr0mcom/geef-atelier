@@ -1,6 +1,9 @@
+using System.Globalization;
 using System.Text.Json;
 using Geef.Atelier.Application.Crew;
+using Geef.Atelier.Application.Orders;
 using Geef.Atelier.Application.Crew.Knowledge;
+using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
@@ -13,6 +16,7 @@ using Geef.Atelier.Core.Persistence.Crew;
 using Geef.Atelier.Core.Persistence.Orders;
 using Geef.Atelier.Core.Persistence.Tools;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Geef.Atelier.Application.Runs;
 
@@ -27,7 +31,8 @@ internal sealed class RunService(
     IRunWarningRepository                 warningRepository,
     IGroundingConsultationRepository?     groundingConsultationRepository = null,
     IToolInvocationRepository?            toolInvocationRepository = null,
-    IOrderRepository?                     orderRepository = null) : IRunService
+    IOrderRepository?                     orderRepository = null,
+    IOptions<OrderOptions>?               orderOptions = null) : IRunService
 {
     internal const string AttachmentUploadFailedMessage = "The attached files could not be prepared. Please submit the task again.";
 
@@ -251,6 +256,10 @@ internal sealed class RunService(
             }
         }
 
+        if (details.Run is { Kind: RunKind.Standard, OrderId: { } changedOrderId } && !string.IsNullOrWhiteSpace(details.Run.RevisionHint)
+            && orderRepository is not null)
+            return await ResumeChangeAsync(details.Run, changedOrderId, snapshotJson, cancellationToken);
+
         var resumedId = await persistence.CreateResumedRunAsync(
             details.Run.BriefingText,
             details.Run.ConfigJson,
@@ -266,6 +275,48 @@ internal sealed class RunService(
             await LinkToOrderAsync(resumedId, OrderEntry.Legacy, cancellationToken);
 
         return resumedId;
+    }
+
+    private async Task<Guid> ResumeChangeAsync(RunEntity failed, Guid orderId, string? snapshotJson, CancellationToken cancellationToken)
+    {
+        var orderRuns = await orderRepository!.ListRunsAsync(orderId, cancellationToken);
+        var shown = OrderStateResolver.SelectShownRun(orderRuns)
+                    ?? throw new RunNotResumableException(RevisionLines.NothingToChange);
+        var version = orderRuns.Where(r => r.Kind == RunKind.Standard).Max(r => r.OrderVersion ?? 0) + 1;
+        var change = failed.RevisionHint!;
+        var run = new RunEntity
+        {
+            Id = Guid.NewGuid(),
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = RunStatus.Pending,
+            BriefingText = RevisionBrief.Compose(shown.BriefingText ?? string.Empty, change, version),
+            ConfigJson = failed.ConfigJson,
+            CreatedByUser = failed.CreatedByUser,
+            CrewTemplateName = failed.CrewTemplateName,
+            CrewSnapshot = snapshotJson,
+            TokensTotal = 0,
+            CostTotal = 0m,
+            Kind = RunKind.Standard,
+            OrderId = orderId,
+            OrderVersion = version,
+            ParentRunId = shown.Id,
+            SeedDraftText = shown.FinalText,
+            RevisionHint = change,
+        };
+
+        var maxVersions = (orderOptions?.Value ?? new OrderOptions()).MaxVersionsPerOrder;
+        var (result, created) = await orderRepository.TryAddRevisionRunAsync(orderId, shown.Id, run, maxVersions, cancellationToken);
+        logger.LogInformation("Run {RunId} resumed as version {Version}, a change of version {BaseVersion} of order {OrderId}: {Result}.",
+            failed.Id, created, shown.OrderVersion, orderId, result);
+        return result switch
+        {
+            RevisionStart.Created => run.Id,
+            RevisionStart.Busy or RevisionStart.BaseNotShown => throw new RunNotResumableException(RevisionLines.Busy),
+            RevisionStart.TooManyVersions => throw new RunNotResumableException(
+                string.Format(CultureInfo.InvariantCulture, RevisionLines.TooManyVersionsFormat, maxVersions)),
+            RevisionStart.Cancelled => throw new RunNotResumableException(RevisionLines.Stopped),
+            _ => throw new RunNotResumableException(RevisionLines.NotFound),
+        };
     }
 
     private async Task LinkToOrderAsync(Guid runId, OrderEntry entry, CancellationToken cancellationToken)

@@ -908,7 +908,10 @@ gespeicherten Ausschnitte unverändert und sucht nie neu.
 
 Ein Lauf, der eine frühere Version des Auftrags ändert („Change something“, `revise_order`), läuft immer über den Direktweg. Er
 trägt `RunEntity.RevisionHint` (die Änderung der Person samt Sätzen der Schnellknöpfe), `ParentRunId` (Lauf der gezeigten Version)
-und `SeedDraftText` (deren ausgelieferter Text). Den Lauf legt der Auftragsdienst an; der Direktweg macht daraus Folgendes:
+und `SeedDraftText` (deren ausgelieferter Text). Den Lauf legt der Auftragsdienst an; „Resume“ auf einem gescheiterten oder
+gestoppten Nachbesserungslauf legt ihn genauso an (`RunService.ResumeRunAsync`: dieselbe `RevisionHint`, die jetzt gezeigte Version
+als `ParentRunId` und Ausgangstext, ihr Brief neu zusammengesetzt, gespeichert über `TryAddRevisionRunAsync`). Der Direktweg macht
+daraus Folgendes:
 
 - **Grounding:** Der Assembler reicht `RevisionHint` an `OrderGroundingStep`; der Schritt setzt den Kontextschlüssel
   `AtelierContextKeys.RevisionHint`. Der frühere Text ist nur Ausgangstext, nie Material des Faktenprüfers. Die Recherche liefert wie
@@ -919,8 +922,9 @@ und `SeedDraftText` (deren ausgelieferter Text). Den Lauf legt der Auftragsdiens
   Änderungen getrennt von den Antworten zurück (`BriefParts.Changes`, die letzte als neueste), und das Material des Faktenprüfers
   hält sie so (`FactMaterial.Changes`). Nur der Prompt des Prüfers schreibt sie unter die Antworten der Person, mit kurzer Marke
   („newest change, version n“ / „earlier change, version n; a newer change wins where they differ“, `FactChange.Marked`) vor dem
-  unveränderten Wortlaut. Nachgeschlagen werden Zitate nur in den Worten; der Filter nimmt die Marke vorher aus jedem Zitat des
-  Prüfers (`FactChange.WithoutMarks`), sodass ein reines Marken-Zitat keine Vorgabe ist und kein gespeichertes Zitat die Marke trägt.
+  unveränderten Wortlaut. Nachgeschlagen werden Zitate nur in den Worten; in einem Nachbesserungslauf (`FactMaterial.IsRevision`)
+  nimmt der Filter die Marke vorher aus jedem Zitat des Prüfers (`FactChange.WithoutMarks`), sodass ein reines Marken-Zitat keine
+  Vorgabe ist und kein gespeichertes Zitat die Marke trägt. Im ersten Lauf eines Auftrags lässt der Filter die Zitate, wie sie sind.
 - **Schreiber:** Nur im Nutzerprompt des ersten Durchgangs ersetzt `DirectWriterPrompts.RevisionInstruction` die `SeedInstruction`
   (für Anbieter ohne Dokumentmodus über dieselbe Ersetzung „the text in draft.md“ → „this text“). Der System-Prompt bleibt bitgleich
   (Hash-Test); Korrekturdurchgang unverändert.

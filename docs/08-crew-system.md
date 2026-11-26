@@ -886,7 +886,9 @@ never searches again.
 
 A run that changes an earlier version of the order ("Change something", `revise_order`) always uses the direct path. It carries
 `RunEntity.RevisionHint` (the person's change including the sentences of the quick buttons), `ParentRunId` (the run of the shown
-version) and `SeedDraftText` (its delivered text). The order service creates the run; the direct path does the following:
+version) and `SeedDraftText` (its delivered text). The order service creates the run; "Resume" on a failed or stopped change run
+creates one the same way (`RunService.ResumeRunAsync`: the same `RevisionHint`, the version shown now as `ParentRunId` and seed, its
+brief composed again, stored through `TryAddRevisionRunAsync`). The direct path does the following:
 
 - **Grounding:** the assembler passes `RevisionHint` to `OrderGroundingStep`, which sets the context key
   `AtelierContextKeys.RevisionHint`. The earlier text is only the seed, never material of the fact check. As for any revision, the
@@ -897,8 +899,9 @@ version) and `SeedDraftText` (its delivered text). The order service creates the
   gives the changes back apart from the answers (`BriefParts.Changes`, the last one as the newest), and the material of the fact check
   keeps them that way (`FactMaterial.Changes`). Only the checker's prompt writes them under the answers of the person, with a short
   mark ("newest change, version n" / "earlier change, version n; a newer change wins where they differ", `FactChange.Marked`) before
-  the unchanged words. Quotes are looked up in the words only; the filter first takes the mark out of every quote of the checker
-  (`FactChange.WithoutMarks`), so a quote that is only a mark is no instruction and no stored quote holds the mark.
+  the unchanged words. Quotes are looked up in the words only; in a change run (`FactMaterial.IsRevision`) the filter first takes the
+  mark out of every quote of the checker (`FactChange.WithoutMarks`), so a quote that is only a mark is no instruction and no stored
+  quote holds the mark. In the first run of an order the filter leaves the quotes as they are.
 - **Writer:** only in the user prompt of the first pass, `DirectWriterPrompts.RevisionInstruction` replaces `SeedInstruction` (for
   providers without document mode through the same replacement "the text in draft.md" → "this text"). The system prompt stays
   bit-identical (hash test); the correction pass is unchanged.

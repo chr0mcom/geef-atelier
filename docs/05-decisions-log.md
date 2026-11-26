@@ -2434,7 +2434,9 @@ so far nor an open point that still applies.
   newer change wins where they differ") before the unchanged words; its prompt and schema stay the same. The mark is never a word
   of the person: the material keeps the changes apart from their mark (`FactMaterial.Changes`), the mark is written out only in
   the checker's prompt, and in one place (the filter of the fact check) it is taken out of every quote of the checker before the
-  quote is looked up or stored. A quote from such a line still counts as an answer of the person and is stored without the mark;
+  quote is looked up or stored – only in a change run, where marks are written out. In the first run of an order no mark exists
+  and the filter leaves every quote as the checker gave it, exactly as before stage 5 (a quote such as "Tariff version 2) costs
+  …" or an instruction quote "draft version 2)" keeps its words; tests). A quote from such a line still counts as an answer of the person and is stored without the mark;
   a quote that is only the mark or parts of it is not taken as an instruction of the person. Stored and shown quotes (web, MCP,
   correction) therefore never hold the mark. Whether the model follows the order this way is **not measured** (gate N).
 - **Writer:** only in the first pass of a change run, `RevisionInstruction` replaces the usual instruction for a seed text (user
@@ -2470,7 +2472,7 @@ so far nor an open point that still applies.
   "Extra careful"), the fixed sentence "The checks of version n were not taken over, so anything they left open was not checked
   again." stands there; it counts as an open point. On the web these fixed sentences of Atelier do not stand under "your change
   may have settled it" but under a neutral lead of their own, "About version n:"; MCP gives them in `earlierOpenPoints` with
-  `kind = note`. Carrying over happens only in change runs. Findings of the version before
+  `kind = note`. Carrying over happens only in change runs (also in one started by "Resume" on a change). Findings of the version before
   whose own check was off or hidden are not carried over; findings already carried over (with their origin) stay and stay visible
   across all versions, also when the fact-check mode was off or hidden in between (findings of the hidden check itself stay
   unseen).
@@ -2503,6 +2505,14 @@ so far nor an open point that still applies.
   the order page can offer the change; otherwise "Resume" stays.
 - **Resume (older path):** "Resume" seeds with the delivered text when the run has one, otherwise with the last iteration as
   before (a fix, no switch).
+- **Resume on a change run:** when the run that failed or was stopped was itself a change, "Resume" (still offered to
+  administrators, and to the owner while the switch is `Off`) starts a change again: the same change, made to the version shown
+  now, seeded with its text, with the brief of that version plus the change as the next version, and that version as the base
+  of the report. Open passages, open points, assumptions and fixed sentences of the earlier versions are therefore carried over,
+  and the rules of the first request do not block, as in any change. It is stored under the same conditions as a change (no run
+  active, the shown version unchanged, the order not stopped, at most 10 versions), otherwise "Resume" names the reason; the
+  switch `Orders:Revise` is not asked, because the change was already accepted. The option to seed with the last iteration does
+  not apply to such a run. Resume on any other run is unchanged. Proven by end-to-end tests over the real wiring.
 - **MCP:** nine order tools, registered one by one: `submit_order`, `answer_order`, `get_order_status`, `get_order_result` (new
   `latestVersion`, `earlierOpenPoints` with `kind` `openPoint`, `assumption` or `note`, `unbackedPassages[].fromVersion`,
   `unbackedPassages[].note` also for instructions from before the latest change, `assumptionsVersion`), `revise_order`
@@ -2519,6 +2529,17 @@ findings of the version before's own check that was off or hidden are not carrie
 text (web and MCP); administrators (also the static token) can export and stop orders of others over MCP as before on the web.
 In the contract the length was the only note; now every rule of the first request is a note, and "Keep the language of the text"
 applies only while the change asks for no other language (decided after the review).
+
+**Limits of carrying over and of the defused rules (named, not measured):**
+- Whether a finding against an instruction blocks depends on the part of the instruction the checker quotes. When it quotes only
+  words that also stand in the newest change (for example "mention the price" for a request "Do not mention the price." and a
+  change "Please mention the price: 5 euros per family."), the quote counts as standing in the newest change and the finding
+  blocks; in mode `On` the correction may then undo the change. Only with the full quote is the finding defused. Whether the
+  model quotes this way is not measured; a contradiction case belongs to the measurement before switching on for everyone.
+- An open passage of the version before is carried over only while its quoted words still stand in the new text as they were.
+  When the change rewords it ("The fee is 30 euros." becomes "The fee is 30 euros per person.", bold or "amounts to 30 euros"),
+  the earlier finding falls away, and only the new check of the new version can report it again; no gate measures whether it
+  does. Before switching on for everyone, the passages of version 1 are followed by hand in one tone case.
 
 **Deliberate limit:** the brief of a change is the brief of the shown version plus the change. It therefore holds the About me
 details that applied to the first request, also when the person has changed them since; the writer gets them again when the text

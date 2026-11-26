@@ -98,6 +98,56 @@ public sealed class FactFindingFilterRevisionTests
         Assert.Equal(InstructionOrigin.Stated, finding.Origin);
     }
 
+    private const string TariffRequest =
+        "Write about our offer. a) Tarif Version 1) kostet 10 Euro pro Monat b) Tarif Version 2) kostet 12 Euro pro Monat. Halte dich an Entwurf Version 2) und schreibe kurz.";
+
+    private const string TariffQuote = "Tarif Version 2) kostet 12 Euro pro Monat";
+
+    private static FactMaterial TariffMaterial(bool revision) =>
+        new(TariffRequest, [], [], null, [], FactCheckScope.Full, null,
+            revision ? [new FactChange(2, "Make it shorter.", Newest: true)] : null);
+
+    [Fact]
+    public void In_the_first_run_of_an_order_a_quote_that_starts_like_the_end_of_a_mark_keeps_its_words()
+    {
+        var instruction = Kept(Instruction(TariffQuote, "the parents' evening takes place on Thursday"), TariffMaterial(revision: false));
+        var superseded = Kept(new ProposedFactFinding(FactFindingKind.Superseded, "We look forward to seeing you all there!", "Replaced.", null,
+            TariffQuote, null), TariffMaterial(revision: false));
+
+        Assert.Equal(TariffQuote, instruction.InstructionQuote);
+        Assert.Equal(InstructionOrigin.Stated, instruction.Origin);
+        Assert.True(instruction.Blocking);
+        Assert.False(instruction.BeforeLastChange);
+        Assert.Equal(TariffQuote, superseded.MaterialQuote);
+        Assert.Equal(MaterialPart.Request, superseded.MaterialFrom);
+    }
+
+    [Fact]
+    public void In_the_first_run_of_an_order_an_instruction_quote_like_the_end_of_a_mark_still_blocks()
+    {
+        var proposed = Instruction("Entwurf Version 2)", "the parents' evening takes place on Thursday");
+
+        var first = Kept(proposed, TariffMaterial(revision: false));
+        var noChanges = Kept(proposed, TariffMaterial(revision: false) with { Changes = [] });
+
+        Assert.Equal("Entwurf Version 2)", first.InstructionQuote);
+        Assert.Equal(InstructionOrigin.Stated, first.Origin);
+        Assert.True(first.Blocking);
+        Assert.Equal(first, noChanges);
+    }
+
+    [Fact]
+    public void Only_a_run_that_changes_an_earlier_version_takes_the_end_of_a_mark_out_of_a_quote()
+    {
+        var revision = FactFindingFilter.Apply([Instruction("Entwurf Version 2)", "the parents' evening takes place on Thursday")], Draft,
+            TariffMaterial(revision: true));
+        var tariff = Kept(Instruction(TariffQuote, "the parents' evening takes place on Thursday"), TariffMaterial(revision: true));
+
+        Assert.Equal(FactFilterDecision.DroppedInstructionNotFound, Assert.Single(revision.Trace).Decision);
+        Assert.Equal("kostet 12 Euro pro Monat", tariff.InstructionQuote);
+        Assert.True(tariff.BeforeLastChange);
+    }
+
     [Fact]
     public void Other_kinds_of_findings_block_in_a_change_as_before()
     {

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Geef.Atelier.Application.Orders;
+using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.FactCheck;
@@ -18,7 +19,8 @@ namespace Geef.Atelier.Tests.EndToEnd;
 /// Changing a delivered text over the real wiring (contract stage 5, 4.2 and N2 acceptance): order → version 1 →
 /// <see cref="IOrderService.ReviseAsync"/> → the writer gets the delivered text as seed and the change, no clarifier and no web search are
 /// asked; a failed version 2 leaves version 1 shown; with the fact check on, a passage against the change blocks; open findings of
-/// version 1 that still apply stay in version 2, and open points of the writer for version 1 are shown with version 2.
+/// version 1 that still apply stay in version 2, and open points of the writer for version 1 are shown with version 2. "Resume" on a failed
+/// change makes the same change again to the shown version (review E5B, B3), and on any other run resumes it as before.
 /// </summary>
 [Collection(EndToEndCollection.Name)]
 [Trait("Category", "EndToEnd")]
@@ -198,5 +200,113 @@ public sealed class ReviseEndToEndTests(PostgresFixture postgres)
         Assert.Equal([new OrderEarlierPoint(1, point)], result.EarlierOpenPoints);
         Assert.True(result.HasOpenPoints());
         Assert.Equal(OrderCheckLines.ToReviewOpenPoints, result.Checks!.ToReview);
+    }
+
+    private const string OpenPoint = "Es fehlt, bis wann man sich anmelden soll.";
+
+    private static string WithNotes(string text, params string[] openPoints) =>
+        text + "\n<!-- atelier-notes\n" + JsonSerializer.Serialize(new { assumptions = Array.Empty<string>(), open_points = openPoints, quotes = Array.Empty<object>() }) + "\n-->";
+
+    private static async Task<Guid> ResumeAsync(AtelierEndToEndHost host, Guid orderId, Guid runId)
+    {
+        var resumedId = await host.WithScopeAsync(sp => sp.GetRequiredService<IRunService>()
+            .ResumeRunAsync(new ResumeOptions(runId, UseSeedDraft: true, MaxIterationsOverride: null), User));
+        host.ReleaseOrchestrator();
+        await host.WaitForTerminalAsync(resumedId);
+        await host.WaitForOrderFinishedAsync(orderId);
+        return resumedId;
+    }
+
+    [Fact]
+    public async Task Resume_on_a_failed_change_makes_the_same_change_to_the_shown_version_and_keeps_what_was_open()
+    {
+        await using var host = await StartAsync(postgres, FactCheckMode.Report, notes: true);
+        host.Script.EnqueueFactCheckJson(Findings(Finding("unsupported", "Wir freuen uns auf Sie.", "Nobody said that.")));
+        host.Script.EnqueueExecutorText(WithNotes(FirstText, OpenPoint));
+        var submission = await host.SubmitOrderAsync(new SubmitOrderRequest(Request, User, OrderEntry.Web, null));
+        await host.WaitForOrderFinishedAsync(submission.OrderId);
+        var orderId = submission.OrderId;
+        host.Script.EnqueueExecutorError(503, LlmApiError.BackendUnavailableCode);
+        await ReviseAsync(host, orderId);
+        var failed = await RunAsync(host, orderId, 2);
+        Assert.Equal(RunStatus.Failed, failed.Status);
+        var callsBefore = host.Llm.Calls.Count;
+        host.Script.EnqueueExecutorText(WithNotes(SecondText));
+        host.Script.EnqueueFactCheckJson(Findings());
+
+        var resumedId = await ResumeAsync(host, orderId, failed.Id);
+
+        var first = await RunAsync(host, orderId, 1);
+        var resumed = await RunAsync(host, orderId, 3);
+        Assert.Equal(resumedId, resumed.Id);
+        Assert.Equal((first.Id, FirstText, failed.RevisionHint), (resumed.ParentRunId, resumed.SeedDraftText, resumed.RevisionHint));
+        Assert.Equal(RunStatus.Completed, resumed.Status);
+        var brief = BriefingSections.Parse(resumed.BriefingText);
+        Assert.Equal(Request, brief.Request);
+        Assert.Equal("(newest change, version 3) " + Change, Assert.Single(brief.Changes).Marked);
+
+        var calls = host.Llm.Calls.Skip(callsBefore).ToList();
+        var writer = Assert.Single(calls, c => c.Role == LlmRole.Executor);
+        Assert.Equal(FirstText, writer.Document);
+        Assert.Contains(DirectWriterPrompts.RevisionInstruction, UserPrompt(writer), StringComparison.Ordinal);
+        Assert.Contains(Change, UserPrompt(writer), StringComparison.Ordinal);
+        Assert.DoesNotContain(calls, ScriptedLlmEndpoint.IsClarifierCall);
+        Assert.Empty(host.External.For(FakeTavilyEndpoint.ClientName));
+
+        var report = RunReportJson.TryParse(resumed.ReportJson)!;
+        var kept = Assert.Single(report.FactCheck!.Open);
+        Assert.Equal(("Wir freuen uns auf Sie.", 1), (kept.TextQuote, kept.FromVersion));
+        var result = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetResultAsync(orderId, User));
+        Assert.Equal((3, 3, SecondText), (result!.Version, result.LatestVersion, result.Text));
+        Assert.Equal([new OrderEarlierPoint(1, OpenPoint)], result.EarlierOpenPoints);
+        Assert.Equal(("Wir freuen uns auf Sie.", 1), (Assert.Single(result.ShownPassages()).Quote, result.ShownPassages()[0].FromVersion));
+    }
+
+    [Fact]
+    public async Task Resume_on_a_failed_change_lets_a_rule_of_the_first_order_not_block()
+    {
+        await using var host = await StartAsync(postgres, FactCheckMode.On);
+        host.Script.EnqueueFactCheckJson(Findings());
+        var orderId = await FirstVersionAsync(host);
+        host.Script.EnqueueExecutorError(503, LlmApiError.BackendUnavailableCode);
+        await ReviseAsync(host, orderId);
+        var failed = await RunAsync(host, orderId, 2);
+        Assert.Equal(RunStatus.Failed, failed.Status);
+        var callsBefore = host.Llm.Calls.Count;
+        host.Script.EnqueueExecutorText(SecondText);
+        host.Script.EnqueueFactCheckJson(Findings(Finding("instruction", "am 5. Mai um 19 Uhr", "The text is too long.", "max. 80 Wörter")));
+        host.Script.EnqueueFactCheckJson(Findings());
+
+        await ResumeAsync(host, orderId, failed.Id);
+
+        Assert.Single(host.Llm.Calls.Skip(callsBefore), c => c.Role == LlmRole.Executor);
+        var resumed = await RunAsync(host, orderId, 3);
+        Assert.Equal(RunStatus.Completed, resumed.Status);
+        var hint = Assert.Single(RunReportJson.TryParse(resumed.ReportJson)!.FactCheck!.Open);
+        Assert.Equal(FactFindingKind.Instruction, hint.Kind);
+        Assert.False(hint.Blocking);
+        Assert.True(hint.BeforeLastChange);
+    }
+
+    [Fact]
+    public async Task Resume_on_a_failed_first_version_resumes_it_as_before()
+    {
+        await using var host = await StartAsync(postgres);
+        host.Script.EnqueueExecutorError(503, LlmApiError.BackendUnavailableCode);
+        var submission = await host.SubmitOrderAsync(new SubmitOrderRequest(Request, User, OrderEntry.Web, null));
+        await host.WaitForOrderFinishedAsync(submission.OrderId);
+        var orderId = submission.OrderId;
+        var failed = await RunAsync(host, orderId, 1);
+        Assert.Equal(RunStatus.Failed, failed.Status);
+        var callsBefore = host.Llm.Calls.Count;
+        host.Script.EnqueueExecutorText(FirstText);
+
+        await ResumeAsync(host, orderId, failed.Id);
+
+        var resumed = await RunAsync(host, orderId, 2);
+        Assert.Equal((failed.Id, (string?)null, failed.BriefingText), (resumed.ParentRunId, resumed.RevisionHint, resumed.BriefingText));
+        Assert.Equal(RunStatus.Completed, resumed.Status);
+        var writer = Assert.Single(host.Llm.Calls.Skip(callsBefore), c => c.Role == LlmRole.Executor);
+        Assert.DoesNotContain(DirectWriterPrompts.RevisionInstruction, UserPrompt(writer), StringComparison.Ordinal);
     }
 }

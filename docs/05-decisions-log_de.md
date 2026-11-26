@@ -2531,7 +2531,10 @@ bisherige Text noch ein offener Punkt, der weiter zutrifft.
   version n“ bzw. „earlier change, version n; a newer change wins where they differ“) vor dem unveränderten Wortlaut; sein Prompt
   und Schema bleiben gleich. Die Marke ist nie ein Wort der Person: Das Material hält die Änderungen getrennt von ihrer Marke
   (`FactMaterial.Changes`), ausgeschrieben wird sie nur im Prompt des Prüfers, und an einer Stelle (Filter des Faktenprüfers)
-  wird sie aus jedem Zitat des Prüfers entfernt, bevor es nachgeschlagen oder gespeichert wird. Ein Zitat aus einer solchen Zeile
+  wird sie aus jedem Zitat des Prüfers entfernt, bevor es nachgeschlagen oder gespeichert wird – nur in einem
+  Nachbesserungslauf, in dem Marken ausgeschrieben werden. Im ersten Lauf eines Auftrags gibt es keine Marke, und der Filter
+  lässt jedes Zitat so, wie der Prüfer es gab, genau wie vor Etappe 5 (ein Zitat wie „Tarif Version 2) kostet …“ oder ein
+  Vorgabenzitat „Entwurf Version 2)“ behält seine Wörter; Tests). Ein Zitat aus einer solchen Zeile
   zählt weiter als Antwort der Person und wird ohne Marke gespeichert; ein Zitat, das nur aus der Marke oder Teilen davon besteht,
   wird nicht als Vorgabe der Person anerkannt. In gespeicherten und gezeigten Zitaten (Web, MCP, Korrekturauftrag) steht die
   Marke deshalb nie. Ob das Modell die Reihenfolge so beachtet, ist **nicht gemessen** (Tor N).
@@ -2569,7 +2572,7 @@ bisherige Text noch ein offener Punkt, der weiter zutrifft.
   „Extra careful“), steht dort der feste Satz „The checks of version n were not taken over, so anything they left open was not
   checked again.“; er zählt als offener Punkt. Diese festen Sätze von Atelier stehen im Web nicht unter „your change may have
   settled it“, sondern unter der eigenen, neutralen Einleitung „About version n:“; MCP liefert sie in `earlierOpenPoints` mit
-  `kind = note`. Übernommen wird nur bei Nachbesserungsläufen. Eigene Befunde einer Vorversion,
+  `kind = note`. Übernommen wird nur bei Nachbesserungsläufen (auch bei einem, den „Resume“ an einer Nachbesserung startet). Eigene Befunde einer Vorversion,
   deren Prüfung aus oder verborgen war, werden nicht übernommen; schon übernommene Befunde (mit Herkunft) bleiben über alle
   Versionen erhalten und sichtbar, auch wenn der Prüfmodus zwischendurch aus oder verborgen war (Befunde der verborgenen Prüfung
   selbst bleiben unsichtbar).
@@ -2603,6 +2606,16 @@ bisherige Text noch ein offener Punkt, der weiter zutrifft.
   wenn die Auftragsseite die Änderung anbieten kann; sonst bleibt „Resume“.
 - **Fortsetzen (Altpfad):** „Resume“ sät mit dem ausgelieferten Text, wenn der Lauf einen hat, sonst wie bisher mit der letzten
   Iteration (Fehlerbehebung, kein Schalter).
+- **Fortsetzen eines Nachbesserungslaufs:** War der gescheiterte oder gestoppte Lauf selbst eine Nachbesserung, startet
+  „Resume“ (weiter angeboten für Administratoren und für die Besitzerin oder den Besitzer, solange der Schalter `Off` steht)
+  wieder eine Nachbesserung: dieselbe Änderung an der jetzt gezeigten Version, gesät mit deren Text, mit dem Brief dieser
+  Version plus Änderung als nächste Version und mit dieser Version als Grundlage des Berichts. Offene Stellen, offene Punkte,
+  Annahmen und feste Sätze früherer Versionen werden deshalb übernommen, und die Regeln des ersten Auftrags blockieren nicht,
+  wie bei jeder Nachbesserung. Angelegt wird unter denselben Bedingungen wie eine Nachbesserung (kein Lauf aktiv, gezeigte
+  Version unverändert, Auftrag nicht gestoppt, höchstens 10 Versionen), sonst nennt „Resume“ den Grund; der Schalter
+  `Orders:Revise` wird nicht gefragt, weil die Änderung schon angenommen war. Die Wahl, mit der letzten Iteration zu säen, gilt
+  für einen solchen Lauf nicht. „Resume“ auf jedem anderen Lauf bleibt unverändert. Belegt durch Ende-zu-Ende-Tests über die
+  echte Verdrahtung.
 - **MCP:** neun Auftragswerkzeuge, einzeln registriert: `submit_order`, `answer_order`, `get_order_status`, `get_order_result`
   (neu `latestVersion`, `earlierOpenPoints` mit `kind` `openPoint`, `assumption` oder `note`, `unbackedPassages[].fromVersion`,
   `unbackedPassages[].note` auch für Vorgaben von vor der letzten Änderung, `assumptionsVersion`), `revise_order`
@@ -2620,6 +2633,17 @@ nur die Besitzerin oder der Besitzer (Web und MCP); exportieren und stoppen dür
 über MCP wie bisher im Web. Die Längenregel war im Vertrag die einzige Notiz; jetzt sind alle Regeln des ersten Auftrags Notizen,
 und „Keep the language of the text“ gilt nur, solange die Änderung keine andere Sprache verlangt (Entscheidung nach der
 Prüfung).
+
+**Grenzen der Übernahme und der entschärften Regeln (benannt, nicht gemessen):**
+- Ob ein Befund gegen eine Vorgabe blockiert, hängt am Teil der Vorgabe, den der Prüfer zitiert. Zitiert er nur Wörter, die auch
+  in der neuesten Änderung stehen (etwa „mention the price“ bei einem Auftrag „Do not mention the price.“ und einer Änderung
+  „Please mention the price: 5 euros per family.“), gilt das Zitat als in der neuesten Änderung stehend, und der Befund
+  blockiert; im Modus `On` kann die Korrektur die Änderung dann zurücknehmen. Erst mit dem vollen Zitat ist der Befund
+  entschärft. Ob das Modell so zitiert, ist nicht gemessen; ein Widerspruchsfall gehört vor dem Einschalten für alle zur Messung.
+- Eine offene Stelle der Vorversion wird nur übernommen, solange ihr zitierter Wortlaut unverändert im neuen Text steht. Formt
+  die Änderung sie um („The fee is 30 euros.“ wird „The fee is 30 euros per person.“, fett oder „amounts to 30 euros“), fällt
+  der frühere Befund weg, und nur die neue Prüfung der neuen Version kann ihn wieder melden; ob sie das tut, misst kein Tor. Vor
+  dem Einschalten für alle werden in einem Ton-Fall die Stellen von Version 1 von Hand nachverfolgt.
 
 **Bewusste Grenze:** Der Brief einer Nachbesserung ist der Brief der gezeigten Version plus Änderung. Er enthält deshalb die
 „About me“-Angaben, die beim ersten Auftrag galten, auch wenn die Person sie inzwischen geändert hat; der Schreiber bekommt sie
