@@ -118,7 +118,7 @@ Unterstützte `contentType`-Werte: `application/pdf`, `application/vnd.openxmlfo
   "warnings": [ { "code": "<string>", "message": "<string>" } ],
   "note": "<string|null>",
   "assumptions": [ { "id": "a1", "text": "<string>", "unsure": true } ],
-  "checks": { "checked": ["Checked automatically: the text is not empty, starts directly."], "changed": [], "toReview": "Please look at the open points below.", "limits": "These checks look for the problems named here. They do not prove that everything in the text is right." },
+  "checks": { "checked": ["Checked automatically: the text is not empty, starts with the text itself, not with a remark to the reader."], "changed": [], "toReview": "Please look at the open points below.", "limits": "These checks look for the problems named here. They do not prove that everything in the text is right." },
   "factCheck": { "state": "checked|open_points|not_completed|version_not_checked|not_checked", "filesCompared": true },
   "unbackedPassages": [ { "quote": "<Stelle des Textes>", "kind": "not_backed|against_instruction|replaced_in_files|differs_from_looked_up", "instruction": "<string|null>", "blocking": true, "instructionFrom": "request|answers|about_me|assistant|null", "note": "<fixed sentence|null>" } ],
   "sourceIssues": ["Your file \"notizen.txt\" gives 62 as the total, but 22 + 31 + 19 = 72. The text uses 72. Please check which figure is right."],

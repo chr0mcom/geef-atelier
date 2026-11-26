@@ -146,9 +146,9 @@ settings.
 
 **Sections (in order):** `LandingNav` (signed in: My work / Write something), `LandingHero`, `LandingExample` (made-up example as an
 annotated proof sheet, built from the fixed sentences of `OrderCheckLines` and the leads of `HowItWorks`), `LandingSteps` (four or
-five steps of the standard way, "one more try, at most"), `LandingFilm` (unchanged), `LandingCapabilities` (six points and "What
+five steps of the standard way, "one more try, at most"), `LandingCapabilities` (six points and "What
 Atelier does not do"), `LandingAudiences` (#for-whom), `LandingPrivacy`, `LandingWorkshop` (#teams; follows
-`Ui:WorkshopForAdminsOnly`), `LandingClosing`, `LandingFooter`. Inline SVGs in `LandingIllustrations.razor` via `Name`.
+`Ui:WorkshopForAdminsOnly`), `LandingFilm` (unchanged; placed after "For teams" until the new video, one line in `Landing.razor` moves it back), `LandingClosing`, `LandingFooter`. Inline SVGs in `LandingIllustrations.razor` via `Name`.
 
 **CSS:** `wwwroot/atelier-landing.css`, tokens of the three palettes only. Prefixes: `lp-*`, `ex-*`/`proof-*` (example),
 `lp-flow*` (steps), `cap`, `aud`, `team-sheet`. Only one orchestrated motion (the steps) besides the press and the film.

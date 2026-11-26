@@ -3258,3 +3258,8 @@ texts ready to send. Only skipping on the standard way has been measured.
   browser (light/dark × desktop/phone) sideways scrolling, layout shift, contrast of every text and the keyboard.
 - **Fixed on the way:** the "ghost" buttons of the public pages were drawn at 40 % opacity by a general rule of the dashboard
   stylesheet (contrast below the minimum); the hero lost its side padding to a more specific rule. The film section is unchanged.
+- **After the independent review:** the page "Host it yourself" (`/self-host`) now says the same as the start page: requests,
+  texts and files are kept on the own server and go to the AI services that are connected (before: "they never leave your
+  servers", plus "briefings", "workshop", "GEEF loop"). The film stays unchanged but sits after "For teams" until the new video
+  exists. "What was checked" says "starts with the text itself, not with a remark to the reader" instead of "starts directly" (web,
+  MCP and the guides). The sticky navigation is opaque. The word list runs over every switch state.

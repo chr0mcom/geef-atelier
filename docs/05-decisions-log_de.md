@@ -3385,3 +3385,8 @@ Kontrollfälle brauchbar, Entscheidungstexte versendbar. Gemessen ist nur das Ü
 - **Nebenbei behoben:** Die „Ghost“-Schaltflächen der öffentlichen Seiten wurden durch eine allgemeine Regel des
   Dashboard-Stylesheets mit 40 % Deckkraft gezeichnet (Kontrast unter dem Minimum); dem Kopfbereich nahm eine spezifischere Regel den
   seitlichen Abstand. Der Filmabschnitt ist unverändert.
+- **Nach der unabhängigen Prüfung:** Die Seite „Host it yourself“ (`/self-host`) sagt jetzt dasselbe wie die Startseite: Aufträge,
+  Texte und Dateien bleiben auf dem eigenen Server und gehen an die angebundenen KI-Dienste (vorher: „they never leave your
+  servers“, dazu „briefings“, „workshop“, „GEEF loop“). Der Film bleibt unverändert, steht aber bis zum neuen Video hinter „For
+  teams“. „What was checked“ sagt „starts with the text itself, not with a remark to the reader“ statt „starts directly“ (Web, MCP
+  und Leitfäden). Die mitlaufende Navigation ist deckend. Die Wortliste läuft über jeden Schalterzustand.

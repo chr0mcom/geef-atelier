@@ -149,9 +149,10 @@ Zahl stammt aus den Einstellungen.
 
 **Abschnitte (Reihenfolge):** `LandingNav` (angemeldet: My work / Write something), `LandingHero`, `LandingExample` (erfundenes
 Beispiel als Korrekturbogen mit Randnotizen, gebaut aus den festen Sätzen von `OrderCheckLines` und den Einleitungen von
-`HowItWorks`), `LandingSteps` (vier oder fünf Schritte des Standardwegs, „one more try, at most“), `LandingFilm` (unverändert),
+`HowItWorks`), `LandingSteps` (vier oder fünf Schritte des Standardwegs, „one more try, at most“),
 `LandingCapabilities` (sechs Punkte und „What Atelier does not do“), `LandingAudiences` (#for-whom), `LandingPrivacy`,
-`LandingWorkshop` (#teams; folgt `Ui:WorkshopForAdminsOnly`), `LandingClosing`, `LandingFooter`. Inline-SVGs in
+`LandingWorkshop` (#teams; folgt `Ui:WorkshopForAdminsOnly`), `LandingFilm` (unverändert; bis zum neuen Video hinter „For teams“, eine Zeile in
+`Landing.razor` setzt ihn wieder nach oben), `LandingClosing`, `LandingFooter`. Inline-SVGs in
 `LandingIllustrations.razor` über `Name`.
 
 **CSS:** `wwwroot/atelier-landing.css`, nur Tokens der drei Paletten. Präfixe: `lp-*`, `ex-*`/`proof-*` (Beispiel), `lp-flow*`
