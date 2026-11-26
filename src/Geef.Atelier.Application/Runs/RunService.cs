@@ -114,7 +114,7 @@ internal sealed class RunService(
             request.ParentCompositionRunId, cancellationToken);
 
         if (effectiveKind != RunKind.Learning)
-            await LinkToOrderAsync(runId, request.Entry, cancellationToken);
+            await LinkToOrderAsync(runId, request.Entry, CancellationToken.None);
 
         await ReportAssignmentWarningsAsync(runId, resolved.Warnings);
 
@@ -151,7 +151,7 @@ internal sealed class RunService(
         }
         else
         {
-            await persistence.UpdateSnapshotAsync(runId, snapshotJson, cancellationToken);
+            await persistence.UpdateSnapshotAsync(runId, snapshotJson, CancellationToken.None);
         }
 
         return runId;
@@ -278,9 +278,9 @@ internal sealed class RunService(
             cancellationToken);
 
         if (details.Run.Kind != RunKind.Learning)
-            await LinkToOrderAsync(resumedId, OrderEntry.Legacy, cancellationToken);
+            await LinkToOrderAsync(resumedId, OrderEntry.Legacy, CancellationToken.None);
 
-        await persistence.UpdateSnapshotAsync(resumedId, snapshotJson!, cancellationToken);
+        await persistence.UpdateSnapshotAsync(resumedId, snapshotJson!, CancellationToken.None);
         return resumedId;
     }
 
