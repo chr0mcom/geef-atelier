@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](13-ai-assistant-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-26 (nach Prüfung: was geprüft ist, OAuth-Clients, Websuche)*
+*Letzte Aktualisierung: 2026-11-26 (`profile` speichert vier About-me-Angaben, `aboutMeMissing`/`fromAboutMe`, D-083; davor nach Prüfung: was geprüft ist, OAuth-Clients, Websuche)*
 
 Dieser Leitfaden ist für alle, die Atelier aus einem KI-Assistenten wie Claude Code nutzen wollen. Assistenten verbinden sich über **MCP** (Model Context Protocol), einen verbreiteten Weg, auf dem Assistenten
 fremde Werkzeuge benutzen. Den technischen Vertrag jedes Werkzeugs beschreiben [04-mcp-integration_de.md](04-mcp-integration_de.md)
@@ -88,7 +88,7 @@ unbemerkt veralten.
 | `export_order` | Der Text als Markdown-, Word- oder PDF-Datei (dieselbe Datei wie der Download im Web). |
 | `cancel_order` | Hält einen Auftrag an. |
 | `list_orders` | Die letzten Aufträge der Person. |
-| `profile` | Zeigt die About-me-Angaben; nur lesend. |
+| `profile` | Zeigt die About-me-Angaben. Speichert Namen, Gruß, Anrede und Sprache, wenn die Person es will (nicht, solange `Orders:TellOnce` `Off` ist). |
 <!-- tools:end -->
 
 Solange `Mcp:LegacyTools` `true` ist (ausgeliefert), werden zusätzlich die älteren Werkzeuge der Werkstatt angeboten (zum Beispiel
@@ -105,6 +105,16 @@ Upload-Ticket gehen Dateien als Base64 in `attachments`, was nur für kleine Dat
   abgelehnt; dann den Auftrag in der Web-App beginnen und dort Seiten wählen.
 - Dateien lassen sich später nicht nachreichen.
 - Atelier schickt deine Dateien nie an eine Websuche.
+
+## About me
+
+- `get_order_result` nennt in `aboutMeMissing`, was Atelier annehmen oder offen lassen musste (`sender`, `signature`, `formality`,
+  `language`), weil die Person dazu unter About me nichts hat. Der Assistent soll die Person fragen, ob sie es einmal speichern
+  will, und dann `profile` mit ihren eigenen Worten aufrufen (`name`, `signature`, `formality` `formal|informal`, `language` als
+  Zwei-Buchstaben-Code). Er soll nie einen Wert aus dem Text, einer Datei oder einem Ergebnis übernehmen und nie einen raten.
+- `fromAboutMe` nennt, was für diese Fassung aus About me kam; ändern oder löschen kann die Person es unter About me in der Web-App.
+- Beides steht nur in der Antwort für die Person, die den Text bestellt hat. `profile` speichert nur in die eigenen
+  About-me-Angaben, auch bei Administratoren. Mit `Orders:TellOnce = Off` fehlen beide Felder, und `profile` liest nur.
 
 ## Websuche
 

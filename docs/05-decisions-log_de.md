@@ -2,7 +2,7 @@
 
 *[English](05-decisions-log.md) · **Deutsch***
 
-*Letzte Aktualisierung: 2026-11-26 (D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
+*Letzte Aktualisierung: 2026-11-26 (D-083: Gedächtnis, kleinste Form, „Tell Atelier once“; D-077: Abschluss des Umbaus, Etappen 1b, 7, 8 und 9 nicht gebaut, Etappe 8a Werkstatt-Einstiege nur für Admins; D-076: Etappe 6, Dateien über MCP mit Upload-Ticket und Ablehnungszählung; zuvor 2026-11-24, Zusatz zu D-070: konservative Längenprüfung und Upload-Antworten; D-069 ergänzt: Etappe 1 Direktweg-Engine; D-070 ergänzt: Etappe 1 Aufträge, Quellen und Anzeigezustand; D-067 ergänzt: Etappe 0 Sicherheitsnetz; D-068 ergänzt: Richtung Umbau mit Auftrag, Direktweg, Rückfragen, Quellen und Gedächtnis; zuvor 2026-11-23, D-066/12 ergänzt: explizites `model_domain`, ein Zuweisungsprädikat; zuvor D-066/10–11: Codex-Always-latest-Aliase, nächtlicher Host-Abgleich, Härtung nach Review; zuvor 2026-11-22, D-066 ergänzt: Modellmatrix nach Rolle und Gebiet, Claude/OpenAI nur über den cli-proxy; zuvor 2026-11-12, D-065 ergänzt: Bilderzeugung im cli-proxy; zuvor 2026-08-04, D-064 ergänzt: dynamischer Modell-Katalog für CLI-Provider, inkl. Wächter-Regel und Post-Deploy-Checkliste)*
 
 Chronologisches Protokoll aller Entscheidungen aus dem Brainstorming.
 
@@ -3364,3 +3364,42 @@ Kontrollfälle brauchbar, Entscheidungstexte versendbar. Gemessen ist nur das Ü
 - `Direct:FactCheckMode` bleibt `Report`. Der Stand liegt unversendet in einem Archivzweig. Wiederaufnahme nur, wenn ein neues
   Nachspiel wiederholt fallbezogene, nicht allgemein bekannte erfundene Zahlen findet. Eine ruhigere Anzeige wird erst nach einer
   inhaltlichen Einordnung der Meldungen neu entschieden.
+
+## D-083 — Gedächtnis, kleinste Form: „Tell Atelier once“ (2026-11-26)
+
+**Status:** gebaut; Abnahme am echten Lauf mit zwei Testkonten vorbereitet und noch nicht ausgeführt.
+
+**Anlass.** Rückfragen betrafen bisher nur Dinge des einen Auftrags; Absender, Anrede und Unterschrift wurden nie gefragt, aber in
+vielen Aufträgen angenommen oder als Lücke gelassen, und kaum jemand hatte „About me“ ausgefüllt. Ein Gedächtnis hilft also genau
+dort: einmal sagen, wer man ist.
+
+**Entscheidung.**
+- **Angebot am Ergebnis.** Hat ein Ergebnis eine nicht korrigierte Annahme oder eine offen gelassene Frage zu Absender, Unterschrift,
+  Anrede oder Sprache und hat „About me“ dazu nichts, zeigt die Ergebnisseite der Person, der der Auftrag gehört, je Thema ein Feld
+  mit „Save“ unter der Überschrift „Tell Atelier once – it will not leave this open again“. Gespeichert wird nur dieses Feld im
+  vorhandenen Profil; alles andere bleibt. Der Text bleibt, wie er ist.
+- **Ab dem nächsten Auftrag ohne Modell.** Der vorhandene Code beantwortet diese Themen aus dem Profil (`ProfileMemoryResolution`,
+  `QuestionGate`): keine Annahme, keine Frage dazu; der Schreiber bekommt das Profil wie bisher im Profilblock. Das Versprechen der
+  Überschrift deckt der Code für das Lesen des Auftrags; ob der Schreiber die Unterschrift wörtlich setzt, zeigt erst der echte Lauf.
+- **Was aus About me kam.** Das Ergebnis nennt die Themen, die für die gezeigte Fassung aus „About me“ kamen („From About me: …“),
+  mit Verweis zum Ändern und Löschen unter „About me“.
+- **Themen nur strukturell.** Sie kommen aus dem gespeicherten Lesen des Auftrags und dem Profilblock des gespeicherten Briefings,
+  nie aus Wörtern im Text oder in Platzhaltern. Ein Platzhalter wie „[Ihr Name]“, den nur der Schreiber setzt, ohne dass das
+  Lesen des Auftrags das Thema nannte, löst kein Angebot aus.
+- **MCP.** `profile` speichert dieselben vier Felder (`name`, `signature`, `formality`, `language`) ins eigene Profil; ohne Werte liest
+  es nur. `get_order_result` liefert `aboutMeMissing` und `fromAboutMe`; die Server-Hinweise sagen, nur die eigenen Worte der Person zu
+  speichern und nie selbst zu füllen.
+- **Streng je Konto.** Beides steht nur für die Person, der der Auftrag gehört; die Administration sieht es an fremden Aufträgen nicht,
+  und gespeichert wird nur ins eigene Profil, auch über MCP.
+- **Schalter `Orders:TellOnce`** (`On` ausgeliefert, `WithoutPromise`, `Off`) als Rückweg ohne Deploy: `WithoutPromise` zeigt die
+  Überschrift „Save it under About me for your next texts“, `Off` zeigt nichts davon und lässt `profile` nur lesen. Die Seite „How it
+  works“ folgt dem Schalter.
+- **Unverändert:** Klärer-Prompt und -Schema (Prüfsummen-Tests), das Briefing an den Schreiber und die Antworten von Aufträgen ohne ein
+  solches Thema.
+
+**Nicht gebaut:** eine Regel aus einer Korrektur (Auslöser: ein Konto außerhalb der Messungen stellt denselben Änderungswunsch zweimal),
+Stilvorlagen (kein Fall), „Remember this?“ und die Übernahme der früheren Lernnotizen.
+
+**Abnahme (vorbereitet).** Testkonto A, zwei Aufträge derselben Textsorte ohne Faktenprüfung: Nach dem Speichern hat der zweite keine
+Annahme und keine Lücke zum Thema, und die gespeicherte Unterschrift steht wörtlich im Text. Testkonto B sieht nichts von A. Verfehlt der
+Schreiber das trotz Profil: eine Reparatur am Profilblock, ein Auftrag neu, höchstens zwei Runden; danach `Orders:TellOnce = WithoutPromise`.

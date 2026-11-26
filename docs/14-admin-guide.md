@@ -2,7 +2,7 @@
 
 *[Deutsch](14-admin-guide_de.md) · **English***
 
-*Last updated: 2026-11-26 (after review: web search outside the standard way, OAuth clients)*
+*Last updated: 2026-11-26 (`Orders:TellOnce`, D-083; before that after review: web search outside the standard way, OAuth clients)*
 
 This guide is for administrators: people who add accounts, decide which features are on and look after the older workshop. How
 to install and host Atelier is in the [developer and host guide](15-developer-guide.md) and the [README](../README.md).
@@ -38,6 +38,7 @@ feature on.
 | Workshop menu only for administrators | `Ui:WorkshopForAdminsOnly` | `true` | `true` (D-077) | – |
 | Older tools for AI assistants | `Mcp:LegacyTools` | `true` | `true` (D-075) | – |
 | Learning loop of the older way | `Learning:Enabled` | `false` | `false` (D-067) | – |
+| Offer to save missing details under About me (“Tell Atelier once”) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `On` | `On` (D-083) | – |
 
 What the values mean:
 
@@ -51,6 +52,13 @@ What the values mean:
   search whenever a search key is set, whatever `Research:Mode` says.
 - **Workshop:** with `true`, only administrators see the menu "Workshop", the link to the older form on the start page and
   "Technical details" on the order page. The pages themselves still open for anyone signed in who types their address (D-077).
+- **Tell Atelier once:** `On` shows the owner of a result one field per topic (sender, signature, form of address, language) that the
+  reading of the request had to assume or leave open while About me has nothing on it, under the heading “Tell Atelier once – it will
+  not leave this open again”, and the line “From About me: …”; AI assistants get the same as `aboutMeMissing`/`fromAboutMe` and can
+  save these four fields with `profile`. `WithoutPromise` is the same with the heading “Save it under About me for your next texts”
+  (the way back if the writer still leaves the signature open although it is saved). `Off` shows none of it, and `profile` only
+  reads. Administrators never see it on someone else's order, and saving goes only into the own About me (D-083). Way back:
+  `Orders__TellOnce=WithoutPromise` or `Orders__TellOnce=Off`.
 
 **How to set a switch.** The settings are read at start. Set them as environment variables of the web service, with `__` in place
 of `:` (for example `Orders__Revise=On`, `Orders__ReviseOverrides__alice=On`). `docker-compose.yml` passes variables one by one,

@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](14-admin-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-26 (nach Prüfung: Websuche außerhalb des Standardwegs, OAuth-Clients)*
+*Letzte Aktualisierung: 2026-11-26 (`Orders:TellOnce`, D-083; davor nach Prüfung: Websuche außerhalb des Standardwegs, OAuth-Clients)*
 
 Dieser Leitfaden ist für die Administration: Menschen, die Konten anlegen, entscheiden, welche Funktionen an sind, und sich um die
 ältere Werkstatt kümmern. Installation und Betrieb beschreiben der [Leitfaden für Entwicklung und Betrieb](15-developer-guide_de.md)
@@ -39,6 +39,7 @@ muss beim Einschalten nicht geändert werden.
 | Werkstatt-Menü nur für die Administration | `Ui:WorkshopForAdminsOnly` | `true` | `true` (D-077) | – |
 | Ältere Werkzeuge für KI-Assistenten | `Mcp:LegacyTools` | `true` | `true` (D-075) | – |
 | Lernschleife des älteren Wegs | `Learning:Enabled` | `false` | `false` (D-067) | – |
+| Angebot, fehlende Angaben unter About me zu speichern („Tell Atelier once“) | `Orders:TellOnce` (`Off`, `On`, `WithoutPromise`) | `On` | `On` (D-083) | – |
 
 Was die Werte bedeuten:
 
@@ -54,6 +55,13 @@ Was die Werte bedeuten:
 - **Werkstatt:** Mit `true` sehen nur Administratoren das Menü „Workshop“, den Link zum älteren Formular auf der Startseite und
   „Technical details“ auf der Auftragsseite. Die Seiten selbst öffnen sich weiter für alle Angemeldeten, die ihre Adresse eingeben
   (D-077).
+- **Tell Atelier once:** `On` zeigt der Person, der ein Ergebnis gehört, je Thema (Absender, Unterschrift, Anrede, Sprache), das beim
+  Lesen des Auftrags angenommen oder offen gelassen werden musste und zu dem About me nichts hat, ein Feld unter der Überschrift
+  „Tell Atelier once – it will not leave this open again“, dazu die Zeile „From About me: …“; KI-Assistenten bekommen dasselbe als
+  `aboutMeMissing`/`fromAboutMe` und können diese vier Felder mit `profile` speichern. `WithoutPromise` ist dasselbe mit der
+  Überschrift „Save it under About me for your next texts“ (der Rückweg, falls der Schreiber die Unterschrift trotz Profil offen
+  lässt). `Off` zeigt nichts davon, und `profile` liest nur. Die Administration sieht es nie an fremden Aufträgen, und gespeichert
+  wird nur in die eigenen About-me-Angaben (D-083). Rückweg: `Orders__TellOnce=WithoutPromise` oder `Orders__TellOnce=Off`.
 
 **Einen Schalter setzen.** Die Einstellungen werden beim Start gelesen. Setz sie als Umgebungsvariablen des Webdienstes, mit `__`
 statt `:` (zum Beispiel `Orders__Revise=On`, `Orders__ReviseOverrides__alice=On`). `docker-compose.yml` reicht Variablen einzeln

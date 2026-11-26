@@ -2,7 +2,7 @@
 
 *[Deutsch](05-decisions-log_de.md) · **English***
 
-*Last updated: 2026-11-26 (D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
+*Last updated: 2026-11-26 (D-083: memory in its smallest form, "Tell Atelier once"; D-077: completion of the rebuild, stages 1b, 7, 8 and 9 not built, stage 8a workshop entries for administrators only; D-076: stage 6, files over MCP with an upload ticket and counting refusals; before that 2026-11-24, D-070 addendum: conservative length check and upload answers; D-069 added: stage 1 direct-path engine; D-070 added: stage 1 orders, sources and display state; D-067 added: stage 0 safety net; D-068 added: direction of the rebuild with order, direct path, questions, sources and memory; before that 2026-11-23, D-066 extended incl. /12 explicit model_domain and a single assignment rule: codex always-latest aliases, nightly host sync, review hardening; before that 2026-11-22, D-066 added: model matrix by role and domain, Claude/OpenAI only via the cli-proxy; before that 2026-11-12, D-065 added: image generation in the cli-proxy; before that 2026-08-04, D-064 added: dynamic model catalog for CLI providers, incl. the guard rule and the post-deploy checklist)*
 
 Chronological log of all decisions from the brainstorming.
 
@@ -3240,3 +3240,42 @@ texts ready to send. Only skipping on the standard way has been measured.
 - `Direct:FactCheckMode` stays `Report`. The work stays unshipped in an archive branch. It comes back only if a new replay finds
   invented numbers of the case at hand, not common knowledge, more than once. A calmer view will only be decided after the
   findings have been sorted by content.
+
+## D-083 — Memory in its smallest form: "Tell Atelier once" (2026-11-26)
+
+**Status:** built; the acceptance on the real system with two test accounts is prepared and not yet run.
+
+**Why.** Questions so far were only about matters of the one order; sender, form of address and signature were never asked, but in
+many orders they were assumed or left as a gap, and hardly anyone had filled in "About me". So a memory helps exactly there: say once
+who you are.
+
+**Decision.**
+- **Offer on the result.** When a result has an uncorrected assumption or a question left open about the sender, signature, form of
+  address or language, and "About me" has nothing on it, the result page shows the person who ordered the text one field per topic
+  with "Save" under the heading "Tell Atelier once – it will not leave this open again". Only that field is saved in the existing
+  profile; everything else stays. The text stays as it is.
+- **From the next order on, without a model.** The existing code answers these topics from the profile (`ProfileMemoryResolution`,
+  `QuestionGate`): no assumption, no question about them; the writer gets the profile in the profile block as before. The code covers
+  the promise of the heading for the reading of the request; whether the writer puts the signature in word for word only the real run
+  shows.
+- **What came from About me.** The result names the topics that came from "About me" for the shown version ("From About me: …"), with a
+  pointer to change or delete them under "About me".
+- **Topics only by structure.** They come from the stored reading of the request and the profile block of the stored briefing, never
+  from words in the text or in placeholders. A placeholder such as "[Your name]" that only the writer puts in, without the reading of
+  the request naming the topic, does not trigger the offer.
+- **MCP.** `profile` saves the same four fields (`name`, `signature`, `formality`, `language`) into the own profile; without values it
+  only reads. `get_order_result` returns `aboutMeMissing` and `fromAboutMe`; the server instructions say to save only the person's own
+  words and never to fill anything in.
+- **Strictly per account.** Both are there only for the person who ordered the text; administrators do not see them on someone else's
+  order, and saving goes only into the own profile, also over MCP.
+- **Switch `Orders:TellOnce`** (`On` shipped, `WithoutPromise`, `Off`) as a way back without a deploy: `WithoutPromise` shows the heading
+  "Save it under About me for your next texts", `Off` shows none of it and lets `profile` only read. The page "How it works" follows the
+  switch.
+- **Unchanged:** clarifier prompt and schema (checksum tests), the briefing for the writer and the answers of orders without such a topic.
+
+**Not built:** a rule from a correction (trigger: an account outside the measurements asks for the same change twice), style templates
+(no case), "Remember this?" and taking over the earlier learning notes.
+
+**Acceptance (prepared).** Test account A, two orders of the same kind without fact check: after saving, the second has no assumption and
+no gap about the topic, and the saved signature stands word for word in the text. Test account B sees nothing of A. If the writer misses
+this despite the profile: one repair of the profile block, one new order, at most two rounds; after that `Orders:TellOnce = WithoutPromise`.

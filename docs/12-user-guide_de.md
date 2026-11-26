@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](12-user-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-26 (nach Prüfung: Websuche nur auf dem Standardweg, Aufbewahrung, Wortwahl)*
+*Letzte Aktualisierung: 2026-11-26 („Tell Atelier once“, D-083; davor nach Prüfung: Websuche nur auf dem Standardweg, Aufbewahrung, Wortwahl)*
 
 Dieser Leitfaden ist für alle, die Atelier im Browser nutzen. Technisches Wissen ist nicht nötig. Die Seite **How it works**
 (`/how-it-works`, auch ohne Anmeldung erreichbar) zeigt dasselbe in kurz, zusammen mit den Funktionen, die gerade für dich
@@ -104,6 +104,13 @@ die Funktion aus ist, erscheint der Knopf nicht.
 Unter **About me** (dein Menü oben rechts) kannst du deinen Namen, deine Tätigkeit, deine Organisation, die Anrede der Leser,
 deine Sprache, deinen Gruß, was nie passieren soll, und weitere Hinweise speichern. Atelier nutzt das in jedem Text, du musst es
 nicht wiederholen. Nur du kannst es ändern.
+
+**Einmal sagen („Tell Atelier once“).** Musste ein Text deinen Namen, deinen Gruß, die Anrede der Leser oder deine Sprache raten
+oder offen lassen, und steht dazu noch nichts unter About me, zeigt das Ergebnis dafür ein Feld mit **Save**. Was du dort
+speicherst, kommt in About me. Ab dem nächsten Auftrag nimmt Atelier es aus About me, statt zu raten oder zu fragen, und der
+Schreiber bekommt es bei jedem Auftrag. Der Text, den du gerade siehst, bleibt, wie er ist; um es dort einzufügen, nutze „Change
+something“. Das Ergebnis sagt außerdem, was aus About me kam („From About me: …“). Ändern oder löschen kannst du es unter About me.
+Ob der Schreiber es wirklich verwendet, etwa deinen Gruß wörtlich, hängt vom Text ab: Prüf das Ergebnis wie immer.
 
 ## Wohin deine Worte gehen
 

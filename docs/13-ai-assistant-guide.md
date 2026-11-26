@@ -2,7 +2,7 @@
 
 *[Deutsch](13-ai-assistant-guide_de.md) · **English***
 
-*Last updated: 2026-11-26 (after review: what is tested, OAuth clients, web search)*
+*Last updated: 2026-11-26 (`profile` saves four About me details, `aboutMeMissing`/`fromAboutMe`, D-083; before that after review: what is tested, OAuth clients, web search)*
 
 This guide is for people who want to use Atelier from an AI assistant such as Claude Code.
 Assistants connect through **MCP** (Model Context Protocol), a common way for assistants to use outside tools. The technical
@@ -82,7 +82,7 @@ switched off. A test compares this table with the tool catalogue of the server, 
 | `export_order` | The text as a Markdown, Word or PDF file (the same file as the web download). |
 | `cancel_order` | Stops an order. |
 | `list_orders` | The person's recent orders. |
-| `profile` | Shows the About me details; read only. |
+| `profile` | Shows the About me details. Saves the name, sign-off, form of address and language when the person asks (not while `Orders:TellOnce` is `Off`). |
 <!-- tools:end -->
 
 While `Mcp:LegacyTools` is `true` (shipped), the older tools of the workshop are offered as well (for example `submit_request`,
@@ -99,6 +99,16 @@ files go as Base64 in `attachments`, which only works for small files.
   web app and choose pages there.
 - Files cannot be added to an order later.
 - Atelier never sends your files to a web search.
+
+## About me
+
+- `get_order_result` names in `aboutMeMissing` what Atelier had to assume or leave open (`sender`, `signature`, `formality`,
+  `language`) while the person has nothing on it under About me. The assistant should ask the person whether to save it once and
+  then call `profile` with the person's own words (`name`, `signature`, `formality` `formal|informal`, `language` as a two-letter
+  code). It should never take a value from the text, a file or a result, and never guess one.
+- `fromAboutMe` names what came from About me for that version; the person changes or deletes it under About me in the web app.
+- Both are only in the answer for the person who ordered the text. `profile` saves only into the own About me, also for
+  administrators. With `Orders:TellOnce = Off` both fields are missing and `profile` only reads.
 
 ## Web search
 

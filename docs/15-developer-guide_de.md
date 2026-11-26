@@ -2,7 +2,7 @@
 
 ***Deutsch** · [English](15-developer-guide.md)*
 
-*Letzte Aktualisierung: 2026-11-26 (nach Prüfung: Websuche, Darstellung unter `/docs`, Einstellungstabelle nur für Admins)*
+*Letzte Aktualisierung: 2026-11-26 (About me am Ergebnis, D-083; davor nach Prüfung: Websuche, Darstellung unter `/docs`, Einstellungstabelle nur für Admins)*
 
 Dieser Leitfaden ist für Entwicklerinnen und Entwickler und für alle, die Atelier selbst betreiben. Er gibt die Karte des heutigen
 Systems und verweist auf die ausführlichen Dokumente. Die Einrichtungsbefehle stehen im [README](../README_de.md); die Gründe
@@ -52,6 +52,7 @@ flowchart TB
 | Was die Person liest | `Application/Orders/OrderCheckLines.cs`, `Application/Orders/OrderResultRules.cs`, `Web/Components/UI/Orders/` |
 | MCP-Werkzeuge und -Anweisungen | `Mcp/McpToolCatalog.cs`, `Mcp/McpServerInstructions.cs`, `Mcp/Tools/` |
 | Erklärseite | `Web/Components/Pages/HowItWorks.razor`, `Web/Display/HowItWorksFeatures.cs` |
+| About me am Ergebnis („Tell Atelier once“) | `Application/Orders/AboutMeTopics.cs`, `Application/Orders/AboutMeLines.cs`, `Application/Intake/ProfileMemoryResolution.cs`, `Web/Components/UI/Orders/OrderAboutMe.razor`, `Mcp/Tools/ProfileTool.cs` |
 | Schalter | `Core/Configuration/*Options.cs`, `Web/appsettings.json` |
 
 Alle Pfade liegen unter `src/Geef.Atelier.*`.
@@ -106,6 +107,11 @@ die Seite auf.
 - Das Repository ist öffentlich: keine Geheimnisse, keine Betriebsdetails, keine Kontonamen, keine echten Aufträge in Tests oder
   Beispielen.
 - UI-Texte nur Englisch (D-062); Doku zweisprachig (Englisch führend, Deutsch als `_de.md`).
+- About me ist streng je Konto: Die Ergebnisfelder `TellOnce` und `FromAboutMe` werden nur für die Person gefüllt, der der Auftrag
+  gehört, die Web-Komponente erscheint nur ihr, und `IProfileService.SavePartAsync` sowie `profile` schreiben nur in das Profil der
+  angemeldeten Person. Die Themen kommen aus dem gespeicherten Lesen des Auftrags (`IntakeRecord`) und dem Profilblock des
+  gespeicherten Briefings, nie aus Wörtern im Text; Klärer-Prompt und Briefing von Aufträgen ohne ein solches Thema bleiben
+  unverändert (D-083).
 
 ## Betrieb
 

@@ -2,7 +2,7 @@
 
 *[Deutsch](12-user-guide_de.md) · **English***
 
-*Last updated: 2026-11-26 (after review: web search only on the standard way, storage, wording)*
+*Last updated: 2026-11-26 (Tell Atelier once, D-083; before that after review: web search only on the standard way, storage, wording)*
 
 This guide is for everyone who uses Atelier in the web browser. You need no technical knowledge. The page **How it works**
 (`/how-it-works`, also open without signing in) shows the same in short, with the features that are switched on for you right
@@ -99,6 +99,13 @@ the text asks you to check the new parts. While this feature is off, the button 
 Under **About me** (your menu at the top right) you can save your name, what you do, your organisation, how readers are addressed,
 your language, how you sign off, what never to do and other notes. Atelier uses it in every text, so you do not have to repeat it.
 Only you can change it.
+
+**Tell Atelier once.** When a text had to guess or leave open your name, how you sign off, how readers are addressed or your
+language, and About me has nothing on it yet, the result shows a field for it with **Save**. What you save there goes into About me.
+From the next request on, Atelier takes it from About me instead of guessing or asking, and the writer gets it with every request.
+The text you are looking at stays as it is; to add it there, use “Change something”. The result also says what came from About me
+(“From About me: …”). You change or delete it under About me. Whether the writer really uses it, for example your sign-off word for
+word, depends on the text: check the result as always.
 
 ## Where your words go
 

@@ -2,7 +2,7 @@
 
 *[Deutsch](15-developer-guide_de.md) · **English***
 
-*Last updated: 2026-11-26 (after review: web search, `/docs` rendering, admin-only settings table)*
+*Last updated: 2026-11-26 (About me on the result, D-083; before that after review: web search, `/docs` rendering, admin-only settings table)*
 
 This guide is for developers and for people who host Atelier. It gives the map of the current system and points to the detailed
 documents. Setup commands are in the [README](../README.md); the reasons behind every rule are in the
@@ -52,6 +52,7 @@ flowchart TB
 | What the person reads | `Application/Orders/OrderCheckLines.cs`, `Application/Orders/OrderResultRules.cs`, `Web/Components/UI/Orders/` |
 | MCP tools and instructions | `Mcp/McpToolCatalog.cs`, `Mcp/McpServerInstructions.cs`, `Mcp/Tools/` |
 | Explanation page | `Web/Components/Pages/HowItWorks.razor`, `Web/Display/HowItWorksFeatures.cs` |
+| About me on the result (“Tell Atelier once”) | `Application/Orders/AboutMeTopics.cs`, `Application/Orders/AboutMeLines.cs`, `Application/Intake/ProfileMemoryResolution.cs`, `Web/Components/UI/Orders/OrderAboutMe.razor`, `Mcp/Tools/ProfileTool.cs` |
 | Switches | `Core/Configuration/*Options.cs`, `Web/appsettings.json` |
 
 All paths are below `src/Geef.Atelier.*`.
@@ -100,6 +101,10 @@ When you add a switch that changes what a person can do, add it to `HowItWorksFe
 - Migrations are hand-written, additive and idempotent and need `[DbContext]` and `[Migration]`, otherwise EF skips them silently.
 - The repository is public: no secrets, no operating details, no account names, no real orders in tests or examples.
 - UI texts are English only (D-062); documentation is bilingual (English primary, German `_de.md`).
+- About me is strictly per account: the result fields `TellOnce` and `FromAboutMe` are filled only for the owner of the order, the
+  web component is rendered only for the owner, and `IProfileService.SavePartAsync` and `profile` write only into the profile of
+  the signed-in user. The topics come from the stored reading of the request (`IntakeRecord`) and the profile block of the stored
+  briefing, never from words in the text; the clarifier prompt and the briefing of orders without such a topic stay unchanged (D-083).
 
 ## Hosting
 
