@@ -346,6 +346,18 @@ public sealed class OrderChangeTests : TestContext
     }
 
     [Fact]
+    public void A_second_version_after_a_first_one_without_text_keeps_the_plain_link_because_there_is_nothing_to_compare()
+    {
+        var view = AddOrder(OrderDisplayState.Delivered, [RunView(1, RunStatus.Failed, RunOutcome.Failed, null), RunView(2, RunStatus.Completed, RunOutcome.Converged, 14, minutes: 5)]);
+        _orders.SetResult(Result(view, 2, 2, FirstText));
+
+        var cut = Render(view);
+
+        Assert.Equal("See all versions", cut.Find("[data-testid='order-versions-link']").TextContent);
+        Assert.Empty(cut.FindAll("[data-testid='order-version-toggle']"));
+    }
+
+    [Fact]
     public void No_button_when_changing_is_switched_off()
     {
         _revise = ReviseMode.Off;

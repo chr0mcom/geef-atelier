@@ -85,7 +85,10 @@ public static class RevisionLines
     /// <summary>Link above the text to the list of versions.</summary>
     public const string SeeVersions = "See all versions";
 
-    /// <summary>Like <see cref="SeeVersions"/> when the shown version changed an earlier one: the list holds “Show changes”.</summary>
+    /// <summary>
+    /// Like <see cref="SeeVersions"/> when the list offers “Show changes” for the shown version, that is when an earlier version has a text
+    /// to compare with; otherwise (for example after a first version that ended without a text) the link stays <see cref="SeeVersions"/>.
+    /// </summary>
     public const string SeeChangesAndVersions = "See what changed and all versions";
 
     /// <summary>Second line of the banner after a change could not be finished, when the shown version still has open points.</summary>
