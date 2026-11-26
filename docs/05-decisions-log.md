@@ -2905,3 +2905,19 @@ Deliberately not changed after T-A1:
 
 **Way back:** switch `Off` through the environment (immediate). Code: the previous image; Step53 is additive, the old code reads
 `Sources` unchanged. Sources uploaded through tickets stay ordinary sources.
+
+### Addendum to D-076 — accepted on the real system, upload ticket switched on (2026-11-26)
+
+Deployed with `Uploads:Tickets=Off`, then switched on through the environment for the measurement. All four gates, evaluated
+together with `upload_check`, **passed**:
+- **T-A2 (Claude Code, 2 sessions):** a 24-page PDF and a DOCX arrived through `prepare_attachment` and `curl`, bytes equal,
+  no Base64 in the transcript, linked to the order; for the PDF the writer read the whole text. For the DOCX with an apostrophe
+  and spaces in its name Claude Code chose the recommended one-command copy path on its own. Measurement condition: shell
+  commands in these sessions were limited to the upload Atelier proposes; for the PDF Claude Code first tried to read the file
+  locally itself, which was refused before it took the Atelier path.
+- **T-A3 (upload page):** arrived and byte-equal; a second account saw “Not Found” and could not use the upload id.
+- **T-A4 (scan without text):** refused on both paths with the intended sentence, nothing stored, exactly two count rows.
+- **T-A5 (counting):** exactly the expected rows, without file name or content.
+
+Then `Uploads:Tickets=On` became the default. Way back: the switch `Off` or the previous image; Step53 is purely additive.
+Not checked: claude.ai as a client.

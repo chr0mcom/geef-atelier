@@ -3018,3 +3018,20 @@ Nach T-A1 bewusst nicht geändert:
 
 **Rückweg:** Schalter `Off` per Umgebung (sofort). Code: vorheriges Image; Step53 ist additiv, der alte Code liest `Sources`
 unverändert. Über Tickets hochgeladene Quellen bleiben normale Quellen.
+
+### Zusatz zu D-076 — Abnahme am echten System, Upload-Ticket eingeschaltet (2026-11-26)
+
+Ausgeliefert mit `Uploads:Tickets=Off`, danach für die Messung per Umgebung eingeschaltet. Alle vier Tore, gemeinsam
+ausgewertet mit `upload_check`, **bestanden**:
+- **T-A2 (Claude Code, 2 Sitzungen):** PDF (24 Seiten) und DOCX über `prepare_attachment` und `curl` angekommen, Bytes
+  gleich, kein Base64 im Mitschnitt, Auftrag verknüpft; beim PDF las der Schreiber den ganzen Text. Beim DOCX mit Apostroph und
+  Leerzeichen im Namen wählte Claude Code selbst den empfohlenen Kopierweg in einem Befehl. Messbedingung: Shell-Befehle waren
+  in diesen Sitzungen auf den von Atelier vorgeschlagenen Upload beschränkt; beim PDF versuchte Claude Code zuerst, die Datei
+  selbst lokal auszulesen, was abgelehnt wurde, bevor es den Atelier-Weg nahm.
+- **T-A3 (Upload-Seite):** angekommen und bytegleich; ein zweites Konto sah „Not Found“ und konnte die Upload-Id nicht
+  verwenden.
+- **T-A4 (Scan ohne Text):** auf beiden Wegen mit dem vorgesehenen Satz abgelehnt, nichts gespeichert, genau zwei Zählzeilen.
+- **T-A5 (Zählung):** genau die erwarteten Zeilen, ohne Dateiname und Inhalt.
+
+Danach `Uploads:Tickets=On` als Standard. Rückweg: Schalter `Off` oder das vorherige Image; Step53 ist rein additiv.
+Nicht geprüft: claude.ai als Client.

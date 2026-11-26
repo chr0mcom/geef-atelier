@@ -229,9 +229,9 @@ public sealed class UploadTicketEndToEndTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task WithTheShippedSwitchOffTheRoutesAnswerLikeUnknownAddresses()
+    public async Task WithTheSwitchOffTheRoutesAnswerLikeUnknownAddresses()
     {
-        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres, services => services.Configure<UploadOptions>(o => o.Tickets = UploadTicketsMode.Off));
         var owner = await host.CreateSignedInClientAsync("off-" + Guid.NewGuid().ToString("N")[..6]);
         var id = Guid.NewGuid();
         using var client = host.CreateAnonymousClient();

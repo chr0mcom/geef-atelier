@@ -311,7 +311,7 @@ public sealed class UploadTicketSeamTests(PostgresFixture postgres)
     [Fact]
     public async Task With_tickets_off_the_upload_addresses_answer_exactly_like_addresses_that_never_existed()
     {
-        await using var host = await AtelierEndToEndHost.StartAsync(postgres);
+        await using var host = await AtelierEndToEndHost.StartAsync(postgres, services => services.Configure<UploadOptions>(o => o.Tickets = UploadTicketsMode.Off));
         var id = Guid.NewGuid();
         var anonymous = host.CreateAnonymousClient();
         var signedIn = await host.CreateSignedInClientAsync("off-" + Guid.NewGuid().ToString("N")[..6]);

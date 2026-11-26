@@ -89,22 +89,22 @@ public sealed class McpOrderContractEndToEndTests(PostgresFixture postgres)
     }
 
     [Fact]
-    public async Task Tools_list_has_the_nine_order_tools_and_the_older_ones_with_a_pointer()
+    public async Task Tools_list_as_shipped_has_the_ten_order_tools_and_the_older_ones_with_a_pointer()
     {
         await using var host = await StartAsync();
 
         var tools = (await host.PostMcpAsync("tools/list")).GetProperty("result").GetProperty("tools").EnumerateArray()
             .ToDictionary(t => t.GetProperty("name").GetString()!, t => t.GetProperty("description").GetString()!);
 
-        Assert.Equal(28, tools.Count);
-        foreach (var name in new[] { "submit_order", "answer_order", "get_order_status", "get_order_result", "revise_order", "export_order", "cancel_order", "list_orders", "profile" })
+        Assert.Equal(29, tools.Count);
+        foreach (var name in new[] { "prepare_attachment", "submit_order", "answer_order", "get_order_status", "get_order_result", "revise_order", "export_order", "cancel_order", "list_orders", "profile" })
             Assert.Contains(name, tools.Keys);
         Assert.StartsWith("Older tool, kept for now: use list_orders instead. ", tools["list_runs"], StringComparison.Ordinal);
         Assert.Contains("max 50", tools["get_order_status"], StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Without_older_tools_only_the_nine_are_listed_and_the_instructions_do_not_name_older_ones()
+    public async Task Without_older_tools_only_the_ten_are_listed_and_the_instructions_do_not_name_older_ones()
     {
         await using var host = await StartAsync(services => services.PostConfigure<McpOptions>(o => o.LegacyTools = false));
 
@@ -117,7 +117,7 @@ public sealed class McpOrderContractEndToEndTests(PostgresFixture postgres)
             clientInfo = new { name = "e2e-client", version = "1.0" },
         })).GetProperty("result").GetProperty("instructions").GetString()!;
 
-        Assert.Equal(new[] { "answer_order", "cancel_order", "export_order", "get_order_result", "get_order_status", "list_orders", "profile", "revise_order", "submit_order" }, tools);
+        Assert.Equal(new[] { "answer_order", "cancel_order", "export_order", "get_order_result", "get_order_status", "list_orders", "prepare_attachment", "profile", "revise_order", "submit_order" }, tools);
         Assert.DoesNotContain("submit_request", instructions, StringComparison.Ordinal);
         var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => host.CallMcpToolAsync("list_runs", new { }));
         Assert.Contains("list_runs", refused.Message, StringComparison.Ordinal);
