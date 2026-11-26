@@ -3140,3 +3140,6 @@ extractor and provider.
   target.
 - **Truth before promotion:** claims only as far as the code ensures them; no claims about other products. Checked in two
   independent rounds.
+- **On the statement about claude.ai:** since 2026-11-26 one complete path through a connection set up in claude.ai has been
+  tried, called from Claude Code: an order with a file and a question, then a change. The claude.ai chat window itself and Claude
+  Desktop are still not checked. To that extent this replaces the earlier notes "claude.ai is not checked".

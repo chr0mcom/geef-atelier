@@ -79,7 +79,8 @@ Download the text as **Word, PDF or Markdown**. The file holds only the text; th
 
 **Change something** (when it is switched on for you): below a finished text, say in your own words what to change. Atelier writes
 a new version and keeps the earlier ones; **Show changes** shows the difference. The writer is asked to make only that change, but
-nothing checks that nothing else changed, so read the new version. While this feature is off, the button does not appear.
+nothing checks that nothing else changed, so read the new version. If it is noticeably longer than the one before, a note above
+the text asks you to check the new parts. While this feature is off, the button does not appear.
 
 ## What the checks mean
 

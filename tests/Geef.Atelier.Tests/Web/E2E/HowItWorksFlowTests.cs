@@ -61,7 +61,11 @@ public sealed class HowItWorksFlowTests(PlaywrightFixture pw, PostgresFixture pg
         await using var host = await WebTestHost.StartAsync(pg, configureServices: s =>
         {
             Shipped(s);
-            s.Configure<OrderOptions>(o => o.ReviseOverrides["test-user"] = ReviseMode.On);
+            s.Configure<OrderOptions>(o =>
+            {
+                o.Revise = ReviseMode.Off;
+                o.ReviseOverrides["test-user"] = ReviseMode.On;
+            });
         });
         var context = await ContextAsync(host, palette, width, height);
         var page = await context.NewPageAsync();

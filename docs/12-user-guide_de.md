@@ -82,7 +82,8 @@ Lade den Text als **Word, PDF oder Markdown** herunter. Die Datei enthält nur d
 
 **Change something** (wenn es für dich eingeschaltet ist): Unter einem fertigen Text sagst du in eigenen Worten, was geändert
 werden soll. Atelier schreibt eine neue Version und behält die früheren; **Show changes** zeigt den Unterschied. Der Schreiber wird
-gebeten, nur diese Änderung zu machen, aber nichts prüft, dass sonst nichts geändert wurde – lies die neue Version also. Solange
+gebeten, nur diese Änderung zu machen, aber nichts prüft, dass sonst nichts geändert wurde – lies die neue Version also. Ist sie deutlich länger als die vorige, steht über
+dem Text ein Hinweis, die neuen Stellen zu prüfen. Solange
 die Funktion aus ist, erscheint der Knopf nicht.
 
 ## Was die Prüfungen bedeuten

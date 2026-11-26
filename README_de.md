@@ -50,9 +50,9 @@ Jeder Punkt nennt die Entscheidung, die ihn beschreibt.
 
 Grenzen: Der Text kann trotzdem falsch sein; der Faktenprüfer kann etwas übersehen und meldet auch harmlose Sätze (D-075); Atelier
 ist kein Chat; es lernt nicht aus früheren Texten (Lernen pausiert, D-067; Gedächtnis nicht gebaut, D-077); Scans ohne Text kann es
-nicht lesen (D-076); „Extra careful“ nutzt die ältere Schleife, sucht nicht im Web und hat kein „What was checked“. Ändern eines
-fertigen Textes und Web-Recherche auf dem Standardweg sind gebaut, aber für alle ausgeschaltet, bis ihre Messungen bestanden sind
-(D-074, D-075, D-077). Ausdrücklich gewählte Werkstatt-Teams können eine eigene Websuche nutzen.
+nicht lesen (D-076); „Extra careful“ nutzt die ältere Schleife, sucht nicht im Web und hat kein „What was checked“. Web-Recherche auf dem
+Standardweg ist gebaut, aber für alle ausgeschaltet, bis ihre Messung bestanden ist (D-074, D-077). Einen fertigen Text kann man
+ändern („Change something“, D-078). Ausdrücklich gewählte Werkstatt-Teams können eine eigene Websuche nutzen.
 
 ## Weiterlesen
 

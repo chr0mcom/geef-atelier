@@ -3258,3 +3258,6 @@ Datenbanktests für die Regel (`StandardOrderWebSearchTests`), Unit-Tests für E
   Dokumente und prüft jedes Linkziel.
 - **Ehrlichkeit vor Werbung:** Aussagen nur, soweit der Code sie sicherstellt; keine Behauptungen über andere Produkte.
   Geprüft in zwei unabhängigen Runden.
+- **Zur Aussage über claude.ai:** Seit dem 26.11. ist ein kompletter Weg über eine in claude.ai eingerichtete Verbindung erprobt,
+  aufgerufen aus Claude Code: Auftrag mit Datei und Rückfrage, danach eine Änderung. Das Chatfenster von claude.ai selbst und
+  Claude Desktop sind weiterhin nicht geprüft. Das ersetzt insoweit die früheren Vermerke „claude.ai nicht geprüft“.

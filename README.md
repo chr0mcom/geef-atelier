@@ -48,8 +48,9 @@ Each point names the decision that describes it.
 
 Limits: the text can still be wrong; the fact check can miss things and also flags harmless sentences (D-075); Atelier is not a
 chat; it does not learn from earlier texts (learning paused, D-067; memory not built, D-077); scans without text cannot be read
-(D-076); "Extra careful" uses the older loop, does not search the web and has no "What was checked". Changing a finished text and
-web research on the standard way are built but switched off for everyone until their measurements pass (D-074, D-075, D-077).
+(D-076); "Extra careful" uses the older loop, does not search the web and has no "What was checked". Web research on the standard way
+is built but switched off for everyone until its measurement passes (D-074, D-077). A finished text can be changed ("Change
+something", D-078).
 Teams chosen explicitly in the workshop can use their own web search.
 
 ## Read on

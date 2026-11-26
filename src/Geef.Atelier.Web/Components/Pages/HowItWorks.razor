@@ -98,7 +98,7 @@
                     <p>The text comes first. Right below it: what was checked, then what you still need to fill in or look at, and what was assumed. Download it as Word, PDF or Markdown.</p>
                     @if (_f.ChangeText)
                     {
-                        <p data-testid="hiw-step-change">Not quite right? Use “@RevisionLines.ChangeButton” and say in your own words what to change. Atelier writes a new version and keeps the earlier ones (up to @_f.MaxVersions versions).</p>
+                        <p data-testid="hiw-step-change">Not quite right? Use “@RevisionLines.ChangeButton” and say in your own words what to change. Atelier writes a new version and keeps the earlier ones (up to @_f.MaxVersions versions). Read the new version: if it is much longer, a note above the text asks you to check the new parts.</p>
                     }
                     <p data-testid="hiw-step-time">This can take from less than a minute to several minutes. You can leave the page; the text waits for you under My work.</p>
                 </div>
@@ -371,7 +371,7 @@
 
     string FlowDescription => _f.WebResearch
         ? "Your request, answers, About me details and files go to Atelier, which passes them to the AI services that write and check the text. A web search gets only short topics from your request, never your files."
-        : "Your request, answers, About me details and files go to Atelier, which passes them to the AI services that write and check the text. Nothing goes to a web search.";
+        : "Your request, answers, About me details and files go to Atelier, which passes them to the AI services that write and check the text. Nothing goes to a web search when you use this standard way.";
 
     string FactCheckSentence => _f.FactCheck switch
     {
