@@ -804,7 +804,7 @@ most once (`MaxIterations: 2`). Since stage 3 it has two reviewers, both injecte
 
 | Reviewer | Profile | Model | What it does |
 |---|---|---|---|
-| Automatic checks | `deterministic-checks` | none | `DraftCheckEvaluator`: not empty, no remark before the text, length, language, placeholders (in square brackets, up to 300 characters on one line), forbidden patterns and words, required words, written calculations. Blocking failures → `Error`, the rest `Info`. |
+| Automatic checks | `deterministic-checks` | none | `DraftCheckEvaluator`: not empty, no remark before the text, length, language, placeholders (in square brackets, up to 300 characters on one line; the fact check drops a flagged passage inside a placeholder only up to 200 characters, so a claim in a longer bracket is kept), forbidden patterns and words, required words, written calculations. Blocking failures → `Error`, the rest `Info`. |
 | Fact check | `source-fact-check` | slot `FactReviewer` (today Codex Astra, never the writer's family) | `SourceFactCheckReviewer`: compares the facts of the text with the request, the answers, the profile and the files (`FactCheckPrompts`, version `fact-check-1`). |
 
 The fact check runs for every order of the direct path; only `Direct:FactCheckMode = Off`, `Shadow` or a failure of the
@@ -888,7 +888,9 @@ A run that changes an earlier version of the order ("Change something", `revise_
 `RunEntity.RevisionHint` (the person's change including the sentences of the quick buttons), `ParentRunId` (the run of the shown
 version) and `SeedDraftText` (its delivered text). The order service creates the run; "Resume" on a failed or stopped change run
 creates one the same way (`RunService.ResumeRunAsync`: the same `RevisionHint`, the version shown now as `ParentRunId` and seed, its
-brief composed again, stored through `TryAddRevisionRunAsync`). The direct path does the following:
+brief composed again, stored through `TryAddRevisionRunAsync`). It refuses with `RunNotResumableException` and creates no run when
+the change run already has its own text (`RevisionLines.ResumeChangedText`; the run page shows the sentence instead of the button) or
+when a later version of the order has a text (`RevisionLines.ResumeLaterVersion`). The direct path does the following:
 
 - **Grounding:** the assembler passes `RevisionHint` to `OrderGroundingStep`, which sets the context key
   `AtelierContextKeys.RevisionHint`. The earlier text is only the seed, never material of the fact check. As for any revision, the

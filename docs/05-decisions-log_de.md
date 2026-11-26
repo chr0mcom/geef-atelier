@@ -2614,8 +2614,11 @@ bisherige Text noch ein offener Punkt, der weiter zutrifft.
   wie bei jeder Nachbesserung. Angelegt wird unter denselben Bedingungen wie eine Nachbesserung (kein Lauf aktiv, gezeigte
   Version unverändert, Auftrag nicht gestoppt, höchstens 10 Versionen), sonst nennt „Resume“ den Grund; der Schalter
   `Orders:Revise` wird nicht gefragt, weil die Änderung schon angenommen war. Die Wahl, mit der letzten Iteration zu säen, gilt
-  für einen solchen Lauf nicht. „Resume“ auf jedem anderen Lauf bleibt unverändert. Belegt durch Ende-zu-Ende-Tests über die
-  echte Verdrahtung.
+  für einen solchen Lauf nicht. Abgelehnt wird „Resume“, ohne dass ein Lauf entsteht, wenn der Nachbesserungslauf schon einen
+  eigenen Text hat (etwa einer, der mit Text als „nicht fertig“ endete: dieselbe Änderung käme ein zweites Mal auf einen Text, der
+  sie schon enthält; die Laufseite zeigt dann den Satz statt des Knopfs) und wenn eine spätere Version des Auftrags schon einen Text
+  hat (die ältere Änderung käme auf den neueren Text). Beide Sätze verweisen auf „Change something“ auf der Auftragsseite. „Resume“
+  auf jedem anderen Lauf bleibt unverändert. Belegt durch Ende-zu-Ende-Tests über die echte Verdrahtung.
 - **MCP:** neun Auftragswerkzeuge, einzeln registriert: `submit_order`, `answer_order`, `get_order_status`, `get_order_result`
   (neu `latestVersion`, `earlierOpenPoints` mit `kind` `openPoint`, `assumption` oder `note`, `unbackedPassages[].fromVersion`,
   `unbackedPassages[].note` auch für Vorgaben von vor der letzten Änderung, `assumptionsVersion`), `revise_order`
@@ -2773,8 +2776,10 @@ Für Anbieter ohne Dokumentmodus wie bisher mit „this text“ statt „the tex
 die Anweisung für einen gesäten ersten Durchgang bleiben unverändert (Tests).
 
 **Vorbedingungen (Code mit Tests, ohne Modellaufruf):**
-- **V1 Platzhalter:** erkannt bis 300 Zeichen auf einer Zeile, gleich im Produkt (Prüfung und Liste „Fill these in …“, Filter des
-  Faktenprüfers, vorher 200) und im Messwerkzeug. Links, Verweise, Bilder, Fußnoten, Ankreuzfelder und Doppelklammern bleiben
+- **V1 Platzhalter:** erkannt bis 300 Zeichen auf einer Zeile im Produkt (Prüfung und Liste „Fill these in …“) und im
+  Messwerkzeug. Der Filter des Faktenprüfers, der eine gemeldete Stelle innerhalb eines Platzhalters verwirft, bleibt bewusst bei
+  200 Zeichen: Eine Stelle in einer längeren Klammer bleibt stehen, weil eine überflüssige Meldung besser ist als eine Aussage, die
+  still verschwindet. Links, Verweise, Bilder, Fußnoten, Ankreuzfelder und Doppelklammern bleiben
   unabhängig von der Länge ausgenommen. Gespeicherte Ergebnisse ändern sich nicht, weil die Liste beim Lauf in den Bericht
   geschrieben wird; neue Läufe listen auch lange Platzhalter, und bei „keine Platzhalter“ im Auftrag blockieren sie wie kurze.
   Lange eckige Klammern mit anderem Inhalt (etwa eine redaktionelle Einfügung in einem Zitat) gelten wie bisher kurze als
@@ -2782,14 +2787,17 @@ die Anweisung für einen gesäten ersten Durchgang bleiben unverändert (Tests).
 - **V2 Laufzeit:** Beim Nachbessern zählt die Anzeige (Web und `elapsedSeconds`) ab Beginn der laufenden Version, nicht ab Anlage
   des Auftrags.
 - **V3:** der neue Satz oben.
-- **V4 (vor „On für alle“):** Notizen früherer Versionen („Noted for version n …“, „About version n“, auch die für Version 1
-  notierten Annahmen und nicht gegebenen Fakten) stehen eingeklappt hinter einer Zeile mit ihrer Anzahl; nichts wird gelöscht.
+- **V4 (vor „On für alle“):** Notizen früherer Versionen („Noted for version n …“, auch die für Version 1 notierten Annahmen und
+  nicht gegebenen Fakten) stehen eingeklappt hinter einer Zeile mit ihrer Anzahl; nichts wird gelöscht. Die festen Sätze unter
+  „About version n“ (was nicht gezeigt oder nicht übernommen wurde, darunter, dass die Prüfungen einer früheren Version nicht
+  übernommen wurden, was der Grund für „Ready – please check“ sein kann) stehen immer offen und zählen in dieser Zeile nicht mit.
   Mit der Tastatur bedienbar, passt auf ein Telefon.
 - **V5 (vor „On für alle“):** Annahmen des Schreibers einer geänderten Version stehen unter „The writer noted while making your
   change:“ statt unter „You did not say this, so it was assumed:“; MCP sagt in `note`, dass `writerAssumptions` dann Notizen zur
   Änderung sind.
-- Empfohlen und umgesetzt: Der Link über dem Text heißt bei einer geänderten Version „See what changed and all versions“ und führt
-  zu „Show changes“. Nicht umgesetzt: doppelte Stelle zusammenführen, Wunsch neben dem Fortschritt zeigen.
+- Empfohlen und umgesetzt: Der Link über dem Text heißt „See what changed and all versions“, wenn die Liste für die gezeigte
+  Version „Show changes“ anbietet (eine frühere Version hat einen Text zum Vergleich), sonst „See all versions“, etwa nach einer
+  ersten Version, die ohne Text endete. Nicht umgesetzt: doppelte Stelle zusammenführen, Wunsch neben dem Fortschritt zeigen.
 
 **Eigener Befund außerhalb von Tor N: Grundrauschen des Faktenprüfers.** In den frischen ersten Fassungen der ersten Messung
 beanstandete er je harmlosem Text 3 bis 9 Stellen, darunter Grußformel und Unterschrift („may not be backed“), und bei

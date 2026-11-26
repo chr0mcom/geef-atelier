@@ -2512,7 +2512,11 @@ so far nor an open point that still applies.
   and the rules of the first request do not block, as in any change. It is stored under the same conditions as a change (no run
   active, the shown version unchanged, the order not stopped, at most 10 versions), otherwise "Resume" names the reason; the
   switch `Orders:Revise` is not asked, because the change was already accepted. The option to seed with the last iteration does
-  not apply to such a run. Resume on any other run is unchanged. Proven by end-to-end tests over the real wiring.
+  not apply to such a run. "Resume" is refused, and no run is created, when the change run already has its own text (for example
+  one that ended as "not finished" with a text: the same change would be made a second time to a text that already has it; the run
+  page shows the sentence instead of the button) and when a later version of the order already has a text (the older change would
+  be put on the newer text). Both sentences point to "Change something" on the order page. Resume on any other run is unchanged.
+  Proven by end-to-end tests over the real wiring.
 - **MCP:** nine order tools, registered one by one: `submit_order`, `answer_order`, `get_order_status`, `get_order_result` (new
   `latestVersion`, `earlierOpenPoints` with `kind` `openPoint`, `assumption` or `note`, `unbackedPassages[].fromVersion`,
   `unbackedPassages[].note` also for instructions from before the latest change, `assumptionsVersion`), `revise_order`
@@ -2666,8 +2670,9 @@ For providers without document mode, as before, with "this text" instead of "the
 quick buttons and the instruction of a seeded first pass stay unchanged (tests).
 
 **Preconditions (code with tests, no model call):**
-- **V1 placeholders:** recognised up to 300 characters on one line, the same in the product (check and list "Fill these in …", the
-  fact check filter, before 200) and in the measuring tool. Links, references, images, footnotes, check boxes and double brackets
+- **V1 placeholders:** recognised up to 300 characters on one line in the product (check and list "Fill these in …") and in the
+  measuring tool. The fact check filter, which drops a flagged passage inside a placeholder, stays at 200 characters on purpose: a
+  passage in a longer bracket is kept, because a needless point is better than a claim that silently disappears. Links, references, images, footnotes, check boxes and double brackets
   stay excluded whatever their length. Stored results do not change, because the list is written into the report during the run;
   new runs also list long placeholders, and with "no placeholders" in the request they block like short ones. Long square brackets
   with other content (such as an editorial insertion in a quote) count as placeholders, as short ones always did; in the stored texts
@@ -2675,14 +2680,17 @@ quick buttons and the instruction of a seeded first pass stay unchanged (tests).
 - **V2 time shown:** while a text is changed, the time shown (web and `elapsedSeconds`) counts from the start of the running version,
   not from when the order was created.
 - **V3:** the new sentence above.
-- **V4 (before "On for everyone"):** notes of earlier versions ("Noted for version n …", "About version n", also the assumptions and
-  facts not given that were noted for version 1) are folded behind one line with their number; nothing is deleted. Works with the
-  keyboard and fits a phone.
+- **V4 (before "On for everyone"):** notes of earlier versions ("Noted for version n …", also the assumptions and facts not given
+  that were noted for version 1) are folded behind one line with their number; nothing is deleted. The fixed sentences under "About
+  version n" (what was not shown or not taken over, among them that the checks of an earlier version were not taken over, which can
+  be the reason for "Ready – please check") always stand open and are not counted in that line. Works with the keyboard and fits a
+  phone.
 - **V5 (before "On for everyone"):** the assumptions of the writer of a changed version stand under "The writer noted while making
   your change:" instead of "You did not say this, so it was assumed:"; MCP says in `note` that `writerAssumptions` are then notes
   about the change.
-- Recommended and done: the link above the text reads "See what changed and all versions" for a changed version and leads to "Show
-  changes". Not done: merging a passage shown twice, showing the request next to the progress.
+- Recommended and done: the link above the text reads "See what changed and all versions" when the list offers "Show changes" for
+  the shown version (an earlier version has a text to compare with), otherwise "See all versions", for example after a first version
+  that ended without a text. Not done: merging a passage shown twice, showing the request next to the progress.
 
 **Finding of its own, outside gate N: background noise of the fact checker.** In the fresh first versions of the first measurement
 it flagged 3 to 9 passages per harmless text, among them the closing and the signature ("may not be backed"), and with an unchanged

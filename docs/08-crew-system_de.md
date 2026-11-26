@@ -824,7 +824,7 @@ einmal und korrigiert höchstens einmal (`MaxIterations: 2`). Seit Etappe 3 hat 
 
 | Prüfer | Profil | Modell | Was er tut |
 |---|---|---|---|
-| Automatische Prüfungen | `deterministic-checks` | keins | `DraftCheckEvaluator`: nicht leer, keine Vorrede, Länge, Sprache, Platzhalter (in eckigen Klammern, bis 300 Zeichen auf einer Zeile), verbotene Formen und Wörter, verlangte Wörter, ausgeschriebene Rechnungen. Blockierendes → `Error`, Rest `Info`. |
+| Automatische Prüfungen | `deterministic-checks` | keins | `DraftCheckEvaluator`: nicht leer, keine Vorrede, Länge, Sprache, Platzhalter (in eckigen Klammern, bis 300 Zeichen auf einer Zeile; der Faktenprüfer verwirft eine gemeldete Stelle innerhalb eines Platzhalters nur bis 200 Zeichen, damit eine Aussage in einer längeren Klammer stehen bleibt), verbotene Formen und Wörter, verlangte Wörter, ausgeschriebene Rechnungen. Blockierendes → `Error`, Rest `Info`. |
 | Faktenprüfung | `source-fact-check` | Slot `FactReviewer` (heute Codex Astra, nie die Familie des Schreibers) | `SourceFactCheckReviewer`: vergleicht die Tatsachen im Text mit Wortlaut, Antworten, Profil und Dateien (`FactCheckPrompts`, Version `fact-check-1`). |
 
 Die Faktenprüfung läuft bei jedem Auftrag des Direktwegs. Nur `Direct:FactCheckMode = Off`, `Shadow` oder ein Ausfall des
@@ -910,8 +910,10 @@ Ein Lauf, der eine frühere Version des Auftrags ändert („Change something“
 trägt `RunEntity.RevisionHint` (die Änderung der Person samt Sätzen der Schnellknöpfe), `ParentRunId` (Lauf der gezeigten Version)
 und `SeedDraftText` (deren ausgelieferter Text). Den Lauf legt der Auftragsdienst an; „Resume“ auf einem gescheiterten oder
 gestoppten Nachbesserungslauf legt ihn genauso an (`RunService.ResumeRunAsync`: dieselbe `RevisionHint`, die jetzt gezeigte Version
-als `ParentRunId` und Ausgangstext, ihr Brief neu zusammengesetzt, gespeichert über `TryAddRevisionRunAsync`). Der Direktweg macht
-daraus Folgendes:
+als `ParentRunId` und Ausgangstext, ihr Brief neu zusammengesetzt, gespeichert über `TryAddRevisionRunAsync`). Er lehnt mit
+`RunNotResumableException` ab und legt keinen Lauf an, wenn der Nachbesserungslauf schon einen eigenen Text hat
+(`RevisionLines.ResumeChangedText`; die Laufseite zeigt den Satz statt des Knopfs) oder eine spätere Version des Auftrags einen Text hat
+(`RevisionLines.ResumeLaterVersion`). Der Direktweg macht daraus Folgendes:
 
 - **Grounding:** Der Assembler reicht `RevisionHint` an `OrderGroundingStep`; der Schritt setzt den Kontextschlüssel
   `AtelierContextKeys.RevisionHint`. Der frühere Text ist nur Ausgangstext, nie Material des Faktenprüfers. Die Recherche liefert wie
