@@ -30,6 +30,10 @@
     {
         <div class="order-copy-failed" role="alert" data-testid="order-copy-failed">Copying did not work in this browser. Select the text below and copy it yourself.</div>
     }
+    @if (!string.IsNullOrWhiteSpace(Result.LengthNotice))
+    {
+        <p class="order-longer-notice" role="note" data-testid="order-longer-notice">@Result.LengthNotice</p>
+    }
     <div class="order-result-sheet">
         <MarkdownView Markdown="@Result.Text" Class="order-result-text" />
     </div>

@@ -1,11 +1,20 @@
 namespace Geef.Atelier.Core.Domain.Orders;
 
-/// <summary>A quick button for a change of a delivered text.</summary>
+/// <summary>
+/// A quick button for a change of a delivered text. <see cref="Longer"/> is no longer offered: a text only gets longer with new details
+/// from the person, so a change asking for it is refused; the value stays because stored changes name it.
+/// </summary>
 public enum RevisionQuick { Shorter = 0, Longer = 1, MoreFormal = 2, Friendlier = 3, Simpler = 4 }
 
 /// <summary>The fixed sentence a quick button sends to the writer and the name the person sees on it.</summary>
 public static class RevisionQuickText
 {
+    /// <summary>The buttons offered on the web page and in MCP, in the order of the buttons; every value but <see cref="RevisionQuick.Longer"/>.</summary>
+    public static IReadOnlyList<RevisionQuick> Offered { get; } = [RevisionQuick.Shorter, RevisionQuick.MoreFormal, RevisionQuick.Friendlier, RevisionQuick.Simpler];
+
+    /// <summary>True for a button that is offered; false for <see cref="RevisionQuick.Longer"/> and unknown values.</summary>
+    public static bool IsOffered(this RevisionQuick q) => Offered.Contains(q);
+
     /// <summary>The sentence for the writer, in English.</summary>
     public static string Instruction(this RevisionQuick q) => q switch
     {

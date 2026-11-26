@@ -180,7 +180,8 @@ internal sealed class OrderService(
             NotGivenFacts: NotGivenFacts(order, run),
             LookedUp: lookedUp,
             LatestVersion: current.OrderVersion,
-            AssumptionsVersion: string.IsNullOrWhiteSpace(run.RevisionHint) ? null : FirstVersion(orderRuns));
+            AssumptionsVersion: string.IsNullOrWhiteSpace(run.RevisionHint) ? null : FirstVersion(orderRuns),
+            LengthNotice: hasText && run.GrewBeyondItsBase() ? RevisionLines.LongerThanBefore : null);
         var viewer = viewerUsername ?? requestingUsername;
         var showProfile = viewer is not null && string.Equals(viewer, order.CreatedByUser, StringComparison.Ordinal);
         return report is null || !hasText ? result : result.WithReport(report, showProfile);
@@ -327,6 +328,8 @@ internal sealed class OrderService(
             throw new OrderRevisionException(RevisionLines.NotFound);
         if (options.ReviseModeFor(order.CreatedByUser) != ReviseMode.On)
             throw new OrderRevisionException(RevisionLines.NotAvailable);
+        if (request.Quick?.Any(q => !q.IsOffered()) == true)
+            throw new OrderRevisionException(RevisionLines.LongerNeedsDetails);
 
         var words = request.Change?.Trim() ?? string.Empty;
         if (words.Length > options.RevisionHintMaxChars)

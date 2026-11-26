@@ -88,10 +88,11 @@ public sealed class OrderChangeTests : TestContext
 
         var card = cut.Find("[data-testid='order-change-card']");
         Assert.Equal("Change something", card.QuerySelector("h2")!.TextContent);
-        Assert.Equal(["Shorter", "Longer", "More formal", "Friendlier", "Simpler words"], cut.FindAll("[data-testid='order-change-quick']").Select(b => b.TextContent));
+        Assert.Equal(["Shorter", "More formal", "Friendlier", "Simpler words"], cut.FindAll("[data-testid='order-change-quick']").Select(b => b.TextContent));
+        Assert.Empty(cut.FindAll("[data-quick='Longer']"));
         Assert.All(cut.FindAll("[data-testid='order-change-quick']"), b => Assert.Equal("false", b.GetAttribute("aria-pressed")));
         Assert.Equal("What should change?", cut.Find("label[for='order-change-text']").TextContent);
-        Assert.Equal("For example: The meeting is on 5 May, not 12 May.", cut.Find("[data-testid='order-change-text']").GetAttribute("placeholder"));
+        Assert.Equal("For example: The meeting is on 5 May, not 12 May. Or: Add that parking is free.", cut.Find("[data-testid='order-change-text']").GetAttribute("placeholder"));
         Assert.Equal("2000", cut.Find("[data-testid='order-change-text']").GetAttribute("maxlength"));
         Assert.Equal("The writer is asked to make only this change. “Show changes” then shows what was changed.", cut.Find("[data-testid='order-change-promise']").TextContent);
         Assert.Equal("Make the change", cut.Find("[data-testid='order-change-make']").TextContent.Trim());
@@ -113,8 +114,8 @@ public sealed class OrderChangeTests : TestContext
 
         cut.Find("[data-quick='Simpler']").Click();
         cut.Find("[data-quick='Shorter']").Click();
-        cut.Find("[data-quick='Longer']").Click();
-        cut.Find("[data-quick='Longer']").Click();
+        cut.Find("[data-quick='MoreFormal']").Click();
+        cut.Find("[data-quick='MoreFormal']").Click();
         cut.Find("[data-testid='order-change-text']").Input("  " + Asked + "  ");
         Assert.Equal("true", cut.Find("[data-quick='Shorter']").GetAttribute("aria-pressed"));
         cut.Find("[data-testid='order-change-make']").Click();
@@ -123,6 +124,51 @@ public sealed class OrderChangeTests : TestContext
         Assert.Equal((view.OrderId, "alice", Asked, OrderEntry.Web), (request.OrderId, request.RequestingUsername, request.Change, request.Entry));
         Assert.Equal([RevisionQuick.Shorter, RevisionQuick.Simpler], request.Quick);
         cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("[data-testid='order-change-card']")));
+    }
+
+    [Fact]
+    public void A_kept_entry_with_the_former_button_longer_opens_without_it()
+    {
+        var view = Delivered();
+        var cut = RenderComponent<OrderChangeCard>(p => p
+            .Add(c => c.OrderId, view.OrderId)
+            .Add(c => c.RequestingUsername, "alice")
+            .Add(c => c.Draft, new OrderChangeDraft("Add the room number.", [RevisionQuick.Longer, RevisionQuick.Shorter])));
+
+        Assert.Equal("true", cut.Find("[data-quick='Shorter']").GetAttribute("aria-pressed"));
+        Assert.Empty(cut.FindAll("[data-quick='Longer']"));
+        cut.Find("[data-testid='order-change-make']").Click();
+
+        var request = Assert.Single(_orders.Revised);
+        Assert.Equal([RevisionQuick.Shorter], request.Quick);
+        Assert.Equal("Add the room number.", request.Change);
+    }
+
+    [Fact]
+    public void A_clearly_longer_version_says_so_above_the_text()
+    {
+        var view = Delivered(RunView(2, RunStatus.Completed, RunOutcome.Converged, 21, "Bitte mach den Text länger.", 5));
+        _orders.SetResult(Result(view, 2, 2, SecondText) with { LengthNotice = RevisionLines.LongerThanBefore });
+
+        var cut = Render(view);
+
+        var notice = cut.Find("[data-testid='order-longer-notice']");
+        Assert.Equal("This version is longer than the one before. Anything new in it did not come from you – please check it.", notice.TextContent);
+        Assert.Equal("note", notice.GetAttribute("role"));
+        var markup = cut.Markup;
+        Assert.True(markup.IndexOf("data-testid=\"order-longer-notice\"", StringComparison.Ordinal) < markup.IndexOf("order-result-sheet", StringComparison.Ordinal));
+        Assert.Single(cut.FindAll("[data-testid='order-longer-notice']"));
+    }
+
+    [Fact]
+    public void A_version_that_did_not_grow_shows_no_sentence_about_its_length()
+    {
+        var view = Delivered(RunView(2, RunStatus.Completed, RunOutcome.Converged, 13, Asked, 5));
+
+        var cut = Render(view);
+
+        Assert.Empty(cut.FindAll("[data-testid='order-longer-notice']"));
+        Assert.DoesNotContain(RevisionLines.LongerThanBefore, cut.Markup, StringComparison.Ordinal);
     }
 
     [Fact]

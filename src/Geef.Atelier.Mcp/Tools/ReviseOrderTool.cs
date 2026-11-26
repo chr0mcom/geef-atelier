@@ -19,6 +19,7 @@ public static class ReviseOrderTool
         "Only the person who ordered the text can change it. " +
         "Pass the person's words about the change in change, word for word as they said them: do not rephrase, shorten, translate or add to them, " +
         "and add no changes of your own. For a simple wish you can pass quick instead of change or together with it. " +
+        "There is no quick change for a longer text: a text only gets longer with new details from the person, so ask them what to add and pass their words in change. " +
         "Atelier asks no questions and does not look anything up again. The new version gets the same automatic checks as every version, " +
         "except that the rules of the first request (such as its length, lists, words or language) only lead to notes, because the change may replace them. " +
         "Then call get_order_status with waitSeconds, and get_order_result when done is true. Until the new version is ready, get_order_result shows the earlier one. " +
@@ -26,7 +27,10 @@ public static class ReviseOrderTool
 
     public const string NoChangeMessage = "Say what should change: pass the person's words in change, or a quick change in quick.";
 
-    public const string UnknownQuickFormat = "Unknown quick change \"{0}\". Use shorter, longer, more_formal, friendlier or simpler.";
+    public const string UnknownQuickFormat = "Unknown quick change \"{0}\". Use shorter, more_formal, friendlier or simpler.";
+
+    /// <summary>Answer to the quick change <c>longer</c>: the fixed sentence of the web page and what the assistant does next. Nothing is started.</summary>
+    public const string LongerMessage = RevisionLines.LongerNeedsDetails + " Nothing was changed: ask the person what to add and pass their words in change.";
 
     public const string StartedMessage =
         "Writing the new version has started. Call get_order_status with waitSeconds, then get_order_result when done is true. " +
@@ -42,7 +46,7 @@ public static class ReviseOrderTool
         ICurrentUserService currentUser,
         [Description("The orderId from submit_order or list_orders.")] string orderId,
         [Description("What should change, in the person's own words, word for word as they said them. Do not rephrase, shorten, translate or add to them.")] string? change = null,
-        [Description("Optional quick changes, several allowed: shorter, longer, more_formal, friendlier, simpler (simpler words and shorter sentences).")] IReadOnlyList<string>? quick = null,
+        [Description("Optional quick changes, several allowed: shorter, more_formal, friendlier, simpler (simpler words and shorter sentences). There is none for a longer text: pass what to add in change.")] IReadOnlyList<string>? quick = null,
         CancellationToken cancellationToken = default)
     {
         var id = McpOrderAccess.ParseOrderId(orderId);
@@ -54,6 +58,8 @@ public static class ReviseOrderTool
         var quickChanges = ParseQuick(quick);
         if (string.IsNullOrWhiteSpace(change) && quickChanges.Count == 0)
             throw new McpException(NoChangeMessage);
+        if (quickChanges.Any(q => !q.IsOffered()))
+            throw new McpException(LongerMessage);
 
         OrderRevision revision;
         try
@@ -63,6 +69,10 @@ public static class ReviseOrderTool
         catch (OrderRevisionException ex) when (ex.Message == RevisionLines.NotFound)
         {
             throw new McpException(McpOrderAccess.OrderNotFound, ex);
+        }
+        catch (OrderRevisionException ex) when (ex.Message == RevisionLines.LongerNeedsDetails)
+        {
+            throw new McpException(LongerMessage, ex);
         }
         catch (OrderRevisionException ex)
         {

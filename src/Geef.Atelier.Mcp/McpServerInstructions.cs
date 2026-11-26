@@ -54,9 +54,11 @@ public static class McpServerInstructions
         " Some sourceIssues and the unbackedPassages of kind differs_from_looked_up concern these pages, not the person's files; each says where it stands.\n" +
         "6. If the person wants something changed in a finished text, call revise_order with their words in change, as they said them. " +
         "Do not rephrase them and do not add changes of your own. Atelier asks the writer to make only this change, asks no questions and writes a new version. " +
+        "For a longer text, ask the person what to add and pass that: a text only gets longer with new details from them. " +
         "It does not check that nothing else changed, so do not promise that; the person can compare the versions. " +
         "Wait with get_order_status and show the new result as in step 5. Say the change is made only when get_order_result shows the new version. " +
         "Until then, and if the new version cannot be finished, get_order_result shows the earlier version and its note says so: tell the person. " +
+        "If get_order_result has lengthNotice, show it to the person with the text. " +
         "If revise_order refuses the change, give the person its answer and do not change the text yourself.\n" +
         "7. If the person wants the text as a file, call export_order (md, docx or pdf). The file holds only the text, " +
         "so still tell the person about the open points from get_order_result.\n" +

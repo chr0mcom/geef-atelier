@@ -9,6 +9,18 @@ public static class RevisionLines
     /// <summary>Answer while changing a text is switched off for the person.</summary>
     public const string NotAvailable = "Changing a text is not available yet.";
 
+    /// <summary>
+    /// Refusal of a change that asks for the quick change "Longer": a text only gets longer with new details from the person, so they are
+    /// asked for them. Nothing is started.
+    /// </summary>
+    public const string LongerNeedsDetails = "A text only gets longer with new details from you. Tell me what to add.";
+
+    /// <summary>
+    /// Shown with a version that changed an earlier one and is clearly longer than the text it changed (<c>RevisionLength</c>): whatever is new
+    /// in it beyond the change did not come from the person.
+    /// </summary>
+    public const string LongerThanBefore = "This version is longer than the one before. Anything new in it did not come from you – please check it.";
+
     /// <summary>Refusal of a change without the person's words and without a quick button.</summary>
     public const string NoChangeGiven = "Please write what should change or choose one of the buttons.";
 
@@ -112,8 +124,8 @@ public static class RevisionLines
     /// <summary>Label of the field for the person's own words.</summary>
     public const string ChangeFieldLabel = "What should change?";
 
-    /// <summary>Placeholder of the field.</summary>
-    public const string ChangeFieldPlaceholder = "For example: The meeting is on 5 May, not 12 May.";
+    /// <summary>Placeholder of the field: one change of a detail and one addition, the way to get a longer text.</summary>
+    public const string ChangeFieldPlaceholder = "For example: The meeting is on 5 May, not 12 May. Or: Add that parking is free.";
 
     /// <summary>Line on the card: it promises only what is done (the writer is asked for this change alone), not that nothing else changes.</summary>
     public const string OnlyWhatYouAsk = "The writer is asked to make only this change. “Show changes” then shows what was changed.";
