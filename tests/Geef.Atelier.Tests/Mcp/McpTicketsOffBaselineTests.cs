@@ -16,14 +16,17 @@ namespace Geef.Atelier.Tests.Mcp;
 /// (<c>main</c> at <c>aadcac5</c>), apart from the texts changed on purpose later: the hashes below were taken from that state, as clients
 /// see it (<see cref="McpJsonUtilities.DefaultOptions"/>), and taken again once when changing a text lost the quick change <c>longer</c>
 /// (<c>revise_order</c>, <c>get_order_result</c> with <c>lengthNotice</c>, step 6 of the instructions), and once more for the questions the
-/// person did not answer in step 5 of the instructions (D-081).
+/// person did not answer in step 5 of the instructions (D-081), and once more for <c>profile</c>, which since D-083 can save four About me
+/// fields, with the sentence about it in the instructions. With saving switched off the instructions still give the hashes before D-083.
 /// </summary>
 public sealed class McpTicketsOffBaselineTests
 {
-    private const string ToolsWithLegacyHash = "db658fcddf55eeab54412dcb5d988294421dc793359281a45492e3dec9f1c840";
-    private const string ToolsWithoutLegacyHash = "165e018513d9f4c28ab23e7b103c71cda389761a326e13804832554f754ed42a";
-    private const string InstructionsWithLegacyHash = "39052d88f5f976882751a4fcde33a70c4bc889cd9f4ea3b0b92ebdf60f256672";
-    private const string InstructionsWithoutLegacyHash = "e56324836621e79badcad70ab3888faaf4477a2d0343d3400008a514b552e2a3";
+    private const string ToolsWithLegacyHash = "d6a120a9c822c43b6b6b8cce5185287449f2de2c64b27a962ac1fbf393a4c1d6";
+    private const string ToolsWithoutLegacyHash = "1f2669b65c1d648f66284d2ef6150a0986ee0da37c3437e34cb0ccd830b3bbb2";
+    private const string InstructionsWithLegacyHash = "55ae0dda5dc96ad7b099eaa5cd01b6804e00e4b1cbea7985fe9155eb96ea36c2";
+    private const string InstructionsWithoutLegacyHash = "03fe8a67778d2a20323d1db96d64d4920cf096407c6e1a43a4e55ad50346b8fb";
+    private const string InstructionsWithLegacyBeforeAboutMeHash = "39052d88f5f976882751a4fcde33a70c4bc889cd9f4ea3b0b92ebdf60f256672";
+    private const string InstructionsWithoutLegacyBeforeAboutMeHash = "e56324836621e79badcad70ab3888faaf4477a2d0343d3400008a514b552e2a3";
 
     [Theory]
     [InlineData("true", ToolsWithLegacyHash)]
@@ -44,6 +47,15 @@ public sealed class McpTicketsOffBaselineTests
         using var provider = McpTestServer.Provider(legacy, tickets: null);
 
         var actual = Sha256(McpTestServer.Instructions(provider));
+        Assert.True(expected == actual, $"instructions hash {actual}");
+    }
+
+    [Theory]
+    [InlineData(true, InstructionsWithLegacyBeforeAboutMeHash)]
+    [InlineData(false, InstructionsWithoutLegacyBeforeAboutMeHash)]
+    public void Without_saving_about_me_details_the_instructions_are_those_before_it(bool legacy, string expected)
+    {
+        var actual = Sha256(McpServerInstructions.For(new OrderOptions().MaxWaitSeconds, legacy, tickets: false, aboutMeSaving: false));
         Assert.True(expected == actual, $"instructions hash {actual}");
     }
 
