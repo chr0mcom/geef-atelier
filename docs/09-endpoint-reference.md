@@ -207,6 +207,8 @@ The file is the one `GET /orders/{id}/export/{format}?version=n` returns. Errors
 
 **`get_order_result`, since D-083:** `aboutMeMissing` (`["sender"|"signature"|"formality"|"language"]`) – topics assumed or left open while the owner's About me has nothing on them; `fromAboutMe` (same values) – what the writer got from About me with the shown version (sent, not necessarily used). Only for the owner, only with a text, never while `Orders:TellOnce` is `Off`; missing otherwise.
 
+**`get_order_result` and `submit_order`, since D-088:** `givenAnswers` (`[{questionId, question, answer, leftToAtelier, origin}]`) – the answers given to Atelier's questions before writing and the corrections of assumptions; `answer` is the chosen option and/or the own words, `null` with `leftToAtelier` true for a question left to Atelier; `origin` `user`, `client` or `form` (the person chose it in a form shown by their app). In `get_order_result` only for the owner, missing otherwise; in `submit_order` only after the questions were answered in a form.
+
 Every tool of stage 5 answers `Order not found.` for an unknown or foreign order before checking anything else. `tools/list` holds the nine order tools and, while `Mcp:LegacyTools` is `true`, the older tools; `submit_request`, `get_run_status`, `get_run_result`, `cancel_run` and `list_runs` begin their description with "Older tool, kept for now: use … instead.", with unchanged answers. The longest wait named in `get_order_status` and in the server instructions is `Orders:MaxWaitSeconds`.
 
 #### Stage 6: `prepare_attachment` and `uploadIds`

@@ -207,6 +207,8 @@ Die Datei ist dieselbe, die `GET /orders/{id}/export/{format}?version=n` liefert
 
 **`get_order_result`, seit D-083:** `aboutMeMissing` (`["sender"|"signature"|"formality"|"language"]`) – Themen, die angenommen oder offen gelassen wurden, während die About-me-Angaben der Person nichts dazu haben; `fromAboutMe` (dieselben Werte) – was der Schreiber mit der gezeigten Fassung aus „About me“ bekam (gesendet, nicht unbedingt verwendet). Nur für die Person, der der Auftrag gehört, nur mit Text, nie solange `Orders:TellOnce` `Off` ist; sonst fehlen sie.
 
+**`get_order_result` und `submit_order`, seit D-088:** `givenAnswers` (`[{questionId, question, answer, leftToAtelier, origin}]`) – die vor dem Schreiben gegebenen Antworten auf Ateliers Fragen und die Korrekturen von Annahmen; `answer` ist die gewählte Option und/oder die eigenen Worte, `null` mit `leftToAtelier` wahr bei einer Atelier überlassenen Frage; `origin` `user`, `client` oder `form` (die Person hat es in einem Formular ihrer App gewählt). In `get_order_result` nur für den Besitzer, sonst fehlt es; in `submit_order` nur nach Antworten über ein Formular.
+
 Jedes Werkzeug der Etappe 5 antwortet bei unbekanntem oder fremdem Auftrag `Order not found.`, bevor es irgendetwas anderes prüft. `tools/list` enthält die neun Auftragswerkzeuge und, solange `Mcp:LegacyTools` `true` ist, die älteren Werkzeuge; `submit_request`, `get_run_status`, `get_run_result`, `cancel_run` und `list_runs` beginnen ihre Beschreibung mit „Older tool, kept for now: use … instead.“, mit unveränderten Antworten. Die längste Wartezeit, die `get_order_status` und die Server-Hinweise nennen, ist `Orders:MaxWaitSeconds`.
 
 #### Etappe 6: `prepare_attachment` und `uploadIds`
