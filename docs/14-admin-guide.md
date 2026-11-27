@@ -24,7 +24,7 @@ can export and stop it.
 
 ## Switching features
 
-Features that are not meant for everyone have a switch. A switch can be set for everyone and, for four of them, first for single
+Features that are not meant for everyone have a switch. A switch can be set for everyone and, for three of them, first for single
 people (an exception per user name). For questions, changing a text, looking things up, the fact check, files from an assistant and
 "Tell Atelier once", the page **How it works** (`/how-it-works`) reads the same settings and the same exceptions, so it does not
 show one of these as available that the viewer does not get, and it needs no change when you switch one on.

@@ -25,7 +25,7 @@ Person, der der Auftrag gehört, D-075). Exportieren und anhalten kann sie ihn.
 
 ## Funktionen schalten
 
-Funktionen, die nicht für alle gedacht sind, haben einen Schalter. Ein Schalter gilt für alle und kann bei vieren zuerst für
+Funktionen, die nicht für alle gedacht sind, haben einen Schalter. Ein Schalter gilt für alle und kann bei dreien zuerst für
 einzelne Personen gesetzt werden (Ausnahme je Benutzername). Für Fragen, Text ändern, Nachschlagen, Faktenprüfung, Dateien aus
 einem Assistenten und „Tell Atelier once“ liest die Seite **How it works** (`/how-it-works`) dieselben Einstellungen und dieselben
 Ausnahmen; sie zeigt davon also nichts als verfügbar, was die betrachtende Person nicht bekommt, und muss beim Einschalten nicht

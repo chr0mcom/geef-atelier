@@ -66,7 +66,7 @@ ihrer Seite da (D-074, nach bestandener Messung für alle eingeschaltet). Einen 
 | Dokument | Inhalt |
 |---|---|
 | [docs/README_de.md](docs/README_de.md) | Übersicht aller Dokumente |
-| [docs/05-decisions-log_de.md](docs/05-decisions-log_de.md) | Jede Entwurfsentscheidung und Messung, zuletzt D-091 (Stufe 8d) |
+| [docs/05-decisions-log_de.md](docs/05-decisions-log_de.md) | Jede Entwurfsentscheidung und Messung, zuletzt D-092 (Datenbank aufgeräumt) |
 | [docs/02-architecture_de.md](docs/02-architecture_de.md) | Schichten, Datenmodell, Schutzmechanismen, Schalter |
 | [docs/04-mcp-integration_de.md](docs/04-mcp-integration_de.md), [docs/09-endpoint-reference_de.md](docs/09-endpoint-reference_de.md) | MCP-Werkzeuge und HTTP-Endpunkte im Detail |
 
@@ -75,7 +75,7 @@ ihrer Seite da (D-074, nach bestandener Messung für alle eingeschaltet). Einen 
 ## Lokaler Start
 
 ```bash
-# App + Postgres starten
+# App + Postgres starten (Wegwerf-Aufbau für die Entwicklung)
 docker compose -f docker-compose.dev.yml up --build -d
 
 # Health-Check
@@ -84,6 +84,10 @@ curl http://localhost:8080/health   # → Healthy
 # Stack stoppen
 docker compose -f docker-compose.dev.yml down
 ```
+
+Danach `http://localhost:8080` öffnen und mit dem Entwicklungskonto unten anmelden. Dieser Stack hat **kein KI-Gateway**: Seiten,
+Konten und die MCP-Verbindung lassen sich ausprobieren, geschrieben wird kein Text. Zum Schreiben braucht es den vollen Stack aus
+dem [Production-Deployment](#production-deployment).
 
 ## Auth-Setup
 
@@ -99,7 +103,7 @@ dotnet run --project tools/HashPassword -- "DeinPasswort"
 
 ```env
 ATELIER_USER=<admin-username>
-ATELIER_PASSWORD_HASH=$2a$11$...
+ATELIER_PASSWORD_HASH='$2a$11$...'   # in .env sind die einfachen Anführungszeichen nötig
 ```
 
 Weitere Benutzer können im Admin-Panel unter `/admin/users` angelegt werden (nur für den Admin-Account sichtbar).
@@ -124,13 +128,16 @@ ATELIER_MCP_TOKEN=<hex-token>
 ## Tests
 
 ```bash
-# Benötigt laufenden Docker-Daemon (Testcontainers)
+# Benötigt laufenden Docker-Daemon (Testcontainers); die Browser-Tests zusätzlich das Chromium von Playwright
 dotnet test
 ```
 
 ## Migration manuell ausführen
 
+Die App wendet Migrationen beim Start selbst an. Von Hand (braucht das Werkzeug `dotnet-ef`):
+
 ```bash
+export ConnectionStrings__DefaultConnection='Host=localhost;Port=5439;Database=geef_atelier;Username=geef_atelier;Password=<passwort>'
 dotnet ef database update \
   --project src/Geef.Atelier.Infrastructure \
   --startup-project src/Geef.Atelier.Web
@@ -144,16 +151,20 @@ Der MCP-Server läuft unter `/mcp`. Zwei Auth-Pfade stehen parallel zur Verfügu
 
 ### Pfad A: Statisches Bearer-Token (Claude Code CLI)
 
+```bash
+claude mcp add --transport http geef-atelier https://<your-domain>/mcp \
+  --header "Authorization: Bearer <ATELIER_MCP_TOKEN>"
+```
+
+oder in `.mcp.json`:
+
 ```json
 {
   "mcpServers": {
     "geef-atelier": {
+      "type": "http",
       "url": "https://<your-domain>/mcp",
-      "transport": "streamable-http",
-      "auth": {
-        "type": "bearer",
-        "token": "<ATELIER_MCP_TOKEN>"
-      }
+      "headers": { "Authorization": "Bearer <ATELIER_MCP_TOKEN>" }
     }
   }
 }
@@ -203,13 +214,27 @@ Aufräumen der Datenbank weg (D-092).
 
 ## Production-Deployment
 
-Voraussetzungen: Traefik läuft auf dem Server, DNS der Domain zeigt auf den Server.
+**Was du brauchst:**
+
+- einen Server mit Docker und Docker Compose,
+- ein laufendes Traefik (v3) im gemeinsamen Docker-Netz `proxy` (einmal mit `docker network create proxy` anlegen), mit dem
+  HTTPS-Einstiegspunkt `websecure`, dem Zertifikats-Resolver `le` und einer Middleware `chain@file` (zum Beispiel
+  Sicherheits-Header); bei anderen Namen die Labels des Dienstes `web` in `docker-compose.yml` anpassen,
+- eine Domain, deren DNS auf den Server zeigt,
+- Konten für **Claude Code** und **OpenAI Codex**. Atelier schreibt und prüft über das mitgelieferte Gateway `cli-proxy`, das
+  diese beiden Kommandozeilen-Werkzeuge mit deinen Konten ausführt; die Standard-Aufstellung schreibt mit Claude und prüft die
+  Fakten mit einem OpenAI-Modell, deshalb beide anmelden. Ein OpenRouter-Schlüssel allein reicht nicht, um einen Text zu
+  schreiben,
+- das .NET-10-SDK für den Passwort-Hash (einmalig; auch auf einem anderen Rechner).
 
 ### Erste Einrichtung
 
-**1. Secrets generieren:**
+**1. Code holen und Secrets generieren:**
 
 ```bash
+git clone https://github.com/chr0mcom/geef-atelier
+cd geef-atelier
+
 # BCrypt-Hash für das UI-Passwort (work factor 11)
 dotnet run --project tools/HashPassword -- "DeinPasswort"
 
@@ -220,7 +245,7 @@ openssl rand -hex 32
 openssl rand -base64 24
 ```
 
-**2. `.env`-Datei anlegen** (niemals in Git committen — ist gitignored):
+**2. `.env`-Datei anlegen** (`cp .env.example .env`; niemals in Git committen — ist gitignored):
 
 ```env
 POSTGRES_DB=geef_atelier
@@ -228,32 +253,57 @@ POSTGRES_USER=geef_atelier
 POSTGRES_PASSWORD=<generiertes-passwort>
 
 ATELIER_USER=<admin-username>
-ATELIER_PASSWORD_HASH=<bcrypt-hash>
+# die einfachen Anführungszeichen behalten: sonst liest Docker Compose jedes "$" als Variable, und die Anmeldung scheitert
+ATELIER_PASSWORD_HASH='<bcrypt-hash>'
 ATELIER_MCP_TOKEN=<hex-token>
+# zugleich die öffentliche Adresse der Installation (OAuth- und Upload-Links: https://<your-domain>)
 ATELIER_DOMAIN=<your-domain>
 
-LLM_OPENROUTER_API_KEY=<openrouter-api-key>
+# optional: Schlüssel für den Anbieter OpenRouter
+LLM_OPENROUTER_API_KEY=
 
-# Tavily Web Search (https://tavily.com) — nötig für das Nachschlagen auf dem Standardweg (Research:Mode, ausgeliefert On);
-# ohne Schlüssel die Recherche mit Research__Mode=Off unter
-# services.web.environment in docker-compose.override.yml ausschalten (diese .env-Datei allein erreicht den Webdienst nicht)
+# Tavily Web Search (https://tavily.com) — für das Nachschlagen im Web (Research:Mode, ausgeliefert On).
+# Ohne Schlüssel die Recherche mit Research__Mode=Off unter services.web.environment in
+# docker-compose.override.yml ausschalten (diese .env-Datei allein erreicht den Webdienst nicht)
 TAVILY_API_KEY=
 ```
+
+Das Gateway ist auch für andere Container im Netz `proxy` erreichbar (und auf `127.0.0.1:8090` des Servers). Sollen diese deine
+Konten nicht nutzen dürfen, in `.env` `CLI_PROXY_API_KEY=<zufall>` setzen: Dann verlangt das Gateway diesen Schlüssel, und die
+Web-App sendet ihn.
 
 **3. Stack starten:**
 
 ```bash
+docker network create proxy   # einmal; „already exists“ ist in Ordnung
 docker compose up -d --build
 ```
 
-Migrations laufen automatisch beim Start. Health-Check: `https://<your-domain>/health`.
+Die Datenbank wird beim ersten Start aufgebaut. Health-Check: `https://<your-domain>/health`.
+
+**4. KI-Werkzeuge anmelden** (einmal; die Anmeldungen bleiben in einem Volume):
+
+```bash
+docker compose exec -e HOME=/auth/claude cli-proxy claude auth login
+docker compose exec cli-proxy codex login --device-auth
+```
+
+Einzelheiten, ein zweites Claude-Konto und Prüfungen: [cli-proxy/README_de.md](cli-proxy/README_de.md#setup-production). Danach
+in der Web-App anmelden und einen kurzen ersten Auftrag stellen.
 
 ### Neustart / Update
 
 ```bash
-docker compose build --no-cache web && docker compose up -d web
+git pull
+docker compose build --no-cache cli-proxy web
+docker compose up -d cli-proxy   # zuerst das Gateway ...
+docker compose up -d web         # ... dann die Web-App
 docker compose logs -f web
 ```
+
+Vor einem Update eine Datenbank-Sicherung ziehen. Für eine Installation von vor der Baseline-Migration (D-092) gibt es **kein
+automatisches Upgrade**: Die App startet auf einer solchen Datenbank nicht und ändert nichts (siehe
+[Leitfaden für die Administration](docs/14-admin-guide_de.md#datenbank)).
 
 ### Wichtige URLs
 
@@ -294,12 +344,16 @@ docker cp geef-atelier-postgres-backup:/backups/last/<datei>.sql.gz ./
 ### Restore
 
 ```bash
-docker compose stop web
+# im Wurzelverzeichnis des Repositorys; das Skript hält die Web-App selbst an und startet sie wieder
 ./scripts/restore-backup.sh <pfad-zur-backup-datei.sql.gz>
 curl https://<your-domain>/health
 ```
 
-> **Hinweis:** `scripts/restore-backup.sh` überschreibt alle bestehenden Daten. Vor dem Restore eine aktuelle Kopie sichern.
+> **Hinweis:** `scripts/restore-backup.sh` **ersetzt** alle Daten der Datenbank. Es arbeitet in einer Transaktion: Lässt sich
+> der Dump nicht vollständig einspielen, ändert sich nichts, und die Web-App bleibt angehalten (`docker compose start web` holt
+> sie zurück). Vorher eine aktuelle Sicherung ziehen. Der Dump enthält weder die hochgeladenen Originaldateien (Volume
+> `geef-atelier-sources`) noch die Anmeldungen der KI-Werkzeuge (`geef-atelier-cli-auth`) oder die Schlüssel der
+> Anmelde-Cookies (`geef-atelier-dpkeys`); diese getrennt sichern.
 
 ---
 

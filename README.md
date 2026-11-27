@@ -64,7 +64,7 @@ something", D-078).
 | Document | Content |
 |---|---|
 | [docs/README.md](docs/README.md) | Index of all documents |
-| [docs/05-decisions-log.md](docs/05-decisions-log.md) | Every design decision and measurement, most recently D-091 (stage 8d) |
+| [docs/05-decisions-log.md](docs/05-decisions-log.md) | Every design decision and measurement, most recently D-092 (database cleanup) |
 | [docs/02-architecture.md](docs/02-architecture.md) | Layers, data model, safeguards, switches |
 | [docs/04-mcp-integration.md](docs/04-mcp-integration.md), [docs/09-endpoint-reference.md](docs/09-endpoint-reference.md) | MCP tools and HTTP endpoints in detail |
 
@@ -73,7 +73,7 @@ something", D-078).
 ## Local startup
 
 ```bash
-# Start app + Postgres
+# Start app + Postgres (throwaway development setup)
 docker compose -f docker-compose.dev.yml up --build -d
 
 # Health check
@@ -82,6 +82,10 @@ curl http://localhost:8080/health   # → Healthy
 # Stop the stack
 docker compose -f docker-compose.dev.yml down
 ```
+
+Then open `http://localhost:8080` and sign in with the development account below. This stack has **no AI gateway**: you can try
+the pages, accounts and the MCP connection, but no text is written. Writing needs the full stack of
+[Production deployment](#production-deployment).
 
 ## Auth setup
 
@@ -97,7 +101,7 @@ dotnet run --project tools/HashPassword -- "YourPassword"
 
 ```env
 ATELIER_USER=<admin-username>
-ATELIER_PASSWORD_HASH=$2a$11$...
+ATELIER_PASSWORD_HASH='$2a$11$...'   # single quotes are required in .env
 ```
 
 Further users can be created in the admin panel at `/admin/users` (visible only to the admin account).
@@ -122,13 +126,16 @@ ATELIER_MCP_TOKEN=<hex-token>
 ## Tests
 
 ```bash
-# Requires a running Docker daemon (Testcontainers)
+# Requires a running Docker daemon (Testcontainers); the browser tests also need Playwright's Chromium
 dotnet test
 ```
 
 ## Run a migration manually
 
+The app applies migrations itself at start. To run them by hand (needs the `dotnet-ef` tool):
+
 ```bash
+export ConnectionStrings__DefaultConnection='Host=localhost;Port=5439;Database=geef_atelier;Username=geef_atelier;Password=<password>'
 dotnet ef database update \
   --project src/Geef.Atelier.Infrastructure \
   --startup-project src/Geef.Atelier.Web
@@ -142,16 +149,20 @@ The MCP server is served at `/mcp`. Two auth paths are available in parallel:
 
 ### Path A: Static bearer token (Claude Code CLI)
 
+```bash
+claude mcp add --transport http geef-atelier https://<your-domain>/mcp \
+  --header "Authorization: Bearer <ATELIER_MCP_TOKEN>"
+```
+
+or in `.mcp.json`:
+
 ```json
 {
   "mcpServers": {
     "geef-atelier": {
+      "type": "http",
       "url": "https://<your-domain>/mcp",
-      "transport": "streamable-http",
-      "auth": {
-        "type": "bearer",
-        "token": "<ATELIER_MCP_TOKEN>"
-      }
+      "headers": { "Authorization": "Bearer <ATELIER_MCP_TOKEN>" }
     }
   }
 }
@@ -199,13 +210,26 @@ removed in stage 8d (D-091); the data from that time went with the database clea
 
 ## Production deployment
 
-Prerequisites: Traefik is running on the server, the domain's DNS points to the server.
+**What you need:**
+
+- a server with Docker and Docker Compose,
+- a running Traefik (v3) on the shared Docker network `proxy` (create it once with `docker network create proxy`), with the HTTPS
+  entry point `websecure`, the certificate resolver `le` and a middleware `chain@file` (for example security headers); with other
+  names, change the labels of the `web` service in `docker-compose.yml`,
+- a domain whose DNS points to the server,
+- accounts for **Claude Code** and **OpenAI Codex**. Atelier writes and checks through the included gateway `cli-proxy`, which
+  runs these two command-line tools signed in with your accounts; the standard setup writes with Claude and checks the facts with
+  an OpenAI model, so sign in to both. An OpenRouter key alone is not enough to write a text,
+- the .NET 10 SDK for the password hash (once; it may run on another machine).
 
 ### Initial setup
 
-**1. Generate secrets:**
+**1. Get the code and generate secrets:**
 
 ```bash
+git clone https://github.com/chr0mcom/geef-atelier
+cd geef-atelier
+
 # BCrypt hash for the UI password (work factor 11)
 dotnet run --project tools/HashPassword -- "YourPassword"
 
@@ -216,7 +240,7 @@ openssl rand -hex 32
 openssl rand -base64 24
 ```
 
-**2. Create the `.env` file** (never commit to Git — it is gitignored):
+**2. Create the `.env` file** (`cp .env.example .env`; never commit it to Git — it is gitignored):
 
 ```env
 POSTGRES_DB=geef_atelier
@@ -224,32 +248,56 @@ POSTGRES_USER=geef_atelier
 POSTGRES_PASSWORD=<generated-password>
 
 ATELIER_USER=<admin-username>
-ATELIER_PASSWORD_HASH=<bcrypt-hash>
+# keep the single quotes: without them Docker Compose reads every "$" as a variable and the sign-in fails
+ATELIER_PASSWORD_HASH='<bcrypt-hash>'
 ATELIER_MCP_TOKEN=<hex-token>
+# also the public address of the installation (OAuth and upload links: https://<your-domain>)
 ATELIER_DOMAIN=<your-domain>
 
-LLM_OPENROUTER_API_KEY=<openrouter-api-key>
+# optional: key for the OpenRouter provider
+LLM_OPENROUTER_API_KEY=
 
-# Tavily web search (https://tavily.com) — needed for looking things up on the standard way (Research:Mode, shipped On);
-# without a key switch research off with Research__Mode=Off under
-# services.web.environment in docker-compose.override.yml (this .env file alone does not reach the web service)
+# Tavily web search (https://tavily.com) — for looking things up on the web (Research:Mode, shipped On).
+# Without a key switch research off with Research__Mode=Off under services.web.environment in
+# docker-compose.override.yml (this .env file alone does not reach the web service)
 TAVILY_API_KEY=
 ```
+
+The gateway is also reachable for other containers on the network `proxy` (and on `127.0.0.1:8090` of the server). If such
+containers must not use your accounts, set `CLI_PROXY_API_KEY=<random>` in `.env`: the gateway then requires this key, and the
+web app sends it.
 
 **3. Start the stack:**
 
 ```bash
+docker network create proxy   # once; "already exists" is fine
 docker compose up -d --build
 ```
 
-Migrations run automatically on startup. Health check: `https://<your-domain>/health`.
+The database is set up on the first start. Health check: `https://<your-domain>/health`.
+
+**4. Sign in the AI tools** (once; the sign-ins stay in a volume):
+
+```bash
+docker compose exec -e HOME=/auth/claude cli-proxy claude auth login
+docker compose exec cli-proxy codex login --device-auth
+```
+
+Details, a second Claude account and checks: [cli-proxy/README.md](cli-proxy/README.md#setup-production). Then sign in to the web
+app and place a short first order.
 
 ### Restart / update
 
 ```bash
-docker compose build --no-cache web && docker compose up -d web
+git pull
+docker compose build --no-cache cli-proxy web
+docker compose up -d cli-proxy   # first the gateway ...
+docker compose up -d web         # ... then the web app
 docker compose logs -f web
 ```
+
+Take a database backup before an update. An installation from before the baseline migration (D-092) has **no automatic upgrade**:
+the app refuses to start on such a database and changes nothing (see the [admin guide](docs/14-admin-guide.md#database)).
 
 ### Important URLs
 
@@ -290,12 +338,15 @@ docker cp geef-atelier-postgres-backup:/backups/last/<file>.sql.gz ./
 ### Restore
 
 ```bash
-docker compose stop web
+# from the root folder of the repository; the script stops and starts the web app itself
 ./scripts/restore-backup.sh <path-to-backup-file.sql.gz>
 curl https://<your-domain>/health
 ```
 
-> **Note:** `scripts/restore-backup.sh` overwrites all existing data. Take a fresh copy before restoring.
+> **Note:** `scripts/restore-backup.sh` **replaces** all existing data in the database. It works in one transaction: if the dump
+> cannot be applied completely, nothing changes and the web app stays stopped (`docker compose start web` brings it back). Take a
+> fresh backup before restoring. The dump does not hold the uploaded original files (volume `geef-atelier-sources`), the sign-ins
+> of the AI tools (`geef-atelier-cli-auth`) or the keys of the sign-in cookies (`geef-atelier-dpkeys`); back these up separately.
 
 ---
 
