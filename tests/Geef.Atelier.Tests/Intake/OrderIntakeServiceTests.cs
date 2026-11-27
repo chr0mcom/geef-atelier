@@ -320,13 +320,14 @@ public sealed class OrderIntakeServiceTests
     }
 
     [Theory]
-    [InlineData(ResearchMode.On, true)]
-    [InlineData(ResearchMode.Off, false)]
-    public async Task The_record_says_whether_research_was_switched_on_for_the_person_when_the_request_was_read(ResearchMode mode, bool allowed)
+    [InlineData(ResearchMode.On, OrderMode.Direct, true)]
+    [InlineData(ResearchMode.Off, OrderMode.Direct, false)]
+    [InlineData(ResearchMode.On, OrderMode.Careful, false)]
+    public async Task The_record_says_whether_research_was_switched_on_for_the_person_when_the_request_was_read(ResearchMode mode, OrderMode orderMode, bool allowed)
     {
         var service = new OrderIntakeService(_orders, _sources, _shadows, _memory, _clarifier, _starter, _notifier, Options.Create(_options),
             NullLogger<OrderIntakeService>.Instance, _time, _deferrals, Options.Create(new ResearchOptions { Mode = mode }));
-        var order = _orders.Add("Schreib einen Aushang zum neuen Mindestlohn, etwa 150 Wörter.");
+        var order = _orders.Add("Schreib einen Aushang zum neuen Mindestlohn, etwa 150 Wörter.", mode: orderMode);
         _clarifier.Enqueue(OutputWith() with { ResearchTopics = ["Mindestlohn 2027 Höhe"] });
 
         await service.ProcessAsync(order.Id, CancellationToken.None);

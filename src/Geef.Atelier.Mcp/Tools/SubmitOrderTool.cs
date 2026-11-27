@@ -38,6 +38,17 @@ public static class SubmitOrderTool
         "Otherwise the order is already being written: call get_order_status with waitSeconds, then get_order_result. " +
         "The text is usually ready in 1–5 minutes.";
 
+    /// <summary>
+    /// Parameter of the removed variant "Extra careful" (D-087). It is never part of the input schema; it only exists so that a client with
+    /// an older tool list is refused instead of silently getting a standard order, which may look things up on the web.
+    /// </summary>
+    public const string RetiredExtraCarefulParameter = "extraCareful";
+
+    /// <summary>The refusal of a call that still sends <see cref="RetiredExtraCarefulParameter"/> as true.</summary>
+    public const string RetiredExtraCarefulMessage =
+        "Extra careful no longer exists, and nothing was sent. A normal order may look things up on the web, which Extra careful never did. " +
+        "Tell the person this; if they agree, send the order again without extraCareful.";
+
     /// <summary>Sentence added to the description while <c>Mcp:Skills</c> is <c>On</c> (D-088).</summary>
     public const string SkillSentence =
         " If you can load skills, load " + AtelierSkill.Uri + " before the first order; it explains every step.";
@@ -89,9 +100,12 @@ public static class SubmitOrderTool
         [Description(UploadIdsDescription)] string[]? uploadIds = null,
         CancellationToken cancellationToken = default,
         IMcpOrderForms? forms = null,
-        RequestContext<CallToolRequestParams>? context = null)
+        RequestContext<CallToolRequestParams>? context = null,
+        bool extraCareful = false)
     {
         var username = currentUser.RequireUsername();
+        if (extraCareful)
+            throw new McpException(RetiredExtraCarefulMessage);
         if (string.IsNullOrWhiteSpace(request))
             throw new McpException("The request is empty. Pass the person's request in their own words.");
 

@@ -3687,14 +3687,14 @@ vorab festgelegt, entfällt das Häkchen, und lange Texte laufen im Direktweg.
 - **Keine Migration, kein `DROP`.** Der Wert `OrderMode.Careful` und die Spalten bleiben; neue Aufträge sind immer `Direct`. Das
   Aufräumen der Datenbank ist ein eigener, späterer Schritt.
 - **Gespeicherte Aufträge im Modus careful** bleiben lesbar und exportierbar. „Change something“ und `revise_order` schreiben die neue
-  Fassung auf dem Direktweg. Ein noch wartender Auftrag läuft wie ein Standardauftrag, auch beim Lesen der Anfrage und bei der Datei,
-  die überarbeitet werden soll. Ob im Web nachgeschlagen werden darf, steht weiter im Verlauf der Rückfragen: Wurde die Anfrage schon
-  als sorgfältiger Auftrag gelesen, wird nie nachgeschlagen.
+  Fassung auf dem Direktweg; auch ein noch wartender Auftrag wird dort geschrieben. Die Zusage aus D-079 gilt für sie weiter: Ein
+  gespeicherter sorgfältiger Auftrag schlägt nie im Web nach, auch wenn seine Anfrage erst jetzt gelesen wird.
 - **Gespeicherte Läufe mit `direct-outline`** gehören weiter zum Direktweg: lesbar, fortsetzbar, änderbar. Wird ein solcher Lauf noch
   ausgeführt, lässt der Zusammenbau die Zusatzprüfung aus; einen Planungsaufruf gibt es nicht. Die technische Laufseite zeigt die
   Aufstellung unter ihrem früheren Namen.
-- **Clients mit gespeicherter alter Werkzeugliste**, die `extraCareful` noch senden, bekommen den Direktweg; der unbekannte Wert wird
-  überlesen.
+- **Clients mit gespeicherter alter Werkzeugliste**, die `extraCareful` noch senden, werden mit einem klaren Satz abgelehnt; es
+  entsteht kein Auftrag. Ein stiller Wechsel auf den Standardauftrag hätte die Zusage gebrochen, nie im Web nachzuschlagen. Der
+  Parameter steht nicht im Schema und fällt mit den Platzhaltern der alten Werkzeuge in der nächsten Version weg.
 - **Nachweis:** Ende-zu-Ende-Tests für einen fertigen sorgfältigen Auftrag mit `direct-outline` (Listen, Seiten, beide Exporte,
   `revise_order`), einen wartenden und einen fortgesetzten Lauf dieser Vorlage, einen auf Antworten wartenden sorgfältigen Auftrag und
   einen Aufruf mit `extraCareful`.

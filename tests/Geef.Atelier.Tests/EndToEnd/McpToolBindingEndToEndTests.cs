@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Mcp;
+using Geef.Atelier.Mcp.Tools;
 using Geef.Atelier.Tests.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,7 +33,8 @@ public sealed class McpToolBindingEndToEndTests(PostgresFixture postgres)
         foreach (var (name, method) in methods)
         {
             var parameters = method.GetParameters();
-            var expected = parameters.Where(p => p.ParameterType.IsClientValue()).Select(p => p.Name!).Order(StringComparer.Ordinal).ToList();
+            var expected = parameters.Where(p => p.ParameterType.IsClientValue()).Select(p => p.Name!)
+                .Where(p => p != SubmitOrderTool.RetiredExtraCarefulParameter).Order(StringComparer.Ordinal).ToList();
             Assert.True(expected.SequenceEqual(listed[name].Order(StringComparer.Ordinal)),
                 $"{name}: listed [{string.Join(", ", listed[name])}], expected [{string.Join(", ", expected)}].");
 

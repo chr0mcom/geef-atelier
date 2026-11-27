@@ -350,6 +350,17 @@ public sealed class OrderResearchServiceTests
         var careful = Order(IntakeRecordJson.Serialize(record)) with { Mode = OrderMode.Careful };
 
         AssertNothingHappened(s, await Ensure(s, careful));
+        AssertNothingHappened(s, await Ensure(s, careful, files: true));
+        Assert.Null(s.Orders.Find(careful.Id)!.ResearchJson);
+    }
+
+    [Fact]
+    public async Task A_stored_careful_order_never_searches_even_if_its_record_allows_research()
+    {
+        var s = Create();
+        var careful = Order(Clarify(IntakeRecordStatus.Ok, TopicA, TopicB)) with { Mode = OrderMode.Careful };
+
+        AssertNothingHappened(s, await Ensure(s, careful));
         Assert.Null(s.Orders.Find(careful.Id)!.ResearchJson);
     }
 

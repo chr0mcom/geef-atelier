@@ -37,12 +37,12 @@ internal sealed class IntakeOrders : IOrderRepository
     public int Writes => SavedQuestions.Count;
 
     public OrderEntity Add(string request, OrderState state = OrderState.Analyzing,
-        string? user = "intake-user", int attempts = 0, string? clarifyJson = null)
+        string? user = "intake-user", int attempts = 0, string? clarifyJson = null, OrderMode mode = OrderMode.Direct)
     {
         var now = DateTimeOffset.UtcNow;
         var order = new OrderEntity
         {
-            Id = Guid.NewGuid(), CreatedByUser = user, RequestText = request, Mode = OrderMode.Direct, State = state, Entry = OrderEntry.Web,
+            Id = Guid.NewGuid(), CreatedByUser = user, RequestText = request, Mode = mode, State = state, Entry = OrderEntry.Web,
             IntakeAttempts = attempts, ClarifyJson = clarifyJson, CreatedAt = now, UpdatedAt = now,
         };
         _orders[order.Id] = order;

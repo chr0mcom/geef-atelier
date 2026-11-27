@@ -19,8 +19,7 @@ namespace Geef.Atelier.Tests.EndToEnd;
 
 /// <summary>
 /// Over the real wiring: the "About me" profile reaches the clarifier and every writer briefing (answered, skipped,
-/// started after the deadline), but never an outside search service. A clarified order without research topics searches nothing at all
-/// (D-079).
+/// started after the deadline), but never an outside search service. A clarified order without research topics searches nothing at all.
 /// </summary>
 [Collection(EndToEndCollection.Name)]
 [Trait("Category", "EndToEnd")]

@@ -218,19 +218,17 @@ public sealed class LegacyDataEndToEndTests(PostgresFixture postgres)
     }
 
     [Fact(Timeout = 90_000)]
-    public async Task A_client_with_an_older_tool_list_that_still_sends_extraCareful_gets_the_direct_path()
+    public async Task A_client_with_an_older_tool_list_that_still_sends_extraCareful_is_refused_and_nothing_is_stored_or_searched()
     {
         await using var host = await AtelierEndToEndHost.StartAsync(postgres);
-        host.Script.ExecutorText = FinishedText;
 
-        var submitted = await host.CallMcpToolAsync("submit_order", new { request = "Write a short note about the new opening hours.", extraCareful = true });
-        host.ReleaseOrchestrator();
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            host.CallMcpToolAsync("submit_order", new { request = "Write a short note about the new opening hours.", extraCareful = true }));
 
-        var orderId = Guid.Parse(submitted.GetProperty("orderId").GetString()!);
-        await host.WaitForOrderFinishedAsync(orderId);
-        var order = await host.QueryAsync(db => db.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId));
-        var run = await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == orderId));
-        Assert.Equal((OrderMode.Direct, SystemCrew.DirectTemplateName, RunStatus.Completed), (order.Mode, run.CrewTemplateName, run.Status));
+        Assert.Contains("Extra careful no longer exists, and nothing was sent.", error.Message, StringComparison.Ordinal);
+        Assert.Equal(0, await host.QueryAsync(db => db.Orders.CountAsync()));
+        Assert.Empty(host.Tavily.RequestBodies);
+        Assert.Empty(host.Llm.Calls);
     }
 
     /// <summary>

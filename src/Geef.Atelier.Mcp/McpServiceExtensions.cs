@@ -84,6 +84,7 @@ public static class McpServiceExtensions
         var tool = method.CreateTool(services, description);
         if (!submit)
             return tool;
+        tool = tool.WithoutInputProperty(SubmitOrderTool.RetiredExtraCarefulParameter);
         return tickets
             ? tool.WithInputPropertyDescription(SubmitOrderTool.AttachmentsParameter, SubmitOrderTool.TicketAttachmentsDescription)
             : tool.WithoutInputProperty(SubmitOrderTool.UploadIdsParameter);

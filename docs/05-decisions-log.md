@@ -3552,13 +3552,14 @@ the checkbox goes, and long texts run on the direct path.
 - **No migration, no `DROP`.** The value `OrderMode.Careful` and the columns stay; new orders are always `Direct`. Cleaning the
   database is a separate, later step.
 - **Stored orders in the mode careful** stay readable and exportable. "Change something" and `revise_order` write the new version on
-  the direct path. One that is still waiting runs like a standard order, also while the request is read and for the file that is to be
-  revised. Whether the web may be searched is still decided by the record of the questions: a request already read as a careful order
-  is never looked up.
+  the direct path, and so is one that is still waiting. The promise of D-079 still holds for them: a stored careful order never looks
+  anything up on the web, even if its request is only read now.
 - **Stored runs with `direct-outline`** still belong to the direct path: readable, resumable, changeable. If such a run is still
   executed, the assembly leaves its extra check out; there is no planning call. The technical run page shows the setup under its
   former name.
-- **Clients with a cached older tool list** that still send `extraCareful` get the direct path; the unknown value is ignored.
+- **Clients with a cached older tool list** that still send `extraCareful` are refused with a plain sentence; no order is created.
+  Silently turning the call into a standard order would have broken the promise never to look anything up on the web. The parameter
+  is not part of the schema and goes with the stubs of the old tools in the next version.
 - **Evidence:** end-to-end tests for a finished careful order with `direct-outline` (lists, pages, both exports, `revise_order`), a
   pending and a continued run of that template, a careful order waiting for answers and a call with `extraCareful`.
 - **Way back:** the previous image; nothing in the database was changed.
