@@ -61,6 +61,11 @@
             Permission: <strong>MCP (full access)</strong>
         </p>
 
+        <p class="auth-card-meta" style="overflow-wrap:anywhere;" data-testid="redirect-target">
+            Access goes to <strong>@RedirectTarget(RedirectUri!)</strong>. The app chose its own name, so check this address
+            and grant access only if you started this yourself.
+        </p>
+
         <p class="auth-card-meta auth-signed-in">
             You are signed in as <strong>@HttpContext!.User.Identity?.Name</strong>.
         </p>
@@ -103,6 +108,11 @@
     private string?     _error;
     private OAuthClient? _client;
     private bool        _valid;
+
+    private static string RedirectTarget(string redirectUri) =>
+        Uri.TryCreate(redirectUri, UriKind.Absolute, out var uri) && uri.Host.Length > 0
+            ? uri.GetLeftPart(UriPartial.Authority)
+            : redirectUri;
 
     protected override async Task OnInitializedAsync()
     {

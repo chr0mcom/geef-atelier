@@ -102,6 +102,24 @@ public sealed class OAuthAuthorizeTests : TestContext
         Assert.Throws<Bunit.ElementNotFoundException>(() => cut.Find("[data-testid='oauth-error']"));
     }
 
+    [Theory]
+    [InlineData("https://app.example.com/oauth/callback?x=1", "https://app.example.com")]
+    [InlineData("http://localhost:53124/callback", "http://localhost:53124")]
+    [InlineData("com.example.app:/callback", "com.example.app:/callback")]
+    public void OAuthAuthorize_ValidRequest_ShowsWhereAccessGoes(string redirectUri, string shown)
+    {
+        Services.AddSingleton<IOAuthService>(new StubOAuthService(
+            new AuthorizationValidationResult(true, null, null, FakeClient())));
+
+        NavigateTo("/oauth/authorize?response_type=code&client_id=c1&code_challenge=abc&code_challenge_method=S256&redirect_uri="
+                   + Uri.EscapeDataString(redirectUri));
+
+        var cut = RenderComponent<OAuthAuthorize>(p => p
+            .AddCascadingValue<HttpContext>(GetContext()));
+
+        Assert.Equal(shown, cut.Find("[data-testid='redirect-target'] strong").TextContent);
+    }
+
     [Fact]
     public void OAuthAuthorize_ValidRequest_ShowsClientName()
     {
