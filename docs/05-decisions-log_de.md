@@ -3767,6 +3767,20 @@ mit dem SDK-Client: Formular → `submit_order` und `get_order_result` nennen di
 über einen Client 2025-11-25 mit `user`; Antwort `client` sichtbar für den Besitzer in beiden Revisionen, nicht für einen
 Administrator.
 
+### Zusatz zu D-088 — Abnahme bestanden, beide Schalter ausgeliefert `On` (2026-11-27)
+
+**Abnahme am echten Client mit Claude Code (2.1.332, gegen Produktion):** Formular beantwortet → das Modell nennt Wahl und Herkunft
+richtig („laut Atelier in einem Formular gewählt, ich habe es nicht gesehen“); Formular ohne Antwort → sauber `needs_input`, nichts
+selbst entschieden; Skill vom echten Server: `skills/list` und `resources/read` funktionieren. **Nicht geprüft:** das Chatfenster von
+claude.ai und Claude Desktop.
+
+**Entscheidung.** `appsettings.json` liefert `Mcp:Skills` und `Mcp:Elicitation` dauerhaft `On`; der Code-Standard bleibt `Off` (wie
+bei den übrigen Schaltern). Die Bitgleichheit bei `Off` prüfen die Tests weiter ausdrücklich mit gesetztem `Off` (Hash-Baselines,
+Schaltertests, Ende-zu-Ende mit `Off`); die Tests des ausgelieferten Stands erwarten `On`, der Kompatibilitätstest für ältere Clients
+erwartet jetzt genau die Erweiterung `io.modelcontextprotocol/skills`. Erklärseite und Startseite bleiben unverändert: Sie sagen nichts,
+was durch die Formulare falsch würde. **Rückweg:** `Mcp__Skills=Off` bzw. `Mcp__Elicitation=Off` per Umgebung, ohne neues Image;
+nach dem ersten `On` ist das Rückweg-Image ein D-088-Image (siehe oben).
+
 ## D-089 — Rückbau, Schnitt 1: ungenutzter Code entfernt (2026-11-27)
 
 **Kontext.** Stufe 8c des Rückbaus (Plan-Etappe 1b, „Rückbau Schnitt 1“). Sie nimmt Code heraus, den keine verbleibende Arbeitsweise

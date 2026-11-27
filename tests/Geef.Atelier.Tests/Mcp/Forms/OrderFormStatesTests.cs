@@ -98,14 +98,14 @@ public sealed class OrderFormStatesTests
     }
 
     [Fact]
-    public void Forms_are_off_by_default_and_in_the_shipped_settings()
+    public void Forms_are_off_in_the_code_and_on_in_the_shipped_settings()
     {
         Assert.Equal(McpElicitationMode.Off, new McpOptions().Elicitation);
         var root = new DirectoryInfo(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "Geef.Atelier.slnx")))
             root = root.Parent;
         using var document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(root!.FullName, "src", "Geef.Atelier.Web", "appsettings.json")));
-        Assert.Equal("Off", document.RootElement.GetProperty("Mcp").GetProperty("Elicitation").GetString());
+        Assert.Equal("On", document.RootElement.GetProperty("Mcp").GetProperty("Elicitation").GetString());
     }
 
     internal sealed class SteppedTime(DateTimeOffset start) : TimeProvider
