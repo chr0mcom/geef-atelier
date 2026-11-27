@@ -42,10 +42,10 @@ public sealed class ToolDefinitionTests
             ToolType.RestApi,
             ToolType.StaticContext,
             ToolType.LearningRetrieval,
-            ToolType.McpTool
         };
 
-        Assert.Equal(9, ToolType.All.Count);
+        Assert.Equal(8, ToolType.All.Count);
+        Assert.DoesNotContain("mcp-tool", ToolType.All);
         foreach (var type in expected)
         {
             Assert.Contains(type, ToolType.All);

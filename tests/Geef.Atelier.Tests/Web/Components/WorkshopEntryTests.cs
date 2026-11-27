@@ -102,7 +102,7 @@ public sealed class WorkshopEntryTests : TestContext
         Assert.Equal(
             new[] { "/workshop", "/runs", "/new", "/crew/templates", "/crew/knowledge", "/crew/learnings",
                 "/crew/profiles/reviewers", "/crew/profiles/executors", "/crew/profiles/advisors", "/crew/profiles/grounding-providers",
-                "/crew/profiles/finalizers", "/tools", "/packs", "/mcp-servers", "/crew/providers" },
+                "/crew/profiles/finalizers", "/tools", "/packs", "/crew/providers" },
             hrefs);
     }
 

@@ -123,8 +123,7 @@ public sealed class ToolInvocationSequencePostgresTests(PostgresFixture fixture)
             .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
         services.AddScoped<IToolInvocationRepository, ToolInvocationRepository>();
         var scopeFactory = services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
-        return new ToolExecutor(scopeFactory, new NoOpHttpClientFactory(), new NullMcpServerConfigRepository(),
-            new NullMcpClientFactory(), NullLogger<ToolExecutor>.Instance);
+        return new ToolExecutor(scopeFactory, new NoOpHttpClientFactory(), NullLogger<ToolExecutor>.Instance);
     }
 
     private async Task<Guid> CreateRunAsync()

@@ -109,25 +109,9 @@ public sealed class ToolSchemaProviderTests
     }
 
     [Fact]
-    public void GetSchema_McpTool_UsesLlmSchemaFromDefinition()
+    public void GetSchema_RetiredMcpToolType_FallsBackToGeneric()
     {
-        const string mcpSchema =
-            """{"type":"object","properties":{"city":{"type":"string","description":"City name"}},"required":["city"]}""";
-        var schemaElement = JsonDocument.Parse(mcpSchema).RootElement;
-        var tool = MakeTool(ToolType.McpTool, schemaElement);
-
-        var schema = Provider.GetSchema(tool);
-
-        // The schema JSON must be the MCP discovery result, not the generic fallback
-        var doc = JsonDocument.Parse(schema.InputSchemaJson).RootElement;
-        Assert.True(doc.TryGetProperty("properties", out var props));
-        Assert.True(props.TryGetProperty("city", out _), "Expected MCP-specific 'city' property");
-    }
-
-    [Fact]
-    public void GetSchema_McpTool_EmptyLlmSchema_FallsBackToGeneric()
-    {
-        var tool = MakeTool(ToolType.McpTool); // LlmSchema = {}
+        var tool = MakeTool("mcp-tool");
 
         var schema = Provider.GetSchema(tool);
 

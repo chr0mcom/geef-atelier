@@ -27,7 +27,8 @@ public static class ToolType
     /// <summary>Retrieval from the run's accumulated learning entries (maps to <c>GroundingProviderTypes.LearningRetrieval</c>).</summary>
     public const string LearningRetrieval = "learning-retrieval";
 
-    /// <summary>Arbitrary MCP tool invocation (new; no direct grounding-provider equivalent).</summary>
+    /// <summary>Retired: calls to tools of outside MCP servers. The MCP client was removed in stage 8c; the value stays so stored rows can still be named.</summary>
+    [Obsolete("The MCP client was removed in stage 8c (D-089); tools of this type no longer run.")]
     public const string McpTool = "mcp-tool";
 
     /// <summary>All known tool type strings.</summary>
@@ -41,6 +42,5 @@ public static class ToolType
         RestApi,
         StaticContext,
         LearningRetrieval,
-        McpTool
     ];
 }

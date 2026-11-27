@@ -7,11 +7,9 @@ using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Application.Security;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain.Crew.Grounding;
-using Geef.Atelier.Core.Domain.Mcp;
 using Geef.Atelier.Core.Domain.Providers;
 using Geef.Atelier.Core.Domain.Tools;
 using Geef.Atelier.Core.Persistence.Crew;
-using Geef.Atelier.Core.Persistence.Mcp;
 using Geef.Atelier.Core.Persistence.Providers;
 using Geef.Atelier.Core.Persistence.Tools;
 using Geef.Atelier.Infrastructure.Grounding;
@@ -196,22 +194,6 @@ public sealed class EnvReferenceSaveAndResolveTests(PostgresFixture fixture) : I
         var badName = Unique("tool-bad-");
         await Assert.ThrowsAsync<EnvReferenceNotAllowedException>(() => tools.SaveAsync(Tool(badName, "CLI_PROXY_API_KEY")));
         Assert.Null(await tools.GetByNameAsync(badName));
-    }
-
-    [Fact]
-    public async Task McpServer_AllowedHeaderEnvIsSaved_ForbiddenIsRejected()
-    {
-        await using var sp = BuildProvider();
-        await using var scope = sp.CreateAsyncScope();
-        var repo = scope.ServiceProvider.GetRequiredService<IMcpServerConfigRepository>();
-
-        var ok = new McpServerConfig { Id = Guid.NewGuid(), Name = Unique("mcp-ok-"), Url = "https://mcp.example.com/mcp", AuthHeaderEnv = _allowed, IsActive = true };
-        await repo.UpsertAsync(ok);
-        Assert.Equal(_allowed, (await repo.GetByIdAsync(ok.Id))!.AuthHeaderEnv);
-
-        var bad = ok with { Id = Guid.NewGuid(), Name = Unique("mcp-bad-"), AuthHeaderEnv = "ATELIER_MCP_TOKEN" };
-        await Assert.ThrowsAsync<EnvReferenceNotAllowedException>(() => repo.UpsertAsync(bad));
-        Assert.Null(await repo.GetByIdAsync(bad.Id));
     }
 
     [Theory]

@@ -72,9 +72,6 @@
                         Packs
                     </NavLink>
                     <AuthorizeView Roles="admin">
-                        <NavLink class="nav-link" href="/mcp-servers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
-                            MCP Servers
-                        </NavLink>
                         <div class="nav-dropdown-sep">Infrastructure</div>
                         <NavLink class="nav-link" href="/crew/providers" Match="NavLinkMatch.Prefix" ActiveClass="active" role="menuitem" @onclick="CloseWorkshop">
                             Providers
@@ -87,7 +84,7 @@
 </div>
 
 @code {
-    static readonly string[] WorkshopPrefixes = ["workshop", "runs", "new", "crew/", "tools", "packs", "mcp-servers"];
+    static readonly string[] WorkshopPrefixes = ["workshop", "runs", "new", "crew/", "tools", "packs"];
 
     bool _workshopOpen;
 

@@ -78,7 +78,6 @@ public sealed class AtelierDbContext(DbContextOptions<AtelierDbContext> options)
     internal DbSet<ToolDefinitionEntity> ToolDefinitions => Set<ToolDefinitionEntity>();
     internal DbSet<ToolInvocation> ToolInvocations => Set<ToolInvocation>();
 
-    internal DbSet<McpServerConfigEntity> McpServerConfigs => Set<McpServerConfigEntity>();
 
     internal DbSet<SpecializationPackEntity> SpecializationPacks => Set<SpecializationPackEntity>();
 
