@@ -39,16 +39,12 @@ public sealed class ProductionWiringEndToEndTests(PostgresFixture postgres)
 
         await using var scope = host.Services.CreateAsyncScope();
         var services = scope.ServiceProvider;
-        var groundingProviders = services.GetServices<IGroundingProvider>().ToList();
         var consumers = new object[]
         {
-            services.GetRequiredService<ICrewService>(),
             services.GetRequiredService<IProviderService>(),
             services.GetRequiredService<ILlmClientResolver>(),
             services.GetRequiredService<IModelCatalog>(),
             services.GetRequiredService<IToolExecutor>(),
-            groundingProviders.OfType<RestApiGroundingProvider>().Single(),
-            groundingProviders.OfType<AcademicSearchGroundingProvider>().Single(),
         };
 
         Assert.All(consumers, consumer => Assert.Same(configured, PolicyOf(consumer)));

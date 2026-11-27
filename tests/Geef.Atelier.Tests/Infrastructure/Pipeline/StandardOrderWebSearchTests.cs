@@ -12,7 +12,9 @@ namespace Geef.Atelier.Tests.Infrastructure.Pipeline;
 [Collection("Postgres")]
 public sealed class StandardOrderWebSearchTests(PostgresFixture postgres)
 {
-    private static readonly GroundingProviderProfile RestApi = Profile("own-api", GroundingProviderTypes.RestApi);
+    private static readonly GroundingProviderProfile RestApi = Profile("own-api", "rest-api");
+    private static readonly GroundingProviderProfile RetiredNews = Profile("tavily-news", "news-search") with { IsSystem = true };
+    private static readonly GroundingProviderProfile RetiredAcademic = Profile("academic-default", "academic-search") with { IsSystem = true };
     private static readonly GroundingProviderProfile UrlFetch = Profile("own-pages", GroundingProviderTypes.UrlFetch);
     private static readonly GroundingProviderProfile LocalTypeThroughTool = Profile("own-tool", GroundingProviderTypes.VectorStore) with { ToolName = "web-search" };
     private static readonly GroundingProviderProfile SystemAttachmentsWithOldToolName = SystemCrew.RunAttachmentsProfile with { ToolName = "vector-search" };
@@ -22,8 +24,8 @@ public sealed class StandardOrderWebSearchTests(PostgresFixture postgres)
         SystemCrew.OrderSourcesProfile,
         SystemCrew.TavilyRefinedProfile,
         SystemCrew.TavilyBasicProfile,
-        SystemCrew.TavilyNewsProfile,
-        SystemCrew.AcademicDefaultProfile,
+        RetiredNews,
+        RetiredAcademic,
         RestApi,
         UrlFetch,
         LocalTypeThroughTool,

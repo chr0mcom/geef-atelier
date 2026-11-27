@@ -58,29 +58,17 @@ public sealed class SystemCrewGroundingConstantsTests
         Assert.False(SystemCrew.IsSystemGroundingProviderName("custom-my-provider"));
     }
 
-    [Fact]
-    public void TavilyNewsProfile_IsSystem()
+    [Theory]
+    [InlineData("tavily-news")]
+    [InlineData("academic-default")]
+    public void The_system_profiles_of_retired_types_are_gone(string name)
     {
-        Assert.True(SystemCrew.TavilyNewsProfile.IsSystem);
+        Assert.False(SystemCrew.GroundingProviderProfiles.ContainsKey(name));
     }
 
     [Fact]
-    public void TavilyNewsProfile_HasCorrectProviderType()
+    public void No_system_profile_uses_a_retired_type()
     {
-        Assert.Equal("news-search", SystemCrew.TavilyNewsProfile.ProviderType);
-    }
-
-    [Fact]
-    public void TavilyNewsProfile_HasExpectedSettings()
-    {
-        var settings = SystemCrew.TavilyNewsProfile.ProviderSettings;
-        Assert.Equal("7", settings[GroundingProviderProfile.KeyRecencyDays]);
-        Assert.Equal("5", settings[GroundingProviderProfile.KeyNewsMaxResults]);
-    }
-
-    [Fact]
-    public void GroundingProviderProfiles_ContainsTavilyNews()
-    {
-        Assert.True(SystemCrew.GroundingProviderProfiles.ContainsKey("tavily-news"));
+        Assert.DoesNotContain(SystemCrew.GroundingProviderProfiles.Values, p => p.ProviderType.IsRetiredGroundingType());
     }
 }

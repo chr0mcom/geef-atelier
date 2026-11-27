@@ -12,7 +12,7 @@ public static class GroundingKeyGuard
     /// <summary>Configuration keys used by system grounding profiles, with the profiles that need them.</summary>
     public static readonly IReadOnlyList<(string Key, string Profiles)> RequiredKeys =
     [
-        ("Tavily:ApiKey", "tavily-refined, tavily-basic, tavily-news"),
+        ("Tavily:ApiKey", "tavily-refined, tavily-basic"),
         ("Llm:Providers:openrouter:ApiKey", "run-attachments, knowledge-base-default (embeddings)"),
     ];
 

@@ -1,4 +1,3 @@
-using Geef.Atelier.Application.Security;
 using Geef.Atelier.Application.Crew.Models;
 using Geef.Atelier.Core.Domain.Crew;
 using Geef.Atelier.Core.Domain.Crew.Advisors;
@@ -21,14 +20,12 @@ internal sealed class CrewService(
     ISpecializationPackRepository packRepo,
     IModelCatalog modelCatalog,
     IModelAssignmentService modelAssignment,
-    ILogger<CrewService> logger,
-    IEnvReferencePolicy? envReferencePolicy = null) : ICrewService
+    ILogger<CrewService> logger) : ICrewService
 {
-    private readonly IEnvReferencePolicy _envPolicy = envReferencePolicy ?? EnvReferencePolicy.Default;
-
     private const string ReadOnlyMessage = "System profile is read-only — copy it as a custom variant.";
     private const string ReadOnlyAdvisorMessage = "System advisor profile is read-only — copy it as a custom variant.";
     private const string ReadOnlyGroundingMessage = "System grounding-provider profile is read-only — copy it as a custom variant.";
+    private const string RetiredGroundingTypeMessage = "This kind of source was removed. Profiles of this kind can no longer be saved; tasks skip them.";
     private const string ReadOnlyFinalizerMessage = "System finalizer profile is read-only — copy it as a custom variant.";
     private const string ReadOnlyTemplateMessage = "System template is read-only — copy it as a custom variant.";
 
@@ -168,7 +165,7 @@ internal sealed class CrewService(
             return customOnly;
 
         // Warn about DB system profiles not tracked by SystemCrew — these would otherwise be silently dropped.
-        foreach (var orphan in dbProfiles.Where(p => p.IsSystem && !SystemCrew.GroundingProviderProfiles.ContainsKey(p.Name)))
+        foreach (var orphan in dbProfiles.Where(p => p.IsSystem && !SystemCrew.GroundingProviderProfiles.ContainsKey(p.Name) && !p.ProviderType.IsRetiredGroundingType()))
             logger.LogWarning(
                 "Grounding-provider profile '{Name}' (type '{Type}') is marked IsSystem in the database but is not registered in SystemCrew.GroundingProviderProfiles. It will not appear in listings. Add it as a code constant to make it visible.",
                 orphan.Name, orphan.ProviderType);
@@ -191,7 +188,7 @@ internal sealed class CrewService(
         profile = profile.ForSave();
         if (SystemCrew.IsSystemGroundingProviderName(profile.Name))
             throw new InvalidOperationException(ReadOnlyGroundingMessage);
-        EnsureEnvReferencesAllowed(profile);
+        EnsureTypeNotRetired(profile);
         var baseName = SystemCrew.EnsureCustomPrefix(profile.Name);
         var uniqueName = await UniqueNameAsync(baseName, n => groundingRepo.GetByNameAsync(n, cancellationToken));
         var normalized = profile with { Name = uniqueName, IsSystem = false };
@@ -205,15 +202,15 @@ internal sealed class CrewService(
         profile = profile.ForSave();
         if (SystemCrew.IsSystemGroundingProviderName(profile.Name))
             throw new InvalidOperationException(ReadOnlyGroundingMessage);
-        EnsureEnvReferencesAllowed(profile);
+        EnsureTypeNotRetired(profile);
         await groundingRepo.UpdateAsync(profile, cancellationToken);
         return profile;
     }
 
-    private void EnsureEnvReferencesAllowed(GroundingProviderProfile profile)
+    private static void EnsureTypeNotRetired(GroundingProviderProfile profile)
     {
-        _envPolicy.EnsureAllowed(profile.RestApiAuthHeaderEnv, "Auth header variable");
-        _envPolicy.EnsureAllowed(profile.AcademicApiKeyEnv, "API key variable");
+        if (profile.ProviderType.IsRetiredGroundingType())
+            throw new InvalidOperationException(RetiredGroundingTypeMessage);
     }
 
     public Task DeleteCustomGroundingProviderProfileAsync(string name, CancellationToken cancellationToken = default)

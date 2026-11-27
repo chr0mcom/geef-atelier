@@ -63,13 +63,17 @@ public sealed class GroundingProviderEditorNewTypesTests : TestContext
         Assert.Contains("url-fetch", select.InnerHtml);
     }
 
-    [Fact]
-    public void TypeDropdown_ContainsNewsSearchOption()
+    [Theory]
+    [InlineData("news-search")]
+    [InlineData("academic-search")]
+    [InlineData("rest-api")]
+    public void TypeDropdown_NoLongerOffersRetiredTypes(string retired)
     {
         SetupServices();
         var cut = RenderComponent<GroundingProviderEditor>();
         var select = cut.Find("[data-testid='input-provider-type']");
-        Assert.Contains("news-search", select.InnerHtml);
+        Assert.DoesNotContain(retired, select.InnerHtml);
+        Assert.Empty(cut.FindAll("[data-testid='retired-type-notice']"));
     }
 
     // ── static-context ────────────────────────────────────────────────────────
@@ -128,35 +132,6 @@ public sealed class GroundingProviderEditorNewTypesTests : TestContext
         SetupServices();
         var cut = RenderComponent<GroundingProviderEditor>();
         cut.Find("[data-testid='input-provider-type']").Change("url-fetch");
-        cut.Find("[data-testid='input-max-queries']");
-    }
-
-    // ── news-search ───────────────────────────────────────────────────────────
-
-    [Fact]
-    public void NewsSearch_ShowsRecencyDaysField()
-    {
-        SetupServices();
-        var cut = RenderComponent<GroundingProviderEditor>();
-        cut.Find("[data-testid='input-provider-type']").Change("news-search");
-        cut.Find("[data-testid='input-recency-days']");
-    }
-
-    [Fact]
-    public void NewsSearch_ShowsNewsMaxResultsField()
-    {
-        SetupServices();
-        var cut = RenderComponent<GroundingProviderEditor>();
-        cut.Find("[data-testid='input-provider-type']").Change("news-search");
-        cut.Find("[data-testid='input-news-max-results']");
-    }
-
-    [Fact]
-    public void NewsSearch_ShowsMaxQueriesPerRunField()
-    {
-        SetupServices();
-        var cut = RenderComponent<GroundingProviderEditor>();
-        cut.Find("[data-testid='input-provider-type']").Change("news-search");
         cut.Find("[data-testid='input-max-queries']");
     }
 

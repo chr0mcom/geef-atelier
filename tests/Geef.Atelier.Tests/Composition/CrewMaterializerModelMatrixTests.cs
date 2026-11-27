@@ -112,14 +112,14 @@ public sealed class CrewMaterializerModelMatrixTests
         var crew = new CapturingCrewService();
         var spec = Spec
             .Replace("""{"name": "plain", "provider_type": "tavily", "settings": {"Tier": "basic"}}""",
-                """{"name": "plain", "provider_type": "academic-search", "settings": {"maxPapers": "5", "apiKeyEnv": "CLI_PROXY_API_KEY", "url": "https://example.invalid"}}, {"name": "fetch", "provider_type": "url-fetch", "settings": {"urls": "http://169.254.169.254/latest/meta-data"}}""")
+                """{"name": "plain", "provider_type": "tavily", "settings": {"MaxResults": "5", "apiKeyEnv": "CLI_PROXY_API_KEY", "url": "https://example.invalid"}}, {"name": "fetch", "provider_type": "url-fetch", "settings": {"urls": "http://169.254.169.254/latest/meta-data"}}""")
             .Replace("""{"name": "summary", "finalizer_type": "Transform", "system_prompt": "Summarize."}""",
                 """{"name": "summary", "finalizer_type": "Transform", "system_prompt": "Summarize.", "settings": {"Provider": "openrouter", "Model": "openai/gpt-4o", "Url": "https://example.invalid"}}""");
 
         await Materializer(crew).MaterializeAsync(spec, Guid.NewGuid());
 
         var plain = crew.Groundings.Single(g => g.Name == "plain");
-        Assert.Equal(new[] { GroundingProviderProfile.KeyAcademicMaxPapers }, plain.ProviderSettings.Keys.ToArray());
+        Assert.Equal(new[] { "MaxResults" }, plain.ProviderSettings.Keys.ToArray());
         Assert.DoesNotContain(crew.Groundings, g => g.Name == "fetch");
         var summary = crew.Finalizers.Single(f => f.Name == "summary");
         Assert.False(summary.Settings.ContainsKey("Url"));

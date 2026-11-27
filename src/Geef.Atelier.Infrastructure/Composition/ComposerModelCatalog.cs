@@ -46,7 +46,7 @@ internal static class ComposerModelCatalog
         sb.AppendLine("**Transform finalizers:** `TransformRewrite` for voice/tone rewrites, `TransformCondense` for summaries, takeaways and glossaries.");
         sb.AppendLine("**Grounding refinement:** to filter grounding results with an LLM, set `settings: { \"refinementMode\": \"0\" }` on an inline grounding provider — the refiner model is assigned automatically.");
         sb.AppendLine("**Reuse rule:** use `reuse: \"learning-extractor\"` for the output finalizer; reuse existing reviewers/advisors/grounding only when they truly fit — reused profiles keep their own role.");
-        sb.AppendLine("**Reuse-only types:** `rest-api` and `url-fetch` grounding providers and `ExternalSink` finalizers need operator-configured targets — never define them inline, only reuse existing profiles.");
+        sb.AppendLine("**Reuse-only types:** `url-fetch` grounding providers and `ExternalSink` finalizers need operator-configured targets — never define them inline, only reuse existing profiles.");
 
         var types = groundingProviderTypes.OrderBy(t => t, StringComparer.Ordinal).ToList();
         if (types.Count > 0)
@@ -56,7 +56,7 @@ internal static class ComposerModelCatalog
             sb.AppendLine();
             sb.AppendLine(string.Join(", ", types.Select(t => $"`{t}`")));
             sb.AppendLine();
-            sb.AppendLine("For web/literature search use `tavily` (general web), `academic-search` (papers/arXiv/Semantic Scholar) or `news-search` — there is NO `web` type. " +
+            sb.AppendLine("For web search use `tavily` — there is NO `web` type. " +
                           "`provider_type` is REQUIRED on every inline grounding provider and must be one of the exact values above.");
         }
 

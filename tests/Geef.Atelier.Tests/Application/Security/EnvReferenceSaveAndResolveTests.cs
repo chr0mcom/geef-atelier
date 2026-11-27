@@ -16,7 +16,6 @@ using Geef.Atelier.Infrastructure.Grounding;
 using Geef.Atelier.Infrastructure.Llm;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Tests.Fakes;
-using Geef.Atelier.Tests.Infrastructure.Grounding;
 using Geef.Atelier.Tests.Persistence;
 using Geef.Atelier.Web.Services;
 using Microsoft.EntityFrameworkCore;
@@ -159,22 +158,20 @@ public sealed class EnvReferenceSaveAndResolveTests(PostgresFixture fixture) : I
     }
 
     [Fact]
-    public async Task Grounding_AllowedName_IsSaved_ForbiddenIsRejected()
+    public async Task Grounding_RetiredType_IsRejectedOnCreateAndUpdate()
     {
         await using var sp = BuildProvider();
         await using var scope = sp.CreateAsyncScope();
         var crew = scope.ServiceProvider.GetRequiredService<ICrewService>();
 
-        var ok = RestApiProfileBuilder.Make("https://api.example.com/data", authHeaderEnv: _allowed) with { Name = Unique("rest-ok-") };
-        var saved = await crew.CreateCustomGroundingProviderProfileAsync(ok);
-        Assert.Equal(_allowed, (await crew.GetGroundingProviderProfileAsync(saved.Name))!.RestApiAuthHeaderEnv);
-
-        var bad = RestApiProfileBuilder.Make("https://evil.example.com", authHeaderEnv: "AtelierMcp__Token") with { Name = Unique("rest-bad-") };
-        await Assert.ThrowsAsync<EnvReferenceNotAllowedException>(() => crew.CreateCustomGroundingProviderProfileAsync(bad));
-        await Assert.ThrowsAsync<EnvReferenceNotAllowedException>(() => crew.UpdateCustomGroundingProviderProfileAsync(saved with
+        foreach (var retired in GroundingProviderTypes.Retired)
         {
-            ProviderSettings = new Dictionary<string, string>(saved.ProviderSettings) { [GroundingProviderProfile.KeyAcademicApiKeyEnv] = "POSTGRES_PASSWORD" },
-        }));
+            var profile = new GroundingProviderProfile(Unique("retired-"), "R", "d", retired,
+                new Dictionary<string, string> { ["apiKeyEnv"] = "CLI_PROXY_API_KEY" }, null, false);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => crew.CreateCustomGroundingProviderProfileAsync(profile));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => crew.UpdateCustomGroundingProviderProfileAsync(profile));
+            Assert.Null(await crew.GetGroundingProviderProfileAsync(profile.Name));
+        }
     }
 
     [Fact]
@@ -196,43 +193,6 @@ public sealed class EnvReferenceSaveAndResolveTests(PostgresFixture fixture) : I
         Assert.Null(await tools.GetByNameAsync(badName));
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task RestApiGrounding_SendsOnlyAllowedSecrets(bool allowed)
-    {
-        SetVariables();
-        var handler = new CapturingHandler("[]");
-        var services = new ServiceCollection();
-        services.AddScoped<IGroundingConsultationRepository>(_ => new InMemoryConsultationRepo());
-        var provider = new RestApiGroundingProvider(
-            new AnyNameHttpClientFactory(new HttpClient(handler)),
-            new AlwaysAllowSafetyValidator(),
-            services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
-            NullLogger<RestApiGroundingProvider>.Instance,
-            EnvReferencePolicy.Default);
-
-        var profile = RestApiProfileBuilder.Make("https://api.example.com/data", authHeaderEnv: allowed ? _allowed : _forbidden);
-        await provider.EnrichAsync("briefing", profile, Guid.NewGuid(), default);
-
-        if (allowed)
-            Assert.Contains("allowed-secret", handler.LastAuthorization);
-        else
-            Assert.Null(handler.LastAuthorization);
-    }
-
-    [Fact]
-    public async Task AcademicApiKeyEnv_ForbiddenName_IsRejected()
-    {
-        await using var sp = BuildProvider();
-        await using var scope = sp.CreateAsyncScope();
-        var crew = scope.ServiceProvider.GetRequiredService<ICrewService>();
-        var academic = new GroundingProviderProfile(Unique("acad-"), "A", "d", GroundingProviderTypes.AcademicSearch,
-            new Dictionary<string, string> { [GroundingProviderProfile.KeyAcademicApiKeyEnv] = "CLI_PROXY_API_KEY" }, null, false);
-
-        await Assert.ThrowsAsync<EnvReferenceNotAllowedException>(() => crew.CreateCustomGroundingProviderProfileAsync(academic));
-    }
-
     private sealed class CapturingHandler(string body = "{\"data\":[]}") : HttpMessageHandler
     {
         public string? LastAuthorization { get; private set; }
@@ -250,5 +210,10 @@ public sealed class EnvReferenceSaveAndResolveTests(PostgresFixture fixture) : I
                 Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json"),
             });
         }
+    }
+
+    private sealed class AnyNameHttpClientFactory(HttpClient client) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => client;
     }
 }

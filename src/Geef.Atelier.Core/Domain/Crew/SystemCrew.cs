@@ -449,45 +449,6 @@ public static class SystemCrew
         MaxQueriesPerRun: 1,
         IsSystem: true);
 
-    /// <summary>System grounding-provider profile for scientific papers via Semantic Scholar with LLM-based relevance filtering.</summary>
-    public static readonly GroundingProviderProfile AcademicDefaultProfile = new(
-        Name: "academic-default",
-        DisplayName: "Academic Search (Semantic Scholar + AI-filtered)",
-        Description: "Semantic Scholar search for scientific papers, filtered by an LLM refiner to retain only the most relevant results.",
-        ProviderType: GroundingProviderTypes.AcademicSearch,
-        ProviderSettings: new Dictionary<string, string>
-        {
-            [GroundingProviderProfile.KeyAcademicSource]             = "semantic-scholar",
-            [GroundingProviderProfile.KeyAcademicMaxPapers]          = "5",
-            [GroundingProviderProfile.KeyRefinementProvider]         = ModelMatrix.Primary(ModelSlot.GroundingRefiner).Provider,
-            [GroundingProviderProfile.KeyRefinementModel]            = ModelMatrix.Primary(ModelSlot.GroundingRefiner).Model,
-            [GroundingProviderProfile.KeyModelSlot] = nameof(ModelSlot.GroundingRefiner),
-            [GroundingProviderProfile.KeyRefinementMaxTokens]        = "2048",
-            [GroundingProviderProfile.KeyRefinementMode]             = "0",
-        },
-        MaxQueriesPerRun: 1,
-        IsSystem: true);
-
-    /// <summary>System grounding-provider profile for recent news via Tavily news topic with LLM-based noise filtering.</summary>
-    public static readonly GroundingProviderProfile TavilyNewsProfile = new(
-        Name: "tavily-news",
-        DisplayName: "Tavily News (recent + AI-filtered)",
-        Description: "Recent news via Tavily news topic (last 7 days), filtered by an LLM refiner to remove noise.",
-        ProviderType: GroundingProviderTypes.NewsSearch,
-        ProviderSettings: new Dictionary<string, string>
-        {
-            [GroundingProviderProfile.KeyRecencyDays]         = "7",
-            [GroundingProviderProfile.KeyNewsMaxResults]      = "5",
-            [GroundingProviderProfile.KeyNewsSearchDepth]     = "basic",
-            [GroundingProviderProfile.KeyRefinementProvider]  = ModelMatrix.Primary(ModelSlot.GroundingRefiner).Provider,
-            [GroundingProviderProfile.KeyRefinementModel]     = ModelMatrix.Primary(ModelSlot.GroundingRefiner).Model,
-            [GroundingProviderProfile.KeyModelSlot] = nameof(ModelSlot.GroundingRefiner),
-            [GroundingProviderProfile.KeyRefinementMaxTokens] = "2048",
-            [GroundingProviderProfile.KeyRefinementMode]      = "0",
-        },
-        MaxQueriesPerRun: 1,
-        IsSystem: true);
-
     /// <summary>
     /// System grounding-provider profile for the Continuous-Learning-Loop (D-054).
     /// Retrieves approved learnings from previous runs using cosine similarity with domain-aware boost.
@@ -610,8 +571,6 @@ public static class SystemCrew
             [TavilyRefinedProfile.Name]              = TavilyRefinedProfile,
             [KnowledgeBaseDefaultProfile.Name]       = KnowledgeBaseDefaultProfile,
             [RunAttachmentsProfile.Name]             = RunAttachmentsProfile,
-            [TavilyNewsProfile.Name]                 = TavilyNewsProfile,
-            [AcademicDefaultProfile.Name]            = AcademicDefaultProfile,
             [LearningRetrieverDefaultProfile.Name]   = LearningRetrieverDefaultProfile,
             // Auto-Crew grounding providers
             [CrewCatalogDefaultProfile.Name]         = CrewCatalogDefaultProfile,
