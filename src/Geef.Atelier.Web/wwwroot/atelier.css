@@ -111,7 +111,7 @@ html.palette-vellum {
 
   --ink:            oklch(0.21 0.012 60);
   --ink-2:          oklch(0.36 0.012 60);
-  --ink-3:          oklch(0.50 0.012 60);
+  --ink-3:          oklch(0.48 0.012 60);
   --ink-4:          oklch(0.62 0.012 60);
 
   --hero:           oklch(0.46 0.13 35);   /* deep bordeaux-ink */
@@ -126,9 +126,9 @@ html.palette-vellum {
   --st-aborted:     oklch(0.45 0.030 50);
 
   --sv-critical:    oklch(0.48 0.20 25);
-  --sv-major:       oklch(0.62 0.16 55);
-  --sv-minor:       oklch(0.70 0.13 90);
-  --sv-info:        oklch(0.50 0.05 235);
+  --sv-major:       oklch(0.50 0.13 55);
+  --sv-minor:       oklch(0.49 0.10 85);
+  --sv-info:        oklch(0.46 0.05 235);
 
   --paper:          oklch(0.97 0.012 85);
   --paper-2:        oklch(0.93 0.018 85);
@@ -1285,10 +1285,10 @@ html.palette-vellum .ink-pool span { mix-blend-mode: multiply; opacity: 0.35; }
   border-bottom: 1px dashed var(--hairline-soft);
 }
 .finding:last-child { border-bottom: none; padding-bottom: 6px; margin-bottom: 0; }
-.finding.crit { color: var(--sv-critical); }
-.finding.maj  { color: var(--sv-major); }
-.finding.min  { color: var(--sv-minor); }
-.finding.inf  { color: var(--sv-info); }
+.finding.critical { color: var(--sv-critical); }
+.finding.major    { color: var(--sv-major); }
+.finding.minor    { color: var(--sv-minor); }
+.finding.info     { color: var(--sv-info); }
 .finding .top {
   display: flex;
   align-items: center;
