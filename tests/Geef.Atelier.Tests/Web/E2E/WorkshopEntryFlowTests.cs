@@ -49,7 +49,9 @@ public sealed class WorkshopEntryFlowTests(PlaywrightFixture pw, PostgresFixture
             await AssertFitsAsync(page, $"start-{palette}");
 
             await page.GotoAsync($"{_host.BaseUrl}/orders/{view.OrderId}");
-            await page.Locator("[data-testid='order-result']").WaitForAsync(new LocatorWaitForOptions { Timeout = 15_000 });
+            // The prerendered page is replaced when the page becomes interactive; opening "How it was made" before that would be undone.
+            await page.Locator("[data-testid='order-page'][data-interactive='true'] [data-testid='order-result']")
+                .WaitForAsync(new LocatorWaitForOptions { Timeout = 30_000 });
             await page.Locator("[data-testid='order-how-made'] summary").ClickAsync();
             await page.Locator("[data-testid='order-how-request']").WaitForAsync(new LocatorWaitForOptions { Timeout = 15_000 });
             Assert.Equal(0, await page.Locator("[data-testid='order-technical-details']").CountAsync());

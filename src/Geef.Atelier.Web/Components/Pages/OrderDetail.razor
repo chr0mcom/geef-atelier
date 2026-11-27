@@ -19,7 +19,7 @@
 
 <PageTitle>@TabTitle</PageTitle>
 
-<div class="order-page" data-testid="order-page">
+<div class="order-page" data-testid="order-page" data-interactive="@(_interactive ? "true" : null)">
     @if (_loadFailed && _view is null)
     {
         <div class="order-banner order-banner--failed" role="alert" data-testid="order-load-failed">
@@ -246,6 +246,7 @@
 </div>
 
 @code {
+    bool _interactive;
     [Parameter] public Guid OrderId { get; set; }
 
     /// <summary><c>?change=1</c> opens the card "Change something" when a change is possible; any other value is ignored.</summary>
@@ -378,7 +379,11 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender && !_disposed)
+        {
             _clock = new System.Threading.Timer(_ => _ = TickAsync(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+            _interactive = true;
+            StateHasChanged();
+        }
         var title = TabTitle;
         if (title == _shownTitle || _disposed)
             return;

@@ -38,7 +38,8 @@ public sealed class RunOrchestratorRecoversRunsInterruptedWhileFinishingTests(Po
             new Geef.Atelier.Core.Configuration.OrchestratorOptions { PollingInterval = TimeSpan.FromSeconds(60), MaxConcurrentRuns = 1 }))
         {
             await host.StartAsync();
-            await WaitUntilAsync(async () => await OutcomeAsync(failedWithoutText) is not null);
+            Guid[] interrupted = [completed, failedWithText, abortedWithText, failedWithoutText];
+            await WaitUntilAsync(() => AllRepairedAsync(interrupted));
             await host.StopAsync();
         }
 
@@ -121,6 +122,17 @@ public sealed class RunOrchestratorRecoversRunsInterruptedWhileFinishingTests(Po
     {
         await using var db = fixture.NewContext();
         return await db.Runs.Where(r => r.Id == runId).Select(r => r.Outcome).SingleAsync();
+    }
+
+    /// <summary>
+    /// True when every run of <paramref name="runIds"/> has its outcome and its warning. The repair goes through the runs in no fixed
+    /// order and writes the warning after the outcome, so the host may only be stopped once all of them are through.
+    /// </summary>
+    private async Task<bool> AllRepairedAsync(IReadOnlyCollection<Guid> runIds)
+    {
+        await using var db = fixture.NewContext();
+        return await db.Runs.CountAsync(r => runIds.Contains(r.Id) && r.Outcome != null) == runIds.Count
+               && await db.RunWarnings.CountAsync(w => runIds.Contains(w.RunId)) >= runIds.Count;
     }
 
     private static async Task WaitUntilAsync(Func<Task<bool>> condition)
