@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Restore a database backup into the production Postgres container.
 # WARNING: This replaces all existing data in the database. The script stops the app first.
-# The schema `public` is dropped and rebuilt from the dump in one transaction: if the dump cannot be applied completely,
-# nothing changes, the script ends with an error and the app stays stopped.
+# The schema `public` is dropped and rebuilt from the dump in one transaction that commits only after the whole dump was read:
+# if it cannot be applied completely or the run is
+# interrupted, nothing changes, the script ends with an error and the app stays stopped.
 # Usage: scripts/restore-backup.sh <path-to-backup-file.sql.gz>   (from the repository root)
 
 set -euo pipefail
@@ -35,12 +36,13 @@ docker compose stop web
 
 echo "Running restore via psql..."
 {
+    echo 'BEGIN;'
     echo 'SET client_min_messages = warning;'
     echo 'DROP SCHEMA IF EXISTS public CASCADE;'
     if [ "$HAS_CREATE_SCHEMA" -eq 0 ]; then echo 'CREATE SCHEMA public;'; fi
-    gunzip -c "$BACKUP_FILE"
+    gunzip -c "$BACKUP_FILE" && echo 'COMMIT;'
 } | docker compose exec -T postgres \
-    psql -v ON_ERROR_STOP=1 --single-transaction --quiet \
+    psql -v ON_ERROR_STOP=1 --quiet \
     -U "${POSTGRES_USER:-geef_atelier}" -d "${POSTGRES_DB:-geef_atelier}" > /dev/null
 
 echo "Restarting app container..."

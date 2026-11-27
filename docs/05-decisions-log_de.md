@@ -3147,7 +3147,7 @@ bekommt zweimal eine Frage zum selben Thema, oder mindestens 10 beantwortete Fra
 **Etappe 9 („Extra careful“ neu): zurückgestellt.** Die Messung kostet mindestens zehn lange Läufe plus Blindvergleich auf
 einem geteilten Kontingent, und ihr Ergebnis entschiede nur über den alten Weg – der vorerst ohnehin bleibt. **Auslöser:** Der
 alte Weg wird weiter genutzt, *obwohl* die neuen Werkzeuge in den verwendeten KI-Clients angekommen sind (mindestens 3 Läufe eines Kontos außerhalb der Messungen in 30 Tagen). Dann entscheidet
-eine einzige Nachtmessung am Bestand: fünf lange Aufgaben, höchstens zehn Läufe, Abbruch bei offenem Breaker. Verliert die
+eine einzige Messung am Bestand: fünf lange Aufgaben, höchstens zehn Läufe, Abbruch bei offenem Breaker. Verliert die
 Schleife, greift der Rückbau aus Etappe 8; wird der alte Weg nicht mehr genutzt, entfällt er ohne Messung.
 
 **Etappe 8a: Werkstatt-Einstiege nur für Admins.** Neuer Schalter `Ui:WorkshopForAdminsOnly` (ausgeliefert `true`). Solange er
@@ -3168,8 +3168,8 @@ unverändert; `Orders:Revise`, Recherche und Faktenprüfer werden nicht für all
 
 **Falls später doch gebaut wird.** Näher am Nutzen als die Etappen 7–9 liegt, was gebaut, aber ausgeschaltet ist. Erste Wahl:
 Ändern eines Ergebnisses ohne den Schnellknopf „Longer“ (der im Tor N′ eine Tatsache hinzufügte, D-075) als eigene kleine
-Etappe mit eigenem Vertrag und einer Nachtmessung – ohne sie kann ein Laie an einem Ergebnis nichts ändern. Danach R3 der
-Recherche mit größerer Menge (D-074). Beides nur nachts und mit Obergrenze.
+Etappe mit eigenem Vertrag und einer Messung – ohne sie kann ein Laie an einem Ergebnis nichts ändern. Danach R3 der
+Recherche mit größerer Menge (D-074). Beides mit Obergrenze.
 
 ## D-078 — Restplan: alles bauen und freischalten; Paket 1 „Ändern für alle“ (2026-11-26)
 

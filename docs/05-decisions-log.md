@@ -3029,7 +3029,7 @@ question on the same topic twice, or at least 10 answered questions from at leas
 **Stage 9 ("Extra careful" anew): deferred.** The measurement costs at least ten long runs plus a blind comparison on a shared
 quota, and its result would only decide about the older way – which stays for now anyway. **Trigger:** the older way is still
 used *although* the new tools have arrived in the AI clients in use (at least 3 runs of an account outside the measurements in
-30 days). Then a single night measurement on the existing system decides: five
+30 days). Then a single measurement on the existing system decides: five
 long tasks, at most ten runs, stop when the circuit breaker is open. If the loop loses, the removal of stage 8 applies; if the
 older way is no longer used, it goes without a measurement.
 
@@ -3050,8 +3050,8 @@ unchanged; `Orders:Revise`, research and the fact checker are not switched on fo
 
 **If something is built later.** Closer to the benefit than stages 7–9 is what is built but switched off. First choice:
 changing a result without the quick button "Longer" (which invented a fact at gate N′, D-075) as a small stage of its own with
-its own contract and a night measurement – without it a layperson cannot change anything about a result. After that R3 of the
-research with a larger sample (D-074). Both only at night and with an upper limit.
+its own contract and a measurement – without it a layperson cannot change anything about a result. After that R3 of the
+research with a larger sample (D-074). Both with an upper limit.
 
 ## D-078 — Remaining plan: build and switch on everything; package 1 "Changing for everyone" (2026-11-26)
 
