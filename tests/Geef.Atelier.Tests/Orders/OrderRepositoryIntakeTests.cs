@@ -259,7 +259,6 @@ public sealed class OrderRepositoryIntakeTests(PostgresFixture fixture)
         var pause = new PauseAfterStateRead(order.Id);
         await using var startDb = new AtelierDbContext(new DbContextOptionsBuilder<AtelierDbContext>()
             .UseNpgsql(fixture.ConnectionString)
-            .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning))
             .AddInterceptors(pause)
             .Options);
         await using var stopDb = fixture.NewContext();
@@ -315,8 +314,6 @@ public sealed class OrderRepositoryIntakeTests(PostgresFixture fixture)
             order.Id, OrderState.Analyzing, Run(user, Guid.NewGuid(), 1), null, null, null, [], DateTimeOffset.UtcNow)));
         await Assert.ThrowsAsync<ArgumentException>(() => repository.TryStartWithRunAsync(new OrderStart(
             order.Id, OrderState.Analyzing, Run(user, order.Id, 2), null, null, null, [], DateTimeOffset.UtcNow)));
-        await Assert.ThrowsAsync<ArgumentException>(() => repository.TryStartWithRunAsync(new OrderStart(
-            order.Id, OrderState.Analyzing, Run(user, order.Id, 1, RunKind.CrewComposition), null, null, null, [], DateTimeOffset.UtcNow)));
     }
 
     private async Task<OrderEntity> AddAsync(OrderEntity order)

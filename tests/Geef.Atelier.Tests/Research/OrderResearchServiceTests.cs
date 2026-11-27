@@ -70,7 +70,7 @@ public sealed class OrderResearchServiceTests
 
     private static OrderEntity Order(string? clarify, string? user = User, string? researchJson = null) => new()
     {
-        Id = Guid.NewGuid(), CreatedByUser = user, RequestText = Request, Mode = OrderMode.Direct, State = OrderState.Ready, Entry = OrderEntry.Web,
+        Id = Guid.NewGuid(), CreatedByUser = user, RequestText = Request, State = OrderState.Ready, Entry = OrderEntry.Web,
         ClarifyJson = clarify, ResearchJson = researchJson, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
     };
 
@@ -340,28 +340,6 @@ public sealed class OrderResearchServiceTests
         Assert.Null(await Ensure(s, Order(Clarify(IntakeRecordStatus.Ok)), files: true));
         Assert.Empty(s.Search.Queries);
         Assert.Equal(0, s.Orders.Sets);
-    }
-
-    [Fact]
-    public async Task A_stored_careful_order_read_by_an_earlier_version_never_searches()
-    {
-        var s = Create();
-        var record = IntakeRecord.Fallback(IntakeRecordStatus.Ok, null, 1, "m", BriefMode.AppendAnswers) with { ResearchTopics = [TopicA, TopicB] };
-        var careful = Order(IntakeRecordJson.Serialize(record)) with { Mode = OrderMode.Careful };
-
-        AssertNothingHappened(s, await Ensure(s, careful));
-        AssertNothingHappened(s, await Ensure(s, careful, files: true));
-        Assert.Null(s.Orders.Find(careful.Id)!.ResearchJson);
-    }
-
-    [Fact]
-    public async Task A_stored_careful_order_never_searches_even_if_its_record_allows_research()
-    {
-        var s = Create();
-        var careful = Order(Clarify(IntakeRecordStatus.Ok, TopicA, TopicB)) with { Mode = OrderMode.Careful };
-
-        AssertNothingHappened(s, await Ensure(s, careful));
-        Assert.Null(s.Orders.Find(careful.Id)!.ResearchJson);
     }
 
     private static string ClarifyWithheld(int withheld, params string[] topics) =>

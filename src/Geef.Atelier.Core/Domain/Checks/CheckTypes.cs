@@ -80,9 +80,6 @@ public static class DraftCheckCodes
     /// clearly wrong, never that the calculations are right.
     /// </summary>
     public const string Arithmetic = "arithmetic";
-
-    /// <summary>Written only by earlier versions; read like a passed <see cref="Arithmetic"/> and never named as "the calculations add up".</summary>
-    public const string ArithmeticPartial = "arithmetic.partial";
 }
 
 /// <summary>Helpers on <see cref="DraftCheckResult"/>.</summary>

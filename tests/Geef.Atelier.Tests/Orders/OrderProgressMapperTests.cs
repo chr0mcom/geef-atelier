@@ -20,7 +20,7 @@ public sealed class OrderProgressMapperTests
             new("ExecutionStartedEvent", 1, T0.AddSeconds(4)),
         };
 
-        var progress = OrderProgressMapper.Map(Working, OrderMode.Direct, hasSources: true, events, T0, null, T0.AddSeconds(30));
+        var progress = OrderProgressMapper.Map(Working, hasSources: true, events, T0, null, T0.AddSeconds(30));
 
         Assert.Equal(["files", "write", "check", "done"], progress.Steps.Select(s => s.Key));
         Assert.Equal(OrderStepStatus.Done, progress.Steps[0].Status);
@@ -40,31 +40,14 @@ public sealed class OrderProgressMapperTests
             new("ExecutionStartedEvent", 2, T0.AddSeconds(22)),
         };
 
-        var progress = OrderProgressMapper.Map(Working, OrderMode.Direct, hasSources: false, events, T0, null, T0.AddSeconds(40));
+        var progress = OrderProgressMapper.Map(Working, hasSources: false, events, T0, null, T0.AddSeconds(40));
 
         Assert.Equal(["write", "check", "fix", "done"], progress.Steps.Select(s => s.Key));
         Assert.Equal("Fixing details", progress.CurrentLabel);
         Assert.Equal(OrderStepStatus.Done, progress.Steps[1].Status);
 
-        var withoutFix = OrderProgressMapper.Map(Working, OrderMode.Direct, false, events.Take(3).ToList(), T0, null, T0.AddSeconds(40));
+        var withoutFix = OrderProgressMapper.Map(Working, false, events.Take(3).ToList(), T0, null, T0.AddSeconds(40));
         Assert.DoesNotContain(withoutFix.Steps, s => s.Key == "fix");
-    }
-
-    [Fact]
-    public void CarefulPathNamesTheReviewRound()
-    {
-        var events = new List<RunEventRow>
-        {
-            new("ExecutionStartedEvent", 1, T0.AddSeconds(1)),
-            new("ExecutionCompletedEvent", 1, T0.AddSeconds(10)),
-            new("EvaluationRejectedEvent", 1, T0.AddSeconds(20)),
-            new("ExecutionStartedEvent", 2, T0.AddSeconds(21)),
-        };
-
-        var progress = OrderProgressMapper.Map(Working, OrderMode.Careful, hasSources: false, events, T0, null, T0.AddSeconds(40));
-
-        Assert.Equal(["write", "review", "done"], progress.Steps.Select(s => s.Key));
-        Assert.Equal("Reviewing (round 2)", progress.CurrentLabel);
     }
 
     [Fact]
@@ -78,7 +61,7 @@ public sealed class OrderProgressMapperTests
         };
         var display = new OrderDisplay(OrderDisplayState.Delivered, true, true);
 
-        var progress = OrderProgressMapper.Map(display, OrderMode.Direct, hasSources: true, events, T0, T0.AddSeconds(12), T0.AddMinutes(9));
+        var progress = OrderProgressMapper.Map(display, hasSources: true, events, T0, T0.AddSeconds(12), T0.AddMinutes(9));
 
         Assert.All(progress.Steps.Where(s => s.Key != "files"), s => Assert.Equal(OrderStepStatus.Done, s.Status));
         Assert.Equal("Done", progress.CurrentLabel);
@@ -89,11 +72,11 @@ public sealed class OrderProgressMapperTests
     public void FailedMarksTheActiveStepAsFailedAndQueuedKeepsAllPending()
     {
         var events = new List<RunEventRow> { new("ExecutionStartedEvent", 1, T0.AddSeconds(1)) };
-        var failed = OrderProgressMapper.Map(new OrderDisplay(OrderDisplayState.Failed, false, true), OrderMode.Direct, false, events, T0, T0.AddSeconds(5), T0.AddSeconds(5));
+        var failed = OrderProgressMapper.Map(new OrderDisplay(OrderDisplayState.Failed, false, true), false, events, T0, T0.AddSeconds(5), T0.AddSeconds(5));
         Assert.Equal(OrderStepStatus.Failed, failed.Steps.Single(s => s.Key == "write").Status);
         Assert.Equal("Something went wrong", failed.CurrentLabel);
 
-        var queued = OrderProgressMapper.Map(new OrderDisplay(OrderDisplayState.Queued, false, false), OrderMode.Direct, true, [], T0, null, T0.AddSeconds(2));
+        var queued = OrderProgressMapper.Map(new OrderDisplay(OrderDisplayState.Queued, false, false), true, [], T0, null, T0.AddSeconds(2));
         Assert.All(queued.Steps, s => Assert.Equal(OrderStepStatus.Pending, s.Status));
         Assert.Equal("Waiting to start", queued.CurrentLabel);
     }
@@ -104,7 +87,7 @@ public sealed class OrderProgressMapperTests
         var order = OrderTestData.Order("user-a", at: T0);
 
         Assert.Null(order.ToIntakeProgress());
-        Assert.Equal(["write", "check", "done"], OrderProgressMapper.Map(Working, OrderMode.Direct, false, [], T0, null, T0, order.ToIntakeProgress()).Steps.Select(s => s.Key));
+        Assert.Equal(["write", "check", "done"], OrderProgressMapper.Map(Working, false, [], T0, null, T0, order.ToIntakeProgress()).Steps.Select(s => s.Key));
     }
 
     [Fact]
@@ -113,7 +96,7 @@ public sealed class OrderProgressMapperTests
         var order = OrderTestData.Order("user-a", state: OrderState.Analyzing, at: T0) with { IntakeStartedAt = T0.AddSeconds(2) };
         var preparing = new OrderDisplay(OrderDisplayState.Preparing, false, false);
 
-        var progress = OrderProgressMapper.Map(preparing, OrderMode.Direct, false, [], T0, null, T0.AddSeconds(5), order.ToIntakeProgress());
+        var progress = OrderProgressMapper.Map(preparing, false, [], T0, null, T0.AddSeconds(5), order.ToIntakeProgress());
 
         Assert.Equal(["understand", "write", "check", "done"], progress.Steps.Select(s => s.Key));
         Assert.Equal(("Reading your request", OrderStepStatus.Active, T0.AddSeconds(2), (DateTimeOffset?)null),
@@ -131,21 +114,21 @@ public sealed class OrderProgressMapperTests
         };
         var needsInput = new OrderDisplay(OrderDisplayState.NeedsInput, false, false);
 
-        var asked = OrderProgressMapper.Map(needsInput, OrderMode.Careful, false, [], T0, null, T0.AddMinutes(1), waiting.ToIntakeProgress());
-        Assert.Equal(["understand", "answers", "write", "review", "done"], asked.Steps.Select(s => s.Key));
+        var asked = OrderProgressMapper.Map(needsInput, false, [], T0, null, T0.AddMinutes(1), waiting.ToIntakeProgress());
+        Assert.Equal(["understand", "answers", "write", "check", "done"], asked.Steps.Select(s => s.Key));
         Assert.Equal((OrderStepStatus.Done, OrderStepStatus.Active), (asked.Steps[0].Status, asked.Steps[1].Status));
         Assert.Equal("Your answers", asked.Steps[1].Label);
         Assert.Equal("Needs your answers", asked.CurrentLabel);
 
         var answered = waiting with { State = OrderState.Ready, IntakeOutcome = IntakeOutcome.Answered, AnsweredAt = T0.AddMinutes(2) };
-        var steps = OrderProgressMapper.Map(Working, OrderMode.Careful, false, [new("ExecutionStartedEvent", 1, T0.AddMinutes(3))], T0, null, T0.AddMinutes(4), answered.ToIntakeProgress()).Steps;
+        var steps = OrderProgressMapper.Map(Working, false, [new("ExecutionStartedEvent", 1, T0.AddMinutes(3))], T0, null, T0.AddMinutes(4), answered.ToIntakeProgress()).Steps;
         Assert.Equal((OrderStepStatus.Done, T0.AddMinutes(2)), (steps[1].Status, steps[1].EndedAt!.Value));
         Assert.Equal(OrderStepStatus.Active, steps[2].Status);
 
         var auto = waiting with { State = OrderState.Ready, IntakeOutcome = IntakeOutcome.AutoStarted, AnsweredAt = T0.AddDays(1) };
-        Assert.Equal(OrderStepStatus.Skipped, OrderProgressMapper.Map(Working, OrderMode.Careful, false, [], T0, null, T0.AddDays(1), auto.ToIntakeProgress()).Steps[1].Status);
+        Assert.Equal(OrderStepStatus.Skipped, OrderProgressMapper.Map(Working, false, [], T0, null, T0.AddDays(1), auto.ToIntakeProgress()).Steps[1].Status);
         var stopped = waiting with { State = OrderState.Cancelled };
-        var stoppedSteps = OrderProgressMapper.Map(new OrderDisplay(OrderDisplayState.Stopped, false, true), OrderMode.Careful, false, [], T0, T0.AddMinutes(1), T0.AddMinutes(1), stopped.ToIntakeProgress()).Steps;
+        var stoppedSteps = OrderProgressMapper.Map(new OrderDisplay(OrderDisplayState.Stopped, false, true), false, [], T0, T0.AddMinutes(1), T0.AddMinutes(1), stopped.ToIntakeProgress()).Steps;
         Assert.Equal((OrderStepStatus.Done, OrderStepStatus.Skipped), (stoppedSteps[0].Status, stoppedSteps[1].Status));
     }
 
@@ -158,12 +141,12 @@ public sealed class OrderProgressMapperTests
         var stoppedWhileReading = OrderTestData.Order("user-a", state: OrderState.Analyzing, at: T0);
         var stoppedDisplay = new OrderDisplay(OrderDisplayState.Stopped, false, true);
 
-        Assert.Equal(OrderStepStatus.Skipped, OrderProgressMapper.Map(Working, OrderMode.Direct, false, [], T0, null, T0, skipped.ToIntakeProgress()).Steps[0].Status);
-        Assert.Equal(OrderStepStatus.Skipped, OrderProgressMapper.Map(Working, OrderMode.Direct, false, [], T0, null, T0, failed.ToIntakeProgress()).Steps[0].Status);
-        var done = OrderProgressMapper.Map(Working, OrderMode.Direct, false, [], T0, null, T0, clarified.ToIntakeProgress()).Steps;
+        Assert.Equal(OrderStepStatus.Skipped, OrderProgressMapper.Map(Working, false, [], T0, null, T0, skipped.ToIntakeProgress()).Steps[0].Status);
+        Assert.Equal(OrderStepStatus.Skipped, OrderProgressMapper.Map(Working, false, [], T0, null, T0, failed.ToIntakeProgress()).Steps[0].Status);
+        var done = OrderProgressMapper.Map(Working, false, [], T0, null, T0, clarified.ToIntakeProgress()).Steps;
         Assert.Equal((OrderStepStatus.Done, T0, T0.AddSeconds(3)), (done[0].Status, done[0].StartedAt!.Value, done[0].EndedAt!.Value));
         Assert.DoesNotContain(done, s => s.Key == OrderProgressMapper.AnswersKey);
-        Assert.Equal(OrderStepStatus.Skipped, OrderProgressMapper.Map(stoppedDisplay, OrderMode.Direct, false, [], T0, T0, T0, stoppedWhileReading.ToIntakeProgress()).Steps[0].Status);
+        Assert.Equal(OrderStepStatus.Skipped, OrderProgressMapper.Map(stoppedDisplay, false, [], T0, T0, T0, stoppedWhileReading.ToIntakeProgress()).Steps[0].Status);
     }
 
     [Fact]
@@ -172,10 +155,10 @@ public sealed class OrderProgressMapperTests
         var versionStart = T0.AddDays(1);
         var events = new List<RunEventRow> { new("ExecutionStartedEvent", 1, versionStart.AddSeconds(2)) };
 
-        var working = OrderProgressMapper.Map(Working, OrderMode.Direct, false, events, T0, null, versionStart.AddSeconds(8), versionStartedAt: versionStart);
-        var delivered = OrderProgressMapper.Map(new OrderDisplay(OrderDisplayState.Delivered, true, true), OrderMode.Direct, false, events, T0,
+        var working = OrderProgressMapper.Map(Working, false, events, T0, null, versionStart.AddSeconds(8), versionStartedAt: versionStart);
+        var delivered = OrderProgressMapper.Map(new OrderDisplay(OrderDisplayState.Delivered, true, true), false, events, T0,
             versionStart.AddSeconds(95), versionStart.AddHours(3), versionStartedAt: versionStart);
-        var first = OrderProgressMapper.Map(Working, OrderMode.Direct, false, events, T0, null, versionStart.AddSeconds(8));
+        var first = OrderProgressMapper.Map(Working, false, events, T0, null, versionStart.AddSeconds(8));
 
         Assert.Equal(TimeSpan.FromSeconds(8), working.Elapsed);
         Assert.Equal(TimeSpan.FromSeconds(95), delivered.Elapsed);

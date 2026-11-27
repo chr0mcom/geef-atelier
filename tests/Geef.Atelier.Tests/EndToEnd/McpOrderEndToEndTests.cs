@@ -87,7 +87,6 @@ public sealed class McpOrderEndToEndTests(PostgresFixture postgres)
 
         var order = await host.QueryAsync(db => db.Orders.AsNoTracking().SingleAsync(o => o.Id == Guid.Parse(orderId)));
         Assert.Equal(OrderEntry.Mcp, order.Entry);
-        Assert.Equal(OrderMode.Direct, order.Mode);
         Assert.Equal(Request, order.RequestText);
     }
 

@@ -1,5 +1,4 @@
 using Geef.Atelier.Application.Orders;
-using Geef.Atelier.Application.Runs;
 using Geef.Atelier.Core.Configuration;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Orders;
@@ -103,52 +102,6 @@ public sealed class ReviseLongerEndToEndTests(PostgresFixture postgres)
                 submission.OrderId.ToString(), quick: ["longer"])));
 
         Assert.Equal(RevisionLines.NotAvailable, refused.Message);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Resume_never_sends_the_retired_longer_sentence_to_the_writer_again(bool withOwnWords)
-    {
-        const string ownWords = "Please add that the meeting ends at 21:00.";
-        await using var host = await AtelierEndToEndHost.StartAsync(postgres, services =>
-            services.PostConfigure<OrderOptions>(o => o.Revise = ReviseMode.On));
-        host.Script.EnqueueExecutorText(FirstText);
-        var submission = await host.SubmitOrderAsync(new SubmitOrderRequest(Request, User, OrderEntry.Web, null));
-        await host.WaitForOrderFinishedAsync(submission.OrderId);
-        var orderId = submission.OrderId;
-        host.Script.EnqueueExecutorError(503, LlmApiError.BackendUnavailableCode);
-        await ReviseAsync(host, orderId, ownWords);
-        var failed = await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == orderId && r.OrderVersion == 2));
-        Assert.Equal(RunStatus.Failed, failed.Status);
-        var stored = (withOwnWords ? ownWords + " " : "") + RevisionQuick.Longer.Instruction();
-        await host.QueryAsync(db => db.Runs.Where(r => r.Id == failed.Id).ExecuteUpdateAsync(s => s.SetProperty(r => r.RevisionHint, stored)));
-        var callsBefore = host.Llm.Calls.Count;
-
-        if (!withOwnWords)
-        {
-            var refused = await Assert.ThrowsAsync<RunNotResumableException>(() => host.WithScopeAsync(sp => sp.GetRequiredService<IRunService>()
-                .ResumeRunAsync(new ResumeOptions(failed.Id, UseSeedDraft: true, MaxIterationsOverride: null), User)));
-            Assert.Equal(RevisionLines.ResumeRetired, refused.Message);
-            Assert.Equal(2, await host.QueryAsync(db => db.Runs.CountAsync(r => r.OrderId == orderId)));
-            Assert.Equal(callsBefore, host.Llm.Calls.Count);
-            return;
-        }
-
-        host.Script.EnqueueExecutorText(FirstText + "\n\nDer Abend endet um 21 Uhr.");
-        var resumedId = await host.WithScopeAsync(sp => sp.GetRequiredService<IRunService>()
-            .ResumeRunAsync(new ResumeOptions(failed.Id, UseSeedDraft: true, MaxIterationsOverride: null), User));
-        host.ReleaseOrchestrator();
-        await host.WaitForTerminalAsync(resumedId);
-        await host.WaitForOrderFinishedAsync(orderId);
-
-        var resumed = await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.Id == resumedId));
-        Assert.Equal(ownWords, resumed.RevisionHint);
-        Assert.DoesNotContain(RevisionQuick.Longer.Instruction(), resumed.BriefingText, StringComparison.Ordinal);
-        var writer = Assert.Single(host.Llm.Calls.Skip(callsBefore), c => c.Role == LlmRole.Executor);
-        var prompt = writer.Messages.Last(m => m.Role == "user").Content ?? string.Empty;
-        Assert.DoesNotContain(RevisionQuick.Longer.Instruction(), prompt, StringComparison.Ordinal);
-        Assert.Contains(ownWords, prompt, StringComparison.Ordinal);
     }
 
     private static async Task ReviseAsync(AtelierEndToEndHost host, Guid orderId, string change)

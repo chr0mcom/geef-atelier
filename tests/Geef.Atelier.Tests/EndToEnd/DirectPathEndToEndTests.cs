@@ -51,7 +51,7 @@ public sealed class DirectPathEndToEndTests(PostgresFixture postgres)
     }
 
     private static Task<RunEntity> RunOfAsync(AtelierEndToEndHost host, Guid orderId) =>
-        host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == orderId && r.Kind == RunKind.Standard));
+        host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == orderId));
 
     [Fact]
     public async Task Markers_of_the_first_and_the_last_page_reach_the_writer_in_document_mode()

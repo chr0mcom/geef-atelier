@@ -6,9 +6,9 @@ namespace Geef.Atelier.Web.Components.UI.Orders;
 /// <summary>Which versions of an order the list of versions shows and compares; the same for the list and for the link above the text.</summary>
 public static class OrderVersionList
 {
-    /// <summary>The listed versions: the newest run of each version number among the standard runs, newest version first.</summary>
+    /// <summary>The listed versions: the newest run of each version number, newest version first.</summary>
     public static IReadOnlyList<OrderRunView> Listed(this IReadOnlyList<OrderRunView> runs) => runs
-        .Where(r => r.Kind == RunKind.Standard && r.Version is not null)
+        .Where(r => r.Version is not null)
         .GroupBy(r => r.Version!.Value)
         .Select(g => g.OrderByDescending(r => r.CreatedAt).First())
         .OrderByDescending(r => r.Version)

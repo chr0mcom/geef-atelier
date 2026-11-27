@@ -230,7 +230,6 @@ public sealed class ModelAssignmentServiceTests
             ],
             EvaluationStrategy: EvaluationStrategy.Parallel,
             ConvergenceOverride: null,
-            Advisors: [],
             CrewDomain: ModelDomain.Legal);
 
         var result = await Service().ApplyAsync(snapshot);
@@ -248,7 +247,7 @@ public sealed class ModelAssignmentServiceTests
             CrewSnapshot.CurrentSchemaVersion, null,
             new ExecutorProfile("e", "E", "d", "p", "claude-cli", "claude-opus-latest", 32000, false, ModelSlot: ModelSlot.Executor),
             [new ReviewerProfile("domain", "D", "d", "p", "x", "y", 8000, false, ModelSlot: ModelSlot.DomainReviewer)],
-            EvaluationStrategy.Parallel, null, []);
+            EvaluationStrategy.Parallel, null);
 
         var result = await Service().ApplyAsync(snapshot);
 
@@ -263,7 +262,7 @@ public sealed class ModelAssignmentServiceTests
             CrewSnapshot.CurrentSchemaVersion, null,
             new ExecutorProfile("writer", "E", "d", "p", "claude-cli", "claude-opus-latest", 32000, false, ModelSlot: ModelSlot.Executor),
             [new ReviewerProfile("domain", "D", "d", "p", "x", "y", 8000, false, ModelSlot: ModelSlot.DomainReviewer)],
-            EvaluationStrategy.Parallel, null, []);
+            EvaluationStrategy.Parallel, null);
         var warnings = new List<ModelAssignmentWarning>();
 
         await Service(catalog).ApplyAsync(snapshot, warnings);
@@ -279,7 +278,7 @@ public sealed class ModelAssignmentServiceTests
             CrewSnapshot.CurrentSchemaVersion, null,
             new ExecutorProfile("writer", "E", "d", "p", "claude-cli", "claude-opus-latest", 32000, false, ModelSlot: ModelSlot.Executor),
             [new ReviewerProfile("domain", "D", "d", "p", "x", "y", 8000, false, ModelSlot: ModelSlot.DomainReviewer)],
-            EvaluationStrategy.Parallel, null, []);
+            EvaluationStrategy.Parallel, null);
         var warnings = new List<ModelAssignmentWarning>();
 
         await Service().ApplyAsync(snapshot, warnings);

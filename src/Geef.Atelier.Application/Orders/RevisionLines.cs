@@ -21,12 +21,6 @@ public static class RevisionLines
     /// </summary>
     public const string LongerThanBefore = "This version is noticeably longer than the one before. Please check the new parts: the writer may have added things you did not ask for.";
 
-    /// <summary>
-    /// Refusal of "Resume" on a version whose change asked only for the quick change "Longer", which is no longer offered: it is not made
-    /// again.
-    /// </summary>
-    public const string ResumeRetired = "This change asked for a longer text without saying what to add, which is no longer made. To change the text, use “Change something” on the order page.";
-
     /// <summary>Refusal of a change without the person's words and without a quick button.</summary>
     public const string NoChangeGiven = "Please write what should change or choose one of the buttons.";
 

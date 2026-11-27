@@ -83,8 +83,8 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
     }
 
     [Theory(Timeout = 30_000)]
-    [InlineData("""{"schemaVersion":3,"executor":"not-an-object","reviewers":[],"advisors":[]}""", "could not be read")]
-    [InlineData("""{"schemaVersion":99,"executor":{"name":"x"},"reviewers":[],"advisors":[]}""", "unknown format")]
+    [InlineData("""{"schemaVersion":4,"executor":"not-an-object","reviewers":[]}""", "could not be read")]
+    [InlineData("""{"schemaVersion":99,"executor":{"name":"x"},"reviewers":[]}""", "unknown format")]
     [InlineData("""null""", "empty")]
     public async Task UnusableSnapshotFailsTheRunWithAClearMessageAndNeverRunsADefaultCrew(string snapshotJson, string expected)
     {
@@ -103,7 +103,7 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
     [Fact(Timeout = 30_000)]
     public async Task SnapshotWithoutExecutorFailsTheRunWithAClearMessage()
     {
-        var runId = await CreateRunAsync("""{"schemaVersion":3,"templateName":"klassik","reviewers":[],"advisors":[],"evaluationStrategy":0}""");
+        var runId = await CreateRunAsync("""{"schemaVersion":4,"templateName":"direct","reviewers":[],"evaluationStrategy":0}""");
         var llm = new CountingLlmClient();
 
         var run = await RunToEndAsync(llm, runId);
@@ -193,7 +193,7 @@ public sealed class RunOrchestratorEngineHonestyTests(PostgresFixture fixture)
     {
         await using var db = fixture.NewContext();
         return await new RunPersistenceService(db).CreateRunAsync(
-            "Engine honesty test briefing.", "{}", crewSnapshotJson: crewSnapshotJson, cancellationToken: CancellationToken.None);
+            "Engine honesty test briefing.", crewSnapshotJson: crewSnapshotJson, cancellationToken: CancellationToken.None);
     }
 
     private async Task<RunEntity> RunToEndAsync(ILlmClient llm, Guid runId, OrchestratorOptions? options = null)

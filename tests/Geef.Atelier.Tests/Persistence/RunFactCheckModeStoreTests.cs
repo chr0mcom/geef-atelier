@@ -91,6 +91,6 @@ public sealed class RunFactCheckModeStoreTests(PostgresFixture fixture)
     private async Task<Guid> NewRunAsync()
     {
         await using var db = fixture.NewContext();
-        return await new RunPersistenceService(db).CreateRunAsync("Write a note.", "{}", cancellationToken: CancellationToken.None);
+        return await new RunPersistenceService(db).CreateRunAsync("Write a note.", cancellationToken: CancellationToken.None);
     }
 }

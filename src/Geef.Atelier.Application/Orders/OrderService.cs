@@ -86,7 +86,6 @@ internal sealed class OrderService(
             Id = Guid.NewGuid(),
             CreatedByUser = request.CreatedByUser,
             RequestText = text,
-            Mode = OrderMode.Direct,
             State = route == OrderIntakeRoute.Clarify ? OrderState.Analyzing : OrderState.Ready,
             Entry = request.Entry,
             CreatedAt = now,
@@ -366,7 +365,7 @@ internal sealed class OrderService(
 
         var shown = OrderStateResolver.SelectShownRun(orderRuns)
                     ?? throw new OrderRevisionException(RevisionLines.NothingToChange);
-        var next = orderRuns.Where(r => r.Kind == RunKind.Standard).Max(r => r.OrderVersion ?? 0) + 1;
+        var next = orderRuns.Max(r => r.OrderVersion ?? 0) + 1;
         if (next > options.MaxVersionsPerOrder)
             throw new OrderRevisionException(TooManyVersions(options));
 
@@ -486,7 +485,7 @@ internal sealed class OrderService(
         var warnings = current is null ? [] : await warningRepository.ListByRunAsync(current.Id, ct);
         var finishedAt = display.IsFinished ? current?.CompletedAt ?? order.UpdatedAt : (DateTimeOffset?)null;
         var versionStartedAt = current is { RevisionHint: { Length: > 0 } } ? current.CreatedAt : (DateTimeOffset?)null;
-        var progress = OrderProgressMapper.Map(display, order.ProgressMode(current), linked.Count > 0, events, order.CreatedAt, finishedAt, time.GetUtcNow(), order.ToIntakeProgress(),
+        var progress = OrderProgressMapper.Map(display, linked.Count > 0, events, order.CreatedAt, finishedAt, time.GetUtcNow(), order.ToIntakeProgress(),
             versionStartedAt);
 
         return new OrderView(
@@ -548,9 +547,9 @@ internal sealed class OrderService(
     private static IReadOnlyList<string>? UnansweredQuestions(RunEntity run) =>
         BriefingSections.Parse(run.BriefingText ?? string.Empty).OpenQuestions is { Count: > 0 } open ? open : null;
 
-    /// <summary>The first version of the order: the lowest version of its standard runs, 1 when none has one.</summary>
+    /// <summary>The first version of the order: the lowest version of its runs, 1 when none has one.</summary>
     private static int FirstVersion(IReadOnlyList<RunEntity> orderRuns) =>
-        orderRuns.Where(r => r.Kind == RunKind.Standard && r.OrderVersion is not null).Select(r => r.OrderVersion!.Value).DefaultIfEmpty(1).Min();
+        orderRuns.Where(r => r.OrderVersion is not null).Select(r => r.OrderVersion!.Value).DefaultIfEmpty(1).Min();
 
     private static IReadOnlyList<OrderGivenAnswer>? GivenAnswers(OrderEntity order)
     {
@@ -572,7 +571,7 @@ internal sealed class OrderService(
     }
 
     private static OrderRunView ToRunView(RunEntity run) =>
-        new(run.Id, run.OrderVersion, run.Kind, run.Status, run.Outcome, run.CreatedAt, run.StartedAt, run.CompletedAt, run.WordCount,
+        new(run.Id, run.OrderVersion, run.Status, run.Outcome, run.CreatedAt, run.StartedAt, run.CompletedAt, run.WordCount,
             RevisionBrief.Requested(run.RevisionHint));
 
     private async Task<SourcePlan> PlanSourcesAsync(IReadOnlyList<OrderSourceSelection> selections, string owner, SourceOptions options, CancellationToken ct)

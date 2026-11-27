@@ -5,12 +5,11 @@ namespace Geef.Atelier.Core.Domain.Orders;
 
 /// <summary>
 /// The parts of a run that decide how its order is shown. <see cref="Finishing"/> is true for a few seconds after the run
-/// reached its final status while its outcome, text or report are still being stored (or, for a composition, while the
-/// writing run is being created). <see cref="CarriesBlockingPoint"/> is true for a change of an earlier version whose report keeps
+/// reached its final status while its outcome, text or report are still being stored. <see cref="CarriesBlockingPoint"/> is true for a change of an earlier version whose report keeps
 /// a blocking passage of that version open while the fact check blocks (<see cref="FactCheckMode.On"/>), or whose report says that the
 /// version it changed needed a check that was not taken over (<see cref="RunReport.EarlierNeedsCheck"/>, in every mode of the fact check).
 /// </summary>
-public sealed record OrderRunState(RunStatus Status, RunOutcome? Outcome, RunKind Kind, bool HasText, bool Finishing = false, bool CarriesBlockingPoint = false);
+public sealed record OrderRunState(RunStatus Status, RunOutcome? Outcome, bool HasText, bool Finishing = false, bool CarriesBlockingPoint = false);
 
 /// <summary>How an order is shown: its display state, whether a text exists and whether the order is finished.</summary>
 public sealed record OrderDisplay(OrderDisplayState State, bool HasText, bool IsFinished);
@@ -56,14 +55,6 @@ public static class OrderStateResolver
         if (currentRun.Finishing)
             return new(OrderDisplayState.Working, hasText, false);
 
-        if (currentRun.Kind == RunKind.CrewComposition)
-            return currentRun.Status switch
-            {
-                RunStatus.Pending or RunStatus.Running => new(OrderDisplayState.Working, hasText, false),
-                RunStatus.Aborted => new(OrderDisplayState.Stopped, hasText, true),
-                _ => new(OrderDisplayState.Failed, hasText, true),
-            };
-
         return (currentRun.Status, currentRun.Outcome, hasText) switch
         {
             (RunStatus.Pending, _, _) => new(OrderDisplayState.Queued, hasText, false),
@@ -80,28 +71,22 @@ public static class OrderStateResolver
     }
 
     /// <summary>
-    /// Picks the current run of an order: among standard runs the highest <see cref="RunEntity.OrderVersion"/>, on a tie
-    /// the newest; without a standard run the newest run of any kind; <c>null</c> for no runs.
+    /// Picks the current run of an order: the highest <see cref="RunEntity.OrderVersion"/>, on a tie the newest;
+    /// <c>null</c> for no runs.
     /// </summary>
     public static RunEntity? SelectCurrentRun(IReadOnlyList<RunEntity> runsOfOrder)
     {
         ArgumentNullException.ThrowIfNull(runsOfOrder);
 
-        var standard = runsOfOrder
-            .Where(r => r.Kind == RunKind.Standard)
+        return runsOfOrder
             .OrderByDescending(r => r.OrderVersion ?? 0)
             .ThenByDescending(r => r.CreatedAt)
-            .ThenByDescending(r => r.Id)
-            .FirstOrDefault();
-
-        return standard ?? runsOfOrder
-            .OrderByDescending(r => r.CreatedAt)
             .ThenByDescending(r => r.Id)
             .FirstOrDefault();
     }
 
     /// <summary>
-    /// Picks the version that is shown: the standard run with the highest <see cref="RunEntity.OrderVersion"/> that has a
+    /// Picks the version that is shown: the run with the highest <see cref="RunEntity.OrderVersion"/> that has a
     /// <see cref="RunEntity.FinalText"/>; <c>null</c> when no run has a text. While a newer version is written, or after it could not
     /// be finished, the version before stays shown.
     /// </summary>
@@ -110,7 +95,7 @@ public static class OrderStateResolver
         ArgumentNullException.ThrowIfNull(runsOfOrder);
 
         return runsOfOrder
-            .Where(r => r.Kind == RunKind.Standard && !string.IsNullOrWhiteSpace(r.FinalText))
+            .Where(r => !string.IsNullOrWhiteSpace(r.FinalText))
             .OrderByDescending(r => r.OrderVersion ?? 0)
             .ThenByDescending(r => r.CreatedAt)
             .ThenByDescending(r => r.Id)
@@ -120,7 +105,7 @@ public static class OrderStateResolver
     /// <summary>
     /// Extracts the parts of <paramref name="run"/> that the resolver needs; a text exists when <see cref="RunEntity.FinalText"/>
     /// is not blank. A run that ended less than <see cref="FinishingWindow"/> before <paramref name="now"/> is still finishing
-    /// while it has no outcome, and so is a completed composition (its writing run follows). A run with a text that changes an earlier
+    /// while it has no outcome. A run with a text that changes an earlier
     /// version (<see cref="RunEntity.RevisionHint"/> not blank) carries a blocking point when its stored report keeps a blocking passage of
     /// that version (<see cref="FactFinding.FromVersion"/>) open while the fact check ran in <see cref="FactCheckMode.On"/>, or says that the
     /// version it changed was shown as "Ready – please check" and its checks were not taken over (<see cref="RunReport.EarlierNeedsCheck"/>,
@@ -132,11 +117,10 @@ public static class OrderStateResolver
         ArgumentNullException.ThrowIfNull(run);
         var ended = run.Status is RunStatus.Completed or RunStatus.Failed or RunStatus.Aborted;
         var recent = run.CompletedAt is { } completed && now - completed < FinishingWindow;
-        var finishing = ended && recent
-            && (run.Outcome is null || (run.Kind == RunKind.CrewComposition && run.Status == RunStatus.Completed && run.Outcome == RunOutcome.Converged));
+        var finishing = ended && recent && run.Outcome is null;
         var hasText = !string.IsNullOrWhiteSpace(run.FinalText);
         var carries = hasText && ended && !string.IsNullOrWhiteSpace(run.RevisionHint) && CarriesBlockingPoint(run.ReportJson);
-        return new(run.Status, run.Outcome, run.Kind, hasText, finishing, carries);
+        return new(run.Status, run.Outcome, hasText, finishing, carries);
     }
 
     private static bool CarriesBlockingPoint(string? reportJson) =>

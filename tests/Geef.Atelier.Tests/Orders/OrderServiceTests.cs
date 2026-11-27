@@ -51,7 +51,6 @@ public sealed class OrderServiceTests(PostgresFixture postgres)
 
         var order = await host.QueryAsync(db => db.Orders.AsNoTracking().SingleAsync(o => o.Id == submission.OrderId));
         Assert.Equal(OrderState.Ready, order.State);
-        Assert.Equal(OrderMode.Direct, order.Mode);
         Assert.Null(await host.QueryAsync(db => db.Sources.Where(s => s.Id == source).Select(s => s.ExpiresAt).SingleAsync()));
         Assert.Equal(source, await host.QueryAsync(db => db.OrderSources.Where(l => l.OrderId == order.Id).Select(l => l.SourceId).SingleAsync()));
     }

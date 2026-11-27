@@ -127,7 +127,7 @@ public sealed class ShippedResearchSettingsTests
 
     private static OrderEntity Order(string user) => new()
     {
-        Id = Guid.NewGuid(), CreatedByUser = user, RequestText = "Schreib einen Aushang zum neuen Mindestlohn.", Mode = OrderMode.Direct,
+        Id = Guid.NewGuid(), CreatedByUser = user, RequestText = "Schreib einen Aushang zum neuen Mindestlohn.",
         State = OrderState.Ready, Entry = OrderEntry.Web, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
         ClarifyJson = IntakeRecordJson.Serialize(IntakeRecord.Fallback(IntakeRecordStatus.Ok, null, 1, "m", BriefMode.AppendAnswers) with { ResearchTopics = ["Mindestlohn 2027 Höhe"], ResearchAllowed = true }),
     };

@@ -1,8 +1,8 @@
 namespace Geef.Atelier.Core.Domain.Orders;
 
 /// <summary>
-/// A quick button for a change of a delivered text. <see cref="Longer"/> is no longer offered: a change asking for it is refused and the
-/// person is asked what to add; the value stays because stored changes name it.
+/// A quick button for a change of a delivered text. <see cref="Longer"/> is not offered: a caller that still asks for it is refused with
+/// the request to say what should be added.
 /// </summary>
 public enum RevisionQuick { Shorter = 0, Longer = 1, MoreFormal = 2, Friendlier = 3, Simpler = 4 }
 

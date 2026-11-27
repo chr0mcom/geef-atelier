@@ -16,11 +16,8 @@ public sealed class CrewBadgeTests : TestContext
 
     [Theory]
     [InlineData("direct", "Direct")]
-    [InlineData("klassik", "Classic")]
-    [InlineData("juristisch", "Legal")]
-    [InlineData("direct-outline", "Extra careful")]
-    [InlineData("my-own-team", "my-own-team")]
-    public void NamedTemplateName_DisplaysItsName_AlsoForRemovedSetups(string template, string shown)
+    [InlineData("unknown-setup", "unknown-setup")]
+    public void NamedTemplateName_DisplaysItsDisplayNameOrTheStoredName(string template, string shown)
     {
         var cut = RenderComponent<CrewBadge>(p => p.Add(c => c.TemplateName, template));
 

@@ -46,7 +46,7 @@ public sealed class RunStopMessageTests(PostgresFixture fixture)
     public async Task FailedEventStoresTheFixedSentenceAtTheRun(ConvergenceDecision reason, string expected)
     {
         await using var db = fixture.NewContext();
-        var runId = await new RunPersistenceService(db).CreateRunAsync("brief", "{}", cancellationToken: CancellationToken.None);
+        var runId = await new RunPersistenceService(db).CreateRunAsync("brief", cancellationToken: CancellationToken.None);
         var sink = new PostgresEventSink(runId, fixture.NewScopeFactory(), new NoOpRunNotifier(), NullLogger.Instance);
 
         await sink.PublishAsync(

@@ -123,7 +123,7 @@ public sealed class OrderLiveUpdateSecurityTests : IAsyncDisposable
     public async Task ARunWithoutOrderSendsNoOrderUpdate()
     {
         var runId = Guid.NewGuid();
-        _runs.Runs[runId] = Run(runId, "alice", null, RunKind.Learning);
+        _runs.Runs[runId] = Run(runId, "alice", null);
         var list = new Inbox();
         using var l = _feed.WatchOrderList(Admin, list.Add);
 
@@ -206,15 +206,13 @@ public sealed class OrderLiveUpdateSecurityTests : IAsyncDisposable
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "Test"));
     }
 
-    private static RunEntity Run(Guid id, string owner, Guid? orderId, RunKind kind = RunKind.Standard) => new()
+    private static RunEntity Run(Guid id, string owner, Guid? orderId) => new()
     {
         Id = id,
         CreatedAt = DateTimeOffset.UtcNow,
         Status = RunStatus.Running,
         BriefingText = "b",
-        ConfigJson = "{}",
         CreatedByUser = owner,
-        Kind = kind,
         OrderId = orderId,
         OrderVersion = orderId is null ? null : 1,
     };
@@ -255,7 +253,7 @@ public sealed class OrderLiveUpdateSecurityTests : IAsyncDisposable
             Task.FromResult(Owners.TryGetValue(orderId, out var owner)
                 ? new OrderEntity
                 {
-                    Id = orderId, CreatedByUser = owner, RequestText = "r", Mode = OrderMode.Direct, State = OrderState.Ready,
+                    Id = orderId, CreatedByUser = owner, RequestText = "r", State = OrderState.Ready,
                     Entry = OrderEntry.Web, CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow,
                 }
                 : null);
@@ -269,7 +267,6 @@ public sealed class OrderLiveUpdateSecurityTests : IAsyncDisposable
         public Task<IReadOnlyList<RunEventRow>> ListRunEventsAsync(Guid runId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> TrySetStateAsync(Guid orderId, OrderState expected, OrderState next, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<(Guid OrderId, int? Version)?> GetLinkForRunAsync(Guid runId, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<Guid> LinkLegacyRunAsync(Guid runId, OrderEntry entry, CancellationToken ct = default) => throw new NotSupportedException();
         public Task TouchAsync(Guid orderId, DateTimeOffset at, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> DeleteAsync(Guid orderId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<Guid>> ListIntakeCandidatesAsync(DateTimeOffset staleBefore, int maxAttempts, int limit, CancellationToken ct = default) => throw new NotImplementedException();

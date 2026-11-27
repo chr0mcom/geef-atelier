@@ -6,7 +6,7 @@ using Geef.Atelier.Core.Domain.Sources;
 namespace Geef.Atelier.Core.Persistence.Orders;
 
 /// <summary>
-/// An order with its current run, the run of its shown version (the newest standard run with a text, see
+/// An order with its current run, the run of its shown version (the newest run with a text, see
 /// <see cref="OrderStateResolver.SelectShownRun"/>; <c>null</c> without a text) and the number of linked sources, for lists.
 /// </summary>
 public sealed record OrderListRow(OrderEntity Order, RunEntity? CurrentRun, int SourceCount, RunEntity? ShownRun = null);
@@ -47,7 +47,7 @@ public interface IOrderRepository
     /// <summary>Inserts an order without a run (stage 2: state <see cref="OrderState.Analyzing"/>); throws <see cref="OrderSourceMissingException"/> like <see cref="CreateWithFirstRunAsync"/>.</summary>
     Task CreateAsync(OrderEntity order, IReadOnlyList<OrderSourceEntity> sources, CancellationToken ct = default);
 
-    /// <summary>Adds a run as the next version (max version + 1, inside the transaction) and returns the version. Composition runs keep the version passed in <paramref name="run"/>.</summary>
+    /// <summary>Adds a run as the next version (max version + 1, inside the transaction) and returns the version.</summary>
     Task<int> AddRunAsync(Guid orderId, RunEntity run, CancellationToken ct = default);
 
     /// <summary>
@@ -62,13 +62,13 @@ public interface IOrderRepository
     /// <summary>Returns the order, or <c>null</c> when it does not exist.</summary>
     Task<OrderEntity?> GetAsync(Guid orderId, CancellationToken ct = default);
 
-    /// <summary>Returns all runs of the order, of every kind.</summary>
+    /// <summary>Returns all runs of the order.</summary>
     Task<IReadOnlyList<RunEntity>> ListRunsAsync(Guid orderId, CancellationToken ct = default);
 
     /// <summary>
     /// Lists orders newest activity first; <paramref name="ownerUsername"/> = null lists all users. The current and the shown run of a
-    /// row are slim copies for the list (status, outcome, kind, version, times, word count); their <see cref="RunEntity.FinalText"/>
-    /// only tells whether a text exists, and briefing, configuration, crew snapshot and report are left empty.
+    /// row are slim copies for the list (status, outcome, version, times, word count); their <see cref="RunEntity.FinalText"/>
+    /// only tells whether a text exists, and briefing, crew snapshot and report are left empty.
     /// </summary>
     Task<IReadOnlyList<OrderListRow>> ListAsync(string? ownerUsername, int limit, CancellationToken ct = default);
 
@@ -80,9 +80,6 @@ public interface IOrderRepository
 
     /// <summary>Returns the order and version a run belongs to, or <c>null</c> when the run has no order.</summary>
     Task<(Guid OrderId, int? Version)?> GetLinkForRunAsync(Guid runId, CancellationToken ct = default);
-
-    /// <summary>Links a run created on the legacy path: inherits the order of the composition parent or the resumed parent, otherwise creates a <c>Careful</c>/<c>Ready</c> order.</summary>
-    Task<Guid> LinkLegacyRunAsync(Guid runId, OrderEntry entry, CancellationToken ct = default);
 
     /// <summary>Sets <see cref="OrderEntity.UpdatedAt"/> to <paramref name="at"/>.</summary>
     Task TouchAsync(Guid orderId, DateTimeOffset at, CancellationToken ct = default);

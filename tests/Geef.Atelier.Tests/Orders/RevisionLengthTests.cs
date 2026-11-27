@@ -80,7 +80,6 @@ public sealed class RevisionLengthTests
         CreatedAt = DateTimeOffset.UnixEpoch,
         Status = RunStatus.Completed,
         BriefingText = "brief",
-        ConfigJson = "{}",
         SeedDraftText = seed,
         FinalText = text,
         RevisionHint = hint,

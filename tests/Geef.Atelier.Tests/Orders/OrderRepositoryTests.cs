@@ -72,7 +72,7 @@ public sealed class OrderRepositoryTests(PostgresFixture fixture)
         var clash = Run(user, order.Id, 1);
         var duplicateRun = new RunEntity
         {
-            Id = existing.Id, CreatedAt = clash.CreatedAt, Status = RunStatus.Pending, BriefingText = "b", ConfigJson = "{}",
+            Id = existing.Id, CreatedAt = clash.CreatedAt, Status = RunStatus.Pending, BriefingText = "b",
             OrderId = order.Id, OrderVersion = 1,
         };
 
@@ -103,12 +103,11 @@ public sealed class OrderRepositoryTests(PostgresFixture fixture)
             var repo = new OrderRepository(db);
             Assert.Equal(2, await repo.AddRunAsync(order.Id, Run(user)));
             Assert.Equal(3, await repo.AddRunAsync(order.Id, Run(user)));
-            Assert.Equal(2, await repo.AddRunAsync(order.Id, Run(user, kind: RunKind.CrewComposition, version: 2)));
             await Assert.ThrowsAsync<InvalidOperationException>(() => repo.AddRunAsync(Guid.NewGuid(), Run(user)));
         }
 
         await using var check = fixture.NewContext();
-        var versions = await check.Runs.Where(r => r.OrderId == order.Id && r.Kind == RunKind.Standard).Select(r => r.OrderVersion).OrderBy(v => v).ToListAsync();
+        var versions = await check.Runs.Where(r => r.OrderId == order.Id).Select(r => r.OrderVersion).OrderBy(v => v).ToListAsync();
         Assert.Equal([1, 2, 3], versions);
     }
 
@@ -201,45 +200,6 @@ public sealed class OrderRepositoryTests(PostgresFixture fixture)
         Assert.False(await repo.TrySetStateAsync(order.Id, OrderState.Ready, OrderState.Cancelled));
         Assert.True(await repo.TrySetStateAsync(order.Id, OrderState.Analyzing, OrderState.Cancelled));
         Assert.Equal(OrderState.Cancelled, (await repo.GetAsync(order.Id))!.State);
-    }
-
-    [Fact]
-    public async Task LinkLegacyRunCreatesInheritsAndVersions()
-    {
-        var user = NewUser();
-        var composition = Run(user, kind: RunKind.CrewComposition, status: RunStatus.Completed,
-            briefing: "Compose a crew for the following task:\n\nPlan a launch.", config: """{"original_task":"Plan a launch."}""");
-        await using (var db = fixture.NewContext())
-        {
-            db.Runs.Add(composition);
-            await db.SaveChangesAsync();
-        }
-
-        await using var ctx = fixture.NewContext();
-        var repo = new OrderRepository(ctx);
-        var orderId = await repo.LinkLegacyRunAsync(composition.Id, OrderEntry.Mcp);
-        Assert.Equal(composition.Id, orderId);
-        var order = (await repo.GetAsync(orderId))!;
-        Assert.Equal("Plan a launch.", order.RequestText);
-        Assert.Equal(OrderMode.Careful, order.Mode);
-        Assert.Equal(OrderEntry.Mcp, order.Entry);
-        Assert.Equal((orderId, (int?)1), await repo.GetLinkForRunAsync(composition.Id));
-
-        var task = Run(user, status: RunStatus.Failed, parentCompositionRunId: composition.Id);
-        var resume = Run(user, parentRunId: task.Id);
-        var learning = Run(user, kind: RunKind.Learning);
-        ctx.Runs.AddRange(task, resume, learning);
-        await ctx.SaveChangesAsync();
-        ctx.ChangeTracker.Clear();
-
-        Assert.Equal(orderId, await repo.LinkLegacyRunAsync(task.Id, OrderEntry.Web));
-        Assert.Equal(orderId, await repo.LinkLegacyRunAsync(resume.Id, OrderEntry.Web));
-        Assert.Equal((orderId, (int?)1), await repo.GetLinkForRunAsync(task.Id));
-        Assert.Equal((orderId, (int?)2), await repo.GetLinkForRunAsync(resume.Id));
-        Assert.Equal(orderId, await repo.LinkLegacyRunAsync(resume.Id, OrderEntry.Web));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => repo.LinkLegacyRunAsync(learning.Id, OrderEntry.Web));
-        Assert.Null(await repo.GetLinkForRunAsync(learning.Id));
-        Assert.Equal(1, await ctx.Orders.CountAsync(o => o.CreatedByUser == user));
     }
 
     [Fact]

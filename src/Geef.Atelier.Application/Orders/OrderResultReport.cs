@@ -15,8 +15,7 @@ public static class OrderResultReport
     public const string NotesNotShownFormat = "{0} more notes of the writer could not be shown because they hold a link, an address, or account or access details.";
 
     /// <summary>
-    /// Adds what <paramref name="report"/> says to <paramref name="result"/>. Schema 1: only <see cref="OrderResult.Checks"/>, which
-    /// say that facts were not checked; the other new fields stay <c>null</c>. Schema 2: the writer's assumptions (without those
+    /// Adds what <paramref name="report"/> says to <paramref name="result"/>: the writer's assumptions (without those
     /// the clarifier already listed, compared by <see cref="OrderResultRules.SameAssumptionKey"/>), the writer's open points (those
     /// about a listed wrong total also paired with its sentence) and a sentence for notes that could not be shown, the flagged
     /// passages and the contradictions in the material (both only when the fact check is shown, not in shadow mode; those carried over from
@@ -32,9 +31,6 @@ public static class OrderResultReport
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(report);
-        if (report.SchemaVersion < 2)
-            return result with { Checks = OrderCheckLines.Build(report, result.HasOpenPoints()) };
-
         var factCheck = report.FactCheck;
         var shown = factCheck is { State: not (FactCheckState.Off or FactCheckState.NotShown) };
         var notes = report.WriterNotes ?? WriterNotes.Empty;
@@ -68,7 +64,7 @@ public static class OrderResultReport
 
     /// <summary>
     /// True for a finding that uses replaced information where the replacing passage stands in the pages looked up on the web; such a
-    /// finding is a hint, also in reports written before that rule.
+    /// finding is a hint.
     /// </summary>
     public static bool FromLookedUp(this FactFinding finding) =>
         finding.Kind == FactFindingKind.Superseded && finding.MaterialFrom == MaterialPart.LookedUp;

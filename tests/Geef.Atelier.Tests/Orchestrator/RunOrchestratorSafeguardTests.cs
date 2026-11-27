@@ -99,7 +99,7 @@ public sealed class RunOrchestratorSafeguardTests(PostgresFixture fixture)
     private async Task<Guid> CreateRunAsync(string briefing, string snapshotJson)
     {
         await using var db = fixture.NewContext();
-        return await new RunPersistenceService(db).CreateRunAsync(briefing, "{}", crewSnapshotJson: snapshotJson);
+        return await new RunPersistenceService(db).CreateRunAsync(briefing, crewSnapshotJson: snapshotJson);
     }
 
     private async Task<RunEntity> LoadAsync(Guid runId)

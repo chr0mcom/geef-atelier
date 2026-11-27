@@ -11,7 +11,6 @@ using Geef.Atelier.Tests.Persistence;
 using Geef.Atelier.Tests.Web.Notifications;
 using Geef.Atelier.Web.Services;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -47,8 +46,7 @@ internal sealed class OrchestratorTestHost : IAsyncDisposable
             .ConfigureServices(services =>
             {
                 services.AddDbContext<AtelierDbContext>(opt =>
-                    opt.UseNpgsql(fixture.ConnectionString)
-            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
+                    opt.UseNpgsql(fixture.ConnectionString));
                 services.AddAtelierPersistence();
                 services.AddAtelierApplication();
                 services.AddSingleton<Geef.Atelier.Application.Crew.IModelCatalog, Geef.Atelier.Tests.Fakes.PassThroughModelCatalog>();

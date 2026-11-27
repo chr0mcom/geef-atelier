@@ -8,9 +8,6 @@ public sealed class RunEntity
     public required RunStatus Status { get; init; }
     public required string BriefingText { get; init; }
 
-    /// <summary>JSON snapshot of model/crew/budget config at submission time.</summary>
-    public required string ConfigJson { get; init; }
-
     public string? CreatedByUser { get; init; }
 
     public DateTimeOffset? StartedAt { get; init; }
@@ -23,15 +20,11 @@ public sealed class RunEntity
     /// </summary>
     public string? ErrorMessage { get; init; }
     public int TokensTotal { get; init; }
-    public decimal CostTotal { get; init; }
 
     /// <summary>Set to true when a cancellation request has been submitted for this run.</summary>
     public bool CancellationRequested { get; init; }
 
-    /// <summary>
-    /// Name of the crew template the run was submitted with, or null when an inline custom crew was used.
-    /// Historical runs (pre-PS-5) are migrated to <c>"klassik"</c>.
-    /// </summary>
+    /// <summary>Name of the code-only crew template the run was submitted with (<see cref="Crew.SystemCrew.DirectTemplateName"/>).</summary>
     public string? CrewTemplateName { get; init; }
 
     /// <summary>
@@ -40,12 +33,12 @@ public sealed class RunEntity
     /// </summary>
     public string? CrewSnapshot { get; init; }
 
-    // Cost tracking — null for runs before Step16 migration or when CostTracking:Enabled=false.
+    // Cost tracking — null while the run is working and when CostTracking:Enabled=false.
     public decimal? TotalCostEur { get; set; }
     public decimal? LlmCostEur { get; set; }
 
-    // Token breakdown (Step43) — run-level sums of the cached-input / reasoning token subsets
-    // across all actor calls. Null when none were reported (e.g. pre-Step43 runs).
+    // Token breakdown — run-level sums of the cached-input / reasoning token subsets across all actor calls.
+    // Null when none were reported.
     public int? CachedInputTokens { get; set; }
     public int? ReasoningTokens { get; set; }
 
@@ -70,26 +63,13 @@ public sealed class RunEntity
 
     /// <summary>
     /// Word count of <see cref="FinalText"/>, computed once when the pipeline completes.
-    /// Null for runs before Step25 migration or when <see cref="FinalText"/> is null/empty.
+    /// Null when <see cref="FinalText"/> is null/empty.
     /// </summary>
     public int? WordCount { get; set; }
 
     /// <summary>
-    /// Distinguishes standard user-initiated runs from internal learning-evaluation runs.
-    /// Defaults to <see cref="RunKind.Standard"/> for all runs created before Step30.
-    /// </summary>
-    public RunKind Kind { get; init; } = RunKind.Standard;
-
-    /// <summary>
-    /// Set on task-runs that were automatically triggered by a crew-composition run.
-    /// Points to the <see cref="RunKind.CrewComposition"/> run that produced the crew configuration.
-    /// Null for runs not originated from an auto-compose flow.
-    /// </summary>
-    public Guid? ParentCompositionRunId { get; init; }
-
-    /// <summary>
-    /// What the run delivered (Step47). Set once when the run ends; <c>null</c> while it is pending or running and
-    /// for runs that finished before Step47. Independent of <see cref="Status"/>.
+    /// What the run delivered. Set once when the run ends; <c>null</c> while it is pending or running.
+    /// Independent of <see cref="Status"/>.
     /// </summary>
     public RunOutcome? Outcome { get; init; }
 
@@ -99,18 +79,12 @@ public sealed class RunEntity
     /// <summary>Structured run report as JSON. Reserved for the result report; <c>null</c> until it is written.</summary>
     public string? ReportJson { get; init; }
 
-    /// <summary>Order the run belongs to (Step48); <c>null</c> only for learning runs.</summary>
+    /// <summary>Order the run belongs to; every run the application creates has one.</summary>
     public Guid? OrderId { get; init; }
 
-    /// <summary>
-    /// Version of the order this run produced, 1..n for standard runs; composition runs carry the version of their task
-    /// run. <c>null</c> when the run has no order.
-    /// </summary>
+    /// <summary>Version of the order this run produced, 1..n; <c>null</c> when the run has no order.</summary>
     public int? OrderVersion { get; init; }
 
-    /// <summary>
-    /// Fact-check mode the run was checked with (<c>Off|Shadow|Report|On</c>, Step50); <c>null</c> for runs before stage 3 and for
-    /// runs outside the direct path.
-    /// </summary>
+    /// <summary>Fact-check mode the run was checked with (<c>Off|Shadow|Report|On</c>); <c>null</c> until the run set it.</summary>
     public string? FactCheckMode { get; init; }
 }

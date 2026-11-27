@@ -46,7 +46,7 @@ public sealed class DirectPipelineRevisionTests
 
     private static RunEntity SecondVersion(RunEntity first, string? revisionHint = Change) => new()
     {
-        Id = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Running, ConfigJson = "{}",
+        Id = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Running,
         BriefingText = Request + "\n\n---\nChange requested by the person (newest last; where changes differ, the newest wins):\n" + Change,
         CrewTemplateName = first.CrewTemplateName, OrderId = first.OrderId, OrderVersion = 2, ParentRunId = first.Id,
         SeedDraftText = first.FinalText, RevisionHint = revisionHint,
@@ -165,7 +165,7 @@ public sealed class DirectPipelineRevisionTests
         var (harness, first) = await FirstVersionAsync();
         var bare = new RunEntity
         {
-            Id = first.Id, CreatedAt = first.CreatedAt, Status = RunStatus.Completed, BriefingText = first.BriefingText, ConfigJson = "{}",
+            Id = first.Id, CreatedAt = first.CreatedAt, Status = RunStatus.Completed, BriefingText = first.BriefingText,
             OrderId = first.OrderId, OrderVersion = 1, FinalText = first.FinalText,
         };
         harness.Runs.Put(bare);
@@ -189,7 +189,7 @@ public sealed class DirectPipelineRevisionTests
         harness.Runs.Put(new RunEntity
         {
             Id = first.Id, CreatedAt = first.CreatedAt, Status = status, Outcome = outcome, CompletedAt = DateTimeOffset.UtcNow.AddHours(-1),
-            BriefingText = first.BriefingText, ConfigJson = "{}", OrderId = first.OrderId, OrderVersion = 1, FinalText = first.FinalText,
+            BriefingText = first.BriefingText, OrderId = first.OrderId, OrderVersion = 1, FinalText = first.FinalText,
         });
         harness.Script.EnqueueExecutorText(Marker + " " + Words(60));
         var second = SecondVersion(first);

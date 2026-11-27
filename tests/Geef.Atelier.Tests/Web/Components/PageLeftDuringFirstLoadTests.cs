@@ -96,7 +96,6 @@ public sealed class PageLeftDuringFirstLoadTests : TestContext
             CreatedAt = DateTimeOffset.UtcNow,
             Status = RunStatus.Running,
             BriefingText = "Test briefing",
-            ConfigJson = "{}",
             CrewSnapshot = TestCrewSnapshots.RunnableJson,
         },
         []);

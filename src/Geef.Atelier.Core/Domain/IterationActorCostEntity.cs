@@ -16,16 +16,16 @@ public sealed class IterationActorCostEntity
     public required int InputTokens { get; init; }
     public required int OutputTokens { get; init; }
 
-    /// <summary>Subset of <see cref="InputTokens"/> served from prompt cache. Null for pre-Step43 rows / when not reported.</summary>
+    /// <summary>Subset of <see cref="InputTokens"/> served from prompt cache. Null when not reported.</summary>
     public int? CachedInputTokens { get; init; }
 
-    /// <summary>Subset of <see cref="OutputTokens"/> spent on reasoning. Null for pre-Step43 rows / when not reported.</summary>
+    /// <summary>Subset of <see cref="OutputTokens"/> spent on reasoning. Null when not reported.</summary>
     public int? ReasoningTokens { get; init; }
 
     /// <summary>Cost in EUR, or null when the model is not in the pricing table.</summary>
     public decimal? CostEur { get; init; }
 
-    /// <summary>The provider that served this actor call, e.g. "claude-cli" or "openrouter". Null for pre-Step25 rows.</summary>
+    /// <summary>The provider that served this actor call, e.g. "claude-cli" or "openrouter". <c>null</c> when unknown.</summary>
     public string? ProviderName { get; init; }
 
     public required DateTimeOffset CreatedAt { get; init; }

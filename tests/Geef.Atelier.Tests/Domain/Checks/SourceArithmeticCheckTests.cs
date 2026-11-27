@@ -389,7 +389,7 @@ public sealed class SourceArithmeticCheckTests
         var text = "2 × 10 € = 20 €\n" + line;
 
         var issue = Assert.Single(SourceArithmeticCheck.CheckExpressions(text));
-        var check = Assert.Single(DraftCheckEvaluator.Evaluate(text, OrderConstraints.None), c => c.Code is DraftCheckCodes.Arithmetic or DraftCheckCodes.ArithmeticPartial);
+        var check = Assert.Single(DraftCheckEvaluator.Evaluate(text, OrderConstraints.None), c => c.Code == DraftCheckCodes.Arithmetic);
 
         Assert.Equal(computed, issue.Computed);
         Assert.Equal((DraftCheckCodes.Arithmetic, false, true), (check.Code, check.Passed, check.Blocking));
@@ -412,7 +412,7 @@ public sealed class SourceArithmeticCheckTests
     public void A_calculation_that_was_left_out_is_never_reported_as_calculations_that_add_up(string text)
     {
         var check = Assert.Single(DraftCheckEvaluator.Evaluate(text, OrderConstraints.None),
-            c => c.Code is DraftCheckCodes.Arithmetic or DraftCheckCodes.ArithmeticPartial);
+            c => c.Code == DraftCheckCodes.Arithmetic);
 
         Assert.Equal((DraftCheckCodes.Arithmetic, true), (check.Code, check.Passed));
         Assert.Equal(DraftCheckEvaluator.NoWrongCalculationFound, check.Message);
@@ -423,7 +423,7 @@ public sealed class SourceArithmeticCheckTests
     public void A_text_whose_calculations_were_all_recalculated_still_never_says_they_add_up()
     {
         var check = Assert.Single(DraftCheckEvaluator.Evaluate("2 × 10 € = 20 €\nWir erwarten 30 Gäste. 3 × 24 € = 72 €.", OrderConstraints.None),
-            c => c.Code is DraftCheckCodes.Arithmetic or DraftCheckCodes.ArithmeticPartial);
+            c => c.Code == DraftCheckCodes.Arithmetic);
 
         Assert.Equal((DraftCheckCodes.Arithmetic, true, DraftCheckEvaluator.NoWrongCalculationFound), (check.Code, check.Passed, check.Message));
     }

@@ -21,6 +21,5 @@ internal sealed class OAuthAuditLogConfiguration : IEntityTypeConfiguration<OAut
         builder.Property(e => e.CreatedAt).IsRequired().HasDefaultValueSql("now()");
 
         builder.HasIndex(e => e.CreatedAt).IsDescending().HasDatabaseName("IX_OAuthAuditLog_CreatedAt");
-        builder.HasIndex(e => e.EventType).HasDatabaseName("IX_OAuthAuditLog_EventType");
     }
 }

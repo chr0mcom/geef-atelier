@@ -202,12 +202,11 @@
     string _shortId => RunId.ToString("N")[..8].ToUpperInvariant();
 
     /// <summary>
-    /// The order of a run of the direct path whose owner may change texts and is the viewer: such a run is changed on the order page
+    /// The order of a run whose owner may change texts and is the viewer: such a run is changed on the order page
     /// ("Change something"), never resumed here. Only when the order page can offer the change: the run has a text, or it is a later version
     /// (the version before it has one). <c>null</c> otherwise, and "Resume" stays.
     /// </summary>
     Guid? ChangeOrderId => _details?.Run is { OrderId: Guid orderId } run
-        && SystemCrew.IsDirectPathTemplate(_snapshot?.TemplateName)
         && !string.IsNullOrWhiteSpace(_viewerName) && string.Equals(run.CreatedByUser, _viewerName, StringComparison.Ordinal)
         && (!string.IsNullOrWhiteSpace(run.FinalText) || run.OrderVersion > 1)
         && ServiceProvider.GetService<Microsoft.Extensions.Options.IOptions<OrderOptions>>()?.Value.ReviseModeFor(run.CreatedByUser) == ReviseMode.On

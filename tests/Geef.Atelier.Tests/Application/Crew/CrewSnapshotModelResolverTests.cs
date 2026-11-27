@@ -19,8 +19,7 @@ public sealed class CrewSnapshotModelResolverTests
                 .Select((m, i) => new ReviewerProfile($"rev{i}", $"Rev{i}", "d", "p", "claude-cli", m, 1024, false))
                 .ToList(),
             EvaluationStrategy: EvaluationStrategy.Parallel,
-            ConvergenceOverride: null,
-            Advisors: []);
+            ConvergenceOverride: null);
 
     [Fact]
     public async Task ResolvesAliasesToConcreteIdsInTheSnapshot()

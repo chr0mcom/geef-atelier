@@ -27,9 +27,7 @@ public sealed class RunOrchestratorRecoversCrashedRunsOnStartTests(PostgresFixtu
             CreatedAt    = DateTimeOffset.UtcNow,
             Status       = RunStatus.Running,
             BriefingText = "Crashed run",
-            ConfigJson   = "{}",
             TokensTotal  = 0,
-            CostTotal    = 0m,
             StartedAt    = DateTimeOffset.UtcNow.AddMinutes(-5)
         });
         await ctx.SaveChangesAsync();

@@ -24,7 +24,7 @@ public sealed class RunDetailProfileVisibilityTests : TestContext
     {
         var details = new RunDetails(new RunEntity
         {
-            Id = _runId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Completed, BriefingText = Briefing, ConfigJson = "{}",
+            Id = _runId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Completed, BriefingText = Briefing,
             FinalText = "Text.", CreatedByUser = "alice",
         }, []);
         Services.AddSingleton<IRunService>(new StubRunService(details));

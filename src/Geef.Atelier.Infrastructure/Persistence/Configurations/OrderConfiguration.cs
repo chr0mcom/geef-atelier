@@ -15,10 +15,8 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<OrderEntity>
 
         builder.Property(o => o.CreatedByUser).HasColumnType("text").IsRequired(false);
         builder.Property(o => o.RequestText).HasColumnType("text").IsRequired();
-        builder.Property(o => o.Mode).HasTextEnumConversion(20, OrderMode.Careful);
         builder.Property(o => o.State).HasTextEnumConversion(20, OrderState.Ready);
-        builder.Property(o => o.Entry).HasTextEnumConversion(20, OrderEntry.Legacy);
-        builder.Property(o => o.CrewTemplateName).HasMaxLength(200).IsRequired(false);
+        builder.Property(o => o.Entry).HasTextEnumConversion(20, OrderEntry.Web);
         builder.Property(o => o.ClarifyJson).HasColumnType("jsonb").IsRequired(false);
         builder.Property(o => o.AnswersJson).HasColumnType("jsonb").IsRequired(false);
         builder.Property(o => o.ClaimedAt).IsRequired(false);
@@ -33,10 +31,12 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<OrderEntity>
         builder.Property(o => o.CreatedAt).IsRequired();
         builder.Property(o => o.UpdatedAt).IsRequired();
 
-        builder.HasIndex(o => new { o.CreatedByUser, o.CreatedAt })
-            .IsDescending(false, true)
-            .HasDatabaseName("IX_Orders_CreatedByUser_CreatedAt");
-        builder.HasIndex(o => o.State).HasDatabaseName("IX_Orders_State");
+        builder.HasIndex(o => new { o.CreatedByUser, o.UpdatedAt, o.CreatedAt })
+            .IsDescending(false, true, true)
+            .HasDatabaseName("IX_Orders_CreatedByUser_UpdatedAt");
+        builder.HasIndex(o => o.ResearchAt)
+            .HasFilter("\"ResearchAt\" IS NOT NULL")
+            .HasDatabaseName("IX_Orders_ResearchAt");
         builder.HasIndex(o => o.CreatedAt)
             .HasFilter("\"State\" = 'Analyzing'")
             .HasDatabaseName("IX_Orders_Intake_Analyzing");

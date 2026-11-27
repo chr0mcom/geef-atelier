@@ -10,12 +10,9 @@ internal sealed class RunPersistenceService(AtelierDbContext db) : IRunPersisten
         [RunStatus.Completed, RunStatus.Failed, RunStatus.Aborted];
     public async Task<Guid> CreateRunAsync(
         string briefingText,
-        string configJson,
         string? createdByUser = null,
         string? crewTemplateName = null,
         string? crewSnapshotJson = null,
-        RunKind kind = RunKind.Standard,
-        Guid? parentCompositionRunId = null,
         CancellationToken cancellationToken = default)
     {
         var run = new RunEntity
@@ -24,14 +21,10 @@ internal sealed class RunPersistenceService(AtelierDbContext db) : IRunPersisten
             CreatedAt               = DateTimeOffset.UtcNow,
             Status                  = RunStatus.Pending,
             BriefingText            = briefingText,
-            ConfigJson              = configJson,
             CreatedByUser           = createdByUser,
             CrewTemplateName        = crewTemplateName,
             CrewSnapshot            = crewSnapshotJson,
             TokensTotal             = 0,
-            CostTotal               = 0m,
-            Kind                    = kind,
-            ParentCompositionRunId  = parentCompositionRunId,
         };
 
         db.Runs.Add(run);
@@ -60,39 +53,5 @@ internal sealed class RunPersistenceService(AtelierDbContext db) : IRunPersisten
                 .SetProperty(r => r.ErrorMessage, errorMessage)
                 .SetProperty(r => r.CompletedAt,  DateTimeOffset.UtcNow),
                 cancellationToken);
-    }
-
-    /// <inheritdoc/>
-    public async Task<Guid> CreateResumedRunAsync(
-        string briefingText,
-        string configJson,
-        string? createdByUser,
-        string? crewTemplateName,
-        string? crewSnapshotJson,
-        Guid parentRunId,
-        string? seedDraftText,
-        RunKind kind = RunKind.Standard,
-        CancellationToken cancellationToken = default)
-    {
-        var run = new RunEntity
-        {
-            Id               = Guid.NewGuid(),
-            CreatedAt        = DateTimeOffset.UtcNow,
-            Status           = RunStatus.Pending,
-            BriefingText     = briefingText,
-            ConfigJson       = configJson,
-            CreatedByUser    = createdByUser,
-            CrewTemplateName = crewTemplateName,
-            CrewSnapshot     = crewSnapshotJson,
-            TokensTotal      = 0,
-            CostTotal        = 0m,
-            ParentRunId      = parentRunId,
-            SeedDraftText    = seedDraftText,
-            Kind             = kind,
-        };
-
-        db.Runs.Add(run);
-        await db.SaveChangesAsync(cancellationToken);
-        return run.Id;
     }
 }

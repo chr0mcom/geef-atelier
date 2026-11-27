@@ -242,7 +242,7 @@ public static class OrderCheckLines
                 yield return FirstRequestFailedLead + string.Join(AutomaticSeparator, notKept) + AutomaticEnd;
         }
 
-        var arithmetic = checks.Where(c => c.Code is DraftCheckCodes.Arithmetic or DraftCheckCodes.ArithmeticPartial).ToList();
+        var arithmetic = checks.Where(c => c.Code == DraftCheckCodes.Arithmetic).ToList();
         if (arithmetic.Count > 0 && arithmetic.All(c => c.Passed))
             yield return ArithmeticSearched;
     }
@@ -288,7 +288,7 @@ public static class OrderCheckLines
             passed.Add(PassedAvoidsLead + JoinWithAnd(avoids));
 
         Sort(DraftCheckCodes.RequiredTerm, revision ? FirstPassedRequiredWords : PassedRequiredWords, revision ? FirstFailedRequiredWords : FailedRequiredWords);
-        if (checks.Any(c => c.Code is DraftCheckCodes.Arithmetic or DraftCheckCodes.ArithmeticPartial && !c.Passed))
+        if (checks.Any(c => c.Code == DraftCheckCodes.Arithmetic && !c.Passed))
             failed.Add(FailedArithmetic);
         return (passed, failed);
     }

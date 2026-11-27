@@ -47,8 +47,7 @@ internal static class TestLoop
         Executor: Writer,
         Reviewers: Reviewers,
         EvaluationStrategy: EvaluationStrategy.Parallel,
-        ConvergenceOverride: new ConvergencePolicyOverride(maxIterations, AbortOnCritical: true, DetectRegression: false, StagnationThreshold: maxIterations),
-        Advisors: []);
+        ConvergenceOverride: new ConvergencePolicyOverride(maxIterations, AbortOnCritical: true, DetectRegression: false, StagnationThreshold: maxIterations));
 
     /// <summary>The pipeline of <paramref name="snapshot"/> with the writer and reviewers of the test loop, answered by <paramref name="resolver"/>.</summary>
     public static GeefPipelineRunner<FinalizedDocument> Build(CrewSnapshot snapshot, ILlmClientResolver resolver,

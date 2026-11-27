@@ -1,6 +1,4 @@
 using System.Data;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 using Geef.Atelier.Core.Domain;
 using Geef.Atelier.Core.Domain.Intake;
 using Geef.Atelier.Core.Domain.Orders;
@@ -11,10 +9,10 @@ using Npgsql;
 
 namespace Geef.Atelier.Infrastructure.Persistence.Orders;
 
-internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider? timeProvider = null) : IOrderRepository
+internal sealed class OrderRepository(AtelierDbContext db, TimeProvider? timeProvider = null) : IOrderRepository
 {
     private const string SourceForeignKey = "FK_OrderSources_Sources_SourceId";
-    private const string FirstRunIndex = "UX_Runs_OrderId_OrderVersion_Standard";
+    private const string RunVersionIndex = "UX_Runs_OrderId_OrderVersion";
 
     private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
 
@@ -76,9 +74,6 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
         ArgumentNullException.ThrowIfNull(run);
         if (run.OrderId is { } given && given != orderId)
             throw new ArgumentException("The run belongs to another order.", nameof(run));
-        if (run.Kind != RunKind.Standard)
-            throw new ArgumentException("A change of a text is a standard run.", nameof(run));
-
         try
         {
             await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -95,7 +90,7 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
             if (OrderStateResolver.SelectShownRun(runs)?.Id != baseRunId)
                 return (RevisionStart.BaseNotShown, null);
 
-            var version = runs.Where(r => r.Kind == RunKind.Standard).Max(r => r.OrderVersion ?? 0) + 1;
+            var version = runs.Max(r => r.OrderVersion ?? 0) + 1;
             if (version > maxVersions)
                 return (RevisionStart.TooManyVersions, null);
             if (run.OrderVersion is { } expected && expected != version)
@@ -109,7 +104,7 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
             await tx.CommitAsync(ct);
             return (RevisionStart.Created, version);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: FirstRunIndex })
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: RunVersionIndex })
         {
             return (RevisionStart.Busy, null);
         }
@@ -131,9 +126,7 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
             if (!await LockOrderAsync(orderId, ct))
                 throw new InvalidOperationException($"Order {orderId} not found.");
 
-            var version = run.Kind == RunKind.CrewComposition && run.OrderVersion is { } kept
-                ? kept
-                : await NextStandardVersionAsync(orderId, ct);
+            var version = await NextVersionAsync(orderId, ct);
 
             var entry = db.Runs.Add(run);
             entry.Property(r => r.OrderId).CurrentValue = orderId;
@@ -204,11 +197,9 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
             CreatedAt = r.CreatedAt,
             Status = r.Status,
             BriefingText = string.Empty,
-            ConfigJson = string.Empty,
             CompletedAt = r.CompletedAt,
             FinalText = r.FinalText == null || r.FinalText.Trim() == string.Empty ? null : TextMarker,
             WordCount = r.WordCount,
-            Kind = r.Kind,
             Outcome = r.Outcome,
             OrderId = r.OrderId,
             OrderVersion = r.OrderVersion,
@@ -246,67 +237,6 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
             .Select(r => new { OrderId = r.OrderId!.Value, r.OrderVersion })
             .FirstOrDefaultAsync(ct);
         return link is null ? null : (link.OrderId, link.OrderVersion);
-    }
-
-    public async Task<Guid> LinkLegacyRunAsync(Guid runId, OrderEntry entry, CancellationToken ct = default)
-    {
-        try
-        {
-            await using var tx = await db.Database.BeginTransactionAsync(ct);
-
-            var run = await db.Runs.AsNoTracking().FirstOrDefaultAsync(r => r.Id == runId, ct)
-                      ?? throw new InvalidOperationException($"Run {runId} not found.");
-            if (run.OrderId is { } existing)
-                return existing;
-            if (run.Kind == RunKind.Learning)
-                throw new InvalidOperationException("Learning runs do not belong to an order.");
-
-            var parentId = run.ParentCompositionRunId ?? run.ParentRunId;
-            var parent = parentId is null
-                ? null
-                : await db.Runs.AsNoTracking()
-                    .Where(r => r.Id == parentId && r.OrderId != null)
-                    .Select(r => new { OrderId = r.OrderId!.Value, r.OrderVersion, r.Kind })
-                    .FirstOrDefaultAsync(ct);
-
-            Guid orderId;
-            int version;
-            var now = _time.GetUtcNow();
-            if (parent is not null && await LockOrderAsync(parent.OrderId, ct))
-            {
-                orderId = parent.OrderId;
-                version = await InheritedVersionAsync(run, parent.OrderId, parent.OrderVersion, parent.Kind, ct);
-            }
-            else
-            {
-                orderId = run.Id;
-                version = 1;
-                db.Orders.Add(new OrderEntity
-                {
-                    Id = orderId,
-                    CreatedByUser = run.CreatedByUser,
-                    RequestText = LegacyRequestText(run),
-                    Mode = OrderMode.Careful,
-                    State = OrderState.Ready,
-                    Entry = entry,
-                    CrewTemplateName = run.Kind == RunKind.CrewComposition ? null : run.CrewTemplateName,
-                    CreatedAt = run.CreatedAt,
-                    UpdatedAt = now,
-                });
-                await db.SaveChangesAsync(ct);
-            }
-
-            await SetLinkAsync(run.Id, orderId, version, ct);
-            await TouchInTransactionAsync(orderId, now, ct);
-            await tx.CommitAsync(ct);
-            db.ChangeTracker.Clear();
-            return orderId;
-        }
-        catch
-        {
-            db.ChangeTracker.Clear();
-            throw;
-        }
     }
 
     public async Task TouchAsync(Guid orderId, DateTimeOffset at, CancellationToken ct = default) =>
@@ -390,8 +320,8 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
         ArgumentNullException.ThrowIfNull(start);
         ArgumentNullException.ThrowIfNull(start.Run);
         ArgumentNullException.ThrowIfNull(start.RoleChanges);
-        if (start.Run.OrderId != start.OrderId || start.Run.OrderVersion != 1 || start.Run.Kind != RunKind.Standard)
-            throw new ArgumentException("The first run must be a standard run of the order with version 1.", nameof(start));
+        if (start.Run.OrderId != start.OrderId || start.Run.OrderVersion != 1)
+            throw new ArgumentException("The first run must be a run of the order with version 1.", nameof(start));
 
         try
         {
@@ -402,7 +332,7 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
             var state = await db.Orders.AsNoTracking().Where(o => o.Id == start.OrderId).Select(o => o.State).SingleAsync(ct);
             if (state != start.Expected)
                 return false;
-            if (await db.Runs.AnyAsync(r => r.OrderId == start.OrderId && r.Kind == RunKind.Standard && r.OrderVersion == 1, ct))
+            if (await db.Runs.AnyAsync(r => r.OrderId == start.OrderId && r.OrderVersion == 1, ct))
                 return false;
 
             var fromAnalyzing = start.Expected == OrderState.Analyzing;
@@ -434,7 +364,7 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
             await tx.CommitAsync(ct);
             return true;
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: FirstRunIndex })
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: RunVersionIndex })
         {
             return false;
         }
@@ -503,43 +433,10 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
             && o.IntakeAttempts < maxAttempts
             && (o.ClaimedAt == null || o.ClaimedAt < staleBefore));
 
-    internal static string LegacyRequestText(RunEntity run)
-    {
-        if (run.Kind != RunKind.CrewComposition)
-            return run.BriefingText;
-
-        try
-        {
-            using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(run.ConfigJson) ? "{}" : run.ConfigJson);
-            if (doc.RootElement.ValueKind == JsonValueKind.Object
-                && doc.RootElement.TryGetProperty("original_task", out var task)
-                && task.ValueKind == JsonValueKind.String
-                && !string.IsNullOrEmpty(task.GetString()))
-                return task.GetString()!;
-        }
-        catch (JsonException)
-        {
-        }
-
-        return ComposePrefix().Replace(run.BriefingText, string.Empty);
-    }
-
-    private async Task<int> InheritedVersionAsync(RunEntity run, Guid orderId, int? parentVersion, RunKind parentKind, CancellationToken ct)
-    {
-        if (run.Kind == RunKind.Standard && run.ParentCompositionRunId is not null && parentKind == RunKind.CrewComposition && parentVersion is { } candidate)
-        {
-            var taken = await db.Runs.AnyAsync(r => r.OrderId == orderId && r.Kind == RunKind.Standard && r.OrderVersion == candidate, ct);
-            if (!taken)
-                return candidate;
-        }
-
-        return await NextStandardVersionAsync(orderId, ct);
-    }
-
-    private async Task<int> NextStandardVersionAsync(Guid orderId, CancellationToken ct)
+    private async Task<int> NextVersionAsync(Guid orderId, CancellationToken ct)
     {
         var max = await db.Runs
-            .Where(r => r.OrderId == orderId && r.Kind == RunKind.Standard)
+            .Where(r => r.OrderId == orderId)
             .MaxAsync(r => (int?)r.OrderVersion, ct);
         return (max ?? 0) + 1;
     }
@@ -551,12 +448,6 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
             .ToListAsync(ct);
         return found.Count > 0;
     }
-
-    private Task SetLinkAsync(Guid runId, Guid orderId, int version, CancellationToken ct) =>
-        db.Runs.Where(r => r.Id == runId)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(r => r.OrderId, orderId)
-                .SetProperty(r => r.OrderVersion, version), ct);
 
     private Task TouchInTransactionAsync(Guid orderId, DateTimeOffset at, CancellationToken ct) =>
         db.Orders.Where(o => o.Id == orderId && o.UpdatedAt < at)
@@ -576,9 +467,6 @@ internal sealed partial class OrderRepository(AtelierDbContext db, TimeProvider?
         if (sources.Any(s => s.OrderId != order.Id))
             throw new ArgumentException("Every source link must belong to the order.", nameof(sources));
     }
-
-    [GeneratedRegex(@"^Compose a crew for the following task:\s*", RegexOptions.CultureInvariant)]
-    private static partial Regex ComposePrefix();
 
     private sealed record RunEventRaw(string EventType, int? Iteration, DateTimeOffset CreatedAt);
 }

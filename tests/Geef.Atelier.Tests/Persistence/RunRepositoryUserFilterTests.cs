@@ -9,7 +9,7 @@ public sealed class RunRepositoryUserFilterTests(PostgresFixture fixture)
     private static async Task<Guid> CreateRunForUser(AtelierDbContext db, string? user)
     {
         var svc = new RunPersistenceService(db);
-        return await svc.CreateRunAsync("Briefing", "{}", user, cancellationToken: CancellationToken.None);
+        return await svc.CreateRunAsync("Briefing", user, cancellationToken: CancellationToken.None);
     }
 
     [Fact]

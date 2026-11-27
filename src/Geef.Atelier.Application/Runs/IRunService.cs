@@ -6,7 +6,7 @@ namespace Geef.Atelier.Application.Runs;
 public interface IRunService
 {
     /// <summary>
-    /// Returns the warnings recorded for a run (Step47), in the order they were recorded. Returns an empty list
+    /// Returns the warnings recorded for a run, in the order they were recorded. Returns an empty list
     /// when the run does not exist or <paramref name="requestingUsername"/> is set and does not own it.
     /// Pass null to bypass the ownership check (admin mode).
     /// </summary>

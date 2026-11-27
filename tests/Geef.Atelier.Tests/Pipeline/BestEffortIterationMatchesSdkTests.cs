@@ -30,8 +30,7 @@ public sealed class BestEffortIterationMatchesSdkTests
             Executor: TestLoop.Writer,
             Reviewers: TestLoop.Reviewers,
             EvaluationStrategy: EvaluationStrategy.Parallel,
-            ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 3, AbortOnCritical: false, DetectRegression: false, StagnationThreshold: null),
-            Advisors: []);
+            ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 3, AbortOnCritical: false, DetectRegression: false, StagnationThreshold: null));
         var scripted = new Dictionary<string, IReviewer>
         {
             [TestLoop.Reviewers[0].Name] = new ScriptedReviewer("always-rejects", 1, 2, 3),

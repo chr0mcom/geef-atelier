@@ -290,7 +290,7 @@
 
     bool ResultShown => _result is { Text: not null } && _view is not null;
 
-    int VersionCount => _view?.Runs.Where(r => r.Kind == RunKind.Standard && r.Version is not null).Select(r => r.Version).Distinct().Count() ?? 0;
+    int VersionCount => _view?.Runs.Where(r => r.Version is not null).Select(r => r.Version).Distinct().Count() ?? 0;
 
     bool NoteInStrip => VersionCount > 1 && _result is { Text: not null, Version: int shownVersion, LatestVersion: int latest } shown && shownVersion < latest
         && !string.IsNullOrWhiteSpace(shown.Note);
@@ -421,7 +421,7 @@
         {
             var view = await Orders.GetAsync(OrderId, _requestingUser);
             var result = view is not null && (view.Display.HasText || view.Display.State is OrderDisplayState.Failed or OrderDisplayState.Stopped
-                    || view.Runs.Count(r => r.Kind == RunKind.Standard && r.Version is not null) > 1)
+                    || view.Runs.Count(r => r.Version is not null) > 1)
                 ? await Orders.GetResultAsync(OrderId, _requestingUser, _viewer)
                 : null;
             _view = view;

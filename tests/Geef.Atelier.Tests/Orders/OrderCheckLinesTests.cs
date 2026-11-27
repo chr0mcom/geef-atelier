@@ -398,7 +398,6 @@ public sealed class OrderCheckLinesTests
 
     [Theory]
     [InlineData(DraftCheckCodes.Arithmetic, true, "The calculations in the text add up.")]
-    [InlineData(DraftCheckCodes.ArithmeticPartial, false, "The calculations in the text that could be read clearly add up; 1 other calculation(s) could not be read clearly and were not checked.")]
     public void Calculations_of_an_earlier_report_never_read_as_calculations_that_add_up(string code, bool blocking, string storedMessage)
     {
         var checks = new[] { Check(DraftCheckCodes.Empty), new DraftCheckResult(code, true, blocking, storedMessage, null) };

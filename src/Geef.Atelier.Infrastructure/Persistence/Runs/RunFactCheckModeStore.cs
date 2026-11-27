@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace Geef.Atelier.Infrastructure.Persistence.Runs;
 
 /// <summary>
-/// Stores the fact-check mode in <c>Runs.FactCheckMode</c> (migration Step50). Writing the same mode again changes nothing; a
+/// Stores the fact-check mode in <c>Runs.FactCheckMode</c>. Writing the same mode again changes nothing; a
 /// failure is logged and never stops the run, because the mode also travels in the run context and the report.
 /// </summary>
 internal sealed class RunFactCheckModeStore(IServiceScopeFactory scopeFactory, ILogger<RunFactCheckModeStore> logger) : IRunFactCheckModeStore

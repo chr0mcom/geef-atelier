@@ -10,7 +10,7 @@ public sealed record FindingEntity
     public required string Message { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
 
-    /// <summary>Category of the finding as the reviewer set it (<c>deterministic-check</c>, <c>fact-check</c>, …); <c>null</c> for findings before Step50.</summary>
+    /// <summary>Category of the finding as the reviewer set it (<c>deterministic-check</c>, <c>fact-check</c>, …); <c>null</c> when the reviewer set none.</summary>
     public string? Category { get; init; }
 
     /// <summary>Machine-readable code of the finding (metadata <c>code</c>, such as <c>fact.unsupported</c> or <c>length</c>); <c>null</c> when it has none.</summary>

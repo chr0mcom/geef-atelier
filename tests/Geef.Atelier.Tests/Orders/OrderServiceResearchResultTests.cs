@@ -19,8 +19,8 @@ namespace Geef.Atelier.Tests.Orders;
 /// <summary>
 /// The research of an order in its result over the real order service and Postgres: shown from the stored research only when the
 /// delivered run used it, every other status as its sentence, the usage row of the research never listed as a file, and the
-/// sentence about research that did not work shown once. The research is stored in its real column (<c>Orders.ResearchJson</c>,
-/// Step51) through <see cref="IOrderRepository.TrySetResearchAsync"/> and read back by the real repository.
+/// sentence about research that did not work shown once. The research is stored in its real column (<c>Orders.ResearchJson</c>)
+/// through <see cref="IOrderRepository.TrySetResearchAsync"/> and read back by the real repository.
 /// </summary>
 [Collection(EndToEndCollection.Name)]
 [Trait("Category", "EndToEnd")]

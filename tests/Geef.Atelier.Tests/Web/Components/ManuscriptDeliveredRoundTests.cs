@@ -16,7 +16,6 @@ public sealed class ManuscriptDeliveredRoundTests : TestContext
         CreatedAt = DateTimeOffset.UtcNow,
         Status = RunStatus.Failed,
         BriefingText = "b",
-        ConfigJson = "{}",
         FinalText = "# Title\n\nText.",
         DeliveredIteration = deliveredIteration,
     };

@@ -291,7 +291,7 @@ internal static class OrderTestData
         };
         var run = state is OrderDisplayState.Preparing or OrderDisplayState.NeedsInput
             ? null
-            : new OrderRunView(runId, 1, RunKind.Standard, status, outcome, Start, Start.AddSeconds(5), IsFinished(state) ? Start.AddMinutes(3) : null, wordCount ?? (text ? 120 : null));
+            : new OrderRunView(runId, 1, status, outcome, Start, Start.AddSeconds(5), IsFinished(state) ? Start.AddMinutes(3) : null, wordCount ?? (text ? 120 : null));
         return new OrderView(
             id,
             title,

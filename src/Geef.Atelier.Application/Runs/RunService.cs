@@ -15,11 +15,10 @@ using Microsoft.Extensions.Options;
 namespace Geef.Atelier.Application.Runs;
 
 internal sealed class RunService(
-    IRunPersistenceService                persistence,
     IRunRepository                        repository,
     ILogger<RunService>                   logger,
     IRunWarningRepository                 warningRepository,
-    IOrderRepository?                     orderRepository = null,
+    IOrderRepository                      orderRepository,
     IOptions<OrderOptions>?               orderOptions = null) : IRunService
 {
     private static readonly JsonSerializerOptions SnapshotJsonOpts =
@@ -120,51 +119,49 @@ internal sealed class RunService(
             }
         }
 
-        if (details.Run.ChangesAnEarlierVersion() && details.Run.OrderId is { } changedOrderId && orderRepository is not null)
-            return await ResumeChangeAsync(details.Run, changedOrderId, snapshotJson, cancellationToken);
+        if (details.Run.OrderId is not { } orderId)
+            throw new RunNotResumableException(RunNotResumableException.NotPreparedMessage);
 
-        var resumedId = await persistence.CreateResumedRunAsync(
-            details.Run.BriefingText,
-            details.Run.ConfigJson,
-            details.Run.CreatedByUser,
-            details.Run.CrewTemplateName,
-            null,
-            options.ParentRunId,
-            seedDraftText,
-            details.Run.Kind,
-            cancellationToken);
+        if (details.Run.ChangesAnEarlierVersion())
+            return await ResumeChangeAsync(details.Run, orderId, snapshotJson, cancellationToken);
 
-        if (details.Run.Kind != RunKind.Learning)
-            await LinkToOrderAsync(resumedId, OrderEntry.Legacy, CancellationToken.None);
-
-        await persistence.UpdateSnapshotAsync(resumedId, snapshotJson!, CancellationToken.None);
-        return resumedId;
+        var resumed = new RunEntity
+        {
+            Id = Guid.NewGuid(),
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = RunStatus.Pending,
+            BriefingText = details.Run.BriefingText,
+            CreatedByUser = details.Run.CreatedByUser,
+            CrewTemplateName = details.Run.CrewTemplateName,
+            CrewSnapshot = snapshotJson,
+            TokensTotal = 0,
+            OrderId = orderId,
+            ParentRunId = options.ParentRunId,
+            SeedDraftText = seedDraftText,
+        };
+        await orderRepository.AddRunAsync(orderId, resumed, cancellationToken);
+        return resumed.Id;
     }
 
     private async Task<Guid> ResumeChangeAsync(RunEntity failed, Guid orderId, string? snapshotJson, CancellationToken cancellationToken)
     {
-        var orderRuns = await orderRepository!.ListRunsAsync(orderId, cancellationToken);
+        var orderRuns = await orderRepository.ListRunsAsync(orderId, cancellationToken);
         var shown = OrderStateResolver.SelectShownRun(orderRuns)
                     ?? throw new RunNotResumableException(RevisionLines.NothingToChange);
         if ((shown.OrderVersion ?? 0) > (failed.OrderVersion ?? 0))
             throw new RunNotResumableException(RevisionLines.ResumeLaterVersion);
-        var version = orderRuns.Where(r => r.Kind == RunKind.Standard).Max(r => r.OrderVersion ?? 0) + 1;
-        var change = RevisionBrief.WithoutRetired(failed.RevisionHint);
-        if (change.Length == 0)
-            throw new RunNotResumableException(RevisionLines.ResumeRetired);
+        var version = orderRuns.Max(r => r.OrderVersion ?? 0) + 1;
+        var change = failed.RevisionHint!;
         var run = new RunEntity
         {
             Id = Guid.NewGuid(),
             CreatedAt = DateTimeOffset.UtcNow,
             Status = RunStatus.Pending,
             BriefingText = RevisionBrief.Compose(shown.BriefingText ?? string.Empty, change, version),
-            ConfigJson = failed.ConfigJson,
             CreatedByUser = failed.CreatedByUser,
             CrewTemplateName = failed.CrewTemplateName,
             CrewSnapshot = snapshotJson,
             TokensTotal = 0,
-            CostTotal = 0m,
-            Kind = RunKind.Standard,
             OrderId = orderId,
             OrderVersion = version,
             ParentRunId = shown.Id,
@@ -185,20 +182,6 @@ internal sealed class RunService(
             RevisionStart.Cancelled => throw new RunNotResumableException(RevisionLines.Stopped),
             _ => throw new RunNotResumableException(RevisionLines.NotFound),
         };
-    }
-
-    private async Task LinkToOrderAsync(Guid runId, OrderEntry entry, CancellationToken cancellationToken)
-    {
-        if (orderRepository is null)
-            return;
-        try
-        {
-            await orderRepository.LinkLegacyRunAsync(runId, entry, cancellationToken);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            logger.LogError("Run {RunId} could not be linked to an order; it runs without one: {Error}", runId, ex.ToRedactedLogText());
-        }
     }
 
     /// <inheritdoc/>
@@ -225,10 +208,10 @@ internal sealed class RunService(
         if (run.Status is RunStatus.Pending or RunStatus.Running)
             throw new InvalidOperationException("Running or pending runs cannot be deleted. Cancel the run first.");
 
-        var link = orderRepository is null ? null : await orderRepository.GetLinkForRunAsync(runId, cancellationToken);
+        var link = await orderRepository.GetLinkForRunAsync(runId, cancellationToken);
         await repository.DeleteAsync(runId, cancellationToken);
 
-        if (link is { OrderId: var orderId } && (await orderRepository!.ListRunsAsync(orderId, cancellationToken)).Count == 0)
+        if (link is { OrderId: var orderId } && (await orderRepository.ListRunsAsync(orderId, cancellationToken)).Count == 0)
             await orderRepository.DeleteAsync(orderId, cancellationToken);
         return true;
     }

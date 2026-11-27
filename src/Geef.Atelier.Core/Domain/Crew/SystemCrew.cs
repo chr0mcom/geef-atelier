@@ -13,19 +13,6 @@ public static class SystemCrew
     /// <summary>Name of the code-only template of the direct path.</summary>
     public const string DirectTemplateName = "direct";
 
-    /// <summary>
-    /// Template name stored with runs of the removed variant "Extra careful" (D-087). No new run gets it; stored runs are still read,
-    /// continued and changed on the direct path.
-    /// </summary>
-    public const string RetiredOutlineTemplateName = "direct-outline";
-
-    /// <summary>Name of the extra check of <see cref="RetiredOutlineTemplateName"/> in stored snapshots; the direct path leaves it out.</summary>
-    public const string RetiredRequestCheckName = "requirements-check";
-
-    /// <summary>True for the template names the direct path runs: <see cref="DirectTemplateName"/> and, for stored runs, <see cref="RetiredOutlineTemplateName"/>.</summary>
-    public static bool IsDirectPathTemplate(string? name) =>
-        string.Equals(name, DirectTemplateName, StringComparison.Ordinal) || string.Equals(name, RetiredOutlineTemplateName, StringComparison.Ordinal);
-
     /// <summary>Writer of the direct path: one writing pass from the request and the attached files.</summary>
     public static readonly ExecutorProfile DirectWriterProfile = new(
         Name: "direct-writer",

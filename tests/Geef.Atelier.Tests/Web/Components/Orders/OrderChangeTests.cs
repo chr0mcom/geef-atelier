@@ -47,7 +47,7 @@ public sealed class OrderChangeTests : TestContext
     }
 
     private static OrderRunView RunView(int version, RunStatus status, RunOutcome? outcome, int? words, string? asked = null, int minutes = 0) =>
-        new(Guid.NewGuid(), version, RunKind.Standard, status, outcome, OrderTestData.Start.AddMinutes(minutes), OrderTestData.Start.AddMinutes(minutes),
+        new(Guid.NewGuid(), version, status, outcome, OrderTestData.Start.AddMinutes(minutes), OrderTestData.Start.AddMinutes(minutes),
             status is RunStatus.Pending or RunStatus.Running ? null : OrderTestData.Start.AddMinutes(minutes + 2), words, asked);
 
     private OrderView AddOrder(OrderDisplayState state, IReadOnlyList<OrderRunView> runs, string owner = "alice")

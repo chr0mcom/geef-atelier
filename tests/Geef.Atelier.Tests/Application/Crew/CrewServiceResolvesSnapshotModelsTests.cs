@@ -40,7 +40,6 @@ public sealed class CrewServiceResolvesSnapshotModelsTests
         Assert.Equal(templateName, resolved.Snapshot.TemplateName);
         Assert.Equal(template.ExecutorProfileName, resolved.Snapshot.Executor.Name);
         Assert.Equal(template.ReviewerProfileNames, resolved.Snapshot.Reviewers.Select(r => r.Name));
-        Assert.Empty(resolved.Snapshot.Advisors);
     }
 
     [Fact]

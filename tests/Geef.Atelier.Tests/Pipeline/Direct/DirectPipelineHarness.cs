@@ -93,7 +93,6 @@ internal sealed class DirectPipelineHarness
         Reviewers: [SystemCrew.DeterministicChecksProfile],
         EvaluationStrategy: EvaluationStrategy.Parallel,
         ConvergenceOverride: SystemCrew.DirectTemplate.ConvergenceOverride,
-        Advisors: [],
         CrewDomain: SystemCrew.DirectTemplate.Domain);
 
     /// <summary>
@@ -106,7 +105,7 @@ internal sealed class DirectPipelineHarness
         var id = orderId ?? Orders.Add(request, runId).Id;
         var run = new RunEntity
         {
-            Id = runId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Running, BriefingText = request, ConfigJson = "{}",
+            Id = runId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Running, BriefingText = request,
             CrewTemplateName = SystemCrew.DirectTemplateName, OrderId = id, OrderVersion = orderVersion, SeedDraftText = seedDraft,
         };
         return (run, id);
@@ -139,7 +138,7 @@ internal sealed class DirectPipelineHarness
         Reports.Reports.TryGetValue(run.Id, out var json);
         var finished = new RunEntity
         {
-            Id = run.Id, CreatedAt = run.CreatedAt, Status = RunStatus.Completed, BriefingText = run.BriefingText, ConfigJson = run.ConfigJson,
+            Id = run.Id, CreatedAt = run.CreatedAt, Status = RunStatus.Completed, BriefingText = run.BriefingText,
             CrewTemplateName = run.CrewTemplateName, OrderId = run.OrderId, OrderVersion = run.OrderVersion, SeedDraftText = run.SeedDraftText,
             ParentRunId = run.ParentRunId, RevisionHint = run.RevisionHint, FinalText = text ?? outcome.Result.Output?.Markdown, ReportJson = json,
         };

@@ -27,7 +27,7 @@ public sealed class RunOrchestratorPicksUpPendingRunTests(PostgresFixture fixtur
         // Arrange — create a Pending run
         await using var ctx = fixture.NewContext();
         var svc   = new RunPersistenceService(ctx);
-        var runId = await svc.CreateRunAsync(Briefing, "{}", crewSnapshotJson: TestCrewSnapshots.RunnableJson, cancellationToken: CancellationToken.None);
+        var runId = await svc.CreateRunAsync(Briefing, crewSnapshotJson: TestCrewSnapshots.RunnableJson, cancellationToken: CancellationToken.None);
 
         // Act — start the orchestrator
         await using var host = new OrchestratorTestHost(fixture, new FakeLlmClient());

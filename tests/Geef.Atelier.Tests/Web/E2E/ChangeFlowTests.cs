@@ -44,7 +44,7 @@ public sealed class ChangeFlowTests(PlaywrightFixture pw, PostgresFixture pg) : 
     }
 
     private static OrderRunView RunView(int version, RunStatus status, RunOutcome? outcome, int? words, string? asked = null) =>
-        new(Guid.NewGuid(), version, RunKind.Standard, status, outcome, OrderTestData.Start.AddMinutes(version * 5), OrderTestData.Start.AddMinutes(version * 5),
+        new(Guid.NewGuid(), version, status, outcome, OrderTestData.Start.AddMinutes(version * 5), OrderTestData.Start.AddMinutes(version * 5),
             status is RunStatus.Pending or RunStatus.Running ? null : OrderTestData.Start.AddMinutes(version * 5 + 2), words, asked);
 
     private Guid AddOrder(bool writing)

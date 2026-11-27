@@ -12,19 +12,19 @@ internal static class OrderTestData
         var time = at ?? DateTimeOffset.UtcNow;
         return new OrderEntity
         {
-            Id = Guid.NewGuid(), CreatedByUser = owner, RequestText = text, Mode = OrderMode.Direct, State = state,
+            Id = Guid.NewGuid(), CreatedByUser = owner, RequestText = text, State = state,
             Entry = OrderEntry.Web, CreatedAt = time, UpdatedAt = time,
         };
     }
 
     public static RunEntity Run(
-        string? owner, Guid? orderId = null, int? version = null, RunKind kind = RunKind.Standard,
+        string? owner, Guid? orderId = null, int? version = null,
         RunStatus status = RunStatus.Pending, DateTimeOffset? at = null, string? finalText = null,
-        Guid? parentRunId = null, Guid? parentCompositionRunId = null, string briefing = "Write a short note.", string config = "{}") => new()
+        Guid? parentRunId = null, string briefing = "Write a short note.") => new()
     {
-        Id = Guid.NewGuid(), CreatedAt = at ?? DateTimeOffset.UtcNow, Status = status, BriefingText = briefing, ConfigJson = config,
-        CreatedByUser = owner, Kind = kind, OrderId = orderId, OrderVersion = version, FinalText = finalText,
-        ParentRunId = parentRunId, ParentCompositionRunId = parentCompositionRunId,
+        Id = Guid.NewGuid(), CreatedAt = at ?? DateTimeOffset.UtcNow, Status = status, BriefingText = briefing,
+        CreatedByUser = owner, OrderId = orderId, OrderVersion = version, FinalText = finalText,
+        ParentRunId = parentRunId,
     };
 
     public static SourceEntity Source(string owner, string? sha = null, int chars = 1_000, string text = "Some text.", DateTimeOffset? expiresAt = null, string? storagePath = null, int? pages = null) => new()

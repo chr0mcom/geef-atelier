@@ -8,7 +8,7 @@ namespace Geef.Atelier.Core.Domain;
 /// The outcome is the "everything is stored" signal: it is written only after the final text and the results of
 /// the finishing steps (finalizers) are saved, so a client that waits for it never reads a text that is still
 /// being changed. While it is <c>null</c> the run is still working, also when its status already looks terminal.
-/// The first recorded outcome wins. Runs finished before Step47 keep <c>null</c>.
+/// The first recorded outcome wins.
 /// </para>
 /// </summary>
 public enum RunOutcome

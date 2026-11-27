@@ -11,23 +11,18 @@ namespace Geef.Atelier.Tests.Orchestrator;
 /// Funktional 1 (Etappe 0, review round 2): a run whose process ended while its finishing steps ran has a terminal
 /// status but no outcome. On the next start the orchestrator records the outcome (Converged for Completed with text,
 /// DeliveredWithOpenPoints for Failed or Aborted with text, Failed without text) and a plain warning. Runs that
-/// completed before the first run with an outcome (finished before Step47) stay untouched. The repair runs after the
+/// have an outcome stay untouched. The repair runs after the
 /// reset of stale Running runs and on its own, so a failure in it never keeps a Running run from being reset. Real
 /// Postgres.
 /// </summary>
 [Collection("Postgres")]
 public sealed class RunOrchestratorRecoversRunsInterruptedWhileFinishingTests(PostgresFixture fixture)
 {
-    private static readonly DateTimeOffset LegacyCompletedAt = new(2020, 1, 1, 12, 0, 0, TimeSpan.Zero);
-    private static readonly DateTimeOffset FirstOutcomeCompletedAt = new(2021, 1, 1, 12, 0, 0, TimeSpan.Zero);
     private static readonly DateTimeOffset InterruptedCompletedAt = new(2021, 6, 1, 12, 0, 0, TimeSpan.Zero);
 
     [Fact(Timeout = 30_000)]
-    public async Task Service_OnStart_RecordsAnOutcomeForRunsStoppedWhileFinishingButLeavesLegacyRunsAlone()
+    public async Task Service_OnStart_RecordsAnOutcomeForRunsStoppedWhileFinishingAndLeavesFinishedOnesAlone()
     {
-        var legacy = await SeedAsync(RunStatus.Completed, "legacy text", null, LegacyCompletedAt);
-        var legacyFailed = await SeedAsync(RunStatus.Failed, null, null, LegacyCompletedAt);
-        await SeedAsync(RunStatus.Completed, "first", RunOutcome.Converged, FirstOutcomeCompletedAt);
         var completed = await SeedAsync(RunStatus.Completed, "finished text", null, InterruptedCompletedAt);
         var failedWithText = await SeedAsync(RunStatus.Failed, "best draft", null, InterruptedCompletedAt);
         var abortedWithText = await SeedAsync(RunStatus.Aborted, "draft", null, InterruptedCompletedAt);
@@ -47,8 +42,6 @@ public sealed class RunOrchestratorRecoversRunsInterruptedWhileFinishingTests(Po
         Assert.Equal(RunOutcome.DeliveredWithOpenPoints, await OutcomeAsync(failedWithText));
         Assert.Equal(RunOutcome.DeliveredWithOpenPoints, await OutcomeAsync(abortedWithText));
         Assert.Equal(RunOutcome.Failed, await OutcomeAsync(failedWithoutText));
-        Assert.Null(await OutcomeAsync(legacy));
-        Assert.Null(await OutcomeAsync(legacyFailed));
         Assert.Equal(RunOutcome.Converged, await OutcomeAsync(alreadyDone));
 
         await using var db = fixture.NewContext();
@@ -59,7 +52,7 @@ public sealed class RunOrchestratorRecoversRunsInterruptedWhileFinishingTests(Po
             Assert.Equal(RunWarningSources.Run, warning.Source);
             Assert.Equal("The result may be incomplete because the service was restarted while finishing.", warning.Message);
         }
-        foreach (var id in new[] { legacy, legacyFailed, alreadyDone })
+        foreach (var id in new[] { alreadyDone })
             Assert.Empty(await db.RunWarnings.Where(w => w.RunId == id).ToListAsync());
 
         var statuses = await db.Runs.Where(r => r.Id == completed || r.Id == failedWithText || r.Id == abortedWithText)
@@ -73,7 +66,6 @@ public sealed class RunOrchestratorRecoversRunsInterruptedWhileFinishingTests(Po
     [Fact(Timeout = 30_000)]
     public async Task Service_OnStart_ResetsStaleRunningRunsEvenWhenTheFinishingRepairFails()
     {
-        await SeedAsync(RunStatus.Completed, "first", RunOutcome.Converged, FirstOutcomeCompletedAt);
         await SeedAsync(RunStatus.Completed, "finished text", null, InterruptedCompletedAt);
         var stale = await SeedAsync(RunStatus.Running, null, null, InterruptedCompletedAt);
 
@@ -110,7 +102,6 @@ public sealed class RunOrchestratorRecoversRunsInterruptedWhileFinishingTests(Po
             CompletedAt = completedAt,
             Status = status,
             BriefingText = "Interrupted while finishing",
-            ConfigJson = "{}",
             FinalText = finalText,
             Outcome = outcome,
         });

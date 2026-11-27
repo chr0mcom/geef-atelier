@@ -54,7 +54,6 @@ public sealed class RunDetailWarningsTests : TestContext
                 CreatedAt = DateTimeOffset.UtcNow,
                 Status = RunStatus.Completed,
                 BriefingText = "Test briefing",
-                ConfigJson = "{}",
                 FinalText = "# Final",
             },
             []);

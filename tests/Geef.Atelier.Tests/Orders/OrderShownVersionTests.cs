@@ -26,16 +26,15 @@ public sealed class OrderShownVersionTests
     }
 
     [Fact]
-    public void The_newest_standard_version_with_text_is_shown_and_blank_texts_or_compositions_never()
+    public void The_newest_version_with_text_is_shown_and_blank_texts_never()
     {
         var order = Guid.NewGuid();
         var v1 = Run("u", order, 1, status: RunStatus.Completed, at: T0, finalText: "One.");
         var v2 = Run("u", order, 2, status: RunStatus.Failed, at: T0.AddMinutes(1), finalText: "Two, with open points.");
         var v3 = Run("u", order, 3, status: RunStatus.Failed, at: T0.AddMinutes(2), finalText: "   ");
-        var composition = Run("u", order, 4, kind: RunKind.CrewComposition, status: RunStatus.Completed, at: T0.AddMinutes(3), finalText: "Crew.");
 
-        Assert.Same(v2, OrderStateResolver.SelectShownRun([v1, v2, v3, composition]));
-        Assert.Null(OrderStateResolver.SelectShownRun([v3, composition]));
+        Assert.Same(v2, OrderStateResolver.SelectShownRun([v1, v2, v3]));
+        Assert.Null(OrderStateResolver.SelectShownRun([v3]));
         Assert.Null(OrderStateResolver.SelectShownRun([]));
     }
 

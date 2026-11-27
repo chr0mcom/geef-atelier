@@ -68,7 +68,7 @@
     /// <summary>The order whose versions are listed.</summary>
     [Parameter, EditorRequired] public Guid OrderId { get; set; }
 
-    /// <summary>The runs of the order; versions are the standard runs with a version number.</summary>
+    /// <summary>The runs of the order; versions are the runs with a version number.</summary>
     [Parameter, EditorRequired] public IReadOnlyList<OrderRunView> Runs { get; set; } = [];
 
     /// <summary>The version shown above the list; <c>null</c> when no text is shown.</summary>

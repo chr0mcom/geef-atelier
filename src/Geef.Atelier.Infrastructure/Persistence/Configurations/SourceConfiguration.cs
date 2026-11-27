@@ -44,9 +44,6 @@ internal sealed class SourceConfiguration : IEntityTypeConfiguration<SourceEntit
         builder.Property(s => s.ExpiresAt).IsRequired(false);
         builder.Property(s => s.CreatedAt).IsRequired();
 
-        builder.HasIndex(s => new { s.OwnerUsername, s.CreatedAt })
-            .IsDescending(false, true)
-            .HasDatabaseName("IX_Sources_OwnerUsername_CreatedAt");
         builder.HasIndex(s => new { s.OwnerUsername, s.Sha256 }).IsUnique().HasDatabaseName("UX_Sources_OwnerUsername_Sha256");
         builder.HasIndex(s => s.ExpiresAt)
             .HasFilter("\"ExpiresAt\" IS NOT NULL")

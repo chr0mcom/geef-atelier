@@ -9,7 +9,6 @@ using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Tests.Persistence;
 using Geef.Atelier.Web.Notifications;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Geef.Atelier.Tests.Web.Notifications;
@@ -29,8 +28,7 @@ public sealed class RunLiveUpdateSecurityTests(PostgresFixture fixture) : IAsync
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddDbContext<AtelierDbContext>(opt => opt.UseNpgsql(fixture.ConnectionString)
-            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
+        services.AddDbContext<AtelierDbContext>(opt => opt.UseNpgsql(fixture.ConnectionString));
         services.AddAtelierPersistence();
         services.AddAtelierApplication();
         services.AddSingleton<Geef.Atelier.Application.Crew.IModelCatalog, PassThroughModelCatalog>();
@@ -52,7 +50,7 @@ public sealed class RunLiveUpdateSecurityTests(PostgresFixture fixture) : IAsync
         var run = new RunEntity
         {
             Id = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Completed, BriefingText = $"Request of {owner}",
-            ConfigJson = "{}", CreatedByUser = owner, CompletedAt = DateTimeOffset.UtcNow,
+            CreatedByUser = owner, CompletedAt = DateTimeOffset.UtcNow,
         };
         db.Runs.Add(run);
         await db.SaveChangesAsync();

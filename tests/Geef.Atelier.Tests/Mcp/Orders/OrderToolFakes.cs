@@ -70,7 +70,7 @@ internal static class OrderToolTestData
         var now = DateTimeOffset.UtcNow;
         var display = new OrderDisplay(state, HasText: state is OrderDisplayState.Delivered or OrderDisplayState.DeliveredWithOpenPoints, IsFinished(state));
         var run = runId is { } id
-            ? new OrderRunView(id, version, RunKind.Standard, RunStatus.Running, outcome, now, now, null, null)
+            ? new OrderRunView(id, version, RunStatus.Running, outcome, now, now, null, null)
             : null;
         return new OrderView(
             orderId, "Synthetic order", "Write a short note.", OrderEntry.Mcp, OrderState.Ready, display,

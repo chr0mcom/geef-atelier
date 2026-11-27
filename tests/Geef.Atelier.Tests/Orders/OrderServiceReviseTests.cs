@@ -27,12 +27,11 @@ public sealed class OrderServiceReviseTests(PostgresFixture postgres)
     private const string ProfileBlock = BriefingSections.ProfileHeading + "\nName: Anna Beispiel";
 
     [Fact]
-    public async Task A_change_creates_version_two_seeded_with_the_shown_text_on_the_direct_path_also_for_a_stored_careful_order()
+    public async Task A_change_creates_version_two_seeded_with_the_shown_text_on_the_direct_path()
     {
         await using var host = await StartAsync(_ => { });
         var user = NewUser();
         var submission = await SubmitAsync(host, new SubmitOrderRequest("Write an article.", user, OrderEntry.Web));
-        await host.QueryAsync(db => db.Orders.Where(o => o.Id == submission.OrderId).ExecuteUpdateAsync(s => s.SetProperty(o => o.Mode, OrderMode.Careful)));
         var v1Briefing = "Write an article." + BriefingSections.Separator + ProfileBlock;
         await DeliverAsync(host, submission.RunId!.Value, V1Text, briefing: v1Briefing);
 
@@ -42,7 +41,7 @@ public sealed class OrderServiceReviseTests(PostgresFixture postgres)
         Assert.Empty(revision.Notices);
         var run = await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.Id == revision.RunId));
         var expectedChange = Change + " " + RevisionQuick.Shorter.Instruction();
-        Assert.Equal((submission.OrderId, 2, RunKind.Standard, RunStatus.Pending), (run.OrderId!.Value, run.OrderVersion!.Value, run.Kind, run.Status));
+        Assert.Equal((submission.OrderId, 2, RunStatus.Pending), (run.OrderId!.Value, run.OrderVersion!.Value, run.Status));
         Assert.Equal(submission.RunId, run.ParentRunId);
         Assert.Equal(V1Text, run.SeedDraftText);
         Assert.Equal(expectedChange, run.RevisionHint);
@@ -52,7 +51,7 @@ public sealed class OrderServiceReviseTests(PostgresFixture postgres)
         Assert.Equal(SystemCrew.DirectTemplateName, run.CrewTemplateName);
         Assert.Equal(SystemCrew.DirectTemplateName, CrewSnapshot.Deserialize(run.CrewSnapshot!)!.TemplateName);
         var order = await host.QueryAsync(db => db.Orders.AsNoTracking().SingleAsync(o => o.Id == submission.OrderId));
-        Assert.Equal((OrderState.Ready, OrderMode.Careful), (order.State, order.Mode));
+        Assert.Equal(OrderState.Ready, order.State);
         Assert.Null(order.ClarifyJson);
 
         var view = (await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderService>().GetAsync(submission.OrderId, user)))!;

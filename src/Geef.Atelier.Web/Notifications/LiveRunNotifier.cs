@@ -49,7 +49,7 @@ internal sealed class LiveRunNotifier(
             if (run is null)
                 return null;
             var link = new RunLink(run.CreatedByUser, run.OrderId);
-            if (link.OrderId is null && run.Kind != RunKind.Learning)
+            if (link.OrderId is null)
                 return link;
             if (_runs.Count >= OwnerCacheLimit)
                 _runs.Clear();

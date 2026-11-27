@@ -27,7 +27,7 @@ public sealed class CrewSummaryTests : TestContext
         MaxTokens: null,
         IsSystem: false);
 
-    private static CrewSnapshot MakeSnapshot(string? templateName = "klassik",
+    private static CrewSnapshot MakeSnapshot(string? templateName = "direct",
         ConvergencePolicyOverride? convergenceOverride = null,
         IReadOnlyList<ReviewerProfile>? reviewers = null) =>
         new(
@@ -36,8 +36,7 @@ public sealed class CrewSummaryTests : TestContext
             Executor: MakeExecutor(),
             Reviewers: reviewers ?? new[] { MakeReviewer("r1", "Reviewer One"), MakeReviewer("r2", "Reviewer Two") },
             EvaluationStrategy: EvaluationStrategy.Parallel,
-            ConvergenceOverride: convergenceOverride,
-            Advisors: []);
+            ConvergenceOverride: convergenceOverride);
 
     [Fact]
     public void NullSnapshot_RendersFallbackLabel()
@@ -128,24 +127,10 @@ public sealed class CrewSummaryTests : TestContext
     }
 
     [Fact]
-    public void A_setup_of_a_removed_way_of_working_says_that_its_details_are_gone()
+    public void A_direct_setup_shows_its_name()
     {
-        var cut = RenderComponent<CrewSummary>(p => p.Add(c => c.Snapshot, MakeSnapshot("klassik")));
+        var cut = RenderComponent<CrewSummary>(p => p.Add(c => c.Snapshot, MakeSnapshot(SystemCrew.DirectTemplateName)));
 
-        cut.Find("[data-testid='crew-summary-toggle']").Click();
-
-        Assert.Contains("no longer exists", cut.Find("[data-testid='crew-summary-retired']").TextContent);
-    }
-
-    [Theory]
-    [InlineData(SystemCrew.DirectTemplateName, "Direct")]
-    [InlineData(SystemCrew.RetiredOutlineTemplateName, "Extra careful")]
-    public void A_direct_setup_shows_its_name_and_no_retired_note(string template, string display)
-    {
-        var cut = RenderComponent<CrewSummary>(p => p.Add(c => c.Snapshot, MakeSnapshot(template)));
-
-        Assert.Contains($"Setup: {display}", cut.Find("[data-testid='crew-summary-toggle']").TextContent);
-        cut.Find("[data-testid='crew-summary-toggle']").Click();
-        Assert.Empty(cut.FindAll("[data-testid='crew-summary-retired']"));
+        Assert.Contains("Setup: Direct", cut.Find("[data-testid='crew-summary-toggle']").TextContent);
     }
 }

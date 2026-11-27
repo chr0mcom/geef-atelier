@@ -6,18 +6,14 @@ public interface IRunPersistenceService
 {
     Task<Guid> CreateRunAsync(
         string briefingText,
-        string configJson,
         string? createdByUser = null,
         string? crewTemplateName = null,
         string? crewSnapshotJson = null,
-        RunKind kind = RunKind.Standard,
-        Guid? parentCompositionRunId = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Replaces the <c>CrewSnapshot</c> JSON for the run with the given <paramref name="runId"/>.
-    /// A run without a snapshot is not picked up for processing: it is saved once everything the run needs exists
-    /// (link to its order, run-local grounding providers), and saving it releases the run.
+    /// A run without a snapshot is not picked up for processing; saving the snapshot releases the run.
     /// Throws <see cref="InvalidOperationException"/> if no run with that ID exists.
     /// </summary>
     Task UpdateSnapshotAsync(Guid runId, string snapshotJson, CancellationToken cancellationToken = default);
@@ -27,21 +23,4 @@ public interface IRunPersistenceService
     /// No-ops if the run does not exist or is already in a terminal state.
     /// </summary>
     Task MarkRunFailedAsync(Guid runId, string errorMessage, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Creates a new run that resumes a previously aborted or failed run.
-    /// Sets <c>ParentRunId</c> and optionally <c>SeedDraftText</c>. The parent's
-    /// <see cref="RunKind"/> must be carried over so that kind-gated behaviour
-    /// (e.g. crew materialization for composition runs) survives a resume.
-    /// </summary>
-    Task<Guid> CreateResumedRunAsync(
-        string briefingText,
-        string configJson,
-        string? createdByUser,
-        string? crewTemplateName,
-        string? crewSnapshotJson,
-        Guid parentRunId,
-        string? seedDraftText,
-        RunKind kind = RunKind.Standard,
-        CancellationToken cancellationToken = default);
 }

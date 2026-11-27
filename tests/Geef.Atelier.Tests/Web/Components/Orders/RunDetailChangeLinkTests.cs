@@ -29,10 +29,10 @@ public sealed class RunDetailChangeLinkTests : TestContext
     private IRenderedComponent<RunDetail> Render(string? template, Guid? orderId, ReviseMode revise, bool withOptions = true, string? finalText = "# Text", int version = 1, string viewer = "alice", string? revisionHint = null, params string[] roles)
     {
         var snapshot = new CrewSnapshot(CrewSnapshot.CurrentSchemaVersion, template, TestLoop.Writer, [TestLoop.Reviewers[0]],
-            EvaluationStrategy.Parallel, null, []);
+            EvaluationStrategy.Parallel, null);
         var run = new RunEntity
         {
-            Id = _runId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Failed, BriefingText = "Test briefing", ConfigJson = "{}",
+            Id = _runId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Failed, BriefingText = "Test briefing",
             FinalText = finalText, CreatedByUser = "alice", OrderId = orderId, CrewTemplateName = template, OrderVersion = orderId is null ? null : version, RevisionHint = revisionHint,
             CrewSnapshot = System.Text.Json.JsonSerializer.Serialize(snapshot, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }),
         };
@@ -72,16 +72,6 @@ public sealed class RunDetailChangeLinkTests : TestContext
 
         Assert.Single(cut.FindAll("[data-testid='resume-run-button']"));
         Assert.Empty(cut.FindAll("[data-testid='resume-change-link']"));
-    }
-
-    [Fact]
-    public void A_run_of_a_removed_way_of_working_offers_neither_resume_nor_change_and_says_why()
-    {
-        var cut = Render("klassik", _orderId, ReviseMode.On);
-
-        Assert.Empty(cut.FindAll("[data-testid='resume-run-button']"));
-        Assert.Empty(cut.FindAll("[data-testid='resume-change-link']"));
-        Assert.Equal(ResumeRules.RetiredSetupMessage, cut.Find("[data-testid='resume-refusal']").TextContent.Trim());
     }
 
     [Fact]

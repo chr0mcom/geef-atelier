@@ -16,16 +16,6 @@ public sealed class SystemCrewConstantsTests
     public void TheOnlyTemplateIsTheDirectTemplate()
     {
         Assert.Equal([SystemCrew.DirectTemplateName], SystemCrew.CodeOnlyTemplates.Keys.ToList());
-        Assert.All(SystemCrew.CodeOnlyTemplates.Keys, name => Assert.True(SystemCrew.IsDirectPathTemplate(name)));
-        Assert.DoesNotContain(SystemCrew.RetiredRequestCheckName, SystemCrew.CodeOnlyReviewerProfiles.Keys);
-    }
-
-    [Fact]
-    public void StoredRunsOfTheRemovedOutlineVariantStillCountAsDirectPath()
-    {
-        Assert.Equal("direct-outline", SystemCrew.RetiredOutlineTemplateName);
-        Assert.Equal("requirements-check", SystemCrew.RetiredRequestCheckName);
-        Assert.True(SystemCrew.IsDirectPathTemplate(SystemCrew.RetiredOutlineTemplateName));
     }
 
     [Fact]
@@ -37,13 +27,4 @@ public sealed class SystemCrewConstantsTests
             Assert.All(template.ReviewerProfileNames, name => Assert.True(SystemCrew.CodeOnlyReviewerProfiles.ContainsKey(name), $"{template.Name}/{name}"));
         }
     }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("klassik")]
-    [InlineData("Direct")]
-    [InlineData("test-loop")]
-    public void OtherNamesAreNoDirectPathTemplate(string? name) =>
-        Assert.False(SystemCrew.IsDirectPathTemplate(name));
 }

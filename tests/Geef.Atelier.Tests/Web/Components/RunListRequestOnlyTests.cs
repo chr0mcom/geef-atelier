@@ -17,7 +17,6 @@ public sealed class RunListRequestOnlyTests : TestContext
         Status = RunStatus.Completed,
         BriefingText = Request + BriefingSections.Separator + "Answers the person gave before writing:\n- Wer? → ANTWORT-MARKER-RL\n\n" +
                        BriefingSections.ProfileHeading + "\nName: PROFIL-MARKER-RL",
-        ConfigJson = "{}",
         CreatedByUser = "alice",
     };
 

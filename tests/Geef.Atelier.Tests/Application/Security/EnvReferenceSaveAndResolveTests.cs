@@ -13,7 +13,6 @@ using Geef.Atelier.Tests.Fakes;
 using Geef.Atelier.Tests.Persistence;
 using Geef.Atelier.Web.Services;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -48,8 +47,7 @@ public sealed class EnvReferenceSaveAndResolveTests(PostgresFixture fixture) : I
     {
         SetVariables();
         var services = new ServiceCollection();
-        services.AddDbContext<AtelierDbContext>(opt => opt.UseNpgsql(fixture.ConnectionString)
-               .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
+        services.AddDbContext<AtelierDbContext>(opt => opt.UseNpgsql(fixture.ConnectionString));
         services.AddAtelierPersistence();
         services.AddAtelierApplication();
         services.AddSingleton<IModelCatalog, PassThroughModelCatalog>();

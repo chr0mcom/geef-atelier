@@ -83,31 +83,6 @@ public sealed class RevisionBriefTests
     }
 
     [Fact]
-    public void A_stored_change_with_the_retired_longer_sentence_never_reaches_the_writer_again_as_an_earlier_change()
-    {
-        var longer = RevisionQuick.Longer.Instruction();
-        var onlyLonger = RevisionBrief.Compose(Request, longer, 2);
-        var mixed = RevisionBrief.Compose(Request, Change2 + " " + longer, 2);
-
-        var afterOnlyLonger = RevisionBrief.Compose(onlyLonger, Change3, 3);
-        var afterMixed = RevisionBrief.Compose(mixed, Change3, 3);
-
-        Assert.DoesNotContain(longer, afterOnlyLonger, StringComparison.Ordinal);
-        Assert.DoesNotContain(longer, afterMixed, StringComparison.Ordinal);
-        Assert.Equal(RevisionBrief.Compose(Request, Change3, 3), afterOnlyLonger);
-        Assert.Contains("- (version 2, earlier change: already made in the text – do not make it again, keep it) " + Change2 + "\n", afterMixed, StringComparison.Ordinal);
-        Assert.EndsWith("- (version 3, the change to make now) " + Change3, afterMixed, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData("Make the text about a third longer without adding new facts.", "")]
-    [InlineData("Add the room number. Make the text about a third longer without adding new facts. Make the tone more formal.", "Add the room number. Make the tone more formal.")]
-    [InlineData("  Add the room number.\n", "Add the room number.")]
-    [InlineData(null, "")]
-    public void Only_the_sentence_of_a_retired_button_is_taken_out(string? change, string expected) =>
-        Assert.Equal(expected, RevisionBrief.WithoutRetired(change));
-
-    [Fact]
     public void A_briefing_that_is_only_the_request_gains_the_block_after_the_separator()
     {
         const string request = "Write a short note to the team.";

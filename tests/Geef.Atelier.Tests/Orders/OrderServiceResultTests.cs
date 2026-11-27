@@ -165,48 +165,28 @@ public sealed class OrderServiceResultTests
         Assert.Contains(OrderCheckLines.FactsNotCompleted + OrderCheckLines.FactsEarlierOne, result.Checks!.Checked);
     }
 
-    [Fact]
-    public void Schema_one_gets_checks_saying_facts_were_not_checked_and_nothing_else()
-    {
-        var report = Schema2(null) with { SchemaVersion = 1 };
-
-        var result = Base().WithReport(report);
-
-        Assert.Contains(OrderCheckLines.FactsNotChecked, result.Checks!.Checked);
-        Assert.Null(result.WriterAssumptions);
-        Assert.Null(result.WriterOpenPoints);
-        Assert.Null(result.UnbackedPassages);
-        Assert.Null(result.SourceIssues);
-        Assert.Null(result.SourceQuotes);
-        Assert.Null(result.FactCheck);
-        Assert.Null(result.FactCheckScope);
-    }
-
     [Collection(EndToEndCollection.Name)]
     [Trait("Category", "EndToEnd")]
     public sealed class OverTheRealService(PostgresFixture postgres)
     {
         [Fact]
-        public async Task Stored_reports_of_both_schemas_and_no_report_give_the_right_result()
+        public async Task A_stored_report_and_no_report_give_the_right_result()
         {
             await using var host = await AtelierEndToEndHost.StartAsync(postgres);
             const string user = "e2e-result";
             var schema2 = await DeliveredAsync(host, user, RunReportJson.Serialize(Schema2(Summary(FactCheckState.OpenPoints, open: [Unbacked]))));
-            var schema1 = await DeliveredAsync(host, user, """{"schemaVersion":1,"kind":"direct","checks":[{"code":"empty","passed":true,"blocking":true,"message":"ok"}],"iterations":1}""");
             var none = await DeliveredAsync(host, user, null);
 
             var results = await host.WithScopeAsync(async sp =>
             {
                 var service = sp.GetRequiredService<IOrderService>();
-                return (await service.GetResultAsync(schema2, user), await service.GetResultAsync(schema1, user), await service.GetResultAsync(none, user));
+                return (await service.GetResultAsync(schema2, user), await service.GetResultAsync(none, user));
             });
 
             Assert.Equal(FactCheckState.OpenPoints, results.Item1!.FactCheck);
             Assert.Equal("Bitte geben Sie uns in der Gruppe Bescheid.", Assert.Single(results.Item1.UnbackedPassages!).Quote);
             Assert.Equal(OrderCheckLines.ToReviewOpenPoints, results.Item1.Checks!.ToReview);
-            Assert.Equal(["Checked automatically: the text is not empty.", OrderCheckLines.FactsNotChecked], results.Item2!.Checks!.Checked);
-            Assert.Null(results.Item2.UnbackedPassages);
-            Assert.Null(results.Item3!.Checks);
+            Assert.Null(results.Item2!.Checks);
         }
 
         [Fact]

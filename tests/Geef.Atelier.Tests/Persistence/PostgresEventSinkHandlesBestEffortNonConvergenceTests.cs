@@ -26,7 +26,7 @@ public sealed class PostgresEventSinkHandlesBestEffortNonConvergenceTests(Postgr
         // Arrange
         await using var db     = fixture.NewContext();
         var             svc    = new RunPersistenceService(db);
-        var             runId  = await svc.CreateRunAsync(Briefing, "{}", cancellationToken: CancellationToken.None);
+        var             runId  = await svc.CreateRunAsync(Briefing, cancellationToken: CancellationToken.None);
         var             scopes = fixture.NewScopeFactory();
         var             sink   = new PostgresEventSink(runId, scopes, new NoOpRunNotifier(), NullLogger.Instance);
 
@@ -36,8 +36,7 @@ public sealed class PostgresEventSinkHandlesBestEffortNonConvergenceTests(Postgr
             Executor: TestLoop.Writer,
             Reviewers: TestLoop.Reviewers,
             EvaluationStrategy: EvaluationStrategy.Parallel,
-            ConvergenceOverride: null,
-            Advisors: []);
+            ConvergenceOverride: null);
 
         var runner = TestLoop.Build(
             snapshot,
@@ -83,7 +82,7 @@ public sealed class PostgresEventSinkHandlesBestEffortNonConvergenceTests(Postgr
         // Arrange
         await using var db     = fixture.NewContext();
         var             svc    = new RunPersistenceService(db);
-        var             runId  = await svc.CreateRunAsync(Briefing, "{}", cancellationToken: CancellationToken.None);
+        var             runId  = await svc.CreateRunAsync(Briefing, cancellationToken: CancellationToken.None);
         var             scopes = fixture.NewScopeFactory();
         var             sink   = new PostgresEventSink(runId, scopes, new NoOpRunNotifier(), NullLogger.Instance);
 
@@ -93,8 +92,7 @@ public sealed class PostgresEventSinkHandlesBestEffortNonConvergenceTests(Postgr
             Executor: TestLoop.Writer,
             Reviewers: TestLoop.Reviewers,
             EvaluationStrategy: EvaluationStrategy.Parallel,
-            ConvergenceOverride: null,
-            Advisors: []);
+            ConvergenceOverride: null);
 
         var runner = TestLoop.Build(
             snapshot,
@@ -134,7 +132,7 @@ public sealed class PostgresEventSinkHandlesBestEffortNonConvergenceTests(Postgr
         // Running when only the best-effort PipelineCompletedEvent(Success: false) arrives.
         await using var db     = fixture.NewContext();
         var             svc    = new RunPersistenceService(db);
-        var             runId  = await svc.CreateRunAsync(Briefing, "{}", cancellationToken: CancellationToken.None);
+        var             runId  = await svc.CreateRunAsync(Briefing, cancellationToken: CancellationToken.None);
         await db.Runs.Where(r => r.Id == runId)
             .ExecuteUpdateAsync(s => s.SetProperty(r => r.Status, RunStatus.Running));
 
@@ -160,7 +158,7 @@ public sealed class PostgresEventSinkHandlesBestEffortNonConvergenceTests(Postgr
         // best-effort completion must leave the terminal status untouched.
         await using var db     = fixture.NewContext();
         var             svc    = new RunPersistenceService(db);
-        var             runId  = await svc.CreateRunAsync(Briefing, "{}", cancellationToken: CancellationToken.None);
+        var             runId  = await svc.CreateRunAsync(Briefing, cancellationToken: CancellationToken.None);
         await db.Runs.Where(r => r.Id == runId)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(r => r.Status,       RunStatus.Aborted)

@@ -52,7 +52,7 @@ public static class CliRoute
     /// Rewrites a Claude/OpenAI binding onto its subscription CLI. A retired codex id (<see cref="IsRetiredCodexModel"/>)
     /// moves to the always-latest alias of its line (Sol, Terra) or to <see cref="ModelMatrix.RetiredOpenAiReplacement"/>;
     /// any other OpenAI id keeps its (lower-cased, unprefixed) name. Open-weight <c>gpt-oss</c> models and everything
-    /// else are returned unchanged. Migration Step46 applies the same rule in SQL (parity-tested).
+    /// else are returned unchanged.
     /// </summary>
     public static ModelCandidate Normalize(string provider, string model)
     {

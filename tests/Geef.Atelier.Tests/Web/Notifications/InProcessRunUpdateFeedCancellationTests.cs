@@ -71,7 +71,6 @@ public sealed class InProcessRunUpdateFeedCancellationTests
         CreatedAt = DateTimeOffset.UtcNow,
         Status = RunStatus.Running,
         BriefingText = "b",
-        ConfigJson = "{}",
         CreatedByUser = "alice",
     };
 

@@ -92,8 +92,6 @@ public sealed class SourceUploadSafetyEndToEndTests(PostgresFixture postgres)
 
         public Task<(Guid OrderId, int? Version)?> GetLinkForRunAsync(Guid runId, CancellationToken ct = default) => inner.GetLinkForRunAsync(runId, ct);
 
-        public Task<Guid> LinkLegacyRunAsync(Guid runId, OrderEntry entry, CancellationToken ct = default) => inner.LinkLegacyRunAsync(runId, entry, ct);
-
         public Task TouchAsync(Guid orderId, DateTimeOffset at, CancellationToken ct = default) => inner.TouchAsync(orderId, at, ct);
 
         public Task<bool> DeleteAsync(Guid orderId, CancellationToken ct = default) => inner.DeleteAsync(orderId, ct);

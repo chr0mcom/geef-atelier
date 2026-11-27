@@ -24,7 +24,7 @@ public sealed class RunServiceResumeTests
         var parentId  = Guid.NewGuid();
         var iteration = MakeIteration(parentId, 1, "draft from iteration 1");
         var parent    = MakeRun(parentId, RunStatus.Aborted, "alice");
-        var capturing = new CapturingPersistenceService();
+        var capturing = new CapturingOrders();
         var repo      = new SingleDetailsRepository(parent, [iteration]);
         var svc       = MakeService(capturing, repo);
 
@@ -41,7 +41,7 @@ public sealed class RunServiceResumeTests
         var iter1     = MakeIteration(parentId, 1, "draft 1");
         var iter2     = MakeIteration(parentId, 2, "draft 2");
         var parent    = MakeRun(parentId, RunStatus.Aborted, "alice");
-        var capturing = new CapturingPersistenceService();
+        var capturing = new CapturingOrders();
         var repo      = new SingleDetailsRepository(parent, [iter1, iter2]);
         var svc       = MakeService(capturing, repo);
 
@@ -56,7 +56,7 @@ public sealed class RunServiceResumeTests
         var parentId  = Guid.NewGuid();
         var iteration = MakeIteration(parentId, 2, "draft before the last corrections");
         var parent    = MakeRunWithText(parentId, RunStatus.Failed, "alice", "delivered text with open points");
-        var capturing = new CapturingPersistenceService();
+        var capturing = new CapturingOrders();
         var svc       = MakeService(capturing, new SingleDetailsRepository(parent, [iteration]));
 
         await svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: true, MaxIterationsOverride: null), "alice");
@@ -69,7 +69,7 @@ public sealed class RunServiceResumeTests
     {
         var parentId  = Guid.NewGuid();
         var parent    = MakeRunWithText(parentId, RunStatus.Aborted, "alice", "stopped, last text");
-        var capturing = new CapturingPersistenceService();
+        var capturing = new CapturingOrders();
         var svc       = MakeService(capturing, new SingleDetailsRepository(parent, []));
 
         await svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: true, MaxIterationsOverride: null), "alice");
@@ -82,7 +82,7 @@ public sealed class RunServiceResumeTests
     {
         var parentId  = Guid.NewGuid();
         var parent    = MakeRunWithText(parentId, RunStatus.Failed, "alice", "delivered text");
-        var capturing = new CapturingPersistenceService();
+        var capturing = new CapturingOrders();
         var svc       = MakeService(capturing, new SingleDetailsRepository(parent, []));
 
         await svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: false, MaxIterationsOverride: null), "alice");
@@ -95,7 +95,7 @@ public sealed class RunServiceResumeTests
     {
         var parentId  = Guid.NewGuid();
         var parent    = MakeRun(parentId, RunStatus.Aborted, "alice");
-        var capturing = new CapturingPersistenceService();
+        var capturing = new CapturingOrders();
         var repo      = new SingleDetailsRepository(parent, []);
         var svc       = MakeService(capturing, repo);
 
@@ -112,7 +112,7 @@ public sealed class RunServiceResumeTests
         var parentId  = Guid.NewGuid();
         var iteration = MakeIteration(parentId, 1, "draft");
         var parent    = MakeRun(parentId, RunStatus.Failed, "alice");
-        var capturing = new CapturingPersistenceService();
+        var capturing = new CapturingOrders();
         var repo      = new SingleDetailsRepository(parent, [iteration]);
         var svc       = MakeService(capturing, repo);
 
@@ -120,45 +120,6 @@ public sealed class RunServiceResumeTests
 
         Assert.Null(capturing.LastSeedDraftText);
         Assert.Equal(parentId, capturing.LastParentRunId);
-    }
-
-    // ── RunKind inheritance ───────────────────────────────────────────────
-
-    [Fact]
-    public async Task ResumeRunAsync_RefusesAComposedRunAsARemovedWayOfWorking()
-    {
-        var parentId  = Guid.NewGuid();
-        var parent    = new RunEntity
-        {
-            Id = parentId, CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Aborted,
-            BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = "alice",
-            Kind = RunKind.CrewComposition,
-            CrewTemplateName = Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplateName,
-            CrewSnapshot = TestCrewSnapshots.RunnableJson,
-        };
-        var capturing = new CapturingPersistenceService();
-        var repo      = new SingleDetailsRepository(parent, []);
-        var svc       = MakeService(capturing, repo);
-
-        var error = await Assert.ThrowsAsync<RunNotResumableException>(() =>
-            svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: false, MaxIterationsOverride: null), "alice"));
-
-        Assert.Equal(ResumeRules.RetiredSetupMessage, error.Message);
-        Assert.Null(capturing.LastKind);
-    }
-
-    [Fact]
-    public async Task ResumeRunAsync_InheritsParentRunKind_Standard()
-    {
-        var parentId  = Guid.NewGuid();
-        var parent    = MakeRun(parentId, RunStatus.Failed, "alice");
-        var capturing = new CapturingPersistenceService();
-        var repo      = new SingleDetailsRepository(parent, []);
-        var svc       = MakeService(capturing, repo);
-
-        await svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: false, MaxIterationsOverride: null), "alice");
-
-        Assert.Equal(RunKind.Standard, capturing.LastKind);
     }
 
     [Theory]
@@ -169,7 +130,7 @@ public sealed class RunServiceResumeTests
     {
         var parentId  = Guid.NewGuid();
         var parent    = MakeRunWithSnapshot(parentId, RunStatus.Failed, "alice", snapshotJson);
-        var capturing = new CapturingPersistenceService();
+        var capturing = new CapturingOrders();
         var svc       = MakeService(capturing, new SingleDetailsRepository(parent, []));
 
         var ex = await Assert.ThrowsAsync<RunNotResumableException>(() =>
@@ -186,7 +147,7 @@ public sealed class RunServiceResumeTests
     {
         var parentId  = Guid.NewGuid();
         var parent    = MakeOrderRun(parentId, status, "changed text with open points", 2, "Make it shorter.");
-        var capturing = new CapturingPersistenceService();
+        var capturing = new CapturingOrders();
         var svc       = MakeService(capturing, new SingleDetailsRepository(parent, []));
 
         var ex = await Assert.ThrowsAsync<RunNotResumableException>(() =>
@@ -201,7 +162,7 @@ public sealed class RunServiceResumeTests
     {
         var parentId  = Guid.NewGuid();
         var parent    = MakeOrderRun(parentId, RunStatus.Failed, "first text with open points", 1, null);
-        var capturing = new CapturingPersistenceService();
+        var capturing = new CapturingOrders();
         var svc       = MakeService(capturing, new SingleDetailsRepository(parent, []));
 
         await svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: true, MaxIterationsOverride: null), "alice");
@@ -221,11 +182,10 @@ public sealed class RunServiceResumeTests
             Executor: TestLoop.Writer,
             Reviewers: [TestLoop.Reviewers[0]],
             EvaluationStrategy: EvaluationStrategy.Parallel,
-            ConvergenceOverride: null,
-            Advisors: []);
+            ConvergenceOverride: null);
         var snapshotJson = JsonSerializer.Serialize(snapshot, JsonOpts);
         var parent    = MakeRunWithSnapshot(parentId, RunStatus.Aborted, "alice", snapshotJson);
-        var capturing = new CapturingPersistenceService();
+        var capturing = new CapturingOrders();
         var repo      = new SingleDetailsRepository(parent, []);
         var svc       = MakeService(capturing, repo);
 
@@ -247,7 +207,7 @@ public sealed class RunServiceResumeTests
         var parentId = Guid.NewGuid();
         var parent   = MakeRun(parentId, status, "alice");
         var repo     = new SingleDetailsRepository(parent, []);
-        var svc      = MakeService(new CapturingPersistenceService(), repo);
+        var svc      = MakeService(new CapturingOrders(), repo);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: false, MaxIterationsOverride: null), "alice"));
@@ -259,7 +219,7 @@ public sealed class RunServiceResumeTests
         var parentId = Guid.NewGuid();
         var parent   = MakeRun(parentId, RunStatus.Aborted, "alice");
         var repo     = new SingleDetailsRepository(parent, []);
-        var svc      = MakeService(new CapturingPersistenceService(), repo);
+        var svc      = MakeService(new CapturingOrders(), repo);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: false, MaxIterationsOverride: null), "bob"));
@@ -270,7 +230,7 @@ public sealed class RunServiceResumeTests
     {
         var parentId  = Guid.NewGuid();
         var parent    = MakeRun(parentId, RunStatus.Aborted, "alice");
-        var capturing = new CapturingPersistenceService();
+        var capturing = new CapturingOrders();
         var repo      = new SingleDetailsRepository(parent, []);
         var svc       = MakeService(capturing, repo);
 
@@ -282,7 +242,7 @@ public sealed class RunServiceResumeTests
     [Fact]
     public async Task ResumeRunAsync_NotFound_Throws()
     {
-        var svc = MakeService(new CapturingPersistenceService(), new EmptyRepository());
+        var svc = MakeService(new CapturingOrders(), new EmptyRepository());
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => svc.ResumeRunAsync(new ResumeOptions(Guid.NewGuid(), UseSeedDraft: false, MaxIterationsOverride: null), null));
@@ -290,36 +250,42 @@ public sealed class RunServiceResumeTests
 
     // ── Helpers ───────────────────────────────────────────────────────────
 
-    private static RunService MakeService(IRunPersistenceService persistence, IRunRepository repo, IOrderRepository? orders = null) =>
+    private static RunService MakeService(CapturingOrders orders, IRunRepository repo) =>
         new RunService(
-            persistence,
             repo,
             NullLogger<RunService>.Instance,
             new InMemoryRunWarnings(),
-            orderRepository: orders);
+            orders.Repository);
+
+    private static RunEntity WithoutOrder(RunEntity run) => new()
+    {
+        Id = run.Id, CreatedAt = run.CreatedAt, Status = run.Status, BriefingText = run.BriefingText, CreatedByUser = run.CreatedByUser,
+        CrewTemplateName = run.CrewTemplateName, CrewSnapshot = run.CrewSnapshot,
+    };
 
     private static RunEntity MakeRun(Guid id, RunStatus status, string? createdByUser) =>
         new RunEntity
         {
             Id = id, CreatedAt = DateTimeOffset.UtcNow, Status = status,
-            BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = createdByUser,
+            BriefingText = "briefing", CreatedByUser = createdByUser,
             CrewTemplateName = Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplateName,
-            CrewSnapshot = TestCrewSnapshots.RunnableJson,
+            CrewSnapshot = TestCrewSnapshots.RunnableJson, OrderId = Guid.NewGuid(), OrderVersion = 1,
         };
 
     private static RunEntity MakeRunWithText(Guid id, RunStatus status, string? createdByUser, string finalText) =>
         new RunEntity
         {
             Id = id, CreatedAt = DateTimeOffset.UtcNow, Status = status,
-            BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = createdByUser,
+            BriefingText = "briefing", CreatedByUser = createdByUser,
             CrewTemplateName = Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplateName, CrewSnapshot = TestCrewSnapshots.RunnableJson, FinalText = finalText,
+            OrderId = Guid.NewGuid(), OrderVersion = 1,
         };
 
     private static RunEntity MakeOrderRun(Guid id, RunStatus status, string finalText, int version, string? revisionHint) =>
         new RunEntity
         {
             Id = id, CreatedAt = DateTimeOffset.UtcNow, Status = status,
-            BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = "alice",
+            BriefingText = "briefing", CreatedByUser = "alice",
             CrewTemplateName = Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplateName, CrewSnapshot = TestCrewSnapshots.RunnableJson, FinalText = finalText,
             OrderId = Guid.NewGuid(), OrderVersion = version, RevisionHint = revisionHint,
         };
@@ -328,9 +294,9 @@ public sealed class RunServiceResumeTests
         new RunEntity
         {
             Id = id, CreatedAt = DateTimeOffset.UtcNow, Status = status,
-            BriefingText = "briefing", ConfigJson = "{}", CreatedByUser = createdByUser,
+            BriefingText = "briefing", CreatedByUser = createdByUser,
             CrewTemplateName = Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplateName,
-            CrewSnapshot = snapshotJson,
+            CrewSnapshot = snapshotJson, OrderId = Guid.NewGuid(), OrderVersion = 1,
         };
 
     private static IterationWithFindings MakeIteration(Guid runId, int number, string text) =>
@@ -343,72 +309,64 @@ public sealed class RunServiceResumeTests
             []);
 
     [Fact]
-    public async Task ResumeRunAsync_ReleasesTheRunOnlyAfterItIsLinkedToItsOrder()
+    public async Task ResumeRunAsync_StoresTheRunOnceInTheOrderOfItsParent_WithItsSetup()
     {
         var parentId  = Guid.NewGuid();
-        var capturing = new CapturingPersistenceService();
-        var orders    = DispatchProxy.Create<IOrderRepository, LinkRecorder>();
-        ((LinkRecorder)(object)orders).Steps = capturing.Steps;
-        var svc = MakeService(capturing, new SingleDetailsRepository(MakeRun(parentId, RunStatus.Failed, "alice"), []), orders);
+        var parent    = MakeRun(parentId, RunStatus.Failed, "alice");
+        var capturing = new CapturingOrders();
+        var svc       = MakeService(capturing, new SingleDetailsRepository(parent, []));
 
-        await svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: false, MaxIterationsOverride: null), "alice");
+        var resumedId = await svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: false, MaxIterationsOverride: null), "alice");
 
-        Assert.Equal(["created held", "linked", "released"], capturing.Steps);
-        Assert.NotNull(CrewSnapshot.Deserialize(capturing.LastSnapshotJson));
+        var (orderId, run) = Assert.Single(capturing.Added);
+        Assert.Equal((parent.OrderId!.Value, resumedId, RunStatus.Pending), (orderId, run.Id, run.Status));
+        Assert.Equal((parent.OrderId, parentId, "briefing", "alice"), (run.OrderId, run.ParentRunId!.Value, run.BriefingText, run.CreatedByUser));
+        Assert.NotNull(CrewSnapshot.Deserialize(run.CrewSnapshot));
+    }
+
+    [Fact]
+    public async Task ResumeRunAsync_ParentWithoutOrder_IsRejectedWithoutCreatingARun()
+    {
+        var parentId  = Guid.NewGuid();
+        var parent    = MakeRun(parentId, RunStatus.Failed, "alice");
+        var capturing = new CapturingOrders();
+        var svc       = MakeService(capturing, new SingleDetailsRepository(WithoutOrder(parent), []));
+
+        var ex = await Assert.ThrowsAsync<RunNotResumableException>(() =>
+            svc.ResumeRunAsync(new ResumeOptions(parentId, UseSeedDraft: false, MaxIterationsOverride: null), "alice"));
+
+        Assert.Equal(RunNotResumableException.NotPreparedMessage, ex.Message);
+        Assert.Empty(capturing.Added);
     }
 
     // ── Fakes ─────────────────────────────────────────────────────────────
 
-    public class LinkRecorder : DispatchProxy
+    private sealed class CapturingOrders
     {
-        public List<string> Steps { get; set; } = [];
+        public CapturingOrders()
+        {
+            Repository = DispatchProxy.Create<IOrderRepository, AddRecorder>();
+            ((AddRecorder)(object)Repository).Added = Added;
+        }
+
+        public IOrderRepository Repository { get; }
+        public List<(Guid OrderId, RunEntity Run)> Added { get; } = [];
+        public Guid? LastParentRunId => Added.LastOrDefault().Run?.ParentRunId;
+        public string? LastSeedDraftText => Added.LastOrDefault().Run?.SeedDraftText;
+        public string? LastSnapshotJson => Added.LastOrDefault().Run?.CrewSnapshot;
+    }
+
+    public class AddRecorder : DispatchProxy
+    {
+        public List<(Guid OrderId, RunEntity Run)> Added { get; set; } = [];
 
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
-            if (targetMethod?.Name != nameof(IOrderRepository.LinkLegacyRunAsync))
+            if (targetMethod?.Name != nameof(IOrderRepository.AddRunAsync))
                 throw new NotSupportedException(targetMethod?.Name);
-            Steps.Add("linked");
-            return Task.FromResult(Guid.NewGuid());
+            Added.Add(((Guid)args![0]!, (RunEntity)args[1]!));
+            return Task.FromResult(Added.Count + 1);
         }
-    }
-
-    private sealed class CapturingPersistenceService : IRunPersistenceService
-    {
-        public Guid?    LastParentRunId   { get; private set; }
-        public string?  LastSeedDraftText { get; private set; }
-        public string?  LastSnapshotJson  { get; private set; }
-        public RunKind? LastKind          { get; private set; }
-        public List<string> Steps         { get; } = [];
-
-        public Task<Guid> CreateRunAsync(string briefingText, string configJson,
-            string? createdByUser = null, string? crewTemplateName = null,
-            string? crewSnapshotJson = null, RunKind kind = RunKind.Standard,
-            Guid? parentCompositionRunId = null,
-            CancellationToken cancellationToken = default)
-            => Task.FromResult(Guid.NewGuid());
-
-        public Task<Guid> CreateResumedRunAsync(string briefingText, string configJson,
-            string? createdByUser, string? crewTemplateName, string? crewSnapshotJson,
-            Guid parentRunId, string? seedDraftText, RunKind kind = RunKind.Standard,
-            CancellationToken cancellationToken = default)
-        {
-            LastParentRunId   = parentRunId;
-            LastSeedDraftText = seedDraftText;
-            LastSnapshotJson  = crewSnapshotJson;
-            LastKind          = kind;
-            Steps.Add(crewSnapshotJson is null ? "created held" : "created claimable");
-            return Task.FromResult(Guid.NewGuid());
-        }
-
-        public Task UpdateSnapshotAsync(Guid runId, string snapshotJson, CancellationToken cancellationToken = default)
-        {
-            LastSnapshotJson = snapshotJson;
-            Steps.Add("released");
-            return Task.CompletedTask;
-        }
-
-        public Task MarkRunFailedAsync(Guid runId, string errorMessage, CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
     }
 
     private sealed class SingleDetailsRepository(RunEntity run, IReadOnlyList<IterationWithFindings> iterations) : IRunRepository

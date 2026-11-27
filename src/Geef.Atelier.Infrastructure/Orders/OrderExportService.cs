@@ -18,9 +18,9 @@ internal sealed class OrderExportService(IOrderRepository orders) : IOrderExport
 
         var runs = await orders.ListRunsAsync(orderId, ct);
         var run = version is { } wanted
-            ? runs.Where(r => r.Kind == RunKind.Standard && r.OrderVersion == wanted).OrderByDescending(r => r.CreatedAt).FirstOrDefault()
+            ? runs.Where(r => r.OrderVersion == wanted).OrderByDescending(r => r.CreatedAt).FirstOrDefault()
             : OrderStateResolver.SelectShownRun(runs);
-        if (run is null || string.IsNullOrWhiteSpace(run.FinalText) || run.Kind != RunKind.Standard)
+        if (run is null || string.IsNullOrWhiteSpace(run.FinalText))
             return null;
 
         var title = order.RequestText.ToOrderTitle();

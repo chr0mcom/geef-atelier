@@ -54,7 +54,7 @@ public sealed partial class ResearchEndToEndTests(PostgresFixture postgres)
     private static IReadOnlyList<RecordedLlmCall> FactCalls(AtelierEndToEndHost host) => host.Llm.Calls.Where(ScriptedLlmEndpoint.IsFactCheckCall).ToList();
 
     private static Task<RunEntity> FirstRunAsync(AtelierEndToEndHost host, Guid orderId) =>
-        host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == orderId && r.Kind == RunKind.Standard && r.OrderVersion == 1));
+        host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == orderId && r.OrderVersion == 1));
 
     private static async Task<RunReport> ReportAsync(AtelierEndToEndHost host, Guid runId) =>
         RunReportJson.TryParse((await host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.Id == runId))).ReportJson)
@@ -75,15 +75,15 @@ public sealed partial class ResearchEndToEndTests(PostgresFixture postgres)
         return new OrderSourceSelection(receipt.GetProperty("sourceId").GetGuid(), null, SourceRole.Facts);
     }
 
-    /// <summary>A further standard run of the order (the next version), started like the first and waited for.</summary>
+    /// <summary>A further run of the order (the next version), started like the first and waited for.</summary>
     private static async Task<RunEntity> NextRunAsync(AtelierEndToEndHost host, Guid orderId)
     {
         var first = await FirstRunAsync(host, orderId);
         var next = new RunEntity
         {
-            Id = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Pending, BriefingText = first.BriefingText, ConfigJson = "{}",
+            Id = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Pending, BriefingText = first.BriefingText,
             CreatedByUser = first.CreatedByUser, CrewTemplateName = first.CrewTemplateName, CrewSnapshot = first.CrewSnapshot, TokensTotal = 0,
-            CostTotal = 0m, Kind = RunKind.Standard, OrderId = orderId,
+            OrderId = orderId,
         };
         var version = await host.WithScopeAsync(sp => sp.GetRequiredService<IOrderRepository>().AddRunAsync(orderId, next));
         Assert.Equal(2, version);

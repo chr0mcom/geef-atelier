@@ -14,14 +14,13 @@ namespace Geef.Atelier.Tests.Pipeline;
 /// </summary>
 public sealed class AtelierPipelineFactoryWithSnapshotTests
 {
-    private static CrewSnapshot KlassikSnapshot(EvaluationStrategy strategy = EvaluationStrategy.Parallel) => new(
+    private static CrewSnapshot TwoCheckSnapshot(EvaluationStrategy strategy = EvaluationStrategy.Parallel) => new(
         SchemaVersion: CrewSnapshot.CurrentSchemaVersion,
         TemplateName: TestLoop.TemplateName,
         Executor: TestLoop.Writer,
         Reviewers: TestLoop.Reviewers,
         EvaluationStrategy: strategy,
-        ConvergenceOverride: null,
-        Advisors: []);
+        ConvergenceOverride: null);
 
     [Theory]
     [InlineData(EvaluationStrategy.Parallel)]
@@ -31,7 +30,7 @@ public sealed class AtelierPipelineFactoryWithSnapshotTests
     public void Build_WithEachEvaluationStrategy_DoesNotThrow(EvaluationStrategy strategy)
     {
         var resolver = new TestLlmClientResolver(new FakeLlmClient());
-        var snapshot = KlassikSnapshot(strategy);
+        var snapshot = TwoCheckSnapshot(strategy);
 
         var ex = Record.Exception(() =>
             TestLoop.Build(snapshot, resolver, Options.Create(new ConvergenceOptions())));
@@ -49,8 +48,7 @@ public sealed class AtelierPipelineFactoryWithSnapshotTests
             Executor: TestLoop.Writer,
             Reviewers: [TestLoop.Reviewers[0]],
             EvaluationStrategy: EvaluationStrategy.Parallel,
-            ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 1, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null),
-            Advisors: []);
+            ConvergenceOverride: new ConvergencePolicyOverride(MaxIterations: 1, AbortOnCritical: null, DetectRegression: null, StagnationThreshold: null));
 
         var ex = Record.Exception(() =>
             TestLoop.Build(snapshot, resolver, Options.Create(new ConvergenceOptions())));

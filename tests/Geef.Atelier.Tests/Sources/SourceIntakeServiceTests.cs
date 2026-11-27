@@ -10,7 +10,6 @@ using Geef.Atelier.Infrastructure.Sources.Extraction;
 using Geef.Atelier.Tests.Persistence;
 using Geef.Atelier.Tests.TestData;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -734,8 +733,7 @@ public sealed class SourceIntakeServiceTests(PostgresFixture fixture) : IDisposa
     {
         var services = new ServiceCollection();
         services.AddLogging(b => b.SetMinimumLevel(LogLevel.Warning));
-        services.AddDbContext<AtelierDbContext>(o => o.UseNpgsql(fixture.ConnectionString)
-            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
+        services.AddDbContext<AtelierDbContext>(o => o.UseNpgsql(fixture.ConnectionString));
         services.AddScoped<SourceRepository>();
         services.AddScoped<ISourceRepository>(sp => sp.GetRequiredService<SourceRepository>());
         services.AddScoped<ISourceRetentionStore>(sp => sp.GetRequiredService<SourceRepository>());

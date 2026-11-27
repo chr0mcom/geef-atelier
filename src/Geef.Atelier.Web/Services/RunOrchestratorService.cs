@@ -140,25 +140,13 @@ internal sealed class RunOrchestratorService(
     /// so such a run would count as "still working" forever. With a saved text the outcome is
     /// <see cref="RunOutcome.Converged"/> (status Completed) or <see cref="RunOutcome.DeliveredWithOpenPoints"/>,
     /// without one <see cref="RunOutcome.Failed"/>; each run gets the warning <see cref="RestartedWhileFinishingMessage"/>.
-    /// Runs that finished before Step47 also have no outcome and must stay untouched. No column records when Step47
-    /// went live, so the earliest completion time of a run that has an outcome serves as that point: every run with an
-    /// outcome finished under Step47, and only runs that completed after it are considered. Until the first run has an
-    /// outcome nothing is changed. A run that completed before that first outcome was written (only possible in the
-    /// first minutes after the upgrade) is not repaired; that is the conservative side.
     /// </summary>
     private async Task<int> RecoverRunsInterruptedWhileFinishingAsync(AtelierDbContext db, CancellationToken ct)
     {
-        var outcomesSince = await db.Runs
-            .Where(r => r.Outcome != null && r.CompletedAt != null)
-            .MinAsync(r => r.CompletedAt, ct);
-        if (outcomesSince is null)
-            return 0;
-
         var interrupted = await db.Runs
             .AsNoTracking()
             .Where(r => r.Outcome == null
                         && r.CompletedAt != null
-                        && r.CompletedAt > outcomesSince
                         && (r.Status == RunStatus.Completed || r.Status == RunStatus.Failed || r.Status == RunStatus.Aborted))
             .Select(r => new { r.Id, r.Status, HasText = r.FinalText != null })
             .ToListAsync(ct);
@@ -697,7 +685,7 @@ internal sealed class RunOrchestratorService(
 
             var totalNullable = llmCostEur > 0 ? llmCostEur : null;
 
-            // Token breakdown (Step43): run-level sums of cached-input / reasoning subsets.
+            // Token breakdown: run-level sums of cached-input / reasoning subsets.
             var cachedSum = costEntities.Sum(c => c.CachedInputTokens ?? 0);
             var reasoningSum = costEntities.Sum(c => c.ReasoningTokens ?? 0);
 

@@ -61,7 +61,7 @@ public static partial class RevisionBrief
         var existing = blocks.FindLastIndex(b => b.StartsWith(Heading + "\n", StringComparison.Ordinal));
         var next = new RevisionChange(version, oneLine);
         if (existing >= 0)
-            blocks[existing] = Block(Lines(blocks[existing]).Select(c => c with { Words = WithoutRetired(c.Words) }).Where(c => c.Words.Length > 0).ToList(), next);
+            blocks[existing] = Block(Lines(blocks[existing]), next);
         else
             blocks.Add(Block([], next));
         if (profile is not null)
@@ -84,19 +84,6 @@ public static partial class RevisionBrief
         if (words.Length == 0)
             return null;
         return new RevisionChange(mark.Success && int.TryParse(mark.Groups["version"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var v) ? v : null, words);
-    }
-
-    /// <summary>
-    /// The change without the fixed sentences of quick buttons that are no longer offered (<see cref="RevisionQuickText.Offered"/>), on one
-    /// line; empty when nothing else was asked. Stored changes keep their words; only what goes to the writer again is cleaned, so a retired
-    /// sentence never reaches the writer as an earlier change or through resuming.
-    /// </summary>
-    public static string WithoutRetired(string? change)
-    {
-        var words = OneLine(change);
-        foreach (var quick in Enum.GetValues<RevisionQuick>().Where(q => !q.IsOffered()))
-            words = OneLine(words.Replace(quick.Instruction(), " ", StringComparison.Ordinal));
-        return words;
     }
 
     private static IReadOnlyList<RevisionChange> Lines(string block) =>

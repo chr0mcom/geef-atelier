@@ -22,5 +22,11 @@ internal sealed class EventConfiguration : IEntityTypeConfiguration<EventEntity>
             .IsRequired();
 
         builder.HasIndex(e => e.RunId);
+
+        builder.HasOne<RunEntity>()
+            .WithMany()
+            .HasForeignKey(e => e.RunId)
+            .HasConstraintName("FK_Events_Runs_RunId")
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

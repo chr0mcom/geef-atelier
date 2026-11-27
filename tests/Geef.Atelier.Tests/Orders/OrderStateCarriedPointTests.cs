@@ -30,7 +30,7 @@ public sealed class OrderStateCarriedPointTests
     private static RunEntity Run(string? reportJson, string? revisionHint = "- (version 2) The meeting is on 5 May, not 12 May.", RunStatus status = RunStatus.Completed,
         RunOutcome? outcome = RunOutcome.Converged, string? text = Text) => new()
     {
-        Id = Guid.NewGuid(), CreatedAt = Now.AddMinutes(-10), Status = status, BriefingText = "b", ConfigJson = "{}", Kind = RunKind.Standard,
+        Id = Guid.NewGuid(), CreatedAt = Now.AddMinutes(-10), Status = status, BriefingText = "b",
         Outcome = outcome, CompletedAt = status is RunStatus.Pending or RunStatus.Running ? null : Now.AddMinutes(-5), FinalText = text,
         OrderVersion = 2, RevisionHint = revisionHint, ReportJson = reportJson,
     };
@@ -133,8 +133,8 @@ public sealed class OrderStateCarriedPointTests
         foreach (var outcome in Enum.GetValues<RunOutcome>().Select(o => (RunOutcome?)o).Append(null))
         foreach (var hasText in new[] { true, false })
         {
-            var plain = OrderStateResolver.Resolve(OrderState.Ready, new OrderRunState(status, outcome, RunKind.Standard, hasText));
-            var carrying = OrderStateResolver.Resolve(OrderState.Ready, new OrderRunState(status, outcome, RunKind.Standard, hasText, CarriesBlockingPoint: true));
+            var plain = OrderStateResolver.Resolve(OrderState.Ready, new OrderRunState(status, outcome, hasText));
+            var carrying = OrderStateResolver.Resolve(OrderState.Ready, new OrderRunState(status, outcome, hasText, CarriesBlockingPoint: true));
             var expected = plain.State == OrderDisplayState.Delivered ? plain with { State = OrderDisplayState.DeliveredWithOpenPoints } : plain;
             Assert.Equal(expected, carrying);
         }

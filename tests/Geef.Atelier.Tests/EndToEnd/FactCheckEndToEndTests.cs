@@ -92,7 +92,7 @@ public sealed class FactCheckEndToEndTests(PostgresFixture postgres)
     }
 
     private static Task<RunEntity> RunOfAsync(AtelierEndToEndHost host, Guid orderId) =>
-        host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == orderId && r.Kind == RunKind.Standard));
+        host.QueryAsync(db => db.Runs.AsNoTracking().SingleAsync(r => r.OrderId == orderId));
 
     private static async Task<RunReport> ReportOfAsync(AtelierEndToEndHost host, Guid orderId) =>
         RunReportJson.TryParse((await RunOfAsync(host, orderId)).ReportJson) ?? throw new InvalidOperationException("No report.");

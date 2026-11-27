@@ -52,7 +52,7 @@ public sealed record OrderProgress(IReadOnlyList<OrderStep> Steps, string Curren
 /// A run of an order as listed under the order. <see cref="ChangeRequested"/> is reserved for what the person asks to change for a
 /// version; nothing sets it yet, so it is always <c>null</c>.
 /// </summary>
-public sealed record OrderRunView(Guid RunId, int? Version, RunKind Kind, RunStatus Status, RunOutcome? Outcome, DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt, int? WordCount,
+public sealed record OrderRunView(Guid RunId, int? Version, RunStatus Status, RunOutcome? Outcome, DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? CompletedAt, int? WordCount,
     string? ChangeRequested = null);
 
 /// <summary>Everything the order page shows.</summary>

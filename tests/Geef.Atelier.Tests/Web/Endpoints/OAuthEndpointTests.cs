@@ -1,7 +1,6 @@
 using Geef.Atelier.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -28,8 +27,7 @@ public sealed class OAuthEndpointTests : IAsyncLifetime
                 if (descriptor is not null) services.Remove(descriptor);
 
                 services.AddDbContext<AtelierDbContext>(options =>
-                    options.UseNpgsql(_postgres.GetConnectionString())
-                           .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
+                    options.UseNpgsql(_postgres.GetConnectionString()));
             }));
 
     private async Task MigrateAsync(WebApplicationFactory<Program> factory)

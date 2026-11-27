@@ -23,7 +23,6 @@ public static class OrderProgressMapper
     public const string WriteKey = "write";
     public const string CheckKey = "check";
     public const string FixKey = "fix";
-    public const string ReviewKey = "review";
     public const string DoneKey = "done";
 
     public const string GroundingStarted = "GroundingStartedEvent";
@@ -37,21 +36,18 @@ public static class OrderProgressMapper
     public const string PipelineFailed = "PipelineFailedEvent";
 
     /// <summary>
-    /// Builds the steps of the progress display: direct path <c>files</c> (only with sources), <c>write</c>, <c>check</c>,
-    /// <c>fix</c> (only when a second iteration began), <c>done</c>; <see cref="OrderMode.Careful"/>, which stands only for stored runs of
-    /// the removed review loop, <c>files</c> (only with sources), <c>write</c>, <c>review</c>, <c>done</c>. Clarified orders (<paramref name="intake"/> given) start with <c>understand</c> and, when
+    /// Builds the steps of the progress display: <c>files</c> (only with sources), <c>write</c>, <c>check</c>,
+    /// <c>fix</c> (only when a second iteration began), <c>done</c>. Clarified orders (<paramref name="intake"/> given) start with <c>understand</c> and, when
     /// questions were asked, <c>answers</c>. The elapsed time counts from <paramref name="versionStartedAt"/> when it is given (a run that
     /// changes an earlier version counts from its own start, not from the order), otherwise from <paramref name="orderCreatedAt"/>.
     /// </summary>
-    public static OrderProgress Map(OrderDisplay display, OrderMode mode, bool hasSources, IReadOnlyList<RunEventRow> events, DateTimeOffset orderCreatedAt, DateTimeOffset? finishedAt, DateTimeOffset now, OrderIntakeProgress? intake = null, DateTimeOffset? versionStartedAt = null)
+    public static OrderProgress Map(OrderDisplay display, bool hasSources, IReadOnlyList<RunEventRow> events, DateTimeOffset orderCreatedAt, DateTimeOffset? finishedAt, DateTimeOffset now, OrderIntakeProgress? intake = null, DateTimeOffset? versionStartedAt = null)
     {
         ArgumentNullException.ThrowIfNull(display);
         ArgumentNullException.ThrowIfNull(events);
 
         var ordered = events.OrderBy(e => e.At).ToList();
-        var steps = mode == OrderMode.Direct
-            ? DirectSteps(hasSources, ordered)
-            : CarefulSteps(hasSources, ordered);
+        var steps = DirectSteps(hasSources, ordered);
 
         steps.Add(new StepDraft(DoneKey, "Done"));
         Finish(steps, display, finishedAt);
@@ -146,46 +142,6 @@ public static class OrderProgressMapper
         return steps;
     }
 
-    private static List<StepDraft> CarefulSteps(bool hasSources, List<RunEventRow> events)
-    {
-        var steps = new List<StepDraft>();
-        if (hasSources)
-            steps.Add(FilesStep(events));
-
-        var write = new StepDraft(WriteKey, "Writing");
-        var review = new StepDraft(ReviewKey, "Reviewing");
-        var round = 0;
-
-        foreach (var e in events)
-        {
-            var iteration = e.Iteration ?? 1;
-            switch (e.EventType)
-            {
-                case ExecutionStarted when iteration <= 1:
-                    write.Start(e.At);
-                    break;
-                case ExecutionCompleted when iteration <= 1:
-                    write.End(e.At);
-                    review.Start(e.At);
-                    round = Math.Max(round, 1);
-                    break;
-                case ExecutionStarted or ExecutionCompleted or EvaluationApproved or EvaluationRejected:
-                    round = Math.Max(round, iteration);
-                    break;
-                case PipelineCompleted or PipelineFailed:
-                    review.End(e.At);
-                    break;
-            }
-        }
-
-        if (round > 0)
-            review.Label = string.Create(CultureInfo.InvariantCulture, $"Reviewing (round {round})");
-
-        steps.Add(write);
-        steps.Add(review);
-        return steps;
-    }
-
     private static StepDraft FilesStep(List<RunEventRow> events)
     {
         var files = new StepDraft(FilesKey, "Reading your files");
@@ -268,7 +224,7 @@ public static class OrderProgressMapper
     private sealed class StepDraft(string key, string label)
     {
         public string Key { get; } = key;
-        public string Label { get; set; } = label;
+        public string Label { get; } = label;
         public OrderStepStatus Status { get; set; } = OrderStepStatus.Pending;
         public DateTimeOffset? StartedAt { get; set; }
         public DateTimeOffset? EndedAt { get; set; }

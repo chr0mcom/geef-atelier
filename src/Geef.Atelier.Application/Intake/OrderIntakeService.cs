@@ -205,7 +205,7 @@ internal sealed class OrderIntakeService(
             gate.Assumptions,
             gate.FromMemory,
             topics.Topics,
-            order.Mode == OrderMode.Direct ? revision?.SourceId : null,
+            revision?.SourceId,
             settings.BriefMode,
             gate.HeldBack,
             topics.Withheld > 0 ? topics.Withheld : null,
@@ -214,12 +214,11 @@ internal sealed class OrderIntakeService(
     }
 
     /// <summary>
-    /// Whether looking things up on the web is switched on for the person of <paramref name="order"/> now, while the request is read: only
-    /// for a standard order (<see cref="OrderMode.Direct"/>; a stored order of the removed variant "Extra careful" was promised never to
-    /// search) and only by <see cref="ResearchOptionsExtensions.ModeFor"/>. Without research options it is off.
+    /// Whether looking things up on the web is switched on for the person of <paramref name="order"/> now, while the request is read,
+    /// only by <see cref="ResearchOptionsExtensions.ModeFor"/>. Without research options it is off.
     /// </summary>
     private bool ResearchAllowed(OrderEntity order) =>
-        order.Mode == OrderMode.Direct && research?.Value is { } settings && settings.ModeFor(order.CreatedByUser) == ResearchMode.On;
+        research?.Value is { } settings && settings.ModeFor(order.CreatedByUser) == ResearchMode.On;
 
     /// <summary>
     /// The research topics of the gate without those that <see cref="ResearchQueryGate"/> withholds against the About me details the

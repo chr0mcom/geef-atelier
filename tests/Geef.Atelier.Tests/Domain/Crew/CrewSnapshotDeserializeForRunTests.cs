@@ -19,12 +19,13 @@ public sealed class CrewSnapshotDeserializeForRunTests
     [InlineData(null, "no saved setup")]
     [InlineData("   ", "no saved setup")]
     [InlineData("{not json", "could not be read")]
-    [InlineData("""{"schemaVersion":3,"executor":42,"reviewers":[],"advisors":[]}""", "could not be read")]
+    [InlineData("""{"schemaVersion":4,"executor":42,"reviewers":[]}""", "could not be read")]
     [InlineData("null", "empty")]
-    [InlineData("""{"schemaVersion":4,"executor":{"name":"x"},"reviewers":[],"advisors":[]}""", "unknown format (version 4)")]
-    [InlineData("""{"schemaVersion":0,"executor":{"name":"x"},"reviewers":[],"advisors":[]}""", "unknown format (version 0)")]
-    [InlineData("""{"schemaVersion":3,"reviewers":[],"advisors":[]}""", "missing: writer")]
-    [InlineData("""{"schemaVersion":3,"executor":{"name":"x"}}""", "missing: checks, advisors")]
+    [InlineData("""{"schemaVersion":3,"executor":{"name":"x"},"reviewers":[],"advisors":[]}""", "unknown format (version 3)")]
+    [InlineData("""{"schemaVersion":5,"executor":{"name":"x"},"reviewers":[]}""", "unknown format (version 5)")]
+    [InlineData("""{"schemaVersion":0,"executor":{"name":"x"},"reviewers":[]}""", "unknown format (version 0)")]
+    [InlineData("""{"schemaVersion":4,"reviewers":[]}""", "missing: writer")]
+    [InlineData("""{"schemaVersion":4,"executor":{"name":"x"}}""", "missing: checks")]
     public void RejectsUnusableSnapshotsWithAReason(string? json, string expected)
     {
         var ex = Assert.Throws<InvalidCrewSnapshotException>(() => CrewSnapshot.DeserializeForRun(json));
@@ -38,8 +39,8 @@ public sealed class CrewSnapshotDeserializeForRunTests
     /// </summary>
     [Theory]
     [InlineData("{not json")]
-    [InlineData("""{"schemaVersion":3,"executor":42,"reviewers":[],"advisors":[]}""")]
-    [InlineData("""{"schemaVersion":3,"executor":{"name":"x"},"reviewers":[{"name":1}],"advisors":[]}""")]
+    [InlineData("""{"schemaVersion":4,"executor":42,"reviewers":[]}""")]
+    [InlineData("""{"schemaVersion":4,"executor":{"name":"x"},"reviewers":[{"name":1}]}""")]
     public void UnreadableSnapshotsGiveAFixedSentenceWithoutParserDetails(string json)
     {
         var ex = Assert.Throws<InvalidCrewSnapshotException>(() => CrewSnapshot.DeserializeForRun(json));

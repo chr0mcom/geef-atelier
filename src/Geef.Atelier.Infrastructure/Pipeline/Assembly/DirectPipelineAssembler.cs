@@ -27,9 +27,8 @@ namespace Geef.Atelier.Infrastructure.Pipeline.Assembly;
 /// The direct path: <see cref="OrderGroundingStep"/> (the order's files in full text and, for the version of the run, the passages looked
 /// up on the web), <see cref="DirectWriterExecutor"/>
 /// and <see cref="DeterministicChecksReviewer"/>, at most two passes. After the run it stores the report
-/// (<c>Runs.ReportJson</c>). Accepts runs of the code-only template <see cref="SystemCrew.DirectTemplateName"/>, also with a seed draft,
-/// and stored runs of <see cref="SystemCrew.RetiredOutlineTemplateName"/>, whose extra check <see cref="SystemCrew.RetiredRequestCheckName"/>
-/// is left out. A run that changes an earlier version (<see cref="RunEntity.RevisionHint"/>) passes the change to the grounding
+/// (<c>Runs.ReportJson</c>). Accepts runs of the code-only template <see cref="SystemCrew.DirectTemplateName"/>, also with a seed draft.
+/// A run that changes an earlier version (<see cref="RunEntity.RevisionHint"/>) passes the change to the grounding
 /// step, and its report also reads the report of that version (<see cref="RunEntity.ParentRunId"/>, <see cref="EarlierVersionAsync"/>).
 /// </summary>
 internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOptions, IOptions<DirectOptions> directOptions) : IPipelineAssembler
@@ -43,7 +42,8 @@ internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOpti
     public int Priority => 90;
 
     /// <inheritdoc/>
-    public bool CanAssemble(RunEntity run, CrewSnapshot snapshot) => SystemCrew.IsDirectPathTemplate(snapshot.TemplateName);
+    public bool CanAssemble(RunEntity run, CrewSnapshot snapshot) =>
+        string.Equals(snapshot.TemplateName, SystemCrew.DirectTemplateName, StringComparison.Ordinal);
 
     /// <inheritdoc/>
     public GeefPipelineRunner<FinalizedDocument> Assemble(PipelineAssemblyContext context)
@@ -62,7 +62,7 @@ internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOpti
         var ledger = Ledgers.GetValue(context, _ => new FactCheckLedger());
 
         return AtelierPipelineFactory.Build(
-            WithoutRetiredChecks(context.Snapshot), context.ConvergenceOptions, grounding, writer,
+            context.Snapshot, context.ConvergenceOptions, grounding, writer,
             profile => profile.Name switch
             {
                 DeterministicChecksReviewer.ReviewerName => checks,
@@ -72,12 +72,6 @@ internal sealed class DirectPipelineAssembler(IOptions<SourceOptions> sourceOpti
             context.LoggerFactory,
             [context.EventSink]);
     }
-
-    /// <summary>The snapshot as it is run: for a stored run of <see cref="SystemCrew.RetiredOutlineTemplateName"/> without its removed extra check.</summary>
-    private static CrewSnapshot WithoutRetiredChecks(CrewSnapshot snapshot) =>
-        snapshot.TemplateName == SystemCrew.RetiredOutlineTemplateName
-            ? snapshot with { Reviewers = snapshot.Reviewers.Where(r => r.Name != SystemCrew.RetiredRequestCheckName).ToList() }
-            : snapshot;
 
     /// <summary>
     /// The fact check of one run: a <see cref="LlmFactChecker"/> with the run's cost accumulator, the run's ledger and, as the one

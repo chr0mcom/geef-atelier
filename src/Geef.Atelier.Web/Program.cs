@@ -29,7 +29,6 @@ using Geef.Atelier.Web.Notifications;
 using Geef.Atelier.Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
@@ -61,10 +60,7 @@ builder.Services.AddLlmClient(builder.Configuration)
     });
 
 builder.Services.AddDbContext<AtelierDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
-           // Raw-SQL migrations (Step19McpOAuth+) deliberately bypass EF schema tracking;
-           // the tables exist in the DB but not in the model snapshot.
-           .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddAtelierPersistence();
 builder.Services.AddAtelierApplication();

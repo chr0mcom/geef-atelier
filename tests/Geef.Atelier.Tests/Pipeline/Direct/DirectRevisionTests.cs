@@ -9,7 +9,6 @@ using Geef.Atelier.Infrastructure.Pipeline.Direct.FactCheck;
 using Geef.Sdk.Context;
 using Geef.Sdk.Results;
 using RunEntity = Geef.Atelier.Core.Domain.RunEntity;
-using RunKind = Geef.Atelier.Core.Domain.RunKind;
 using RunOutcome = Geef.Atelier.Core.Domain.RunOutcome;
 using RunStatus = Geef.Atelier.Core.Domain.RunStatus;
 
@@ -492,8 +491,8 @@ public sealed class DirectRevisionTests
 
     private static RunEntity RunEntityWith(string reportJson) => new()
     {
-        Id = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow.AddHours(-1), Status = RunStatus.Completed, BriefingText = "b", ConfigJson = "{}",
-        Kind = RunKind.Standard, Outcome = RunOutcome.Converged, CompletedAt = DateTimeOffset.UtcNow.AddHours(-1), FinalText = Text, OrderVersion = 2,
+        Id = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow.AddHours(-1), Status = RunStatus.Completed, BriefingText = "b",
+        Outcome = RunOutcome.Converged, CompletedAt = DateTimeOffset.UtcNow.AddHours(-1), FinalText = Text, OrderVersion = 2,
         RevisionHint = "Bitte die Uhrzeit ergänzen.", ReportJson = reportJson,
     };
 }

@@ -1,7 +1,6 @@
 using Geef.Atelier.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Geef.Atelier.Web.Health;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -63,8 +62,7 @@ public sealed class HealthEndpointTests : IAsyncLifetime
                     if (descriptor is not null) services.Remove(descriptor);
 
                     services.AddDbContext<AtelierDbContext>(options =>
-                        options.UseNpgsql(badConnectionString)
-            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
+                        options.UseNpgsql(badConnectionString));
                 }));
 
         Assert.ThrowsAny<Exception>(() => factory.CreateClient());
@@ -83,8 +81,7 @@ public sealed class HealthEndpointTests : IAsyncLifetime
                     if (descriptor is not null) services.Remove(descriptor);
 
                     services.AddDbContext<AtelierDbContext>(options =>
-                        options.UseNpgsql(connectionString)
-            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
+                        options.UseNpgsql(connectionString));
                 }));
 
         using var client = factory.CreateClient();
@@ -101,7 +98,6 @@ public sealed class HealthEndpointTests : IAsyncLifetime
     {
         await using var db = new AtelierDbContext(new DbContextOptionsBuilder<AtelierDbContext>()
             .UseNpgsql(_postgres.GetConnectionString())
-            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options);
         var check = new PendingMigrationsHealthCheck(db);
 
@@ -110,7 +106,7 @@ public sealed class HealthEndpointTests : IAsyncLifetime
         var after = await check.CheckHealthAsync(new HealthCheckContext());
 
         Assert.Equal(HealthStatus.Unhealthy, before.Status);
-        Assert.Contains("Step47EngineHonesty", before.Description);
+        Assert.Contains("_Baseline", before.Description);
         Assert.Equal(HealthStatus.Healthy, after.Status);
     }
 }

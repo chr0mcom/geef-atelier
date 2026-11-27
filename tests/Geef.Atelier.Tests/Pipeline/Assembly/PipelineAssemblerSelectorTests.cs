@@ -12,10 +12,10 @@ namespace Geef.Atelier.Tests.Pipeline.Assembly;
 
 public sealed class PipelineAssemblerSelectorTests
 {
-    private static RunEntity Run(RunKind kind = RunKind.Standard, string? seed = null, Guid? orderId = null) => new()
+    private static RunEntity Run(string? seed = null, Guid? orderId = null) => new()
     {
-        Id = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Running, BriefingText = "b", ConfigJson = "{}",
-        Kind = kind, SeedDraftText = seed, OrderId = orderId,
+        Id = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Running, BriefingText = "b",
+        SeedDraftText = seed, OrderId = orderId,
     };
 
     public static TheoryData<string, Type> Cases => new()
@@ -51,18 +51,16 @@ public sealed class PipelineAssemblerSelectorTests
     }
 
     [Theory]
-    [InlineData(RunKind.Standard, null)]
-    [InlineData(RunKind.Standard, "draft")]
-    [InlineData(RunKind.CrewComposition, null)]
-    [InlineData(RunKind.Learning, null)]
-    public void A_run_of_a_removed_way_of_working_is_refused_with_a_plain_sentence(RunKind kind, string? seed)
+    [InlineData(null)]
+    [InlineData("draft")]
+    public void A_run_with_a_setup_no_assembler_accepts_is_refused_with_a_plain_sentence(string? seed)
     {
         var selector = new ServiceCollection().AddOptions().AddPipelineAssemblers().BuildServiceProvider().GetRequiredService<IPipelineAssemblerSelector>();
-        var snapshot = CrewSnapshot.DeserializeForRun(TestCrewSnapshots.RetiredKlassikJson);
+        var snapshot = DirectPipelineHarness.DirectSnapshot with { TemplateName = "unknown-setup" };
 
-        var error = Assert.Throws<InvalidCrewSnapshotException>(() => selector.Select(Run(kind, seed), snapshot));
+        var error = Assert.Throws<InvalidCrewSnapshotException>(() => selector.Select(Run(seed), snapshot));
 
-        Assert.Equal(PipelineAssemblerSelector.RetiredSetupMessage, error.Message);
+        Assert.Equal(PipelineAssemblerSelector.UnknownSetupMessage, error.Message);
     }
 
     [Fact]

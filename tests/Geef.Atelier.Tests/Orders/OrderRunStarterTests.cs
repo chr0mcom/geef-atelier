@@ -30,7 +30,7 @@ public sealed class OrderRunStarterTests
     {
         var composer = new RecordingComposer();
         var starter = Starter(composer);
-        var order = Order("user-a", "Schreib eine Beschwerde.", expected) with { Mode = OrderMode.Direct };
+        var order = Order("user-a", "Schreib eine Beschwerde.", expected);
 
         var runId = await starter.TryStartAsync(new RunStartRequest(order, expected, IntakeBriefComposerTests.Record(), [], outcome, RecordIsNew: true), CancellationToken.None);
 
@@ -44,7 +44,7 @@ public sealed class OrderRunStarterTests
         var composer = new IntakeBriefComposer(Options.Create(new IntakeOptions()));
         var starts = new List<OrderStart>();
         var starter = Starter(composer, starts);
-        var order = Order("user-a", "Schreib eine Beschwerde.", OrderState.Analyzing) with { Mode = OrderMode.Direct };
+        var order = Order("user-a", "Schreib eine Beschwerde.", OrderState.Analyzing);
 
         await starter.TryStartAsync(new RunStartRequest(order, OrderState.Analyzing, IntakeBriefComposerTests.Record(), [], IntakeOutcome.Clarified, true), CancellationToken.None);
 
@@ -93,8 +93,7 @@ public sealed class OrderRunStarterTests
         Executor: SystemCrew.DirectWriterProfile,
         Reviewers: [SystemCrew.DeterministicChecksProfile],
         EvaluationStrategy: EvaluationStrategy.Parallel,
-        ConvergenceOverride: null,
-        Advisors: []);
+        ConvergenceOverride: null);
 
     private sealed class RecordingComposer : IOrderBriefComposer
     {

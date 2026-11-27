@@ -33,7 +33,7 @@ public sealed class OrderRepositoryRevisionTests(PostgresFixture fixture)
         Assert.Equal((RevisionStart.Created, 2), outcome);
         await using var check = fixture.NewContext();
         var stored = await check.Runs.AsNoTracking().SingleAsync(r => r.Id == revision.Id);
-        Assert.Equal((order.Id, 2, RunStatus.Pending, RunKind.Standard), (stored.OrderId!.Value, stored.OrderVersion!.Value, stored.Status, stored.Kind));
+        Assert.Equal((order.Id, 2, RunStatus.Pending), (stored.OrderId!.Value, stored.OrderVersion!.Value, stored.Status));
         Assert.Equal(v1.Id, stored.ParentRunId);
         Assert.Equal("Version one.", stored.SeedDraftText);
         Assert.Equal(Change, stored.RevisionHint);
@@ -48,15 +48,6 @@ public sealed class OrderRepositoryRevisionTests(PostgresFixture fixture)
     {
         var (order, v1) = await OrderWithDeliveredVersionAsync();
         await AddAsync(Run(order.CreatedByUser, order.Id, 2, status: status, at: T0.AddMinutes(1)));
-
-        await AssertRefusedAsync(order.Id, v1.Id, Revision(order, v1), 10, RevisionStart.Busy);
-    }
-
-    [Fact]
-    public async Task A_running_composition_makes_the_change_busy_too()
-    {
-        var (order, v1) = await OrderWithDeliveredVersionAsync();
-        await AddAsync(Run(order.CreatedByUser, order.Id, 1, kind: RunKind.CrewComposition, status: RunStatus.Running, at: T0.AddMinutes(1)));
 
         await AssertRefusedAsync(order.Id, v1.Id, Revision(order, v1), 10, RevisionStart.Busy);
     }
@@ -221,12 +212,11 @@ public sealed class OrderRepositoryRevisionTests(PostgresFixture fixture)
         Assert.Equal([1, 2], await check.Runs.Where(r => r.OrderId == order.Id).Select(r => r.OrderVersion!.Value).OrderBy(v => v).ToListAsync());
     }
 
-    private const string VersionIndex = "UX_Runs_OrderId_OrderVersion_Standard";
+    private const string VersionIndex = "UX_Runs_OrderId_OrderVersion";
 
     private static AtelierDbContext NewContext(string connectionString, params IInterceptor[] interceptors) =>
         new(new DbContextOptionsBuilder<AtelierDbContext>()
             .UseNpgsql(connectionString)
-            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .AddInterceptors(interceptors)
             .Options);
 
@@ -363,8 +353,8 @@ public sealed class OrderRepositoryRevisionTests(PostgresFixture fixture)
 
     private static RunEntity Revision(OrderEntity order, RunEntity baseRun, int? version = null) => new()
     {
-        Id = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Pending, BriefingText = order.RequestText, ConfigJson = "{}",
-        CreatedByUser = order.CreatedByUser, Kind = RunKind.Standard, OrderVersion = version, ParentRunId = baseRun.Id,
+        Id = Guid.NewGuid(), CreatedAt = DateTimeOffset.UtcNow, Status = RunStatus.Pending, BriefingText = order.RequestText,
+        CreatedByUser = order.CreatedByUser, OrderVersion = version, ParentRunId = baseRun.Id,
         SeedDraftText = baseRun.FinalText, RevisionHint = Change,
     };
 }

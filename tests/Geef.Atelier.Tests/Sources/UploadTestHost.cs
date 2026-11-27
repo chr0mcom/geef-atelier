@@ -6,7 +6,6 @@ using Geef.Atelier.Infrastructure.Persistence.Sources;
 using Geef.Atelier.Infrastructure.Sources;
 using Geef.Atelier.Tests.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -46,8 +45,7 @@ internal sealed class UploadTestHost : IAsyncDisposable
         var logs = new CapturedLogs();
         var services = new ServiceCollection();
         services.AddLogging(b => b.SetMinimumLevel(LogLevel.Trace).AddProvider(logs));
-        services.AddDbContext<AtelierDbContext>(o => o.UseNpgsql(connectionString ?? fixture.ConnectionString)
-            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
+        services.AddDbContext<AtelierDbContext>(o => o.UseNpgsql(connectionString ?? fixture.ConnectionString));
         services.AddScoped<SourceRepository>();
         services.AddScoped<ISourceRepository>(sp => sp.GetRequiredService<SourceRepository>());
         services.AddScoped<ISourceRetentionStore>(sp => sp.GetRequiredService<SourceRepository>());

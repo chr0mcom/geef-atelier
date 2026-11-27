@@ -9,7 +9,7 @@ public sealed class IterationEntity
     public required string ArtifactText { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
 
-    // Cost tracking — null for iterations before Step16 migration or when tracking is disabled.
+    // Cost tracking — null while the pass is running and when tracking is disabled.
     public int? ExecutorInputTokens { get; set; }
     public int? ExecutorOutputTokens { get; set; }
     public decimal? ExecutorCostEur { get; set; }

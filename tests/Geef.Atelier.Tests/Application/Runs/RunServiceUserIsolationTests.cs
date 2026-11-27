@@ -228,10 +228,10 @@ public sealed class RunServiceUserIsolationTests
     {
         warnings ??= new InMemoryRunWarnings();
         return new RunService(
-            new MinimalPersistenceService(),
             repo,
             NullLogger<RunService>.Instance,
-            warnings);
+            warnings,
+            System.Reflection.DispatchProxy.Create<Geef.Atelier.Core.Persistence.Orders.IOrderRepository, UnusedOrders>());
     }
 
     private static RunEntity MakeRun(Guid id, string? createdByUser) => new RunEntity
@@ -240,7 +240,6 @@ public sealed class RunServiceUserIsolationTests
         CreatedAt     = DateTimeOffset.UtcNow,
         Status        = RunStatus.Pending,
         BriefingText  = "briefing",
-        ConfigJson    = "{}",
         CreatedByUser = createdByUser,
     };
 
@@ -292,24 +291,9 @@ public sealed class RunServiceUserIsolationTests
         public Task DeleteAsync(Guid runId, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
-    private sealed class MinimalPersistenceService : IRunPersistenceService
+    public class UnusedOrders : System.Reflection.DispatchProxy
     {
-        public Task<Guid> CreateRunAsync(string briefingText, string configJson, string? createdByUser = null,
-            string? crewTemplateName = null, string? crewSnapshotJson = null, RunKind kind = RunKind.Standard,
-            Guid? parentCompositionRunId = null,
-            CancellationToken cancellationToken = default)
-            => Task.FromResult(Guid.NewGuid());
-
-        public Task UpdateSnapshotAsync(Guid runId, string snapshotJson, CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
-
-        public Task MarkRunFailedAsync(Guid runId, string errorMessage, CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
-
-        public Task<Guid> CreateResumedRunAsync(string briefingText, string configJson,
-            string? createdByUser, string? crewTemplateName, string? crewSnapshotJson,
-            Guid parentRunId, string? seedDraftText, RunKind kind = RunKind.Standard,
-            CancellationToken cancellationToken = default)
-            => Task.FromResult(Guid.NewGuid());
+        protected override object? Invoke(System.Reflection.MethodInfo? targetMethod, object?[]? args) =>
+            throw new NotSupportedException(targetMethod?.Name);
     }
 }

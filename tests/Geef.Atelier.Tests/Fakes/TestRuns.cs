@@ -18,7 +18,7 @@ internal static class TestRuns
         int maxIterations = 3, CancellationToken ct = default)
     {
         var persistence = services.GetRequiredService<IRunPersistenceService>();
-        var runId = await persistence.CreateRunAsync(briefing, "{}", createdByUser, TestLoop.TemplateName, null, RunKind.Standard, null, ct);
+        var runId = await persistence.CreateRunAsync(briefing, createdByUser, TestLoop.TemplateName, null, ct);
         await persistence.UpdateSnapshotAsync(runId, JsonSerializer.Serialize(TestLoop.Snapshot(maxIterations), SnapshotJson), ct);
         return runId;
     }

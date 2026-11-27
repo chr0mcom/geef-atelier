@@ -40,7 +40,7 @@ public sealed class AccountStoreTests(PostgresFixture fixture)
     private async Task<Guid> RunAsync(string owner)
     {
         await using var db = fixture.NewContext();
-        return await new RunPersistenceService(db).CreateRunAsync(Briefing(), "{}", owner, cancellationToken: CancellationToken.None);
+        return await new RunPersistenceService(db).CreateRunAsync(Briefing(), owner, cancellationToken: CancellationToken.None);
     }
 
     private async Task<AtelierUser> SeedAsync(string name, string? profile = "mine")
@@ -278,7 +278,6 @@ public sealed class AccountStoreTests(PostgresFixture fixture)
     private AtelierDbContext FailingContext(string marker) =>
         new(new DbContextOptionsBuilder<AtelierDbContext>()
             .UseNpgsql(fixture.ConnectionString)
-            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .AddInterceptors(new FailingCommand(marker))
             .Options);
 

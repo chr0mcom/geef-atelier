@@ -1,6 +1,6 @@
 namespace Geef.Atelier.Infrastructure.Persistence;
 
-/// <summary>Column limits of the <c>RunWarnings</c> table (Step47).</summary>
+/// <summary>Column limits of the <c>RunWarnings</c> table.</summary>
 internal static class RunWarningLimits
 {
     public const int SourceLength = 100;

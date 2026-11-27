@@ -5,8 +5,7 @@ namespace Geef.Atelier.Core.Domain.Crew;
 
 /// <summary>
 /// Frozen, fully-dereferenced snapshot of the setup used for a single run, persisted as JSON in <c>RunEntity.CrewSnapshot</c> so that a
-/// run stays reproducible. Snapshots of the removed ways of working (D-091) name more fields (advisors with content, grounding sources,
-/// finishers, tool bindings, pack compositions); they are read here without those fields and are never run again.
+/// run stays reproducible.
 /// </summary>
 /// <param name="SchemaVersion">
 /// Format version. Increment when the snapshot schema changes; <see cref="DeserializeForRun"/> throws on unknown versions to surface
@@ -17,11 +16,7 @@ namespace Geef.Atelier.Core.Domain.Crew;
 /// <param name="Reviewers">Embedded check profiles in the order required by the evaluation strategy.</param>
 /// <param name="EvaluationStrategy">Strategy used for the checks.</param>
 /// <param name="ConvergenceOverride">Convergence-policy overrides applied for this run, if any.</param>
-/// <param name="Advisors">
-/// Always empty for new runs. Kept in the stored format because images before stage 8d refuse a snapshot without the list; snapshots
-/// of the removed review loop may carry advisor entries, which are kept as they are and never used.
-/// </param>
-/// <param name="CrewDomain">Domain the setup ran in, used for model-matrix assignment (D-066); <c>null</c> for snapshots before D-066.</param>
+/// <param name="CrewDomain">Domain the setup ran in, used for model-matrix assignment (D-066); <c>null</c> means <c>General</c>.</param>
 public sealed record CrewSnapshot(
     int SchemaVersion,
     string? TemplateName,
@@ -29,11 +24,10 @@ public sealed record CrewSnapshot(
     IReadOnlyList<ReviewerProfile> Reviewers,
     EvaluationStrategy EvaluationStrategy,
     ConvergencePolicyOverride? ConvergenceOverride,
-    IReadOnlyList<JsonElement> Advisors,
     Models.ModelDomain? CrewDomain = null)
 {
     /// <summary>Current snapshot schema version. Bump when the format changes incompatibly.</summary>
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     private static readonly JsonSerializerOptions DeserializeOpts =
         new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
@@ -72,8 +66,8 @@ public sealed record CrewSnapshot(
 
     /// <summary>
     /// Strict read for executing a run. Throws <see cref="InvalidCrewSnapshotException"/> with a user-facing
-    /// reason when the snapshot is missing, unreadable, of an unknown schema version or lacks the writer or the
-    /// list of checks or advisors. There is no fallback setup.
+    /// reason when the snapshot is missing, unreadable, not of <see cref="CurrentSchemaVersion"/> or lacks the writer or the
+    /// list of checks. There is no fallback setup.
     /// </summary>
     public static CrewSnapshot DeserializeForRun(string? json)
     {
@@ -93,7 +87,7 @@ public sealed record CrewSnapshot(
 
         if (snapshot is null)
             throw new InvalidCrewSnapshotException("The saved setup of this task is empty. Please submit it again.");
-        if (snapshot.SchemaVersion is < 1 or > CurrentSchemaVersion)
+        if (snapshot.SchemaVersion != CurrentSchemaVersion)
             throw new InvalidCrewSnapshotException(
                 $"The saved setup of this task uses an unknown format (version {snapshot.SchemaVersion}). Please submit it again.");
 
@@ -102,8 +96,6 @@ public sealed record CrewSnapshot(
             missing.Add("writer");
         if (snapshot.Reviewers is null)
             missing.Add("checks");
-        if (snapshot.Advisors is null)
-            missing.Add("advisors");
         if (missing.Count > 0)
             throw new InvalidCrewSnapshotException(
                 $"The saved setup of this task is incomplete (missing: {string.Join(", ", missing)}). Please submit it again.");

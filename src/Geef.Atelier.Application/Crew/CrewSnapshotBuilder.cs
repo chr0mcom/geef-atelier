@@ -32,7 +32,6 @@ public static class CrewSnapshotBuilder
             Reviewers: checks,
             EvaluationStrategy: template.EvaluationStrategy,
             ConvergenceOverride: template.ConvergenceOverride,
-            Advisors: [],
             CrewDomain: template.Domain ?? Core.Domain.Crew.Models.ModelDomain.General);
     }
 }

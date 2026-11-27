@@ -29,7 +29,6 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -106,8 +105,7 @@ internal sealed class WebTestHost : IAsyncDisposable
 
         // DB: fixture Postgres (already migrated by PostgresFixture)
         builder.Services.AddDbContext<AtelierDbContext>(opts =>
-            opts.UseNpgsql(fixture.ConnectionString)
-            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
+            opts.UseNpgsql(fixture.ConnectionString));
 
         builder.Services.AddAtelierPersistence();
         builder.Services.AddAtelierApplication();

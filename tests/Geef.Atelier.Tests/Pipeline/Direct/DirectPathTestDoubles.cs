@@ -24,7 +24,7 @@ internal sealed class InMemoryOrderRepository : IOrderRepository
         var now = DateTimeOffset.UtcNow;
         var order = new OrderEntity
         {
-            Id = Guid.NewGuid(), CreatedByUser = "e2e-user", RequestText = requestText, Mode = OrderMode.Direct,
+            Id = Guid.NewGuid(), CreatedByUser = "e2e-user", RequestText = requestText,
             State = OrderState.Ready, Entry = OrderEntry.Web, CreatedAt = now, UpdatedAt = now,
         };
         _orders[order.Id] = order;
@@ -53,7 +53,6 @@ internal sealed class InMemoryOrderRepository : IOrderRepository
     public Task<IReadOnlyList<OrderListRow>> ListAsync(string? ownerUsername, int limit, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<IReadOnlyList<RunEventRow>> ListRunEventsAsync(Guid runId, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<bool> TrySetStateAsync(Guid orderId, OrderState expected, OrderState next, CancellationToken ct = default) => throw new NotSupportedException();
-    public Task<Guid> LinkLegacyRunAsync(Guid runId, OrderEntry entry, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<bool> DeleteAsync(Guid orderId, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<IReadOnlyList<Guid>> ListIntakeCandidatesAsync(DateTimeOffset staleBefore, int maxAttempts, int limit, CancellationToken ct = default) => throw new NotImplementedException();
     public Task<bool> TryClaimForIntakeAsync(Guid orderId, DateTimeOffset now, DateTimeOffset staleBefore, int maxAttempts, CancellationToken ct = default) => throw new NotImplementedException();

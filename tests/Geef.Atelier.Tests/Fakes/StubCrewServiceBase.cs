@@ -12,6 +12,6 @@ internal abstract class StubCrewServiceBase : ICrewService
     public virtual Task<ResolvedCrewSnapshot> ResolveCodeTemplateSnapshotAsync(CrewTemplate template, CancellationToken cancellationToken = default) =>
         Task.FromResult(new ResolvedCrewSnapshot(
             new CrewSnapshot(CrewSnapshot.CurrentSchemaVersion, template.Name, SystemCrew.DirectWriterProfile, [],
-                template.EvaluationStrategy, template.ConvergenceOverride, []),
+                template.EvaluationStrategy, template.ConvergenceOverride),
             []));
 }

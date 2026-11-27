@@ -13,7 +13,7 @@ namespace Geef.Atelier.Tests.Orders;
 /// <summary>
 /// The result of a changed version shows what the report carried over from the version before: flagged passages keep the version
 /// they came from, the open points of the writer for that version are listed, and "What was checked" never says there is nothing to
-/// look at while such points are shown. Reports without these fields (schema 1, reports written before stage 5) stay as they were.
+/// look at while such points are shown. Reports without these fields stay as they were.
 /// The About me rule applies to carried-over passages as to new ones.
 /// </summary>
 public sealed class OrderResultEarlierVersionTests
@@ -36,9 +36,8 @@ public sealed class OrderResultEarlierVersionTests
         IReadOnlyList<FactFinding>? open = null,
         IReadOnlyList<string>? openPoints = null,
         IReadOnlyList<RunReportEarlierPoint>? earlier = null,
-        FactCheckState? state = null,
-        int schema = 2) =>
-        new(schema, RunReport.DirectKind, OrderConstraints.None, [new DraftCheckResult(DraftCheckCodes.Empty, true, true, "ok", null)], [],
+        FactCheckState? state = null) =>
+        new(RunReport.CurrentSchemaVersion, RunReport.DirectKind, OrderConstraints.None, [new DraftCheckResult(DraftCheckCodes.Empty, true, true, "ok", null)], [],
             [new RunReportSource(Guid.NewGuid(), "notizen.txt", SourceUsageMode.FullText, 400)], 1, 1, null, [], WriterNotesStatus.Ok,
             new WriterNotes([], openPoints ?? [], []), [], 0,
             new FactCheckSummary(FactCheckMode.Report, FactCheckScope.Full,
@@ -113,18 +112,6 @@ public sealed class OrderResultEarlierVersionTests
 
         Assert.True(result.HasOpenPoints());
         Assert.Equal([new OrderEarlierPoint(1, "Es fehlt die Uhrzeit.")], result.ShownEarlierPoints());
-    }
-
-    [Fact]
-    public void A_schema_1_report_leaves_both_fields_null()
-    {
-        var report = Report(open: [Unsupported("in der Aula", fromVersion: 1)], earlier: [new RunReportEarlierPoint(1, "Offen.")], schema: 1);
-
-        var result = Base().WithReport(report);
-
-        Assert.Null(result.EarlierOpenPoints);
-        Assert.Null(result.UnbackedPassages);
-        Assert.False(result.HasOpenPoints());
     }
 
     [Fact]

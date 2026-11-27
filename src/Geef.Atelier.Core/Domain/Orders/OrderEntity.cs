@@ -11,15 +11,13 @@ public sealed record OrderEntity
     public required Guid Id { get; init; }
     public string? CreatedByUser { get; init; }
     public required string RequestText { get; init; }
-    public required OrderMode Mode { get; init; }
     public required OrderState State { get; init; }
     public required OrderEntry Entry { get; init; }
-    public string? CrewTemplateName { get; init; }
     public string? ClarifyJson { get; init; }
     public string? AnswersJson { get; init; }
     public DateTimeOffset? ClaimedAt { get; init; }
 
-    /// <summary>How the intake ended; null when the order was not clarified (intake off, bypassed, older orders).</summary>
+    /// <summary>How the intake ended; null when the order was not clarified (intake off or bypassed).</summary>
     public IntakeOutcome? IntakeOutcome { get; init; }
 
     /// <summary>Number of times the intake worker claimed the order.</summary>

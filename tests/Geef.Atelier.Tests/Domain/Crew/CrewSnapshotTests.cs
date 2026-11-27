@@ -7,9 +7,23 @@ namespace Geef.Atelier.Tests.Domain.Crew;
 public sealed class CrewSnapshotTests
 {
     [Fact]
-    public void CurrentSchemaVersion_IsThree()
+    public void CurrentSchemaVersion_IsFour()
     {
-        Assert.Equal(3, CrewSnapshot.CurrentSchemaVersion);
+        Assert.Equal(4, CrewSnapshot.CurrentSchemaVersion);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    [InlineData(5)]
+    public void A_snapshot_of_another_format_version_is_not_run(int version)
+    {
+        var json = TestCrewSnapshots.Serialize(TestCrewSnapshots.Runnable with { SchemaVersion = version });
+
+        var error = Assert.Throws<InvalidCrewSnapshotException>(() => CrewSnapshot.DeserializeForRun(json));
+
+        Assert.Contains($"unknown format (version {version})", error.Message, StringComparison.Ordinal);
+        Assert.False(CrewSnapshot.IsUsableForRun(json));
     }
 
     [Fact]
@@ -21,27 +35,14 @@ public sealed class CrewSnapshotTests
         var reviewer = new ReviewerProfile(
             "rev", "Rev", "Reviewer", "prompt", "provider", "model", null, true);
 
-        var snapshot = new CrewSnapshot(1, "klassik", executor, [reviewer],
-            EvaluationStrategy.Parallel, null, []);
+        var snapshot = new CrewSnapshot(CrewSnapshot.CurrentSchemaVersion, "direct", executor, [reviewer],
+            EvaluationStrategy.Parallel, null);
 
-        Assert.Equal(1, snapshot.SchemaVersion);
-        Assert.Equal("klassik", snapshot.TemplateName);
-        Assert.Equal(executor, snapshot.Executor);
-        Assert.Single(snapshot.Reviewers);
-        Assert.Equal(reviewer, snapshot.Reviewers[0]);
-        Assert.Equal(EvaluationStrategy.Parallel, snapshot.EvaluationStrategy);
-    }
+        var read = CrewSnapshot.DeserializeForRun(TestCrewSnapshots.Serialize(snapshot));
 
-    [Fact]
-    public void AdvisorsProperty_CanBeEmptyArray()
-    {
-        var snapshot = new CrewSnapshot(
-            CrewSnapshot.CurrentSchemaVersion, "klassik",
-            TestLoop.Writer,
-            [TestLoop.Reviewers[0]],
-            EvaluationStrategy.Parallel, null,
-            []);
-
-        Assert.Empty(snapshot.Advisors);
+        Assert.Equal("direct", read.TemplateName);
+        Assert.Equal(executor.Name, read.Executor.Name);
+        Assert.Equal(reviewer.Name, Assert.Single(read.Reviewers).Name);
+        Assert.Equal(EvaluationStrategy.Parallel, read.EvaluationStrategy);
     }
 }

@@ -23,7 +23,6 @@ public sealed class RunDetailManuscriptVisibilityTests : TestContext
                 CreatedAt = DateTimeOffset.UtcNow,
                 Status = status,
                 BriefingText = "Test briefing",
-                ConfigJson = "{}",
                 FinalText = finalText,
                 ErrorMessage = errorMessage,
                 CrewTemplateName = Geef.Atelier.Core.Domain.Crew.SystemCrew.DirectTemplateName,

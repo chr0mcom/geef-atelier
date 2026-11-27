@@ -2,7 +2,6 @@ using Geef.Atelier.Core.Domain.Warnings;
 using Geef.Atelier.Infrastructure.Persistence;
 using Geef.Atelier.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -87,8 +86,7 @@ public sealed class RunWarningSinkTests(PostgresFixture fixture)
     {
         var services = new ServiceCollection();
         services.AddDbContext<AtelierDbContext>(o => o
-            .UseNpgsql("Host=127.0.0.1;Port=1;Database=none;Username=none;Password=none;Timeout=2")
-            .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
+            .UseNpgsql("Host=127.0.0.1;Port=1;Database=none;Username=none;Password=none;Timeout=2"));
         var sink = new RunWarningSink(
             services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>(),
             NullLogger<RunWarningSink>.Instance);
@@ -102,6 +100,6 @@ public sealed class RunWarningSinkTests(PostgresFixture fixture)
     private async Task<Guid> CreateRunAsync()
     {
         await using var db = fixture.NewContext();
-        return await new RunPersistenceService(db).CreateRunAsync("warning sink test", "{}");
+        return await new RunPersistenceService(db).CreateRunAsync("warning sink test");
     }
 }

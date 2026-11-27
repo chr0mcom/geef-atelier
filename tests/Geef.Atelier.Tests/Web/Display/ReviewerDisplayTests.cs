@@ -5,14 +5,6 @@ namespace Geef.Atelier.Tests.Web.Display;
 public sealed class ReviewerDisplayTests
 {
     [Theory]
-    [InlineData("BriefingTreueReviewer", "BriefingFidelity")]
-    [InlineData("KlarheitReviewer",      "Clarity")]
-    public void KnownReviewers_ReturnMappedDisplayName(string input, string expected)
-    {
-        Assert.Equal(expected, ReviewerDisplay.ToDisplay(input));
-    }
-
-    [Theory]
     [InlineData("UnknownReviewer")]
     [InlineData("")]
     [InlineData("SomeOtherName")]
@@ -26,12 +18,6 @@ public sealed class ReviewerDisplayTests
     {
         Assert.Equal("Automatic checks", ReviewerDisplay.ToDisplay("deterministic-checks"));
         Assert.Equal("Direct", ReviewerDisplay.GetTemplateDisplay("direct"));
-    }
-
-    [Fact]
-    public void CatalogueProfilesStillWinOverTheFallback()
-    {
-        Assert.Equal("Clarity", ReviewerDisplay.ToDisplay("clarity"));
         Assert.Equal("unknown-template", ReviewerDisplay.GetTemplateDisplay("unknown-template"));
     }
 }
