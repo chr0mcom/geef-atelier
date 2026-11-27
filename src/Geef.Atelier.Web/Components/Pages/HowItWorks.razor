@@ -78,7 +78,7 @@
                     <p>An AI writer drafts the text from your request, your answers, your <a href="#about-me">About me</a> details and your files. Where a fact is missing, it is asked to leave a gap in [square brackets] instead of making something up.</p>
                     @if (_f.WebResearch)
                     {
-                        <p data-testid="hiw-step-research">If your request has gaps that can be looked up on the web, it may look them up first. It never does this when you add files, and never for “Extra careful”. The result shows which search words were sent, what was looked up and on which page. A change of a finished text uses what was looked up the first time and does not search again. There is a daily limit for looking things up; once it is reached, the text is written without it, and the result says so.</p>
+                        <p data-testid="hiw-step-research">If your request has gaps that can be looked up on the web, it may look them up first. It never does this when you add files@(_f.Careful ? ", and never for “Extra careful”" : ""). The result shows which search words were sent, what was looked up and on which page. A change of a finished text uses what was looked up the first time and does not search again. There is a daily limit for looking things up; once it is reached, the text is written without it, and the result says so.</p>
                     }
                 </div>
             </li>
@@ -197,7 +197,10 @@
                     <li>It is not a chat. Once it starts, you wait for the result. You cannot add files to a request later.</li>
                     <li data-testid="hiw-limit-learning">It does not learn from your earlier texts. Only your About me details carry over.</li>
                     <li>Scanned pages (photos of paper) cannot be read.</li>
-                    <li data-testid="hiw-limit-careful">“Extra careful” takes longer and uses an older way of working with several review rounds. It does not look things up on the web. Its result does not show “What was checked”. For most texts, leave it off.</li>
+                    @if (_f.Careful)
+                    {
+                        <li data-testid="hiw-limit-careful">“Extra careful” takes longer: it plans the text in sections first and then checks that everything you asked for is in it. It does not look things up on the web. For most texts, leave it off.</li>
+                    }
                 </ul>
             </div>
         </div>
@@ -236,7 +239,7 @@
 
     <section class="hiw-section" id="checks" aria-labelledby="hiw-checks-title" data-testid="hiw-checks">
         <h2 id="hiw-checks-title" class="hiw-h2">What the checks mean</h2>
-        <p>Below every text written the standard way there is a box “@OrderCheckLines.Heading”. It lists only the checks that really ran. (“Extra careful” has no such box.)</p>
+        <p>Below every text written the standard way there is a box “@OrderCheckLines.Heading”. It lists only the checks that really ran.</p>
         <dl class="hiw-defs">
             <dt>Checked automatically</dt>
             <dd>Checked without AI. A few basics are always checked: the text is not empty and starts with the text itself, not with a remark to the reader. Length, language, gaps, lists or headings, and words to use or to avoid are checked only when your request asked for them.</dd>
@@ -277,7 +280,7 @@
             <li>Your request, your answers, your About me details and your files go to the AI services that write and check the text.</li>
             @if (_f.WebResearch)
             {
-                <li data-testid="hiw-privacy-research">To look things up, Atelier sends a web search service a few short search words taken from your request, and only when you add no files. @OrderResearchLines.SearchPrivacy “Extra careful” never searches the web.</li>
+                <li data-testid="hiw-privacy-research">To look things up, Atelier sends a web search service a few short search words taken from your request, and only when you add no files. @OrderResearchLines.SearchPrivacy@(_f.Careful ? " “Extra careful” never searches the web." : "")</li>
             }
             <li>Only you and the administrators of this Atelier can see your requests. More in the <a href="/privacy">privacy notice</a>.</li>
         </ul>
@@ -332,11 +335,12 @@
                         <tr><td>Fact check</td><td><code>Direct:FactCheckMode</code>, per person <code>Direct:FactCheckModeOverrides</code></td><td>@DirectSettings.Value.FactCheckMode</td></tr>
                         <tr><td>Files from an AI assistant</td><td><code>Uploads:Tickets</code></td><td>@_everyone.UploadThroughAssistant.OnOff()</td></tr>
                         <tr><td>Offer to save missing details under About me</td><td><code>Orders:TellOnce</code></td><td>@_everyone.TellOnce</td></tr>
-                        <tr><td>Workshop only for administrators</td><td><code>Ui:WorkshopForAdminsOnly</code></td><td>@UiSettings.Value.WorkshopForAdminsOnly.OnOff()</td></tr>
+                        <tr><td>“Extra careful”</td><td><code>Orders:CarefulOutline</code>, per person <code>Orders:CarefulOutlineOverrides</code></td><td>@OrderSettings.Value.CarefulOutline</td></tr>
+                        <tr><td>Workshop menu only for administrators</td><td><code>Ui:WorkshopForAdminsOnly</code></td><td>@UiSettings.Value.WorkshopForAdminsOnly.OnOff()</td></tr>
                     </tbody>
                 </table>
             </div>
-            <p data-testid="hiw-admins-workshop">The workshop is the older way of working: teams of AI roles that you set up yourself, with their own models, sources and rules. @(UiSettings.Value.WorkshopForAdminsOnly ? "Its menu is shown only to administrators." : "Its menu is shown to everyone.") A team chosen there (also through the older tools for AI assistants) can search the web with its own sources, whatever the setting for the standard way says.</p>
+            <p data-testid="hiw-admins-workshop">The workshop menu holds the technical list of all runs and, for administrators, the AI providers. @(UiSettings.Value.WorkshopForAdminsOnly ? "It is shown only to administrators." : "It is shown to everyone.") The older way of working with teams you set up yourself no longer exists; older requests stay readable.</p>
         }
         <p><a href="/docs/14-admin-guide">Guide for administrators</a></p>
     </section>

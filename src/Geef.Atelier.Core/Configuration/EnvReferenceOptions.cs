@@ -2,8 +2,7 @@ namespace Geef.Atelier.Core.Configuration;
 
 /// <summary>
 /// Allow list for environment-variable names that user-editable configuration may reference (provider
-/// <c>ApiKeyEnv</c>/<c>EndpointEnvOverride</c>, tool <c>SecretRef</c>, MCP <c>AuthHeaderEnv</c>, grounding
-/// <c>authHeaderEnv</c>/<c>apiKeyEnv</c>). Entries are exact names or prefixes ending in <c>*</c>.
+/// <c>ApiKeyEnv</c>/<c>EndpointEnvOverride</c>). Entries are exact names or prefixes ending in <c>*</c>.
 /// The effective list is <see cref="DefaultAllowed"/> plus <see cref="Allowed"/>.
 /// </summary>
 public sealed class EnvReferenceOptions

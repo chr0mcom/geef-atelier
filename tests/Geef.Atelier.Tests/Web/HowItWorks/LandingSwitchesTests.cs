@@ -38,7 +38,8 @@ public sealed class LandingSwitchesTests : TestContext
         Assert.Contains(OrderCheckLines.Limits, cut.Find("[data-testid='landing-example-checks']").TextContent, StringComparison.Ordinal);
         Assert.Single(cut.FindAll("[data-testid='landing-example-unbacked']"));
         Assert.Single(cut.FindAll("[data-testid='landing-limit-learning']"));
-        Assert.Contains("shown only to administrators", cut.Find("[data-testid='landing-teams-visibility']").TextContent, StringComparison.Ordinal);
+        Assert.Empty(cut.FindAll("[data-testid='landing-teams']"));
+        Assert.DoesNotContain("Extra careful", text, StringComparison.Ordinal);
         Assert.Contains("about 30 days", cut.Find("[data-testid='landing-privacy-kept']").TextContent, StringComparison.Ordinal);
         Assert.Contains("up to 10 per request", text, StringComparison.Ordinal);
         Assert.Contains("150,000 characters", text, StringComparison.Ordinal);
@@ -172,18 +173,6 @@ public sealed class LandingSwitchesTests : TestContext
         Assert.Contains("100,000 characters (roughly 40 pages)", text, StringComparison.Ordinal);
         Assert.Contains("up to 4 in all", text, StringComparison.Ordinal);
         Assert.Contains("about 14 days", cut.Find("[data-testid='landing-privacy-kept']").TextContent, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void With_the_workshop_open_to_everyone_the_page_does_not_call_it_admin_only()
-    {
-        this.AddTestAuthorization().SetNotAuthorized();
-        Services.Configure<UiOptions>(o => o.WorkshopForAdminsOnly = false);
-
-        var cut = RenderComponent<Landing>();
-
-        Assert.DoesNotContain("only to administrators", cut.Find("[data-testid='landing-teams']").TextContent, StringComparison.Ordinal);
-        Assert.Equal("The workshop, for teams.", cut.Find("#lp-workshop-title").TextContent);
     }
 
     [Fact]

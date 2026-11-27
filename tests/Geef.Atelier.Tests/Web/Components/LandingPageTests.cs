@@ -56,7 +56,7 @@ public sealed class LandingPageTests : TestContext
         // where the nav is shared but the anchor targets live on the landing page.
         Assert.Contains(midLinks, a => a.GetAttribute("href") == "/how-it-works");
         Assert.Contains(midLinks, a => a.GetAttribute("href") == "/#for-whom");
-        Assert.Contains(midLinks, a => a.GetAttribute("href") == "/#teams");
+        Assert.DoesNotContain(midLinks, a => a.GetAttribute("href") == "/#teams");
         Assert.Contains(midLinks, a => a.GetAttribute("href") == "/self-host");
         Assert.DoesNotContain(midLinks, a => a.TextContent.Contains("crew", StringComparison.OrdinalIgnoreCase) || a.TextContent.Contains("Manuscript", StringComparison.Ordinal));
     }
@@ -139,25 +139,6 @@ public sealed class LandingPageTests : TestContext
         Assert.Equal(6, cut.FindAll(".cap").Count);
         Assert.Contains("150,000 characters (roughly 60 pages)", cut.Find("[data-testid='landing-cap-files']").TextContent, StringComparison.Ordinal);
         cut.Find("[data-testid='landing-limits']");
-    }
-
-    // ── Workshop ─────────────────────────────────────────────────────────
-
-    [Fact]
-    public void LandingWorkshop_HasTeamsAnchorAndNamesNoModel()
-    {
-        var cut = RenderComponent<LandingWorkshop>();
-        Assert.Equal("teams", cut.Find("section").GetAttribute("id"));
-        Assert.Contains("administrators", cut.Find("h2").TextContent, StringComparison.Ordinal);
-        Assert.Equal(5, cut.FindAll(".team-row").Count);
-    }
-
-    [Fact]
-    public void LandingWorkshop_FollowsTheSwitchForWhoSeesTheMenu()
-    {
-        var cut = RenderComponent<LandingWorkshop>(p => p.Add(c => c.WorkshopForAdminsOnly, false));
-        Assert.Equal("The workshop, for teams.", cut.Find("h2").TextContent);
-        Assert.Contains("shown to everyone who is signed in", cut.Find("[data-testid='landing-teams-visibility']").TextContent, StringComparison.Ordinal);
     }
 
     // ── Film ─────────────────────────────────────────────────────────────

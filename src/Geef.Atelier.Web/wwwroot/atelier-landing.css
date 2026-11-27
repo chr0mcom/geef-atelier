@@ -591,8 +591,7 @@ body[data-static="1"] .press-anim * { animation: none !important; }
 .lp-flow-foot a,
 .lp-limits-more a,
 .aud a,
-.lp-privacy-links a,
-.workshop-links a {
+.lp-privacy-links a {
   color: var(--hero);
   text-decoration: underline;
   text-decoration-thickness: 1px;
@@ -1062,68 +1061,6 @@ body[data-static="1"] .lp-flow .retry-path { animation: none !important; }
 }
 @media (max-width: 980px) { .lp-privacy-grid { grid-template-columns: minmax(0, 1fr); } }
 .lp-privacy-links { margin: 22px 0 0; display: flex; flex-wrap: wrap; gap: 10px 28px; }
-
-/* ============================================================
-   WORKSHOP — for teams
-   ============================================================ */
-.lp-workshop {
-  border-top: 1px solid var(--hairline-soft);
-}
-.lp-workshop-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: 40px 72px;
-  align-items: start;
-}
-@media (max-width: 980px) { .lp-workshop-grid { grid-template-columns: minmax(0, 1fr); } }
-.workshop-copy .lp-lede { margin-bottom: 26px; }
-.workshop-links { margin: 24px 0 0; display: flex; flex-wrap: wrap; gap: 10px 28px; }
-.team-sheet {
-  background: var(--paper);
-  color: var(--paper-ink);
-  padding: 36px 40px 34px;
-  border-radius: 2px;
-  position: relative;
-  font-family: var(--font-display);
-  box-shadow:
-    0 1px 0 var(--paper-2),
-    0 2px 0 var(--paper),
-    0 3px 0 var(--paper-2),
-    0 30px 70px -40px color-mix(in oklch, black 35%, transparent);
-}
-.team-sheet .top {
-  text-align: center;
-  border-bottom: 1px solid var(--paper-rule);
-  padding-bottom: 18px;
-  margin-bottom: 8px;
-}
-.team-sheet .top p { margin: 0; }
-.team-sheet .top .label { font-family: var(--font-ui); font-size: 13px; color: var(--paper-ink-2); }
-.team-sheet .top .title {
-  font-weight: 300;
-  font-style: italic;
-  font-size: 32px;
-  line-height: 1.1;
-  margin: 6px 0 4px;
-  color: var(--paper-ink);
-}
-.team-sheet .top .ord { font-family: var(--font-ui); font-size: 13px; color: var(--paper-ink-2); }
-.team-sheet dl { margin: 0; }
-.team-row {
-  display: grid;
-  grid-template-columns: 110px minmax(0, 1fr);
-  gap: 16px;
-  align-items: baseline;
-  padding: 13px 0;
-  border-bottom: 1px dotted var(--paper-rule);
-}
-.team-row:last-child { border-bottom: none; }
-.team-row dt { font-family: var(--font-ui); font-size: 13px; font-weight: 600; color: var(--paper-ink-2); }
-.team-row dd { margin: 0; font-size: 17px; line-height: 1.4; font-style: italic; color: var(--paper-ink); }
-@media (max-width: 760px) {
-  .team-sheet { padding: 26px 20px; }
-  .team-row { grid-template-columns: minmax(0, 1fr); gap: 2px; }
-}
 
 /* ============================================================
    CLOSING
