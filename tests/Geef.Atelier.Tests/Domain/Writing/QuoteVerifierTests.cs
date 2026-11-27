@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Geef.Atelier.Core.Domain.Writing;
 
 namespace Geef.Atelier.Tests.Domain.Writing;
@@ -160,13 +159,14 @@ public sealed class QuoteVerifierTests
         Assert.Equal(QuoteMatchKind.NotFound, QuoteVerifier.FindVerbatim("Summe: 62 €", "63 €", 4).Kind);
     }
 
+    /// <summary>Fifty quotes in a long text; compared by growth (<see cref="ScalingAssert"/>) instead of a limit in seconds.</summary>
     [Fact]
-    public void Six_hundred_thousand_characters_and_fifty_quotes_take_under_two_seconds()
+    public void Fifty_quotes_in_six_hundred_thousand_characters_cost_about_the_length_of_the_text() => ScalingAssert.GrowsAboutLinearly(percent =>
     {
         var random = new Random(7);
         var vocabulary = Enumerable.Range(0, 3000).Select(i => $"w{i:x}{(char)('a' + i % 26)}").ToArray();
         var builder = new System.Text.StringBuilder();
-        while (builder.Length < 600_000)
+        while (builder.Length < 6_000 * percent)
         {
             builder.Append(vocabulary[random.Next(vocabulary.Length)]);
             builder.Append(random.Next(12) == 0 ? ".\n" : " ");
@@ -181,25 +181,19 @@ public sealed class QuoteVerifierTests
             quotes.Add(i % 3 == 0 ? quote.Replace(" w1", " zz", StringComparison.Ordinal) : i % 3 == 1 ? quote.ToUpperInvariant() : quote);
         }
 
-        var watch = Stopwatch.StartNew();
-        foreach (var quote in quotes)
-            QuoteVerifier.Find(haystack, quote, true);
-        watch.Stop();
-
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(2), $"took {watch.Elapsed.TotalMilliseconds:F0} ms");
-    }
+        return () =>
+        {
+            foreach (var quote in quotes)
+                QuoteVerifier.Find(haystack, quote, true);
+        };
+    });
 
     [Fact]
-    public void Common_words_only_do_not_explode()
+    public void Common_words_only_do_not_explode() => ScalingAssert.GrowsAboutLinearly(percent =>
     {
-        var haystack = string.Concat(Enumerable.Repeat("der die das und ist ein ", 25_000));
-        var watch = Stopwatch.StartNew();
-        var match = QuoteVerifier.Find(haystack, "der die das und war ein der die das und ist ein", true);
-        watch.Stop();
-
-        Assert.True(match.IsFound);
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(2), $"took {watch.Elapsed.TotalMilliseconds:F0} ms");
-    }
+        var haystack = string.Concat(Enumerable.Repeat("der die das und ist ein ", 250 * percent));
+        return () => Assert.True(QuoteVerifier.Find(haystack, "der die das und war ein der die das und ist ein", true).IsFound);
+    });
 
     [Theory]
     [InlineData("Der Beitrag: 15 Euro pro Kind.", "5 Euro pro Kind", false)]

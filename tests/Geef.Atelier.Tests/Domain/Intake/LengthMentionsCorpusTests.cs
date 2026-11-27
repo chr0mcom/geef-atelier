@@ -136,12 +136,9 @@ public sealed class LengthMentionsCorpusTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void A_long_request_is_read_quickly()
+    public void A_long_request_is_read_quickly() => ScalingAssert.GrowsAboutLinearly(percent =>
     {
-        var request = string.Concat(Enumerable.Repeat("Unser Verein feiert im Sommer ein großes Fest mit vielen Gästen und Musik. ", 400));
-        var watch = System.Diagnostics.Stopwatch.StartNew();
-
-        Assert.False(LengthMentions.InRequest(request));
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(2), watch.Elapsed.ToString());
-    }
+        var request = string.Concat(Enumerable.Repeat("Unser Verein feiert im Sommer ein großes Fest mit vielen Gästen und Musik. ", 40 * percent));
+        return () => Assert.False(LengthMentions.InRequest(request));
+    });
 }

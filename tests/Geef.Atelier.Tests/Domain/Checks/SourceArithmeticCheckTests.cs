@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text;
 using Geef.Atelier.Core.Domain.Checks;
 
@@ -303,28 +302,31 @@ public sealed class SourceArithmeticCheckTests
             r => r.Code == DraftCheckCodes.Arithmetic);
     }
 
+    /// <summary>
+    /// Long runs of digits, separators, sums and totals must not cost more than about their length. Compared by growth
+    /// (<see cref="ScalingAssert"/>), because a fixed limit in seconds failed on a loaded machine.
+    /// </summary>
     [Fact]
-    public void Long_and_hostile_inputs_stay_fast()
+    public void Long_and_hostile_inputs_stay_fast() => ScalingAssert.GrowsAboutLinearly(percent =>
+    {
+        var text = HostileArithmetic(percent);
+        return () => SourceArithmeticCheck.WithTextUse(Check(text), text);
+    });
+
+    private static string HostileArithmetic(int percent)
     {
         var builder = new StringBuilder();
-        builder.Append(string.Concat(Enumerable.Repeat("1.", 100_000)));
-        builder.Append('\n').Append(string.Concat(Enumerable.Repeat("1,", 100_000)));
-        builder.Append('\n').Append(string.Concat(Enumerable.Repeat("1 ", 100_000)));
-        builder.Append('\n').Append(string.Concat(Enumerable.Repeat("123.456.789", 20_000)));
-        builder.Append('\n').Append(string.Concat(Enumerable.Repeat("22 € + ", 20_000))).Append("= 1 €");
-        builder.Append('\n').Append(string.Concat(Enumerable.Repeat("Posten 5 €. ", 20_000)));
-        builder.Append('\n').Append(string.Concat(Enumerable.Repeat("zusammen 5 €, ", 20_000)));
-        builder.Append('\n').Append(string.Concat(Enumerable.Repeat("Posten 3 €\n", 20_000))).Append("Summe 7 €");
-        for (var i = 0; i < 20_000; i++)
+        builder.Append(string.Concat(Enumerable.Repeat("1.", 1_000 * percent)));
+        builder.Append('\n').Append(string.Concat(Enumerable.Repeat("1,", 1_000 * percent)));
+        builder.Append('\n').Append(string.Concat(Enumerable.Repeat("1 ", 1_000 * percent)));
+        builder.Append('\n').Append(string.Concat(Enumerable.Repeat("123.456.789", 200 * percent)));
+        builder.Append('\n').Append(string.Concat(Enumerable.Repeat("22 € + ", 200 * percent))).Append("= 1 €");
+        builder.Append('\n').Append(string.Concat(Enumerable.Repeat("Posten 5 €. ", 200 * percent)));
+        builder.Append('\n').Append(string.Concat(Enumerable.Repeat("zusammen 5 €, ", 200 * percent)));
+        builder.Append('\n').Append(string.Concat(Enumerable.Repeat("Posten 3 €\n", 200 * percent))).Append("Summe 7 €");
+        for (var i = 0; i < 200 * percent; i++)
             builder.Append('\n').Append(i % 7 == 0 ? $"Summe {i} €" : $"Posten {i % 100} €, zusammen {i} €, gesamt");
-
-        var text = builder.ToString();
-        var watch = Stopwatch.StartNew();
-        var result = Check(text);
-        SourceArithmeticCheck.WithTextUse(result, text);
-        watch.Stop();
-
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), $"took {watch.Elapsed.TotalMilliseconds:F0} ms");
+        return builder.ToString();
     }
 
     [Theory]

@@ -202,9 +202,14 @@ internal sealed class FakeSearch(Func<string, TavilySearchOutcome>? answer = nul
 
     public TimeSpan Delay { get; set; }
 
+    /// <summary>When set, every search waits for the returned task before it answers.</summary>
+    public Func<CancellationToken, Task>? Hold { get; set; }
+
     public async Task<TavilySearchOutcome> SearchAsync(string query, int maxResults, CancellationToken ct)
     {
         _queries.Enqueue(query);
+        if (Hold is not null)
+            await Hold(ct);
         if (Delay > TimeSpan.Zero)
             await Task.Delay(Delay, ct);
         return (answer ?? (_ => new([], null, 1)))(query);

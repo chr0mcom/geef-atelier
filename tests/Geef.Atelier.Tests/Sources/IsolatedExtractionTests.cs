@@ -267,6 +267,10 @@ public sealed class IsolatedExtractionTests : IDisposable
         Assert.Equal(IsolatedExtractionProcess.UnavailableReason, result.Extraction.FailureReason);
     }
 
+    /// <summary>
+    /// The first extraction blocks until the test releases it, so a second one that waited for it would never answer; the time limit is
+    /// only a safety net and wide enough for a loaded machine (the queue itself gives up after 300 ms).
+    /// </summary>
     [Fact]
     public async Task OnlyAFewFilesAreReadAtTheSameTimeAndTheRestHearsThatTheServiceIsBusy()
     {
@@ -289,7 +293,7 @@ public sealed class IsolatedExtractionTests : IDisposable
 
         Assert.Equal(SourceQuality.Unreadable, second.Quality);
         Assert.Equal("The service is busy with other uploads. Please try again in a minute.", second.FailureReason);
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(3), $"took {clock.Elapsed}");
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(30), $"took {clock.Elapsed}");
         Assert.Equal("Plain text is read at once.", text.Text);
 
         blocking.Release.SetResult();

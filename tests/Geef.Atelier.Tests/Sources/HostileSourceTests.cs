@@ -12,6 +12,12 @@ namespace Geef.Atelier.Tests.Sources;
 /// <summary>Defences inside the extractors and the text pipeline against hostile files, without a separate process.</summary>
 public sealed class HostileSourceTests
 {
+    /// <summary>
+    /// Time within which a hostile file has to be refused. The reason in the result already proves that it was refused before it was
+    /// opened; the limit only catches work that runs away, and is wide enough for a loaded machine.
+    /// </summary>
+    private static readonly TimeSpan RefusedEarly = TimeSpan.FromSeconds(30);
+
     [Fact]
     public async Task DeeplyNestedWordFileIsRefusedBeforeTheDocumentModelIsBuilt()
     {
@@ -22,7 +28,7 @@ public sealed class HostileSourceTests
         var withoutRatioCheck = await Docx(new SourceOptions { MaxCompressionRatio = 1_000_000 }).ExtractAsync(bomb, CancellationToken.None);
         Assert.Equal(SourceQuality.Unreadable, withoutRatioCheck.Quality);
         Assert.Equal(DocxSourceExtractor.NestingReason, withoutRatioCheck.FailureReason);
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(5), $"took {clock.Elapsed}");
+        Assert.True(clock.Elapsed < RefusedEarly, $"took {clock.Elapsed}");
 
         var defaults = await Docx(new SourceOptions()).ExtractAsync(bomb, CancellationToken.None);
         Assert.Equal(SourceQuality.Unreadable, defaults.Quality);
@@ -77,7 +83,7 @@ public sealed class HostileSourceTests
         var result = await Pdf(new SourceOptions { MaxPdfInflatedBytes = 1_048_576 }).ExtractAsync(bomb, CancellationToken.None);
         Assert.Equal(SourceQuality.Unreadable, result.Quality);
         Assert.Equal(PdfSourceExtractor.InflatedReason, result.FailureReason);
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(5), $"took {clock.Elapsed}");
+        Assert.True(clock.Elapsed < RefusedEarly, $"took {clock.Elapsed}");
     }
 
     [Fact]

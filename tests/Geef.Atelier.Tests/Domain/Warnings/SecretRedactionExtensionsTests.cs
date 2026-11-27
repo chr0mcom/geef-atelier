@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Geef.Atelier.Core.Domain.Warnings;
 
 namespace Geef.Atelier.Tests.Domain.Warnings;
@@ -133,26 +132,26 @@ public sealed class SecretRedactionExtensionsTests
     [InlineData("a1")]
     [InlineData("Ab1+")]
     [InlineData("x-api-key")]
-    public void StaysLinearOnLongHostileInput(string unit)
+    public void StaysLinearOnLongHostileInput(string unit) => ScalingAssert.GrowsAboutLinearly(percent =>
     {
         var inputs = new[]
         {
-            string.Concat(Enumerable.Repeat(unit + " ", 50_000)),
-            unit + new string(' ', 200_000),
-            unit + new string(' ', 200_000) + ":" + new string(' ', 200_000) + "x",
-            string.Concat(Enumerable.Repeat(unit, 100_000)),
-            string.Concat(Enumerable.Repeat(new string('a', 31) + "1!", 10_000)),
+            string.Concat(Enumerable.Repeat(unit + " ", 500 * percent)),
+            unit + new string(' ', 2_000 * percent),
+            unit + new string(' ', 2_000 * percent) + ":" + new string(' ', 2_000 * percent) + "x",
+            string.Concat(Enumerable.Repeat(unit, 1_000 * percent)),
+            string.Concat(Enumerable.Repeat(new string('a', 31) + "1!", 100 * percent)),
         };
 
-        var watch = Stopwatch.StartNew();
-        foreach (var input in inputs)
+        return () =>
         {
-            input.RedactSecrets();
-            input.RedactKnownSecrets();
-        }
-
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), $"Redaction took {watch.Elapsed}.");
-    }
+            foreach (var input in inputs)
+            {
+                input.RedactSecrets();
+                input.RedactKnownSecrets();
+            }
+        };
+    });
 
     [Theory]
     [InlineData("The source \"Web search\" could not be read and was skipped.")]

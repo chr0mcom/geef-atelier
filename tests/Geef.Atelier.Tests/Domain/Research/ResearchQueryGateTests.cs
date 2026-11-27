@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -225,25 +224,34 @@ public sealed class ResearchQueryGateTests
         Assert.True(sentCount > 2_000 && withheldCount > 2_000, $"sent {sentCount}, withheld {withheldCount}");
     }
 
+    /// <summary>
+    /// Long request, files and profile must not cost more than about their length. The numbers of the material use the digits 1, 3, 5
+    /// and 7 only, so that no number of a topic is ever found and every comparison runs to its end at both sizes; the topics stay the
+    /// same, so only the material grows. Compared by growth (<see cref="ScalingAssert"/>), because a fixed limit in seconds failed on a
+    /// loaded machine.
+    /// </summary>
     [Fact]
-    public void Long_and_hostile_texts_finish_quickly()
+    public void Long_and_hostile_texts_finish_quickly() => ScalingAssert.GrowsAboutLinearly(percent =>
     {
         var random = new Random(17);
         var builder = new StringBuilder();
-        while (builder.Length < 4_000_000)
-            builder.Append(CultureInfo.InvariantCulture, $"Wort{random.Next(200_000)} ").Append(random.Next(1_000_000)).Append(random.Next(3) == 0 ? "\n" : " - ");
+        while (builder.Length < 10_000 * percent)
+            builder.Append(CultureInfo.InvariantCulture, $"Wort{Number()} ").Append(Number()).Append(random.Next(3) == 0 ? "\n" : " - ");
         var huge = builder.ToString();
-        var oneWord = new string('a', 2_000_000) + "ü" + new string('7', 500_000);
-        var longTopic = string.Concat(Enumerable.Repeat("Mindestlohn 2026 ", 2_000));
-        var topics = new[] { longTopic, "Mindestlohn Deutschland", "Feiertage England 2027", "Tarif " + new string('9', 5_000), "Urlaub Gesetz" };
+        var oneWord = new string('a', 20_000 * percent) + "ü" + new string('7', 5_000 * percent);
+        var longTopic = string.Concat(Enumerable.Repeat("Mindestlohn 2026 ", 200));
+        var topics = new[] { longTopic, "Mindestlohn Deutschland", "Feiertage England 2026", "Tarif " + new string('9', 5_000), "Urlaub Gesetz" };
+        var request = Request + " " + huge[..(1_000 * percent)];
+        var profile = huge[..(2_000 * percent)];
 
-        var stopwatch = Stopwatch.StartNew();
-        var selection = ResearchQueryGate.Select(topics, Request + " " + huge[..100_000], [huge, oneWord], huge[..200_000], 4);
-        stopwatch.Stop();
+        return () =>
+        {
+            var selection = ResearchQueryGate.Select(topics, request, [huge, oneWord], profile, 4);
+            Assert.Equal(topics.Length, selection.Sent.Count + selection.Withheld + selection.OverLimit);
+        };
 
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(15), $"took {stopwatch.Elapsed}");
-        Assert.Equal(topics.Length, selection.Sent.Count + selection.Withheld + selection.OverLimit);
-    }
+        string Number() => string.Concat(Enumerable.Range(0, random.Next(1, 7)).Select(_ => "1357"[random.Next(4)]));
+    });
 
     private static HashSet<string> ContractWords(IEnumerable<string> texts)
     {

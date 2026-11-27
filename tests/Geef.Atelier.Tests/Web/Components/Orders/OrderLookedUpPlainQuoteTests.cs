@@ -102,12 +102,15 @@ public sealed class OrderLookedUpPlainQuoteTests : TestContext
     [InlineData("**x** ")]
     public void A_million_characters_take_linear_time(string unit)
     {
-        var quote = string.Concat(Enumerable.Repeat(unit, 1_000_000 / unit.Length));
-        var watch = Stopwatch.StartNew();
+        ScalingAssert.GrowsAboutLinearly(percent =>
+        {
+            var input = string.Concat(Enumerable.Repeat(unit, 10_000 * percent / unit.Length));
+            return () => input.ToShownQuote();
+        });
 
+        var quote = string.Concat(Enumerable.Repeat(unit, 1_000_000 / unit.Length));
         var shown = quote.ToShownQuote();
 
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(5), $"{watch.Elapsed} for {quote.Length} characters");
         Assert.True(shown.Length <= quote.Length);
     }
 

@@ -622,16 +622,26 @@ public sealed class OrderResearchServiceTests
         Assert.NotNull(s.Orders.Find(order.Id)!.ResearchAt);
     }
 
+    /// <summary>Each search waits until all four have started, so they can only finish when they run at the same time.</summary>
     [Fact]
     public async Task Searches_run_side_by_side()
     {
-        var s = Create(search: new FakeSearch(Hits) { Delay = TimeSpan.FromMilliseconds(400) });
-        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var allStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = 0;
+        var s = Create(search: new FakeSearch(Hits)
+        {
+            Hold = ct =>
+            {
+                if (Interlocked.Increment(ref started) == 4)
+                    allStarted.SetResult();
+                return allStarted.Task.WaitAsync(ct);
+            },
+        });
 
         await Ensure(s, Order(Clarify(IntakeRecordStatus.Ok, TopicA, TopicB, "Mindestlohn Minijob", "Mindestlohn Azubi")));
 
         Assert.Equal(4, s.Search.Queries.Count);
-        Assert.True(watch.Elapsed < TimeSpan.FromMilliseconds(1_500), $"took {watch.Elapsed}");
+        Assert.True(allStarted.Task.IsCompletedSuccessfully, "The four searches were never running at the same time.");
     }
 
     [Fact]
