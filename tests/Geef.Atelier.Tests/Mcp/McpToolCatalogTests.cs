@@ -194,7 +194,7 @@ public sealed class McpToolCatalogTests
         var without = Instructions(Provider(legacy: "false"));
         Assert.DoesNotContain("submit_request", without, StringComparison.Ordinal);
         Assert.DoesNotContain("older interface", without, StringComparison.Ordinal);
-        Assert.EndsWith("do not add it.", without, StringComparison.Ordinal);
+        Assert.EndsWith(McpServerInstructions.ProfileSavingLine, without, StringComparison.Ordinal);
     }
 
     [Fact]
