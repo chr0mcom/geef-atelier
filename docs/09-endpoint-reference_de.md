@@ -401,9 +401,15 @@ Die `GET /oauth/authorize`-Seite ist eine server-gerenderte Blazor-Consent-Seite
 Submit-Ziel der Consent-Seite. Verarbeitet die Zustimmung/Ablehnung des Nutzers,
 erzeugt bei Zustimmung den Authorization-Code und führt den Redirect aus.
 
+Das Formular trägt das Antiforgery-Token im Feld `__RequestVerificationToken`; der Server prüft es für Zustimmung und
+Ablehnung. Das Token gilt nur zusammen mit dem Antiforgery-Cookie und für die angemeldete Person. Wer den Ablauf per
+Skript durchläuft, liest deshalb zuerst `GET /oauth/authorize` mit demselben Cookie-Speicher und sendet das Feld mit.
+Die Seite darf nicht in Frames fremder Herkunft angezeigt werden (`Content-Security-Policy: frame-ancestors 'self'`).
+
 **Nach Zustimmung:** Redirect zu `redirect_uri?code=<auth_code>&state=<state>`  
 **Nach Ablehnung:** Redirect zu `redirect_uri?error=access_denied&state=<state>`  
-**Bei ungültigem Request:** `400` (kein Redirect, das schützt vor Open-Redirects)
+**Bei ungültigem Request:** `400` (kein Redirect, das schützt vor Open-Redirects)  
+**Ohne gültiges Antiforgery-Token:** `400` mit dem Text „This page is out of date. Go back, reload it and try again.“
 
 ---
 
@@ -503,8 +509,9 @@ Die Web-Oberfläche ist Blazor Server (Cookie-Auth). Die von außen erreichbaren
 | `/admin/users` | GET | Cookie (Admin) | Benutzerverwaltung |
 | `/admin/site-settings` | GET | Cookie (Admin) | Seiteneinstellungen |
 | `/crew/providers`, `/crew/providers/create`, `/crew/providers/create/cli`, `/crew/providers/edit/cli/{name}`, `/crew/providers/view/{name}` | GET | Cookie (Admin) | Provider (CLI-Provider können angelegt und bearbeitet werden) |
-| `/auth/logout` | POST | Cookie | Logout (Anti-Forgery, Minimal-API) |
-| `/settings/theme` | POST | Cookie | Theme-Wechsel ohne JavaScript (Formularfeld `value`: `vellum`, `noir` oder `petrol`), Redirect zum Referer |
+| `/auth/logout` | POST | Cookie, Antiforgery-Feld | Logout (Minimal-API); ohne gültiges Token `400` |
+| `/settings/theme` | POST | Cookie, Antiforgery-Feld | Theme-Wechsel ohne JavaScript (Formularfeld `value`: `vellum`, `noir` oder `petrol`), Redirect zum Referer; ohne gültiges Token `400` |
+| `/_blazor` | GET, POST, WebSocket | wie die jeweilige Seite | Live-Verbindung der interaktiven Seiten; nennt der Header `Origin` einen anderen Host, `400` |
 
 **Intern:** `GET /api/internal/providers/cli` liefert dem cli-proxy die aktiven CLI-Provider; ist
 `CliProxy:InternalApiToken` gesetzt, verlangt der Endpunkt den Header `X-Internal-Token`.

@@ -177,6 +177,7 @@ app.Use(async (ctx, next) =>
     await next();
 });
 
+app.UseSameHostLiveConnection();
 app.UseUploadPageSwitch();
 app.UseAuthentication();
 app.UseAuthorization();

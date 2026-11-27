@@ -173,6 +173,9 @@ class UrllibWebSession:
         return any(cookie.name == name for cookie in self._jar)
 
 
+_CONSENT_FORM = re.compile(r'<form[^>]*action="/oauth/consent".*?</form>', re.S)
+
+
 def _antiforgery(page: str) -> str | None:
     for tag in re.findall(r"<input[^>]*>", page):
         if 'name="__RequestVerificationToken"' in tag:
@@ -195,9 +198,16 @@ def oauth_access_token(session: WebSession, user: str, password: str, client_id:
     verifier = secrets.token_urlsafe(48)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
     state = secrets.token_urlsafe(16)
-    reply = session.request("POST", "/oauth/consent", form={
-        "action": "approve", "response_type": "code", "client_id": client_id, "redirect_uri": redirect_uri, "scope": "mcp",
-        "state": state, "code_challenge": challenge, "code_challenge_method": "S256"})
+    request = {"response_type": "code", "client_id": client_id, "redirect_uri": redirect_uri, "scope": "mcp",
+               "state": state, "code_challenge": challenge, "code_challenge_method": "S256"}
+    reply = session.request("GET", "/oauth/authorize?" + urllib.parse.urlencode(request))
+    form = _CONSENT_FORM.search(reply.body) if reply.status == 200 else None
+    if not form:
+        raise SignInError(f"OAuth-Freigabe gescheitert (keine Consent-Seite, HTTP {reply.status})")
+    fields = {"action": "approve", **request}
+    if consent_token := _antiforgery(form.group(0)):
+        fields["__RequestVerificationToken"] = consent_token
+    reply = session.request("POST", "/oauth/consent", form=fields)
     query = urllib.parse.parse_qs(urllib.parse.urlsplit(reply.headers.get("location", "")).query)
     if reply.status not in (301, 302, 303) or "code" not in query:
         raise SignInError(f"OAuth-Freigabe gescheitert ({query.get('error', [f'HTTP {reply.status}'])[0]})")

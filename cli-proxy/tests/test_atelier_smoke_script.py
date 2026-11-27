@@ -62,8 +62,26 @@ class FakeAtelier(BaseHTTPRequestHandler):
         if self.path.startswith("/login"):
             self._send(200, '<form><input type="hidden" name="__RequestVerificationToken" value="af-123" /></form>',
                        {"Set-Cookie": "af=1; Path=/"})
+        elif self.path.startswith("/oauth/authorize"):
+            self._consent_page()
         else:
             self._send(404)
+
+    def _consent_page(self):
+        s = self.scenario
+        query = {k: v[0] for k, v in urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).items()}
+        s["authorize"] = query
+        if "Atelier.Auth=cookie-1" not in (self.headers.get("Cookie") or ""):
+            self._send(302, "", {"Location": "/login"})
+            return
+        if query.get("client_id") != "client-1":
+            self._send(200, '<div data-testid="oauth-error">Unknown client_id</div>')
+            return
+        token = "" if s.get("page_without_token") else (
+            '<input type="hidden" name="__RequestVerificationToken" value="cf-456" />')
+        self._send(200, '<form><input type="hidden" name="__RequestVerificationToken" value="another-form" /></form>'
+                        f'<form method="post" action="/oauth/consent" class="auth-consent-form">{token}'
+                        '<button name="action" value="approve">Grant access</button></form>')
 
     def do_POST(self):
         s = self.scenario
@@ -79,7 +97,12 @@ class FakeAtelier(BaseHTTPRequestHandler):
                 self._send(200, "Invalid credentials")
         elif self.path == "/oauth/consent":
             f = self._form()
-            if "Atelier.Auth=cookie-1" not in (self.headers.get("Cookie") or "") or f.get("client_id") != "client-1":
+            s["consent"] = f
+            expected_token = None if s.get("page_without_token") else "cf-456"
+            if f.get("__RequestVerificationToken") != expected_token:
+                self._send(400, "This page is out of date. Go back, reload it and try again.", ctype="text/plain")
+                return
+            if "Atelier.Auth=cookie-1" not in (self.headers.get("Cookie") or "") or s.get("refuse_consent"):
                 self._send(302, "", {"Location": f"{f.get('redirect_uri')}?error=access_denied"})
                 return
             s["challenge"] = f["code_challenge"]
@@ -275,10 +298,39 @@ def test_wrong_password_exits_3(sandbox, server):
 
 
 def test_unknown_client_exits_3(sandbox, server):
-    httpd, _ = server
+    httpd, scenario = server
     r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}", ATELIER_SMOKE_CLIENT_ID="anderer"))
     assert r.returncode == 3
+    assert "OAuth-Freigabe gescheitert (keine Consent-Seite, HTTP 200)" in r.stdout
+    assert ("POST", "/oauth/consent") not in scenario["requests"]
+
+
+def test_refused_consent_exits_3(sandbox, server):
+    httpd, scenario = server
+    scenario["refuse_consent"] = True
+    r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}"))
+    assert r.returncode == 3
     assert "OAuth-Freigabe gescheitert (access_denied)" in r.stdout
+
+
+def test_consent_sends_the_antiforgery_field_of_the_consent_form(sandbox, server):
+    httpd, scenario = server
+    r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}"))
+    assert r.returncode == 0, r.stdout + r.stderr
+    paths = [(method, path.split("?")[0]) for method, path in scenario["requests"]]
+    assert paths.index(("GET", "/oauth/authorize")) < paths.index(("POST", "/oauth/consent"))
+    assert scenario["consent"]["__RequestVerificationToken"] == "cf-456"
+    for key in ("response_type", "client_id", "redirect_uri", "scope", "state", "code_challenge", "code_challenge_method"):
+        assert scenario["consent"][key] == scenario["authorize"][key]
+    assert "cf-456" not in r.stdout + r.stderr
+
+
+def test_a_consent_form_without_the_field_still_works_for_an_older_image(sandbox, server):
+    httpd, scenario = server
+    scenario["page_without_token"] = True
+    r = run(sandbox, write_env(sandbox / "s.env", base=f"http://127.0.0.1:{httpd.server_port}"))
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "__RequestVerificationToken" not in scenario["consent"]
 
 
 def test_state_mismatch_exits_3(sandbox, server):

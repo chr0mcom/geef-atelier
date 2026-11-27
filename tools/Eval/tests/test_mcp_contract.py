@@ -102,6 +102,9 @@ class FakeSession:
         if path == "/login":
             self._cookie = self.cookie
             return HttpReply(self.login_status, {"location": "/"}, "")
+        if path.startswith("/oauth/authorize?") and method == "GET":
+            return HttpReply(200, {}, '<form method="post" action="/oauth/consent">'
+                                      '<input type="hidden" name="__RequestVerificationToken" value="cf-2" /></form>')
         if path == "/oauth/consent":
             state = self.state or form["state"]
             return HttpReply(302, {"location": f"http://127.0.0.1/cb?code=c-1&state={state}"}, "")
@@ -136,9 +139,11 @@ def test_base_url_needs_https_unless_loopback(url, ok):
 def test_oauth_runs_login_consent_and_pkce_exchange():
     session = FakeSession()
     assert mc.oauth_access_token(session, "nutzer", SECRET, "client-1") == "tok-1"
-    paths = [(m, p) for m, p, _ in session.requests]
-    assert paths == [("GET", "/login"), ("POST", "/login"), ("POST", "/oauth/consent"), ("POST", "/oauth/token")]
-    login, consent, exchange = session.requests[1][2], session.requests[2][2], session.requests[3][2]
+    paths = [(m, p.split("?")[0]) for m, p, _ in session.requests]
+    assert paths == [("GET", "/login"), ("POST", "/login"), ("GET", "/oauth/authorize"), ("POST", "/oauth/consent"),
+                     ("POST", "/oauth/token")]
+    login, consent, exchange = session.requests[1][2], session.requests[3][2], session.requests[4][2]
+    assert consent["__RequestVerificationToken"] == "cf-2"
     assert login["__RequestVerificationToken"] == "af-1" and login["Model.Password"] == SECRET
     assert consent["code_challenge_method"] == "S256" and consent["scope"] == "mcp"
     assert exchange["code"] == "c-1" and exchange["code_verifier"]

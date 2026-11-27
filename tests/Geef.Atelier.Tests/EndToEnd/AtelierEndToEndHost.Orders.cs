@@ -59,6 +59,26 @@ internal sealed partial class AtelierEndToEndHost
     public HttpClient CreateAnonymousClient() =>
         _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
 
+    /// <summary>A client without a sign-in that keeps cookies like a browser and does not follow redirects.</summary>
+    public HttpClient CreateBrowserClient() =>
+        _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = true });
+
+    /// <summary>Creates a user who can sign in through the login form with <paramref name="password"/>.</summary>
+    public async Task CreateUserWithPasswordAsync(string username, string password)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var now = DateTimeOffset.UtcNow;
+        await scope.ServiceProvider.GetRequiredService<IAtelierUserRepository>().AddAsync(new AtelierUser(
+            UserId: Guid.NewGuid().ToString(),
+            Username: username,
+            PasswordHash: BCrypt.Net.BCrypt.HashPassword(password, workFactor: 4),
+            Email: null,
+            IsActive: true,
+            IsAdmin: false,
+            CreatedAt: now,
+            UpdatedAt: now), CancellationToken.None);
+    }
+
     /// <summary>
     /// Fetches an antiforgery request token for <paramref name="client"/>, to be sent in the <c>RequestVerificationToken</c>
     /// header. The matching antiforgery cookie is added to the client.

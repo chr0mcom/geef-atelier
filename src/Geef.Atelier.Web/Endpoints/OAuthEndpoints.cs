@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Geef.Atelier.Application.OAuth;
 using Geef.Atelier.Core.Configuration;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -150,12 +151,16 @@ public static class OAuthEndpoints
         // Separate POST path avoids Blazor SSR route ambiguity (Blazor maps @page for all HTTP methods)
         app.MapPost("/oauth/consent", async (
             HttpContext ctx,
+            IAntiforgery antiforgery,
             IOAuthService oauthService,
             CancellationToken ct) =>
         {
             // User must be authenticated via Cookie
             if (ctx.User.Identity?.IsAuthenticated != true)
                 return Results.Redirect("/login");
+
+            if (await antiforgery.RefuseOutdatedFormAsync(ctx) is { } refused)
+                return refused;
 
             var form            = await ctx.Request.ReadFormAsync(ct);
             var action          = form["action"].ToString();       // "approve" or "deny"
@@ -204,8 +209,7 @@ public static class OAuthEndpoints
         })
         .RequireAuthorization(policy =>
             policy.AddAuthenticationSchemes(CookieAuthenticationDefaults.AuthenticationScheme)
-                  .RequireAuthenticatedUser())
-        .DisableAntiforgery();
+                  .RequireAuthenticatedUser());
 
         return app;
     }

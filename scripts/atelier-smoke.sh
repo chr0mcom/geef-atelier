@@ -4,7 +4,8 @@
 # Ablauf:
 #   1. GET /health der Web-App lokal im Container (docker exec $WEB_CONTAINER curl http://localhost:8080/health).
 #   2. Anmeldung mit dem Smoke-Konto: Login-Formular (Cookie), dann OAuth-Freigabe mit PKCE für den registrierten
-#      Smoke-Client und Tausch gegen ein Zugriffstoken. Zugangsdaten nur aus der Datei $ATELIER_SMOKE_ENV
+#      Smoke-Client (Consent-Seite lesen, ihr Formular mit dem Antiforgery-Feld absenden) und Tausch gegen ein
+#      Zugriffstoken. Zugangsdaten nur aus der Datei $ATELIER_SMOKE_ENV
 #      (Standard /srv/docker/websites/geef_atelier/.smoke.env, Modus 0600, gitignored). Werte werden nie ausgegeben.
 #   3. Auftrag über den MCP-Endpunkt (/mcp, Werkzeug submit_order, Standardweg): ein Ein-Satz-Auftrag. Stellt Atelier
 #      Rückfragen (state needs_input), überspringt das Skript sie mit answer_order(skip=true).
@@ -189,15 +190,19 @@ def call(method, path, form=None, body=None, headers=None, timeout=60):
         result(f"FEHLER (verbindung): {method} {path} nicht möglich: {reason}", 3)
 
 
+def antiforgery_field(html):
+    for tag in re.findall(r"<input[^>]*>", html):
+        if 'name="__RequestVerificationToken"' in tag:
+            match = re.search(r'value="([^"]*)"', tag)
+            return match.group(1) if match else None
+    return None
+
+
 def login():
     status, _, page = call("GET", "/login")
     if status != 200:
         result(f"FEHLER (anmeldung): GET /login lieferte HTTP {status}", 3)
-    token = None
-    for tag in re.findall(r"<input[^>]*>", page):
-        if 'name="__RequestVerificationToken"' in tag:
-            match = re.search(r'value="([^"]*)"', tag)
-            token = match.group(1) if match else None
+    token = antiforgery_field(page)
     if not token:
         result("FEHLER (anmeldung): Login-Seite ohne Antiforgery-Feld", 3)
     status, headers, _ = call("POST", "/login", form={
@@ -215,8 +220,7 @@ def access_token():
     verifier = secrets.token_urlsafe(48)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
     state = secrets.token_urlsafe(16)
-    status, headers, _ = call("POST", "/oauth/consent", form={
-        "action": "approve",
+    request = {
         "response_type": "code",
         "client_id": cfg["ATELIER_SMOKE_CLIENT_ID"],
         "redirect_uri": REDIRECT_URI,
@@ -224,7 +228,16 @@ def access_token():
         "state": state,
         "code_challenge": challenge,
         "code_challenge_method": "S256",
-    })
+    }
+    status, _, page = call("GET", "/oauth/authorize?" + urllib.parse.urlencode(request))
+    form = re.search(r'<form[^>]*action="/oauth/consent".*?</form>', page, re.S)
+    if status != 200 or not form:
+        result(f"FEHLER (anmeldung): OAuth-Freigabe gescheitert (keine Consent-Seite, HTTP {status}); "
+               "Client-ID und Redirect-URI prüfen", 3)
+    fields = {"action": "approve", **request}
+    if consent_token := antiforgery_field(form.group(0)):
+        fields["__RequestVerificationToken"] = consent_token
+    status, headers, _ = call("POST", "/oauth/consent", form=fields)
     location = headers.get("Location", "") if headers else ""
     query = urllib.parse.parse_qs(urllib.parse.urlparse(location).query)
     if status not in (301, 302, 303) or "code" not in query:

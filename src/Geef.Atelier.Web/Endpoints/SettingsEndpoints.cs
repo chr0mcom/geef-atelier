@@ -23,8 +23,7 @@ public static class SettingsEndpoints
             var referer = ctx.Request.Headers.Referer.ToString();
             return Results.Redirect(string.IsNullOrEmpty(referer) ? "/" : referer);
         })
-        .RequireAuthorization()
-        .DisableAntiforgery();
+        .RequireAuthorization();
 
         return app;
     }

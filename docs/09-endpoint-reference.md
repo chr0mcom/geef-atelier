@@ -400,9 +400,15 @@ The `GET /oauth/authorize` page is a server-rendered Blazor consent page
 Submit target of the consent page. Processes the user's approval/denial,
 on approval creates the authorization code and performs the redirect.
 
+The form carries the antiforgery token in the field `__RequestVerificationToken`; the server checks it for approval and
+denial. The token is valid only together with the antiforgery cookie and for the signed-in person. A script that goes
+through the flow therefore reads `GET /oauth/authorize` first, with the same cookie store, and sends the field along.
+The page cannot be shown in frames of another origin (`Content-Security-Policy: frame-ancestors 'self'`).
+
 **On approval:** redirect to `redirect_uri?code=<auth_code>&state=<state>`  
 **On denial:** redirect to `redirect_uri?error=access_denied&state=<state>`  
-**On an invalid request:** `400` (no redirect, which protects against open redirects)
+**On an invalid request:** `400` (no redirect, which protects against open redirects)  
+**Without a valid antiforgery token:** `400` with the text "This page is out of date. Go back, reload it and try again."
 
 ---
 
@@ -502,8 +508,9 @@ The web interface is Blazor Server (cookie auth). The externally reachable route
 | `/admin/users` | GET | Cookie (admin) | User management |
 | `/admin/site-settings` | GET | Cookie (admin) | Site settings |
 | `/crew/providers`, `/crew/providers/create`, `/crew/providers/create/cli`, `/crew/providers/edit/cli/{name}`, `/crew/providers/view/{name}` | GET | Cookie (admin) | Providers (CLI providers can be created and edited) |
-| `/auth/logout` | POST | Cookie | Logout (anti-forgery, Minimal API) |
-| `/settings/theme` | POST | Cookie | Theme switch without JavaScript (form field `value`: `vellum`, `noir` or `petrol`), redirect to the referer |
+| `/auth/logout` | POST | Cookie, antiforgery field | Logout (Minimal API); `400` without a valid token |
+| `/settings/theme` | POST | Cookie, antiforgery field | Theme switch without JavaScript (form field `value`: `vellum`, `noir` or `petrol`), redirect to the referer; `400` without a valid token |
+| `/_blazor` | GET, POST, WebSocket | as the page it belongs to | Live connection of the interactive pages; `400` when the `Origin` header names another host |
 
 **Internal:** `GET /api/internal/providers/cli` returns the active CLI providers to the cli-proxy; when
 `CliProxy:InternalApiToken` is set, it requires the header `X-Internal-Token`.

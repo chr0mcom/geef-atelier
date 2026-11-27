@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 
@@ -7,8 +8,11 @@ public static class AuthEndpoints
 {
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/auth/logout", async (HttpContext ctx) =>
+        app.MapPost("/auth/logout", async (HttpContext ctx, IAntiforgery antiforgery) =>
         {
+            if (await antiforgery.RefuseOutdatedFormAsync(ctx) is { } refused)
+                return refused;
+
             try
             {
                 await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
