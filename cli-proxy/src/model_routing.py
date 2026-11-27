@@ -19,7 +19,6 @@ log = logging.getLogger(__name__)
 
 PRIMARY = claude_adapter.PRIMARY
 ALT = failover.ALT
-CLAUDE_ACCOUNTS = (PRIMARY, ALT)
 
 
 def model_key(model: str | None) -> str:

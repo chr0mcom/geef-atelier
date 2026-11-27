@@ -4,7 +4,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import shutil
 from typing import Any
 
 import cli_process
@@ -75,8 +74,3 @@ class GenericAdapter(CliAdapter):
     async def list_models(self, config: dict[str, Any]) -> list[str]:
         settings = config.get("settings", {})
         return settings.get("models", [])
-
-    async def health_check(self, config: dict[str, Any]) -> bool:
-        settings = config.get("settings", {})
-        binary = settings.get("binary", "")
-        return bool(binary and shutil.which(binary))

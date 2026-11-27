@@ -36,7 +36,3 @@ class CodexAdapter(CliAdapter):
         synced configuration. Always-latest aliases (`gpt-sol-latest`) come first in the list,
         and the alias map says which concrete model each one resolves to right now."""
         return await _cli.list_models_with_aliases_async(bypass_cache)
-
-    async def health_check(self, config: dict[str, Any]) -> bool:
-        import shutil
-        return bool(shutil.which("codex"))

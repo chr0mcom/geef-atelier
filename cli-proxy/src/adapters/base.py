@@ -34,9 +34,3 @@ class CliAdapter(ABC):
         authoritative answer, not a degradation.
         """
         return await self.list_models(config), "static", {}
-
-    async def health_check(self, config: dict[str, Any]) -> bool:
-        """Check if the CLI is available. Default: check binary exists."""
-        import shutil
-        binary = config.get("settings", {}).get("binary", "")
-        return bool(shutil.which(binary))

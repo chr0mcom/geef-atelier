@@ -31,7 +31,3 @@ class ClaudeAdapter(CliAdapter):
         """Resolves the list from the claude CLI itself rather than echoing the synced
         configuration, which would make this endpoint answer with what the caller pushed in."""
         return await _cli.list_models_with_source_async(bypass_cache)
-
-    async def health_check(self, config: dict[str, Any]) -> bool:
-        import shutil
-        return bool(shutil.which("claude"))

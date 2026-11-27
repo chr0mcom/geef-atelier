@@ -20,11 +20,6 @@ def format_messages(messages: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
-def build_openai_response(request: dict, text: str) -> dict:
-    """Build minimal OpenAI-format chat completion response."""
-    return build_openai_response_from_parts(request, text, 0, 0)
-
-
 def build_openai_response_from_parts(
     request: dict,
     content: str,

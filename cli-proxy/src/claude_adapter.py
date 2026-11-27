@@ -270,10 +270,6 @@ def _set_last_attempt(account: str, value: float) -> None:
         _last_attempt_at = value
 
 
-def _accounts() -> list[str]:
-    """Claude accounts whose catalog counts: the primary, and the alternative once logged in."""
-    return [PRIMARY, failover.ALT] if failover.alt_configured() else [PRIMARY]
-
 # Source markers reported alongside every model list.
 SOURCE_LIVE = "live"
 SOURCE_DEGRADED = "degraded"
@@ -608,12 +604,6 @@ async def list_models_async(bypass_cache: bool = False, force: bool = False) -> 
     when probing is unavailable, so the list is never stale and needs no manual updates."""
     models, _source, _aliases = await list_models_with_source_async(bypass_cache, force)
     return models
-
-
-async def resolve_alias_map_async() -> dict[str, str]:
-    """Current alias-to-concrete mapping, empty when no successful probe is available."""
-    _models, _source, alias_map = await list_models_with_source_async()
-    return alias_map
 
 
 def list_models() -> list[str]:

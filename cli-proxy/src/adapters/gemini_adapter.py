@@ -4,7 +4,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import shutil
 from typing import Any
 
 import cli_process
@@ -67,8 +66,3 @@ class GeminiAdapter(CliAdapter):
             "google/gemini-2.5-pro",
             "google/gemini-2.5-flash",
         ])
-
-    async def health_check(self, config: dict[str, Any]) -> bool:
-        settings = config.get("settings", {})
-        binary = settings.get("binary", "gemini")
-        return bool(shutil.which(binary))

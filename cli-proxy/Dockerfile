@@ -11,10 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install claude, codex and gemini CLIs globally.
 RUN npm install -g @anthropic-ai/claude-code @openai/codex @google/gemini-cli
 
-# Install Python dependencies.
+# Install Python dependencies (runtime only; the tests run outside the image).
 WORKDIR /app
 COPY pyproject.toml .
-RUN pip install --no-cache-dir ".[dev]"
+RUN pip install --no-cache-dir .
 
 # Copy source.
 COPY src/ ./src/

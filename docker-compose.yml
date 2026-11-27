@@ -95,7 +95,6 @@ services:
       - CLAUDE_HOME_ALT=/auth/claude-alt
       - CODEX_HOME=/auth/codex
       - GEMINI_HOME=/auth/gemini
-      - OPENCODE_HOME=/auth/opencode
       - OPENROUTER_API_KEY=${LLM_OPENROUTER_API_KEY}
       # Opt-in Bearer auth for the portfolio-shared gateway (comma-separated allowlist).
       # Empty → open access (back-compat). Must match web's CLI_PROXY_API_KEY.
